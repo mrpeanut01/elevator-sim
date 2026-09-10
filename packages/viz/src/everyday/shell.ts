@@ -89,7 +89,12 @@ import {
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
 import type { EverydayMode, EverydayScreen, EverydayState, RunContext } from './types.js';
-import { EVERYDAY_ROOT, EVERYDAY_ROOT_CLASS } from './types.js';
+import {
+  EVERYDAY_ROOT,
+  EVERYDAY_ROOT_CLASS,
+  EVERYDAY_SCREEN_REGION_ID,
+  SHELL_SKIP_LABEL,
+} from './types.js';
 
 /**
  * What the shell actually hands a screen's `mount` — the registry's contract plus the one seam
@@ -499,7 +504,43 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   const signInNotice = el(doc, 'div', 'everyday-signin');
   signInNotice.setAttribute('role', 'status');
 
-  const screenRegion = el(doc, 'div', 'everyday-screen');
+  /**
+   * **The screen region is a `main` landmark, and it is in the tab order** — `docs/36` `AX-15` and
+   * the `scrollable-region-focusable` finding, GitHub issue #404.
+   *
+   * Three writes, and each closes something that was measured rather than suspected.
+   *
+   * `main` rather than `div`: § 5.3's second half — *"The Everyday main region is a `div`, so there
+   * is also no `main` landmark to skip to."* The document now holds two `main` elements — this one
+   * and `index.html`'s `<main class="stagecol">` on the Engineer surface — and never two that are
+   * *exposed*: whichever world does not have the page is covered, {@link setCoveredInert} writing
+   * `inert` on the Engineer side and {@link setEverydayCovered} writing `inert` **and**
+   * `aria-hidden="true"` on this one. Measured on the shipped bundle rather than reasoned about:
+   * with Everyday Mode holding the page, `main.stagecol`'s nearest `[inert]` is `div.shell` and
+   * `main.everyday-screen` has neither.
+   *
+   * That is **not** left to axe. `landmark-one-main` is classified `best-practice` and therefore
+   * outside `accessibilitySweep.browser.test.ts`'s WCAG tag set, so no rule in the gate would notice
+   * a second exposed `main`. `everyday/keyboardJourneys.browser.test.ts` asserts it directly, on the
+   * page — and that assertion was watched failing on a shell that exposed a second one.
+   *
+   * An `id`, because {@link skipLink} has to be able to name it, and the two halves of a fragment
+   * that disagree are a link that goes nowhere. It is `types.ts`'s constant so there is one.
+   *
+   * `tabindex="0"`, which is the one that costs something and is worth saying plainly: it puts a new
+   * stop in the Tab order of all twenty screens. That is exactly the price
+   * `accessibilitySweep.browser.test.ts`'s register named — *"the remedy … puts a new stop in the
+   * Tab order of all twenty, which is `docs/36` `AX-9` and `AX-10` work and needs the written
+   * keyboard journeys § 5.2 specifies before anybody moves focus order"* — and those journeys are
+   * `everyday/keyboardJourneys.browser.test.ts`, landed on this commit. What it buys is SC 2.1.1 on
+   * a region that scrolls: on a screen whose content holds no focusable element (Endless rush and
+   * the tutorial's second screen were the two measured), a reader who does not point could not
+   * scroll it at all. The stop it adds is at the **top of the content**, which is where the skip
+   * link wants to land anyway, so the two changes are one change.
+   */
+  const screenRegion = el(doc, 'main', 'everyday-screen');
+  screenRegion.id = EVERYDAY_SCREEN_REGION_ID;
+  screenRegion.tabIndex = 0;
   /**
    * The region's own inset, which is a **share of the width** at phone widths rather than a
    * constant — GitHub issue #240.
@@ -545,8 +586,76 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   const BAR_NARROW = BAR_SKIN + ';flex-wrap:wrap;padding:8px 12px';
   bar.style.cssText = BAR_SKIN;
 
+  /**
+   * **The way past the rail** — `docs/36` `AX-15`, `UX.md` KB-01, GitHub issue #404.
+   *
+   * An `<a href="#…">` rather than a button, because that is the shape a screen-reader user goes
+   * looking for and it is the shape axe's own `skip-link` rule is written against: the target must
+   * exist and be focusable, which {@link screenRegion} now is.
+   *
+   * **It calls `preventDefault` and moves focus itself**, which is worth a sentence because it looks
+   * like belt and braces and is not. The fragment is not inert state in this product:
+   * `dev/main.ts#redeemLinkFromHash` reads `location.hash` for a mailed sign-in token, and § 3.5
+   * forbids the shell writing anything a reload could mistake for an entry-screen override. Letting
+   * the browser navigate would leave `#everyday-screen-region` in the address bar for the rest of
+   * the session, for no gain — the default action's only job is to move focus, and this does that
+   * directly.
+   *
+   * `position:absolute` inside a `position:fixed` root, so it takes no grid track and cannot disturb
+   * § 3.1's three rows. Hidden until it has focus and a full control while it has it — see the next
+   * block for what *hidden* has to mean here and why the obvious shape was wrong. The swap is a
+   * pair of listeners rather than a `:focus` rule because this shell has no stylesheet to put one
+   * in, which is the same reason every other box here carries `cssText`.
+   */
+  const skipLink = el(doc, 'a', 'everyday-skip', SHELL_SKIP_LABEL);
+  skipLink.href = `#${EVERYDAY_SCREEN_REGION_ID}`;
+  /**
+   * **Hidden the `.sr-only` way and not at `left:-9999px`, and that is a measured correction.**
+   *
+   * The off-screen idiom was the first shape this link took, and
+   * `everyday/viewportGates.browser.test.ts` reported it — correctly — as a control **drawn and out
+   * of reach**, in six cases across two files. That file's clause 3 asks *what could a gesture do*,
+   * and a full-size box at `left:-9999px` is a real box the viewport does not contain and no scroll
+   * a person can perform will bring back. It is only reachable by <kbd>Tab</kbd>, which is the one
+   * gesture that instrument deliberately does not count.
+   *
+   * A 1 px clipped box is the shape that file's own docstring names as the floor: `index.html`'s
+   * `.sr-only` is *"a box deliberately removed from the visual layout and left in the accessibility
+   * tree"*, and `MIN_DRAWN_PX` exists so that *drawn* means drawn. So the link is inside the
+   * viewport, one pixel of it, until it takes focus — at which point it becomes the full control at
+   * the top-left corner, where every skip link a player has met before it sits.
+   *
+   * Worth saying rather than fixing silently: the guard was right and the first draft was wrong. A
+   * skip link at `left:-9999px` is genuinely a control outside the page.
+   */
+  const SKIP_COMMON = [
+    'position:absolute',
+    'z-index:3',
+    'text-decoration:none',
+  ].join(';');
+  const SKIP_AWAY =
+    SKIP_COMMON +
+    ';left:0;top:0;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden' +
+    ';clip:rect(0 0 0 0);white-space:nowrap;border:0';
+  const SKIP_SHOWN =
+    SKIP_COMMON +
+    `;left:8px;top:8px;background:${C.card};color:${C.ink};padding:8px 12px` +
+    `;border:1px solid ${C.ink};border-radius:${String(R.row)}px;font-size:13px;font-weight:600`;
+  skipLink.style.cssText = SKIP_AWAY;
+  skipLink.addEventListener('focus', () => {
+    skipLink.style.cssText = SKIP_SHOWN;
+  });
+  skipLink.addEventListener('blur', () => {
+    skipLink.style.cssText = SKIP_AWAY;
+  });
+  skipLink.addEventListener('click', (event) => {
+    event.preventDefault();
+    screenRegion.focus();
+  });
+
   main.append(signInNotice, screenRegion, bar);
-  root.append(narrowHeader, rail, main, railScrim);
+  /* The skip link is first, or it is not a skip link — `UX.md` KB-01's *first tab stop*. */
+  root.append(skipLink, narrowHeader, rail, main, railScrim);
 
   doc.body.append(root);
 

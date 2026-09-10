@@ -192,6 +192,7 @@ import {
   ENGINEER_RETURN_TITLE,
   EVERYDAY_SCREENS,
   RUN_CONTEXTS,
+  SHELL_SKIP_LABEL,
 } from '../everyday/types.js';
 import { scenarioHubViewOf } from '../everyday/scenarioModel.js';
 import {
@@ -7756,6 +7757,8 @@ const EVERYDAY_MENU: SurfaceAdapter = {
   covers: [
     'everyday/modes.ts#EVERYDAY_MODES',
     'everyday/rail.ts#RAIL_DRAWER_COPY',
+    /* The shell's skip link, GitHub issue #404 — chrome the shell draws and does not author. */
+    'everyday/types.ts#SHELL_SKIP_LABEL',
     'everyday/rail.ts#sublineFor',
     'everyday/rail.ts#railGroups',
     'everyday/rail.ts#railFooter',
@@ -7881,6 +7884,16 @@ const EVERYDAY_MENU: SurfaceAdapter = {
      */
     seeds.push({ field: 'rail.drawer.open', text: RAIL_DRAWER_COPY.open, role: 'label' });
     seeds.push({ field: 'rail.drawer.close', text: RAIL_DRAWER_COPY.close, role: 'label' });
+
+    /*
+     * The shell's skip link — `docs/36` AX-15, GitHub issue #404.
+     *
+     * Here for the same reason as the two lines above it: the mount that draws it is excluded from
+     * this corpus on the DOM mounts' shared ground, so a word authored inline would be a word the
+     * sweep cannot read. It is the **first** thing a keyboard reader meets on every screen, which
+     * makes it exactly the kind of chrome string this adapter exists to hold accountable.
+     */
+    seeds.push({ field: 'shell.skip.label', text: SHELL_SKIP_LABEL, role: 'label' });
 
     /*
      * § 3.2's footer, once — it does not vary by campaign shape.

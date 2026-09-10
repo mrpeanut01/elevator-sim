@@ -188,6 +188,48 @@ export interface EverydayState {
 export const EVERYDAY_ROOT: EverydayScreen = 'menu';
 
 /* -------------------------------------------------------------------------- *
+ * The way past the rail — `docs/36` AX-15, GitHub issue #404
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The words on the shell's skip link, and the measurement that says why it exists.**
+ *
+ * `docs/36` § 5.3 states the defect in two halves and neither existed: *"The Everyday rail is
+ * 212 px at every width and sits before the screen region in DOM order, so a keyboard reader
+ * traverses it on every screen. The product has exactly one skip link and it is in the Engineer
+ * markup, targeting `#stage`. The Everyday main region is a `div`, so there is also no `main`
+ * landmark to skip to."* Both halves were re-derived on the shipped bundle before this constant was
+ * written rather than taken from the document: `a.skip[href="#stage"]` is inside the covered
+ * Engineer subtree and therefore `inert` while Everyday Mode has the page, so it is not even a tab
+ * stop; and the region was `div.everyday-screen`, with no `role`, no `id` and no `tabindex`.
+ *
+ * **What it cost, measured by pressing <kbd>Tab</kbd> on the artifact and reading
+ * `document.activeElement`.** From a cold load, the first control inside the screen region sat
+ * **nine presses** deep, behind the rail's Main-menu row, its five destination rows, Settings and
+ * the Engineer swap — on *every* screen, because the rail is redrawn by every navigation. Reaching
+ * a mode tile from the front door took **ten to twelve**. That is `AX-15`'s *repeated chrome*
+ * stated as a number rather than as a worry.
+ *
+ * **Declared here rather than in `shell.ts` for this module's standing reason**, which the
+ * {@link ENGINEER_SWAP_NOTE} block below states at length: a player-facing word authored inside the
+ * mount is a word `honesty/surfaces.ts` cannot read without a document. `EVERYDAY_MENU` seeds it
+ * beside `rail.ts#RAIL_DRAWER_COPY`'s two, which are here for exactly the same reason.
+ *
+ * It names the **screen** rather than the building. Engineer's link says *Skip to the building*
+ * because it targets one canvas; this one targets whatever screen the player is on, and seventeen
+ * of the twenty are not a building.
+ */
+export const SHELL_SKIP_LABEL = 'Skip to this screen';
+
+/**
+ * The id the link targets, and the shell's screen region wears.
+ *
+ * One constant because a fragment and its target that disagree is a link that goes nowhere, and the
+ * only thing that would notice is a player who does not point.
+ */
+export const EVERYDAY_SCREEN_REGION_ID = 'everyday-screen-region';
+
+/* -------------------------------------------------------------------------- *
  * The door between the two worlds — GAMEPLAY § 3.2's footer row, and its return
  * -------------------------------------------------------------------------- */
 

@@ -397,38 +397,96 @@ Engineer surface, driven, and its own docstring says so.
 So keyboard coverage is not partial on the Everyday side. It is **zero**, and `AX-10` starts from
 nothing.
 
+**That was true when it was written on 2026-09-04 and stopped being true on 2026-09-10**, which is
+worth marking rather than editing over: the zero is what made `AX-10` a build rather than an audit,
+and a section headed *where the zero is* that quietly stopped saying zero would lose the reason the
+work happened. GitHub issue #404 built `packages/viz/src/everyday/keyboardJourneys.browser.test.ts`
+— one driven journey per mode, key presses only, each ending on that mode's own result — so the
+Everyday side now has coverage of exactly the thing § 5.2 defines. Read the scope precisely: three
+completed journeys and the `AX-15` route, **not** all seventeen of `UX.md`'s `KB-` rows and not
+every one of the twenty screens. What is zero, still, is `UX.md` mentioning Everyday Mode at all.
+
 ### 5.2 What a journey is, so that #239 can drive one
 
 A clause reading *every mode is completable using the keyboard alone* is unusable until *completable*
 means something a test can decide. This document defines it, and this is the definition #239's sweep
 should be written against.
 
+**Driven since 2026-09-10, and this section had gone stale before it was.** GitHub issue #404 built
+the journeys — `packages/viz/src/everyday/keyboardJourneys.browser.test.ts`, one per mode, driving
+real key presses through the shipped bundle to each mode's own result — and found the paragraph
+below it wrong. The correction is kept in view rather than edited away, because it is this
+repository's signature defect on the page that defines the instrument: **the mode list under
+*One journey per mode* named four modes that no longer exist**, transcribed rather than derived, and
+nothing read the sentence. The four were retired by the product owner's 2026-09-06 re-declaration
+([`38-what-the-game-is.md`](38-what-the-game-is.md), [`39-decisions-in-force.md`](39-decisions-in-force.md),
+[§ D525](../DECISIONS.md)–[§ D527](../DECISIONS.md)) and this page went on naming them for four
+days. The list is corrected below **and** derived in the test, so the next re-declaration is a
+failing case rather than a stale sentence.
+
 **A keyboard journey is written down before it is driven, and it names four things.**
 
 1. **The start state**, as a screen key from `everyday/screens.ts#SCREEN_NAMES` plus the run context
-   from `everyday/types.ts#RUN_CONTEXTS`. There are seventeen screen keys and four contexts, so a
-   journey that says *the stage* has not said which of four stages.
+   from `everyday/types.ts#RUN_CONTEXTS`. There are **twenty** screen keys and **five** contexts —
+   this clause said *seventeen* and *four* when it was written, and both had moved by the time
+   anybody drove a journey — so a journey that says *the stage* has not said which of five stages.
+   Every journey in the shipped set starts at `menu` / `daily`, which is where a cold load lands.
 2. **The acts**, as keystrokes and nothing else. No `page.click`, no direct focus call, no helper
    that reaches into the shell. If the journey needs a helper the player does not have, the journey
    has proved the opposite of what it set out to.
-3. **The end state**, as an observable the mode itself defines: a scored day for Today's tower, a
-   judged stage for Campaign, a closed case for Fix a building, a completed rush for Endless rush.
+3. **The end state**, as an observable the mode itself defines: a scored day for Scenario — its hub's
+   *Today's scenario* entry, which is where the retired *Today's tower* screen now lives — a judged
+   day for Career, read off the desk's own month card rather than off the report screen, and a
+   completed rush on its own result sheet for Rush. *A closed case for Fix a building* was a fourth
+   end state on this list and is not deleted so much as re-homed: the fix cases are Scenario's other
+   hub entry, so a second Scenario journey may end there, and one mode still means one journey.
 4. **What the player can read at every step**, which is `AX-1` and `AX-16` arriving inside the
    journey rather than beside it. A mode completable by a sighted keyboard user and opaque to a
    non-visual one has passed half a clause.
 
-**One journey per mode**, and the modes are `everyday/modes.ts#EVERYDAY_MODES`: Today's tower,
-Campaign, Endless rush, Fix a building. Deriving the list from that array rather than writing four
-names is the same discipline `honesty/surfaces.ts` applies to `RUN_CONTEXTS`, and for the same
-reason: a fifth mode should become a fifth missing journey, loudly.
+**One journey per mode**, and the modes are `everyday/modes.ts#EVERYDAY_MODES` — **three** of them
+today: **Scenario**, **Career**, **Rush**. Naming them here is a convenience for a reader and is
+**not** how the journeys are enumerated: `keyboardJourneys.browser.test.ts` keys its table by
+`EverydayMode['pick']` and asserts that key set equals `EVERYDAY_MODES`'s picks **in both
+directions**, so a fourth mode is a failing case and a mode that leaves the array is one too. That is
+the same discipline `honesty/surfaces.ts` applies to `RUN_CONTEXTS` and
+`everyday/accessibilitySweep.browser.test.ts` applies to `EVERYDAY_SCREENS_BUILT`, and it is the
+mechanism that would have caught the four names this section used to carry.
 
 ### 5.3 The two rows that are not journeys and still matter
 
-**`AX-15`, the way past repeated chrome.** The Everyday rail is 212 px at every width and sits before
-the screen region in DOM order, so a keyboard reader traverses it on every screen. The product has
-exactly one skip link and it is in the Engineer markup, targeting `#stage`. The Everyday main region
-is a `div`, so there is also no `main` landmark to skip to. Both halves are one small change and
-neither exists.
+**`AX-15`, the way past repeated chrome — closed 2026-09-10 by GitHub issue #404.** What stood here
+was: *"The Everyday rail is 212 px at every width and sits before the screen region in DOM order, so
+a keyboard reader traverses it on every screen. The product has exactly one skip link and it is in
+the Engineer markup, targeting `#stage`. The Everyday main region is a `div`, so there is also no
+`main` landmark to skip to. Both halves are one small change and neither exists."*
+
+Every clause of that was re-derived on the shipped bundle before it was acted on, and one of them was
+sharper than written: the Engineer skip link is not merely aimed at the wrong target, it is inside
+the covered Engineer subtree and therefore `inert` while Everyday Mode has the page, so it is **not a
+tab stop at all**. What it cost was measured by pressing <kbd>Tab</kbd> and reading
+`document.activeElement`: the first tab stop of the page was `button.everyday-rail-menu`, the first
+control inside the screen region sat nine presses deep on every screen, and a mode tile took ten to
+twelve.
+
+Both halves now exist. `everyday/types.ts#SHELL_SKIP_LABEL` is drawn by `everyday/shell.ts` as the
+first focusable element of the Everyday root, and `.everyday-screen` is a `main` carrying
+`everyday/types.ts#EVERYDAY_SCREEN_REGION_ID` and `tabindex="0"`. The document holds two `main`
+elements and never two that are exposed: the world without the page is covered — `inert` on the
+Engineer side, `inert` and `aria-hidden` on the Everyday one — which was measured on the bundle
+rather than assumed, and is asserted on the page, because `landmark-one-main` is `best-practice`
+and so sits outside § 6.2's sweep by that sweep's own § 2 item 2.
+`keyboardJourneys.browser.test.ts` drives the before-and-after rather than asserting an element
+exists: it requires the skip link to be the first thing focus reaches, one <kbd>Enter</kbd> to land
+focus in the region, and the route through the region to be strictly shorter than the route past the
+rail.
+
+**And it settled a second row.** `everyday/accessibilitySweep.browser.test.ts` had
+`scrollable-region-focusable` (SC 2.1.1) in its `OUTSTANDING` register, recorded rather than fixed
+because the remedy *"needs the written keyboard journeys § 5.2 specifies before anybody moves focus
+order."* The journeys exist, the region is in the tab order, the rule reports nothing on any of the
+twenty screens, and that register entry is deleted — by its own ghost check going red on the commit
+that fixed it.
 
 **`AX-11`, focus not obscured.** The Everyday shell pins an action bar over a fixed root. This is
 2.2's SC 2.4.11 and it is also just a defect: a focused control the player cannot see is a control
