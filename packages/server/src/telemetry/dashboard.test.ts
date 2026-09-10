@@ -29,7 +29,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { TelemetryEventRow } from '../store/store.js';
 
-import { K2_CHAIN, MIN_CELL_PEOPLE, dashboardOf, type PanelView } from './dashboard.js';
+import {
+  DASHBOARD_PANELS,
+  K2_CHAIN,
+  MIN_CELL_PEOPLE,
+  dashboardOf,
+  type PanelView,
+} from './dashboard.js';
 import { renderDashboard } from './dashboardRender.js';
 
 const MONTH_START = Date.parse('2026-04-01T00:00:00.000Z');
@@ -319,8 +325,31 @@ describe('docs/26 K2 — a chain that cannot close is refused, never drawn as a 
     expect(p2Block, 'P2 published a cell count for a panel that drew no cells').not.toMatch(
       /n = \d+ people/u,
     );
-    expect(p2Block, 'the target must still be drawn on a refused KPI panel — #250 AC2').toMatch(
-      /Target: ≥ 60\.0 % \(charter S2\)/u,
+    /*
+     * **Derived from the panel, not restated.** This asserted `≥ 60.0 %` as a literal, which made
+     * it the second statement of a number § 20.2 says belongs to the charter — and a review showed
+     * what that costs: raising `charter S2` to 70 % in the charter *and* in `DASHBOARD_PANELS`
+     * together left `dashboardSpec.test.ts` green, as AC4 requires, and turned **this** case red.
+     * A gate that reddens on the commit raising a criterion teaches exactly one lesson, and
+     * `dashboardSpec.test.ts`'s own docstring says which: *delete the gate*.
+     *
+     * So the relation and the criterion come off the panel's own target, and the value is compared
+     * numerically rather than as rendered text. What is still asserted is #250 AC2 — a refused KPI
+     * panel must **still draw its target** — which is the thing this case is for.
+     */
+    const p2Target = DASHBOARD_PANELS.find((panel) => panel.id === 'P2')?.target;
+    expect(p2Target, 'P2 is a KPI panel and must carry a target').toBeDefined();
+    const relation = p2Target?.direction === 'at-most' ? '≤' : '≥';
+    expect(p2Block, 'the target must still be drawn on a refused KPI panel — #250 AC2').toContain(
+      `Target: ${relation} `,
+    );
+    expect(p2Block, 'the target names its charter criterion').toContain(
+      `(${String(p2Target?.criterion)})`,
+    );
+    const drawnTarget = /Target: [≤≥] (\d+\.\d+) %/u.exec(p2Block)?.[1];
+    expect(Number(drawnTarget), 'the drawn target is the panel’s own declared value').toBeCloseTo(
+      (p2Target?.value ?? 0) * 100,
+      6,
     );
   });
 
