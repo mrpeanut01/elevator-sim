@@ -20,10 +20,24 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { issuedChallengeFor } from '../challenge/schedule.js';
 import { challengeScoreOf, type SeedResult } from '../challenge/submission.js';
+import {
+  boardDistributionOf,
+  MIN_LADDER_N,
+  type AxisObservation,
+} from '../leaderboard/distribution.js';
 import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js';
 import { PgliteSql } from './pglite.test-helper.js';
 import { RacingSql } from './racingSql.test-helper.js';
-import { HOUSE_DISPLAY_NAME, HOUSE_USER_ID, NoSuchUserError, SESSION_TTL_MS, Store, normaliseEmail } from './store.js';
+import {
+  BOARD_METRICS,
+  HOUSE_DISPLAY_NAME,
+  HOUSE_USER_ID,
+  NoSuchUserError,
+  SESSION_TTL_MS,
+  Store,
+  normaliseEmail,
+  type BoardMetric,
+} from './store.js';
 
 /**
  * **Every test in this file boots a whole PostgreSQL, and vitest's default gives it five seconds.**
@@ -985,5 +999,199 @@ describe('the KPI dashboard’s read', () => {
      */
     const { store } = await fixture();
     expect(store.telemetryEventsForDashboard.length).toBe(0);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The modifier set on the row and in the key — GitHub issue #371, § D526 clause 3
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Boards keyed by modifier set, and the twenty-player floor a rare set inherits.**
+ *
+ * Three claims that only a real database can settle. That the column round-trips; that two sets are
+ * two populations in `axisObservations`, which is what *keyed by* has to mean at the SQL layer; and
+ * that a rare set therefore falls under `distribution.ts#MIN_LADDER_N` **without this file naming
+ * twenty**, because a second copy of the floor is how the two come to disagree.
+ */
+describe('a run carries its modifiers onto the board — issue #371', () => {
+  const PURSE = Object.freeze([{ sinkId: 'rush-purse-top-up', steps: 2 }]);
+  const STANDARD_KEY = 'daily:2026-09-20';
+  const PURSE_KEY = 'daily:2026-09-20/rush-purse-top-up=2';
+
+  /** `n` players, each with one row on `boardKey`, each carrying `modifiers`. */
+  async function populate(
+    store: Store,
+    boardKey: string,
+    n: number,
+    modifiers: readonly { readonly sinkId: string; readonly steps: number }[] | undefined,
+    from: number,
+  ): Promise<void> {
+    for (let index = 0; index < n; index += 1) {
+      const name = `p${String(from + index)}`;
+      const created = await store.createUser({
+        email: `${name}@example.test`,
+        displayName: name,
+        displayNameChosen: true,
+      });
+      if (!created.ok) throw new Error(created.reason);
+      await store.recordEntry({
+        boardKey,
+        dataHash: modifiers === undefined ? 'standard' : 'purse',
+        userId: created.user.id,
+        run: { ...RUN, seed: String(from + index) },
+        measured: metrics(20 + index),
+        legs: 300,
+        ...(modifiers === undefined ? {} : { modifiers }),
+      });
+    }
+  }
+
+  it('reads back the set it was written with, and the empty set for a run that bought nothing', async () => {
+    const { store, ada, bo } = await fixture();
+    await store.recordEntry({
+      boardKey: PURSE_KEY,
+      dataHash: 'purse',
+      userId: ada,
+      run: RUN,
+      measured: metrics(21),
+      legs: 300,
+      modifiers: PURSE,
+    });
+    await store.recordEntry({
+      boardKey: STANDARD_KEY,
+      dataHash: 'standard',
+      userId: bo,
+      run: RUN,
+      measured: metrics(22),
+      legs: 300,
+    });
+    expect((await store.board(PURSE_KEY, 'awtS', 10))[0]?.modifiers).toEqual(PURSE);
+    /*
+     * **The empty set, not `undefined`.** A row that bought nothing is a row whose set is empty,
+     * and the board key it is on already says so — so there is no unknown to model and no reason
+     * for a renderer to withhold. `NULL` in the column and `[]` here are the same answer.
+     */
+    expect((await store.board(STANDARD_KEY, 'awtS', 10))[0]?.modifiers).toEqual([]);
+  });
+
+  it('does not collapse a purse run and a standard run of one configuration into one row', async () => {
+    /*
+     * `entries`' natural key is `(board_key, data_hash, user_id, seed)`, and a personal log is one
+     * key for everything a player posts. So the modifier set has to be in the **hash** or these two
+     * upsert over each other and the player's own log can hold only one of them —
+     * `boardKey.ts#runDataHashOf` is where that happens, and this is that decision seen from the
+     * table.
+     */
+    const { store, ada } = await fixture();
+    for (const [dataHash, modifiers] of [
+      ['standard', undefined],
+      ['purse', PURSE],
+    ] as const) {
+      await store.recordEntry({
+        boardKey: `personal:${ada}`,
+        dataHash,
+        userId: ada,
+        run: RUN,
+        measured: metrics(21),
+        legs: 300,
+        ...(modifiers === undefined ? {} : { modifiers }),
+      });
+    }
+    /*
+     * **Counted on the board rather than listed from it, and the first draft got that wrong.**
+     * `Store.board` is `DISTINCT ON (user_id, baseline_profile_id)` — best per player — so a
+     * personal log *lists* one row for one player however many it holds. That is pre-existing and
+     * is not this issue's business; the claim here is that the table keeps both rows rather than
+     * upserting one over the other, and `Store.boards` is the count that says so.
+     */
+    const log = (await store.boards()).find((row) => row.boardKey === `personal:${ada}`);
+    expect(log?.entries).toBe(2);
+  });
+
+  it('counts a modifier set’s board as its own population, and the standard board as its own', async () => {
+    /*
+     * **The positive control for the whole issue, and the boundary is deliberate.** Nineteen
+     * players on the purse board and five on the standard one: 19 is one short of the floor and
+     * 19 + 5 = 24 is comfortably over it. So a build that keyed boards *without* the modifier set
+     * would pool them into one population of twenty-four and publish a ladder over runs that did
+     * not start from the same purse. Keyed properly, the purse board has nineteen observations and
+     * the standard board five, and neither reaches the floor.
+     *
+     * The numbers are chosen against the value the defect would really have. Nineteen and one, or
+     * five and five, would have left both boards under the floor either way and the case would have
+     * passed on a build with no keying at all.
+     */
+    const { store } = await fixture();
+    await populate(store, PURSE_KEY, 19, PURSE, 100);
+    await populate(store, STANDARD_KEY, 5, undefined, 200);
+    expect(await store.axisObservations(PURSE_KEY, 'awtS')).toHaveLength(19);
+    expect(await store.axisObservations(STANDARD_KEY, 'awtS')).toHaveLength(5);
+    // And the mixture a key without the axis would have produced is not reachable: no key holds
+    // both populations.
+    for (const key of [PURSE_KEY, STANDARD_KEY]) {
+      const rows = await store.board(key, 'awtS', 100);
+      expect(new Set(rows.map((row) => JSON.stringify(row.modifiers))).size).toBe(1);
+    }
+  });
+
+  it('shows a rare modifier set no ladder, on the floor distribution.ts owns — § D506', async () => {
+    /*
+     * § D526 clause 3: *a modifier-set board inherits § D506's twenty-player floor, so a rare
+     * modifier set shows no ladder.* Inherited rather than restated — the floor is read from
+     * `MIN_LADDER_N` here, so a change to it moves this case rather than leaving it asserting a
+     * number the server no longer uses.
+     *
+     * Driven at the boundary and one either side of it: `MIN_LADDER_N - 1` withholds and
+     * `MIN_LADDER_N` publishes. An off-by-one in the comparison passes a 1-versus-100 case.
+     */
+    const { store } = await fixture();
+    await populate(store, PURSE_KEY, MIN_LADDER_N - 1, PURSE, 300);
+    const byAxis = new Map<BoardMetric, readonly AxisObservation[]>();
+    for (const metric of BOARD_METRICS) {
+      byAxis.set(metric, await store.axisObservations(PURSE_KEY, metric));
+    }
+    const rare = boardDistributionOf(PURSE_KEY, byAxis);
+    expect(rare.n).toBe(MIN_LADDER_N - 1);
+    expect(rare.withheld).toBeDefined();
+    expect(rare.ladders.every((ladder) => ladder.rungs === undefined)).toBe(true);
+
+    // One more player and the same board publishes, so the withholding above is the floor rather
+    // than something else about a modifier-set board.
+    await populate(store, PURSE_KEY, 1, PURSE, 400);
+    const byAxisNow = new Map<BoardMetric, readonly AxisObservation[]>();
+    for (const metric of BOARD_METRICS) {
+      byAxisNow.set(metric, await store.axisObservations(PURSE_KEY, metric));
+    }
+    const common = boardDistributionOf(PURSE_KEY, byAxisNow);
+    expect(common.n).toBe(MIN_LADDER_N);
+    expect(common.withheld).toBeUndefined();
+    expect(common.ladders.every((ladder) => ladder.rungs !== undefined)).toBe(true);
+  });
+
+  it('resets with the day, because a modifier board’s key carries the date — § D509', async () => {
+    // § D509 clause 1: nothing is deleted and yesterday's rows stay under yesterday's key. Two
+    // dates with one modifier set are two boards, exactly as two dates with none are.
+    const { store, ada, bo } = await fixture();
+    await store.recordEntry({
+      boardKey: 'daily:2026-09-20/rush-purse-top-up=2',
+      dataHash: 'purse',
+      userId: ada,
+      run: RUN,
+      measured: metrics(21),
+      legs: 300,
+      modifiers: PURSE,
+    });
+    await store.recordEntry({
+      boardKey: 'daily:2026-09-21/rush-purse-top-up=2',
+      dataHash: 'purse',
+      userId: bo,
+      run: RUN,
+      measured: metrics(22),
+      legs: 300,
+      modifiers: PURSE,
+    });
+    expect(await store.board('daily:2026-09-20/rush-purse-top-up=2', 'awtS', 10)).toHaveLength(1);
+    expect(await store.board('daily:2026-09-21/rush-purse-top-up=2', 'awtS', 10)).toHaveLength(1);
   });
 });

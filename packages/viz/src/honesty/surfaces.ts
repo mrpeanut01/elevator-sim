@@ -10593,11 +10593,22 @@ function placeholderBoardEntry(
   legs: number | null = 312,
   /** The house's dispatcher on a seeded baseline row — GitHub issue #222, § D521. */
   baselineProfileId: string | undefined = undefined,
+  /**
+   * What the run was played with — GitHub issue #371, § D526 clause 3. `undefined` is a standard
+   * run, which is what every row above this one is and what almost every real row will be.
+   *
+   * The names here are `data/chime-ledger.json`'s own, because that is what the server sends off
+   * the table it loads. **The prices are deliberately not here and there is no field for one**: the
+   * board may name the modifier and never the spend, and the sweep is what says so about the drawn
+   * strings rather than about the type.
+   */
+  modifiers: readonly { readonly sinkId: string; readonly steps: number; readonly name: string }[] | undefined = undefined,
 ): BoardEntry {
   return {
     id: `row-${displayName}${baselineProfileId === undefined ? '' : `-${baselineProfileId}`}`,
     displayName,
     ...(baselineProfileId === undefined ? {} : { baselineProfileId }),
+    ...(modifiers === undefined ? {} : { modifiers }),
     run: {
       buildingId: 'midtown-office',
       dispatcherProfileId: 'eta',
@@ -11012,6 +11023,53 @@ const GAUNTLET: SurfaceAdapter = {
           rows: [placeholderBoardEntry('A. Turing', 21.4), placeholderBoardEntry('G. Hopper', 29.5)],
         },
       ],
+      /*
+       * A modifier set's own board — GitHub issue #371, § D526 clause 3. Every row carries the same
+       * set, which is what keying by it means, so this state sweeps the set note, the multi-step
+       * form and the single-step one.
+       */
+      [
+        'modifiers',
+        {
+          kind: 'board',
+          date: '2026-09-02',
+          note: BOARD_NOTE,
+          distribution: undefined,
+          distributionDetail: undefined,
+          rows: [
+            placeholderBoardEntry('A. Turing', 21.4, 312, undefined, [
+              { sinkId: 'rush-purse-top-up', steps: 2, name: 'Start with a bigger purse' },
+            ]),
+            placeholderBoardEntry('G. Hopper', 29.5, 312, undefined, [
+              { sinkId: 'rush-purse-top-up', steps: 2, name: 'Start with a bigger purse' },
+            ]),
+          ],
+        },
+      ],
+      /*
+       * **A board whose rows disagree about their set — the state a correct key cannot produce.**
+       * Seeded because the sentence it draws is a *disclosure of a defect*, and a disclosure nobody
+       * sweeps is § D227's stale refusal waiting to happen: if the mixed note ever stops being true
+       * of the mixture, this case says so. It is also the only place the two-modifier row form is
+       * drawn.
+       */
+      [
+        'modifiersMixed',
+        {
+          kind: 'board',
+          date: '2026-09-02',
+          note: BOARD_NOTE,
+          distribution: undefined,
+          distributionDetail: undefined,
+          rows: [
+            placeholderBoardEntry('A. Turing', 21.4, 312, undefined, [
+              { sinkId: 'rush-prefit', steps: 1, name: 'Start with the building fitted' },
+              { sinkId: 'rush-purse-top-up', steps: 3, name: 'Start with a bigger purse' },
+            ]),
+            placeholderBoardEntry('G. Hopper', 29.5),
+          ],
+        },
+      ],
     ];
     /*
      * The challenge tab, in all five of its states — GitHub issue #221. Every one, on the daily
@@ -11096,6 +11154,24 @@ const GAUNTLET: SurfaceAdapter = {
         seeds.push({ field: `board.daily.${state}.row${String(index)}.driver`, text: row.driver, role: 'label' });
         if (row.gap !== '') {
           seeds.push({ field: `board.daily.${state}.row${String(index)}.gap`, text: row.gap, role: 'observation' });
+        }
+        /*
+         * What the run was played with — GitHub issue #371, § D526 clause 3. `label` rather than
+         * `observation`: it names a configuration the run had, not a quantity the run produced, so
+         * R13 has no denominator to want. The `×2` in it is a step count and is why that
+         * distinction had to be made deliberately — a digit beside a name is exactly the shape R3
+         * reads, and this one is licensed because it is not a measurement.
+         *
+         * Skipped on a standard row, because the empty set draws nothing and `singleRun` would drop
+         * an empty string anyway; seeding it as a field would claim the row said something it did
+         * not.
+         */
+        if (row.modifiers !== '') {
+          seeds.push({
+            field: `board.daily.${state}.row${String(index)}.modifiers`,
+            text: row.modifiers,
+            role: 'label',
+          });
         }
         /*
          * Two roles, and which one applies is the row's own answer rather than the adapter's

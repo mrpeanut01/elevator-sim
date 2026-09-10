@@ -164,6 +164,19 @@ Three rows carry an argument rather than a preference:
   convenience: both gates used to answer with the incident answer's reason whatever kind was
   refused, and the day a second kind was refused that became a refusal naming the wrong ground.
 
+  **The modifier set is beside this row rather than in it, and the distinction is § D526 clause 3's
+  own.** That clause asks for two things and they land in different places. *Boards keyed by
+  modifier set* is the server's, and it ships:
+  `packages/server/src/leaderboard/boardKey.ts#placeSubmission` puts the set in the daily key and
+  `#runDataHashOf` in the measurement identity, both through one `canonicalModifierSet`. *A run
+  carries its modifier set in its identity* is this row's, and **it is not owed yet, because there
+  is nothing to carry**: a modifier is bought against an account and checked against its ledger, and
+  no field of `ViewerState` holds one — so `scope/runIdentity.ts` has no field to answer about and
+  an entry in `SCOPE_OF` for a field that does not exist would be the dead seam this repository has
+  shipped eleven times. It is owed on the commit that gives a modifier a run to reach, which is
+  GitHub issue #372 (the rush purse). Written here rather than left implied, because an obligation
+  that is not yet due and an obligation nobody noticed look identical from a distance.
+
 ---
 
 ## 4. The rules

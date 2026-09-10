@@ -156,7 +156,10 @@ const HOUSE_EMAIL = 'house@elevator-sim.invalid';
 /** One accepted score. The **server's** metrics; a claim is never persisted (§ D214 § 3). */
 export interface EntryRow {
   readonly id: string;
-  /** Which board — `daily:YYYY-MM-DD` or `personal:<user id>`. `boardKey.ts#placeSubmission`. */
+  /**
+   * Which board — `daily:YYYY-MM-DD`, `daily:YYYY-MM-DD/<set>` or `personal:<user id>`.
+   * `boardKey.ts#placeSubmission`.
+   */
   readonly boardKey: string;
   /** What data it was measured against — `boardKey.ts#runDataHashOf`. Never a board key. */
   readonly dataHash: string;
@@ -203,6 +206,22 @@ export interface EntryRow {
    * because the ladder's `n` is *players who posted* and the house is not one.
    */
   readonly baselineProfileId: string | undefined;
+  /**
+   * The modifier set this run was played with — GitHub issue #371, § D526 clause 3, `docs/38`
+   * § 2.3's *"a run carries its modifiers onto the board"*.
+   *
+   * Canonical (`boardKey.ts#canonicalModifierSet`) and empty on a standard run, which is every run
+   * this product shipped before the chime ledger and every run a player posts without having
+   * bought anything. **Empty rather than `undefined`**, because *nothing was bought* is an answer
+   * and a row that could not distinguish it from *we do not know* would have to withhold; the board
+   * key already records the same fact, so there is nothing to be unsure about.
+   *
+   * **The sink and the steps, never the price.** § D526 clause 3 forbids a currency figure in a
+   * comparison between players and a board row is one; `ChimeSink.priceChimes` is on the server and
+   * does not travel. `api.test.ts` asserts the absence over the wire body rather than over this
+   * type, because a type cannot stop a `JSON.stringify` of the sink.
+   */
+  readonly modifiers: readonly { readonly sinkId: string; readonly steps: number }[];
 }
 
 /**
@@ -772,10 +791,20 @@ export class Store {
     readonly legs: number;
     /** {@link EntryRow.baselineProfileId}. Only `leaderboard/seed.ts` sets it, and only for {@link HOUSE_USER_ID}. */
     readonly baselineProfileId?: string | undefined;
+    /**
+     * {@link EntryRow.modifiers} — the canonical set, already checked against the account's
+     * ledger by `http/api.ts`. Absent is the standard set.
+     *
+     * **This store does not canonicalise it and deliberately does not.** `boardKey.ts` is the one
+     * derivation; a second sort or a second sum here would be the second consumer that quietly
+     * disagrees with the board key it was written beside.
+     */
+    readonly modifiers?: readonly { readonly sinkId: string; readonly steps: number }[] | undefined;
   }): Promise<EntryRow> {
     const user = await this.userById(input.userId);
     if (user === undefined) throw new NoSuchUserError('recordEntry');
 
+    const modifiers = input.modifiers ?? [];
     const draft = {
       boardKey: input.boardKey,
       dataHash: input.dataHash,
@@ -786,6 +815,7 @@ export class Store {
       legs: input.legs,
       submittedAtMs: this.#now(),
       baselineProfileId: input.baselineProfileId,
+      modifiers,
     };
     // Guarded, because the `userById` above is a check-then-act and `deleteUser` is what made its
     // second half reachable. See {@link NoSuchUserError}.
@@ -793,12 +823,13 @@ export class Store {
     try {
       written = await this.#sql.query(
         'INSERT INTO entries (id, board_key, data_hash, user_id, seed, run_json, awt_s, wt95_s, ' +
-          'ttd_mean_s, pct_over_long_wait, legs, submitted_at_ms, baseline_profile_id) ' +
-          'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ' +
+          'ttd_mean_s, pct_over_long_wait, legs, submitted_at_ms, baseline_profile_id, modifiers_json) ' +
+          'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ' +
           'ON CONFLICT (board_key, data_hash, user_id, seed) DO UPDATE SET run_json = excluded.run_json, ' +
           'awt_s = excluded.awt_s, wt95_s = excluded.wt95_s, ttd_mean_s = excluded.ttd_mean_s, ' +
           'pct_over_long_wait = excluded.pct_over_long_wait, legs = excluded.legs, ' +
-          'submitted_at_ms = excluded.submitted_at_ms, baseline_profile_id = excluded.baseline_profile_id ' +
+          'submitted_at_ms = excluded.submitted_at_ms, baseline_profile_id = excluded.baseline_profile_id, ' +
+          'modifiers_json = excluded.modifiers_json ' +
           'RETURNING id',
         [
           randomUUID(),
@@ -814,6 +845,9 @@ export class Store {
           draft.legs,
           draft.submittedAtMs,
           draft.baselineProfileId ?? null,
+          // The empty set is `NULL` rather than `'[]'`, so a standard run written today is
+          // byte-identical in this column to one written before it existed.
+          modifiers.length === 0 ? null : JSON.stringify(modifiers),
         ],
       );
     } catch (error) {
@@ -1483,6 +1517,16 @@ function entryOf(row: Record<string, unknown>): EntryRow {
     // dangerous of those because it looks like an answer. Measured against this driver rather than
     // assumed — a column the table does not have comes back with the key missing, not as `null`.
     legs: row['legs'] === null || row['legs'] === undefined ? undefined : Number(row['legs']),
+    /*
+     * `NULL`, a missing column and `'[]'` are all the standard set — GitHub issue #371. Unlike
+     * `legs` above there is no third state to preserve: a row written before migration 5 was
+     * placed by a `placeSubmission` that appended no modifier suffix, so its board key already
+     * says it carried none, and the empty set is that fact rather than a backfilled guess.
+     */
+    modifiers:
+      typeof row['modifiers_json'] === 'string'
+        ? (JSON.parse(row['modifiers_json']) as readonly { readonly sinkId: string; readonly steps: number }[])
+        : [],
     submittedAtMs: Number(row['submitted_at_ms']),
   });
 }
@@ -1563,6 +1607,15 @@ CREATE TABLE IF NOT EXISTS entries (
   -- board keeps one best row per (player, baseline dispatcher), and the distribution counts players
   -- only. Nullable and indexed by nothing; added by migration 2 to a database that predates it.
   baseline_profile_id TEXT,
+  -- The modifier set this run was played with, canonical JSON, or NULL for the standard set --
+  -- GitHub issue #371, section D526 clause 3. What the ROW shows; the board_key above is what
+  -- decides who it ranks beside, and leaderboard/boardKey.ts derives both from one function so the
+  -- two cannot disagree. NEVER a price: a sink's priceChimes stays on the server, because a
+  -- currency figure in a comparison between players is what clause 3 forbids.
+  -- Nullable, and NULL is an answer rather than an absence: a standard run is the empty set, and
+  -- every row written before this column was on a board key with no modifier suffix, which is the
+  -- same fact said by the key.
+  modifiers_json      TEXT,
   submitted_at_ms     BIGINT NOT NULL,
   UNIQUE (board_key, data_hash, user_id, seed)
 );
@@ -1826,6 +1879,23 @@ const MIGRATIONS: readonly Migration[] = Object.freeze([
       '  UNIQUE (user_id, seq)\n' +
       ');\n' +
       'CREATE INDEX IF NOT EXISTS chime_entries_account ON chime_entries (user_id, seq);',
+  }),
+  /*
+   * GitHub issue #371, § D526 clause 3: the modifier set a row was played with, so a board row can
+   * show it. Migration 1's shape and for its reason — a database created today has the column from
+   * migration 0 and this does nothing.
+   *
+   * **Nullable, and nothing is backfilled, and here that costs nothing at all.** Every row written
+   * before this column was posted through a `placeSubmission` that produced no modifier suffix, so
+   * every one of them is on a standard board key and the empty set is not a guess about them but
+   * the fact their own key already records. That is a stronger position than migration 1's, where
+   * `legs` genuinely could not be recovered — and it is why `entryOf` reads a missing column and a
+   * `NULL` as the same answer rather than as an unknown.
+   */
+  Object.freeze({
+    version: 5,
+    name: 'entries.modifiers_json, null on every row played with the standard set',
+    sql: 'ALTER TABLE entries ADD COLUMN IF NOT EXISTS modifiers_json TEXT;',
   }),
 ]);
 

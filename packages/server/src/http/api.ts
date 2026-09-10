@@ -62,7 +62,12 @@
 
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 
-import { CHIME_COMPLETIONS, type ChimeCompletion, type ChimeLedgerTable } from '@elevator-sim/core';
+import {
+  CHIME_COMPLETIONS,
+  type ChimeCompletion,
+  type ChimeLedgerTable,
+  chimeSinkById,
+} from '@elevator-sim/core';
 
 import {
   LOGIN_TTL_MS,
@@ -1022,9 +1027,15 @@ async function submit(
    * says which board; the data hash says what the row was measured against. The board is decided
    * against **this server's** fixture on **this server's** clock, so a client cannot choose which
    * leaderboard it lands on any more than it can choose which challenge is open (§ D218 § 3).
+   *
+   * **Both take `claimed`, and both take it *after* the ledger check above** — GitHub issue #371,
+   * § D526 clause 3. The order is the whole guarantee: a modifier nobody paid for cannot reach a
+   * board key, so a player cannot post themselves onto a rarer board by naming a purse they do not
+   * have. `boardKey.ts#canonicalModifierSet` is applied inside both, so this route holds the raw
+   * claim list and never a second normalisation of it.
    */
-  const placement = placeSubmission(submission.run, user.id, dailyFixtureAt(deps.now()));
-  const dataHash = runDataHashOf(submission.run, facts);
+  const placement = placeSubmission(submission.run, user.id, dailyFixtureAt(deps.now()), claimed);
+  const dataHash = runDataHashOf(submission.run, facts, claimed);
   let entry: EntryRow;
   try {
     entry = await deps.store.recordEntry({
@@ -1036,6 +1047,9 @@ async function submit(
       measured: verification.measured,
       // And the count behind the mean, which no client ever sends — `EntryRow.legs`.
       legs: verification.legs,
+      // The canonical set the placement was computed from, so the row and its board key say the
+      // same thing by construction rather than by two callers agreeing.
+      modifiers: placement.modifiers,
     });
   } catch (error) {
     if (error instanceof NoSuchUserError) return accountVanished();
@@ -1050,7 +1064,7 @@ async function submit(
    */
   return {
     status: 201,
-    body: { boardKey: placement.key, placement: placement.kind, entry: publicEntry(entry) },
+    body: { boardKey: placement.key, placement: placement.kind, entry: publicEntry(deps, entry) },
   };
 }
 
@@ -1244,7 +1258,7 @@ async function board(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
       // Said on the wire, not only in a docstring. A client that ranked on one column and drew the
       // others would otherwise have no way to say which one the order came from.
       note: 'Ranked on the named metric alone. The others are shown beside it and never combined.',
-      entries: entries.map((entry) => publicEntry(entry)),
+      entries: entries.map((entry) => publicEntry(deps, entry)),
     },
   };
 }
@@ -1837,13 +1851,45 @@ function timingSafeEqualStrings(a: string, b: string): boolean {
   return timingSafeEqual(left, right);
 }
 
-function publicEntry(entry: EntryRow): Record<string, unknown> {
+/**
+ * A row's modifier set as it goes on the wire — **the sink, the steps, and the sink's own name.**
+ *
+ * GitHub issue #371, § D526 clause 3, `docs/38` § 2.3: *a run carries its modifiers onto the
+ * board*. Three fields and a deliberate fourth absence.
+ *
+ * **The name travels rather than the client mapping the id**, on `baselineProfileId`'s argument one
+ * field over: `data/chime-ledger.json` is loaded here and nowhere in `packages/viz`, so a client
+ * that drew *"Start with a bigger purse"* would be a second authority for what a sink is called,
+ * and the two would disagree on the day the table is edited. A sink this server does not ship falls
+ * back to its id, which is what `dailyBoardViewOf` already does for a dispatcher.
+ *
+ * **`priceChimes` is not here and may not be.** It is on `ChimeSink` two fields from `name`, which
+ * is exactly why this function names the fields it wants instead of spreading the sink: § D526
+ * clause 3 forbids a currency figure in a comparison between players, and a board row is the
+ * comparison. `api.test.ts` asserts the absence against a walk of the real body, with the spread
+ * as its positive control.
+ */
+function publicModifiers(
+  deps: ApiDeps,
+  modifiers: EntryRow['modifiers'],
+): readonly Record<string, unknown>[] {
+  return modifiers.map((modifier) => ({
+    sinkId: modifier.sinkId,
+    steps: modifier.steps,
+    name: chimeSinkById(deps.chimeLedger, modifier.sinkId)?.name ?? modifier.sinkId,
+  }));
+}
+
+function publicEntry(deps: ApiDeps, entry: EntryRow): Record<string, unknown> {
   return {
     id: entry.id,
     displayName: entry.displayName,
     run: entry.run,
     dataHash: entry.dataHash,
     measured: entry.measured,
+    // Absent on a standard run — every row this product wrote before the chime ledger — so a
+    // standard board's body is byte-identical to the one it served before this field existed.
+    ...(entry.modifiers.length === 0 ? {} : { modifiers: publicModifiers(deps, entry.modifiers) }),
     // The house's dispatcher on a baseline row, absent on a player's — GitHub issue #222, § D521.
     // On the wire so the client can draw the marker and the note rather than inferring either from
     // a display name, which a player could choose.

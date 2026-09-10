@@ -52,7 +52,52 @@
  * The rating itself already exists client-side in `packages/viz/src/gauntlet/rating.ts` and posts
  * nowhere — `gauntlet/ladder.ts#LADDER_WORLD_ABSENCE` is the labelled unavailable state § 12.2 asks
  * for in the meantime, and it stays correct until that route is built.
+ *
+ * ## The fourth axis, and why it is not the forbidden key coming back — GitHub issue #371
+ *
+ * [§ D526](../../../../DECISIONS.md) clause 3 and `docs/38` § 2.3: *a run played with a bought
+ * modifier carries the modifier on its board row, keyed by modifier set*, and *the standard board
+ * is the standard purse and the building as shipped, the same for everyone*. So the daily key is
+ * the date **and the modifier set**, which reads at first like the digest this module exists to
+ * have removed. Three things separate them, and each is asserted rather than argued:
+ *
+ * 1. **The space is enumerable and small, not combinatorial.** The forbidden key was building ×
+ *    dispatcher × template × rate × length — five continuous or open axes whose product is
+ *    unbounded, so every selection minted a board. A modifier set is a subset of
+ *    `data/chime-ledger.json`'s sinks, each capped at its own `maxSteps`; the shipped table has
+ *    three sinks at 3, 3 and 1 step, so the whole space is 4 × 4 × 2 = 32 keys a day and
+ *    `boardKey.test.ts` computes that bound from the table rather than asserting the number.
+ * 2. **Nothing a player *selects* enters it.** A modifier reaches a submission only by having been
+ *    bought — `http/api.ts` refuses a claim `chimes/ledger.ts#unbackedModifiers` cannot back
+ *    before anything simulates — so the axis is a fact about what the account paid for rather than
+ *    a control on a screen. That is the exact distinction § 12.1's sentence draws.
+ * 3. **A rare set shows no ladder rather than a leaderboard of one.** § D506's twenty-player floor
+ *    is inherited by construction: a different key is a different population in
+ *    `store.ts#axisObservations`, and `distribution.ts#MIN_LADDER_N` withholds. The floor is read
+ *    from that one module and is not restated here — a second copy of twenty is how the two come
+ *    to disagree.
+ *
+ * **The standard set is the empty set and produces no suffix at all**, so `daily:2026-09-01` is
+ * still `daily:2026-09-01`: every row a database already holds stays on the board it was posted to,
+ * and no migration backfills a key. {@link runDataHashOf} takes the same treatment — a run with no
+ * modifiers digests to the identical hex string it digested before the field existed.
+ *
+ * **What the key never carries is the spend.** § D526 clause 3 forbids a currency figure in a
+ * comparison between players, and a board key is the most durable such comparison there is. The
+ * key names the sink and the steps; `chime-ledger.json`'s `priceChimes` is on the server and
+ * reaches neither the key, the row, nor the wire.
+ *
+ * **The modifier does not yet reach the replay, and that is a seam rather than an omission.**
+ * `SubmittedRun` is what `verify.ts` re-simulates, and neither `purse-units` nor `prefit` has a
+ * field on it, because no mode that spends a purse posts yet. So a modified run today replays to
+ * the same figures a standard one would and is separated **on the board** rather than in the
+ * simulation. GitHub issue #372 is where the rush purse reaches the run; when it does, the purse
+ * becomes part of `SubmittedRun` and this axis starts separating runs that really are different.
+ * Until then the separation is the honest one: the account paid for something, and the board says
+ * which runs were played by accounts that did.
  */
+
+import type { ClaimedModifier } from '../chimes/ledger.js';
 
 import { digestOf, type ResolvedDataFacts, type SubmittedRun } from './submission.js';
 
@@ -77,18 +122,31 @@ export interface BoardKeyRow {
  * § 12.1's three keys, transcribed.
  *
  * ```
- * daily board key  = date                      // one board a day, everybody on it
+ * daily board key  = date × modifier set       // one board a day per set; standard is the default
  * ladder key       = dispatcher id             // scored as a mean over the fixed 40 cases
  * personal log     = anything else
  * ```
+ *
+ * The first line is § 12.1's `date` **as amended by § D526 clause 3**; the other two are the
+ * contract's unchanged.
  *
  * `boardKey.test.ts` asserts both directions: every row with a `route` is produced by
  * {@link placeSubmission} on some submission, and the row with no `route` is produced by none.
  */
 export const BOARD_KEYS: readonly BoardKeyRow[] = Object.freeze([
   Object.freeze({
-    key: 'date',
-    board: 'the daily board — one board a day, everybody on it, on the fixture the server issues',
+    /*
+     * **§ 12.1 says `date`; § D526 clause 3 says `date × modifier set`, and this row is the second
+     * one.** The transcription is amended rather than left standing beside a key that no longer
+     * matches it — a table describing a key the code does not produce is § D227's stale refusal in
+     * a data structure, and `boardKey.test.ts` reads this string. The standard set appends nothing,
+     * so the amendment is invisible to every run that carries no modifier, which is what makes it an
+     * axis on the daily key rather than a fourth key.
+     */
+    key: 'date × modifier set',
+    board:
+      'the daily board — one board a day for each modifier set, everybody with that set on it, on ' +
+      'the fixture the server issues; the standard set is the board everyone starts on',
     route: 'placeSubmission, when the run is dailyFixtureAt(now)’s own axes at its own seed',
   }),
   Object.freeze({
@@ -102,6 +160,65 @@ export const BOARD_KEYS: readonly BoardKeyRow[] = Object.freeze([
     route: 'placeSubmission, for every run that is not the day’s fixture',
   }),
 ]);
+
+/* -------------------------------------------------------------------------- *
+ * The modifier set — one derivation, three consumers
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A modifier set in the one form anything here may compare: summed by sink, sorted, nothing empty.
+ *
+ * The *set*, not the list of purchases that produced it. Two claims of one sink at one step and one
+ * claim of it at two are the same run configuration, and `chimes/ledger.ts#unbackedModifiers`
+ * already decides the account's entitlement that way in as many words — *"a budget bought in two
+ * steps and a budget bought in one are the same budget"*. A key that told them apart would put two
+ * players who played identically on two boards, which is the fragmentation this module exists to
+ * refuse, arriving through the shape of a list instead of through an axis.
+ */
+export type ModifierSet = readonly ClaimedModifier[];
+
+/** The standard set: the standard purse and the building as shipped, the same for everyone. */
+export const STANDARD_MODIFIER_SET: ModifierSet = Object.freeze([]);
+
+/**
+ * The canonical form of a claim list — the **one derivation** {@link modifierSetKeyOf},
+ * {@link placeSubmission} and {@link runDataHashOf} all read.
+ *
+ * Sums by sink, drops anything at or below zero steps, sorts by sink id. Three consumers with three
+ * sorts is how a board key and a data hash come to disagree about whether two runs are the same
+ * run, so there is one function and the test drives all three through it.
+ *
+ * A claim above a sink's `maxSteps` never arrives here: `http/api.ts` refuses it against the ledger
+ * before the placement is computed. This function is deliberately not a second enforcement of that
+ * bound — a cap checked in two places is a cap that can be raised in one.
+ */
+export function canonicalModifierSet(claimed: ModifierSet | undefined): ModifierSet {
+  if (claimed === undefined || claimed.length === 0) return STANDARD_MODIFIER_SET;
+  const steps = new Map<string, number>();
+  for (const claim of claimed) {
+    steps.set(claim.sinkId, (steps.get(claim.sinkId) ?? 0) + claim.steps);
+  }
+  return Object.freeze(
+    [...steps.entries()]
+      .filter(([, total]) => total > 0)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([sinkId, total]) => Object.freeze({ sinkId, steps: total })),
+  );
+}
+
+/**
+ * The modifier set as the string a board key carries — `''` for the standard set.
+ *
+ * `sinkId=steps`, joined with `+`, in the canonical order. The empty string for the standard set is
+ * load-bearing rather than a convenience: {@link placeSubmission} appends nothing for it, so the
+ * standard board's key is the date alone, byte-identical to the key every row already in a
+ * database was written under.
+ */
+export function modifierSetKeyOf(claimed: ModifierSet | undefined): string {
+  return canonicalModifierSet(claimed)
+    .map((entry) => `${entry.sinkId}=${String(entry.steps)}`)
+    .join('+');
+}
 
 /* -------------------------------------------------------------------------- *
  * The day's fixture
@@ -203,15 +320,22 @@ export function dailyFixtureAt(nowMs: number): DailyFixture {
 export type BoardPlacement =
   | {
       readonly kind: 'daily';
-      /** `daily:YYYY-MM-DD`. The date and nothing else — § 12.1. */
+      /**
+       * `daily:YYYY-MM-DD` on the standard board, `daily:YYYY-MM-DD/<set>` on a modifier set's —
+       * § 12.1's date, and § D526 clause 3's axis. The standard set appends nothing.
+       */
       readonly key: string;
       readonly date: string;
+      /** The set this board is, canonical. Empty on the standard board. */
+      readonly modifiers: ModifierSet;
     }
   | {
       readonly kind: 'personal';
       /** `personal:<user id>`. One log per player, whatever they ran. */
       readonly key: string;
       readonly userId: string;
+      /** The set this run was played with, canonical. Empty on a standard run. */
+      readonly modifiers: ModifierSet;
     };
 
 /**
@@ -249,16 +373,38 @@ export function isDailyFixtureRun(run: SubmittedRun, fixture: DailyFixture): boo
  * The dispatcher is in neither key. On the daily board that is the point: it is the axis being
  * compared. In the personal log it is unnecessary: the log is one player's, and
  * {@link runDataHashOf} already tells one configuration's rows from another's inside it.
+ *
+ * ## The modifier set enters one of the two keys, and the asymmetry is the decision
+ *
+ * **The daily key takes it** (§ D526 clause 3): a board is a comparison between players, and a
+ * player who bought a wider purse is not playing the same game as one who did not. **The personal
+ * key does not**, and adding it there would be the fragmentation defect with the polarity
+ * reversed — a personal log is *one player's own record*, and splitting it by what they had bought
+ * that week would give one player several logs and a record in none of them. The separation the log
+ * needs is between rows rather than between logs, and it has it: {@link runDataHashOf} carries the
+ * set, so a purse run and a standard run of one configuration at one seed are two rows.
+ *
+ * Since the standard set appends nothing, every existing daily key is unchanged and the two-outcome
+ * shape above is unchanged: a modified run that is the day's fixture goes on that day's board *for
+ * its set*, and everything else is still the player's own log.
  */
 export function placeSubmission(
   run: SubmittedRun,
   userId: string,
   fixture: DailyFixture,
+  claimedModifiers: ModifierSet | undefined = undefined,
 ): BoardPlacement {
+  const modifiers = canonicalModifierSet(claimedModifiers);
   if (isDailyFixtureRun(run, fixture)) {
-    return Object.freeze({ kind: 'daily', key: `daily:${fixture.date}`, date: fixture.date });
+    const setKey = modifierSetKeyOf(modifiers);
+    return Object.freeze({
+      kind: 'daily',
+      key: setKey === '' ? `daily:${fixture.date}` : `daily:${fixture.date}/${setKey}`,
+      date: fixture.date,
+      modifiers,
+    });
   }
-  return Object.freeze({ kind: 'personal', key: `personal:${userId}`, userId });
+  return Object.freeze({ kind: 'personal', key: `personal:${userId}`, userId, modifiers });
 }
 
 /* -------------------------------------------------------------------------- *
@@ -281,17 +427,31 @@ export function placeSubmission(
  * ## What is spread and what is dropped, and why the distinction is load-bearing
  *
  * `canonicalJson` drops `undefined` entries. So `windowStartS ?? undefined` keeps a whole-period run
- * digesting to the string it digested before that field existed, and the two fields this wave added
- * do the same through {@link emptyToUndefined}: a run with no rules and no interventions produces
- * **the identical hex string** it produced before either could be submitted. `0` is a window and
- * `[]` is not a rule list, which is why the test is emptiness rather than falsiness.
+ * digesting to the string it digested before that field existed, and the three list fields do the
+ * same through {@link emptyToUndefined}: a run with no rules, no interventions and no modifiers
+ * produces **the identical hex string** it produced before any of them could be submitted. `0` is a
+ * window and `[]` is not a rule list, which is why the test is emptiness rather than falsiness.
  *
- * A run that *does* carry rules or a log digests differently, and that is correct — those inputs
- * moved the result, and a hash that ignored them would say two different runs were measured against
- * the same thing.
+ * A run that *does* carry rules, a log or a modifier set digests differently, and that is correct —
+ * those inputs moved the result, and a hash that ignored them would say two different runs were
+ * measured against the same thing.
  */
-export function runDataHashOf(run: SubmittedRun, facts: ResolvedDataFacts): string {
+export function runDataHashOf(
+  run: SubmittedRun,
+  facts: ResolvedDataFacts,
+  /**
+   * The set this run was played with — GitHub issue #371. Canonicalised here, so a caller that
+   * passes the raw claim list and one that passes a canonical set produce the same digest.
+   *
+   * It belongs in this value for the reason the docstring above gives about `ruleRows` and
+   * `interventions`: a modifier is an input the result depends on, and a hash that ignored it would
+   * say two runs measured against different things were measured against the same thing. The
+   * *board* key answers a different question and takes it for a different reason.
+   */
+  claimedModifiers: ModifierSet | undefined = undefined,
+): string {
   return digestOf({
+    modifiers: emptyToUndefined(canonicalModifierSet(claimedModifiers)),
     buildingId: run.buildingId,
     dispatcherProfileId: run.dispatcherProfileId,
     demandTemplateId: run.demandTemplateId,
