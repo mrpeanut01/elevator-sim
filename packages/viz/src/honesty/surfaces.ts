@@ -7410,10 +7410,34 @@ const WATCH: SurfaceAdapter = {
     'watch/library.ts#DAY_HAS_NO_RECORD',
     'watch/library.ts#refusalForDay',
     /*
-     * `recordRefusalFor` composes no prose of its own — it joins `runIdentityIssues`' sentences,
-     * which `SCOPE_REFUSALS` already sweeps — but it *is* the producer that puts them on a watching
-     * surface, and the seed above renders one through `refusalForDay` in the wording a picker row
-     * prints. Covered here rather than excluded, because the composition is the player-facing act.
+     * `recordRefusalFor` composes no prose of its own — it joins `runIdentityIssues`'
+     * sentences — and it *is* the producer that puts them on a watching surface, which is why it
+     * is covered here rather than excluded: the composition is the player-facing act.
+     *
+     * **This comment used to say `SCOPE_REFUSALS` already sweeps those sentences. There is no
+     * such adapter and there never was** — the name was written here on the commit that added
+     * this entry (`c95e17e`, 2026-08-11) and appears nowhere else in the tree. It named a
+     * mechanism that did not exist, which is the class § D227 is about, and it mattered because
+     * it read as *covered twice* when the truth is nearer the opposite.
+     *
+     * What actually holds those sentences is an **exclusion**, not an adapter.
+     * `scope/runIdentity.ts#runIdentityIssues` and `#CARRY_CHECKS` sit in `derive.test.ts`'s
+     * `NOT_PLAYER_FACING`, inheriting `dev/main.ts#provenanceLineOf`'s limitation in that file's
+     * own words — *swept statically, not driven, which is weaker and is said rather than dressed
+     * up*. (`#ANSWER_INCIDENT_STAYS_REFUSED` is not there either: #370 deleted it, and its
+     * sentence is a row on `core/src/sim/interventionWire.ts#INTERVENTION_WIRE` now.)
+     *
+     * So say what this entry buys, exactly. The seed below wraps **one** of those sentences —
+     * `runIdentity.ts:434`'s levers refusal, copied verbatim rather than called — in
+     * `refusalForDay`, so the wording a picker row prints is driven. One sentence, not the set,
+     * and it is the only one of them any adapter drives.
+     *
+     * And the narrower half, because **being in `covers` is not being swept** and this file has
+     * been caught by that before (the FIXIT adapter's as-built keys, found in `covers` and in
+     * nothing's output): no seed calls `recordRefusalFor` itself. What runs is the wrapper it
+     * shares with `refusalForDay`. Left as it stands rather than quietly widened — a seed that
+     * drove the composer over the `CARRY_CHECKS` table is the better home, and it is a change to
+     * coverage rather than to a comment.
      */
     'watch/record.ts#recordRefusalFor',
     'watch/reproduce.ts#reproductionRefusalFor',
