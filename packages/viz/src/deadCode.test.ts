@@ -246,6 +246,15 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    */
   'wrinkles/gateLibrary':
     '§ 17’s content gate, swept over a library; its consumer is gate.test.ts, which drives it',
+  /*
+   * -- `gateWrinkle` joined this entry when `gateLibrary` stopped calling it. The sweep now runs
+   * the control day once and drives a private `gateWrinkleAgainst`, so the public single-day
+   * function's only caller is `gate.test.ts` — which drives it deliberately, to prove the shared
+   * control changes no verdict. It is the same offline instrument as `gateLibrary` and carries the
+   * same exemption; it did not become dead code, it became the one-day door to a two-door tool.
+   */
+  'wrinkles/gateWrinkle':
+    '§ 17’s content gate for one day; its consumer is gate.test.ts, which drives both doors',
   'honesty/runHonestyCampaign':
     'the honesty harness’s driver; its consumer is the suite § D163 clause 2 was accepted on',
   'honesty/formatHonestyStats': 'formats the campaign tier summary for the suite that drives it',

@@ -307,6 +307,30 @@ function requestOf(input: WrinkleGateInput, demand: SimulationDemandOptions): Ba
  *   two dispatchers were given — a ranking of one arm cannot differ from anything.
  */
 export function gateWrinkle(input: WrinkleGateInput): WrinkleGateVerdict {
+  return gateWrinkleAgainst(input, runControlDay(input));
+}
+
+/**
+ * The control day for a set of inputs — the same building, seed, horizon and demand, no wrinkle.
+ *
+ * Separated so {@link gateLibrary} can run it **once** for a whole sweep instead of once per
+ * wrinkle. It is a pure function of the fields of {@link WrinkleGateInput} that are not the
+ * wrinkle, which is what makes sharing it safe rather than merely cheaper: `dayOf(input, null)`
+ * never reads `input.wrinkle`, so every wrinkle in a sweep was re-simulating a byte-identical run.
+ *
+ * The saving is half the sweep. Over the shipped library that is 38 redundant control runs of three
+ * arms × 50 replications, and it was enough to make `gate.test.ts` exceed its own per-case timeouts
+ * on a loaded machine — found when two parallel lanes hit it at once, not by reading the code.
+ */
+function runControlDay(input: WrinkleGateInput): BatchResult {
+  const controlDay = dayOf(input, null);
+  return runBatch(requestOf(input, controlDay.demand), {
+    ...input.resources,
+    building: controlDay.building,
+  });
+}
+
+function gateWrinkleAgainst(input: WrinkleGateInput, control: BatchResult): WrinkleGateVerdict {
   if (input.dispatcherProfileIds.length < 2) {
     throw new WrinkleGateError(
       'the gate ranks dispatchers, so it needs at least two; one arm cannot shuffle.',
@@ -331,14 +355,9 @@ export function gateWrinkle(input: WrinkleGateInput): WrinkleGateVerdict {
   };
 
   const candidateDay = dayOf(input, event);
-  const controlDay = dayOf(input, null);
   const candidate = runBatch(requestOf(input, candidateDay.demand), {
     ...input.resources,
     building: candidateDay.building,
-  });
-  const control = runBatch(requestOf(input, controlDay.demand), {
-    ...input.resources,
-    building: controlDay.building,
   });
 
   const candidateRanking = rankingOf(candidate);
@@ -457,5 +476,14 @@ export function gateLibrary(
   library: WrinkleLibrary,
   input: Omit<WrinkleGateInput, 'wrinkle'>,
 ): readonly WrinkleGateVerdict[] {
-  return everyWrinkle(library).map((wrinkle) => gateWrinkle({ ...input, wrinkle }));
+  const wrinkles = everyWrinkle(library);
+  const first = wrinkles[0];
+  if (first === undefined) return [];
+  /*
+   * One control run for the whole sweep — see {@link runControlDay}. Every verdict is still
+   * compared against a control, and it is the same control it would have got on its own; what is
+   * gone is thirty-seven identical re-simulations of it.
+   */
+  const control = runControlDay({ ...input, wrinkle: first });
+  return wrinkles.map((wrinkle) => gateWrinkleAgainst({ ...input, wrinkle }, control));
 }

@@ -206,6 +206,50 @@ describe('a refused load reaches the player, and keeps the bytes it promised to 
     expect(slots.get(CAREER_QUARANTINE_KEY), 'the refused save was eaten').toBe(original);
   });
 
+  it('clears both slots, and seals so the next save cannot write the career back', () => {
+    /*
+     * GitHub issue #229's criterion is not *removes the bytes* — it is *"Clear saved progress
+     * works, **including preventing the running session from rewriting the store**"*. The host
+     * holds the career in memory and saves it on the player's next action, so a `clear` that only
+     * removed would be undone before the reload it is followed by.
+     *
+     * The quarantine slot goes with it: a refused career is still a career this device kept, and
+     * the row's own words are *nothing this device kept survives*.
+     */
+    const original = JSON.stringify({ version: 99, career: openingCareer('collective') });
+    const { store, slots } = backingWith(original);
+    const career = createCareerStore(store);
+
+    career.load(); // refused on version, so the bytes move to quarantine
+    expect(slots.get(CAREER_QUARANTINE_KEY)).toBe(original);
+    career.save(openingCareer('collective'));
+    expect(slots.has(CAREER_STORAGE_KEY), 'nothing was saved to clear').toBe(true);
+
+    career.clear();
+    expect(slots.has(CAREER_STORAGE_KEY), 'the career survived the clear').toBe(false);
+    expect(slots.has(CAREER_QUARANTINE_KEY), 'the quarantined career survived the clear').toBe(
+      false,
+    );
+
+    // The seal, which is the half a removal alone does not buy.
+    career.save(openingCareer('collective'));
+    expect(
+      slots.has(CAREER_STORAGE_KEY),
+      'the running session wrote the career back after the clear — #229’s own criterion',
+    ).toBe(false);
+  });
+
+  it('clears a memory-only store too, so a denied backing is not a career that outlives it', () => {
+    // No backing is the storage-denied browser and every node test. `load` must read empty after.
+    const career = createCareerStore(undefined);
+    career.save(openingCareer('collective'));
+    expect(career.load().refusal).toBeUndefined();
+    career.clear();
+    expect(career.load().refusal).toBe('empty');
+    career.save(openingCareer('collective'));
+    expect(career.load().refusal, 'the seal does not hold without a backing').toBe('empty');
+  });
+
   it('sets nothing aside for an empty slot, which is not a refusal', () => {
     const { store, slots } = backingWith(null);
     expect(createCareerStore(store).load().refusal).toBe('empty');

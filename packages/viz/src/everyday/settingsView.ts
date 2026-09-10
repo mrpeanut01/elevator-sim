@@ -442,8 +442,23 @@ export const CLEAR_PROGRESS_COPY = Object.freeze({
   label: 'Clear saved progress',
   booting:
     'Clearing reaches the simulator’s own saved week, and the simulator is still loading — this row appears when it has.',
+  /*
+   * **The enumeration and the summary two states below must name the same set**, and for three
+   * days they did not — GitHub issue #229's follow-up.
+   *
+   * This sentence was complete when it was written on 2026-09-06: the press cleared the week and
+   * this side's own slot, and that was every byte of progress the device held. Career persistence
+   * landed on 2026-09-07 (#375) and nobody came back here, so `cleared`'s *"nothing this device
+   * kept survives"* became false against an enumeration that was merely incomplete — a summary
+   * broader than the list above it, which is the shape a reader cannot catch by reading one string.
+   *
+   * The career is named here now because the press takes it. Anything added to this list must be
+   * added to the handler in `settingsScreen.ts` in the same commit, and the two live one file
+   * apart deliberately: the words and the deletion are reviewed together or the next slot repeats
+   * this.
+   */
   ready:
-    'Forgets everything this device keeps: the week and its banked days, the saved dispatchers, buildings and patterns, the solved cases and the ratings, and the name and picture above. Press twice.',
+    'Forgets everything this device keeps: the week and its banked days, the career and the towers you hold, the saved dispatchers, buildings and patterns, the solved cases and the ratings, and the name and picture above. Press twice.',
   armed: 'Press again and it is gone. There is no undo, and nothing is sent anywhere first.',
   cleared:
     'Cleared. Nothing this device kept survives. The day on screen finishes as it stands and is not saved; the page reloads to start fresh.',
