@@ -7,7 +7,19 @@ each building and what it is designed to stress.
 
 **This table was three buildings stale**: Secure Tower, Mixed-Use High-Rise and Vertical City were
 listed as unbuilt Phase 1 deliverables long after they shipped, and nothing failed, because no test
-reads it. It is now a list of what is on disk, which is checkable by looking.
+reads it. It was then repaired into a list of what is on disk, **which was checkable by looking** —
+and *checkable by looking* is the mechanism that failed again one building later.
+`burj-class-reference.json` landed in PR #402 and appeared in neither this table nor
+[docs/04-test-buildings.md](../../docs/04-test-buildings.md), so nine shipped while both registers
+said eight, and `grep -i burj` found nothing in either. It is now **checked by a test**, which is a
+different and better claim: `packages/experiments/src/validation/buildingRegisters.test.ts` reads
+`data/buildings/*.json` off disk and asserts, in both directions, that every config has a row here
+and a section there — matched on the **config file**, never on a prose title, so a renamed heading
+cannot satisfy it.
+
+**So a new building owes three things, and two of them are documents**: the config, a row in this
+table, and a numbered section in `docs/04-test-buildings.md` saying what it is designed to stress.
+Adding the file alone turns the suite red, which is the intended way to find out.
 
 | Building | Config | Notes |
 |---|---|---|
@@ -19,6 +31,7 @@ reads it. It is now a list of what is on disk, which is checkable by looking.
 | Chancery House | [`chancery-house.json`](chancery-house.json) | Complete — the only `office-prestige` caller |
 | Crown Hotel | [`crown-hotel.json`](crown-hotel.json) | Complete — two-way demand, unlike cars |
 | St Jude Hospital | [`st-jude-hospital.json`](st-jude-hospital.json) | Complete — `hospital` profile, first shipped stair |
+| Burj-class reference tower | [`burj-class-reference.json`](burj-class-reference.json) | Complete — 165 levels, 57 cars, **reference only**: no Career contract, and the stage cannot draw it |
 
 ## Schema
 

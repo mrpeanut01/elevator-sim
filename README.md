@@ -298,7 +298,7 @@ you believe in, and each is scoped to arrive opt-in and off by default so no shi
 | [Architecture](docs/01-architecture.md) | Three-layer design, core interfaces, DES kernel, determinism strategy |
 | [Elevator Reference](docs/02-elevator-reference.md) | Elevator classes, speeds, capacities, door and motion timings |
 | [Traffic & Statistics](docs/03-traffic-and-statistics.md) | Demand profiles, RTT math, replication methodology, CRN, stopping rules |
-| [Test Buildings](docs/04-test-buildings.md) | Eight reference buildings from low-rise to supertall |
+| [Test Buildings](docs/04-test-buildings.md) | Nine reference buildings from low-rise to supertall |
 | [Roadmap](docs/05-roadmap.md) | Phased development plan, with each phase's acceptance verdict and the measurements behind it |
 | [Parameterization & Tuning](docs/06-parameterization-and-tuning.md) | How to tweak every model without recoding, and how to search for an optimum |
 | [Handoff](docs/07-handoff.md) | Current state, measured facts that bound what you may claim, known-answer tests, open debt |

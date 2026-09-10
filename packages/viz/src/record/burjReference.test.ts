@@ -190,7 +190,11 @@ describe('the Burj-class reference building — issue #376', () => {
    *
    * 1. Every one of the 27 060 pairs is reachable. On a building with three sky lobbies and four
    *    local banks that is not a given, and an unreachable pair would be a floor nobody can get to.
-   * 2. With a *pair* of escalators at each landing — which is what the reference tower has — **four
+   * 2. **28 hops** are taken across the four declared edges — 6, 8, 8 and 6 — and `docs/04` § 9
+   *    quotes that figure, so it is asserted here rather than left to a reader to re-derive. It was
+   *    published as 24 first, by arithmetic rather than by a run; the count below is what the run
+   *    says. `CLAUDE.md`: *if you publish a number, pin it to the run that produced it*.
+   * 3. With a *pair* of escalators at each landing — which is what the reference tower has — **four
    *    of the eight took zero hops**. As modelled an escalator is an undirected, uncapacitated edge,
    *    so the second of an identical pair can never be chosen. One edge per landing is declared and
    *    the finding is recorded, which is the evidence § D527 wanted before anybody adds capacity or
@@ -227,5 +231,13 @@ describe('the Burj-class reference building — issue #376', () => {
       declared.filter((id) => (hopsByMode.get(id) ?? 0) === 0),
       'a declared transport mode with zero hops is a dead field — data/buildings/README.md',
     ).toEqual([]);
+
+    /* The figure `docs/04` § 9 quotes. Pinned per mode rather than as a total, so a change that
+       moved a hop from one landing to another could not net out to the same number. */
+    expect(
+      Object.fromEntries([...hopsByMode].sort(([a], [b]) => a.localeCompare(b))),
+      'the escalator hop count docs/04 § 9 publishes has moved',
+    ).toEqual({ 'escalator-1': 6, 'escalator-2': 8, 'escalator-3': 8, 'escalator-4': 6 });
+    expect([...hopsByMode.values()].reduce((sum, n) => sum + n, 0)).toBe(28);
   });
 });
