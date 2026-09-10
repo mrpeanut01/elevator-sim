@@ -2502,8 +2502,22 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   }
 
   /**
-   * **The tutorial, reached before Scenario** — [§ D529](../../../../DECISIONS.md) clause 1,
-   * GitHub issue #380.
+   * **The first arrival — the landing page, and then the tutorial before Scenario** —
+   * [§ D529](../../../../DECISIONS.md) clause 1, GitHub issues #380 and #244.
+   *
+   * ## What #244 changed here, and what it deliberately did not
+   *
+   * It used to `go('tutorial')`. It goes to the landing page instead, on **exactly the same
+   * condition** — the walkthrough's own gate, unmoved — and the landing page's single call to
+   * action opens the walkthrough. So the sequence a first visitor meets is *what this is*, then
+   * *how it plays*, then a scenario, and § D529 clause 1 is untouched: nothing skips the
+   * walkthrough and nothing reaches Scenario ahead of it.
+   *
+   * **The gate is the tutorial's rather than a second one**, which is the half worth reading twice.
+   * A landing page with a condition of its own would be a second answer to *is this visitor new*,
+   * and the day the two disagreed one of them would be showing a stranger the wrong screen with
+   * nothing to notice. `everyday/landingScreen.ts` asks `tutorialIsDue` too, for the same reason
+   * and from the same counts.
    *
    * Here rather than in the initial state, because the answer is a function of the week and the
    * week arrives with the host. The condition is
@@ -2533,7 +2547,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       solvedCases: progress.solvedCaseIds.length,
       ratings: progress.ratings.length,
     });
-    if (due) go('tutorial');
+    if (due) go('landing');
   }
 
   /* ---------------------------------------------------------------- *

@@ -431,6 +431,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * asks `dev/offThreadRuns.ts` for the shipped `fixit/run.ts` pair — and a run is not a
          * string this corpus can read.
          */
+        /*
+         * GitHub issue #244's landing page, on the mounts' shared ground and the strongest case of
+         * it in this group: it draws into the shell's scroll region, it holds a `<canvas>`, and it
+         * asks a worker for a run — three things that need a document between them.
+         *
+         * **Every word it draws is `everyday/landingView.ts`'s**, which the `EVERYDAY_LANDING`
+         * adapter drives over all six states the page distinguishes — the block pending, playing
+         * and unavailable, each for a visitor who has played nothing and one who has. What this
+         * mount authors of its own is geometry, class names and **the run**: a building, a
+         * dispatcher, a seed and five minutes of demand. A run is not a string this corpus can
+         * read, which is `everyday/tutorialScreens.ts#mountWorkedAnswer`'s position exactly, and
+         * it is recorded here for the same reason.
+         */
+        'everyday/landingScreen.ts#LANDING_SCREEN',
         'everyday/tutorialScreens.ts#TUTORIAL_SCREEN',
         'everyday/tutorialScreens.ts#COLLAPSE_SCREEN',
         'everyday/tutorialScreens.ts#mountWorkedAnswer',

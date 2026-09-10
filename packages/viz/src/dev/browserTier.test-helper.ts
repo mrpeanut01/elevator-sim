@@ -511,8 +511,21 @@ export async function openEverydayRail(page: Page): Promise<void> {
  * Idempotent, so a caller may run it twice, and a no-op on a visit that is not a first one.
  */
 export async function leaveTutorialIfOffered(page: Page): Promise<void> {
-  await page.waitForSelector('.everyday-tutorial, .everyday-mode[data-screen]', { timeout: 30_000 });
-  if ((await page.locator('.everyday-tutorial').count()) === 0) return;
+  /*
+   * **Two screens can be the first-visit offer now, and the outer one is the landing page** —
+   * GitHub issue #244. `offerTutorial` used to `go('tutorial')` and now goes to the landing page,
+   * on the same gate, with the landing page's own call to action opening the walkthrough. So the
+   * race this waits on has three arms rather than two, and either offered screen is left the same
+   * way: § 3.3's `leave` row, live on both, a plain `go('menu')` that runs nothing and files
+   * nothing.
+   *
+   * The name is kept. Every caller means *get me past whatever a first visit puts in front of the
+   * menu*, and renaming it across thirty-odd call sites would buy a word and cost a diff nobody
+   * can read against the change that needed it.
+   */
+  const OFFERED = '.everyday-landing, .everyday-tutorial';
+  await page.waitForSelector(`${OFFERED}, .everyday-mode[data-screen]`, { timeout: 30_000 });
+  if ((await page.locator(OFFERED).count()) === 0) return;
   await page.locator('.everyday-bar-leave').click();
   await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
 }

@@ -367,6 +367,13 @@ import { goalReport } from '../scenario/goalReport.js';
 import { goalLabel, GOAL_BLOCKER } from '../scenario/goals.js';
 import type { PublishedScenario } from '../scenario/published.js';
 import {
+  LANDING_CALL_TO_ACTION,
+  LANDING_CLAIMS,
+  LANDING_COPY,
+  LANDING_FIRST_SESSION_CALL_TO_ACTION,
+  landingViewOf,
+} from '../everyday/landingView.js';
+import {
   SURVIVOR_COPY,
   survivorSentenceFor,
   type PublishedSurvivors,
@@ -12411,6 +12418,107 @@ const SURVIVORS: SurfaceAdapter = {
 };
 
 /* -------------------------------------------------------------------------- *
+ * The landing page — GitHub issue #244
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The first screen a stranger reads, and every arm of it.**
+ *
+ * `everyday/landingView.ts` carries the words; `everyday/landingScreen.ts` is the mount and is
+ * excluded in `derive.test.ts` on the DOM mounts' shared ground — it needs a document, and the
+ * pure/DOM split in `everyday/` exists so the words are drivable without one. What that mount
+ * authors of its own is a **run**, which is not a string this corpus can read.
+ *
+ * ## Six states, crossed rather than sampled
+ *
+ * The page has two independent axes and both are swept whole: what the block above the claims is
+ * doing (`pending`, `playing`, `unavailable`) and whether the visitor has played anything yet,
+ * which decides where the one call to action goes and what it says. Sweeping one axis and fixing
+ * the other would leave three real screens unread — including the two a stranger is most likely to
+ * meet, because a page whose run has not landed yet is what everybody sees first.
+ *
+ * ## Why this page is worth sweeping even though it publishes no figure
+ *
+ * It publishes none on purpose (`landingView.ts` has the argument, and its own test fails on a
+ * digit anywhere), so R3, R13 and R6 have nothing to say about it. What does have something to say
+ * is `internal-notation` — the charter's own gate — and it applies here for a reason the other
+ * player surfaces do not carry: this is marketing copy about an engineering product, written by
+ * people who know the engineering, which is the exact circumstance under which a module name gets
+ * into a sentence meant for somebody who has never seen one. R10 is the same argument: a page
+ * arguing that the numbers can be trusted is the most tempting place in the product to hedge.
+ *
+ * Appended last, per the fault-ordering rule stated at `SHIFT_REPORT`. Obeying it costs nothing
+ * here and the reason is worth stating rather than inherited: this adapter seeds no figure, no
+ * band, no verdict and no count, so there is no wording whose fault it could take off another
+ * surface wherever it sat.
+ */
+const EVERYDAY_LANDING: SurfaceAdapter = {
+  id: 'everyday/landingView.ts#landingViewOf',
+  covers: [
+    'everyday/landingView.ts#landingViewOf',
+    'everyday/landingView.ts#LANDING_COPY',
+    'everyday/landingView.ts#LANDING_CLAIMS',
+    'everyday/landingView.ts#LANDING_CALL_TO_ACTION',
+    'everyday/landingView.ts#LANDING_FIRST_SESSION_CALL_TO_ACTION',
+  ],
+  render(this: SurfaceAdapter, context) {
+    void context;
+    const seeds: TextSeed[] = [];
+    for (const motion of ['pending', 'playing', 'unavailable'] as const) {
+      for (const firstSession of [true, false]) {
+        /*
+         * A real building's name rather than a placeholder: the caption is composed from the run's
+         * own tower, so seeding it with something that is not one would sweep a sentence no player
+         * can produce.
+         */
+        const view = landingViewOf({ motion, buildingName: 'Midtown Office', firstSession });
+        const arm = `${motion}.${firstSession ? 'first' : 'returning'}`;
+        seeds.push({ field: `landing.${arm}.eyebrow`, text: view.eyebrow, role: 'label' });
+        seeds.push({ field: `landing.${arm}.headline`, text: view.headline, role: 'prose' });
+        seeds.push({ field: `landing.${arm}.lede`, text: view.lede, role: 'prose' });
+        seeds.push({ field: `landing.${arm}.motion.eyebrow`, text: view.motion.eyebrow, role: 'label' });
+        /*
+         * `reason` rather than `prose` on the block's note: in two of its three arms it is a
+         * statement about what the surface may be believed about — the run has not arrived, or it
+         * could not start — which is R3's cue-rule reading rather than description.
+         */
+        seeds.push({ field: `landing.${arm}.motion.note`, text: view.motion.note, role: 'reason' });
+        seeds.push({ field: `landing.${arm}.hook`, text: view.hook, role: 'prose' });
+        seeds.push({ field: `landing.${arm}.claimsHeading`, text: view.claimsHeading, role: 'prose' });
+        for (const claim of view.claims) {
+          seeds.push({ field: `landing.${arm}.claim.${claim.id}`, text: claim.claim, role: 'prose' });
+          seeds.push({
+            field: `landing.${arm}.claim.${claim.id}.because`,
+            text: claim.because,
+            role: 'reason',
+          });
+        }
+        seeds.push({ field: `landing.${arm}.cta.label`, text: view.callToAction.label, role: 'label' });
+        seeds.push({ field: `landing.${arm}.cta.note`, text: view.callToAction.note, role: 'prose' });
+        seeds.push({ field: `landing.${arm}.closing`, text: view.closing, role: 'prose' });
+      }
+    }
+
+    /*
+     * The four copy tables are reached through the view above, which is the point of the split —
+     * but `covers` claims each of them by name, and a claim is worth what it is checked against.
+     * Touching them here makes the claim true in the direction `derive.test.ts` cannot see: if the
+     * view ever stopped reading one, this reference is what still compiles while the seeded strings
+     * above quietly stop appearing. `landingView.test.ts` is the other direction, and it is the
+     * stronger one — it fails when a declared entry is drawn by no arm at all.
+     */
+    void [
+      LANDING_COPY,
+      LANDING_CLAIMS,
+      LANDING_CALL_TO_ACTION,
+      LANDING_FIRST_SESSION_CALL_TO_ACTION,
+    ].length;
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/* -------------------------------------------------------------------------- *
  * The consent ask and its settings row — `docs/26` §§ 4 and 15.2
  * -------------------------------------------------------------------------- */
 
@@ -12684,6 +12792,12 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * exist to carry them.
    */
   SURVIVORS,
+  /*
+   * And the landing page — GitHub issue #244. Appended last in turn. It seeds no figure at all,
+   * by construction rather than by luck: the page publishes no number, so there is no rate-shaped
+   * wording whose fault it could take off a surface that exists to carry one.
+   */
+  EVERYDAY_LANDING,
 ]);
 
 /* -------------------------------------------------------------------------- *

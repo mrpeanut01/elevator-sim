@@ -60,6 +60,7 @@ import { DESIGNER_SCREEN } from './designerScreen.js';
 import { DOOR_SCREEN } from './doorScreen.js';
 import { SCENARIO_SCREEN } from './scenarioScreen.js';
 import { COLLAPSE_SCREEN, TUTORIAL_SCREEN } from './tutorialScreens.js';
+import { LANDING_SCREEN } from './landingScreen.js';
 import { FIXIT_SCREEN } from './fixitScreen.js';
 import type { EverydayHost } from './host.js';
 import { REPORT_SCREEN } from './reportScreen.js';
@@ -121,6 +122,11 @@ const SCREEN_MODULES: Readonly<Partial<Record<EverydayScreen, EverydayScreenModu
     // {@link EVERYDAY_SCREENS_BUILT} derives anyway — the table is a filter over the inventory, so
     // a row's position here decides nothing and matching the inventory keeps the two readable
     // side by side.
+    /*
+     * GitHub issue #244's landing page. First, because it sits ahead of everything else: it is what
+     * a visitor arriving from a link meets, and the row order here follows the inventory's.
+     */
+    landing: LANDING_SCREEN,
     /*
      * § D529's tutorial (GitHub issue #380). Two rows, ahead of `scenario` because the tutorial
      * sits before it — the registry is a filter over the inventory and matches its order.
@@ -284,6 +290,7 @@ export function unbuiltReasonFor(screen: EverydayScreen): string {
  */
 export const SCREEN_NAMES: Readonly<Record<EverydayScreen, string>> = Object.freeze({
   menu: 'Main menu',
+  landing: 'What this is',
   tutorial: 'How this works',
   collapse: 'Watch it come apart',
   scenario: 'Scenario',

@@ -938,7 +938,7 @@ verdict:
   the Day report and the live-metrics panel became mode-aware for GitHub issues #110 and #100, and
   both adapters now render **both** registers on every case, which is where the always-on tier's
   string count moved to 278 756. A null is a measurement of a tree, not a property of the axis)*,
-  **39 statically swept DOM entry points** are not driven *(**19** mounts and **20**
+  **40 statically swept DOM entry points** are not driven *(**19** mounts and **21**
   screen-registry rows, derived by `packages/viz/src/honesty/derive.test.ts` rather than
   transcribed, and published in this verdict as three until [§ D421](DECISIONS.md) measured it —
   the screen rows' pure halves **are** driven, so what goes unswept in both groups is only what the
@@ -1036,6 +1036,27 @@ keep being checked rather than a rule that can be deleted.
 Everyday main menu whichever world the player was in, because a remembered world is the entry-screen
 override the guide forbids wearing `localStorage`. The rail's row says so on its own face
 (`types.ts#ENGINEER_SWAP_NOTE`), which is where a reader will meet it.
+
+**A first arrival meets a landing page, and it is one `go` in the shell rather than a second rule
+about entry screens** (GitHub issue #244). `everyday/shell.ts#offerTutorial` used to send a visitor
+who has played nothing to the two-screen walkthrough; it sends them to `everyday/landingScreen.ts`
+instead, **on exactly the same gate**, and that page's single call to action opens the walkthrough.
+So § D529 clause 1 is untouched — nothing skips the walkthrough and nothing reaches Scenario ahead
+of it — and § 3.5 is untouched too, because the gate is re-derived from the week on every load and
+nothing is stored. A returning player still lands on the mode picker.
+
+Three things about that page are worth knowing before you touch it. **Its one button changes what it
+says as well as where it goes** — *show me how it plays* into the walkthrough, *play a scenario*
+afterwards — because a button promising a scenario and opening a walkthrough would be a small lie on
+the one screen the page exists to be trusted on, and `landingView.test.ts` fails when the two labels
+converge. **It publishes no figure at all**, deliberately and mechanically: a digit anywhere in a
+drawn string fails that same file, because the honesty search checks whether a figure is *licensed*
+and nothing in this repository checks whether one is *current*. And **the block that shows the game
+in motion is a real run** — one pinned morning at Midtown Office, simulated in a worker and played
+back on the stage's own painter over a window that skips the empty lobby at the start and the
+draining tail at the end. Measured on the built bundle at 1440 × 900: **370 ms from navigation to a
+moving canvas**, of which 240 ms is the page drawn. There is no video and no decorative animation,
+for the reason a picture of a run would be the one curated thing in the product.
 
 **The viewer is now built to a design handoff, and the handoff is canonical for the interface.**
 *Elevator Sim Reimagined* is vendored at [`docs/design/`](docs/design/); the requirements extracted

@@ -232,6 +232,13 @@ export function sublineFor(state: EverydayState): string {
     case 'menu':
       return 'YOU ARE HERE';
     /*
+     * GitHub issue #244's landing page. Bare words for the same reason the two arms below carry
+     * them: the run this page plays is its own block's, not the shell's transport, so there is no
+     * live detail to append.
+     */
+    case 'landing':
+      return 'WHAT THIS IS';
+    /*
      * § D529's two-screen tutorial (GitHub issue #380). Bare words, like every other arm; there is
      * no live detail to append, because the tutorial's own runs are not the shell's transport.
      */
@@ -328,6 +335,14 @@ export function railGroups(
   groups.push({
     title: 'WORLD',
     items: Object.freeze([
+      /*
+       * GitHub issue #244's landing page, on the rail because a screen reachable only through the
+       * first-arrival offer is a screen nobody can get back to. It is also what makes the page's
+       * *returning player* arm reachable at all — its call to action opens the walkthrough on a
+       * first visit and Scenario afterwards, and the second of those is only ever drawn for
+       * somebody who came back here on purpose.
+       */
+      item('landing', 'What this is'),
       item('week', 'Your week'),
       /*
        * One entry, not two — the guide's own correction. `board` covers today's board and the

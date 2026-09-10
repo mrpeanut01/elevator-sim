@@ -45,9 +45,10 @@
  * guide's number — a docstring that asserted "sixteen" over a seventeen-entry array would be this
  * repository's signature defect in one line.
  *
- * **Twenty today**, and every addition past the seventeen carries a ruling beside it: `scenario`
- * is [§ D525](../../../../DECISIONS.md)'s first tile (GitHub issue #364), and `tutorial` and
- * `collapse` are [§ D529](../../../../DECISIONS.md)'s two-screen tutorial (#380). The count is
+ * **Twenty-one today**, and every addition past the seventeen carries a ruling beside it:
+ * `scenario` is [§ D525](../../../../DECISIONS.md)'s first tile (GitHub issue #364), `tutorial` and
+ * `collapse` are [§ D529](../../../../DECISIONS.md)'s two-screen tutorial (#380), and `landing` is
+ * GitHub issue #244's landing page, whose own entry below carries why it is a screen. The count is
  * stated rather than left to be inferred for the reason the paragraph above exists: a number in a
  * docstring that has stopped matching the array under it is this repository's signature defect,
  * and the same sentence has now been wrong once and corrected twice.
@@ -60,6 +61,19 @@
  */
 export const EVERYDAY_SCREENS = [
   'menu',
+  /*
+   * The landing page (GitHub issue #244), listed straight after the root because it sits **before**
+   * it: a visitor arriving from a link meets this and then the menu, where a returning player meets
+   * the menu directly.
+   *
+   * **Three keys past § 4's seventeen now, and this one carries the same argument the two below
+   * it do.** § D489 ruled that sign-in was *"the missing state of an already-specified surface, not
+   * an eighteenth screen"*, and that argument turned on the handoff already specifying the state.
+   * It does not reach here either: the handoff specifies no landing page at all — its § 4 inventory
+   * begins at the menu — and there is no surface for a page that comes before the front door to be
+   * a state of. That is § D529's own reasoning for the tutorial, applied one screen earlier.
+   */
+  'landing',
   /*
    * § D529's two-screen tutorial (GitHub issue #380), ahead of Scenario because that is where it
    * sits: *"The first session is a tutorial of two screens, and it sits before Scenario rather
