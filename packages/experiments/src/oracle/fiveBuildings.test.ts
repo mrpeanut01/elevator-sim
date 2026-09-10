@@ -741,10 +741,18 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
     // cars produces. `CLAUDE.md` § "A stated refusal goes stale the same way" is why that is worth
     // more than the sentence above it.
     //
-    // `burj-class-reference` is the one debt left: every one of its six banks holds identical cars,
-    // so each is coverable, and GitHub issue #376's third criterion is exactly this measurement
-    // left open. Four of its six banks reduce to the closed form's scalars today; `shuttle` and
-    // `observation` throw on a zero served population.
+    // `burj-class-reference` is the one debt left, and it is a harder debt than an earlier draft of
+    // this comment said. That draft read *"every one of its six banks holds identical cars, so each
+    // is coverable … four of its six banks reduce to the closed form's scalars today"*. Measured,
+    // **all six refuse** — two on a zero served population and four on `departureGapBracket`, which
+    // is the same ground `st-jude-hospital` is refused on. `remainingBuildings.test.ts` asserts that
+    // bank by bank; the name below stays in `coverable` only in the sense that GitHub issue #376's
+    // third criterion is still the thing that owes the measurement, not in the sense that the
+    // measurement is waiting to be run.
+    //
+    // The wrong step is the one to remember: identical cars within a bank does **not** imply
+    // coverable. `st-jude-hospital` refuses on the bracket with a heterogeneous bank, so the bracket
+    // is independent of heterogeneity and uniformity cannot license the converse.
     const coverable = ['burj-class-reference', 'chancery-house'];
     const notCoverable = ['crown-hotel', 'st-jude-hospital'];
     expect([...coverable, ...notCoverable].sort()).toEqual(absent);

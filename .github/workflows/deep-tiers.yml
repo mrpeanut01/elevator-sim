@@ -158,7 +158,6 @@
 # | `fuzz-deep` (250 cases) | 20.5 min, **RED** — a real counterexample, issue #305 | 60 |
 # | `golden-runs` (6 of 6, cross-process) | 55.6 s, green | 90 |
 # | `oracle-campaign` (11 banks at n = 128) | 5.5 min, green | 120 |
-# | `oracle-campaign`'s second step, added later (`remainingBuildings`, Crown Hotel's counterfactual at n = 64) | 71 s green alone, 245 s under six concurrent lanes — measured on a developer machine and not this runner | shares the 120 above |
 # | `matrix-census` (200 replications) | 17.0 min, **RED** — three declared figures do not reproduce, issue #306 | 120 |
 # | `perf-sweep` (20 000 replications, workers) | 4.6 min, green — **on an already-built tree; this job had none, and see below** | 180 |
 # | `perf-scaling` (the wall-clock fits) | 26.9 s, green | 90 |
@@ -438,17 +437,6 @@ jobs:
         env:
           ELEVATOR_SIM_DEEP: '1'
         run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=1800000 src/oracle/deepCampaign.test.ts
-      # The same oracle on the three buildings the five-building table does not reach. Its
-      # always-on half runs in `ci.yml` with everything else; what needs this job is one
-      # counterfactual arm — Crown Hotel with its one unlike car made like the others — which is
-      # what attributes that building's refusal to the heterogeneity rather than to either of the
-      # other two warnings its bank raises. It costs ~75 s on its own, which is why it is here
-      # rather than always-on, and it belongs in *this* job because it is the same apparatus at the
-      # same seeds as the campaign above.
-      - name: Remaining buildings — Crown Hotel's counterfactual arm
-        env:
-          ELEVATOR_SIM_DEEP: '1'
-        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=1800000 src/oracle/remainingBuildings.test.ts
 
   # ---------------------------------------------------------------------------
   # Re-derives every declared matrix ceiling and spread at 200 replications. The numbers the

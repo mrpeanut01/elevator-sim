@@ -197,11 +197,14 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
    * file's central claim about Crown Hotel, so four and a half seconds was a bad trade and it
    * runs always-on.
    *
-   * **The `oracle-campaign` job still names the file with `ELEVATOR_SIM_DEEP=1` set.** That step
-   * is redundant rather than wrong — it re-runs a file that no longer reads the variable — and
-   * `.github/workflows/**` is a protected path, so removing it is owed to whoever can edit one.
-   * This comment is here rather than an entry because the register is of *gated* tiers, and a
-   * file that reads no gate is not one.
+   * **The `oracle-campaign` step that named the file is deleted.** It was redundant — it re-ran a
+   * file that no longer reads the variable, and whose always-on half `ci.yml` already runs. This
+   * comment previously said `.github/workflows/**` was *"a protected path, so removing it is owed
+   * to whoever can edit one"*, which was false on the branch that wrote it: the same diff was
+   * editing `deep-tiers.yml`. The step is gone rather than owed.
+   *
+   * This comment is here rather than an entry because the register is of *gated* tiers, and a file
+   * that reads no gate is not one.
    */
   'packages/experiments/src/validation/goldenRuns.test.ts': {
     gates: ['ELEVATOR_SIM_DEEP'],

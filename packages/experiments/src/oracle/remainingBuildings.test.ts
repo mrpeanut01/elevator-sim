@@ -141,10 +141,16 @@ const PEAK_WINDOW_S = 900;
  * strength of a number nobody had re-derived. Four and a half seconds does not buy that. It runs
  * always-on now.
  *
- * The `oracle-campaign` job still names this file with `ELEVATOR_SIM_DEEP=1` set. That step is now
- * redundant rather than wrong — it re-runs a file that no longer reads the variable — and
- * `.github/workflows/**` is a protected path this branch may not edit, so it is recorded here for
- * whoever can.
+ * **The `oracle-campaign` step that named this file is deleted, and the note that said it could not
+ * be is deleted with it.** This docstring read *"`.github/workflows/**` is a protected path this
+ * branch may not edit, so it is recorded here for whoever can"* — while the same branch was editing
+ * `deep-tiers.yml` two hunks away, to add the very step it was describing. A sentence claiming a
+ * limit its own diff disproves is worse than a sentence that is merely stale: it tells the next
+ * reader not to attempt something that has just been done.
+ *
+ * The step was redundant on its own terms — it re-ran a file that no longer reads the variable, and
+ * whose always-on half `ci.yml` already runs — so what is left is one job step and one runtime-table
+ * row fewer, both carrying the refuted ~75 s figure.
  *
  * **A smaller `n` was tried and rejected on evidence rather than on taste.** At 4 replications the
  * control's own assertion fails, so the read-out is not settled there; it is not a boolean that can
@@ -194,10 +200,24 @@ const REFUSED_HERE: readonly string[] = ['crown-hotel', 'st-jude-hospital'];
  *
  * `burj-class-reference` landed with GitHub issue #376 and `DECISIONS.md` § D527; four of the five
  * measurements that issue names are taken and the fifth — the Barney/CIBSE round trip per bank at
- * 10 m/s over a rise of several hundred metres — is its third criterion and is open. Four of its
- * six banks reduce to the closed form's scalars today; `shuttle` and `observation` do not, both
- * throwing on a zero served population. Absorbing that into this file would close another issue's
- * criterion inside this one, and the honest thing is to name it as owed.
+ * 10 m/s over a rise of several hundred metres — is its third criterion and is open. Absorbing that
+ * into this file would close another issue's criterion inside this one, and the honest thing is to
+ * name it as owed.
+ *
+ * **And it is owed harder than an earlier draft of this docstring said — all six banks refuse.**
+ * That draft read *"four of its six banks reduce to the closed form's scalars today; `shuttle` and
+ * `observation` do not"*. Measured over every bank at `FIRST_SEED`, none reduces: `shuttle` and
+ * `observation` throw on a zero served population, and `local-lower`, `local-zone1`, `local-zone2`
+ * and `local-zone3` all throw `departureGapBracket` — *the longest door reopen (37.00 s) is not
+ * shorter than the shortest round trip (32.83 s for `local-lower`, 29.68 s for the three zones)*.
+ * That is the same ground on which `st-jude-hospital` is REFUSED, and the case below asserts it
+ * rather than restating it.
+ *
+ * **The wrong inference is worth naming, because it is the one a reader will make again.** That
+ * draft reasoned from *internally uniform banks* to *coverable*, and this file's own
+ * `st-jude-hospital` row refutes the step: the bracket refusal is independent of heterogeneity.
+ * Whoever picks up #376's third criterion should expect to change the apparatus or the building,
+ * not to run a measurement that is waiting.
  */
 const OWED_ELSEWHERE: readonly string[] = ['burj-class-reference'];
 
@@ -339,14 +359,44 @@ describe('every shipped building is accounted for by exactly one closed-form ver
     expect(OWED_ELSEWHERE).toEqual(['burj-class-reference']);
     const burj = config.buildingsById.get('burj-class-reference');
     expect(burj).toBeDefined();
-    // And it is owed rather than impossible: its banks are internally uniform, which is the
-    // property the Barney/CIBSE derivation needs and the one `crown-hotel` and `st-jude-hospital`
-    // lack.
-    for (const bank of burj?.banks ?? []) {
-      const specs = new Set(
-        bank.cars.map((car) => `${String(car.ratedSpeedMps)}/${String(car.ratedLoadLb)}`),
-      );
-      expect(specs.size, `burj-class-reference/${bank.id}`).toBe(1);
+  });
+
+  it('is owed on a blocker this file can name, and every bank refuses today', () => {
+    /*
+     * **This case replaces one that asserted the wrong property, and the replacement is the point.**
+     *
+     * It used to walk the six banks and assert each was internally uniform — true, and green
+     * forever — under a comment saying that made the building *"owed rather than impossible"*. The
+     * assertion could not fail and the conclusion it was written to support is false: measured,
+     * none of the six reduces. A check whose stated conclusion has already been refuted is worse
+     * than no check, because it reads as evidence.
+     *
+     * The uniformity inference is refuted by a row in this very file. `st-jude-hospital` is REFUSED
+     * on `departureGapBracket` and its bank is heterogeneous — so heterogeneity is not what the
+     * bracket is about, and uniformity cannot license the opposite conclusion. Four of the six banks
+     * here are uniform *and* refuse on that same ground.
+     *
+     * So the check is now the shape `st-jude-hospital`'s is at the bottom of this file: assert the
+     * throw. It is a refusal that can be lifted — by a door timing, a rise, or an apparatus that
+     * does not need the bracket — and a refusal that could never be lifted would be decoration.
+     */
+    const burj = config.buildingsById.get('burj-class-reference');
+    expect(burj).toBeDefined();
+    const banks = burj?.banks ?? [];
+    expect(banks.length, 'the reference lost a bank; the measurement below is about six').toBe(6);
+
+    for (const bank of banks) {
+      expect(() =>
+        measureUpPeak({
+          config,
+          buildingId: 'burj-class-reference',
+          bankId: bank.id,
+          seeds: [FIRST_SEED],
+          peakWindowS: PEAK_WINDOW_S,
+        }),
+        `burj-class-reference/${bank.id} now reduces — #376's third criterion may be takeable, and ` +
+          'this docstring says it is not',
+      ).toThrow(/not shorter than|finite, positive number/i);
     }
   });
 });
@@ -513,6 +563,55 @@ describe('Crown Hotel is refused, and the refusal is a run rather than a sentenc
     const m = measurementOf('crown-hotel');
     expect(m.allSaturated).toBe(true);
     expect(m.tripCountFull).toBeGreaterThan(200);
+  });
+
+  it('publishes that figure from a bracket 85× narrower than the reconciled one', () => {
+    /*
+     * **The residual above is apparatus-dependent, and the apparatus says so here rather than
+     * leaving it for whoever re-measures.** `reconcile.ts`'s departure reconstruction argues the
+     * answer is *"insensitive to the exact value"* of the clustering threshold, and that argument
+     * holds when the threshold has room. The room is `minRoundTripS − maxReopenS`:
+     *
+     * | bank | reopen | round trip | width |
+     * |---|---|---|---|
+     * | `chancery-house/main` | 24.000 s | 29.750 s | **5.750 s** |
+     * | `crown-hotel/main` | 30.240 s | 30.308 s | **0.068 s** |
+     *
+     * Both at seed 810 000. Chancery's threshold has five and a half seconds either side; Crown's
+     * has three hundredths. `maxReopenS` is computed at the bank's *design* load, and the simulator
+     * carries more than that under this peak, so real loadings on Crown pause for longer than the
+     * threshold and are split — the reconstruction is running outside its own stated regime on the
+     * one building this file publishes a refusal for.
+     *
+     * **The verdict is unaffected and that is why this is a disclosure rather than a defect.** The
+     * residual moves with the threshold on Crown and grows rather than shrinks, so a converged
+     * threshold refuses it by more; and REFUSED is the answer either way. What would be wrong is
+     * publishing **+7.592 %** in four places as though it were threshold-independent, which is the
+     * reading the paragraph in `reconcile.ts` invites.
+     *
+     * The assertion is on the width rather than on the residual, because the width is the thing
+     * that decides whether the figure means what it appears to mean. A bracket narrowing towards
+     * zero is how this reconstruction stops working silently.
+     */
+    const crown = measurementOf('crown-hotel').bracket;
+    const chancery = measurementOf(RECONCILED_HERE).bracket;
+
+    const widthOf = (b: { minRoundTripS: number; maxReopenS: number }): number =>
+      b.minRoundTripS - b.maxReopenS;
+
+    // Both brackets are non-empty, or `measureUpPeak` would have thrown rather than measured.
+    expect(widthOf(crown)).toBeGreaterThan(0);
+    expect(widthOf(chancery)).toBeGreaterThan(0);
+
+    /*
+     * Crown's is under a tenth of a second. If this ever fails upward, the building or the door
+     * timings changed and the caveat above is the thing to re-check — not the figure alone.
+     */
+    expect(widthOf(crown)).toBeLessThan(0.1);
+    /* And Chancery's is wide, which is what makes the contrast a property of Crown rather than of
+       the apparatus. Without this line the case above would pass on a reconstruction that had
+       become narrow everywhere. */
+    expect(widthOf(chancery)).toBeGreaterThan(1);
   });
 
   it('locates the disagreement in the per-stop fixed cost, which no reconciled bank shows', () => {

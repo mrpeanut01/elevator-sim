@@ -687,8 +687,16 @@ bank deliberately (§ D213 § 3, to avoid making every ward a transfer floor). *
 three warnings on Crown Hotel causes its residual is measured, not argued**: a counterfactual arm
 gives the one unlike car its neighbours' specification, holds the floors, populations, express zone,
 traffic profile and seeds fixed, and the uncited per-stop term falls from **4.50 s to 0.021 s** with
-`explained` flipping to true. That arm costs ~75 s on its own and is opt-in under
-`ELEVATOR_SIM_DEEP=1`, on `deepCampaign.test.ts`'s rule that a budget is moved rather than reduced.
+`explained` flipping to true. **That arm is always-on and costs about five seconds**, and this
+paragraph said otherwise for one commit: it read *"costs ~75 s on its own and is opt-in under
+`ELEVATOR_SIM_DEEP=1`"*, on a figure nobody had re-derived. Re-measured, the two arms cost **5.20 s
+and 5.26 s** — a ratio of 1.01 — and the whole file goes 13.70 s → 18.4 s with the arm switched on.
+The gate is removed and the redundant `oracle-campaign` step that named the file is deleted.
+
+That correction matters here rather than in a changelog, because this document is the resume brief:
+a reader told the arm was deep-tier-only and expensive will not re-run the **only** evidence
+licensing the Crown Hotel attribution on a change that could move it, and an integrator sizing the
+scheduled job would budget 120 s for a 5 s arm.
 
 **One is still owed, and it is harder than an earlier draft of this paragraph said.**
 `burj-class-reference`'s closed-form measurement is GitHub issue #376's third criterion, left there
