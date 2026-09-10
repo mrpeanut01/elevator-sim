@@ -71,7 +71,7 @@ import type { ProofCaseSet } from '../gauntlet/proofCases.js';
 import { RATING_BASIS } from '../gauntlet/rating.js';
 import { runGauntlet, type GauntletHandle, type GauntletWorker } from '../gauntlet/run.js';
 
-import { DAILY_BOARD_METRIC, type EverydayDailyBoard } from './host.js';
+import { DAILY_BOARD_METRIC, type EverydayChallengeToday, type EverydayDailyBoard } from './host.js';
 import { everydayAccount } from './accountPort.js';
 import { everydayProgressWith } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
@@ -140,6 +140,54 @@ export const BOARD_SCREEN_COPY = Object.freeze({
    * they are here so the board is never empty, and they do not rank the dispatchers — one crowd,
    * one seed, one run each is exactly the shape this project refuses to draw a conclusion from.
    */
+  /*
+   * The third tab — GitHub issue #221's third acceptance criterion, *"the daily challenge is
+   * reachable without entering the Engineer surface"*.
+   *
+   * A tab rather than a screen key, and that was costed rather than preferred: a new key is edits
+   * in eight files and a new row in every registry that must stay total, while a tab is one arm
+   * here. § 14 already puts two boards on one screen behind tabs *because they answer different
+   * questions*; a third question about who held up belongs in the same place.
+   *
+   * The eyebrow says the two things that separate a challenge from the board beside it: it is a
+   * **set** of seeds rather than one crowd, and it opens and shuts on the server's clock rather
+   * than resetting at midnight.
+   */
+  challengeTab: 'This week’s challenge',
+  challengeEyebrow: 'A SEED SET · OPENS AND SHUTS',
+  challengeAsking: 'Asking the server for this week’s challenge…',
+  /*
+   * The `no-server` arm. It says what a challenge *is* — the same courtesy the daily tab's absence
+   * pays — because a player who has never seen one otherwise reads an empty tab as a broken one.
+   * Deliberately shorter than the Engineer menu's version of this: that surface has a whole screen
+   * to fill and this has a tab beside two that work.
+   */
+  challengeAbsence:
+    'A challenge is a fixed set of numbered seeds that everybody runs, scored over the whole set ' +
+    'rather than a lucky single run, and it opens and shuts on the server’s clock. Reading one ' +
+    'needs a server, and this build has none — so there is nothing here rather than an invented ' +
+    'ladder. The two tabs beside this one are unaffected.',
+  challengeUnreachable:
+    'This week’s challenge could not be reached just now. Nothing is wrong with your runs, and the ' +
+    'ladder beside it is unaffected — its ratings are measured on this device.',
+  /*
+   * The index came back and the board did not. The challenge is still drawn above this line, which
+   * is why the sentence says *the ranking* rather than *the challenge*: an upcoming challenge has
+   * no board yet, and that is the commonest reason a reader will meet this.
+   */
+  challengeNoBoard: 'The ranking for it could not be read:',
+  challengeEmpty: 'Nobody has posted to this challenge yet.',
+  /** The heading over the rows. The board's own `note` is carried under them, unparaphrased. */
+  challengeRowsHeading: 'WHO HAS POSTED',
+  /*
+   * Posting a set is not on this surface, and the absence is stated on the tab rather than left for
+   * a player to discover by looking for a button. A challenge submission is a run **per seed** —
+   * up to eight — and no Everyday screen runs a set; saying so is `docs/16` S9's rule about a
+   * control that writes nothing, applied to a control that does not exist.
+   */
+  challengeCannotPost:
+    'Posting to a challenge means running every seed in the set and sending them together, and no ' +
+    'screen here does that yet. This tab reads the challenge and its ranking.',
   dailyHouseTag: 'house',
   dailyHouseNote:
     'Rows marked house are the game’s own runs, one per shipped dispatcher on today’s crowd, posted ' +
@@ -271,7 +319,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
   root.className = 'everyday-board';
   root.style.cssText = 'max-width:860px';
 
-  let tab: 'daily' | 'ladder' = 'ladder';
+  let tab: 'daily' | 'ladder' | 'challenge' = 'ladder';
   let data: { resources: BrowserResources; set: ProofCaseSet } | undefined;
   let running: GauntletHandle | undefined;
   let progressLine: string | undefined;
@@ -279,6 +327,8 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
   let disposed = false;
   /** `undefined` while the read is in flight — the fifth thing this tab can be drawing. */
   let board: EverydayDailyBoard | undefined;
+  /** The same, for the challenge tab — GitHub issue #221's third criterion. */
+  let challenge: EverydayChallengeToday | undefined;
   /** Rows whose press the gate refused, by the server's row id, with the reason — GitHub issue #337. */
   const watchRefused = new Map<string, string>();
 
@@ -303,7 +353,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
    * rating), selected filled ink and unselected outline.
    */
   function tabCard(
-    key: 'daily' | 'ladder',
+    key: 'daily' | 'ladder' | 'challenge',
     label: string,
     cardEyebrow: string,
     mark: string,
@@ -724,6 +774,64 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
     return wrap;
   }
 
+  /**
+   * {@link challengeTabViewOf}'s answer, drawn — GitHub issue #221's third criterion.
+   *
+   * `dailyBlock`'s split, kept: the decision about *what* the tab says is in the pure function so
+   * all five states are drivable without a document, and this renders it and nothing more. In
+   * particular there is no arithmetic here — no ordering, no interval, no fold over `perSeed` —
+   * because every figure a challenge row carries was computed by the server over runs it made.
+   */
+  function challengeBlock(): HTMLElement {
+    const view = challengeTabViewOf(challenge, (id) => context.host.dispatcherById(id)?.name);
+    const wrap = el(doc, 'div');
+    wrap.style.cssText = `margin-top:${String(G.section)}px`;
+    if (view.heading !== '') {
+      const heading = el(doc, 'h2', view.heading);
+      heading.className = 'everyday-challenge-heading';
+      heading.style.cssText = `font-family:${TYPE.heading};font-size:21px;font-weight:600;margin:0 0 6px`;
+      wrap.append(heading);
+    }
+    const prose = (line: DailyBoardLine): HTMLElement => {
+      const p = el(doc, 'p', line.text);
+      p.className = line.className;
+      p.style.cssText = line.role === 'reason' ? NOTE : `${NOTE};color:${C.label}`;
+      return p;
+    };
+    for (const line of view.lines) wrap.append(prose(line));
+    if (view.rows.length > 0) {
+      const heading = el(doc, 'div', BOARD_SCREEN_COPY.challengeRowsHeading);
+      heading.className = 'everyday-challenge-rows-heading';
+      heading.style.cssText = `${EYEBROW};margin-top:${String(G.section)}px`;
+      const rows = el(doc, 'div');
+      rows.className = 'everyday-challenge-rows';
+      rows.style.cssText = `display:grid;gap:${String(G.row)}px;margin-top:${String(G.block)}px`;
+      for (const entry of view.rows) {
+        const row = el(doc, 'div');
+        row.className = 'everyday-challenge-row';
+        row.style.cssText = `display:flex;gap:${String(G.block)}px;align-items:baseline;font-size:13.5px;flex-wrap:wrap`;
+        const place = el(doc, 'span', entry.place);
+        place.style.cssText = `font:600 12px ${TYPE.mono};color:${C.label};min-width:2ch`;
+        const who = el(doc, 'span', entry.displayName);
+        who.style.cssText = 'flex:1';
+        const driver = el(doc, 'span', entry.driver);
+        driver.className = 'everyday-challenge-row-driver';
+        driver.style.cssText = `font-size:11.5px;color:${C.label}`;
+        const figure = el(doc, 'span', entry.figure);
+        figure.style.cssText = `font:600 13px ${TYPE.mono}`;
+        /* In the row, beside the mean — R13's clause one is about the visual unit, not the page. */
+        const count = el(doc, 'span', entry.count);
+        count.className = 'everyday-challenge-row-count';
+        count.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label}`;
+        row.append(place, who, driver, figure, count);
+        rows.append(row);
+      }
+      wrap.append(heading, rows);
+    }
+    for (const line of view.footnotes) wrap.append(prose(line));
+    return wrap;
+  }
+
   function redraw(): void {
     if (disposed) return;
     tabs.replaceChildren();
@@ -740,10 +848,21 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
         C.terracotta,
       ),
       tabCard('ladder', BOARD_SCREEN_COPY.ladderTab, ladderEyebrowOf(set), '■', C.moss),
+      /*
+       * The third card — GitHub issue #221. A triangle in the terracotta the daily board uses,
+       * because a challenge is the same *kind* of thing as today's board (a window that opens and
+       * shuts) rather than the same kind as the standing ladder, and § 14.2 asks a card's mark to
+       * say which question it answers.
+       */
+      tabCard('challenge', BOARD_SCREEN_COPY.challengeTab, BOARD_SCREEN_COPY.challengeEyebrow, '▲', C.terracotta),
     );
 
     if (tab === 'daily') {
       body.append(dailyBlock());
+      return;
+    }
+    if (tab === 'challenge') {
+      body.append(challengeBlock());
       return;
     }
 
@@ -806,6 +925,21 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
   void context.host.dailyBoard().then((answer) => {
     if (disposed) return;
     board = answer;
+    redraw();
+  });
+
+  /*
+   * The challenge, asked beside the board rather than after it and rather than on the tab press —
+   * GitHub issue #221. Two independent reads, and a tab that only fetched when opened would put the
+   * § D243 cold start in front of the press rather than in front of the mount, which is the one
+   * place this shell has already decided to pay it.
+   *
+   * A rejection is impossible by the port's contract — every failure is one of its four states — so
+   * a `catch` here would be dead code, which is `dailyBoard`'s own argument above.
+   */
+  void context.host.challengeToday().then((answer) => {
+    if (disposed) return;
+    challenge = answer;
     redraw();
   });
 
@@ -1092,6 +1226,163 @@ export function dailyBoardViewOf(
               : `over ${entry.legs.toLocaleString('en-US')} rides`,
         })),
         world: worldLinesOf(board),
+      };
+    }
+  }
+}
+
+/* -------------------------------------------------------------------------- *
+ * The third tab — this week's challenge, read-only (GitHub issue #221)
+ * -------------------------------------------------------------------------- */
+
+/** One posted challenge score, pre-formatted so the renderer decides nothing. */
+export interface ChallengeTabRowView {
+  readonly place: string;
+  readonly displayName: string;
+  /** Who drove it — the dispatcher's name, or its id where this build does not ship one. */
+  readonly driver: string;
+  /** The mean the board is ordered on, with its unit. */
+  readonly figure: string;
+  /**
+   * The two counts behind {@link figure}, in the row's own box — R13's clause one.
+   *
+   * **Never `undefined`.** A challenge row's mean is a mean over its `runs`, and the server sends
+   * both counts with every row; a shell that could not say what a mean was taken over would be the
+   * `estimate-without-n` defect issue #137 closed for the Day report, re-opened on a new surface.
+   */
+  readonly count: string;
+}
+
+/** What the challenge tab says and shows, for any one of its five states. */
+export interface ChallengeTabView {
+  /** The challenge's name and brief, or `''` when no challenge came back. */
+  readonly heading: string;
+  readonly lines: readonly DailyBoardLine[];
+  readonly rows: readonly ChallengeTabRowView[];
+  /** Drawn under the rows: the server's own note, then Compare's pointer. Both carried whole. */
+  readonly footnotes: readonly DailyBoardLine[];
+}
+
+/**
+ * § 14's third question, drawn honestly in every state — GitHub issue #221's third criterion.
+ *
+ * The daily tab's rule, applied to a different read: **five states, and the two that must never
+ * share a sentence are *nobody has posted* and *we could not ask***. `undefined` is the fifth and
+ * is not an absence — the read is in flight, and drawing an absence there publishes *nobody has
+ * posted* for as long as the network takes.
+ *
+ * ## Every honesty obligation arrives in the body, and every one of them is drawn
+ *
+ * `menu/challenge.ts#ChallengeBoardPage` says so in terms: `note` (§ D106 and § D218 § 5 clause 2),
+ * `compare` (clause 5) and each row's `runs`/`legs` (R13) travel **on the wire** rather than being
+ * something a client is trusted to remember, because *"a renderer that drops `note` or `compare` is
+ * free to draw a composite with nothing on screen saying it should not"*. Both are carried below,
+ * unparaphrased, and no row is drawn without its counts.
+ *
+ * ## Nothing here orders two dispatchers
+ *
+ * The rows are the server's, in the server's order, and the note that says an ordering is a fact
+ * about what was posted rather than a claim that one dispatcher beats another is the server's too.
+ * This function adds no comparison, no interval, and nothing derived from `perSeed` — five runs
+ * cannot support an inference, and a `[min, max]` beside a mean is read as one by everybody who has
+ * seen an interval.
+ *
+ * Pure and exported so `boardScreen.test.ts` and the sweep can drive all five states without a
+ * document, on `dailyBoardViewOf`'s rule and for its reason.
+ */
+export function challengeTabViewOf(
+  today: EverydayChallengeToday | undefined,
+  /** The dispatcher's player-facing name for an id, or `undefined` for one this build does not ship. */
+  dispatcherNameOf: (id: string) => string | undefined = () => undefined,
+): ChallengeTabView {
+  const only = (text: string, className: string, role: 'reason' | 'note' = 'reason'): ChallengeTabView => ({
+    heading: '',
+    lines: [{ text, className, role }],
+    rows: [],
+    footnotes: [],
+  });
+
+  if (today === undefined) {
+    return only(BOARD_SCREEN_COPY.challengeAsking, 'everyday-challenge-asking', 'note');
+  }
+  switch (today.kind) {
+    case 'no-server':
+      return only(BOARD_SCREEN_COPY.challengeAbsence, 'everyday-challenge-absent');
+    case 'unreachable':
+      /* Ours saying what happened, then the client's own sentence carried rather than paraphrased. */
+      return {
+        heading: '',
+        lines: [
+          { text: BOARD_SCREEN_COPY.challengeUnreachable, className: 'everyday-challenge-unreachable', role: 'reason' },
+          { text: today.detail, className: 'everyday-challenge-unreachable-detail', role: 'note' },
+        ],
+        rows: [],
+        footnotes: [],
+      };
+    case 'index-only':
+      /*
+       * The challenge is drawn and the ranking is not. Both halves are true and only one of them is
+       * a failure, which is why they are two lines rather than one — an upcoming challenge has no
+       * board yet, and a player told *the challenge could not be read* about one they can see the
+       * name of has been told something false.
+       */
+      return {
+        heading: today.challenge.challenge.name,
+        lines: [
+          { text: today.challenge.challenge.brief, className: 'everyday-challenge-brief', role: 'note' },
+          { text: today.challenge.clockNote, className: 'everyday-challenge-clock', role: 'note' },
+          { text: `${BOARD_SCREEN_COPY.challengeNoBoard} ${today.detail}`, className: 'everyday-challenge-no-board', role: 'reason' },
+          { text: BOARD_SCREEN_COPY.challengeCannotPost, className: 'everyday-challenge-cannot-post', role: 'reason' },
+        ],
+        rows: [],
+        footnotes: [],
+      };
+    case 'board': {
+      const page = today.board;
+      const lines: DailyBoardLine[] = [
+        { text: today.challenge.challenge.brief, className: 'everyday-challenge-brief', role: 'note' },
+        /*
+         * The server's clock note, carried. § D218 § 3: nothing on this side reads a clock, so the
+         * window's state is the server's word for it and is printed as such.
+         */
+        { text: today.challenge.clockNote, className: 'everyday-challenge-clock', role: 'note' },
+        { text: BOARD_SCREEN_COPY.challengeCannotPost, className: 'everyday-challenge-cannot-post', role: 'reason' },
+      ];
+      if (page.entries.length === 0) {
+        lines.push({ text: BOARD_SCREEN_COPY.challengeEmpty, className: 'everyday-challenge-empty', role: 'reason' });
+      }
+      const footnotes: DailyBoardLine[] = [
+        /* § D106 and § D218 § 5 clause 2 — the server's own sentence about what the order means. */
+        { text: page.note, className: 'everyday-challenge-note', role: 'reason' },
+        /* Clause 5 — where the question this board may not answer *is* answered. */
+        { text: page.compare.note, className: 'everyday-challenge-compare', role: 'reason' },
+      ];
+      /*
+       * Entries set before a mid-challenge `data/` change describe runs this server can no longer
+       * reproduce, so they are on their own board. The count is drawn with the server's own
+       * sentence, and it is drawn rather than merged or dropped — which is the wire's own rule.
+       */
+      if (page.otherDataNote !== undefined && page.entriesOnOtherData > 0) {
+        footnotes.push({ text: page.otherDataNote, className: 'everyday-challenge-other-data', role: 'reason' });
+      }
+      return {
+        heading: today.challenge.challenge.name,
+        lines,
+        rows: page.entries.map((entry, index) => ({
+          place: String(index + 1),
+          displayName: entry.displayName,
+          driver: dispatcherNameOf(entry.dispatcherProfileId) ?? entry.dispatcherProfileId,
+          figure: `${entry.score.meanAwtS.toFixed(1)} s`,
+          /*
+           * Both counts, because the mean is over `runs` and the runs are over `legs`, and a reader
+           * asked to judge a mean of five runs needs to know it is five. `toLocaleString` for the
+           * legs on the daily row's own precedent.
+           */
+          count:
+            `over ${String(entry.score.runs)} ${entry.score.runs === 1 ? 'run' : 'runs'}, ` +
+            `${entry.score.legs.toLocaleString('en-US')} rides`,
+        })),
+        footnotes,
       };
     }
   }

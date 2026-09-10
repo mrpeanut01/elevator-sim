@@ -67,6 +67,10 @@ import {
   type PatternSpec,
 } from '../authoring/patternSpec.js';
 import { profileWithRules, rulesFromProfile, type RuleRow } from '../authoring/ruleSpec.js';
+// The wire shape only — a type import, which `boundaries.test.ts` exempts by name because it cannot
+// reach the network. `runSubmissionOf` builds the body; the transport stays in `dev/main.ts`.
+import type { RunSubmission } from '../menu/client.js';
+import { wireInterventionsOf } from '../scope/switchWire.js';
 import {
   patternSwitchingWithSelector,
   profileWithSelector,
@@ -301,6 +305,64 @@ export function shiftSubmittedSelection(
   return {
     demandTemplateId: shiftDemandTemplateId(resources, state, building),
     arrivalRatePctPop5min: state.freePlay?.arrivalRatePctPop5min ?? null,
+  };
+}
+
+/**
+ * **The whole wire body for a run, from the state that ran it** — GitHub issue #221, and
+ * {@link shiftSubmittedSelection}'s own argument taken to its end.
+ *
+ * That function exists because two lines of the submission were read off the menu rather than off
+ * the run, and its docstring says why the answer was a function: *"the two sites now cannot
+ * disagree, because there is one derivation and it is this one"*. The rest of the body stayed
+ * inside `dev/main.ts#postCurrentRun`, where the Everyday shell cannot reach it and **no test can
+ * call it at all** — it is a statement inside a 7 600-line boot closure that needs a document to
+ * enter. So a second surface wanting to post had exactly two options, and both are defects this
+ * repository has a register for: write the body again, or take a run the shell did not build.
+ *
+ * It is here rather than beside its caller for the reason its sibling is: this is a derivation over
+ * `ViewerState` and `BrowserResources`, and every other one of those lives in this module.
+ *
+ * ## Every field is the run's, and never the menu's
+ *
+ * `state`, not `state.freePlay`, throughout — § D285 and § D318. The menu holds what is *selected
+ * next*; this describes what was *simulated*, and the server replays the latter. The two agree
+ * until somebody moves a select after a run and before posting, at which point only one of them
+ * names the seed the server is about to re-run, and posting the other spends this product's one
+ * accusation on a player who did nothing wrong.
+ *
+ * ## The two spreads are absences rather than empty lists
+ *
+ * `ruleRows` and `interventions` are **omitted** when empty rather than sent as `[]`, which is the
+ * same decision `shiftRunConfigOf` makes at the same two fields: `core` pins a run with no
+ * `interventions` key byte-identical to one built before the field existed, and the server drops an
+ * empty list from its digest. Writing `[]` would be a claim the run never made and would re-digest
+ * every score already posted.
+ *
+ * ## What this does not do
+ *
+ * It does not decide whether the run *may* be posted. Every refusal — a run this shell did not
+ * simulate, a state `runIdentityIssues` rejects, a claim with an unmeasured share in it — stays at
+ * the call site, because each needs something this function is not given (the recording on screen,
+ * the recording this shell produced, the account). A builder that also judged would be two answers
+ * to one question the first time a caller used only half of it.
+ */
+export function runSubmissionOf(resources: BrowserResources, state: ViewerState): RunSubmission {
+  return {
+    buildingId: state.buildingId,
+    dispatcherProfileId: state.dispatcherId,
+    ...shiftSubmittedSelection(
+      resources,
+      state,
+      buildingConfigOf(resources, state.savedBuildings, state.buildingId),
+    ),
+    durationS: state.shiftLengthS,
+    windowStartS: state.windowStartS,
+    seed: state.seed.toString(),
+    ...(state.ruleRows.length === 0 ? {} : { ruleRows: state.ruleRows }),
+    ...(state.interventions.length === 0
+      ? {}
+      : { interventions: wireInterventionsOf(state.interventions, resources.dispatcherProfiles.profiles) }),
   };
 }
 

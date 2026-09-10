@@ -58,6 +58,9 @@ import { watchingViewOf, type WatchingView } from '../watch/view.js';
 import {
   createEverydayHost,
   dailyBoardOf,
+  challengeTodayOf,
+  CHALLENGE_BOARD_METRIC,
+  POST_RUN_NO_SERVER,
   EVERYDAY_HOST,
   type EverydayGhostRace,
   type EverydayHostBindings,
@@ -1548,6 +1551,152 @@ describe('the daily board read', () => {
       () => Promise.resolve(failed('The server refused that request.')),
     );
     expect(board).toEqual({ kind: 'unreachable', detail: 'The server refused that request.' });
+  });
+});
+
+/**
+ * The write half and the challenge read — GitHub issue #221's first and third criteria.
+ *
+ * Both are `dailyBoard`'s split applied again, and both are checked for the same two things: the
+ * host's own part (there is nowhere to post, and nowhere to ask) and that everything else is handed
+ * to the caller untouched. A façade that reworded an outcome would be a second author for a
+ * refusal, which is the defect `postRun.ts` exists to prevent one layer up.
+ */
+describe('the post seam and the challenge read — GitHub issue #221', () => {
+  const failed = (detail: string): never =>
+    ({ ok: false, code: 'unreachable', detail, issues: [] }) as never;
+
+  it('answers no-server for a post when the page was served with no API origin', async () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost({ ...h.bindings, postRun: undefined });
+    const outcome = await host.postRun();
+    expect(outcome.kind).toBe('no-server');
+    // The sentence is the constant both shells read, never one this façade wrote.
+    expect(outcome.kind === 'no-server' ? outcome.detail : '').toBe(POST_RUN_NO_SERVER);
+  });
+
+  it('hands a post straight to its binding and returns the answer unchanged', async () => {
+    const h = harnessOf(base());
+    let calls = 0;
+    const answer = {
+      kind: 'posted',
+      boardKey: 'personal:someone',
+      placement: 'Your own record log.',
+      entry: { id: 'e' },
+    } as never;
+    const host = createEverydayHost({
+      ...h.bindings,
+      postRun: () => {
+        calls += 1;
+        return Promise.resolve(answer);
+      },
+    });
+    expect(await host.postRun()).toBe(answer);
+    expect(calls).toBe(1);
+  });
+
+  it('answers no-server for the challenge when there is nothing to ask', async () => {
+    const h = harnessOf(base());
+    expect(await createEverydayHost({ ...h.bindings, challengeToday: undefined }).challengeToday()).toEqual({
+      kind: 'no-server',
+    });
+  });
+
+  it('asks the board for the challenge the index says is current, and reads no clock', async () => {
+    const asked: string[] = [];
+    const today = await challengeTodayOf(
+      () =>
+        Promise.resolve({
+          ok: true,
+          value: { currentId: 'challenge-9', current: { challenge: { id: 'challenge-9' } }, clockNote: '', recent: [] },
+        } as never),
+      (id, metric) => {
+        asked.push(`${id}|${metric}`);
+        return Promise.resolve({ ok: true, value: { entries: [] } } as never);
+      },
+    );
+    /*
+     * The index's own `currentId`, and the metric the composer names. Nothing here picks a challenge
+     * out of `recent` by comparing windows against a local clock, which is § D218 § 3's guarantee:
+     * a browser whose clock is a week out still reads the challenge the server says is open.
+     */
+    /*
+     * The metric is written out rather than interpolated. `` `challenge-9|${CHALLENGE_BOARD_METRIC}` ``
+     * is what this line used to say, and it is a **tautology**: it passes for any string the constant
+     * happens to hold, which is how `'meanAwtS'` — a `ChallengeScore` field the server answers 400
+     * to — survived a green suite. The case below asks the server's source what the vocabulary is.
+     */
+    expect(asked).toEqual(['challenge-9|awtS']);
+    expect(today.kind).toBe('board');
+  });
+
+  it('asks for a metric the server will accept, checked against `store.ts` rather than a fixture', () => {
+    /*
+     * The server's own source text, on `menu/challenge.test.ts`'s method and for its reason: a
+     * fixture that spells the wire vocabulary is written by whoever wrote the constant and agrees
+     * with it by construction. `packages/server/src/store/store.ts` does not, and it is the file
+     * `http/api.ts` checks the query against before answering 400.
+     *
+     * Parsed out of the `BoardMetric` union rather than out of the `BOARD_METRICS` array, because
+     * the union is what the type system enforces and the array is derived from it — a server that
+     * let the two drift would fail its own build, so either is sound and the union is shorter.
+     */
+    const storeSource = readFileSync(
+      fileURLToPath(new URL('../../../server/src/store/store.ts', import.meta.url)),
+      'utf8',
+    );
+    const union = /export type BoardMetric =([^;]+);/.exec(storeSource);
+    expect(union, 'BoardMetric union not found in the server source — the check has gone stale').not.toBeNull();
+    const metrics = [...(union?.[1] ?? '').matchAll(/'([a-zA-Z0-9]+)'/g)].map((m) => m[1]);
+
+    // The regex found something, so a later assertion cannot pass vacuously on an empty list.
+    expect(metrics.length).toBeGreaterThan(1);
+    expect(metrics).toContain(CHALLENGE_BOARD_METRIC);
+
+    /*
+     * And the negative control: the field name this constant used to hold is **not** in the
+     * vocabulary. Without this line the case above would still pass if the server ever grew a
+     * `meanAwtS` metric, and the point of the check is that the two namespaces are separate.
+     */
+    expect(metrics).not.toContain('meanAwtS');
+  });
+
+  it('orders the challenge board on the same metric the Engineer panel asks for', () => {
+    /*
+     * `host.ts`'s docstring claims the two surfaces order the same board the same way. It was false
+     * as written — the Engineer panel asked for `'awtS'` and this shell asked for `'meanAwtS'` — and
+     * a claim about a sibling module is the kind a docstring cannot keep on its own.
+     */
+    const menuSource = readFileSync(fileURLToPath(new URL('../menu/menu.ts', import.meta.url)), 'utf8');
+    expect(menuSource).toContain(`metric: '${CHALLENGE_BOARD_METRIC}'`);
+  });
+
+  it('keeps the challenge when only its board failed, and carries the client’s sentence', async () => {
+    const today = await challengeTodayOf(
+      () =>
+        Promise.resolve({
+          ok: true,
+          value: { currentId: 'c', current: { challenge: { id: 'c', name: 'A climb' } }, clockNote: '', recent: [] },
+        } as never),
+      () => Promise.resolve(failed('This challenge has not opened yet.')),
+    );
+    expect(today.kind).toBe('index-only');
+    expect(today.kind === 'index-only' ? today.detail : '').toBe('This challenge has not opened yet.');
+  });
+
+  it('is unreachable when the index itself failed, and asks for no board', async () => {
+    let boardAsked = false;
+    const today = await challengeTodayOf(
+      () => Promise.resolve(failed('Could not reach the server.')),
+      () => {
+        boardAsked = true;
+        return Promise.resolve({ ok: true, value: { entries: [] } } as never);
+      },
+    );
+    expect(today).toEqual({ kind: 'unreachable', detail: 'Could not reach the server.' });
+    // A board cannot be asked for without a challenge id, and inventing one is the second answer to
+    // *which challenge is it* that this composer exists to refuse.
+    expect(boardAsked).toBe(false);
   });
 });
 

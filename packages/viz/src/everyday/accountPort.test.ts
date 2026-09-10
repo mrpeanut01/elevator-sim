@@ -17,9 +17,20 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { SIGNED_OUT, signedIn, signedOut, updateForm, withNotice } from '../menu/account.js';
+import {
+  SIGNED_OUT,
+  pending,
+  signedIn,
+  signedOut,
+  updateForm,
+  waitEnded,
+  withNotice,
+} from '../menu/account.js';
+
+import type { AccountState } from '../menu/account.js';
 
 import { everydayAccount, onEverydayAccount, publishEverydayAccount } from './accountPort.js';
+import { settingsScreenViewOf, type SettingsScreenView } from './settingsView.js';
 
 /* Module state. Withdrawn after each case so an order dependence cannot hide here. */
 afterEach(() => {
@@ -155,5 +166,96 @@ describe('what only the source can say — the two publishes', () => {
     const boot = body.indexOf('publishEverydayAccount(accountState);', host);
     expect(host, 'the Everyday host is no longer published under that name').toBeGreaterThan(0);
     expect(boot, 'boot does not publish the account after publishing the host').toBeGreaterThan(host);
+  });
+});
+
+/**
+ * **A wait that ends leaves no trace of itself** — GitHub issue #221's third defect.
+ *
+ * `startWaiting` set `busy: true` and returned a closure that cleared only the timers and the live
+ * region. Three of its four callers followed `done()` with `withNotice` or `signedIn`, both of
+ * which write `busy: false`, so the flag came down by *coincidence of the caller* rather than by
+ * the pair being complete. `postCurrentRun` was the fourth: the surface that consumes it is the
+ * Everyday shell, which writes its own success line on its own screen and has no account notice to
+ * write. Posting a run from Everyday therefore left the account `busy` for the rest of the session
+ * — {@link canSubmitForm} false, *Save name* disabled, and a stale *"Posting this run…"* under an
+ * `aria-describedby` claiming a request was in flight when none was.
+ *
+ * It lives in this file rather than in a screen's because this is the channel it broke on: the
+ * Everyday world only ever sees `busy` through `publishEverydayAccount`, and the two cases below
+ * are the property and the wiring that carries it.
+ */
+describe('a wait that ends — GitHub issue #221', () => {
+  const waiting = signedIn(SIGNED_OUT, 'token', {
+    id: 'u-1',
+    email: 'a@turing.example',
+    displayName: 'A. Turing',
+    displayNameChosen: true,
+  });
+
+  it('round-trips exactly: what was displaced comes back, not merely the flag', () => {
+    const before = withNotice(waiting, 'Signed in.');
+    const during = pending(before, 'Posting this run…');
+    expect(during.busy).toBe(true);
+    expect(during.notice).toBe('Posting this run…');
+
+    const after = waitEnded(during, before.notice);
+    /*
+     * Field-for-field rather than `busy === false`. *Clears the flag* would also be satisfied by a
+     * function that left the wait's own sentence on screen — which is the second half of what the
+     * player actually saw, a disabled control beside a sentence about a request that had finished.
+     */
+    expect(after).toEqual(before);
+  });
+
+  it('re-offers *Save name* on the screen the player was actually stuck on', () => {
+    /*
+     * The rendered settings block rather than {@link canSubmitForm}, because the flag is not what a
+     * player meets. `settingsView.ts`'s `offered = !account.busy && …` is what greys the control,
+     * and its `notice` is the sentence beside it — so this drives the two things that were wrong on
+     * screen: a disabled *Save name*, and *"Posting this run…"* still under it.
+     */
+    const screen = (account: AccountState): SettingsScreenView =>
+      settingsScreenViewOf({ profile: undefined, accountServer: true, account });
+
+    const before = withNotice(waiting, 'Signed in.');
+    expect(screen(before).you.signIn.actionOffered).toBe(true);
+
+    const during = pending(before, 'Posting this run…');
+    expect(screen(during).you.signIn.actionOffered).toBe(false);
+    expect(screen(during).you.signIn.notice).toBe('Posting this run…');
+
+    const after = screen(waitEnded(during, before.notice));
+    expect(after.you.signIn.actionOffered, 'the control is still disabled after the post finished').toBe(true);
+    expect(
+      after.you.signIn.notice,
+      'the screen still says a request is in flight after it finished — the stale half of the defect',
+    ).toBe('Signed in.');
+  });
+
+  it('is what `startWaiting` returns, so no caller has to remember to clear it', () => {
+    /*
+     * The source rather than a behaviour, because the defect was a *missing* call and no unit can
+     * observe one. `dev/main.ts`'s `startWaiting` is a closure inside boot with no seam to drive,
+     * and the property that matters is structural: the undo is in the pair, not in each of the
+     * four callers.
+     */
+    const body = readFileSync(fileURLToPath(new URL('../dev/main.ts', import.meta.url)), 'utf8');
+    const at = body.indexOf('function startWaiting(');
+    expect(at, '`startWaiting` is not in `dev/main.ts` under that name').toBeGreaterThan(0);
+    const to = body.indexOf('\n  }\n', at);
+    const fn = body.slice(at, to);
+
+    expect(
+      fn,
+      '`startWaiting` no longer ends the wait through `waitEnded`. It sets `busy` and returns the ' +
+        'way to stop, so clearing it has to happen here — a caller that forgets leaves the account ' +
+        'busy for the session, which is exactly what posting from the Everyday shell did.',
+    ).toContain('waitEnded(accountState');
+    expect(
+      fn,
+      'the undo no longer redraws. `drawMenu` is the only thing that publishes to `accountPort`, ' +
+        'so a state cleared without it is a state the Everyday world never hears about.',
+    ).toContain('drawMenu()');
   });
 });

@@ -244,6 +244,31 @@ export function pending(state: AccountState, notice: string): AccountState {
   return Object.freeze({ ...state, notice, busy: true });
 }
 
+/**
+ * The request is over and there is nothing new to say — {@link pending} undone exactly.
+ *
+ * **This is the other half of the pair, and it exists because assuming it was already there shipped
+ * a defect** (GitHub issue #221). The comment below used to end *"`withNotice` clears the flag on
+ * the way out, so the pair is complete without it"*, and that is true only of a caller that has a
+ * sentence to write. The Everyday shell posts a run and writes its **own** success line on its own
+ * screen rather than an account notice, so it had nothing to call: `busy` stayed `true` for the
+ * session, {@link canSubmitForm} stayed false, and *Save name* was disabled behind a stale
+ * *"Posting this run…"* until the player signed out and back in.
+ *
+ * The displaced `notice` is a parameter rather than something this function invents, because only
+ * the caller that started the wait knows what was on screen before it. Passing back what was there
+ * makes the round trip exact — `waitEnded(pending(s, 'anything'), s.notice)` is `s` — which is the
+ * property `account.test.ts` asserts, and it is a stronger claim than *clears busy*: a wait that
+ * ends must leave no trace of itself, not merely lower one flag.
+ *
+ * Not folded into {@link withNotice} with an optional argument. *Ended with something to say* and
+ * *ended with nothing to say* are different events on the screen, and an optional parameter would
+ * let a caller do the second by accident while meaning the first.
+ */
+export function waitEnded(state: AccountState, notice: string | undefined): AccountState {
+  return Object.freeze({ ...state, notice, busy: false });
+}
+
 /*
  * `busy(state, value)` used to sit here and has been **deleted rather than kept for symmetry**.
  *
@@ -251,7 +276,8 @@ export function pending(state: AccountState, notice: string): AccountState {
  * ran; the cold start (§ D243 § 4) made that gap visible, {@link pending} closed it, and what was
  * left was an export with no non-test caller. That is the defect this repository has shipped eleven
  * times in code, and `menu/` is not exempt from its own standing rule because the export is small.
- * `withNotice` clears the flag on the way out, so the pair is complete without it.
+ * The way out is {@link withNotice} when there is something to say and {@link waitEnded} when there
+ * is not — see the latter for why the second of those had to be built rather than assumed.
  */
 
 /* -------------------------------------------------------------------------- *

@@ -116,6 +116,9 @@ import type {
  * imports by name. The row shape crosses this façade; the transport does not.
  */
 import type { BoardDistribution, BoardEntry, BoardPage, BoardsPage, Result } from '../menu/client.js';
+// Wire shapes only, from the module that restates them for the browser. `menu/challenge.ts` holds
+// no client and reads no clock, so this crosses the same line the row shapes above do.
+import type { ChallengeBoardPage, ChallengeIndex, ChallengeView } from '../menu/challenge.js';
 import type { PriceSchedule } from '../pricing/types.js';
 
 import { specFromBuilding, type BuildingSpec } from '../authoring/buildingSpec.js';
@@ -298,6 +301,151 @@ export async function dailyBoardOf(
 
 /** What the daily board is ranked on. The Engineer board list asks for the same one. */
 export const DAILY_BOARD_METRIC = 'awtS';
+
+/**
+ * **What posting the run on screen came back with** — GitHub issue #221's first acceptance
+ * criterion, in {@link EverydayDailyBoard}'s shape and for its reasons.
+ *
+ * Five states, and the split is the same one the read half makes: *there is nowhere to post*,
+ * *there is nobody to post as*, *this shell will not post this run*, *the server would not take
+ * it*, and *it is on the board*. Collapsing any two of them tells a player to fix the wrong thing —
+ * a signed-in player with an unpostable run told to sign in, or a signed-out one told their run is
+ * bad.
+ *
+ * **`refused` and `failed` are the pair that must never share a sentence.** `refused` is this
+ * shell's own judgement, made before a request leaves — a run somebody else made, a run carrying a
+ * growth or a held car the server cannot rebuild, a claim with an unmeasured share in it. `failed`
+ * is the server's or the transport's, carried as its own words. The difference is whether anything
+ * was sent, and a player who is told *the server refused this* about a request that never happened
+ * has been told something false about a machine they cannot inspect.
+ *
+ * `posted` carries the server's own `boardKey` and `placement` **unparaphrased**, and that is
+ * load-bearing rather than tidy: `leaderboard/boardKey.ts#placeSubmission` puts a run on
+ * `daily:<date>` only when it matches every axis of the day's fixture and on `personal:<user id>`
+ * otherwise, so a shell that announced *"posted to today's board"* would be wrong for most runs a
+ * player actually plays. GitHub issue #331 records that exact failure as the reason this issue
+ * split. The server knows which board it used; nothing here works it out.
+ */
+export type EverydayPostOutcome =
+  /** No API origin on the page at all — the `no-server` of the read half, said about a write. */
+  | { readonly kind: 'no-server'; readonly detail: string }
+  /** There is a server and nobody is signed in. `detail` is `menu/account.ts`'s own sentence. */
+  | { readonly kind: 'signed-out'; readonly detail: string }
+  /** This shell will not post this run, and `detail` says which of its own gates refused it. */
+  | { readonly kind: 'refused'; readonly detail: string }
+  /** The request was made and did not succeed. `detail` is the server's sentence, or the client's. */
+  | { readonly kind: 'failed'; readonly detail: string }
+  /**
+   * Accepted and replayed. The one field is the server's own answer.
+   *
+   * **`boardKey` and `entry` were here and are deleted rather than kept for completeness.** Both
+   * were populated from the 201 and read by nothing outside tests — the response carries them, so
+   * carrying them one layer further looked free — and `entry`'s docstring justified itself as
+   * *"so a caller can put it in front of the replay gate"*, which no caller did. That is the
+   * defect CLAUDE.md's standing requirement names, the twelfth time in this tree, and the rule it
+   * states is *name the non-test caller*: there was none for either. `menu/client.ts` still parses
+   * both off the wire, where a reader exists.
+   *
+   * **No register row is owed for the deletion, and that was checked rather than assumed.** The
+   * capability `entry` was justified by — putting a row in front of the replay gate — is built and
+   * reachable: {@link EverydayHost.postedRun} takes a `BoardEntry` and answers a `WatchableRun`,
+   * and the board screen presses it. What was missing was only the *shortcut* from the post block
+   * to that gate, which is a route nobody has asked for rather than an absence a player can meet.
+   * `EVERYDAY_SHELL_ABSENCES` is empty on this commit and a row invented to justify a deletion
+   * would be [§ D227](../../../../DECISIONS.md)'s stale refusal minted deliberately.
+   */
+  | {
+      readonly kind: 'posted';
+      /**
+       * Which board the server chose, as its own token — `'daily'` or `'personal'`, the `kind` of
+       * `leaderboard/boardKey.ts#BoardPlacement`. **Not a sentence**, which is the correction:
+       * `everyday/postRun.ts#placementLineOf` is where it becomes one, and this shell may not
+       * derive the choice itself.
+       */
+      readonly placement: string;
+    };
+
+/**
+ * The `no-server` sentence for a **write**, said once and read by both the host and the screen.
+ *
+ * It lives here rather than in the screen because the host is what decides the arm — the binding is
+ * absent, which is a property of the page — and a screen that authored its own wording for a state
+ * it does not decide is `honesty/agreement.ts`'s `surfaces-disagree` waiting to happen.
+ *
+ * The second sentence is the part that matters and is not decoration: a player whose run cannot be
+ * posted has lost nothing, and this is the one place the product can say so before they wonder.
+ */
+export const POST_RUN_NO_SERVER =
+  'This site has no leaderboard server behind it, so this run cannot be posted. It is still on ' +
+  'screen and still in the report — nothing about it is lost.';
+
+/**
+ * What a read of today's challenge came back with — GitHub issue #221's third acceptance criterion,
+ * *"the daily challenge is reachable without entering the Engineer surface"*.
+ *
+ * The same five-state shape the board read has, minus `undeclared`: `/api/challenges` answers with
+ * a challenge or it does not answer, and there is no field on it that a running server can predate.
+ * `no-rows` is not a state either — a challenge board with no entries is a `board` whose `entries`
+ * are empty, which is a fact about the players and not about the read.
+ */
+export type EverydayChallengeToday =
+  | { readonly kind: 'no-server' }
+  | { readonly kind: 'unreachable'; readonly detail: string }
+  /**
+   * The index was read and the board was not. The challenge is still drawn — its name, its brief,
+   * its window and the server's clock note — because those came back; only the ranking is missing,
+   * and `detail` is the client's own sentence about why.
+   *
+   * A read that returned the index and refused the board is exactly what an `upcoming` challenge
+   * looks like from here, which is why the challenge travels with the refusal rather than instead
+   * of it.
+   */
+  | { readonly kind: 'index-only'; readonly challenge: ChallengeView; readonly detail: string }
+  | { readonly kind: 'board'; readonly challenge: ChallengeView; readonly board: ChallengeBoardPage };
+
+/**
+ * What a challenge board is ordered on — **a wire metric, not a score field**, and the distinction
+ * is the whole of why this constant has a docstring.
+ *
+ * `packages/server/src/store/store.ts`'s `BoardMetric` is `awtS | wt95S | ttdMeanS |
+ * pctOverLongWait`, and `http/api.ts` checks the query against `BOARD_METRICS` and answers **400**
+ * to anything else. `ChallengeScore` — the shape of a *row* on that board — spells its mean wait
+ * `meanAwtS`, and this constant was that field name for one commit. The read never 400ed loudly:
+ * `challengeTodayOf` folds any board failure into `index-only`, so the tab drew the challenge with
+ * the server's refusal beside it — *"A board is ordered on one of awtS, wt95S, ttdMeanS,
+ * pctOverLongWait"*, raw wire notation on a player surface — for every player, always.
+ *
+ * The two names are one letter of overlap apart and sit either side of the same request, which is
+ * why `host.test.ts` asserts this value against the server's **own source text** rather than
+ * against a fixture. A fixture written by whoever wrote the constant agrees with the constant by
+ * construction; `store.ts` does not.
+ *
+ * The Engineer challenge panel asks for `'awtS'` (`menu/menu.ts:107`), so the two surfaces order
+ * the same board the same way — that claim is now true, and it was not before.
+ */
+export const CHALLENGE_BOARD_METRIC = 'awtS';
+
+/**
+ * Compose the two challenge reads into one of {@link EverydayChallengeToday}'s four states.
+ *
+ * Takes the calls rather than a client, on {@link dailyBoardOf}'s rule and for its reason.
+ *
+ * **Nothing here reads a clock, and nothing here names a challenge.** `menu/client.ts#challenges`
+ * takes no parameter — *"there is nothing a caller could pass to move the answer"* — and the id the
+ * board is asked for is the index's own `currentId`. A composer that picked a challenge out of
+ * `recent` by comparing windows against `Date.now()` would be the second answer to *which challenge
+ * is it today* that § D218 § 3 exists to forbid.
+ */
+export async function challengeTodayOf(
+  index: () => Promise<Result<ChallengeIndex>>,
+  board: (challengeId: string, metric: string) => Promise<Result<ChallengeBoardPage>>,
+): Promise<EverydayChallengeToday> {
+  const listed = await index();
+  if (!listed.ok) return { kind: 'unreachable', detail: listed.detail };
+  const page = await board(listed.value.currentId, CHALLENGE_BOARD_METRIC);
+  if (!page.ok) return { kind: 'index-only', challenge: listed.value.current, detail: page.detail };
+  return { kind: 'board', challenge: listed.value.current, board: page.value };
+}
 
 /**
  * **The four account effects, as calls** — GitHub issue #332,
@@ -1043,6 +1191,34 @@ export interface EverydayHost {
   dailyBoard(): Promise<EverydayDailyBoard>;
 
   /**
+   * Post the run on screen, and say what happened — GitHub issue #221's first criterion.
+   *
+   * A promise because it is a network write, and the five states are the whole of its contract.
+   * **Every refusal this shell makes is made here rather than in the affordance**, which is issue
+   * #21's rule about the Engineer surface's own posting row applied to this one: a control that is
+   * merely disabled is a refusal one keyboard route away from not existing. A screen may draw a
+   * disabled button *as well*, and must not rely on it.
+   *
+   * The run posted is the run on screen, and the shell refuses to post one it did not simulate —
+   * `shift/banking.ts#bankingRefusalFor`'s object-identity gate, which is the same one that decides
+   * whether a day may be banked. So a watched row or a loaded recording comes back `refused` with
+   * that gate's own sentence rather than being posted as the player's own work.
+   */
+  postRun(): Promise<EverydayPostOutcome>;
+
+  /**
+   * Today's challenge and its board — GitHub issue #221's third criterion, *reachable without
+   * entering the Engineer surface*.
+   *
+   * Read-only. Posting a challenge set is `menu/client.ts#submitChallenge` and is not on this
+   * façade, because a challenge submission is a run **per seed** — `challengeRunConfigs` returns up
+   * to {@link import('../menu/challenge.js').MAX_CHALLENGE_SEEDS} of them — and the Everyday shell
+   * has no surface that runs a set. A method that existed and always refused is the dead seam this
+   * façade's own docstring keeps a register of, so the absence is named here instead.
+   */
+  challengeToday(): Promise<EverydayChallengeToday>;
+
+  /**
    * The four account effects, or `undefined` when this build was served with no API origin.
    *
    * `undefined` is `EverydayDailyBoard`'s `no-server` said as an absence rather than a state, and
@@ -1212,6 +1388,28 @@ export interface EverydayHostBindings {
    * imported one would be the third.
    */
   readonly dailyBoard: (() => Promise<EverydayDailyBoard>) | undefined;
+  /**
+   * Post the run on screen — GitHub issue #221's write half. `undefined` when there is no API
+   * origin, on {@link dailyBoard}'s rule: the absence is a property of the page, decided once at
+   * boot, and a binding that exists and always refuses is the shape this repository keeps paying
+   * for.
+   *
+   * **Optional rather than required, and the reason is the one {@link accountActions} gives**: two
+   * binding literals outside this lane's reach (`campaign/wearClock.test.ts`,
+   * `campaign/buildStandingOrder.test.ts`) would otherwise have to gain a field. A shell that omits
+   * it gets `no-server`, which is drawn honestly.
+   *
+   * The whole refusal ladder is the caller's, because the whole of it needs the run on screen, the
+   * recording this shell simulated and the account — all three of which live in `dev/main.ts`'s
+   * boot closure. The Engineer surface's own **Post this run** goes through the same function, so
+   * the two shells cannot come to different conclusions about whether one run may be posted.
+   */
+  readonly postRun?: (() => Promise<EverydayPostOutcome>) | undefined;
+  /**
+   * Today's challenge and its board — GitHub issue #221's third criterion. `undefined` with no API
+   * origin, on {@link dailyBoard}'s rule, and optional on {@link postRun}'s.
+   */
+  readonly challengeToday?: (() => Promise<EverydayChallengeToday>) | undefined;
   /**
    * The account effects — GitHub issue #332. `undefined` when there is no account server.
    *
@@ -1991,6 +2189,21 @@ export function createEverydayHost(
        * is the caller's, because everything else is the client's.
        */
       const read = b.dailyBoard;
+      return read === undefined ? { kind: 'no-server' } : read();
+    },
+    /*
+     * {@link dailyBoard}'s split, applied to a write: the host's part is that there is nowhere to
+     * post when the page was served with no API origin, and everything else — every refusal, the
+     * request, and the server's answer — is the caller's, because all of it needs the run on screen
+     * and the account.
+     */
+    postRun: async () => {
+      const post = b.postRun;
+      return post === undefined ? { kind: 'no-server', detail: POST_RUN_NO_SERVER } : post();
+    },
+    /* Read-only, and the same split. See {@link EverydayHost.challengeToday}. */
+    challengeToday: async () => {
+      const read = b.challengeToday;
       return read === undefined ? { kind: 'no-server' } : read();
     },
     /*

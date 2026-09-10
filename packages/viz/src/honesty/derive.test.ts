@@ -1544,6 +1544,41 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Two more compositions that author no string, and one metric name — GitHub issue #221. ' +
+        '`challengeTodayOf` is `dailyBoardOf` again for the challenge read: two client calls in, ' +
+        'one of four states out, and every word it can put on a screen is somebody else’s — ' +
+        '`detail` is `menu/client.ts`’s failure sentence, the challenge’s name, brief and clock ' +
+        'note are the server’s. What holds it honest is not this search: all five states are ' +
+        'seeded through `everyday/boardScreen.ts#challengeTabViewOf`, which is the surface that ' +
+        'decides what any of them says, and `everyday/host.test.ts` drives the composition itself ' +
+        'against stubs. `DAILY_BOARD_METRIC` and `CHALLENGE_BOARD_METRIC` are the axes the two ' +
+        'reads ask a board for — `awtS` and `meanAwtS`, wire field names rather than prose — and ' +
+        'the deriver collects the first only because a declaration’s span runs to the next one and ' +
+        '`EverydayPostOutcome`’s `no-server` tag reads as two hyphenated words to `PROSE`. ' +
+        '`CHALLENGE_BOARD_METRIC` is deliberately **not** listed: the deriver does not collect it, ' +
+        'because its own span holds no such literal — which is the difference between a name that ' +
+        'needs excusing and one that never came up. ' +
+        'Over-collection is this instrument’s safe direction, so the answer is to classify rather ' +
+        'than to loosen the scan.',
+      ids: [
+        'everyday/host.ts#challengeTodayOf',
+        'everyday/host.ts#DAILY_BOARD_METRIC',
+      ],
+    },
+    {
+      reason:
+        'The wire body for a posted run — GitHub issue #221. `runSubmissionOf` is ids, numbers and ' +
+        'a seed: a building id, a dispatcher id, a demand template id, a duration, a window and ' +
+        'the run’s rule rows, every one of them a key the server resolves against its own `data/`. ' +
+        'The deriver reaches it transitively through `shiftSubmittedSelection` → ' +
+        '`shiftDemandTemplateId`, whose `rise-and-fall` is a template id that reads as two ' +
+        'hyphenated words. Nothing it returns is drawn: what a player reads about posting is ' +
+        '`everyday/postRun.ts#postRunViewOf`, which the daily loop’s adapter seeds in all seven ' +
+        'states, and the server’s own refusals, which that view carries unparaphrased.',
+      ids: ['dev/state.ts#runSubmissionOf'],
+    },
+    {
+      reason:
         'A vocabulary id or a stream name, not prose — GitHub issues #171 and #169 item 1, § D507. ' +
         '`coach-party` and `campaign-incident` are hyphenated identifiers the derivation reads as ' +
         'two adjacent words: the first is a `ShiftEventId` the contract calendar files a day under, ' +
