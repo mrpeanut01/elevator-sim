@@ -1,0 +1,1632 @@
+{
+  "generatedBy": "packages/viz/src/scenario/regenerateSurvivors.test-helper.ts",
+  "contract": "docs/38-what-the-game-is.md § 2.1 and § 3, DECISIONS.md § D525 clause 3, GitHub issue #367. Difficulty is the number of ways through: take every configuration the budget can reach on the schedule, judge each on the scenario's own seeds under common random numbers against the scenario's own goals, and count the ones that clear. Counts, never quotients — a survivor count is over `examined` configurations and each configuration is judged over `replications` runs, and the two denominators are not interchangeable.",
+  "provenance": {
+    "kind": "measured",
+    "command": "ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz src/scenario/survivorSweep.test.ts",
+    "tree": "8939d79",
+    "measuredAt": "2026-09-10",
+    "masterSeed": 20260910,
+    "sampleSize": 12,
+    "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, priced by data/price-schedule.json. 4 of 24 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 24 of 59 declared dimensions are priced and therefore varied. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
+    "reachableChangeIds": [
+      "idle-parking",
+      "dispatch-rules",
+      "dwell-policy",
+      "destination-panels"
+    ],
+    "unreachableChangeIds": [
+      "door-dwell",
+      "faster-doors",
+      "door-sensors",
+      "advance-opening",
+      "zone-the-tower",
+      "full-destination",
+      "tenant-floors",
+      "queue-marshalling",
+      "staggered-starts",
+      "move-a-tenant",
+      "rezone-bank",
+      "faster-machines",
+      "larger-cars",
+      "new-car",
+      "fifth-car",
+      "larger-car-step",
+      "machines-4mps",
+      "machines-5mps",
+      "machines-gearless",
+      "larger-cars-21"
+    ],
+    "unpricedDimensionCount": 35,
+    "declaredDimensionCount": 59
+  },
+  "scenarios": [
+    {
+      "id": "stage-1-first-call",
+      "name": "One shaft, low demand",
+      "ladderPosition": 1,
+      "inFirstHour": true,
+      "buildingId": "garden-apartments",
+      "baselineProfileId": "collective",
+      "durationS": 900,
+      "replications": 50,
+      "tuningSeeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
+      "diagnosis": null,
+      "steps": [
+        {
+          "stepId": null,
+          "units": 4,
+          "chimesSpent": 0,
+          "examined": 20,
+          "survivors": 1,
+          "survivorNames": [
+            "zoned-uppeak"
+          ],
+          "unjudged": 0,
+          "suppressed": 0,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 8,
+            "survivors": 1
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 19,
+              "survivors": 1
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 951829162,
+            "bundles": 5,
+            "enumerable": false,
+            "draws": 14,
+            "refusedDraws": 0,
+            "inertDraws": 2,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "equipment-rung",
+          "units": 24,
+          "chimesSpent": 20,
+          "examined": 24,
+          "survivors": 1,
+          "survivorNames": [
+            "zoned-uppeak"
+          ],
+          "unjudged": 0,
+          "suppressed": 0,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 1
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 18,
+              "survivors": 1
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 5,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 1644787431,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 13,
+            "refusedDraws": 0,
+            "inertDraws": 1,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "building-rung",
+          "units": 54,
+          "chimesSpent": 50,
+          "examined": 24,
+          "survivors": 1,
+          "survivorNames": [
+            "zoned-uppeak"
+          ],
+          "unjudged": 0,
+          "suppressed": 0,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 1
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 17,
+              "survivors": 1
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 6,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 1896623623,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 16,
+            "refusedDraws": 0,
+            "inertDraws": 3,
+            "duplicateDraws": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "stage-2-morning-rush",
+      "name": "The morning rush",
+      "ladderPosition": 2,
+      "inFirstHour": true,
+      "buildingId": "midtown-office",
+      "baselineProfileId": "collective",
+      "durationS": 900,
+      "replications": 50,
+      "tuningSeeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
+      "diagnosis": null,
+      "steps": [
+        {
+          "stepId": null,
+          "units": 4,
+          "chimesSpent": 0,
+          "examined": 20,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 3,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 8,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 19,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 989916867,
+            "bundles": 5,
+            "enumerable": false,
+            "draws": 12,
+            "refusedDraws": 0,
+            "inertDraws": 0,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "equipment-rung",
+          "units": 24,
+          "chimesSpent": 20,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 3,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 17,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 6,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 50924351,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 14,
+            "refusedDraws": 0,
+            "inertDraws": 2,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "building-rung",
+          "units": 54,
+          "chimesSpent": 50,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 5,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 16,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 7,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 898620172,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 14,
+            "refusedDraws": 0,
+            "inertDraws": 2,
+            "duplicateDraws": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "stage-3-overwhelmed",
+      "name": "Overwhelmed",
+      "ladderPosition": 3,
+      "inFirstHour": true,
+      "buildingId": "midtown-office",
+      "baselineProfileId": "collective",
+      "durationS": 900,
+      "replications": 50,
+      "tuningSeeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
+      "diagnosis": null,
+      "steps": [
+        {
+          "stepId": null,
+          "units": 4,
+          "chimesSpent": 0,
+          "examined": 20,
+          "survivors": 1,
+          "survivorNames": [
+            "fairness-first"
+          ],
+          "unjudged": 0,
+          "suppressed": 20,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 8,
+            "survivors": 1
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 19,
+              "survivors": 1
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 1802987014,
+            "bundles": 5,
+            "enumerable": false,
+            "draws": 12,
+            "refusedDraws": 0,
+            "inertDraws": 0,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "equipment-rung",
+          "units": 24,
+          "chimesSpent": 20,
+          "examined": 23,
+          "survivors": 1,
+          "survivorNames": [
+            "fairness-first"
+          ],
+          "unjudged": 0,
+          "suppressed": 23,
+          "unbuildable": 1,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 1
+          },
+          "dials": {
+            "examined": 11,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 18,
+              "survivors": 1
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 4,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 2056965768,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 13,
+            "refusedDraws": 0,
+            "inertDraws": 1,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "building-rung",
+          "units": 54,
+          "chimesSpent": 50,
+          "examined": 24,
+          "survivors": 1,
+          "survivorNames": [
+            "fairness-first"
+          ],
+          "unjudged": 0,
+          "suppressed": 24,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 1
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 14,
+              "survivors": 1
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 9,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 902852627,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 13,
+            "refusedDraws": 0,
+            "inertDraws": 1,
+            "duplicateDraws": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "stage-4-two-banks",
+      "name": "Two banks",
+      "ladderPosition": 4,
+      "inFirstHour": true,
+      "buildingId": "mixed-use-high-rise",
+      "baselineProfileId": "collective",
+      "durationS": 900,
+      "replications": 50,
+      "tuningSeeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
+      "diagnosis": null,
+      "steps": [
+        {
+          "stepId": null,
+          "units": 15,
+          "chimesSpent": 0,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 6,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 17,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 6,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 133268929,
+            "bundles": 11,
+            "enumerable": false,
+            "draws": 12,
+            "refusedDraws": 0,
+            "inertDraws": 0,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "equipment-rung",
+          "units": 24,
+          "chimesSpent": 9,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 5,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 16,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 7,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 583472238,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 12,
+            "refusedDraws": 0,
+            "inertDraws": 0,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "building-rung",
+          "units": 54,
+          "chimesSpent": 39,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 4,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 15,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 8,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 123683065,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 14,
+            "refusedDraws": 0,
+            "inertDraws": 2,
+            "duplicateDraws": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "stage-5-credentials",
+      "name": "Credentials",
+      "ladderPosition": 5,
+      "inFirstHour": false,
+      "buildingId": "secure-tower",
+      "baselineProfileId": "collective",
+      "durationS": 900,
+      "replications": 50,
+      "tuningSeeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
+      "diagnosis": null,
+      "steps": [
+        {
+          "stepId": null,
+          "units": 15,
+          "chimesSpent": 0,
+          "examined": 23,
+          "survivors": 1,
+          "survivorNames": [
+            "predictive-balanced"
+          ],
+          "unjudged": 0,
+          "suppressed": 23,
+          "unbuildable": 1,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 1
+          },
+          "dials": {
+            "examined": 11,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 16,
+              "survivors": 1
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 6,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 1359977640,
+            "bundles": 11,
+            "enumerable": false,
+            "draws": 12,
+            "refusedDraws": 0,
+            "inertDraws": 0,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "equipment-rung",
+          "units": 24,
+          "chimesSpent": 9,
+          "examined": 24,
+          "survivors": 1,
+          "survivorNames": [
+            "predictive-balanced"
+          ],
+          "unjudged": 0,
+          "suppressed": 24,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 1
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 15,
+              "survivors": 1
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 8,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 1670001683,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 14,
+            "refusedDraws": 0,
+            "inertDraws": 2,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "building-rung",
+          "units": 54,
+          "chimesSpent": 39,
+          "examined": 24,
+          "survivors": 1,
+          "survivorNames": [
+            "predictive-balanced"
+          ],
+          "unjudged": 0,
+          "suppressed": 24,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 1
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 19,
+              "survivors": 1
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 4,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 1655406416,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 12,
+            "refusedDraws": 0,
+            "inertDraws": 0,
+            "duplicateDraws": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "stage-6-the-tall-one",
+      "name": "The tall one",
+      "ladderPosition": 6,
+      "inFirstHour": false,
+      "buildingId": "vertical-city",
+      "baselineProfileId": "collective",
+      "durationS": 900,
+      "replications": 50,
+      "tuningSeeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
+      "diagnosis": null,
+      "steps": [
+        {
+          "stepId": null,
+          "units": 15,
+          "chimesSpent": 0,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 1,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 17,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 6,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 502393573,
+            "bundles": 11,
+            "enumerable": false,
+            "draws": 13,
+            "refusedDraws": 0,
+            "inertDraws": 1,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "equipment-rung",
+          "units": 24,
+          "chimesSpent": 9,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 3,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 15,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 8,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 1215951009,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 12,
+            "refusedDraws": 0,
+            "inertDraws": 0,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "building-rung",
+          "units": 54,
+          "chimesSpent": 39,
+          "examined": 23,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 1,
+          "unbuildable": 1,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 11,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 15,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 7,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 417881390,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 13,
+            "refusedDraws": 0,
+            "inertDraws": 1,
+            "duplicateDraws": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "stage-7-prove-it",
+      "name": "Tune it",
+      "ladderPosition": 7,
+      "inFirstHour": false,
+      "buildingId": "midtown-office",
+      "baselineProfileId": "collective",
+      "durationS": 900,
+      "replications": 50,
+      "tuningSeeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
+      "diagnosis": null,
+      "steps": [
+        {
+          "stepId": null,
+          "units": 15,
+          "chimesSpent": 0,
+          "examined": 24,
+          "survivors": 2,
+          "survivorNames": [
+            "edit-1",
+            "edit-3"
+          ],
+          "unjudged": 0,
+          "suppressed": 1,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 2
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 18,
+              "survivors": 2
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 5,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 357179212,
+            "bundles": 11,
+            "enumerable": false,
+            "draws": 13,
+            "refusedDraws": 0,
+            "inertDraws": 1,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "equipment-rung",
+          "units": 24,
+          "chimesSpent": 9,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 1,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 16,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 7,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 346273175,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 13,
+            "refusedDraws": 0,
+            "inertDraws": 1,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "building-rung",
+          "units": 54,
+          "chimesSpent": 39,
+          "examined": 24,
+          "survivors": 1,
+          "survivorNames": [
+            "edit-8"
+          ],
+          "unjudged": 0,
+          "suppressed": 1,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 1
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 18,
+              "survivors": 1
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 5,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 549340453,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 15,
+            "refusedDraws": 0,
+            "inertDraws": 3,
+            "duplicateDraws": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "stage-8-the-headline-address",
+      "name": "The headline address",
+      "ladderPosition": 8,
+      "inFirstHour": false,
+      "buildingId": "chancery-house",
+      "baselineProfileId": "collective",
+      "durationS": 900,
+      "replications": 50,
+      "tuningSeeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
+      "diagnosis": null,
+      "steps": [
+        {
+          "stepId": null,
+          "units": 4,
+          "chimesSpent": 0,
+          "examined": 20,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 0,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 8,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 19,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 2104205868,
+            "bundles": 5,
+            "enumerable": false,
+            "draws": 16,
+            "refusedDraws": 0,
+            "inertDraws": 4,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "equipment-rung",
+          "units": 24,
+          "chimesSpent": 20,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 0,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 16,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 7,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 2097791607,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 18,
+            "refusedDraws": 0,
+            "inertDraws": 3,
+            "duplicateDraws": 3
+          }
+        },
+        {
+          "stepId": "building-rung",
+          "units": 54,
+          "chimesSpent": 50,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 0,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 16,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 7,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 247181573,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 14,
+            "refusedDraws": 0,
+            "inertDraws": 2,
+            "duplicateDraws": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "stage-9-both-ways-at-once",
+      "name": "Both ways at once",
+      "ladderPosition": 9,
+      "inFirstHour": false,
+      "buildingId": "crown-hotel",
+      "baselineProfileId": "collective",
+      "durationS": 900,
+      "replications": 50,
+      "tuningSeeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
+      "diagnosis": null,
+      "steps": [
+        {
+          "stepId": null,
+          "units": 15,
+          "chimesSpent": 0,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 24,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 19,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 4,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 30329684,
+            "bundles": 11,
+            "enumerable": false,
+            "draws": 12,
+            "refusedDraws": 0,
+            "inertDraws": 0,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "equipment-rung",
+          "units": 24,
+          "chimesSpent": 9,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 24,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 18,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 5,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 1162558158,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 14,
+            "refusedDraws": 0,
+            "inertDraws": 2,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "building-rung",
+          "units": 54,
+          "chimesSpent": 39,
+          "examined": 23,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 23,
+          "unbuildable": 1,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 11,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 14,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 8,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 519516764,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 14,
+            "refusedDraws": 0,
+            "inertDraws": 1,
+            "duplicateDraws": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "stage-10-the-bed-and-the-visitor",
+      "name": "The bed and the visitor",
+      "ladderPosition": 10,
+      "inFirstHour": false,
+      "buildingId": "st-jude-hospital",
+      "baselineProfileId": "collective",
+      "durationS": 900,
+      "replications": 50,
+      "tuningSeeds": {
+        "name": "tuning-20260730",
+        "seed": "20260730",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "holdout-20260731",
+        "seed": "20260731",
+        "replications": 50
+      },
+      "diagnosis": null,
+      "steps": [
+        {
+          "stepId": null,
+          "units": 15,
+          "chimesSpent": 0,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 24,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 20,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 3,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 58369091,
+            "bundles": 11,
+            "enumerable": false,
+            "draws": 13,
+            "refusedDraws": 0,
+            "inertDraws": 1,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "equipment-rung",
+          "units": 24,
+          "chimesSpent": 9,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 24,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 19,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 4,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 1343276222,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 14,
+            "refusedDraws": 0,
+            "inertDraws": 2,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "building-rung",
+          "units": 54,
+          "chimesSpent": 39,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
+          "suppressed": 24,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 14,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 9,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 1887644557,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 12,
+            "refusedDraws": 0,
+            "inertDraws": 0,
+            "duplicateDraws": 0
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -23,6 +23,7 @@ import type { Campaign } from '../campaign/types.js';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
+import type { PublishedSurvivors } from '../scenario/survivors.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import type { HonestyResources } from './run.js';
 
@@ -51,6 +52,10 @@ export async function loadHonestyResources(
     await readFile(join(dataDir, 'scenario-goals.json'), 'utf8'),
   ) as PublishedGoalRates;
   const rawCampaign: unknown = JSON.parse(await readFile(join(dataDir, 'campaign.json'), 'utf8'));
+  /* #367: the published survivor counts, seeded by the SURVIVORS adapter on every case. */
+  const survivors = JSON.parse(
+    await readFile(join(dataDir, 'scenario-survivors.json'), 'utf8'),
+  ) as PublishedSurvivors;
   const space = collectSearchSpace();
 
   const context: CampaignContext = {
@@ -104,6 +109,7 @@ export async function loadHonestyResources(
     space,
     stagesById,
     dimensionHelp,
+    survivors,
   };
 
   return { resources, config, campaign, published };

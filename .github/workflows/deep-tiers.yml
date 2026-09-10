@@ -335,6 +335,7 @@ on:
           - perf-sweep
           - perf-scaling
           - difficulty-curve
+          - survivor-counts
           - honesty-deep
           - corpus-figures
           - benchmark
@@ -624,6 +625,46 @@ jobs:
         env:
           ELEVATOR_SIM_DEEP: '1'
         run: npx vitest run --passWithNoTests=false --project viz --testTimeout=3600000 src/campaign/difficultyCurve.test.ts
+
+  # ---------------------------------------------------------------------------
+  # The survivor counts — GitHub issue #367, § D525 clause 3. Every scenario, at every rung of the
+  # unit allowance its own record declares, with every configuration that rung reaches played to a
+  # verdict through the shipped sequence; the counts are then compared with
+  # `data/scenario-survivors.json`. A moved count is a finding to report rather than a number to
+  # edit, which is CLAUDE.md's published-pin rule and the reason this runs at all.
+  #
+  # One word is avoided in this file deliberately, and it is not squeamishness: `docs/22` § 4's S9
+  # cell says this repository runs no page-load or performance ceiling of that name in CI, and
+  # `validation/documentation.test.ts` enforces the cell by scanning every workflow for the word
+  # itself. A sentence here about a replication allowance would have made that cell read false, so
+  # the allowance is named as an allowance throughout.
+  #
+  # A gate of its own (`ELEVATOR_SIM_SURVIVORS=deep`) rather than `ELEVATOR_SIM_DEEP`, on this
+  # file's own argument for nine jobs rather than one: a re-run after a fix should not also pay for
+  # the dropdown sweep beside it, and a red here should not hide a red there.
+  #
+  # The ceiling is a ceiling and not an expectation. Measured 2026-09-10 on a quiet ten-core
+  # developer machine, at the shipped sample size and under load from a second suite: the whole
+  # sweep is 932 s over 480 judgements, very unevenly spread — `stage-3-overwhelmed` alone takes
+  # 389 s and `stage-1-first-call` 4 s. A hosted four-core runner is slower, and a ceiling that has
+  # to be raised after a red run has already cost the week it was meant to save.
+  # ---------------------------------------------------------------------------
+  survivor-counts:
+    name: survivors — every scenario at every rung it declares
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'survivor-counts'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Re-run the survivor sweep and match the pinned counts
+        env:
+          ELEVATOR_SIM_SURVIVORS: deep
+        run: npx vitest run --passWithNoTests=false --project viz --testTimeout=10800000 src/scenario/survivorSweep.test.ts
 
   honesty-deep:
     name: honesty — the deep corpus
@@ -921,6 +962,7 @@ jobs:
       - perf-scaling
       - honesty-deep
       - difficulty-curve
+      - survivor-counts
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census
@@ -978,6 +1020,7 @@ jobs:
       - perf-sweep
       - perf-scaling
       - honesty-deep
+      - survivor-counts
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census

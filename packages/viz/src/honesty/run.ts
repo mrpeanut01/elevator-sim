@@ -43,6 +43,7 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { recordRun } from '../record/recordRun.js';
 import type { PublishedScenario } from '../scenario/published.js';
+import type { PublishedSurvivors } from '../scenario/survivors.js';
 import type { CampaignFitOut } from '../campaign/fitOut.js';
 import { fitOutForCase, fittedBuildingFor, fittedProfileFor } from './fitOut.js';
 import { checkAll } from './properties.js';
@@ -82,6 +83,20 @@ export interface HonestyResources {
   /** Stages by id, with their published row. Absent means no case may name a stage. */
   readonly stagesById?: ReadonlyMap<string, { readonly stage: CampaignStage; readonly published: PublishedScenario }> | undefined;
   readonly dimensionHelp: ReadonlyMap<string, string>;
+  /**
+   * `data/scenario-survivors.json` — GitHub issue #367's published counts.
+   *
+   * Handed in rather than read here, on this interface's own stated rule: the module is
+   * browser-facing and `boundaries.test.ts` refuses a `node:` import in it.
+   *
+   * **Not keyed to the case's stage, deliberately.** The table is static content — the same
+   * sentences on every case — so the `SURVIVORS` adapter seeds all of it every time, the way
+   * `SCENARIOS` seeds `CONTRACTS`. Keying it to `stagesById` would have made the surface appear
+   * only where a case draws a stage, and the always-on tier sets `stageProbability: 0`; the deep
+   * tier's one-surface lead over always-on is a property `honesty.test.ts` asserts, and a second
+   * stage-keyed surface would have moved it without saying so.
+   */
+  readonly survivors: PublishedSurvivors;
   /**
    * Injected between rendering and checking, for `faults.ts` only.
    *
@@ -444,6 +459,7 @@ export function contextFor(honestyCase: HonestyCase, resources: HonestyResources
     buildings: [...resources.buildingsById.values()],
     trafficProfiles: resources.trafficProfiles,
     dispatcherProfiles: resources.dispatcherProfiles,
+    survivors: resources.survivors,
     bundleAt: memoisedBundles(recording, access),
   };
 }
