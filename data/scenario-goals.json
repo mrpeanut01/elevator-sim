@@ -1471,6 +1471,300 @@
           "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
+    },
+    {
+      "id": "brief-e5-handling-capacity",
+      "name": "E5 — Meet the handling-capacity target",
+      "buildingId": "chancery-house",
+      "dispatcherProfileId": "energy-aware",
+      "durationS": 900,
+      "arrivalRatePctPop5min": 2.5,
+      "tuningSeeds": {
+        "name": "brief-tuning-20260910",
+        "seed": "20260910",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "brief-holdout-20260911",
+        "seed": "20260911",
+        "replications": 50
+      },
+      "goals": [
+        {
+          "kind": "answer-the-demand",
+          "threshold": null,
+          "disposition": "batch",
+          "tuning": {
+            "n": 50,
+            "passes": 31,
+            "fails": 19,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 32,
+            "fails": 18,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdoutAgrees": true,
+          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 31 of 50 on the tuning seeds and 32 of 50 on the holdout seeds."
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null,
+          "disposition": "batch",
+          "tuning": null,
+          "holdout": null,
+          "holdoutAgrees": null,
+          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+        }
+      ],
+      "configurationFacts": [
+        {
+          "kind": "deliver-everyone",
+          "threshold": null,
+          "disposition": "configuration-fact",
+          "tuning": {
+            "n": 50,
+            "passes": 50,
+            "fails": 0,
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 50,
+            "fails": 0,
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
+          },
+          "holdoutAgrees": true,
+          "reason": "deliver-everyone: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+        },
+        {
+          "kind": "no-divergence",
+          "threshold": null,
+          "disposition": "configuration-fact",
+          "tuning": {
+            "n": 50,
+            "passes": 50,
+            "fails": 0,
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 50,
+            "fails": 0,
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
+          },
+          "holdoutAgrees": true,
+          "reason": "no-divergence: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+        },
+        {
+          "kind": "nobody-abandoned",
+          "threshold": null,
+          "disposition": "configuration-fact",
+          "tuning": {
+            "n": 50,
+            "passes": 50,
+            "fails": 0,
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 50,
+            "fails": 0,
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
+          },
+          "holdoutAgrees": true,
+          "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+        }
+      ],
+      "withheld": [
+        {
+          "kind": "long-waits-under",
+          "threshold": 10,
+          "disposition": "not-shippable",
+          "tuning": {
+            "n": 50,
+            "passes": 49,
+            "fails": 1,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 50,
+            "fails": 0,
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
+          },
+          "holdoutAgrees": false,
+          "reason": "long-waits-under (≤ 10 %): withheld. It passed 49 of 50 on the tuning seeds and 50 of 50 on the holdout seeds, which are two different kinds of answer (variable against constant-pass). A classification that does not survive a disjoint seed set is not one to ship a level on."
+        },
+        {
+          "kind": "everyone-can-get-there",
+          "threshold": null,
+          "disposition": "not-shippable",
+          "tuning": null,
+          "holdout": null,
+          "holdoutAgrees": null,
+          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+        }
+      ]
+    },
+    {
+      "id": "brief-e3-diagnose-the-saturation",
+      "name": "E3 — Diagnose the saturation",
+      "buildingId": "mixed-use-high-rise",
+      "dispatcherProfileId": "energy-aware",
+      "durationS": 900,
+      "arrivalRatePctPop5min": null,
+      "tuningSeeds": {
+        "name": "brief-tuning-20260910",
+        "seed": "20260910",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "brief-holdout-20260911",
+        "seed": "20260911",
+        "replications": 50
+      },
+      "goals": [
+        {
+          "kind": "deliver-everyone",
+          "threshold": null,
+          "disposition": "batch",
+          "tuning": {
+            "n": 50,
+            "passes": 4,
+            "fails": 46,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 5,
+            "fails": 45,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdoutAgrees": true,
+          "reason": "deliver-everyone: a batch goal, judged over the scenario's replications — 4 of 50 on the tuning seeds and 5 of 50 on the holdout seeds."
+        },
+        {
+          "kind": "no-divergence",
+          "threshold": null,
+          "disposition": "batch",
+          "tuning": {
+            "n": 50,
+            "passes": 36,
+            "fails": 14,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 35,
+            "fails": 15,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdoutAgrees": true,
+          "reason": "no-divergence: a batch goal, judged over the scenario's replications — 36 of 50 on the tuning seeds and 35 of 50 on the holdout seeds."
+        },
+        {
+          "kind": "answer-the-demand",
+          "threshold": null,
+          "disposition": "batch",
+          "tuning": {
+            "n": 50,
+            "passes": 6,
+            "fails": 44,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 7,
+            "fails": 43,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdoutAgrees": true,
+          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 6 of 50 on the tuning seeds and 7 of 50 on the holdout seeds."
+        },
+        {
+          "kind": "long-waits-under",
+          "threshold": 10,
+          "disposition": "batch",
+          "tuning": {
+            "n": 50,
+            "passes": 14,
+            "fails": 36,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 19,
+            "fails": 31,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdoutAgrees": true,
+          "reason": "long-waits-under (≤ 10 %): a batch goal, judged over the scenario's replications — 14 of 50 on the tuning seeds and 19 of 50 on the holdout seeds."
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null,
+          "disposition": "batch",
+          "tuning": null,
+          "holdout": null,
+          "holdoutAgrees": null,
+          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+        }
+      ],
+      "configurationFacts": [
+        {
+          "kind": "nobody-abandoned",
+          "threshold": null,
+          "disposition": "configuration-fact",
+          "tuning": {
+            "n": 50,
+            "passes": 50,
+            "fails": 0,
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 50,
+            "fails": 0,
+            "unmeasured": 0,
+            "rateClass": "constant-pass"
+          },
+          "holdoutAgrees": true,
+          "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+        }
+      ],
+      "withheld": [
+        {
+          "kind": "everyone-can-get-there",
+          "threshold": null,
+          "disposition": "not-shippable",
+          "tuning": null,
+          "holdout": null,
+          "holdoutAgrees": null,
+          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+        }
+      ]
     }
   ]
 }

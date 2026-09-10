@@ -647,8 +647,12 @@ Named on screen in the products' own registers rather than only here:
   above said the row was *owned by no issue*, which was true when it was written and stopped being
   true when #169 was filed.
 - **§ 7.4's ghost lane** is not drawn: the host exposes no second recording.
-- **B2 and B5 of `docs/21`** (Compare/report surfaces, the six engineering briefs) are specified and
-  unbuilt.
+- **B2 and B5 of `docs/21`** (Compare/report surfaces, the six engineering briefs) were specified and
+  unbuilt. **B5 is half true now** — GitHub issue **#227**, 2026-09-10: two of the six ship as
+  scenarios (`data/engineering-briefs.json`, `packages/viz/src/briefs/`), measured into
+  `data/scenario-goals.json` and playable from the Lab's stage picker; the other four are refused at
+  load, each naming the seam it needs, and `briefs/parse.test.ts` checks those premises against the
+  tree. The issue stays open on its human clause — two lift-industry testers rating them credible.
 
 ---
 

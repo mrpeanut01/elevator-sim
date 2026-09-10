@@ -84,6 +84,8 @@ const WEB_DATA_FILES: readonly string[] = Object.freeze([
   'dispatcher-profiles.json',
   'campaign.json',
   'scenario-goals.json',
+  /* The engineering briefs that ship, authored to the scenario schema — GitHub issue #227. */
+  'engineering-briefs.json',
   'fixit-cases.json',
   'price-schedule.json',
   'reference-runs.json',

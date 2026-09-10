@@ -69,8 +69,8 @@ beforeAll(async () => {
 /**
  * Every document the viewer fetches by a fixed name.
  *
- * The same six `dev/data.test.ts` pins from the other end — it asserts these are what
- * `loadBrowserResources` and `loadCampaign` request, this asserts the build emits them. A seventh
+ * The same set `dev/data.test.ts` pins from the other end — it asserts these are what
+ * `loadBrowserResources` and `loadCampaign` request, this asserts the build emits them. One more
  * fetch added there without a line in `vite.config.ts` fails here, which is the 404 it would
  * otherwise become only once deployed.
  */
@@ -79,6 +79,7 @@ const FETCHED = [
   'campaign.json',
   'dispatcher-profiles.json',
   'elevator-specs.json',
+  'engineering-briefs.json',
   'scenario-goals.json',
   'traffic-profiles.json',
 ] as const;

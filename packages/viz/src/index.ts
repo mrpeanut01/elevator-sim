@@ -113,6 +113,7 @@
  * | {@link validatePublishedGoalRates} | `src/scenario/goalRates.test.ts` — the guard. A goal kind with no measured rate on a scenario is a failure, not an omission |
  * | {@link CANDIDATE_GOALS}, {@link CANDIDATE_SCENARIOS} | `goalReport`, `regenerate.test-helper.ts` and the guard |
  * | {@link parseCampaign}, {@link validateCampaign} | `loadCampaign` in `src/dev/data.ts`, called once by `src/dev/main.ts` before the Campaign tab is mounted — `docs/10` § 5.2 |
+ * | {@link parseEngineeringBriefs}, {@link BRIEF_KINDS}, {@link BRIEF_KIND_SEAM} | `loadCampaign` in `src/dev/data.ts`, on the same context object it hands `parseCampaign` — GitHub issue **#227**. A brief **is** a scenario, so the only thing this validator adds is which of `docs/21` § 4's six challenges a scenario is, and the refusal that stops a challenge with no runner from shipping as an inert one |
  * | {@link editableIdsOf} | `src/dev/campaignPanel.ts`, `src/campaign/brief.ts` and `parse.ts`'s lever check. One answer to *"may I move this?"* |
  * | {@link briefingFor} | `src/dev/campaignPanel.ts`'s left column, redrawn on every stage change |
  * | {@link admitProfile}, {@link movedDimensions} | `src/dev/campaignPanel.ts` — a profile outside the stage's editable set is refused with the dimension named, before the batch |
@@ -562,6 +563,16 @@ export {
   validateCampaign,
   type CampaignContext,
 } from './campaign/parse.js';
+
+export {
+  BRIEF_KINDS,
+  BRIEF_KIND_SEAM,
+  EngineeringBriefsError,
+  parseEngineeringBriefs,
+  type BriefKind,
+  type EngineeringBrief,
+  type EngineeringBriefs,
+} from './briefs/parse.js';
 
 export { PROBABILITY_WORDS, probabilityWordIn } from './campaign/words.js';
 

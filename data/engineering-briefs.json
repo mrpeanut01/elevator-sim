@@ -1,0 +1,205 @@
+{
+  "$comment": "THE SIX ENGINEERING BRIEFS — GitHub issue #227, docs/21-engineer-reimagined-contract.md § 4, and the product owner's 2026-09-06 rescope of that issue, which is the schema this file is on. § 4 asked for one entry per brief with six `kind`s of its own; the rescope replaced that schema and kept the content: \"the six briefs survive whole; their schema and their home do not … the briefs are authored as scenarios in the technical register\". DECISIONS.md § D525 clause 1 and docs/38 § 2.1 say what a scenario is — \"data/campaign.json's stage record already carries everything but the budget … that record, plus a budget, is the scenario schema\" — and campaign/types.ts#CampaignStage has carried the budget since #365. SO EVERY ENTRY BELOW IS A CampaignStage, validated by packages/viz/src/campaign/parse.ts against data/scenario-goals.json, collectSearchSpace(), data/buildings/ and data/price-schedule.json, exactly as the ten campaign stages are. The only field the campaign record does not have is `kind`: which of § 4's six challenges a scenario is. IT IS A FILE OF ITS OWN RATHER THAN ROWS IN data/campaign.json BECAUSE THAT ARRAY IS CAREER'S ORDERED TEN — campaign/stageSequence.ts walks it as a progression — and putting briefs in it would put them in the Career ladder, which is the one thing the rescope does not say. TWO OF THE SIX SHIP. The other four are refused at load by briefs/parse.ts#BRIEF_KIND_SEAM, each naming the seam it needs rather than an amount of work, and briefs/parse.test.ts checks every one of those premises against the tree: E1 and E2 need two arms on two buildings, which batch/types.ts#BatchArmRequest forbids because the dispatcher is the one field the passenger trace is not a function of; E4 declares no goal and every published goals bucket carries beat-the-baseline; E6 delivers a front over a candidate set and so declares no goal either \u2014 and its entry records a correction rather than a refusal, because docs/21 \u00a7 4 names its blocker as widening batch/suite.ts's SuiteField and that widening already landed. An authored brief that cannot reach a run would be the twelfth dead seam this repository has shipped in code, and refusing it at load is cheaper than finding it later. PROVENANCE, per the product owner's 2026-09-08 standing ruling on governed data/ values: THESE FIGURES ARE AN AGENT'S PROPOSAL, drafted by Claude Opus 5 for the owner to accept, tighten or reject, and the line that ruling asks for is drawn field by field. MEASURED, and re-derived on every run rather than trusted here: every goal kind below is one data/scenario-goals.json put in this scenario's `goals` bucket — goals are selected, never authored, and the bar each is judged against is the handover setting's own count on these same seeds; the two configurations were chosen by sweeping all thirteen shipped dispatchers to a verdict at these seeds, and briefs/playable.test.ts re-derives that at least one still clears and that the handover setting still does not. CHOSEN: which building and which demand each brief asks its question at, the handover dispatcher (energy-aware on both, because § D106's measured finding — a dispatcher that drives less carries fewer people — is the most instructive starting point this product can hand an enthusiast, and it is a real commissioning choice rather than a strawman), the prose, and the budget rule, which is stage-7-prove-it's verbatim because both briefs open the whole editor and the arithmetic is therefore identical. NO SCALAR SCORE ANYWHERE, per docs/21 § 6 non-goal 3: a brief's outcome is the goal verdicts, the paired intervals and the refusals campaign/judge.ts already produces, and that module's refusal is untouched. Energy appears on no aggregate here and is never a goal.",
+  "generatedBy": "Authored. Validated at load by packages/viz/src/briefs/parse.ts for its kind, and by packages/viz/src/campaign/parse.ts for everything else — the same validator, the same context object and the same published goal table the campaign is checked against.",
+  "contract": "docs/21-engineer-reimagined-contract.md § 4 (the six challenges), docs/38-what-the-game-is.md § 2.1 and DECISIONS.md § D525 clause 1 (the scenario schema they are authored to), GitHub issue #227 and its 2026-09-06 rescope comment. Trip-wire one: a batch-judged bar must already be measured, so every brief here has its row in data/scenario-goals.json, regenerated through packages/viz/src/scenario/regenerate.test-helper.ts from packages/viz/src/scenario/candidates.ts and re-derived by goalRates.test.ts. Trip-wire two: nothing here speaks of required n or a resolvable effect, because compareCell, replicationsToResolve and smallestDetectableEffect still have no viz caller and § 3.7 (2) requires Compare's own caveat to travel with the figure.",
+  "briefs": [
+    {
+      "id": "brief-e5-handling-capacity",
+      "kind": "meet-the-target",
+      "name": "E5 — Meet the handling-capacity target",
+      "teaches": "that a bank with cars to spare can still fail to carry the crowd that arrives, and that the two figures to compare are offered and carried over the same five minutes",
+      "brief": [
+        "Chancery House has more cars than its floor count suggests it needs, and it was handed over on a setting chosen to keep the machines quiet.",
+        "Two figures decide this one: how many people arrive every five minutes, and how many the bank carries in the same five minutes. They are not the same figure, and the second is the one a dispatcher can move.",
+        "Change whatever you like and run it again. The bar is the handover setting's own count on these fifty traces, and the brief is only met on fifty more it never saw."
+      ],
+      "building": "chancery-house",
+      "traffic": {
+        "arrivalRatePctPop5min": 2.5
+      },
+      "durationS": 900,
+      "dispatcher": {
+        "startingProfileId": "energy-aware",
+        "editable": {
+          "mode": "every-declared-dimension"
+        }
+      },
+      "seeds": {
+        "name": "brief-tuning-20260910",
+        "seed": "20260910",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "brief-holdout-20260911",
+        "seed": "20260911",
+        "replications": 50
+      },
+      "replications": 50,
+      "goals": [
+        {
+          "kind": "answer-the-demand",
+          "threshold": null
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null
+        }
+      ],
+      "levers": {
+        "overwhelmed": "dispatch.assignmentMode",
+        "abandoned": "weights.starvation",
+        "stranded": "answer.allowBypassIfSoleEligibleCar",
+        "locked-out": null
+      },
+      "budget": {
+        "startingUnits": 15,
+        "note": "DERIVED: 15 u is \"Destination panels\" at 13 u — the dearest change on data/price-schedule.json that every dimension the search space declares can reach — plus the dispatcher tier's own typical of 2 u, so the lesson is never the last thing this brief can afford. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial. It is stage-7-prove-it's arithmetic verbatim, because this brief opens the whole editor exactly as that stage does and a second derivation of the same quantity would be a second answer to one question.",
+        "schema": {
+          "type": "integer",
+          "unit": "units",
+          "min": 0,
+          "max": 357,
+          "default": 15,
+          "activeWhen": null
+        },
+        "steps": [
+          {
+            "id": "equipment-rung",
+            "name": "Widen to the equipment tier",
+            "addsUnits": 9,
+            "chimes": 9,
+            "note": "DERIVED: +9 u lifts the budget to 24, which is \"Full destination dispatch\" — the dearest change on the equipment tier. CHOSEN: that the first rung a player buys is the whole equipment tier rather than a slice of it, and 9 chimes for it, at one chime per unit bought. Nothing measures that rate.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 9,
+              "activeWhen": null
+            }
+          },
+          {
+            "id": "building-rung",
+            "name": "Widen to the building tier",
+            "addsUnits": 30,
+            "chimes": 30,
+            "note": "DERIVED: +30 u lifts the budget to 54, which is \"A fifth car\" — the dearest change on the whole ladder, so at this rung every single change in data/price-schedule.json is individually affordable and what a further rung would buy is a combination rather than a change. CHOSEN: that the ladder stops here, and 30 chimes for it, at one chime per unit bought.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 30,
+              "activeWhen": "equipment-rung"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "brief-e3-diagnose-the-saturation",
+      "kind": "diagnose",
+      "name": "E3 — Diagnose the saturation",
+      "teaches": "how to read a report that withholds its average wait, and that the reason it was withheld is a fact about the run rather than a setting anybody chose",
+      "brief": [
+        "Mixed-Use High-Rise, at the demand its own traffic profile declares, on the setting it was handed over with.",
+        "Some of these runs end with no average wait to quote, because the report refuses to publish a mean the run does not support. It says why, on the run's own terms. Read that, find the dial it points at, and change it.",
+        "The brief is met when the fix holds on the fifty traces you tuned on and on fifty more you never saw."
+      ],
+      "building": "mixed-use-high-rise",
+      "traffic": {
+        "arrivalRatePctPop5min": null
+      },
+      "durationS": 900,
+      "dispatcher": {
+        "startingProfileId": "energy-aware",
+        "editable": {
+          "mode": "every-declared-dimension"
+        }
+      },
+      "seeds": {
+        "name": "brief-tuning-20260910",
+        "seed": "20260910",
+        "replications": 50
+      },
+      "holdoutSeeds": {
+        "name": "brief-holdout-20260911",
+        "seed": "20260911",
+        "replications": 50
+      },
+      "replications": 50,
+      "goals": [
+        {
+          "kind": "deliver-everyone",
+          "threshold": null
+        },
+        {
+          "kind": "no-divergence",
+          "threshold": null
+        },
+        {
+          "kind": "answer-the-demand",
+          "threshold": null
+        },
+        {
+          "kind": "long-waits-under",
+          "threshold": 10
+        },
+        {
+          "kind": "beat-the-baseline",
+          "threshold": null
+        }
+      ],
+      "levers": {
+        "overwhelmed": "dispatch.assignmentMode",
+        "abandoned": "weights.starvation",
+        "stranded": "weights.zoneAffinity",
+        "locked-out": "dispatch.callType"
+      },
+      "budget": {
+        "startingUnits": 15,
+        "note": "DERIVED: 15 u is \"Destination panels\" at 13 u — the dearest change on data/price-schedule.json that every dimension the search space declares can reach — plus the dispatcher tier's own typical of 2 u. It is also exactly what this brief's four suggested levers cost together, which parse.ts checks: a hint pointing at a dial the player cannot pay to move is the locked-dial hint with a price on it. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial, which is stage-7-prove-it's verbatim.",
+        "schema": {
+          "type": "integer",
+          "unit": "units",
+          "min": 0,
+          "max": 357,
+          "default": 15,
+          "activeWhen": null
+        },
+        "steps": [
+          {
+            "id": "equipment-rung",
+            "name": "Widen to the equipment tier",
+            "addsUnits": 9,
+            "chimes": 9,
+            "note": "DERIVED: +9 u lifts the budget to 24, which is \"Full destination dispatch\" — the dearest change on the equipment tier. CHOSEN: that the first rung a player buys is the whole equipment tier rather than a slice of it, and 9 chimes for it, at one chime per unit bought. Nothing measures that rate.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 9,
+              "activeWhen": null
+            }
+          },
+          {
+            "id": "building-rung",
+            "name": "Widen to the building tier",
+            "addsUnits": 30,
+            "chimes": 30,
+            "note": "DERIVED: +30 u lifts the budget to 54, which is \"A fifth car\" — the dearest change on the whole ladder, so at this rung every single change in data/price-schedule.json is individually affordable and what a further rung would buy is a combination rather than a change. CHOSEN: that the ladder stops here, and 30 chimes for it, at one chime per unit bought.",
+            "schema": {
+              "type": "integer",
+              "unit": "units",
+              "min": 0,
+              "max": 357,
+              "default": 30,
+              "activeWhen": "equipment-rung"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

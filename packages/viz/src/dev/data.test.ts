@@ -34,7 +34,7 @@ import { loadBrowserResources, loadCampaign, loadFixitCases, loadReferenceRuns }
  * The contract, and the reason each entry is on it.
  *
  * Every one is fetched under a name that survives a deploy, so every one must be `no-cache` on the
- * server. `__buildings.json` is Vite's generated manifest of `data/buildings/`; the other five are
+ * server. `__buildings.json` is Vite's generated manifest of `data/buildings/`; the other eight are
  * copies of the files beside them in `data/`.
  */
 const EXPECTED_FETCHES = [
@@ -42,6 +42,7 @@ const EXPECTED_FETCHES = [
   '/campaign.json',
   '/dispatcher-profiles.json',
   '/elevator-specs.json',
+  '/engineering-briefs.json',
   '/fixit-cases.json',
   '/price-schedule.json',
   '/reference-runs.json',
@@ -85,9 +86,11 @@ describe('the documents the viewer fetches by a fixed name', () => {
 
     // All three loaders, because the split is deliberate and none alone is the contract.
     // `loadBrowserResources` is what `dev/batchWorker.ts` runs on every worker start and fetches
-    // four; `loadCampaign` is the Campaign panel's only call and fetches two more; `loadFixitCases`
-    // is the Fix-a-building panel's only call and fetches the seventh; `loadReferenceRuns` is the
-    // watch picker's only call and fetches the eighth. A test that drove one would leave documents
+    // four; `loadCampaign` is the Campaign panel's only call and fetches three more — the campaign,
+    // the goal table and, since GitHub issue #227, the engineering briefs, which are scenarios
+    // checked against that same table; `loadFixitCases` is the Fix-a-building panel's only call and
+    // fetches the eighth; `loadReferenceRuns` is the watch picker's only call and fetches the
+    // ninth. A test that drove one would leave documents
     // unpinned — which is how `campaign.json` and `scenario-goals.json` came to be absent from the
     // first draft of this list.
     const resources = await loadBrowserResources();
