@@ -92,8 +92,60 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **624 294** | **606** | **57** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **777 728** | **4 710** | **58** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **680 037** | **606** | **62** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **845 966** | **4 710** | **63** | **0** | **green**, and the register is empty |
+
+  **Wave Y's move is exactly 752 strings a case in both tiers — and the row it replaced was already
+  wrong before this wave started, which is the more useful half.** Measured on the integrated tree
+  after wave Y, both tiers in one sitting, with the base at `f2e1970` re-measured first.
+
+  **The base did not reproduce.** Fifteen consecutive waves had confirmed it; this is the sixteenth
+  and it is the one that broke the streak:
+
+  | | published for wave X | measured at `f2e1970` | drift |
+  |---|---|---|---|
+  | always-on strings | 624 294 | **643 189** | **+18 895** |
+  | always-on surfaces | 57 | **58** | **+1** |
+  | deep strings | 777 728 | **800 846** | **+23 118** |
+  | deep surfaces | 58 | **59** | **+1** |
+
+  So this wave's own move has to be stated against the **measured** base rather than the published
+  one, and both are given, because subtracting the published figures would attribute somebody else's
+  wave to this one — which is the mistake waves P and Q's row exists to record.
+
+  | | base `f2e1970` | wave Y | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 643 189 | **680 037** | **+36 848** | **752.0** |
+  | deep strings | 800 846 | **845 966** | **+45 120** | **752.0** |
+  | surfaces | 58 / 59 | **62 / 63** | **+4 / +4** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **752.0 in both tiers to the tenth**, which is what four whole screens seeded once per case looks
+  like: 36 848 ÷ 49 and 45 120 ÷ 60 are both exactly 752.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers, and the +4 is
+  named with nothing removed: `everyday/landingView.ts#landingViewOf`,
+  `everyday/support.ts#supportViewOf`, `scenario/survivors.ts#survivorSentenceFor` and
+  `telemetry/consentView.ts#consentAskViewOf` — GitHub issues #244, #245, #367 and #340, the four
+  screens this wave built. **The deep tier's one-surface lead survives**, and the diff names it:
+  `campaign/judge.ts#judgeStage` is the only surface in deep and not in always-on, and nothing is in
+  always-on and not in deep. A wave that added four surfaces to both sides did not disturb the gap,
+  which is how a real move would have been told apart from this one.
+
+  **The move is deliberately not decomposed, and the arithmetic says why.** Four lanes published a
+  per-case forecast — the landing page at +131, telemetry's consent at +30, #404's skip label at +1
+  and #370's stamp at +1 — summing to **163**. Measured, 752. The two lanes that seeded the other
+  two surfaces, `support` and `survivors`, published no string forecast at all, and the remainder is
+  theirs. Attributing 589 a case between two lanes that did not forecast would be manufacturing a
+  decomposition, which is what § D256 refuses; the surface attribution is exact because a set
+  difference is a measurement and a quotient is not.
+
+  **What the streak breaking is worth, stated rather than filed.** Wave X's row was correct when it
+  was taken. What happened between then and `f2e1970` is that waves landed without the row being
+  re-measured — so the published figures aged into a claim nobody had checked, and only re-measuring
+  the base told a *correction* apart from a *move*. That is this row's oldest lesson arriving from
+  the other direction: the habit § D442 set is not that the base *will* reproduce, it is that you
+  find out.
 
   **Wave X's move is exactly nineteen strings a case in both tiers, all of it on one adapter, and it
   is the third time this column has landed on nineteen.** Measured on the integrated tree after
