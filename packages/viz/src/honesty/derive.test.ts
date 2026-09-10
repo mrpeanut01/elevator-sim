@@ -472,6 +472,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A DOM `id`, not a sentence — GitHub issue #404. `shell.ts` writes it onto the screen ' +
+        'region and the skip link puts it in an `href`, so the two halves of the fragment cannot ' +
+        'disagree; it is derived only because the two-adjacent-words prose test cannot tell a ' +
+        'hyphenated slug from prose, which is the same reason `EVERYDAY_ROOT_CLASS` two exports ' +
+        'above it is *not* here — that one is a single word and the scanner never sees it. The ' +
+        'words a player actually reads on that link are ' +
+        '`everyday/types.ts#SHELL_SKIP_LABEL`, which the `EVERYDAY_MENU` adapter drives beside ' +
+        '`RAIL_DRAWER_COPY`\'s two. The day this constant becomes something a player reads, it ' +
+        'stops being excludable.',
+      ids: ['everyday/types.ts#EVERYDAY_SCREEN_REGION_ID'],
+    },
+    {
+      reason:
         'GAMEPLAY § 19\'s design tokens. The type stack\'s font-family values — ' +
         '"\'Familjen Grotesk\', sans-serif" and friends — are CSS, read by no player as a ' +
         'sentence, and are derived only because a two-word font name satisfies the ' +

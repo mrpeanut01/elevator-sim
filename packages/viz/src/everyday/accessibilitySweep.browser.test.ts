@@ -124,14 +124,26 @@
  * ## 7. What it found, what was fixed, and what is recorded
  *
  * The first run of this sweep over all twenty screens found violations of **four** rules. Two were
- * fixed on this commit and two are in {@link OUTSTANDING} with a ghost check holding them.
+ * fixed on the commit that built this file, one has since been fixed by GitHub issue #404, and one
+ * is in {@link OUTSTANDING} with a ghost check holding it.
  *
  * | rule | criterion | where | what happened |
  * |---|---|---|---|
  * | `select-name` | SC 4.1.2 | Career, building, Workshop — **9** nodes from **3** call sites | **fixed**: `campaignScreens.ts#select` now requires a name, and `workshopScreen.ts`'s pattern select carries one |
  * | `label` | SC 4.1.2 | Design a building, Tune the tower — **21 to 41** inputs | **fixed**: `designerScreen.ts#sliderRow`, `#numberField` and `tunerScreen.ts#drawSliderRow` name their inputs |
- * | `color-contrast` | SC 1.4.3 | **every one of the twenty screens**, **265** nodes | **recorded** — see {@link OUTSTANDING}, first entry |
- * | `scrollable-region-focusable` | SC 2.1.1 | the shell's own screen region, on Endless rush and the tutorial's second screen | **recorded** — see {@link OUTSTANDING}, second entry |
+ * | `color-contrast` | SC 1.4.3 | **every one of the twenty screens**, **265** nodes | **recorded** — see {@link OUTSTANDING}, its one entry |
+ * | `scrollable-region-focusable` | SC 2.1.1 | the shell's own screen region, on Endless rush and the tutorial's second screen | **fixed** by issue #404 — see below |
+ *
+ * **The fourth row moved from *recorded* to *fixed*, and the register entry was deleted rather than
+ * reworded.** Its recorded reason was a precondition, not a doubt: *"the remedy — `tabindex="0"` on
+ * the region every screen mounts into — puts a new stop in the Tab order of all twenty, which is
+ * `docs/36` `AX-9` and `AX-10` work and needs the written keyboard journeys § 5.2 specifies before
+ * anybody moves focus order."* Those journeys are `everyday/keyboardJourneys.browser.test.ts`, and
+ * `shell.ts` now writes `main`, an `id` and `tabindex="0"` onto `.everyday-screen` — so the region
+ * is in the tab order, `focusable-element` passes, and the rule reports nothing on any of the
+ * twenty. **The ghost check below is what said so**: it went red on the commit that made the
+ * finding stop reproducing, which is the direction a register is worth keeping for. A registered
+ * finding that has been fixed must stop being registered, or the register becomes decoration.
  *
  * The counts in that table are a **dated record of one host on 2026-09-09**, taken by driving the twenty
  * routes outside vitest — which is how they can be read at all, since vitest 4 intercepts
@@ -281,9 +293,12 @@ interface SweepResult {
  * screens**, so a per-screen register would hold the same finding twenty times.
  *
  * The cost is stated rather than glossed. `'every'` weakens the ghost check to *found on at least
- * one screen*, which is weaker than *found where it was recorded*. It is accepted for these two
- * entries because both are about chrome or a rule that reproduces on every screen measured, so
- * per-screen precision would buy a longer register and no extra information.
+ * one screen*, which is weaker than *found where it was recorded*. It is accepted for the one entry
+ * that remains because it is a rule reproducing on every screen measured, so per-screen precision
+ * would buy a longer register and no extra information. **It was accepted for a second entry that
+ * has since been deleted**, and that deletion is the argument for the marker rather than against
+ * it: `scrollable-region-focusable` was one element in `everyday/shell.ts`, drawn on all twenty, and
+ * fixing it took one entry out rather than twenty.
  *
  * ## Why the match is a selector fragment and never a node count
  *
@@ -325,21 +340,16 @@ const OUTSTANDING: readonly {
       'Owner: `docs/36` `AX-6` and `AX-7`, and GitHub issue #239\'s remaining clauses. The rule ' +
       'stays in the gate: what is registered is this finding, not the criterion.',
   },
-  {
-    ruleId: 'scrollable-region-focusable',
-    screen: 'every',
-    targetContains: '.everyday-screen',
-    finding:
-      'WCAG SC 2.1.1. The shell\'s own screen region scrolls, and on a screen whose content holds ' +
-      'no focusable element the region itself is not reachable from the keyboard, so a reader who ' +
-      'does not point cannot scroll it. Measured on two screens of the twenty — Endless rush and ' +
-      'the tutorial\'s second screen — and registered against `.everyday-screen` rather than ' +
-      'against those two, because it is one element in `everyday/shell.ts` and which screens ' +
-      'overflow without a control is a property of their content. Recorded rather than fixed ' +
-      'because the remedy — `tabindex="0"` on the region every screen mounts into — puts a new ' +
-      'stop in the Tab order of all twenty, which is `docs/36` `AX-9` and `AX-10` work and needs ' +
-      'the written keyboard journeys § 5.2 specifies before anybody moves focus order.',
-  },
+  /*
+   * **`scrollable-region-focusable` used to be the second entry and is deleted, not reworded** —
+   * GitHub issue #404. Its own recorded reason named the precondition rather than a doubt: the
+   * remedy needed `docs/36` § 5.2's written keyboard journeys to exist first, because it moves
+   * focus order on all twenty screens. They exist (`everyday/keyboardJourneys.browser.test.ts`),
+   * `shell.ts`'s screen region is now a `main` with an `id` and `tabindex="0"`, and the ghost check
+   * below went red on the commit that made the finding stop reproducing — which is what took the
+   * entry out. The rule itself stays in the gate: what was registered was that finding, not the
+   * criterion, so a *new* unfocusable scrolling region arrives unregistered and red.
+   */
 ]);
 
 /** Whether this entry is the one that finding is about. One place, so the two directions agree. */
