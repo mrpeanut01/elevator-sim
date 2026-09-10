@@ -825,12 +825,22 @@ describe.skipIf(!HAS_BROWSER)('the accessibility sweep — WCAG 2.1 A and AA ove
  */
 async function takeTheNameAway(page: Page, selector: string): Promise<boolean> {
   /*
-   * Written over three lines rather than as `}, selector);` on one, and that is not a style
-   * preference. `testCost.test-helper.ts`'s annotation scanner reads a line matching `}, <arg>);`
-   * as a test's trailing timeout and attributes it to the nearest opener at the same indent — so
-   * this shape, inside a `describe`, was censused as an annotation whose value is the identifier
-   * `selector`, and `testCost.test.ts` failed it as an *unresolved constant*. The scanner is right
-   * to refuse what it cannot price; this is the call moving out of its way.
+   * **This shape was once a workaround, and it is no longer load-bearing.**
+   *
+   * `testCost.test-helper.ts`'s scanner used to read a line matching `}, <arg>);` as a test's
+   * trailing timeout and attribute it to the nearest opener *at the same indent* — so
+   * `page.evaluate(fn, selector)` inside a `describe` was censused as an annotation whose value is
+   * the identifier `selector`, and `testCost.test.ts` failed it as an *unresolved constant*. This
+   * call was written over three lines to get out of the scanner's way, which worked only because
+   * the three-line shape was in its blind spot.
+   *
+   * Both halves of that are now fixed in the scanner rather than worked around here: it reads the
+   * multi-line shape too, and it attributes by **parenthesis balance**, so a call that is not the
+   * one the opener opened is declined however it is laid out. `page.evaluate` here is dropped as
+   * *no opener*, which is the correct classification and was always the intended one.
+   *
+   * The three lines are kept because Prettier writes them that way and reformatting proves
+   * nothing. What is gone is the reason a reader had to be told about.
    */
   return page.evaluate(
     (css: string) => {
@@ -846,7 +856,7 @@ async function takeTheNameAway(page: Page, selector: string): Promise<boolean> {
 
 /** And put it back, so the sweep either side of the mutation is comparable. */
 async function putTheNameBack(page: Page, selector: string): Promise<void> {
-  /* The same three-line shape, for {@link takeTheNameAway}'s reason. */
+  /* The same three-line shape, and see {@link takeTheNameAway} for why it no longer matters. */
   await page.evaluate(
     (css: string) => {
       const node = document.querySelector<HTMLElement>(css);

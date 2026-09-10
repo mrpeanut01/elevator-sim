@@ -215,6 +215,41 @@ export interface UnattributedTimeout {
 
 const OPENER = /^(\s*)(it|test|describe|beforeAll|beforeEach|afterAll|afterEach)\b/u;
 const CLOSER = /^(\s*)\}, ([A-Za-z0-9_.]+)\);\s*$/u;
+
+/**
+ * The same annotation spread over three lines, which {@link CLOSER} cannot see.
+ *
+ * `CLOSER` requires the brace, the comma and the milliseconds on **one** line. Prettier breaks a
+ * call whose arguments do not fit, and a bound with a reason written beside it never fits, so the
+ * shape below is what a long annotation actually looks like in this tree:
+ *
+ * ```ts
+ *   it(
+ *     'name',
+ *     async () => {
+ *       …
+ *     },
+ *     /* why this bound *\/
+ *     10_800_000,
+ *   );
+ * ```
+ *
+ * **Measured 2026-09-10, while wiring GitHub issue #367's survivor sweep**: written that way,
+ * `scenario/survivorSweep.test.ts`'s three-hour bound was invisible — `viz` read 441 annotations
+ * and 92 above ceiling, so `testCost.test.ts`'s `ABOVE_CEILING` ratchet stayed green over a
+ * 10 800 000 ms bound nobody had counted. Rewriting that one call site into the single-line form
+ * moved the tree to 442 / 93. **That lane fixed its own call and not the scanner**, which left the
+ * blind spot open for every other site; this widens the scanner instead.
+ *
+ * The three parts are matched separately because a comment may sit between any two of them, and
+ * {@link blankNonCode} has already turned such a comment into whitespace by the time these run —
+ * which is also why widening this cannot count a docstring. That protection is `blankNonCode`'s,
+ * not the pattern's, and it is why these stay as strict as `CLOSER`: the tree really does quote
+ * `}, 600_000);` in prose, twice in `vitest.config.ts`'s own retraction.
+ */
+const MULTI_BRACE = /^(\s*)\},\s*$/u;
+const MULTI_ARGUMENT = /^(\s*)([A-Za-z0-9_.]+),?\s*$/u;
+const MULTI_END = /^(\s*)\);\s*$/u;
 const NUMERIC = /^[0-9_]+$/u;
 const STRING_LITERAL = /'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"/u;
 
@@ -227,6 +262,29 @@ const STRING_LITERAL = /'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"/u;
  * `}, 600_000);` is exactly the shape being counted, and `vitest.config.ts`'s own retraction quotes
  * two of them.
  */
+/**
+ * Whether a `/` at this offset opens a regular expression rather than dividing.
+ *
+ * **A blanker that cannot see a regex silently eats code**, and this tree has the case that proves
+ * it: `dev/watch.browser.test.ts` matches words with `/[a-z']+/g`, whose apostrophe was read as the
+ * start of a string literal. Everything to the next quote — thirty-nine lines, four parentheses and
+ * a real `}, 300_000);` — was blanked, so {@link annotationsIn} lost that annotation entirely once
+ * attribution began balancing parentheses. The census was wrong before this and could not say so.
+ *
+ * The `/`-is-ambiguous problem has no complete solution without parsing, so this uses the standard
+ * heuristic: a regex may begin only where a *value* may not have just ended. That is exact for
+ * every site in `packages/`, and the failure mode is conservative — a misread `/` blanks to the end
+ * of its own line at worst, because an unterminated candidate is abandoned rather than run on.
+ */
+function regexCanStartAt(source: string, index: number): boolean {
+  for (let back = index - 1; back >= 0; back -= 1) {
+    const char = source[back] as string;
+    if (char === ' ' || char === '\t' || char === '\n' || char === '\r') continue;
+    return '([{,;:=!&|?+-*%<>~^'.includes(char);
+  }
+  return true;
+}
+
 export function blankNonCode(source: string): string {
   const out = source.split('');
   const blank = (from: number, to: number): void => {
@@ -249,6 +307,28 @@ export function blankNonCode(source: string): string {
       const close = source.indexOf('*/', index + 2);
       const end = close === -1 ? source.length : close + 2;
       blank(index, end);
+      index = end;
+      continue;
+    }
+    if (char === '/' && next !== '/' && next !== '*' && regexCanStartAt(source, index)) {
+      let end = index + 1;
+      let inClass = false;
+      while (end < source.length) {
+        const at = source[end];
+        if (at === '\\') {
+          end += 2;
+          continue;
+        }
+        if (at === '\n') break; // unterminated: not a regex after all, leave it alone
+        if (at === '[') inClass = true;
+        else if (at === ']') inClass = false;
+        else if (at === '/' && !inClass) {
+          end += 1;
+          break;
+        }
+        end += 1;
+      }
+      blank(index + 1, Math.max(end - 1, index + 1));
       index = end;
       continue;
     }
@@ -310,21 +390,115 @@ export function annotationsIn(
   const annotations: TimeoutAnnotation[] = [];
   const unattributed: UnattributedTimeout[] = [];
 
+  /**
+   * The next line that is not blank, or `-1`.
+   *
+   * Comments are already whitespace here — {@link blankNonCode} blanked them in place — so this
+   * skips a reason written between the closing brace and its bound without ever seeing prose.
+   */
+  const nextCode = (from: number): number => {
+    for (let at = from; at < lines.length; at += 1) {
+      if ((lines[at] as string).trim() !== '') return at;
+    }
+    return -1;
+  };
+
+  /**
+   * Every trailing argument that could be an annotation, in both shapes it is written in.
+   *
+   * `line` is the line the *argument* sits on, because that is the line a reader has to open;
+   * for the single-line shape that is the closer itself. `indent` is the indent the opener must
+   * match, which is the closing `);`'s — one level out from the brace in the multi-line shape.
+   */
+  const candidates: {
+    line: number;
+    closesAt: number;
+    from: number;
+    indent: string;
+    argument: string;
+  }[] = [];
   for (let index = 0; index < lines.length; index += 1) {
     const closing = CLOSER.exec(lines[index] as string);
-    if (closing === null) continue;
-    const indent = closing[1] as string;
-    const argument = closing[2] as string;
+    if (closing !== null) {
+      candidates.push({
+        line: index,
+        closesAt: index,
+        from: index - 1,
+        indent: closing[1] as string,
+        argument: closing[2] as string,
+      });
+      continue;
+    }
+    if (MULTI_BRACE.exec(lines[index] as string) === null) continue;
+    const argAt = nextCode(index + 1);
+    if (argAt === -1) continue;
+    const arg = MULTI_ARGUMENT.exec(lines[argAt] as string);
+    if (arg === null) continue;
+    const endAt = nextCode(argAt + 1);
+    if (endAt === -1) continue;
+    const end = MULTI_END.exec(lines[endAt] as string);
+    if (end === null) continue;
+    candidates.push({
+      line: argAt,
+      closesAt: endAt,
+      from: index - 1,
+      indent: end[1] as string,
+      argument: arg[2] as string,
+    });
+  }
 
+  /**
+   * Whether the call opened on `openerLine` is the call closed on `closeLine`.
+   *
+   * **Indent agreement is not ownership, and assuming it was is what made the census wrong in both
+   * directions.** The old attribution walked back to the nearest `it`/`describe` at the same
+   * indent and stopped there, so a *different* call closing at that indent — `page.evaluate(fn,
+   * selector)` is the shape in this tree — was attributed to whatever opener happened to sit above
+   * it, and censused as an annotation whose value is the identifier `selector`.
+   *
+   * That mattered more than a miscount. `everyday/accessibilitySweep.browser.test.ts` met it and
+   * **rewrote its call over three lines to get away from the scanner**, saying so in a docstring —
+   * a workaround that only worked because the three-line shape was in the blind spot this commit
+   * closes. So widening {@link MULTI_BRACE} without fixing attribution would have re-broken exactly
+   * the file that had already paid for it once, and sent it looking for a third shape to hide in.
+   *
+   * Parens balance instead, which is exact rather than nearly right: strings, template literals and
+   * comments are blanked by {@link blankNonCode} before this runs, so every parenthesis left is
+   * code. The call owns the closer only if its depth first returns to zero *there*.
+   */
+  const callClosesAt = (openerLine: number, closeLine: number): boolean => {
+    let depth = 0;
+    for (let at = openerLine; at <= closeLine; at += 1) {
+      for (const char of lines[at] as string) {
+        if (char === '(') depth += 1;
+        else if (char === ')') depth -= 1;
+        if (depth < 0) return false;
+      }
+      /*
+       * Judged at the **end** of each line, not the first time the count reaches zero, and
+       * `it.each(BUILDING_IDS)('%s: …', (id) => {` is why: a curried opener closes its first
+       * parenthesis mid-line and opens the real one after it. Stopping at the first zero read that
+       * as *the call already closed* and dropped nine live annotations in `frame/overlay.test.ts`
+       * alone — a widening that quietly lost coverage would have been worse than the blind spot.
+       *
+       * An intermediate line that ends balanced is the honest rejection: the opener's call finished
+       * before this closer, so the closer belongs to something else.
+       */
+      if (at < closeLine && depth === 0) return false;
+    }
+    return depth === 0;
+  };
+
+  for (const { line: index, closesAt, from, indent, argument } of candidates) {
     let opener: string | undefined;
     let openerLine = -1;
-    for (let back = index - 1; back >= 0; back -= 1) {
+    for (let back = from; back >= 0; back -= 1) {
       const found = OPENER.exec(lines[back] as string);
-      if (found !== null && found[1] === indent) {
-        opener = found[2] as string;
-        openerLine = back;
-        break;
-      }
+      if (found === null || found[1] !== indent) continue;
+      if (!callClosesAt(back, closesAt)) continue;
+      opener = found[2] as string;
+      openerLine = back;
+      break;
     }
     if (opener === undefined) {
       unattributed.push({ file: repoRelativePath, line: index + 1, argument, reason: 'no opener' });
