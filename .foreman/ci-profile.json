@@ -1,0 +1,1047 @@
+{
+  "generated_at": "2026-09-07T00:57:38-04:00",
+  "tier_threshold_s": 300,
+  "jobs": {
+    "check": {
+      "workflow": "Blocked by",
+      "workflow_file": "blocked-by.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "blockers that have closed",
+      "p50": null,
+      "p95": null,
+      "samples": 0,
+      "tier": "unmeasured",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "legs": {
+      "workflow": "CI",
+      "workflow_file": "ci.yml",
+      "needs": [],
+      "triggers": [
+        "merge_group",
+        "pull_request",
+        "push",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "push": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [
+            "main"
+          ],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "pull_request": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "merge_group": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "${{ matrix.leg }}",
+      "p50": 402.0,
+      "p95": 560.0,
+      "samples": 3,
+      "tier": "expensive",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "suite": {
+      "workflow": "CI",
+      "workflow_file": "ci.yml",
+      "needs": [
+        "legs"
+      ],
+      "triggers": [
+        "merge_group",
+        "pull_request",
+        "push",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "push": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [
+            "main"
+          ],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "pull_request": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "merge_group": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "suite (linux)",
+      "p50": 3.0,
+      "p95": 4.0,
+      "samples": 20,
+      "tier": "cheap",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "fuzz-deep": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "fuzz \u2014 the deep campaign",
+      "p50": null,
+      "p95": null,
+      "samples": 0,
+      "tier": "unmeasured",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "golden-runs": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "goldens \u2014 6 of 6, and across a fresh process",
+      "p50": null,
+      "p95": null,
+      "samples": 0,
+      "tier": "unmeasured",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "oracle-campaign": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "oracle \u2014 every measurable bank",
+      "p50": null,
+      "p95": null,
+      "samples": 0,
+      "tier": "unmeasured",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "matrix-census": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "matrix \u2014 the 200-replication census",
+      "p50": null,
+      "p95": null,
+      "samples": 0,
+      "tier": "unmeasured",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "collective-adoption": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "collective adoption \u2014 \u00a7 D209 at the pre-registered count",
+      "p50": null,
+      "p95": null,
+      "samples": 0,
+      "tier": "unmeasured",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "perf-sweep": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "perf \u2014 the 20 000-replication sweep",
+      "p50": null,
+      "p95": null,
+      "samples": 0,
+      "tier": "unmeasured",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "perf-scaling": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "perf \u2014 the wall-clock fits (noise-prone; see the job header)",
+      "p50": null,
+      "p95": null,
+      "samples": 0,
+      "tier": "unmeasured",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "difficulty-curve": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "difficulty curve \u2014 the dropdown sweep",
+      "p50": null,
+      "p95": null,
+      "samples": 0,
+      "tier": "unmeasured",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "honesty-deep": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "honesty \u2014 the deep corpus",
+      "p50": null,
+      "p95": null,
+      "samples": 0,
+      "tier": "unmeasured",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "corpus-figures": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "corpus figures \u2014 \u00a7 D343, both tiers, one sitting",
+      "p50": null,
+      "p95": null,
+      "samples": 0,
+      "tier": "unmeasured",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "benchmark-selection-sweep": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "benchmark \u2014 the eight-cell selection sweep",
+      "p50": 949.0,
+      "p95": 949.0,
+      "samples": 1,
+      "tier": "standalone",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "benchmark-saturation-census": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "benchmark \u2014 the operating-point census",
+      "p50": 765.0,
+      "p95": 765.0,
+      "samples": 1,
+      "tier": "standalone",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "benchmark-double-deck-and-lunch": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "benchmark \u2014 double deck, and lunch two-way",
+      "p50": 949.0,
+      "p95": 949.0,
+      "samples": 1,
+      "tier": "standalone",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "benchmark-studies": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "benchmark \u2014 the twelve remaining studies",
+      "p50": 764.0,
+      "p95": 764.0,
+      "samples": 1,
+      "tier": "standalone",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "summary": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [
+        "fuzz-deep",
+        "golden-runs",
+        "oracle-campaign",
+        "matrix-census",
+        "collective-adoption",
+        "perf-sweep",
+        "perf-scaling",
+        "honesty-deep",
+        "difficulty-curve",
+        "corpus-figures",
+        "benchmark-selection-sweep",
+        "benchmark-saturation-census",
+        "benchmark-double-deck-and-lunch",
+        "benchmark-studies"
+      ],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "summary",
+      "p50": 4.0,
+      "p95": 4.0,
+      "samples": 1,
+      "tier": "cheap",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "report": {
+      "workflow": "Deep tiers",
+      "workflow_file": "deep-tiers.yml",
+      "needs": [
+        "fuzz-deep",
+        "golden-runs",
+        "oracle-campaign",
+        "matrix-census",
+        "collective-adoption",
+        "perf-sweep",
+        "perf-scaling",
+        "honesty-deep",
+        "corpus-figures",
+        "benchmark-selection-sweep",
+        "benchmark-saturation-census",
+        "benchmark-double-deck-and-lunch",
+        "benchmark-studies"
+      ],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "report a failure",
+      "p50": null,
+      "p95": null,
+      "samples": 0,
+      "tier": "unmeasured",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "build": {
+      "workflow": "Deploy viewer",
+      "workflow_file": "deploy-viz.yml",
+      "needs": [],
+      "triggers": [
+        "pull_request",
+        "push",
+        "workflow_dispatch"
+      ],
+      "path_filters": [
+        ".github/workflows/deploy-viz.yml",
+        "data/**",
+        "package-lock.json",
+        "package.json",
+        "packages/**",
+        "tsconfig*.json"
+      ],
+      "pr_path_filters": [
+        ".github/workflows/deploy-viz.yml",
+        "data/**",
+        "package-lock.json",
+        "package.json",
+        "packages/**",
+        "tsconfig*.json"
+      ],
+      "events": {
+        "push": {
+          "paths": [
+            "packages/**",
+            "data/**",
+            "package.json",
+            "package-lock.json",
+            "tsconfig*.json",
+            ".github/workflows/deploy-viz.yml"
+          ],
+          "paths_ignore": [],
+          "branches": [
+            "main"
+          ],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "pull_request": {
+          "paths": [
+            "packages/**",
+            "data/**",
+            "package.json",
+            "package-lock.json",
+            "tsconfig*.json",
+            ".github/workflows/deploy-viz.yml"
+          ],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [
+            "opened",
+            "synchronize",
+            "reopened",
+            "closed"
+          ],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "build site",
+      "p50": 24.0,
+      "p95": 29.0,
+      "samples": 9,
+      "tier": "cheap",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "deploy": {
+      "workflow": "Deploy viewer",
+      "workflow_file": "deploy-viz.yml",
+      "needs": [
+        "build"
+      ],
+      "triggers": [
+        "pull_request",
+        "push",
+        "workflow_dispatch"
+      ],
+      "path_filters": [
+        ".github/workflows/deploy-viz.yml",
+        "data/**",
+        "package-lock.json",
+        "package.json",
+        "packages/**",
+        "tsconfig*.json"
+      ],
+      "pr_path_filters": [
+        ".github/workflows/deploy-viz.yml",
+        "data/**",
+        "package-lock.json",
+        "package.json",
+        "packages/**",
+        "tsconfig*.json"
+      ],
+      "events": {
+        "push": {
+          "paths": [
+            "packages/**",
+            "data/**",
+            "package.json",
+            "package-lock.json",
+            "tsconfig*.json",
+            ".github/workflows/deploy-viz.yml"
+          ],
+          "paths_ignore": [],
+          "branches": [
+            "main"
+          ],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "pull_request": {
+          "paths": [
+            "packages/**",
+            "data/**",
+            "package.json",
+            "package-lock.json",
+            "tsconfig*.json",
+            ".github/workflows/deploy-viz.yml"
+          ],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [
+            "opened",
+            "synchronize",
+            "reopened",
+            "closed"
+          ],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "deploy",
+      "p50": 69.0,
+      "p95": 94.0,
+      "samples": 9,
+      "tier": "cheap",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "close-preview": {
+      "workflow": "Deploy viewer",
+      "workflow_file": "deploy-viz.yml",
+      "needs": [],
+      "triggers": [
+        "pull_request",
+        "push",
+        "workflow_dispatch"
+      ],
+      "path_filters": [
+        ".github/workflows/deploy-viz.yml",
+        "data/**",
+        "package-lock.json",
+        "package.json",
+        "packages/**",
+        "tsconfig*.json"
+      ],
+      "pr_path_filters": [
+        ".github/workflows/deploy-viz.yml",
+        "data/**",
+        "package-lock.json",
+        "package.json",
+        "packages/**",
+        "tsconfig*.json"
+      ],
+      "events": {
+        "push": {
+          "paths": [
+            "packages/**",
+            "data/**",
+            "package.json",
+            "package-lock.json",
+            "tsconfig*.json",
+            ".github/workflows/deploy-viz.yml"
+          ],
+          "paths_ignore": [],
+          "branches": [
+            "main"
+          ],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "pull_request": {
+          "paths": [
+            "packages/**",
+            "data/**",
+            "package.json",
+            "package-lock.json",
+            "tsconfig*.json",
+            ".github/workflows/deploy-viz.yml"
+          ],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [
+            "opened",
+            "synchronize",
+            "reopened",
+            "closed"
+          ],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "close preview environment",
+      "p50": 36.0,
+      "p95": 39.0,
+      "samples": 4,
+      "tier": "cheap",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "gates": {
+      "workflow": "Review",
+      "workflow_file": "review.yml",
+      "needs": [],
+      "triggers": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "pull_request": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [
+            "opened",
+            "synchronize",
+            "reopened"
+          ],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "invariant gates",
+      "p50": 18.0,
+      "p95": 20.0,
+      "samples": 13,
+      "tier": "cheap",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "claude-review": {
+      "workflow": "Review",
+      "workflow_file": "review.yml",
+      "needs": [],
+      "triggers": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "pull_request": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [
+            "opened",
+            "synchronize",
+            "reopened"
+          ],
+          "branches_ignore": [],
+          "tags_ignore": []
+        },
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "claude review",
+      "p50": 7.0,
+      "p95": 9.0,
+      "samples": 13,
+      "tier": "cheap",
+      "required": false,
+      "flake_rate": 0.0
+    },
+    "seed": {
+      "workflow": "seed-boards",
+      "workflow_file": "seed-boards.yml",
+      "needs": [],
+      "triggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "path_filters": [],
+      "pr_path_filters": [],
+      "events": {
+        "workflow_dispatch": {
+          "paths": [],
+          "paths_ignore": [],
+          "branches": [],
+          "tags": [],
+          "types": [],
+          "branches_ignore": [],
+          "tags_ignore": []
+        }
+      },
+      "display": "seed today's board",
+      "p50": null,
+      "p95": null,
+      "samples": 0,
+      "tier": "unmeasured",
+      "required": false,
+      "flake_rate": 0.0
+    }
+  },
+  "required_checks": [],
+  "protection_known": false,
+  "cheap_tier_s": 199.0,
+  "expensive_tier_s": 560.0,
+  "unmeasured_jobs": [
+    "check",
+    "collective-adoption",
+    "corpus-figures",
+    "difficulty-curve",
+    "fuzz-deep",
+    "golden-runs",
+    "honesty-deep",
+    "legs",
+    "matrix-census",
+    "oracle-campaign",
+    "perf-scaling",
+    "perf-sweep",
+    "report",
+    "seed"
+  ],
+  "unattributed_runs": [
+    "Adjust Configuration",
+    "Analyze (actions)",
+    "Analyze (javascript-typescript)",
+    "browser",
+    "core",
+    "experiments",
+    "service",
+    "viz"
+  ],
+  "problems": [],
+  "repo": "mrpeanut01/elevator-sim",
+  "correction_note": "legs measured from post-a2ee4e2 PR runs as matrix WALL CLOCK (max leg); benchmark-* moved to tier 'standalone' - triggers are [schedule, workflow_dispatch] so they never run on a pull request."
+}
