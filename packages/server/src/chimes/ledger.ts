@@ -38,12 +38,18 @@
  * budget bought in two steps and a budget bought in one are the same budget and a run that claims
  * three steps against two paid for is a run whose configuration was never affordable.
  *
- * **What this does not build, stated so nobody reads it as built.** `docs/38` § 3 also asks that
- * `docs/16`'s `ranked` row and `scope/runIdentity.ts` widen to carry the modifier set, and that
- * boards be *keyed* by it. That is separate work: a modifier is checked here and is not yet part of
- * a run's identity, so two runs with different modifier sets still rank on the same board. Until it
- * lands, a bought purse is refused when it is claimed and unpaid, and is not yet separated on the
- * ladder.
+ * **The board half of that has landed and this paragraph used to refuse it.** It read *"two runs
+ * with different modifier sets still rank on the same board"*, and GitHub issue #371 made that
+ * false: `leaderboard/boardKey.ts#placeSubmission` keys the daily board by the set, and
+ * `#runDataHashOf` carries it into the measurement identity. § D227 says a refusal that stops being
+ * true is **deleted rather than reworded**, so it is gone rather than softened — a sentence telling
+ * a reader that two purses rank together would send them to build a separation that exists.
+ *
+ * **What is still not built, stated narrowly so it is not read as the whole gap coming back.**
+ * `docs/16`'s `ranked` row and `scope/runIdentity.ts` do not carry the modifier set, and cannot:
+ * no field of `viz`'s `ViewerState` holds a modifier, because no mode spends a purse into a run
+ * yet. That is GitHub issue #372's, and `docs/16` § 3 says the same thing where a reader of the
+ * contract will meet it.
  */
 
 import { readFile } from 'node:fs/promises';

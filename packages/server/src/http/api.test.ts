@@ -28,6 +28,7 @@ import { runSimulation } from '@elevator-sim/core';
 
 import { LOGIN_TTL_MS, signLoginToken } from '../accounts/credentials.js';
 import { bootstrap, UnsafeConfigurationError, type Server } from '../bootstrap.js';
+import { DAILY_FIXTURE_CONFIG, dailyDateOf, dailySeedFor } from '../leaderboard/boardKey.js';
 import { configFor, metricsOf } from '../leaderboard/verify.js';
 import { OutboxMailer } from '../mail/mailer.js';
 import { PgliteSql } from '../store/pglite.test-helper.js';
@@ -2065,5 +2066,199 @@ describe('the chime write verbs are bounded like every other write on this surfa
       body: { completion: 'rush-wave-survived' },
     });
     expect(theirs.status, 'one account exhausting its budget locked another out').toBe(200);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The board's modifier set, on the wire — GitHub issue #371, § D526 clause 3
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Every key and every string a board body can carry, flattened, so a walk can ask about all of it.
+ *
+ * Returned as `path → value` rather than as a set of leaves, because a violation has to be able to
+ * say **where** — a guard that reports *something on this board mentions a price* is a guard the
+ * next reader deletes.
+ */
+function leavesOf(value: unknown, at = ''): readonly (readonly [string, unknown])[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) => leavesOf(entry, `${at}[${String(index)}]`));
+  }
+  if (typeof value === 'object' && value !== null) {
+    return Object.entries(value).flatMap(([key, entry]) => leavesOf(entry, at === '' ? key : `${at}.${key}`));
+  }
+  return [[at, value]];
+}
+
+/**
+ * Where a body says something about currency — **the check § D526 clause 3 asks for, mechanised.**
+ *
+ * Two shapes, because the defect has two. A **numeric field whose name is about money** is the one a
+ * spread produces: `{ ...sink }` puts `priceChimes: 8` on the row without anybody writing the word,
+ * which is exactly how this would ship. A **string with a digit beside a currency word** is the one
+ * a copywriter produces. Neither is a paraphrase of the rule; each is a way the rule gets broken.
+ *
+ * `steps`, `grantUnits` and `legs` are numbers a board may carry and are not currency: a step count
+ * is a fact about the run's configuration and a grant is in units. The names below are matched
+ * rather than the values, so those are out of scope by construction rather than by exception.
+ */
+const CURRENCY_FIELD = /chime|credit|price|cost|spend|spent|balance|paid|purchase/iu;
+const CURRENCY_IN_PROSE = /\d[^.]{0,24}?(chime|credit)|(chime|credit)[^.]{0,24}?\d/iu;
+
+function currencyFiguresIn(body: unknown): readonly string[] {
+  return leavesOf(body)
+    .filter(([path, value]) => {
+      const field = path.split('.').at(-1) ?? '';
+      if (typeof value === 'number' && CURRENCY_FIELD.test(field)) return true;
+      return typeof value === 'string' && CURRENCY_IN_PROSE.test(value);
+    })
+    .map(([path, value]) => `${path} = ${JSON.stringify(value)}`);
+}
+
+describe('a board row carries the modifier and never the spend — issue #371', () => {
+  /** Sign in, earn enough to buy `steps` of `sinkId`, and buy it. */
+  async function bought(sinkId: string, steps: number): Promise<{ token: string; id: string }> {
+    const player = await signIn();
+    for (let i = 0; i < 8; i += 1) {
+      await call('POST', '/api/chimes/earn', { token: player.token, body: { completion: 'scenario-cleared' } });
+    }
+    for (let i = 0; i < steps; i += 1) {
+      const spent = await call('POST', '/api/chimes/spend', {
+        token: player.token,
+        body: { modifier: sinkId, steps: 1 },
+      });
+      expect(spent.status, `buying ${sinkId}`).toBe(200);
+    }
+    return player;
+  }
+
+  it('finds the currency figure a naive row would carry — the positive control', () => {
+    /*
+     * **The control is the real defect rather than an invented one.** The obvious way to put a
+     * modifier on the wire is to send the sink: `{ ...chimeSinkById(table, id), steps }`. That
+     * object carries `priceChimes` two fields from `name`, so the row would publish what the player
+     * paid without anybody deciding to — which is § D526 clause 3 broken by a spread operator.
+     *
+     * Driven with the shipped table's own price rather than a made-up one, and with the prose form
+     * beside it, so the guard is shown catching both shapes before it is trusted to report none.
+     */
+    const sink = { id: 'rush-purse-top-up', name: 'Start with a bigger purse', priceChimes: 8, maxSteps: 3 };
+    const naive = { entries: [{ displayName: 'A. Turing', modifiers: [{ ...sink, steps: 2 }] }] };
+    expect(currencyFiguresIn(naive)).toEqual(['entries[0].modifiers[0].priceChimes = 8']);
+    expect(currencyFiguresIn({ note: 'Bought for 16 chimes.' })).toEqual([
+      'note = "Bought for 16 chimes."',
+    ]);
+    /* And the fields a board legitimately carries are not swept up with them. */
+    expect(
+      currencyFiguresIn({
+        entries: [{ legs: 312, modifiers: [{ sinkId: 'rush-purse-top-up', steps: 2, name: sink.name }] }],
+      }),
+    ).toEqual([]);
+  });
+
+  it('names the modifier on the row and no figure of what it cost', async () => {
+    const player = await bought('rush-purse-top-up', 2);
+    const posted = await call('POST', '/api/scores', {
+      token: player.token,
+      body: { ...honest(), modifiers: [{ sinkId: 'rush-purse-top-up', steps: 2 }] },
+    });
+    expect(posted.status, JSON.stringify(bodyOf(posted))).toBe(201);
+    const entry = bodyOf(posted)['entry'] as Record<string, unknown>;
+    /*
+     * The currency walk **first**, so that it is what reports when this breaks. A `toEqual` on the
+     * modifier's own shape would fail on a spread too — but it would fail with *the object has more
+     * keys than expected*, which is a shape complaint, and the rule being kept here is § D526
+     * clause 3 rather than a field list.
+     */
+    expect(currencyFiguresIn(bodyOf(posted))).toEqual([]);
+    expect(entry['modifiers']).toEqual([
+      { sinkId: 'rush-purse-top-up', steps: 2, name: 'Start with a bigger purse' },
+    ]);
+
+    // And the same row read back off the board it landed on, which is the body a player's screen
+    // actually receives.
+    const boardKey = String(bodyOf(posted)['boardKey']);
+    const board = await call('GET', '/api/board', { query: { board: boardKey, metric: 'awtS' } });
+    expect(board.status).toBe(200);
+    expect(currencyFiguresIn(bodyOf(board))).toEqual([]);
+    const rows = bodyOf(board)['entries'] as readonly Record<string, unknown>[];
+    expect(rows.some((row) => JSON.stringify(row['modifiers']).includes('rush-purse-top-up'))).toBe(true);
+  }, 600_000);
+
+  it('sends a standard row no modifiers key at all, so an old body is unchanged', async () => {
+    const player = await signIn();
+    const posted = await call('POST', '/api/scores', { token: player.token, body: honest() });
+    expect(posted.status, JSON.stringify(bodyOf(posted))).toBe(201);
+    const entry = bodyOf(posted)['entry'] as Record<string, unknown>;
+    expect('modifiers' in entry).toBe(false);
+    expect(currencyFiguresIn(bodyOf(posted))).toEqual([]);
+  }, 600_000);
+
+  it('puts a bought run on its set’s own board and a standard run on the standard one', async () => {
+    /*
+     * **The routing criterion, end to end and against a real ledger.** Two players post *today's
+     * fixture*; one of them has bought a purse. They must not land on one board, or a wider
+     * starting purse would rank beside a standard one.
+     *
+     * The fixture rather than `RUN`, and the difference is the whole case: `RUN` is not today's
+     * axes, so it goes to a **personal log**, whose key is one per player and deliberately does
+     * not carry the set (`boardKey.ts#placeSubmission` argues the asymmetry). Posting `RUN` here
+     * would have compared two personal keys and proved nothing about the daily board — which is
+     * what the first draft of this case did.
+     */
+    const today = { ...DAILY_FIXTURE_CONFIG, dispatcherProfileId: 'eta', seed: dailySeedFor(dailyDateOf(clock)) };
+    const standardPlayer = await signIn();
+    const standard = await call('POST', '/api/scores', { token: standardPlayer.token, body: honest(today) });
+    expect(standard.status, JSON.stringify(bodyOf(standard))).toBe(201);
+    expect(bodyOf(standard)['placement']).toBe('daily');
+    expect(String(bodyOf(standard)['boardKey'])).toBe(`daily:${dailyDateOf(clock)}`);
+
+    clock += 60_000;
+    const purseePlayer = await bought('rush-purse-top-up', 1);
+    const purse = await call('POST', '/api/scores', {
+      token: purseePlayer.token,
+      body: { ...honest(today), modifiers: [{ sinkId: 'rush-purse-top-up', steps: 1 }] },
+    });
+    expect(purse.status, JSON.stringify(bodyOf(purse))).toBe(201);
+    expect(bodyOf(purse)['placement']).toBe('daily');
+    expect(bodyOf(purse)['boardKey']).not.toBe(bodyOf(standard)['boardKey']);
+    expect(String(bodyOf(purse)['boardKey'])).toBe(
+      `daily:${dailyDateOf(clock)}/rush-purse-top-up=1`,
+    );
+
+    /*
+     * **And the two boards hold one population each**, which is what *keyed by* has to mean where a
+     * player can see it. A build that dropped the axis from the key would put both rows here.
+     */
+    for (const [key, expected] of [
+      [String(bodyOf(standard)['boardKey']), standardPlayer.id],
+      [String(bodyOf(purse)['boardKey']), purseePlayer.id],
+    ] as const) {
+      void expected;
+      const board = await call('GET', '/api/board', { query: { board: key, metric: 'awtS' } });
+      expect((bodyOf(board)['entries'] as readonly unknown[]).length, key).toBe(1);
+    }
+  }, 900_000);
+
+  it('cannot be talked onto a rarer board by a claim the ledger will not back', async () => {
+    /*
+     * **The half that makes the axis safe against a player rather than against a bug.** A board key
+     * a client could choose is a board a client could be alone on, and *alone* is *first*. The
+     * ledger check runs before the placement, so an unbacked claim is a 422 and reaches no key at
+     * all — asserted by there being no board with that suffix afterwards, rather than only by the
+     * status code.
+     */
+    const player = await signIn();
+    const refused = await call('POST', '/api/scores', {
+      token: player.token,
+      body: { ...honest(), modifiers: [{ sinkId: 'rush-prefit', steps: 1 }] },
+    });
+    expect(refused.status).toBe(422);
+    expect(bodyOf(refused)['error']).toBe('modifier-not-bought');
+    const boards = await call('GET', '/api/boards', {});
+    const keys = (bodyOf(boards)['boards'] as readonly Record<string, unknown>[]).map((row) =>
+      String(row['boardKey']),
+    );
+    expect(keys.some((key) => key.includes('rush-prefit'))).toBe(false);
   });
 });

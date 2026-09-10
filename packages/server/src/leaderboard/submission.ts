@@ -180,12 +180,18 @@ export interface Submission {
    * results page or in a comparison between players, and a spend on a submission would be one
    * arriving through the back of the board.
    *
-   * On {@link Submission} rather than on {@link SubmittedRun}, and the placement is deliberate:
-   * `SubmittedRun` is what the server **replays**, and a modifier is not yet part of a run's
-   * identity. `docs/38` § 3 asks for that widening — `docs/16`'s `ranked` row and
-   * `scope/runIdentity.ts` carrying the modifier set, and boards keyed by it — and it is separate
-   * work. What ships here is the check: `http/api.ts` refuses a claim the account's ledger cannot
-   * support, before it spends a simulation on it.
+   * On {@link Submission} rather than on {@link SubmittedRun}, and the placement is deliberate and
+   * has survived the widening: `SubmittedRun` is what the server **replays**, and neither
+   * `purse-units` nor `prefit` reaches a replay, because no mode that spends a purse posts yet. A
+   * field on `SubmittedRun` that `verify.ts` read and could not act on would be the dead seam this
+   * repository has shipped eleven times, so it stays here until GitHub issue #372 gives it a run to
+   * reach.
+   *
+   * **Two things consume it, and both are outside the replay** — GitHub issue #371, § D526
+   * clause 3. `http/api.ts` refuses a claim the account's ledger cannot support before it spends a
+   * simulation on it; and `boardKey.ts#placeSubmission` and `#runDataHashOf` then take the
+   * *checked* claim, so a set nobody paid for reaches no board key. The ordering is the guarantee,
+   * and `api.test.ts` asserts it by looking for the board rather than only at the status code.
    */
   readonly modifiers?: readonly { readonly sinkId: string; readonly steps: number }[] | undefined;
 }

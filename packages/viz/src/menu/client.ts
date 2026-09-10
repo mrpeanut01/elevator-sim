@@ -271,11 +271,35 @@ export interface BoardEntry {
    * marker and the note off this field and never treats the row as the player's own.
    */
   readonly baselineProfileId?: string | undefined;
+  /**
+   * What this run was played with, if anything was bought for it — GitHub issue #371,
+   * § D526 clause 3, `docs/38` § 2.3's *"a run carries its modifiers onto the board"*.
+   *
+   * **Absent on a standard run**, which is every run this product shipped before the chime ledger
+   * and every run posted by an account that has bought nothing. Absent is the answer rather than an
+   * unknown: the board a row is on already says which set it carries, so a client never has to
+   * guess, and the row draws nothing rather than withholding.
+   *
+   * `name` is the sink's own, sent by the server because `data/chime-ledger.json` is loaded there
+   * and nowhere here — the same argument {@link baselineProfileId} makes one field up. A build that
+   * does not know a sink still has its id, which is what `dailyBoardViewOf` falls back to for a
+   * dispatcher.
+   *
+   * **There is no price on this type and there may not be.** § D526 clause 3 forbids a currency
+   * figure in a comparison between players; a board row is one; `boardScreen.test.ts` and the
+   * server's `api.test.ts` each assert the absence over a real body rather than over a type.
+   */
+  readonly modifiers?:
+    | readonly { readonly sinkId: string; readonly steps: number; readonly name: string }[]
+    | undefined;
   readonly submittedAtMs: number;
 }
 
 export interface BoardPage {
-  /** `daily:YYYY-MM-DD` or `personal:<user id>` — the key the page was asked for. */
+  /**
+   * `daily:YYYY-MM-DD`, `daily:YYYY-MM-DD/<modifier set>` or `personal:<user id>` — the key the
+   * page was asked for.
+   */
   readonly boardKey: string;
   readonly metric: string;
   /** The server's own sentence about what the ranking means. Shown, never paraphrased. */

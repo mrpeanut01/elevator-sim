@@ -68,6 +68,7 @@ import {
   type TowerFacts,
 } from '../gauntlet/ladder.js';
 import type { ProofCaseSet } from '../gauntlet/proofCases.js';
+import type { BoardEntry } from '../menu/client.js';
 import { RATING_BASIS } from '../gauntlet/rating.js';
 import { runGauntlet, type GauntletHandle, type GauntletWorker } from '../gauntlet/run.js';
 
@@ -193,6 +194,43 @@ export const BOARD_SCREEN_COPY = Object.freeze({
     'Rows marked house are the game’s own runs, one per shipped dispatcher on today’s crowd, posted ' +
     'so the board is never empty. Nobody played them, and they do not rank the dispatchers: one ' +
     'crowd, one run each. Beat one and you have beaten a machine on the same arrivals.',
+  /*
+   * § D526 clause 3 and `docs/38` § 2.3 — the modifier a row was played with, and the two board
+   * sentences that go with it (GitHub issue #371).
+   *
+   * **`dailyRowStandard` is `''` and is a key rather than an omission.** A standard row draws
+   * nothing at all, because *the standard board is the standard purse and the building as shipped,
+   * the same for everyone* — a tag reading *standard* on every row of the board almost every player
+   * is on would be noise, and a tag reading *standard* on a row of a modifier-set board would be a
+   * lie. Naming the empty string here rather than inlining it is what makes
+   * `dailyBoardViewOf`'s two arms readable as a decision.
+   *
+   * **None of these carries a chime figure and none may.** § D526 clause 3 forbids a currency
+   * figure in a comparison between players; what a modifier cost is the player's own business and
+   * the board's business is what the run was played with.
+   */
+  dailyRowStandard: '',
+  dailyModifierSetNote:
+    'This board is runs played with the modifiers named on their rows. Runs played with a different ' +
+    'set rank on their own board, and runs played as shipped rank on the standard one — a wider ' +
+    'purse is a different game, not a better player.',
+  dailyStandardBoardNote:
+    'This is the standard board: the purse the mode gives everybody and the building as shipped. ' +
+    'A run played with something bought for it ranks on that set’s own board instead.',
+  /*
+   * **The fourth arm, and it is a defect report rather than a state a correct server can produce.**
+   * A board is keyed by its modifier set, so its rows cannot disagree about what that set is —
+   * unless the key stopped carrying it, which is the exact regression `boardScreen.test.ts` drives
+   * as a positive control. Drawing the ranking with no word about it would be the honest thing this
+   * screen most owes: a sort across two populations reads as a ranking of players.
+   *
+   * Said rather than suppressed, on the daily tab's own rule that *nobody has posted* and *we could
+   * not ask* must never share a sentence — this is a third thing again, and it gets its own.
+   */
+  dailyMixedNote:
+    'These rows were not all played with the same modifiers, so the order below is not a comparison ' +
+    'between players — it puts runs with different starting conditions in one column. Each row says ' +
+    'what it was played with. This is a fault in the board rather than something you did.',
   /*
    * § D509 — the reset policy, said before a rating is earned (GitHub issue #252). Two clocks and
    * two sentences: the daily board is one date and resets by construction; the ladder is a standing
@@ -734,6 +772,19 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
         count.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label}`;
         row.append(count);
       }
+      if (entry.modifiers !== BOARD_SCREEN_COPY.dailyRowStandard) {
+        /*
+         * What the run was played with — GitHub issue #371, § D526 clause 3. Drawn in the row for
+         * the count's own reason: *a run carries its modifiers onto the board* is a claim about the
+         * row, and a set named only in the note above would leave a reader working out which rows
+         * it applied to. A standard row draws nothing, which is the empty-set arm rather than a
+         * withholding.
+         */
+        const modifiers = el(doc, 'span', entry.modifiers);
+        modifiers.className = 'everyday-board-row-modifiers';
+        modifiers.style.cssText = `font-size:11.5px;color:${C.label}`;
+        row.append(modifiers);
+      }
       /*
        * § 14.1's `Watch it` — GitHub issue #337. The press is `weekScreen.ts`'s, in the one order
        * that is safe: the gate first, and the spectator state only on its `blocked: null`. A row it
@@ -1057,6 +1108,19 @@ export interface DailyBoardRowView {
    * row either says a number and what it is over, or says why it is saying neither.
    */
   readonly count: string | undefined;
+  /**
+   * What this run was played with — GitHub issue #371, § D526 clause 3.
+   *
+   * `BOARD_SCREEN_COPY.dailyRowStandard` (`''`) on a standard run, and each sink's own name with
+   * its step count otherwise: *Start with a bigger purse ×2*. **A count and not a price**: the
+   * `×2` is how many steps of the modifier the run carried, which is a fact about its
+   * configuration, and what those steps cost is the thing clause 3 forbids on this row.
+   *
+   * A `string` rather than `string | undefined`, unlike {@link house}: a modifier set is a *set*
+   * and the empty set is an answer, so there is no absent state to model. The row draws nothing
+   * for it and never a withholding, because nothing is being withheld.
+   */
+  readonly modifiers: string;
 }
 
 /** What the daily tab says and shows, for any one of its five states. */
@@ -1090,6 +1154,70 @@ export interface DailyBoardView {
  * Pure and exported so `boardScreen.test.ts` can drive every state without a document, and so the
  * shape of the decision is readable without reading a renderer.
  */
+/**
+ * Which modifier-set sentence a board of rows gets — GitHub issue #371, § D526 clause 3.
+ *
+ * Three arms and a fourth that should be unreachable. **Derived from the rows rather than parsed
+ * out of the board key**, on `api.ts`'s own argument about the placement: a client that read
+ * `daily:2026-09-01/rush-purse-top-up=2` would be a second place deciding what a board key looks
+ * like, and it would go wrong on the day the format moves. The rows carry the set already.
+ *
+ * The fourth arm is the interesting one. A board keyed by its modifier set **cannot** hold rows
+ * that disagree about the set; if it does, the key has stopped carrying the axis and the ranking
+ * spans two populations. That is not a state to hide behind the standard sentence, so it has its
+ * own, and `boardScreen.test.ts` reaches it by handing this function the mixture a broken key would
+ * produce.
+ */
+function boardModifierNoteOf(rows: readonly BoardEntry[]): DailyBoardLine | undefined {
+  if (rows.length === 0) return undefined;
+  const sets = new Set(rows.map((row) => modifierSentenceOf(row.modifiers)));
+  if (sets.size > 1) {
+    return {
+      text: BOARD_SCREEN_COPY.dailyMixedNote,
+      className: 'everyday-board-modifiers-mixed',
+      role: 'reason',
+    };
+  }
+  const only = [...sets][0] ?? BOARD_SCREEN_COPY.dailyRowStandard;
+  return only === BOARD_SCREEN_COPY.dailyRowStandard
+    ? {
+        text: BOARD_SCREEN_COPY.dailyStandardBoardNote,
+        className: 'everyday-board-modifiers-standard',
+        role: 'note',
+      }
+    : {
+        text: BOARD_SCREEN_COPY.dailyModifierSetNote,
+        className: 'everyday-board-modifiers-set',
+        role: 'note',
+      };
+}
+
+/**
+ * A row's modifier set as one pre-formatted string — GitHub issue #371, § D526 clause 3.
+ *
+ * `''` for a standard run, and each sink's name with its step count otherwise, joined so the row
+ * reads as a list rather than as a sentence: *Start with a bigger purse ×2 · Start with the
+ * building fitted*. `×1` is dropped, because *one step of a modifier* is just the modifier.
+ *
+ * **The name comes off the wire and is never mapped here.** `data/chime-ledger.json` is loaded by
+ * `packages/server` and by nothing in this package, so a table of sink names in this file would be
+ * a second authority that goes stale the day the ledger is edited. A sink whose name this build was
+ * not told falls back to its id, which is exactly what the `driver` column does for a dispatcher.
+ *
+ * **No price is reachable from here even by accident**, because none is on `BoardEntry.modifiers`
+ * to reach. That is the shape clause 3 asks for: the absence is in the wire type rather than in a
+ * habit of this function.
+ */
+function modifierSentenceOf(modifiers: BoardEntry['modifiers']): string {
+  if (modifiers === undefined || modifiers.length === 0) return BOARD_SCREEN_COPY.dailyRowStandard;
+  return modifiers
+    .map((modifier) => {
+      const name = modifier.name === '' ? modifier.sinkId : modifier.name;
+      return modifier.steps > 1 ? `${name} ×${String(modifier.steps)}` : name;
+    })
+    .join(' · ');
+}
+
 /** The axis's name in the player's words, or its id for an axis this build does not know. */
 function worldAxisLabelOf(axis: string): string {
   switch (axis) {
@@ -1207,10 +1335,27 @@ export function dailyBoardViewOf(
           world: worldLinesOf(board),
         };
       }
+      /*
+       * Which modifier set this board is, under the ranking note and before the house's — GitHub
+       * issue #371. It says what the column is a comparison *between*, which the house note then
+       * qualifies for some of the rows in it; the other order would explain the exceptions before
+       * the rule.
+       */
+      const modifierNote = boardModifierNoteOf(board.rows);
       return {
-        lines: board.rows.some((entry) => entry.baselineProfileId !== undefined)
-          ? [note, { text: BOARD_SCREEN_COPY.dailyHouseNote, className: 'everyday-board-house-note', role: 'note' }]
-          : [note],
+        lines: [
+          note,
+          ...(modifierNote === undefined ? [] : [modifierNote]),
+          ...(board.rows.some((entry) => entry.baselineProfileId !== undefined)
+            ? [
+                {
+                  text: BOARD_SCREEN_COPY.dailyHouseNote,
+                  className: 'everyday-board-house-note',
+                  role: 'note' as const,
+                },
+              ]
+            : []),
+        ],
         /*
          * One figure per row, and it is the one the board is ranked on. A row carrying more would
          * invite a comparison the ranking does not make, and `dataHash` — which says whether
@@ -1253,6 +1398,7 @@ export function dailyBoardViewOf(
             entry.legs === undefined
               ? undefined
               : `over ${entry.legs.toLocaleString('en-US')} rides`,
+          modifiers: modifierSentenceOf(entry.modifiers),
         })),
         world: worldLinesOf(board),
       };
