@@ -124,7 +124,7 @@ export interface JudgedConfiguration {
  * A configuration the declared space admits and `core` refuses to build.
  *
  * **Empty on the shipped ladder, measured rather than expected, and kept because it is the
- * instrument that found the thing that emptied it.** The whole sweep was re-run on `f4383c4` after
+ * instrument that found the thing that emptied it.** The whole sweep was re-run on `4159520` after
  * GitHub issue #475's fix — ten scenarios, three rungs, 1 900 s — and every one of the thirty cells
  * reports `unbuildable: 0`. That is the claim this field exists to be able to make, and it is a
  * reading of `data/scenario-survivors.json` rather than an argument from the fix: exactly the four

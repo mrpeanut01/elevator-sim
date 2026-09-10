@@ -189,7 +189,7 @@ export interface PublishedSurvivorStep {
   /**
    * Configurations the declared space admits and `core` refuses to build. **Not** in `examined`.
    *
-   * Zero on all thirty shipped cells, re-measured on `f4383c4` after GitHub issue **#475** closed
+   * Zero on all thirty shipped cells, re-measured on `4159520` after GitHub issue **#475** closed
    * rather than inferred from the fix, and the field is kept rather than dropped for the reason
    * `measureSurvivors.ts#UnbuildableConfiguration` gives: a category that is empty because it was
    * fixed reads exactly like one that is empty because nobody looked, unless the count is still

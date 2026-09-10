@@ -33,7 +33,7 @@
  * `stage-3-overwhelmed` alone takes 389 s, `stage-5-credentials` 189 s and `stage-1-first-call` 4 s,
  * which is why a per-scenario progress line exists at all.
  *
- * **Re-run on `f4383c4` for GitHub issue #475 at 1 900 s**, and that is two effects rather than a
+ * **Re-run on `4159520` for GitHub issue #475 at 1 900 s**, and that is two effects rather than a
  * regression in the sweep. Most of it is the machine — that run shared a host whose load average
  * was above 60 — and the rest is the fix doing its job: the four configurations that used to
  * `throw` while the building was constructed cost almost nothing, and each now runs a full

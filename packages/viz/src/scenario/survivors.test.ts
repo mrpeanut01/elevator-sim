@@ -82,7 +82,7 @@ function contextOf(): SurvivorContext {
  * -------------------------------------------------------------------------- */
 
 /**
- * **Scenarios nothing gets through at any rung, re-measured 2026-09-10 on `f4383c4`.**
+ * **Scenarios nothing gets through at any rung, re-measured 2026-09-10 on `4159520`.**
  *
  * **The denominators moved and the membership did not** — GitHub issue **#475**. Four cells across
  * the ladder used to read *of 23* rather than *of 24*, because the sampler drew a vector `core`
