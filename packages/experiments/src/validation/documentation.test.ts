@@ -1722,7 +1722,7 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
  * use of it, which is why the convention for writing about it is to name it rather than utter it —
  * see § D405. Over-counting is the safe direction for a ratchet; under-counting is not.
  */
-const DECISION_DEBT_CEILING = 5;
+const DECISION_DEBT_CEILING = 4;
 
 describe('the decision-number bookkeeping (GitHub issue #173)', () => {
   it('keeps the charter’s next-free number correct by derivation, not by transcription', () => {
