@@ -308,8 +308,15 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
    * built from ids alone therefore has the **answer and not the thing answered** — the option's own
    * service events would be the only mode changes in the run — so this is a missing *cause* rather
    * than a missing field, and carrying it would be worse than refusing it. `packages/server`'s
-   * `SUBMITTABLE_INTERVENTION_KINDS` names the one kind that travels, for the same reason and in the
+   * `SUBMITTABLE_INTERVENTION_KINDS` names the kinds that travel, for the same reason and in the
    * same direction: an allow-list, so a kind added tomorrow is refused until somebody decides.
+   *
+   * **That sentence used to say *the one kind that travels*, and it had been wrong for two waves**
+   * (GitHub issue #371). It was written when `park-cars-lobby` was alone; § D486 added
+   * `switch-dispatcher` as a shipped id plus rows and issue #352 added `spread-cars`, so three of
+   * the four travel and one is refused. The allow-list itself was correct throughout — what had
+   * gone stale is this description of it, which is the more dangerous half, because a reader who
+   * believes one kind travels will not think to ask why theirs does not.
    *
    * The empty log still carries: `shiftRunConfigOf` writes no `interventions` key for it, and `core`
    * pins that run byte-identical to one built before the field existed.

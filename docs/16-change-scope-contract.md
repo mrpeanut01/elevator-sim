@@ -111,7 +111,7 @@ export const PLAY_MODES = [
 | `shift-week` — the day loop: contracts, growth, events, goals that harden | ✅ | ✅ | ✅ | ✅ |
 | `free-play` — one run, no week, no growth, no event | ✅ | ✅ | ❌ | ✅ |
 | `stage-campaign` — `data/campaign.json`'s batch-judged stages | ✅ | derived | ❌ | ❌ |
-| `ranked` — a run offered to the leaderboard | ✅ | ❌ | ❌ | ✅ |
+| `ranked` — a run offered to the leaderboard | ✅ | recorded interventions only | ❌ | ✅ |
 | `incidents` — a week with scheduled and unscheduled service events | ✅ | ✅ | ✅ | ✅ |
 | `calendar` — a week inside a declared period | ✅ | ✅ | ✅ | ✅ |
 | `commissioning` — the pre-week design phase | ✅ | ❌ | ❌ | ✅ |
@@ -124,12 +124,37 @@ Three rows carry an argument rather than a preference:
   `editable` block via `campaign/dimensions.ts`, which already refuses a dimension the discovered
   search space does not declare. Writing the ids here would make this document the second place that
   has to change when `core` declares a knob.
-- **`ranked` permits `presentation` and `between-games` only**, because nothing else survives the
-  server's replay (§ D214 § 3). **This row already exists in the tree, written by hand**:
-  `dev/main.ts#provenanceLineOf` refuses to emit a CLI line for a run whose building, dispatcher or
-  pattern is not shipped, whose `week.day !== 1`, whose event changes anything, which holds cars out
-  of service, or whose group levers are off their defaults. That is the `ranked` row, and S5 exists
-  so it is derived once and consumed twice rather than written twice and allowed to drift.
+- **`ranked` permits `presentation`, `between-games`, and `within-day` changes that are *recorded
+  interventions*** — nothing else survives the server's replay (§ D214 § 3). **This row already
+  exists in the tree, written by hand**: `scope/runIdentity.ts#runIdentityIssues` refuses a run
+  whose building, dispatcher or pattern is not shipped, whose `week.day !== 1`, whose event changes
+  anything, which holds cars out of service, or whose group levers are off their defaults. That is
+  the `ranked` row, and S5 exists so it is derived once and consumed twice rather than written
+  twice and allowed to drift.
+
+  **The `within-day` cell read ❌ until GitHub issue #371, and the document was the stale half.**
+  It was written when nothing a player did mid-run survived a replay, and § D525 clause 6 widened
+  it on § D486's shape: a submission carries **causes** and the server derives **effects**. So a
+  recorded intervention travels as the cause it was — an instant, and for a handover the shipped
+  profile id plus the player's rows — and the server replays the day from those. The word
+  *recorded* is load-bearing and is not a synonym for *any*: pausing, scrubbing and the speed chips
+  are not interventions and are not recorded, which is why this cell is narrower than `shift-week`'s.
+
+  **Which kinds travel is `packages/server`'s `SUBMITTABLE_INTERVENTION_KINDS` and is not restated
+  here.** It is an **allow-list**, so a kind added tomorrow is refused until somebody decides it can
+  travel, and `scope/runIdentity.ts#CARRIED_INTERVENTION_KINDS` is the client's restatement of it —
+  asserted against the server's own source text by `runIdentity.test.ts`, because `viz` may not
+  import `server` (§ D215 § 3). Listing the members in this document would make it a **third**
+  consumer of a predicate S5 says has one derivation; what this document owes instead is the
+  boundary, and `runIdentity.test.ts` derives the sentence above from the allow-list rather than
+  letting it be transcribed.
+
+  **One kind is refused, permanently, and the reason is a missing cause rather than a missing
+  field** (§ D486, `runIdentity.ts#ANSWER_INCIDENT_STAYS_REFUSED`). An `answer-incident` names
+  service events that `shift/incidents.ts` writes onto the *building* from the week's day and the
+  calendar; neither travels, so a replay built from ids alone would hold the answer and not the
+  thing answered — and the server would verify **that** run as honest. A refusal that prevents a
+  verified-but-wrong replay is a feature, and it stops being tracked as a gap.
 
 ---
 
