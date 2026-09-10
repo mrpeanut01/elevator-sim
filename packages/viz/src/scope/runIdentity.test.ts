@@ -85,6 +85,7 @@ import {
   runIdentityIssues,
 } from './runIdentity.js';
 import { SCOPE_OF } from './surface.js';
+import { wireInterventionsOf } from './switchWire.js';
 import { PLAY_MODES, type SurfaceKey } from './types.js';
 
 /**
@@ -1142,5 +1143,128 @@ describe('the goods-car refusal names a reservation that happened — issue #264
     expect(issues.find((issue) => issue.key === 'viewer.calendar')?.message ?? '').toContain(
       'pulls the mix',
     );
+  });
+});
+
+/**
+ * **One derivation, *three* consumers** — S5 (`docs/16` § 4), GitHub issue #371.
+ *
+ * The clause says the submit gate and the server's replay read the same predicate. Two consumers
+ * were already held to that, and the check predates this issue: the test above compares
+ * `CARRIED_INTERVENTION_KINDS` against `SUBMITTABLE_INTERVENTION_KINDS`'s own source text, both
+ * directions. **What it cannot see is the consumers that spell the same set a different way**, and
+ * both were found by looking rather than assumed:
+ *
+ * 1. `scope/switchWire.ts#wireInterventionsOf` enumerates the carried kinds as an `if`-chain and
+ *    **throws** on anything else. Adding a fourth kind to the allow-list without adding an arm
+ *    there leaves the array test green and the submission raising an `Error` out of the assembler
+ *    — on a run the gate has just declared postable. That is the accusation-shaped failure this
+ *    module exists to prevent, arriving as a crash instead of a rejection.
+ * 2. `docs/16-change-scope-contract.md` is the contract this predicate implements, and until this
+ *    issue its `ranked` row said `within-day` was `❌` while three kinds had been travelling for
+ *    two waves. A document cannot be compared to an array by reading it harder, so what is
+ *    asserted is the shape that keeps it derivable: it states the **boundary** and never
+ *    transcribes the **members**.
+ */
+describe('one derivation, the consumers that spell the set differently — S5, issue #371', () => {
+  /** `baseState()` with one logged intervention on it — the `logged` helper above, re-declared. */
+  function withLog(change: unknown): ViewerState {
+    return {
+      ...baseState(),
+      buildingId: 'midtown-office',
+      shiftLengthS: 1800,
+      interventions: [{ atS: 120, change }],
+    } as unknown as ViewerState;
+  }
+
+  /** A log entry of `kind`, carrying whatever that kind carries besides its instant. */
+  function logEntry(kind: string): unknown {
+    if (kind !== 'switch-dispatcher') return { atS: 120, change: { kind } };
+    // The one carried kind that carries more than its instant: a shipped style, which
+    // `switchWireOf` resolves to an id plus rows.
+    return { atS: 120, change: { kind, profile: RESOURCES.dispatcherProfiles.profiles[1] } };
+  }
+
+  it('every kind the gate carries survives the wire, rather than throwing out of the assembler', () => {
+    const shipped = RESOURCES.dispatcherProfiles.profiles;
+    expect(CARRIED_INTERVENTION_KINDS.length).toBeGreaterThan(0);
+    for (const kind of CARRIED_INTERVENTION_KINDS) {
+      const entry = logEntry(kind) as { readonly change: unknown };
+      // The gate says yes…
+      expect(
+        runIdentityIssues(withLog(entry.change), RESOURCES, 'ranked').filter(
+          (issue) => issue.key === 'viewer.interventions',
+        ),
+        `${kind} is in the allow-list and the gate refuses it`,
+      ).toEqual([]);
+      // …and the wire must agree, in the same breath. `wireInterventionsOf` spells the set as an
+      // `if`-chain, so a kind added to the array and not to the chain reaches its final `throw`.
+      const wired = wireInterventionsOf(
+        [entry] as unknown as Parameters<typeof wireInterventionsOf>[0],
+        shipped,
+      );
+      expect(wired, kind).toHaveLength(1);
+      expect(wired[0]?.change.kind, `${kind} is carried by the gate and dropped by the wire`).toBe(
+        kind,
+      );
+    }
+  });
+
+  it('and the wire still throws on a kind the gate refuses — the negative control', () => {
+    /*
+     * Accepting everything would satisfy the case above and would be the allow-list undone. The
+     * refused kind must still reach the chain's final `throw`, because that throw is what says
+     * arriving there is a defect in the ordering rather than a state a player can be in.
+     */
+    expect(() =>
+      wireInterventionsOf(
+        [
+          { atS: 120, change: { kind: 'answer-incident', option: 'x', serviceEvents: [] } },
+        ] as unknown as Parameters<typeof wireInterventionsOf>[0],
+        RESOURCES.dispatcherProfiles.profiles,
+      ),
+    ).toThrow(/does not carry it/u);
+  });
+
+  it('docs/16’s ranked row states the boundary and does not transcribe the members', () => {
+    /*
+     * The document is a consumer of this predicate and it went stale in the one way a document
+     * can: its `within-day` cell read `❌` while three kinds travelled, and the word *intervention*
+     * appeared in it zero times. It is fixed by naming the *boundary* — recorded interventions —
+     * and pointing at the allow-list, rather than by copying the allow-list into a third place that
+     * would need editing on the day a fourth kind lands.
+     *
+     * So the assertion has two halves, and the second is the one that keeps it fixed: no carried
+     * kind's id may appear in the document at all. The **refused** kind may, and does: that is a
+     * permanent decision with a stated reason (§ D486), not a list that grows.
+     */
+    const contract = readFileSync(
+      new URL('../../../../docs/16-change-scope-contract.md', import.meta.url),
+      'utf8',
+    );
+    const row = contract.split('\n').find((line) => line.startsWith('| `ranked`'));
+    expect(row, 'docs/16 no longer carries a `ranked` row').toBeDefined();
+    const withinDay = (row ?? '').split('|')[3]?.trim();
+    expect(
+      withinDay,
+      'docs/16’s `ranked` row still refuses every within-day change, which three intervention ' +
+        'kinds have contradicted since § D486',
+    ).not.toBe('❌');
+    expect(withinDay).toContain('recorded interventions');
+
+    for (const kind of CARRIED_INTERVENTION_KINDS) {
+      expect(
+        contract.includes(kind),
+        `docs/16 transcribes “${kind}”, making it a third place the allow-list has to be edited`,
+      ).toBe(false);
+    }
+    // It points at both ends of the one derivation instead.
+    expect(contract).toContain('SUBMITTABLE_INTERVENTION_KINDS');
+    expect(contract).toContain('CARRIED_INTERVENTION_KINDS');
+    // And it carries the permanent refusal, which is the half that is a decision rather than a list.
+    // Whitespace-tolerant, because the sentence wraps in the document and a prose check that a
+    // reflow can break is a check that will be deleted rather than understood.
+    expect(contract).toContain('answer-incident');
+    expect(contract).toMatch(/the\s+answer\s+and\s+not\s+the\s+thing\s+answered/u);
   });
 });

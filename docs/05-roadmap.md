@@ -444,11 +444,21 @@ buildings by `packages/viz/src/record/recordRun.test.ts` § *"gives every shaft 
 itself reports, not the position it ended at"*, under `describe.each(BUILDING_IDS)`.
 
 **The UX cycle ran, and its ledger is published rather than summarised.**
-`packages/viz/UX.md` § 7.0 carries **88** scenarios with differentiated states, not a blanket tick:
-**86 ✅** (32 wave 1, 37 driven in a browser against the shipped `data/`, 4 driven *and* asserted,
-13 asserted by a test whose assertion was proved to bite), 1 ✅+⚠️ with one clause each way
-(`ED-23`), **0 ⚠️ unverified**, 0 🔲 re-marked, and 1 🔲 not built (`PB-09`). The ids are reproduced
+`packages/viz/UX.md` § 7.0 carries **91** scenarios with differentiated states, not a blanket tick:
+**90 ✅** (32 wave 1, 37 driven in a browser against the shipped `data/`, 6 driven *and* asserted,
+15 asserted by a test whose assertion was proved to bite), 1 ✅+🔲 with one clause each way
+(`ED-23`), **0 ⚠️ unverified**, 0 🔲 re-marked, and **0 🔲 not built**. The ids are reproduced
 in [`TEST_MATRIX.md`](../TEST_MATRIX.md) § 3.
+
+> **Most of that move is a correction rather than this wave's work, and the split is stated so the
+> next reader does not credit it to the wrong commit.** This paragraph read `88` / `86 ✅` / `4` /
+> `13` while `UX.md`'s own table had said `91` for two waves — `T48` added `ED-24` and `ED-25` to
+> the driven-*and*-asserted bucket and `T44` added `ED-17a` to the asserted one, and neither
+> re-derived this sentence. GitHub issue #417 moved exactly two things: `PB-09` is built and joins
+> the asserted bucket (`14` → `15`, and the not-built bucket to **zero**), and `ED-23`'s second
+> clause is re-marked ⚠️ → 🔲, because `grep -rn beforeunload packages/*/src` returns nothing and
+> *unverified* means *built and never exercised*. `documentation.test.ts` now derives this
+> paragraph from `UX.md`'s table in both directions, which is what stops the fourth recurrence.
 
 > **The count moved from 87 to 88 because `T29` added a row, and two of the existing rows were
 > found to be *false* rather than merely unverified.** `UX.md` § A.3's **Success** and **Saturated**

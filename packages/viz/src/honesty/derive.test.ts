@@ -826,6 +826,26 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        '`UX.md` `PB-09`’s two halves, and they are excluded for different reasons. ' +
+        '`LOOP_WINDOW_IDLE_LABEL` is a **control’s accessible name** — the third face of the A–B ' +
+        'chip, the one `index.html` ships and `setLoopMark` puts back — and it carries no figure, ' +
+        'no mean and no claim about a run, so none of the ten properties has anything to say ' +
+        'about it. It is a module-level export only so that the page and the code cannot hold two ' +
+        'different sentences for one state, and `chromeLabels.test.ts` asserts exactly that, in ' +
+        'both directions, against the page’s own opening tag. That is a stronger check than a ' +
+        'string sweep for a label whose entire job is to equal a `aria-label` attribute. The rest ' +
+        'of the transport’s chip names are authored inline in `drawTransportChrome` and reach the ' +
+        'derivation not at all, on the DOM entry points’ shared ground. ' +
+        '`Playback` is derived for one sentence, `setLoop`’s `RangeError` on a window with no ' +
+        'positive length, and that is a developer diagnostic in `recordRun`’s own class: it ' +
+        'reports that a caller asked for a loop the playhead cannot cross, fires before a frame ' +
+        'is drawn, and is pinned by `playback.test.ts` in both directions rather than swept as ' +
+        'player copy. No transport state reaches a reader through this class — the words a player ' +
+        'sees about the loop are the chip’s names above and the timeline’s own bands.',
+      ids: ['dev/main.ts#LOOP_WINDOW_IDLE_LABEL', 'playback/playback.ts#Playback'],
+    },
+    {
+      reason:
         'The change-scope model (`docs/16`, § D216). `CHANGE_SCOPES` and `PLAY_MODES` are the two ' +
         'id tuples every exhaustive switch in `scope/` walks — the same id-table case as ' +
         '`campaign/types.ts#FAIL_STATES`. `SCOPE_OF`’s `why` field is **developer** prose: it is ' +

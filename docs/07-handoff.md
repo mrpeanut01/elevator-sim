@@ -924,11 +924,15 @@ the same building with **no** schedule, in which 18 promises are broken by full 
   (§ D67)
 - ✅ **Live metrics overlay** — it suppresses *estimates* and keeps *observations*, and copies
   `awtIsValid` from the summary rather than recomputing it (§ D64)
-- ✅ A rendering contract (`VIZ_SCHEMA_VERSION = 4`), a Canvas renderer, and an **88-scenario UX
-  ledger** at `packages/viz/UX.md` § 7.0 with per-scenario ids and differentiated states — **86 ✅**
-  (32 wave 1, 37 driven, 4 driven *and* asserted, 13 asserted by a test proved to bite), 1 half
-  (`ED-23`), **0 unverified**, 1 not built (`PB-09`). Wave 5 drove the last four ⚠️ rows and settled
-  `ED-12`/`ED-13` against the schema ([§ D120](../DECISIONS.md), [§ D116](../DECISIONS.md))
+- ✅ A rendering contract (`VIZ_SCHEMA_VERSION = 4`), a Canvas renderer, and a **91-scenario UX
+  ledger** at `packages/viz/UX.md` § 7.0 with per-scenario ids and differentiated states — **90 ✅**
+  (32 wave 1, 37 driven, 6 driven *and* asserted, 15 asserted by a test proved to bite), 1 half
+  (`ED-23`), **0 unverified**, **0 not built**. Wave 5 drove the last four ⚠️ rows and settled
+  `ED-12`/`ED-13` against the schema ([§ D120](../DECISIONS.md), [§ D116](../DECISIONS.md)); GitHub
+  issue #417 built `PB-09` and re-marked `ED-23`'s second clause ⚠️ → 🔲, and the rest of the move
+  from `88` is this sentence catching up with a table that had been `91` since `T44` and `T48` —
+  see [`docs/05`](05-roadmap.md) § Phase 4 for the split, and `documentation.test.ts`, which now
+  derives both from `UX.md`'s table rather than letting either be transcribed
 
 > **Two of those rows were *false*, not merely unverified, and were found by driving the app.**
 > `UX.md` § A.3's **Success** and **Saturated** rows each carried a "must not show" clause about the

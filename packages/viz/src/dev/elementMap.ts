@@ -330,6 +330,14 @@ export interface TransportElements {
   readonly stepForward: HTMLButtonElement;
   /** A `.chip[aria-pressed]`, not a checkbox — the handoff's own toggle. `docs/12` § 4.7. */
   readonly loop: HTMLButtonElement;
+  /**
+   * `UX.md` `PB-09` — the A–B repeat, a three-press cycle over `aria-pressed`'s three values.
+   * Not a pair of mark-start / mark-end buttons: one control that says which of the three states
+   * it is in cannot get out of step with itself.
+   */
+  readonly loopWindow: HTMLButtonElement;
+  /** `PB-09` — the marked span drawn over the timeline. A child of {@link timeline}, like {@link playhead}. */
+  readonly loopBand: HTMLElement;
   readonly status: HTMLElement;
   readonly error: HTMLElement;
   readonly verify: HTMLButtonElement;
@@ -763,6 +771,8 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     stepBack: 'step-back',
     stepForward: 'step-forward',
     loop: 'loop',
+    loopWindow: 'loop-window',
+    loopBand: 'loop-band',
     status: 'status',
     error: 'error',
     verify: 'verify',

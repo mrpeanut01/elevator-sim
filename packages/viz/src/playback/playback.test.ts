@@ -155,6 +155,131 @@ describe('Playback', () => {
     clock.advance(1000);
     expect(playback.frame().simTimeS).toBe(10);
   });
+});
+
+/**
+ * `UX.md` `PB-09` — *window selection then loop: only the selected span repeats*.
+ *
+ * The row was `🔲 not built` for two waves, and what was missing was never the arithmetic: it was
+ * that `loop` was a `readonly` boolean read once in the constructor, so a viewer could only change
+ * its mind by building a second transport. These assertions are the contract that replaced it, and
+ * the first two are the ones that fail against the old code.
+ */
+describe('Playback — the loop window (PB-09)', () => {
+  const make = (options?: ConstructorParameters<typeof Playback>[2]): [Playback, ManualClock] => {
+    const clock = new ManualClock(0);
+    return [new Playback(RECORDING, clock, options), clock];
+  };
+
+  it('only the selected span repeats', () => {
+    const [playback, clock] = make({ speed: 10, autoplay: true });
+    playback.setLoop({ fromS: 40, toS: 60 });
+    playback.seekTo(40);
+    clock.advance(1000);
+    expect(playback.frame().simTimeS).toBe(50); // mid-window, nothing has wrapped
+    clock.advance(1500);
+    expect(playback.frame().simTimeS).toBe(40); // 65 is past the window, so back to its start
+
+    /*
+     * And it stays there. Sixty frames of a quarter-second each is seven and a half times round a
+     * two-second window; a transport that wrapped at `endedAt` rather than at `toS` would leave it
+     * on the very first pass, and one that subtracted the window's length instead of re-anchoring
+     * would drift out of it eventually.
+     */
+    let wraps = 0;
+    let previous = playback.simTimeS;
+    for (let tick = 0; tick < 60; tick += 1) {
+      clock.advance(250);
+      const at = playback.frame().simTimeS;
+      expect(at, `frame ${String(tick)} left the window`).toBeGreaterThanOrEqual(40);
+      expect(at, `frame ${String(tick)} left the window`).toBeLessThan(60);
+      if (at < previous) wraps += 1;
+      previous = at;
+    }
+    expect(wraps).toBeGreaterThan(2);
+  });
+
+  it('does not move the playhead when the window is selected — the defect PB-09 names', () => {
+    /*
+     * `dev/main.ts`'s loop chip used to call `adopt(recording)`, which builds a fresh `Playback`
+     * with `startAtS` unset — so choosing to loop at 07:30 restarted the shift at 06:00. Selecting
+     * a span says where the transport wraps, not where it is.
+     */
+    const [playback, clock] = make({ speed: 10, autoplay: true });
+    clock.advance(7000);
+    expect(playback.simTimeS).toBe(70);
+    playback.setLoop({ fromS: 20, toS: 90 });
+    expect(playback.simTimeS).toBe(70);
+    expect(playback.state).toBe('playing');
+  });
+
+  it('plays a lead-in before the window once, and does not come back to it', () => {
+    const [playback, clock] = make({ speed: 10, autoplay: true });
+    playback.setLoop({ fromS: 80, toS: 100 });
+    clock.advance(5000);
+    expect(playback.frame().simTimeS).toBe(50); // still in the lead-in
+    clock.advance(5000);
+    expect(playback.frame().simTimeS).toBe(80); // wrapped at 100 to the window's start
+    clock.advance(1000);
+    expect(playback.frame().simTimeS).toBe(90); // and never below 80 again
+  });
+
+  it('never reads `ended` while a sub-window is looping, so no day is filed off it', () => {
+    const [playback, clock] = make({ speed: 10, autoplay: true });
+    playback.setLoop({ fromS: 10, toS: 30 });
+    for (let tick = 0; tick < 20; tick += 1) {
+      clock.advance(1000);
+      playback.frame();
+      expect(playback.state).toBe('playing');
+    }
+  });
+
+  it('stops looping when the window is cleared, and the run then ends', () => {
+    const [playback, clock] = make({ speed: 10, autoplay: true, loop: true });
+    clock.advance(10_000);
+    expect(playback.frame().simTimeS).toBe(0);
+    playback.setLoop(null);
+    expect(playback.loopWindow).toBeNull();
+    clock.advance(20_000);
+    expect(playback.frame().simTimeS).toBe(100);
+    expect(playback.state).toBe('ended');
+  });
+
+  it('reports the whole run as the window a `loop: true` transport is looping over', () => {
+    const [playback] = make({ loop: true });
+    expect(playback.loopWindow).toEqual({ fromS: 0, toS: 100 });
+    expect(playback.wholeRun).toEqual({ fromS: 0, toS: 100 });
+    const [plain] = make();
+    expect(plain.loopWindow).toBeNull();
+  });
+
+  it('clamps a window into the recording rather than extrapolating', () => {
+    const [playback] = make();
+    playback.setLoop({ fromS: -50, toS: 500 });
+    expect(playback.loopWindow).toEqual({ fromS: 0, toS: 100 });
+  });
+
+  it('refuses a window the playhead cannot cross, in both directions', () => {
+    const [playback] = make();
+    expect(() => {
+      playback.setLoop({ fromS: 40, toS: 40 });
+    }).toThrow(RangeError);
+    expect(() => {
+      playback.setLoop({ fromS: 60, toS: 40 });
+    }).toThrow(RangeError);
+    // Both ends below the recording: they clamp onto each other, which is the same failure.
+    expect(() => {
+      playback.setLoop({ fromS: -20, toS: -10 });
+    }).toThrow(/clamps to 0–0/u);
+    expect(playback.loopWindow, 'a refused window must not be half-applied').toBeNull();
+  });
+});
+
+describe('Playback', () => {
+  const make = (options?: ConstructorParameters<typeof Playback>[2]): [Playback, ManualClock] => {
+    const clock = new ManualClock(0);
+    return [new Playback(RECORDING, clock, options), clock];
+  };
 
   it('seeks in either direction, in either state', () => {
     const [playback, clock] = make({ speed: 10 });

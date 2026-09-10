@@ -170,7 +170,8 @@ import {
   timelineOf,
 } from '../live/timeline.js';
 import { systemClock } from '../playback/clock.js';
-import { Playback } from '../playback/playback.js';
+import { nextLoopMark } from '../playback/loopMark.js';
+import { Playback, type LoopWindow } from '../playback/playback.js';
 import { readRecordingDocument, verifyReplay, writeRecordingDocument } from '../record/document.js';
 import { assertSameCrowd } from '../record/crowd.js';
 import { recordRun } from '../record/recordRun.js';
@@ -203,7 +204,13 @@ import { contractById, statLineOf } from '../shift/contracts.js';
 import { bankingRefusalFor, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { readGoals } from '../shift/goals.js';
-import { dayReportOf, type DayReportInput, type ShapedDayReport } from '../shift/report.js';
+import {
+  clockOf,
+  clockRange,
+  dayReportOf,
+  type DayReportInput,
+  type ShapedDayReport,
+} from '../shift/report.js';
 import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
 import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
@@ -329,6 +336,17 @@ const SPEEDS = [1, 10, 60, 240, 900] as const;
  * cannot drift apart.
  */
 const DEFAULT_BASE_SPEED = 60;
+
+/**
+ * What `#loop-window` is called before anything is marked — `UX.md` `PB-09`.
+ *
+ * Exported because `index.html` writes it too, on the element's own opening tag, and the boot state
+ * of a three-state control has to be the same sentence the code puts back when the reader clears
+ * the mark. `chromeLabels.test.ts` asserts the page against this constant rather than against a
+ * copy of the words, which is the difference between checking a mirror and describing one.
+ */
+export const LOOP_WINDOW_IDLE_LABEL =
+  'A–B loop — press to mark the start of a section at the playhead';
 
 /** Width of the right gutter, where the landing counts and the rider queues are drawn. */
 const QUEUE_GUTTER_PX = 280;
@@ -2920,6 +2938,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * `aria-pressed`, written by {@link setLooping} and read by nothing — one source, one writer.
    */
   let looping = false;
+
+  /**
+   * `UX.md` `PB-09` — the span the transport repeats, or `null` for the whole shift.
+   *
+   * Two locals rather than one, because the A–B repeat has a **half-marked** state and a window
+   * with one end is not a window: {@link loopMarkFromS} is where the next press would start the
+   * span, and {@link loopMark} is a span both of whose ends are marked. `setLoopMark` is the one
+   * writer of both, on {@link setLooping}'s own precedent, and `applyLoop` is the one place either
+   * reaches `Playback`.
+   *
+   * Boot-scope, like {@link looping} and {@link bankFilter}, and deliberately not a `ViewerState`
+   * field: a marked span changes which instants the reader watches and not one leg of the run, so
+   * persisting it or probing it as a run input would claim an effect it does not have.
+   */
+  let loopMark: LoopWindow | null = null;
+  let loopMarkFromS: number | null = null;
 
   /* ---------------------------------------------------------------------- *
    * The race — GAMEPLAY §7.4, Everyday slice 4d
@@ -5748,6 +5782,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
         menuHasBeenDismissed &&
         shouldAutoplayWith(window.matchMedia.bind(window), menuState.settings.reduceMotion),
     });
+    /*
+     * The marked span belongs to the run it was marked on — `UX.md` `PB-09`.
+     *
+     * A window is a pair of instants in *this* recording; carried onto the next one it would name
+     * a different part of a different shift, and the two runs need not even be the same length.
+     * Cleared through `setLoopMark`, so the chip, the band and the transport all learn about it
+     * from the one writer. {@link looping} is deliberately **not** cleared: whether the reader
+     * likes the transport repeating is a preference and survives the run, which is why `loop` is
+     * still passed above.
+     */
+    setLoopMark(null, null);
     disableTransport(ui, false);
     filedRunId = undefined;
     /*
@@ -6331,10 +6376,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
       step(1);
     });
     ui.transport.loop.addEventListener('click', () => {
+      /*
+       * Live, through `Playback#setLoop` — `UX.md` `PB-09`.
+       *
+       * This used to be `adopt(state.recording)`, because `loop` was read once in the transport's
+       * constructor and a `readonly` field after that. `adopt` builds a fresh `Playback` with
+       * `startAtS` unset, so **pressing this chip at 07:30 put the playhead back at 06:00**, and it
+       * cleared the landing selection and re-armed the day-filing gate on the way past. The row's
+       * own note called that *"rebuilt at the current instant"*, which is the one thing it was not.
+       */
       setLooping(!looping);
-      // `Playback` takes `loop` at construction, so the change reaches a run already on screen only
-      // by re-adopting it. That was true of the checkbox too; only the event name moved.
-      if (state.recording !== undefined) adopt(state.recording);
+      applyLoop();
+    });
+    ui.transport.loopWindow.addEventListener('click', () => {
+      cycleLoopMark();
     });
     ui.transport.timeline.addEventListener('click', (event) => {
       scrubTo(event.clientX);
@@ -6418,6 +6473,92 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ui.transport.loop.setAttribute('aria-pressed', on ? 'true' : 'false');
   }
 
+  /**
+   * The one writer of the A–B mark's three representations — `UX.md` `PB-09`.
+   *
+   * `aria-pressed` takes its third legal value here. `false` is *no span marked*, `mixed` is *one
+   * end marked and waiting for the other*, and `true` is *a span the transport is repeating*; a
+   * half-marked control drawn identically to an unmarked one is a press that looks like it did
+   * nothing, which is why `index.html` gives `mixed` a rule of its own.
+   *
+   * The accessible name leads with the visible `A–B` in every state — WCAG 2.5.3, the same rule
+   * the speed chips follow, so speech input still reaches the control by what a reader can see.
+   */
+  function setLoopMark(window: LoopWindow | null, pendingFromS: number | null): void {
+    loopMark = window;
+    loopMarkFromS = pendingFromS;
+    const chip = ui.transport.loopWindow;
+    if (window !== null) {
+      chip.setAttribute('aria-pressed', 'true');
+      chip.setAttribute(
+        'aria-label',
+        `A–B loop over ${clockRange(window.fromS, window.toS, runStartOfDayS ?? DAY_START_S)} — press to go back to the whole shift`,
+      );
+    } else if (pendingFromS !== null) {
+      chip.setAttribute('aria-pressed', 'mixed');
+      chip.setAttribute(
+        'aria-label',
+        `A–B loop — start marked at ${clockOf(pendingFromS, runStartOfDayS ?? DAY_START_S)}; press to mark the end at the playhead`,
+      );
+    } else {
+      chip.setAttribute('aria-pressed', 'false');
+      chip.setAttribute('aria-label', LOOP_WINDOW_IDLE_LABEL);
+    }
+    drawLoopBand();
+    applyLoop();
+  }
+
+  /**
+   * One press of `A–B` — `UX.md` `PB-09`.
+   *
+   * The cycle itself is `playback/loopMark.ts#nextLoopMark`, a pure export with its own tests,
+   * because a decision taken inside a click handler in a mount is a decision no test can reach.
+   * What is left here is the two things only the mount knows: where the playhead is, and that
+   * completing a span should **turn looping on** if it was off.
+   *
+   * That second clause is the standing requirement in `CLAUDE.md` applied to a transport. A
+   * control whose whole purpose is to make a span repeat, and which needs a *different* control
+   * pressed before anything repeats, is a control that does nothing on its own press.
+   */
+  function cycleLoopMark(): void {
+    const next = nextLoopMark({ span: loopMark, pendingFromS: loopMarkFromS }, playback?.simTimeS);
+    if (next.span !== null) setLooping(true);
+    setLoopMark(next.span, next.pendingFromS);
+  }
+
+  /**
+   * The one place either loop local reaches the transport.
+   *
+   * A marked span only repeats while {@link looping} is on, so the `loop` chip stays the answer to
+   * *does this repeat at all* and `A–B` stays the answer to *which part*. Two controls, one piece
+   * of state on `Playback`, and no third opinion about it anywhere.
+   */
+  function applyLoop(): void {
+    if (playback === undefined) return;
+    playback.setLoop(looping ? (loopMark ?? playback.wholeRun) : null);
+  }
+
+  /**
+   * Draw the marked span over the timeline — `PB-09`'s visible half.
+   *
+   * Percentages of the run rather than pixels, because the timeline is a flex child that resizes
+   * with the pane and a pixel offset would be wrong on the next reflow with nothing to redraw it.
+   */
+  function drawLoopBand(): void {
+    const band = ui.transport.loopBand;
+    const recording = state.recording;
+    const span = recording === undefined ? 0 : recording.endedAt - recording.startedAt;
+    if (recording === undefined || loopMark === null || span <= 0) {
+      band.hidden = true;
+      return;
+    }
+    const left = ((loopMark.fromS - recording.startedAt) / span) * 100;
+    const width = ((loopMark.toS - loopMark.fromS) / span) * 100;
+    band.style.setProperty('left', `${left.toFixed(3)}%`);
+    band.style.setProperty('width', `${width.toFixed(3)}%`);
+    band.hidden = false;
+  }
+
   function step(frames: number): void {
     if (playback === undefined) return;
     playback.pause();
@@ -6492,7 +6633,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
     /*
      * The playhead is a child of the timeline and must survive the segments being replaced, so it
      * is re-appended rather than recreated: recreating it would drop the element `#playhead` names
-     * and `elementMap.test.ts` would be describing a page that no longer exists.
+     * and `elementMap.test.ts` would be describing a page that no longer exists. `PB-09`'s loop
+     * band is a child on exactly the same terms, and it goes in **before** the playhead so the
+     * mark that says *where you are* draws over the mark that says *what repeats*.
      */
     fill(
       ui.transport.timeline,
@@ -6507,8 +6650,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
           children: [el(document, 'span', { text: segment.label, style: { color: segment.fg } })],
         }),
       ),
+      ui.transport.loopBand,
       ui.transport.playhead,
     );
+    // Re-appending does not re-position it, and `state.recording` may have changed underneath.
+    drawLoopBand();
     fill(
       ui.transport.ticks,
       // The same hour as the segments one call up and the header clock — the tick row was the one
