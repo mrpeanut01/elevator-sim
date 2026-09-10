@@ -223,9 +223,15 @@ refuses a version that is not a positive integer, so the next such import is red
 4. **Both directions on the read set.** Every version the build has ever written must be in
    `SESSION_SCHEMA_VERSIONS_READ`, *and* every entry of that set must be a version the build could
    have written. A number in one and not the other is red.
-5. **A newer envelope is still refused.** `careerPersist.ts` documents that case for its own slot;
-   the matrix checks it on all three rather than trusting the docstring, and requires the refusal to
-   name the version it found and the one it supports.
+5. **A newer envelope is still refused — on all three slots, and only one of them names why.**
+   `careerPersist.ts` documents the case for its own slot; the matrix checks it on all three rather
+   than trusting the docstring. **The three checks are not equal, and this row says so rather than
+   averaging them:** the session slot asserts `failure.kind === 'version'` together with `found`,
+   `supported` and the direction word, so the refusal really does name what it met; the career slot
+   asserts the refusal code and a non-empty notice but **does not require that notice to name either
+   version**; and the profile slot can assert only that `loadProfile` returned `undefined`, because
+   it returns no reason at all. Widening the two narrower ones is product work rather than a
+   checklist edit, and it is not done here.
 
 - **What a pass looks like:** `npx vitest run --project viz packages/viz/src/persist/migrationMatrix.test.ts`
   → **23 passed**, exit 0.
@@ -543,9 +549,9 @@ This section is the point of the document, and it holds to the standard
 
 | claim | how |
 |---|---|
-| Every version the session slot has ever written migrates, and the result survives a save, a reload and a played day | `packages/viz/src/persist/migrationMatrix.test.ts`, **23 passed** |
+| Every version the session slot has ever written migrates, and the result survives a save, a reload and a played day — **including version 7's stored-record half**, which was asserted by nothing until a fixture day carried a real `WatchRecord` | `packages/viz/src/persist/migrationMatrix.test.ts`, **23 passed** |
 | The same for the profile slot's five versions and the career slot's one | Same file |
-| A newer envelope is refused on all three slots, by version, naming what it found | Same file |
+| A newer envelope is refused on all three slots — **named** by version only on the session slot; career asserts a code and a non-empty notice, profile asserts only `undefined` (§ 3.3 item 5) | Same file |
 | The matrix goes red when a migration arm is deleted, when a step-down is neutered, when the version is bumped with nothing else, and when the refusal is disabled | § 3.4, four controls, output recorded there |
 | The matrix's own row derivation cannot silently produce an empty set | `versionsUpTo`'s guard — added because it had already done so once |
 | The workspace typechecks and the four node projects are green with this file in them | `npm run typecheck`, then `npx vitest run --project core --project viz --project experiments --project server`, on the commit that added this document |

@@ -81,6 +81,8 @@ import {
 import { openingCareer } from '../campaign/career.js';
 import type { BrowserResources } from '../dev/data.js';
 import { initialState, type ViewerState } from '../dev/state.js';
+import { watchRecordOf } from '../watch/record.js';
+import type { WatchRecord } from '../watch/types.js';
 import {
   PROFILE_SCHEMA_VERSION,
   PROFILE_SCHEMA_VERSIONS_READ,
@@ -198,9 +200,30 @@ const PERFECT = Object.freeze({
  * reason: a fixture that hand-writes what a constructor produces cannot catch a constructor that
  * changed, and GitHub issue #159 is the wave where exactly that happened to `eventId`.
  */
+/**
+ * A real shape-2 `WatchRecord`, built by the shipped constructor rather than hand-written.
+ *
+ * **Version 7's migration has two halves and only one of them used to be asserted.** The completion
+ * at `shift/session.ts` fills `ruleRows: []` and a record `version` of 2 on a *stored record*, and
+ * every fixture day carried `record: null` — so `if (day.record !== null)` never ran, and a review
+ * proved it by breaking the completion outright and watching all 23 cases stay green. Three
+ * documents said that half was verified.
+ *
+ * Built through {@link watchRecordOf} rather than as a literal, for this file's own stated reason:
+ * a fixture that hand-writes what a constructor produces cannot catch a constructor that changed,
+ * which is what happened to `eventId` in GitHub issue #159.
+ */
+function storedRecord(): WatchRecord {
+  const record = watchRecordOf(initialState(resources, VIEWER_SEED), resources);
+  if (record === undefined) {
+    throw new Error('migrationMatrix.test.ts: the initial state no longer yields a watch record');
+  }
+  return record;
+}
+
 function playedWeek(): WeekState {
   const day1 = outcomeOf({
-    record: null,
+    record: storedRecord(),
     recordRefusal: null,
     day: 1,
     dayIdx: 0,
