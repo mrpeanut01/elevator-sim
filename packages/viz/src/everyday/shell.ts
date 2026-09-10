@@ -80,6 +80,14 @@ import {
   signInNoticeViewOf,
 } from './signInLink.js';
 import { provideEverydaySwap } from './swap.js';
+/*
+ * Telemetry — GitHub issue #340. The recorder is a shared instance (`telemetryPort.ts` says why),
+ * the ask's words are pure (`telemetry/consentView.ts`), and the clock comes through the package's
+ * one door to a wall clock so `boundaries.test.ts` still has exactly one to police.
+ */
+import { everydayTelemetry, onEverydayConsent } from './telemetryPort.js';
+import { CONSENT_COPY, consentAskViewOf } from '../telemetry/consentView.js';
+import { systemClock } from '../playback/clock.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_GAPS as GAP,
@@ -351,6 +359,26 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * name typed on the settings screen move the `PLAYING AS` card without a reload.
    */
   const profileStore = everydayProfileStore();
+  /**
+   * The telemetry recorder — GitHub issue #340, one page-wide instance for `profileStore`'s reason.
+   *
+   * The shell and the screens have to be filling one queue: a session is a batch, and two recorders
+   * would be two sessions for one visit. `telemetryPort.ts` owns the singleton and the four ports
+   * it is built from.
+   *
+   * **It is safe to hold before consent is known**, and that is the design rather than an accident:
+   * every method on it is a no-op or a read until the state reads `granted`, so a shell that holds
+   * one on a device that has refused holds a queue nothing can put anything into.
+   */
+  const telemetry = everydayTelemetry();
+  /**
+   * Milliseconds since this page started loading — `performance.timeOrigin` is navigation start,
+   * so a reading taken from a fresh {@link systemClock} at any instant is the span since then.
+   *
+   * Held rather than read inline so there is exactly one clock in this file and `openSession`'s
+   * docstring can say what it measures.
+   */
+  const sessionClock = systemClock();
   /** Whether this shell has already asked whether the tutorial is due — see `offerTutorial`. */
   let tutorialOffered = false;
 
@@ -492,8 +520,21 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * controls unreachable at 1280×800, where that register had been empty — which is the clause that
    * file exists for, firing on the first commit that broke it.
    */
+  /*
+   * **Four tracks since GitHub issue #340, and the fourth is declared rather than implicit.**
+   *
+   * The consent ask (§ 4.1) is a second notice above the screen. A fourth grid *item* against three
+   * declared tracks would be auto-placed into an implicit `auto` row **after** them — putting the
+   * pinned bar above the screen region — which is the same class of defect the `hidden` paragraph
+   * below records, arriving through the track list instead of through `display`. So the track is
+   * named here on the commit that adds the item.
+   *
+   * Both leading tracks are `auto` and both notices are empty when there is nothing to say, so an
+   * element with no padding, border or inline style of its own has no line box and its track is
+   * zero. The bar is still the row that cannot go below a fold.
+   */
   main.style.cssText =
-    'display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden;min-width:0';
+    'display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;overflow:hidden;min-width:0';
 
   /*
    * GitHub issue #336's banner: always in the document, empty when there is nothing to say.
@@ -503,6 +544,25 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    */
   const signInNotice = el(doc, 'div', 'everyday-signin');
   signInNotice.setAttribute('role', 'status');
+
+  /*
+   * The consent ask — GitHub issue #340, `docs/26-telemetry-and-privacy.md` § 4.1.
+   *
+   * The same shape as the banner above and for the same reason: always in the document, empty when
+   * there is nothing to ask, every style on a child that is created and destroyed with the content.
+   *
+   * **It is a notice and not a modal**, which § 4.4 requires in as many words: *"A gate. No screen
+   * waits on an answer. If the question is unanswered, the answer is no."* A dialog would be a
+   * consent wall, which § 10 non-goal 3 refuses by name — so this sits above the screen, the screen
+   * behind it is fully usable, and a player who ignores it has answered.
+   *
+   * `role="region"` rather than `status`: this one is not announcing a change that happened, it is
+   * asking a question, and a live region would interrupt a screen reader partway through the page
+   * it was reading. The label is what puts it in the landmark list instead.
+   */
+  const consentAsk = el(doc, 'div', 'everyday-consent');
+  consentAsk.setAttribute('role', 'region');
+  consentAsk.setAttribute('aria-label', CONSENT_COPY.heading);
 
   /**
    * **The screen region is a `main` landmark, and it is in the tab order** — `docs/36` `AX-15` and
@@ -653,7 +713,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     screenRegion.focus();
   });
 
-  main.append(signInNotice, screenRegion, bar);
+  /* The consent ask sits above the screen, never over it — GitHub issue #340, § 4.4. */
+  main.append(consentAsk, signInNotice, screenRegion, bar);
   /* The skip link is first, or it is not a skip link — `UX.md` KB-01's *first tab stop*. */
   root.append(skipLink, narrowHeader, rail, main, railScrim);
 
@@ -1190,6 +1251,13 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     if (state.ctx === 'watch' && screen !== 'stage') leaveWatch();
     if (state.ctx === 'rush' && screen !== 'stage' && screen !== 'report') leaveRush();
     if (state.ctx === 'replay' && screen !== 'brief' && screen !== 'stage' && screen !== 'report') leaveReplay();
+    /*
+     * § 7.3 E8 — the beat-drop profile's only source, and it is here for {@link leaveWatch}'s own
+     * reason: every rail row, every bar button and every screen's own hand-off calls {@link go},
+     * so one line here is every navigation and a line at each caller would be the one somebody
+     * forgets. A no-op unless consent is granted; the recorder's first line is that guard.
+     */
+    telemetry.record({ name: 'screen_entered', screenKey: screen, fromScreenKey: state.screen });
     state = { ...state, screen };
     draw();
     /*
@@ -2098,6 +2166,103 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     row.append(dismiss);
   }
 
+  /* ---------------------------------------------------------------- *
+   * The consent ask — GitHub issue #340, `docs/26` §§ 4.1 and 15.2
+   * ---------------------------------------------------------------- */
+
+  /**
+   * Draw the question, or nothing.
+   *
+   * `consentAskViewOf` returns `undefined` on every state but `unasked`, so this empties itself on
+   * the press that answers it and never draws again — § 10 non-goal 3's *no repeated asking after a
+   * refusal*, expressed as a view rather than as a flag somebody has to remember to set.
+   *
+   * ## The two answers are the same button
+   *
+   * Same element, same size, same border, same font, same padding; only the words differ. § 10
+   * non-goal 3 forbids *asymmetric buttons*, and the honest way to hold that is to build both from
+   * one function rather than to style two and compare them. There is no primary treatment here and
+   * no `autofocus`: a default is a pre-tick wearing a keyboard.
+   *
+   * ## The order is No, then Yes
+   *
+   * Deliberate, and the deliberation is the point rather than the order: a design that puts the
+   * agreeing answer where the eye lands has made one answer easier to give, which is what §
+   * 4.1 forbids. Put the refusal first and the ask cannot be accused of leading.
+   */
+  function drawConsentAsk(): void {
+    consentAsk.replaceChildren();
+    const view = consentAskViewOf(telemetry.consent());
+    if (view === undefined) return;
+
+    const row = el(doc, 'div', 'everyday-consent-row');
+    row.style.cssText = [
+      'display:flex',
+      'align-items:flex-start',
+      `gap:${String(GAP.row)}px`,
+      'padding:11px 16px 11px 13px',
+      `border-bottom:1px solid ${C.rule}`,
+      `border-left:3px solid ${C.sun}`,
+      `background:${C.card}`,
+      'min-width:0',
+      'flex-wrap:wrap',
+    ].join(';');
+
+    const said = el(doc, 'div');
+    said.style.cssText = 'min-width:0;flex:1';
+    const heading = el(doc, 'div', 'everyday-consent-heading', view.heading);
+    heading.style.cssText = `font:600 13px ${TYPE.heading};color:${C.ink}`;
+    const body = el(doc, 'div', 'everyday-consent-body', view.body);
+    body.style.cssText = `margin-top:3px;font-size:12.5px;line-height:1.45;color:${C.ink};max-width:78ch`;
+    const not = el(doc, 'div', 'everyday-consent-not', view.notCollected);
+    not.style.cssText = `margin-top:4px;font-size:11.5px;line-height:1.45;color:${C.warmGrey};max-width:78ch`;
+    const later = el(doc, 'div', 'everyday-consent-later', view.later);
+    later.style.cssText = `margin-top:4px;font-size:11.5px;line-height:1.45;color:${C.warmGrey};max-width:78ch`;
+    said.append(heading, body, not, later);
+    row.append(said);
+
+    const answers = el(doc, 'div');
+    answers.style.cssText = `display:flex;gap:${String(GAP.row)}px;flex:none;align-items:center`;
+    const answer = (className: string, label: string, press: () => void): HTMLElement => {
+      const button = el(doc, 'button', className, label);
+      button.type = 'button';
+      button.style.cssText = [
+        'flex:none',
+        'background:transparent',
+        `border:1px solid ${C.rule}`,
+        `border-radius:${String(R.control)}px`,
+        'padding:7px 15px',
+        `color:${C.ink}`,
+        'cursor:pointer',
+        'font-size:12px',
+        'font-weight:600',
+      ].join(';');
+      button.addEventListener('click', () => {
+        press();
+        drawConsentAsk();
+      });
+      return button;
+    };
+    answers.append(
+      answer('everyday-consent-no', view.no, () => {
+        telemetry.refuse();
+      }),
+      answer('everyday-consent-yes', view.yes, () => {
+        /*
+         * The grant mints the identifier, and the first event follows it rather than preceding it.
+         * P-1 is unambiguous — *no event is queued, no identifier is minted and no request is made
+         * before a player has said yes* — so this session's `session_start` is emitted here, on the
+         * press, and not at mount. A session that began before consent contributes nothing, which
+         * is the correct denominator for a KPI measured on the consenting subset (§ 4.2).
+         */
+        telemetry.grant();
+        openSession();
+      }),
+    );
+    row.append(answers);
+    consentAsk.append(row);
+  }
+
   function drawMenu(): void {
     screenRegion.replaceChildren();
     const h = el(doc, 'h1', undefined, 'Elevator Sim');
@@ -2371,9 +2536,61 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     if (due) go('tutorial');
   }
 
+  /* ---------------------------------------------------------------- *
+   * Telemetry — GitHub issue #340, `docs/26` § 7
+   * ---------------------------------------------------------------- */
+
+  /**
+   * Open the session's funnel: `session_start`, and the cold load beside it.
+   *
+   * Called from exactly two places, and both are a moment consent is known to be `granted`: the
+   * *Yes* press above, and the mount below on a page whose slot already says yes. On every other
+   * path it is not called, and `record` would be a no-op anyway — P-1's belt and braces, where the
+   * belt is that the recorder refuses and the brace is that nothing asks.
+   *
+   * **`cold_load` is measured from the browser's own navigation timing and not from this shell.**
+   * `docs/26` § 6.3 says the field cold load may *refute* the CI budget's representativeness and can
+   * never satisfy `charter S9`, so what it has to measure is the whole page — the bundle, the boot
+   * and the mount — rather than the millisecond this function runs at. `performance.timeOrigin` is
+   * navigation start, so `performance.now()` at this instant is exactly that span; it is read
+   * through `playback/clock.ts#systemClock`, which is the package's one door to a wall clock, and
+   * `boundaries.test.ts` is what keeps it the only one.
+   *
+   * A page with no timing to offer emits nothing rather than a zero. § 9.2: a missing event
+   * subtracts from a distribution, and a fabricated zero would move its median.
+   */
+  function openSession(): void {
+    telemetry.record({ name: 'session_start', entryScreenKey: state.screen });
+    const readyMs = Math.round(sessionClock.now());
+    if (readyMs > 0) telemetry.record({ name: 'cold_load', msToInteractive: readyMs });
+    telemetry.record({ name: 'screen_entered', screenKey: state.screen, fromScreenKey: null });
+  }
+
   const slotUnsubscribe = options.host?.whenReady(connectDataHost);
 
   draw();
+  drawConsentAsk();
+  /*
+   * **The ask redraws whenever the answer moves, wherever it moved** — GitHub issue #340.
+   *
+   * Settings draws a consent pill over the *same* recorder this shell holds, so without this the
+   * ask stayed on screen after Settings had answered it — a question the product had already been
+   * given an answer to, still pressable. Answering it a second time was the orphaned-id defect
+   * `telemetry/recorder.ts#refuse` now names: a `playerId` gone from the device while its rows sat
+   * on the server for ninety days with nothing left that could name them.
+   *
+   * Subscribed rather than folded into `draw()`, because the stale ask is pressable **while the
+   * player is still on Settings** and a redraw-on-navigate would leave the window open exactly
+   * where it was opened.
+   */
+  const consentUnsubscribe = onEverydayConsent(drawConsentAsk);
+  /*
+   * A returning player whose slot already says yes never meets the ask, so their funnel has to open
+   * here. A first-time player's opens on the *Yes* press instead, which is why this is guarded on
+   * the state rather than called unconditionally: calling it here as well would give a granting
+   * player two `session_start` events and halve every rate computed over the denominator.
+   */
+  if (telemetry.consent() === 'granted') openSession();
 
   /*
    * § 20.15's check, made true by wiring rather than by luck: a profile write from any surface —
@@ -2416,6 +2633,36 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    */
   provideEverydaySwap({ returnToEveryday, hasThePage: () => world === 'everyday' });
 
+  /**
+   * When a batch leaves — `docs/26` § 8's *"batch per session; flush on `visibilitychange` and at a
+   * declared interval, never per event."*
+   *
+   * The reason is measured rather than stylistic: this deployment runs at `minReplicas: 0` and a
+   * cold start has been timed at **28.7 s** and **32.2 s**, so a request per event would be a
+   * player's afternoon spent waking a container. Nothing here is awaited and nothing is retried; §
+   * 8's third consequence is that total failure is normal, and P-6 is why that is affordable.
+   *
+   * **`hidden` is where a session actually ends**, so that is where `session_end` goes rather than
+   * on `unload`: a tab switched away from, a phone locked and a page closed all fire it, and
+   * `unload` is unreliable on mobile and blocks the browser's back-forward cache. § 7.2 E7 already
+   * says the event is best-effort and that `docs/26 K3` does not depend on it, which is what makes
+   * this the right trade rather than a compromise.
+   *
+   * The interval is the second half § 8 asks for, and it exists for the session that never goes
+   * hidden — a page left open on a desk. Sixty seconds is far below the horizon at which anything
+   * is lost and far above anything that could look like per-event traffic.
+   */
+  const view = doc.defaultView;
+  const flushOnHide = (): void => {
+    if (doc.visibilityState !== 'hidden') return;
+    telemetry.record({ name: 'session_end', endReason: 'hidden' });
+    telemetry.flush();
+  };
+  doc.addEventListener('visibilitychange', flushOnHide);
+  const flushTimer = view?.setInterval(() => {
+    telemetry.flush();
+  }, 60_000);
+
   return {
     root,
     go,
@@ -2429,6 +2676,17 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     enterReplay: enterReplayBrief,
     world: () => world,
     destroy: () => {
+      /*
+       * The telemetry lifecycle comes off first, and the flush is the reason for the order: a
+       * destroyed shell must not go on holding a document listener or an interval, and whatever is
+       * queued at that moment is a session's worth of events that will otherwise be dropped when
+       * the closure is collected. `navigated` rather than `hidden` — this is the shell being taken
+       * down rather than the tab going away, and § 7.4's three-value vocabulary distinguishes them.
+       */
+      doc.removeEventListener('visibilitychange', flushOnHide);
+      if (flushTimer !== undefined) view?.clearInterval(flushTimer);
+      telemetry.record({ name: 'session_end', endReason: 'navigated' });
+      telemetry.flush();
       stopProfileWatch();
       stopSignInWatch();
       scrollKeeper.disconnect();
@@ -2436,6 +2694,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       // The host wiring goes first: a destroyed shell must not hear another notification and
       // write a latch for a page it is no longer on.
       slotUnsubscribe?.();
+      /* Same reason, one subscription over: a destroyed shell must not redraw a removed ask. */
+      consentUnsubscribe();
       stopAccountWatch();
       dataHostUnsubscribe?.();
       dataHost = undefined;

@@ -124,16 +124,22 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
 'traffic/passengersPer5Min': 'converts a rate; the handling-capacity unit CIBSE reports in',
 'traffic/inReportWindow': 'reads a template and an instant',
 
-// -- Documented constants. `CLOSED_FORM_COMPARISON_RULE` is the rule the oracle is judged by;
-// `AWT_INVALID_GROUNDS` is the suppression-ground list § D108 fixed at four and docs/14 § 3.1
-// widened to five.
+// -- Documented constants. `CLOSED_FORM_COMPARISON_RULE` is the rule the oracle is judged by.
 //
 // `CLOSED_FORM_ASSUMPTIONS` **left this list** when `dev/rightRail.ts` began citing it on the
 // building plate's closed-form row (`docs/21` § 3.7 (1), § D337): the row states its own basis by
 // counting the declared simplifications and naming the first, so the constant has a shipped reader
 // and an allowlist entry for it would be the decoration this file's own message warns about.
+//
+// **`AWT_INVALID_GROUNDS` left it the same way on 2026-09-10**, and its entry is deleted rather
+// than reworded. It read *"the suppression grounds; consumed as a set by guards"* — true while
+// nothing shipped consumed the list — and GitHub issue #340's telemetry schema now imports it as
+// the vocabulary a `verdict_shown` event's `refusalGround` may carry, precisely so that a sixth
+// ground added to `metrics/awtValidity.ts`'s table widens the wire with no second list to edit.
+// The staleness check below is what caught it, which is the entry's own message arriving on the
+// entry: an allowlist that keeps entries after their reason lapses is where dead code goes to be
+// forgotten.
 'analytical/CLOSED_FORM_COMPARISON_RULE': 'the oracle contract, quoted by docs and asserted by tests',
-'metrics/AWT_INVALID_GROUNDS': 'the suppression grounds; consumed as a set by guards',
 
   // -- Stage 5 result accessors. The monitor returns a CapacityReassignmentResult; these read it.
   // The simulation counts crossings/migrations/held itself off the same result, so it needs none

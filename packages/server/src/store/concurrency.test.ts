@@ -350,6 +350,68 @@ const REMEDIES: Readonly<Record<string, readonly Remedy[]>> = Object.freeze({
         'is what the docstring says a challenge entry is.',
     },
   ],
+
+  /*
+   * The three telemetry members — GitHub issue #340. Between them they are the only writes in this
+   * store whose table has **no reference to `users`**, which is `docs/26` § 3.2's design rather than
+   * an oversight, and it is why `cascade` appears on none of them: a `DELETE FROM users` cannot
+   * reach a row this table holds, and that is the whole point of the table's shape.
+   */
+  recordTelemetry: [
+    {
+      risks: ['unique'],
+      remedy: 'nothing-can-fire',
+      because:
+        'The one unique key on `telemetry_events` is its primary key, and every value inserted into it ' +
+        'is a fresh `randomUUID` this member mints itself — so a collision would need the database to ' +
+        'already hold a UUID nothing has ever written. There is no natural key on this table and ' +
+        'deliberately so: two identical events from one session at one elapsed millisecond are two ' +
+        'things that happened, not one thing recorded twice, and a uniqueness constraint that ' +
+        'silently dropped the second would be the instrument deciding what a player did. It reads ' +
+        'nothing before writing, so there is no check-then-act here at all; the sweep that follows ' +
+        'the insert deletes only rows past the retention horizon, which the insert could not have ' +
+        'written, so the two statements cannot undo one another and do not need to be atomic.',
+      player:
+        'Nothing, in either direction, and that is a requirement rather than a happy accident: ' +
+        '`docs/26 P-6` says every mode, screen and figure behaves identically whether the transport ' +
+        'succeeded, failed or was never there, so a lost batch costs a data point and no player ' +
+        'anything.',
+    },
+  ],
+
+  forgetTelemetry: [
+    {
+      risks: [],
+      remedy: 'nothing-can-fire',
+      because:
+        'One `DELETE` on a table nothing references, so no foreign key can block it and no cascade ' +
+        'can surprise it; it reads nothing, so there is no check-then-act; and it is idempotent, so ' +
+        'two concurrent withdrawals of the same `playerId` both succeed and the second removes ' +
+        'nothing. It deliberately returns no count, which is also what stops the route being an ' +
+        'oracle for whether an id exists — an unknown id and an id whose rows another request has ' +
+        'just deleted have to be indistinguishable, and a racing pair is exactly the case that ' +
+        'would otherwise tell them apart.',
+      player:
+        'The same sentence either way: what was recorded about this browser is gone. A second press ' +
+        'answers identically rather than reporting that there was nothing left to delete.',
+    },
+  ],
+
+  '#sweepTelemetry': [
+    {
+      risks: [],
+      remedy: 'nothing-can-fire',
+      because:
+        'The retention horizon, and the same shape as `forgetTelemetry` one predicate along: one ' +
+        '`DELETE` on a table nothing references, reading nothing, idempotent. It runs from two ' +
+        'callers — every ingest, and every `Store.open` — so two containers booting together both ' +
+        'sweep and the second finds the rows already gone, which is a no-op rather than a race. ' +
+        'The horizon is a module constant rather than an argument, so no caller can widen it.',
+      player:
+        'Nothing visible. What it enforces is `docs/26` § 5.1’s ninety days, which is a promise the ' +
+        'posture makes on the player’s behalf rather than a figure any screen shows them.',
+    },
+  ],
 });
 
 /* -------------------------------------------------------------------------- *

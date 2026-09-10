@@ -325,6 +325,7 @@ packages/
 │   ├── pricing/           — § D525 clause 2: one price schedule for every purchasable change, in `data/price-schedule.json` — the three tiers, their ladder, and what a fix-a-building repair costs
 │   ├── wrinkles/          — GitHub issue #159, `GAMEPLAY_AND_NAVIGATION.md` § 17: the wrinkle library in `data/wrinkles.json` — the templates a day's twist is drawn from, § 17's rotation, and the gate that keeps a day only if it changes which dispatcher wins
 │   ├── commissioning/    — § D219: the pre-week design phase — shafts, machine classes and rated speeds under a declared capital constraint, put back through the loader; retrofit is the constraint whose editable set is empty
+│   ├── telemetry/         — GitHub issue #340: `docs/26` § 7's event schema, the consent slot and its ask, and the batching recorder — pure, with the browser half in `everyday/telemetryPort.ts`
 │   ├── everyday/          — the Everyday Mode shell: the page's entry point, the 212 px rail, the pinned bar, and the menu whose three tiles are the three modes
 │   └── dev/               — the Engineer surface the stage hands off to, and its editors (was the page's entry point until `everyday/boot.ts`)
 ├── server/                — § D214: accounts, email confirmation, and a verified leaderboard
@@ -332,6 +333,7 @@ packages/
 │   ├── mail/              — the one-method Mailer, and the dev driver that writes an outbox
 │   ├── leaderboard/       — the submission shape, its board hash, and verification by replay
 │   ├── challenge/        — § D218: the weekly fixed-seed challenge, scored over a seed set
+│   ├── telemetry/         — GitHub issue #340: the ingest gate — `docs/26` § 7's allowlist, its vocabularies and the ninety-day horizon `store/` enforces
 │   ├── store/             — the SQLite schema: users, sessions, entries; the clock is injected
 │   └── http/              — the API as a pure request→response function, and the socket above it
 └── cli/                   — headless batch entry point

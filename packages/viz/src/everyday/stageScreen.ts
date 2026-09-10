@@ -114,6 +114,9 @@ import {
   type StageSwitchTarget,
 } from './stageScreenModel.js';
 import { everydayProfileStore } from './profileStore.js';
+/* GitHub issue #340: the two beat-1 events. The recorder is a no-op until consent is granted. */
+import { everydayTelemetry } from './telemetryPort.js';
+import { telemetryRunPointerOf } from '../telemetry/schema.js';
 /*
  * § D344's sound — GitHub issue #258. The decisions are `audio.ts`', the graph is
  * `audioEngine.ts`', and this file holds the two frames, the limiter's memory and the context.
@@ -160,6 +163,26 @@ import { campaignDockViewOf, type CampaignDockView } from './campaignDock.js';
  * exposes none. {@link syncTransport} is its one writer, on the edge rather than on every frame.
  */
 const barFacts = { hasRun: false, dayClosed: false, recomputing: false, dayEnded: false };
+
+/**
+ * Whether this session has already seen visible trouble — GitHub issue #340, `docs/26` § 7.2 E3.
+ *
+ * *"`trouble_visible` ships once per session — the first crossing only."* Module scope rather than
+ * mount scope, and the choice is the difference between *this session* and *this mount*: the stage
+ * is mounted and unmounted every time a player walks off it and back, and a per-mount latch would
+ * fire again on the second visit. Trouble is a thing a player sees for the first time once.
+ *
+ * It sits beside {@link barFacts} for that module's own reason — the stage's cross-mount facts live
+ * here — and it is never reset, because a page load is what starts a session and a page load is a
+ * fresh module.
+ */
+let troubleSeen = false;
+
+/**
+ * Whether the alarm strip was on the screen at the last draw — the edge {@link troubleSeen} is set
+ * on. See the comment beside the event for why the condition is not watched directly.
+ */
+let alarmDrawn = false;
 
 /**
  * The same store's spectator half — GitHub issue **#182**, [§ D436](../../../../DECISIONS.md).
@@ -1403,6 +1426,27 @@ function mountStage(
     if (ended !== barFacts.dayEnded) {
       barFacts.dayEnded = ended;
       context.refreshBar();
+      /*
+       * § 7.2 E2 — `run_observed`, beat 1 of `docs/26 K2`'s chain, GitHub issue #340.
+       *
+       * On the same edge and for the same reason the bar is refreshed here: this is the one
+       * function every transport change passes through, and it fires on the transition rather than
+       * on the frame. `reachedEndedAt` is `true` because that is the transition — a player who
+       * leaves halfway emits nothing, which is § 9.2's direction: a lost observation subtracts
+       * from `docs/26 K2` and can never add to it.
+       *
+       * The pointer is `undefined` on a watched run, a replay and anything this shell did not
+       * simulate (`host.ts#runPointer` says why), and no event is emitted then. An event about
+       * somebody else's day would be a false statement rather than a missing one.
+       */
+      const pointer = ended ? context.host.runPointer() : undefined;
+      if (pointer !== undefined) {
+        everydayTelemetry().record({
+          name: 'run_observed',
+          run: telemetryRunPointerOf(pointer),
+          reachedEndedAt: true,
+        });
+      }
     }
     playButton.textContent = playing ? '⏸ Pause' : '▶ Play';
     playButton.disabled = playback === undefined;
@@ -1652,6 +1696,67 @@ function mountStage(
     const alarmLine = stageAlarmOf(observations, labelOf);
     alarm.style.display = alarmLine === undefined ? 'none' : 'flex';
     if (alarmLine !== undefined) alarm.replaceChildren(breathingDot(doc), el(doc, 'span', undefined, alarmLine));
+    /*
+     * § 7.2 E3 — `trouble_visible`, and it is `charter S1` exactly: *a first-time player reaches a
+     * building in visible trouble within 90 s of first load.*
+     *
+     * ## What counts as visible trouble is the stage's decision and not this line's
+     *
+     * `docs/26` § 6.2 requires the threshold to *"exist once, declared beside the stage, cited by
+     * the schema and never re-stated in the telemetry client"* — P-5 — because two definitions of
+     * visible trouble would be two sets of statistics that nobody could tell apart. The shipped
+     * one is `stageScreenModel.ts#stageAlarmOf` over `STAGE_ALARM_STANDING`, and this reads the
+     * **drawn** result of it rather than the count behind it: the event fires exactly when the
+     * alarm strip is on the screen, which is what *visible* means.
+     *
+     * ## The dwell, and what is honestly missing
+     *
+     * § 6.2 asks for a threshold **and a declared dwell**, because *"passengers arrive in batches,
+     * so an instantaneous count crossing a line is a normal arrival rather than a building failing
+     * to drain."* The shipped alarm has a threshold and no wall-clock dwell, and this lane does not
+     * invent one: a constant authored here would be the second definition § 6.2 forbids, and a
+     * constant authored beside the stage would be this lane deciding what the stage means by
+     * trouble. What the alarm does have is a threshold on **forty people standing**, which a batch
+     * does not reach on arrival. The gap is real, it is `docs/26` § 11's *"the visible-trouble
+     * threshold and dwell belong to the stage and are owed by M2"*, and it is stated rather than
+     * papered over.
+     *
+     * ## Once per session, on the crossing — and **on the edge**, which is not a nicety
+     *
+     * § 7.2: *"`trouble_visible` ships once per session — the first crossing only. A second one
+     * answers no question in § 6 and would turn a funnel event into a stream."* The recorder cannot
+     * enforce that (it holds no per-name history), so the guard is here, and it is a module-level
+     * latch rather than a per-mount one: a player who walks off the stage and back has still only
+     * seen trouble for the first time once.
+     *
+     * **`draw()` runs on every animation frame**, so the transition is what is watched rather than
+     * the condition — `syncTransport`'s own rule about `dayEnded`, one function up. Written as a
+     * plain `if (alarmShowing && !troubleSeen)` it read correctly and cost a `runPointer()` — which
+     * resolves the whole selection — sixty times a second for as long as the alarm was up and the
+     * pointer came back `undefined`. That is not hypothetical: it timed out three cases of
+     * `stageScreen.browser.test.ts`, which is how it was found, and P-6 makes a telemetry line that
+     * can slow a page a defect rather than a cost.
+     *
+     * The latch is set on the crossing whether or not a pointer is available, so a run this shell
+     * did not simulate spends the session's one crossing and emits nothing. That is the honest
+     * direction: § 9.2 says a missing event subtracts from a KPI and can never add to one, and an
+     * event about somebody else's day would be a false statement rather than a missing one.
+     */
+    const alarmShowing = alarmLine !== undefined;
+    if (alarmShowing !== alarmDrawn) {
+      alarmDrawn = alarmShowing;
+      if (alarmShowing && !troubleSeen) {
+        troubleSeen = true;
+        const pointer = context.host.runPointer();
+        if (pointer !== undefined) {
+          everydayTelemetry().record({
+            name: 'trouble_visible',
+            run: telemetryRunPointerOf(pointer),
+            atRunS: simTimeS,
+          });
+        }
+      }
+    }
 
     const ctx = sizeCanvas(canvas);
     if (ctx !== undefined) {
