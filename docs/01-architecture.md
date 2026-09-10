@@ -333,6 +333,7 @@ packages/
 │   ├── mail/              — the one-method Mailer, and the dev driver that writes an outbox
 │   ├── leaderboard/       — the submission shape, its board hash, and verification by replay
 │   ├── challenge/        — § D218: the weekly fixed-seed challenge, scored over a seed set
+│   ├── errors/            — GitHub issue #242: what a server fault is allowed to say — one line, no request body, no stack, so a log is safe to keep
 │   ├── telemetry/         — GitHub issue #340: the ingest gate — `docs/26` § 7's allowlist, its vocabularies and the ninety-day horizon `store/` enforces
 │   ├── store/             — the SQLite schema: users, sessions, entries; the clock is injected
 │   └── http/              — the API as a pure request→response function, and the socket above it
