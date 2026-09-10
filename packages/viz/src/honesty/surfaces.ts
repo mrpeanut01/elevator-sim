@@ -174,6 +174,7 @@ import {
 import { FIGURE_NOTE_HANDLE, everydayReportViewOf } from '../everyday/reportView.js';
 // GitHub issue #221's post block — the decision, seeded in all seven states by the report adapter.
 import { postRunViewOf } from '../everyday/postRun.js';
+import { CHIMES_PANEL_COPY } from '../everyday/chimesPanel.js';
 import { SETTINGS_ABSENCES, SIGN_IN_COPY, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
@@ -8617,6 +8618,19 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      */
     'everyday/settingsView.ts#SIGN_IN_COPY',
     /*
+     * The chime tally — GitHub issue #368, § D526 clause 5, § D530. Two declarations, and both are
+     * reached below: `chimesPanelViewOf` because this screen is where a player reads a balance, and
+     * `CHIMES_PANEL_COPY` because the panel's three home notes are one arm each and only one of
+     * them is drawn per case — so the constant is iterated generically, the way `BOARD_SCREEN_COPY`
+     * is, and every sentence is swept rather than whichever home the fixture happened to be in.
+     *
+     * **What is deliberately not seeded is a source**, and there is nothing here that could be:
+     * the panel's input is a number and a home. § D526 clause 5 is the reason, and
+     * `boundaries.test.ts` is where it is asserted rather than merely observed.
+     */
+    'everyday/chimesPanel.ts#chimesPanelViewOf',
+    'everyday/chimesPanel.ts#CHIMES_PANEL_COPY',
+    /*
      * The DISPLAY NAME field's note, which is **two** sentences because it is about two different
      * names — § D490. Both arms are reached below: all but one of the cases draw the device one, and
      * `not-durable` is signed in and named and draws the account one. A pair of sentences with one
@@ -8743,6 +8757,22 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
       seeds.push({ field: `${label}.you.pictureLabel`, text: view.you.pictureLabel, role: 'label' });
       seeds.push({ field: `${label}.you.note`, text: view.you.note, role: 'prose' });
       /*
+       * The chime tally — GitHub issue #368. The balance line is a **label** rather than an
+       * observation: it is a count of completed turns, not a figure any run produced, which is
+       * exactly what § D526 clause 2 makes it. Seeding it as an observation would ask R13 for a
+       * denominator that does not exist, and inventing one is the defect R13 exists to catch.
+       */
+      const chimes = view.you.chimes;
+      seeds.push({ field: `${label}.chimes.heading`, text: chimes.heading, role: 'label' });
+      seeds.push({ field: `${label}.chimes.balance`, text: chimes.balanceLine, role: 'label' });
+      seeds.push({ field: `${label}.chimes.lede`, text: chimes.lede, role: 'prose' });
+      seeds.push({ field: `${label}.chimes.home`, text: chimes.homeNote, role: 'prose' });
+      seeds.push({ field: `${label}.chimes.spendHeading`, text: chimes.spendHeading, role: 'label' });
+      for (const row of chimes.rows) {
+        seeds.push({ field: `${label}.chimes.${row.id}.name`, text: row.name, role: 'label' });
+        seeds.push({ field: `${label}.chimes.${row.id}.price`, text: row.price, role: 'label' });
+      }
+      /*
        * The account block — § D489's asking half and § 15.1's signed-in one. `fieldValue` is
        * deliberately not seeded: it is the reader's own address, and `settingsView.ts` says why
        * the display name beside it is a different kind of thing.
@@ -8801,6 +8831,15 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
       if (view.device.clear.button !== undefined) {
         seeds.push({ field: `${label}.device.clear.button`, text: view.device.clear.button, role: 'label' });
       }
+    }
+
+    /*
+     * Every sentence the tally can say, over its arms rather than over the arms this corpus's cases
+     * happen to reach. `CHIMES_PANEL_COPY` is iterated by key, so a home note added to it is swept
+     * on the commit that adds it and not on the commit that first seeds a case into that state.
+     */
+    for (const [key, text] of Object.entries(CHIMES_PANEL_COPY)) {
+      seeds.push({ field: `chimes.copy.${key}`, text, role: 'prose' });
     }
 
     return singleRun(this.id, seeds);

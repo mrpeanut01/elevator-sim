@@ -310,6 +310,46 @@ const REMEDIES: Readonly<Record<string, readonly Remedy[]>> = Object.freeze({
     },
   ],
 
+  recordChimeEntry: [
+    {
+      risks: ['unique'],
+      remedy: 'arbitrated-by-the-write',
+      because:
+        'GitHub issue #368. `UNIQUE (user_id, seq)` is not a constraint the write is trying to avoid — ' +
+        'it is the mechanism. The balance is `balance_after` on the highest `seq`, so the insert reads ' +
+        'both inside its own statement and refuses in its own `WHERE` clause if the move would take the ' +
+        'account below zero; two racing writers therefore compute the same `seq + 1` and exactly one ' +
+        'lands. The loser’s `23505` is **retried** rather than mapped, and on the retry it reads the ' +
+        'winner’s row and re-decides against the new balance — which is the only reason a ledger can be ' +
+        'correct in a store that has no transactions (§ D361). The primary key in the derived list is a ' +
+        'fresh `randomUUID` and cannot collide with a row this store wrote.',
+      player:
+        'Two spends fired at once cost what two spends cost, and the second is refused if the first ' +
+        'emptied the balance. Never a negative balance, and never a modifier bought twice for one price.',
+    },
+    {
+      risks: ['foreign-key'],
+      remedy: 'mapped',
+      because:
+        '`recordEntry`’s site and `recordEntry`’s answer. `chime_entries.user_id` references `users`, so ' +
+        'an account deleted while a turn is being banked fails the key, and `#asOwnerError` turns it ' +
+        'into the `NoSuchUserError` the routes already answer `401` to (§ D358). A transaction would not ' +
+        'close it for the reason stated there, and the lock that would buys the player a worse story.',
+      player:
+        '`401`, the same sentence a posted score gets, rather than a `500`. The chimes are not banked, ' +
+        'which is right: the account they would have been banked to is gone.',
+    },
+    {
+      risks: ['cascade'],
+      remedy: 'nothing-can-fire',
+      because:
+        'It inserts a row rather than reading one, on `createUser`’s ground. `deleteUser` takes the ' +
+        'ledger with the account through `ON DELETE CASCADE`, which is what erasure means here — a ' +
+        'balance is account state and § D358’s route deletes every table that cascades off it.',
+      player: 'Unchanged. A deleted account has no balance, because it has no ledger.',
+    },
+  ],
+
   issueChallenge: [
     {
       risks: [],

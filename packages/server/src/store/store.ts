@@ -252,6 +252,52 @@ export interface TelemetryEventRow {
   /** The event's own fields, as § 7's table gives them. Validated before the row is written. */
   readonly fields: Readonly<Record<string, unknown>>;
   readonly receivedAtMs: number;
+ * One entry on an account's chime ledger — GitHub issue **#368**, [§ D526](../../../../DECISIONS.md).
+ *
+ * **The ledger is the balance.** There is no balance column anywhere: {@link balanceAfter} on the
+ * highest {@link seq} is the account's balance, and every row says what the balance became when it
+ * was written. That is what lets one statement both refuse an overdraft and append the record —
+ * see {@link Store.recordChimeEntry} — in a store that has no transactions by ruling (§ D361).
+ *
+ * **{@link entryKey} is the ledger's own vocabulary and never crosses the wire.** § D526 clause 5:
+ * *the play surface reads one balance and posts two verbs, and never knows a source.* On an earn
+ * this is a source id from `data/chime-ledger.json`; on a spend it is a sink id. `http/api.ts`
+ * serialises neither — the balance route returns one number — and
+ * `packages/viz/src/boundaries.test.ts` asserts no module in the viewer names a source at all.
+ * That is the property an external add would rely on: it would be one more source here, and
+ * nothing on the play surface would move.
+ */
+export interface ChimeEntryRow {
+  readonly id: string;
+  readonly userId: string;
+  /** Per account, from 1. The optimistic lock: `UNIQUE (user_id, seq)` is what serialises writes. */
+  readonly seq: number;
+  readonly direction: ChimeDirection;
+  /** A source id on an earn, a sink id on a spend. Server-side only — see the type docstring. */
+  readonly entryKey: string;
+  /** Always positive. {@link direction} says which way the balance moved. */
+  readonly chimes: number;
+  /** The balance once this row was written. Never negative: the write refuses rather than allows. */
+  readonly balanceAfter: number;
+  /** What a spend bought, as authored in `data/chime-ledger.json`. `undefined` on an earn. */
+  readonly modifier: ChimeSpentModifier | undefined;
+  readonly writtenAtMs: number;
+}
+
+/** Which way an entry moves the balance. Two values, and a third would be a new verb. */
+export type ChimeDirection = 'earn' | 'spend';
+
+/**
+ * What one spend bought, recorded on the row so a posted run can be checked against it.
+ *
+ * `sinkId` and `steps` rather than the granted units, because the units are a function of the
+ * table and re-deriving them keeps one authority: a row that stored its own grant would go stale
+ * the day `data/chime-ledger.json` was edited, and the server would then honour a modifier the
+ * shipped table no longer sells.
+ */
+export interface ChimeSpentModifier {
+  readonly sinkId: string;
+  readonly steps: number;
 }
 
 /** How a board is ordered. Never a composite: § D106 — energy is an axis, never a score. */
@@ -851,6 +897,151 @@ export class Store {
     );
   }
 
+  /* ---------------------------------------------------------- chime ledger */
+
+  /**
+   * Append one entry to an account's chime ledger — GitHub issue **#368**, [§ D526](../../../../DECISIONS.md).
+   *
+   * ## One statement, and it is what makes an overdraft impossible without a transaction
+   *
+   * The balance is not a column. It is {@link ChimeEntryRow.balanceAfter} on the highest
+   * {@link ChimeEntryRow.seq}, and the insert reads that, adds the signed move, and **refuses in
+   * its own `WHERE` clause** if the result would be negative. So a spend the balance cannot cover
+   * writes no row, and there is no window between a check and an act for a second request to fit
+   * into — the shape {@link Store.consumeLoginToken} argues for in as many words: *not a `SELECT`
+   * then a `DELETE`: two statements are a check-then-act.*
+   *
+   * `UNIQUE (user_id, seq)` closes the other half. Two requests racing both read the same maximum
+   * and both try `seq + 1`; the key means exactly one lands, and the loser's `23505` is **retried**
+   * rather than mapped, because on the retry it reads the winner's row and either succeeds against
+   * the new balance or is refused by the same `WHERE`. That is optimistic concurrency on a ledger,
+   * and it is why `Store` still needs no transaction (§ D361).
+   *
+   * ## No caller names an amount, and that is deliberate rather than incidental
+   *
+   * `chimes` arrives from `chimes/ledger.ts`, which reads it out of `data/chime-ledger.json`
+   * against a completion the client named or a sink the client chose. No route reaches this with a
+   * number a request supplied. A purchase is, mechanically, a client naming an amount — so the
+   * absence of that argument all the way down is the structural half of
+   * [§ D526](../../../../DECISIONS.md) clause 6, and the reason a store method is not somewhere a
+   * purchase could be added quietly.
+   *
+   * `undefined` means **refused**: the balance would go negative, or `notWithinMs` says this key
+   * has already been written to this account inside its own window — the sign-in gift,
+   * [§ D531](../../../../DECISIONS.md), whose *it does not compound* is therefore a fact about this
+   * statement rather than about whoever calls it.
+   */
+  async recordChimeEntry(input: {
+    readonly userId: string;
+    readonly direction: ChimeDirection;
+    /** A source id on an earn, a sink id on a spend. Never on the wire — see {@link ChimeEntryRow}. */
+    readonly entryKey: string;
+    /** Whole chimes, positive. Priced by `chimes/ledger.ts` from `data/`, never by a request. */
+    readonly chimes: number;
+    readonly modifier?: ChimeSpentModifier | undefined;
+    /**
+     * Refuse if this same key was written to this account inside the last this-many milliseconds.
+     *
+     * `0` for everything but the gift, where `written_at_ms > now - 0` is false for every row and
+     * the clause therefore does nothing. A parameter rather than a second statement, so that
+     * `concurrency.test-helper.ts` reads one literal here and not a branch between two.
+     */
+    readonly notWithinMs?: number | undefined;
+  }): Promise<ChimeEntryRow | undefined> {
+    const move = input.direction === 'earn' ? input.chimes : -input.chimes;
+    const modifierJson = input.modifier === undefined ? null : JSON.stringify(input.modifier);
+    /*
+     * Bounded, because the retry is for a lost race and not for a broken database. Eight is far
+     * above any contention one account can generate — a player has to finish a turn before they can
+     * post one — and an exhausted budget throws rather than silently dropping an earn.
+     */
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const writtenAtMs = this.#now();
+      let written;
+      try {
+        written = await this.#sql.query(
+          'INSERT INTO chime_entries (id, user_id, seq, direction, entry_key, chimes, ' +
+            'balance_after, modifier_json, written_at_ms) ' +
+            'SELECT $1, $2, ' +
+            'COALESCE((SELECT MAX(seq) FROM chime_entries WHERE user_id = $2), 0) + 1, ' +
+            '$3, $4, $5, ' +
+            'COALESCE((SELECT balance_after FROM chime_entries WHERE user_id = $2 ' +
+            'ORDER BY seq DESC LIMIT 1), 0) + $6, $7, $8 ' +
+            'WHERE COALESCE((SELECT balance_after FROM chime_entries WHERE user_id = $2 ' +
+            'ORDER BY seq DESC LIMIT 1), 0) + $6 >= 0 ' +
+            'AND NOT EXISTS (SELECT 1 FROM chime_entries WHERE user_id = $2 AND entry_key = $4 ' +
+            'AND written_at_ms > $8::bigint - $9::bigint) ' +
+            'RETURNING id, seq, balance_after',
+          [
+            randomUUID(),
+            input.userId,
+            input.direction,
+            input.entryKey,
+            input.chimes,
+            move,
+            modifierJson,
+            writtenAtMs,
+            input.notWithinMs ?? 0,
+          ],
+        );
+      } catch (error) {
+        // Lost the `seq` race. Read the winner's row on the next pass and re-decide against it.
+        if (isUniqueViolation(error)) continue;
+        throw await this.#asOwnerError(error, input.userId, 'recordChimeEntry');
+      }
+      const row = written.rows[0];
+      if (row === undefined) return undefined;
+      return Object.freeze({
+        id: String(row['id']),
+        userId: input.userId,
+        seq: Number(row['seq']),
+        direction: input.direction,
+        entryKey: input.entryKey,
+        chimes: input.chimes,
+        balanceAfter: Number(row['balance_after']),
+        modifier: input.modifier,
+        writtenAtMs,
+      });
+    }
+    throw new Error('recordChimeEntry: lost the sequence race eight times running.');
+  }
+
+  /**
+   * One balance, in whole chimes — **and the route that serves it returns nothing else**.
+   *
+   * [§ D526](../../../../DECISIONS.md) clause 5's read verb. Zero for an account with no ledger,
+   * which is every account created before migration 3 and every account that has finished nothing.
+   */
+  async chimeBalance(userId: string): Promise<number> {
+    const result = await this.#sql.query(
+      'SELECT balance_after FROM chime_entries WHERE user_id = $1 ORDER BY seq DESC LIMIT 1',
+      [userId],
+    );
+    const row = result.rows[0];
+    return row === undefined ? 0 : Number(row['balance_after']);
+  }
+
+  /**
+   * Every modifier this account has actually bought — what a posted run is checked against.
+   *
+   * `docs/38` § 2.3: *a run carries its modifiers onto the board*, and the server has to be able to
+   * tell a claimed modifier from a bought one. This is the half of that the store owns; the
+   * comparison is `chimes/ledger.ts#unbackedModifiers`.
+   */
+  async chimeSpends(userId: string): Promise<readonly ChimeSpentModifier[]> {
+    const result = await this.#sql.query(
+      "SELECT modifier_json FROM chime_entries WHERE user_id = $1 AND direction = 'spend' " +
+        'ORDER BY seq',
+      [userId],
+    );
+    return Object.freeze(
+      result.rows
+        .map((row) => row['modifier_json'])
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => JSON.parse(value) as ChimeSpentModifier),
+    );
+  }
+
   /* ------------------------------------------------------------ challenges */
 
   /**
@@ -1379,6 +1570,31 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
 -- The two questions asked of this table: forget one player, and sweep everything past the horizon.
 CREATE INDEX IF NOT EXISTS telemetry_events_player ON telemetry_events (player_id);
 CREATE INDEX IF NOT EXISTS telemetry_events_received ON telemetry_events (received_at_ms);
+-- One entry on an account's chime ledger -- GitHub issue #368, section D526. There is no balance
+-- column: balance_after on the highest seq IS the balance, and UNIQUE (user_id, seq) is the
+-- optimistic lock that lets one statement refuse an overdraft and append the record at once, in a
+-- store that has no transactions (section D361).
+CREATE TABLE IF NOT EXISTS chime_entries (
+  id             TEXT PRIMARY KEY,
+  user_id        TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  -- Per account, from 1. Contiguous by construction: every insert takes the previous maximum plus
+  -- one, and the unique key below is what makes exactly one of two racing writers win.
+  seq            INTEGER NOT NULL,
+  -- 'earn' or 'spend'. There is no third verb, and no route that could post one.
+  direction      TEXT NOT NULL,
+  -- The LEDGER's own vocabulary: a source id on an earn, a sink id on a spend. It never crosses
+  -- the wire -- section D526 clause 5 -- which is what makes an external add invisible to play.
+  entry_key      TEXT NOT NULL,
+  -- Always positive. There is no amount on any request: the server prices every entry from
+  -- data/chime-ledger.json, so a client has no argument in which to name one.
+  chimes         INTEGER NOT NULL,
+  balance_after  INTEGER NOT NULL,
+  -- What a spend bought, so a posted run can be checked against a real spend. NULL on an earn.
+  modifier_json  TEXT,
+  written_at_ms  BIGINT NOT NULL,
+  UNIQUE (user_id, seq)
+);
+CREATE INDEX IF NOT EXISTS chime_entries_account ON chime_entries (user_id, seq);
 `;
 
 /* -------------------------------------------------------------------------- *
@@ -1518,6 +1734,43 @@ const MIGRATIONS: readonly Migration[] = Object.freeze([
       ');\n' +
       'CREATE INDEX IF NOT EXISTS telemetry_events_player ON telemetry_events (player_id);\n' +
       'CREATE INDEX IF NOT EXISTS telemetry_events_received ON telemetry_events (received_at_ms);',
+   * GitHub issue #368, § D526: the chime ledger.
+   *
+   * **A whole table rather than a column, which is why this one is not an `ALTER`.**
+   * `CREATE TABLE IF NOT EXISTS` is the same shape migration 0 uses and is safe to repeat, so a
+   * database created today gets the table from {@link SCHEMA} and this does nothing, and a database
+   * created before 2026-09-10 gets it here. The two indexes come with it for the same reason.
+   *
+   * **Nothing is backfilled and nothing could be.** Every account that predates this migration has
+   * an empty ledger and therefore a balance of zero, which is not a decision this migration takes —
+   * it is what a ledger of completed turns says about a player who completed them before there was
+   * anywhere to write them down. § D526 clause 2 forbids deriving a balance from anything the run
+   * measured, and a backfill over posted entries would be exactly that.
+   */
+  Object.freeze({
+    /*
+     * **Four rather than three, and the collision is worth a sentence.** This migration was written
+     * as version 3 and so was GitHub issue #340's `telemetry_events`; the two lanes ran in parallel
+     * and each was correct about the tree it was written on. Telemetry merged first, so this one
+     * moves. `migrations.test.ts` asserts the register is contiguous from zero and derives the
+     * shipped list from this file, which is what turns a silent double-3 into a red suite.
+     */
+    version: 4,
+    name: 'chime_entries, empty for every account that predates it',
+    sql:
+      'CREATE TABLE IF NOT EXISTS chime_entries (\n' +
+      '  id             TEXT PRIMARY KEY,\n' +
+      '  user_id        TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,\n' +
+      '  seq            INTEGER NOT NULL,\n' +
+      '  direction      TEXT NOT NULL,\n' +
+      '  entry_key      TEXT NOT NULL,\n' +
+      '  chimes         INTEGER NOT NULL,\n' +
+      '  balance_after  INTEGER NOT NULL,\n' +
+      '  modifier_json  TEXT,\n' +
+      '  written_at_ms  BIGINT NOT NULL,\n' +
+      '  UNIQUE (user_id, seq)\n' +
+      ');\n' +
+      'CREATE INDEX IF NOT EXISTS chime_entries_account ON chime_entries (user_id, seq);',
   }),
 ]);
 

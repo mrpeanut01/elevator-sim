@@ -110,6 +110,7 @@
  */
 
 import { displayNameIssueOf, namingStage, type AccountState } from '../menu/account.js';
+import { chimesPanelViewOf, type ChimesPanelView } from './chimesPanel.js';
 import {
   AVATAR_SWATCHES,
   avatarInitialOf,
@@ -187,6 +188,20 @@ export interface SettingsYouView {
   readonly signIn: SettingsSignInView;
   /** Said when a write did not survive the tab — a memory-only store or a refusing one. */
   readonly saveNotice: string | undefined;
+  /**
+   * The chime tally — GitHub issue **#368**, [§ D526](../../../../DECISIONS.md) clause 5.
+   *
+   * Here rather than on a screen of its own, and the placement is the decision. A balance is
+   * **account state**: it lives with the account when there is one and on this device when there is
+   * not, which is the same sentence the block above it is already making about a display name. A
+   * player who has just read *you are not signed in* is exactly the player who needs to be told
+   * that a tally kept here cannot post a run, and telling them somewhere else would be telling them
+   * later.
+   *
+   * It is also why it is **not** on a results page: § D526 clause 3 forbids a currency figure
+   * beside a wait figure or in any comparison between players, and Settings is neither.
+   */
+  readonly chimes: ChimesPanelView;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -686,6 +701,15 @@ export interface SettingsScreenInput {
    * not written anything has nothing to report about whether the write survived.
    */
   readonly telemetryDurable?: boolean | undefined;
+   * The account's chime balance — GitHub issue **#368**. One number, and never anything else.
+   *
+   * Optional because the balance arrives from the server after the screen has drawn, and `0` is
+   * both the honest reading for an account that has finished nothing and the honest reading for a
+   * caller that has not asked yet. There is deliberately no *unknown* arm: a balance nobody has
+   * fetched and a balance of nothing say the same true sentence to a player, and inventing a third
+   * state would be a screen claiming to know something about the ledger that it does not.
+   */
+  readonly chimeBalance?: number | undefined;
 }
 
 /** § 15.1's screen for this state. Total; every sentence a player can meet starts here. */
@@ -732,6 +756,16 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
         selected: swatch.color === committed.avatarColor,
       })),
       note: signedIn ? NAME_NOTE.account : NAME_NOTE.device,
+      /*
+       * Three homes from the two facts already in hand — GitHub issue #368. `booting` is the same
+       * real window the Motion row and the account block have, and it is drawn as one rather than
+       * guessed at, because telling a player their tally is device-only and then moving it is worse
+       * than saying nothing for a moment.
+       */
+      chimes: chimesPanelViewOf({
+        balanceChimes: input.chimeBalance ?? 0,
+        home: signedIn ? 'account' : account === undefined ? 'booting' : 'device',
+      }),
       signIn: signInViewOf(input),
       saveNotice:
         input.durable === false

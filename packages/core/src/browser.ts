@@ -202,6 +202,17 @@ export {
   trafficProfileSchema,
   trafficProfilesSchema,
   transportModeSchema,
+  CHIME_COMPLETIONS,
+  CHIME_EARNED_BY,
+  CHIME_MODIFIER_KINDS,
+  ChimeLedgerError,
+  chimeAwardFor,
+  chimeGiftSource,
+  chimeGrantUnits,
+  chimeSinkById,
+  chimeSpendPrice,
+  parseChimeLedger,
+  violationsInChimeLedger,
 } from './config/index.js';
 
 export type {
@@ -289,6 +300,16 @@ export type {
   TransportModeKind,
   TypicalMax,
   ValueRange,
+  ChimeBand,
+  ChimeCompletion,
+  ChimeCurrency,
+  ChimeEarnedBy,
+  ChimeLedgerTable,
+  ChimeModifier,
+  ChimeModifierKind,
+  ChimeSchema,
+  ChimeSink,
+  ChimeSource,
 } from './config/index.js';
 
 /* -------------------------------------------------------------------------- *

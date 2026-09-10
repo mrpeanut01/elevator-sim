@@ -171,6 +171,23 @@ export interface ClaimedMetrics {
 export interface Submission {
   readonly run: SubmittedRun;
   readonly claimed: ClaimedMetrics;
+  /**
+   * What this run was played with, if anything was bought for it — GitHub issue **#368**,
+   * `docs/38` § 2.3.
+   *
+   * Absent on a standard run, which is every run this product shipped before the chime ledger. It
+   * carries the **modifier** and never what it cost: § D526 clause 3 forbids a currency figure on a
+   * results page or in a comparison between players, and a spend on a submission would be one
+   * arriving through the back of the board.
+   *
+   * On {@link Submission} rather than on {@link SubmittedRun}, and the placement is deliberate:
+   * `SubmittedRun` is what the server **replays**, and a modifier is not yet part of a run's
+   * identity. `docs/38` § 3 asks for that widening — `docs/16`'s `ranked` row and
+   * `scope/runIdentity.ts` carrying the modifier set, and boards keyed by it — and it is separate
+   * work. What ships here is the check: `http/api.ts` refuses a claim the account's ledger cannot
+   * support, before it spends a simulation on it.
+   */
+  readonly modifiers?: readonly { readonly sinkId: string; readonly steps: number }[] | undefined;
 }
 
 /* -------------------------------------------------------------------------- *

@@ -76,6 +76,32 @@ export type {
 } from './demandPhases.js';
 
 export {
+  CHIME_COMPLETIONS,
+  CHIME_EARNED_BY,
+  CHIME_MODIFIER_KINDS,
+  ChimeLedgerError,
+  chimeAwardFor,
+  chimeGiftSource,
+  chimeGrantUnits,
+  chimeSinkById,
+  chimeSpendPrice,
+  parseChimeLedger,
+  violationsInChimeLedger,
+} from './chimeLedger.js';
+export type {
+  ChimeBand,
+  ChimeCompletion,
+  ChimeCurrency,
+  ChimeEarnedBy,
+  ChimeLedgerTable,
+  ChimeModifier,
+  ChimeModifierKind,
+  ChimeSchema,
+  ChimeSink,
+  ChimeSource,
+} from './chimeLedger.js';
+
+export {
   DEFAULT_ID_PATTERN,
   MAX_FLOORS_PER_RANGE,
   expandFloors,

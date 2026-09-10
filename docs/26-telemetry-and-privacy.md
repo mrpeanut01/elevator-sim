@@ -799,6 +799,19 @@ whole premise: a vocabulary retyped in a telemetry module is a vocabulary that g
 | `endReason` | `hidden`, `navigated`, `unknown`. Three values, closed |
 | `run` | `SubmittedRun` from `packages/server/src/leaderboard/submission.ts`, unchanged (§ 2.1) |
 
+**The chime ledger emits no event, and its absence from the table above is the allowlist doing its
+job** — GitHub issue #368, [§ D526](../DECISIONS.md) clause 6, amended into § 10 non-goal 1 on the
+commit that landed the ledger. A balance earned and a balance spent are **account state**, held by
+`packages/server/`, and they are deliberately **not** E1 to E10: P-3 says the schema is the
+allowlist, so an event named `chimes_earned` or `chimes_spent` would have to be added here to exist,
+and adding one is what non-goal 1 refuses. There is no `chimeBalance` field on the envelope and none
+on any event; `playerId` never joins an account id (§ 3.2), so nothing here could be correlated with
+a balance even if somebody wanted to. **What this costs is stated rather than hidden**: no funnel
+question about the currency can be answered from this schema — not whether a spend follows a clear,
+not what a balance is at the moment a session ends, not whether the sign-in gift changes anything.
+[§ D531](../DECISIONS.md) already records that last one as forfeited for a different reason, and the
+other two are the price of an allowlist that means what it says.
+
 **No field in this schema has an unbounded string type** except `buildId` and the two random ids.
 That is P-4's second half expressed as a type rather than as a rule, and § 7.6's third test asserts
 it. **The 2026-09-09 rewrite does not relax this by one field.** P-4 now permits typed text where a
@@ -981,8 +994,38 @@ at M4, when the gate is being read to decide whether the milestone exits.
 charter pillar.** They extend `docs/22-charter.md` § 5 into this discipline and contradict none of
 it.
 
-1. **No monetisation of any kind, and no event that exists to support one.** No purchase, no price,
-   no paywall, no store, no conversion event, no lifetime-value figure.
+1. **No purchase, price, store, conversion event or supporting telemetry ships anywhere.** No
+   paywall, no lifetime-value figure, and no vendor to reach one through.
+
+   **Amended by [§ D526](../DECISIONS.md) clause 6, on the commit that landed the chime ledger
+   (GitHub issue #368), which is when § D526's own obligation says it may be amended and not
+   before.** It read *"No monetisation of any kind, and no event that exists to support one"*, and
+   that sentence was true of a product with no currency in it. There is one now — chimes, earned by
+   completing turns and spent on a mode's modifiers ([§ D530](../DECISIONS.md),
+   [`38-what-the-game-is.md`](38-what-the-game-is.md) § 2.4) — and it is **not** monetisation: no
+   real money enters this product at any point, and none can.
+
+   **What changed is the shape of the refusal rather than its strength.** The old form forbade a
+   category; this forbids the machinery, which is the half a reviewer can actually check. A ledger
+   has sources; today they are three completed turns and one unconditional gift. An external add —
+   a purchase, a gift card, an operator's correction — would be **one more source on the same
+   ledger**, and because the play surface reads only the balance, nothing on it would move when such
+   a source appeared: no store, no price in money, no purchase screen, no conversion event and no
+   telemetry that exists to support one. That is what *the ledger is built so one could be a source
+   later* means, and it is the reason it is safe to write down.
+
+   **Such a source is added only by a decision that cites a measured `charter S4`**, and until then
+   there is no purchase anywhere. Three checks hold this rather than a reviewer's attention:
+   `packages/core/src/config/chimeLedger.ts` refuses a source earned by anything but a completion or
+   a gift, and refuses any unrecognised key in the document — which is where a price in money would
+   otherwise land; no route on the account takes an amount from a request, so a client has no
+   argument in which to name one; and
+   `packages/experiments/src/validation/documentation.test.ts` reads every source file under
+   `packages/` with its comments and strings removed and requires that none of them names a
+   payment processor, a storefront, a bundle or an amount in money, deriving the population from
+   disk so a new file cannot escape by not being on a list. Non-goal 4 below is restated for the
+   currency: the balance is a tally of completed turns, not a metric over a person built from
+   telemetry.
 2. **No advertising, and no third-party ad, marketing or analytics tracker.** No vendor SDK, no
    CDN-hosted script, no pixel, no tag manager. This is enforced today by `connect-src 'self'` (§ 8),
    and **widening the policy for an analytics vendor is refused**, not negotiated.

@@ -62,6 +62,8 @@
 
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 
+import { CHIME_COMPLETIONS, type ChimeCompletion, type ChimeLedgerTable } from '@elevator-sim/core';
+
 import {
   LOGIN_TTL_MS,
   constantTimeEquals,
@@ -70,6 +72,13 @@ import {
   verifyLoginToken,
 } from '../accounts/credentials.js';
 import { FixedWindowLimiter } from '../accounts/rateLimit.js';
+import {
+  awardSignInGift,
+  claimedModifierIssues,
+  earnCompletion,
+  spendOnModifier,
+  unbackedModifiers,
+} from '../chimes/ledger.js';
 import {
   CHALLENGE_CLOCK_NOTE,
   challengeBoardNote,
@@ -170,6 +179,15 @@ export interface ApiDeps {
    * the token.
    */
   readonly signInUrl: (token: string) => string;
+  /**
+   * The chime ledger's table, read from `data/` at boot — GitHub issue **#368**.
+   *
+   * Injected rather than read here for the reason every other `data/` fact is: this file stays a
+   * function of its arguments. It is also the only thing on this interface that decides what an
+   * entry is **worth**, which is [§ D526](../../../../DECISIONS.md) clause 6's structural half —
+   * no route below takes an amount from a request, because the amounts are all in here.
+   */
+  readonly chimeLedger: ChimeLedgerTable;
 }
 
 export type Api = (request: ApiRequest) => Promise<ApiResponse>;
@@ -421,6 +439,18 @@ export function createApi(deps: ApiDeps): Api {
         return ingestTelemetry(deps, request, telemetryPerCaller);
       case 'POST /api/telemetry/forget':
         return forgetTelemetry(deps, request, telemetryPerCaller);
+       * The chime ledger's three verbs, and the shape of this block is the contract — GitHub issue
+       * #368, § D526 clause 5. **One read and two posts, and there is no fourth.** No route returns
+       * an entry, a source, or a history; no route accepts an amount. A route that did either would
+       * be the first thing a purchase needed, which is why the absence is asserted in
+       * `api.test.ts` rather than merely true today.
+       */
+      case 'GET /api/chimes':
+        return chimeBalance(deps, request);
+      case 'POST /api/chimes/earn':
+        return chimeEarn(deps, request);
+      case 'POST /api/chimes/spend':
+        return chimeSpend(deps, request);
       default:
         return { status: 404, body: { error: 'no-such-route', detail: `Nothing is served at ${route}.` } };
     }
@@ -603,6 +633,15 @@ async function redeemLink(deps: ApiDeps, request: ApiRequest): Promise<ApiRespon
     if (error instanceof NoSuchUserError) return badLink('invalid');
     throw error;
   }
+  /*
+   * The sign-in gift — § D531, and it is deliberately the last thing and deliberately silent.
+   *
+   * Last, because a gift must not be able to cost anybody a session: the store refuses a second one
+   * inside its own window and this awaits nothing the response depends on. Silent, because a gift
+   * announced on the way in is a currency figure on a surface, and because § D526 clause 4's
+   * *nothing resets on time* survives only while the player has nothing to keep up with.
+   */
+  await awardSignInGift({ store: deps.store, table: deps.chimeLedger, userId: user.id });
   return { status: 200, body: { token: session.token, user: publicUser(user) } };
 }
 
@@ -891,6 +930,36 @@ async function submit(
   const limited = chargeCooldown(deps, user.id, nextSubmitMs, 1, submission.run.durationS);
   if (limited !== undefined) return limited;
 
+  /*
+   * **A posted modified run is checked against a real spend** — GitHub issue #368, § D526 clause 3.
+   *
+   * Between the cheap gate and the expensive one, and the placement is the decision: the shape
+   * check costs nothing and runs with the rest of them, and the *ledger* read runs before the
+   * simulation, so a run claiming a modifier nobody paid for never commands a replay. A claim is
+   * refused by sink and named, because *the ledger cannot support this claim* is a different
+   * sentence from *something was wrong*.
+   */
+  const claimIssues = claimedModifierIssues(submission.modifiers);
+  if (claimIssues.length > 0) {
+    return { status: 400, body: { error: 'invalid-submission', issues: claimIssues } };
+  }
+  const claimed = submission.modifiers ?? [];
+  if (claimed.length > 0) {
+    const unbacked = unbackedModifiers(claimed, await deps.store.chimeSpends(user.id));
+    if (unbacked.length > 0) {
+      return {
+        status: 422,
+        body: {
+          error: 'modifier-not-bought',
+          detail:
+            'That run says it was played with something this account has not bought: ' +
+            `${unbacked.join(', ')}. Runs with a wider budget rank among runs with the same, so ` +
+            'the claim has to be one the ledger can support.',
+        },
+      };
+    }
+  }
+
   const facts = deps.factsFor(submission.run);
   if (facts === undefined) {
     return {
@@ -941,6 +1010,130 @@ async function submit(
   return {
     status: 201,
     body: { boardKey: placement.key, placement: placement.kind, entry: publicEntry(entry) },
+  };
+}
+
+/* --------------------------------------------------------------- the ledger */
+
+/**
+ * The balance, and **nothing else on the wire** — GitHub issue **#368**,
+ * [§ D526](../../../../DECISIONS.md) clause 5.
+ *
+ * One key. Not a list of entries, not a breakdown by source, not the last thing that was earned.
+ * That is the whole of the play surface's read verb, and it is what makes an add from outside
+ * invisible to play: a source the ledger gains changes this number and moves nothing else, because
+ * there is nothing else here to move. `api.test.ts` asserts the key set rather than the value, so a
+ * field added to this body fails a test instead of shipping.
+ */
+async function chimeBalance(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+  const user = await authenticate(deps, request);
+  if (user === undefined) {
+    return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to see your balance.' } };
+  }
+  return { status: 200, body: { balanceChimes: await deps.store.chimeBalance(user.id) } };
+}
+
+/**
+ * Bank a completed turn — **and the body carries a turn, never an amount**.
+ *
+ * A client says *I cleared a scenario*, at a band the scenario declared, and the server prices it
+ * from `data/chime-ledger.json`. There is no field here in which a number could arrive, which is
+ * [§ D526](../../../../DECISIONS.md) clause 6 as a wire format rather than as a rule: a purchase
+ * is a client naming an amount, and this route has nowhere to put one.
+ *
+ * It also has no way to name a **source**. The completions are the three in `core`'s
+ * `CHIME_COMPLETIONS`; the sign-in gift is a source with no completion and is written by the
+ * redemption route, so nothing a client can compose reaches it.
+ */
+async function chimeEarn(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+  const user = await authenticate(deps, request);
+  if (user === undefined) {
+    return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to bank what you finished.' } };
+  }
+  const body = request.body as Partial<Record<'completion' | 'band', unknown>>;
+  const completion = typeof body?.completion === 'string' ? body.completion : '';
+  if (!(CHIME_COMPLETIONS as readonly string[]).includes(completion)) {
+    return {
+      status: 400,
+      body: {
+        error: 'unknown-completion',
+        detail: `A turn is one of ${CHIME_COMPLETIONS.join(', ')}.`,
+      },
+    };
+  }
+  const band = typeof body?.band === 'string' ? body.band : undefined;
+  const outcome = await earnCompletion({
+    store: deps.store,
+    table: deps.chimeLedger,
+    userId: user.id,
+    completion: completion as ChimeCompletion,
+    bandId: band,
+  }).catch((error: unknown) => {
+    if (error instanceof NoSuchUserError) return undefined;
+    throw error;
+  });
+  if (outcome === undefined) return accountVanished();
+  if (!outcome.ok) {
+    return { status: 400, body: { error: outcome.reason, detail: 'This build does not pay that turn.' } };
+  }
+  return { status: 200, body: { balanceChimes: outcome.balanceChimes } };
+}
+
+/**
+ * Spend on a modifier — **and the body carries a modifier and a number of steps, never a price**.
+ *
+ * `docs/38` § 2.4: chimes buy a scenario's budget up, a tower's purse up, a rush's purse up or a
+ * pre-fitted start, and nothing else. What each costs is in `data/chime-ledger.json` and the store
+ * refuses the write if the balance cannot cover it, inside one statement, so there is no moment at
+ * which two requests can spend the same chimes.
+ *
+ * The answer is the new balance and what the spend granted. It is **not** a receipt id, and that is
+ * deliberate: a run proves its modifier by naming the sink it claims, and the server sums what the
+ * account bought (`chimes/ledger.ts#unbackedModifiers`). A receipt a client had to carry would be a
+ * token that could be replayed, lost, or shared.
+ */
+async function chimeSpend(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+  const user = await authenticate(deps, request);
+  if (user === undefined) {
+    return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to spend.' } };
+  }
+  const body = request.body as Partial<Record<'modifier' | 'steps', unknown>>;
+  const sinkId = typeof body?.modifier === 'string' ? body.modifier : '';
+  const steps = typeof body?.steps === 'number' ? body.steps : 1;
+  if (sinkId === '' || !Number.isInteger(steps) || steps < 1) {
+    return {
+      status: 400,
+      body: { error: 'unknown-modifier', detail: 'Name a modifier and a whole number of steps.' },
+    };
+  }
+  const outcome = await spendOnModifier({
+    store: deps.store,
+    table: deps.chimeLedger,
+    userId: user.id,
+    sinkId,
+    steps,
+  }).catch((error: unknown) => {
+    if (error instanceof NoSuchUserError) return undefined;
+    throw error;
+  });
+  if (outcome === undefined) return accountVanished();
+  if (!outcome.ok) {
+    return outcome.reason === 'not-enough-chimes'
+      ? {
+          status: 409,
+          body: {
+            error: 'not-enough-chimes',
+            detail: 'There are not enough chimes in the account for that yet.',
+          },
+        }
+      : {
+          status: 400,
+          body: { error: outcome.reason, detail: 'This build does not sell that modifier.' },
+        };
+  }
+  return {
+    status: 200,
+    body: { balanceChimes: outcome.balanceChimes, grantUnits: outcome.grantUnits ?? 0 },
   };
 }
 

@@ -59,6 +59,7 @@ const AUDITED_MODULES = [
   'server/src',
   'server/src/accounts',
   'server/src/challenge',
+  'server/src/chimes',
   'server/src/errors',
   'server/src/http',
   'server/src/leaderboard',
@@ -111,6 +112,14 @@ const WIRING: readonly (readonly [string, string, 'import' | 'same file'])[] = O
   ['constantTimeEquals', 'server/src/http/api.ts', 'import'],
   ['LOGIN_TTL_MS', 'server/src/http/api.ts', 'import'],
   ['FixedWindowLimiter', 'server/src/http/api.ts', 'import'],
+  // GitHub issue #368, § D526: the chime ledger. Four of the five are reached by the three routes
+  // and the redemption; `loadChimeLedger` is `bootstrap.ts`'s, beside `loadConfig`.
+  ['loadChimeLedger', 'server/src/bootstrap.ts', 'import'],
+  ['earnCompletion', 'server/src/http/api.ts', 'import'],
+  ['spendOnModifier', 'server/src/http/api.ts', 'import'],
+  ['awardSignInGift', 'server/src/http/api.ts', 'import'],
+  ['claimedModifierIssues', 'server/src/http/api.ts', 'import'],
+  ['unbackedModifiers', 'server/src/http/api.ts', 'import'],
   ['newSessionToken', 'server/src/http/api.ts', 'import'],
   ['signInMessage', 'server/src/http/api.ts', 'import'],
   ['normaliseEmail', 'server/src/http/api.ts', 'import'],

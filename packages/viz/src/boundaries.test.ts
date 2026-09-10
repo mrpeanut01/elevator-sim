@@ -740,3 +740,99 @@ describe('the browser-facing modules import no node builtins', () => {
     expect(users.length).toBeGreaterThan(0);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * § D526 clause 5 — the play surface never learns a source (GitHub issue #368)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The chime ledger's **source** vocabulary, read off the shipped table rather than transcribed.
+ *
+ * *The play surface reads one balance and posts two verbs, earn and spend, and never knows a
+ * source* ([§ D526](../../../DECISIONS.md) clause 5). This is that rule as a grep, and the whole of
+ * it turns on two words this repository keeps apart on purpose:
+ *
+ * - a **completion** is what the play surface names — *a scenario cleared* — and every module here
+ *   is free to say one;
+ * - a **source** is what the ledger calls the entry it wrote — *earn-scenario-clear* — and no
+ *   module here may say one at all.
+ *
+ * Derived from `data/chime-ledger.json` rather than listed here, on
+ * `validation/documentation.test.ts`'s own rule for the carrier set it checks: a source added to
+ * the table joins this rule on the commit that adds it, and a module that names it cannot escape by
+ * not being on a list. **That is also what makes an add from outside invisible to play** — the
+ * property the whole clause exists for. A purchase, a gift, an operator's correction: each would be
+ * one more source on the same ledger, and nothing here could name it, so nothing here could draw a
+ * different sentence because of it.
+ */
+async function chimeSourceIds(): Promise<readonly string[]> {
+  const raw = await readFile(join(REPO_ROOT, 'data', 'chime-ledger.json'), 'utf8');
+  const table = JSON.parse(raw) as { sources: readonly { id: string }[] };
+  return table.sources.map((source) => source.id);
+}
+
+describe('§ D526 clause 5 — the balance is all the play surface knows', () => {
+  it('names no chime source anywhere in this package', async () => {
+    const sources = await chimeSourceIds();
+    const offenders = (await vizSources())
+      .filter((file) => !isTest(file.id))
+      .filter((file) => sources.some((id) => file.code.includes(id)))
+      .map((file) => file.id)
+      .sort((a, b) => a.localeCompare(b));
+    expect(
+      offenders,
+      'a module in the viewer names a chime source. § D526 clause 5: the play surface reads one ' +
+        'balance and posts earn and spend, and never learns where an entry came from — which is ' +
+        'what makes an add from outside invisible to play. If this module needs to say what the ' +
+        'player finished, it should name a completion (scenario cleared, contract day paid, rush ' +
+        'wave survived); if it needs a balance, it should read the one number the account answers.',
+    ).toEqual([]);
+  });
+
+  it('reads no ledger entry, and has no shape to put one in', async () => {
+    /*
+     * The other half of the same clause and the one a screen would breach first. A history, a
+     * breakdown, a *where this came from* — each needs the entries, and the server serves a balance
+     * and nothing else. Asserted over the words a client would have to use to ask.
+     */
+    const asking = /chimeEntries|ledgerEntries|chimeHistory|chimeSources|earnedFrom/;
+    const offenders = (await vizSources())
+      .filter((file) => !isTest(file.id))
+      .filter((file) => asking.test(file.identifiers))
+      .map((file) => file.id);
+    expect(
+      offenders,
+      'a module in the viewer asks the ledger for its entries. There is no route that answers ' +
+        'one, on purpose — see § D526 clause 5 and the balance route’s own docstring.',
+    ).toEqual([]);
+  });
+
+  it('positive control: the source ids are real, and the grep would catch one', async () => {
+    /*
+     * This file's own habit, and it matters more here than usual: a rule keyed on a list read off
+     * disk passes vacuously the day the list comes back empty. Both halves are asserted — the table
+     * really has sources, and the detector really catches a module that names one.
+     *
+     * The literal is **assembled** rather than written out, because the rule above reads
+     * comment-stripped-but-string-intact source and exempts only tests by name; spelling a source
+     * id here would make this file the first offender the day somebody widened the filter.
+     */
+    const sources = await chimeSourceIds();
+    expect(sources.length).toBeGreaterThan(2);
+    for (const id of sources) expect(id.startsWith('earn-') || id.startsWith('gift-')).toBe(true);
+
+    const wouldOffend = `const paid = ${JSON.stringify(sources[0] ?? '')};`;
+    expect(sources.some((id) => wouldOffend.includes(id))).toBe(true);
+
+    /* And the completion vocabulary, which this rule must NOT catch, is genuinely different. */
+    const completion = ['scenario', 'cleared'].join('-');
+    expect(sources.some((id) => completion.includes(id))).toBe(false);
+  });
+
+  it('positive control: the panel that draws the balance is really in the tree', async () => {
+    /* A rule confining a surface that does not exist confines nothing. */
+    const files = (await vizSources()).map((file) => file.id);
+    expect(files).toContain('everyday/chimesPanel.ts');
+    expect(files).toContain('everyday/settingsView.ts');
+  });
+});

@@ -412,7 +412,39 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   accountBlock.append(accountHeading, accountNote, emailBlock, accountNotice, buttonRow);
   homeBlock.append(accountBlock, saveNotice);
 
-  youCard.append(identityRow, nameNote, homeBlock);
+  /* ---- the chime tally — GitHub issue #368, § D526 clause 5 ---- */
+  /*
+   * **Built once and updated in place**, on this file's own rule for the account block: nothing
+   * below calls `replaceChildren`, because a repaint that rebuilt this region while the reader was
+   * typing in the name field above it would take the caret with it.
+   *
+   * The rows are the sinks, and the count of them is fixed at build time by the shipped table — so
+   * the loop below can be built once and only ever have its affordability written. A table that
+   * gained a sink between two paints is not a thing that can happen: it is bundled with the module.
+   */
+  const chimesBlock = el(doc, 'div');
+  chimesBlock.style.cssText = `margin-top:14px;padding-top:14px;border-top:1px solid ${C.ruleLight}`;
+  const chimesHeading = el(doc, 'div', undefined, view.you.chimes.heading);
+  chimesHeading.style.cssText = `font-size:11px;letter-spacing:0.08em;color:${C.warmGrey}`;
+  const chimesBalance = el(doc, 'div', 'everyday-settings-chimes-balance', view.you.chimes.balanceLine);
+  chimesBalance.style.cssText = `font-size:15px;color:${C.ink};margin-top:6px`;
+  const chimesLede = el(doc, 'div', undefined, view.you.chimes.lede);
+  chimesLede.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.5;margin-top:6px;max-width:70ch`;
+  const chimesHome = el(doc, 'div', 'everyday-settings-chimes-home', view.you.chimes.homeNote);
+  chimesHome.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.5;margin-top:8px;max-width:70ch`;
+  const chimesSpendHeading = el(doc, 'div', undefined, view.you.chimes.spendHeading);
+  chimesSpendHeading.style.cssText = `font-size:11px;letter-spacing:0.08em;color:${C.warmGrey};margin-top:12px`;
+  const chimesRows = el(doc, 'div');
+  chimesRows.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:6px';
+  const chimesRowNodes = view.you.chimes.rows.map((row) => {
+    const line = el(doc, 'div', undefined, `${row.name} — ${row.price}`);
+    line.style.cssText = `font-size:12.5px;color:${C.ink}`;
+    chimesRows.append(line);
+    return line;
+  });
+  chimesBlock.append(chimesHeading, chimesBalance, chimesLede, chimesHome, chimesSpendHeading, chimesRows);
+
+  youCard.append(identityRow, nameNote, homeBlock, chimesBlock);
   root.append(youHeading, youCard);
 
   /* ---- PLAYING ---- */
@@ -853,6 +885,20 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     issue.hidden = view.you.nameIssue === undefined;
     saveNotice.textContent = view.you.saveNotice ?? '';
     saveNotice.hidden = view.you.saveNotice === undefined;
+    /*
+     * The tally follows the view — GitHub issue #368. Text only, on this file's build-once rule,
+     * and the balance is the one thing here that moves on its own: it changes when the account
+     * bridge answers and when a spend lands, and both arrive as a repaint.
+     */
+    chimesBalance.textContent = view.you.chimes.balanceLine;
+    chimesHome.textContent = view.you.chimes.homeNote;
+    for (const [index, node] of chimesRowNodes.entries()) {
+      const row = view.you.chimes.rows[index];
+      if (row !== undefined) {
+        node.textContent = `${row.name} — ${row.price}`;
+        node.style.opacity = row.affordable ? '1' : '0.55';
+      }
+    }
     for (const [index, button] of swatchButtons.entries()) {
       const swatch = view.you.swatches[index];
       if (swatch !== undefined) button.style.cssText = swatchStyle(swatch.color, swatch.selected);

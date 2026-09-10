@@ -577,6 +577,9 @@ async function populate(store: Store, userId: string, suffix: string): Promise<v
     dispatcherProfileId: 'collective',
     score: challengeScore(20),
   });
+  // GitHub issue #368. A balance is account state, so erasure has to take it — and the assertion
+  // that it does is only worth anything if there is a row here to take.
+  await store.recordChimeEntry({ userId, direction: 'earn', entryKey: 'career-day-paid', chimes: 3 });
 }
 
 describe('deleting an account', () => {
