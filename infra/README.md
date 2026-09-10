@@ -64,12 +64,26 @@ a send that fails at run time. Registering an account is the test; § 4 has it.
 Also unverified: **scaling past one replica**. The store is PostgreSQL so concurrent replicas are
 sound in principle, but nothing has run two.
 
-**And the whole of the static-hosting lane.** `viewerOrigin` (§ 3.5) has never been set on a real
-deployment, no Static Web App has been created, and **no page has ever been served cross-origin** —
-so the CORS round trip, the preflight and a real sign-in against two origins are unit-tested and
-have never met a browser. `docs/16-static-site-deployment.md` § 9 itemises that lane's verified and
-unverified halves separately; it is longer than this paragraph because the lane is entirely
-unrun.
+**One clause of the static-hosting lane, and this paragraph claimed the whole of it until
+2026-09-10.** It read *"`viewerOrigin` (§ 3.5) has never been set on a real deployment, no Static
+Web App has been created, and no page has ever been served cross-origin — so the CORS round trip,
+the preflight and a real sign-in against two origins are unit-tested and have never met a browser
+… the lane is entirely unrun."* Every clause of that was true when it was written, and every one
+but the cross-origin clause became false on 2026-08-08, when the lane was armed: the Static Web App
+`elevator-sim-viz` exists, `viewerOrigin` is set on the deployed app, and the mechanism has met a
+browser. A refusal that has gone stale is
+worse than a figure that has, because it tells the reader not to touch a control that is live
+([§ D227](../DECISIONS.md)), and this is the file whose whole job is to say what is deployed;
+§ D339 corrected `deploy.sh`'s header for the same reason and this paragraph was missed.
+
+What survives is the narrower half, and `docs/16-static-site-deployment.md` § 9 states it in those
+terms: **no page has ever been served cross-origin *to the permitted origin*.** The refusal half is
+observed — from the preview hostname Chrome blocked `/api/boards` and `/api/wake` at preflight and
+named the mismatch, and the page said the leaderboard server could not be reached rather than
+claiming it was down. The permitted half, a preflight and an `Authorization` header and a real
+sign-in from the production hostname, is still reasoned about rather than run. That § 9 itemises
+the lane's verified and unverified halves separately, and it is longer than this paragraph because
+it is where the itemisation belongs.
 
 **Verified, by running it:**
 
