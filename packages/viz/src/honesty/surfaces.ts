@@ -156,6 +156,14 @@ import {
 } from '../everyday/tunerModel.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { SIGN_IN_LINK_STAGES, signInNoticeViewOf } from '../everyday/signInLink.js';
+/* GitHub issue #245's report block — driven by `EVERYDAY_SUPPORT` at the end of this file. */
+import {
+  reportBodyOf,
+  SUPPORT_TEXT_LIMIT,
+  supportViewOf,
+  type SupportInput,
+  type SupportRun,
+} from '../everyday/support.js';
 import { FIGURE_NOTE_HANDLE, everydayReportViewOf } from '../everyday/reportView.js';
 // GitHub issue #221's post block — the decision, seeded in all seven states by the report adapter.
 import { postRunViewOf } from '../everyday/postRun.js';
@@ -11955,6 +11963,131 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
 };
 
 /* -------------------------------------------------------------------------- *
+ * Reporting a problem — GitHub issue #245, on the Settings screen
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The report block** — GitHub issue **#245**, the product owner's ruling of 2026-09-09.
+ *
+ * ## Why a form belongs in a corpus about honesty more than most screens do
+ *
+ * Every other surface in this list makes claims about a run. This one makes a claim about **what
+ * happens to the reader's own words**, and the ruling makes that claim a requirement: *"the surface
+ * has to say, plainly and next to the box, that what they write will be publicly visible."* A
+ * sentence that goes stale on a report card costs a reader a wrong figure; a sentence that goes
+ * stale here costs somebody a public page with their own words on it. So the notices are driven in
+ * **every** state this block can be in — including the two where the press is refused, because a
+ * refused reader has already typed and a happy-path sweep would never visit them.
+ *
+ * ## What is driven
+ *
+ * Every state the pure view distinguishes, iterated rather than sampled: nothing typed with and
+ * without a run, a report over each of the five flows a run can be in, a run whose settings do not
+ * rebuild it, and a report past the ceiling. The composed report is seeded too, and it is the one
+ * seed on this surface worth a sentence — it is the string a reader reads on the way to making it
+ * public, so `CHARTER_PROGRAMME.md` § M2's third exit criterion reaches it exactly as it reaches a
+ * caption.
+ *
+ * **Two of the fields inside that report are fixtures this adapter authors**, and saying so is what
+ * keeps the claim honest: the words the reader typed and the string their browser gave are theirs,
+ * not the product's, and no property could judge either. What is swept is the composition around
+ * them. `everyday/settingsView.ts` makes the same distinction one adapter over and resolves it the
+ * other way for the sign-in address, which is never seeded at all; the difference is that an address
+ * has no composition around it to check.
+ *
+ * `everyday/settingsScreen.ts` draws this block and is **not** driven here, on the DOM mounts'
+ * shared ground in `derive.test.ts` — the pure/DOM split in `everyday/` exists so the words are
+ * drivable without a document, and here they are. The address {@link reportLinkOf} composes is not
+ * seeded either: it is a machine address, and the two things inside it that anybody reads — this
+ * surface's sentences and the reader's own — are swept where they are authored.
+ *
+ * Appended last, per the fault-ordering rule stated at `SHIFT_REPORT`. It costs nothing to obey
+ * here and the reason is worth stating rather than inheriting: this adapter seeds no figure, no
+ * band and no verdict, so there is no wording whose fault it could take off another surface
+ * wherever it sat.
+ */
+const EVERYDAY_SUPPORT: SurfaceAdapter = {
+  id: 'everyday/support.ts#supportViewOf',
+  covers: [
+    'everyday/support.ts#supportViewOf',
+    'everyday/support.ts#SUPPORT_COPY',
+    'everyday/support.ts#supportFactsOf',
+    'everyday/support.ts#reportBodyOf',
+    'everyday/support.ts#reportLinkOf',
+  ],
+  render(context) {
+    void context;
+    const seeds: TextSeed[] = [];
+
+    const run: SupportRun = {
+      seed: 20_260_909n,
+      buildingId: 'midtown-office',
+      buildingName: 'Midtown Office',
+      dispatcherId: 'collective',
+      dispatcherName: 'Collective control',
+      day: 3,
+      ctx: 'daily',
+      carried: true,
+    };
+    const typed = 'The lift went past my floor twice and then stopped on the one above it.';
+    const browser = 'A browser, as a browser describes itself';
+
+    const cases: readonly (readonly [string, SupportInput])[] = [
+      /* Nothing typed — the state the block is in when a reader first meets it, both ways. */
+      ['empty-no-run', { text: '' }],
+      ['empty-with-run', { text: '', run, browser }],
+      /* Typed, with nothing played: the report a broken menu produces, and the one nothing else catches. */
+      ['no-run', { text: typed }],
+      /*
+       * A run in each flow. Five cases rather than one because the line naming the flow is the one
+       * field of the attachment whose value comes from a table, and a table with four arms swept and
+       * one not is the shape this corpus exists to catch.
+       */
+      ...RUN_CONTEXTS.map(
+        (ctx) => [`run-${ctx}`, { text: typed, run: { ...run, ctx }, browser }] as const,
+      ),
+      /* The settings do not rebuild the run — the honest arm, and the one a reader must not miss. */
+      ['run-not-carried', { text: typed, run: { ...run, carried: false }, browser }],
+      /* Past the ceiling: the second refusal, and the one nobody meets on a happy path. */
+      ['too-long', { text: 'x'.repeat(SUPPORT_TEXT_LIMIT + 1), run, browser }],
+    ];
+
+    for (const [label, input] of cases) {
+      const view = supportViewOf(input);
+      seeds.push({ field: `${label}.heading`, text: view.heading, role: 'label' });
+      seeds.push({ field: `${label}.lede`, text: view.lede, role: 'prose' });
+      /*
+       * The four notices, `prose` rather than `reason`: none of them refuses anything. They are
+       * statements about what pressing the button does and what the product can and cannot do
+       * afterwards, which is a different kind of sentence from *why this is greyed*.
+       */
+      seeds.push({ field: `${label}.publicNotice`, text: view.publicNotice, role: 'prose' });
+      seeds.push({ field: `${label}.attachNotice`, text: view.attachNotice, role: 'prose' });
+      seeds.push({ field: `${label}.handoffNotice`, text: view.handoffNotice, role: 'prose' });
+      seeds.push({ field: `${label}.deletionNotice`, text: view.deletionNotice, role: 'prose' });
+      seeds.push({ field: `${label}.fieldLabel`, text: view.fieldLabel, role: 'label' });
+      seeds.push({ field: `${label}.${view.stage}`, text: view.stageNote, role: 'prose' });
+      seeds.push({ field: `${label}.action`, text: view.action, role: 'label' });
+      seeds.push({ field: `${label}.counter`, text: view.counter, role: 'label' });
+      if (view.refusal !== undefined) {
+        seeds.push({ field: `${label}.refusal`, text: view.refusal, role: 'reason' });
+      }
+      for (const fact of view.attached) {
+        seeds.push({ field: `${label}.attached.${fact.label}`, text: fact.label, role: 'label' });
+        seeds.push({
+          field: `${label}.attached.${fact.label}.value`,
+          text: fact.value,
+          role: 'label',
+        });
+      }
+      seeds.push({ field: `${label}.report`, text: reportBodyOf(input), role: 'prose' });
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/* -------------------------------------------------------------------------- *
  * The build-information panel — every register of absences, in one place
  * -------------------------------------------------------------------------- */
 
@@ -12336,6 +12469,12 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * carry them. The end of the array is both the rule and the right place.
    */
   EVERYDAY_TUTORIAL,
+  /*
+   * Appended last in turn — GitHub issue #245's report block. The fault-ordering rule is free here
+   * for the sign-in banner's reason rather than the tutorial's: this adapter seeds no figure, no
+   * band and no verdict, so there is no wording whose fault it could take off an earlier surface.
+   */
+  EVERYDAY_SUPPORT,
 ]);
 
 /* -------------------------------------------------------------------------- *

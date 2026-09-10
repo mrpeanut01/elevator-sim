@@ -55,6 +55,20 @@
  * deliberately not written here**: the register has fallen from six to one as `Units`,
  * `Default speed`, `Clear saved progress`, `Switch to Engineer`, `Sign out` and now `Sound` were
  * built, and a count in prose beside a shrinking array is this repository's oldest stale figure.
+ *
+ * ## The fifth region — reporting a problem, and it is a state rather than a screen too
+ *
+ * GitHub issue **#245**, the product owner's ruling of 2026-09-09. Its words, its refusals and the
+ * address it opens are `everyday/support.ts`'s, and that module's docstring carries the whole of
+ * why the press opens a page instead of posting. It lives here on {@link SIGN_IN_COPY}'s own
+ * ground — § D489's, one issue over — and for a reason specific to it: what a player reports from
+ * is Settings, reached from the rail's gear row on every screen, and an eighteenth key against a
+ * handoff that specifies none would be inventing a screen to hold a block.
+ *
+ * **Two things this file authors and `support.ts` cannot.** The **browser's own string**, read off
+ * the document's view because `boundaries.test.ts` exempts this file by name and not that one; and
+ * the **run the report points at**, composed from `everyday/host.ts`'s reads at draw time. Both are
+ * handed in, so every sentence a reader meets is still swept by the honesty search.
  */
 
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
@@ -66,6 +80,13 @@ import { everydayProfileStore } from './profileStore.js';
 import { STAGE_SPEEDS } from './stageScreenModel.js';
 import type { EverydayScreenContext, EverydayScreenHandle, EverydayScreenModule } from './screens.js';
 import { settingsScreenViewOf, type SettingsScreenView } from './settingsView.js';
+/* GitHub issue #245's report block — its words, its refusals and the address it opens. */
+import {
+  SUPPORT_COPY,
+  supportViewOf,
+  type SupportInput,
+  type SupportRun,
+} from './support.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_RADII as R,
@@ -491,6 +512,204 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
 
   root.append(deviceHeading, deviceRegion, clearRegion);
 
+  /* ---------------------------------------------------------------- *
+   * REPORT A PROBLEM — GitHub issue #245
+   * ---------------------------------------------------------------- */
+
+  /**
+   * The run this report would point at, or `undefined` when nothing has played.
+   *
+   * Read at draw time rather than latched, `rail.ts`'s rule for the week: a run that had to be
+   * threaded separately is a run that goes stale by a frame, and a report naming yesterday's crowd
+   * is worse than one naming none. The building's and the dispatcher's names come from the host's
+   * own honest lookups and fall back to the id — `weekScreen.ts`'s idiom — so a saved tower this
+   * build cannot resolve is still named by the thing that would rebuild it.
+   */
+  function reportRun(): SupportRun | undefined {
+    const data = context.host;
+    if (!data.runState().hasRun) return undefined;
+    const selection = data.selection();
+    return {
+      seed: data.seed(),
+      buildingId: selection.buildingId,
+      buildingName: data.resolvedBuilding()?.name ?? selection.buildingId,
+      dispatcherId: selection.dispatcherId,
+      dispatcherName: data.dispatcherById(selection.dispatcherId)?.name ?? selection.dispatcherId,
+      day: data.week().day,
+      ctx: context.ctx,
+      /* `scope/runIdentity.ts`'s answer through the façade — never a second opinion here. */
+      carried: data.runCarriedBySelection(),
+    };
+  }
+
+  /** What the reader has typed. Never read back off the box, so a repaint cannot rewrite it. */
+  let reportText = '';
+
+  const supportInput = (): SupportInput => ({
+    text: reportText,
+    run: reportRun(),
+    /*
+     * The browser's own string, read here because this is a file `boundaries.test.ts` exempts by
+     * name and `support.ts` is not — the pure/DOM split, and the reason the composer takes it as an
+     * argument rather than reaching for it.
+     */
+    browser: doc.defaultView?.navigator.userAgent,
+  });
+
+  const supportHeading = el(doc, 'div', undefined, SUPPORT_COPY.heading);
+  supportHeading.style.cssText = `${EYEBROW};margin:28px 0 10px`;
+  const supportCard = el(doc, 'div', 'everyday-settings-support');
+  supportCard.style.cssText = `border:1px solid ${C.rule};border-radius:${String(R.card)}px;background:${C.card};padding:18px 20px`;
+
+  const supportLede = el(doc, 'p', undefined, SUPPORT_COPY.lede);
+  supportLede.style.cssText = `font-size:13.5px;line-height:1.55;color:${C.inkSoft};margin:0;max-width:64ch`;
+
+  /*
+   * **The ruling's requirement, drawn immediately above the box and not below it.** The order is
+   * the whole of it: a reader who has already typed has already decided, so the sentence that
+   * changes what they type has to be above the caret. It is drawn in the terracotta the clear row
+   * uses for its armed state, which is this shell's one colour for *this does something you cannot
+   * take back*.
+   */
+  const publicNotice = el(doc, 'p', 'everyday-settings-support-public', SUPPORT_COPY.publicNotice);
+  publicNotice.style.cssText = [
+    'font-size:13px',
+    'line-height:1.5',
+    'margin:14px 0 0',
+    'max-width:64ch',
+    `color:${C.ink}`,
+    `border-left:3px solid ${C.terracotta}`,
+    'padding:2px 0 2px 12px',
+  ].join(';');
+
+  const supportFieldLabel = el(doc, 'label', undefined, SUPPORT_COPY.fieldLabel);
+  supportFieldLabel.style.cssText = `${EYEBROW};display:block;margin:16px 0 6px`;
+  const supportBox = el(doc, 'textarea', 'everyday-settings-support-text');
+  supportBox.id = 'everyday-support-text';
+  supportBox.rows = 5;
+  supportFieldLabel.htmlFor = supportBox.id;
+  supportBox.style.cssText = [
+    'width:100%',
+    'box-sizing:border-box',
+    'resize:vertical',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(ROW_RADIUS_PX)}px`,
+    `background:${C.cardSunk}`,
+    `color:${C.ink}`,
+    'padding:10px 12px',
+    'font-size:14px',
+    'line-height:1.5',
+    `font-family:${TYPE.body}`,
+  ].join(';');
+  const supportCounter = el(doc, 'div', 'everyday-settings-support-counter');
+  supportCounter.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey};margin-top:6px`;
+
+  const attachNotice = el(doc, 'p', undefined, SUPPORT_COPY.attachNotice);
+  attachNotice.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.warmGrey};margin:16px 0 0;max-width:64ch`;
+  const attachedRegion = el(doc, 'div', 'everyday-settings-support-attached');
+  attachedRegion.style.cssText = 'margin-top:8px';
+  const stageNote = el(doc, 'p', 'everyday-settings-support-stage');
+  stageNote.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.warmGrey};margin:10px 0 0;max-width:64ch`;
+
+  const handoffNotice = el(doc, 'p', undefined, SUPPORT_COPY.handoffNotice);
+  handoffNotice.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.warmGrey};margin:14px 0 0;max-width:64ch`;
+  const deletionNotice = el(doc, 'p', undefined, SUPPORT_COPY.deletionNotice);
+  deletionNotice.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.warmGrey};margin:8px 0 0;max-width:64ch`;
+
+  const supportRefusal = el(doc, 'div', 'everyday-settings-support-refusal');
+  supportRefusal.id = 'everyday-support-refusal';
+  supportRefusal.style.cssText = `font-size:12.5px;line-height:1.45;color:${C.warmGrey};margin-top:10px;max-width:64ch`;
+  const supportButton = el(doc, 'button', 'everyday-settings-support-open', SUPPORT_COPY.action);
+  supportButton.type = 'button';
+  supportButton.style.cssText = [
+    'margin-top:12px',
+    'cursor:pointer',
+    `border:1.5px solid ${C.rule}`,
+    `background:${C.cardSunk}`,
+    `color:${C.ink}`,
+    `border-radius:${String(R.pill)}px`,
+    'padding:8px 16px',
+    `font:500 12.5px ${TYPE.mono}`,
+  ].join(';');
+
+  /**
+   * Everything about this block that depends on what has been typed, redrawn together.
+   *
+   * The box itself is never written here — the reader owns it, and a repaint that rewrote a focused
+   * textarea would take the caret to the end of it mid-word, which is {@link redrawAccount}'s own
+   * stated hazard one control over.
+   */
+  function redrawSupport(): void {
+    const view = supportViewOf(supportInput());
+    supportCounter.textContent = view.counter;
+    stageNote.textContent = view.stageNote;
+
+    attachedRegion.replaceChildren();
+    for (const fact of view.attached) {
+      const row = el(doc, 'div', 'everyday-settings-support-fact');
+      row.style.cssText = 'display:flex;gap:10px;align-items:baseline;padding:2px 0';
+      const label = el(doc, 'span', undefined, fact.label);
+      label.style.cssText = `font-size:12.5px;color:${C.warmGrey};min-width:12ch`;
+      const value = el(doc, 'span', undefined, fact.value);
+      value.style.cssText = `font:500 12px ${TYPE.mono};color:${FACT_FIGURE_COLOR};word-break:break-word`;
+      row.append(label, value);
+      attachedRegion.append(row);
+    }
+
+    supportRefusal.textContent = view.refusal ?? '';
+    supportRefusal.hidden = view.refusal === undefined;
+    supportButton.disabled = !view.actionOffered;
+    supportButton.style.opacity = view.actionOffered ? '1' : '.55';
+    /*
+     * The drawn reason, pointed at from the control — `deadControls.browser.test.ts`'s two clauses,
+     * and § D488's rule met without leaning on a `title` a touch device never shows. The `title` is
+     * set as well rather than instead, because that tier reads either.
+     */
+    if (view.refusal === undefined) {
+      supportButton.removeAttribute('aria-describedby');
+      supportButton.removeAttribute('title');
+    } else {
+      supportButton.setAttribute('aria-describedby', supportRefusal.id);
+      supportButton.title = view.refusal;
+    }
+  }
+
+  supportBox.addEventListener('input', () => {
+    reportText = supportBox.value;
+    redrawSupport();
+  });
+  supportButton.addEventListener('click', () => {
+    const destination = supportViewOf(supportInput()).destination;
+    /*
+     * The refused arm presses nothing, and it is guarded here as well as by `disabled`: the view
+     * decides both, so a state that refuses cannot compose an address, and this reads the same
+     * answer rather than a second one.
+     */
+    if (destination === undefined) return;
+    /*
+     * A new context, with no handle back to this one. The report is a page the reader posts from;
+     * nothing here needs to hear from it, and the page it opens is a public site.
+     */
+    doc.defaultView?.open(destination, '_blank', 'noopener,noreferrer');
+  });
+
+  supportCard.append(
+    supportLede,
+    publicNotice,
+    supportFieldLabel,
+    supportBox,
+    supportCounter,
+    attachNotice,
+    attachedRegion,
+    stageNote,
+    handoffNotice,
+    deletionNotice,
+    supportRefusal,
+    supportButton,
+  );
+  redrawSupport();
+  root.append(supportHeading, supportCard);
+
   /* ---- the build-information panel — all six registers, folded away ---- */
   root.append(buildNotesPanel(doc));
 
@@ -787,6 +1006,16 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     redrawClear();
   });
   const stopAccountWatch = onEverydayAccount(redrawAccount);
+  /*
+   * **The attachment follows the host, so what is shown stays what is sent** — GitHub issue #245.
+   *
+   * Without this the lines were drawn at mount and on every keystroke, and the press composed the
+   * address fresh: a run landing while a reader sat on this screen would have been in the report
+   * and not on the screen, which is the one promise this block makes. The subscription fires on
+   * state changes rather than per frame (`host.ts`'s stated cadence), and {@link redrawSupport}
+   * never writes the box, so a repaint cannot take the caret.
+   */
+  const stopHostWatch = context.host.subscribe(redrawSupport);
 
   host.append(root);
 
@@ -794,6 +1023,7 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     unmount: () => {
       stopWaiting();
       stopAccountWatch();
+      stopHostWatch();
     },
   };
 }
