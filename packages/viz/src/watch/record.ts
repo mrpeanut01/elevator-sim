@@ -54,10 +54,12 @@
  */
 
 import {
+  EFFECT_CARRYING_KINDS,
   isInterventionKind,
   RULE_ACTIONS,
   RULE_CONDITIONS,
-  SERVICE_MODES,
+  storedEffectIssue,
+  type EffectCarryingKind,
   type RunInterventionConfig,
   type SimulationConfig,
 } from '@elevator-sim/core/browser';
@@ -257,6 +259,12 @@ export function recordUnreadableReason(
    * mode would be applied silently — `Car.setMode` stores any string — which is § 1.5's
    * *approximate replay*, the one outcome this gate exists to forbid. `core` refuses both
    * loudly at scheduling time; this is the same refusal wearing a picker row.
+   *
+   * **The effects half of that promise is now literally one source** (GitHub issue #476). It was
+   * not: three clauses across two arms each spelled their own idea of what a service event may
+   * look like, and they disagreed about whether an effect must name a car. `core`'s
+   * `sim/storedEffect.ts` holds the description and {@link effectsUnreadableReason} wears the
+   * sentence.
    */
   for (const [index, entry] of record.interventions.entries()) {
     const reason = interventionUnreadableReason(entry, index);
@@ -334,46 +342,11 @@ function interventionUnreadableReason(
     if (typeof change['option'] !== 'string' || change['option'].length === 0) {
       return guess('answers an incident with no option words');
     }
-    const effects = change['serviceEvents'];
-    if (!Array.isArray(effects)) {
-      return guess('answers an incident with no effect list');
-    }
-    for (const effect of effects as readonly {
-      readonly atS?: unknown;
-      readonly bankId?: unknown;
-      readonly carId?: unknown;
-      readonly mode?: unknown;
-    }[]) {
-      if (
-        effect === null ||
-        typeof effect !== 'object' ||
-        typeof effect.atS !== 'number' ||
-        !Number.isFinite(effect.atS) ||
-        typeof effect.bankId !== 'string' ||
-        effect.bankId.length === 0 ||
-        typeof effect.carId !== 'string' ||
-        effect.carId.length === 0
-      ) {
-        return guess('answers an incident with an effect that names no car and no second');
-      }
-      if (
-        typeof effect.mode !== 'string' ||
-        !(SERVICE_MODES as readonly string[]).includes(effect.mode)
-      ) {
-        return `this build does not ship the service mode “${String(effect.mode)}”`;
-      }
-    }
   }
   /*
    * **The two bought kinds** — GitHub issue #370. Checked to the fields the record must carry for a
    * re-simulation to be the day it says it is: the priced change's id, so the day's spend can be
-   * re-derived, the words that were shown, and a list of effects. The effects themselves are
-   * deliberately checked only for shape, not for a car: unlike an incident answer's, a bought
-   * change's effect is routinely a **bank range** event, which names no car — and the arm above
-   * demands one, which is a pre-existing narrowness in that arm rather than something to copy into
-   * this one. `Simulation` refuses a malformed effect loudly at scheduling time either way; what
-   * this gate owes is the graceful half, and refusing a record for lacking a field its own kind
-   * never had would be refusing an honest one.
+   * re-derived, and the words that were shown.
    */
   if (change['kind'] === 'equipment-change' || change['kind'] === 'building-change') {
     const noun = change['kind'] === 'equipment-change' ? 'equipment' : 'the building';
@@ -383,19 +356,83 @@ function interventionUnreadableReason(
     if (typeof change['name'] !== 'string' || change['name'].length === 0) {
       return guess(`changes ${noun} with no words for what was bought`);
     }
-    if (!Array.isArray(change['serviceEvents'])) {
-      return guess(`changes ${noun} with no effect list`);
-    }
-    for (const effect of change['serviceEvents'] as readonly { readonly atS?: unknown }[]) {
-      if (
-        effect === null ||
-        typeof effect !== 'object' ||
-        typeof effect.atS !== 'number' ||
-        !Number.isFinite(effect.atS)
-      ) {
-        return guess(`changes ${noun} with an effect that names no second`);
-      }
-    }
+  }
+  return effectsUnreadableReason(change, guess);
+}
+
+/**
+ * How each effect-carrying kind says what it did, for the refusal's own sentence.
+ *
+ * `Record<EffectCarryingKind, string>` and not a partial one: `core`'s
+ * {@link EFFECT_CARRYING_KINDS} decides the key set, so a seventh kind that carries effects is a
+ * **compile error here** rather than a kind whose effects this gate quietly stops reading. The
+ * words are this file's — `core`'s own phrases are *incident answer* and *equipment change*, which
+ * are nouns for a warning and not verbs for this sentence — and each verb is kept **verbatim** from
+ * the arm it replaces, because re-wording a refusal nobody asked to move is how a reader who greps
+ * for it stops finding it.
+ *
+ * **The verb is verbatim and the clause deliberately is not**, which is the half worth saying. The
+ * incident arm used to end *…with an effect that names no car and no second* whatever was actually
+ * wrong with the effect, and that single sentence is the defect #476 was filed about: it blamed the
+ * bytes for a shape the reader did not know. The clause now comes from the description and names
+ * the field, so *no effect list* and *this build does not ship…* survive unchanged and the one
+ * sentence that was lying stops.
+ */
+const EFFECT_VERBS: Readonly<Record<EffectCarryingKind, string>> = Object.freeze({
+  'answer-incident': 'answers an incident',
+  'equipment-change': 'changes equipment',
+  'building-change': 'changes the building',
+});
+
+/** Whether this kind's arm carries effects at all — `core`'s allow-list, narrowed for the map. */
+function carriesEffects(kind: unknown): kind is EffectCarryingKind {
+  return (EFFECT_CARRYING_KINDS as readonly unknown[]).includes(kind);
+}
+
+/**
+ * Why one stored intervention's **effects** cannot be re-asked, or `null` — GitHub issue #476.
+ *
+ * ## Why this is one function over three kinds rather than a clause inside each arm
+ *
+ * It was three clauses inside two arms, and they disagreed. The incident answer's demanded a
+ * `carId` on every effect, which a `ResolvedServiceEvent` carrying a **bank range** does not
+ * have (§ D523) — so an answer that closed a zone, and the derate `campaign/incidents.ts` writes
+ * on a car's return, both came back as *this record is malformed* when the truth was *this reader
+ * does not know that shape*. The two bought kinds' clause was written the other way, tolerant to a
+ * fault: an `atS` and nothing else. Neither was right and nothing could say they disagreed.
+ *
+ * `core/src/sim/storedEffect.ts` is now the one description of what an effect may be and
+ * `storedEffectIssue` the one reader of it; this function is the part that belongs here — the
+ * *sentence*, in the register the rest of this file speaks. `record.test.ts` derives the reader set
+ * from disk, so a fourth reader spelled by hand goes red rather than quietly disagreeing.
+ *
+ * ## What it does not ask
+ *
+ * Whether the run builds that bank or that car, and whether the effect falls inside the window.
+ * Those are questions about a building and a horizon, `Simulation` asks them where the building is,
+ * and asking them here would be the second answer `runIdentityIssues`' docstring refuses.
+ */
+function effectsUnreadableReason(
+  change: { readonly kind?: unknown; readonly [key: string]: unknown },
+  guess: (what: string) => string,
+): string | null {
+  const kind = change['kind'];
+  if (!carriesEffects(kind)) return null;
+  const verb = EFFECT_VERBS[kind];
+  const effects = change['serviceEvents'];
+  if (!Array.isArray(effects)) return guess(`${verb} with no effect list`);
+  for (const effect of effects as readonly unknown[]) {
+    const issue = storedEffectIssue(effect);
+    if (issue === null) continue;
+    /*
+     * The two registers this file already keeps, taken from the description rather than decided
+     * here: *this build does not ship X* for a vocabulary miss, *would be a guess* for bytes the
+     * shape check cannot vouch for. Collapsing them would blame the file for something the build
+     * did, which is #476's own complaint one level up.
+     */
+    return issue.kind === 'vocabulary'
+      ? `this build does not ship the ${issue.noun} “${issue.value}”`
+      : guess(`${verb} with an effect that ${issue.clause}`);
   }
   return null;
 }

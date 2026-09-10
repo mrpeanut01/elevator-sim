@@ -15,7 +15,19 @@
  *    honestly and one that answers with a different run.
  */
 
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
+
+import {
+  EFFECT_CARRYING_KINDS,
+  STORED_EFFECT_SHAPES,
+  type EffectCarryingKind,
+  type StoredEffectField,
+  type StoredEffectFieldKind,
+} from '@elevator-sim/core/browser';
 
 import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
@@ -492,4 +504,329 @@ describe('the reproduction gate', () => {
    * the two that must refuse **before** they simulate are still asserted by handing in a simulator
    * that throws.
    */
+});
+
+/* -------------------------------------------------------------------------- *
+ * GitHub issue #476 — one description of a stored effect, and the readers of it
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A value of each field kind that the description accepts, and one it does not.
+ *
+ * `Record<StoredEffectFieldKind, …>` and not a partial one: `core` owns the vocabulary, so a sixth
+ * kind added there is a **compile error here** rather than a field this file quietly stops
+ * exercising. That is the tie that lets the two blocks below derive their effects from the table
+ * instead of transcribing three shapes — and a transcription is exactly what #476 was filed about.
+ */
+const SAMPLE: Readonly<Record<StoredEffectFieldKind, { readonly ok: unknown; readonly bad: unknown }>> =
+  Object.freeze({
+    'a finite number': { ok: 200, bad: Number.NaN },
+    'a non-empty string': { ok: 'main', bad: '' },
+    'a non-empty list of non-empty strings': { ok: ['G', '2'], bad: [] },
+    'a positive finite number': { ok: 900, bad: 0 },
+    'a declared service mode': { ok: 'out-of-service', bad: 'toast' },
+  });
+
+/** The rows of the description, as `[name, fields]` — the union of `Record`s widened once, here. */
+const DESCRIBED_SHAPES: readonly (readonly [string, Readonly<Record<string, StoredEffectField>>])[] =
+  Object.entries(STORED_EFFECT_SHAPES).map(([name, shape]) => [
+    name,
+    shape.fields as Readonly<Record<string, StoredEffectField>>,
+  ]);
+
+/** The smallest effect of one described shape that the description accepts. */
+function effectOf(fields: Readonly<Record<string, StoredEffectField>>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(fields).map(([at, rule]) => [at, SAMPLE[rule.must].ok]));
+}
+
+/** A record carrying one intervention of `kind`, with `serviceEvents` passed through verbatim. */
+function recordCarrying(kind: EffectCarryingKind, serviceEvents: readonly unknown[]): WatchRecord {
+  const record = watchRecordOf(baseState(), RESOURCES);
+  if (record === undefined) throw new Error('the base state must produce a record');
+  const change =
+    kind === 'answer-incident'
+      ? { kind, option: 'close the high bank', serviceEvents }
+      : { kind, changeId: 'rezone-bank', name: 'Re-zone a bank', serviceEvents };
+  return { ...record, interventions: [{ atS: 120, change: change as never }] };
+}
+
+/**
+ * **The two controls, and both were run red before the fix landed.**
+ *
+ * The first against `main`, where a bank-range effect reads *"answers an incident with an effect
+ * that names no car and no second"* — the defect, exactly as #476 describes it. The second against
+ * a deliberately over-wide implementation of `storedEffectIssue`, because the dangerous way to fix
+ * the first is to widen the arm until it accepts anything, and a guard that has never failed is a
+ * guard nobody has checked.
+ *
+ * Both are driven from {@link STORED_EFFECT_SHAPES} and {@link EFFECT_CARRYING_KINDS} rather than
+ * from transcribed exemplars, which is the drift leg: a fourth shape, or a fourth kind that carries
+ * effects, is exercised through every reader the day it is declared.
+ */
+describe('every reader of a stored effect reads it against one description', () => {
+  it('reads back every shape the description admits, on every kind that carries one', () => {
+    for (const kind of EFFECT_CARRYING_KINDS) {
+      for (const [name, fields] of DESCRIBED_SHAPES) {
+        expect(
+          recordUnreadableReason(recordCarrying(kind, [effectOf(fields)]), RESOURCES),
+          `a ${kind} carrying a ${name} effect must be readable`,
+        ).toBeNull();
+      }
+      // Empty is legal on every one of them — `core/src/sim/types.ts` says so on all three arms:
+      // an answer whose effect is reassurance alone still belongs on the record.
+      expect(recordUnreadableReason(recordCarrying(kind, []), RESOURCES)).toBeNull();
+    }
+  });
+
+  it('still refuses what the description does not admit — the widening this could have been', () => {
+    /*
+     * **The boundary first, and it is checked against the value the widening would really have.**
+     * `{ atS, bankId }` is precisely what *"drop the `carId` requirement"* accepts — a second and a
+     * bank, changing nothing — and it is the shape a reader widened to pass the block above would
+     * let through. Two shapes in one object is the other side: not an arm of the union at all.
+     */
+    const twoShapes = { ...effectOf(DESCRIBED_SHAPES[0]?.[1] ?? {}), ...effectOf(DESCRIBED_SHAPES[1]?.[1] ?? {}) };
+    for (const kind of EFFECT_CARRYING_KINDS) {
+      for (const effects of [[{ atS: 200, bankId: 'main' }], [twoShapes], [null], ['out-of-service'], [42]]) {
+        expect(
+          recordUnreadableReason(recordCarrying(kind, effects), RESOURCES),
+          `a ${kind} carrying ${JSON.stringify(effects)} must be refused`,
+        ).not.toBeNull();
+      }
+      // An effect list that is not a list at all.
+      expect(
+        recordUnreadableReason(recordCarrying(kind, 'out-of-service' as never), RESOURCES),
+      ).not.toBeNull();
+
+      /*
+       * Then every field of every shape, absent and then wrong — derived rather than written out,
+       * so a shape that gains a field is exercised the day it is described. The `carId` rows are
+       * the other naive fix: *require `carId` only when there is no `servesFloors`* accepts a mode
+       * change with no car, and this refuses it.
+       */
+      for (const [name, fields] of DESCRIBED_SHAPES) {
+        for (const [at, rule] of Object.entries(fields)) {
+          const dropped: Record<string, unknown> = effectOf(fields);
+          delete dropped[at];
+          expect(
+            recordUnreadableReason(recordCarrying(kind, [dropped]), RESOURCES),
+            `a ${kind} carrying a ${name} effect without ${at} must be refused`,
+          ).not.toBeNull();
+          expect(
+            recordUnreadableReason(
+              recordCarrying(kind, [{ ...effectOf(fields), [at]: SAMPLE[rule.must].bad }]),
+              RESOURCES,
+            ),
+            `a ${kind} carrying a ${name} effect with a bad ${at} must be refused`,
+          ).not.toBeNull();
+        }
+      }
+    }
+  });
+
+  it('names the build rather than the file when the miss is a vocabulary one', () => {
+    // The distinction #476 is about, one level up: a mode this build does not declare is a fact
+    // about the build; a bank id that is not a string is a fact about the bytes.
+    const alien = { ...effectOf(STORED_EFFECT_SHAPES.mode.fields), mode: 'toast' };
+    expect(recordUnreadableReason(recordCarrying('answer-incident', [alien]), RESOURCES))
+      .toContain('does not ship the service mode');
+    const damaged = { ...effectOf(STORED_EFFECT_SHAPES.mode.fields), bankId: 42 };
+    expect(recordUnreadableReason(recordCarrying('answer-incident', [damaged]), RESOURCES))
+      .toContain('would be a guess');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The drift guard — the reader set is derived from disk, never from a list
+ * -------------------------------------------------------------------------- */
+
+/** The monorepo's `packages/` directory — `deadCode.test-helper.ts`'s own derivation, three up. */
+const PACKAGES_DIR = fileURLToPath(new URL('../../../', import.meta.url));
+
+/**
+ * Dependencies and build output. Dot-directories are skipped by the walk itself, which also keeps a
+ * `.claude/worktrees/` checkout parked inside the tree from being scanned twice — a guard that
+ * passes CI and reddens on any machine with a worktree in it is a guard that has to be found twice.
+ */
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'dist-web', 'coverage']);
+
+/** Every shipped `.ts` under `packages/`, derived. Tests and helpers are not readers of a record. */
+function shippedSources(dir: string): readonly string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith('.')) continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (!SKIP_DIRS.has(entry.name)) out.push(...shippedSources(full));
+    } else if (
+      entry.name.endsWith('.ts') &&
+      !entry.name.includes('.test.') &&
+      !entry.name.includes('.test-helper.')
+    ) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+/**
+ * The fields that tell one described shape from another — **derived from the description**.
+ *
+ * A field every shape carries (`atS`, `bankId`) is not evidence of anything: an intervention entry
+ * has an `atS` too. A field only some shapes carry is what a reader touches when it is deciding
+ * *which* shape it has, which is the decision this module exists to hold in one place.
+ */
+const TELLING_FIELDS = [
+  ...new Set(DESCRIBED_SHAPES.flatMap(([, fields]) => Object.keys(fields))),
+].filter((field) => !DESCRIBED_SHAPES.every(([, fields]) => field in fields));
+
+/**
+ * The fields **every** described shape carries — the complement of {@link TELLING_FIELDS}, derived
+ * the same way. `atS` and `bankId` today; a fourth shape that dropped one would take it out of here
+ * and out of idiom 4 below, which is why it is computed rather than written.
+ */
+const SHARED_FIELDS = [
+  ...new Set(DESCRIBED_SHAPES.flatMap(([, fields]) => Object.keys(fields))),
+].filter((field) => DESCRIBED_SHAPES.every(([, fields]) => field in fields));
+
+/**
+ * A file spelling its own idea of what a stored effect may be, in four idioms — the three the
+ * divergent readers were actually written in, and one that closes the hole those three left. The
+ * field names come from the table rather than from here.
+ *
+ * 1. a runtime test of a telling field — `typeof x.carId`, `Array.isArray(x.servesFloors)`;
+ * 2. a discrimination on one — `'mode' in x`, which is what `config/serviceEvent.ts`'s three guards
+ *    do and what a reader that branched for itself would copy;
+ * 3. an untrusted read of `serviceEvents` by bracket index, which is how the *tolerant* reader was
+ *    spelled — it named no field at all and asked for an `atS`, so 1 and 2 would never have seen
+ *    it. The trailing class excludes `Draft['serviceEvents'][number]`, a type and not a read.
+ * 4. a hand-rolled runtime test of a **shared** field — `typeof x.atS`, `typeof x['bankId']`.
+ *
+ * **Idiom 4 is here because the hole this docstring used to declare turned out to be affordable.**
+ * It said a reader validating an effect on `atS` and `bankId` alone, reaching `serviceEvents` by a
+ * dotted property rather than a bracket, matched none of the three — and that a marker on the
+ * shared fields *"would flag most of this file"*. The first half was true and was reproduced with a
+ * probe; the second was not measured. Measured: of every shipped file that mentions `serviceEvents`
+ * at all, **exactly one** hand-rolls such a test — this module's own `record.ts`, on the
+ * *intervention entry's* `atS` rather than an effect's — and it is already exempt for consulting
+ * the description. So the marker costs no register entry and closes the case, and
+ * `noPropertyAccessFromIndexSignature` being **off** in `tsconfig.base.json` is what made the hole
+ * reachable rather than theoretical: a dotted read of an index-signature bag compiles here.
+ *
+ * **What it still cannot see**, stated rather than left to be discovered: a reader that keeps its
+ * `storedEffectIssue` call and hand-rolls a second check beside it. The exemption is file-granular,
+ * as `deadCode.test.ts`'s registers are, and no regex over a file can be otherwise.
+ */
+function spellsItsOwnCheck(): RegExp {
+  const alt = TELLING_FIELDS.join('|');
+  const shared = SHARED_FIELDS.join('|');
+  const reach = `(?:\\.(?:${alt})|\\[['"](?:${alt})['"]\\])`;
+  const sharedReach = `(?:\\.(?:${shared})|\\[['"](?:${shared})['"]\\])`;
+  return new RegExp(
+    `typeof\\s+[A-Za-z_$][\\w$]*${reach}` +
+      `|Array\\.isArray\\(\\s*[A-Za-z_$][\\w$]*${reach}` +
+      `|['"](?:${alt})['"]\\s+in\\s+` +
+      `|[A-Za-z_$][\\w$]*\\[['"]serviceEvents['"]\\]\\s*[^[]` +
+      `|(?:typeof\\s+|Array\\.isArray\\(\\s*)[A-Za-z_$][\\w$]*${sharedReach}`,
+    'u',
+  );
+}
+
+/**
+ * Files the pattern flags whose match is about something other than a stored effect, with the
+ * reason — `deadCode.test.ts#PUBLIC_API_ONLY`'s shape, and asserted in **both** directions below so
+ * an entry cannot outlive its reason and become the place a real reader goes to be forgotten.
+ */
+const NOT_A_STORED_EFFECT: Readonly<Record<string, string>> = Object.freeze({
+  'experiments/src/validation/serviceMode.ts':
+    'its `in` test guards a `CarSnapshot` off a run result on the way to rewriting a recorded ' +
+    'car’s mode. Two of the fields it names are two of the description’s, which is a collision ' +
+    'rather than a reader: nothing in that file reads a stored intervention.',
+});
+
+describe('nothing else spells its own idea of what a stored effect may be', () => {
+  const sources = shippedSources(PACKAGES_DIR);
+  const pattern = spellsItsOwnCheck();
+  const read = (path: string): string => readFileSync(path, 'utf8');
+
+  it('scans the tree it is supposed to be scanning, with a pattern that still matches', () => {
+    /*
+     * The two ways this guard reaches a **correct-looking zero while the readers diverge**, asserted
+     * directly rather than through the defect — `documentation.test.ts`'s own repair of the same
+     * mistake. A `SKIP_DIRS` entry that swallowed `packages/` takes the walk to nothing and passes;
+     * a pattern edited to something narrower matches nothing and passes.
+     */
+    expect(sources.length, 'the walk found no sources, so this guard is scanning nothing')
+      .toBeGreaterThan(400);
+    expect(
+      sources.filter((path) => /serviceEvents/u.test(read(path))).length,
+      'no file mentions serviceEvents, so the conjunction below can never fire',
+    ).toBeGreaterThan(15);
+    /*
+     * Control strings, verbatim from the tree: the first two are the two divergent readers as
+     * `watch/record.ts` spelled them before #476 landed, the third is `config/serviceEvent.ts`'s
+     * own guard — the discrimination a new reader would copy. Checked against strings rather than
+     * against the tree, because the tree is *supposed* to stop matching once the fix is in, and a
+     * pattern that has stopped matching anything is indistinguishable from a tree that is clean.
+     */
+    for (const control of [
+      "        typeof effect.carId !== 'string' ||",
+      "    const effects = change['serviceEvents'];",
+      "  return 'mode' in event;",
+      // Idiom 4, and it is the probe that found the hole rather than an invented string: a reader
+      // that reaches `serviceEvents` dotted and validates on the shared fields alone escaped the
+      // other three, which was reproduced before this clause was written.
+      '    return effects.every((e) => typeof e.atS === \'number\');',
+    ]) {
+      expect(pattern.test(control), `the pattern no longer matches a real spelling: ${control}`)
+        .toBe(true);
+    }
+    /*
+     * The two field sets are complements and both are load bearing — the telling fields drive
+     * idioms 1 and 2, the shared ones idiom 4 — so a table change that emptied either would take a
+     * whole idiom out of the pattern silently. Asserted as a partition rather than by name.
+     */
+    expect(TELLING_FIELDS).not.toContain('atS');
+    expect(TELLING_FIELDS).not.toContain('bankId');
+    expect([...SHARED_FIELDS].sort()).toEqual(['atS', 'bankId']);
+    expect(TELLING_FIELDS.filter((field) => SHARED_FIELDS.includes(field))).toEqual([]);
+    expect(TELLING_FIELDS.length).toBeGreaterThan(0);
+  });
+
+  it('flags no shipped file that does not consult the one description', () => {
+    const flagged = sources
+      .filter((path) => {
+        const src = read(path);
+        return /serviceEvents/u.test(src) && pattern.test(src);
+      })
+      .map((path) => relative(PACKAGES_DIR, path).split(sep).join('/'));
+
+    const rogue = flagged.filter(
+      (path) => !(path in NOT_A_STORED_EFFECT) && !/storedEffectIssue/u.test(read(join(PACKAGES_DIR, path))),
+    );
+    expect(
+      rogue,
+      'these files decide for themselves what a stored service event may look like. That is the ' +
+        'divergence GitHub issue #476 was filed about — two readers with different ideas of the ' +
+        'same shape, and nothing that could say so. Call core’s storedEffectIssue instead, or ' +
+        'record the file in NOT_A_STORED_EFFECT with the reason its match is about something else.',
+    ).toEqual([]);
+
+    // The register cannot rot: an entry whose file has stopped matching must be deleted.
+    for (const [path, reason] of Object.entries(NOT_A_STORED_EFFECT)) {
+      expect(flagged, `${path} no longer matches, so its entry is stale — delete it. (${reason})`)
+        .toContain(path);
+    }
+  });
+
+  it('derives the readers from disk, and finds the one the issue was filed against', () => {
+    const readers = sources
+      .filter((path) => /storedEffectIssue/u.test(read(path)))
+      .map((path) => relative(PACKAGES_DIR, path).split(sep).join('/'))
+      .sort();
+    // Both ends: the description itself, and the record reader #476 names. A reader that stopped
+    // importing it would fall out of this list and the check above would catch it going rogue.
+    expect(readers).toContain('core/src/sim/storedEffect.ts');
+    expect(readers).toContain('viz/src/watch/record.ts');
+  });
 });

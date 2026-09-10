@@ -106,6 +106,23 @@ export type {
   WireInterventionChange,
 } from './interventionWire.js';
 
+/**
+ * The one description of what a stored service-event effect may be — GitHub issue #476. See
+ * `sim/storedEffect.ts` for why it is in `core` and why every reader of an untrusted record
+ * consults it rather than spelling its own.
+ */
+export { EFFECT_CARRYING_KINDS, STORED_EFFECT_SHAPES, storedEffectIssue } from './storedEffect.js';
+
+export type {
+  CarriesEffectsByTable,
+  EffectCarryingKind,
+  EffectDiscriminant,
+  ShapeFor,
+  StoredEffectField,
+  StoredEffectFieldKind,
+  StoredEffectIssue,
+} from './storedEffect.js';
+
 export {
   INTERVENTION_KINDS,
   isInterventionKind,
