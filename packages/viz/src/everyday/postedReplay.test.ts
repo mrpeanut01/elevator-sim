@@ -41,7 +41,7 @@ import { claimedMetricsOf, type BoardEntry } from '../menu/client.js';
 import { recordRun } from '../record/recordRun.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
-import { checkedRun } from '../watch/library.js';
+import { checkedRunForTest as checkedRun } from '../watch/gate.test-helper.js';
 import { postedRunOf } from '../watch/posted.js';
 
 /** Garden Apartments at 900 s — `scope/probes.test-helper.ts`'s own reason: small, and quick. */
