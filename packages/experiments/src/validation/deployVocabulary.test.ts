@@ -70,7 +70,7 @@
  * here and in `docs/16-static-site-deployment.md` § 11.
  */
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -153,7 +153,34 @@ const CORRECTION = /\b(?:is|was)\s+not\s+(?:an?|the)\s+roll ?back\b/giu;
  * The carrier set, derived from disk
  * -------------------------------------------------------------------------- */
 
-const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', 'coverage', '.foreman', '.claude']);
+/**
+ * Directories the walk does not enter.
+ *
+ * **`.worktrees` and `worktrees` are here because this guard went red on a green tree**, and the
+ * way it went red is the part worth keeping. A `git worktree` checked out *inside* the repository
+ * holds a whole second copy of it, at whatever commit that branch is on — including copies of
+ * `deploy-viz.yml` and `docs/16` from before § 11 corrected them. The walk found them and reported
+ * thirty stale carriers.
+ *
+ * Nothing was wrong with the tree. What was wrong was the derivation's idea of *the repository*.
+ *
+ * It is the more dangerous shape of guard failure, because **CI could never have caught it**: a
+ * fresh checkout has no nested worktrees, so this passed every check and failed only on a machine
+ * where somebody had been working. A guard that goes red for reasons unrelated to the change in
+ * front of you is one the next person deletes, and they would not be wrong to.
+ *
+ * Both spellings, and `.claude/worktrees` is already covered by `.claude`.
+ */
+const SKIP_DIRS = new Set([
+  'node_modules',
+  'dist',
+  '.git',
+  'coverage',
+  '.foreman',
+  '.claude',
+  '.worktrees',
+  'worktrees',
+]);
 const SCANNED_SUFFIXES = ['.md', '.ts', '.yml', '.yaml', '.sh', '.mjs', '.bicep'];
 
 /** Every text file the repository owns, as repository-relative paths. */
@@ -163,8 +190,17 @@ function scannedFiles(): readonly string[] {
     for (const entry of readdirSync(at, { withFileTypes: true })) {
       if (SKIP_DIRS.has(entry.name)) continue;
       const here = rel === '' ? entry.name : `${rel}/${entry.name}`;
-      if (entry.isDirectory()) walk(join(at, entry.name), here);
-      else if (SCANNED_SUFFIXES.some((suffix) => entry.name.endsWith(suffix))) found.push(here);
+      /*
+       * A nested checkout announces itself with a `.git` entry — a directory for a clone, a *file*
+       * for a `git worktree`. Skipping on the name alone would miss a worktree parked under any
+       * other directory name, and this guard has already been surprised once by where they live.
+       */
+      if (entry.isDirectory()) {
+        if (existsSync(join(at, entry.name, '.git'))) continue;
+        walk(join(at, entry.name), here);
+      } else if (SCANNED_SUFFIXES.some((suffix) => entry.name.endsWith(suffix))) {
+        found.push(here);
+      }
     }
   };
   walk(ROOT, '');
