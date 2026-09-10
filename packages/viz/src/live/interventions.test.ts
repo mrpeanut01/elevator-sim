@@ -9,18 +9,30 @@
  * shape changes.
  */
 
-import { RULE_ACTION_WORDS, type DispatcherProfile } from '@elevator-sim/core/browser';
+import {
+  RULE_ACTION_WORDS,
+  type DispatcherProfile,
+  type RunInterventionConfig,
+} from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+import type { PricedChange } from '../pricing/types.js';
+
 import {
+  admitWorks,
   interventionLogOf,
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
   RECOMPUTING_BEAT,
   SPREAD_CARS_LABEL,
+  spentOnWorks,
   switchChangesNothing,
   SWITCH_PINS_NOTE,
   switchDispatcherLabelOf,
+  WORKS_ARM_EXPLAINS,
+  worksKindOfTier,
+  worksLabelOf,
 } from './interventions.js';
 
 // 09:14 under the shared 06:00 day start: 3 h 14 min into the run.
@@ -247,5 +259,241 @@ describe('switchChangesNothing', () => {
     expect(
       switchChangesNothing({ interventions: log, target: other, driving: () => PLAIN }),
     ).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The bought kinds — GitHub issue #370
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The two kinds a player **buys** mid-run, priced from `data/price-schedule.json`.
+ *
+ * Driven against the **shipped** schedule rather than a fixture, on
+ * `pricing/tiersReachTheRun.test.ts`'s stated ground: a price this file invented would be the
+ * second price list #366 exists to end, and a refusal quoting an invented number is a refusal
+ * nobody can check against the ladder a player is actually paying on.
+ */
+describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', () => {
+  const schedule = shippedPriceSchedule();
+
+  /** The cheapest and dearest shipped changes on each of the two tiers, found rather than named. */
+  const onTier = (tier: string): readonly PricedChange[] =>
+    schedule.changes.filter((change) => change.tier === tier).sort((a, b) => a.priceUnits - b.priceUnits);
+
+  const cheapestEquipment = onTier('equipment')[0];
+  const dearestBuilding = onTier('building').at(-1);
+
+  it('stamps a purchase in the schedule’s own words, and never its id', () => {
+    expect(
+      interventionStampOf(
+        [
+          {
+            atS: AT_0914,
+            change: {
+              kind: 'equipment-change',
+              changeId: 'zone-the-tower',
+              name: 'Zone the tower',
+              serviceEvents: [],
+            },
+          },
+        ],
+        AT_0914,
+      ),
+    ).toBe('09:14 · fitted new equipment — Zone the tower');
+    expect(
+      interventionStampOf(
+        [
+          {
+            atS: AT_0914,
+            change: {
+              kind: 'building-change',
+              changeId: 'rezone-bank',
+              name: 'Re-zone a bank',
+              serviceEvents: [],
+            },
+          },
+        ],
+        AT_0914,
+      ),
+    ).toBe('09:14 · changed the building — Re-zone a bank');
+  });
+
+  it('never leaks the changeId into the stamp — gameplay § 16 rule 11', () => {
+    // The id is engine-flavoured on purpose here, exactly as `STEADY`'s is on the switch arm, so a
+    // leak would be visible rather than plausible.
+    const stamp = interventionStampOf(
+      [
+        {
+          atS: AT_0914,
+          change: {
+            kind: 'building-change',
+            changeId: 'shop.machines.3',
+            name: 'New machines',
+            serviceEvents: [],
+          },
+        },
+      ],
+      AT_0914,
+    );
+    expect(stamp).toBe('09:14 · changed the building — New machines');
+    expect(stamp).not.toContain('shop.machines.3');
+  });
+
+  it('records each shipped tier as the kind that tier is paid on, and refuses a tier no kind records', () => {
+    expect(worksKindOfTier('equipment')).toBe('equipment-change');
+    expect(worksKindOfTier('building')).toBe('building-change');
+    // The dispatcher tier is `switch-dispatcher`'s, and a third kind meaning the same press would
+    // be two records for one act.
+    expect(worksKindOfTier('dispatcher')).toBeUndefined();
+    expect(worksKindOfTier('a-tier-this-build-has-never-shipped')).toBeUndefined();
+    // Every shipped tier is accounted for one way or the other, so a fourth tier landing in
+    // `data/` is a decision somebody has to take rather than a silent `undefined`.
+    for (const tier of schedule.tiers) {
+      expect(['dispatcher', 'equipment', 'building']).toContain(tier.id);
+    }
+  });
+
+  it('labels a purchase with the schedule’s price and never with one of its own', () => {
+    expect(cheapestEquipment).toBeDefined();
+    const change = cheapestEquipment as PricedChange;
+    expect(worksLabelOf(change)).toBe(`${change.name} · ${String(change.priceUnits)} units`);
+  });
+
+  it('admits a change the rung covers, and refuses one it does not — naming the price and the budget', () => {
+    const dear = dearestBuilding as PricedChange;
+    expect(dear.priceUnits).toBeGreaterThan(0);
+
+    const afforded = admitWorks({
+      schedule,
+      budgetUnits: dear.priceUnits,
+      interventions: [],
+      changeId: dear.id,
+      kind: 'building-change',
+    });
+    expect(afforded.admitted).toBe(true);
+    expect(afforded.reason).toBeUndefined();
+    expect(afforded.priceUnits).toBe(dear.priceUnits);
+
+    // One unit short — the boundary, not a round number, so the comparison is `<=` and not `<`.
+    const refused = admitWorks({
+      schedule,
+      budgetUnits: dear.priceUnits - 1,
+      interventions: [],
+      changeId: dear.id,
+      kind: 'building-change',
+    });
+    expect(refused.admitted).toBe(false);
+    // The refusal names the price, the budget and what is already committed — a sentence saying
+    // only *you cannot afford this* leaves a player unable to tell a dear change from a spent purse.
+    expect(refused.reason).toContain(String(dear.priceUnits));
+    expect(refused.reason).toContain(String(dear.priceUnits - 1));
+    expect(refused.reason).toContain(dear.name);
+    expect(refused.reason).toContain('already spent');
+  });
+
+  it('prices a second purchase against what the day has already spent', () => {
+    const first = onTier('building')[0] as PricedChange;
+    const second = onTier('building').find(
+      (change) => change.id !== first.id && change.priceUnits > 0,
+    ) as PricedChange;
+    const log: readonly RunInterventionConfig[] = [
+      {
+        atS: 300,
+        change: {
+          kind: 'building-change',
+          changeId: first.id,
+          name: first.name,
+          serviceEvents: [],
+        },
+      },
+    ];
+    expect(spentOnWorks(schedule, log)).toBe(first.priceUnits);
+
+    // A rung that covers the second change on its own and not beside the first.
+    const rung = Math.max(first.priceUnits, second.priceUnits);
+    const alone = admitWorks({ schedule, budgetUnits: rung, interventions: [], changeId: second.id, kind: 'building-change' });
+    expect(alone.admitted).toBe(true);
+    const afterTheFirst = admitWorks({ schedule, budgetUnits: rung, interventions: log, changeId: second.id, kind: 'building-change' });
+    expect(afterTheFirst.admitted).toBe(false);
+    expect(afterTheFirst.spentUnits).toBe(first.priceUnits);
+  });
+
+  it('charges nothing to repeat a change today’s record already holds', () => {
+    // `changesBought`'s distinct-by-id rule read down the time axis: a bank re-zoned at 09:00 and
+    // re-zoned again at 11:00 was bought once and used twice. Stated because the opposite reading
+    // is equally arguable and only one of them can be the shipped one.
+    const change = onTier('building').at(-1) as PricedChange;
+    const log: readonly RunInterventionConfig[] = [
+      { atS: 300, change: { kind: 'building-change', changeId: change.id, name: change.name, serviceEvents: [] } },
+    ];
+    expect(spentOnWorks(schedule, log)).toBe(change.priceUnits);
+    const again = admitWorks({
+      schedule,
+      budgetUnits: change.priceUnits,
+      interventions: log,
+      changeId: change.id,
+      kind: 'building-change',
+    });
+    expect(again.admitted).toBe(true);
+  });
+
+  it('refuses a change priced on a rung this control does not buy on', () => {
+    const building = onTier('building')[0] as PricedChange;
+    const wrongRung = admitWorks({
+      schedule,
+      budgetUnits: 1_000,
+      interventions: [],
+      changeId: building.id,
+      kind: 'equipment-change',
+    });
+    expect(wrongRung.admitted).toBe(false);
+    expect(wrongRung.reason).toContain('building rung');
+    expect(wrongRung.reason).toContain('equipment rung');
+  });
+
+  it('refuses an id the schedule prices nothing for, rather than letting it through free', () => {
+    // Silently free is the worst of the three answers: a stored record naming an unknown change
+    // would buy the tower for nothing. `pricing/parse.ts#priceOf` throws for the same reason; this
+    // hands back the sentence because its caller is a screen.
+    const unknown = admitWorks({
+      schedule,
+      budgetUnits: 1_000,
+      interventions: [],
+      changeId: 'a-change-this-build-has-never-priced',
+      kind: 'building-change',
+    });
+    expect(unknown.admitted).toBe(false);
+    expect(unknown.reason).toContain('a-change-this-build-has-never-priced');
+    expect(unknown.priceUnits).toBe(0);
+  });
+
+  it('counts nothing for a log that holds no purchases', () => {
+    expect(spentOnWorks(schedule, [{ atS: 60, change: PARK }, { atS: 90, change: ANSWER }])).toBe(0);
+  });
+
+  it('states what the arm does, including the promise a run has to keep', () => {
+    // The second half of this sentence is a claim about the mechanism, pinned by
+    // `core/src/sim/interventions.test.ts`'s *holds the crowd across the press* rather than by
+    // another sentence (§ D227).
+    expect(WORKS_ARM_EXPLAINS).toContain('re-simulates the day from the start');
+    expect(WORKS_ARM_EXPLAINS).toContain('the same people arrive at the same seconds');
+  });
+
+  it('prints a purchase on the filed sheet in the stamp’s own words', () => {
+    expect(
+      interventionLogOf([
+        { atS: 60, change: PARK },
+        {
+          atS: 120,
+          change: {
+            kind: 'building-change',
+            changeId: 'rezone-bank',
+            name: 'Re-zone a bank',
+            serviceEvents: [],
+          },
+        },
+      ]),
+    ).toEqual(['06:01 · parked the cars in the lobby', '06:02 · changed the building — Re-zone a bank']);
   });
 });

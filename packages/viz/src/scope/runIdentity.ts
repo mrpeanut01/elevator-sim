@@ -137,7 +137,12 @@
  * no screen would have offered outranks every honest run on it.
  */
 
-import { RULE_ACTION_WORDS, RULE_CONDITION_WORDS } from '@elevator-sim/core/browser';
+import {
+  CARRIED_INTERVENTION_KINDS as CARRIED_KINDS,
+  RULE_ACTION_WORDS,
+  RULE_CONDITION_WORDS,
+  interventionKindRefusal,
+} from '@elevator-sim/core/browser';
 
 import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
 // The two are aliased at every site that needs both — `authoring/selectorSpec.ts`'s naming hazard.
@@ -248,29 +253,34 @@ type CarryCheck = (state: ViewerState, resources: BrowserResources) => string | 
  * whether the two agree.
  */
 /**
- * The intervention kinds the wire carries — `packages/server`'s `SUBMITTABLE_INTERVENTION_KINDS`,
- * restated here because `viz` may not import the server, and asserted equal to it by
- * `runIdentity.test.ts` so the two cannot drift. Both parking kinds carry nothing but their instant.
+ * The intervention kinds the wire carries — **`core`'s table, not a restatement of it**.
+ *
+ * This constant used to be a hand-written tuple beside a test that read
+ * `packages/server`'s `SUBMITTABLE_INTERVENTION_KINDS` out of its own source text and compared the
+ * two. That test is still here and still worth having, but the pair it guarded was **two of six**
+ * places the same set was written down: four TypeScript unions spelled the same three arms and had
+ * no drift test at all. GitHub issue **#370** widened the vocabulary and **#371** asked for one
+ * derivation, so the answer moved to `core/src/sim/interventionWire.ts` — the package both ends
+ * already depend on, and the only one they can share under § D215 § 3 — and this is now a
+ * re-export.
+ *
+ * It stays exported under this name because `docs/16` cites it by name and `runIdentity.test.ts`
+ * asserts against it; the alias costs nothing and re-pointing every citation would be the churn the
+ * derivation exists to avoid.
  */
-export const CARRIED_INTERVENTION_KINDS: readonly string[] = Object.freeze([
-  'park-cars-lobby',
-  'spread-cars',
-  'switch-dispatcher',
-]);
+export const CARRIED_INTERVENTION_KINDS: readonly string[] = CARRIED_KINDS;
 
-/**
- * `answer-incident`'s refusal, and it is **permanent** — GitHub issue #338,
- * [§ D486](../../../../DECISIONS.md). Not a missing field: `shift/incidents.ts` writes the incident
- * onto the *building* as `serviceEvents` from the week's day and the calendar, and a replay built
- * from ids would hold the answer and not the thing answered — the option's own service events would
- * be the only mode changes in the run, the legs would differ, and the server would verify **that**
- * run as honest. A refusal that prevents a verified-but-wrong replay is a feature, and it stops
- * being tracked as a gap. The route out is named and not recommended: the incident would have to be
- * derivable server-side from causes that travel, or carried as submitted data, which is § D481's
- * cheat lever exactly — a player who picks their own incident picks their own difficulty.
+/*
+ * `ANSWER_INCIDENT_STAYS_REFUSED` stood here — GitHub issue #338, § D486 — and is **deleted**
+ * rather than registered as unused (GitHub issue #370). It held the incident answer’s permanent
+ * refusal, and the arm below used it for *every* refused kind, which was correct while there was
+ * one and became a false accusation the moment there were three. The sentence is now a row on
+ * `core/src/sim/interventionWire.ts#INTERVENTION_WIRE`, beside the two the bought kinds carry, and
+ * this module reads whichever one applies. Deleted on the commit that made it callerless, on
+ * `pricing/repairPrice.ts`’s own precedent for a helper nothing calls: `deadCode.test.ts` found it
+ * within the minute, and registering it would have been a list entry standing in for a decision.
+ * `docs/16` § 3 cites the table now.
  */
-export const ANSWER_INCIDENT_STAYS_REFUSED =
-  'an incident answer names service events for an incident no selection or submission carries, so a replay would hold the answer and not the thing answered — and that stays so by design, because a replay that verified the answer alone would verify a different day as this one';
 
 export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze({
   week: (state) => weekCarries(state),
@@ -337,7 +347,18 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
     const refusedKinds = kinds
       .filter((kind) => !CARRIED_INTERVENTION_KINDS.includes(kind))
       .sort((left, right) => left.localeCompare(right));
-    const clauses: string[] = refusedKinds.map(() => ANSWER_INCIDENT_STAYS_REFUSED);
+    /*
+     * **Each refused kind's own ground, from `core`'s table** — GitHub issue #370. This line read
+     * `refusedKinds.map(() => ANSWER_INCIDENT_STAYS_REFUSED)`, which was right while one kind was
+     * refused and became a false accusation the moment two more were: a player who bought a rezone
+     * would have been told their record held an incident answer. The `??` arm cannot fire for a
+     * kind the filter above let through — a refused kind has a refusal by construction — and it is
+     * there because a `string | undefined` reaching `listOf` would print the word `undefined` at a
+     * player, which is the failure this module exists to avoid arriving through its own fix.
+     */
+    const clauses: string[] = refusedKinds.map(
+      (kind) => interventionKindRefusal(kind as Parameters<typeof interventionKindRefusal>[0]) ?? '',
+    );
     const shipped = resources.dispatcherProfiles.profiles;
     const unpostable = new Set<string>();
     for (const entry of state.interventions) {

@@ -933,11 +933,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'scope/runIdentity.ts#EXPRESSIBLE_IN_A_SELECTION',
         'scope/runIdentity.ts#fieldsAnsweredFor',
         /*
-         * GitHub issue #338's tuple of the intervention kinds the wire carries — `park-cars-lobby`,
-         * `spread-cars`, `switch-dispatcher` — derived because a hyphen reads as a word break, and
-         * asserted against `submission.ts`'s own source by `runIdentity.test.ts` rather than swept.
+         * `scope/runIdentity.ts#CARRIED_INTERVENTION_KINDS` stood here — GitHub issue #338's tuple
+         * of the kinds the wire carries, derived only because a hyphenated id reads as two words.
+         * **The tuple is gone** (GitHub issues #370, #371): the set is `core`'s
+         * `sim/interventionWire.ts` now and this export is a one-line re-export of it, which
+         * authors no literal and so is found by nothing. The exclusion goes with the thing it
+         * excused rather than being left to pre-approve whatever takes the name next, which is what
+         * the ghost check below is for and how this deletion was found.
          */
-        'scope/runIdentity.ts#CARRIED_INTERVENTION_KINDS',
         /*
          * GitHub issue #353's works writer: returns the run's car ids, derived only because the
          * private `${bankId}-${carId}` composer reads as a phrase — `shift/events.ts#carRuntimeId`'s
@@ -997,11 +1000,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'scope/runIdentity.ts#runIdentityIssues',
         'scope/runIdentity.ts#CARRY_CHECKS',
         /*
-         * GitHub issue #338's permanent refusal for the incident answer, one more of the same
-         * sentences: returned by `runIdentityIssues` and by nothing else, so it reaches a reader by
-         * exactly the route above.
+         * `scope/runIdentity.ts#ANSWER_INCIDENT_STAYS_REFUSED` stood here — GitHub issue #338's
+         * permanent refusal for the incident answer. The constant is **deleted** (#370): its
+         * sentence is a row on `core/src/sim/interventionWire.ts#INTERVENTION_WIRE` now, beside the
+         * two the bought kinds carry, and `runIdentityIssues` reads whichever row applies instead of
+         * using this one for every refused kind. It still reaches a reader by exactly the route
+         * above, through `runIdentityIssues`, which is already listed.
          */
-        'scope/runIdentity.ts#ANSWER_INCIDENT_STAYS_REFUSED',
       ],
     },
     {
@@ -1198,6 +1203,31 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'scenario/budget.ts#admitPurchase',
         'scenario/budget.ts#budgetViolations',
         'scenario/budget.ts#decodeScenarioBudget',
+        /*
+         * `live/interventions.ts`'s **purchase** half — GitHub issue **#370**, and it is
+         * `admitPurchase`'s exclusion one substrate over, deliberately quoting it rather than
+         * inventing a second ground.
+         *
+         * The two bought kinds' **stamps** are swept and are not here: `interventionStampOf` and
+         * `interventionLogOf` are in `LIVE_RAIL.covers` and `SHIFT_REPORT.covers`, the seeded log
+         * carries all six kinds, and the two new past-tense verbs enter the corpus with the other
+         * four. What is excluded is the pricing beside the press — the label with the price on it,
+         * the arm's title, and the refusal naming the price and the budget — because **no screen
+         * draws them yet**: `everyday/stageScreenModel.ts#stageInterventionsOf` builds the row when
+         * a caller supplies an offer, and no caller supplies one until the scenario budget reaches
+         * the stage (#365's ladder is validated at load and read by nothing at play time). Seeding
+         * a string the product does not render would be coverage manufactured rather than earned,
+         * which is precisely what the entry above refuses to do, and the rule is the same here: it
+         * enters an adapter on the commit that draws it, not before. `live/interventions.test.ts`
+         * drives every one of these directly against the shipped schedule in the meantime, so the
+         * refusal is pinned by a run rather than by this paragraph (§ D227).
+         */
+        'live/interventions.ts#WORKS_ARM_EXPLAINS',
+        'live/interventions.ts#WORKS_KIND_BY_TIER',
+        'live/interventions.ts#admitWorks',
+        'live/interventions.ts#spentOnWorks',
+        'live/interventions.ts#worksKindOfTier',
+        'live/interventions.ts#worksLabelOf',
         'scenario/published.ts#classOfCounts',
         'scenario/published.ts#validatePublishedGoalRates',
         'editor/editorValidate.ts#validateBuildingText',
@@ -1270,11 +1300,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'fixit/run.ts#assertPairMatchesRepairs',
         'scope/switchWire.ts#wireInterventionsOf',
         /*
-         * GitHub issue #337's inverse of the wire form: returns a profile or `undefined` and authors
-         * no sentence; derived only because a hyphenated id reads as two words. The sentence a
-         * spectator reads about an unresolvable handover is `watch/posted.ts#postedLogOf`'s, driven.
+         * `scope/switchWire.ts#switchTargetFromWire` stood here — GitHub issue #337's inverse of the
+         * wire form, derived only because the local `SwitchOnTheWire` **interface** it named carried
+         * a hyphenated id that read as two words. That interface is now a one-line alias of `core`'s
+         * (GitHub issues #370, #371), so the words it was derived through are in another package and
+         * the derivation no longer finds this function at all. Deleted rather than left standing,
+         * for the reason the ghost check gives: an exclusion that outlives its subject silently
+         * pre-approves whatever takes the name next.
          */
-        'scope/switchWire.ts#switchTargetFromWire',
       ],
     },
     {

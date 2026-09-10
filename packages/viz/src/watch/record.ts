@@ -364,6 +364,39 @@ function interventionUnreadableReason(
       }
     }
   }
+  /*
+   * **The two bought kinds** — GitHub issue #370. Checked to the fields the record must carry for a
+   * re-simulation to be the day it says it is: the priced change's id, so the day's spend can be
+   * re-derived, the words that were shown, and a list of effects. The effects themselves are
+   * deliberately checked only for shape, not for a car: unlike an incident answer's, a bought
+   * change's effect is routinely a **bank range** event, which names no car — and the arm above
+   * demands one, which is a pre-existing narrowness in that arm rather than something to copy into
+   * this one. `Simulation` refuses a malformed effect loudly at scheduling time either way; what
+   * this gate owes is the graceful half, and refusing a record for lacking a field its own kind
+   * never had would be refusing an honest one.
+   */
+  if (change['kind'] === 'equipment-change' || change['kind'] === 'building-change') {
+    const noun = change['kind'] === 'equipment-change' ? 'equipment' : 'the building';
+    if (typeof change['changeId'] !== 'string' || change['changeId'].length === 0) {
+      return guess(`changes ${noun} with no priced change to bill it to`);
+    }
+    if (typeof change['name'] !== 'string' || change['name'].length === 0) {
+      return guess(`changes ${noun} with no words for what was bought`);
+    }
+    if (!Array.isArray(change['serviceEvents'])) {
+      return guess(`changes ${noun} with no effect list`);
+    }
+    for (const effect of change['serviceEvents'] as readonly { readonly atS?: unknown }[]) {
+      if (
+        effect === null ||
+        typeof effect !== 'object' ||
+        typeof effect.atS !== 'number' ||
+        !Number.isFinite(effect.atS)
+      ) {
+        return guess(`changes ${noun} with an effect that names no second`);
+      }
+    }
+  }
   return null;
 }
 

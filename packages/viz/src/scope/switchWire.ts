@@ -26,13 +26,23 @@
  * done here first so the player is told before they post rather than accused after.
  */
 
-import type { DispatcherProfile, RuleRowConfig, RunInterventionConfig } from '@elevator-sim/core/browser';
+import type {
+  DispatcherProfile,
+  RuleRowConfig,
+  RunInterventionConfig,
+  SwitchOnTheWire as CoreSwitchOnTheWire,
+  WireIntervention as CoreWireIntervention,
+} from '@elevator-sim/core/browser';
 
-/** The switch arm as the wire carries it — `submission.ts`'s `SubmittedSwitch`, restated. */
-export interface SwitchOnTheWire {
-  readonly toProfileId: string;
-  readonly ruleRows?: readonly RuleRowConfig[] | undefined;
-}
+/**
+ * The switch arm as the wire carries it.
+ *
+ * **`core`'s shape, re-exported rather than restated** — GitHub issues #370 and #371. This was one
+ * of six independent spellings of the same wire vocabulary, and it and `submission.ts`'s
+ * `SubmittedSwitch` were the pair that had no drift test between them at all. The one derivation is
+ * `core/src/sim/interventionWire.ts`; the name stays here because this module's callers use it.
+ */
+export type SwitchOnTheWire = CoreSwitchOnTheWire;
 
 /** The fields a profile carries for people rather than for the kernel. Not compared. */
 const IDENTITY_FIELDS: readonly string[] = ['id', 'name', 'description', '$comment'];
@@ -127,14 +137,17 @@ export function switchTargetFromWire(
   return withRows(base, wire.ruleRows ?? []);
 }
 
-/** One entry of the log as the wire carries it — `menu/client.ts#SubmittedIntervention`'s shape. */
-export type WireIntervention =
-  | { readonly atS: number; readonly change: { readonly kind: 'park-cars-lobby' } }
-  | { readonly atS: number; readonly change: { readonly kind: 'spread-cars' } }
-  | {
-      readonly atS: number;
-      readonly change: { readonly kind: 'switch-dispatcher' } & SwitchOnTheWire;
-    };
+/**
+ * One entry of the log as the wire carries it — **`core`'s union, re-exported**.
+ *
+ * It used to be spelled out here, in `menu/client.ts`, in `watch/posted.ts` and in
+ * `packages/server`'s `submission.ts`: four hand-written unions of the same three arms, guarded by
+ * nothing. `core/src/sim/interventionWire.ts` now declares it once and holds it to the carried set
+ * with a compile-time assertion in both directions, so widening the vocabulary is one edit and a
+ * kind that reaches the allow-list without an arm is a type error rather than the `throw` at the
+ * foot of {@link wireInterventionsOf} on a run the gate has just declared postable.
+ */
+export type WireIntervention = CoreWireIntervention;
 
 /**
  * The whole log, translated for the wire. Throws on an entry the wire cannot carry, because

@@ -1361,14 +1361,14 @@ export class Simulation {
    * answer entry itself puts nothing on the intervention queue — its `atS` is the record's
    * `runIncidentClock`, a fact for the report, not an action for the kernel.
    *
-   * The effects were validated by {@link #answeredIncidentEvents} before they got here, so the
+   * The effects were validated by {@link #carriedEffectEvents} before they got here, so the
    * deadline branch below can only fire on the building's own entries and its message may keep
    * naming `serviceEvents[…]`.
    */
   #scheduleServiceEvents(): void {
     this.#serviceSchedule = Object.freeze([
       ...(this.#resolved.serviceEvents ?? []),
-      ...this.#answeredIncidentEvents(),
+      ...this.#carriedEffectEvents(),
     ]);
     const events = this.#serviceSchedule;
     for (const [index, event] of events.entries()) {
@@ -1389,8 +1389,16 @@ export class Simulation {
   }
 
   /**
-   * The service events the run's `answer-incident` interventions carry, validated — the second
-   * half of {@link #scheduleServiceEvents}' schedule.
+   * The service events the run's interventions carry, validated — the second half of
+   * {@link #scheduleServiceEvents}' schedule.
+   *
+   * **Three kinds carry effects, not one** (GitHub issue #370). `answer-incident` was the first;
+   * `equipment-change` and `building-change` are the two the player *buys*, and they ride this same
+   * schedule for the reason {@link #scheduleServiceEvents} gives about the first: `#onServiceChange`
+   * is the sole authority on what a mid-run change does to the group, and a sibling handler would be
+   * a second copy of it. So the arithmetic below is the same for all three and only the **words**
+   * differ — {@link Simulation.#carriedEffectPhrase} — because a warning that called a bought
+   * rezone *an incident answer* would send a reader hunting an incident that never happened.
    *
    * Three refusals, each on its own ground:
    *
@@ -1409,22 +1417,51 @@ export class Simulation {
    * {@link #scheduleInterventions}' and is not repeated here — an entry it warned about is
    * skipped whole, silently, so the record produces one warning per defect rather than two.
    */
-  #answeredIncidentEvents(): readonly ResolvedServiceEvent[] {
+  /**
+   * What to call a carried effect's owner in a message a person reads.
+   *
+   * `static` and total over the three kinds that carry effects, so a fourth is a compile error here
+   * rather than a warning that names the wrong mechanism. The narrowing is `'serviceEvents' in
+   * change`, which is the structural test {@link #carriedEffectEvents} already makes, so this
+   * cannot be handed a kind that carries none.
+   */
+  static #carriedEffectPhrase(
+    kind: 'answer-incident' | 'equipment-change' | 'building-change',
+  ): string {
+    switch (kind) {
+      case 'answer-incident':
+        return 'incident answer';
+      case 'equipment-change':
+        return 'equipment change';
+      case 'building-change':
+        return 'building change';
+    }
+  }
+
+  #carriedEffectEvents(): readonly ResolvedServiceEvent[] {
     const events: ResolvedServiceEvent[] = [];
     for (const [index, entry] of this.#interventions.entries()) {
-      if (entry.change.kind !== 'answer-incident') continue;
+      const change = entry.change;
+      if (!('serviceEvents' in change)) continue;
       if (entry.atS > this.#deadlineS) continue;
-      for (const effect of entry.change.serviceEvents) {
+      const phrase = Simulation.#carriedEffectPhrase(change.kind);
+      const answering = change.kind === 'answer-incident';
+      const verb = answering ? 'answers an incident' : `buys ${phrase}`;
+      // `the answer itself` is kept verbatim on the incident arm: it is the sentence the record has
+      // published since that kind landed, and re-wording a warning nobody asked to move is how a
+      // reader who greps for it stops finding it.
+      const noun = answering ? 'the answer itself' : 'the press itself';
+      for (const effect of change.serviceEvents) {
         if (effect.atS < entry.atS) {
           this.#warnings.push(
-            `interventions[${index}] answers an incident at ${entry.atS} s with an effect that would ${describeServiceEvent(effect)} at ${effect.atS} s — before the answer itself. An answer cannot reschedule the past (contract § 1.4's prefix is bit-identical by construction), so this effect was not scheduled.`,
+            `interventions[${index}] ${verb} at ${entry.atS} s with an effect that would ${describeServiceEvent(effect)} at ${effect.atS} s — before ${noun}. An intervention cannot reschedule the past (contract § 1.4's prefix is bit-identical by construction), so this effect was not scheduled.`,
           );
           continue;
         }
         if (effect.atS > this.#deadlineS) {
           this.#deadlineTruncations += 1;
           this.#warnings.push(
-            `interventions[${index}]'s incident answer would ${describeServiceEvent(effect)} at ${effect.atS} s, which is past this run's drain deadline of ${this.#deadlineS} s (demand horizon ${this.#trace.durationS} s + sim.drainGraceS ${this.#options.drainGraceS} s). It was not scheduled and the building is unchanged by it.`,
+            `interventions[${index}]'s ${phrase} would ${describeServiceEvent(effect)} at ${effect.atS} s, which is past this run's drain deadline of ${this.#deadlineS} s (demand horizon ${this.#trace.durationS} s + sim.drainGraceS ${this.#options.drainGraceS} s). It was not scheduled and the building is unchanged by it.`,
           );
           continue;
         }
@@ -1435,12 +1472,12 @@ export class Simulation {
           // this method can check without the model: the bank exists and the set is non-empty.
           if (this.#building.bankById(effect.bankId) === undefined) {
             throw new SimulationError(
-              `interventions[${index}]'s incident answer moves the range of bank "${effect.bankId}", which this run did not build. Known banks: ${this.#building.banks.map((bank) => bank.id).join(', ')}.`,
+              `interventions[${index}]'s ${phrase} moves the range of bank "${effect.bankId}", which this run did not build. Known banks: ${this.#building.banks.map((bank) => bank.id).join(', ')}.`,
             );
           }
           if (effect.servesFloors.length === 0) {
             throw new SimulationError(
-              `interventions[${index}]'s incident answer would set bank "${effect.bankId}" to serve no floors, which is a car out of service wearing a different name; say that instead.`,
+              `interventions[${index}]'s ${phrase} would set bank "${effect.bankId}" to serve no floors, which is a car out of service wearing a different name; say that instead.`,
             );
           }
           events.push(effect);
@@ -1448,13 +1485,13 @@ export class Simulation {
         }
         if (!this.#carsById.has(`${effect.bankId}-${effect.carId}`)) {
           throw new SimulationError(
-            `interventions[${index}]'s incident answer names car "${effect.carId}" in bank "${effect.bankId}", which this run did not build. Known cars: ${[...this.#carsById.keys()].join(', ')}.`,
+            `interventions[${index}]'s ${phrase} names car "${effect.carId}" in bank "${effect.bankId}", which this run did not build. Known cars: ${[...this.#carsById.keys()].join(', ')}.`,
           );
         }
         if (!isServiceModeEvent(effect)) {
           if (!Number.isFinite(effect.ratedLoadKg) || effect.ratedLoadKg <= 0) {
             throw new SimulationError(
-              `interventions[${index}]'s incident answer would rate car "${effect.bankId}-${effect.carId}" at ${String(effect.ratedLoadKg)} kg, which is not a positive load.`,
+              `interventions[${index}]'s ${phrase} would rate car "${effect.bankId}-${effect.carId}" at ${String(effect.ratedLoadKg)} kg, which is not a positive load.`,
             );
           }
           events.push(effect);
@@ -1468,7 +1505,7 @@ export class Simulation {
         // effects have no config pass, so it happens here.
         if (!(SERVICE_MODES as readonly string[]).includes(effect.mode)) {
           throw new SimulationError(
-            `interventions[${index}]'s incident answer would set car "${effect.bankId}-${effect.carId}" to mode "${String(effect.mode)}", which this build does not declare. Known modes: ${SERVICE_MODES.join(', ')}.`,
+            `interventions[${index}]'s ${phrase} would set car "${effect.bankId}-${effect.carId}" to mode "${String(effect.mode)}", which this build does not declare. Known modes: ${SERVICE_MODES.join(', ')}.`,
           );
         }
         events.push(effect);
@@ -1842,9 +1879,12 @@ export class Simulation {
    *   model the record stamps stays the model the cars ran. A policy supplied through
    *   `config.createPolicy` that predates {@link DispatchPolicy.adoptWeights} is warned about by
    *   bank, because a switch such a bank cannot adopt is a control that moved nothing.
-   * - `answer-incident` schedules **nothing here**: its effects ride the service schedule
-   *   ({@link #scheduleServiceEvents} says why), and its `atS` is the record's `runIncidentClock`
-   *   — a fact for the report rather than an action for the kernel.
+   * - `answer-incident`, `equipment-change` and `building-change` schedule **nothing here**: their
+   *   effects ride the service schedule ({@link #scheduleServiceEvents} says why), and their `atS`
+   *   is a fact for the report rather than an action for the kernel — for the incident answer it is
+   *   the record's `runIncidentClock`, and for the two bought kinds it is the playhead the purchase
+   *   was stamped at (GitHub issue #370). The entry-level deadline warning above still applies to
+   *   all three, because an entry stamped past the deadline is a press that never happened.
    */
   #scheduleInterventions(): void {
     for (const [index, entry] of this.#interventions.entries()) {
@@ -1861,7 +1901,15 @@ export class Simulation {
         );
         continue;
       }
-      if (entry.change.kind === 'answer-incident') continue;
+      /*
+       * The three kinds that carry effects put **nothing** on the intervention queue: their
+       * effects ride the service schedule ({@link #scheduleServiceEvents} says why) and their
+       * `atS` is a fact for the report rather than an action for the kernel. Told apart
+       * structurally — by carrying a `serviceEvents` field — rather than by naming the kinds, so
+       * the day a fourth carries one it is skipped here for the right reason instead of being
+       * quietly walked into the parking arm below.
+       */
+      if ('serviceEvents' in entry.change) continue;
       if (entry.change.kind === 'switch-dispatcher') {
         const profile = entry.change.profile;
         this.#switchWeights.set(index, resolveWeights(profile.weights, profile.id).weights);
@@ -1938,6 +1986,18 @@ export class Simulation {
       }
       for (const policy of this.#policies.values()) policy.adoptWeights?.(weights);
       return;
+    }
+    /*
+     * Everything that reaches here is a parking kind, and it says so rather than falling through.
+     * The fall-through was safe while the only other kind scheduled nothing; it stopped being safe
+     * the moment two more effect-carrying kinds landed (#370), because a scheduling bug that let
+     * one through would have parked the fleet and called it a rezone. Loud, on
+     * {@link #scheduleInterventions}' own footing about a kind applied as a guess.
+     */
+    if (entry.change.kind !== 'park-cars-lobby' && entry.change.kind !== 'spread-cars') {
+      throw new SimulationError(
+        `Intervention ${index} of kind "${entry.change.kind}" reached the intervention queue, which only the parking kinds are scheduled onto; its effects ride the service schedule instead.`,
+      );
     }
     for (const car of this.#building.cars) {
       if (this.#isIdle(car)) this.#park(car, at);

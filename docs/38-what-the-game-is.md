@@ -190,12 +190,33 @@ people can be watched, the player presses a control while it plays, the press is
 playhead and written into the run record as an intervention with the moment it happened
 (`{ seed, config, interventions[] }`, `packages/viz/src/live/interventions.ts`), and the day is
 re-simulated with it. The crowd is the same crowd either side of the press, so nothing the player
-already watched changes. Four intervention kinds exist: park the cars in the lobby, spread them across the
-tower, switch dispatcher, and answer an incident — `core/src/sim/types.ts#INTERVENTION_KINDS`.
-(Stairs are a **transport mode**, `TRANSPORT_MODE_KINDS`, not an intervention; an earlier draft of
-this paragraph counted them as a fifth kind and GitHub issue #370 inherited the error.) Equipment and building
-changes mid-run are new kinds, priced from
-the schedule, on the same record. *Record what changes to what and when* is that record.
+already watched changes. **Six** intervention kinds exist: park the cars in the lobby, spread them
+across the tower, switch dispatcher, answer an incident, and — since GitHub issue #370 — an
+equipment change and a building change, priced from the schedule and on the same record
+(`core/src/sim/types.ts#INTERVENTION_KINDS`). (Stairs are a **transport mode**,
+`TRANSPORT_MODE_KINDS`, not an intervention; an earlier draft of this paragraph counted them as a
+fifth kind and GitHub issue #370 inherited the error.) *Record what changes to what and when* is
+that record.
+
+**The two bought kinds add no engine.** Their effect travels in `ResolvedServiceEvent` — a car's
+mode, a bank's serving range, a car's rated load — which is the one plain-data vocabulary the
+simulator already has for the building changing mid-run, and it rides the same service schedule an
+incident answer's effects ride. What the two kinds are *for* is the price: the record has to say
+which rung of the ladder a change was paid on, or the day's spend cannot be re-derived from it.
+Neither travels to a board, and for a stated reason — a purchase is made against a scenario budget
+and no submission carries a budget, so a replay would hold the change and not the entitlement to it
+(`core/src/sim/interventionWire.ts`).
+
+**What the vocabulary reaches and what it does not, measured rather than assumed.** A rezone at
+either tier and a change of rated load reach the run; door timings and rated speed do not, because
+`Car.doorConfig` and `Car.constraints` are frozen for the run by construction. Anything that would
+move `floorPopulations` is refused for a stronger reason: the crowd is drawn from the seed before
+the first event fires, and *the crowd is the same crowd either side of the press* is the property
+these kinds exist to protect. And a bought change costs the live path **no more** than a dispatcher
+switch — measured at 1.8 / 80.6 / 325.2 ms against a switch's 2.6 / 94.6 / 354.5 ms on the three
+shipped sizes, because the day is re-simulated whole either way and a narrowed bank then serves
+fewer legs. The top of the range is § D527's second measurement, 1.33–1.38 s at the Burj-class
+reference, which bounds every kind at once.
 
 **Speed.** The stage ships seven rungs from `1×`, which is real time, to `600×`, and four of them
 sit inside the range where a door cycle is still a cue ([§ D344](../DECISIONS.md)). **Settings now carries a
@@ -338,7 +359,12 @@ Named so the next lane does not discover it. None of it is built by this page.
   fallback that says so, and the server checking a posted modified run against a real spend.
 - The stage's opening speed moves to a watching rung, reopening [§ D354](../DECISIONS.md)'s
   default, and a *skip to the end* control is added.
-- Two new intervention kinds, equipment and building changes, on the run record.
+- ~~Two new intervention kinds, equipment and building changes, on the run record.~~ **Built**
+  (GitHub issue #370): the kinds, their effects on the one service schedule, their price from
+  `data/price-schedule.json` and the refusal that names the price and the budget. What is **not**
+  built is the rung a player spends against — `scenario/budget.ts` is validated at load and read by
+  nothing while a day plays — so no screen offers a purchase yet and the stage's own register says
+  so. That remainder belongs to the survivor-count bullet above it.
 - `docs/16`'s `ranked` row and `scope/runIdentity.ts` widen to carry recorded interventions and the
   run's modifiers, and the server's replay consumes them; boards are keyed by modifier set.
 - The rush ships ([§ D515](../DECISIONS.md)); it gains a per-wave purse authored in its own data, recorded

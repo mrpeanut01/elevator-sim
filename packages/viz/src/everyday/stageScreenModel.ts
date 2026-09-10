@@ -80,7 +80,11 @@
  * a state that keeps being checked rather than a rule that can be deleted.
  */
 
-import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/core/browser';
+import type {
+  DispatcherProfile,
+  ResolvedServiceEvent,
+  RunInterventionConfig,
+} from '@elevator-sim/core/browser';
 
 import type { VizFloor, VizRecording, VizShaft } from '../contract/types.js';
 import { WAIT_BANDS } from '../live/bands.js';
@@ -91,6 +95,10 @@ import {
   switchChangesNothing,
   switchDispatcherLabelOf,
   SWITCH_PINS_NOTE,
+  admitWorks,
+  worksKindOfTier,
+  worksLabelOf,
+  WORKS_ARM_EXPLAINS,
 } from '../live/interventions.js';
 import { clockAt, phaseAt, timelineOf } from '../live/timeline.js';
 import type { LiveObservations, WaitBandId } from '../live/types.js';
@@ -101,6 +109,7 @@ import type { LiveObservations, WaitBandId } from '../live/types.js';
  * reaches into `dev/` for that class of thing (`briefScreen.ts` takes `dispatcherCardOf`,
  * `reportView.ts` takes `reportViewOf`). Nothing DOM-shaped crosses with it.
  */
+import type { PriceSchedule } from '../pricing/types.js';
 import { goalRowsOf } from '../dev/leftRail.js';
 import { GOAL_GLYPHS } from '../shift/goals.js';
 import type { DayOutcome, GoalReading, GoalState } from '../shift/types.js';
@@ -906,6 +915,43 @@ export interface StageInterventionInput {
    * offering none — which is every caller that draws no picker.
    */
   readonly switchTo?: StageSwitchTarget | undefined;
+  /**
+   * The mid-run purchases the screen is offering, priced against a budget — GitHub issue **#370**,
+   * `docs/38` § 2.3. `undefined` when the screen is offering none, which is every caller today.
+   *
+   * **The absence is declared and not accidental**, and {@link STAGE_ABSENCES} carries it where a
+   * player reads it. `scenario/budget.ts` validates a scenario's ladder at load and nothing reads
+   * it at play time yet, so no caller can honestly say what rung is in force; a stage that offered
+   * a *Re-zone a bank* button against a budget it invented would be the failure `CLAUDE.md` names
+   * eleven times, arriving as a control that spends money nobody has. The arm is built here so
+   * that supplying it is the whole of what the screen has to do when the rung arrives.
+   */
+  readonly works?: StageWorksInput | undefined;
+}
+
+/** One mid-run purchase a screen is offering — the priced change, and what it would do. */
+export interface StageWorksOffer {
+  /** A `PricedChange.id` in `data/price-schedule.json`. The price is read, never authored. */
+  readonly changeId: string;
+  /**
+   * What buying it does to the building, at or after the press.
+   *
+   * `ResolvedServiceEvent[]`, because that is the one plain-data vocabulary the engine has for a
+   * mid-run change to the fabric and `core/src/sim/types.ts` explains at length why a bought change
+   * may not invent a second. An offer whose effects this build cannot express is an offer the
+   * caller must not make — the empty list is legal and means *the stamp is the point*.
+   */
+  readonly serviceEvents: readonly ResolvedServiceEvent[];
+}
+
+/** The ladder, the rung and the offers — everything the purchase rows need. */
+export interface StageWorksInput {
+  /** The shipped ladder, parsed. */
+  readonly schedule: PriceSchedule;
+  /** The rung in force: the scenario's base plus whatever chimes have bought. */
+  readonly budgetUnits: number;
+  /** What is on offer, in the order the screen should draw it. */
+  readonly offers: readonly StageWorksOffer[];
 }
 
 /**
@@ -957,7 +1003,8 @@ export function stageInterventionsOf(input: StageInterventionInput): StageInterv
  */
 function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] {
   const { switchTo } = input;
-  if (switchTo === undefined) return STAGE_INTERVENTIONS;
+  const works = worksRowsOf(input);
+  if (switchTo === undefined) return Object.freeze([...STAGE_INTERVENTIONS, ...works]);
   const changesNothing = switchChangesNothing({
     interventions: input.interventions,
     target: switchTo.target,
@@ -972,7 +1019,62 @@ function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] 
       ...(changesNothing ? { refusal: STAGE_SWITCH_NO_CHANGE } : {}),
       ...(switchTo.unpostable === undefined ? {} : { note: switchTo.unpostable }),
     }),
+    ...works,
   ]);
+}
+
+/**
+ * The purchase arms — GitHub issue **#370**, one row per offer, priced from the schedule.
+ *
+ * ## Why the row is built here and the price is not decided here
+ *
+ * `live/interventions.ts` owns both — the words and *whether the control can act* — for the reason
+ * `switchChangesNothing` is there rather than in either shell: this module already reads that
+ * module's labels, and a second answer to *can this be bought* would be the second price list #366
+ * exists to end. So {@link admitWorks} decides, this assembles, and the row's refusal is that
+ * function's sentence verbatim.
+ *
+ * ## What a refused row does, and why it is a refusal rather than an absence
+ *
+ * It is still drawn, with the reason on it. A change the day cannot afford is a real thing a player
+ * may want to know the price of — *"“Re-zone a bank” costs 6 units and today's budget holds 4"* is
+ * information, where hiding the row is a screen that silently narrows as money runs out. That is
+ * {@link StageInterventionRow.refusal}'s own contract: about the *arm*, beside a `note`, and never
+ * a bare disabled button (§ 7.6's fourth rule).
+ *
+ * An offer naming a change the schedule does not price is refused rather than dropped, for the same
+ * reason: a control that vanishes teaches a player nothing about why.
+ */
+function worksRowsOf(input: StageInterventionInput): readonly StageInterventionRow[] {
+  const { works } = input;
+  if (works === undefined) return [];
+  return works.offers.map((offer) => {
+    const priced = works.schedule.changes.find((row) => row.id === offer.changeId);
+    const kind = priced === undefined ? undefined : worksKindOfTier(priced.tier);
+    // A tier no kind records — the schedule grew one, or the offer names a dispatcher-tier change,
+    // which `switch-dispatcher` already is. Recorded as a building change and refused by
+    // `admitWorks`' own tier clause, so the sentence a player reads is that function's rather than
+    // a second one invented here for a case that should not arise.
+    const recordedAs = kind ?? 'building-change';
+    const admission = admitWorks({
+      schedule: works.schedule,
+      budgetUnits: works.budgetUnits,
+      interventions: input.interventions,
+      changeId: offer.changeId,
+      kind: recordedAs,
+    });
+    return Object.freeze({
+      change: Object.freeze({
+        kind: recordedAs,
+        changeId: offer.changeId,
+        name: priced?.name ?? offer.changeId,
+        serviceEvents: offer.serviceEvents,
+      }),
+      label: priced === undefined ? offer.changeId : worksLabelOf(priced),
+      explains: WORKS_ARM_EXPLAINS,
+      ...(admission.reason === undefined ? {} : { refusal: admission.reason }),
+    });
+  });
 }
 
 /* -------------------------------------------------------------------------- *
@@ -1071,6 +1173,21 @@ export const STAGE_ABSENCES: readonly string[] = Object.freeze([
    * (`STAGE_CAMERAS`, `stageCameraWindowOf`) and absent on the others, which is what the measurement
    * said the honest control looks like.
    */
+  /*
+   * **The register is not empty any more, and this entry is a *narrow* claim about a built arm**
+   * — GitHub issue **#370**. What is built is the whole path: `core` records the two bought kinds,
+   * `live/interventions.ts` prices them off the shipped schedule and refuses one the budget cannot
+   * cover, and {@link StageInterventionInput.works} turns an offer into a row on this very control.
+   * What is missing is the **rung**: `scenario/budget.ts` validates a scenario's ladder at load and
+   * nothing reads it while a day is playing, so no caller can say what a player has to spend.
+   *
+   * Said this way round deliberately, on § D451's own rule about trimming. *"No mid-run purchases"*
+   * would be the wrong sentence — the record carries them, and a day replayed from a record that
+   * holds one plays it. What a player cannot do **on this screen** is buy one, and the reason is a
+   * number that has nowhere to come from rather than a control nobody wrote.
+   */
+  'no works to buy while the day plays — equipment and building changes are priced and recorded, ' +
+    'and this screen has no budget to spend against yet, so it offers none',
 ]);
 
 /* -------------------------------------------------------------------------- *

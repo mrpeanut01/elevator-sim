@@ -67,6 +67,8 @@ import {
   provenanceLineOf,
   shareLinkOf,
 } from '../dev/main.js';
+import { INTERVENTION_KINDS } from '@elevator-sim/core/browser';
+
 import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import {
   CALENDAR_PERIODS,
@@ -616,7 +618,27 @@ describe('the grounds that are still true after the refusals shrank', () => {
     expect(mine[0]?.message).toContain('the answer and not the thing answered');
     // Permanent, and said so — § D486: a refusal that prevents a verified-but-wrong replay is a
     // feature, and the sentence a player reads carries that rather than an implied *not yet*.
-    expect(mine[0]?.message).toContain('stays so by design');
+    //
+    // The wording moved with the sentence on GitHub issue #370 — *"that stays so by design"* became
+    // *"that refusal is permanent by design"* when it went onto `core`'s table — and the word
+    // asserted is now the one § D486 actually ruled, which the old fragment only implied. That
+    // matters here rather than being a re-point: the same message is composed for two *other*
+    // refused kinds whose refusals are **not** permanent, so a check that passed on shared boilerplate
+    // would stop telling the two apart.
+    expect(mine[0]?.message).toContain('permanent by design');
+    // And the two bought kinds are refused without borrowing that word, which is the pair the old
+    // shared sentence would have over-claimed about.
+    for (const kind of ['equipment-change', 'building-change'] as const) {
+      const bought = runIdentityIssues(
+        logged({ kind, changeId: 'rezone-bank', name: 'Re-zone a bank', serviceEvents: [] }),
+        RESOURCES,
+        'ranked',
+      ).filter((issue) => issue.key === 'viewer.interventions');
+      expect(bought.length, kind).toBe(1);
+      expect(bought[0]?.message).toContain('no submission carries a budget');
+      expect(bought[0]?.message).not.toContain('the answer and not the thing answered');
+      expect(bought[0]?.message).not.toContain('permanent');
+    }
   });
 
   it('accepts the two kinds that carry nothing but their instant', () => {
@@ -632,24 +654,44 @@ describe('the grounds that are still true after the refusals shrank', () => {
     }
   });
 
-  it('carries exactly the kinds the server admits — read off the server’s own source', () => {
+  it('carries exactly the kinds the server admits — because neither end spells the set any more', () => {
     /*
-     * `viz` may not import `packages/server`, so the client's list is a restatement of
-     * `SUBMITTABLE_INTERVENTION_KINDS`, and this is what stops the two drifting: the server file is
-     * read from disk and its literal compared, both directions, the way the wire test below reads
-     * `submission.ts`. A kind the client carried and the server refused would spend the product's
-     * one accusation on an honest player; a kind the server admitted and the client refused would
-     * be a control the player is told not to press.
+     * **This case changed shape on GitHub issue #370, and the change is the point of it.**
+     *
+     * It used to read the server's file from disk and compare its `Object.freeze([…])` literal to
+     * this module's, both directions — the only thing available while both ends hand-wrote the set
+     * and § D215 § 3 forbids `viz` importing `packages/server`. That check was real and it guarded
+     * **two of six** places the same vocabulary was written down: the four TypeScript unions had no
+     * check at all, so widening the set meant six edits and one of them was tested.
+     *
+     * The set now lives once, in `core/src/sim/interventionWire.ts`, and both ends re-export it. So
+     * the honest assertion is no longer *do these two lists agree* — they are the same object, and
+     * asserting equality of a thing with itself proves nothing — but **does either end still spell
+     * it**. The source text is still read, for exactly the reason it always was, and what it is now
+     * read for is the absence of a literal.
      */
     const source = readFileSync(
       new URL('../../../server/src/leaderboard/submission.ts', import.meta.url),
       'utf8',
     );
-    const literal = /SUBMITTABLE_INTERVENTION_KINDS: readonly string\[\] = Object\.freeze\(\[([^\]]*)\]\)/u.exec(source);
-    expect(literal, 'the server’s allow-list literal moved; re-point this test').not.toBeNull();
-    const server = [...(literal?.[1] ?? '').matchAll(/'([^']+)'/gu)].map((m) => m[1]).sort();
-    expect([...CARRIED_INTERVENTION_KINDS].sort()).toEqual(server);
-    expect(server.length).toBeGreaterThan(0);
+    // The server derives, and says which derivation.
+    expect(source).toMatch(
+      /SUBMITTABLE_INTERVENTION_KINDS: readonly string\[\] = CARRIED_INTERVENTION_KINDS/u,
+    );
+    expect(source).toContain("from '@elevator-sim/core'");
+    // And it spells no allow-list of its own — the shape this case used to parse is the shape that
+    // must not come back, on either end.
+    expect(
+      /SUBMITTABLE_INTERVENTION_KINDS[^=]*=\s*Object\.freeze\(\[/u.test(source),
+      'the server has gone back to writing the allow-list out; there are six copies of this set ' +
+        'when anybody is allowed to keep their own',
+    ).toBe(false);
+    const client = readFileSync(new URL('./runIdentity.ts', import.meta.url), 'utf8');
+    expect(/CARRIED_INTERVENTION_KINDS[^=]*=\s*Object\.freeze\(\[/u.test(client)).toBe(false);
+    // The derivation is not empty, and it does not carry everything — an allow-list that admitted
+    // every declared kind would satisfy every case in this file and would be the gate removed.
+    expect(CARRIED_INTERVENTION_KINDS.length).toBeGreaterThan(0);
+    expect(CARRIED_INTERVENTION_KINDS.length).toBeLessThan(INTERVENTION_KINDS.length);
   });
 
   it('refuses a rule row naming a condition this build does not declare', () => {

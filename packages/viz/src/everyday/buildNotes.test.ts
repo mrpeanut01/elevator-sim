@@ -106,10 +106,18 @@ describe('the build-information panel', () => {
     }
   });
 
-  it('says so where the stage’s rows were, now that its register is empty — GitHub issue #171', () => {
+  it('draws the stage’s register as rows again, now that it has one — GitHub issues #171, #370', () => {
+    /*
+     * This case pinned *the register is empty, and the panel says so* while GitHub issue #171 had
+     * emptied it. #370 put an entry back, so what it pins now is the other arm of the same rule:
+     * a register with rows draws the rows and **no** empty line. Both arms are shipped states and
+     * the general case above (*a heading is never over nothing*) holds either way; this one exists
+     * to keep the stage's own section honest as the queue drains and refills.
+     */
     const stage = buildNotesViewOf().sections.find((section) => section.entries === STAGE_ABSENCES);
-    expect(stage?.entries).toEqual([]);
-    expect(stage?.empty).toBe(REGISTER_EMPTY_LINE);
+    expect(stage?.entries).toEqual([...STAGE_ABSENCES]);
+    expect(stage?.entries.length).toBe(1);
+    expect(stage?.empty).toBeUndefined();
   });
 
   /**
@@ -229,8 +237,17 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   /*
    * `STAGE_ABSENCES`' two rows — *no campaign dock* (#181) and *no answer to a live incident*
    * (#171) — left this table on the commit that built the dock and the incident it answers
-   * (GitHub issue #171, § D507). The register is empty and still asserted both ways below.
+   * (GitHub issue #171, § D507). The register was empty and is not any more.
+   *
+   * **A row arrived, which is this table working in the direction it is usually not tested in.**
+   * GitHub issue **#370** put the two bought intervention kinds on the run record and priced them
+   * off the schedule; what a player still cannot do is buy one *while the day plays*, because
+   * `scenario/budget.ts`'s ladder is validated at load and nothing reads it at play time. The
+   * absence is the **rung**, not the control, so the owner is the issue that makes a budget reach a
+   * playing day: **#367**, the survivor count per budget step, which is the first thing that has to
+   * know what rung a scenario is on.
    */
+  { register: 'STAGE_ABSENCES', fragment: 'no works to buy while the day plays', issue: 367 },
   /*
    * **Two rows left together here, and that they were a pair is the whole reason to say so.**
    * `STAGE_ABSENCES`' *no rival lane* and `EVERYDAY_SHELL_ABSENCES`' *Racing a second dispatcher*
