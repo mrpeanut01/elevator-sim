@@ -274,6 +274,13 @@ export function stepAtOrBelow(steps: readonly number[], value: number): number {
  * Duty is § 10.1's other input (*a goods lift is geared or hydraulic*) and is not one here: no
  * field of `BuildingSpec` carries a shaft's duty, so a duty control would be the third thing in
  * {@link DESIGNER_ABSENCES} rather than an arm of this function.
+ *
+ * **What duty is, and the four things it is not, are now settled in one place** —
+ * `data/buildings/README.md` § *Duty*, GitHub issue #481 — so this refusal and `fixitScreen.ts`'s
+ * point at a contract rather than only at each other. Two things a reader should take from it
+ * before reaching for a field: *out of service* is **not** a duty but `CarConfig.mode`, authorable
+ * today; and the demand side has to be able to express a duty-bound trip before dispatch can be
+ * right or wrong about one, or the field is § D265's shape — a caller with no behaviour to reach.
  */
 export function automaticClassFor(
   classes: readonly MachineClass[],

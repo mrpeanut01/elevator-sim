@@ -48,10 +48,17 @@
  * - **Shafts.** A new shaft is `building.addCars[]` and *is* priced (`new-car`, 34 u) — but it is
  *   already sold as each case's fourth repair, at a price no shipped budget can take. A second
  *   control for the same purchase would be one act at two places, which is what #366 abolished.
- * - **Who-drives — per-shaft duty, the goods car, the bed car, the one out of service.** There is no
- *   `duty` field to write. `CarConfig` carries `mode`, which is not the same concept, and
+ * - **Who-drives — per-shaft duty, the goods car and the bed car.** There is no `duty` field to
+ *   write. `CarConfig` carries `mode`, which is not the same concept, and
  *   `everyday/designerModel.ts` names the same absence from the other side, so it is one missing
- *   concept two screens want rather than a gap in this one.
+ *   concept two screens want rather than a gap in this one. **What duty is and is not is settled
+ *   in `data/buildings/README.md` § *Duty*** (GitHub issue #481), which is where a lane that wants
+ *   the control should start.
+ *
+ *   **This row used to end *"the one out of service"*, and that was over-scoped.** A car out of
+ *   service is `CarConfig.mode: 'out-of-service'` — authorable today, and a `ServiceEventConfig`
+ *   can put it back mid-run. Claiming it here made the refusal wider than the gap, which is § D227
+ *   pointed the other way: a refusal may not claim more is missing than is.
  *
  * **And zoning is drawn only where it can bind.** Eight of the eighteen shipped cases run a
  * single-bank building, where every floor a bank could grow into it already serves;
