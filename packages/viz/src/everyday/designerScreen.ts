@@ -260,6 +260,13 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     input.max = String(bounds.max);
     input.step = String(bounds.step);
     input.value = String(value);
+    /*
+     * The name the slider carries into the accessibility tree — WCAG SC 4.1.2, axe's `label` rule,
+     * found by `accessibilitySweep.browser.test.ts`. The visible `name` span above is a sibling and
+     * not a `<label for>`, so a non-visual reader met five unnamed range inputs on this screen.
+     * `label` is the same string the sighted reader sees, which is what SC 2.5.3 asks for.
+     */
+    input.setAttribute('aria-label', label);
     input.style.cssText = 'width:100%';
     input.addEventListener('input', () => {
       onInput(Number(input.value));
@@ -503,10 +510,10 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       row.style.cssText = `display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid ${C.ruleLight};border-radius:${String(R.row)}px;background:${C.paper};flex-wrap:wrap`;
       const letter = el(doc, 'span', undefined, carLabelOf(car));
       letter.style.cssText = `flex:none;width:22px;text-align:center;font:600 12px ${TYPE.mono};color:${C.ink}`;
-      const from = numberField(String(band[0]), (next) => {
+      const from = numberField(`Shaft ${carLabelOf(car)} lowest floor served`, String(band[0]), (next) => {
         edit({ bandByCar: { ...spec.bandByCar, [car]: [next, Math.max(next, band[1])] } });
       });
-      const to = numberField(String(band[1]), (next) => {
+      const to = numberField(`Shaft ${carLabelOf(car)} highest floor served`, String(band[1]), (next) => {
         edit({ bandByCar: { ...spec.bandByCar, [car]: [Math.min(band[0], next), next] } });
       });
       const between = el(doc, 'span', undefined, 'calls at');
@@ -560,15 +567,20 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       const to = el(doc, 'span', undefined, 'to');
       to.style.cssText = from.style.cssText;
       const endField = (end: 0 | 1): HTMLInputElement =>
-        numberField(String(mode.connects[end]), (next) => {
-          /* Both ends inside the tower and never on one floor — the schema's own two refusals, made unreachable. */
-          const floor = Math.max(-spec.belowLobby.length, Math.min(highest, next));
-          if (floor === mode.connects[1 - end]) return;
-          edit({ transportModes: withTransportEnd(spec, mode.id, end, floor) });
-        });
+        numberField(
+          end === 0 ? 'Escalator lower floor' : 'Escalator upper floor',
+          String(mode.connects[end]),
+          (next) => {
+            /* Both ends inside the tower and never on one floor — the schema's own two refusals,
+               made unreachable. */
+            const floor = Math.max(-spec.belowLobby.length, Math.min(highest, next));
+            if (floor === mode.connects[1 - end]) return;
+            edit({ transportModes: withTransportEnd(spec, mode.id, end, floor) });
+          },
+        );
       row.append(from, endField(0), to, endField(1));
       if (typeof mode.traversalTimeS === 'number') {
-        const seconds = numberField(mode.traversalTimeS.toFixed(1), (next) => {
+        const seconds = numberField('Escalator landing-to-landing seconds', mode.traversalTimeS.toFixed(1), (next) => {
           edit({ transportModes: withTransportSeconds(spec, mode.id, next) });
         });
         seconds.step = '0.1';
@@ -606,10 +618,21 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     escalatorPanel.append(add);
   }
 
-  function numberField(value: string, onCommit: (next: number) => void): HTMLInputElement {
+  /**
+   * A small numeric field. `label` is not optional and is not decoration: these fields sit in rows
+   * whose meaning is carried by adjacent `<span>`s (*calls at*, *→*, *from*, *to*), which a
+   * `<label for>` never claims, so without it a non-visual reader meets a row of anonymous numbers.
+   * WCAG SC 4.1.2, axe's `label` rule, found by `accessibilitySweep.browser.test.ts`.
+   */
+  function numberField(
+    label: string,
+    value: string,
+    onCommit: (next: number) => void,
+  ): HTMLInputElement {
     const input = el(doc, 'input', 'everyday-designer-band');
     input.type = 'number';
     input.value = value;
+    input.setAttribute('aria-label', label);
     input.style.cssText = `width:56px;flex:none;box-sizing:border-box;border:1px solid ${C.rule};border-radius:${String(R.tight)}px;background:${C.card};padding:4px 6px;font:500 12px ${TYPE.mono};color:${C.ink}`;
     input.addEventListener('change', () => {
       const next = Number(input.value);

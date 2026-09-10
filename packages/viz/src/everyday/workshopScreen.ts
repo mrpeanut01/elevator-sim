@@ -642,6 +642,15 @@ function mountWorkshop(
       const select = el(doc, 'select');
       select.disabled = view.inertNote !== undefined;
       select.dataset['patternId'] = card.patternId;
+      /*
+       * The name the control carries into the accessibility tree — WCAG SC 4.1.2, axe's
+       * `select-name` rule, found by `accessibilitySweep.browser.test.ts`. The pattern's own line
+       * sits above it as a sibling `<div>`, which names nothing: five selects on this screen reached
+       * a non-visual reader announced only as *combo box*. The pattern id is the one stable word the
+       * card has — `card.line` is a sentence and `card.signature` is optional — so the name is built
+       * from it rather than from prose that may not be there.
+       */
+      select.setAttribute('aria-label', `Dispatcher for ${card.patternId} traffic`);
       select.style.cssText = `margin-top:8px;border:1.5px solid ${C.rule};border-radius:${String(R.control)}px;background:${C.paper};padding:6px 8px;font-size:12.5px`;
       for (const profile of ctx.profiles) {
         const option = new (doc.defaultView?.Option ?? Option)(profile.name, profile.id);
