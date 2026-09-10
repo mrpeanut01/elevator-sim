@@ -758,14 +758,20 @@ a score, not a pass*, and its *Fix a building* entry still reads *~5 min a case 
 you like*. § 5 is a table about **sessions**, and the sessions are unchanged; what moved is which
 surface offers them.
 
-**What holds the pair honest is not built on the tree this row lands on, and this row says so
-rather than implying otherwise.** `everyday/actionBar.test.ts`'s `GUIDE_TABLE` still transcribes
-§ 3.3's four-label menu cell and asserts the shipped row **matches** it — which is correct here,
-because the shipped menu is still four tiles. The three-tile menu, and the both-directions guard
-beside it on `GUIDE_WATCHING_NOTE`'s pattern, arrive with
-[GitHub issue #364](https://github.com/mrpeanut01/elevator-sim/issues/364). Until then this row is
-**the ruling recorded, not the deviation shipped**, and a reader who takes it as already-guarded
-will find `row menu` red on the commit that ships three labels.
+**What holds the pair honest was not built on the tree this row landed on, and this row said so
+— then stopped being true.** As written it read: *"`everyday/actionBar.test.ts`'s `GUIDE_TABLE` still
+transcribes § 3.3's four-label menu cell … because the shipped menu is still four tiles"*, with the
+three-tile menu arriving under
+[GitHub issue #364](https://github.com/mrpeanut01/elevator-sim/issues/364).
+
+**#364 is closed and the menu is three tiles** — `everyday/modes.ts#EVERYDAY_MODES` holds exactly
+three, and `actionBar.test.ts` drives *Pick a scenario* and *Play the career* rather than the
+four-label cell. So this row is **the deviation shipped**, not the ruling recorded, and the sentence
+predicting `row menu` going red described a commit that has since landed green.
+
+Corrected 2026-09-10. The paragraph is kept rather than deleted because its shape is the useful
+part: a row that names what is *not yet* guarded is right to do so, and is exactly the kind of
+sentence that has to leave on the commit that makes it false ([§ D227](../DECISIONS.md)).
 
 ### 4.15 The four-repair menu and the five decoys go, and the diagnosis line goes with them
 
