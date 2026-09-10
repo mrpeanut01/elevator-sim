@@ -779,13 +779,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/watchPanel.ts#mountWatchPanel',
         'dev/watchPanel.ts#WATCHING_HEADER_CLASS',
         /*
-         * GitHub issue #165 split `checkedRun` into its two halves so `dev/watchPanel.ts` could run
-         * the gate's simulation on a worker. All three are the same seam and carry the same words —
-         * every refusal either of them returns is `watch/record.ts`'s or `watch/reproduce.ts`'s,
-         * both driven — so they take the entry the whole gate already had rather than an exclusion
-         * of their own, which would read as a second seam that is not there.
+         * GitHub issue #165 split `checkedRun` into these two halves so `dev/watchPanel.ts` could
+         * run the gate's simulation on a worker, and issue **#410** moved the Everyday press the
+         * same way — at which point the composition had no non-test caller and was deleted, so its
+         * id is no longer in this list. The two that remain are the same seam and carry the same
+         * words — every refusal either of them returns is `watch/record.ts`'s or
+         * `watch/reproduce.ts`'s, both driven — so they take the entry the whole gate already had
+         * rather than an exclusion of their own, which would read as a second seam that is not
+         * there.
          */
-        'watch/library.ts#checkedRun',
         'watch/library.ts#watchGateAfter',
         'watch/library.ts#watchGateBefore',
         'watch/library.ts#filedDayRuns',

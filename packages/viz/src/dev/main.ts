@@ -12,7 +12,7 @@
  * | `shift/contracts.ts`, `week.ts`, `goals.ts`, `events.ts`, `growth.ts` | `dev/state.ts`'s `shiftRunConfigOf`, called by {@link runShift} |
  * | `shift/report.ts` | {@link closeShift}, and `dev/reportPanel.ts` |
  * | `authoring/*` | the four editor mounts, and `shiftRunConfigOf` |
- * | `record/decisionLog.ts` | `recordRun` — called by `dev/shiftWorker.ts` for the shift and, since GitHub issue #410, for {@link runChallenge}'s seeds too; and directly on this thread by the `simulateRecord` binding below, which is the Everyday Watch gate and the one caller here that has not moved |
+ * | `record/decisionLog.ts` | `recordRun`, called by `dev/shiftWorker.ts` — for the shift, for {@link runChallenge}'s seeds and for the Everyday Watch gate's `simulateRecord` binding, the last two since GitHub issue #410. **This file no longer imports `recordRun` at all**, which is the whole of what #410 bought here: every simulation this shell starts crosses a message port |
  * | `dev/shiftRunner.ts`, `dev/shiftWorker.ts` | {@link runShift} and {@link verifyCurrent}, which no longer simulate on this thread |
  * | `dev/offThreadRuns.ts` | `dev/fixitPanel.ts` and `dev/watchPanel.ts`, both handed {@link boot}'s one `spawnRunWorker` — GitHub issue #165 — and {@link runChallenge}'s own runner, #410 |
  * | `dev/surfaces.ts` | {@link applyNavigation} |
@@ -174,7 +174,7 @@ import { nextLoopMark } from '../playback/loopMark.js';
 import { Playback, type LoopWindow } from '../playback/playback.js';
 import { readRecordingDocument, verifyReplay, writeRecordingDocument } from '../record/document.js';
 import { assertSameCrowd } from '../record/crowd.js';
-import { recordRun } from '../record/recordRun.js';
+import { wireInterventionsOf } from '../scope/switchWire.js';
 import {
   DEFAULT_THEME,
   drawScene,
@@ -1533,6 +1533,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * a wire field this package does not own.
    */
   const challengeRunner = createOffThreadRunner({ spawn: spawnRunWorker });
+
+  /**
+   * The Everyday Watch gate's runner — the `simulateRecord` binding below, GitHub issue #410.
+   *
+   * Declared here beside the challenge's rather than at the binding, because both are `boot`'s and
+   * a reader looking for *what runs off this thread* should find them together. Its own runner and
+   * not the challenge's: one ask is one press, and a shared runner would let a challenge press
+   * silently supersede a watch press that was already in flight.
+   */
+  const everydayWatchRunner = createOffThreadRunner({ spawn: spawnRunWorker });
 
   function runChallenge(): void {
     const view = challengeView.view;
@@ -4185,7 +4195,36 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     loadReferenceRuns: () =>
       loadReferenceRuns((id: string) => buildingNameOf(resources, state.savedBuildings, id)),
-    simulateRecord: (config) => recordRun(config).recording,
+    /*
+     * **Off the thread that paints** — GitHub issue #410, and the last of this shell's three
+     * `recordRun` call sites to move.
+     *
+     * It used to read `(config) => recordRun(config).recording`, which put the Everyday Watch
+     * reproduction gate — a whole day's simulation — inside a click handler. That is the defect
+     * issue #165 closed on `dev/watchPanel.ts`, the Engineer picker one screen over, and it
+     * survived here because `EverydayHost.watchRun` returned a row and could not wait for one.
+     * Measured before the move: 5 ms and 110 ms on the two shipped reference rows, and **1 943 ms**
+     * on a filed `vertical-city` day at 7 200 s that this picker offers
+     * (`dev/measure.surfaceRuns.test.ts`).
+     *
+     * Its **own** runner rather than the Fix-a-building or Watch panels' — one ask is one press,
+     * and sharing a runner with a panel would let one shell's press supersede the other's silently.
+     * The `spawn` is the same one, which is what keeps the bundler seam in one place.
+     *
+     * `recordDecisions: true` — `recordRun`'s own default, which is what the synchronous binding
+     * used. It matters rather than being tidy: a recording's decision log is *in* the recording,
+     * so `false` would hand the stage a different replay than the gate compared, and this gate's
+     * whole job is deciding whether a record reproduces.
+     */
+    simulateRecord: (config, done, failed) => {
+      everydayWatchRunner.start({
+        runs: [{ config, outOfServiceCarIds: [], recordDecisions: true }],
+        onDone: ([recording]) => {
+          if (recording !== undefined) done(recording);
+        },
+        onFailed: failed,
+      });
+    },
     enterWatch: (run, view, recording) => {
       enterWatch(run, view, recording);
     },

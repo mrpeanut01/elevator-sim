@@ -21,7 +21,7 @@ import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { buildingNameOf } from '../dev/state.js';
 
-import { checkedRun } from './library.js';
+import { checkedRunForTest } from './gate.test-helper.js';
 import { FIXTURE_MARKER, ReferenceRunsError, parseReferenceRuns } from './reference.js';
 import { postedResultOf } from './reproduce.js';
 import { watchRunConfigOf } from './record.js';
@@ -70,7 +70,7 @@ describe('the shipped reference runs', () => {
     }, 120_000);
 
     it(`passes the product's own reproduction gate — “${run.label}”`, () => {
-      const checked = checkedRun(
+      const checked = checkedRunForTest(
         run,
         RESOURCES,
         baseState(),

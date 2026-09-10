@@ -66,31 +66,23 @@ const PACKAGE = fileURLToPath(new URL('../..', import.meta.url));
  */
 const MAIN_THREAD_SIMULATION: Readonly<Record<string, string>> = Object.freeze({
   /*
-   * Two call sites in one module, and they are the reason this table's granularity is stated as a
-   * limit above.
+   * **`dev/main.ts` is deliberately absent, and its absence is the deliverable rather than an
+   * omission.** It held two of these call sites when this file was written, and both moved for
+   * GitHub issue #410:
    *
-   * `#runChallenge` **is off the thread** since GitHub issue #410 — `createOffThreadRunner` over
-   * `dev/shiftWorker.ts` — and the import that keeps this module in the derivation is the *other*
-   * one: `simulateRecord`, the `EverydayHost` binding at the bottom of `boot`, which hands
-   * `recordRun` to `everyday/host.ts#watchRun` for the Everyday shell's Watch reproduction gate.
+   * - `#runChallenge` ran the challenge's whole seed set in a `for` loop — 6 ms to 897 ms over the
+   *   shipped buildings at eight seeds and 3 229 ms at a length the server may name — and now runs
+   *   on `createOffThreadRunner`;
+   * - the `simulateRecord` binding handed `recordRun` to `everyday/host.ts#watchRun`, the Everyday
+   *   Watch reproduction gate, measured at 5 ms, 110 ms and **1 943 ms** on the rows that picker
+   *   offers. That was issue #165's own defect still live on the shell `index.html` opens: #165
+   *   moved the Engineer picker and left this one because `EverydayHost.watchRun` returned a row
+   *   and could not wait for one. It returns nothing and settles a callback now.
    *
-   * That one is **outstanding and measured**, and it is registered rather than argued away.
-   * `dev/measure.surfaceRuns.test.ts`'s `watch/press` rows are the same press on the same gate:
-   * 5 ms and 110 ms on the two shipped reference rows, and **1 943 ms** on a filed `vertical-city`
-   * day at 7 200 s, which `menu/types.ts#LONGEST_OFFERED_RUN_S` lets a player file and this picker
-   * then offers. That is far above `dev/mainThreadFrames.test-helper.ts#BLOCKED_FRAME_GAP_MS`, so
-   * it is not boundable and it has to move.
-   *
-   * It is the *same* defect issue #165 closed on `dev/watchPanel.ts`, still live on the shell
-   * `index.html` actually opens — #165 moved the Engineer picker and `EverydayHost.watchRun`'s
-   * contract is synchronous, so the Everyday one was left behind. `watch/library.ts` already
-   * carries the two halves of the gate that the move needs (`watchGateBefore`/`watchGateAfter`);
-   * what it costs is `EverydayHost.watchRun` becoming asynchronous, which reaches two screens and
-   * would leave `watch/library.ts#checkedRun` with no non-test caller at all.
+   * The file no longer imports `recordRun`, so every simulation the shell starts crosses a message
+   * port. The both-directions assertions below are what make that a fact rather than a claim: a
+   * row put back here would have to be a module the graph finds again.
    */
-  'dev/main.ts':
-    'outstanding — `#runChallenge` moved to a worker (#410); the `simulateRecord` binding for ' +
-    '`everyday/host.ts#watchRun` has not, and is measured at up to 1 943 ms',
   /*
    * `#failStates` — one replication replayed to name a floor and a credential, after the batch it
    * diagnoses has already come back from `dev/batchWorker.ts`.
