@@ -26,11 +26,28 @@
  * checkable against the fold, and the check would catch a `describeLegs` that dropped or
  * duplicated a leg. Deriving it *from* the fold would make that test a tautology.
  *
- * ## Cost, and why there is no cache
+ * ## Cost, measured rather than asserted, and why there is no cache
  *
  * One pass over `recording.legs` for the counters, plus one sort-and-sweep over `2n` queue events
- * for the peak. A 900 s run of the largest shipped building holds a few thousand legs, so the
- * whole thing is comfortably inside a frame budget.
+ * for the peak — **and a third pass this paragraph used to leave out**: the first statement calls
+ * `frame/overlay.ts#overlayAt` on the same recording, deliberately, so that two answers to *who is
+ * waiting* cannot exist. Three passes, and `frame/perFrameBudget.test.ts` holds that as a budget:
+ * it counts the legs this function reads and fails if it reads more than three per leg that had
+ * arrived.
+ *
+ * The sentence that stood here — *"comfortably inside a frame budget"* — had no run behind it, and
+ * GitHub issue #410 is the clause that says a claim about a cost is measured rather than restated.
+ * `frame/measure.perFrame.test.ts` is the run: the worst call over the shipped population at 900 s
+ * is **0.550 ms**, and on the heaviest recording the product can hand this fold — a `vertical-city`
+ * day at 7 200 s, 11 436 legs — **3.546 ms**, or 21.3 % of a 16.7 ms frame. True, then, including
+ * at a ceiling nothing had looked at, and true with two orders less room than the fold next door.
+ *
+ * **One thing the same measurement found, said here because this is the module it is about.** This
+ * function reads exactly three times the legs `overlayAt` does and costs about nine times as much
+ * per leg at 900 s and eighteen times at the ceiling — a per-leg cost that *rises* with the
+ * recording while `overlayAt`'s falls. That is the `2n` sort, which no bound written in legs can
+ * see tightly. Which line inside the sweep the time goes to is **unmeasured**, and no plausible
+ * sentence is offered in place of a measurement (`DECISIONS.md` § D256).
  *
  * There is **no cache and no cursor**, and that is not an oversight. The playhead scrubs
  * backwards: a reader drags left, a test samples the same instant twice, and the replay harness
