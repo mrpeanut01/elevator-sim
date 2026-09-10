@@ -82,7 +82,17 @@ function contextOf(): SurvivorContext {
  * -------------------------------------------------------------------------- */
 
 /**
- * **Scenarios nothing gets through at any rung, measured 2026-09-10 on `8939d79`.**
+ * **Scenarios nothing gets through at any rung, re-measured 2026-09-10 on `f4383c4`.**
+ *
+ * **The denominators moved and the membership did not** — GitHub issue **#475**. Four cells across
+ * the ladder used to read *of 23* rather than *of 24*, because the sampler drew a vector `core`
+ * then refused to build and `measureSurvivors.ts` had to count it out of `examined`. The gate now
+ * takes that refusal at the draw, so the twelfth dial configuration is redrawn and judged instead
+ * of being subtracted, and every cell here is a full 24. Two of those four cells are on this
+ * register — stage 6's building rung and stage 9's — and **neither changed what it found**: the
+ * redrawn configuration cleared nothing, so the survivors, the survivor names and the six-scenario
+ * membership below are exactly what they were. A denominator that moves while a count holds is the
+ * shape a fixed instrument makes, and it is worth telling apart from a rebalance.
  *
  * § D525 clause 3 says *zero is not a scenario* unless it declares itself a diagnosis, and six of
  * the ten do neither. The register exists for `difficultyCurve.test.ts`'s stated reason, which is
@@ -108,14 +118,14 @@ const UNWINNABLE_AS_MEASURED: Readonly<Record<string, string>> = Object.freeze({
     '0 of 20 at the base rung and 0 of 24 at both bought rungs; 3 to 5 configurations a rung ran ' +
     'a batch that refused its own mean.',
   'stage-4-two-banks': '0 of 24 at every rung; 4 to 6 a rung suppressed.',
-  'stage-6-the-tall-one': '0 of 24, 0 of 24 and 0 of 23; 1 to 3 a rung suppressed.',
+  'stage-6-the-tall-one': '0 of 24 at every rung; 1 to 3 a rung suppressed.',
   'stage-8-the-headline-address':
     '0 of 20 and 0 of 24 twice, with nothing suppressed anywhere — the one row here where every ' +
     'configuration stood behind its own numbers and still missed a bar.',
   'stage-9-both-ways-at-once':
-    '0 of 24, 0 of 24 and 0 of 23, with **every** examined configuration suppressed. Read the ' +
-    'count beside that: on this scenario no configuration produced a quotable mean, so a zero ' +
-    'here says less about the ways through than the other five do.',
+    '0 of 24 at every rung, with **every** examined configuration suppressed — 24 of 24 three ' +
+    'times over. Read the count beside that: on this scenario no configuration produced a ' +
+    'quotable mean, so a zero here says less about the ways through than the other five do.',
   'stage-10-the-bed-and-the-visitor':
     '0 of 24 at every rung, and every examined configuration suppressed — the same shape as ' +
     'stage 9 and the same caveat.',
@@ -140,9 +150,11 @@ const FIRST_HOUR_SINGLE_SURVIVOR: Readonly<Record<string, string>> = Object.free
     'one at every rung, and it is `zoned-uppeak` from the dropdown rather than a dial: 1 of 20 at ' +
     'the base rung and 1 of 24 at both bought ones, with the dial half at 0 of 12 throughout.',
   'stage-3-overwhelmed':
-    'one at every rung, `fairness-first` from the dropdown, with the dial half at 0 of 12 or 11 ' +
+    'one at every rung, `fairness-first` from the dropdown, with the dial half at 0 of 12 ' +
     'throughout — and 20 to 24 of the examined configurations suppressed, which is what an ' +
-    'overwhelmed building looks like from here.',
+    'overwhelmed building looks like from here. The equipment rung read 0 of 11 until issue #475 ' +
+    'stopped the sampler drawing a vector this tower cannot be built with; the redrawn twelfth ' +
+    'cleared nothing, so the one survivor here is the same one it always was.',
 });
 
 /**

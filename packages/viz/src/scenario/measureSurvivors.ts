@@ -123,8 +123,17 @@ export interface JudgedConfiguration {
 /**
  * A configuration the declared space admits and `core` refuses to build.
  *
- * **Empty on the shipped ladder since GitHub issue #475 was fixed, and kept because it is the
- * instrument that found it.** The four this sweep first met were real:
+ * **Empty on the shipped ladder, measured rather than expected, and kept because it is the
+ * instrument that found the thing that emptied it.** The whole sweep was re-run on `f4383c4` after
+ * GitHub issue #475's fix — ten scenarios, three rungs, 1 900 s — and every one of the thirty cells
+ * reports `unbuildable: 0`. That is the claim this field exists to be able to make, and it is a
+ * reading of `data/scenario-survivors.json` rather than an argument from the fix: exactly the four
+ * cells that used to carry a refusal moved, each from `examined: 23` to `examined: 24`, and the
+ * other twenty-six are unchanged to the string. **The survivors did not move with them** — the
+ * redrawn twelfth configuration cleared nothing in any of the four, so the counts and the survivor
+ * names are what they were and only the denominators grew.
+ *
+ * The four this sweep first met were real:
  * `controls/editedProfile.ts#admitEditedVector` accepted a vector with
  * `answer.dwellPolicy: 'adaptive'` and an `answer.maxDwellS` below the car's own door timings,
  * `space.validate` returned no reason — it cannot, being building-independent — and
