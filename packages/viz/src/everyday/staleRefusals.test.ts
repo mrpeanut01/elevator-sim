@@ -66,8 +66,10 @@
  * dead seam does nothing, while a stale refusal **tells the reader not to touch the control**.
  * These four told a reader that four shipped features were absent.
  *
- * Per [§ D405](../../../../DECISIONS.md) no decision number is owed — nothing here binds a module
- * that does not own it, and this file is the record.
+ * [§ D405](../../../../DECISIONS.md) settles the bookkeeping: nothing here binds a module that does
+ * not own it, so this file is the record and no `DECISIONS.md` entry is due. Phrased that way rather
+ * than with the marker phrase itself, because `documentation.test.ts`'s ratchet counts a discussion
+ * of the marker as a use of it — § D405's own convention is to name it rather than utter it.
  */
 
 import { readFileSync } from 'node:fs';

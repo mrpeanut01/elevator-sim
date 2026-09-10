@@ -65,12 +65,12 @@ defect as a figure re-measured per branch:
 
 ### 1.2 The rules this document adds, in one table
 
-Twenty-seven, all in three families, all stated as properties rather than preferences so that a lane
+Twenty-eight, all in three families, all stated as properties rather than preferences so that a lane
 can turn each into a test. Anything in this document not carrying one of these labels is context.
 
 | family | rules | section |
 |---|---|---|
-| **AD-S** — the stage | S1–S3 the shut door · S4–S6 the opening · S7–S10 legible pressure · S11–S14 the caps · S15–S16 the wait ramp · S17 the rest bar | § 5 |
+| **AD-S** — the stage | S1–S3 the shut door · S4–S6 the opening · S7–S10 legible pressure · S11–S14 the caps · S15–S16 the wait ramp · S17 the rest bar · S18 one owner for the legible floor pitch | § 5 |
 | **AD-M** — motion | M1 no easing · M2 no transitions on the playhead · M3 state not events · M4 no rider entrances | § 6 |
 | **AD-A** — accessibility | A1 never colour-only · A2 measure against the real ground · A3 a live region is not a paint target · A4 refusals are drawn · A5 mono figures with units and `n` · A6 motion is bounded | § 7 |
 
@@ -611,6 +611,70 @@ frame** is a claim about a number, and this is the number."*
   three-dot ellipsis are not, and `charter P2`'s refusal test — *does this change make the product
   say less?* — refuses all three.
 
+### 5.5a The size at which the drama stops being legible — and it is three numbers, not one
+
+GitHub issue **#195**'s third acceptance criterion asks this document to state *"the minimum stage
+size at which the drama is still legible, and the behaviour below it"*. Both halves are **already
+measured in the tree**; what was missing is this document saying so. Neither is invented here.
+
+**The unit is the floor pitch, not the viewport.** A stage is legible when a floor row is tall
+enough to hold what is drawn in it, and viewport width reaches that only through the canvas box.
+`docs/31-support-matrix.md` § 2's **360 px** is the launch floor for the *page*; the stage's own
+floor is per-row.
+
+**And it is three numbers, in three files, two of which share a name and disagree.** Stated as
+found rather than reconciled, because reconciling them in prose is how a document acquires a fourth
+answer:
+
+| constant | value | what it is the floor of | argued in place? |
+|---|---|---|---|
+| `render/canvas.ts#MIN_GLYPH_PITCH_PX` | **12 px** | a rider glyph being a glyph rather than a smear — it is the font size this renderer draws at | **yes** |
+| `render/layout.ts#MIN_LABEL_PITCH_PX` | **14 px** | a 12 px monospace floor id being readable — one line box, below which consecutive labels touch | **yes** |
+| `everyday/stageScreenModel.ts#MIN_LABEL_PITCH_PX` | **13 px** | the Everyday stage's own label pitch, feeding `legibleFloorCount` | **no** — it sits between `PAD` and `GUTTER` with no docstring |
+
+The first two are different quantities and are *correctly* different: a glyph and a line box are not
+the same thing, and each says so where it is declared. **The third is the finding.** It carries the
+same name as the second, one import away, means the same thing, and answers 13 where that one
+answers 14. One of the two is wrong and neither file knows the other exists.
+
+**AD-S18 — the stage's legible floor pitch has one owner.** A row's minimum height is a property of
+what is drawn in the row, so it may be different for a glyph and for a label — but it may not be
+two different numbers for the *same* thing in two files. Until that is resolved, no document may
+quote a single figure for *the* minimum pitch, including this one, which is why the table above has
+three rows.
+
+**The behaviour below it is built, and it is not degradation — it is a control.** Three mechanisms,
+in the order a shrinking stage meets them:
+
+1. **`legibleFloorCount(height)`** turns a canvas height into the number of floors it can label.
+   `wholeTowerIsLegible` is that count against the tower.
+
+   **Its stated floor of 2 is unreachable, and the real minimum is 4** — found by driving it rather
+   than reading it. The docstring says *"At least two, because a one-floor window has no pitch to
+   speak of"* and the body is `Math.max(2, floor(plotHeightOf(h) / 13) + 1)`; but `plotHeightOf` is
+   `Math.max(height, 2 · PAD + 40) − 2 · PAD`, so with `PAD = 14` the plot is never shorter than
+   **40 px** for *any* box — zero, negative, `-Infinity` — and 40 / 13 + 1 is 4. The `Math.max(2, …)`
+   is a defensive bound with no reachable input, and the sentence explaining it describes a state
+   the function cannot produce. Recorded rather than changed: it belongs to whoever owns that
+   function, and `everyday/stagePitchClaims.test.ts` holds it in place until they do.
+2. **The camera.** `stageScreenModel.ts#stageCameraChipsOf` draws its three band chips **only** on a
+   tower the whole of which does not fit — so the chips' presence *is* the product saying *this
+   tower is taller than this box*, and the player picks a band rather than being handed a smear.
+   Measured: a 100-floor tower in a 400 px canvas is **29** legible floors, so the chips are there.
+   That is § 5.4's honest-control shape, and [§ D505](../DECISIONS.md) is the ruling it follows.
+3. **The degraded row.** Below `MIN_GLYPH_PITCH_PX` a row draws a **bar** rather than glyphs — § 6.2's
+   second bar trigger, *"or the floor pitch is below the glyph height"*. Vertical City's 100 floors
+   at 700 px is under **8 px** a floor, which is exactly the case that bar exists for.
+
+**None of the three is a message.** No sentence tells the player the stage is too small; the product
+changes what it offers instead, which is AD-A4's shape (*refusals are drawn*) applied to a viewport
+rather than to a control.
+
+**What this section does not settle** — and it belongs in § 8's list rather than being answered
+here: whether **13 or 14** is right for the Everyday stage's labels. That is a measurement against a
+rendered label at both pitches, this document has run no runs, and picking one in prose would be the
+fourth answer.
+
 ### 5.6 The wait ramp is the simulator's banding, not the guide's
 
 The stage's only quantitative colour encoding. `stageBandOf(waitedS)` reads `live/bands.ts`'
@@ -1017,6 +1081,67 @@ the defect this repository has recorded most often.
 - `stageScreen.ts#breathingDot` names motion it does not have (§ 6.1 (3)).
 
 ---
+
+## 8a. The reference board
+
+GitHub issue **#195**'s first acceptance criterion asks for a brief *"merged with a reference board
+and a stated visual thesis"*. The thesis is § 1's and § 5's; this is the board, and it was the last
+thing outstanding on that issue.
+
+**It is a board of arguments, not of screenshots.** Every entry below names a title, the **one thing**
+this document takes from it, the rule that thing became, and — the half that makes a reference board
+worth having rather than a mood board — **what the same title must not be used to justify**. A
+reference nobody has bounded is a reference somebody will later cite for anything.
+
+**Every claim here is second-hand through [`24-competitive-teardown.md`](24-competitive-teardown.md),
+and deliberately so.** That document examined these titles with sources, marked what it could not
+verify `[unverified]`, and is the place a claim about another game is allowed to originate in this
+tree. Nothing new about any of them is asserted here. Where the teardown says a thing is unverified,
+this board inherits the mark rather than quietly dropping it — because the pattern being adopted
+does not depend on it, and saying so is the difference between a reference and an appeal to
+authority.
+
+| title | what is taken | the rule it became | what it may **not** justify |
+|---|---|---|---|
+| **Mini Motorways** | **A fail state is *located*.** The backlog is drawn at the building that caused it — pins accumulate on an under-served destination and are removed one per visiting car — rather than in a status bar ([`24`](24-competitive-teardown.md) § 6.1, *secondary*) | **AD-S8**, the landing carrying its own worst band, and **AD-S10**, duration drawn under the stage rather than only in the report. Both are the same idea: the thing that is going wrong is drawn where it is going wrong | **A points economy.** Its round trips score; § 6 non-goal 3 forbids a scalar challenge score here whatever the source design does. Also not the *drawing* — pins are its vocabulary and capsules are this one's |
+| **Two Point Hospital** | **Presentation carries onboarding**, and **capability arrives with the mission that needs it** ([`24`](24-competitive-teardown.md) § 6.2, *secondary*) | The § 5.4 argument that pressure must be legible **before** the report names it — a stage that only reads after the fact teaches nothing during play. Its campaign-side counterpart is the scenario ladder's, not this document's | **A star rating.** Its success ladder is 1–3 stars per hospital; `docs/10` § 5.5 and § 6 non-goal 3 forbid one here. Nor an art style: it is stylised-3D and this stage is a flat elevation with a fixed camera |
+| **Prison Architect** | Named in the same playtest breath as Two Point Hospital, for the same claim — that a rendering of this family *"would do more for the game's popularity than any single numeric feature"*, and that *"the simulation math does not need to change at all"* ([`elevator-sim-playtest-report.md`](elevator-sim-playtest-report.md), which [`../README.md`](../README.md) marks **a report rather than a finding**) | Nothing on its own. It is here as **corroboration of the thesis**, and it is listed rather than omitted so a reader meets the status of the source alongside the claim | **Anything specific.** No mechanic, no palette, no layout. A title cited once in a document the README labels a report cannot carry a rule |
+
+### 8a.1 The non-references, which are the load-bearing half
+
+Three titles are on this board **to be refused**, and each refusal already exists elsewhere in the
+tree — restated here because a board that lists only what to copy is how a reference set grows a
+scalar score by accident.
+
+- **Mini Metro's legibility warning is adopted; its scalar is not.** [`10-experience-layer-contract.md`](10-experience-layer-contract.md)
+  § 3.1 already carries the warning. The teardown's own observation is the one to keep:
+  *"in both Dinosaur Polo Club titles a good fail state and a scalar score arrive as one package,
+  and only the first half is adoptable"* ([`24`](24-competitive-teardown.md) § 4.1). Its
+  delivered-passenger ranking is marked `[unverified]` there, and **the refusal does not rest on
+  it** — `docs/21` § 6 non-goal 3 forbids the scalar regardless of what Mini Metro does.
+- **Elevator Saga is a comparator, never a model.** It computes an average wait over **delivered
+  riders only**, unconditionally, from a single unseeded run ([`24`](24-competitive-teardown.md)
+  § 8). That is the exact figure `awtValidity.ts` suppresses on five grounds. It earns its place on
+  this board as the worked example of the product's central refusal — which is § 5's argument for
+  drawing pressure honestly, seen from the other end.
+- **No reference may license a second renderer on the Engineer stage.** `docs/21` § 6.5 forbids it,
+  and every entry above is scoped to the Casual stage. A reference that would require the Engineer
+  surface to be redrawn has been mis-applied rather than newly permitted.
+
+### 8a.2 What this board does not contain, said rather than implied
+
+**No images.** Screenshots of shipped commercial titles are not vendored into this repository, and a
+board that pretended to include them would be describing files that are not here — which is the
+defect [`../CLAUDE.md`](../CLAUDE.md) opens with, pointed at a document instead of a number. Each
+entry above is followable to a cited source through [`24`](24-competitive-teardown.md) § 15.
+
+**No new claim about any title.** If a lane needs one, the place to establish it is the teardown,
+with sources and an `[unverified]` mark where it cannot be — not this section, which is downstream
+of it.
+
+**And no entry for the design handoff**, deliberately. [`design/`](design/) is not a reference; it is
+**canonical for the interface** per [`../CLAUDE.md`](../CLAUDE.md), which is a stronger relationship
+than anything on this board. Listing it among references would demote it.
 
 ## 9. Requests to files this document does not own
 
