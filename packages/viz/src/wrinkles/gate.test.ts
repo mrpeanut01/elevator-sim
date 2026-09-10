@@ -10,6 +10,46 @@
  * The budget is `MIN_REPLICATION_BUDGET`, which the gate enforces rather than accepts. Fifty
  * replications × three arms × two days × thirty-eight wrinkles is a few seconds on Garden
  * Apartments, which is why the sweep is affordable here at all.
+ *
+ * ## The per-case timeouts this file used to carry, and why it carries none
+ *
+ * Five cases here were annotated `}, 120_000)`. They were **narrowings**: `vitest.config.ts` gives
+ * `viz` `SIMULATING_TIMEOUT_MS`, which is **300 000 ms**, so each annotation cut this file's budget
+ * to 40 % of what the project had already derived for exactly this question — *does not fit
+ * vitest's default on a loaded machine*.
+ *
+ * They were also sized against a cost that no longer exists. Measured 2026-09-09 on `main` at load
+ * average ~3, `--project viz src/wrinkles/gate.test.ts` costs **24.4 s** over 8 cases, worst case
+ * **13.9 s** (twice, ±0.2 %), second worst **4.5–4.8 s**. The figure the annotations were written
+ * against — about 200 s for the file — was measured before
+ * [#446](https://github.com/mrpeanut01/elevator-sim/pull/446) stopped the sweep re-simulating an
+ * identical control day thirty-seven times. The cause was removed; the ceiling was left.
+ *
+ * **Why the annotations are deleted rather than raised.** A per-case number here would be a second
+ * answer to a question `SIMULATING_TIMEOUT_MS` already answers, and its docstring is explicit that
+ * the seconds in it are *"a dated record of one machine on one day and deliberately not a budget"*
+ * — § D483 measured a sibling leg moving 1.82× on identical work. Inheriting the project constant
+ * keeps one answer; annotating keeps two, and the second goes stale exactly the way these did.
+ *
+ * **Why not make the cases cheaper instead.** The obvious lever is replications, and it is the one
+ * lever that is not available: `MIN_REPLICATION_BUDGET` is `CLAUDE.md`'s statistical floor and the
+ * gate **refuses** a budget below it — `gate.ts` throws rather than reporting a thin interval, and
+ * a case above asserts that refusal. Cutting the sweep's wrinkles or its arms would weaken what it
+ * checks rather than what it costs. Nothing here is slow by accident.
+ *
+ * At 13.9 s the worst case sits **21×** inside the project's 300 s. That clears the 4.5×
+ * amplification `vitest.config.ts` measured for `viz` under sixteen spinners — 13.9 × 4.5 ≈ 63 s —
+ * by arithmetic on that file's figure rather than on one taken here: fourteen spinners on this
+ * machine moved the worst case from 13 908 ms to 13 989 ms, which is 0.6 % and not an
+ * amplification, so nothing was learned by trying and the borrowed figure is the honest one to
+ * reason from. What produced the original red was six concurrent vitest projects, not spinners.
+ *
+ * **What removing them costs, stated rather than glossed**, because `vitest.config.ts` states the
+ * same trade for the constant these now inherit: a case here that genuinely hangs takes five
+ * minutes to fail instead of two. That is worth paying for the same reason it was there — a hang
+ * is a bug found once and fixed, and a ceiling that goes red under load is a false failure that
+ * recurs forever and teaches people to re-run the suite instead of reading it. It taught exactly
+ * that this week: two separate lanes stopped to prove these two files were not their doing.
  */
 
 import { loadConfig } from '@elevator-sim/core';
@@ -34,7 +74,7 @@ let config: Awaited<ReturnType<typeof loadConfig>>;
 
 beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
-}, 120_000);
+});
 
 function inputFor(wrinkleId: string, overrides: Partial<WrinkleGateInput> = {}): WrinkleGateInput {
   const building = requireBuilding(config, BUILDING_ID);
@@ -150,7 +190,7 @@ describe('a day the gate could not read is not a day it discarded', () => {
     expect(verdict.reason).not.toMatch(/cosmetic/);
     // The counts are in the sentence — `batch/report.ts` R13, *no estimate without its `n`*.
     expect(verdict.reason).toMatch(/\d+\/\d+/);
-  }, 120_000);
+  });
 });
 
 describe('the gate will not average the replications that survived', () => {
@@ -182,7 +222,7 @@ describe('the gate will not average the replications that survived', () => {
      * docstring and by nothing else, and this comment is where that is admitted.
      */
     expect(verdict.reason).toMatch(/48\/50 on the candidate day/);
-  }, 120_000);
+  });
 });
 
 describe('sharing one control run across a sweep changes no verdict', () => {
@@ -205,7 +245,7 @@ describe('sharing one control run across a sweep changes no verdict', () => {
     );
     expect(viaSweep, 'the sweep did not reach move-in:two-thirds').toBeDefined();
     expect(viaSweep).toEqual(alone);
-  }, 120_000);
+  });
 });
 
 describe('the gate discriminates — the case this file exists for', () => {
@@ -273,5 +313,5 @@ describe('the gate discriminates — the case this file exists for', () => {
       judged.length,
       `the gate could read none of the library at this operating point:\n${rows}`,
     ).toBeGreaterThan(0);
-  }, 120_000);
+  });
 });
