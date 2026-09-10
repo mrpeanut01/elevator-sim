@@ -439,6 +439,8 @@ export function createApi(deps: ApiDeps): Api {
         return ingestTelemetry(deps, request, telemetryPerCaller);
       case 'POST /api/telemetry/forget':
         return forgetTelemetry(deps, request, telemetryPerCaller);
+
+      /*
        * The chime ledger's three verbs, and the shape of this block is the contract — GitHub issue
        * #368, § D526 clause 5. **One read and two posts, and there is no fourth.** No route returns
        * an entry, a source, or a history; no route accepts an amount. A route that did either would

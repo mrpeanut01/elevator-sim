@@ -701,6 +701,8 @@ export interface SettingsScreenInput {
    * not written anything has nothing to report about whether the write survived.
    */
   readonly telemetryDurable?: boolean | undefined;
+
+  /**
    * The account's chime balance — GitHub issue **#368**. One number, and never anything else.
    *
    * Optional because the balance arrives from the server after the screen has drawn, and `0` is

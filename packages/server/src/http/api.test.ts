@@ -1770,6 +1770,10 @@ describe('telemetry', () => {
       refused = response.status === 429;
     }
     expect(refused, 'alternating between the two routes escaped the shared budget').toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * The chime ledger — GitHub issue #368
  * -------------------------------------------------------------------------- */
 

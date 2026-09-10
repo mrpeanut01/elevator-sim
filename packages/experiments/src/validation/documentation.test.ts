@@ -2152,9 +2152,22 @@ describe('DECISIONS.md D526 clause 6 — no purchase, price, store or conversion
    * within a wave. What is here is the machinery a purchase needs and honest play never does: a
    * processor, a storefront, an amount denominated in money, a thing bought and owned, and the
    * conversion event that would exist to measure it.
+   *
+   * **And deliberately not the word *purchase* either, which took one merge to find out.** This
+   * pattern carried it, and `scenario/budget.ts#admitPurchase` and `campaign/parse.ts` — GitHub
+   * issue #365's budget, landed in a parallel lane — are named for exactly the thing this game is
+   * *made of*: spending chimes on a rung. The two lanes never met, and the first tree that held
+   * both went red on a function doing nothing wrong.
+   *
+   * It is the same mistake the paragraph above already avoided one word earlier, so the fix is the
+   * same reasoning applied consistently: **the discriminator is money, not the verb.** A purchase
+   * this rule forbids is one denominated in a currency, which is why `cents\b`, `moneyamount`
+   * and the three currency codes are here and `purchase` is not. A lane adding
+   * `purchaseChimes(cents)` still trips it; a lane adding `admitPurchase(rung)` does not, and
+   * should not.
    */
   const PURCHASE_MACHINERY =
-    /purchase|paywall|checkout|stripe|paypal|braintree|adyen|storefront|microtransaction|in-app|\biap\b|\bsku\b|billing|invoice|payment|refund|entitlement|merchant|creditcard|cardnumber|currencycode|realmoney|\busd\b|\beur\b|\bgbp\b/iu;
+    /paywall|checkout|stripe|paypal|braintree|adyen|storefront|microtransaction|in-app|\biap\b|\bsku\b|billing|invoice|payment|refund|entitlement|merchant|creditcard|cardnumber|currencycode|realmoney|cents\b|moneyamount|\busd\b|\beur\b|\bgbp\b/iu;
 
   it('names none of a purchase’s machinery in code, anywhere under packages/', () => {
     /*

@@ -252,6 +252,9 @@ export interface TelemetryEventRow {
   /** The event's own fields, as § 7's table gives them. Validated before the row is written. */
   readonly fields: Readonly<Record<string, unknown>>;
   readonly receivedAtMs: number;
+}
+
+/**
  * One entry on an account's chime ledger — GitHub issue **#368**, [§ D526](../../../../DECISIONS.md).
  *
  * **The ledger is the balance.** There is no balance column anywhere: {@link balanceAfter} on the
@@ -1734,6 +1737,8 @@ const MIGRATIONS: readonly Migration[] = Object.freeze([
       ');\n' +
       'CREATE INDEX IF NOT EXISTS telemetry_events_player ON telemetry_events (player_id);\n' +
       'CREATE INDEX IF NOT EXISTS telemetry_events_received ON telemetry_events (received_at_ms);',
+  }),
+  /**
    * GitHub issue #368, § D526: the chime ledger.
    *
    * **A whole table rather than a column, which is why this one is not an `ALTER`.**
