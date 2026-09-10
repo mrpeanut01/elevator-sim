@@ -113,6 +113,14 @@ async function register(sql: Sql): Promise<readonly { version: number; appliedAt
   return found.rows.map((row) => ({ version: Number(row['version']), appliedAtMs: Number(row['applied_at_ms']) }));
 }
 
+/** Whether migration 4's table is there — asked of the catalog rather than of the register. */
+async function chimeTable(sql: Sql): Promise<boolean> {
+  const found = await sql.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'chime_entries'`,
+  );
+  return found.rows.length > 0;
+}
+
 /** Whether `entries` has the column, asked of the catalog rather than of a failed query. */
 async function legsColumn(sql: Sql): Promise<{ present: boolean; nullable: boolean }> {
   const found = await sql.query(
@@ -227,6 +235,29 @@ describe('an empty database', () => {
     // `SCHEMA` declares the column `NOT NULL`, and migration 1's `ADD COLUMN IF NOT EXISTS` is a
     // no-op here. A database created today therefore cannot hold a row with no count.
     expect(await legsColumn(sql)).toEqual({ present: true, nullable: false });
+  });
+
+  it('creates the chime ledger, and leaves every account that predates it with nothing', async () => {
+    /*
+     * Migration **4** — GitHub issue #368. It was written as 3 and so was #340's `telemetry_events`;
+     * telemetry merged first, so this one moved, and `MIGRATIONS`' own entry carries that note. Two
+     * halves, and the second is the one worth asserting: the
+     * table arrives on a database that already holds an account, and that account's balance is
+     * **zero** rather than a backfill. § D526 clause 2 forbids a balance derived from anything a run
+     * measured, and the only figures a database this old holds are exactly that.
+     */
+    const sql = await databaseBeforeLegs();
+    const store = await Store.open({ sql, now: () => CLOCK });
+    expect(await chimeTable(sql)).toBe(true);
+    expect(await store.chimeBalance('user-ada')).toBe(0);
+    /* And the ledger works on that database, rather than merely existing on it. */
+    const written = await store.recordChimeEntry({
+      userId: 'user-ada',
+      direction: 'earn',
+      entryKey: 'earn-career-day',
+      chimes: 3,
+    });
+    expect(written?.balanceAfter).toBe(3);
   });
 
   it('applies nothing on a second open, and does not restamp the first', async () => {

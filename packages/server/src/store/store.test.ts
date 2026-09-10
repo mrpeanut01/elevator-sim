@@ -577,6 +577,13 @@ async function populate(store: Store, userId: string, suffix: string): Promise<v
     dispatcherProfileId: 'collective',
     score: challengeScore(20),
   });
+  // GitHub issue #368. A balance is account state, so erasure has to take it — and the assertion
+  // that it does is only worth anything if there is a row here to take.
+  // `entryKey` is the LEDGER's vocabulary — a **source** id on an earn, never the completion a
+  // client posts. This wrote `career-day-paid`, which is the completion; the source that pays it is
+  // `earn-career-day`, and the two are deliberately different strings so a module naming one is
+  // distinguishable from a module naming the other (`data/chime-ledger.json`'s own comment).
+  await store.recordChimeEntry({ userId, direction: 'earn', entryKey: 'earn-career-day', chimes: 3 });
 }
 
 describe('deleting an account', () => {

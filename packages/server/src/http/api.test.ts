@@ -1772,3 +1772,298 @@ describe('telemetry', () => {
     expect(refused, 'alternating between the two routes escaped the shared budget').toBe(true);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * The chime ledger — GitHub issue #368
+ * -------------------------------------------------------------------------- */
+
+describe('the chime ledger over the wire', () => {
+  it('answers a balance to a signed-in account and a 401 to nobody', async () => {
+    const player = await signIn();
+    expect((await call('GET', '/api/chimes')).status).toBe(401);
+    const mine = await call('GET', '/api/chimes', { token: player.token });
+    expect(mine.status).toBe(200);
+    expect(typeof bodyOf(mine)['balanceChimes']).toBe('number');
+  });
+
+  it('returns one key and nothing else, which is the whole of the read verb', async () => {
+    /*
+     * **§ D526 clause 5, asserted as a key set rather than trusted as a habit.** *The play surface
+     * reads one balance … and never knows a source.* A field added to this body — the last source,
+     * a history, a breakdown — fails here, and it fails whether or not anybody remembers why. It is
+     * also what makes an add from outside invisible to play: there is nothing else in this body for
+     * a new source to show up in. Asserted after an earn and a spend rather than on a fresh
+     * account, so an empty ledger cannot be what makes the body small.
+     */
+    const player = await signIn();
+    for (let i = 0; i < 3; i += 1) {
+      await call('POST', '/api/chimes/earn', {
+        token: player.token,
+        body: { completion: 'scenario-cleared' },
+      });
+    }
+    await call('POST', '/api/chimes/spend', {
+      token: player.token,
+      body: { modifier: 'career-purse-top-up', steps: 1 },
+    });
+    const mine = await call('GET', '/api/chimes', { token: player.token });
+    expect(Object.keys(bodyOf(mine))).toEqual(['balanceChimes']);
+  });
+
+  it('banks a turn a client names and refuses one it invents', async () => {
+    const player = await signIn();
+    const before = Number(bodyOf(await call('GET', '/api/chimes', { token: player.token }))['balanceChimes']);
+
+    const earned = await call('POST', '/api/chimes/earn', {
+      token: player.token,
+      body: { completion: 'career-day-paid' },
+    });
+    expect(earned.status).toBe(200);
+    expect(Number(bodyOf(earned)['balanceChimes'])).toBeGreaterThan(before);
+    expect(Object.keys(bodyOf(earned))).toEqual(['balanceChimes']);
+
+    const invented = await call('POST', '/api/chimes/earn', {
+      token: player.token,
+      body: { completion: 'bought-some' },
+    });
+    expect(invented.status).toBe(400);
+    expect(bodyOf(invented)['error']).toBe('unknown-completion');
+  });
+
+  it('ignores an amount a client tries to name, because there is nowhere to put one', async () => {
+    /*
+     * **The purchase control.** A purchase is a client naming an amount. This request names one
+     * every way a body can — `chimes`, `amount`, `balanceChimes` — and the balance moves by exactly
+     * what `data/chime-ledger.json` pays for the turn, because no route reads any of them.
+     */
+    const player = await signIn();
+    const other = await signIn();
+    const paid = await call('POST', '/api/chimes/earn', {
+      token: other.token,
+      body: { completion: 'rush-wave-survived' },
+    });
+    const greedy = await call('POST', '/api/chimes/earn', {
+      token: player.token,
+      body: {
+        completion: 'rush-wave-survived',
+        chimes: 9999,
+        amount: 9999,
+        balanceChimes: 9999,
+        price: '9.99',
+        /*
+         * **And a `band`**, which is not a greedy extra field like the four above — it is a field
+         * this route really did read, until the review of PR #485 found the band was taken verbatim
+         * from the body of the account being paid (`chimes/ledger.ts#earnCompletion` holds the
+         * withdrawal). Asserted here rather than in a case of its own so that the claim under test
+         * is the one that matters: **the award does not move**, whatever the body says.
+         */
+        band: 'single',
+      },
+    });
+    expect(greedy.status).toBe(200);
+    expect(bodyOf(greedy)['balanceChimes']).toEqual(bodyOf(paid)['balanceChimes']);
+  });
+
+  it('refuses a spend the balance cannot cover with a 409, and moves nothing', async () => {
+    const player = await signIn();
+    const before = Number(bodyOf(await call('GET', '/api/chimes', { token: player.token }))['balanceChimes']);
+    const refused = await call('POST', '/api/chimes/spend', {
+      token: player.token,
+      body: { modifier: 'career-purse-top-up', steps: 1 },
+    });
+    expect(refused.status).toBe(409);
+    expect(bodyOf(refused)['error']).toBe('not-enough-chimes');
+    expect(Number(bodyOf(await call('GET', '/api/chimes', { token: player.token }))['balanceChimes'])).toBe(before);
+  });
+
+  it('gives the sign-in gift on redemption, silently, and once', async () => {
+    /*
+     * § D531 over the wire. A fresh account has the gift and nothing else, the redemption body says
+     * nothing about it — a gift announced on the way in is a currency figure on a surface — and a
+     * second redemption inside the window adds nothing.
+     */
+    const player = await signIn();
+    const first = Number(bodyOf(await call('GET', '/api/chimes', { token: player.token }))['balanceChimes']);
+    expect(first).toBeGreaterThan(0);
+
+    const asked = await call('POST', '/api/auth/request-link', { body: { email: player.email } });
+    expect(asked.status).toBe(202);
+    const again = await call('POST', '/api/auth/redeem', { body: { token: (await lastLink()).token } });
+    expect(again.status).toBe(200);
+    /* The redemption body is a session and an account, and never a balance. */
+    expect(Object.keys(bodyOf(again)).sort()).toEqual(['token', 'user']);
+    const second = Number(
+      bodyOf(await call('GET', '/api/chimes', { token: String(bodyOf(again)['token']) }))['balanceChimes'],
+    );
+    expect(second).toBe(first);
+  });
+
+  it('spends on a modifier and says what it granted', async () => {
+    const player = await signIn();
+    for (let i = 0; i < 3; i += 1) {
+      await call('POST', '/api/chimes/earn', {
+        token: player.token,
+        body: { completion: 'scenario-cleared' },
+      });
+    }
+    const spent = await call('POST', '/api/chimes/spend', {
+      token: player.token,
+      body: { modifier: 'career-purse-top-up', steps: 1 },
+    });
+    expect(spent.status).toBe(200);
+    expect(Number(bodyOf(spent)['grantUnits'])).toBeGreaterThan(0);
+    /* The answer carries a balance and a grant, and never a price or a receipt to replay. */
+    expect(Object.keys(bodyOf(spent)).sort()).toEqual(['balanceChimes', 'grantUnits']);
+  });
+
+  it('refuses a modifier this build does not sell', async () => {
+    const player = await signIn();
+    const refused = await call('POST', '/api/chimes/spend', {
+      token: player.token,
+      body: { modifier: 'unlock-the-tower', steps: 1 },
+    });
+    expect(refused.status).toBe(400);
+    expect(bodyOf(refused)['error']).toBe('unknown-modifier');
+  });
+
+  it('has no route that lists entries, names a source, or takes money', async () => {
+    /*
+     * **§ D526 clause 6, asked of the router rather than of a reviewer.** Every shape a purchase or
+     * a source-reading client would reach for, and each one is a 404 because there is no such
+     * route. A lane that added one would have to delete a line here to keep the suite green, which
+     * is the difference between an absence and a refusal.
+     */
+    const player = await signIn();
+    for (const [method, path] of [
+      ['GET', '/api/chimes/entries'],
+      ['GET', '/api/chimes/sources'],
+      ['GET', '/api/chimes/history'],
+      ['GET', '/api/chimes/store'],
+      ['GET', '/api/chimes/prices'],
+      ['POST', '/api/chimes/buy'],
+      ['POST', '/api/chimes/purchase'],
+      ['POST', '/api/chimes/checkout'],
+      ['POST', '/api/chimes/grant'],
+      ['POST', '/api/chimes/adjust'],
+      ['POST', '/api/chimes/topup'],
+    ] as const) {
+      const response = await call(method, path, { token: player.token, body: {} });
+      expect(response.status, `${method} ${path}`).toBe(404);
+      expect(bodyOf(response)['error'], `${method} ${path}`).toBe('no-such-route');
+    }
+  });
+
+  it('refuses a posted run that claims a modifier the account never bought', async () => {
+    /*
+     * **The acceptance criterion, end to end.** The submission is otherwise the one the file's own
+     * cases post; the only difference is the claim, and the claim is refused **before** the replay,
+     * so a run nobody paid for cannot command a simulation either.
+     */
+    const player = await signIn();
+    const claiming = await call('POST', '/api/scores', {
+      token: player.token,
+      body: { ...honest(), modifiers: [{ sinkId: 'career-purse-top-up', steps: 2 }] },
+    });
+    expect(claiming.status).toBe(422);
+    expect(bodyOf(claiming)['error']).toBe('modifier-not-bought');
+    expect(String(bodyOf(claiming)['detail'])).toContain('career-purse-top-up');
+  });
+
+  it('accepts the same run once the spend is real', async () => {
+    const player = await signIn();
+    for (let i = 0; i < 3; i += 1) {
+      await call('POST', '/api/chimes/earn', {
+        token: player.token,
+        body: { completion: 'scenario-cleared' },
+      });
+    }
+    const spent = await call('POST', '/api/chimes/spend', {
+      token: player.token,
+      body: { modifier: 'career-purse-top-up', steps: 1 },
+    });
+    expect(spent.status).toBe(200);
+    const posted = await call('POST', '/api/scores', {
+      token: player.token,
+      body: { ...honest(), modifiers: [{ sinkId: 'career-purse-top-up', steps: 1 }] },
+    });
+    /* Whatever the verification says about the figures, it is no longer the modifier being refused. */
+    expect(bodyOf(posted)['error']).not.toBe('modifier-not-bought');
+  }, 600_000);
+
+  it('refuses a modifiers field that is not a list of modifiers, before reading any ledger', async () => {
+    const player = await signIn();
+    const bad = await call('POST', '/api/scores', {
+      token: player.token,
+      body: { ...honest(), modifiers: 'career-purse-top-up' },
+    });
+    expect(bad.status).toBe(400);
+    expect(bodyOf(bad)['error']).toBe('invalid-submission');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The two write verbs are bounded — the review of PR #485, medium 6
+ * -------------------------------------------------------------------------- */
+
+describe('the chime write verbs are bounded like every other write on this surface', () => {
+  it('refuses an account that banks turns faster than anybody plays them', async () => {
+    /*
+     * **The defect this is written against was measured rather than imagined**: two hundred
+     * consecutive earns produced two thousand chimes and nothing was refused. That makes the spend
+     * route's balance check a guard on a number the caller sets, and it appends an unbounded number
+     * of rows to one account's ledger.
+     *
+     * Keyed on the **account** rather than on the caller's address, unlike the telemetry budget
+     * next door and for the opposite reason: the thing being protected is a per-account balance, an
+     * earn requires an account to have been verified by mail, and a per-address budget would refuse
+     * a school or an office where the accounts are real.
+     */
+    const player = await signIn();
+    let refusal: ApiResponse | undefined;
+    for (let n = 0; n < 200 && refusal === undefined; n += 1) {
+      const response = await call('POST', '/api/chimes/earn', {
+        token: player.token,
+        body: { completion: 'rush-wave-survived' },
+      });
+      if (response.status === 429) refusal = response;
+    }
+    expect(refusal, 'two hundred earns in a row and the ledger paid every one').toBeDefined();
+    expect(Number(bodyOf(refusal as ApiResponse)['retryAfterMs'])).toBeGreaterThan(0);
+  });
+
+  it('shares that budget with the spend verb, so alternating does not double it', async () => {
+    const player = await signIn();
+    let refused = false;
+    for (let n = 0; n < 200 && !refused; n += 1) {
+      const response =
+        n % 2 === 0
+          ? await call('POST', '/api/chimes/earn', {
+              token: player.token,
+              body: { completion: 'rush-wave-survived' },
+            })
+          : await call('POST', '/api/chimes/spend', {
+              token: player.token,
+              body: { modifier: 'rush-prefit', steps: 1 },
+            });
+      refused = response.status === 429;
+    }
+    expect(refused, 'alternating between the two verbs escaped the shared budget').toBe(true);
+  });
+
+  it('bounds one account without bounding another, which is what keying on the account means', async () => {
+    const noisy = await signIn();
+    for (let n = 0; n < 200; n += 1) {
+      const response = await call('POST', '/api/chimes/earn', {
+        token: noisy.token,
+        body: { completion: 'rush-wave-survived' },
+      });
+      if (response.status === 429) break;
+    }
+    const quiet = await signIn();
+    const theirs = await call('POST', '/api/chimes/earn', {
+      token: quiet.token,
+      body: { completion: 'rush-wave-survived' },
+    });
+    expect(theirs.status, 'one account exhausting its budget locked another out').toBe(200);
+  });
+});

@@ -174,6 +174,7 @@ import {
 import { FIGURE_NOTE_HANDLE, everydayReportViewOf } from '../everyday/reportView.js';
 // GitHub issue #221's post block — the decision, seeded in all seven states by the report adapter.
 import { postRunViewOf } from '../everyday/postRun.js';
+import { CHIMES_PANEL_COPY } from '../everyday/chimesPanel.js';
 import { SETTINGS_ABSENCES, SIGN_IN_COPY, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
@@ -8691,6 +8692,34 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      */
     'everyday/settingsView.ts#SIGN_IN_COPY',
     /*
+     * The chime tally — GitHub issue #368, § D526 clause 5, § D530. Two declarations, and both are
+     * reached below: `chimesPanelViewOf` because this screen is where a player reads a balance, and
+     * `CHIMES_PANEL_COPY` because the panel's three home notes are one arm each and only one of
+     * them is drawn per case — so the constant is iterated generically, the way `BOARD_SCREEN_COPY`
+     * is, and every sentence is swept rather than whichever home the fixture happened to be in.
+     *
+     * **What is deliberately not seeded is a source**, and there is nothing here that could be:
+     * the panel's input is a number and a home. § D526 clause 5 is the reason, and
+     * `boundaries.test.ts` is where it is asserted rather than merely observed.
+     */
+    'everyday/chimesPanel.ts#chimesPanelViewOf',
+    'everyday/chimesPanel.ts#CHIMES_PANEL_COPY',
+    /*
+     * The shipped price table's **spend half**, whose player-facing strings are the sink names and
+     * the prices drawn from them — both seeded per row below, out of `chimesPanelViewOf`'s own
+     * answer rather than off this constant, so what is swept is what the screen actually renders.
+     *
+     * It is `covers` rather than a seed of its own for that reason, and being here is deliberately
+     * **not** a claim that it is checked: wave T's lesson is that being in `covers` is not being
+     * swept, and what checks these words is the row loop below plus `chimesPanel.test.ts`, which
+     * asserts every price reads as a whole number of the currency's own singular or plural.
+     *
+     * There is no `sources` on it to reach — `core`'s `chimeSpendTableOf` projects them away before
+     * this package holds anything (§ D526 clause 5, and `boundaries.test.ts` forbids the property
+     * access that walked round the id grep).
+     */
+    'everyday/chimesPanel.ts#CHIME_PRICES',
+    /*
      * The DISPLAY NAME field's note, which is **two** sentences because it is about two different
      * names — § D490. Both arms are reached below: all but one of the cases draw the device one, and
      * `not-durable` is signed in and named and draws the account one. A pair of sentences with one
@@ -8803,6 +8832,22 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
        * shipped for a whole milestone and this corpus exists to catch.
        */
       ['muted', { profile: stored, reduceMotion: false, soundOn: false }],
+      /*
+       * GitHub issue #368's tally in the two arms a balance of zero cannot reach — the review of
+       * PR #485, medium 8. Every case above constructs no `chimeBalance`, so `balanceLineOf` drew
+       * its *you have no chimes yet* arm on all of them and **`You have 1 chime.` and `You have 40
+       * chimes.` were never swept at all**. That is the shape wave #483 recorded: a fixture snaps
+       * the value a player is most likely to have to the identity, and the arm that would meet the
+       * search is the one no case constructs.
+       *
+       * Two rather than one, because the singular is a **different string** rather than the same
+       * string with a different number in it — `data/chime-ledger.json` authors `one` and `many`
+       * and the panel picks between them, so a table that lost its singular would ship
+       * *You have 1 chimes.* with nothing reading it. Signed in on both, because a balance and the
+       * account note that explains where it lives are one state.
+       */
+      ['banked-one', { profile: stored, reduceMotion: false, account: named, accountServer: true, chimeBalance: 1 }],
+      ['banked-many', { profile: stored, reduceMotion: false, account: named, accountServer: true, chimeBalance: 40 }],
     ] as const;
 
     for (const [label, input] of cases) {
@@ -8816,6 +8861,29 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
       seeds.push({ field: `${label}.you.name`, text: view.you.nameValue, role: 'label' });
       seeds.push({ field: `${label}.you.pictureLabel`, text: view.you.pictureLabel, role: 'label' });
       seeds.push({ field: `${label}.you.note`, text: view.you.note, role: 'prose' });
+      /*
+       * The chime tally — GitHub issue #368. The balance line is a **label** rather than an
+       * observation: it is a count of completed turns, not a figure any run produced, which is
+       * exactly what § D526 clause 2 makes it. Seeding it as an observation would ask R13 for a
+       * denominator that does not exist, and inventing one is the defect R13 exists to catch.
+       */
+      const chimes = view.you.chimes;
+      seeds.push({ field: `${label}.chimes.heading`, text: chimes.heading, role: 'label' });
+      seeds.push({ field: `${label}.chimes.balance`, text: chimes.balanceLine, role: 'label' });
+      seeds.push({ field: `${label}.chimes.lede`, text: chimes.lede, role: 'prose' });
+      seeds.push({ field: `${label}.chimes.home`, text: chimes.homeNote, role: 'prose' });
+      seeds.push({ field: `${label}.chimes.spendHeading`, text: chimes.spendHeading, role: 'label' });
+      for (const row of chimes.rows) {
+        seeds.push({ field: `${label}.chimes.${row.id}.name`, text: row.name, role: 'label' });
+        seeds.push({ field: `${label}.chimes.${row.id}.price`, text: row.price, role: 'label' });
+      }
+      /*
+       * That none of those prices can be bought yet — seeded **by name**, because being reachable
+       * through a `covers` entry is not being swept (wave T's finding). A `reason`, not prose: it
+       * is a refusal this surface makes about its own rows, which is the role
+       * `signIn.notice` already carries for a sentence that explains why something is not offered.
+       */
+      seeds.push({ field: `${label}.chimes.spendRefusal`, text: chimes.spendRefusal, role: 'reason' });
       /*
        * The account block — § D489's asking half and § 15.1's signed-in one. `fieldValue` is
        * deliberately not seeded: it is the reader's own address, and `settingsView.ts` says why
@@ -8875,6 +8943,15 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
       if (view.device.clear.button !== undefined) {
         seeds.push({ field: `${label}.device.clear.button`, text: view.device.clear.button, role: 'label' });
       }
+    }
+
+    /*
+     * Every sentence the tally can say, over its arms rather than over the arms this corpus's cases
+     * happen to reach. `CHIMES_PANEL_COPY` is iterated by key, so a home note added to it is swept
+     * on the commit that adds it and not on the commit that first seeds a case into that state.
+     */
+    for (const [key, text] of Object.entries(CHIMES_PANEL_COPY)) {
+      seeds.push({ field: `chimes.copy.${key}`, text, role: 'prose' });
     }
 
     return singleRun(this.id, seeds);

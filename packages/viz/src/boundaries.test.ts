@@ -740,3 +740,167 @@ describe('the browser-facing modules import no node builtins', () => {
     expect(users.length).toBeGreaterThan(0);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * § D526 clause 5 — the play surface never learns a source (GitHub issue #368)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The chime ledger's **source** vocabulary, read off the shipped table rather than transcribed.
+ *
+ * *The play surface reads one balance and posts two verbs, earn and spend, and never knows a
+ * source* ([§ D526](../../../DECISIONS.md) clause 5). This is that rule as a grep, and the whole of
+ * it turns on two words this repository keeps apart on purpose:
+ *
+ * - a **completion** is what the play surface names — *a scenario cleared* — and every module here
+ *   is free to say one;
+ * - a **source** is what the ledger calls the entry it wrote — *earn-scenario-clear* — and no
+ *   module here may say one at all.
+ *
+ * Derived from `data/chime-ledger.json` rather than listed here, on
+ * `validation/documentation.test.ts`'s own rule for the carrier set it checks: a source added to
+ * the table joins this rule on the commit that adds it, and a module that names it cannot escape by
+ * not being on a list. **That is also what makes an add from outside invisible to play** — the
+ * property the whole clause exists for. A purchase, a gift, an operator's correction: each would be
+ * one more source on the same ledger, and nothing here could name it, so nothing here could draw a
+ * different sentence because of it.
+ */
+async function chimeSourceIds(): Promise<readonly string[]> {
+  const raw = await readFile(join(REPO_ROOT, 'data', 'chime-ledger.json'), 'utf8');
+  const table = JSON.parse(raw) as { sources: readonly { id: string }[] };
+  return table.sources.map((source) => source.id);
+}
+
+describe('§ D526 clause 5 — the balance is all the play surface knows', () => {
+  it('names no chime source anywhere in this package', async () => {
+    const sources = await chimeSourceIds();
+    const offenders = (await vizSources())
+      .filter((file) => !isTest(file.id))
+      .filter((file) => sources.some((id) => file.code.includes(id)))
+      .map((file) => file.id)
+      .sort((a, b) => a.localeCompare(b));
+    expect(
+      offenders,
+      'a module in the viewer names a chime source. § D526 clause 5: the play surface reads one ' +
+        'balance and posts earn and spend, and never learns where an entry came from — which is ' +
+        'what makes an add from outside invisible to play. If this module needs to say what the ' +
+        'player finished, it should name a completion (scenario cleared, contract day paid, rush ' +
+        'wave survived); if it needs a balance, it should read the one number the account answers.',
+    ).toEqual([]);
+  });
+
+  it('reaches no source list, which a name grep alone could not have told it', async () => {
+    /*
+     * **The hole the review of PR #485 measured, closed.** The rule above greps for source *ids*,
+     * and `everyday/chimesPanel.ts` imported the whole `data/chime-ledger.json` and exported the
+     * parsed table — so `CHIME_LEDGER.sources[i].name` drew a source's name to a player through one
+     * property access, spelling no id at all, with nothing going red. Four of the five ways a
+     * module could learn a source went uncaught; only a literal id was seen.
+     *
+     * A grep over names cannot catch a grep-free path to the same data, so this is a grep over the
+     * **path**: nothing in this package may reach a `.sources` at all — not off a parsed table, not
+     * off a raw JSON import. The panel's own half of the fix is in `core`
+     * (`chimeSpendTableOf`), which projects the sources away before the module holds anything, so
+     * the two rules together mean there is no binding here that has one and no expression here that
+     * could read one.
+     *
+     * Deliberately not narrowed to the ledger: `.sources` on any document in this package is the
+     * same shape, and a rule that named one file would be a rule about that file.
+     */
+    /*
+     * Three shapes, because the docstring above says *not at all* and a dotted read alone does not
+     * mean that. `chimesPanel.ts` still imports the raw JSON, so `chimeLedgerDocument['sources']`
+     * is a live path in the one file holding the document, and a destructure hides the word behind
+     * a binding — both were measured as escaping the first spelling of this guard.
+     */
+    const reaching = /[.[]\s*['"]?sources\b|\bsources\s*[,}]/u;
+    const offenders = (await vizSources())
+      .filter((file) => !isTest(file.id))
+      .filter((file) => reaching.test(file.code))
+      .map((file) => file.id)
+      .sort((a, b) => a.localeCompare(b));
+    expect(
+      offenders,
+      'a module in the viewer reads a `.sources`. § D526 clause 5: the play surface never learns ' +
+        'where an entry came from, and a property access is a way of learning it that no grep over ' +
+        'source names can see. A module that needs the prices should import the projection — ' +
+        '`core`\u2019s `chimeSpendTableOf`, which `everyday/chimesPanel.ts` applies to the parse ' +
+        'expression itself so that nothing here ever holds a table with sources on it.',
+    ).toEqual([]);
+  });
+
+  it('positive control: that rule really catches a property access', () => {
+    /*
+     * Assembled rather than written out, on this block's own habit: the rule reads
+     * comment-stripped-but-string-intact source and exempts only tests by name, so spelling the
+     * expression here would make this file its first offender the day somebody widened the filter.
+     */
+    /*
+     * Three shapes, because the docstring above says *not at all* and a dotted read alone does not
+     * mean that. `chimesPanel.ts` still imports the raw JSON, so `chimeLedgerDocument['sources']`
+     * is a live path in the one file holding the document, and a destructure hides the word behind
+     * a binding — both were measured as escaping the first spelling of this guard.
+     */
+    const reaching = /[.[]\s*['"]?sources\b|\bsources\s*[,}]/u;
+    const property = ['const paid = table', 'sources[0].name;'].join('.');
+    expect(reaching.test(property), 'the detector misses a property access').toBe(true);
+    expect(reaching.test('const rows = table.sinks.map(price);'), 'the detector is too wide').toBe(false);
+  });
+
+  it('reads no ledger entry, and has no shape to put one in', async () => {
+    /*
+     * The other half of the same clause and the one a screen would breach first. A history, a
+     * breakdown, a *where this came from* — each needs the entries, and the server serves a balance
+     * and nothing else. Asserted over the words a client would have to use to ask.
+     */
+    const asking = /chimeEntries|ledgerEntries|chimeHistory|chimeSources|earnedFrom/;
+    const offenders = (await vizSources())
+      .filter((file) => !isTest(file.id))
+      .filter((file) => asking.test(file.identifiers))
+      .map((file) => file.id);
+    expect(
+      offenders,
+      'a module in the viewer asks the ledger for its entries. There is no route that answers ' +
+        'one, on purpose — see § D526 clause 5 and the balance route’s own docstring.',
+    ).toEqual([]);
+  });
+
+  it('positive control: the source ids are real, and the grep would catch one', async () => {
+    /*
+     * This file's own habit, and it matters more here than usual: a rule keyed on a list read off
+     * disk passes vacuously the day the list comes back empty. Both halves are asserted — the table
+     * really has sources, and the detector really catches a module that names one.
+     *
+     * The literal is **assembled** rather than written out, because the rule above reads
+     * comment-stripped-but-string-intact source and exempts only tests by name; spelling a source
+     * id here would make this file the first offender the day somebody widened the filter.
+     */
+    const sources = await chimeSourceIds();
+    /*
+     * **Every id, not the first one.** This read `expect(sources.length).toBeGreaterThan(2)` and
+     * then built one offending line out of `sources[0]`, which the review of PR #485 named as a
+     * vacuity guard that is itself vacuous: deleting a source left three and nothing went red, and
+     * an id the detector happened to miss would never have been tried. The existence of each
+     * shipped source is asserted where the table is parsed — `core`'s `chimeLedger.test.ts` requires
+     * a gift and one source per completion, so a deleted source is red there — and what this owes
+     * is that the **detector** works on all of them.
+     */
+    expect(sources.length).toBeGreaterThan(2);
+    for (const id of sources) {
+      expect(id.startsWith('earn-') || id.startsWith('gift-'), id).toBe(true);
+      const wouldOffend = `const paid = ${JSON.stringify(id)};`;
+      expect(sources.some((candidate) => wouldOffend.includes(candidate)), id).toBe(true);
+    }
+
+    /* And the completion vocabulary, which this rule must NOT catch, is genuinely different. */
+    const completion = ['scenario', 'cleared'].join('-');
+    expect(sources.some((id) => completion.includes(id))).toBe(false);
+  });
+
+  it('positive control: the panel that draws the balance is really in the tree', async () => {
+    /* A rule confining a surface that does not exist confines nothing. */
+    const files = (await vizSources()).map((file) => file.id);
+    expect(files).toContain('everyday/chimesPanel.ts');
+    expect(files).toContain('everyday/settingsView.ts');
+  });
+});

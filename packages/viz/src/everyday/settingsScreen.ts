@@ -199,9 +199,40 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
    */
   const actions = context.host.accountActions();
 
+  /**
+   * The account's chime balance, once the server has answered — GitHub issue **#368**.
+   *
+   * `undefined` until then, which `settingsView.ts#chimeBalance` reads as the same `0` an account
+   * that has finished nothing gets, and deliberately: *a balance nobody has fetched and a balance
+   * of nothing say the same true sentence to a player.*
+   *
+   * **This is the read verb's only non-test caller**, and it exists because the branch that built
+   * the panel shipped without one: the balance route, both write verbs and the modifier claim had
+   * no client at all, so the panel drew *"You have no chimes yet"* for ever whatever the account
+   * held. That is `CLAUDE.md`'s standing requirement — *name the non-test caller* — and it would
+   * have been the twelfth instance of the class.
+   */
+  let chimeBalance: number | undefined;
+  /*
+   * {@link readChimeBalance}'s gate, declared **here** rather than beside the function it belongs
+   * to, and that is load-bearing rather than tidy.
+   *
+   * `readChimeBalance` is a function *declaration*, so it hoists and can be called from the mount
+   * block far above it. `lastReadToken` is a `let`, which does not — so with the two together the
+   * mount's first call read the binding in its temporal dead zone and threw
+   * `ReferenceError: Cannot access 'lastReadToken' before initialization` **before**
+   * `host.append(root)` and before either watch was registered. Every mount, on every account
+   * state: the whole Settings panel failed to open in the shipped bundle, and the browser tier was
+   * red in three files while four projects were green — wave R's lesson arriving again.
+   */
+  let lastReadToken: string | undefined | null = null;
+  /** Set by `unmount`, so a late answer cannot paint a screen that has gone. `boardScreen.ts`'s shape. */
+  let disposed = false;
+
   const viewNow = (): SettingsScreenView =>
     settingsScreenViewOf({
       profile: store.current(),
+      chimeBalance,
       draftName,
       durable,
       reduceMotion: engineerSettings()?.reduceMotion(),
@@ -412,7 +443,54 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   accountBlock.append(accountHeading, accountNote, emailBlock, accountNotice, buttonRow);
   homeBlock.append(accountBlock, saveNotice);
 
-  youCard.append(identityRow, nameNote, homeBlock);
+  /* ---- the chime tally — GitHub issue #368, § D526 clause 5 ---- */
+  /*
+   * **Built once and updated in place**, on this file's own rule for the account block: nothing
+   * below calls `replaceChildren`, because a repaint that rebuilt this region while the reader was
+   * typing in the name field above it would take the caret with it.
+   *
+   * The rows are the sinks, and the count of them is fixed at build time by the shipped table — so
+   * the loop below can be built once and never rebuilt. A table that gained a sink between two
+   * paints is not a thing that can happen: it is bundled with the module.
+   *
+   * **They are not dimmed by affordability any more, and the deletion is the point.** A row faded
+   * because the balance will not cover it is a row telling a player it becomes pressable when the
+   * balance does. Nothing in this build spends a chime, `chimesRefusal` below says so in the
+   * player's own words, and a dimming rule that implied otherwise beside that sentence would have
+   * the panel disagreeing with itself.
+   */
+  const chimesBlock = el(doc, 'div');
+  chimesBlock.style.cssText = `margin-top:14px;padding-top:14px;border-top:1px solid ${C.ruleLight}`;
+  const chimesHeading = el(doc, 'div', undefined, view.you.chimes.heading);
+  chimesHeading.style.cssText = `font-size:11px;letter-spacing:0.08em;color:${C.warmGrey}`;
+  const chimesBalance = el(doc, 'div', 'everyday-settings-chimes-balance', view.you.chimes.balanceLine);
+  chimesBalance.style.cssText = `font-size:15px;color:${C.ink};margin-top:6px`;
+  const chimesLede = el(doc, 'div', undefined, view.you.chimes.lede);
+  chimesLede.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.5;margin-top:6px;max-width:70ch`;
+  const chimesHome = el(doc, 'div', 'everyday-settings-chimes-home', view.you.chimes.homeNote);
+  chimesHome.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.5;margin-top:8px;max-width:70ch`;
+  const chimesSpendHeading = el(doc, 'div', undefined, view.you.chimes.spendHeading);
+  chimesSpendHeading.style.cssText = `font-size:11px;letter-spacing:0.08em;color:${C.warmGrey};margin-top:12px`;
+  const chimesRows = el(doc, 'div');
+  chimesRows.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:6px';
+  for (const row of view.you.chimes.rows) {
+    const line = el(doc, 'div', undefined, `${row.name} — ${row.price}`);
+    line.style.cssText = `font-size:12.5px;color:${C.ink}`;
+    chimesRows.append(line);
+  }
+  const chimesRefusal = el(doc, 'div', 'everyday-settings-chimes-refusal', view.you.chimes.spendRefusal);
+  chimesRefusal.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.5;margin-top:8px;max-width:70ch`;
+  chimesBlock.append(
+    chimesHeading,
+    chimesBalance,
+    chimesLede,
+    chimesHome,
+    chimesSpendHeading,
+    chimesRows,
+    chimesRefusal,
+  );
+
+  youCard.append(identityRow, nameNote, homeBlock, chimesBlock);
   root.append(youHeading, youCard);
 
   /* ---- PLAYING ---- */
@@ -853,6 +931,13 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     issue.hidden = view.you.nameIssue === undefined;
     saveNotice.textContent = view.you.saveNotice ?? '';
     saveNotice.hidden = view.you.saveNotice === undefined;
+    /*
+     * The tally follows the view — GitHub issue #368. Text only, on this file's build-once rule,
+     * and the balance is the one thing here that moves on its own: it changes when the account
+     * bridge answers and when a spend lands, and both arrive as a repaint.
+     */
+    chimesBalance.textContent = view.you.chimes.balanceLine;
+    chimesHome.textContent = view.you.chimes.homeNote;
     for (const [index, button] of swatchButtons.entries()) {
       const swatch = view.you.swatches[index];
       if (swatch !== undefined) button.style.cssText = swatchStyle(swatch.color, swatch.selected);
@@ -1119,11 +1204,45 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   redrawTelemetry();
   redrawClear();
   redrawAccount();
+  readChimeBalance();
   const stopWaiting = onEngineerSettingsProvided(() => {
     redrawPlaying();
     redrawClear();
   });
-  const stopAccountWatch = onEverydayAccount(redrawAccount);
+  /**
+   * Ask the account for its balance, and repaint the tally when it answers — GitHub issue **#368**.
+   *
+   * ## Why it is keyed on the token
+   *
+   * A balance belongs to an account, so it is re-read when the account changes and not otherwise:
+   * `onEverydayAccount` fires on every publish — a keystroke in the address box is one — and a read
+   * per publish would be a request per keystroke, which `menu/client.ts#wake` names as a thing a
+   * caller must not do. `lastReadToken` is the whole of the gate, and `null` before any read so
+   * that a signed-out mount reads once and a sign-out is a change like any other.
+   *
+   * ## Why the answer is folded to a number or nothing
+   *
+   * `settingsView.ts#chimeBalance` takes `number | undefined` and says why in its own docstring:
+   * *a balance nobody has fetched and a balance of nothing say the same true sentence to a player*.
+   * A server that refused and a visitor with no account both leave it `undefined`, and the panel
+   * draws *you have no chimes yet* or *there is no tally yet* from the account state it already
+   * has — so a failed read never invents a figure and never contradicts the block above it.
+   */
+  function readChimeBalance(): void {
+    const token = everydayAccount()?.token;
+    if (token === lastReadToken) return;
+    lastReadToken = token;
+    void context.host.chimeBalance().then((answer) => {
+      if (disposed || everydayAccount()?.token !== token) return;
+      chimeBalance = answer.kind === 'balance' ? answer.chimes : undefined;
+      redrawIdentity();
+    });
+  }
+
+  const stopAccountWatch = onEverydayAccount(() => {
+    redrawAccount();
+    readChimeBalance();
+  });
   /*
    * **The attachment follows the host, so what is shown stays what is sent** — GitHub issue #245.
    *
@@ -1139,6 +1258,7 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
 
   return {
     unmount: () => {
+      disposed = true;
       stopWaiting();
       stopAccountWatch();
       stopHostWatch();

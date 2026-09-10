@@ -101,6 +101,7 @@
 
 import type {
   BuildingConfig,
+  ChimeCompletion,
   DispatcherProfile,
   DispatcherProfiles,
   ElevatorSpecs,
@@ -267,6 +268,31 @@ export type EverydayDailyBoard =
       readonly distribution: BoardDistribution | undefined;
       readonly distributionDetail: string | undefined;
     };
+
+/**
+ * The account's chime balance, as a screen knows it — GitHub issue **#368**.
+ *
+ * {@link EverydayDailyBoard}'s three-state shape with the middle two collapsed, and the collapse is
+ * deliberate: a balance has no *the server said nothing about it* arm, because the route answers one
+ * key or it does not answer. `no-server` and `unreachable` stay apart for that type's own reason —
+ * *a build served with no API origin* is a fact about the page and *the server refused* is a fact
+ * about a moment, and a screen that merged them would tell a player to try again on a build that
+ * has nowhere to try.
+ *
+ * **`signed-out` is a fourth state rather than a balance of zero**, because they are different
+ * sentences: an account that has finished nothing has a tally of nothing, and a visitor has no
+ * tally. `everyday/chimesPanel.ts` says so on the screen, which is the half of this the review of
+ * PR #485 found the branch getting backwards.
+ */
+export type EverydayChimeBalance =
+  /** No API origin on this build — the `<meta>` tag is absent. Not a server that failed. */
+  | { readonly kind: 'no-server' }
+  /** Nobody is signed in, so there is no account to hold a balance. */
+  | { readonly kind: 'signed-out' }
+  /** There is a server and it did not answer, or refused. `detail` is renderable as it stands. */
+  | { readonly kind: 'unreachable'; readonly detail: string }
+  /** The account's balance, in whole chimes. */
+  | { readonly kind: 'balance'; readonly chimes: number };
 
 /**
  * Compose the two board reads into one of {@link EverydayDailyBoard}'s four states.
@@ -1264,6 +1290,15 @@ export interface EverydayHost {
    * caller draws one of them and never invents a fifth. See {@link EverydayDailyBoard}.
    */
   dailyBoard(): Promise<EverydayDailyBoard>;
+  /**
+   * Read the account's chime balance — GitHub issue **#368**, [§ D526](../../../../DECISIONS.md)
+   * clause 5's **one read**, and the whole of what a screen may ask the ledger.
+   *
+   * Not a history, not a breakdown, not *where this came from*: the route serves one key and this
+   * carries it. That is what makes a source added on the server invisible to play — it moves this
+   * number and there is nothing else here for it to move.
+   */
+  chimeBalance(): Promise<EverydayChimeBalance>;
 
   /**
    * Post the run on screen, and say what happened — GitHub issue #221's first criterion.
@@ -1492,6 +1527,25 @@ export interface EverydayHostBindings {
    * imported one would be the third.
    */
   readonly dailyBoard: (() => Promise<EverydayDailyBoard>) | undefined;
+  /**
+   * Read the account's chime balance — GitHub issue **#368**. `undefined` with no API origin, on
+   * {@link dailyBoard}'s rule, and **optional** on {@link postRun}'s: two binding literals outside
+   * this lane's reach would otherwise have to gain a field, and a shell that omits it gets
+   * `no-server`, which is drawn honestly.
+   */
+  readonly chimeBalance?: (() => Promise<EverydayChimeBalance>) | undefined;
+  /**
+   * Bank a turn the player finished — GitHub issue **#368**, the earn verb's **non-test caller**.
+   *
+   * `undefined` with no API origin, on {@link dailyBoard}'s rule. It answers nothing on purpose:
+   * a banked turn changes a number on the Settings screen and **nothing a player is looking at when
+   * they finish**, because [§ D526](../../../../DECISIONS.md) clause 3 forbids a currency figure on
+   * a results page, and a call whose answer nobody reads cannot grow one.
+   *
+   * The completion is `core`'s vocabulary rather than this file's, which is clause 5's other half:
+   * a screen names *what it finished* and never *which source pays it*.
+   */
+  readonly bankCompletion?: ((completion: ChimeCompletion) => void) | undefined;
   /**
    * Post the run on screen — GitHub issue #221's write half. `undefined` when there is no API
    * origin, on {@link dailyBoard}'s rule: the absence is a property of the page, decided once at
@@ -2124,6 +2178,27 @@ export function createEverydayHost(
       if (next === career) return;
       setCareer(next);
       notifyCampaign();
+      /*
+       * **And the ledger hears about it** — GitHub issue #368, and this is the earn verb's only
+       * non-test caller. `data/chime-ledger.json`'s `earn-career-day`: *a day the contract paid
+       * for — the completed turn, not the day's figures.*
+       *
+       * Placed **after** `setCareer`, and gated on `next !== career` above, so it fires exactly
+       * where a day is really filed: `fileDay` returns the record unchanged on a tower this career
+       * does not hold and on a month that is over, and a bank on either would be paying for a turn
+       * nobody took.
+       *
+       * **A missed day earns nothing**, which is the source's own note and § D526 clause 3's *no
+       * buying relief on a miss* read from the other end. `verdict` is the same one filed above, so
+       * there is no second answer to *did today clear*.
+       *
+       * **Nothing is awaited and nothing is drawn.** The award is the server's to price and the
+       * player is on a report screen; a figure arriving there would be the currency-beside-a-wait
+       * clause 3 forbids, and a day that could fail to close because a network call failed would be
+       * a worse trade than a chime nobody banked. The balance is read again next time Settings is
+       * opened, and the ledger is append-only, so nothing is lost that was not already spent.
+       */
+      if (verdict === 'cleared') b.bankCompletion?.('career-day-paid');
     },
     intervene: (atS, change) => {
       // Gated here as well as on the control, because the record cannot grow before it exists and
@@ -2363,6 +2438,11 @@ export function createEverydayHost(
        * is the caller's, because everything else is the client's.
        */
       const read = b.dailyBoard;
+      return read === undefined ? { kind: 'no-server' } : read();
+    },
+    /* {@link dailyBoard}'s split, applied to the ledger's one read. GitHub issue #368. */
+    chimeBalance: async () => {
+      const read = b.chimeBalance;
       return read === undefined ? { kind: 'no-server' } : read();
     },
     /*

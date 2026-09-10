@@ -2106,3 +2106,197 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
     ).toBeLessThanOrEqual(DECISION_DEBT_CEILING);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * § D526 clause 6 — no purchase anywhere (GitHub issue #368)
+ * -------------------------------------------------------------------------- */
+
+describe('DECISIONS.md D526 clause 6 — no purchase, price, store or conversion event ships', () => {
+  /**
+   * TypeScript with comments and string literals removed — the S1 scrubber, and its reason applies
+   * here more sharply than it did there.
+   *
+   * This repository is **full of prose about not shipping a purchase**: the decision entry, the
+   * ledger's own docstrings, `docs/26` § 10, this test's own title. Asked of the word, every one of
+   * those is a hit and the check is worthless. Asked of the **code**, a file that says *there is no
+   * purchase here* is silent and a file that implements one is loud, which is the only version of
+   * this check worth running.
+   */
+  const code = (source: string): string =>
+    source
+      .replace(/\/\*[\s\S]*?\*\//gu, ' ')
+      .replace(/\/\/[^\n]*/gu, ' ')
+      .replace(/'(?:\\.|[^'\\])*'/gu, "''")
+      .replace(/"(?:\\.|[^"\\])*"/gu, '""')
+      .replace(/`(?:\\.|[^`\\])*`/gu, '``');
+
+  const sourceFilesUnder = (dir: string): readonly string[] => {
+    const found: string[] = [];
+    const walk = (at: string): void => {
+      for (const entry of readdirSync(at, { withFileTypes: true })) {
+        const path = join(at, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== 'node_modules' && entry.name !== 'dist') walk(path);
+        } else if (entry.name.endsWith('.ts')) found.push(path);
+      }
+    };
+    walk(dir);
+    return found;
+  };
+
+  /**
+   * What a purchase is made of, in code.
+   *
+   * Deliberately **not** the word *price*: this product prices everything — a repair in units, a
+   * modifier in chimes — and a vocabulary that caught those would be a vocabulary somebody deletes
+   * within a wave. What is here is the machinery a purchase needs and honest play never does: a
+   * processor, a storefront, an amount denominated in money, a thing bought and owned, and the
+   * conversion event that would exist to measure it.
+   *
+   * **And deliberately not the word *purchase* either, which took one merge to find out.** This
+   * pattern carried it, and `scenario/budget.ts#admitPurchase` and `campaign/parse.ts` — GitHub
+   * issue #365's budget, landed in a parallel lane — are named for exactly the thing this game is
+   * *made of*: spending chimes on a rung. The two lanes never met, and the first tree that held
+   * both went red on a function doing nothing wrong.
+   *
+   * It is the same mistake the paragraph above already avoided one word earlier, so the fix is the
+   * same reasoning applied consistently: **the discriminator is money, not the verb.** A purchase
+   * this rule forbids is one denominated in a currency, which is why `cents\b`, `moneyamount`
+   * and the three currency codes are here and `purchase` is not. A lane adding
+   * `purchaseChimes(cents)` still trips it; a lane adding `admitPurchase(rung)` does not, and
+   * should not.
+   */
+  const PURCHASE_MACHINERY =
+    /paywall|checkout|stripe|paypal|braintree|adyen|storefront|microtransaction|in-app|\biap\b|\bsku\b|billing|invoice|payment|refund|entitlement|merchant|creditcard|cardnumber|currencycode|realmoney|cents\b|moneyamount|\busd\b|\beur\b|\bgbp\b/iu;
+
+  /**
+   * The **installed** half of the same refusal, and it is a different vocabulary on purpose.
+   *
+   * One regular expression ran against both source code and dependency names, which the review of
+   * PR #485 named: it caught `@stripe/stripe-js` because *stripe* happens to be a word a purchase
+   * writes as well as a vendor it installs, and missed `revenuecat`, `paddle` and a wallet SDK
+   * entirely, because those are things you *install* rather than things you *type*.
+   *
+   * The two cannot be merged, and `subscription` is the reason rather than a preference: it appears
+   * eight times in non-test source in this tree as an **event** subscription — `EverydayHost.subscribe`
+   * and its callers — so a code rule naming it would refuse the shell. A dependency called
+   * `something-subscriptions` has no such second meaning, so the word belongs here and not there.
+   * `purchase` is the same shape one step along: `scenario/budget.ts#admitPurchase` is a budget
+   * admitting a *change*, not a shop, and `react-native-purchases` is a shop.
+   * {@link PURCHASE_MACHINERY} still applies to manifests as well; this is added to it, so a vendor
+   * that renames itself into either vocabulary is caught by one of them.
+   */
+  const PURCHASE_VENDORS =
+    /revenuecat|lemonsqueezy|chargebee|recurly|gumroad|fastspring|xsolla|\bpaddle\b|square-?up|\bwallet\b|subscription|purchases?|applepay|googlepay|shopify|snipcart|\bcoinbase\b|\bplaid\b/iu;
+
+  it('names none of a purchase’s machinery in code, anywhere under packages/', () => {
+    /*
+     * `documentation.test.ts:1136`'s shape, and its four moves kept: ask the code rather than the
+     * word, exclude tests because an instrument is non-test code by this repository's own standing
+     * rule, derive the population from disk rather than transcribing it, and assert **both**
+     * directions so that a reworded document fails on the reword and a moved tree fails on the
+     * measurement.
+     */
+    const naming = sourceFilesUnder(join(ROOT, 'packages'))
+      .filter((path) => path.includes(`${sep}src${sep}`))
+      .filter((path) => !path.endsWith('.test.ts') && !path.endsWith('.test-helper.ts'))
+      .filter((path) => PURCHASE_MACHINERY.test(code(readFileSync(path, 'utf8'))))
+      .map((path) => path.slice(ROOT.length));
+
+    expect(
+      naming,
+      'DECISIONS.md D526 clause 6: no purchase, price, store, conversion event or supporting ' +
+        'telemetry ships anywhere, and such a source is added only by a decision citing a measured ' +
+        'charter S4. These files name one in code rather than in prose. Either that decision has ' +
+        'been taken and this check moves with it, or they do.',
+    ).toEqual([]);
+
+    // The other direction: the document must still be making the claim this case pins.
+    const nonGoals = read('docs', '26-telemetry-and-privacy.md');
+    expect(nonGoals).toMatch(/No purchase, price, store, conversion event or supporting telemetry/u);
+  });
+
+  it('declares no payment or store dependency in any package', () => {
+    /*
+     * The other half, and the cheaper one to get wrong: a purchase does not have to be written to
+     * arrive, it can be installed. Read off every `package.json` under `packages/` rather than a
+     * list, so a new package joins this rule on the commit that creates it.
+     */
+    const manifests = readdirSync(join(ROOT, 'packages'), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => join(ROOT, 'packages', entry.name, 'package.json'));
+    expect(manifests.length, 'the packages directory produced no manifests').toBeGreaterThan(3);
+
+    const offenders: string[] = [];
+    for (const path of manifests) {
+      const manifest = JSON.parse(readFileSync(path, 'utf8')) as {
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      };
+      const named = [
+        ...Object.keys(manifest.dependencies ?? {}),
+        ...Object.keys(manifest.devDependencies ?? {}),
+      ];
+      for (const name of named) {
+        if (PURCHASE_MACHINERY.test(name) || PURCHASE_VENDORS.test(name)) {
+          offenders.push(`${path.slice(ROOT.length)}: ${name}`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      'a package declares a payment or store dependency. See DECISIONS.md D526 clause 6 — the ' +
+        'ledger is built so an add from outside would be one more source on it, and that source ' +
+        'needs a decision rather than an install.',
+    ).toEqual([]);
+  });
+
+  it('positive control: the detector really would catch one', () => {
+    /*
+     * This suite's own habit. A vocabulary that quietly stopped matching would pass forever, and a
+     * scrubber that over-removed would make every file silent. Both are asserted: the machinery is
+     * caught in code, and the same words inside a comment or a string are not — which is the
+     * distinction that lets this repository write about refusing a purchase at length.
+     */
+    const implemented = 'const session = await stripe.checkout.sessions.create({ amount: 499 });';
+    expect(PURCHASE_MACHINERY.test(code(implemented))).toBe(true);
+
+    const denied = '/* No purchase, no price, no store, no checkout, no stripe. */ const a = 1;';
+    expect(PURCHASE_MACHINERY.test(code(denied))).toBe(false);
+
+    const quoted = "const note = 'there is no checkout in this product';";
+    expect(PURCHASE_MACHINERY.test(code(quoted))).toBe(false);
+
+    /*
+     * And the vendors a purchase is **installed** from, which the code vocabulary above does not
+     * see and does not need to. Each is asserted against the manifest rule's own predicate rather
+     * than against the regular expression alone, because what the rule reads is a dependency name.
+     */
+    const installs = (name: string): boolean =>
+      PURCHASE_MACHINERY.test(name) || PURCHASE_VENDORS.test(name);
+    for (const vendor of [
+      '@stripe/stripe-js',
+      'react-native-purchases',
+      'revenuecat',
+      '@paddle/paddle-js',
+      'lemonsqueezy.ts',
+      '@solana/wallet-adapter',
+      'some-subscriptions-sdk',
+    ]) {
+      expect(installs(vendor), vendor).toBe(true);
+    }
+    /* And the names this workspace really declares are not caught by either. */
+    for (const real of ['vitest', 'typescript', '@elevator-sim/core', 'playwright', 'esbuild']) {
+      expect(installs(real), real).toBe(false);
+    }
+
+    /* And the words this product legitimately uses are not in the vocabulary. */
+    for (const allowed of [
+      'const priceUnits = sink.priceChimes;',
+      'const cost = repair.costUnits;',
+      'const bought = changesBought(schedule, patch);',
+    ]) {
+      expect(PURCHASE_MACHINERY.test(code(allowed)), allowed).toBe(false);
+    }
+  });
+});

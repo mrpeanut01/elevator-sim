@@ -27,6 +27,7 @@
 import { TRAFFIC_DEFAULTS, loadConfig, type LoadedConfig } from '@elevator-sim/core';
 
 import { requireSecret } from './accounts/credentials.js';
+import { loadChimeLedger } from './chimes/ledger.js';
 import {
   CHALLENGE_ROTATION,
   challengeDefinitionIssues,
@@ -111,6 +112,14 @@ function seedTokenFrom(env: Readonly<Record<string, string | undefined>>): strin
 export async function bootstrap(options: BootstrapOptions): Promise<Server> {
   const secret = requireSecret(options.env);
   const config = await loadConfig(options.dataDir);
+  /*
+   * The chime ledger's table — GitHub issue #368. Loaded here with everything else that reads the
+   * world, and **not** folded into `loadConfig`: `LoadedConfig` is the simulation's configuration
+   * and a currency is not part of a simulation. A throw here is the right answer, on
+   * `assertChallengesAreRunnable`'s ground — a server whose economy will not parse would fail at
+   * the moment a player finished a turn, which is the one moment with no words for it.
+   */
+  const chimeLedger = await loadChimeLedger(options.dataDir);
   const now = options.now ?? ((): number => Date.now());
 
   // Three sources, most explicit first: what a test passed, what the environment configures, and
@@ -149,6 +158,7 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
     seedToken: seedTokenFrom(options.env),
     now,
     signInUrl: signInUrlFor(options.publicOrigin),
+    chimeLedger,
   };
 
   return {
