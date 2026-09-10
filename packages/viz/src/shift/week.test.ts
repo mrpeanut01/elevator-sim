@@ -45,6 +45,10 @@ function readings(day: number, kind: 'met' | 'missed' | 'pending'): readonly Goa
           minutePct: 100,
           peakQueue: 0,
           abandoned: 0,
+          // The overlap and the run's own horizon that § D417 binds every publisher of
+          // `abandoned` to carry, and `goals.ts#gaveUpBesideOf` reads (GitHub issue #456).
+          abandonedCarried: 0,
+          horizonS: 900,
           worstWaitS: 20,
           worstWaitIsCensored: false,
         }
@@ -55,6 +59,10 @@ function readings(day: number, kind: 'met' | 'missed' | 'pending'): readonly Goa
             minutePct: 100,
             peakQueue: 0,
             abandoned: 0,
+            // The overlap and the run's own horizon that § D417 binds every publisher of
+            // `abandoned` to carry, and `goals.ts#gaveUpBesideOf` reads (GitHub issue #456).
+            abandonedCarried: 0,
+            horizonS: 900,
             worstWaitS: 40,
             worstWaitIsCensored: false,
             // Under `GOAL_BARS.energyPerLegMaxKJ`. A `met` fixture has to carry every observation
@@ -68,6 +76,10 @@ function readings(day: number, kind: 'met' | 'missed' | 'pending'): readonly Goa
             minutePct: 10,
             peakQueue: 99,
             abandoned: 9,
+            // The overlap and the run's own horizon that § D417 binds every publisher of
+            // `abandoned` to carry, and `goals.ts#gaveUpBesideOf` reads (GitHub issue #456).
+            abandonedCarried: 0,
+            horizonS: 900,
             worstWaitS: 940,
             worstWaitIsCensored: false,
             workPerServedLegKJ: 260.5,

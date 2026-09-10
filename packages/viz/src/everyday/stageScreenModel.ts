@@ -113,7 +113,7 @@ import type { LiveObservations, WaitBandId } from '../live/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import { goalRowsOf } from '../dev/leftRail.js';
 import { GOAL_GLYPHS } from '../shift/goals.js';
-import type { DayOutcome, GoalReading, GoalState } from '../shift/types.js';
+import type { DayOutcome, GoalObservations, GoalReading, GoalState } from '../shift/types.js';
 // AD-S17's length rule, shared with the Engineer stage. The *derivation* — what counts as standing
 // still, and why the word is not *parked* — is that module's docstring and is deliberately one home.
 import { REST_BAR_THICKNESS_PX, restBarWidthPx } from '../render/carRest.js';
@@ -605,6 +605,17 @@ export interface StageGoalRow {
    * attribute to it, because `was —` would dress an absence as a measurement.
    */
   readonly was: string;
+  /**
+   * `goalRowsOf`'s own slot: the riders whose wait crossed the give-up horizon, beside a goal their
+   * standing there could flatter, and `''` on every other goal — `shift/goals.ts#gaveUpBesideOf`,
+   * § D106 at the renderer, GitHub issue #456.
+   *
+   * **It is drawn at every playhead, including the ungraded ones**, and that is deliberate rather
+   * than an oversight in {@link unjudged}. It is a *reading* and not a verdict — § D371's own
+   * distinction — so it belongs on the same side of that line as {@link value}, which also
+   * survives.
+   */
+  readonly beside: string;
   /** `✓`, `×` or `·`. Always `·` while the run is unfinished — see {@link stageGoalsOf}. */
   readonly glyph: string;
   /** `met`, `missed` or `pending`. Always `pending` while the run is unfinished. */
@@ -627,6 +638,12 @@ export interface StageGoalsView {
 export interface StageGoalsInput {
   /** `host.goalsToday()` — read at the playhead, the same derivation the Engineer rail draws. */
   readonly readings: readonly GoalReading[];
+  /**
+   * `host.goalFactsAt(simTimeS)` — the fold those readings were graded against, at that same
+   * instant. GitHub issue #456: the strip has to publish the riders who were left standing beside
+   * the share their standing there flatters, and a reading does not carry them.
+   */
+  readonly observations: GoalObservations;
   readonly simTimeS: number;
   /** `recording.endedAt`. The run's own last instant, never a constant. */
   readonly endedAt: number;
@@ -738,12 +755,13 @@ export function stageGoalsOf(input: StageGoalsInput): StageGoalsView {
     heading: STAGE_GOALS_COPY.heading,
     note: judged ? STAGE_GOALS_COPY.graded : STAGE_GOALS_COPY.reading,
     judged,
-    rows: goalRowsOf(readings, input.history, input.day).map((row, index) => ({
+    rows: goalRowsOf(readings, input.history, input.day, input.observations).map((row, index) => ({
       /* The reading's own goal, never the row's label — an id is not a sentence. */
       id: readings[index]?.goal.id ?? '',
       label: row.label,
       value: row.value,
       was: row.was,
+      beside: row.beside,
       glyph: row.glyph,
       state: row.state,
       barPct: row.barPct,

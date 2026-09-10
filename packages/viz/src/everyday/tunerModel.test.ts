@@ -571,6 +571,10 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
       minutePct,
       peakQueue: kind === 'met' ? 0 : 99,
       abandoned: kind === 'met' ? 0 : 9,
+      // The overlap and the run's own horizon that § D417 binds every publisher of
+      // `abandoned` to carry, and `goals.ts#gaveUpBesideOf` reads (GitHub issue #456).
+      abandonedCarried: 0,
+      horizonS: 900,
       worstWaitS: kind === 'met' ? 40 : 940,
       worstWaitIsCensored: false,
       // The energy bar (§ D367, § D468). A `met` fixture has to clear all five, and an absent

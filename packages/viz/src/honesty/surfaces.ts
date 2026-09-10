@@ -3174,6 +3174,14 @@ const SHIFT_REPORT: SurfaceAdapter = {
   id: 'shift/report.ts#dayReportOf',
   covers: [
     'shift/report.ts#dayReportOf',
+    /*
+     * The riders who were left standing, and the caption's own horizon label — GitHub issue #456,
+     * § D106 at the renderer. Claimed here because this adapter renders them: the sentence is
+     * seeded by name above, so this entry is a statement about what is drawn rather than a way of
+     * being counted as covered (CLAUDE.md, wave T: *being in `covers` is not being swept*).
+     */
+    'shift/goals.ts#gaveUpBesideOf',
+    'shift/goals.ts#horizonLabelOf',
     'shift/report.ts#averageWaitFigure',
     'shift/report.ts#clockRange',
     'shift/report.ts#NOT_RECORDED',
@@ -3269,7 +3277,25 @@ const SHIFT_REPORT: SurfaceAdapter = {
           role: 'label',
         });
       }
-      for (const { reading, was } of report.goals) {
+      for (const { reading, was, beside } of report.goals) {
+        /*
+         * The riders who were left standing, beside the goal their standing there could flatter —
+         * § D106 at the renderer, GitHub issue #456. Seeded **by name** rather than left to arrive
+         * inside some composed row: being listed in `covers` is not being swept, which is wave T's
+         * own finding one adapter over.
+         *
+         * `observation` for the reading's reason beside it, and it carries its own denominator in
+         * the sentence (`20 of 340`), which is what R13 wants of a count. Empty on the goals it
+         * cannot flatter and on a day where nobody's wait crossed the line, and an empty seed is
+         * not pushed: a corpus case has no string there to read.
+         */
+        if (beside !== '') {
+          seeds.push({
+            field: `${at}.goals(${reading.goal.id}).beside`,
+            text: beside,
+            role: 'observation',
+          });
+        }
         seeds.push({
           field: `${at}.goals(${reading.goal.id}).label`,
           text: reading.goal.label,
@@ -3905,6 +3931,14 @@ const RAIL_VIEW: SurfaceAdapter = {
     'dev/leftRail.ts#runFiguresOf',
     'dev/leftRail.ts#historyBarsOf',
     'dev/leftRail.ts#goalRowsOf',
+    /*
+     * The riders who were left standing, and the caption's own horizon label — GitHub issue #456,
+     * § D106 at the renderer. Claimed here because this adapter renders them: the sentence is
+     * seeded by name above, so this entry is a statement about what is drawn rather than a way of
+     * being counted as covered (CLAUDE.md, wave T: *being in `covers` is not being swept*).
+     */
+    'shift/goals.ts#gaveUpBesideOf',
+    'shift/goals.ts#horizonLabelOf',
     'dev/leftRail.ts#mathsDisclosureOf',
     'dev/leftRail.ts#idleHonestyCard',
     'dev/leftRail.ts#idleDecisionRow',
@@ -4035,7 +4069,20 @@ const RAIL_VIEW: SurfaceAdapter = {
       for (const bar of historyBarsOf([], undefined, entry.dayIdx)) {
         seeds.push({ field: `${at}.historyBarsOf(empty).title`, text: bar.title, role: 'observation' });
       }
-      for (const row of goalRowsOf(entry.readings, entry.week.history, entry.day)) {
+      for (const row of goalRowsOf(
+        entry.readings,
+        entry.week.history,
+        entry.day,
+        bundle.observations,
+      )) {
+        /* GitHub issue #456 — seeded by name, `REPORT_SHEET`'s own reason two adapters up. */
+        if (row.beside !== '') {
+          seeds.push({
+            field: `${at}.goalRowsOf(${row.label}).beside`,
+            text: row.beside,
+            role: 'observation',
+          });
+        }
         seeds.push({
           field: `${at}.goalRowsOf(${row.label}).value`,
           // The glyph is never the only signal — KB-15 — so the row is driven as a reader sees it,
@@ -4054,7 +4101,12 @@ const RAIL_VIEW: SurfaceAdapter = {
        */
       const morningAfter = nextDay(entry.week);
       const tomorrowsGoals = readGoals(goalsForDay(morningAfter.day), bundle.observations);
-      for (const row of goalRowsOf(tomorrowsGoals, morningAfter.history, morningAfter.day)) {
+      for (const row of goalRowsOf(
+        tomorrowsGoals,
+        morningAfter.history,
+        morningAfter.day,
+        bundle.observations,
+      )) {
         seeds.push({
           field: `${at}.goalRowsOf(nextDay, ${row.label}).was`,
           text: `${row.glyph} ${row.label} — ${row.was} — ${row.value}`,
@@ -4438,7 +4490,7 @@ const REPORT_PANEL: SurfaceAdapter = {
       /* The two row builders, driven on their own so the coverage claim names what it calls. */
       const firstReading = entry.readings[0];
       if (firstReading !== undefined) {
-        const row = goalRowViewOf({ reading: firstReading, was: '—' });
+        const row = goalRowViewOf({ reading: firstReading, was: '—', beside: '' });
         seeds.push({ field: `${at}.goalRowViewOf.help`, text: row.help, role: 'label' });
       }
       const firstFigure = entry.report.figures[0];
@@ -8847,6 +8899,14 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
     'everyday/campaignModel.ts#contractView',
     'everyday/campaignModel.ts#calendarView',
     'everyday/campaignModel.ts#campaignTestRows',
+    /*
+     * The riders who were left standing, and the caption's own horizon label — GitHub issue #456,
+     * § D106 at the renderer. Claimed here because this adapter renders them: the sentence is
+     * seeded by name above, so this entry is a statement about what is drawn rather than a way of
+     * being counted as covered (CLAUDE.md, wave T: *being in `covers` is not being swept*).
+     */
+    'shift/goals.ts#gaveUpBesideOf',
+    'shift/goals.ts#horizonLabelOf',
     'everyday/campaignModel.ts#campaignTestGoals',
     'everyday/campaignModel.ts#testsHeldLine',
     'everyday/campaignModel.ts#careerStageLabel',
@@ -8936,7 +8996,18 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
       carryPct: 97,
       minutePct: 80,
       peakQueue: 21,
-      abandoned: 0,
+      /*
+       * **Non-zero on purpose, and it is the state the corpus could not otherwise reach** — GitHub
+       * issue #456. Two of the campaign's four tests are ones a rider left standing makes easier
+       * (`away` reads the share over the legs that boarded; `trips` is an `at-most` wear budget), so
+       * `campaignModel.ts#campaignTestRows` draws `shift/goals.ts#gaveUpBesideOf`'s sentence on
+       * them — and a fixture reading `abandoned: 0` would sweep every arm of that sentence except
+       * the one a player meets. The overlap is the third of `gaveUpBesideOf`'s three branches, some
+       * carried and some not, which is the only one that publishes two numbers.
+       */
+      abandoned: 34,
+      abandonedCarried: 12,
+      horizonS: 900,
       worstWaitS: 164,
       worstWaitIsCensored: false,
     };
@@ -9110,6 +9181,17 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
           seeds.push({ field: `${at}.label`, text: row.label, role: 'label' });
           seeds.push({ field: `${at}.target`, text: row.target, role: 'label' });
           seeds.push({ field: `${at}.was`, text: row.was, role: 'observation' });
+          /*
+           * The riders who were left standing — § D106 at the renderer, GitHub issue #456. Seeded
+           * **by name** here, and not left to the `covers` entry above: this adapter's fixture
+           * carries a non-zero `abandoned` precisely so two of these four rows draw the sentence,
+           * and a claim in `covers` with no seed beside it is the shape CLAUDE.md's wave T names —
+           * *being in `covers` is not being swept*. Empty on the two arms that grade no run and on
+           * the two tests the count cannot flatter, and an empty seed is not pushed.
+           */
+          if (row.beside !== '') {
+            seeds.push({ field: `${at}.beside`, text: row.beside, role: 'observation' });
+          }
           seeds.push({ field: `${at}.tension`, text: row.tension, role: 'prose' });
           if (row.reading !== undefined) {
             seeds.push({ field: `${at}.reading`, text: row.reading.display, role: 'observation' });
@@ -9525,6 +9607,14 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#stageNextStretchOf',
     /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
     'everyday/stageScreenModel.ts#stageGoalsOf',
+    /*
+     * The riders who were left standing, and the caption's own horizon label — GitHub issue #456,
+     * § D106 at the renderer. Claimed here because this adapter renders them: the sentence is
+     * seeded by name above, so this entry is a statement about what is drawn rather than a way of
+     * being counted as covered (CLAUDE.md, wave T: *being in `covers` is not being swept*).
+     */
+    'shift/goals.ts#gaveUpBesideOf',
+    'shift/goals.ts#horizonLabelOf',
     'everyday/stageScreenModel.ts#STAGE_GOALS_COPY',
     /*
      * § 7.5's dock — GitHub issue #171, § D507. The column is `stageScreen.ts`'s to draw and
@@ -9804,6 +9894,7 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       ] as const) {
         const strip = stageGoalsOf({
           readings: readGoals(goalsForDay(week.day), atEnd),
+          observations: atEnd,
           simTimeS: recording.endedAt,
           endedAt: recording.endedAt,
           history: week.history,
@@ -9815,6 +9906,18 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
             text: row.was,
             role: 'observation',
           });
+          /*
+           * The riders who were left standing — § D106 at the renderer, GitHub issue #456. Seeded
+           * by name, and empty on the four bars the count cannot flatter and on a case whose day
+           * left nobody standing, so an empty seed is not pushed.
+           */
+          if (row.beside !== '') {
+            seeds.push({
+              field: `stage.goals(${arm}).${row.id}.beside`,
+              text: row.beside,
+              role: 'observation',
+            });
+          }
         }
       }
     }
@@ -9958,8 +10061,15 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
        */
       const goalDay = shiftBundleOf(context).days[0];
       if (goalDay !== undefined) {
+        /*
+         * One projection, read twice — the readings and the fold they were graded against are the
+         * same object here for the reason `everyday/host.ts#goalFactsAt` exists: two folds of one
+         * recording at one playhead is `shift/observations.ts`'s own stated failure mode.
+         */
+        const atThisInstant = shiftObservationsOf(observations);
         const strip = stageGoalsOf({
-          readings: readGoals(goalsForDay(goalDay.day), shiftObservationsOf(observations)),
+          readings: readGoals(goalsForDay(goalDay.day), atThisInstant),
+          observations: atThisInstant,
           simTimeS: at,
           endedAt: recording.endedAt,
           history: goalDay.week.history,
@@ -9993,6 +10103,21 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
             ...(row.id === 'energy' ? { energyAxis: true } : {}),
             playhead: atPlayhead(recording, at),
           });
+          /*
+           * The riders who were left standing — § D106 at the renderer, GitHub issue #456, seeded
+           * by name. It carries the playhead like the value above it and for the same reason: the
+           * count is folded at `t` and is non-decreasing in it, so a strip drawn at 200 s that
+           * published the whole run's figure would be exactly the § D307 violation the temporal
+           * axis exists to find.
+           */
+          if (row.beside !== '') {
+            seeds.push({
+              field: `stage(@${stamp}s).goals.${row.id}.beside`,
+              text: row.beside,
+              role: 'observation',
+              playhead: atPlayhead(recording, at),
+            });
+          }
         }
       }
 

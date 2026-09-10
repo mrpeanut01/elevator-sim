@@ -1924,6 +1924,13 @@ function mountStage(
     const week = host.week();
     const strip = stageGoalsOf({
       readings: host.goalsAt(simTimeS),
+      /*
+       * The fold those readings were graded against, at the same instant — GitHub issue #456. Taken
+       * from the host rather than folded here: two folds of one recording at one playhead is the
+       * failure `shift/observations.ts` has a rule about, and this screen already refuses to
+       * re-derive the readings for exactly that reason two lines up.
+       */
+      observations: host.goalFactsAt(simTimeS),
       simTimeS,
       endedAt: recording.endedAt,
       history: week.history,
@@ -1960,6 +1967,22 @@ function mountStage(
       const fill = el(doc, 'div', 'everyday-stage-goal-fill');
       fill.style.cssText = `height:100%;width:${String(row.barPct)}%;background:${ink}`;
       track.append(fill);
+
+      /*
+       * The riders who were left standing — § D106 at the renderer, GitHub issue #456.
+       *
+       * Between the claim and the track, in the *was* slot's faint ink and never in `ink`: the
+       * verdict's colour on this line would make the count read as part of the verdict, and it is
+       * an observation beside one. Appended only where there is one, so no row grows a blank line
+       * about a population it does not have.
+       */
+      if (row.beside !== '') {
+        const beside = el(doc, 'span', 'everyday-stage-goal-beside', row.beside);
+        beside.style.cssText = `font:500 10px ${TYPE.mono};color:${C.faint};min-width:0`;
+        line.append(top, beside, track);
+        goalRows.append(line);
+        continue;
+      }
 
       line.append(top, track);
       goalRows.append(line);

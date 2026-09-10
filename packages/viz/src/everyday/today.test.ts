@@ -62,6 +62,10 @@ const pendingGoals = (day: number): readonly GoalReading[] =>
     minutePct: 100,
     peakQueue: 0,
     abandoned: 0,
+    // The overlap and the run's own horizon that § D417 binds every publisher of
+    // `abandoned` to carry, and `goals.ts#gaveUpBesideOf` reads (GitHub issue #456).
+    abandonedCarried: 0,
+    horizonS: 900,
     worstWaitS: 0,
     worstWaitIsCensored: false,
   });

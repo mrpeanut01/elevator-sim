@@ -1501,11 +1501,10 @@ describe('the § 7 goal strip', () => {
   const DAY = 1;
 
   function stripAt(recording: VizRecording, at: number, day = DAY): StageGoalsView {
+    const observations = shiftObservationsOf(observationsAt(recording, at));
     return stageGoalsOf({
-      readings: readGoals(
-        goalsForDay(day),
-        shiftObservationsOf(observationsAt(recording, at)),
-      ),
+      readings: readGoals(goalsForDay(day), observations),
+      observations,
       simTimeS: at,
       endedAt: recording.endedAt,
       history: [],
@@ -1633,14 +1632,12 @@ describe('the § 7 goal strip', () => {
      * implementation*. Asserted against the rail's own fold rather than against expected strings,
      * so a stage that started deciding its own glyphs would fail here.
      */
-    const readings = readGoals(
-      goalsForDay(DAY),
-      shiftObservationsOf(observationsAt(recording, recording.endedAt)),
-    );
-    const rail = goalRowsOf(readings, [], DAY);
-    expect(strip.rows.map((row) => [row.glyph, row.value, row.was, row.barPct])).toEqual(
-      rail.map((row) => [row.glyph, row.value, row.was, row.barPct]),
-    );
+    const atEnd = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+    const readings = readGoals(goalsForDay(DAY), atEnd);
+    const rail = goalRowsOf(readings, [], DAY, atEnd);
+    expect(
+      strip.rows.map((row) => [row.glyph, row.value, row.was, row.barPct, row.beside]),
+    ).toEqual(rail.map((row) => [row.glyph, row.value, row.was, row.barPct, row.beside]));
   });
 
   /**

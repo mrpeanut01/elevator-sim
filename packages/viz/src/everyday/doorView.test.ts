@@ -29,6 +29,10 @@ const MET: GoalObservations = {
   minutePct: 84,
   peakQueue: 3,
   abandoned: 0,
+  // The overlap and the run's own horizon that § D417 binds every publisher of
+  // `abandoned` to carry, and `goals.ts#gaveUpBesideOf` reads (GitHub issue #456).
+  abandonedCarried: 0,
+  horizonS: 900,
   worstWaitS: 40,
   worstWaitIsCensored: false,
 };

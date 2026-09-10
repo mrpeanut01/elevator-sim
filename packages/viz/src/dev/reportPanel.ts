@@ -183,6 +183,15 @@ export interface GoalRowView {
    * would be two screens disagreeing.
    */
   readonly was: string;
+  /**
+   * The riders whose wait crossed the give-up horizon, beside a goal their standing there could
+   * flatter, and `''` on every other goal — `GoalLine.beside`, § D106 at the renderer, GitHub
+   * issue #456.
+   *
+   * Carried through undressed. It takes no colour from the verdict and no tone of its own: the
+   * three `dressing` channels above are the grade, and this is an observation standing beside one.
+   */
+  readonly beside: string;
   readonly colour: string;
   readonly background: string;
   /** The state in words, as a `title`. The glyph is the shorthand; this is the message. KB-15. */
@@ -675,6 +684,13 @@ export function goalRowViewOf(line: GoalLine): GoalRowView {
     // The word only when there is a figure to attribute — `was —` would dress an absence as a
     // measurement. The same rule `dev/leftRail.ts#goalRowsOf` applies, spelled the same way.
     was: line.was === PENDING_DISPLAY ? PENDING_DISPLAY : `was ${line.was}`,
+    /*
+     * Verbatim, including the empty string — § D106 at the renderer, GitHub issue #456.
+     * `shift/goals.ts#gaveUpBesideOf` decides which goals carry one and what it says; this panel
+     * and the rail and the stage strip all draw the same expression, which is what stops four
+     * surfaces saying four things about one day's riders.
+     */
+    beside: line.beside,
     ...dressing,
   };
 }
@@ -1719,6 +1735,24 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
               text: row.display,
               style: { color: row.colour },
             }),
+            /*
+             * The riders who were left standing — § D106 at the renderer, GitHub issue #456.
+             *
+             * After the verdict and in the dim ink, never in `row.colour`: the grade's colour on
+             * this span would read as part of the grade, and it is an observation beside one. The
+             * sheet's TOOK THE STAIRS cell is the day's figure; this is that figure standing where
+             * the verdict it flatters is drawn, which is what *beside, never folded in* asks for.
+             * Absent rather than empty on the goals it cannot flatter.
+             */
+            ...(row.beside === ''
+              ? []
+              : [
+                  el(doc, 'span', {
+                    className: 'goal-beside',
+                    text: row.beside,
+                    style: { color: 'var(--dimmer)' },
+                  }),
+                ]),
           ],
         }),
       ),

@@ -58,6 +58,7 @@ import { worksHeldCarRefsOf } from '../campaign/works.js';
 import { drawElevation } from './elevation.js';
 import type { DifficultyId, ShopCategoryId } from '../campaign/economy.js';
 import { observationsAt } from '../live/observations.js';
+import type { GoalObservations } from '../shift/types.js';
 
 /* -------------------------------------------------------------------------- *
  * Module store — the two facts a `bar()` needs and a mount cannot pass it
@@ -240,14 +241,62 @@ function observationsOfHost(host: EverydayHost): CampaignInput['observations'] {
   const worstWaitS = valueOf('worstWaitS');
   if (minutePct === null || peakQueue === null || worstWaitS === null) return undefined;
   return {
-    arrived: Number.POSITIVE_INFINITY,
     carryPct: valueOf('carryPct') ?? 0,
     minutePct,
     peakQueue,
-    abandoned: valueOf('abandoned') ?? 0,
     worstWaitS,
     worstWaitIsCensored: false,
+    ...gaveUpOfHost(host),
     ...tripsOfHost(host),
+  };
+}
+
+/**
+ * The arrival count and the three abandonment facts, from the **fold** rather than from a reading —
+ * GitHub issue #456.
+ *
+ * ## Why they cannot come from the reassembly above
+ *
+ * The reassembly recovers each field from the daily loop's own readings, and **no goal in
+ * `shift/goals.ts#goalsForDay` reads `abandoned`** — the odd-day horizon goal that once did was
+ * retired when the worst-wait ceiling subsumed it. So `valueOf('abandoned')` was `null` on every
+ * day of every run, and its `?? 0` handed the campaign desk a **fabricated zero**: four tests
+ * graded on a screen that reported nobody had been left standing, whatever the day did. That is
+ * the shape this file already refuses one field over — see {@link tripsOfHost}'s last paragraph —
+ * arriving through a fallback rather than through a type.
+ *
+ * `abandonedCarried` and `horizonS` are here for the same reason and one more: they are not
+ * gradeable at all, so no reading could ever carry them, and § D417 binds every surface that
+ * publishes `abandoned` to publish both beside it.
+ *
+ * The playhead is the host's own, the instant `goalsToday()` was folded at, so the rows on a desk
+ * stay four facts about one moment.
+ */
+function gaveUpOfHost(
+  host: EverydayHost,
+): Pick<GoalObservations, 'arrived' | 'abandoned' | 'abandonedCarried' | 'horizonS'> {
+  const facts = host.goalFactsAt(host.runState().playheadS);
+  return {
+    /*
+     * **And `arrived`, which retires a sentinel** — this field read
+     * `Number.POSITIVE_INFINITY` until #456. That was a stand-in for a number the reassembly could
+     * not recover (no goal reads the arrival count; it is the wake-up **gate**, not a bar), chosen
+     * so `readGoal` would grade the four campaign tests rather than refuse them. It worked for as
+     * long as nothing *printed* the field — and `gaveUpBesideOf` prints it, because R13 says a
+     * count travels with the population it was taken over, so the desk would have read
+     * `34 of Infinity waited past the horizon`.
+     *
+     * **Replacing it changes no verdict, and the early return four lines up is why.** That guard
+     * refuses unless the daily loop's `minutePct` and `peakQueue` readings both carry a value, and
+     * those two are `pending` under exactly one condition — `arrived < WAKE_UP_ARRIVALS`. So on
+     * every path that reaches here the gate has already been passed by the same fold, and the true
+     * count answers it the same way the sentinel did. What the sentinel bought was a number nobody
+     * had; the fold has one.
+     */
+    arrived: facts.arrived,
+    abandoned: facts.abandoned,
+    abandonedCarried: facts.abandonedCarried,
+    horizonS: facts.horizonS,
   };
 }
 
@@ -345,13 +394,23 @@ function testRows(doc: Document, rows: readonly CampaignTestRow[]): HTMLElement 
     was.style.cssText = `${MONO};color:${C.label}`;
     head.append(glyph, label, target, was);
     /*
+     * The riders who were left standing — § D106 at the renderer, GitHub issue #456.
+     *
+     * Above the tension rather than inside the head row, in the label ink the tension uses, because
+     * it is an observation about the day and the head row is the verdict. Two of these four tests
+     * carry one and two never will; `campaignModel.ts#campaignTestRows` decides which and this only
+     * draws what it is handed.
+     */
+    /*
      * No refusal arm any more — GitHub issue #169. The fourth row used to carry a sentence saying
      * nothing measured it, drawn here in terracotta under the tension; it grades now, so the
      * sentence is gone rather than reworded (`campaignModel.ts#campaignTestGoals`). A row that
      * cannot be graded on some particular day says so through `row.reading`, which is what the
      * glyph and the `—` above already draw.
      */
-    item.append(head, note(doc, row.tension));
+    item.append(head);
+    if (row.beside !== '') item.append(note(doc, row.beside, 'everyday-campaign-beside'));
+    item.append(note(doc, row.tension));
     list.append(item);
   }
   return list;

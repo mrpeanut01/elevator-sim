@@ -440,6 +440,11 @@ const A_CLEAN_DAY: GoalObservations = Object.freeze({
   minutePct: 84,
   peakQueue: 2,
   abandoned: 0,
+  // Zero, and its overlap is zero with it — a clean day is one where nobody's wait crossed the
+  // line, so `goals.ts#gaveUpBesideOf` draws nothing here and the horizon is the project's own
+  // 900 s stated rather than assumed (GitHub issue #456).
+  abandonedCarried: 0,
+  horizonS: 900,
   worstWaitS: 30,
   worstWaitIsCensored: false,
   // Under `GOAL_BARS.energyPerLegMaxKJ`, so the constant's name stays true after § D468 gave the
