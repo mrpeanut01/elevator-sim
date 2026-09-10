@@ -528,16 +528,48 @@ describe.skipIf(!HAS_BROWSER)('every mode is completable with the keyboard alone
        * than argued in a docstring. Both closures are checked because the two sides are written by
        * two different functions and only one of them writes both attributes.
        */
-      const landmarks = await page.evaluate(() => {
-        const all = [...document.querySelectorAll('main, [role="main"]')];
-        return {
-          total: all.length,
-          exposed: all.filter(
-            (node) =>
-              node.closest('[inert]') === null && node.closest('[aria-hidden="true"]') === null,
-          ).length,
-        };
-      });
+      /*
+       * **Read once the reading has settled, and settled is not the same as correct.**
+       *
+       * This was a single `evaluate` and it was **flaky — one failure in three local runs, and one
+       * on CI**. The Engineer root's cover is written during `dev/main.ts`'s boot, so a read that
+       * lands before it sees two exposed `main` elements and reports a defect the page does not
+       * have a moment later. `coldLoad` waits for the overlay and for a screen, and neither of
+       * those is the cover.
+       *
+       * The wait is for **two consecutive readings to agree across a frame**, never for
+       * `exposed === 1`. That distinction is the whole of it: waiting for the value would make a
+       * product that genuinely exposes two landmarks time out instead of failing, which is the
+       * least useful way for this case to go red — the same rule the § 7.4 race case states one
+       * file over. A page that really exposes two settles at two, and the assertion below fails
+       * with the number.
+       */
+      const readLandmarks = async (): Promise<{ total: number; exposed: number }> =>
+        page.evaluate(() => {
+          const all = [...document.querySelectorAll('main, [role="main"]')];
+          return {
+            total: all.length,
+            exposed: all.filter(
+              (node) =>
+                node.closest('[inert]') === null && node.closest('[aria-hidden="true"]') === null,
+            ).length,
+          };
+        });
+
+      let landmarks = await readLandmarks();
+      for (let settle = 0; settle < 60; settle += 1) {
+        await page.evaluate(
+          async () =>
+            new Promise<void>((resolve) => {
+              requestAnimationFrame(() => {
+                resolve();
+              });
+            }),
+        );
+        const again = await readLandmarks();
+        if (again.total === landmarks.total && again.exposed === landmarks.exposed) break;
+        landmarks = again;
+      }
       expect(landmarks.total).toBeGreaterThan(1);
       expect(
         landmarks.exposed,
