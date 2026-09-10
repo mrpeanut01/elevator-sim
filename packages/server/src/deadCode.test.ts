@@ -59,6 +59,7 @@ const AUDITED_MODULES = [
   'server/src',
   'server/src/accounts',
   'server/src/challenge',
+  'server/src/errors',
   'server/src/http',
   'server/src/leaderboard',
   'server/src/mail',

@@ -83,6 +83,7 @@
  * and the sentence a player reads is this surface's own.
  */
 
+import { MAX_FAULTS_COUNTED, type ClientFaultTally } from './faults.js';
 import type { RunContext } from './types.js';
 import { BUILD_VERSION, UNBUILT } from '../release/version.js';
 
@@ -173,6 +174,20 @@ export interface SupportInput {
    * the words are pure and the document is not.
    */
   readonly browser?: string | undefined;
+  /**
+   * How many faults this page has hit, and in which half of the visit — GitHub issue **#242**.
+   *
+   * `everyday/faults.ts` counts them; `everyday/settingsScreen.ts` reads the page's register into
+   * this field. Absent off a browser and in any state that has no register to read, which is not
+   * the same as a tally of zero: *nothing went wrong* and *nobody was counting* are different
+   * claims, and {@link supportFactsOf} draws the line only for the first.
+   *
+   * **Two numbers and never an error.** That module's docstring has the argument; the short form is
+   * that this report becomes a public issue, so the line below has to keep
+   * {@link SUPPORT_COPY.attachNotice} true — *nothing else about you is attached either* — and a
+   * thrown message is very often built out of what was on screen.
+   */
+  readonly faults?: ClientFaultTally | undefined;
 }
 
 /** The whole block, as data. Total: every sentence a reader can meet starts here. */
@@ -283,6 +298,19 @@ export const SUPPORT_COPY = Object.freeze({
   buildUnknown: 'not built for release',
   browserUnknown: 'not known',
 
+  /*
+   * GitHub issue #242's line, in five fragments rather than one sentence because the two halves are
+   * independent and either can be absent. **Plain words and a count, never a class name**: the
+   * report is public, the reader is shown exactly what is sent, and a class on a player surface is
+   * internal notation. `faults.ts` carries the whole argument, including what it costs.
+   */
+  faultsLabel: 'Problems this page hit',
+  faultsNone: 'none',
+  faultsStartingUp: 'while the game was starting up',
+  faultsPlaying: 'after it had started',
+  /* The register stops counting at a ceiling, so the line says *at least* rather than a wrong exact. */
+  faultsAtLeast: 'or more',
+
   /* ---- the report itself, as it arrives ---- */
   reportTitle: 'Problem report from the game',
   bodyProblemHeading: 'What went wrong',
@@ -324,6 +352,37 @@ function buildValueOf(): string {
   return BUILD_VERSION === UNBUILT ? SUPPORT_COPY.buildUnknown : BUILD_VERSION;
 }
 
+/** One half of the fault line — `3 while the game was starting up`, or nothing at all. */
+function faultHalfOf(count: number, when: string): string | undefined {
+  if (count <= 0) return undefined;
+  /*
+   * The ceiling arm. `everyday/faults.ts` stops counting at {@link MAX_FAULTS_COUNTED} — a fault
+   * inside a render loop fires every frame — so at the ceiling the exact number is unknown, and a
+   * report that stated one would be this repository's own defect on a line it just added.
+   */
+  const figure =
+    count >= MAX_FAULTS_COUNTED
+      ? `${String(count)} ${SUPPORT_COPY.faultsAtLeast}`
+      : String(count);
+  return `${figure} ${when}`;
+}
+
+/**
+ * How many problems this page hit, in the reader's words — GitHub issue **#242**.
+ *
+ * Three states and they are three rather than two: **no register** is not *no problems*. Off a
+ * browser, or anywhere the page's own register was not read, there is nothing to say and the line
+ * is absent — because *nothing went wrong* is a claim, and a surface that made it on the strength of
+ * having no instrument would be the shape this repository keeps catching.
+ */
+function faultsValueOf(tally: ClientFaultTally): string {
+  const halves = [
+    faultHalfOf(tally.startingUp, SUPPORT_COPY.faultsStartingUp),
+    faultHalfOf(tally.playing, SUPPORT_COPY.faultsPlaying),
+  ].filter((half): half is string => half !== undefined);
+  return halves.length === 0 ? SUPPORT_COPY.faultsNone : halves.join(', then ');
+}
+
 /**
  * The attachment, in the order it is shown and sent.
  *
@@ -354,6 +413,15 @@ export function supportFactsOf(input: SupportInput): readonly SupportFactView[] 
         ? SUPPORT_COPY.browserUnknown
         : input.browser.slice(0, SUPPORT_BROWSER_LIMIT),
   });
+  /*
+   * Last, after the build and the browser, because it is the line about **this session** rather
+   * than about the run or the machine — and because a reader scanning the block for the thing they
+   * are reporting will most often find it here. Absent where there is no register: see
+   * {@link faultsValueOf}.
+   */
+  if (input.faults !== undefined) {
+    facts.push({ label: SUPPORT_COPY.faultsLabel, value: faultsValueOf(input.faults) });
+  }
   return facts;
 }
 

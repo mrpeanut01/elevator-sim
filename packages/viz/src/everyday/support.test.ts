@@ -31,6 +31,7 @@ import type { HonestyContext, RenderedText } from '../honesty/index.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import { baseState, RESOURCES } from '../scope/probes.test-helper.js';
 import { BUILD_VERSION, UNBUILT } from '../release/version.js';
+import { MAX_FAULTS_COUNTED } from './faults.js';
 import { RUN_CONTEXTS } from './types.js';
 import {
   reportBodyOf,
@@ -89,6 +90,37 @@ function states(): readonly { readonly name: string; readonly input: SupportInpu
     },
     { name: 'longer than the page will take', input: { text: 'x'.repeat(SUPPORT_TEXT_LIMIT + 1), run: RUN } },
     { name: 'whitespace only', input: { text: '   \n  ' } },
+    /*
+     * GitHub issue #242's four fault states. Four rather than one because the line composes from
+     * two independent halves and a ceiling, and because *no problems* and *no register* are
+     * different claims that must not render the same. The dead-page state — faults while starting
+     * up and none after — is the one this issue exists for.
+     */
+    {
+      name: 'a page that failed while starting up',
+      input: { text: 'The menu is there but nothing opens.', faults: { startingUp: 3, playing: 0 } },
+    },
+    {
+      name: 'a page that failed while being played',
+      input: {
+        text: 'The lift skipped my floor.',
+        run: RUN,
+        browser: 'A browser',
+        faults: { startingUp: 0, playing: 1 },
+      },
+    },
+    {
+      name: 'a page that failed in both halves, at the ceiling',
+      input: {
+        text: 'Everything is stuck.',
+        run: RUN,
+        faults: { startingUp: MAX_FAULTS_COUNTED, playing: 2 },
+      },
+    },
+    {
+      name: 'a page with a register and nothing in it',
+      input: { text: 'A number looks wrong.', run: RUN, faults: { startingUp: 0, playing: 0 } },
+    },
   ];
 }
 
@@ -397,6 +429,94 @@ describe('the report carries no identity, and the seam says so', () => {
 /* -------------------------------------------------------------------------- *
  * 7. The charter's M2 gate, and the measured reason a borrowed sentence stays out
  * -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- *
+ * The fault line — GitHub issue #242
+ * -------------------------------------------------------------------------- */
+
+describe('how many problems the page hit travels with the report', () => {
+  const faultValue = (input: SupportInput): string | undefined =>
+    supportViewOf(input).attached.find((fact) => fact.label === SUPPORT_COPY.faultsLabel)?.value;
+
+  /*
+   * The distinction the whole line turns on. Off a browser, or anywhere the register was not read,
+   * there is nothing to say — and saying *none* there would be a claim made on the strength of
+   * having no instrument, which is the shape this repository keeps catching.
+   */
+  it('is absent where there is no register, and present where there is an empty one', () => {
+    expect(faultValue({ text: 'x' })).toBeUndefined();
+    expect(faultValue({ text: 'x', faults: { startingUp: 0, playing: 0 } })).toBe(
+      SUPPORT_COPY.faultsNone,
+    );
+  });
+
+  /* The dead page. This is the report the historic boot failure would have produced. */
+  it('says which half of the visit failed', () => {
+    expect(faultValue({ text: 'x', faults: { startingUp: 3, playing: 0 } })).toBe(
+      `3 ${SUPPORT_COPY.faultsStartingUp}`,
+    );
+    expect(faultValue({ text: 'x', faults: { startingUp: 0, playing: 1 } })).toBe(
+      `1 ${SUPPORT_COPY.faultsPlaying}`,
+    );
+  });
+
+  it('says both halves when both failed, in the order they happened', () => {
+    const value = faultValue({ text: 'x', faults: { startingUp: 1, playing: 2 } }) ?? '';
+    expect(value.indexOf(SUPPORT_COPY.faultsStartingUp)).toBeGreaterThan(-1);
+    expect(value.indexOf(SUPPORT_COPY.faultsStartingUp)).toBeLessThan(
+      value.indexOf(SUPPORT_COPY.faultsPlaying),
+    );
+  });
+
+  /*
+   * At the ceiling the register has stopped counting, so an exact figure would be wrong. A report
+   * that stated one would be this repository's own published-number defect, on a line just added.
+   */
+  it('says at least, rather than an exact number it does not have', () => {
+    expect(faultValue({ text: 'x', faults: { startingUp: MAX_FAULTS_COUNTED, playing: 0 } })).toBe(
+      `${String(MAX_FAULTS_COUNTED)} ${SUPPORT_COPY.faultsAtLeast} ${SUPPORT_COPY.faultsStartingUp}`,
+    );
+    expect(
+      faultValue({ text: 'x', faults: { startingUp: MAX_FAULTS_COUNTED - 1, playing: 0 } }),
+    ).not.toContain(SUPPORT_COPY.faultsAtLeast);
+  });
+
+  /*
+   * The load-bearing one. `SUPPORT_COPY.attachNotice` promises the reader that nothing else about
+   * them is attached, and the report becomes a public issue — so this line may carry a count and
+   * the words this surface authors, and nothing that came out of an error.
+   */
+  it('is made of a number and this surface’s own words, and nothing else', () => {
+    for (const tally of [
+      { startingUp: 0, playing: 0 },
+      { startingUp: 4, playing: 0 },
+      { startingUp: 0, playing: 7 },
+      { startingUp: 1, playing: 1 },
+      { startingUp: MAX_FAULTS_COUNTED, playing: MAX_FAULTS_COUNTED },
+    ]) {
+      const value = faultValue({ text: 'x', faults: tally }) ?? '';
+      let residue = value;
+      for (const word of [
+        SUPPORT_COPY.faultsNone,
+        SUPPORT_COPY.faultsStartingUp,
+        SUPPORT_COPY.faultsPlaying,
+        SUPPORT_COPY.faultsAtLeast,
+      ]) {
+        residue = residue.split(word).join('');
+      }
+      /* Whatever is left is digits, commas, the joining word and spaces. Never a borrowed string. */
+      expect(residue.trim(), value).toMatch(/^[0-9,\s]*(?:then[0-9,\s]*)?$/u);
+    }
+  });
+
+  /* Shown and sent from one array — the rule the whole module is arranged around. */
+  it('appears in the report body exactly as the reader was shown it', () => {
+    const input: SupportInput = { text: 'x', run: RUN, faults: { startingUp: 2, playing: 0 } };
+    const shown = faultValue(input) ?? '';
+    expect(shown).not.toBe('');
+    expect(reportBodyOf(input)).toContain(`${SUPPORT_COPY.faultsLabel}: ${shown}`);
+  });
+});
 
 describe('nothing a reader meets here names a file, a section or an identifier', () => {
   /**

@@ -25,6 +25,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { IncomingMessage } from 'node:http';
 
 import type { Api } from './api.js';
+import { faultLineOf, type FaultReporter, type ServerFault } from '../errors/faults.js';
 import { clientIpOf, serve, type ServeOptions } from './serve.js';
 import type { StaticAsset, StaticBundle } from './static.js';
 
@@ -438,5 +439,108 @@ describe('a same-origin deployment is untouched', () => {
 
     expect(answer.status).toBe(200);
     expect(JSON.parse(answer.body)).toEqual({ reached: 'the api', path: '/no-such-asset' });
+  });
+});
+
+/**
+ * **A route that throws is reported** — GitHub issue #242, AC2, over a real socket.
+ *
+ * The defect, quoted from the code these cases replaced:
+ *
+ * ```ts
+ * } catch {
+ *   response.writeHead(500, headers);
+ * ```
+ *
+ * A `catch` with no binding. The caller got a 500 and the deployment got silence — and because the
+ * container runs at `minReplicas: 0` there is not even a process left afterwards for somebody to
+ * attach to. Every case below binds a port and makes a real request against a real API that really
+ * throws, because AC3 asks for an alert path *tested by triggering a real error*, and a fault
+ * reported by a unit test calling `serverFaultOf` directly would be a test of the classifier rather
+ * than of the wiring.
+ */
+describe('a request that fails is reported', () => {
+  /** Bind a port with an API of the test's own choosing. */
+  async function listeningWith(api: Api, onFault?: FaultReporter): Promise<number> {
+    const server = serve({
+      api,
+      port: 0,
+      allowOrigin: 'null',
+      ...(onFault === undefined ? {} : { onFault }),
+    });
+    running = server;
+    if (!server.listening) {
+      await new Promise<void>((resolve, reject) => {
+        server.once('listening', resolve);
+        server.once('error', reject);
+      });
+    }
+    return (server.address() as AddressInfo).port;
+  }
+
+  const throwing: Api = () => {
+    throw new TypeError('the store said no to someone@example.test with token abc123');
+  };
+
+  it('answers 500 and hands the fault to the reporter', async () => {
+    const faults: ServerFault[] = [];
+    const port = await listeningWith(throwing, (fault) => faults.push(fault));
+
+    const answer = await ask(port, '/api/board');
+
+    expect(answer.status).toBe(500);
+    expect(faults).toEqual([
+      { at: 'request', method: 'GET', route: '/api/board', kind: 'TypeError' },
+    ]);
+  });
+
+  it('reports a rejected promise as well as a synchronous throw', async () => {
+    const faults: ServerFault[] = [];
+    const port = await listeningWith(
+      () => Promise.reject(new RangeError('x')),
+      (fault) => faults.push(fault),
+    );
+
+    expect((await ask(port, '/api/scores', { method: 'POST' })).status).toBe(500);
+    expect(faults[0]?.kind).toBe('RangeError');
+    expect(faults[0]?.method).toBe('POST');
+  });
+
+  /*
+   * The whole reason the fault is a record rather than the error: what a caller sent must not
+   * become what an operator's log holds. The thrown message above carries an address and a token,
+   * both of which a real failure of `POST /api/auth/request-link` would carry for real.
+   */
+  it('reports nothing the error said', async () => {
+    const faults: ServerFault[] = [];
+    const port = await listeningWith(throwing, (fault) => faults.push(fault));
+    await ask(port, '/api/board');
+
+    const line = faultLineOf(faults[0] ?? { at: 'boot', kind: 'nothing-was-reported' });
+    expect(line).not.toContain('someone@example.test');
+    expect(line).not.toContain('abc123');
+    expect(line).toBe('elevator-sim-fault at=request kind=TypeError method=GET route=/api/board');
+  });
+
+  /*
+   * The caller's answer is byte for byte what it was before the reporter existed. A change to
+   * observability that changed what a player's browser receives would be a different change.
+   */
+  it('does not change what the caller is told', async () => {
+    const port = await listeningWith(throwing);
+    const answer = await ask(port, '/api/board');
+
+    expect(answer.status).toBe(500);
+    expect(JSON.parse(answer.body)).toEqual({
+      error: 'internal-error',
+      detail: 'The server failed to handle that request.',
+    });
+    expect(answer.body).not.toContain('someone@example.test');
+  });
+
+  /* With no reporter the transport still serves. The silence is the caller's wiring, not a default. */
+  it('serves with no reporter at all', async () => {
+    const port = await listeningWith(throwing);
+    expect((await ask(port, '/api/board')).status).toBe(500);
   });
 });

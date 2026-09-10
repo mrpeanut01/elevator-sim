@@ -156,6 +156,8 @@ import {
 } from '../everyday/tunerModel.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { SIGN_IN_LINK_STAGES, signInNoticeViewOf } from '../everyday/signInLink.js';
+/* GitHub issue #242's fault ceiling — the report line's *at least* arm is drawn at it. */
+import { MAX_FAULTS_COUNTED } from '../everyday/faults.js';
 /* GitHub issue #245's report block — driven by `EVERYDAY_SUPPORT` at the end of this file. */
 import {
   reportBodyOf,
@@ -12106,6 +12108,23 @@ const EVERYDAY_SUPPORT: SurfaceAdapter = {
       ['run-not-carried', { text: typed, run: { ...run, carried: false }, browser }],
       /* Past the ceiling: the second refusal, and the one nobody meets on a happy path. */
       ['too-long', { text: 'x'.repeat(SUPPORT_TEXT_LIMIT + 1), run, browser }],
+      /*
+       * GitHub issue #242's fault line, in its four shapes. Four rather than one because the value
+       * composes from two independent halves and a count ceiling, and because *a register holding
+       * nothing* and *no register at all* render differently and must both be read: the second is
+       * every case above, which carry no `faults` field, and the first is `faults-none` here.
+       *
+       * `faults-starting-up` is the report a dead page produces, which is the state this issue
+       * exists for — and it is deliberately paired with no run, because a page that failed while
+       * starting up never reached one.
+       */
+      ['faults-none', { text: typed, run, browser, faults: { startingUp: 0, playing: 0 } }],
+      ['faults-starting-up', { text: typed, browser, faults: { startingUp: 3, playing: 0 } }],
+      ['faults-playing', { text: typed, run, browser, faults: { startingUp: 0, playing: 1 } }],
+      [
+        'faults-both-at-ceiling',
+        { text: typed, run, browser, faults: { startingUp: MAX_FAULTS_COUNTED, playing: 2 } },
+      ],
     ];
 
     for (const [label, input] of cases) {
