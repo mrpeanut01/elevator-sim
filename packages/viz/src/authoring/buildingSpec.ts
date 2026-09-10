@@ -902,6 +902,37 @@ function sameMachine(left: SpecMachine, right: SpecMachine): boolean {
   );
 }
 
+/**
+ * **How many shafts carry a machine that is not the design's** — the differences, not the pins.
+ *
+ * The distinction {@link machineIsPinned} deliberately does *not* make, and the one every sentence
+ * about the fleet has to. A pin is a **state** a reader placed on a shaft: it survives the design's
+ * chips moving, which is the whole of what {@link machineByCar} is sparse for. Whether the machine
+ * in it *differs* is a separate question, and it is the one a reader is being told the answer to
+ * when a surface says a shaft carries something else.
+ *
+ * They come apart in both directions, and each direction has shipped a false sentence:
+ *
+ * - {@link withShaftMachine} snaps the shaft's own steps into the class it is handed, so picking
+ *   the design's own class writes a pin byte-equal to the design. Two clicks from the shipped
+ *   `blank tower` button — geared traction's ladders make both snaps identities on `BLANK_SPEC` —
+ *   and the shaft carries exactly what the other three do.
+ * - A pin written while it *did* equal the design stops equalling it the moment a design chip
+ *   moves, which is precisely what {@link carryLosses}'s branch is gated on.
+ *
+ * So this counts by comparison against the design as it stands now, over the shafts the design
+ * actually has — {@link machinesWithin}'s bound, arrived at by the loop rather than by filtering,
+ * because a pin on a shaft that is gone is not a shaft that differs either.
+ */
+export function shaftsUnlikeDesign(spec: BuildingSpec): number {
+  const design = designMachineOf(spec);
+  let unlike = 0;
+  for (let car = 0; car < spec.cars; car += 1) {
+    if (!sameMachine(machineAt(spec, car), design)) unlike += 1;
+  }
+  return unlike;
+}
+
 /** A carried car's own machine, as the document authored it. */
 function machineOfCar(car: CarConfig, fallback: SpecMachine): SpecMachine {
   return {
@@ -2048,17 +2079,26 @@ function carryLosses(spec: BuildingSpec): readonly string[] {
     /*
      * **The count of shafts this sentence does *not* apply to** — GitHub issue #420. The design's
      * three controls write one specification onto every shaft that follows them, which was all of
-     * them until `machineByCar` existed; a pinned shaft keeps its own machine through this edit, so
-     * *"all N the same machine"* would be false the moment a reader had pinned one. § D227: a
-     * refusal that outlives its own condition is worse than a missing one, because it tells the
-     * reader not to touch a control that works.
+     * them until `machineByCar` existed; a shaft carrying its own machine keeps it through this
+     * edit, so *"all N the same machine"* would be false the moment one did. § D227: a refusal that
+     * outlives its own condition is worse than a missing one, because it tells the reader not to
+     * touch a control that works.
+     *
+     * **Counted by {@link shaftsUnlikeDesign} rather than by pin keys, and stated in the third
+     * person.** Both halves were wrong and both were about reading `machineByCar` as a set of keys.
+     * `carriedCarOf` writes `pinned ?? design` onto every car, so a pin equal to the design gets
+     * exactly what a following shaft gets — promising the reader it *keeps its own* would promise
+     * something this save does not do. And the pin is very often not the reader's: on
+     * `crown-hotel` opened untouched, `specFromBuilding` derives one for car 4's service lift
+     * straight off the document, and *"the 1 you have given"* was a second-person claim about a
+     * state nobody had touched.
      */
-    const pinned = Object.keys(machinesWithin(spec.machineByCar, spec.cars)).length;
-    const follow = Math.max(0, authoredCars - pinned);
+    const own = shaftsUnlikeDesign(spec);
+    const follow = Math.max(0, authoredCars - own);
     const except =
-      pinned === 0
+      own === 0
         ? `so saving now gives all ${String(authoredCars)} the same machine`
-        : `so saving now gives the ${String(follow)} shaft${follow === 1 ? '' : 's'} that follow them the same machine. The ${String(pinned)} you have given a machine of ${pinned === 1 ? 'its' : 'their'} own keep${pinned === 1 ? 's' : ''} it`;
+        : `so saving now gives the ${String(follow)} shaft${follow === 1 ? '' : 's'} that follow them the same machine. The ${String(own)} shaft${own === 1 ? '' : 's'} that carr${own === 1 ? 'ies' : 'y'} a machine of ${own === 1 ? 'its' : 'their'} own keep${own === 1 ? 's' : ''} it`;
     said.push(
       `This building was authored with ${String(variants.size)} different lift specifications across its ${String(authoredCars)} cars. The class, speed and load controls here write one specification onto every shaft that follows the design, ${except}. The banks, the doors and the deck geometry are kept.`,
     );

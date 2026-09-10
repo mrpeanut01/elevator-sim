@@ -58,6 +58,7 @@ import {
   designerShaftRows,
   designerWarnings,
   loadStepsFor,
+  shaftPickOf,
   speedStepsFor,
   withMachineClass,
   withShaftMachine,
@@ -467,10 +468,22 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
         pick.append(unknown);
       }
       pick.addEventListener('change', () => {
+        /*
+         * Three answers, not two — see {@link shaftPickOf}. `classes.find(…)` here resolved the
+         * fallback option above to `undefined`, which {@link withShaftMachine} reads as *clear the
+         * pin* — so the handler meant the opposite of what the option means.
+         *
+         * **Not a defect a reader can hit, and the option twelve lines up is why**: it is appended
+         * `selected = true`, and this panel is rebuilt whole on every redraw, so the select's value
+         * is that id for as long as the option is drawn and no `change` can carry it. Fixed as a
+         * disagreement between two halves of one control rather than as a bug with a victim.
+         */
+        const picked = shaftPickOf(classes, pick.value);
+        if (picked.kind === 'keep') return;
         spec = withShaftMachine(
           spec,
           row.car,
-          classes.find((entry) => entry.id === pick.value),
+          picked.kind === 'class' ? picked.machineClass : undefined,
         );
         redraw();
       });

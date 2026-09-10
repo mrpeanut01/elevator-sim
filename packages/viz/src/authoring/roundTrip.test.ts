@@ -355,6 +355,45 @@ describe('what the slider model cannot hold is refused at the control', () => {
     expect(validateSpec({ ...crown, cars: 6 }, undefined).join(' ')).toMatch(/authored with/i);
   });
 
+  it('counts the shafts that differ from the design, and never says the reader pinned them', () => {
+    /*
+     * **Two conflations in one sentence, and both are about `machineByCar` being read as a set of
+     * keys rather than as a set of differences.**
+     *
+     * `crown-hotel` opened *untouched* already carries a pin: `specFromBuilding` derives one for
+     * every car whose machine is not the headline's, so car 4's 4 000 lb side-opening service lift
+     * is pinned by the **document**. *"The 1 you have given a machine of its own"* was a
+     * second-person claim about a state nobody had touched.
+     *
+     * And a shaft pinned to the machine the design already carries is not a shaft that differs.
+     * `carriedCarOf` writes `pinned ?? design` onto every car, so when the two are equal the save
+     * gives that shaft exactly what it gives the ones that follow — and a sentence promising the
+     * reader it *keeps its own* would be promising something the save does not do. Moving the
+     * design's three controls onto the service lift's own machine is how that state is reached from
+     * the shipped controls, and it is the arm that is red without the fix.
+     */
+    const crown = specFromBuilding(configOf('crown-hotel'), 'crown-hotel');
+    const service = crown.machineByCar[4];
+    expect(service, 'the document authored a car unlike the headline').toBeDefined();
+
+    const derived = validateSpec({ ...crown, ratedSpeedMps: 1.6 }, undefined).join(' ');
+    expect(derived).toMatch(/authored with/);
+    expect(derived, 'the document gave this pin, not the reader').not.toMatch(/you have given/i);
+    expect(derived).toMatch(/1 shaft that carries a machine of its own keeps it/);
+
+    const onto = {
+      ...crown,
+      specClass: service?.specClass ?? crown.specClass,
+      ratedSpeedMps: service?.ratedSpeedMps ?? crown.ratedSpeedMps,
+      ratedLoadLb: service?.ratedLoadLb ?? crown.ratedLoadLb,
+    };
+    const said = validateSpec(onto, undefined).join(' ');
+    expect(said).toMatch(/authored with/);
+    expect(said, 'a pin equal to the design is not a shaft that differs').toMatch(
+      /gives all 5 the same machine/,
+    );
+  });
+
   it('names the authored floors when the pitch or the occupancy control is moved', () => {
     expect(validateSpec({ ...tower, floorHeightM: 3 }, undefined).join(' ')).toMatch(
       /evenly pitched/i,

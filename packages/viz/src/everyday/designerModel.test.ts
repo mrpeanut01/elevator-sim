@@ -45,6 +45,7 @@ import {
   designerReading,
   designerShaftNote,
   designerShaftRows,
+  shaftPickOf,
   designerWarnings,
   loadStepsFor,
   speedStepsFor,
@@ -413,6 +414,85 @@ describe('a machine per shaft, over a design-wide default', () => {
     const note = designerShaftNote(withShaftMachine(SIZED, 3, hydraulic));
     expect(note).toContain('1 of 4 shafts');
     expect(note).not.toMatch(/typical|average|mean/i);
+  });
+
+  it('says nothing about a shaft pinned to the machine the design already carries', () => {
+    /*
+     * **The state two clicks from the shipped `blank tower` button, and the one this note used to
+     * lie about.** `withShaftMachine` snaps a shaft's steps into whatever class it is handed, and
+     * both snaps are identities when that class is the design's own — geared traction's band is
+     * `[1.75, 2.5]` and its load ladder starts at 2 500, which is exactly what `BLANK_SPEC`
+     * carries. So the pin is byte-equal to the design, every shaft in the building carries the same
+     * machine, and the plate above is true of all of them.
+     *
+     * Counting pin **keys** made the note say *1 of 4 shafts carries a different one* while
+     * `buildingSummary` said *4 cars at 2.50 m/s · 16 persons each* about the same spec — two
+     * surfaces disagreeing about one design, which is what the `surfaces-disagree` honesty property
+     * exists for and cannot see here, because the two sit on different adapters. § D227 with its
+     * polarity reversed: a control that wrote nothing different, claiming it wrote something.
+     *
+     * The pin itself must survive, which is why both halves are asserted. It is what
+     * {@link withShaftMachine}'s docstring keeps distinguishable from no pin at all, and the row's
+     * border and its two step ladders are gated on it.
+     */
+    const own = CLASSES.find((entry) => entry.id === SIZED.specClass) as MachineClass;
+    const equal = withShaftMachine(SIZED, 0, own);
+    expect(equal.machineByCar[0], 'the snap is an identity on the design’s own class').toStrictEqual(
+      designMachineOf(SIZED),
+    );
+    expect(designerShaftRows(equal, CLASSES, 'metric')[0]?.pinned, 'the pin is still a pin').toBe(
+      true,
+    );
+    expect(designerShaftNote(equal)).toBe('');
+
+    /* A shaft that does differ is still counted, and the equal pin beside it is not. */
+    const mixed = withShaftMachine(equal, 2, hydraulic);
+    expect(designerShaftNote(mixed)).toContain('1 of 4 shafts');
+    expect(designerShaftNote(mixed)).toContain('carries');
+  });
+
+  it('reads the picker’s three values apart, and keeps a pin the class table cannot name', () => {
+    /*
+     * **The option drawn to preserve an unresolvable pin resolved to the value that clears it.**
+     * The screen read every value through `classes.find((entry) => entry.id === pick.value)`, and
+     * that answers `undefined` for two different questions: *follow the design* (`''`) and *the
+     * machine this shaft already carries, under a class id this build has no entry for*.
+     * {@link withShaftMachine} reads `undefined` as **clear the pin**, so the handler meant the
+     * opposite of what that option means.
+     *
+     * **No reader ever hit it, and this case says so rather than inheriting the claim that they
+     * did.** The screen appends that option `selected = true` and rebuilds the panel whole on every
+     * redraw, so the select already holds that id whenever the option exists and a `change` cannot
+     * carry it. That also means the screen cannot be driven into the state — so what is asserted
+     * here is the value resolver, on all three answers, which is the half that was wrong and the
+     * half a test can reach. The state itself is built directly, because building it is the only
+     * way to have it.
+     *
+     * Asserted here rather than left to `staleRefusals.test.ts:235`, which says only that the
+     * screen's **source** contains `withShaftMachine` — a guard that passes just as well when the
+     * listener writes the wrong car or is never attached at all.
+     */
+    const orphan = { ...SIZED, machineByCar: { 1: { ...designMachineOf(SIZED), specClass: 'gone' } } };
+    expect(designerShaftRows(orphan, CLASSES, 'metric')[1]?.className, 'the row answers the raw id')
+      .toBe('gone');
+
+    const keep = shaftPickOf(CLASSES, 'gone');
+    expect(keep.kind).toBe('keep');
+
+    const follow = shaftPickOf(CLASSES, '');
+    expect(follow.kind).toBe('follow');
+    expect(withShaftMachine(orphan, 1, undefined).machineByCar).toStrictEqual({});
+
+    const chosen = shaftPickOf(CLASSES, hydraulic.id);
+    expect(chosen.kind).toBe('class');
+    expect(chosen.kind === 'class' ? chosen.machineClass.id : '').toBe('hydraulic');
+
+    /*
+     * And what the screen does with each: `keep` writes nothing, so the pin the class table cannot
+     * name is still there and still says what it said.
+     */
+    expect(machineAt(orphan, 1).specClass).toBe('gone');
+    expect(machineAt(withShaftMachine(orphan, 1, hydraulic), 1).specClass).toBe('hydraulic');
   });
 
   it('drops a pin on a shaft the design no longer has', () => {

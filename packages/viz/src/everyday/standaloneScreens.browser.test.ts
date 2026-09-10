@@ -307,6 +307,98 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
   });
 
   /**
+   * **The per-shaft machine picker, driven — GitHub issue #420.**
+   *
+   * The seam this covers had **no** driven guard. The only thing standing over the picker → model
+   * edge was `staleRefusals.test.ts:235`, a source grep asserting that `designerScreen.ts` contains
+   * the string `withShaftMachine` — which passes when the listener writes the wrong car index, and
+   * passes when no listener is attached at all. #420's acceptance says *the pickers write it*, and
+   * a grep cannot say that.
+   *
+   * It is driven from `blank tower` rather than from `garden-apartments`, because the state the
+   * review found is two clicks from that button and nowhere near a shipped document: `BLANK_SPEC`
+   * is geared traction at 2.5 m/s and 2 500 lb, geared traction's own band is `[1.75, 2.5]` and its
+   * load ladder starts at 2 500, so both of `withShaftMachine`'s snaps are identities when the
+   * class handed to a shaft is the design's own. The shaft is genuinely pinned and genuinely
+   * carries the design's machine, and the plate above it is true of all four shafts. Counting pins
+   * rather than differences made the note claim otherwise while `buildingSummary` said *4 cars at
+   * 2.50 m/s · 16 persons each* about the same spec.
+   */
+  it('writes one shaft’s machine from its own picker, and stays quiet when it matches the design', async () => {
+    const page = await coldLoad();
+    await railRow(page, 'Design a building');
+    await page.waitForSelector('.everyday-designer');
+    await page.click('.everyday-designer-blank');
+    await page.waitForSelector('.everyday-designer-machine-shaft-class');
+    /* The plate and its note live inside § 13.3's collapsed document; open it once and it stays. */
+    await page.click('.everyday-designer-document-summary');
+
+    /** Every shaft's picker value, its figure line, and whether its own step ladders are drawn. */
+    const shafts = async (): Promise<{ value: string; figure: string; steps: number }[]> =>
+      page.$$eval('.everyday-designer-machine-shaft', (nodes) =>
+        nodes.map((node) => ({
+          value: (node.querySelector('select') as HTMLSelectElement).value,
+          figure: node.querySelector('.everyday-designer-machine-shaft-figure')?.textContent ?? '',
+          steps: node.querySelectorAll('.everyday-designer-step').length,
+        })),
+      );
+    const note = async (): Promise<string> =>
+      (await page.$('.everyday-designer-plate-note')) === null
+        ? ''
+        : ((await page.textContent('.everyday-designer-plate-note')) ?? '');
+    const pick = async (shaft: number, value: string): Promise<void> => {
+      const selects = await page.$$('.everyday-designer-machine-shaft-class');
+      const select = selects[shaft];
+      if (select === undefined) throw new Error(`no picker for shaft ${String(shaft)}`);
+      await select.selectOption(value);
+    };
+
+    const blank = await shafts();
+    expect(blank).toHaveLength(4);
+    expect(blank.every((shaft) => shaft.value === '')).toBe(true);
+    expect(new Set(blank.map((shaft) => shaft.figure)).size, 'one design, one figure').toBe(1);
+    expect(blank.every((shaft) => shaft.steps === 0), 'no steps on a following shaft').toBe(true);
+    expect(await note()).toBe('');
+
+    /*
+     * Shaft **B**, and the assertion is *that shaft and no other* — the half a grep cannot make and
+     * the half an off-by-one in the listener would fail. Its figure moves, its step ladders appear,
+     * and the other three are byte-identical to what they were.
+     */
+    await pick(1, 'hydraulic');
+    const one = await shafts();
+    expect(one[1]?.value).toBe('hydraulic');
+    expect(one[1]?.figure).not.toBe(blank[1]?.figure);
+    expect(one[1]?.steps, 'a shaft with its own machine gets its own ladders').toBeGreaterThan(0);
+    for (const other of [0, 2, 3]) {
+      expect(one[other]?.figure, `shaft ${String(other)}`).toBe(blank[other]?.figure);
+      expect(one[other]?.value, `shaft ${String(other)}`).toBe('');
+    }
+    expect(await note()).toContain('1 of 4 shafts');
+
+    /*
+     * Shaft **C**, handed the design's *own* class. The pin is real — the select holds it and the
+     * clear affordance is gated on it — and the machine it names is the machine the plate already
+     * quotes, so the note must not grow. This is the assertion that was red before the fix.
+     */
+    await pick(2, 'geared-traction');
+    const equal = await shafts();
+    expect(equal[2]?.value).toBe('geared-traction');
+    expect(equal[2]?.figure, 'the snap is an identity here').toBe(blank[2]?.figure);
+    expect(equal[2]?.steps).toBeGreaterThan(0);
+    expect(await note()).toContain('1 of 4 shafts');
+
+    /* And *Same as the design* clears the pin the picker gave, rather than writing the design in. */
+    await pick(1, '');
+    const cleared = await shafts();
+    expect(cleared[1]?.value).toBe('');
+    expect(cleared[1]?.figure).toBe(blank[1]?.figure);
+    expect(cleared[1]?.steps).toBe(0);
+    expect(await note(), 'the equal pin on C is not a shaft that differs').toBe('');
+    await page.close();
+  });
+
+  /**
    * **The register moved, so this case follows it across the two screens.**
    *
    * It used to assert that the drawing board drew three or more register rows of its own. GitHub

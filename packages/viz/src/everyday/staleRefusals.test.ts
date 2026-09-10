@@ -232,6 +232,15 @@ describe('a refusal that outlived the thing it refused — GitHub issue #423', (
     expect(machineAt(pinned, 0).specClass, 'and an unpinned shaft still follows the design').toBe(
       BLANK_SPEC.specClass,
     );
+    /*
+     * **This line is a grep and is not the guard for the picker → model seam.** It passes when the
+     * listener writes the wrong car index, and it passes when no listener is attached at all — an
+     * independent review found exactly that hole, and the seam had nothing else standing over it.
+     * What drives the seam is `standaloneScreens.browser.test.ts`'s *writes one shaft's machine
+     * from its own picker*, on the page, through the shipped `<select>`; what drives the value the
+     * listener resolves is `designerModel.test.ts`'s `shaftPickOf` case. This one only says the
+     * screen still names the writer, which is what the retraction above needs.
+     */
     expect(sourceOf('./designerScreen.ts')).toContain('withShaftMachine');
     for (const row of DESIGNER_ABSENCES) {
       expect(row, 'a class-per-shaft row is back without the docstring coming back').not.toContain(

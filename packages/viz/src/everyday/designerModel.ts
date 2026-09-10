@@ -74,9 +74,9 @@ import {
   carLabelOf,
   machineAt,
   machineIsPinned,
-  machinesWithin,
   personsOf,
   riseM,
+  shaftsUnlikeDesign,
   totalCapacity,
   totalPopulation,
   type BuildingSpec,
@@ -351,6 +351,54 @@ export function withShaftMachine(
   return { ...spec, machineByCar };
 }
 
+/**
+ * **What one shaft picker's value means** — the three answers, told apart before the model is asked.
+ *
+ * The picker's options are *Same as the design* at `''`, one per entry of `classes`, and — on a
+ * shaft whose own class this build does not have — a last one carrying that class's raw id, so the
+ * select does not silently read *Same as the design* while the figure beneath it says otherwise.
+ *
+ * That last option is why this is a function rather than a `classes.find(…)` at the call site.
+ * `find` answers `undefined` for two different questions — *the reader chose to follow the design*
+ * and *the reader chose the machine this shaft already has, under a name this build cannot resolve*
+ * — and {@link withShaftMachine} reads `undefined` as **clear the pin**. So the handler said the
+ * opposite of what the option means: the one control drawn to preserve an unresolvable pin is the
+ * one that would have thrown it away.
+ *
+ * **Would have — and that is the whole claim, because the branch is not reachable from the shipped
+ * screen and this docstring is not going to say it was.** An independent review raised it from
+ * reading and marked it *plausible, not driven*; driving it is impossible, and the construction
+ * says why rather than a plausibility argument. `designerScreen.ts` appends that option with
+ * `selected = true` unconditionally, and `drawMachinePanel` opens with `replaceChildren()` and ends
+ * with `drawShaftMachines()`, so the `<select>` is rebuilt whole on every redraw and its value **is**
+ * the unresolvable id at every moment the option exists. A `change` event carries a value the
+ * select did not already hold, and every other value it can hold is a member of `classes` or `''`.
+ * There is no input that reaches the wrong branch — and none a fixture can manufacture either,
+ * which is why no test here drives the screen for it.
+ *
+ * What is left after that is worth fixing anyway, and is the reason this function exists rather
+ * than a comment: a handler that contradicted the option above it, held apart by nothing but which
+ * option happened to be pre-selected. The sentence this paragraph replaced — *selecting the shaft's
+ * own machine set the shaft to Same as the design* — was a mechanism nobody measured, which is the
+ * thing [§ D256](../../../../DECISIONS.md) refuses, and it would have been the second false
+ * sentence this seam shipped.
+ *
+ * `keep` is the honest third answer: the shaft already carries that machine, so there is nothing to
+ * write. Extracted from the listener rather than guarded inside it because a source grep is not a
+ * test — the only thing holding this seam was `staleRefusals.test.ts` asserting the screen's source
+ * *contains* `withShaftMachine`, which passes just as well when the listener writes the wrong car.
+ */
+export type ShaftPick =
+  | { readonly kind: 'follow' }
+  | { readonly kind: 'class'; readonly machineClass: MachineClass }
+  | { readonly kind: 'keep' };
+
+export function shaftPickOf(classes: readonly MachineClass[], value: string): ShaftPick {
+  if (value === '') return { kind: 'follow' };
+  const machineClass = classes.find((entry) => entry.id === value);
+  return machineClass === undefined ? { kind: 'keep' } : { kind: 'class', machineClass };
+}
+
 /** Move one pinned shaft's speed or load onto another rung. A no-op on a shaft with no pin. */
 export function withShaftStep(
   spec: BuildingSpec,
@@ -422,15 +470,33 @@ export function designerShaftRows(
  * *a published number goes stale* at rating-plate scale: every figure on it would still be true of
  * some shaft and none of them true of the building. So the plate keeps quoting the design's machine
  * — which is what a plate is — and this line says whose figures those are and how many shafts do
- * not carry them. `''` where every shaft follows the design, because a sentence about an exception
- * that does not exist is one a reader learns to skip.
+ * not carry them. `''` where every shaft carries the design's machine, because a sentence about an
+ * exception that does not exist is one a reader learns to skip.
+ *
+ * **Counted by {@link shaftsUnlikeDesign}, which is a comparison and not a count of pins, and the
+ * choice between those two readings is what this sentence is.** It shipped counting the keys of
+ * `machineByCar`, and that is a different question: {@link withShaftMachine} snaps a shaft's steps
+ * into the class it is handed, so handing it the design's **own** class writes a pin byte-equal to
+ * the design. Two clicks from the shipped `blank tower` button the note read *1 of 4 shafts carries
+ * a different one* while `buildingSummary` read *4 cars at 2.50 m/s · 16 persons each* about the
+ * same spec — two surfaces disagreeing about one design, which is what the `surfaces-disagree`
+ * honesty property exists for and cannot see here, because the two sit on different adapters.
+ *
+ * Rewording to *“carries a machine of its own”* would have been true of the keys and would have
+ * been the wrong sentence, because this line's whole job is the one its paragraph above states:
+ * to say when the plate stops describing the building. A shaft holding the design's own machine is
+ * a shaft the plate describes exactly, so there is nothing to say and it says nothing.
+ *
+ * The **row** above keeps saying `pinned`, and that divergence is deliberate rather than an
+ * oversight to tidy up: {@link DesignerShaftRow.pinned} is what the clear control is gated on and
+ * what {@link withShaftMachine} refuses to blur, while this line is about the plate.
  */
 export function designerShaftNote(spec: BuildingSpec): string {
-  const pinned = Object.keys(machinesWithin(spec.machineByCar, spec.cars)).length;
-  if (pinned === 0) return '';
+  const unlike = shaftsUnlikeDesign(spec);
+  if (unlike === 0) return '';
   return (
-    `This plate is the design’s machine. ${String(pinned)} of ${String(spec.cars)} shaft${spec.cars === 1 ? '' : 's'} ` +
-    `carr${pinned === 1 ? 'ies' : 'y'} a different one, listed with the machines above.`
+    `This plate is the design’s machine. ${String(unlike)} of ${String(spec.cars)} shaft${spec.cars === 1 ? '' : 's'} ` +
+    `carr${unlike === 1 ? 'ies' : 'y'} a different one, listed with the machines above.`
   );
 }
 

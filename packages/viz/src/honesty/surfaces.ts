@@ -8350,14 +8350,27 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     const overClass: typeof sized = { ...sized, specClass: 'hydraulic', floors: 40, ratedSpeedMps: 0.75, ratedLoadLb: 2500 };
     /*
      * **A design whose shafts do not all carry the same machine** — GitHub issue #420. The arm is
-     * here rather than folded into `sized` because the two are different products: `sized` is a
-     * fleet whose plate speaks for the whole building, and this is one whose plate has to say whose
-     * machine it is quoting. Both are states a player produces, and only one of them draws
-     * `designerShaftNote`.
+     * here rather than folded into `sized` because the two are different products: `sized` is the
+     * document's own fleet, and this is that fleet with one more machine in it.
+     *
+     * **`sized` is not the homogeneous half, and this comment used to say it was.** It read *"Both
+     * are states a player produces, and only one of them draws `designerShaftNote`"*, which is
+     * false on every shipped building whose document authored more than one lift:
+     * `specFromBuilding` derives a pin for each car unlike the headline, so `crown-hotel`'s service
+     * lift, `st-jude-hospital`'s two and the tall towers' many are pinned straight off the document
+     * and `sized` draws the note by itself. What is true of both arms is narrower — `mixed` draws
+     * the note with one more shaft in it than `sized` does, so the arm *adds* a machine rather than
+     * introducing the sentence, and on the buildings authored with one lift throughout it is the
+     * arm that introduces it. § D227: a sentence that has gone false leaves on the commit that
+     * makes it false.
      *
      * The pin is the **first** shaft and the class is the shipped hydraulic, so it exists on every
      * building the corpus draws from; `withShaftMachine` snaps its two steps into that class's own
-     * ladder, which is the same rule the design's class chips follow one panel up.
+     * ladder, which is the same rule the design's class chips follow one panel up. That snap is
+     * also why this arm reliably *differs* from the design rather than merely being pinned — a pin
+     * byte-equal to the design draws nothing, which is what `designerShaftNote` counts. It lands on
+     * hydraulic's own rungs, which no shipped building's design sits on: measured, including
+     * `garden-apartments`, whose design *is* hydraulic and whose 0.63 m/s snaps down to 0.50.
      */
     const mixed: typeof sized = withShaftMachine(
       sized,
