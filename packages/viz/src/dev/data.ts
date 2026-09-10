@@ -31,6 +31,7 @@ import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/
 import { restrictedFloorIds } from '../access/zoning.js';
 import { mixedFleetBanks } from '../commissioning/choices.js';
 import { CONTRACT_LADDER, contractLadderIssues } from '../shift/ladder.js';
+import { parseEngineeringBriefs, type EngineeringBriefs } from '../briefs/parse.js';
 import { parseCampaign } from '../campaign/parse.js';
 import type { Campaign } from '../campaign/types.js';
 import { fixitContextOf, parseFixitCases } from '../fixit/parse.js';
@@ -264,7 +265,8 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
  * -------------------------------------------------------------------------- */
 
 /**
- * `data/campaign.json` and `data/scenario-goals.json`, fetched, cross-checked and parsed.
+ * `data/campaign.json`, `data/scenario-goals.json` and `data/engineering-briefs.json`, fetched,
+ * cross-checked and parsed.
  *
  * **Deliberately not part of {@link loadBrowserResources}.** That function is what
  * `dev/batchWorker.ts` calls on every worker start, and a batch worker has no use for a campaign;
@@ -275,9 +277,10 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
  * campaign checked against a malformed table would be checked against nothing.
  */
 export async function loadCampaign(resources: BrowserResources): Promise<LoadedCampaign> {
-  const [campaignRaw, publishedRaw] = await Promise.all([
+  const [campaignRaw, publishedRaw, briefsRaw] = await Promise.all([
     fetchJson('/campaign.json'),
     fetchJson('/scenario-goals.json'),
+    fetchJson('/engineering-briefs.json'),
   ]);
 
   const published = publishedRaw as PublishedGoalRates;
@@ -295,7 +298,7 @@ export async function loadCampaign(resources: BrowserResources): Promise<LoadedC
     if (parameter.description !== undefined) dimensionHelp.set(parameter.id, parameter.description);
   }
 
-  const campaign = parseCampaign(campaignRaw, {
+  const context = {
     published,
     // The one statement anywhere about what a dimension may be, and it is derived here.
     dimensionIds: space.ids,
@@ -311,13 +314,26 @@ export async function loadCampaign(resources: BrowserResources): Promise<LoadedC
     ),
     /* One document, loaded once with the rest — see `BrowserResources.priceSchedule`. */
     schedule: resources.priceSchedule,
-  });
+  };
+  const campaign = parseCampaign(campaignRaw, context);
+  /*
+   * The six engineering briefs — GitHub issue **#227**, `docs/21` § 4, and § D525 clause 1's
+   * *"one shape, four sources"*.
+   *
+   * Loaded here rather than in a loader of their own because a brief **is** a scenario: it is
+   * checked against the same published goal table, by the same validator, with the same context
+   * object. Two contexts assembled two ways would be two answers to *"what is a dimension?"*, which
+   * is the defect `campaign/parse.ts`'s own docstring exists to prevent one level down.
+   */
+  const briefs = parseEngineeringBriefs(briefsRaw, context);
 
-  return { campaign, published, space, dimensionHelp };
+  return { campaign, briefs, published, space, dimensionHelp };
 }
 
 export interface LoadedCampaign {
   readonly campaign: Campaign;
+  /** `data/engineering-briefs.json`, parsed and validated against the same table. */
+  readonly briefs: EngineeringBriefs;
   readonly published: PublishedGoalRates;
   readonly space: SearchSpace;
   readonly dimensionHelp: ReadonlyMap<string, string>;

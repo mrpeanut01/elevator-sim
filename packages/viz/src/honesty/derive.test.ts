@@ -1214,6 +1214,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'campaign/parse.ts#parseCampaign',
         'campaign/parse.ts#validateCampaign',
         /*
+         * `briefs/parse.ts` is `campaign/parse.ts` one `data/` document over — GitHub issue #227.
+         * Every sentence in it refuses a malformed `data/engineering-briefs.json` to the person
+         * authoring it: a kind that is not one of `docs/21` § 4's six, a second brief of one kind,
+         * and — the one that matters — a brief whose kind cannot reach a scenario run, which names
+         * the seam rather than the amount of work. `briefs/parse.test.ts` fires every one of them
+         * and checks each seam's premise against the tree. What a *player* reads is the parsed
+         * copy: the brief's `name`, `teaches` and `brief` sentences, which are a `CampaignStage`'s
+         * and travel through `dev/campaignPanel.ts` and the judge exactly as the ten stages' do.
+         */
+        'briefs/parse.ts#BRIEF_KINDS',
+        'briefs/parse.ts#BRIEF_KIND_SEAM',
+        'briefs/parse.ts#EngineeringBriefsError',
+        'briefs/parse.ts#parseEngineeringBriefs',
+        /*
          * `fixit/parse.ts` is `campaign/parse.ts` one surface over, and the same argument holds:
          * its sentences refuse a malformed `data/fixit-cases.json` to the person authoring it,
          * `fixit/parse.test.ts` drives every refusal, and what a *player* reads is the parsed

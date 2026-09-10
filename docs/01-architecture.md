@@ -314,6 +314,7 @@ packages/
 │   ├── fixit/             — Everyday Mode slice 6: the Fix-a-building case engine, two real runs sharing a crowd
 │   ├── watch/             — Everyday Mode slice 8: a run replayed from its record, read-only and never scored
 │   ├── gauntlet/          — Everyday Mode slice 9a: the forty proof cases as data, the rating that is their mean, and the ladder that orders it
+│   ├── briefs/            — GitHub issue #227: the Engineer challenges as scenarios — § D525 clause 1 folds them into one schema, so this parses and refuses rather than defining a second one
 │   ├── scenario/          — Phase 9 W9: goal predicates, their measured across-seed pass rates
 │   ├── campaign/          — Phase 9 W5: the scenario schema, the seven stages, the four fail states
 │   ├── honesty/           — Phase 9 § D163 clause 1: the generated search over every player-facing string

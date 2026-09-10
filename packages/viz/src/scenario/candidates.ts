@@ -1,5 +1,13 @@
 /**
- * The configurations whose goals are measured — one per stage of `docs/10` § 5.4's progression.
+ * The configurations whose goals are measured: one per stage of `docs/10` § 5.4's progression, and
+ * — since GitHub issue **#227** — one per shipped engineering brief.
+ *
+ * **The briefs are here rather than in a driver of their own, and that is the first of `docs/21`
+ * § 4's two trip-wires enforced rather than promised.** A brief with goals may not ship unless its
+ * bar was measured, because `campaign/judge.ts#judgeStage` refuses to judge against a bar that does
+ * not reproduce. Measuring them through this list means `regenerate.test-helper.ts` writes their
+ * rows and `goalRates.test.ts` re-derives them, exactly as it does the ten stages'. A second driver
+ * would have been a second answer to *"what was this bar measured on?"*.
  *
  * **These are not the campaign.** § 5.4's stages carry a brief, an editable dimension set, a
  * suggested lever and an order; none of that is here, and T65 owns all of it. What is here is the
@@ -93,8 +101,118 @@ function stage(
 }
 
 /**
- * The ten stages, as configurations: § 5.4's original seven, and three that came with the
- * buildings added afterwards.
+ * The engineering briefs' own seed sets — GitHub issue **#227**.
+ *
+ * Different masters from the ten stages', and deliberately: a brief is a different question on a
+ * different configuration, and sharing a master would make *"the same fifty traces"* true across two
+ * bodies of content that were never meant to be compared. Disjointness from each other is what
+ * matters and it is checked on the **derived** replication seeds by `campaign/parse.ts`, never on
+ * the masters — two masters can in principle collide.
+ */
+const BRIEF_TUNING: SeedSet = { name: 'brief-tuning-20260910', seed: '20260910', replications: 50 };
+const BRIEF_HOLDOUT: SeedSet = {
+  name: 'brief-holdout-20260911',
+  seed: '20260911',
+  replications: 50,
+};
+
+function brief(
+  id: string,
+  name: string,
+  buildingId: string,
+  dispatcherProfileId: string,
+  arrivalRatePctPop5min: number | null,
+): GoalScenario {
+  return {
+    id,
+    name,
+    buildingId,
+    dispatcherProfileId,
+    durationS: 900,
+    arrivalRatePctPop5min,
+    tuningSeeds: BRIEF_TUNING,
+    holdoutSeeds: BRIEF_HOLDOUT,
+    candidateGoals: CANDIDATE_GOALS,
+  };
+}
+
+/**
+ * **The engineering briefs, as configurations** — `docs/21` § 4, GitHub issue **#227**, and the
+ * first trip-wire that issue binds every brief to.
+ *
+ * > *"A batch-judged bar must already be measured. `judgeStage` refuses to judge against a bar
+ * > that does not reproduce (`met: null`, the stage can never clear) … Any brief with goals
+ * > therefore ships **with** its measured row, regenerated via the scenario regeneration path."*
+ *
+ * This constant is what makes that mechanical rather than a promise. The briefs are appended to
+ * {@link CANDIDATE_SCENARIOS} rather than measured by a second driver, so
+ * `regenerate.test-helper.ts` writes their rows with the ten stages' and `goalRates.test.ts`
+ * re-derives them on every run against what is on disk. A brief added here and never regenerated
+ * fails that guard; a brief authored in `data/engineering-briefs.json` and never added here fails
+ * `campaign/parse.ts`'s *"has no entry in the published goal table"*. Both directions are held by a
+ * test rather than by this paragraph.
+ *
+ * **They are appended rather than interleaved**, so the ten stages' rows keep their positions and a
+ * regeneration that moves one of them is a finding rather than a re-ordering.
+ *
+ * ## Why `energy-aware` is the starting setting on both, and why it is not a dig at that profile
+ *
+ * [§ D106](../../../../DECISIONS.md) is this repository's most-repeated measured finding: energy is
+ * an axis and never a score, because *"a dispatcher that drives less carries fewer people"* — the
+ * Phase 8 matrix put `nearest-car` on the Pareto front at six of eight cells for exactly that
+ * reason. A building handed over with an energy-first setting is therefore the most instructive
+ * starting point this product can offer an enthusiast, and it is a real commissioning choice rather
+ * than a strawman. The brief never grades the energy figure and never orders two arms on it;
+ * `campaign/judge.ts`'s refusal is untouched, and what is judged is the wait and the demand
+ * answered.
+ *
+ * ## Both configurations are measured rather than chosen, and the measurements are named
+ *
+ * - `brief-e5-handling-capacity` — Chancery House at 2.5 % of population every five minutes.
+ *   Swept over all thirteen shipped profiles at these seeds, **three** clear both batches and
+ *   **seven more** meet every bar on the tuning seeds and lose on the holdout. That is the
+ *   difficulty `docs/38` § 2.1 asks for — *"many survivors is easy; one survivor is the hardest a
+ *   scenario is allowed to be"* — arrived at by measurement, and the seven are what the holdout is
+ *   for.
+ * - `brief-e3-diagnose-the-saturation` — Mixed-Use High-Rise at its own declared demand. The
+ *   starting setting withholds its mean on **14 of 50** replications and every one of those
+ *   fourteen names the queue-growth ground, which is what gives the brief a suppression to
+ *   diagnose. Eight of the thirteen clear it.
+ *
+ * **What is re-derived and what is a dated measurement, said rather than blurred.**
+ * `briefs/playable.test.ts` re-derives the two claims a brief's playability rests on — *at least one
+ * affordable setting clears both batches* and *the starting setting clears nothing* — and, on E3,
+ * that a mean is still withheld on some replications and never on all of them. The counts above —
+ * three, seven, eight, fourteen — are a **record of one sweep on 2026-09-10**, over all thirteen
+ * shipped profiles at these seeds, and nothing re-derives them. They are here because a reader
+ * deciding whether a brief is too easy needs them and the cheap test deliberately does not publish
+ * a difficulty figure; they are not a bar, and a later reader who finds them moved has found a
+ * measurement rather than an error.
+ */
+const BRIEF_SCENARIOS: readonly GoalScenario[] = [
+  brief(
+    'brief-e5-handling-capacity',
+    'E5 — Meet the handling-capacity target',
+    'chancery-house',
+    'energy-aware',
+    2.5,
+  ),
+  brief(
+    'brief-e3-diagnose-the-saturation',
+    'E3 — Diagnose the saturation',
+    'mixed-use-high-rise',
+    'energy-aware',
+    null,
+  ),
+];
+
+/**
+ * The ten stages, as configurations, and the briefs appended: § 5.4's original seven, three that
+ * came with the buildings added afterwards, and {@link BRIEF_SCENARIOS}.
+ *
+ * The briefs are **appended** so the ten keep their positions: `goalRates.test.ts` compares this
+ * list with `data/scenario-goals.json` as an ordered array, so a regeneration that moved a stage's
+ * row would be a finding rather than a re-ordering.
  *
  * The three new ones exist because the original seven could not pose their questions at all.
  * **8 — The headline address** is the first stage on `office-prestige`, a profile that had been
@@ -122,4 +240,6 @@ export const CANDIDATE_SCENARIOS: readonly GoalScenario[] = [
   stage('stage-8-the-headline-address', 'The headline address', 'chancery-house', 'collective', 3),
   stage('stage-9-both-ways-at-once', 'Both ways at once', 'crown-hotel', 'collective', 2.5),
   stage('stage-10-the-bed-and-the-visitor', 'The bed and the visitor', 'st-jude-hospital', 'collective', 2),
+  ...BRIEF_SCENARIOS,
 ];
+

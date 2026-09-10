@@ -79,12 +79,20 @@ const ENTRIES: readonly ScenarioEntry[] = Object.freeze([
 ]);
 
 /**
- * The § 2.1 sources with no schema to be authored to. Both rows leave on the commit that closes
- * #365, and `buildNotes.test.ts#ABSENCE_TRIAGE` is what makes leaving them behind fail.
+ * What this hub does not reach yet, in the player's words.
+ *
+ * The first row is § 2.1's remaining unauthored source and leaves on the commit that closes #365.
+ * **The second row is narrower than it was**, and the narrowing is the record: it read *"the six
+ * engineering challenges, E1 to E6, are specified and unbuilt — no brief data ships"*, and since
+ * GitHub issue **#227** brief data does ship — two of the six, authored to the scenario schema in
+ * `data/engineering-briefs.json` and played from the Lab's own stage picker. What is still true is
+ * that this list cannot reach them and that four of the six are refused at load, so the entry says
+ * both rather than being deleted. § D227 in the direction that bites after a lane lands: an absence
+ * that stopped being true is as wrong as one that was never recorded.
  */
 export const SCENARIO_ABSENCES: readonly string[] = Object.freeze([
   'The ten campaign stages are authored to the campaign record rather than to the scenario schema, so they are reached from Career until the two are one thing.',
-  'The six engineering challenges, E1 to E6, are specified and unbuilt — no brief data ships.',
+  'Two of the six engineering challenges ship, and they are played on the Engineer surface rather than from this list. The other four ask for something a scenario run cannot do yet, and each says which.',
 ]);
 
 /** The hub, computed. Takes nothing: a thin hub has no state to be wrong about. */

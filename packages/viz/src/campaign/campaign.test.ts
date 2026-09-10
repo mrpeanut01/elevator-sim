@@ -70,16 +70,30 @@ describe('the shipped campaign', () => {
     expect(validateCampaign(fixture.campaign, fixture.context)).toEqual([]);
   });
 
-  it('is one stage per measured scenario, in order', () => {
-    // Derived from the goal table, which is the point: a stage without a measured pass rate is a
-    // level shipped on a goal nobody has taken a rate of, and R12 forbids it. The length is checked
-    // against the table rather than against a literal, which had been `7` and is now the campaign's
-    // to grow.
+  it('is one stage per measured scenario, in order, and holds the head of that table', () => {
+    /*
+     * Derived from the goal table, which is the point: a stage without a measured pass rate is a
+     * level shipped on a goal nobody has taken a rate of, and R12 forbids it. The length is checked
+     * against the table rather than against a literal, which had been `7` and is now the campaign's
+     * to grow.
+     *
+     * **This used to compare the two lists whole, and it stopped being able to on 2026-09-10** —
+     * GitHub issue **#227**. `data/scenario-goals.json` has a second author now: the engineering
+     * briefs are scenarios measured through the same `scenario/candidates.ts` path, so the table is
+     * the campaign's rows *and* theirs. The equality is therefore narrowed to a **prefix** rather
+     * than dropped, and that is not a weakening in the direction that matters:
+     * `scenario/candidates.ts` appends the briefs precisely so the ten keep their positions, so a
+     * stage that moved, was renamed or lost its row still fails here exactly as before.
+     *
+     * The half this can no longer see — *a measured row nobody ships* — is checked where the second
+     * author lives: `briefs/parse.test.ts` asserts every row of the table is authored exactly once,
+     * by the campaign or by a brief. Splitting it that way keeps `campaign/` from importing
+     * `briefs/`, which would make the campaign know about a content source it is not.
+     */
     const { campaign, published } = fixture;
-    expect(campaign.stages.map((stage) => stage.id)).toEqual(
-      published.scenarios.map((scenario) => scenario.id),
-    );
-    expect(campaign.stages).toHaveLength(published.scenarios.length);
+    const head = published.scenarios.slice(0, campaign.stages.length).map((scenario) => scenario.id);
+    expect(campaign.stages.map((stage) => stage.id)).toEqual(head);
+    expect(campaign.stages.length).toBeLessThanOrEqual(published.scenarios.length);
     expect(campaign.stages.length).toBeGreaterThanOrEqual(7);
   });
 

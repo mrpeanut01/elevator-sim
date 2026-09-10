@@ -186,9 +186,43 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
    */
   let lastDemonstration: VizRecording | undefined;
 
-  for (const [index, stage] of loaded.campaign.stages.entries()) {
-    ui.stage.append(new Option(`${String(index + 1)}. ${stage.name}`, stage.id));
+  /**
+   * Every scenario this panel can play: the campaign's ten, then the engineering briefs.
+   *
+   * **One list, because a brief is a scenario** — `docs/38` § 2.1's *"one shape, four sources"* and
+   * GitHub issue **#227**. Both are `CampaignStage`s validated by `campaign/parse.ts` against the
+   * same published goal table, so everything below this line — the baseline, the weight editor, the
+   * admission, the two batches, the judge, the fail-state diagnosis — reaches a brief with no
+   * second path and no branch on which source it came from. A panel that special-cased briefs would
+   * be the second judge this directory exists to avoid.
+   *
+   * They are drawn in two `optgroup`s because the register differs even though the machinery does
+   * not: the ten are an ordered progression and the briefs are a set of standing engineering
+   * questions, and a player choosing *"6. The tall one"* out of a flat list of sixteen would have no
+   * way to know which ordinal meant *sixth of a path*.
+   */
+  const playable: readonly CampaignStage[] = [
+    ...loaded.campaign.stages,
+    ...loaded.briefs.asScenarios.stages,
+  ];
+
+  function fillStageOptions(): void {
+    const campaignGroup = doc.createElement('optgroup');
+    campaignGroup.label = 'Campaign';
+    for (const [index, stage] of loaded.campaign.stages.entries()) {
+      campaignGroup.append(new Option(`${String(index + 1)}. ${stage.name}`, stage.id));
+    }
+    ui.stage.append(campaignGroup);
+    if (loaded.briefs.briefs.length === 0) return;
+    const briefGroup = doc.createElement('optgroup');
+    briefGroup.label = 'Engineering briefs';
+    for (const brief of loaded.briefs.briefs) {
+      briefGroup.append(new Option(brief.stage.name, brief.stage.id));
+    }
+    ui.stage.append(briefGroup);
   }
+
+  fillStageOptions();
   fillDispatcherOptions();
 
   /**
@@ -234,7 +268,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   }
 
   function currentStage(): CampaignStage | undefined {
-    return loaded.campaign.stages.find((stage) => stage.id === ui.stage.value);
+    return playable.find((stage) => stage.id === ui.stage.value);
   }
 
   /**
@@ -1312,7 +1346,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     ui.status.textContent = 'cancelled — a stopped batch has no result, so nothing is reported.';
   });
 
-  const first = loaded.campaign.stages[0];
+  const first = playable[0];
   if (first !== undefined) {
     ui.stage.value = first.id;
     ui.profile.value = openingProfileFor(first);

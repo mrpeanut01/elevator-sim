@@ -577,6 +577,34 @@ screen, each with its basis attached. Three, and one is a declared new seam:
 
 ## 4. The engineering challenges
 
+> **Status 2026-09-10: SUPERSEDED IN PART by [§ D525](../DECISIONS.md).** The six challenges stand;
+> the file shape declared below does not, and two of the six now ship. GitHub issue
+> **#227**'s third comment rescoped this section on 2026-09-06 and
+> [§ D525](../DECISIONS.md) clause 1 says what it rescoped it *to*: a brief is a **scenario** —
+> `data/campaign.json`'s stage record plus a budget — so `data/engineering-briefs.json` holds
+> `CampaignStage`s validated by `packages/viz/src/campaign/parse.ts`, and the only field this
+> section's own shape contributes is `kind`. **E5** (`meet-the-target`, Chancery House at 2.5 %)
+> and **E3** (`diagnose`, Mixed-Use High-Rise at its shipped demand) are authored, measured into
+> `data/scenario-goals.json` through the scenario regeneration path, and playable through
+> `dev/campaignPanel.ts` — which lists them beside the ten stages rather than growing the
+> `dev/briefsPanel.ts` the rescope retires. **E1, E2, E4 and E6 are refused at load**, each naming
+> the seam it needs, in `packages/viz/src/briefs/parse.ts#BRIEF_KIND_SEAM`; `briefs/parse.test.ts`
+> checks every one of those premises against the tree, so a seam that opens turns the refusal red.
+> **One of them opened before anybody looked, and checking is how it was found.** E6's entry below
+> asks for *"a typed change to `SuiteField`"*, widening the suite's field *"from exactly-two to the
+> brief's candidate list"* — and `packages/viz/src/batch/suite.ts` already declares
+> `readonly [BatchArmRequest, BatchArmRequest, ...(readonly BatchArmRequest[])]`, at least two with
+> no ceiling, widened for the Everyday bench and recorded as done in its own docstring. **That
+> clause is withdrawn**: what still refuses E6 is the schema — a front over a candidate set declares
+> no goal, so there is no stage to author it as — plus the domination computation and the screen to
+> draw it on, neither of which is a scenario. It is [§ D227](../DECISIONS.md)'s class arriving on a
+> contract instead of a control, and the refusal in the code now says the widening is **not** the
+> blocker so that the next reader does not go and make it twice.
+> Both trip-wires below are unchanged and are enforced rather than described. The clause this
+> issue still owes a human is its fourth acceptance criterion — *at least two lift-industry testers
+> complete them and rate them credible* — which no run can discharge. The module docstring is the
+> record for everything this note summarises ([§ D405](../DECISIONS.md)).
+
 Different from Casual's four (daily score, campaign economy, rush, Fix-a-building) — these are
 about the engineering. **All of them are data** (invariant 7): a new authored file,
 **`data/engineering-briefs.json`**, one entry per brief, validated at load the way
