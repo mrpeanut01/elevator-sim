@@ -42,8 +42,11 @@
  * Before persistence that coupling was harmless, because a reload reset both together. It is not
  * harmless now: the two slots carry independent versions and independent refusals, and
  * `dev/main.ts` **clears** the session slot on a refused restore while this one deliberately does
- * not. A future `SESSION_SCHEMA_VERSION` bump — there have been six — resets the week to day 1 with
- * no history while a career restores at contract day 6.
+ * not. A future `SESSION_SCHEMA_VERSION` bump — there have been **eight**, and this sentence said
+ * six until GitHub issue #243's migration matrix counted them — resets the week to day 1 with
+ * no history while a career restores at contract day 6. The count is the constant minus one and is
+ * derived rather than quoted by `persist/migrationMatrix.test.ts`, which is why the next reader of
+ * this sentence should distrust the integer in it and trust that file.
  *
  * **The rule, stated rather than emergent: the week is authoritative for what happened on a day,
  * and the career never fabricates one.** `wasDisplayOf` withholds — an em-dash, not a zero — when

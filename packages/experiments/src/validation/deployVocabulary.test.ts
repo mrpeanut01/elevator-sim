@@ -244,6 +244,15 @@ const DISARM_CARRIERS: readonly string[] = Object.freeze([
    * already got it wrong.
    */
   'docs/40-incident-runbook.md',
+  /*
+   * The launch checklist — GitHub issue #243, added 2026-09-10. It joins for the same reason
+   * `docs/40` did and by the same route: its § 6.3 names the command in order to say it is **not**
+   * the rollback, because an operator who reaches for it during an incident disarms the only job
+   * that could replace the bad page. The guard caught its arrival and required somebody to look,
+   * which is the sixth file and the second written after § 355's correction rather than corrected
+   * by it.
+   */
+  'docs/41-launch-checklist.md',
   'infra/azure/swa/provision.sh',
   'packages/server/src/http/serve.ts',
 ]);

@@ -244,8 +244,15 @@ export function everydayProgressWith(
 /** The slot. Dotted and prefixed like `persist/types.ts`'s `SESSION_KEY` and `dev/main.ts`'s mode key. */
 const PROFILE_KEY = 'elevator-sim.everyday-profile';
 
-/** The envelope's shape number — refused in both directions, `persist/`'s rule. */
-const PROFILE_SCHEMA_VERSION = 5;
+/**
+ * The envelope's shape number — refused in both directions, `persist/`'s rule.
+ *
+ * **Exported for GitHub issue #243's migration matrix and for nothing else.** The number is what
+ * `persist/migrationMatrix.test.ts` derives its row set from — every version `1 … this` must still
+ * open — so a guard that could not read it would have to transcribe it, which is the constant that
+ * goes stale. Nothing outside this module may write it, and nothing in `everyday/` reads it.
+ */
+export const PROFILE_SCHEMA_VERSION = 5;
 
 /**
  * The shapes this build will read, as against the one it writes.
@@ -257,7 +264,7 @@ const PROFILE_SCHEMA_VERSION = 5;
  * added a second sibling the same way ({@link withUnits}), which is why both migrations are one
  * line each and neither touches a payload it did not add.
  */
-const PROFILE_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4, 5]);
+export const PROFILE_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4, 5]);
 
 /**
  * Version 3: the version, the profile, the progress and the units preference — four siblings.
