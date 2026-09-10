@@ -1004,6 +1004,21 @@
         position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text);
         box-shadow: 0 0 8px color-mix(in srgb, var(--text) 70%, transparent); pointer-events: none;
       }
+      /* PB-09. A tinted overlay with a hard edge each side rather than a fill, so the phase
+         segments underneath stay readable — the window says *which part of this*, and hiding the
+         part would defeat it. No `display` is set here, so `hidden` still hides it. */
+      #loop-band {
+        position: absolute; top: 0; bottom: 0; pointer-events: none;
+        background: color-mix(in srgb, var(--accent) 22%, transparent);
+        border-left: 2px solid var(--accent); border-right: 2px solid var(--accent);
+      }
+      /* The half-marked A–B state. `aria-pressed="mixed"` is a real third value, and without a
+         rule of its own it would draw exactly like `false` — a control that took a press and
+         looks untouched. */
+      .chip[aria-pressed='mixed'] {
+        border-style: dashed;
+        color: var(--accent);
+      }
       .ticks {
         display: flex; justify-content: space-between;
         font: 500 9.5px var(--mono); color: var(--faint); margin-top: 3px;
@@ -2192,6 +2207,10 @@
                 <div class="transport-mid">
                   <div id="timeline" role="slider" tabindex="0"
                        aria-label="playhead" aria-valuemin="0" aria-valuemax="1000" aria-valuenow="0">
+                    <!-- PB-09 — the span the transport repeats, drawn behind the playhead so a
+                         reader can see what they marked. Hidden until both ends are marked; the
+                         `A–B` chip below is the only thing that writes it. -->
+                    <div id="loop-band" hidden></div>
                     <div id="playhead" style="left: 0%"></div>
                   </div>
                   <div class="ticks" id="timeline-ticks"></div>
@@ -2227,8 +2246,16 @@
                        sits with the speed chips because it is the same kind of claim: how the
                        transport behaves, not what the run contains. -->
                   <button type="button" class="chip" id="loop" aria-pressed="false"
-                          aria-label="loop the shift when it ends"
-                          title="when the shift ends, start it again from the beginning">loop</button>
+                          aria-label="loop — when the transport reaches the end of the loop, start it again"
+                          title="when the transport reaches the end of the loop, start it again">loop</button>
+                  <!-- PB-09 — window selection, then loop. One control rather than a mark-start and
+                       a mark-end, because the classic A–B repeat is three presses of one button and
+                       `aria-pressed="mixed"` is exactly the half-marked state ARIA has for it. The
+                       three faces are written by `main.ts#setLoopMark`, which is the only writer of
+                       both representations. -->
+                  <button type="button" class="chip" id="loop-window" aria-pressed="false"
+                          aria-label="A–B loop — press to mark the start of a section at the playhead"
+                          title="press to mark the start of a section at the playhead, again to mark its end, and again to go back to the whole shift">A–B</button>
                 </div>
               </div>
               <div class="transport-row" style="margin-top: 8px">

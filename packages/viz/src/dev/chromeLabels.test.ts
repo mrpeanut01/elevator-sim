@@ -39,7 +39,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { SPEEDS } from './main.js';
+import { LOOP_WINDOW_IDLE_LABEL, SPEEDS } from './main.js';
 
 async function indexHtml(): Promise<string> {
   return readFile(fileURLToPath(new URL('../../index.html', import.meta.url)), 'utf8');
@@ -351,6 +351,7 @@ const TRANSPORT_CONTROLS: readonly string[] = Object.freeze([
   'step-back',
   'step-forward',
   'loop',
+  'loop-window',
   'play-pause',
 ]);
 
@@ -379,6 +380,20 @@ describe('every transport control has a name a screen reader can use', () => {
     expect(back).not.toBe(forward);
   });
 
+  it('boots the A–B chip on the same sentence the code puts back — PB-09', async () => {
+    /*
+     * `#loop-window` has three faces and `main.ts#setLoopMark` writes two of them. The third is
+     * the one `index.html` ships, and a reader who marks a span and then clears it lands back on
+     * whichever of the two is authored — so if the page and {@link LOOP_WINDOW_IDLE_LABEL}
+     * disagree, the control silently renames itself the first time it is used and never renames
+     * itself back. Asserted against the exported constant rather than against a copy of the words,
+     * which is the difference between checking a mirror and describing one.
+     */
+    const html = await indexHtml();
+    expect(accessibleNameOf(html, 'loop-window')).toBe(LOOP_WINDOW_IDLE_LABEL);
+    expect(attr(openingTagOf(html, 'loop-window').tag, 'aria-pressed')).toBe('false');
+  });
+
   it('contains the visible text where there is any — WCAG 2.5.3', async () => {
     /*
      * `#loop` draws the word *loop*. A name that replaced it would break speech input for a reader
@@ -387,6 +402,8 @@ describe('every transport control has a name a screen reader can use', () => {
      */
     const html = await indexHtml();
     expect(accessibleNameOf(html, 'loop').toLowerCase()).toContain('loop');
+    // `#loop-window` draws `A–B`, and its name has to carry it in all three of its states.
+    expect(accessibleNameOf(html, 'loop-window')).toContain('A–B');
   });
 
   it('keeps every tooltip that was already there — the long form is not deleted', async () => {
@@ -399,7 +416,17 @@ describe('every transport control has a name a screen reader can use', () => {
     const tooltips: Readonly<Record<string, string>> = {
       'step-back': 'one display frame back (,)',
       'step-forward': 'one display frame forward (.)',
-      loop: 'when the shift ends, start it again from the beginning',
+      /*
+       * `#loop`'s long form was *"when the shift ends, start it again from the beginning"* until
+       * `UX.md` `PB-09` landed, and it was **deleted rather than reworded around**: with a marked
+       * A–B span the transport wraps at the span's end and restarts at the span's start, so both
+       * halves of the old sentence had stopped being true of the control. A tooltip that describes
+       * a behaviour the control no longer has is `CLAUDE.md`'s stale-refusal defect facing the
+       * other way, and this file exists because a hidden explanation is worse than none.
+       */
+      loop: 'when the transport reaches the end of the loop, start it again',
+      'loop-window':
+        'press to mark the start of a section at the playhead, again to mark its end, and again to go back to the whole shift',
     };
     for (const [id, expected] of Object.entries(tooltips)) {
       expect(attr(openingTagOf(html, id).tag, 'title'), `#${id} lost its tooltip`).toBe(expected);

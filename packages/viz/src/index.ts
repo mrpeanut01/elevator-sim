@@ -218,7 +218,12 @@ export {
   simTimeAt,
   type PlaybackAnchor,
 } from './playback/mapping.js';
-export { Playback, type PlaybackOptions, type PlaybackState } from './playback/playback.js';
+export {
+  Playback,
+  type LoopWindow,
+  type PlaybackOptions,
+  type PlaybackState,
+} from './playback/playback.js';
 
 export {
   buildLayout,

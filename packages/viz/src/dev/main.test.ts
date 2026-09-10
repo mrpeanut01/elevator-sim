@@ -1709,3 +1709,75 @@ describe('an intervention re-simulation is not a new attempt — docs/20 defect 
     expect(source).toContain("closedWeekOf(state, outcome, runCause === 'intervention')");
   });
 });
+
+/**
+ * `UX.md` `PB-09` — the loop reaches a **live** transport.
+ *
+ * The row was `🔲 not built` and the note under it said the transport is *"rebuilt at the current
+ * instant, because `Playback` takes `loop` at construction"*. The first half of that was wrong in
+ * the way that mattered: `adopt` constructs a `Playback` with `startAtS` unset, so the replacement
+ * starts at `recording.startedAt` — **pressing `loop` at 07:30 put the playhead back at 06:00**,
+ * cleared the landing selection and re-armed the day-filing gate on the way past.
+ *
+ * The behaviour is `playback.test.ts`'s and the cycle is `loopMark.test.ts`'s. What only this file
+ * can pin is the wiring, which lives inside `boot()` where no Node test can call it — the binding
+ * site is read at the source, `reportPanel.test.ts`'s idiom and the two tests above it.
+ */
+describe('the loop controls drive the transport rather than rebuilding it — PB-09', () => {
+  async function mainSource(): Promise<string> {
+    return readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+  }
+
+  /**
+   * One listener body with its prose stripped, from its `addEventListener` to the `});` closing it.
+   *
+   * The comments go first, and finding out why is the reason this helper exists rather than a
+   * `slice`: the loop chip's own docstring *names* the call it stopped making, so a check for
+   * `adopt(` over the raw text matched the sentence explaining that it does not call `adopt`. A
+   * test that a comment can satisfy is a test about comments. `challenge.test.ts` strips `//`
+   * lines before harvesting for the same reason.
+   */
+  function listenerBody(source: string, id: string): string {
+    const start = source.indexOf(`ui.transport.${id}.addEventListener('click'`);
+    expect(start, `#${id} has no click listener where this test reads for one`).toBeGreaterThan(0);
+    const end = source.indexOf('\n    });', start);
+    expect(end, `#${id}'s listener does not close where this test reads for it`).toBeGreaterThan(
+      start,
+    );
+    return source
+      .slice(start, end)
+      .replace(/\/\*[\s\S]*?\*\//gu, '')
+      .replace(/^\s*\/\/.*$/gmu, '');
+  }
+
+  it('does not re-adopt the recording when the loop chip is pressed', async () => {
+    const body = listenerBody(await mainSource(), 'loop');
+    expect(
+      body,
+      'the loop chip rebuilds the transport, which throws the playhead back to the start of the ' +
+        'shift — the defect PB-09 exists to close',
+    ).not.toContain('adopt(');
+    expect(body).toContain('applyLoop()');
+  });
+
+  it('gives the A–B chip the same one writer, and no second opinion about the window', async () => {
+    const source = await mainSource();
+    expect(listenerBody(source, 'loopWindow')).toContain('cycleLoopMark()');
+    // `applyLoop` is the only thing that may speak to `Playback` about looping. Two callers of
+    // `setLoop` would be two answers to *what is this transport repeating*.
+    expect([...source.matchAll(/playback\.setLoop\(/gu)]).toHaveLength(1);
+    expect([...source.matchAll(/\bfunction applyLoop\(/gu)]).toHaveLength(1);
+  });
+
+  it('clears the marked span when a new recording is adopted', async () => {
+    /*
+     * A window is a pair of instants in *this* recording. Carried onto the next one it would name
+     * a different part of a different shift, and the two runs need not even be the same length.
+     */
+    const source = await mainSource();
+    const start = source.indexOf('function adopt(recording: VizRecording)');
+    expect(start, 'adopt is not declared the way this test reads it').toBeGreaterThan(0);
+    const body = source.slice(start, source.indexOf('\n  }', start));
+    expect(body).toContain('setLoopMark(null, null)');
+  });
+});

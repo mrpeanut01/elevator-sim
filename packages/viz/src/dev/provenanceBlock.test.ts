@@ -90,6 +90,14 @@ const ACCOUNTED_FOR: readonly string[] = Object.freeze([
   'landing-select',
   'run',
   'loop',
+  /*
+   * `UX.md` `PB-09`'s pair, GitHub issue #417. `#loop-window` is the A–B chip and `#loop-band` is
+   * the span it marks, drawn over the timeline. The band is not a control and is listed here
+   * anyway: § 4.7 exists so that nothing on this card is unaccounted for, and a *mark* the reader
+   * can see and cannot explain is the same failure as a button nobody named.
+   */
+  'loop-window',
+  'loop-band',
   'step-back',
   'step-forward',
   'status',
