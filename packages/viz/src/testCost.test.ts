@@ -37,6 +37,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   annotationCosts,
+  annotationsIn,
   attributionOf,
   censusOf,
   ceilingsFrom,
@@ -109,9 +110,28 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * 92 above ceiling, and this
      * ratchet green over a three-hour bound nobody had counted. An uncounted annotation is
      * `RISKS.md` R38 wearing a timeout, so the call was rewritten into the counted form rather than
-     * left in the blind spot. The scanner's limit is real and is not fixed here.
+     * left in the blind spot. **That limit is now fixed in the scanner**, one entry down.
+     *
+     * **93 → 96, and not one case was annotated upward — the instrument stopped being blind.**
+     * `testCost.test-helper.ts` now reads the multi-line shape as well as the single-line one, and
+     * attributes by parenthesis balance rather than by indent agreement. Forty-two annotations that
+     * already existed became visible tree-wide, **and none was lost**: the census went 1 318 → 1 360
+     * with zero removals, measured by diffing the site list rather than comparing totals.
+     *
+     * Three of the forty-two sit above this project's ceiling, and the sum says so exactly:
+     * `dev/measure.surfaceRuns.test.ts:500` at 900 000, `honesty/honesty.test.ts:1113` at
+     * 1 800 000 and `scenario/goalRates.test.ts:340` at 900 000 — **900 000 + 1 800 000 + 900 000 =
+     * 3 600 000**, which is precisely 104 700 000 − 101 100 000. A raise that decomposes to the
+     * string is a raise a reader can check.
+     *
+     * **Read the direction of this raise carefully**, because it is the one thing this ratchet
+     * exists to make hard. #344's fourth criterion forbids *annotating a case upward to satisfy a
+     * budget*. Nothing here was re-annotated: every one of these bounds was written on the commit
+     * that added its case, and every one was already being paid at run time. What changed is that
+     * the census can now say so. A ratchet that fell while the tree it measures grew invisibly was
+     * not protecting anything — it was reporting its own blind spot as good news.
      */
-    ['viz', { count: 93, totalMs: 101_100_000 }],
+    ['viz', { count: 96, totalMs: 104_700_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this
@@ -122,7 +142,14 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * it contains. Raised here, with that reason, on the commit that added them, which is what the
      * ratchet's own message asks for. Nothing existing was raised to make room.
      */
-    ['viz-browser', { count: 70, totalMs: 17_520_000 }],
+    /*
+     * **70 → 71, and the one is the same event as `viz`'s three**, not a new annotation:
+     * `everyday/autoFile.browser.test.ts:259` at 300 000 ms, written over three lines and therefore
+     * invisible until the scanner learned that shape. 17 820 000 − 17 520 000 = **300 000**, which
+     * is that single site and nothing else. Nothing was annotated upward to make room, and nothing
+     * existing was raised.
+     */
+    ['viz-browser', { count: 71, totalMs: 17_820_000 }],
   ]);
 
 /**
@@ -188,6 +215,105 @@ const REFERENCE_COHORT: readonly string[] = [
   'packages/viz/src/watch/record.test.ts',
   'packages/viz/src/watch/reference.test.ts',
 ];
+
+/**
+ * The two shapes an annotation is written in, and the one that used to be invisible.
+ *
+ * Both fixtures are the **same annotation**: one case, one bound, 600 001 ms — a millisecond over
+ * `viz`'s ceiling so that a miscount shows up in the above-ceiling arm too, not only in the total.
+ * They differ in nothing but line breaks, so a scanner that reads one and not the other is
+ * reporting a fact about Prettier rather than about cost.
+ *
+ * **The multi-line one is the control.** Before the {@link MULTI_BRACE} path it returned zero
+ * annotations, which is how a three-hour bound sat uncounted in `scenario/survivorSweep.test.ts`
+ * with `ABOVE_CEILING` green over it. Revert that path and the second case here goes red, which is
+ * the only reason to trust the first.
+ *
+ * The third fixture is the guard in the other direction, and it is the one worth keeping: this
+ * repository really does quote `}, 600_000);` **in prose**, twice in `vitest.config.ts`'s own
+ * retraction. It must stay uncounted — and it does, because {@link blankNonCode} turns a comment
+ * into whitespace before any pattern here runs. That protection belongs to the blanker rather than
+ * to the patterns, which is exactly why widening the patterns is safe.
+ */
+describe('an annotation is counted in both shapes it is written in', () => {
+  const CEILINGS = ceilingsFrom(config);
+  const AT = 'packages/viz/src/fixture.test.ts';
+
+  const ONE_LINE = [
+    "import { it } from 'vitest';",
+    '',
+    "  it('a bound on one line', async () => {",
+    '    await nothing();',
+    '  }, 600_001);',
+    '',
+  ].join('\n');
+
+  const MULTI_LINE = [
+    "import { it } from 'vitest';",
+    '',
+    '  it(',
+    "    'a bound on one line',",
+    '    async () => {',
+    '      await nothing();',
+    '    },',
+    '    /* the same bound, with its reason written beside it */',
+    '    600_001,',
+    '  );',
+    '',
+  ].join('\n');
+
+  const IN_PROSE = [
+    '/**',
+    ' * A docstring that quotes the shape being counted, closed `}, 600_001);` exactly as a test',
+    ' * would be — and on three lines too:',
+    ' *',
+    ' *   },',
+    ' *   600_001,',
+    ' * );',
+    ' */',
+    'export const NOTHING = 1;',
+    '',
+  ].join('\n');
+
+  it('counts the single-line shape', () => {
+    const { annotations, unattributed } = annotationsIn(AT, ONE_LINE, CEILINGS);
+    expect(annotations.map((one) => one.ms)).toStrictEqual([600_001]);
+    expect(annotations[0]?.opener).toBe('it');
+    expect(annotations[0]?.name).toBe('a bound on one line');
+    expect(unattributed).toStrictEqual([]);
+  });
+
+  it('counts the multi-line shape, which it could not before', () => {
+    const { annotations, unattributed } = annotationsIn(AT, MULTI_LINE, CEILINGS);
+    expect(
+      annotations.map((one) => one.ms),
+      'a bound Prettier broke across lines is still a bound, and an uncounted annotation is ' +
+        'RISKS.md R38 wearing a timeout',
+    ).toStrictEqual([600_001]);
+    expect(annotations[0]?.opener).toBe('it');
+    expect(annotations[0]?.name).toBe('a bound on one line');
+    expect(unattributed).toStrictEqual([]);
+  });
+
+  it('reads the two shapes identically, because they are the same annotation', () => {
+    const one = annotationsIn(AT, ONE_LINE, CEILINGS).annotations;
+    const many = annotationsIn(AT, MULTI_LINE, CEILINGS).annotations;
+    expect(many.length).toBe(one.length);
+    expect(many[0]?.ms).toBe(one[0]?.ms);
+    expect(many[0]?.via).toBe(one[0]?.via);
+    expect(many[0]?.project).toBe(one[0]?.project);
+  });
+
+  it('counts neither shape when it is quoted in prose', () => {
+    const { annotations, unattributed } = annotationsIn(AT, IN_PROSE, CEILINGS);
+    expect(
+      annotations,
+      'blankNonCode blanks a comment before any pattern runs, which is what lets the patterns ' +
+        'widen safely — vitest.config.ts quotes this shape twice in its own retraction',
+    ).toStrictEqual([]);
+    expect(unattributed).toStrictEqual([]);
+  });
+});
 
 describe('the annotation census is derived from the tree, not transcribed', () => {
   it('reads every project ceiling out of vitest.config.ts', () => {
@@ -273,10 +399,27 @@ describe('the annotation census is derived from the tree, not transcribed', () =
     const directory = census.annotations.filter((one) => one.file.startsWith('packages/viz/'));
     const atSimulatingCeiling = directory.filter((one) => one.ms === 300_000).length;
 
+    /*
+     * The fourth row, derived like the three above it — **and it was the one that was not**.
+     *
+     * It read `| above 300 000 ms | 89 | 4 |` and the tree said 96, because nothing asserted it:
+     * `above its own ceiling` moved three times while this sat still. For the `viz` column the two
+     * rows are the **same predicate**, since that project's own ceiling *is* 300 000 ms, so the
+     * file contradicted itself two lines apart. The row earns its place only in the `viz-browser`
+     * column, where the ceiling is 120 000 and *above 300 000* is a genuinely different question.
+     *
+     * A stale figure inside the docstring written to stop stale figures is `RISKS.md` R38 at its
+     * least excusable, and it was found by a reviewer rather than by this loop — which is the
+     * argument for putting it in the loop.
+     */
+    const aboveSimulatingCeiling = (project: string): number =>
+      census.annotations.filter((one) => one.project === project && one.ms > 300_000).length;
+
     for (const claim of [
       `| annotations | ${viz?.total ?? 0} | ${browser?.total ?? 0} |`,
       `| above its own ceiling | **${viz?.above ?? 0}** | **${browser?.above ?? 0}** |`,
       `| at its own ceiling | ${viz?.at ?? 0} | ${browser?.at ?? 0} |`,
+      `| above 300 000 ms | ${aboveSimulatingCeiling('viz')} | ${aboveSimulatingCeiling('viz-browser')} |`,
       `**${directory.length}** timeout annotations in all, of which **${atSimulatingCeiling}**`,
     ]) {
       expect(
