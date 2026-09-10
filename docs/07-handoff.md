@@ -661,6 +661,58 @@ Six further banks are measurable and covered by `oracle/deepCampaign.test.ts` (`
 Pushing the simplifications *into* the simulator via per-car config (huge acceleration, zero dwell)
 collapses its round trip onto the textbook figure at −0.4 %.
 
+#### The three shipped buildings the table above does not reach
+
+The table is five buildings because it was written when five shipped. The set went to eight
+([§ D213](../DECISIONS.md)) and to nine with the Burj-class reference tower, and the table was never
+extended — which is what GitHub issue #232's third acceptance criterion, *"a closed-form
+round-trip-time check like the existing five"*, is really asking about.
+`oracle/remainingBuildings.test.ts` closes three of the four, and they are three different kinds of
+answer rather than three more rows:
+
+| building | verdict | measured |
+|---|---|---|
+| `chancery-house` | **RECONCILED** — a sixth, on this table's own apparatus, seeds and n = 64 | raw +49.297 %, residual **+0.074 %**, and `analyzeUpPeak` raises **no warning at all** on it, which is true of three shipped banks — this one and `burj-class-reference`'s `local-zone1` and `local-zone2` |
+| `crown-hotel` | **REFUSED, by a run** | the apparatus is carried to the end rather than declined: raw +36.513 %, residual **+7.592 %** against the 4 % band, `explained: false` |
+| `st-jude-hospital` | **REFUSED TWICE, for free** | `heterogeneousGroup`, and a longest door reopen of 53.20 s against a shortest round trip of 29.56 s — no simulation runs |
+
+**Chancery House being the cleanest case in the shipped set and the one with no check is the finding
+rather than a detail.** Nineteen floors, six identical cars, one bank, uniform populations, uniform
+pitch. Every other bank that reduces at all raises at least one warning.
+
+**The two refusals are pinned to runs rather than to sentences**, which is the rule
+[`CLAUDE.md`](../CLAUDE.md) § *"A stated refusal goes stale the same way"* exists for. The
+Barney/CIBSE derivation assumes one car specification per bank; both of these hold unlike cars in one
+bank deliberately (§ D213 § 3, to avoid making every ward a transfer floor). **And which of the
+three warnings on Crown Hotel causes its residual is measured, not argued**: a counterfactual arm
+gives the one unlike car its neighbours' specification, holds the floors, populations, express zone,
+traffic profile and seeds fixed, and the uncited per-stop term falls from **4.50 s to 0.021 s** with
+`explained` flipping to true. **That arm is always-on and costs about five seconds**, and this
+paragraph said otherwise for one commit: it read *"costs ~75 s on its own and is opt-in under
+`ELEVATOR_SIM_DEEP=1`"*, on a figure nobody had re-derived. Re-measured, the two arms cost **5.20 s
+and 5.26 s** — a ratio of 1.01 — and the whole file goes 13.70 s → 18.4 s with the arm switched on.
+The gate is removed and the redundant `oracle-campaign` step that named the file is deleted.
+
+That correction matters here rather than in a changelog, because this document is the resume brief:
+a reader told the arm was deep-tier-only and expensive will not re-run the **only** evidence
+licensing the Crown Hotel attribution on a change that could move it, and an integrator sizing the
+scheduled job would budget 120 s for a 5 s arm.
+
+**One is still owed, and it is harder than an earlier draft of this paragraph said.**
+`burj-class-reference`'s closed-form measurement is GitHub issue #376's third criterion, left there
+rather than absorbed.
+
+That draft read *"coverable — all six of its banks are internally uniform … four of its six banks
+reduce today"*. Measured, **all six refuse**: `shuttle` and `observation` throw on a zero served
+population, and `local-lower`, `local-zone1`, `local-zone2` and `local-zone3` all throw
+`departureGapBracket` — *the longest door reopen (37.00 s) is not shorter than the shortest round
+trip (32.83 s / 29.68 s)*. That is the same ground on which `st-jude-hospital` is REFUSED two rows
+above, and the same error this table lists elsewhere as *cannot be measured this way at all*.
+
+Internal uniformity was the wrong test to infer coverability from: `st-jude-hospital` shows the
+bracket refusal is independent of heterogeneity. Whoever picks up #376's third criterion should
+expect to change the apparatus or the building, not to run a measurement that is waiting.
+
 ### Determinism
 
 Same seed under CRN gives **bit-identical** paired differences — exactly zero on all 23
@@ -914,7 +966,7 @@ directions (§ D32, § D33).
 | Track | State | Where |
 |---|---|---|
 | **Property-based fuzzing** | ✅ | `experiments/src/fuzz/` — generator, hand-written shrinker, six properties, 64-case always-on corpus, 2 000-case deep tier |
-| Analytical cross-validation, all five buildings | ✅ | `experiments/src/oracle/{fiveBuildings,bankCensus,deepCampaign}.test.ts` |
+| Analytical cross-validation, all five buildings | ✅ | `experiments/src/oracle/{fiveBuildings,bankCensus,deepCampaign,remainingBuildings}.test.ts` |
 | Physics verification | ✅ | `validation/physics.test.ts` |
 | Statistical self-validation | ✅ | `validation/{crnVarianceReduction,nullComparison,sequentialStopping,operatingPoint}.test.ts` |
 | Determinism regression | ✅ | `validation/goldenRuns.test.ts`, `fuzz/determinism.test.ts` |

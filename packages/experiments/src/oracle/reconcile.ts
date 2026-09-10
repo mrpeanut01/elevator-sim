@@ -100,6 +100,19 @@ export function relativeDivergence(measured: number, reference: number): number 
  * one that is too long. Between them the answer is insensitive to the exact value, which is
  * what makes {@link DepartureGapBracket.midpointS} a defensible default.
  *
+ * **That insensitivity is a property of a *wide* bracket, and the width is not guaranteed.** It is
+ * `minRoundTripS − maxReopenS`, and it varies by two orders of magnitude across shipped banks:
+ * measured at seed 810 000, `chancery-house/main` is **5.750 s** wide and `crown-hotel/main` is
+ * **0.068 s** — 85× narrower. On a bracket that thin the midpoint is not comfortably between two
+ * real quantities, it is wedged between them, and a loading heavier than the design load the
+ * reopen is computed at will pause for longer than the threshold and be split. So a reconstruction
+ * on a narrow bracket is running outside the regime this paragraph describes, and its interval is
+ * apparatus-dependent in a way a wide-bracket one is not.
+ *
+ * Callers that publish a figure from this reconstruction should say which regime they are in.
+ * `remainingBuildings.test.ts` asserts the width on both buildings it measures, so a bracket that
+ * narrows towards nothing is visible in a run rather than discovered by whoever re-measures next.
+ *
  * @throws RangeError if the bracket is empty, which means no threshold can separate the two and
  *   the reconstruction needs a different signal (a car-position series rather than boardings).
  */

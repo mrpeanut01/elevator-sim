@@ -187,6 +187,25 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
     reason: "CLAUDE.md's correctness oracle at full width — every measurable bank",
     scheduled: true,
   },
+  /*
+   * `packages/experiments/src/oracle/remainingBuildings.test.ts` was registered here as a partly
+   * gated file and is **not gated any more** — GitHub issue #232, corrected in review.
+   *
+   * Its counterfactual arm sat behind `ELEVATOR_SIM_DEEP=1` on a stated cost of *"~75 s against
+   * ~8 s for the shipped arm"*. Re-measured, the two arms cost 5.20 s and 5.26 s and the whole
+   * file goes 13.70 s → 18.41 s with the arm on. That arm is the only evidence licensing the
+   * file's central claim about Crown Hotel, so four and a half seconds was a bad trade and it
+   * runs always-on.
+   *
+   * **The `oracle-campaign` step that named the file is deleted.** It was redundant — it re-ran a
+   * file that no longer reads the variable, and whose always-on half `ci.yml` already runs. This
+   * comment previously said `.github/workflows/**` was *"a protected path, so removing it is owed
+   * to whoever can edit one"*, which was false on the branch that wrote it: the same diff was
+   * editing `deep-tiers.yml`. The step is gone rather than owed.
+   *
+   * This comment is here rather than an entry because the register is of *gated* tiers, and a file
+   * that reads no gate is not one.
+   */
   'packages/experiments/src/validation/goldenRuns.test.ts': {
     gates: ['ELEVATOR_SIM_DEEP'],
     reason:

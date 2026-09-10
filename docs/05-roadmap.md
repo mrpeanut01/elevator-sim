@@ -1587,7 +1587,7 @@ load-bearing is the shape [§ D99](../DECISIONS.md) had to own.
 | track | state | evidence |
 |---|---|---|
 | Property-based fuzzing | ✅ built | `experiments/src/fuzz/` — generator, shrinker, six properties, a 64-case always-on corpus and a 2 000-case deep tier |
-| Analytical cross-validation, all five buildings | ✅ built | `experiments/src/oracle/fiveBuildings.test.ts`, `bankCensus.test.ts`, `reconcile.ts` |
+| Analytical cross-validation, all five buildings | ✅ built | `experiments/src/oracle/fiveBuildings.test.ts`, `bankCensus.test.ts`, `reconcile.ts` — and `remainingBuildings.test.ts`, which takes the shipped set from five reconciled buildings to six and records why two of the other three cannot be reconciled at all (GitHub issue #232) |
 | Physics verification | ✅ built | `experiments/src/validation/physics.test.ts` |
 | Statistical self-validation | ✅ built | `validation/{crnVarianceReduction,nullComparison,sequentialStopping,operatingPoint}.test.ts` |
 | Determinism regression, golden runs | ✅ built | `validation/goldenRuns.test.ts`, `validation/golden/manifest.json`, `fuzz/determinism.test.ts` |
