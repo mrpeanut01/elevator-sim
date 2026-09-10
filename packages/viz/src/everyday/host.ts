@@ -335,15 +335,34 @@ export type EverydayPostOutcome =
   | { readonly kind: 'refused'; readonly detail: string }
   /** The request was made and did not succeed. `detail` is the server's sentence, or the client's. */
   | { readonly kind: 'failed'; readonly detail: string }
-  /** Accepted, replayed and ranked. Every field is the server's own answer. */
+  /**
+   * Accepted and replayed. The one field is the server's own answer.
+   *
+   * **`boardKey` and `entry` were here and are deleted rather than kept for completeness.** Both
+   * were populated from the 201 and read by nothing outside tests — the response carries them, so
+   * carrying them one layer further looked free — and `entry`'s docstring justified itself as
+   * *"so a caller can put it in front of the replay gate"*, which no caller did. That is the
+   * defect CLAUDE.md's standing requirement names, the twelfth time in this tree, and the rule it
+   * states is *name the non-test caller*: there was none for either. `menu/client.ts` still parses
+   * both off the wire, where a reader exists.
+   *
+   * **No register row is owed for the deletion, and that was checked rather than assumed.** The
+   * capability `entry` was justified by — putting a row in front of the replay gate — is built and
+   * reachable: {@link EverydayHost.postedRun} takes a `BoardEntry` and answers a `WatchableRun`,
+   * and the board screen presses it. What was missing was only the *shortcut* from the post block
+   * to that gate, which is a route nobody has asked for rather than an absence a player can meet.
+   * `EVERYDAY_SHELL_ABSENCES` is empty on this commit and a row invented to justify a deletion
+   * would be [§ D227](../../../../DECISIONS.md)'s stale refusal minted deliberately.
+   */
   | {
       readonly kind: 'posted';
-      /** `daily:<date>` or `personal:<user id>` — the server's key, never derived here. */
-      readonly boardKey: string;
-      /** The server's sentence about where the run landed. Shown as it stands. */
+      /**
+       * Which board the server chose, as its own token — `'daily'` or `'personal'`, the `kind` of
+       * `leaderboard/boardKey.ts#BoardPlacement`. **Not a sentence**, which is the correction:
+       * `everyday/postRun.ts#placementLineOf` is where it becomes one, and this shell may not
+       * derive the choice itself.
+       */
       readonly placement: string;
-      /** The accepted row, so a caller can put it in front of the replay gate. */
-      readonly entry: BoardEntry;
     };
 
 /**
@@ -384,8 +403,27 @@ export type EverydayChallengeToday =
   | { readonly kind: 'index-only'; readonly challenge: ChallengeView; readonly detail: string }
   | { readonly kind: 'board'; readonly challenge: ChallengeView; readonly board: ChallengeBoardPage };
 
-/** What a challenge board is ordered on. The Engineer challenge panel asks for the same one. */
-export const CHALLENGE_BOARD_METRIC = 'meanAwtS';
+/**
+ * What a challenge board is ordered on — **a wire metric, not a score field**, and the distinction
+ * is the whole of why this constant has a docstring.
+ *
+ * `packages/server/src/store/store.ts`'s `BoardMetric` is `awtS | wt95S | ttdMeanS |
+ * pctOverLongWait`, and `http/api.ts` checks the query against `BOARD_METRICS` and answers **400**
+ * to anything else. `ChallengeScore` — the shape of a *row* on that board — spells its mean wait
+ * `meanAwtS`, and this constant was that field name for one commit. The read never 400ed loudly:
+ * `challengeTodayOf` folds any board failure into `index-only`, so the tab drew the challenge with
+ * the server's refusal beside it — *"A board is ordered on one of awtS, wt95S, ttdMeanS,
+ * pctOverLongWait"*, raw wire notation on a player surface — for every player, always.
+ *
+ * The two names are one letter of overlap apart and sit either side of the same request, which is
+ * why `host.test.ts` asserts this value against the server's **own source text** rather than
+ * against a fixture. A fixture written by whoever wrote the constant agrees with the constant by
+ * construction; `store.ts` does not.
+ *
+ * The Engineer challenge panel asks for `'awtS'` (`menu/menu.ts:107`), so the two surfaces order
+ * the same board the same way — that claim is now true, and it was not before.
+ */
+export const CHALLENGE_BOARD_METRIC = 'awtS';
 
 /**
  * Compose the two challenge reads into one of {@link EverydayChallengeToday}'s four states.

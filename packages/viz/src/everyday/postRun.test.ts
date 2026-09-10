@@ -6,10 +6,13 @@
  * exists at all.
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { POST_RUN_NO_SERVER, type EverydayPostOutcome } from './host.js';
-import { POST_RUN_COPY, postRunViewOf } from './postRun.js';
+import { POST_RUN_COPY, placementLineOf, postRunViewOf } from './postRun.js';
 
 const READY = {
   hasRun: true,
@@ -102,38 +105,72 @@ describe('everyday/postRun.ts — a refusal is carried, never paraphrased', () =
 });
 
 describe('everyday/postRun.ts — where the run landed is the server’s answer', () => {
-  const posted: EverydayPostOutcome = {
-    kind: 'posted',
-    boardKey: 'personal:user-1',
-    placement: 'Your own record log, because this run is not today’s fixture.',
-    entry: {
-      id: 'entry-1',
-      displayName: 'Someone',
-      run: {
-        buildingId: 'garden-apartments',
-        dispatcherProfileId: 'collective',
-        demandTemplateId: 'residential-day',
-        arrivalRatePctPop5min: null,
-        durationS: 900,
-        windowStartS: null,
-        seed: '20260804',
-      },
-      dataHash: 'hash',
-      measured: { awtS: 1, wt95S: 2, ttdMeanS: 3, pctOverLongWait: 4, awtIsValid: true },
-      legs: 10,
-      submittedAtMs: 0,
-    },
-  };
+  /*
+   * **The token the server actually sends, not a sentence.** This fixture used to carry
+   * `placement: 'Your own record log, because this run is not today's fixture.'` — prose nobody
+   * ships. `http/api.ts` answers `{ placement: placement.kind }` and `kind` is `'daily' |
+   * 'personal'`, so the fixture encoded the same misunderstanding as the code it was checking, and
+   * the product printed *"The server put it here: personal"* under a green suite.
+   *
+   * The parity check below is what stops that recurring: it reads the server's own source for the
+   * token set rather than trusting this literal.
+   */
+  const posted: EverydayPostOutcome = { kind: 'posted', placement: 'personal' };
 
-  it('draws the server’s placement sentence and derives no board name of its own', () => {
+  it('turns each placement token into words, and never prints the token', () => {
+    for (const [token, expected] of [
+      ['daily', POST_RUN_COPY.postedDaily],
+      ['personal', POST_RUN_COPY.postedPersonal],
+      // A server ahead of this client, and the empty string `menu/client.ts` yields for an omitted
+      // field. Both get the honest arm rather than a lede with nothing after it.
+      ['seasonal', POST_RUN_COPY.postedUnknownBoard],
+      ['', POST_RUN_COPY.postedUnknownBoard],
+    ] as const) {
+      const text = textOf(postRunViewOf({ ...READY, outcome: { kind: 'posted', placement: token } }));
+      expect(text, `placement '${token}'`).toContain(expected);
+      /*
+       * The token itself is never on screen. Written as a **word-boundary** match rather than
+       * `not.toContain(token)`, because `postedDaily` legitimately contains the word *day* — the
+       * assertion has to refuse the bare wire word without refusing English.
+       */
+      if (token.length > 0) {
+        expect(text, `placement '${token}' leaked`).not.toMatch(new RegExp(`(^|[\\s:])${token}([\\s.,]|$)`));
+      }
+    }
+  });
+
+  it('renders no board key, because it is not carried and was never parsed', () => {
+    /*
+     * GitHub issue #331 is the record of what happens when a client decides which board a run went
+     * to: `placeSubmission` answers `daily:<date>` only for the day's exact fixture, so a shell
+     * announcing *today's board* on its own reckoning would be wrong for most runs a player plays.
+     * The key is no longer even on `EverydayPostOutcome` — see `everyday/host.ts` — so this is now
+     * a check that the deletion held rather than a check on a rendering decision.
+     */
     const view = postRunViewOf({ ...READY, outcome: posted });
-    expect(textOf(view)).toContain(posted.kind === 'posted' ? posted.placement : '');
-    // The key is never rendered and never parsed. GitHub issue #331 is the record of what happens
-    // when a client decides which board a run went to: `placeSubmission` answers `daily:<date>` only
-    // for the day's exact fixture, so a shell announcing *today's board* would be wrong for most
-    // runs a player plays.
     expect(textOf(view)).not.toContain('personal:');
     expect(textOf(view)).not.toContain('daily:');
+  });
+
+  it('has a sentence for every placement kind the server can send', () => {
+    /*
+     * The server's own source, on `menu/challenge.test.ts`'s method: the arms of
+     * `BoardPlacement` in `leaderboard/boardKey.ts`. A client that grows a third board and forgets
+     * the sentence draws `postedUnknownBoard` in production and passes every fixture here, so the
+     * set has to come from the file that defines it.
+     */
+    const boardKeySource = readFileSync(
+      fileURLToPath(new URL('../../../server/src/leaderboard/boardKey.ts', import.meta.url)),
+      'utf8',
+    );
+    const union = /export type BoardPlacement =([\s\S]*?)\n\n/.exec(boardKeySource);
+    expect(union, 'BoardPlacement not found in the server source — the check has gone stale').not.toBeNull();
+    const kinds = [...(union?.[1] ?? '').matchAll(/readonly kind: '([a-z-]+)'/g)].map((m) => m[1] ?? '');
+
+    expect(kinds).toEqual(['daily', 'personal']);
+    for (const kind of kinds) {
+      expect(placementLineOf(kind), `no sentence for '${kind}'`).not.toBe(POST_RUN_COPY.postedUnknownBoard);
+    }
   });
 
   it('says the server replayed the seed, and says it on no other state', () => {

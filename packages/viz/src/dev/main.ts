@@ -84,6 +84,7 @@ import {
   signedIn,
   signedOut,
   updateForm,
+  waitEnded,
   withNotice,
   type AccountState,
 } from '../menu/account.js';
@@ -2244,6 +2245,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * than inside the client, because the client has no screen to write to.
    */
   function startWaiting(first: string): () => void {
+    /*
+     * The notice as it stood, so the closure below can put it back. See the return value: this is
+     * what makes `done()` an undo of `startWaiting` rather than half of one.
+     */
+    const before = accountState.notice;
     accountState = pending(accountState, first);
     announceWait(first);
     drawMenu();
@@ -2259,9 +2265,34 @@ function boot(ui: Elements, resources: BrowserResources): void {
         drawMenu();
       }, rung.afterMs),
     );
+    /*
+     * **`done()` undoes the whole of `startWaiting`, including the `busy` flag** — GitHub issue
+     * #221's third defect, and it is fixed here rather than at the call site on purpose.
+     *
+     * This used to clear only the timers and the live region, which made *whoever set busy clears
+     * busy* a discipline every caller had to remember instead of a property of the pair. Three of
+     * the four callers did remember — they follow `done()` with `withNotice` or `signedIn`, both
+     * of which write `busy: false`. `postCurrentRun` did not, because the surface that consumes it
+     * is the Everyday shell and the shell writes its **own** success line rather than an account
+     * notice. So posting from Everyday left `busy: true` for the session: `canSubmitForm` stayed
+     * false, `everyday/settingsScreen.ts` kept *Save name* disabled with *"Posting this run…"*
+     * beside it and `aria-describedby` pointing at it — a sentence claiming a request is in flight
+     * when none is — and the only way out was to sign out and back in.
+     *
+     * The notice is **restored rather than cleared**, so the undo is exact: a caller that had
+     * something to say before the wait still says it, and the three callers that write their own
+     * result overwrite this within the same tick and never paint it.
+     *
+     * `drawMenu()` is part of the undo and not a flourish: it is the only thing that publishes to
+     * `everyday/accountPort.ts`, so a state cleared without it is a state the other world does not
+     * hear about. `accountPort` publishes nothing when the object is unchanged, so the extra draw
+     * the three notice-writing callers now take costs them one `renderMenu` and no subscriber.
+     */
     return () => {
       for (const timer of timers) window.clearTimeout(timer);
       announceWait('');
+      accountState = waitEnded(accountState, before);
+      drawMenu();
     };
   }
 
@@ -2573,12 +2604,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
     });
     done();
     if (!result.ok) return { kind: 'failed', detail: result.detail };
-    return {
-      kind: 'posted',
-      boardKey: result.value.boardKey,
-      placement: result.value.placement,
-      entry: result.value.entry,
-    };
+    /*
+     * `boardKey` and `entry` come back on the 201 and are deliberately **not** carried — see
+     * `everyday/host.ts#EverydayPostOutcome`. Neither had a non-test reader, and the standing
+     * requirement is that a seam names its caller rather than that a field looks free.
+     */
+    return { kind: 'posted', placement: result.value.placement };
   }
 
   /**

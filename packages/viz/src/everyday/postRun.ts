@@ -31,11 +31,17 @@
  *
  * ## The board the run landed on is the server's answer, and this file does not derive it
  *
- * `placement` is drawn as it stands. `leaderboard/boardKey.ts#placeSubmission` puts a run on
- * `daily:<date>` only when it matches every axis of the day's fixture and on `personal:<user id>`
- * otherwise — so a shell that announced *"posted to today's board"* would be wrong for most runs a
- * player actually plays, which is the failure GitHub issue #331 records as the reason this issue
- * split in the first place. Nothing here parses the key, and nothing here decides which day it is.
+ * **The server's `placement` is a token, and this file turns it into words** — see
+ * {@link placementLineOf}. `leaderboard/boardKey.ts#placeSubmission` puts a run on `daily:<date>`
+ * only when it matches every axis of the day's fixture and on `personal:<user id>` otherwise, and
+ * the wire carries the bare `kind` of that choice. So a shell that announced *"posted to today's
+ * board"* on its own reckoning would be wrong for most runs a player actually plays — the failure
+ * GitHub issue #331 records as the reason this issue split — and a shell that printed the token
+ * said *"The server put it here: personal"*, which is the failure the other direction.
+ *
+ * What is carried unparaphrased is the **choice**; what is authored here is the **wording**.
+ * Nothing here parses the key, nothing here decides which day it is, and nothing here decides
+ * which board a run belongs on.
  */
 
 // The type and the one sentence the host owns. `everyday/host.ts` imports nothing from here, so
@@ -70,8 +76,35 @@ export const POST_RUN_COPY = Object.freeze({
    * congratulating anybody, and the placement line beside it says where the run went.
    */
   posted: 'Posted. The server replayed your seed and it reproduced.',
-  /** Drawn under {@link posted}, before the server's own `placement`. Names the source. */
-  postedWhere: 'The server put it here:',
+  /*
+   * Where the run landed, one sentence per board the server has — see {@link placementLineOf}.
+   *
+   * These are **prose for a token**, not a paraphrase of a sentence. The wire's `placement` is
+   * `BoardPlacement['kind']` (`packages/server/src/leaderboard/boardKey.ts`) — the bare words
+   * `daily` and `personal` — so a line that carried it through said *"The server put it here:
+   * personal"* on a player surface. The server does not author a sentence here; it authors a
+   * choice, and this is the one place the product turns that choice into words.
+   *
+   * Each says the **consequence** rather than the name of the board, because the name is what the
+   * player cannot check and the consequence is what they came to find out: whether anyone else is
+   * on the thing they just joined.
+   */
+  postedDaily:
+    'It went on today’s board: this run met the day’s fixture, so it is ranked against everyone ' +
+    'else who played it.',
+  postedPersonal:
+    'It went in your own record log: this run is not today’s fixture, so there is nobody to rank ' +
+    'it against. It is kept, and it is yours.',
+  /*
+   * A `placement` this build has no sentence for — a server ahead of this client, or a field it
+   * omitted. Says the two things that are still true and does not guess the third.
+   *
+   * Deliberately **not** the token: printing an unrecognised wire word is the defect this arm
+   * exists because of, one release later.
+   */
+  postedUnknownBoard:
+    'The server accepted it and put it on a board this build does not have a name for. The run is ' +
+    'recorded either way.',
   /*
    * Why a run this shell will not post cannot be posted from anywhere else either. Drawn beside the
    * refusal so the player does not go looking for a second button.
@@ -84,6 +117,38 @@ export const POST_RUN_COPY = Object.freeze({
     'There is no finished run to post yet. Play a day, then come back — the run on screen is what ' +
     'gets posted.',
 } as const);
+
+/**
+ * The sentence for a `placement` token — GitHub issue #221's second defect.
+ *
+ * **This is the only translation in this module, and it is here because the server does not do it.**
+ * `http/api.ts` answers `{ placement: placement.kind }`, and `kind` is `'daily' | 'personal'` — two
+ * words chosen to name a branch in a switch, not to be read by a player. This file drew them
+ * through a *"The server put it here:"* lede for one commit, so the product said **"The server put
+ * it here: personal"**.
+ *
+ * The docstrings above and in `everyday/host.ts` that called `placement` *"the server's sentence"*
+ * were the mistake in prose form, and they are corrected rather than deleted: what the server
+ * carries unparaphrased is the **choice of board**, which is the part this client must not derive.
+ * `boardKey.ts#placeSubmission` is still the only thing that decides it. What the client owns is
+ * the wording, which the server never had.
+ *
+ * The default arm is not a fallthrough for tidiness. `menu/client.ts` writes
+ * `String(record['placement'] ?? '')`, so a server that omitted the field yields `''` here — which
+ * under the old line produced the lede with nothing after the colon. An unrecognised token and an
+ * absent one get the same honest sentence, because from a player's seat they are the same event:
+ * the run was accepted, and this build cannot name where it went.
+ */
+export function placementLineOf(placement: string): string {
+  switch (placement) {
+    case 'daily':
+      return POST_RUN_COPY.postedDaily;
+    case 'personal':
+      return POST_RUN_COPY.postedPersonal;
+    default:
+      return POST_RUN_COPY.postedUnknownBoard;
+  }
+}
 
 /** One line of the block's prose. `note` is the quieter grey; `reason` is the refusal ink. */
 export interface PostRunLine {
@@ -215,7 +280,7 @@ export function postRunViewOf(input: {
         pressable: true,
         lines: [
           line(POST_RUN_COPY.posted, 'everyday-post-posted'),
-          line(`${POST_RUN_COPY.postedWhere} ${outcome.placement}`, 'everyday-post-placement'),
+          line(placementLineOf(outcome.placement), 'everyday-post-placement'),
         ],
       };
     case 'no-server':

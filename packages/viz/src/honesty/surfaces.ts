@@ -10758,17 +10758,30 @@ function postRunStates(): readonly {
         outcome: { kind: 'failed', detail: 'The board service did not answer.' },
       },
     },
+    /*
+     * **All three placement arms, and the token is the server's own** — GitHub issue #221.
+     *
+     * This used to be one state seeding `placement` as an invented prose sentence, which meant the
+     * sweep read a sentence nobody ships: the wire carries `BoardPlacement['kind']`, the bare words
+     * `daily` and `personal`, and `everyday/postRun.ts#placementLineOf` is what turns one into
+     * words. A fixture that pre-translated it hid the defect where the product printed the token —
+     * *"The server put it here: personal"* — because the property had no token to see.
+     *
+     * The third is the unrecognised arm, seeded with a token no server sends. It is the one that
+     * has to be swept rather than reasoned about: it is what a client one release behind its
+     * server draws, and printing the token there is the same defect a year later.
+     */
     {
-      label: 'posted',
-      input: {
-        ...ready,
-        outcome: {
-          kind: 'posted',
-          boardKey: 'personal:a-player',
-          placement: 'your own record log, because this run is not the day’s fixture',
-          entry: placeholderBoardEntry('A. Turing', 21.4),
-        },
-      },
+      label: 'posted-daily',
+      input: { ...ready, outcome: { kind: 'posted', placement: 'daily' } },
+    },
+    {
+      label: 'posted-personal',
+      input: { ...ready, outcome: { kind: 'posted', placement: 'personal' } },
+    },
+    {
+      label: 'posted-unknown-board',
+      input: { ...ready, outcome: { kind: 'posted', placement: 'seasonal' } },
     },
   ];
 }
@@ -10811,6 +10824,15 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      */
     'everyday/postRun.ts#postRunViewOf',
     'everyday/postRun.ts#POST_RUN_COPY',
+    /*
+     * The token-to-prose arm — GitHub issue #221. It is `covers` rather than a separate adapter
+     * because every sentence it can return is a `POST_RUN_COPY` key already rendered through
+     * `postRunViewOf` above, and the three `posted-*` states below drive all three of its branches.
+     * Naming it here is what says the branch is *swept*: the wave that shipped the raw-token defect
+     * had a `posted` state seeded with a sentence no server sends, so the property had no token to
+     * see. `covers` records that this producer has an exercised path, not merely a caller.
+     */
+    'everyday/postRun.ts#placementLineOf',
     /* The *no API origin* sentence, owned by the host because the host decides that arm. */
     'everyday/host.ts#POST_RUN_NO_SERVER',
   ],
