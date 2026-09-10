@@ -22,22 +22,32 @@
  * `shift/contracts.ts#statLineOf` is where it is generated) and every unit, day and percentage
  * comes from `campaign/economy.ts`.
  *
- * ## What is refused, and said
+ * ## Nothing here is refused any more, and this section is the record of two that were
  *
- * Two things this build cannot produce are drawn as refusals rather than omitted:
+ * This header carried two refusals for weeks after both stopped being true, which is GitHub issue
+ * #423 and the reason the section is kept rather than deleted. A stale refusal is worse than a dead
+ * seam — `CLAUDE.md` § *"A stated refusal goes stale the same way"* — because a dead seam merely
+ * does nothing while a refusal **tells the reader not to touch the control**. These two told a
+ * reader that two shipped features were absent.
  *
- * - **The trip budget's *was* figure.** § 7 says the four *was* figures are *"the same four
- *   measurements from this building's previous day"*. Three of § 8.6's four tests read an
- *   observation `shift/types.ts#GoalObservations` carries — away inside a minute, the longest
- *   anybody stood, the deepest landing — so those three are read through `shift/goals.ts`'s own
- *   `readGoal` and `wasDisplayOf` and are the run's own figures. **Loaded car departures are not on
- *   that record**, so the fourth test grades nothing and its *was* is `—` with the reason beside
- *   it. A stand-in there would be a figure with no source, which is the defect
- *   `shift/goals.ts#PENDING_DISPLAY` exists to avoid one layer down.
- * - **Offers on the table (§ 8.8).** Named in `campaign/career.ts#CAMPAIGN_ABSENCES`' neighbour
- *   {@link TOWERS_COPY.offersRefusal} rather than drawn empty: an offer is a contract on a building
- *   whose complexity § 8.5 publishes and whose acceptance switches a week, and neither the
- *   complexity table nor `shift/week.ts#switchWeek` is reached from these three screens yet.
+ * - **The trip budget's *was* figure** was said to grade nothing, because *"loaded car departures
+ *   are not on that record"*. They are: `core/src/metrics/summarize.ts#loadedDepartureTimes` reaches
+ *   `record/recordRun.ts` and `live/observations.ts`, and the `trips` goal below reads
+ *   `loadedDepartures` through `shift/goals.ts#readGoal` like the other three. The refusal's own
+ *   deletion is recorded further down this file, where it stood.
+ * - **Offers on the table (§ 8.8)** were said to be named rather than drawn, *"neither the
+ *   complexity table nor `shift/week.ts#switchWeek` is reached from these three screens yet"*. Both
+ *   are: {@link offersView} reads `complexityOf` and `offerFeeOf`, `everyday/campaignScreens.ts`
+ *   presses `take-offer`, and `everyday/host.ts` calls `switchWeek`. The sentence also carried a
+ *   `{@link}` to `TOWERS_COPY.offersRefusal`, **a symbol that no longer exists** — its only
+ *   surviving mention in the whole tree was that line, which is the shape this defect takes when
+ *   nothing checks it.
+ *
+ * `everyday/staleRefusals.test.ts` is what stops it recurring here and in the three sibling
+ * docstrings the same sweep found. It reads this file's source and requires the sentences to be
+ * absent **and** the features to still be present, so the guard cannot be satisfied by deleting the
+ * feature. Per [§ D405](../../../../DECISIONS.md) this docstring is the record and no decision
+ * number is owed: nothing here binds a module that does not own it.
  *
  * ## No engine identifier reaches any string here
  *

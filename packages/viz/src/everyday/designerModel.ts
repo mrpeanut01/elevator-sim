@@ -37,13 +37,19 @@
  *   `specClass`/`ratedSpeedMps`/`ratedLoadLb` triple, because that is what its cars are dealt from.
  *   Five selects that all wrote one field is § D219 exactly — a panel that binds nothing while
  *   looking right — so the class is drawn once, and {@link DESIGNER_ABSENCES} says so.
- * - **No escalators, no duty, no credential dots on the elevation.** `SpecTransportMode` exists and
- *   is carried, but no control here authors one; § 13.2's grid is the Engineer building editor's
- *   surface and is not re-drawn in Casual clothes on this pass. **The credential half of that is
- *   now said on the screen's own face** rather than only here — {@link DESIGNER_COPY}'s
+ * - **No duty, no credential dots on the elevation.** § 13.2's grid is the Engineer building
+ *   editor's surface and is not re-drawn in Casual clothes on this pass. **The credential half of
+ *   that is now said on the screen's own face** rather than only here — {@link DESIGNER_COPY}'s
  *   `serviceScopeHint` — because a boundary a player cannot see reads to them as a capability the
- *   product lacks. The escalator half is not, and must not be: nothing authors an escalator on
- *   either surface, so it is a genuine absence and stays a row in {@link DESIGNER_ABSENCES}.
+ *   product lacks.
+ *
+ *   **This bullet said *no escalators* and named it a genuine absence for two weeks after it
+ *   stopped being one** — GitHub issue #423. It read: *"nothing authors an escalator on either
+ *   surface, so it is a genuine absence and stays a row in {@link DESIGNER_ABSENCES}"*, while
+ *   {@link DESIGNER_ABSENCES} eleven lines below carried a comment saying the escalator rows had
+ *   left on § D518 and `designerScreen.ts#drawEscalatorPanel` was writing `spec.transportModes`.
+ *   A file contradicting itself at 110 lines' distance is what this class of defect looks like
+ *   from inside, and `everyday/staleRefusals.test.ts` is what now reads both ends.
  * - **The service column is bands, not hand-drawn cells.** § 10.2's *drawn by hand* override has no
  *   field in `BuildingSpec`; what it does have is `bandByCar` and `noLobby`, which are § 10.2's
  *   *zone's bands* and *shuttle* respectively, and those are the two this screen writes.

@@ -8,9 +8,15 @@
  * hold rule, the standings under the marker that says what they are, and who would drive.
  *
  * It wires **no control**. § 3.3 gives the screen one primary (`Start the rush`) and the shell owns
- * it; the model marks it inert because the climbing stream is not built, and the prototype's
- * dispatcher select is not drawn for the reason `rushDrivingLine`'s docstring gives. So this mount
- * has nothing to listen to and nothing to redraw — which is why it takes no host subscription.
+ * it; the prototype's dispatcher select is not drawn for the reason `rushDrivingLine`'s docstring
+ * gives. So this mount has nothing to listen to and nothing to redraw — which is why it takes no
+ * host subscription.
+ *
+ * **This paragraph also said the model *"marks it inert because the climbing stream is not built"*,
+ * and it had been false since GitHub issue #220** (§ D515). `rushScreenModel.ts#rushBarModel` is
+ * `return base` — the primary is live and the mount answers the press with `EverydayHost.startRush`.
+ * The refusal it substituted was deleted on the commit that built the engine, § D227's rule, and
+ * this sentence a file away was not. GitHub issue #423.
  *
  * **The refusal about that inert primary is not on this screen**, and since GitHub issue #262 it is
  * not drawn here at all: `rushScreenModel.ts#rushBarModel` substitutes it into the § 3.3 bar, which
