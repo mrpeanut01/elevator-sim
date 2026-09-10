@@ -309,6 +309,14 @@ const EVERYDAY_SHELL_FILES = new Set([
    * own view — ENGINE_CONTRACT § 14's rules, which cannot be followed without touching them.
    */
   'everyday/screenDom.ts',
+  /*
+   * GitHub issue #244's landing page. Its words are pure in `everyday/landingView.ts`, which is not
+   * exempt and is driven in this node tier; the mount is here because it draws to a canvas — the
+   * second file in `everyday/` to do so, after `briefScreen.ts` — so it reads `devicePixelRatio`
+   * and asks the document's own view for animation frames, and it spawns the worker its run
+   * crosses. None of the three can be done without touching the DOM.
+   */
+  'everyday/landingScreen.ts',
   'everyday/doorScreen.ts',
   'everyday/briefScreen.ts',
   'everyday/reportScreen.ts',

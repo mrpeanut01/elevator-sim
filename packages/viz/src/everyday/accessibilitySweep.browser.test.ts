@@ -398,7 +398,9 @@ async function coldLoad(): Promise<Page> {
     undefined,
     { timeout: 30_000 },
   );
-  await page.waitForSelector('.everyday-tutorial, .everyday-mode[data-screen]', { timeout: 30_000 });
+  await page.waitForSelector('.everyday-landing, .everyday-tutorial, .everyday-mode[data-screen]', {
+    timeout: 30_000,
+  });
   return page;
 }
 
@@ -471,11 +473,32 @@ const ROUTES: Readonly<Record<EverydayScreen, (page: Page) => Promise<void>>> = 
     await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
   },
   /*
+   * GitHub issue #244's landing page. Reached by **not leaving it**: it is what a fresh context
+   * meets, which is the whole of what the page is for, so the route is to wait for it rather than
+   * to navigate to it. That also makes this the one route here that sweeps a screen in the state a
+   * stranger actually arrives in.
+   *
+   * Its canvas is outside what any rule set can read — a bitmap is not the accessibility tree — so
+   * this sweep says nothing about what is drawn on it. The screen labels it `role="img"` with the
+   * caption as its name, which is the half the tree *can* carry, and the sweep does check that.
+   */
+  landing: async (page) => {
+    await page.waitForSelector('.everyday-landing', { timeout: 30_000 });
+  },
+  /*
    * § D529's walkthrough is not reached by a tile or a row: `shell.ts:2262` is the only `go`, inside
    * the first-visit offer. So the route is to wait for it — which is also why every other route here
    * has to leave it.
    */
   tutorial: async (page) => {
+    /*
+     * Reached through the landing page's own call to action since GitHub issue #244 — a fresh
+     * context now meets the landing page and the walkthrough is one press behind it. Pressed here
+     * rather than waited for, because waiting for a screen nothing opens is how a route quietly
+     * stops testing anything.
+     */
+    await page.waitForSelector('.everyday-landing-cta', { timeout: 30_000 });
+    await page.locator('.everyday-landing-cta').click();
     await page.waitForSelector('.everyday-tutorial', { timeout: 30_000 });
   },
   /*
@@ -485,6 +508,8 @@ const ROUTES: Readonly<Record<EverydayScreen, (page: Page) => Promise<void>>> = 
    * page a week that is not the fixture.
    */
   collapse: async (page) => {
+    await page.waitForSelector('.everyday-landing-cta', { timeout: 30_000 });
+    await page.locator('.everyday-landing-cta').click();
     await page.waitForSelector('.everyday-tutorial', { timeout: 30_000 });
     await page.locator('.everyday-bar-primary').click();
     await page.waitForSelector('.everyday-collapse', { timeout: 20_000 });

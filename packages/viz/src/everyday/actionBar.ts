@@ -262,6 +262,33 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     inverted: false,
   }),
   /*
+   * GitHub issue #244's landing page, `guide: false` — § 3.3's table predates it and contains no
+   * landing row, so this sits beside the tutorial's pair and the Scenario hub's rather than being
+   * compared against a transcription of the handoff.
+   *
+   * **The leave row is live and is the whole of the second route off this page.** The page itself
+   * authors exactly one way in — the issue's third acceptance criterion — so the way *past* it to
+   * the mode picker has to be the shell's, and this is it. Marking it `inert` here would leave a
+   * visitor with one button and no way round it, which is the one thing a front door may not be.
+   */
+  row({
+    screen: 'landing',
+    guide: false,
+    leave: leave(MODES),
+    /*
+     * **Deliberately not the page's own button label, and this is the one cell where that matters.**
+     * The landing page's single call to action changes what it says with who is reading it — *show
+     * me how it plays* for somebody who has played nothing, *play a scenario* for somebody who came
+     * back — because the walkthrough sits before Scenario and a button may not promise the second
+     * and open the first. This row cannot see which of the two it is: `bar` is handed the shell's
+     * state and the answer is a function of the week, which only the mount can ask. So it says the
+     * thing that is true of both destinations rather than picking one and being wrong half the time.
+     */
+    primary: primary(['Start playing']),
+    note: 'The button on the page says where it goes. Or take the modes list, if you already know what you came for.',
+    inverted: false,
+  }),
+  /*
    * § D529's two-screen tutorial (GitHub issue #380), both rows `guide: false` — § 3.3's table
    * predates the ruling and contains no tutorial, so the pair sits beside the Scenario hub's row
    * and the two replay rows rather than being compared against a transcription of the handoff.

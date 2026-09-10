@@ -305,6 +305,9 @@ describe('the table matches the guide, cell for cell', () => {
     const extras = ACTION_BAR_ROWS.filter((row) => !row.guide);
     expect(extras.map((row) => keyOf(row.screen, row.ctx)).sort()).toEqual([
       'collapse',
+      /* GitHub issue #244's landing page — § 3.3's table begins at the menu and has no row for a
+         screen that comes before it. */
+      'landing',
       'report·replay',
       'report·watch',
       'scenario',

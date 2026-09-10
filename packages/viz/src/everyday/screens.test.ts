@@ -69,6 +69,12 @@ describe('what this build has actually built', () => {
     expect(EVERYDAY_SCREENS_BUILT).toEqual([
       'menu',
       /*
+       * GitHub issue #244's landing page — the third key past § 4's seventeen, on the same ground
+       * as the two below it and one screen earlier: the handoff's inventory begins at the menu, so
+       * there is no landing page in it and no surface for one to be a state of.
+       */
+      'landing',
+      /*
        * § D529's two-screen tutorial, GitHub issue #380 — the two keys past § 4's seventeen, and
        * the only two this repository has added for a surface the handoff does not specify. § D489
        * refused an eighteenth key for sign-in on the ground that the handoff *did* specify that
