@@ -21,7 +21,8 @@
     "build": "tsc -b",
     "typecheck": "tsc -b",
     "clean": "tsc -b --clean",
-    "serve": "node dist/main.js"
+    "serve": "node dist/main.js",
+    "dashboard": "node dist/telemetry/dashboardMain.js"
   },
   "dependencies": {
     "@azure/communication-email": "^1.1.0",

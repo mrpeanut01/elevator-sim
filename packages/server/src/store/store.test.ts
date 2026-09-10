@@ -936,3 +936,54 @@ describe('the house — GitHub issue #222, § D521', () => {
     expect(await store.board('daily:2026-09-08', 'awtS', 25)).toHaveLength(1);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * Telemetry — R-1's route-internal read (GitHub issue #250)
+ * -------------------------------------------------------------------------- */
+
+describe('the KPI dashboard’s read', () => {
+  it('hands back what was written, fields and all, oldest arrival first', async () => {
+    const { store } = await fixture();
+    await store.recordTelemetry([
+      {
+        playerId: 'a'.repeat(32),
+        sessionId: 'b'.repeat(32),
+        buildId: 'abc0123456',
+        name: 'screen_entered',
+        atMs: 900,
+        fields: { screenKey: 'stage', fromScreenKey: null },
+        receivedAtMs: 1_770_000_002_000,
+      },
+      {
+        playerId: 'a'.repeat(32),
+        sessionId: 'b'.repeat(32),
+        buildId: 'abc0123456',
+        name: 'session_start',
+        atMs: 0,
+        fields: { entryScreenKey: 'menu' },
+        receivedAtMs: 1_770_000_001_000,
+      },
+    ]);
+
+    const read = await store.telemetryEventsForDashboard();
+    /*
+     * Ordered by the server's own clock rather than by `atMs`, because that is what tells a
+     * player's first session from their fourth — `docs/26` § 7.1's only absolute clock, and the
+     * one `dashboardOf` groups on.
+     */
+    expect(read.map((event) => event.name)).toEqual(['session_start', 'screen_entered']);
+    // The fields survive the JSON round trip rather than arriving as a string.
+    expect(read[1]?.fields).toEqual({ screenKey: 'stage', fromScreenKey: null });
+    expect(read[0]?.atMs).toBe(0);
+  });
+
+  it('takes no player filter, because § 18.3 item 1 forbids the screen one would build', async () => {
+    /*
+     * *"No per-player view for the team … nobody on this project gets a screen that shows one
+     * person's sessions."* A `playerId` parameter here is that screen's query arriving before the
+     * screen, so the method has none — asserted on its arity rather than described in prose.
+     */
+    const { store } = await fixture();
+    expect(store.telemetryEventsForDashboard.length).toBe(0);
+  });
+});

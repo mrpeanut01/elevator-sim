@@ -133,6 +133,19 @@ const WIRING: readonly (readonly [string, string, 'import' | 'same file'])[] = O
   ['batchIssues', 'server/src/http/api.ts', 'import'],
   ['ID_PATTERN', 'server/src/http/api.ts', 'import'],
   ['RAW_EVENT_RETENTION_MS', 'server/src/store/store.ts', 'import'],
+  /*
+   * GitHub issue #250's dashboard — `docs/26` § 20, reader R-1. The chain is short and it is pinned
+   * link by link because the whole risk of this feature is that it has none: a dashboard over a
+   * source nobody reads is `CLAUDE.md`'s dead seam with a screen on it, and the product owner said
+   * so on the issue before it was built. `dashboardMain.ts` is the entry point (`npm run dashboard`
+   * in this package), it is the only non-test caller of the route, and the route is the only caller
+   * of the reader.
+   */
+  ['dashboardOf', 'server/src/telemetry/dashboardMain.ts', 'import'],
+  ['renderDashboard', 'server/src/telemetry/dashboardMain.ts', 'import'],
+  ['DASHBOARD_PANELS', 'server/src/telemetry/dashboardRender.ts', 'import'],
+  ['MIN_CELL_PEOPLE', 'server/src/telemetry/dashboardRender.ts', 'import'],
+  ['dashboardMain', 'server/src/telemetry/dashboardMain.ts', 'same file'],
   ['signInUrlFor', 'server/src/bootstrap.ts', 'same file'],
   ['SIGN_IN_FRAGMENT_KEY', 'server/src/bootstrap.ts', 'same file'],
   ['bearerOf', 'server/src/http/serve.ts', 'same file'],
