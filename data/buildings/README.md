@@ -96,6 +96,70 @@ concept from `accessZones` (credential-based) and from any operational zoning th
 dispatcher applies dynamically. See
 [docs/01-architecture.md](../../docs/01-architecture.md#security-zones-are-three-different-things).
 
+## Duty — the fourth thing, and it is not in the schema
+
+**A car has no `duty` field, and this section exists so that the next lane to want one adds the
+concept rather than a field.** GitHub issue #481; two shipped screens refuse the control from
+opposite sides — `everyday/designerModel.ts` and `everyday/fixitScreen.ts` — and each names the
+other, which is what says it is one missing concept two screens want rather than a gap in either.
+
+**Duty is what a car is *for*: a goods lift, a bed lift, a passenger lift.** It is a property of the
+shaft as built, and it does not change during a run.
+
+### What duty is not, and each of these already exists
+
+Four neighbours, and collapsing duty into any of them is the failure this section is written to
+prevent — three of them are the trio the paragraph above forbids collapsing, and the fourth is the
+one most likely to be mistaken for duty:
+
+| not duty | what it actually is | where |
+|---|---|---|
+| `CarConfig.mode` | **operational state** — how the car is running *now* | `SERVICE_MODES` = `in-service`, `independent`, `fire-recall`, `out-of-service` |
+| `servesFloors` | **service zoning** — a hard physical feasibility filter | the paragraph above |
+| `accessZones` | **access zoning** — a credential filter | § Access zones |
+| the dispatcher's own grouping | **operational zoning**, applied dynamically | `docs/01` |
+
+**`mode` is the one to read twice, because it answers a question people ask duty for.** *"The one out
+of service"* is **not** a duty — it is `mode: 'out-of-service'`, authorable today, and a
+`ServiceEventConfig` can put the car back mid-run. `CarConfig.mode`'s own docstring settles it: *"A
+building with a car under maintenance, a bank in fire recall, an attendant-operated car — all of them
+are `mode`."* So the concept duty still owes is narrower than the screens' refusals suggest: it is
+**purpose**, and nothing else.
+
+### What has to be true before a `duty` field is added
+
+**A duty no dispatcher or generator consults is a label**, and this repository keeps a register of
+behaviours that were configurable, unit-tested and reached by nothing — **eleven times in code and
+twice in `data/`**. So the standing requirement binds here in its usual form: *move the control and
+require the run to change, compared on the legs.*
+
+**The precedent to read first is `accessZones`, because it is this defect with its polarity
+reversed** ([§ D265](../../DECISIONS.md)). It was loaded, schema-checked, cross-validated with four
+dedicated warning codes, indexed by `Bank` and consulted by `Simulation` in three places — and could
+not change a result, because `traffic/generator.ts` issued every rider the credential their own route
+needed, so every generated trip was authorised by construction and the gate never bit. **Not a
+behaviour with no caller: a caller with no behaviour to reach.**
+
+A `duty` field lands in exactly that position unless the **demand side** can express a duty-bound
+trip. A goods lift that dispatch prefers for a goods journey does nothing if no journey is a goods
+journey. So the order is:
+
+1. **This paragraph** — what duty is and is not. Done here; it binds no code and needs no field.
+2. **The demand side** — a trip that *has* a duty, in `traffic/`, so there is something for a
+   dispatcher to be right or wrong about.
+3. **Dispatch** — a duty-bound car preferred, avoided, or refused for a call, with the legs moving.
+4. **The control** — the picker the two screens want, on § D219's test.
+
+Doing 4 before 2 produces a screen that looks finished and binds nothing, which is what both
+refusals are currently protecting against.
+
+### Not decided here
+
+Whether duty is a closed vocabulary or free text; whether it sits on the car or on the bank; and
+whether a duty-bound car is *preferred*, *reserved* or merely *scored* for a matching call. Those
+reach past this document into `core`'s model, so they want a `DECISIONS.md` entry rather than a
+schema note ([§ D404](../../DECISIONS.md), [§ D405](../../DECISIONS.md)).
+
 ## Access zones
 
 ```json
