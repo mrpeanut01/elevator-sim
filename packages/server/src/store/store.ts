@@ -1297,6 +1297,56 @@ export class Store {
   }
 
   /**
+   * Every stored event, for **R-1's route and nothing else** — GitHub issue #250,
+   * `docs/26-telemetry-and-privacy.md` § 18.2 and § 20.
+   *
+   * ## Why this is a row read and not an aggregate query
+   *
+   * § 18.2 bounds the **reader** to aggregates: *"a dashboard that filters small cells is one query
+   * away from a dashboard that does not."* § 20.3 says where the bound is enforced — *"in the route
+   * and not in the reader"* — and this method is inside the route. The aggregate boundary is
+   * `telemetry/dashboard.ts#dashboardOf`, whose output carries no `playerId`, no `sessionId` and no
+   * run pointer, and whose refused cells carry no number at all.
+   *
+   * The alternative was a `GROUP BY` per panel. It was refused: `docs/26 K2` is an *ordered* chain
+   * over a session's events and `docs/26 K3` is a median over each session's last event, so the SQL
+   * that computed them would be a second statement of § 6.2's definitions — the shape `docs/26`
+   * P-5 forbids, and the first time the two disagreed nobody would know which one the review had
+   * read.
+   *
+   * ## What it is not
+   *
+   * **Not a route.** Nothing in `http/api.ts` calls this and nothing may: § 8's refusal was lifted
+   * for a dashboard's shape, and the dashboard is an analyst-initiated, offline read over the store
+   * — the same footing § 2.1 already puts run replay on. `telemetry/dashboardMain.ts` is its only
+   * non-test caller, and `deadCode.test.ts` pins that link by name.
+   *
+   * **Not a per-player view.** There is no `playerId` parameter, deliberately: § 18.3 item 1 says
+   * nobody on this project gets a screen that shows one person's sessions, and a filter here would
+   * be that screen's query arriving before the screen.
+   *
+   * Ordered by `received_at_ms` so that a session's first arrival is what orders it, which is what
+   * `dashboardOf` needs to tell a player's first session from their fourth. The sweep has already
+   * run at {@link Store.open}, so nothing past § 5.1's horizon is here to be read.
+   */
+  async telemetryEventsForDashboard(): Promise<readonly TelemetryEventRow[]> {
+    const result = await this.#sql.query(
+      'SELECT id, player_id, session_id, build_id, name, at_ms, fields_json, received_at_ms ' +
+        'FROM telemetry_events ORDER BY received_at_ms, id',
+    );
+    return result.rows.map((row) => ({
+      id: String(row['id']),
+      playerId: String(row['player_id']),
+      sessionId: String(row['session_id']),
+      buildId: String(row['build_id']),
+      name: String(row['name']),
+      atMs: Number(row['at_ms']),
+      fields: JSON.parse(String(row['fields_json'])) as Readonly<Record<string, unknown>>,
+      receivedAtMs: Number(row['received_at_ms']),
+    }));
+  }
+
+  /**
    * Delete every event received longer ago than {@link RAW_EVENT_RETENTION_MS} — § 5.1's 90 days,
    * enforced rather than documented.
    *

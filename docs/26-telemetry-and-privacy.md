@@ -892,6 +892,13 @@ forget, and a read route that is bounded so that the lookup the old sentence fea
 it cannot perform. Read § 18 before building any of it; the ruling made the dashboard possible and
 made this section's bound a requirement rather than a preference.
 
+**And what #250 built on 2026-09-10 is *not* a third endpoint, which is worth saying here because
+this is the section a reader consults to learn what the server answers.** R-1 is an offline,
+analyst-initiated read over the store — `npm run dashboard --workspace @elevator-sim/server`, no
+socket, no URL, nothing added to `http/api.ts`. The endpoint count on this deployment is therefore
+still **two**. A URL would have decided who holds access, and § 20.6 leaves that open; R-3's route,
+which genuinely would be a third, is drafted and not required (§ 18.2, `LAWYER` — § 19 item 11).
+
 **Unauthenticated, and deliberately.** No bearer token, no cookies — the session is a bearer token in
 an `Authorization` header and never a cookie, and `Access-Control-Allow-Credentials` appears nowhere
 in this server. Sending the session token with telemetry would create the join § 3.2 exists to
@@ -1112,7 +1119,25 @@ prevent.
   in its own report rather than here: `rerun_same_crowd` has no shipped emitter and is registered as such
   in `telemetry/schema.ts#UNEMITTED_EVENTS`, asserted in both directions; § 6.2's **dwell** is still owed by
   M2 with the stage, so `docs/26 K1` fires on the stage's own alarm threshold and on no wall-clock dwell;
-  and § 18's read route is unbuilt, which is #250's.
+  and ~~§ 18's read route is unbuilt, which is #250's~~ — **built 2026-09-10** (GitHub issue #250):
+  R-1 is `packages/server/src/telemetry/dashboard.ts`, reached by
+  `npm run dashboard --workspace @elevator-sim/server`, and § 20.3's floor is enforced in it rather
+  than described. Struck rather than deleted, on § 0's own rule. **What #250 did not build is named
+  here because it belongs in this register**: the holder's name (§ 20.6, its own row above), the four
+  baselines (§ 20.4, its own row above), and P1's figures, which are refused whole for as long as
+  the **dwell** row above is open — the dashboard derives that refusal from the missing constant, so
+  the two cannot drift.
+
+  **And P2's and P5's figures, for the `rerun_same_crowd` clause of this very row.** `docs/26 K2`'s
+  chain runs through beat 4, so while that beat has no emitter the chain cannot close: P2's
+  completion share can only read **0 %** — against `charter S2`'s 60 % target — and P5's every cell
+  would attribute a drop to a beat no player can be observed reaching. Both panels are refused whole
+  rather than re-defined over the beats that do emit, because § 6.2 owns K2 and a second definition
+  is P-5's failure. The dashboard derives that refusal by reading `UNEMITTED_EVENTS` itself, so this
+  row and the code go red together whichever of them moves first. **This was found while building
+  #250 and not while specifying it**: § 20.2 was written the day before #340 landed and its refusal
+  column could not have known, which is this register's own argument for dating a row rather than
+  trusting it.
 - **The consent surface may not be turned on until Part B has been reviewed**, and nothing in the code
   enforces that — a deployment turns it on by serving a build with an API origin tag. The client is
   built, the words are drafted, and the decision to show them to a person is the product owner's
@@ -1795,9 +1820,15 @@ instrument.** That was written when there was no telemetry at all (§ 0 fact 1, 
 a dashboard would have been a dashboard over an empty source — which was #340's finding and not this
 document's. **#340 landed on 2026-09-10 and the instrument now exists**, so the second half of that
 sentence has stopped binding: the source is no longer empty. **The first half is unchanged and is
-now the whole of it** — the posture is drafted and marked as requiring legal review, and § 18's read
-route is still unbuilt, which is #250's own work. A dashboard needs a route that does not exist yet;
-what it no longer needs is an instrument.
+now the whole of it** — the posture is drafted and marked as requiring legal review, and
+~~§ 18's read route is still unbuilt, which is #250's own work. A dashboard needs a route that does
+not exist yet; what it no longer needs is an instrument.~~ — **the route was built on 2026-09-10**
+(GitHub issue #250) and that clause goes with it, struck rather than deleted. **What survives the
+build is the half that was never about work**: the posture is still only *drafted*, § 19's items are
+still unanswered, and nothing in the code can enforce the condition that Part B is reviewed before
+the consent surface is shown to anyone. So R-1 exists and reads an empty source, which is the
+correct state rather than an awkward one — a dashboard built against that fact says *nobody has
+consented yet*, and a dashboard built later against a populated one would never have had to.
 
 **When it ships, it inherits § 6.4 whole**: not shown to a player, not compared across builds without
 an interval and the counts it was computed over, and not read as a criterion met. A dashboard is the
@@ -1809,7 +1840,11 @@ well as a review one.** R-1 is *a* reader rather than *anyone*; a dashboard nobo
 whose access nobody is deciding. **Who that is, is not named here** — this document does not staff the
 project — but the posture is that the answer exists in writing before the first table is published.
 **The dashboard's shape is now specified in § 20**, the owner's role in § 20.6, and the minimum cell
-size § 5.4 used to defer alongside it is declared in § 20.3.
+size § 5.4 used to defer alongside it is declared in § 20.3. **And as of 2026-09-10 the shape is
+built** — `packages/server/src/telemetry/dashboard.ts`, with § 20.3's floor inside it rather than in
+front of it. The name is still not here, and that is the row § 11 carries: R-1 has a role and no
+holder, so *the answer exists in writing before the first table is published* is the condition it is
+still waiting on rather than one this build discharged.
 
 ---
 
@@ -1868,6 +1903,29 @@ reads. **It is not a second definition of anything.** Every KPI here is § 6.2's
 § 6.3's, every horizon is § 5.1's. A figure defined twice is `docs/26 P-5`'s failure, and the first
 time the two disagreed nobody would know which one the review had read.
 
+**Built on 2026-09-10** (GitHub issue #250), and this section is still the specification rather than
+a description of the code. The route is `packages/server/src/telemetry/dashboard.ts`, the reader is
+`dashboardRender.ts`, and an analyst reaches it with
+`ELEVATOR_SIM_DB=… npm run dashboard --workspace @elevator-sim/server` — an offline, analyst-initiated
+read, on the footing § 2.1 already puts run replay on. **There is deliberately no HTTP route**:
+§ 18.2 grants R-1 aggregates and does not grant a URL, and serving these figures over one would
+settle *who holds access* — which is § 20.6's question and is still open. `dashboardSpec.test.ts`
+derives the panel set from § 6.2 and § 6.3, the targets from
+[`docs/22-charter.md`](22-charter.md) § 4 and the floor from § 20.3, so the code cannot hold a second
+copy of any of them; a fifth KPI here with no panel there is red, and a panel there for a KPI § 6
+does not define is red.
+
+**Three of the eight panels draw nothing today, and each says so by name rather than by drawing an
+empty chart.** P1, because `docs/26 K1`'s threshold-and-dwell constant does not exist (§ 11); P2 and
+P5, because `docs/26 K2`'s chain carries a beat nothing emits (§ 20.2, § 11). **None of the three
+refusals is written into a panel** — each is computed from a constant the test holds against the
+document or the register that owns it, in both directions, so a refusal cannot outlive its cause and
+a cause cannot arrive without the refusal. That is § D227 mechanised, and it is the half of the
+stale-sentence rule this project calls the more dangerous one: a dead seam merely does nothing, while
+a stale refusal tells a reader not to look at a panel that works. A refused panel still draws its
+target, its baseline and its grain, because a panel that hid those while refusing would answer one of
+#250's criteria by failing another.
+
 ### 20.2 The panels
 
 Eight, and the set is not free: § 18.2 grants R-1 *"§ 6's four KPIs and § 6.3's diagnostics"*, so the
@@ -1877,10 +1935,10 @@ this document's. Every baseline is refused today and § 20.4 says why.
 | # | Reads | Target | Baseline | Refused when | Grain |
 |---|---|---|---|---|---|
 | **P1** | `docs/26 K1` — reach, and time, to visible trouble | `charter S1` — median ≤ **90 s**, on a reach share high enough that the median is not survivorship (§ 6.2) | `unmeasured` — § 20.4 | either figure's cell is under § 20.3's floor; or the threshold and dwell constant does not yet exist (§ 11) | build × UTC month |
-| **P2** | `docs/26 K2` — first-session loop completion | `charter S2` — **60 %** of first sessions complete the five-beat chain | `unmeasured` — § 20.4 | the cell is under § 20.3's floor | build × UTC month |
+| **P2** | `docs/26 K2` — first-session loop completion | `charter S2` — **60 %** of first sessions complete the five-beat chain | `unmeasured` — § 20.4 | the cell is under § 20.3's floor; **or the chain cannot close** — a beat of it has no shipped emitter (§ 11), so a completion share over it can only read 0 % | build × UTC month |
 | **P3** | `docs/26 K3` — first-session length | `charter S3` — median **≥ 10 minutes** | `unmeasured` — § 20.4 | the cell is under § 20.3's floor | build × UTC month |
 | **P4** | `docs/26 K4` — day-one to seven-day return | `charter S4` — **25 %** of a day's cohort returns within 7 days | `unmeasured` — § 20.4 | the cohort is under § 20.3's floor, **or** the window has not closed — no cohort is drawn before *D*+8 (§ 6.2) | first-seen UTC day × build |
-| **P5** | Beat-drop profile | none — a diagnostic has no target (§ 6.1) | not applicable | any beat × screen cell under the floor, **and § 20.3's complement rule** | build × UTC month × beat × screen key |
+| **P5** | Beat-drop profile | none — a diagnostic has no target (§ 6.1) | not applicable | any beat × screen cell under the floor, **and § 20.3's complement rule**; or the chain cannot close, as P2 — this panel's base is exactly the sessions P2 cannot count (§ 11) | build × UTC month × beat × screen key |
 | **P6** | Refusal encounters | none | not applicable | any ground's cell under the floor | build × UTC month × refusal ground |
 | **P7** | Field cold load | none. **It may refute the CI budget's representativeness and can never satisfy `charter S9`** (§ 6.3) | not applicable | the cell is under the floor | build × UTC month |
 | **P8** | Screen reach | none. Not a `charter S10` instrument — that is [`TEST_MATRIX.md`](../TEST_MATRIX.md)'s journey rows | not applicable | any screen's cell under the floor | build × UTC month × screen key |
@@ -1893,6 +1951,28 @@ single most likely way this dashboard does damage.
 **Every panel is a rate or a median over a cell, and every cell carries its count and an interval.**
 That is § 6.4's second bullet, and it is the reason § 20.3's floor does not have to do statistical
 work as well as disclosure work.
+
+**P2's and P5's second refusal ground was added on 2026-09-10 by GitHub issue #250, and the reason
+it was missing is worth more than the ground itself.** This table was written on 2026-09-09, the day
+*before* #340 landed the instrument — so it could not know that the shipped emitter would leave beat
+4 of `docs/26 K2` unemitted (`rerun_same_crowd`, registered with what blocks it in
+`packages/viz/src/telemetry/schema.ts#UNEMITTED_EVENTS`). A chain carrying an event nothing emits
+**cannot close**, so P2's completion share can only read **0 %** — and it would read it directly
+under `charter S2`'s 60 % target, where it looks like a product failing its criterion rather than an
+instrument with a hole in it. #250's own issue thread predicted exactly that before any of this was
+built: *"a dashboard drawing K2 as a funnel would show a flat zero and look like a bug"*, and
+[`docs/22-charter.md`](22-charter.md)'s S2 cell had already been corrected to **Partly — the chain
+cannot close today** for the same reason. Every other place in the tree knew; this table was the
+last one that did not. **The chain is not re-defined over the beats that do emit** — § 6.2 owns K2,
+and a second definition in a dashboard is P-5's own failure — so both panels are refused whole,
+derived from the register rather than from a sentence, and they start drawing on the commit that
+wires the emitter.
+
+**This paragraph and `dashboard.ts`'s own docstring are the record, under
+[§ D405](../DECISIONS.md).** The decision reaches no further than the section it corrects and the
+module that implements it: it binds no other package's code, moves no `DECISIONS.md` entry, and
+changes no charter row — `docs/22-charter.md`'s S2 cell already said *Partly — the chain cannot close
+today* before this was written, which is what made the omission visible rather than arguable.
 
 ### 20.3 The minimum cell size
 
@@ -1966,6 +2046,13 @@ wearing the arithmetic of the thing that prevents it.
 mean does — rather than being dropped, rounded, or quietly merged into its neighbour. A dashboard
 that filters small cells in the client is one query away from a dashboard that does not.
 
+*As built (2026-09-10), that is structural rather than disciplined.* A refused cell in
+`packages/server/src/telemetry/dashboard.ts` is an object with an axis map and a sentence and **no
+numeric field at all** — no value, no interval, no count. The renderer is not trusted with the
+number; it is never handed one, so there is no client-side filter to write. The same file's option
+type carries a single member, so the fixed window this section's second ground rests on is not a
+convention a caller can widen.
+
 **What the floor is not for.** It is not a precision bar. A cell of exactly 20 clears disclosure and
 is still far too small to steer by: a share over 20 has a 95 % half-width of up to ±0.220, so an
 observed 60 % is an interval running from 38 % to 82 % — it does not separate a month that clears
@@ -2036,6 +2123,16 @@ raise and referring it** — a panel that clears its target on organic traffic i
 months is minuted as clearing it, and the raise is made where the criterion is decided. The
 prohibition needs no such clause and has none: **a target is never moved down**, at this review or
 anywhere else, whatever the month looks like.
+
+**And since 2026-09-10 the prohibition is a test rather than a sentence.**
+`packages/server/src/telemetry/dashboardSpec.test.ts` derives every target from
+[`docs/22-charter.md`](22-charter.md) § 4 — so the dashboard cannot hold a second copy of one — and
+holds each against a watermark in the criterion's **own direction**: `charter S1` is a ceiling, so a
+raise is a smaller number, and `charter S2` is a floor, so a raise is a larger one. A target that
+moves towards being easier to meet is red. It is a ratchet rather than a pin for the reason
+`documentation.test.ts` gives about its own: a pin goes red on the commit that *raises* a criterion,
+which is the commit this rule exists to reward, and a gate that fails when its subject improves
+teaches exactly one lesson — delete the gate.
 
 **What the review may not turn into.** Not a conversation about a person — § 18.3 item 1 is not
 suspended because eight people are in a room. Not a verdict on `charter S1`–`S4`, which are met on a
