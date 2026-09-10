@@ -107,3 +107,8 @@ pnpm-debug.log*
 /scratch/
 probe-*.mjs
 scrollprobe*.mjs
+
+# foreman loop state — a session log and a machine-local CI cost profile, not source.
+# Committed by accident in 479116e via a `git add -A`; untracked here rather than left,
+# because `events.jsonl` is one session record and `ci-profile.json` is one machine.
+.foreman/
