@@ -59,12 +59,27 @@ clear it — has an average waiting time, arithmetically. That number is meaning
 you when you stopped watching, not how the building performs. **The simulator suppresses it
 and prints the reason instead.**
 
-Saturation is only one of four grounds for refusing to publish a mean. The others are an
-empty reporting window (nobody was served), censoring above the unserved limit, and a journey
-past the 900-second abandonment horizon — the last of which was added after a run was found
-publishing a tidy mean beside a **922.7-second** wait. The queue had grown enormously and
-drained just in time; the trend test saw a queue that had stopped growing, the censoring test
-saw one that had cleared, and **neither saw the disaster in between**.
+Saturation is only one of **five** grounds for refusing to publish a mean
+(`packages/core/src/metrics/awtValidity.ts`). The others are an empty reporting window (nobody
+was served), censoring above the unserved limit, a journey past the 900-second abandonment
+horizon, and an abandonment rate above 2 %.
+
+The fourth was added after a run was found publishing a tidy mean beside a **922.7-second**
+wait. The queue had grown enormously and drained just in time; the trend test saw a queue that
+had stopped growing, the censoring test saw one that had cleared, and **neither saw the
+disaster in between**.
+
+The fifth arrived with passenger patience, and it is the one that catches the system gaming
+itself: once riders actually give up and leave, **abandonment improves the average by
+construction**, because the people it removes from the sample are precisely the ones who waited
+longest. At `midtown-office` 6 % with a 120-second mean patience, the average falls **61.9 s →
+23.3 s** with fifty-one riders gone. A configuration that improves its wait by serving fewer
+people has not improved anything, so above 2 % the mean is suppressed outright — and the
+abandonment count is published beside the average rather than folded into it.
+
+*(This paragraph said **four** for as long as there had been five, while a sentence thirty-five
+lines above it said five. Both numbers were on the front page at once, and neither was derived
+from `awtValidity.ts`, which answers it in one grep.)*
 
 In practice this refusal bites hard. Across the twelve shipped dispatchers and five shipped
 buildings at the viewer's default settings, only **14 of 60 combinations** produce a quotable
@@ -294,7 +309,7 @@ you believe in, and each is scoped to arrive opt-in and off by default so no shi
 | [Building behaviour contract](docs/14-building-behaviour-contract.md) | The program that makes the sim read as a building — **steps 0–6 built, every feature opt-in and off by default**: an independent traffic seed, body-mass and group-size distributions you can shape, day-to-day variability, passenger patience and abandonment, lift-lobby crowding, stairs with the up/down asymmetry real people have, and the surface for teaching a learned dispatcher. Every feature opt-in and byte-identical when unused, with the acceptance criteria written before the implementation and the sequencing forced by what can move a published number — including step 2's, which measurement sent back for correction rather than met ([§ D203](DECISIONS.md)) |
 | [Compute offload contract](docs/15-compute-offload-contract.md) | Moving measurement compute off one laptop, and why that is a statistics problem before it is an infrastructure one: common random numbers pair alternatives *within one run on one machine*, so the unit of distribution is a whole paired comparison and never an arm; and a runner is a pin environment, so a second architecture is a third pin set rather than cheaper cores. **Phase A — self-hosted Azure CI runners — is withdrawn and its code removed**, on a cost finding: the template billed fixed capacity (≈ $212/month) while the runbook published the ~$5 of a per-job model it did not implement, which is a published number that did not reproduce from the code that produced it. Phase B, the measurement fan-out, is still only designed. Carries the honest ranking of what compute does and does not buy — two of whose four rows died with Phase A — and the criterion that raising the replication budget requires re-measuring the resolution limit rather than inheriting it |
 | [Change scope contract](docs/16-change-scope-contract.md) | What a control is allowed to move, and when. The simulator runs a whole day and plays the recording back, so there is no mid-day change — every change re-rolls the day, which makes the retry the product's most-used verb and, until it was named, one that could bank a scenario on a single Monday. Four scopes named so a fifth is a compile error, the controls under them derived from the state's own keys in both directions, and ten rules **S1–S10** — including the one that says a presentation control must reach a sink *and* must not reach the legs |
-| [Static site deployment](docs/16-static-site-deployment.md) | Hosting the viewer's page on a CDN while the API stays on the Container App, because `serve.ts` serves the page out of a container running at `minReplicas: 0` and a cold first load was measured at **32.2 s** against 0.13 s warm — which `/api/wake` cannot fix, since the page is the thing being waited on. Carries the priced three-way comparison and the trade it honestly is: £0 and same-origin stops being true, versus ≈ £9/month to keep it, versus ≈ £26/month to change nothing but the bill. The three configured values that then have to agree, the two the server refuses to hold apart, and — in the runbook's own voice — a § 9 that separates what was run from what was only reasoned about. **Nothing is switched on and no Azure resource has been created by it** |
+| [Static site deployment](docs/16-static-site-deployment.md) | Hosting the viewer's page on a CDN while the API stays on the Container App, because `serve.ts` serves the page out of a container running at `minReplicas: 0` and a cold first load was measured at **32.2 s** against 0.13 s warm — which `/api/wake` cannot fix, since the page is the thing being waited on. Carries the priced three-way comparison and the trade it honestly is: £0 and same-origin stops being true, versus ≈ £9/month to keep it, versus ≈ £26/month to change nothing but the bill. The three configured values that then have to agree, the two the server refuses to hold apart, and — in the runbook's own voice — a § 9 that separates what was run from what was only reasoned about. **Armed since 2026-08-08** — the Static Web App exists and `vars.AZURE_SWA_NAME` is set. This cell said *"Nothing is switched on and no Azure resource has been created by it"* for a month after that stopped being true; § 11 is the revert procedure, and its first finding is that the command four sites called *the rollback* disarms the only job that can put a build back |
 | [Everyday Mode playtest audit #2](docs/20-everyday-playtest-audit-2.md) | The second player-walk, taken after every slice landed: it re-verifies docs/19's fourteen defects as a player (nine fixed, three partial, no regressions, the blocks-play trap gone) and plays the new rules editor, ghost race, Fix-a-building, bench suite and watch flows. Seventeen new findings, none blocks-play, each with a repro and an owning module — plus the session narrative naming the product's best ninety seconds and its worst |
 | [Everyday Mode playtest audit](docs/19-everyday-playtest-audit.md) | The Everyday Mode delivery walked as a player in a real browser — docs/17's successor. Per-flow verdicts on playability, navigation, intuition and information; fourteen ranked defects with reproductions, one blocks-play (the post-reload Resume trap, since fixed with the repro as a browser regression); and the what-would-make-it-fun notes the polish lanes are scoped from |
 | [Everyday Mode tree audit](docs/18-everyday-mode-tree-audit.md) | The casual-mode design handoff's build plan verified against this tree, slice by slice, after the handoff's own precedence rule fired: the prototype §20 describes is not in this repository, so what it calls inert controls do not exist here, what it calls missing partly exists, and what it says to delete was never built. Carries a verified work-order per slice naming the real seams, the implementation-status register for landed slices, and the disagreement register where the code won |
