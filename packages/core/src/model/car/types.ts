@@ -666,7 +666,11 @@ export interface CarSnapshot {
   readonly door: DoorMachineState;
   readonly doorConfig: DoorConfig;
 
-  /** The comfort envelope: rated speed, acceleration, jerk. */
+  /**
+   * The comfort envelope: rated speed, acceleration, jerk — and, on a car that has one, the
+   * separate descent limit GitHub issue #444 added. Absent means the car descends at its rated
+   * speed, which is every shipped car.
+   */
   readonly constraints: MotionConstraints;
   /** Brake lift and torque build before the profile begins, seconds. */
   readonly motorStartDelayS: number;

@@ -33,8 +33,8 @@
  *    runs through `campaign/stageRun.ts#batchRequestForStage`, whose two knobs are a dispatcher
  *    profile and an edited weight vector. A priced change whose `covers` list names only
  *    `shop.*`, `building.*` or `editor.*` paths prices something no scenario run can apply, so it
- *    is **not** reachable here — {@link unreachableChangeIdsOf} names them, and it is 20 of the
- *    schedule's 24. That is a bound on this measurement rather than a claim about the schedule, and
+ *    is **not** reachable here — {@link unreachableChangeIdsOf} names them, and it is 21 of the
+ *    schedule's 25. That is a bound on this measurement rather than a claim about the schedule, and
  *    saying so is the difference between a count that is small and a count that is wrong.
  * 3. **The empty bundle is excluded.** Buying nothing is the scenario as it was handed over, not a
  *    way through it — and it is measured in every cell anyway, because it is arm 0 of every batch
@@ -216,7 +216,7 @@ export function reachableChangesOf(
 /**
  * The priced changes a scenario run **cannot** apply, named rather than dropped.
  *
- * A count of survivors taken over three of twenty-four priced changes is a different claim from one
+ * A count of survivors taken over three of twenty-five priced changes is a different claim from one
  * taken over all of them, and a reader who is not told which is which will read the first as the
  * second. `survivors.ts` publishes this list on the table's header for that reason.
  */

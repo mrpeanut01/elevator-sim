@@ -113,7 +113,7 @@ evaluates it against `roundTripTime()` on a bank with a non-zero `expressJumpS`.
 |---|---|
 | `H` | Highest reversal floor — `N − Σ_{i=1..N−1} (i/N)^P`, exact for uniform destinations |
 | `N` | Number of floors served above the lobby |
-| `tv` | Single-floor transit time at rated speed |
+| `tv` | Single-floor transit time at rated speed. **One `tv`, charged twice**: `2·(H·tv + tx)` prices the climb and the descent at the same speed, so a car whose descent is limited below its rated speed — by design, or by `elevator-specs.json`'s air-pressure cap above 300 m of travel — runs longer than this expression charges. The published expression has no asymmetric form and none is invented here: `CLOSED_FORM_ASSUMPTIONS`' `symmetric-speed` entry records the divergence and `analyzeUpPeak` raises `directionalSpeedAsymmetry` on a bank with such a car. GitHub issue #444. |
 | `tx` | **Express-jump time** — the one-way run from the terminal to the bottom of the served zone. Zero for an unzoned bank, ~14 s for Secure Tower's high bank |
 | `ts` | Time lost per stop (doors, start delay, leveling) |
 | `tp` | Passenger transfer time |

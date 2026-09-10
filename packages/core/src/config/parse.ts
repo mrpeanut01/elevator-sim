@@ -24,7 +24,12 @@ import type { ZodError } from 'zod';
 import { bankRangeIsFixed, isServiceDerateEvent, isServiceRangeEvent } from './serviceEvent.js';
 import { connectivityDiagnostics } from './buildingConnectivity.js';
 import { expandFloors } from './expandFloors.js';
-import { findElevatorSpec, ratedLoadKgOf, resolveCar } from './resolveCar.js';
+import {
+  airPressureDescentCapMps,
+  findElevatorSpec,
+  ratedLoadKgOf,
+  resolveCar,
+} from './resolveCar.js';
 import {
   ConfigError,
   ISSUE_CODES,
@@ -333,6 +338,16 @@ export function resolveBuilding(
       }
     });
 
+    /*
+     * **The shaft's travel, computed before the cars rather than after them** (GitHub issue
+     * #444). It was derived below, beside the envelope checks, and moved up here because the
+     * air-pressure descent cap is a property of the travel and has to be known to *resolve* a
+     * car rather than to comment on one. One derivation, used by both — the envelope checks
+     * below read this same `riseM`.
+     */
+    const heights = servedFloors.map((floor) => floor.heightM);
+    const riseM = heights.length > 1 ? Math.max(...heights) - Math.min(...heights) : 0;
+
     const cars: ResolvedCar[] = [];
     /** Distinct classes in this bank; the rise/floor-count checks are per class, not per car. */
     const usedSpecs = new Map<string, ElevatorSpec>();
@@ -351,6 +366,10 @@ export function resolveBuilding(
           path: carPath,
           buildingType: building.type,
           buildingId: building.id,
+          // The shaft this car actually flies. Without it the air-pressure cap cannot be
+          // applied, which is why `resolveCar` leaves the car symmetric when it is absent
+          // rather than guessing a travel — see `ResolveCarOptions.travelM`.
+          travelM: riseM,
         });
       } catch (error) {
         if (!(error instanceof ConfigError)) throw error;
@@ -371,6 +390,60 @@ export function resolveBuilding(
           `${carPath}.ratedSpeedMps`,
           `${resolved.ratedSpeedMps} m/s is outside the reference envelope for class "${spec.id}" (${spec.ratedSpeedMps.min}-${spec.ratedSpeedMps.max} m/s).`,
           WARNING_CODES.speedOutsideClassRange,
+        );
+      }
+      /*
+       * **The three directional-speed advisories** — GitHub issue #444.
+       *
+       * All warnings and never errors: each configuration is legal and is simulated exactly as
+       * declared. What they exist to stop is a *silent* one — a car whose plate says 14 m/s
+       * running a 10 m/s evening egress with nothing on the record saying so, which is the
+       * shape this repository has shipped as a dead seam eleven times with the polarity
+       * reversed.
+       */
+      const capMps = airPressureDescentCapMps(
+        specs.airPressure,
+        riseM,
+        resolved.cabinPressurised === true,
+      );
+      if (capMps !== undefined && capMps < resolved.ratedSpeedMps) {
+        addWarning(
+          `${carPath}.ratedSpeedMps`,
+          `car "${car.id}" is rated ${resolved.ratedSpeedMps} m/s, but bank "${bank.id}" spans ${Number(riseM.toFixed(1))} m and elevator-specs.json caps an unpressurised cabin's descent at ${capMps} m/s above ${specs.airPressure?.appliesAboveTravelM} m of travel. The car climbs at ${resolved.ratedSpeedMps} m/s and descends at ${capMps} m/s. Pressurise the cabin (cabinPressurised) to lift the cap, or stop buying speed this shaft cannot spend going down.`,
+          WARNING_CODES.descentCappedByAirPressure,
+        );
+      }
+      if (
+        car.descentSpeedMps !== undefined &&
+        car.descentSpeedMps > resolved.ratedSpeedMps
+      ) {
+        addWarning(
+          `${carPath}.descentSpeedMps`,
+          `car "${car.id}" descends at ${car.descentSpeedMps} m/s and climbs at ${resolved.ratedSpeedMps} m/s. Nothing forbids a machine that is quicker down than up, and none of the reference asymmetries is: TWIN is about 7 m/s up and 4 m/s down. Check the pair is not transposed.`,
+          WARNING_CODES.descentAboveRatedSpeed,
+        );
+      }
+      /*
+       * *"Buys nothing"* is asked of the **unpressurised** cabin, not of this one. A pressurised
+       * car's own effective cap is `undefined` by construction (`pressurisedDescentCapMps` is
+       * `null`), so testing it would say the equipment bought nothing on exactly the buildings
+       * where it bought everything — which is what the first draft of this warning did, and what
+       * `descentCap.test.ts`'s third arm caught.
+       */
+      const unpressurisedCapMps = airPressureDescentCapMps(specs.airPressure, riseM, false);
+      const wouldHaveBitten =
+        unpressurisedCapMps !== undefined && unpressurisedCapMps < resolved.ratedSpeedMps;
+      if (resolved.cabinPressurised === true && !wouldHaveBitten) {
+        const because =
+          specs.airPressure === undefined
+            ? 'this data directory declares no airPressure block'
+            : riseM <= specs.airPressure.appliesAboveTravelM
+              ? `bank "${bank.id}" spans ${Number(riseM.toFixed(1))} m, at or below the ${specs.airPressure.appliesAboveTravelM} m the cap applies above`
+              : `the car is rated ${resolved.ratedSpeedMps} m/s, at or below the ${specs.airPressure.descentCapMps} m/s cap`;
+        addWarning(
+          `${carPath}.cabinPressurised`,
+          `car "${car.id}" declares a pressurised cabin, but nothing is capping its descent: ${because}. The equipment is fitted and buys no seconds on this building.`,
+          WARNING_CODES.pressurisationBuysNothing,
         );
       }
       if (
@@ -469,9 +542,7 @@ export function resolveBuilding(
     }
 
     // Envelope checks belong to the shaft, so they are reported once per class in the
-    // bank rather than once per car.
-    const heights = servedFloors.map((floor) => floor.heightM);
-    const riseM = heights.length > 1 ? Math.max(...heights) - Math.min(...heights) : 0;
+    // bank rather than once per car. `riseM` is derived above, where the cars are resolved.
     for (const spec of usedSpecs.values()) {
       if (servedFloors.length > spec.maxFloors) {
         addWarning(

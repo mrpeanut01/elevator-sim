@@ -16,11 +16,48 @@ Machine-readable form: [`data/elevator-specs.json`](../data/elevator-specs.json)
 
 ### Real-world anchors
 
-| Building | Speed | Note |
+Every figure in this table is an **ascent** speed. See § Descent is capped by air pressure below —
+a car rated 20.5 m/s up does not descend at 20.5 m/s unless its cabin is pressurised.
+
+| Building | Speed (up) | Note |
 |---|---|---|
-| Shanghai Tower | 20.5 m/s | World's fastest (Mitsubishi) |
+| Shanghai Tower | 20.5 m/s | World's fastest (Mitsubishi). Fitted a pneumatic cabin system for the descent |
 | Burj Khalifa | 10 m/s (600 m/min) | Reaches floor 124 in ~60 s; world's fastest double-deck |
 | Shanghai World Financial Center | 10 m/s | Double-deck shuttles to 240 m sky lobby |
+
+### Descent is capped by air pressure
+
+A tall car descending fast sheds ambient pressure faster than the ear can equalise. Al-Kodmany
+records the industry's answer: *"because of the air-pressure problem, elevators continue to descend
+not faster than 10 m per second."* It is a limit on the cabin rather than on the machine, and it can
+be bought off — One World Trade Center pressurises its cars and releases the pressure slowly, and
+Shanghai Tower fitted a pneumatic system for the same reason.
+
+The simulator models it as data, in `data/elevator-specs.json`'s `airPressure` block:
+
+| Field | Shipped value | Provenance |
+|---|---|---|
+| `descentCapMps` | 10.0 m/s | **Cited** — Al-Kodmany § 3.1.4, verbatim |
+| `appliesAboveTravelM` | 300 m | **An agent's proposal**, derived from the same section's *"just 30 s to adjust air pressure"*: 30 s at 10 m/s. Not a figure the paper states |
+| `pressurisedDescentCapMps` | `null` — no cap | **A refusal.** The paper records pressurisation as the answer to the problem, not as a higher number, so a figure here would be invented |
+
+`config/parse.ts#resolveBuilding` applies it: a bank whose travel exceeds `appliesAboveTravelM`,
+carrying an unpressurised car rated above `descentCapMps`, resolves that car with a separate
+`descentSpeedMps`. It raises `descent-capped-by-air-pressure` when it bites, and
+`pressurisation-buys-nothing` when a cabin is fitted where nothing was capping it.
+
+**It binds no shipped building.** The fastest car in `data/buildings/` is 10.0 m/s, which is
+exactly the cap, so every shipped run is byte-identical with the block and without it. It is a
+ceiling a player meets by buying past it — `data/price-schedule.json` prices the cabin at the
+equipment tier — rather than a retrofit of the shipped towers.
+
+### Directionally asymmetric machines
+
+A car may also be asymmetric **by design** rather than by the shaft. Al-Kodmany records the TWIN
+system as travelling up to 7 m/s up and about 4 m/s down. That is authored per car as
+`descentSpeedMps`; where both apply, the lower binds. See GitHub issue #444 and, for the closed
+form's position on it, `CLOSED_FORM_ASSUMPTIONS`' `symmetric-speed` entry — the published
+Barney/CIBSE round trip charges one speed in both directions and is left exactly as published.
 
 ### Code minimum speeds by rise
 

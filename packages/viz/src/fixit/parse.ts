@@ -692,7 +692,7 @@ function decodeBuildingPatch(raw: Record_, at: string, violations: string[]): Bu
         continue;
       }
       const set = entry['set'];
-      const allowed = ['ratedSpeedDeltaMps', 'dwellCarCallS', 'dwellHallCallS'];
+      const allowed = ['ratedSpeedDeltaMps', 'cabinPressurised', 'dwellCarCallS', 'dwellHallCallS'];
       for (const key of Object.keys(set)) {
         if (!allowed.includes(key)) violations.push(`${at}: a car patch may not set "${key}".`);
       }
@@ -700,6 +700,7 @@ function decodeBuildingPatch(raw: Record_, at: string, violations: string[]): Bu
         carIds: strings(entry['carIds']),
         set: {
           ...(num(set['ratedSpeedDeltaMps']) === undefined ? {} : { ratedSpeedDeltaMps: num(set['ratedSpeedDeltaMps']) }),
+          ...(typeof set['cabinPressurised'] === 'boolean' ? { cabinPressurised: set['cabinPressurised'] } : {}),
           ...(num(set['dwellCarCallS']) === undefined ? {} : { dwellCarCallS: num(set['dwellCarCallS']) }),
           ...(num(set['dwellHallCallS']) === undefined ? {} : { dwellHallCallS: num(set['dwellHallCallS']) }),
         },

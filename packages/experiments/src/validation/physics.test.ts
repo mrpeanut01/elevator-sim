@@ -54,11 +54,15 @@ beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
 }, 60_000);
 
-const constraintsOf = (car: ResolvedCar): MotionConstraints => ({
-  ratedSpeedMps: car.ratedSpeedMps,
-  acceleration: car.acceleration,
-  jerk: car.jerk,
-});
+/*
+ * **The car itself, not three of its fields.** A `ResolvedCar` *is* a `MotionConstraints`
+ * structurally — that is `physics/motion/types.ts`'s stated reason for the interface declaring
+ * exactly the fields `ResolvedCar` carries — and this used to copy three of them by hand. GitHub
+ * issue #444 added a fourth, `descentSpeedMps`, and the hand-written copy silently dropped it:
+ * benign on shipped data, where no car is asymmetric, and a wrong answer the day one is. The
+ * annotation is kept so the structural claim is checked by the compiler rather than assumed.
+ */
+const constraintsOf = (car: ResolvedCar): MotionConstraints => car;
 
 function carOf(buildingId: string, bankId: string): ResolvedCar {
   const building = config.buildingsById.get(buildingId);

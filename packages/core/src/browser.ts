@@ -336,6 +336,7 @@ export {
   profileDuration,
   sharedPrefixSeconds,
   speedAt,
+  topSpeedFor,
   travelTime,
   velocityAt,
 } from './physics/motion/index.js';

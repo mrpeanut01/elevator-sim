@@ -137,6 +137,11 @@ export interface RoundTripTerms {
    * deceleration and jerk entirely, so a real car — which on a one-floor hop never gets
    * anywhere near rated speed — always takes longer. See
    * {@link CLOSED_FORM_ASSUMPTIONS} entry `constant-transit-speed`.
+   *
+   * **One `tv`, charged twice**, which is the second qualification it needs since GitHub issue
+   * #444: `RTT`'s `2·(H·tv + tx)` term uses this number for the climb *and* for the descent, and
+   * a car may now have two top speeds. `symmetric-speed` is that entry, and `analyzeUpPeak`
+   * raises `directionalSpeedAsymmetry` on a bank whose cars have one.
    */
   readonly singleFloorTransitS: number;
 
@@ -386,6 +391,22 @@ export const UP_PEAK_WARNING_CODES = {
   heterogeneousGroup: 'heterogeneousGroup',
   /** A double-deck car is present. The single-deck closed form does not describe it. */
   doubleDeck: 'doubleDeck',
+  /**
+   * A car in this bank descends more slowly than it climbs, so the closed form's `2·(H·tv + tx)`
+   * — one speed, charged twice — does not describe the round trip it is being applied to.
+   *
+   * GitHub issue #444's answer to CLAUDE.md's *"either keep agreeing within a few percent or say
+   * precisely why it cannot"*. This is the *cannot*, mechanised: the published Barney/CIBSE
+   * expression has exactly one `tv` and no term to hang a second on, and inventing an asymmetric
+   * closed form here would be this project publishing arithmetic no reference states and then
+   * validating a simulation against it. The expression is left exactly as CIBSE publishes it,
+   * the divergence is enumerated in {@link CLOSED_FORM_ASSUMPTIONS} as `symmetric-speed` with
+   * `bias: 'under'`, and this warning is what stops a residual being read as a defect.
+   *
+   * Raised on no shipped building — every car in `data/buildings/` is symmetric — which is the
+   * same distinction `missingFloorPairs` draws in `config/schema.ts`.
+   */
+  directionalSpeedAsymmetry: 'directionalSpeedAsymmetry',
   /** The bank runs express below its served zone; `tx` is non-zero. */
   expressZone: 'expressZone',
   /** `P` exceeds `N`: every trip fills more than one passenger per served floor. */
@@ -498,9 +519,9 @@ export interface ClosedFormAssumption {
  * drawing any conclusion from a comparison, because **this list is not one-sided**:
  *
  * - The **travel and stop** terms are. `constant-transit-speed`,
- *   `stop-time-excludes-acceleration` and `no-minimum-dwell` all bias `under`, and nothing
- *   here pushes back against them. That is why a simulated up-peak RTT should land *above*
- *   the closed form rather than scattered around it.
+ *   `stop-time-excludes-acceleration`, `no-minimum-dwell` and — on a car with a descent limit —
+ *   `symmetric-speed` all bias `under`, and nothing here pushes back against them. That is why a
+ *   simulated up-peak RTT should land *above* the closed form rather than scattered around it.
  * - The **load** is not. `full-car-every-trip` and `fractional-capacity` both bias `over`,
  *   and both act through `P`: a car that leaves the terminal part-full makes fewer stops
  *   and a shorter round trip, so its simulated RTT sits legitimately *below* a closed form
@@ -608,6 +629,14 @@ export const CLOSED_FORM_ASSUMPTIONS: readonly ClosedFormAssumption[] = [
     bias: 'either',
   },
   {
+    id: 'symmetric-speed',
+    assumption:
+      'One rated speed serves both directions: the 2·(H·tv + tx) term charges the climb and the descent at the same tv = df/v.',
+    divergence:
+      "A car whose descent is limited below its rated speed — by design, as TWIN is (about 7 m/s up, 4 m/s down), or by the air-pressure cap data/elevator-specs.json's airPressure block carries above 300 m of travel — spends longer coming down than the expression charges. Only the return half is affected: the shortfall is H·df·(1/v_down − 1/v_up) per trip, which is positive whenever the descent is the slower half. Every asymmetry the reference literature records is of that sign, and every one this repository can produce from data is too — the air-pressure cap is a cap, and it is the only asymmetry a shipped path writes. The bias is therefore 'under' for the cases that occur rather than for every case expressible: a car authored with descentSpeedMps ABOVE its rated speed is legal (config/parse.ts warns descent-above-rated-speed rather than refusing it) and would make the closed form read high instead. That configuration is not shipped, is flagged where it is authored, and is named here rather than being quietly excluded by the word 'one-sided'. The published expression has one tv and no term to hang a second on; it is left as CIBSE publishes it and analyzeUpPeak raises directionalSpeedAsymmetry instead. See GitHub issue #444.",
+    bias: 'under',
+  },
+  {
     id: 'single-deck',
     assumption: 'One car body serving one floor at a time.',
     divergence:
@@ -660,6 +689,7 @@ export const CLOSED_FORM_COMPARISON_RULE: ClosedFormComparisonRule = {
     'pure-up-peak',
     'single-entrance',
     'no-door-interference',
+    'symmetric-speed',
   ],
   canPushSimulationBelowIds: [
     'uniform-floor-populations',

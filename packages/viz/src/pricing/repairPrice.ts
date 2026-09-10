@@ -72,6 +72,7 @@ export function pathsIn(patch: RepairPatchShape): readonly string[] {
       if ('dwellHallCallS' in set) out.push('building.cars[].set.dwellHallCallS');
       if ('dwellCarCallS' in set) out.push('building.cars[].set.dwellCarCallS');
       if ('ratedSpeedDeltaMps' in set) out.push('building.cars[].set.ratedSpeedDeltaMps');
+      if ('cabinPressurised' in set) out.push('building.cars[].set.cabinPressurised');
     }
   }
   for (const [group, fields] of Object.entries(objectOf(patch.dispatcher) ?? {})) {

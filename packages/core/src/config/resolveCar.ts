@@ -17,6 +17,7 @@
 
 import { ConfigError, ISSUE_CODES, parseLoadDivisor } from './schema.js';
 import type {
+  AirPressureLimit,
   BuildingType,
   CarConfig,
   DoorTiming,
@@ -48,6 +49,16 @@ export function ratedLoadKgOf(
 export interface ResolveCarOptions {
   /** File name used in error messages. */
   readonly file?: string | undefined;
+  /**
+   * Metres of travel in the shaft this car runs in — the highest served floor less the lowest.
+   *
+   * Supplying it lets the air-pressure descent cap be applied (GitHub issue #444). Omitting it
+   * leaves the car symmetric unless it authors its own `descentSpeedMps`, which is the honest
+   * answer rather than a default: a car resolved with no shaft in view — a fixture, a bare
+   * class lookup — has no travel to be capped by, and inventing one would put a limit on a car
+   * nobody has placed in a building. `resolveBuilding` always supplies it.
+   */
+  readonly travelM?: number | undefined;
   /** Path to the car within that file, e.g. `banks[0].cars[2]`. */
   readonly path?: string | undefined;
   /**
@@ -110,6 +121,60 @@ export function findPassengerTransferS(
  */
 export function personsAtRatedLoad(ratedLoadLb: number, divisorLbPerPerson: number): number {
   return Math.floor(ratedLoadLb / divisorLbPerPerson);
+}
+
+/**
+ * The descent cap air pressure imposes on a shaft of this travel, m/s, or `undefined` for none.
+ *
+ * **The one implementation of the rule**, exported because `resolveBuilding` needs the same
+ * answer to decide whether to warn and a second derivation there would be a second authority on
+ * when the cap bites — the shape CLAUDE.md's standing requirement is about.
+ *
+ * Four ways it comes back `undefined`, and each is a real state rather than a fallback:
+ *
+ * - the data directory declares no `airPressure` block at all (pre-#444 behaviour, exactly);
+ * - the shaft's travel is at or below `appliesAboveTravelM`, so there is not enough column for
+ *   the problem to arise;
+ * - the cabin is pressurised and `pressurisedDescentCapMps` is `null`, which is the source's
+ *   own position: pressurisation answers the problem rather than raising a number;
+ * - no travel was supplied, so no shaft has been named.
+ *
+ * Pure. Note it does **not** consult the car's rated speed: a cap above what the car can do is
+ * still the cap, and whether it *binds* is the caller's question.
+ */
+export function airPressureDescentCapMps(
+  airPressure: AirPressureLimit | undefined,
+  travelM: number | undefined,
+  cabinPressurised: boolean,
+): number | undefined {
+  if (airPressure === undefined) return undefined;
+  if (travelM === undefined || !Number.isFinite(travelM)) return undefined;
+  if (travelM <= airPressure.appliesAboveTravelM) return undefined;
+  if (!cabinPressurised) return airPressure.descentCapMps;
+  return airPressure.pressurisedDescentCapMps ?? undefined;
+}
+
+/**
+ * The top speed downwards, m/s, or `undefined` when it is the rated speed.
+ *
+ * Two limits and one field: the machine's own asymmetry (`CarConfig.descentSpeedMps`, TWIN's
+ * shape) and the shaft's air-pressure cap. **The lower binds**, because they are limits rather
+ * than settings, and a car in a supertall is held by whichever arrives first.
+ *
+ * Returns `undefined` — never `ratedSpeedMps` — when nothing binds, which is what keeps a
+ * symmetric car's resolved object identical to the one it resolved to before #444.
+ */
+function descentSpeedOf(
+  ratedSpeedMps: number,
+  authoredDescentMps: number | undefined,
+  capMps: number | undefined,
+): number | undefined {
+  const limits = [authoredDescentMps, capMps].filter(
+    (limit): limit is number => limit !== undefined,
+  );
+  if (limits.length === 0) return undefined;
+  const descent = Math.min(...limits);
+  return descent === ratedSpeedMps ? undefined : descent;
 }
 
 /**
@@ -229,6 +294,14 @@ export function resolveCar(
     }
   }
 
+  const ratedSpeedMps = car.ratedSpeedMps ?? spec.ratedSpeedMps.typical;
+  const cabinPressurised = car.cabinPressurised === true;
+  const descentSpeedMps = descentSpeedOf(
+    ratedSpeedMps,
+    car.descentSpeedMps,
+    airPressureDescentCapMps(specs.airPressure, options.travelM, cabinPressurised),
+  );
+
   const ratedLoadLb = car.ratedLoadLb ?? spec.capacityLbRange[0];
   const standardSize = specs.capacities.find((entry) => entry.ratedLoadLb === ratedLoadLb);
   const designLoadFactor = specs.conventions.designLoadFactor;
@@ -252,7 +325,9 @@ export function resolveCar(
     // answer instead of each re-deriving it. Unlike `passengerTransferS` there is a safe
     // default, so this is resolved rather than left absent.
     mode: car.mode ?? 'in-service',
-    ratedSpeedMps: car.ratedSpeedMps ?? spec.ratedSpeedMps.typical,
+    ratedSpeedMps,
+    ...(descentSpeedMps === undefined ? {} : { descentSpeedMps }),
+    ...(cabinPressurised ? { cabinPressurised } : {}),
     acceleration: car.acceleration ?? spec.acceleration.typical,
     jerk: car.jerk ?? spec.jerk.typical,
     ratedLoadLb,
