@@ -238,21 +238,43 @@ async function coldLoad(): Promise<Page> {
     undefined,
     { timeout: 30_000 },
   );
-  await page.waitForSelector('.everyday-tutorial, .everyday-mode[data-screen]', {
+  /*
+   * **Three arms, not two** — GitHub issue #244. A first session can land on the landing page, the
+   * tutorial, or straight on a mode, and this waited on the last two. It was the *first* thing to
+   * time out on the branch that added the landing page, thirty seconds before `leaveTutorial` got
+   * a chance to be wrong as well — so widening only the leave helper swapped one timeout for the
+   * same one, which is how a wait that is too narrow hides the next wait that is too narrow.
+   */
+  await page.waitForSelector('.everyday-landing, .everyday-tutorial, .everyday-mode[data-screen]', {
     timeout: 30_000,
   });
   return page;
 }
 
 /**
- * § D529's two-screen tutorial stands in front of the front door on a first session, and it is left
- * by the bar's own leave row — by keyboard, like everything else here.
+ * Whatever a first session puts in front of the front door, left by the bar's own leave row — by
+ * keyboard, like everything else here.
  *
  * The tier's shared `leaveTutorialIfOffered` clicks, so it may not be used from this file.
+ *
+ * **Two screens can be the first-visit offer, and this knew about one** — GitHub issue #244.
+ * `offerTutorial` used to `go('tutorial')` and now goes to the landing page on the same gate, with
+ * the landing page's own call to action opening the walkthrough. This helper still looked only for
+ * `.everyday-tutorial`, found none, returned immediately, and left all three journeys pressing at a
+ * landing page that has no mode tiles — **four cases timing out at thirty seconds each** rather
+ * than failing with a reason, which is the least useful way for them to go red.
+ *
+ * The offer is now the same two-armed selector the shared helper uses, and the loop runs twice:
+ * leaving the landing page can reveal the tutorial behind it, and one pass would have swapped a
+ * timeout for a different timeout.
  */
 async function leaveTutorial(page: Page): Promise<void> {
-  if ((await page.locator('.everyday-tutorial').count()) === 0) return;
-  await pressFocused(page, '.everyday-bar-leave');
+  const OFFERED = '.everyday-landing, .everyday-tutorial';
+  for (let pass = 0; pass < 2; pass += 1) {
+    if ((await page.locator(OFFERED).count()) === 0) return;
+    await pressFocused(page, '.everyday-bar-leave');
+    await page.waitForSelector(`${OFFERED}, .everyday-mode[data-screen]`, { timeout: 15_000 });
+  }
   await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
 }
 
