@@ -85,7 +85,7 @@ import { provideEverydaySwap } from './swap.js';
  * the ask's words are pure (`telemetry/consentView.ts`), and the clock comes through the package's
  * one door to a wall clock so `boundaries.test.ts` still has exactly one to police.
  */
-import { everydayTelemetry } from './telemetryPort.js';
+import { everydayTelemetry, onEverydayConsent } from './telemetryPort.js';
 import { CONSENT_COPY, consentAskViewOf } from '../telemetry/consentView.js';
 import { systemClock } from '../playback/clock.js';
 import {
@@ -2571,6 +2571,20 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   draw();
   drawConsentAsk();
   /*
+   * **The ask redraws whenever the answer moves, wherever it moved** — GitHub issue #340.
+   *
+   * Settings draws a consent pill over the *same* recorder this shell holds, so without this the
+   * ask stayed on screen after Settings had answered it — a question the product had already been
+   * given an answer to, still pressable. Answering it a second time was the orphaned-id defect
+   * `telemetry/recorder.ts#refuse` now names: a `playerId` gone from the device while its rows sat
+   * on the server for ninety days with nothing left that could name them.
+   *
+   * Subscribed rather than folded into `draw()`, because the stale ask is pressable **while the
+   * player is still on Settings** and a redraw-on-navigate would leave the window open exactly
+   * where it was opened.
+   */
+  const consentUnsubscribe = onEverydayConsent(drawConsentAsk);
+  /*
    * A returning player whose slot already says yes never meets the ask, so their funnel has to open
    * here. A first-time player's opens on the *Yes* press instead, which is why this is guarded on
    * the state rather than called unconditionally: calling it here as well would give a granting
@@ -2680,6 +2694,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       // The host wiring goes first: a destroyed shell must not hear another notification and
       // write a latch for a page it is no longer on.
       slotUnsubscribe?.();
+      /* Same reason, one subscription over: a destroyed shell must not redraw a removed ask. */
+      consentUnsubscribe();
       stopAccountWatch();
       dataHostUnsubscribe?.();
       dataHost = undefined;

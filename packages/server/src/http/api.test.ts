@@ -1145,10 +1145,18 @@ describe('deleting an account', () => {
     for (const named of [/address/iu, /board/iu, /session/iu, /sign-in link/iu]) {
       expect(detail, String(named)).toMatch(named);
     }
-    // `docs/26` § 3.3: telemetry is a second store reached by a second request holding a different
-    // key, and the server never holds the join. A response that spoke for it would be claiming a
-    // relationship this design exists not to have — and there is no telemetry in this tree to
-    // speak for anyway.
+    /*
+     * `docs/26` § 3.3: telemetry is a second store reached by a second request holding a different
+     * key, and the server never holds the join. A response that spoke for it would be claiming a
+     * relationship this design exists not to have.
+     *
+     * This comment ended *"and there is no telemetry in this tree to speak for anyway"*, which
+     * **this commit makes false** — and `docs/26` § 3.3 cites this very case as the thing that
+     * asserts the separation in both directions. `RISKS.md` R42's rule is that a site saying a
+     * thing is unbuilt is corrected on the commit that builds it, so it is corrected here. The
+     * assertion is **stronger** now than when it was written: there is a telemetry store to speak
+     * for, and this response still may not speak for it.
+     */
     expect(detail).not.toMatch(/telemetry|analytics|everything we hold|all your data/iu);
   });
 });

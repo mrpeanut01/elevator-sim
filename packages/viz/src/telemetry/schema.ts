@@ -387,11 +387,15 @@ export interface TelemetryBatch {
 export const UNEMITTED_EVENTS: Readonly<Partial<Record<TelemetryEventName, string>>> = Object.freeze(
   {
     rerun_same_crowd:
-      'Beat 4 of the chain. The fix-it screen re-runs a case as two arms — as built and as ' +
-      'repaired — and the second arm is not a re-run of the first with the crowd held; it is the ' +
-      'other half of one comparison, run in the same press. Nothing in the player shell today ' +
-      'runs the same configuration twice on the player’s own second press, so an event here would ' +
-      'be describing something that does not happen. It becomes emittable when a screen offers ' +
-      'that press.',
+      'Beat 4 of the chain, and the blocker is a missing pointer rather than a missing press. ' +
+      'The fix-it screen does offer that press — its primary reads “Run it again” once a case has ' +
+      'run this session, and a second press after a repair toggle re-runs the same case with the ' +
+      'crowd held. What is missing is a run pointer to attach: the shell answers one only for runs ' +
+      'it simulated itself, and the fix-it pair runs on a worker outside that state, so an event ' +
+      'here would carry no way to say which run it was about. It becomes emittable when that pair ' +
+      'is reachable as a pointer. This reason was wrong once and the correction is worth keeping: ' +
+      'it said no screen offers the press at all, which review refuted by reading the shipped ' +
+      'action bar — and a register that names the wrong blocker sends the next reader to build ' +
+      'something that already exists.',
   },
 );

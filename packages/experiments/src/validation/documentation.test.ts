@@ -1232,11 +1232,79 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
     // quietly kept the retired one beside it.
     const table = instrumentTable();
     expect(table).toMatch(/S1 \| \*\*Yes — and unevaluated\*\*/u);
+    /*
+     * **This direction was inoperative and review found it, which is worth more than the fix.**
+     *
+     * It read `.not.toMatch(/^\| S1 [^\n]*there is now no funnel/u)` and could never fail, for two
+     * independent reasons. The pattern carries `u` but not `m`, so `^` anchors at the start of the
+     * whole string — and {@link instrumentTable} returns a slice beginning with its heading, never
+     * with `| S1`. And the quoted phrase never existed: the retired sentence was *"There is no
+     * funnel, no event chain and no session record anywhere in the tree."*
+     *
+     * So the file's own docstring claim — *"the case did not become weaker, it changed subject …
+     * in the same two directions"* — was true of one direction. A guard asserting a presence with
+     * a dead negative beside it is exactly the shape that reads as protection and is not.
+     *
+     * Fixed by matching the **retired sentence's own words**, anchored on the S1 row rather than on
+     * the string, so the assertion is about the cell that would carry it.
+     */
+    const s1Row = /^\|\s*S1\s*\|[^\n]*$/mu.exec(table)?.[0] ?? '';
+    expect(s1Row, 'the S1 row is no longer in the table this reads').not.toBe('');
+
+    /*
+     * **Asserted-not-quoted, which is the third time this tree has needed that distinction today.**
+     *
+     * The S1 cell *does* contain the retired sentence — it quotes it, inside `*"…"*`, as the thing
+     * it is retiring. That is the right way to retract prose here and a bare `not.toMatch` on the
+     * words refuses it. So the words are stripped of every retraction quotation first, and what is
+     * left is the cell speaking in its own voice.
+     */
+    const asserted = s1Row.replace(/\*"[^"]*"\*/gu, '');
     expect(
-      table,
-      'the charter still carries the sentence this instrument retired. A cell that claims both is ' +
-        'the stale refusal `CLAUDE.md` calls the more dangerous half.',
-    ).not.toMatch(/^\| S1 [^\n]*there is now no funnel/u);
+      asserted,
+      'the charter still asserts the sentence this instrument retired, outside a quotation. A cell ' +
+        'that claims both is the stale refusal `CLAUDE.md` calls the more dangerous half.',
+    ).not.toMatch(/there is no funnel/iu);
+  });
+
+  it('S1–S4 — telemetry is this product\u2019s own, and no third-party analytics module exists', () => {
+    /*
+     * **A property the tree lost when this guard changed subject, restored deliberately.**
+     *
+     * The scan that asserted an absence read `/telemetry|analytics|\bfunnel\b/iu`. Building #340
+     * turned it into a presence check and narrowed it to `/telemetry/iu` — correct for what it now
+     * asserts, and it silently dropped the only mechanical check that **no `analytics` module
+     * exists**. Review found the gap. A guard that changes subject may not take a second property
+     * with it without saying so.
+     *
+     * The property is worth holding on its own terms. `docs/26` § 8 caps ingest at two routes and
+     * `staticwebapp.config.json`'s `connect-src` is the real enforcement — but a CSP is a runtime
+     * refusal, and a module named for a vendor would be a design decision this repository has not
+     * made. `analytics` is the word that shows up when one has been.
+     *
+     * Prose is excluded by the same stripper the case below drives, so a comment discussing an
+     * analytics endpoint — there is one in `telemetry/recorder.ts` — does not match.
+     *
+     * The pattern has **no word boundary after the word**, deliberately and by measurement: the
+     * first draft used `\banalytics\b` and a positive control injecting `analyticsClient` — the
+     * shape a vendor module actually takes — sailed through it. A guard against a naming decision
+     * has to match the names that decision produces.
+     */
+    const named = sourceFilesUnder(join(ROOT, 'packages'))
+      .filter((path) => path.includes(`${sep}src${sep}`))
+      .filter((path) => !path.endsWith('.test.ts') && !path.endsWith('.test-helper.ts'))
+      .filter((path) => /analytics/iu.test(code(readFileSync(path, 'utf8'))))
+      .map((path) => path.slice(ROOT.length).split(sep).join('/'));
+
+    /* Non-vacuity: the enumeration must actually reach files, or this asserts nothing. */
+    expect(sourceFilesUnder(join(ROOT, 'packages')).length).toBeGreaterThan(100);
+
+    expect(
+      named,
+      'a source file names `analytics` in code rather than in prose. Telemetry here is this ' +
+        'product\u2019s own, posted to its own API under `docs/26` \u00a7 8\u2019s two routes; a ' +
+        'vendor module would be a decision nobody has recorded.',
+    ).toEqual([]);
   });
 
   it('S1–S4 — positive control: the scan reads code and not prose', () => {
@@ -1264,7 +1332,24 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
       expect(row, `${criterion} reports itself met; it is instrumented and unevaluated`).not.toMatch(
         /currently met|and met\b/u,
       );
-      expect(row).toMatch(/unevaluated/u);
+      /*
+       * **`unevaluated` or something weaker, and the weaker case is why this reads an alternation.**
+       *
+       * *Unevaluated* means instrumented but not yet measured. A row entitled to say less than that
+       * must be able to: S2 says **Partly — the chain cannot close today**, because `docs/26 K2`'s
+       * beat 4 is in `UNEMITTED_EVENTS` and its KPI therefore reads 0 % by construction. Requiring
+       * the word `unevaluated` of every row would have forced that cell to overstate — to claim a
+       * complete instrument in order to satisfy a check about not claiming a measurement.
+       *
+       * The rule the case is actually for is unchanged and is the line above: no row may report
+       * itself **met**. This line only says a row must state its standing rather than leave it to
+       * be inferred.
+       */
+      expect(
+        row,
+        `${criterion} states no standing — a cell must say unevaluated, or say plainly what less ` +
+          'than that it is claiming',
+      ).toMatch(/unevaluated|partly|not instrumented|cannot close/iu);
     }
   });
 

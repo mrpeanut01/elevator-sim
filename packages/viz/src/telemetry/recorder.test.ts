@@ -236,6 +236,64 @@ describe('§ 4.3 — withdrawal', () => {
  * P-6 — nothing here can break a page
  * -------------------------------------------------------------------------- */
 
+describe('§ 4.3 — a refusal that meets an identifier, which review found reachable', () => {
+  /*
+   * **The path this covers was described as unreachable in the file that had to handle it**, and
+   * the commit that shipped the Settings consent pill made that description false.
+   *
+   * All presses on a fresh device: the shell mounts `unasked` and draws the ask; the player reaches
+   * Settings through the rail and presses the consent pill, which grants and mints an id; a batch
+   * flushes under that id; the ask is still on screen, and the player answers it. Pressing *No* used
+   * to drop the id from the device while its rows sat on the server for ninety days with **nothing
+   * left anywhere that could name them** — `docs/26` § 4.3's own sentence turned around.
+   *
+   * Two things fix it and both are asserted: `refuse` takes `withdraw`'s path when it holds an id,
+   * and `everyday/telemetryPort.ts` publishes the answer so the shell's ask cannot go stale. This
+   * file covers the first; the second is a shell concern.
+   */
+  it('deletes rather than orphans, when a grant came first', () => {
+    const store = memoryStore();
+    const transport = recordingTransport();
+    const recorder = createTelemetryRecorder(ports({ store, transport }));
+    recorder.grant();
+    const id = recorder.playerId();
+    expect(id, 'a grant that mints no id makes this case vacuous').toBeDefined();
+    recorder.record({ name: 'session_start', entryScreenKey: 'menu' });
+
+    recorder.refuse();
+
+    /*
+     * The deletion request is the whole point. Before the fix this was `[]` — the id was dropped
+     * locally and the rows were unreachable.
+     */
+    expect(
+      transport.forgotten,
+      'a refusal that holds an identifier must ask the server to forget it, or the rows outlive ' +
+        'every key that could name them',
+    ).toEqual([id]);
+    expect(recorder.queued(), 'the queue goes unsent, as on any exit from consent').toBe(0);
+    expect(transport.sent, 'nothing may be flushed on the way out').toEqual([]);
+    expect(recorder.playerId()).toBeUndefined();
+  });
+
+  it('asks the server to forget nobody when there was never an identifier', () => {
+    /*
+     * The ordinary refusal, unchanged and asserted so the fix above cannot become *every refusal
+     * makes a request*. A player who has said no has told the product not to talk to a server, and
+     * a deletion request naming nobody would be exactly that request.
+     */
+    const store = memoryStore();
+    const transport = recordingTransport();
+    const recorder = createTelemetryRecorder(ports({ store, transport }));
+
+    recorder.refuse();
+
+    expect(transport.forgotten, 'a plain refusal made a request').toEqual([]);
+    expect(transport.sent).toEqual([]);
+    expect(readConsent(store).state).toBe('refused');
+  });
+});
+
 describe('P-6 — the product behaves identically however this fails', () => {
   it('carries on with no transport at all, which is the shipped `vite dev` state', () => {
     const recorder = createTelemetryRecorder(ports({ transport: undefined }));
@@ -250,15 +308,26 @@ describe('P-6 — the product behaves identically however this fails', () => {
     expect(recorder.queued()).toBe(0);
   });
 
-  it('carries on when the transport throws', () => {
+  it('carries on when the transport throws, including into a caller', () => {
+    /*
+     * **This case asserted `.toThrow()` under a comment saying the throw must not reach a caller.**
+     * Review found the contradiction; the comment was right and the assertion was wrong, so the
+     * module was fixed rather than the sentence.
+     *
+     * The adapter swallows its own rejection in the browser, so a **synchronous** throw is the one
+     * case that gets past it — and `send` is reached from `record` at the batch cap as well as from
+     * `flush`, which the shell calls inside `go()`. An unguarded throw there breaks navigation,
+     * which is exactly what P-6 forbids.
+     */
     const recorder = createTelemetryRecorder(ports({ transport: recordingTransport(true) }));
     recorder.grant();
     recorder.record({ name: 'session_start', entryScreenKey: 'menu' });
-    // The adapter swallows its own rejection in the browser; a synchronous throw is the case that
-    // gets past that, and it must not reach a caller either.
+
     expect(() => {
       recorder.flush();
-    }).toThrow();
+    }, 'a synchronous transport throw reached the caller').not.toThrow();
+    /* And the batch is gone rather than held — § 4.2's direction is to under-report. */
+    expect(recorder.queued()).toBe(0);
   });
 
   it('carries on when the device will not store the answer, and says so', () => {

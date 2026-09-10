@@ -19,7 +19,25 @@
  *
  * All three are *normal*, which is § 8's own word, and P-6 is why: *"With the transport absent,
  * unreachable, blocked or refused, every mode, every screen and every figure behaves identically."*
- * Nothing in this module can throw into a caller and nothing in it can block one.
+ * Nothing in this module can throw into a caller and nothing in it can block one — see the guard
+ * inside {@link send}, which is there because this sentence was false for one commit and the case
+ * named for it asserted the opposite.
+ *
+ * ## Which identifier P-1 is held on here, said rather than left to be assumed
+ *
+ * P-1 is *no identifier is minted before a player has said yes*, and this module holds it exactly
+ * on `playerId`: there is no exported way to mint one, and `grantConsent` is the only thing that
+ * does. `sessionId` is minted at construction, which is shell mount — **before** any answer — and
+ * that is a deliberate exception rather than an oversight, so it is named here.
+ *
+ * What makes it defensible is that it is not an identifier of a *player*: it is a closure variable,
+ * per tab, never persisted (`recorder.test.ts` asserts it is absent from the stored slot), never
+ * transmitted without a grant (`send` refuses without a `playerId`), and it dies with the tab. It
+ * cannot be joined to anything, including a later session on the same device. Minting it lazily
+ * would change nothing a player could observe and would put a branch on the hot path.
+ *
+ * The claim to avoid is the broad one — *the id is minted only inside the grant* — which is true of
+ * `playerId` and not of both.
  *
  * ## Pure, with four ports
  *
@@ -271,16 +289,38 @@ export function createTelemetryRecorder(ports: TelemetryPorts): TelemetryRecorde
     if (events.length === 0) return;
     const playerId = record.playerId;
     if (playerId === undefined || ports.transport === undefined) return;
-    ports.transport.send({
-      schemaVersion: TELEMETRY_SCHEMA_VERSION,
-      buildId: ports.buildId,
-      playerId,
-      sessionId,
-      events,
-    });
+    /*
+     * **P-6, and the module's own promise: nothing here may throw into a caller.**
+     *
+     * This call was unguarded, and the case named for the invariant asserted the opposite —
+     * `expect(() => { recorder.flush(); }).toThrow()`, one line under a comment saying it *"must
+     * not reach a caller either"*. Review found the pair. The shipped adapter wraps everything
+     * including `JSON.stringify`, so no live break existed; the invariant was false all the same.
+     *
+     * It matters because `send` is not only reached from `flush`. {@link api.record} calls it at
+     * the batch cap, and the shell calls `record` inside `go()` — so a transport that threw
+     * synchronously would break **navigation**, which is P-6's own sentence: the product behaves
+     * identically however this fails.
+     *
+     * Swallowed rather than reported. There is nowhere to report it to that would not itself be
+     * telemetry, and a player whose analytics endpoint is unreachable must not be told about it.
+     * The events are already out of the queue above, so a failed send drops a batch rather than
+     * retrying — which is § 4.2's direction: under-report rather than hold data waiting.
+     */
+    try {
+      ports.transport.send({
+        schemaVersion: TELEMETRY_SCHEMA_VERSION,
+        buildId: ports.buildId,
+        playerId,
+        sessionId,
+        events,
+      });
+    } catch {
+      /* Deliberately empty — see above. */
+    }
   }
 
-  return {
+  const api: TelemetryRecorder = {
     consent: () => record.state,
 
     grant: () => {
@@ -290,14 +330,36 @@ export function createTelemetryRecorder(ports: TelemetryPorts): TelemetryRecorde
     },
 
     refuse: () => {
+      /*
+       * **A refusal that meets an id is a withdrawal, and this used to drop the id instead.**
+       *
+       * The comment here read: *"Nothing can be queued before a grant, so the only way to reach
+       * here with a queue is a grant followed by a refusal — a shape no shipped surface offers
+       * today."* That sentence was true when it was written and **the commit that shipped the
+       * Settings pill made it false**, which is `CLAUDE.md`'s more dangerous half: a refusal
+       * describing a path as unreachable, in the file that would have to handle it.
+       *
+       * The reachable path, all presses on a fresh device: the shell mounts `unasked` and draws
+       * the ask; the player reaches Settings through the rail and presses the consent pill, which
+       * grants and mints an id; a batch flushes under that id; **the ask is still on screen**, and
+       * the player answers it. Pressing *No* dropped the id from the device while its rows sat on
+       * the server for ninety days with nothing left anywhere that could name them.
+       *
+       * That is `docs/26` § 4.3's own sentence turned around — *a withdrawal that only stops
+       * future collection is not a withdrawal* — and § 3.3's promise that the client holds both
+       * keys at the moment of erasure.
+       *
+       * So a refusal that finds an id **is** the withdrawal, and takes its path: the deletion
+       * request goes first and the local half is cleared after. A refusal with no id is the
+       * ordinary case and is unchanged — there is nothing to delete, and asking the server to
+       * forget nobody would be a request a refusal is not allowed to make.
+       */
+      const held = record.playerId;
+      if (held !== undefined) return api.withdraw();
+
       const refused = refuseConsent(ports.store);
       record = refused.record;
-      /*
-       * Anything already queued goes, and this line is not defensive tidiness. Nothing can be
-       * queued before a grant, so the only way to reach here with a queue is a grant followed by a
-       * refusal — a shape no shipped surface offers today and one a future one might. Dropping is
-       * the answer that cannot be wrong.
-       */
+      /* Nothing can be queued without a grant, so this is empty on every path that reaches it. */
       queue = [];
       return refused.durable;
     },
@@ -366,6 +428,12 @@ export function createTelemetryRecorder(ports: TelemetryPorts): TelemetryRecorde
     queued: () => queue.length,
     playerId: () => record.playerId,
   };
+
+  /*
+   * Named so `refuse` can take `withdraw`'s path rather than re-implement it — see the comment
+   * there. One deletion sequence, one place, and a second copy of it is how the two answers drift.
+   */
+  return api;
 }
 
 /**

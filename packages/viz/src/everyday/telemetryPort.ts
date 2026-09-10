@@ -145,13 +145,67 @@ let shared: TelemetryRecorder | undefined;
  * imported by `boot.ts`, and reading a `<meta>` tag at module-evaluation time would read it before
  * the document this module is going to be asked about is necessarily complete.
  */
+/**
+ * Who wants to know when the consent answer moves — GitHub issue #340, on
+ * `everyday/accountPort.ts#onEverydayAccount`'s shape and for its reason.
+ *
+ * **Two surfaces can answer the same question and this is what stops them disagreeing.** The shell
+ * draws the ask; Settings draws a pill that answers it; both hold the *same* recorder, because
+ * {@link everydayTelemetry} is a page-wide singleton. Without this, granting from Settings left the
+ * shell's ask on screen offering a question that had been answered — and answering it again was the
+ * orphaned-id defect {@link TelemetryRecorder.refuse} now names in its own comment.
+ *
+ * A notification rather than a redraw-on-navigate: the stale ask is pressable **while the player is
+ * still on Settings**, so waiting for the next `draw()` would leave the window open exactly where
+ * it was opened.
+ */
+const consentListeners = new Set<() => void>();
+
+/** Subscribe to consent answers. Returns the way to stop. */
+export function onEverydayConsent(listener: () => void): () => void {
+  consentListeners.add(listener);
+  return () => {
+    consentListeners.delete(listener);
+  };
+}
+
+/** Tell every listener the answer moved. Called by the three writes below and by nothing else. */
+function publishConsent(): void {
+  for (const listener of consentListeners) listener();
+}
+
 export function everydayTelemetry(): TelemetryRecorder {
-  shared ??= createTelemetryRecorder({
-    store: browserBacking(),
-    clock: systemClock(),
-    randomId,
-    transport: browserTransport(apiOrigin()),
-    buildId: BUILD_VERSION,
-  });
+  if (shared === undefined) {
+    const recorder = createTelemetryRecorder({
+      store: browserBacking(),
+      clock: systemClock(),
+      randomId,
+      transport: browserTransport(apiOrigin()),
+      buildId: BUILD_VERSION,
+    });
+    /*
+     * The three writes that move the answer, wrapped once here rather than in the recorder — the
+     * recorder is pure and has no business holding a listener set, which is the same split
+     * `accountPort` draws against `menu/account.ts`.
+     */
+    shared = {
+      ...recorder,
+      grant: () => {
+        const durable = recorder.grant();
+        publishConsent();
+        return durable;
+      },
+      refuse: () => {
+        const durable = recorder.refuse();
+        publishConsent();
+        return durable;
+      },
+      withdraw: () => {
+        const durable = recorder.withdraw();
+        publishConsent();
+        return durable;
+      },
+    };
+  }
   return shared;
 }
