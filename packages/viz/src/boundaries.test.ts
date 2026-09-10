@@ -807,7 +807,13 @@ describe('§ D526 clause 5 — the balance is all the play surface knows', () =>
      * Deliberately not narrowed to the ledger: `.sources` on any document in this package is the
      * same shape, and a rule that named one file would be a rule about that file.
      */
-    const reaching = /\.\s*sources\b/u;
+    /*
+     * Three shapes, because the docstring above says *not at all* and a dotted read alone does not
+     * mean that. `chimesPanel.ts` still imports the raw JSON, so `chimeLedgerDocument['sources']`
+     * is a live path in the one file holding the document, and a destructure hides the word behind
+     * a binding — both were measured as escaping the first spelling of this guard.
+     */
+    const reaching = /[.[]\s*['"]?sources\b|\bsources\s*[,}]/u;
     const offenders = (await vizSources())
       .filter((file) => !isTest(file.id))
       .filter((file) => reaching.test(file.code))
@@ -829,7 +835,13 @@ describe('§ D526 clause 5 — the balance is all the play surface knows', () =>
      * comment-stripped-but-string-intact source and exempts only tests by name, so spelling the
      * expression here would make this file its first offender the day somebody widened the filter.
      */
-    const reaching = /\.\s*sources\b/u;
+    /*
+     * Three shapes, because the docstring above says *not at all* and a dotted read alone does not
+     * mean that. `chimesPanel.ts` still imports the raw JSON, so `chimeLedgerDocument['sources']`
+     * is a live path in the one file holding the document, and a destructure hides the word behind
+     * a binding — both were measured as escaping the first spelling of this guard.
+     */
+    const reaching = /[.[]\s*['"]?sources\b|\bsources\s*[,}]/u;
     const property = ['const paid = table', 'sources[0].name;'].join('.');
     expect(reaching.test(property), 'the detector misses a property access').toBe(true);
     expect(reaching.test('const rows = table.sinks.map(price);'), 'the detector is too wide').toBe(false);

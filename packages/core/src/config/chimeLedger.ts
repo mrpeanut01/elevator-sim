@@ -11,8 +11,12 @@
  *
  * `data/price-schedule.json` is parsed in `packages/viz`, because only the viewer reads it. The
  * chime ledger has **two** readers that must agree: the server, which holds the balance and is the
- * only thing allowed to decide what an entry is worth, and the viewer, which draws a sink's price
- * and keeps a device-only ledger when there is no account. `packages/server` cannot import
+ * only thing allowed to decide what an entry is worth, and the viewer, which draws a sink's price.
+ * (This sentence used to add *"and keeps a device-only ledger when there is no account"*. **There is
+ * no device ledger** — `everyday/profile.ts` owns `localStorage` and holds no chime — and that
+ * clause was the same false mechanism the panel's own copy was corrected for. The module still
+ * belongs here for the rest of the argument: the viewer really does draw prices.)
+ * `packages/server` cannot import
  * `packages/viz`, so a table parsed on the play side would have to be transcribed on the server —
  * and `pricing/types.ts` documents at length what happens when one price lives in six places: a
  * player pays a different amount depending on which screen they are standing on. Across a network

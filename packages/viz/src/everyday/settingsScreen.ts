@@ -213,6 +213,19 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
    * have been the twelfth instance of the class.
    */
   let chimeBalance: number | undefined;
+  /*
+   * {@link readChimeBalance}'s gate, declared **here** rather than beside the function it belongs
+   * to, and that is load-bearing rather than tidy.
+   *
+   * `readChimeBalance` is a function *declaration*, so it hoists and can be called from the mount
+   * block far above it. `lastReadToken` is a `let`, which does not — so with the two together the
+   * mount's first call read the binding in its temporal dead zone and threw
+   * `ReferenceError: Cannot access 'lastReadToken' before initialization` **before**
+   * `host.append(root)` and before either watch was registered. Every mount, on every account
+   * state: the whole Settings panel failed to open in the shipped bundle, and the browser tier was
+   * red in three files while four projects were green — wave R's lesson arriving again.
+   */
+  let lastReadToken: string | undefined | null = null;
   /** Set by `unmount`, so a late answer cannot paint a screen that has gone. `boardScreen.ts`'s shape. */
   let disposed = false;
 
@@ -1215,7 +1228,6 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
    * draws *you have no chimes yet* or *there is no tally yet* from the account state it already
    * has — so a failed read never invents a figure and never contradicts the block above it.
    */
-  let lastReadToken: string | undefined | null = null;
   function readChimeBalance(): void {
     const token = everydayAccount()?.token;
     if (token === lastReadToken) return;
