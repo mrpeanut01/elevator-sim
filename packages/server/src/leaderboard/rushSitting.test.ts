@@ -48,6 +48,13 @@ const DATA_DIR = new URL('../../../../data/', import.meta.url).pathname;
  * the log still decides it: collective 1 640 s, a switch to nearest-car at 60 s 1 510 s, the cars parked
  * at 60 s 1 536 s. A round whose log cannot move its hold is not a round that shows the log reaching
  * the replay, so the fixture is the tower where it does.
+ *
+ * **Those three are figures a player's rush produces, and that is pinned rather than claimed.** They
+ * are the three Midtown Office cells of `rushHoldAgreement.json`, which this package's
+ * `rushHoldAgreement.test.ts` replays here and `packages/viz/src/everyday/rushHoldAgreement.test.ts`
+ * plays through the viewer's own *Start the rush* press. Until PR #513's review they were not: the
+ * viewer sized the stream from the player's standing week, and from a day-1 `c2` week the same three
+ * rounds held 664 s, 598 s and 664 s.
  */
 const BUILDING = 'midtown-office';
 

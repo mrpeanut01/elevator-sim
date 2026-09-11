@@ -220,7 +220,7 @@ import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import type { DemandBand } from '../fixit/parse.js';
-import { rushBeforeOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
+import { rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
 import { REPLAY_COPY, replayBeforeOf, replayPatchOf, replayRestorePatchOf, replayableDay, type ReplayBefore } from './replay.js';
 
 import { campaignDayVerdict, campaignTestRows } from './campaignModel.js';
@@ -2561,7 +2561,15 @@ export function createEverydayHost(
     },
     startRush: () => {
       const state = b.state();
-      const building = resolvedBuildingOf(b.resources, state);
+      /*
+       * **The rush's building, never the standing week's** — PR #513's review, finding 1. This read
+       * `resolvedBuildingOf` on the state the press came from, so the stream was sized from the
+       * player's week — its contract's occupancy, its day's growth — while the run was the rush's own
+       * week: Midtown Office held 664 s here and 1 640 s on the server. Both reads below go through
+       * `rush.ts#rushBuildingOf`, so the rate, the disclosure and the run are one building's.
+       */
+      const building = rushBuildingOf(b.resources, state);
+      const patch = rushSession === undefined ? rushPatchOf(b.resources, state) : undefined;
       if (building === undefined) return 'no building is standing, so there is nothing for the stream to arrive at';
       if (rushSession === undefined) {
         rushSession = {
@@ -2571,7 +2579,7 @@ export function createEverydayHost(
           hold: undefined,
           endedAtS: undefined,
         };
-        b.applyPatch(rushPatchOf(state, building.totalPopulation));
+        if (patch !== undefined) b.applyPatch(patch);
       } else {
         rushSession = { ...rushSession, hold: undefined, endedAtS: undefined };
       }
@@ -2620,7 +2628,8 @@ export function createEverydayHost(
       notifyCampaign();
     },
     rushDisclosure: () => {
-      const building = resolvedBuildingOf(b.resources, b.state());
+      // The rush's building, on `startRush`'s ground: the setup screen describes the stream the press sends.
+      const building = rushBuildingOf(b.resources, b.state());
       return building === undefined ? undefined : rushDisclosureOf(building, bandOf(building));
     },
     bankScenarioClear: (scenarioId) => {
