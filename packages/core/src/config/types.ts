@@ -270,6 +270,22 @@ export interface AirPressureLimit extends Commented {
   readonly source: string;
 }
 
+/**
+ * **What a regenerative drive gives back** — `elevator-specs.json`'s `regenerativeDrive` block,
+ * `DECISIONS.md` § D539, GitHub issue #431.
+ *
+ * Reference data about the drive rather than a property of a class or of one bank, so it sits
+ * beside the classes exactly as {@link AirPressureLimit} does. A bank *buys* the drive
+ * ({@link BankConfig.regenerativeDrive}); this says how much of an overhauling move the drive it
+ * bought returns, and `config/parse.ts#resolveBuilding` is the one place that reads it.
+ */
+export interface RegenerativeDriveConvention extends Commented {
+  /** Share of an overhauling move's out-of-balance work the drive returns, strictly between 0 and 1. */
+  readonly recoveryFraction: number;
+  /** Where the figure comes from, and whether it is cited or chosen. */
+  readonly source: string;
+}
+
 /** The whole of `data/elevator-specs.json`. */
 export interface ElevatorSpecs extends Commented {
   readonly version: number;
@@ -286,6 +302,13 @@ export interface ElevatorSpecs extends Commented {
    * model this project shipped before GitHub issue #444.
    */
   readonly airPressure?: AirPressureLimit | undefined;
+  /**
+   * What a regenerative drive returns, when a bank fits one — § D539. Optional for
+   * {@link airPressure}'s reason: a data directory that declares none prices every bank as
+   * non-regenerative, which is the model this project shipped before GitHub issue #431, and a bank
+   * that fits a drive there is told so (`regenerative-drive-buys-nothing`).
+   */
+  readonly regenerativeDrive?: RegenerativeDriveConvention | undefined;
   readonly capacities: readonly CapacityEntry[];
   readonly doors: DoorTimings;
   readonly timing: ElevatorTiming;
@@ -1405,6 +1428,24 @@ export interface BankConfig extends Commented {
    * apart in `heightM`, or the car is physically impossible.
    */
   readonly servesFloorPairs?: readonly (readonly [string, string])[] | undefined;
+  /**
+   * The counterweight's share of rated load, within **0.4–0.5**, and `0.5` when absent —
+   * `DECISIONS.md` § D539, GitHub issue #431.
+   *
+   * **An equipment setting that moves energy and never a leg**, by the owner's ruling of
+   * 2026-09-10. It prices this bank's moves in the energy proxy
+   * (`metrics/types.ts#outOfBalanceWorkJ`) and reaches nothing a dispatcher reads, so under any
+   * value the passengers, boardings and car movements of a run are identical and only
+   * `energyKJ`, `workPerServedLegKJ` and the 80 kJ goal's verdict move. The range and default are
+   * declared in `config/schema.ts#BANK_ENERGY_TUNABLES` (CLAUDE.md invariant 8).
+   */
+  readonly counterweightBalanceRatio?: number | undefined;
+  /**
+   * Whether this bank's drives regenerate — § D539. Defaults to `false`. Fitted, every overhauling
+   * move is charged `1 − elevator-specs.json#regenerativeDrive.recoveryFraction` of its
+   * out-of-balance work. Energy only, exactly as {@link counterweightBalanceRatio} is.
+   */
+  readonly regenerativeDrive?: boolean | undefined;
   readonly cars: readonly CarConfig[];
 }
 
@@ -1858,6 +1899,14 @@ export interface ResolvedBank {
   readonly name?: string | undefined;
   readonly servesFloors: readonly string[];
   readonly servesFloorPairs?: readonly (readonly [string, string])[] | undefined;
+  /** The declared balance ratio, **present only when the bank declares one** (§ D539). */
+  readonly counterweightBalanceRatio?: number | undefined;
+  /**
+   * The recovery fraction this bank's moves are priced with: present only when the bank fits a
+   * regenerative drive **and** the specs declare a `regenerativeDrive` block (§ D539). Absent is the
+   * non-regenerative default, so every shipped bank resolves exactly as it did before.
+   */
+  readonly regenerativeRecoveryFraction?: number | undefined;
   readonly cars: readonly ResolvedCar[];
 }
 

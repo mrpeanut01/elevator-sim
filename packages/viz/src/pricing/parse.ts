@@ -34,9 +34,24 @@
  * - **Every withheld entry says why**, and covers something.
  * - **The block is required.** An absent one is refused rather than read as *nothing withheld*,
  *   because a file nobody finished and a file that withholds nothing must not look alike.
+ *
+ * And three for a row priced per unit — GitHub issue **#478**, [§ D552](../../../../DECISIONS.md):
+ *
+ * - **A row is flat or rated, never both**, and a rate carries one per-unit figure and its quantity
+ *   and nothing else. *Linear only, no curves* is the owner's ruling, so a key that would bend the
+ *   line is refused rather than ignored, **at every level of a rated row**: inside `rate`, inside its
+ *   `quantity` and its `schema`, and beside it on the row, where any key a flat row does not define is
+ *   refused. Until the review of GitHub PR #527 only the top of `rate` was read, so
+ *   `rate.quantity.bands` and a row-level `fixedUnits` parsed clean. **Flat rows are not held to
+ *   this**: their parser has never refused a key it does not read, and this rule does not start.
+ * - **The rate sits inside the row's own schema**, as a flat price does, and a rate of zero or less is
+ *   refused: a row that charges nothing per unit is a free flat row wearing a multiplier.
+ * - **The quantity declares its own schema, from none.** Its floor and default are 0 — an unset
+ *   quantity is the building as it is — and its ceiling buys at least one.
  */
 
 import {
+  type PriceRate,
   type PriceSchedule,
   type PriceSchema,
   type PricedChange,
@@ -82,6 +97,36 @@ function list(value: unknown, where: string): readonly unknown[] {
 /** Every key a withheld entry may carry — and none of them is a price. */
 const WITHHELD_KEYS: readonly string[] = ['id', 'note', 'covers'];
 
+/** Every key a rate may carry — one per-unit figure and its quantity, and nothing that bends the line. */
+const RATE_KEYS: readonly string[] = ['unitsPer', 'quantity'];
+
+/**
+ * Every key a declared range may carry — a rated row's schema or its quantity's: a type, a unit, a
+ * floor, a ceiling and a default, and nothing that would make the line a band or a curve (§ D552).
+ */
+const RANGE_KEYS: readonly string[] = ['type', 'unit', 'min', 'max', 'default'];
+
+/**
+ * Every key a flat row defines, which is what the flat parser reads. Beside a rate, a key outside this
+ * list that is not `rate` itself is refused (§ D552). A flat row is **not** checked against it: its
+ * parser has never refused a key it does not read, and every shipped row is flat.
+ */
+const FLAT_ROW_KEYS: readonly string[] = [
+  'id',
+  'tier',
+  'name',
+  'priceUnits',
+  'nights',
+  'note',
+  'covers',
+  'schema',
+];
+
+/** The keys of an entry that a list does not name, in the order the document wrote them. */
+function keysBeyond(entry: Record<string, unknown>, allowed: readonly string[]): readonly string[] {
+  return Object.keys(entry).filter((key) => !allowed.includes(key));
+}
+
 /** Whether two config paths name the same field, or one is a dotted group holding the other. */
 function pathsOverlap(left: string, right: string): boolean {
   return left === right || left.startsWith(`${right}.`) || right.startsWith(`${left}.`);
@@ -108,6 +153,39 @@ function parseSchema(raw: unknown, where: string): PriceSchema {
   };
 }
 
+/** A row's rate, with any key beyond a line's reported into `shape`, at both its levels (#478, § D552). */
+function parseRate(raw: unknown, where: string, id: string, shape: string[]): PriceRate {
+  const entry = record(raw, where);
+  for (const key of keysBeyond(entry, RATE_KEYS)) {
+    shape.push(
+      `change "${id}" carries "${key}" in its rate. Linear only, no curves: a rate is one per-unit ` +
+        'figure times a quantity, so there is no field for a band, a curve or a fixed part (GitHub ' +
+        'issue #478, § D552).',
+    );
+  }
+  const quantity = record(entry['quantity'], `${where}.quantity`);
+  for (const key of keysBeyond(quantity, RANGE_KEYS)) {
+    shape.push(
+      `change "${id}" carries "${key}" in its rate's quantity. Linear only, no curves: a quantity is ` +
+        'a whole number of things with a floor, a ceiling and a default, so there is no field for a ' +
+        'band, a curve or a fixed part (GitHub issue #478, § D552).',
+    );
+  }
+  if (str(quantity['type'], `${where}.quantity.type`) !== 'integer') {
+    throw new PriceScheduleError(`${where}.quantity.type: a quantity is a whole number of things.`);
+  }
+  return {
+    unitsPer: int(entry['unitsPer'], `${where}.unitsPer`),
+    quantity: {
+      type: 'integer',
+      unit: str(quantity['unit'], `${where}.quantity.unit`),
+      min: int(quantity['min'], `${where}.quantity.min`),
+      max: int(quantity['max'], `${where}.quantity.max`),
+      default: int(quantity['default'], `${where}.quantity.default`),
+    },
+  };
+}
+
 /**
  * Parse and validate the schedule, collecting every violation before refusing.
  *
@@ -130,21 +208,49 @@ export function parsePriceSchedule(raw: unknown): PriceSchedule {
     };
   });
 
+  const shape: string[] = [];
   const changes: PricedChange[] = list(doc['changes'], 'changes').map((entry, index) => {
     const where = `changes[${String(index)}]`;
     const change = record(entry, where);
-    return {
-      id: str(change['id'], `${where}.id`),
-      tier: str(change['tier'], `${where}.tier`),
-      name: str(change['name'], `${where}.name`),
-      priceUnits: int(change['priceUnits'], `${where}.priceUnits`),
-      nights: int(change['nights'], `${where}.nights`),
-      note: str(change['note'], `${where}.note`),
-      covers: list(change['covers'], `${where}.covers`).map((path, i) =>
-        str(path, `${where}.covers[${String(i)}]`),
-      ),
-      schema: parseSchema(change['schema'], `${where}.schema`),
-    };
+    const id = str(change['id'], `${where}.id`);
+    const tier = str(change['tier'], `${where}.tier`);
+    const name = str(change['name'], `${where}.name`);
+    const nights = int(change['nights'], `${where}.nights`);
+    const note = str(change['note'], `${where}.note`);
+    const covers = list(change['covers'], `${where}.covers`).map((path, i) =>
+      str(path, `${where}.covers[${String(i)}]`),
+    );
+    const schema = parseSchema(change['schema'], `${where}.schema`);
+    /* A row is flat or rated, never both — GitHub issue #478, § D552. */
+    if (change['rate'] === undefined) {
+      const priceUnits = int(change['priceUnits'], `${where}.priceUnits`);
+      return { id, tier, name, priceUnits, nights, note, covers, schema };
+    }
+    if (change['priceUnits'] !== undefined) {
+      shape.push(
+        `change "${id}" carries both a flat price and a rate. A row is priced flat or per unit, ` +
+          'never both, so a flat price cannot quietly become a fixed part under a rate (GitHub ' +
+          'issue #478, § D552).',
+      );
+    }
+    /* Every level of a rated row, not only the top of its rate — the review of GitHub PR #527. */
+    for (const key of keysBeyond(change, [...FLAT_ROW_KEYS, 'rate'])) {
+      shape.push(
+        `change "${id}" carries "${key}" beside its rate, and a price row defines no such field. ` +
+          'Linear only, no curves: beside a rate there is no field for a band, a curve or a fixed ' +
+          'part, so a key the row does not read is refused rather than ignored (GitHub issue #478, ' +
+          '§ D552).',
+      );
+    }
+    for (const key of keysBeyond(record(change['schema'], `${where}.schema`), RANGE_KEYS)) {
+      shape.push(
+        `change "${id}" carries "${key}" in the schema of its rate. Linear only, no curves: a rate's ` +
+          'schema is its range and its default, so there is no field for a band, a curve or a fixed ' +
+          'part (GitHub issue #478, § D552).',
+      );
+    }
+    const rate = parseRate(change['rate'], `${where}.rate`, id, shape);
+    return { id, tier, name, rate, nights, note, covers, schema };
   });
 
   const extras: PricedExtra[] = list(doc['extras'], 'extras').map((entry, index) => {
@@ -157,7 +263,6 @@ export function parsePriceSchedule(raw: unknown): PriceSchedule {
     };
   });
 
-  const shape: string[] = [];
   const withheld: WithheldChange[] = list(doc['withheld'], 'withheld').map((entry, index) => {
     const where = `withheld[${String(index)}]`;
     const item = record(entry, where);
@@ -246,19 +351,23 @@ export function violationsIn(schedule: PriceSchedule): readonly string[] {
       out.push(`change "${change.id}" names tier "${change.tier}", which is not in the ladder.`);
     }
     const { schema } = change;
-    if (change.priceUnits < schema.min || change.priceUnits > schema.max) {
+    /* The figure the schema describes: a flat row's price, a rated row's rate (§ D552). */
+    const figure = change.rate === undefined ? change.priceUnits : change.rate.unitsPer;
+    const per = change.rate === undefined ? '' : ` per ${change.rate.quantity.unit}`;
+    if (figure < schema.min || figure > schema.max) {
       out.push(
-        `change "${change.id}" is priced ${String(change.priceUnits)} u, outside its own ` +
+        `change "${change.id}" is priced ${String(figure)} u${per}, outside its own ` +
           `declared ${String(schema.min)}–${String(schema.max)} (CLAUDE.md invariant 8).`,
       );
     }
-    if (schema.default !== change.priceUnits) {
+    if (schema.default !== figure) {
       out.push(
-        `change "${change.id}" prices at ${String(change.priceUnits)} u and defaults to ` +
+        `change "${change.id}" prices at ${String(figure)} u${per} and defaults to ` +
           `${String(schema.default)}. The default is the shipped price, not a second opinion.`,
       );
     }
     if (change.nights < 0) out.push(`change "${change.id}" books negative nights.`);
+    if (change.rate !== undefined) out.push(...rateViolations(change.id, change.rate));
   }
 
   /* Two rows claiming one field, by path or through a group, is two prices for one change. */
@@ -294,7 +403,7 @@ export function violationsIn(schedule: PriceSchedule): readonly string[] {
   for (const tier of schedule.tiers) {
     const prices = schedule.changes
       .filter((change) => change.tier === tier.id)
-      .map((change) => change.priceUnits);
+      .map((change) => smallestPurchaseUnitsOf(change));
     if (prices.length === 0) {
       out.push(`tier "${tier.id}" prices nothing, so its typical describes nothing.`);
       continue;
@@ -322,6 +431,32 @@ export function violationsIn(schedule: PriceSchedule): readonly string[] {
   return out;
 }
 
+/** A rate's own rules — invariant 8 on the quantity, and a rate that charges something (§ D552). */
+function rateViolations(id: string, rate: PriceRate): readonly string[] {
+  const out: string[] = [];
+  const { unitsPer, quantity } = rate;
+  if (unitsPer <= 0) {
+    out.push(
+      `change "${id}" has a rate of ${String(unitsPer)} u per ${quantity.unit}. A row that charges ` +
+        'nothing per unit is a free flat row wearing a multiplier — write "priceUnits": 0 — and a ' +
+        'negative rate pays the player to buy (GitHub issue #478, § D552).',
+    );
+  }
+  if (quantity.min !== 0 || quantity.default !== 0) {
+    out.push(
+      `change "${id}" sells ${quantity.unit} from ${String(quantity.min)}, defaulting to ` +
+        `${String(quantity.default)}. A quantity's floor and default are 0, none bought, so an unset ` +
+        'quantity is the building as it is (CLAUDE.md invariant 8, § D552).',
+    );
+  }
+  if (quantity.max < 1) {
+    out.push(
+      `change "${id}" sells at most ${String(quantity.max)} ${quantity.unit}, which buys nothing.`,
+    );
+  }
+  return out;
+}
+
 /** The price of one change, by id. Throws rather than defaulting: an unpriced change is a bug. */
 export function priceOf(schedule: PriceSchedule, changeId: string): PricedChange {
   const found = schedule.changes.find((change) => change.id === changeId);
@@ -340,4 +475,72 @@ export function changeCovering(
   path: string,
 ): PricedChange | undefined {
   return schedule.changes.find((change) => change.covers.includes(path));
+}
+
+/**
+ * **What buying a change costs — the one place a rate is multiplied by a quantity.** GitHub issue
+ * **#478**, [§ D552](../../../../DECISIONS.md).
+ *
+ * A flat row costs its price and takes no quantity. A rated row costs `unitsPer × quantity`, linear
+ * and nothing else, for a whole-number quantity inside its declared range.
+ *
+ * **It is not the only place a price is multiplied, and the exception is known.** The fix-it editor
+ * reads `faster-machines` and `larger-car-step` through here as flat figures
+ * (`fixit/engine.ts#editorPricingFrom`), and `fixit/engine.ts#spendOf` multiplies each by the step
+ * count the player chose: a flat price times a quantity, in code. The figures are identical today to
+ * what this function would charge a rated row at the same price for the same count, and GitHub issue
+ * #528 tracks moving them onto this seam. Until it does, turning either row into a rated one makes
+ * `editorPricingFrom` throw here, and `spendOf` with it; `fixit/engine.test.ts` holds both halves.
+ *
+ * **Both refusals are the point.** Every other path that priced a change before #478 summed a flat
+ * figure and has no quantity to give, so a rated row reached through one of them throws here rather than
+ * being charged for one unit — one unit is a quantity chosen for the player, which is the private
+ * multiplier the issue exists to prevent, arrived at by default. And a quantity on a flat row throws
+ * rather than multiplying a figure that declared no rate.
+ */
+export function purchaseUnits(change: PricedChange, quantity?: number): number {
+  if (change.rate === undefined) {
+    if (quantity !== undefined) {
+      throw new PriceScheduleError(
+        `"${change.id}" is priced flat at ${String(change.priceUnits)} u and was bought with a ` +
+          `quantity of ${String(quantity)}. A flat row declares no rate, so multiplying its price ` +
+          'would be a multiplier nobody authored (GitHub issue #478, § D552).',
+      );
+    }
+    return change.priceUnits;
+  }
+  const { unitsPer, quantity: sold } = change.rate;
+  if (quantity === undefined) {
+    throw new PriceScheduleError(
+      `"${change.id}" is priced per ${sold.unit} at ${String(unitsPer)} u and was bought without a ` +
+        `quantity. Charging for one ${sold.unit} would be choosing how many for the player (GitHub ` +
+        'issue #478, § D552).',
+    );
+  }
+  if (!Number.isInteger(quantity) || quantity < sold.min || quantity > sold.max) {
+    throw new PriceScheduleError(
+      `"${change.id}" sells ${String(sold.min)}–${String(sold.max)} ${sold.unit}, and ` +
+        `${String(quantity)} was asked for.`,
+    );
+  }
+  return unitsPer * quantity;
+}
+
+/**
+ * The smallest purchase of a change that is still a purchase of it: a flat row's price, a rated row's
+ * one unit. What its tier's median reads — the price on the row's face — and what a budget's cheapest
+ * step is measured against (§ D552).
+ */
+export function smallestPurchaseUnitsOf(change: PricedChange): number {
+  return change.rate === undefined ? change.priceUnits : change.rate.unitsPer;
+}
+
+/**
+ * The most a change can cost: a flat row's price, a rated row at its declared most. What a scenario's
+ * budget ceiling counts, because above the ceiling there must be nothing left to buy (§ D552).
+ */
+export function ceilingUnitsOf(change: PricedChange): number {
+  return change.rate === undefined
+    ? change.priceUnits
+    : change.rate.unitsPer * change.rate.quantity.max;
 }

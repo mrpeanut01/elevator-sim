@@ -52,6 +52,13 @@
  * The bands **overlap deliberately** and no test forbids it: a large dispatcher change can cost
  * more than a trivial equipment one, and #366's own words are *cheap*, *dearer*, *dearest* rather
  * than a claim that every change in one tier outprices every change in the one below.
+ *
+ * ## A row may carry one rate — GitHub issue #478
+ *
+ * {@link PricedChange} is flat or rated, never both ([§ D552](../../../../DECISIONS.md)). A rated row
+ * has **no** `priceUnits` field, so a reader that summed flat figures fails to compile against one
+ * rather than quietly charging a single unit, and `pricing/parse.ts#purchaseUnits` is the one place a
+ * rate is multiplied by a quantity.
  */
 
 /** One rung of the ladder — `docs/38` § 2.1's three tiers. */
@@ -85,13 +92,41 @@ export interface PriceSchema {
   readonly default: number;
 }
 
-/** One purchasable change, at one price, in one tier. */
-export interface PricedChange {
+/**
+ * The schema a rated row's **quantity** declares — `CLAUDE.md` invariant 8's type, range and default
+ * for the one number a player chooses. GitHub issue **#478**, [§ D552](../../../../DECISIONS.md).
+ *
+ * The floor and the default are both **0**, meaning none bought, and `pricing/parse.ts` refuses either
+ * at anything else: an unset quantity has to mean the building as it is, or a row could charge for a
+ * purchase nobody made. {@link QuantitySchema.unit} is what is counted, singular — *panel* — and it is
+ * what a refusal names, so a price is never quoted as a bare multiplier.
+ */
+export interface QuantitySchema {
+  readonly type: 'integer';
+  readonly unit: string;
+  readonly min: number;
+  readonly max: number;
+  readonly default: number;
+}
+
+/**
+ * **One per-unit rate.** The owner's ruling on GitHub issue #478: *"a price-schedule row may carry one
+ * data-declared per-unit rate, multiplied by a quantity the player chooses … Linear only, no curves."*
+ * Two fields and no third, and `pricing/parse.ts` refuses a third: a band, a curve or a fixed part is
+ * the shape the ruling declined.
+ */
+export interface PriceRate {
+  /** Units charged for each one of {@link QuantitySchema.unit}. */
+  readonly unitsPer: number;
+  readonly quantity: QuantitySchema;
+}
+
+/** What every purchasable change carries, whichever way it is priced. */
+interface PricedChangeFields {
   readonly id: string;
   /** A {@link PriceTier.id}. Resolved at parse time, so nothing downstream may invent one. */
   readonly tier: string;
   readonly name: string;
-  readonly priceUnits: number;
   /**
    * Nights of works the change books — #366's fourth criterion, *"with nights on top"*.
    *
@@ -111,8 +146,24 @@ export interface PricedChange {
    * a landing panel. #366 draws that line itself, from [§ D112](../../../../DECISIONS.md).
    */
   readonly covers: readonly string[];
+  /** The figure the row is priced by — a flat row's price, a rated row's rate — in range, defaulting to itself. */
   readonly schema: PriceSchema;
 }
+
+/** A change at one price however it is bought — every row the schedule shipped before #478. */
+export interface FlatPricedChange extends PricedChangeFields {
+  readonly priceUnits: number;
+  readonly rate?: undefined;
+}
+
+/** A change priced per unit — GitHub issue #478. It has no `priceUnits`, so nothing can read one off it. */
+export interface RatedPricedChange extends PricedChangeFields {
+  readonly rate: PriceRate;
+  readonly priceUnits?: undefined;
+}
+
+/** One purchasable change, in one tier, priced flat or per unit and never both ([§ D552](../../../../DECISIONS.md)). */
+export type PricedChange = FlatPricedChange | RatedPricedChange;
 
 /** A standing extra: a thing that costs units and fixes nothing (§ 10.2). */
 export interface PricedExtra {

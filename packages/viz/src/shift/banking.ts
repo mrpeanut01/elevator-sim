@@ -112,6 +112,19 @@ export const UNCHOSEN_RUN_CANNOT_BANK =
   'press “Run this shift”, or pick a scenario, and the day you start files itself here';
 
 /**
+ * Why a run left behind by a day the player walked away from may not close one — GitHub issue #526.
+ *
+ * Everyday Mode's leave strip says *today's run will not be scored*, and taking a campaign offer parks
+ * the week a run was asked for. Both leave a run of this shell's own standing unfiled, so the Engineer
+ * surface's `Ctrl`+`Enter`, its Day report tab and its export press would file it — onto the day the
+ * player was told it would not count, or onto another contract's week. It says what happened to the run
+ * and names the press that does count, for {@link LOADED_RUN_CANNOT_BANK}'s reason.
+ */
+export const LEFT_UNFINISHED_CANNOT_BANK =
+  'this run belongs to a day that was left unfinished, so it banks nothing — ' +
+  'start a day, or press “Run this shift”, and that run files itself here';
+
+/**
  * The refusal, or `null` when the run on screen **is** the run this shell simulated.
  *
  * ## Reference identity, and the finding that forced it
@@ -136,11 +149,21 @@ export const UNCHOSEN_RUN_CANNOT_BANK =
  *
  * `undefined` for `simulated` is *this shell has simulated nothing yet*. It refuses, and it must: a
  * run that arrived from somewhere other than this shell's simulator is the whole of the question.
+ *
+ * `leftUnfinished` is the run standing when the player left a day unfinished — {@link
+ * LEFT_UNFINISHED_CANNOT_BANK}. Omitted, nothing has been left, and the answer is the two grounds above.
  */
 export function bankingRefusalFor(
   onScreen: VizRecording | undefined,
   simulated: VizRecording | undefined,
+  leftUnfinished?: VizRecording,
 ): string | null {
   if (onScreen === undefined) return null;
-  return onScreen === simulated ? null : LOADED_RUN_CANNOT_BANK;
+  if (onScreen !== simulated) return LOADED_RUN_CANNOT_BANK;
+  /*
+   * The third ground, GitHub issue #526, and by the same identity for the same reason: a day left
+   * unfinished is one particular recording, and the next run the player presses is a new object that
+   * files as it always did. A loaded run is never the simulated one, so the grounds cannot overlap.
+   */
+  return onScreen === leftUnfinished ? LEFT_UNFINISHED_CANNOT_BANK : null;
 }

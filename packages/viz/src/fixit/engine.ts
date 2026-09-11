@@ -29,7 +29,7 @@ import type {
   FixitRepair,
   FixitState,
 } from './types.js';
-import { priceOf } from '../pricing/parse.js';
+import { priceOf, purchaseUnits } from '../pricing/parse.js';
 import { changesAtPaths } from '../pricing/repairPrice.js';
 import type { PriceSchedule } from '../pricing/types.js';
 
@@ -68,9 +68,9 @@ export function editorPricingFrom(schedule: PriceSchedule): {
   readonly capacityUnitsPerTwoPlaces: number;
 } {
   return Object.freeze({
-    shaftUnits: priceOf(schedule, 'new-car').priceUnits,
-    speedUnitsPerHalfMps: priceOf(schedule, 'faster-machines').priceUnits,
-    capacityUnitsPerTwoPlaces: priceOf(schedule, 'larger-car-step').priceUnits,
+    shaftUnits: purchaseUnits(priceOf(schedule, 'new-car')),
+    speedUnitsPerHalfMps: purchaseUnits(priceOf(schedule, 'faster-machines')),
+    capacityUnitsPerTwoPlaces: purchaseUnits(priceOf(schedule, 'larger-car-step')),
   });
 }
 
@@ -198,7 +198,7 @@ export function spendOf(
   const repairUnits = repairs.reduce((sum, repair) => sum + repair.costUnits, 0);
   const extraUnits = extras.reduce((sum, extra) => sum + extra.costUnits, 0);
   const settingUnits = changesAtPaths(schedule, editorPathsOf(state)).reduce(
-    (sum, change) => sum + change.priceUnits,
+    (sum, change) => sum + purchaseUnits(change),
     0,
   );
   const editorUnits =
@@ -343,10 +343,10 @@ export function stepCapacity(
 
 /** What the schedule charges for the editor's zoning step, and for its parking rule. */
 export function zonePriceUnits(schedule: PriceSchedule): number {
-  return priceOf(schedule, 'rezone-bank').priceUnits;
+  return purchaseUnits(priceOf(schedule, 'rezone-bank'));
 }
 export function parkingPriceUnits(schedule: PriceSchedule): number {
-  return priceOf(schedule, 'idle-parking').priceUnits;
+  return purchaseUnits(priceOf(schedule, 'idle-parking'));
 }
 
 /**

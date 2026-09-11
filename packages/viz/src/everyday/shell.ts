@@ -1392,6 +1392,19 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     dataHost?.leaveReplay();
   }
 
+  /**
+   * § 3.4's *Leave it* — the leave the strip has just asked about, and the only one that promised anything.
+   *
+   * A day-shaped strip says *today's run will not be scored*, so on a day the host is told first
+   * (`EverydayHost.leaveDayUnfinished`, GitHub issue #526 item 1). Every other leave stays
+   * {@link doLeave}: a rail row walks off a stage without a question, and the day is still the player's.
+   * A rush and a replay stop their own runs inside `doLeave`, and a campaign day is not decided here.
+   */
+  function leaveUnfinished(): void {
+    if (state.ctx === 'daily') dataHost?.leaveDayUnfinished();
+    doLeave();
+  }
+
   /** Leave for real: clear the flow and land on the menu. */
   function doLeave(): void {
     runOpen = false;
@@ -2090,7 +2103,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     const leaveIt = el(doc, 'button', 'everyday-bar-confirm-leave', leaveLabel);
     leaveIt.type = 'button';
     leaveIt.style.cssText = BUTTON + `;color:${C.alarm};border-color:${C.alarm}`;
-    leaveIt.addEventListener('click', doLeave);
+    leaveIt.addEventListener('click', leaveUnfinished);
     const stay = el(doc, 'button', 'everyday-bar-confirm-stay', stayLabel);
     stay.type = 'button';
     stay.style.cssText = PRIMARY;

@@ -31,6 +31,7 @@ import {
   type RunInterventionConfig,
 } from '@elevator-sim/core/browser';
 
+import { purchaseUnits } from '../pricing/parse.js';
 import type { PriceSchedule, PricedChange } from '../pricing/types.js';
 
 import { clockAt } from './timeline.js';
@@ -295,7 +296,7 @@ export function worksKindOfTier(tierId: string): 'equipment-change' | 'building-
  * is how the same change comes to cost three different things on three screens.
  */
 export function worksLabelOf(change: PricedChange): string {
-  return `${change.name} · ${String(change.priceUnits)} units`;
+  return `${change.name} · ${String(purchaseUnits(change))} units`;
 }
 
 /**
@@ -383,7 +384,7 @@ export function spentOnWorks(
     const change = entry.change;
     if (change.kind !== 'equipment-change' && change.kind !== 'building-change') continue;
     const priced = schedule.changes.find((row) => row.id === change.changeId);
-    if (priced !== undefined) bought.set(priced.id, priced.priceUnits);
+    if (priced !== undefined) bought.set(priced.id, purchaseUnits(priced));
   }
   return [...bought.values()].reduce((sum, units) => sum + units, 0);
 }
@@ -509,11 +510,12 @@ export function admitWorks(input: WorksAdmissionInput): WorksAdmission {
         'today — and a change nobody can price is one nobody can be billed for honestly',
     };
   }
+  const priceUnits = purchaseUnits(priced);
   const recordedAs = worksKindOfTier(priced.tier);
   if (recordedAs !== kind) {
     return {
       admitted: false,
-      priceUnits: priced.priceUnits,
+      priceUnits,
       spentUnits,
       budgetUnits,
       reason:
@@ -526,7 +528,7 @@ export function admitWorks(input: WorksAdmissionInput): WorksAdmission {
   if (unbuildable !== undefined) {
     return {
       admitted: false,
-      priceUnits: priced.priceUnits,
+      priceUnits,
       spentUnits,
       budgetUnits,
       reason: unbuildable,
@@ -539,17 +541,17 @@ export function admitWorks(input: WorksAdmissionInput): WorksAdmission {
   );
   // A change already on today's record costs nothing to repeat — {@link spentOnWorks}' distinct-by-id
   // rule, read at the press so the two cannot disagree about what a second rezone costs.
-  const owed = alreadyBought ? 0 : priced.priceUnits;
+  const owed = alreadyBought ? 0 : priceUnits;
   if (spentUnits + owed <= budgetUnits) {
-    return { admitted: true, priceUnits: priced.priceUnits, spentUnits, budgetUnits, reason: undefined };
+    return { admitted: true, priceUnits, spentUnits, budgetUnits, reason: undefined };
   }
   return {
     admitted: false,
-    priceUnits: priced.priceUnits,
+    priceUnits,
     spentUnits,
     budgetUnits,
     reason:
-      `“${priced.name}” costs ${String(priced.priceUnits)} units and today’s budget holds ` +
+      `“${priced.name}” costs ${String(priceUnits)} units and today’s budget holds ` +
       `${String(budgetUnits)}, with ${String(spentUnits)} already spent on this day’s changes. ` +
       'A wider budget is bought with chimes; the bar the day is judged against does not move with it.',
   };

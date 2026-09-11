@@ -35108,6 +35108,52 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 
 ---
 
+## D539 — The counterweight's balance ratio and a regenerative drive are per-bank equipment that move energy and never a leg, and the refusal to configure the ratio is moved
+
+**Date: 2026-09-11 · GitHub issue #431 · A ruling by the project owner, given on the issue on 2026-09-10.**
+
+**Approved as drafted by the product owner on 2026-09-11.** The recovery fraction, both prices and both night counts clause 7 names stand as drafted. So does `counterweight-rebalance` as a purchase: the independent review of GitHub PR #515 noted that it always pays, because every measured optimum clamps to 0.4, and the owner kept it.
+
+**Why an entry.** It moves a recorded refusal: `metrics/types.ts#COUNTERWEIGHT_BALANCE_RATIO` said the ratio was *"deliberately not configurable"*, and a moved refusal that changes what a published axis measures reaches past the module that holds it ([§ D405](DECISIONS.md)). `energyKJ` and `workPerServedLegKJ` are no longer priced one way on every run. And it restates one of #431's acceptance criteria, which the issue cannot do for itself.
+
+1. **The ruling, as given.** *"An energy-only machine choice … The balance ratio and the regenerative drive are per-bank equipment settings. They move `energyKJ`, `workPerServedLegKJ` and the 80 kJ goal's verdict, and never a leg. The move-the-control test is stated on the goal verdict, and the PR says in terms that no leg moves. `metrics/types.ts`'s refusal is moved by a `DECISIONS.md` entry, and AC3 is restated to match."*
+2. **What is built.** Two optional bank fields, declared with type, range and default in `config/schema.ts#BANK_ENERGY_TUNABLES` (invariant 8):
+   - `counterweightBalanceRatio`, within the cited 0.4–0.5, and 0.5 when absent;
+   - `regenerativeDrive`, `false` when absent. What a fitted drive returns is reference data, `data/elevator-specs.json#regenerativeDrive.recoveryFraction`, which `config/parse.ts#resolveBuilding` resolves onto the bank.
+
+   `Simulation` reads each bank's convention once, through `metrics/comparability.ts#energyConventionOf`, and hands it to `MetricsRecorder#sampleTravel`. Nothing a dispatcher, a car or `Car.estimateCost()` reads is touched, which is the whole of why no leg can move. Under a fitted drive an **overhauling** move is charged `1 − f` of its out-of-balance work and a motoring move all of it. It is never credited, so the figure stays non-negative and a drive returning nothing prices a run exactly as no drive does. The non-test writer is `packages/viz/src/fixit/run.ts#applyBuildingPatch`'s `bankEquipment` patch, priced by two equipment rows in `data/price-schedule.json`.
+3. **The refusal is moved, and its reason is answered rather than dropped.** The reason was that a per-run ratio *"would let two arms of one comparison be scored on different scales"*. Three things answer it:
+   - **The record carries the convention.** Every travel sample a non-default convention priced records that convention, so a reader can redo the sum. At the default both fields are absent, so a shipped run's record serialises byte-identically with one written before this entry.
+   - **The two figures are declared.** `metrics/comparability.ts#ENERGY_CONVENTION_SENSITIVE_METRICS` names `energyKJ` and `energyPerServedLegKJ`, and not the odometer or the motor starts. `Simulation` writes `energyConventionDisclaimer` into the warnings of every run that uses a non-default convention.
+   - **The default is unchanged to the bit.** `metrics/energyConvention.test.ts` compares the default's float with `Object.is`, and runs a shipped building with the defaults declared explicitly against the building as shipped.
+
+   Two arms on different scales are still possible. What keeps them from being silent is stated per run and per comparison, because this sentence first read *"They are never silent"*, and that was true per run only:
+   - **Per run.** Every run that uses a non-default convention carries the disclaimer in its warnings, and `mode/disclosure.ts` draws each warning as a row.
+   - **Per comparison.** The Day report's before/after block, which § D310's editor result strip draws from the same view, used to check building, mode, traffic, stretch of the day and pattern, and not equipment. So it paired work per ride between a fitted and an unfitted run of one building without refusing. GitHub PR #515's review found that. `shift/report.ts#ReportBasis.equipment` is now a sixth axis, read off `VizRecording.bankEquipment` (viz schema 14). When it differs, `dev/reportPanel.ts#reportDeltaOf` refuses the two energy rows, names equipment as the reason and pairs every other row. Only the energy rows are refused because equipment moves no leg, so every other figure of the two runs is the same passengers carried the same way, and refusing it would silence a true pairing. Where another axis also differs, the whole comparison is refused as before, with equipment among the reasons. This covers that block; no other surface that sets two runs side by side was audited for a pairing across conventions.
+4. **#431's third criterion, restated.** As written it read *"Move the control and require the run to change, compared on the legs and on `workPerServedLegKJ`"*. Under the ruling no leg can move, so a test of the legs changing would fail forever or be quietly narrowed. Restated:
+
+   > Move the control and require the 80 kJ goal's verdict (`shift/goals.ts#goalsForDay`, judged against `workPerServedLegKJ`) to change, and require every leg of the two runs to be identical, compared whole.
+
+   `packages/viz/src/pricing/bankEquipmentReachesTheGoal.test.ts` holds it on `st-jude-hospital` under `collective` at seed 20 284 581, which is [§ D468](DECISIONS.md)'s own seed formula at `n = 3`. That day misses the bar as built and meets it under either setting, and the legs are compared as every field of every leg. The same file drives both settings through a scenario repair, and `core`'s half is `metrics/energyConvention.test.ts`. This is not a weakening: the restated form asserts more about the legs than the original did.
+5. **#431's fourth criterion found a null for the decision.** `packages/experiments/src/benchmark/counterweightOptimum.ts` asks whether the ratio that minimises a run's out-of-balance work differs across `rise-and-fall`, `office-down-peak` and `lunch-two-way`. It runs `midtown-office` under `collective` at n = 50 per row, at 1.5 % and 2.5 % of population per five minutes. **None of its 300 replications saturated.** Its header records how the 2.5 % point was found after a first heavy point, 4.5 %, saturated 12 of 100 office-peak replications and was withdrawn.
+   - **The unclamped optimum does differ by pattern, by hundredths.** All six paired differences exclude zero, one only just, and none is larger than 0.04.
+   - **Every replication's optimum lies below 0.4**, with or without a regenerative drive; the largest is 0.136. So clamped into the band a player can set, the best ratio is 0.4 on every run, under every pattern, at both rates. A census over 1.5–4.5 % on the study's seeds and on a disjoint seed base, printed by the study's `main --census`, found every optimum below 0.4 in every cell, saturated or not; the largest was 0.243.
+   - **So within the cited band the lever has one right answer, and it is the same for every pattern measured.** The issue's premise, a best setting per traffic pattern, does not hold on this building. By the criterion's own words the finding is published as a null and the lever is reconsidered. **This entry does not reconsider it:** the dial, its range and its price are unchanged, and whether it stays a dial, becomes a one-off rebalance or goes is the owner's. **The owner kept it as drafted on 2026-09-11**, so `counterweight-rebalance` stays a purchase at 3 u and 1 night.
+   - **What the setting buys is not in doubt.** 0.4 against 0.5 takes about 23 % off `workPerServedLegKJ` in every row (22.5–23.6 %).
+   - **Direction cannot move the non-regenerative optimum at all.** Each move costs `R·d·|x − r|` whichever way it travels, so whatever the two office rows differ by is load and trace, not up against down.
+6. **Energy stays an axis ([§ D106](DECISIONS.md)).** Neither setting adds a weight, a combined score or an ordering of two arms on energy alone. The one verdict either can move is the fifth goal's single, independent bar, which [§ D367](DECISIONS.md) permits and § D468 derived.
+7. **Drafted for the owner, marked so in `data/`, and approved as drafted by the owner on 2026-09-11.**
+   - `recoveryFraction` 0.6: an agent's derivation from Al-Kodmany's cited 20–40 % whole-consumption band, not a figure the source states.
+   - `regenerative-drive` at 12 u and 2 nights, and `counterweight-rebalance` at 3 u and 1 night: chosen, and game feel.
+   - Those two rows add 15 u to the schedule's whole cost: 368 u to 383 u on the tree this entry was built on. GitHub PR #506 landed first and moved the same total to 381 u, so on the merged tree it is **396 u**, the figure `packages/viz/src/scenario/budget.test.ts` derives from the whole schedule. Every ceiling derived from that total reads 396: 30 in `data/campaign.json` and 6 in `data/engineering-briefs.json`.
+   - Each figure's note keeps its `AGENT'S PROPOSAL` label and its field-by-field provenance, and adds `APPROVED AS DRAFTED by the product owner on 2026-09-11`. `packages/viz/src/pricing/schedule.test.ts` holds that on both price rows by id. No test reads `data/elevator-specs.json`'s comment, so the recovery fraction's approval is recorded there and held by nothing else.
+
+**What this does not decide.** Whether a regenerative drive should be credited rather than discounted, which `metrics/types.ts#outOfBalanceWorkJ` refuses for three stated reasons without a ruling. Rope class and rope mass, GitHub issue #433, none of which is built here.
+
+**Bookkeeping.** This lane was reserved D539–D541 and spent D539; D540 and D541 are returned unspent.
+
+---
+
 ## D542 — A rush round is a sitting, posted whole: the server replays every round, derives every purse, and the refusal of `endless-rush` is lifted after its replay cost was measured
 
 **Date: 2026-09-11 · Owner: product owner (the ruling, 2026-09-10, and the approval of the figures and readings under it as drafted, 2026-09-11); the lane that built GitHub issue #372 (the readings under it) · Rules on: [§ D515](#d515), [§ D525](#d525) clause 6, [§ D526](#d526) clauses 2 and 3, [§ D486](#d486), `packages/server/src/leaderboard/verify.ts`, `data/rush-purse.json`, [`docs/38`](docs/38-what-the-game-is.md) § 2.3, GitHub issue #372.**
@@ -35266,6 +35312,85 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 9. **The duty weight is refused where it cannot bite, and a scenario neither offers nor draws it there.** An independent review of this branch found the new slider offered as a working control on every building the viewer can load, with no refusal beside it, while a scenario priced it: no shipped building declares a duty, so moving it changed no leg (40 of 40 digests identical at `dutyMismatch: 5`). The refusal and the exclusion now come from one decision. `core` exports `traffic/generator.ts#buildingDeclaresDuty` — the predicate the generator already asked before it draws a duty — and `sim/searchSpaceLiveness.test.ts`'s proof for `weights.dutyMismatch` asserts it in both directions, so the register's condition and the product's are one function. `viz`'s `authoring/dispatcherSpec.ts#inertTerms` takes the **standing** building and names a weighted `dutyMismatch` where no car declares a duty, in § D112's shape — *"inert on this building — no car in this building declares a duty, so no call carries one to be wrong about and this weight changes no decision"*. The Engineer editor draws it through `dev/dispatcherEditor.ts#editorTermRowsOf`, from the viewer state's standing selection, and the Everyday workshop through `everyday/workshopModel.ts#termDisclosureOf`, from `EverydayHost.resolvedBuilding`. `dimensionIdsLiveOn` withholds `weights.dutyMismatch` from the same buildings: `dev/campaignPanel.ts` resolves every stage's editable set, and its briefing, against it, and `scenario/survivorSpace.ts#sampleReachableConfigurations` skips the dial **before** its value is drawn, so no other dial's draw moves. Where a building does declare a duty, all three stop — the refusal is not drawn, the dial is offered, and the sweep draws it — and each direction is a test.
 
 **What this does not claim.** That duty improves any metric. `sim/dutySeam.test.ts` runs one seed on Midtown Office with car A declared goods and a 20 % goods share, under `predictive-balanced` with the weight authored onto it, and requires the legs to change when the weight moves. Measured with `DUTY_SEAM_REPORT=1 npx vitest run --project core packages/core/src/sim/dutySeam.test.ts`, legs put in a car that is not for their trip go **244 → 243** at the drafted 0.35 and **→ 223** at 5, of 734 boarded. That is a mechanism check on one trace, not a paired comparison, and **why the fall is that small is unmeasured**. Two facts of the model bear on it and neither has been isolated: a landing call carries only its head's duty, and boarding is not filtered by duty. **The control — the picker two screens refuse — is not built**, and is step 3 of `data/buildings/README.md` § *Duty*.
+
+---
+
+## D552 — A price row may carry one rate, multiplied by a quantity the player chooses: linear, flat rows unchanged, a ceiling at the declared most, and no purchase without a quantity
+
+**Date: 2026-09-11 · GitHub issue #478 · The product owner's ruling of 2026-09-10 on that issue · Extends [§ D525](#d525) clause 2's one price schedule and the schedule format [§ D535](#d535) last changed.**
+
+**Decided by the product owner, 2026-09-10**, on the issue: *"Linear rate × quantity. A price-schedule
+row may carry one data-declared per-unit rate, multiplied by a quantity the player chooses —
+destination panels per floor is the first case. Linear only, no curves. Rows without a rate stay
+flat, so every existing price is unchanged. Figures are drafted for approval under the standing
+`data/` ruling. This unblocks #437."*
+
+**Why an entry.** The shape is `data/price-schedule.json`'s, and every module that charges a price
+reads it: `scenario/budget.ts` derives every scenario's ceiling from it, and `fixit/`,
+`campaign/economy.ts`, `live/interventions.ts` and `scenario/survivorSpace.ts` charge from it. What a
+ceiling means for a row with more than one price is a rule those modules share and none of them owns.
+
+1. **A row is flat or rated, never both.** A flat row carries `priceUnits`, as every shipped row
+   does. A rated row carries `rate: { unitsPer, quantity }` and no `priceUnits`. `pricing/parse.ts`
+   refuses a row carrying both, and refuses any other key at every level of a rated row: inside
+   `rate`; inside its `quantity`, which carries only `type`, `unit`, `min`, `max` and `default`;
+   inside its `schema`, which carries the same five; and beside it on the row, where any key a flat
+   row does not define is refused. No bands, no curve, no fixed part, wherever one is written — which
+   is *linear only* made mechanical. **Flat rows are not held to it**: their parser has never refused
+   a key it does not read, and this decision does not start. `PricedChange` is a union on that split,
+   so a reader that takes `priceUnits` off a rated row does not compile.
+2. **What buying costs is one function, with one known exception.**
+   `pricing/parse.ts#purchaseUnits(change, quantity)` is the only place a **rate** is multiplied by
+   a quantity: `unitsPer × quantity` for a rated row, the flat figure for a flat row. It refuses a
+   rated row bought with no quantity rather than charging one unit, because one unit is a quantity
+   chosen for the player; and it refuses a quantity on a flat row rather than multiplying a figure
+   that declared no rate. Every path that summed `priceUnits` goes through it — repair patches,
+   scenario moves, the fix-it editor, the campaign shop, the live works control and the survivor
+   bundles — and none of them passes it a quantity, so a rated row reached through one of them fails
+   loudly. **The exception is the fix-it editor, which multiplies a flat price in code.**
+   `fixit/engine.ts#editorPricingFrom` reads `faster-machines` and `larger-car-step` through
+   `purchaseUnits` as flat figures, and `fixit/engine.ts#spendOf` multiplies each by the step count
+   the player chose: `speedSteps × speedUnitsPerHalfMps` and
+   `capacitySteps × capacityUnitsPerTwoPlaces`. Those two multiplications produce identical figures
+   today to what the seam would charge a rated row at the same price for the same count. GitHub
+   issue #528 tracks moving them onto the seam; until it lands, turning either row into a rated one
+   makes `editorPricingFrom`, and `spendOf` with it, throw. `fixit/engine.test.ts` holds both halves.
+3. **Invariant 8, twice.** A rated row's `schema` describes its rate, as a flat row's describes its
+   price: in range, and a default equal to the figure. The quantity declares its own integer schema —
+   its unit, a floor and a default of **0**, meaning none bought, and a ceiling of at least one. A
+   rate of 0 is refused as a free flat row wearing a multiplier.
+4. **A ceiling is every change bought at once, and a rated row is bought at its most.**
+   `scenario/budget.ts#scheduleBoundsOf` counts a rated row at `unitsPer × quantity.max` for the
+   whole schedule and for the dearest single change, and at `unitsPer` — one unit — for the cheapest
+   purchase that costs anything. The ceiling's own sentence chose this: above it there is nothing
+   left to buy, which stops being true if a rated row counts at one unit. `pricing/parse.ts`'s tier
+   median reads a rated row at one unit too, the price on its face. The rung rule counts affordable
+   **units** rather than affordable rows — a flat row is one unit — so a rung that buys a second
+   panel enlarges what is affordable, and a flat-only schedule counts exactly as before.
+5. **No shipped row carries a rate yet.** Every price in `data/price-schedule.json` is unchanged, so
+   are the tier typicals and the schedule's total, and so is every scenario's ceiling.
+   `pricing/rate.test.ts` holds that empty register, and the change that adds the first rated row
+   replaces it with that row's run-change test.
+
+**What this does not decide.** Any figure: the first rate, its tier, its nights and its quantity's
+ceiling are GitHub issue #437's to draft for approval. And where a quantity comes from: a scenario
+move names dimensions and a repair patch names paths, neither carries a count, so how a player
+chooses one is #437's too.
+
+---
+
+## D555 — A day left unfinished, or put down for a campaign offer, files nothing: the run in flight is cancelled and the run that stands is refused at filing
+
+**Date: 2026-09-11 · GitHub issue #526 · Found by the independent review of GitHub PR #525 · Extends #136's refusal in `shift/banking.ts`.**
+
+**Why an entry.** The decision is taken in `everyday/` and binds `dev/main.ts`, `shift/banking.ts` and `honesty/surfaces.ts`, and it adds a ground to a refusal already recorded ([§ D405](#d405)).
+
+1. **A daily day left mid-run.** § 3.4's strip says *today's run will not be scored*, and `everyday/shell.ts#doLeave` then left the run behind for the Engineer surface's `Ctrl`+`Enter`, Day report tab or export press to file. Measured on `origin/main` at `e88f6e82` by `autoFile.browser.test.ts`: left while generating, the press filed today at **100 %**; left after the run had landed, likewise. **A cancel alone was measured and is not enough.** With the leave calling only #521's `cancelRun`, both cases still filed 100 %: left after landing, the landed run is untouched by a cancel, and left while generating, the run standing behind the cancelled one filed instead — by reading, boot's own run, which the *Start the day* press had made filable. So the leave does both, through one binding, `abandonDay`: the shift runner's `cancel`, then the standing recording is refused. The refusal is `bankingRefusalFor`'s third argument, compared by identity for that function's own reason, so the next run pressed on the same configuration files as it always did; `closeShift`, the posting gate and both unfiled-sheet sentences read it, and `runIsOwn` excludes it so a stage re-entered presses a fresh run. **Only the strip's *Leave it* abandons.** A rail row walks off a stage without asking, the day is still the player's, and `replay.browser.test.ts`'s #522 control depends on it filing; `autoFile.browser.test.ts`'s control case holds that boundary.
+2. **Taking a campaign offer while a daily run is in flight — reproduced.** Start the day, walk off by a rail row (no strip, so item 1 is not what is measured), take an offer in the same task: on `e88f6e82` the Engineer press filed **100 %** onto the new contract's week. `take-offer` now calls `abandonDay` before `switchWeek`. **Refused rather than starting the new contract's run**, because a run nobody pressed on the new week would be filed by the same three presses.
+3. **A watch check that lands after the player has left.** Measured by `watchStage.browser.test.ts`: *Watch* and *Test bench* pressed in one task, and on `e88f6e82` the landing pulled the player onto the stage, `WATCHING · THE HOUSE BASELINE`. `weekScreen.ts` and `boardScreen.ts` now enter nothing from an unmounted screen, and because the host has already entered the spectator state when `settled` runs, they end that session — only when `watching().run` is the row this press entered, by identity. The board's copy of those lines has no browser case: the browser tier runs no board server.
+4. **Leaving a replay from its brief.** § D548's `leaveReplay` cancel stopped whatever was in flight, and `startReplay` presses nothing, so a replay left from its brief stopped the player's own day-2 run. The session now records whether the host's `startRun` or `intervene` was pressed inside it, and `leaveReplay` cancels only then; `host.test.ts` read `['cancelRun', 'applyPatch']` on `e88f6e82`.
+
+**What it moves.** One seeded string per honesty case, `leftUnfinishedCannotBank` on the `REPLAY` adapter; the corpus row is the integrator's to re-measure ([§ D343](#d343)). **What it does not decide.** A campaign day's strip makes the same promise and is not wired: `shell.ts#leaveUnfinished` abandons in the daily context only, and says so.
 
 ---
 

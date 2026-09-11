@@ -47,8 +47,11 @@ import type { CredentialGroup, Direction } from '../model/types.js';
 import { TRAFFIC_DEFAULTS, type TrafficModelVersion } from '../traffic/types.js';
 
 import {
+  COUNTERWEIGHT_BALANCE_RATIO,
+  DEFAULT_ENERGY_CONVENTION,
   METRICS_SCHEMA_VERSION,
   MetricsError,
+  type EnergyConvention,
   type CarTimings,
   type LoadReading,
   type LoadSample,
@@ -750,13 +753,22 @@ export class MetricsRecorder {
    * existed here and was never called from `sim/simulation.ts` would be the ninth instance of
    * the defect docs/05-roadmap.md § *Standing requirement* enumerates.
    *
-   * The joules are computed here rather than in the car, because
-   * {@link COUNTERWEIGHT_BALANCE_RATIO} is a measurement convention and a car is a mechanism.
+   * The joules are computed here rather than in the car, because the convention that prices a move
+   * is the simulation's to hand in and a car is a mechanism. Since `DECISIONS.md` § D539 that
+   * convention is the bank's — its counterweight ratio and whether its drive regenerates — and
+   * `Simulation` passes it; a caller that passes none gets {@link DEFAULT_ENERGY_CONVENTION}, which is
+   * the only convention there was before. The sample records the convention only when it is not the
+   * default, so a default record is byte-identical to one written before § D539.
    * A zero-distance move is refused: the simulator never commands one (`departFor` throws when
    * the target is the current floor), so one arriving here is a bug worth failing on rather
    * than a free sample that dilutes the mean.
    */
-  sampleTravel(at: SimTime, carId: string, reading: TravelReading): void {
+  sampleTravel(
+    at: SimTime,
+    carId: string,
+    reading: TravelReading,
+    convention: EnergyConvention = DEFAULT_ENERGY_CONVENTION,
+  ): void {
     this.#assertOpen('sampleTravel');
     if (!Number.isFinite(at)) {
       throw new MetricsError(`Travel sample needs a finite time; received ${at}.`);
@@ -776,6 +788,18 @@ export class MetricsRecorder {
         `Travel sample for car "${carId}" needs a non-negative loadKg; received ${reading.loadKg}.`,
       );
     }
+    const ratio = convention.counterweightBalanceRatio;
+    const recovery = convention.regenerativeRecoveryFraction;
+    if (!Number.isFinite(ratio) || ratio <= 0 || ratio >= 1) {
+      throw new MetricsError(
+        `Travel sample for car "${carId}" needs a counterweight balance ratio strictly between 0 and 1; received ${ratio}.`,
+      );
+    }
+    if (!Number.isFinite(recovery) || recovery < 0 || recovery >= 1) {
+      throw new MetricsError(
+        `Travel sample for car "${carId}" needs a regenerative recovery fraction in [0, 1); received ${recovery}. A drive cannot return more than the move gave up.`,
+      );
+    }
     this.#travelSamples.push(
       Object.freeze({
         at,
@@ -784,7 +808,9 @@ export class MetricsRecorder {
         direction: reading.direction,
         loadKg: reading.loadKg,
         ratedLoadKg: reading.ratedLoadKg,
-        workJ: outOfBalanceWorkJ(reading),
+        ...(ratio === COUNTERWEIGHT_BALANCE_RATIO ? {} : { counterweightBalanceRatio: ratio }),
+        ...(recovery === 0 ? {} : { regenerativeRecoveryFraction: recovery }),
+        workJ: outOfBalanceWorkJ(reading, convention),
       }),
     );
     // **Deliberately does not `#observe(at)`, unlike every other recording method here.**
