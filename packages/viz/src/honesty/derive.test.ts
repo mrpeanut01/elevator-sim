@@ -119,6 +119,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'pricing/parse.ts#parsePriceSchedule',
         'pricing/parse.ts#violationsIn',
         'pricing/parse.ts#priceOf',
+        'pricing/parse.ts#purchaseUnits',
         'pricing/repairPrice.ts#pathsIn',
         'pricing/repairPrice.ts#changesBought',
         'pricing/repairPrice.ts#unpricedPathsIn',
