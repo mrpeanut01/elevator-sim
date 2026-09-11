@@ -29,8 +29,8 @@
  * what the `$comment` has always published, and it is not an interval: `CLAUDE.md`'s 50–200
  * replications are the budget for a claim that one arrangement waits less than another, and this
  * file makes no such claim. The chosen figures the corrections introduce — the 3.645 m floor, the
- * per-use densities, which lobby levels the single-deck shuttle serves — are an agent's proposal
- * awaiting the owner, and the building's `$comment` says so beside each.
+ * per-use densities, which lobby levels the single-deck shuttle serves — are an agent's proposal,
+ * approved as drafted by the owner on 2026-09-11, and the building's `$comment` says so beside each.
  */
 
 import { readFileSync } from 'node:fs';

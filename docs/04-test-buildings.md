@@ -220,7 +220,7 @@ double-deck observation cars serving G/1 and 123/124. About 1.6× the floors and
 City, which was the tallest thing this tree had run.
 
 **Corrected against its operator by GitHub issue #438** ([§ D545](../DECISIONS.md)), with every
-chosen figure in the correction **drafted for the owner's approval** rather than settled. As first
+chosen figure in the correction **drafted for the owner's approval**, which the owner approved as drafted on 2026-09-11. As first
 authored the file had a 14-car double-deck shuttle, offices on 2–75 with residential above, and
 4.0 m floors that put level 124 at 496 m. No source read gives the sky lobbies a double-deck shuttle —
 the real tower's two double-deck cars serve the observation deck (Otis, 2024; Al-Kodmany, 2015) —

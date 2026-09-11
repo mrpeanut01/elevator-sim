@@ -62,7 +62,7 @@ The standing decisions those three rest on, unchanged and cited rather than rest
 | [§ D520](../DECISIONS.md) | The dropdown sweep is built and tiered, and names the stages that still clear from the dropdown |
 | [§ D537](../DECISIONS.md) | The survivor band **narrows by ladder position**, authored in `data/scenario-survivor-bands.json` as shares of the configurations judged at a scenario's base rung. The owner ruled the shape on 2026-09-10; **the owner approved every figure as drafted the same day**, and the band's only reader is an acceptance check |
 | [§ D538](../DECISIONS.md) | Phase 7's schema-driven search entry point, Bayesian optimization and OCBA are **withdrawn** by the project owner (GitHub issue #416): the six introspection helpers waiting for the entry point are deleted, and `CLAUDE.md` invariant 8 keeps every tunable declaring its schema while naming `tuning/search` as the search over the space `tuning/space` collects |
-| [§ D545](../DECISIONS.md) | The Burj-class reference follows its operator (GitHub issue #438): two double-deck observation cars, Emaar's use stacking and level 124 at 452 m, with every chosen figure **drafted for the owner's approval**. Its 57-lift bracket is re-measured and pinned, and the figures first published for it did not reproduce |
+| [§ D545](../DECISIONS.md) | The Burj-class reference follows its operator (GitHub issue #438): two double-deck observation cars, Emaar's use stacking and level 124 at 452 m, with every chosen figure **drafted for the owner's approval, and approved as drafted on 2026-09-11**. Its 57-lift bracket is re-measured and pinned, and the figures first published for it did not reproduce |
 
 ## 2. Superseded or amended
 
