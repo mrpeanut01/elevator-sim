@@ -7,8 +7,8 @@
  * seed* and nothing wider, and #438's re-measurement found that the answer the file had published
  * for its own population was a one-seed answer: on the arrangement as first authored, 3 198 people
  * gave a valid AWT at seed 376 and **saturated on 16 of these 50 seeds**. That count came from this
- * file's cases run against the building as it stood at the parent of the correcting commit, and it
- * is why the counts below are published beside the seed-376 figures rather than instead of them.
+ * file's logic, run as an uncommitted probe against the building as it stood at the parent of the
+ * correcting commit, and it is why the counts below are published beside the seed-376 figures rather than instead of them.
  *
  * What is counted is verdicts, not means: a configuration that saturates on any seed has its AWT
  * interval suppressed (`CLAUDE.md` § Statistical discipline), so no interval is formed here, and
@@ -18,7 +18,8 @@
  *
  * Not scheduled, and `deepTiers.test.ts` records why: the seed-376 slice is pinned on every run,
  * and a nightly re-derivation would write counts nothing reads. It is re-run by hand when the
- * building moves — about two minutes on an Apple M1 Max.
+ * building moves — about two minutes on an Apple M1 Max, each case well inside the project's own
+ * 300 s timeout, so it carries no annotation of its own (`testCost.test.ts`).
  */
 
 import { readFileSync } from 'node:fs';
@@ -40,7 +41,6 @@ import { recordRun } from './recordRun.js';
 const DATA_DIR = fileURLToPath(new URL('../../../../data', import.meta.url));
 const FILE = 'burj-class-reference.json';
 const SEEDS = Array.from({ length: 50 }, (_, i) => BigInt(376 + i));
-const TIMEOUT_MS = 1_800_000;
 
 const dataFile = (name: string): unknown =>
   JSON.parse(readFileSync(join(DATA_DIR, name), 'utf8')) as unknown;
@@ -111,7 +111,6 @@ describe.runIf(process.env['BURJ_BRACKET_SWEEP'] === '1')(
         }
         expect(counted).toEqual(expected);
       },
-      TIMEOUT_MS,
     );
   },
 );

@@ -51,7 +51,6 @@ import { recordRun } from './recordRun.js';
 
 const DATA_DIR = fileURLToPath(new URL('../../../../data', import.meta.url));
 const FILE = 'burj-class-reference.json';
-const TIMEOUT_MS = 300_000;
 
 const dataFile = (name: string): unknown =>
   JSON.parse(readFileSync(join(DATA_DIR, name), 'utf8')) as unknown;
@@ -248,7 +247,6 @@ describe('the Burj-class reference against its operator — issue #438', () => {
         });
       }
     },
-    TIMEOUT_MS,
   );
 
   it('keeps its assumption paragraph and the four checks #438 recorded, word for word', () => {
