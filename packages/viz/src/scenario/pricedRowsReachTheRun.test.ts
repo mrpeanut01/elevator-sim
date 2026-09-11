@@ -46,6 +46,14 @@
  * Who boarded which car and when — `budgetReachesTheRun.test.ts`'s own key, and `docs/12` § 5
  * clause 9's. A mean can move because a run is noisy; the boarding identities move only when the
  * simulation did something different.
+ *
+ * ## No timeout annotation, and the census is why that is a decision
+ *
+ * The first version of this file annotated its hook and both cases at 900 000 ms, three sites above
+ * `viz`'s 300 000 ms ceiling, and `testCost.test.ts`'s ratchet refused them — *"a case may not be
+ * annotated upward to satisfy a budget"*. It was right to: the file runs in about ten seconds alone,
+ * against a project default that is already the ceiling. So the cases resolve to that default, and
+ * a future annotation here owes the measurement that earns it.
  */
 
 import { readFile } from 'node:fs/promises';
@@ -78,8 +86,6 @@ import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import { recordRun } from '../record/recordRun.js';
 import { DATA_DIR, requireBuilding, requireDispatcher } from '../fixtures.test-helper.js';
-
-const TIMEOUT_MS = 900_000;
 
 type Values = Readonly<Record<string, ParameterValue>>;
 
@@ -119,7 +125,7 @@ beforeAll(async () => {
     context,
   );
   scenarios = [...campaign.stages, ...briefs.asScenarios.stages];
-}, TIMEOUT_MS);
+});
 
 /** The rows #467 drafted, found by the issue number their provenance notes cite. */
 function rowsThisIssuePriced(): readonly string[] {
@@ -312,7 +318,6 @@ describe('every priced change a scenario can apply reaches a scenario run — #4
       expect(missing).toEqual([]);
       for (const id of rowsThisIssuePriced()) expect(reached.has(id), id).toBe(true);
     },
-    TIMEOUT_MS,
   );
 
   it(
@@ -329,6 +334,5 @@ describe('every priced change a scenario can apply reaches a scenario run — #4
       }
       expect(refused, 'no priced change costs anything, so no refusal arm ran').toBeGreaterThan(0);
     },
-    TIMEOUT_MS,
   );
 });
