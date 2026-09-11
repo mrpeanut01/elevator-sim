@@ -66,6 +66,13 @@
  * the check readable: the sentence a person writes and the sentence a machine reads are the same
  * sentence.
  *
+ * **And every shape now ignores case, for the reason the tokens tolerate whitespace.** The third
+ * shape wanted a lower-case *the*, so a claim that *began* a sentence with it was invisible:
+ * `docs/31-support-matrix.md` § 7 item 7 read *"The tier holds **33** now"* on a tree whose tier held
+ * 47, and this guard reported green over it. A capital letter at the start of a sentence is the line
+ * wrap again, one character wide. The `i` flag is on all five shapes rather than only the one that
+ * missed, because any of them can open a sentence.
+ *
  * **No `DECISIONS.md` entry is claimed for this, and that is deliberate rather than an oversight.**
  * The wave that produced it forbade taking a number, and `documentation.test.ts`'s ratchet on
  * owed-decision sites stands at its ceiling — a lane may not raise a ratchet, and settling one
@@ -104,16 +111,16 @@ describe('the browser-tier file count both documents publish is derived, not tra
   it('publishes the count each document carries as the one on disk', () => {
     const found = tierFiles().length;
     /*
-     * The four shapes the two documents write the figure in: the prose count in each, and the two
+     * The five shapes the two documents write the figure in: the prose counts, and the two
      * commands § 3 shows with their answers beside them. All four are read, so neither document
      * and neither command can drift alone — which is what happened, in both directions at once.
      */
     const SHAPES: readonly RegExp[] = Object.freeze([
-      /\*\*(\d+)\s+of\s+(\d+)\*\*\s+browser-tier\s+files/gu,
-      /(\d+)[*_]*\s+`\*\.browser\.test\.ts`\s+files/gu,
-      /the\s+tier\s+holds\s+\*{0,2}(\d+)\*{0,2}/gu,
-      /grep -rl "chromium\.launch"[^\n]*?→\s*(\d+)/gu,
-      /find packages -name "\*\.browser\.test\.ts" \| wc -l[^\n]*?→\s*(\d+)/gu,
+      /\*\*(\d+)\s+of\s+(\d+)\*\*\s+browser-tier\s+files/giu,
+      /(\d+)[*_]*\s+`\*\.browser\.test\.ts`\s+files/giu,
+      /the\s+tier\s+holds\s+\*{0,2}(\d+)\*{0,2}/giu,
+      /grep -rl "chromium\.launch"[^\n]*?→\s*(\d+)/giu,
+      /find packages -name "\*\.browser\.test\.ts" \| wc -l[^\n]*?→\s*(\d+)/giu,
     ]);
     /* A set, because `**N of N**` carries the same figure twice and one wrong sentence should be
        one line in the diff rather than two. */
