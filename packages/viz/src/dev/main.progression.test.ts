@@ -441,7 +441,7 @@ describe('issue #136 — a loaded recording banks nothing', () => {
       body,
       'closeShift no longer consults shift/banking.ts, so a recording loaded from a file can bank ' +
         'a day against the shell’s last simulated plan',
-    ).toContain('bankingRefusalFor(recording, simulatedRecording)');
+    ).toContain('bankingRefusalFor(recording, simulatedRecording, abandonedRecording)');
 
     /*
      * **Before** anything is written, and the ordering is the assertion rather than the presence.

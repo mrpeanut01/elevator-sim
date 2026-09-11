@@ -1440,6 +1440,12 @@ export interface EverydayHost {
   replay(): EverydayReplaySession | undefined;
   /** Leave the replay, putting the parked week and the run it interrupted back. A no-op outside one. */
   leaveReplay(): void;
+  /**
+   * § 3.4's *Leave it* on a day — GitHub issue #526 item 1. The strip has just told the player *today's
+   * run will not be scored*, so the run in flight is stopped and the run standing is refused at filing,
+   * rather than either being left for another surface to file.
+   */
+  leaveDayUnfinished(): void;
 
   /**
    * § 14.1's primary — drop the spectator state and set the same crowd up to be played.
@@ -1492,6 +1498,14 @@ export interface EverydayHostBindings {
    * field, and a shell that omits it cancels nothing.
    */
   cancelRun?(): void;
+  /**
+   * Stop the run in flight **and** refuse to file the run that stands — `dev/main.ts`'s shift runner's
+   * `cancel`, then `shift/banking.ts#LEFT_UNFINISHED_CANNOT_BANK` on that recording at every filing press.
+   * {@link EverydayHost.leaveDayUnfinished} and a campaign `take-offer` call it (GitHub issue #526 items 1
+   * and 2). A cancel alone was measured and is not enough: with the pressed run stopped, the run behind
+   * it files instead. **Optional** on {@link cancelRun}'s ground.
+   */
+  abandonDay?(): void;
   /**
    * § 1.4's *record growing*: append at `atS`, re-run with cause `'intervention'`, and seek the
    * shell's own transport to `atS` once the new recording is adopted. One implementation, shared
@@ -1807,7 +1821,12 @@ export function createEverydayHost(
     for (const listener of [...campaignListeners]) listener();
   };
   /** The rush in progress — GitHub issue #220. Host-scoped like the career: a rush is not a day. */
-  let replaySession: { readonly day: number; readonly before: ReplayBefore } | undefined;
+  /**
+   * § 6.1's replay in progress. `pressed` is whether this session has asked for a run — its brief's
+   * *Start the day*, the stage's own entry press, or an intervention's re-run — which is what makes a run
+   * in flight the replay's to cancel on the way out (GitHub issue #526 item 4).
+   */
+  let replaySession: { readonly day: number; readonly before: ReplayBefore; readonly pressed: boolean } | undefined;
   let rushSession:
     | {
         readonly before: RushBefore;
@@ -2135,6 +2154,8 @@ export function createEverydayHost(
       // here would file, and against which building.
       campaignDayTowerId = undefined;
       campaignDayIncident = undefined;
+      // A run pressed inside a replay is the replay's to stop on the way out — {@link replaySession}.
+      if (replaySession !== undefined) replaySession = { ...replaySession, pressed: true };
       b.startRun();
     },
     /**
@@ -2237,6 +2258,8 @@ export function createEverydayHost(
       // Gated here as well as on the control, because the record cannot grow before it exists and
       // a façade that appended to nothing would produce a run of a day nobody watched.
       if (b.state().recording === undefined) return;
+      // An intervention's re-run inside a replay is the replay's, as its first run was — {@link replaySession}.
+      if (replaySession !== undefined) replaySession = { ...replaySession, pressed: true };
       b.intervene(atS, change);
     },
     openTomorrow: () => {
@@ -2304,6 +2327,14 @@ export function createEverydayHost(
       if (action.kind === 'take-offer') {
         const contract = contractById(action.contractId);
         if (contract !== undefined) {
+          /*
+           * **The day being left goes with the week being parked** — GitHub issue #526 item 2. A run in
+           * flight here was asked for the old week and landed on the new one, where the Engineer surface's
+           * filing presses filed it; a landed, unclosed run was filed there the same way. So the run in
+           * flight is stopped and the run standing is refused, first. Starting the new contract's run
+           * instead would put a run nobody pressed on the new week, which those same presses would file.
+           */
+          b.abandonDay?.();
           const state = b.state();
           const moved = switchWeek(state.week, state.parkedWeeks, contract.id, 'restart');
           b.applyPatch({
@@ -2673,7 +2704,7 @@ export function createEverydayHost(
       const state = b.state();
       if (replaySession !== undefined) return 'a replay is already standing; leave it before opening another';
       if (!replayableDay(state.week, day)) return REPLAY_COPY.beforeTheWeek;
-      replaySession = { day, before: replayBeforeOf(state) };
+      replaySession = { day, before: replayBeforeOf(state), pressed: false };
       b.applyPatch(replayPatchOf(state, day));
       notifyCampaign();
       return undefined;
@@ -2681,7 +2712,7 @@ export function createEverydayHost(
     replay: () => (replaySession === undefined ? undefined : { day: replaySession.day }),
     leaveReplay: () => {
       if (replaySession === undefined) return;
-      const before = replaySession.before;
+      const { before, pressed } = replaySession;
       replaySession = undefined;
       /*
        * **The run in flight goes before the week comes back** — GitHub issue #522, `leaveRush`'s
@@ -2692,10 +2723,29 @@ export function createEverydayHost(
        * day — `replay.browser.test.ts` measures that on the shipped bundle. Whatever is in flight when
        * the player leaves would land over the recording this restore puts back, so it is cancelled, and
        * first. A no-op once it has landed. Recorded here under § D405: the decision is this function's.
+       *
+       * **And only a run the replay pressed** — GitHub issue #526 item 4. `startReplay` presses nothing,
+       * and the week it parks can have a run of the player's in flight: *Tomorrow* presses day 2's run
+       * itself, and the rival raced after it rides the same runner. So a replay left from its brief, before
+       * anything was pressed inside it, stopped the player's own day. That run is not the replay's, and it
+       * lands on the week it was asked for, which is the week this restore puts back.
        */
-      b.cancelRun?.();
+      if (pressed) b.cancelRun?.();
       b.applyPatch(replayRestorePatchOf(b.state(), before));
       notifyCampaign();
+    },
+    leaveDayUnfinished: () => {
+      /*
+       * **The run in flight goes, as it does out of a rush or a replay** — GitHub issue #526 item 1,
+       * #518 item 4's and #522's shape on the daily loop. `everyday/shell.ts#doLeave` put the player on
+       * the menu and left the run generating; `dev/main.ts#applyShift` adopted it when it landed, and the
+       * Engineer surface's `Ctrl`+`Enter`, its Day report tab or its export press filed it.
+       *
+       * **And the run that stands goes unfiled** — a cancel alone was measured on the shipped bundle and
+       * kept the promise in neither state: left in flight, the run behind the cancelled one filed at
+       * 100 %; left after landing, the landed run did. `autoFile.browser.test.ts` holds both.
+       */
+      b.abandonDay?.();
     },
     playThisCrowd: (run) => {
       b.playThisCrowd(run);

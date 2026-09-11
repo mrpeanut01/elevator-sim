@@ -295,4 +295,59 @@ describe.skipIf(!HAS_BROWSER)('watching, in the Everyday shell — GAMEPLAY § 1
 
     await page.close();
   }, 300_000);
+
+  it('does not pull the player onto a watch whose check lands after they left the week — GitHub issue #526 item 3', async () => {
+    const page = await openEveryday();
+    try {
+      await openWeek(page);
+      /*
+       * The instrument that says the check has landed, whichever way the product answers it. The gate is
+       * a worker round trip; when it passes, `dev/main.ts#enterWatch` runs `renderAll`, which writes the
+       * Engineer surface's watch pill its label whether or not that surface has the page. A text node
+       * added to the pill is therefore the check landing — on a build that enters the watch and on one
+       * that ends it again in the same task, where the pill is empty again by the time anybody looks.
+       */
+      await page.evaluate(() => {
+        const landed: string[] = [];
+        (window as unknown as { watchCheckLanded: string[] }).watchCheckLanded = landed;
+        const pill = document.querySelector('.watch-pill');
+        if (pill === null) return;
+        new MutationObserver((records) => {
+          for (const record of records) {
+            for (const node of record.addedNodes) if ((node.textContent ?? '') !== '') landed.push(node.textContent ?? '');
+          }
+        }).observe(pill, { childList: true, subtree: true, characterData: true });
+      });
+      /*
+       * Press *Watch* and walk away to the bench inside one task, `rush.browser.test.ts`'s #518 shape: the
+       * worker answers with a message, which is a task of its own, so the check cannot land before the
+       * player has left, and this case cannot pass by the check being quick.
+       */
+      const pressed = await page.evaluate(() => {
+        const watch = document.querySelector<HTMLButtonElement>('.everyday-week-watch-open');
+        watch?.click();
+        const checking = watch?.isConnected === true ? (watch.textContent ?? '') : 'redrawn';
+        const bench = [...document.querySelectorAll<HTMLButtonElement>('.everyday-rail button')].find((row) =>
+          (row.textContent ?? '').includes('Test bench'),
+        );
+        bench?.click();
+        return { checking, left: bench !== undefined };
+      });
+      expect(pressed.left).toBe(true);
+      await page.waitForFunction(
+        () => ((window as unknown as { watchCheckLanded?: string[] }).watchCheckLanded ?? []).length > 0,
+        undefined,
+        { timeout: 60_000 },
+      );
+      /* The landing's own notification redraws, so the reading waits a frame past it. */
+      await page.waitForTimeout(300);
+      expect(await page.textContent('.everyday-rail-subline')).not.toContain('WATCHING');
+      expect(await page.locator('.everyday-stage-watching').count()).toBe(0);
+      expect(await page.locator('.everyday-bar').first().innerText()).not.toContain('Stop watching');
+      /* And the host is not left watching behind the bench: the pill the landing wrote is empty again. */
+      expect(await page.evaluate(() => document.querySelector<HTMLElement>('.watch-pill')?.style.display)).toBe('none');
+    } finally {
+      await page.close();
+    }
+  });
 });

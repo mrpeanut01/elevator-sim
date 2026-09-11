@@ -27,8 +27,10 @@ import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { RUSH_SEED, RUSH_TEMPLATE_ID, rushOutcomeOf, rushPatchOf } from './rush.js';
 import { REPLAY_COPY } from './replay.js';
 import { RUSH_CONTRACT_ID, REPLAY_CONTRACT_ID } from '../shift/week.js';
+import { CONTRACTS } from '../shift/contracts.js';
+import type { CareerStore } from './careerStore.js';
 
-import { towerById, type CampaignTower } from '../campaign/career.js';
+import { offerRefusalOf, openingCareer, towerById, type CampaignTower } from '../campaign/career.js';
 import { clearedDays, purseOf, spentTodayUnits, type ShopCategoryId } from '../campaign/economy.js';
 import { TECHNICIAN_UNITS, campaignEventFor } from '../campaign/incidents.js';
 import { CAMPAIGN_DOCK_COPY } from './campaignDock.js';
@@ -190,6 +192,9 @@ function harnessOf(
       },
       cancelRun: () => {
         calls.push('cancelRun');
+      },
+      abandonDay: () => {
+        calls.push('abandonDay');
       },
       intervene: (atS, change) => {
         calls.push(`intervene:${String(atS)}:${change.kind}`);
@@ -1982,5 +1987,66 @@ describe('the replay — GitHub issue #177 item 1, § D517', () => {
     /* Outside a replay, leaving cancels nothing: a day's own run is not the replay's to stop. */
     host.leaveReplay();
     expect(h.calls).toHaveLength(beforeLeaving + 2);
+  });
+
+  it('leaving from the brief cancels nothing, because the run in flight there is not the replay’s — GitHub issue #526 item 4', () => {
+    /*
+     * `startReplay` presses no run; the brief's *Start the day* does. So a replay left from its brief has
+     * started nothing, and the run in flight is the one the replay found standing — *Tomorrow* presses
+     * day 2's run itself, and the rival raced after it rides the same runner. #522's unconditional cancel
+     * stopped that run, which is the player's own day. Leaving cancels only once the replay has pressed.
+     */
+    const start = { ...base(), week: { ...base().week, day: 4, dayIdx: 3 } };
+    const h = harnessOf(start);
+    const host = createEverydayHost(h.bindings);
+    expect(host.startReplay(2)).toBeUndefined();
+    const beforeLeaving = h.calls.length;
+    host.leaveReplay();
+    expect(h.calls.slice(beforeLeaving)).toEqual(['applyPatch']);
+    /* And the flag is the session's: a second replay that does press cancels on its way out. */
+    expect(host.startReplay(2)).toBeUndefined();
+    host.startRun();
+    const beforeSecond = h.calls.length;
+    host.leaveReplay();
+    expect(h.calls.slice(beforeSecond)).toEqual(['cancelRun', 'applyPatch']);
+  });
+});
+
+describe('a run in flight when a day is left — GitHub issue #526', () => {
+  it('leaving a day unfinished stops the run in flight and refuses the run that stands, through one binding', () => {
+    /*
+     * § 3.4's strip has just said *today's run will not be scored*. A cancel alone was measured on the
+     * shipped bundle and kept that promise in neither state — `autoFile.browser.test.ts` — so the host
+     * asks `dev/main.ts` for both halves at once, and nothing else.
+     */
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    host.startRun();
+    const beforeLeaving = h.calls.length;
+    host.leaveDayUnfinished();
+    expect(h.calls.slice(beforeLeaving)).toEqual(['abandonDay']);
+  });
+
+  it('taking a campaign offer abandons the day before the week moves — item 2', () => {
+    /*
+     * A career one slot up, so the reducer takes the offer rather than refusing it: standing 14 opens
+     * the second slot. The day in flight was asked for the week being parked, so it goes first, and the
+     * week then moves exactly as it did.
+     */
+    const career = { ...openingCareer(base().dispatcherId), carry: 14 };
+    const store: CareerStore = {
+      load: () => ({ career, refusal: undefined, notice: undefined }),
+      save: () => {},
+      clear: () => {},
+    };
+    const offer = CONTRACTS.find((contract) => offerRefusalOf(career, contract.id) === undefined);
+    if (offer === undefined) throw new Error('no contract is takeable on a career one slot up — the fixture no longer opens one');
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings, store);
+    const beforeTaking = h.calls.length;
+    host.campaignAct({ kind: 'take-offer', contractId: offer.id });
+    expect(h.calls.slice(beforeTaking)).toEqual(['abandonDay', 'applyPatch']);
+    expect(h.patches.at(-1)?.buildingId).toBe(offer.buildingId);
+    expect(h.patches.at(-1)?.week?.contractId).toBe(offer.id);
   });
 });

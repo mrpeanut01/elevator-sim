@@ -526,7 +526,12 @@ import {
 import { moodOf } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import { CONTRACTS, contractById, contractForBuilding, nextContract, statLineOf } from '../shift/contracts.js';
-import { bankingRefusalFor, LOADED_RUN_CANNOT_BANK, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
+import {
+  bankingRefusalFor,
+  LEFT_UNFINISHED_CANNOT_BANK,
+  LOADED_RUN_CANNOT_BANK,
+  UNCHOSEN_RUN_CANNOT_BANK,
+} from '../shift/banking.js';
 import { baseDemandOf, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { everyWrinkle } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
@@ -1982,6 +1987,7 @@ const REPLAY: SurfaceAdapter = {
     'shift/banking.ts#bankingRefusalFor',
     'shift/banking.ts#LOADED_RUN_CANNOT_BANK',
     'shift/banking.ts#UNCHOSEN_RUN_CANNOT_BANK',
+    'shift/banking.ts#LEFT_UNFINISHED_CANNOT_BANK',
   ],
   render(context) {
     const verdict = verifyReplay(context.recording, context.recording);
@@ -2013,6 +2019,13 @@ const REPLAY: SurfaceAdapter = {
       {
         field: 'unchosenRunCannotBank',
         text: UNCHOSEN_RUN_CANNOT_BANK,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      /* The third answer — a day left unfinished, GitHub issue #526 — on the same pairing for the same reason. */
+      {
+        field: 'leftUnfinishedCannotBank',
+        text: LEFT_UNFINISHED_CANNOT_BANK,
         role: 'reason',
         provenance: 'authored',
       },
