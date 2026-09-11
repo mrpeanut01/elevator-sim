@@ -34909,3 +34909,83 @@ is fire and forget and nothing reads its answer (clause 3, `docs/32` GD13). A cl
 never a source or an amount (clause 5).
 
 ---
+
+## D537 — The survivor band narrows by ladder position: shares in data, drafted for approval, judged at the base rung, read by one acceptance check
+
+**Date: 2026-09-10 · GitHub issue #234 · Rules on: [§ D525](#d525) clause 3, [§ D528](#d528) clause 2, `docs/33` DC-4's band as the precedent for shape, GitHub issues #367 and #467.**
+
+**Decided by the product owner, 2026-09-10**, on #234: *"The survivor band narrows by ladder position.
+Positions 1–2 may allow many survivors, because a dropdown clear is permitted there (§ D528); later
+positions allow few, but at least one. The band is authored in data as shares of the configurations
+examined, drafted for approval. The rebalance then moves demand and building fabric, never a bar, to
+bring each scenario inside its band."* The figures under that ruling, the reading rules and the
+register are the #234 lane's, and **every figure is a draft the owner has not approved**.
+
+**Why an entry.** All three of § D405's grounds. It records an owner ruling that gives § D528 clause
+2's *budgeted by ladder position* its form. Its reading rules bind the rebalance lane and anyone who
+regenerates `data/scenario-survivors.json`. And a band existing made five sentences outside
+`scenario/` untrue — two in `packages/core/src/config/chimeLedger.ts` (one of them a thrown refusal),
+one in `packages/server/src/chimes/ledger.ts`, one in `data/chime-ledger.json` and one in
+[`docs/38`](docs/38-what-the-game-is.md) § 2.4 — each of which said nothing turns a survivor count
+into a band.
+
+1. **The band is its own authored file**, `data/scenario-survivor-bands.json`: `version`; a
+   `provenance` block declaring `kind: 'chosen'` and `approval: 'draft'`; and bands over contiguous
+   position ranges, the last open-ended, each with `minShare`, `maxShare`, an invariant-8 `schema` per
+   share whose default is the shipped value, and a `note` opening `CHOSEN:`. **Not** a field of
+   `data/scenario-survivors.json`, which is generated and declares itself measured, so a choice there
+   would sit inside a table of measurements. **Not** `data/contract-ladder.json`, which
+   `scenario/survivors.ts` had named as the likely home: that file's rows are keyed by the week's
+   contracts rather than by the scenario ladder, and its parser is bundled into the browser, while
+   this band's only reader is a test.
+2. **The drafted figures.** Positions 1–2 admit a share from 0.25 to 0.75; positions 3–4 at most
+   0.20; 5–7 at most 0.15; 8 and after at most 0.10, with a share floor of 0 from position 3. Each note
+   argues from one yardstick, stated as a yardstick and not as a model of play: the share at which a
+   player trying a few configurations at random is more, or less, likely than not to find a way
+   through. The figure most worth attacking is the 0.25 floor at positions 1–2, which reads *"doable
+   with tweaks"* (§ D525) where the ruling itself names no floor above one survivor.
+3. **What is ruled is enforced in code, not authored as a figure.** At least one survivor at every
+   position (§ D525 clause 3), a declared diagnosis exempting a zero count from that floor and from
+   nothing else — `survivors.ts`'s own asymmetry. The band narrows: from one band to the next the
+   ceiling, the floor and the width may not grow. No band admits the whole space (`maxShare < 1`, DC-1
+   as a reading of the count). Approving the band flips one field and moves no code.
+4. **A scenario is judged at its base budget rung.** A ladder position describes the scenario as every
+   player meets it, and a bought rung is an optional purchase in chimes (§ D526). A band judged at
+   every rung would forbid a purchase from widening the space, which § D525 clause 3 and § D528
+   clause 3 make the budget's whole job. And each rung's dial half is its own sample, so reading the
+   rungs as a sequence reads sampling noise as a curve.
+5. **A share is survivors over the configurations judged — examined less unjudged.** An unjudged
+   configuration is one where some goal came back `met: null` because its baseline did not reproduce
+   the published count; it is neither a way through nor a failed attempt, so it leaves the
+   denominator, and a scenario with nothing judged reads `nothing-judged` rather than zero. **A
+   suppressed configuration stays in**, because the table shows suppressed configurations surviving —
+   on the table measured 2026-09-10 two scenarios suppress every configuration examined and still
+   have one survivor each — and does not say which survivors were suppressed. **But a zero over
+   suppressed runs is not a zero over measured ones**, so a scenario below its band on which every
+   examined configuration was suppressed reads `below-over-suppressed-runs`.
+6. **The check is `packages/viz/src/scenario/survivorBands.test.ts`**, always on and simulating
+   nothing, with a register checked in both directions whose entries name their verdict. The counts
+   are derived on every run and never written into an entry, so a regeneration — GitHub issue #467's
+   is due — moves an entry only where it moves a verdict. On `main` at `b7d513e`, against the draft:
+   **seven of ten outside, all below** — stages 1, 2, 4, 6 and 8 below, stages 9 and 10 below over
+   suppressed runs — and stages 3, 5 and 7 inside.
+7. **Inside is not rebalanced.** The band is over every configuration examined, not per tier, so it
+   cannot see which configuration got through: the one survivor on stage 3 and the one on stage 5 are
+   shipped dispatcher profiles, which § D528 clause 2 forbids from position three. That clause's
+   per-tier form is not asserted by this check, and `campaign/difficultyCurve.test.ts`'s
+   `DROPDOWN_CLEARS` holds its dropdown half. **Whether the band should carry a dropdown ceiling of its
+   own is not decided here**, and is the owner's.
+8. **The chime sentences are corrected, and the refusal stands.** The earn route still reads no band
+   and is still never told which scenario was cleared, so `parseChimeLedger` still refuses a `bands`
+   key. What changed is only that a sentence saying no band exists anywhere had become false.
+
+**What this does not decide.** Whether the drafted figures are right: the owner's approval does
+that, and the register moves with the band on the same commit. The rebalance: no scenario is moved
+here. Which lever — demand or fabric — moves each scenario outside its band, which is unmeasured.
+Whether a harder band should pay more chimes, which § D526 clause 2 permits and nothing takes up.
+
+**Bookkeeping.** This lane was reserved D537–D538 and spent D537; D538 is returned unspent. No
+reservation was open, and the numbers below D537 are not written on this lane's branch, so
+`documentation.test.ts`'s reservation was opened there at D533–D538. Its bounds are the integrator's.
+
+---

@@ -220,9 +220,13 @@ export type ChimeSchemaUnit = (typeof CHIME_SCHEMA_UNITS)[number];
  * *survivor-count band*, and `chimes/ledger.ts` described that band as *"a property of the scenario
  * … known before anybody plays"*. It was not. The band arrived **verbatim in the request body**
  * (`http/api.ts`'s earn route), `data/scenario-survivors.json` carries survivor **counts** and no
- * band at all, nothing anywhere maps a count to one, and the server was not then told which
+ * band at all, nothing the earn route reads maps a count to one, and the server was not then told which
  * scenario was cleared (since GitHub issue #499 it is told a scenario id, which pays a scenario once
- * and maps to no band). A client could post `single` on the easiest scenario and be paid 10 instead of 4.
+ * and maps to no band). A client could post `single` on the easiest scenario and be paid 10 instead
+ * of 4. (A survivor band does exist since GitHub issue #234 — `data/scenario-survivor-bands.json`, a
+ * **difficulty** band per ladder position, drafted for the owner's approval, whose only reader is a
+ * viz acceptance check ([§ D537](../../../../DECISIONS.md)). It is on no scenario's pinned record, and
+ * nothing that pays reads it.)
  *
  * [§ D256](../../../../DECISIONS.md) is the rule that decides what to do about that: a stated
  * mechanism is either measured or withdrawn, and offering a second plausible sentence in its place
@@ -413,11 +417,12 @@ function parseSource(raw: unknown, where: string): ChimeSource {
    */
   if (entry['bands'] !== undefined) {
     throw new ChimeLedgerError(
-      `${where}.bands: an award may not be banded. Nothing in this repository maps a survivor ` +
-        'count to a band: data/scenario-survivors.json carries counts and no band, no document ' +
-        'declares a boundary, and nothing maps the scenario id the earn route is told to one — so a ' +
-        'band could only arrive from the client that is paid for it. DECISIONS.md D256: a stated ' +
-        'mechanism is measured or withdrawn, never re-worded.',
+      `${where}.bands: an award may not be banded. Nothing the earn route reads maps a survivor ` +
+        'count to a band: data/scenario-survivors.json carries counts and no band, the one survivor ' +
+        'band in the tree (data/scenario-survivor-bands.json) is a drafted difficulty band whose only ' +
+        'reader is an acceptance check, and nothing maps the scenario id the earn route is told to one ' +
+        '— so a band could only arrive from the client that is paid for it. ' +
+        'DECISIONS.md D256: a stated mechanism is measured or withdrawn, never re-worded.',
     );
   }
   strict(
