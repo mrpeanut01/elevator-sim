@@ -44,9 +44,19 @@ describe('the shipped purse — invariant 8, and a rule a reviewer can check', (
     for (const id of purse.topUpSinkIds) expect(chimeSinkById(LEDGER, id)?.modifier.kind).toBe('purse-units');
   });
 
-  it('says on its own face that its figure is a proposal and not a measurement', () => {
+  it('says on its own face that its figure is a proposal and not a measurement, and that the owner approved it as drafted', () => {
     expect(String(RAW['$comment'])).toContain("AN AGENT'S PROPOSAL");
     expect(String(RAW['note'])).toMatch(/^CHOSEN/u);
+    /*
+     * The product owner approved the figure, its schema and the purse as a carrying balance as
+     * drafted on 2026-09-11 (§ D542). The provenance stays, because an agent chose the figure and
+     * nothing measured it; the approval is said beside it on both faces, so neither reads as still
+     * waiting on a ruling.
+     */
+    const approval = 'APPROVED AS DRAFTED by the product owner on 2026-09-11';
+    expect(String(RAW['$comment'])).toContain(approval);
+    expect(String(RAW['note'])).toContain(approval);
+    expect(String(RAW['$comment'])).not.toMatch(/drafted for the owner/iu);
   });
 });
 

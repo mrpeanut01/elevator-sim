@@ -24,9 +24,9 @@
  * say whether units a round did not spend are kept, and {@link rushPurseRounds} reads a purse as a
  * **balance within the sitting**: it opens at what a listed top-up sink bought, each round pays into
  * it, and the next round opens with the whole of it. That is the reading under which *"a player who
- * lasts longer has more to rebuild with"* holds across rounds rather than only within one, and it is
- * a proposal for the owner rather than a ruling (the PR that built this says so). Changing it is this
- * one function.
+ * lasts longer has more to rebuild with"* holds across rounds rather than only within one. It was
+ * drafted as a proposal, and the product owner approved it as drafted on 2026-09-11 (§ D542).
+ * Changing it is this one function.
  *
  * ## What is not built
  *

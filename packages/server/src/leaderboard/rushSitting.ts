@@ -35,7 +35,7 @@
  *
  * Each round then pays its purse on the waves it outlasted, read at that hold moment
  * (`core`'s `rushWavesOutlasted`), into a balance the next round opens with (`core`'s
- * `config/rushPurse.ts`, which says why a balance and that the reading is a proposal). The sitting
+ * `config/rushPurse.ts`, which says why a balance and that the owner approved it). The sitting
  * opens at what the account's listed top-up bought, checked against its spends by `http/api.ts`
  * before any of this runs.
  *
