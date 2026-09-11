@@ -54,7 +54,6 @@ import { changesBought, pathsIn } from './repairPrice.js';
 import { shippedPriceSchedule } from './schedule.test-helper.js';
 
 const DATA_DIR = fileURLToPath(new URL('../../../../data', import.meta.url));
-const TIMEOUT_MS = 300_000;
 
 /** The pinned day. See the header for how it was found. */
 const GOAL_BUILDING = 'st-jude-hospital';
@@ -148,7 +147,7 @@ describe('the 80 kJ goal’s verdict moves, and no leg does', () => {
     expect(energyVerdict(regenerative).state).toBe('met');
     expect(legsOf(regenerative)).toBe(legsOf(asBuilt));
     expect(regenerative.recording.legs.length).toBeGreaterThan(0);
-  }, TIMEOUT_MS);
+  });
 
   it('meets it with the counterweight at 0.4 of rated load, on the same legs', () => {
     const shipped = resources.entries.find((entry) => entry.config.id === GOAL_BUILDING)?.resolved;
@@ -158,7 +157,7 @@ describe('the 80 kJ goal’s verdict moves, and no leg does', () => {
 
     expect(energyVerdict(lighter).state).toBe('met');
     expect(legsOf(lighter)).toBe(legsOf(asBuilt));
-  }, TIMEOUT_MS);
+  });
 
   it('changes nothing at all when the defaults are declared explicitly', () => {
     const shipped = resources.entries.find((entry) => entry.config.id === GOAL_BUILDING)?.resolved;
@@ -171,7 +170,7 @@ describe('the 80 kJ goal’s verdict moves, and no leg does', () => {
     expect(energyVerdict(declared)).toEqual(energyVerdict(asBuilt));
     expect(JSON.stringify(declared.recording.summary)).toBe(JSON.stringify(asBuilt.recording.summary));
     expect(legsOf(declared)).toBe(legsOf(asBuilt));
-  }, TIMEOUT_MS);
+  });
 });
 
 /* -------------------------------------------------------------------------- *
@@ -309,7 +308,7 @@ describe('a scenario repair reaches the run through fixit/run.ts (§ D219)', () 
     const before = both.without.recording.summary.energy.workKJ ?? Number.NaN;
     const after = both.with.recording.summary.energy.workKJ ?? Number.NaN;
     expect(after).toBeLessThan(before);
-  }, TIMEOUT_MS);
+  });
 
   it('writes the counterweight onto every bank, moves the energy, and moves no leg', () => {
     const both = arms(caseWith(REBALANCED));
@@ -317,5 +316,5 @@ describe('a scenario repair reaches the run through fixit/run.ts (§ D219)', () 
     expect(both.with.recording.summary.energy.workKJ).not.toBe(
       both.without.recording.summary.energy.workKJ,
     );
-  }, TIMEOUT_MS);
+  });
 });
