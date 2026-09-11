@@ -458,11 +458,16 @@ describe('the turns a shipped build will pay for — loadChimeTurnBounds, issue 
       ] ?? []
     ).map((entry) => entry[field] ?? '');
 
-  it('reads every contract and every fix case, and the rush’s waves, from data/', async () => {
+  it('reads every fix case and no week contract, and the rush’s waves, from data/', async () => {
     const bounds = await loadChimeTurnBounds(DATA_DIR, profiles);
-    expect([...bounds.scenarioIds].sort()).toEqual(
-      [...idsIn('contract-ladder.json', 'contracts', 'contractId'), ...idsIn('fixit-cases.json', 'cases', 'id')].sort(),
-    );
+    expect([...bounds.scenarioIds].sort()).toEqual([...idsIn('fixit-cases.json', 'cases', 'id')].sort());
+    /*
+     * Scenario-mode clears only — the owner's ruling of 2026-09-10, after the review of PR #505. A
+     * daily-loop week contract's clear pays no scenario award, so no contract id may be one.
+     */
+    const contracts = idsIn('contract-ladder.json', 'contracts', 'contractId');
+    expect(contracts.length, 'data/contract-ladder.json names no contract, so this half tests nothing').toBeGreaterThan(0);
+    expect(contracts.filter((id) => bounds.scenarioIds.has(id)), 'a week contract is paid as a scenario').toEqual([]);
     /*
      * Thirty is `packages/viz/src/everyday/rushScreenModel.ts#LAST_GENERATED_WAVE`, which this
      * package may not import. `everyday/rush.test.ts` pins that constant against the same template's
@@ -472,7 +477,7 @@ describe('the turns a shipped build will pay for — loadChimeTurnBounds, issue 
     expect(rushWaveCountOf(profiles)).toBe(bounds.rushWaves);
   });
 
-  it('refuses to start when the rush cannot be read or two documents claim one id', async () => {
+  it('refuses to start when the rush cannot be read or the case file names one id twice', async () => {
     const withoutRush = {
       ...profiles,
       demandTemplates: profiles.demandTemplates.filter((template) => template.id !== 'endless-rush'),
@@ -482,8 +487,7 @@ describe('the turns a shipped build will pay for — loadChimeTurnBounds, issue 
 
     const scratch = await mkdtemp(join(tmpdir(), 'chime-turns-499-'));
     onTestFinished(async () => rm(scratch, { recursive: true, force: true }));
-    await writeFile(join(scratch, 'contract-ladder.json'), JSON.stringify({ contracts: [{ contractId: 'c1' }, { contractId: 'shared' }] }));
-    await writeFile(join(scratch, 'fixit-cases.json'), JSON.stringify({ cases: [{ id: 'shared' }] }));
-    await expect(loadChimeTurnBounds(scratch, profiles)).rejects.toThrow(/shared/u);
+    await writeFile(join(scratch, 'fixit-cases.json'), JSON.stringify({ cases: [{ id: 'same-case' }, { id: 'same-case' }] }));
+    await expect(loadChimeTurnBounds(scratch, profiles)).rejects.toThrow(/names same-case twice/u);
   });
 });

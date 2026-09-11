@@ -35,7 +35,7 @@ One ruled later, on 2026-09-10, narrowing how often § D526's awards pay rather 
 
 | decision | what it rules |
 |---|---|
-| [§ D533](../DECISIONS.md) | **First time only.** A scenario pays once per account; a rush pays only the waves beyond the account's best; the server keeps the record, so posting a turn again pays nothing. A contract day is outside the ruling and still pays each day posted |
+| [§ D533](../DECISIONS.md) | **First time only.** A scenario pays once per account; a rush pays only the waves beyond the account's best; the server keeps the record, so posting a turn again pays nothing. A contract day is outside the ruling and still pays each day posted. **Scenario-mode clears only**, ruled the same day after the review of PR #505: a fix case pays today, campaign stages and the E1–E6 briefs pay once they are playable in Everyday, and a daily-loop week contract's clear pays no scenario award |
 
 The standing decisions those three rest on, unchanged and cited rather than restated:
 

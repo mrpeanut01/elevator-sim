@@ -567,37 +567,3 @@ describe('docs/19 defect 6 — a navigation dismisses the drawer', () => {
     expect(arm).toContain('drawerOpen: false');
   });
 });
-
-/* -------------------------------------------------------------------------- *
- * GitHub issue #499 — the clear closeShift files is the clear the ledger hears about
- * -------------------------------------------------------------------------- */
-
-describe('issue #499 — a scenario clear is banked where the week files it', () => {
-  it('asks which contract this close newly cleared, and banks it after the week is written', async () => {
-    /*
-     * `shift/week.ts#newlyClearedScenarioOf` is the decision, and `week.test.ts` drives it over a first
-     * clear, a retry of the clearing day, a missed day and every week no scenario runs. What only this
-     * file can pin is the wiring inside `boot()`, read as text — this file's own caveat applies: weak
-     * evidence about behaviour, strong evidence about a line having been deleted or moved.
-     */
-    const body = await bodyOf('closeShift');
-    const asked = body.indexOf('newlyClearedScenarioOf(state.week, week)');
-    const written = body.indexOf('state = { ...state, week, report, tomorrow }');
-    const banked = body.indexOf("bankTurn({ completion: 'scenario-cleared', scenarioId:");
-    expect(asked, 'closeShift does not ask which scenario this close cleared').toBeGreaterThan(-1);
-    expect(written).toBeGreaterThan(-1);
-    expect(banked, 'closeShift files a clear and the ledger never hears of it').toBeGreaterThan(-1);
-    /* Asked before the write, because after it `state.week` is the closed week and nothing is new. */
-    expect(asked).toBeLessThan(written);
-    /* Banked after it, so a clear is never paid for a week that was not written. */
-    expect(banked).toBeGreaterThan(written);
-    /* And after the refusal of a run this shell did not simulate, which files nothing and so clears nothing. */
-    expect(banked).toBeGreaterThan(body.indexOf('const cannotBank'));
-  });
-
-  it('banks through the one function the Everyday host is bound to, so the two cannot disagree about a signed-out player', async () => {
-    const source = await mainSource();
-    expect(source).toMatch(/bankCompletion:\s*client === undefined \? undefined : bankTurn,/u);
-    expect(source.match(/function bankTurn\(/gu) ?? []).toHaveLength(1);
-  });
-});

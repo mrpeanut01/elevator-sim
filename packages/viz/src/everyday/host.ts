@@ -1418,13 +1418,15 @@ export interface EverydayHost {
   /** § D478's line for a rush on the standing building, before one starts; `undefined` inside the band or with no building. */
   rushDisclosure(): string | undefined;
   /**
-   * Bank a scenario the player has just cleared — GitHub issue **#499**. `scenarioId` is the
-   * scenario's own id, and the server pays it once per account whatever this is asked.
+   * Bank a Scenario-mode clear the player has just made — GitHub issue **#499**. `scenarioId` is a
+   * fix case's id today, and the server pays it once per account whatever this is asked.
    *
    * Answers nothing, for {@link EverydayHostBindings.bankCompletion}'s reason: a clear is filed on a
    * results screen, and a call whose answer nobody reads cannot put a chime on one. Its non-test
-   * caller is `everyday/fixitScreen.ts#primary`, on a case the run it pressed for has just fixed; a
-   * week's contract clear is banked by `dev/main.ts#closeShift` directly, where the week is filed.
+   * caller is `everyday/fixitScreen.ts#primary`, on a case the run it pressed for has just fixed, and
+   * `everyday/chimeTurns.browser.test.ts` drives that press on the shipped bundle. Campaign stages
+   * and the E1–E6 briefs call it once they are playable in Everyday. A daily-loop week contract never
+   * does: its clear is not Scenario content and pays no scenario award (§ D533's second ruling).
    */
   bankScenarioClear(scenarioId: string): void;
 
@@ -2197,12 +2199,14 @@ export function createEverydayHost(
        * **And the ledger hears about it** — GitHub issue #368. `data/chime-ledger.json`'s
        * `earn-career-day`: *a day the contract paid for — the completed turn, not the day's figures.*
        *
-       * **No longer the earn verb's only non-test caller** (GitHub issue #499). It is posted from four
-       * places: this contract day; {@link EverydayHost.endRush} below, for the waves a broken rush
-       * outlasted; {@link EverydayHost.bankScenarioClear} below, which `everyday/fixitScreen.ts#primary`
-       * calls on a case its run has just fixed; and `dev/main.ts#closeShift`, which posts a week's
-       * contract clear through the same `bankTurn` this binding is. A contract day is the one turn the
-       * owner's first-time-only ruling does not reach, so it still pays on every post.
+       * **No longer the earn verb's only non-test caller** (GitHub issue #499). It is posted from three
+       * places, all in this host: this contract day; {@link EverydayHost.endRush} below, for the waves
+       * a broken rush outlasted; and {@link EverydayHost.bankScenarioClear} below, which
+       * `everyday/fixitScreen.ts#primary` calls on a case its run has just fixed. A contract day is the
+       * one turn the owner's first-time-only ruling does not reach, so it still pays on every post. It
+       * is also the only turn a Career day posts: the week contract standing behind the shell is not
+       * Scenario content, so its clear pays no scenario award (§ D533's second ruling), which
+       * `everyday/chimeTurns.browser.test.ts` asserts on the wire.
        *
        * Placed **after** `setCareer`, and gated on `next !== career` above, so it fires exactly
        * where a day is really filed: `fileDay` returns the record unchanged on a tower this career

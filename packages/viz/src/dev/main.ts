@@ -44,7 +44,6 @@ import {
   SimulationError,
   type BuildingConfig,
   type RunInterventionConfig,
-  type ChimeTurn,
 } from '@elevator-sim/core/browser';
 
 import {
@@ -212,7 +211,7 @@ import {
   type DayReportInput,
   type ShapedDayReport,
 } from '../shift/report.js';
-import { HISTORY_DAYS, newlyClearedScenarioOf, outcomeOf } from '../shift/week.js';
+import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
 import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
@@ -1370,29 +1369,6 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * into a form with no stated purpose, and they could not have known before typing.
    */
   let accountState: AccountState = client === undefined ? signedOut(NO_SERVER_SIGN_IN) : SIGNED_OUT;
-
-  /**
-   * The earn verb, posted once per finished turn — GitHub issues #368 and #499.
-   *
-   * One function for both shells, so a signed-out player and a page with no API origin are refused
-   * the same way whichever world finished the turn: no client or no token is no post. Its callers are
-   * {@link closeShift} (a week's contract clear) and, through `everydayHostBindings.bankCompletion`,
-   * `everyday/host.ts`'s `closeDay`, `endRush` and `bankScenarioClear`.
-   *
-   * **Fire and forget, deliberately.** Each caller is a synchronous path that files something — a
-   * day, a rush's end, a clear — and a filing that could fail because a network call failed would be
-   * a worse trade than a chime nobody banked. The ledger is append-only and the balance is re-read
-   * whenever Settings opens, so a dropped bank costs one award and corrupts nothing.
-   *
-   * **Silent on refusal for the same reason it is silent on success:** § D526 clause 3 keeps a
-   * currency figure off a results page, and a *could not bank that* notice on one would be the same
-   * figure wearing an apology.
-   */
-  function bankTurn(turn: ChimeTurn): void {
-    const token = accountState.token;
-    if (client === undefined || token === undefined) return;
-    void client.bankCompletion(token, turn);
-  }
   let boardView: LeaderboardView = {
     boards: [],
     selected: undefined,
@@ -4117,13 +4093,29 @@ function boot(ui: Elements, resources: BrowserResources): void {
               : { kind: 'unreachable', detail: answer.detail };
           },
     /*
-     * The earn verb — GitHub issues #368 and #499. `bankTurn` is the body, and the Everyday host
-     * calls this binding from `closeDay` (a contract day), `endRush` (the waves a broken rush
-     * outlasted) and `bankScenarioClear` (a fixed case); this closure's own `closeShift` calls
-     * `bankTurn` directly for a week's contract clear. `bankTurn`'s docstring says why every one of
-     * them is fire and forget.
+     * The earn verb — GitHub issues #368 and #499. The Everyday host calls it from `closeDay` (a
+     * contract day), `endRush` (the waves a broken rush outlasted) and `bankScenarioClear` (a fixed
+     * case), and `everyday/chimeTurns.browser.test.ts` reads what those posts put on the wire.
+     * `closeShift` banks nothing: a daily-loop week contract's clear is not a scenario's (§ D533's
+     * second ruling), and a Career day closes through `closeShift` into whatever week is standing.
+     *
+     * Fire and forget, deliberately: each caller is a synchronous path that files something — a day,
+     * a rush's end, a clear — and a filing that could fail because a network call failed would be a
+     * worse trade than a chime nobody banked. The ledger is append-only and the balance is re-read
+     * whenever Settings opens, so a dropped bank costs one award and corrupts nothing.
+     *
+     * Silent on refusal for the same reason it is silent on success: § D526 clause 3 keeps a
+     * currency figure off a results page, and a *could not bank that* notice on one would be the
+     * same figure wearing an apology.
      */
-    bankCompletion: client === undefined ? undefined : bankTurn,
+    bankCompletion:
+      client === undefined
+        ? undefined
+        : (turn) => {
+            const token = accountState.token;
+            if (token === undefined) return;
+            void client.bankCompletion(token, turn);
+          },
     /*
      * **This binding and `accountActions` below are absent together, and a screen reads that.**
      * `everyday/reportScreen.ts` decides whether to draw a live *Post this run* from
@@ -6332,12 +6324,6 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * it again inside a handler that `openTab` called would be the same write twice, which is how a
      * navigation ends up fighting itself.
      */
-    /*
-     * Asked before the write, because after it `state.week` is the closed week — GitHub issue #499.
-     * `shift/week.ts#newlyClearedScenarioOf` is the decision, and says why a retried clearing day is
-     * not a second clear; it is banked below, once the week the clear belongs to is written.
-     */
-    const clearedScenario = newlyClearedScenarioOf(state.week, week);
     state = { ...state, week, report, tomorrow };
     /*
      * **The sheet opens itself only over a reader who is not doing something else** — § D233,
@@ -6362,16 +6348,6 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // A closed day is the thing a player would most mind losing to a reload, so it is the moment
     // the session is written. `nextDay` goes through here on its way to the next sheet.
     saveSessionNow();
-    /*
-     * **And the ledger hears about a scenario this close cleared** — GitHub issue #499, at the moment
-     * the clear is filed: after the week holding it is written and saved. Every early return above
-     * files no clear — a run this shell did not simulate, a player who has not chosen, a day already
-     * filed — and a mode that does not own a week hands back the week it had. Whether a Career day
-     * can clear a week's contract through here is not asserted by any test in this change; if one
-     * does, it is banked like any other clear, and the server pays a scenario once per account.
-     * Nothing is awaited and nothing is drawn — `bankTurn` says why.
-     */
-    if (clearedScenario !== undefined) bankTurn({ completion: 'scenario-cleared', scenarioId: clearedScenario });
     renderAll();
   }
 

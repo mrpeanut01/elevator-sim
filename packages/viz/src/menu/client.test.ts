@@ -1121,7 +1121,7 @@ describe('the earn verb carries the turn it finished, and never an amount — is
   it('posts which scenario was cleared and how many waves a rush outlasted, and nothing else', async () => {
     const { transport, seen } = scripted({ status: 200, body: { balanceChimes: 9 } });
     const client = createClient('https://x', transport);
-    await client.bankCompletion('t', { completion: 'scenario-cleared', scenarioId: 'c1' });
+    await client.bankCompletion('t', { completion: 'scenario-cleared', scenarioId: 'three-cars-one-cars-work' });
     await client.bankCompletion('t', { completion: 'rush-wave-survived', waves: 4 });
     await client.bankCompletion('t', { completion: 'career-day-paid' });
     expect(seen.map((request) => [request.method, request.url, request.token])).toEqual([
@@ -1135,7 +1135,7 @@ describe('the earn verb carries the turn it finished, and never an amount — is
      * award for either is read out of `data/chime-ledger.json` on the other side.
      */
     expect(seen.map((request) => request.body)).toEqual([
-      { completion: 'scenario-cleared', scenarioId: 'c1' },
+      { completion: 'scenario-cleared', scenarioId: 'three-cars-one-cars-work' },
       { completion: 'rush-wave-survived', waves: 4 },
       { completion: 'career-day-paid' },
     ]);

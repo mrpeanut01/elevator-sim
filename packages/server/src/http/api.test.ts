@@ -55,11 +55,16 @@ function idsIn(file: string, key: string, field: string): readonly string[] {
   const document = JSON.parse(readFileSync(join(DATA_DIR, file), 'utf8')) as Record<string, readonly Record<string, string>[] | undefined>;
   return (document[key] ?? []).map((entry) => entry[field] ?? '');
 }
-/** Every scenario a shipped path can clear: the week's contracts (keyed `contractId`), then the fix cases (keyed `id`). */
-const SCENARIO_IDS: readonly string[] = [
-  ...idsIn('contract-ladder.json', 'contracts', 'contractId'),
-  ...idsIn('fixit-cases.json', 'cases', 'id'),
-];
+/**
+ * Every scenario a shipped path can clear, by id: the fix cases, keyed `id`.
+ *
+ * Scenario-mode clears only — the owner's ruling of 2026-09-10, after the review of PR #505. Campaign
+ * stages and the E1–E6 briefs join once they are playable in Everyday, and a daily-loop week contract
+ * is not Scenario content at all.
+ */
+const SCENARIO_IDS: readonly string[] = idsIn('fixit-cases.json', 'cases', 'id');
+/** The daily loop's week contracts, keyed `contractId` — ids the earn route must refuse as scenarios. */
+const WEEK_CONTRACT_IDS: readonly string[] = idsIn('contract-ladder.json', 'contracts', 'contractId');
 
 let server: Server;
 let outbox: OutboxMailer;
@@ -2140,6 +2145,26 @@ describe('a scenario and a rush pay first time only, and the server keeps the re
       expect(bodyOf(refused)['error'], JSON.stringify(body)).toBe('unknown-scenario');
     }
     expect(await balanceOf(player.token)).toBe(before);
+  });
+
+  it('refuses a daily-loop week contract as a scenario, and pays nothing for it — the ruling of 2026-09-10', async () => {
+    /*
+     * **Scenario-mode clears only.** A week contract's clear pays no scenario award: its days already
+     * pay `earn-career-day`, and `docs/38` § 2.4 lists *a scenario cleared* and *a contract day paid*
+     * as separate turns. The review of PR #505 found the viewer posting one, from a Career day closed
+     * into whatever week contract was standing, and this route paid it because it accepted contract
+     * ids. It is refused with the code any other unknown id gets, because to this route a contract
+     * id names no scenario.
+     */
+    expect(WEEK_CONTRACT_IDS.length, 'data/contract-ladder.json names no contract, so this case tests nothing').toBeGreaterThan(0);
+    const player = await signIn();
+    const before = await balanceOf(player.token);
+    for (const scenarioId of WEEK_CONTRACT_IDS) {
+      const refused = await earn(player.token, { completion: 'scenario-cleared', scenarioId });
+      expect(refused.status, scenarioId).toBe(400);
+      expect(bodyOf(refused)['error'], scenarioId).toBe('unknown-scenario');
+    }
+    expect(await balanceOf(player.token), 'a week contract was paid as a scenario').toBe(before);
   });
 
   it('refuses a wave count the stream never generated, and pays nothing for it', async () => {

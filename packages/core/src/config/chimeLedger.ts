@@ -95,8 +95,10 @@ export type ChimeCompletion = (typeof CHIME_COMPLETIONS)[number];
  * a rush finished and the ledger still pays each one the table's flat award. No member carries a
  * figure a run measured, and none can name a chime.
  *
- * - `scenarioId` is a week contract's id or a fix case's (`data/contract-ladder.json`,
- *   `data/fixit-cases.json`). The server refuses one those documents do not name.
+ * - `scenarioId` is a fix case's id (`data/fixit-cases.json`). **Scenario-mode clears only**, the
+ *   owner's ruling of 2026-09-10 after the review of PR #505: campaign stages and the E1–E6 briefs
+ *   join once they are playable in Everyday, a daily-loop week contract's clear pays no scenario
+ *   award (its days pay `career-day-paid`), and the server refuses any id that is not a fix case's.
  * - `waves` is how many whole waves the rush **outlasted** before its breaking point; the wave the
  *   line was crossed in was reached and not survived. The server refuses a count above the waves the
  *   stream generates.
@@ -221,7 +223,7 @@ export type ChimeSchemaUnit = (typeof CHIME_SCHEMA_UNITS)[number];
  * … known before anybody plays"*. It was not. The band arrived **verbatim in the request body**
  * (`http/api.ts`'s earn route), `data/scenario-survivors.json` carries survivor **counts** and no
  * band at all, nothing the earn route reads maps a count to one, and the server was not then told which
- * scenario was cleared (since GitHub issue #499 it is told a scenario id, which pays a scenario once
+ * scenario was cleared (since GitHub issue #499 it is told a fix-case id, which pays a scenario once
  * and maps to no band). A client could post `single` on the easiest scenario and be paid 10 instead
  * of 4. (A survivor band does exist since GitHub issue #234 — `data/scenario-survivor-bands.json`, a
  * **difficulty** band per ladder position, drafted for the owner's approval, whose only reader is a
@@ -420,7 +422,7 @@ function parseSource(raw: unknown, where: string): ChimeSource {
       `${where}.bands: an award may not be banded. Nothing the earn route reads maps a survivor ` +
         'count to a band: data/scenario-survivors.json carries counts and no band, the one survivor ' +
         'band in the tree (data/scenario-survivor-bands.json) is a drafted difficulty band whose only ' +
-        'reader is an acceptance check, and nothing maps the scenario id the earn route is told to one ' +
+        'reader is an acceptance check, and nothing maps the fix-case id the earn route is told to one ' +
         '— so a band could only arrive from the client that is paid for it. ' +
         'DECISIONS.md D256: a stated mechanism is measured or withdrawn, never re-worded.',
     );

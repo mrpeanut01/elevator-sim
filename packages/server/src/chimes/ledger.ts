@@ -117,7 +117,10 @@ const RUSH_TEMPLATE_ID = 'endless-rush';
  * waves the stream generates.
  */
 export interface ChimeTurnBounds {
-  /** Every scenario a shipped path can clear: the week's contracts and the fix cases, by id. */
+  /**
+   * Every scenario a shipped path can clear, by id — the fix cases, today. Scenario-mode clears only
+   * (the owner's ruling of 2026-09-10): {@link loadChimeTurnBounds} says why a week contract is not one.
+   */
   readonly scenarioIds: ReadonlySet<string>;
   /** How many waves the rush's stream generates — the most a run can outlast before it breaks. */
   readonly rushWaves: number;
@@ -142,34 +145,37 @@ export function rushWaveCountOf(profiles: TrafficProfiles): number | undefined {
 /**
  * Read the turns a shipped build pays for, at boot — GitHub issue **#499**.
  *
- * The scenario ids come from `data/contract-ladder.json` (the week's contracts, each keyed
- * `contractId`) and `data/fixit-cases.json` (the fix cases, each keyed `id`): the two kinds of
- * scenario a shipped path files a clear for. Only the ids are read, because the documents' shapes are
- * the viewer's to validate and this package may not import that validation.
+ * **Scenario-mode clears only**, the owner's ruling of 2026-09-10 after the review of PR #505. The
+ * scenario ids are the fix cases' (`data/fixit-cases.json`, each keyed `id`), because a fix case is
+ * the one kind of Scenario content a shipped path files a clear for today. Campaign stages and the
+ * E1–E6 briefs join this set once they are playable in Everyday, and not before: an id for a clear
+ * no shipped path can file is an id only a hand-built request would post.
+ *
+ * **A daily-loop week contract (`data/contract-ladder.json`, `c1`–`c8`) is not here, and that is the
+ * ruling rather than an omission.** A contract's days already pay `earn-career-day`, and `docs/38`
+ * § 2.4 lists *a scenario cleared* and *a contract day paid* as separate turns. The first cut of #499
+ * read the contracts in as well, and the review found what that paid for: `dev/main.ts#closeShift`
+ * banked a week contract's clear, and a Career day closed into whatever week was standing, so a
+ * Career day could post a scenario clear for another building's contract. A contract id now names no
+ * scenario, and {@link earnCompletion} refuses it as `unknown-scenario`, like any other name it does
+ * not hold.
+ *
+ * Only the ids are read, because the document's shape is the viewer's to validate and this package
+ * may not import that validation.
  *
  * **Throws**, on {@link loadChimeLedger}'s ground: a server that cannot say which turns it pays would
  * refuse every scenario clear at the moment a player finished one. It refuses a missing or empty
- * list, an entry with no id, an id named twice, an id both documents claim — one clear would then
- * name two scenarios — and a rush it cannot count.
+ * list, an entry with no id, an id named twice, and a rush it cannot count.
  */
 export async function loadChimeTurnBounds(dataDir: string, profiles: TrafficProfiles): Promise<ChimeTurnBounds> {
-  const [contracts, cases] = await Promise.all([
-    idsIn(join(dataDir, 'contract-ladder.json'), 'contracts', 'contractId'),
-    idsIn(join(dataDir, 'fixit-cases.json'), 'cases', 'id'),
-  ]);
-  const shared = contracts.filter((id) => cases.includes(id));
-  if (shared.length > 0) {
-    throw new Error(
-      `chime turns: ${shared.join(', ')} is both a contract and a fix case, so one clear would name two scenarios.`,
-    );
-  }
+  const cases = await idsIn(join(dataDir, 'fixit-cases.json'), 'cases', 'id');
   const rushWaves = rushWaveCountOf(profiles);
   if (rushWaves === undefined) {
     throw new Error(
       `chime turns: the traffic profiles carry no "${RUSH_TEMPLATE_ID}" template with waves in it, so no rush result can be bounded.`,
     );
   }
-  return Object.freeze({ scenarioIds: new Set([...contracts, ...cases]), rushWaves });
+  return Object.freeze({ scenarioIds: new Set(cases), rushWaves });
 }
 
 /** The `field` of every entry in one document's list, refusing the shapes {@link loadChimeTurnBounds} names. */
@@ -221,7 +227,7 @@ async function idsIn(path: string, key: string, field: string): Promise<readonly
  * post `single` on the easiest scenario and be paid ten instead of four. Nor could it have been
  * derived: `data/scenario-survivors.json` carries survivor **counts** and no band, nothing this route
  * reads maps a count to one, and this route was not then told which scenario was cleared (since
- * GitHub issue #499 it is told a scenario id, which pays once and maps to no band). The one survivor
+ * GitHub issue #499 it is told a fix-case id, which pays once and maps to no band). The one survivor
  * band in the tree — `data/scenario-survivor-bands.json`, GitHub issue #234's drafted difficulty band
  * per ladder position — has a viz acceptance check as its only reader.
  *

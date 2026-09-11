@@ -1098,10 +1098,11 @@ async function chimeBalance(deps: ApiDeps, request: ApiRequest): Promise<ApiResp
 /**
  * Bank a completed turn — **and the body carries a turn, never an amount**.
  *
- * A client says *I cleared this scenario*, *this contract day was paid* or *this rush outlasted this
- * many waves*, and the server prices it from `data/chime-ledger.json`. There is no field here in which a number could arrive, which is
- * [§ D526](../../../../DECISIONS.md) clause 6 as a wire format rather than as a rule: a purchase
- * is a client naming an amount, and this route has nowhere to put one.
+ * A client says *I cleared this fix case*, *this contract day was paid* or *this rush outlasted this
+ * many waves*, and the server prices it from `data/chime-ledger.json`. **No field here carries an
+ * amount.** `waves` is a number, but it counts turns and the ledger prices each one; `scenarioId`
+ * names a fix case. That is [§ D526](../../../../DECISIONS.md) clause 6 as a wire format rather than
+ * as a rule: a purchase is a client naming an amount, and this route has nowhere to put one.
  *
  * It also has no way to name a **source**. The completions are the three in `core`'s
  * `CHIME_COMPLETIONS`; the sign-in gift is a source with no completion and is written by the
@@ -1127,11 +1128,11 @@ async function chimeBalance(deps: ApiDeps, request: ApiRequest): Promise<ApiResp
  *
  * **What it cannot check, stated rather than hidden:** that the scenario was cleared, or that the rush
  * reached the waves claimed — a contract day has been believed the same way since #368, and a rush
- * result is not replayed until #372. The bounds are the shipped scenario ids and the stream's wave
+ * result is not replayed until #372. The bounds are the shipped fix-case ids and the stream's wave
  * count; within them a post is believed, once.
  *
  * **Its refusal details are drawn by no screen**, which is why they are not in `honesty/surfaces.ts`:
- * `packages/viz/src/dev/main.ts#bankTurn` posts and discards the answer, on § D526 clause 3's ground
+ * `packages/viz/src/dev/main.ts`'s earn binding posts and discards the answer, on § D526 clause 3's ground
  * that nothing about a chime reaches a results page.
  */
 const EARN_REFUSAL_DETAIL: Readonly<Partial<Record<string, string>>> = Object.freeze({

@@ -1902,24 +1902,6 @@ describe('what the host banks — GitHub issue #499, first time only', () => {
     expect(h.banked).toEqual([{ completion: 'scenario-cleared', scenarioId: 'sleeping-sky-lobby' }]);
   });
 
-  it('is called by the fix-it screen on a case this run fixed, after the solved set is kept', () => {
-    /*
-     * The fix-it screen's run lands on a worker and its mount needs a document, so the wiring is read
-     * as text — `dev/main.progression.test.ts`'s idiom and its caveat: weak evidence about behaviour,
-     * strong evidence about a line having been deleted or moved. The decision it gates on is
-     * `fixit/engine.ts#fixedBadgeAfter`, which `fixit/engine.test.ts` drives in both directions.
-     */
-    const source = readFileSync(fileURLToPath(new URL('./fixitScreen.ts', import.meta.url)), 'utf8');
-    const start = source.indexOf('function primary(): void {');
-    expect(start).toBeGreaterThan(-1);
-    const body = source.slice(start, source.indexOf('\n  }', start));
-    const badge = body.indexOf('session.fixed = fixedBadgeAfter(session.outcome);');
-    const kept = body.indexOf('keepSolved();');
-    const banked = body.indexOf('if (session.fixed) scenarioHost.bankScenarioClear(entry.id);');
-    expect(badge).toBeGreaterThan(-1);
-    expect(kept).toBeGreaterThan(badge);
-    expect(banked, 'the fix-it screen files a clear and the ledger never hears of it').toBeGreaterThan(kept);
-  });
 });
 
 describe('the replay — GitHub issue #177 item 1, § D517', () => {
