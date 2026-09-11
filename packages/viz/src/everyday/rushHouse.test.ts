@@ -82,8 +82,8 @@ describe('the table is a measurement, pinned to this build’s stream', () => {
   it('replays a cell on a tower whose first contract scales occupancy, and matches the file to the figure', () => {
     /*
      * `chancery-house` × `collective`. The garden cell cannot see whose population sizes the stream:
-     * Garden Apartments' first contract leaves the tower as authored, and § D547 measured 3 466 legs
-     * there either way. Midtown Office and Chancery House are the two towers where it moved, and the
+     * from a day-1 week the press already wrote Garden Apartments' own rate, and § D547 measured 3 466
+     * legs there either way. Midtown Office and Chancery House are the two towers where it moved, and the
      * table's 26 rows on them were first measured with the stream sized from the player's week (§ D548).
      */
     const resources = browserResourcesFrom(config);
