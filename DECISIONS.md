@@ -34943,7 +34943,7 @@ Positions 1–2 may allow many survivors, because a dropdown clear is permitted 
 positions allow few, but at least one. The band is authored in data as shares of the configurations
 examined, drafted for approval. The rebalance then moves demand and building fabric, never a bar, to
 bring each scenario inside its band."* The figures under that ruling, the reading rules and the
-register are the #234 lane's, and **every figure is a draft the owner has not approved**.
+register are the #234 lane's. **The owner approved every figure as drafted on 2026-09-10**, and ruled that the band carries no dropdown ceiling (clause 7).
 
 **Why an entry.** All three of § D405's grounds. It records an owner ruling that gives § D528 clause
 2's *budgeted by ladder position* its form. Its reading rules bind the rebalance lane and anyone who
@@ -34954,7 +34954,7 @@ one in `packages/server/src/chimes/ledger.ts`, one in `data/chime-ledger.json` a
 into a band.
 
 1. **The band is its own authored file**, `data/scenario-survivor-bands.json`: `version`; a
-   `provenance` block declaring `kind: 'chosen'` and `approval: 'draft'`; and bands over contiguous
+   `provenance` block declaring `kind: 'chosen'`, its `approval` and `approvedOn`, and the survivor-table `approvedAtSampleSize` it was approved against; and bands over contiguous
    position ranges, the last open-ended, each with `minShare`, `maxShare`, an invariant-8 `schema` per
    share whose default is the shipped value, and a `note` opening `CHOSEN:`. **Not** a field of
    `data/scenario-survivors.json`, which is generated and declares itself measured, so a choice there
@@ -34967,12 +34967,12 @@ into a band.
    argues from one yardstick, stated as a yardstick and not as a model of play: the share at which a
    player trying a few configurations at random is more, or less, likely than not to find a way
    through. The figure most worth attacking is the 0.25 floor at positions 1–2, which reads *"doable
-   with tweaks"* (§ D525) where the ruling itself names no floor above one survivor.
+   with tweaks"* (§ D525) where the ruling itself names no floor above one survivor. The owner approved it as drafted.
 3. **What is ruled is enforced in code, not authored as a figure.** At least one survivor at every
    position (§ D525 clause 3), a declared diagnosis exempting a zero count from that floor and from
    nothing else — `survivors.ts`'s own asymmetry. The band narrows: from one band to the next the
    ceiling, the floor and the width may not grow. No band admits the whole space (`maxShare < 1`, DC-1
-   as a reading of the count). Approving the band flips one field and moves no code.
+   as a reading of the count). Approving the band sets `approval`, `approvedOn` and `approvedAtSampleSize` together — the schema refuses an approval missing a date or a sample size — and moves the register on the same commit wherever the approved figures move a verdict. It moves no code.
 4. **A scenario is judged at its base budget rung.** A ladder position describes the scenario as every
    player meets it, and a bought rung is an optional purchase in chimes (§ D526). A band judged at
    every rung would forbid a purchase from widening the space, which § D525 clause 3 and § D528
@@ -34987,6 +34987,13 @@ into a band.
    have one survivor each — and does not say which survivors were suppressed. **But a zero over
    suppressed runs is not a zero over measured ones**, so a scenario below its band on which every
    examined configuration was suppressed reads `below-over-suppressed-runs`.
+   **What a share is made of.** At the base rung the configurations examined are a census of every
+   shipped profile the rung affords plus the table's `sampleSize` dial draws (12 when approved), so a
+   share moves with either — the census when prices move, the sample when the sweep's budget does —
+   even where the scenario has not. The band records the sample size it was approved against, and the
+   check refuses a table regenerated at another until the band is re-approved; a moved census is a real
+   change in what a player can afford, and is judged as one. **A configuration core refuses to build is
+   not in `examined`** (`survivors.ts`), so it is neither a way through nor a failure a player meets.
 6. **The check is `packages/viz/src/scenario/survivorBands.test.ts`**, always on and simulating
    nothing, with a register checked in both directions whose entries name their verdict. The counts
    are derived on every run and never written into an entry, so a regeneration — GitHub issue #467's
@@ -34997,14 +35004,14 @@ into a band.
    cannot see which configuration got through: the one survivor on stage 3 and the one on stage 5 are
    shipped dispatcher profiles, which § D528 clause 2 forbids from position three. That clause's
    per-tier form is not asserted by this check, and `campaign/difficultyCurve.test.ts`'s
-   `DROPDOWN_CLEARS` holds its dropdown half. **Whether the band should carry a dropdown ceiling of its
-   own is not decided here**, and is the owner's.
+   `DROPDOWN_CLEARS` holds its dropdown half. **The owner ruled on 2026-09-10 that it carries none**: which
+   survivor got through stays `DROPDOWN_CLEARS`' question, and that register is to be reconciled against the
+   survivor table, which names a different clearing profile for stage 5.
 8. **The chime sentences are corrected, and the refusal stands.** The earn route still reads no band
    and is still never told which scenario was cleared, so `parseChimeLedger` still refuses a `bands`
    key. What changed is only that a sentence saying no band exists anywhere had become false.
 
-**What this does not decide.** Whether the drafted figures are right: the owner's approval does
-that, and the register moves with the band on the same commit. The rebalance: no scenario is moved
+**What this does not decide.** The rebalance: no scenario is moved
 here. Which lever — demand or fabric — moves each scenario outside its band, which is unmeasured.
 Whether a harder band should pay more chimes, which § D526 clause 2 permits and nothing takes up.
 

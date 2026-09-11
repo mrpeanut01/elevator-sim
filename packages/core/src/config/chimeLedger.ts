@@ -226,7 +226,7 @@ export type ChimeSchemaUnit = (typeof CHIME_SCHEMA_UNITS)[number];
  * scenario was cleared (since GitHub issue #499 it is told a fix-case id, which pays a scenario once
  * and maps to no band). A client could post `single` on the easiest scenario and be paid 10 instead
  * of 4. (A survivor band does exist since GitHub issue #234 — `data/scenario-survivor-bands.json`, a
- * **difficulty** band per ladder position, drafted for the owner's approval, whose only reader is a
+ * **difficulty** band per ladder position, approved by the owner on 2026-09-10, whose only reader is a
  * viz acceptance check ([§ D537](../../../../DECISIONS.md)). It is on no scenario's pinned record, and
  * nothing that pays reads it.)
  *
@@ -421,7 +421,7 @@ function parseSource(raw: unknown, where: string): ChimeSource {
     throw new ChimeLedgerError(
       `${where}.bands: an award may not be banded. Nothing the earn route reads maps a survivor ` +
         'count to a band: data/scenario-survivors.json carries counts and no band, the one survivor ' +
-        'band in the tree (data/scenario-survivor-bands.json) is a drafted difficulty band whose only ' +
+        'band in the tree (data/scenario-survivor-bands.json) is an approved difficulty band whose only ' +
         'reader is an acceptance check, and nothing maps the fix-case id the earn route is told to one ' +
         '— so a band could only arrive from the client that is paid for it. ' +
         'DECISIONS.md D256: a stated mechanism is measured or withdrawn, never re-worded.',

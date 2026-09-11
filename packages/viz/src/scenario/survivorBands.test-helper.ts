@@ -83,7 +83,7 @@
 
 import { fileURLToPath } from 'node:url';
 
-import type { PublishedSurvivorScenario, PublishedSurvivorStep } from './survivors.js';
+import type { PublishedSurvivorScenario, PublishedSurvivorStep, PublishedSurvivors } from './survivors.js';
 
 /** Where the band lives. One constant, so the check and anything that ever writes it cannot diverge. */
 export const SURVIVOR_BANDS_PATH = fileURLToPath(
@@ -134,6 +134,11 @@ export interface SurvivorBandProvenance {
   readonly draftedOn: string;
   /** `null` while a draft; the date of the approval once approved. */
   readonly approvedOn: string | null;
+  /**
+   * The survivor table's `sampleSize` the band was approved against, or `null` while a draft. A share
+   * is survivors over the affordable census plus that many dial draws, so it moves with the sample.
+   */
+  readonly approvedAtSampleSize?: number | null;
 }
 
 export interface SurvivorBands {
@@ -160,7 +165,7 @@ const TOLERANCE = 1e-9;
  * -------------------------------------------------------------------------- */
 
 const TOP_KEYS = ['$comment', 'version', 'provenance', 'bands'] as const;
-const PROVENANCE_KEYS = ['kind', 'approval', 'ruling', 'draftedOn', 'approvedOn'] as const;
+const PROVENANCE_KEYS = ['kind', 'approval', 'ruling', 'draftedOn', 'approvedOn', 'approvedAtSampleSize'] as const;
 const BAND_KEYS = ['fromPosition', 'toPosition', 'minShare', 'maxShare', 'schema', 'note'] as const;
 const SCHEMA_KEYS = ['minShare', 'maxShare'] as const;
 const SHARE_SCHEMA_KEYS = ['type', 'unit', 'min', 'max', 'default', 'activeWhen'] as const;
@@ -258,6 +263,17 @@ function provenanceIssues(raw: unknown): string[] {
       'provenance: the band is a draft that carries an approval date. A draft has none; approval ' +
         'becomes "approved" on the commit that records the owner’s approval.',
     );
+  }
+  const sampleSize = raw['approvedAtSampleSize'];
+  if (approval === 'approved' && !(Number.isSafeInteger(sampleSize) && (sampleSize as number) > 0)) {
+    out.push(
+      'provenance: the band says it is approved and does not record approvedAtSampleSize, the survivor ' +
+        'table sample size it was approved against. A share moves with that sample, so an approval that ' +
+        'does not name it approves nothing a later table can be held to.',
+    );
+  }
+  if (approval === 'draft' && sampleSize !== undefined && sampleSize !== null) {
+    out.push('provenance: the band is a draft that records approvedAtSampleSize. A draft has approved nothing.');
   }
   return out;
 }
@@ -437,6 +453,26 @@ export function decodeSurvivorBands(raw: unknown): SurvivorBands {
   return raw as SurvivorBands;
 }
 
+/**
+ * Whether the survivor table was measured at the sample size the band was approved against.
+ *
+ * A share is survivors over a census of the profiles a rung affords plus `provenance.sampleSize` dial
+ * draws, so the same scenario reads a different share at another sample size. An approved band names
+ * the sample it was approved at, and a table regenerated at another is refused until the band is
+ * re-approved. A draft has approved nothing, so it holds the table to nothing.
+ */
+export function sampleSizeIssue(bands: SurvivorBands, table: PublishedSurvivors): string | undefined {
+  const approvedAt = bands.provenance.approvedAtSampleSize;
+  if (bands.provenance.approval !== 'approved' || approvedAt === undefined || approvedAt === null) return undefined;
+  if (table.provenance.sampleSize === approvedAt) return undefined;
+  return (
+    `data/scenario-survivors.json was measured at sample size ${String(table.provenance.sampleSize)}, and the ` +
+    `band was approved against ${String(approvedAt)}. A share is survivors over the affordable census plus ` +
+    'that many dial draws, so every share moved without any scenario moving. Re-approve the band at the ' +
+    'new sample size, or regenerate the table at the old one.'
+  );
+}
+
 /** The band covering a ladder position, or `undefined` for a position no band covers. */
 export function bandForPosition(bands: SurvivorBands, position: number): SurvivorBand | undefined {
   return bands.bands.find(
@@ -514,6 +550,9 @@ export function bandReadingOf(
         'no band covers.',
     );
   }
+  // `unbuildable` configurations are not in `examined` (`survivors.ts#PublishedSurvivorStep`), so a
+  // change core refuses to build is neither a way through nor a failure a player meets, and it leaves
+  // the share without this line touching it.
   const judged = step.examined - step.unjudged;
   return {
     scenarioId: scenario.id,

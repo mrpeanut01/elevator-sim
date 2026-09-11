@@ -228,7 +228,7 @@ async function idsIn(path: string, key: string, field: string): Promise<readonly
  * derived: `data/scenario-survivors.json` carries survivor **counts** and no band, nothing this route
  * reads maps a count to one, and this route was not then told which scenario was cleared (since
  * GitHub issue #499 it is told a fix-case id, which pays once and maps to no band). The one survivor
- * band in the tree — `data/scenario-survivor-bands.json`, GitHub issue #234's drafted difficulty band
+ * band in the tree — `data/scenario-survivor-bands.json`, GitHub issue #234's approved difficulty band
  * per ladder position — has a viz acceptance check as its only reader.
  *
  * [§ D256](../../../../DECISIONS.md) decides what happens next — a stated mechanism is measured or
