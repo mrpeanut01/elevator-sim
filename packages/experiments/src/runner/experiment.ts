@@ -32,6 +32,7 @@ import type {
   BatchSizeCurve,
   CredentialAssignment,
   CredentialGapOverride,
+  DutyDemandOverride,
   DayVariationConfig,
   DemandLevel,
   DirectionalSplit,
@@ -203,6 +204,29 @@ function parseCredentialGap(value: unknown, path: string): CredentialGapOverride
   return { wrongZoneShare: asFiniteNumber(record['wrongZoneShare'], `${path}.wrongZoneShare`) };
 }
 
+/**
+ * A duty block as a spec author writes it — GitHub issue #481. Any of the three shares, each named
+ * alone, because `DutyDemandOverride` falls back to the data key by key; the ranges and the sum are
+ * the generator's to refuse, exactly as `parseCredentialGap` leaves the share's range to it.
+ */
+function parseDutyDemand(value: unknown, path: string): DutyDemandOverride {
+  const record = asRecord(value, path);
+  rejectUnknown(record, ['shares'], path);
+  const shares = asRecord(record['shares'], `${path}.shares`);
+  rejectUnknown(shares, ['goods', 'bed', 'service'], `${path}.shares`);
+  return {
+    shares: {
+      ...(present(shares, 'goods')
+        ? { goods: asFiniteNumber(shares['goods'], `${path}.shares.goods`) }
+        : {}),
+      ...(present(shares, 'bed') ? { bed: asFiniteNumber(shares['bed'], `${path}.shares.bed`) } : {}),
+      ...(present(shares, 'service')
+        ? { service: asFiniteNumber(shares['service'], `${path}.shares.service`) }
+        : {}),
+    },
+  };
+}
+
 /** A day-variation block as a spec author writes it. Both bounds required. docs/14 § 2.3. */
 function parseDayVariation(value: unknown, path: string): DayVariationConfig {
   const record = asRecord(value, path);
@@ -260,6 +284,7 @@ const DEMAND_PARSERS: DemandParsers = {
   credentialAssignment: (value, path) =>
     asMember<CredentialAssignment>(value, CREDENTIAL_ASSIGNMENTS, path),
   credentialGap: parseCredentialGap,
+  duty: parseDutyDemand,
   maxLegs: asFiniteNumber,
   peakWindowS: asFiniteNumber,
   baselineFraction: asFiniteNumber,

@@ -257,6 +257,11 @@ export function traceKeyOf(simulation: CellSimulationConfig): string {
     // data produces exactly the trace key it produced before this field existed, and no cohort in
     // any existing experiment moves — the same argument the three below carry.
     credentialGap: demand.credentialGap,
+    // GitHub issue #481, on the credential gap's argument exactly: `canonicalize` drops `undefined`,
+    // so an arm that leaves the duty shares to the reference data keeps the key it had. Separated
+    // even though the shares move a trace only where a car declares a duty — pairing two arms the
+    // key cannot tell apart is the failure, and a key that splits a cohort it need not is not.
+    duty: demand.duty,
     maxLegs: demand.maxLegs,
     peakWindowS: demand.peakWindowS,
     baselineFraction: demand.baselineFraction,

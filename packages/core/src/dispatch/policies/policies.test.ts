@@ -242,9 +242,17 @@ interface ContributionScenario {
 function contributionScenarios(): readonly ContributionScenario[] {
   const idle: ContributionScenario = {
     name: 'idle',
-    cars: [snapshotAt('A', '0'), snapshotAt('B', '6'), snapshotAt('C', '12'), snapshotAt('D', '18')],
+    // Car D declared goods and the call a passenger's, for `rideTime`'s reason above (GitHub issue
+    // #481): `dutyMismatch` prices a call only when the call carries a duty and some car's differs,
+    // so a scenario without both would fail any profile that weights it, by construction.
+    cars: [
+      snapshotAt('A', '0'),
+      snapshotAt('B', '6'),
+      snapshotAt('C', '12'),
+      Object.freeze({ ...snapshotAt('D', '18'), duty: 'goods' as const }),
+    ],
     at: 0,
-    call: call('9', 'up', 0, '17'),
+    call: { ...call('9', 'up', 0, '17'), duty: 'passenger' },
     waitingPassengers: 6,
   };
 

@@ -29,6 +29,7 @@
  *   building that skips 13 or starts at -2.
  */
 
+import type { Duty } from '../../config/types.js';
 import type { SimTime } from '../../kernel/types.js';
 import type { DoorConfig, DoorMachineState } from '../../physics/doors/index.js';
 import type { MotionConstraints, MotionProfile } from '../../physics/motion/index.js';
@@ -632,6 +633,12 @@ export interface CarSnapshot {
   /** Simulated time the snapshot was taken. Every route time is relative to this. */
   readonly at: SimTime;
   readonly mode: ServiceMode;
+  /**
+   * What the car is for, as declared — GitHub issue #481. **Absent when the car declares none**, and
+   * a reader applies `DEFAULT_CAR_DUTY` rather than finding it here, so a building that declares no
+   * duty produces exactly the snapshots it did before the field existed.
+   */
+  readonly duty?: Duty | undefined;
 
   /** Floor the car is at, or the one it last left while {@link motion} is in progress. */
   readonly floorId: string;
@@ -736,6 +743,12 @@ export interface CostRequest {
   readonly kind?: 'hall' | 'car' | undefined;
   /** Access-control credential, when known. `undefined` means an unbadged visitor. */
   readonly credentialGroup?: CredentialGroup | undefined;
+  /**
+   * The rider's duty, forwarded from the call by `costRequestFor` under every call type — GitHub
+   * issue #481. Read by `dutyMismatchTerm` and by nothing in `estimateCost`: a duty prices a car, it
+   * never makes one infeasible.
+   */
+  readonly duty?: Duty | undefined;
   /** Destination, when known at call time (destination entry). */
   readonly destinationFloorId?: string | undefined;
   /** Passengers expected to board. Defaults to `assumedBoardingPassengers`. */

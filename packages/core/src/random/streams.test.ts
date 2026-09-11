@@ -31,6 +31,9 @@ describe('StreamSet — required streams', () => {
       'modeChoice',
       'dayVariation',
       'credential',
+      // GitHub issue #481: a journey's duty. Appended for the same reason, so the eleven above
+      // keep the PCG parameters their golden vectors below pin.
+      'duty',
     ]);
   });
 
@@ -398,6 +401,13 @@ const GOLDEN_STREAMS: Readonly<Record<StreamName, GoldenVector>> = {
     initState: 6419364212881892576n,
     initSeq: 9369841324602713275n,
     firstDraws: [4180617894, 3874291952, 653796123, 2278565795],
+  },
+  // GitHub issue #481. Recorded when the stream was added; the eleven vectors above are the proof that
+  // adding it moved none of them.
+  duty: {
+    initState: 15729102548481749012n,
+    initSeq: 6038388547346923148n,
+    firstDraws: [1374562018, 2748204689, 3432331392, 2500501789],
   },
 };
 

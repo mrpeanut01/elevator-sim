@@ -875,6 +875,10 @@ export class Simulation {
           // "configured, validated, dead in the shipped path" shape docs/05 § *Standing
           // requirement* names. The non-test caller of `CarInit.mode` is right here.
           mode: spec.mode,
+          // What the car is for, straight off the resolved car (GitHub issue #481) — the non-test
+          // caller of `CarInit.duty`, for `mode`'s reason above. Spread-or-omit, so a car that
+          // declares none is constructed exactly as it was.
+          ...(spec.duty === undefined ? {} : { duty: spec.duty }),
           ...(answer === undefined ? {} : { answer }),
           ...(loadSensorSpec === undefined ? {} : { loadSensorSpec }),
           ...(passengerTransferS === undefined ? {} : { passengerTransferS }),
@@ -4291,6 +4295,7 @@ export class Simulation {
   ): DispatchCall & HallCall {
     let credentialGroup: string | undefined;
     let destinationFloorId: string | undefined;
+    let duty: DispatchCall['duty'];
     for (const passenger of floor.waiting(direction)) {
       if (
         forDestinationFloorId !== undefined &&
@@ -4301,6 +4306,7 @@ export class Simulation {
       if (!this.#bankCanCarry(bank, passenger)) continue;
       credentialGroup = passenger.credentialGroup;
       destinationFloorId = passenger.destinationFloorId;
+      duty = passenger.duty;
       break;
     }
     return Object.freeze({
@@ -4311,6 +4317,10 @@ export class Simulation {
       registeredAt,
       ...(credentialGroup === undefined ? {} : { credentialGroup }),
       ...(destinationFloorId === undefined ? {} : { destinationFloorId }),
+      // The head's duty, GitHub issue #481: the landing's duty control, pressed by the person this
+      // call already speaks for. Carried under every call type — `costRequestFor` says why — and
+      // omitted where the head has none, which is every call in a building that declares no duty.
+      ...(duty === undefined ? {} : { duty }),
       // The panel authorized this request (DECISIONS.md § D30), and says so.
       //
       // `#bankCanCarry` — the predicate every passenger above has just passed — *is* the access
@@ -5574,6 +5584,8 @@ function traceConfigFor(config: SimulationConfig, streams: StreamSet): TrafficCo
     // default here would be a second source of truth for a number `data/traffic-profiles.json`
     // already states with its reasoning attached (§ D265).
     ...(demand.credentialGap === undefined ? {} : { credentialGap: demand.credentialGap }),
+    // GitHub issue #481. Spread-or-omit for the same reason: unset means the data decides.
+    ...(demand.duty === undefined ? {} : { duty: demand.duty }),
     ...(demand.maxLegs === undefined ? {} : { maxLegs: demand.maxLegs }),
     // docs/14 §§ 2.1-2.2. Spread-or-omit, never `?? <a default of this file's own>`: unset means
     // the reference data decides, and a default invented here would be a second source of truth

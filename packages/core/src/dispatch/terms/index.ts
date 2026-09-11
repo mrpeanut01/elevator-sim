@@ -59,6 +59,7 @@
 import type { CostTermDefinition } from '../types.js';
 
 import { crowdingTerm } from './crowding.js';
+import { dutyMismatchTerm } from './dutyMismatch.js';
 import { detourPenaltyTerm } from './detourPenalty.js';
 import { diversionDetourTerm } from './diversionDetour.js';
 import { directionReversalTerm } from './directionReversal.js';
@@ -92,6 +93,7 @@ export const COST_TERMS: readonly CostTermDefinition[] = Object.freeze([
   zoneAffinityTerm,
   predictedDemandTerm,
   crowdingTerm,
+  dutyMismatchTerm,
 ]);
 
 /**
@@ -124,6 +126,7 @@ export const DECLARED_TERM_IDS: readonly string[] = Object.freeze([
   'zoneAffinity',
   'predictedDemand',
   'crowding',
+  'dutyMismatch',
 ]);
 
 const DECLARED_TERM_ID_SET: ReadonlySet<string> = new Set(DECLARED_TERM_IDS);
@@ -158,6 +161,7 @@ export function isImplementedTerm(id: string): boolean {
  * -------------------------------------------------------------------------- */
 
 export { crowdingTerm, spareSeatsOnArrival, unservedQueueFraction } from './crowding.js';
+export { dutyMismatchOf, dutyMismatchTerm } from './dutyMismatch.js';
 
 export { detourPassengerSeconds, detourPenaltyTerm } from './detourPenalty.js';
 export {

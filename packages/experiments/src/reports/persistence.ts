@@ -755,6 +755,7 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
     'interfloorWeighting',
     'credentialAssignment',
     'credentialGap',
+    'duty',
     'maxLegs',
     'peakWindowS',
     'baselineFraction',
@@ -822,6 +823,24 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
     });
   });
 
+  // GitHub issue #481, for the credential gap's reason: a stored block with a misspelt share would
+  // rebuild at the shipped share while the record named another. Each share is optional, because
+  // the override falls back to the data key by key.
+  const duty = readOptional(object, 'duty', path, (entry, entryPath) => {
+    const inner = expectObject(entry, entryPath);
+    rejectUnknownKeys(inner, entryPath, ['shares']);
+    const sharesPath = [...entryPath, 'shares'];
+    const shares = expectObject(inner['shares'], sharesPath);
+    rejectUnknownKeys(shares, sharesPath, ['goods', 'bed', 'service']);
+    return Object.freeze({
+      shares: Object.freeze({
+        ...spread('goods', readOptional(shares, 'goods', sharesPath, expectNumber)),
+        ...spread('bed', readOptional(shares, 'bed', sharesPath, expectNumber)),
+        ...spread('service', readOptional(shares, 'service', sharesPath, expectNumber)),
+      }),
+    });
+  });
+
   const split = readOptional(object, 'directionalSplit', path, (entry, entryPath) => {
     const inner = expectObject(entry, entryPath);
     rejectUnknownKeys(inner, entryPath, ['incoming', 'outgoing', 'interfloor']);
@@ -865,6 +884,7 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
       ),
     ),
     ...spread('credentialGap', credentialGap),
+    ...spread('duty', duty),
     ...spread('maxLegs', readOptional(object, 'maxLegs', path, expectNumber)),
     ...spread('peakWindowS', readOptional(object, 'peakWindowS', path, expectNumber)),
     ...spread('baselineFraction', readOptional(object, 'baselineFraction', path, expectNumber)),
@@ -1130,6 +1150,9 @@ function demandOptionsOf(demand: NonNullable<SimulationConfig['demand']>): Store
     // § D265, for `mixAmplitude`'s reason one line down: 0 is a control arm, and a projection
     // that dropped it would replay the control at the shipped share.
     ...spread('credentialGap', demand.credentialGap),
+    // GitHub issue #481, for the same reason: a projection that dropped a named share would replay
+    // the arm at the data's share while the record named another.
+    ...spread('duty', demand.duty),
     ...spread('maxLegs', demand.maxLegs),
     ...spread('peakWindowS', demand.peakWindowS),
     ...spread('baselineFraction', demand.baselineFraction),

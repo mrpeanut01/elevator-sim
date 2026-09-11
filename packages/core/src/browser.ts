@@ -578,6 +578,7 @@ export type {
   ConstantDemandOptions,
   CredentialAssignment,
   CredentialGapOverride,
+  DutyDemandOverride,
   DayVariationConfig,
   DemandConfig,
   DemandLevel,

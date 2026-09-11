@@ -58,6 +58,7 @@ export type {
   BatchSizeCurve,
   CredentialAssignment,
   CredentialGapOverride,
+  DutyDemandOverride,
   DayVariationConfig,
   DemandLevel,
   DemandPhase,

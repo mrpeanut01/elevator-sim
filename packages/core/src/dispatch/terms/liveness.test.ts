@@ -46,6 +46,7 @@ import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../../config/loader.js';
 import type { CarSnapshot, ServedFloor } from '../../model/car/types.js';
 import { hallCallId } from '../../model/types.js';
+import { withDuty } from '../../sim/duty.test-helper.js';
 import { DATA_DIR } from '../../sim/fixtures.test-helper.js';
 import { Simulation } from '../../sim/simulation.js';
 import { createDispatchPolicy } from '../policy.js';
@@ -103,6 +104,9 @@ function callAt(
     // Old enough that a car already holding it is holding a starving call.
     registeredAt: Math.max(0, at - 95),
     destinationFloorId,
+    // Every call a passenger's, so the one car `withDuty` declares goods below is the one it would be
+    // a mismatch to send — `dutyMismatch` cannot be seen to discriminate between cars otherwise.
+    duty: 'passenger',
   };
 }
 
@@ -113,9 +117,13 @@ interface Liveness {
 }
 
 describe('every term in the registry can change a decision through the real engine', () => {
-  it('scores non-zero, and differently between two candidate cars, for all thirteen', async () => {
+  it('scores non-zero, and differently between two candidate cars, for all fourteen', async () => {
     const config = await loadConfig(DATA_DIR);
-    const building = config.buildingsById.get('midtown-office');
+    // Car A declared goods (GitHub issue #481). The run below is under `predictive-balanced`, which
+    // weights no duty, so its decisions — and every other term's figures in the table further down —
+    // are those of the undeclared building; only the snapshots gain a duty to be priced against.
+    const midtown = config.buildingsById.get('midtown-office');
+    const building = midtown === undefined ? undefined : withDuty(midtown, { 'main-A': 'goods' });
     const shipped = config.dispatcherProfilesById.get('predictive-balanced');
     expect(building).toBeDefined();
     expect(shipped).toBeDefined();
@@ -215,6 +223,8 @@ describe('every term in the registry can change a decision through the real engi
     //   directionReversal 77.4% / 2   loadFactor 100.0% / 0.72      stopCount 88.2% / 2
     //   distanceTravelled 37.9% / 138.6 m   starvation 69.1% / 59212 s
     //   zoneAffinity 75.0% / 69.3 m   predictedDemand 100.0% / 44.3 m    crowding 34.2% / 0.75
+    //   dutyMismatch 25.0% / 1 — car A of four declared goods and every call a passenger's, so one
+    //   evaluation in four is a mismatch, which is the arithmetic rather than a coincidence (#481)
     //
     // **Every number above moved when `diversionDetour` landed, and none of it is that term's
     // arithmetic.** Taking the snapshots with `enRouteDiversion` makes a moving car's route project

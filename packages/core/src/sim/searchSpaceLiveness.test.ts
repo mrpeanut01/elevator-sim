@@ -74,6 +74,7 @@ import { COST_TERMS } from '../dispatch/index.js';
 import { activeWhenSatisfied, isActiveWhenRange } from '../dispatch/parameters.js';
 import type { ActiveWhenCondition, DispatchParameterSpec } from '../dispatch/types.js';
 
+import { withDuty } from './duty.test-helper.js';
 import { BUILDING_IDS, load, tinyBuilding } from './fixtures.test-helper.js';
 import { runSimulation } from './simulation.js';
 import type { SimulationConfig, SimulationResult } from './types.js';
@@ -494,9 +495,28 @@ interface InertReason {
   readonly liveWith?: RunOverrides | undefined;
   /** Set when the live condition is a *building* no shipped configuration provides. */
   readonly liveOnOneCarBank?: boolean | undefined;
+  /**
+   * Set when the live condition is a building that declares a duty — GitHub issue #481. No shipped
+   * building does, so the probe derives one: Midtown Office with car A declared goods, under a demand
+   * that gives it goods trips to be right or wrong about.
+   */
+  readonly liveOnDutyBuilding?: boolean | undefined;
 }
 
 const DECLARED_INERT: Readonly<Record<string, InertReason>> = Object.freeze({
+  /*
+   * GitHub issue #481. A duty is priced only on a call that carries one, and a call carries one only
+   * in a building where some car declares a duty — which no shipped building does, by design: the
+   * control that lets a player declare one is the next step of `data/buildings/README.md` § *Duty*.
+   * Not a gate `activeWhen` can express, because the condition is a building rather than any
+   * dispatcher parameter; the proof obligation below derives that building and requires a run to move.
+   */
+  'weights.dutyMismatch': {
+    reason:
+      'a mismatch can be priced only on a call that carries a duty, and only a building in which some car declares a duty generates one; no shipped building declares one',
+    liveOnDutyBuilding: true,
+  },
+
   /*
    * A theorem, not a plateau. With one round there is no round to reallocate a declined contract
    * into, so the sealed-bid winner is the lowest bid — which is what the central scorer picks.
@@ -849,6 +869,26 @@ describe('every searchable dimension can change a run, or declares why it cannot
         expect(
           verdict.live,
           `${id} is allowlisted as "live only on a one-car bank" and did not move a run there either`,
+        ).toBe(true);
+        continue;
+      }
+
+      if (entry.liveOnDutyBuilding === true) {
+        const building = withDuty(
+          harness.cfg.buildingsById.get('midtown-office') as ResolvedBuilding,
+          { 'main-A': 'goods' },
+        );
+        const verdict = sweepDimension(
+          harness,
+          spec,
+          byId,
+          { demand: { duty: { shares: { goods: 0.2, bed: 0, service: 0 } } } },
+          [building.id],
+          building,
+        );
+        expect(
+          verdict.live,
+          `${id} is allowlisted as "live only on a building that declares a duty" and did not move a run there either`,
         ).toBe(true);
         continue;
       }

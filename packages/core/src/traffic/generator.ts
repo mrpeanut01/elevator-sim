@@ -106,6 +106,7 @@
  * byte-identical trace, whatever the elevators do with it.
  */
 
+import { DUTY_SHARE_KEYS, type Duty, type DutyShares } from '../config/types.js';
 import type {
   AccessZone,
   DirectionalSplit,
@@ -379,6 +380,7 @@ const TRAFFIC_CONFIG_FIELDS: { readonly [K in keyof Required<TrafficConfig>]-?: 
   interfloorWeighting: true,
   credentialAssignment: true,
   credentialGap: true,
+  duty: true,
   maxLegs: true,
   idPrefix: true,
   journeyIdPrefix: true,
@@ -559,6 +561,61 @@ function resolveCredentialGap(config: DemandConfig): number {
     );
   }
   return share;
+}
+
+/**
+ * Whether any car of the building declares a duty — the one question that decides whether a trace
+ * carries duties at all. GitHub issue #481, `DECISIONS.md` § D549.
+ */
+function buildingDeclaresDuty(building: DemandConfig['building']): boolean {
+  return building.banks.some((bank) => bank.cars.some((car) => car.duty !== undefined));
+}
+
+/**
+ * The shares a duty draw is read against: the run's override where it names one, the data's block
+ * everywhere else, key by key.
+ *
+ * Runtime-checked for {@link resolveCredentialGap}'s reason, with one check more: the three divide
+ * one set of journeys, so their sum may not pass `1`. The tolerance is float arithmetic's and nothing
+ * else — `0.4 + 0.3 + 0.3` must be allowed to mean one.
+ */
+function resolveDutyShares(config: DemandConfig): DutyShares {
+  const data = config.profiles.duty?.shares;
+  const override = config.duty?.shares;
+  const resolved: Record<(typeof DUTY_SHARE_KEYS)[number], number> = { goods: 0, bed: 0, service: 0 };
+  let sum = 0;
+  for (const key of DUTY_SHARE_KEYS) {
+    const share = override?.[key] ?? data?.[key];
+    if (typeof share !== 'number' || !Number.isFinite(share) || share < 0 || share > 1) {
+      throw new TrafficError(
+        `duty.shares.${key} must be a finite share in [0, 1]; received ${String(share)}. data/traffic-profiles.json declares it and the schema requires it — an absent share would read exactly like zero, and a building's declared goods or bed car could then only turn passengers away (GitHub issue #481).`,
+      );
+    }
+    resolved[key] = share;
+    sum += share;
+  }
+  if (sum > 1 + DUTY_SHARE_SUM_TOLERANCE) {
+    throw new TrafficError(
+      `duty shares divide one set of journeys, so they cannot sum to more than 1; received ${JSON.stringify(resolved)}, which sums to ${String(sum)} (GitHub issue #481).`,
+    );
+  }
+  return resolved;
+}
+
+/** Float arithmetic's slack on the duty-share sum, and nothing more. See {@link resolveDutyShares}. */
+const DUTY_SHARE_SUM_TOLERANCE = 1e-9;
+
+/**
+ * The duty a uniform draw lands in: the shares laid end to end in {@link DUTY_SHARE_KEYS} order, and
+ * a passenger past the last of them.
+ */
+function dutyOfDraw(draw: number, shares: DutyShares): Duty {
+  let edge = 0;
+  for (const key of DUTY_SHARE_KEYS) {
+    edge += shares[key];
+    if (draw < edge) return key;
+  }
+  return 'passenger';
 }
 
 /* -------------------------------------------------------------------------- *
@@ -1395,6 +1452,11 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
   const { building, streams } = config;
   const options = resolveOptions(config);
   /*
+   * GitHub issue #481. Resolved once, and only where some car declares a duty: a building in which
+   * none does is never asked whether its shares are shares, and records no duty on anybody.
+   */
+  const dutyShares = buildingDeclaresDuty(building) ? resolveDutyShares(config) : undefined;
+  /*
    * docs/14 § 2.3. **Drawn before anything else in this function**, which is the whole of the
    * criterion-3 guarantee: the day is a function of the seed and the configuration alone, taken
    * before a single arrival instant exists and long before a car moves, so two arms of a paired
@@ -1608,6 +1670,10 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
         arrivalTimeS >= template.reportWindowStartS && arrivalTimeS < template.reportWindowEndS;
       if (withinWindow) inWindow += 1;
 
+      // Drawn here, unconditionally and in final trace order, for the credential's reason below:
+      // duty membership is then a property of the person, so declaring which car is the goods lift
+      // moves this column and no other. Recorded only where some car declares a duty (issue #481).
+      const dutyDraw = streams.duty.nextFloat();
       const record: GeneratedPassenger = Object.freeze({
         id: `${options.idPrefix}${passengerCount}`,
         journeyId: `${options.journeyIdPrefix}${passengerCount}`,
@@ -1629,6 +1695,7 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
         // so two arms that differ only in an access zone are still the same crowd. See
         // {@link credentialForRouteWithGap}.
         credentialGroup: credentialGroupFor(route, batch.originFloor.id, streams.credential.nextFloat()),
+        ...(dutyShares === undefined ? {} : { duty: dutyOfDraw(dutyDraw, dutyShares) }),
         category: pick.category,
         demandFloorId: pick.demandFloorId,
         profileId: pick.profileId,
@@ -1906,6 +1973,7 @@ export function toPassengerInit(record: GeneratedPassenger): PassengerInit {
     // Only when leg 0 is also the last leg does the egress hop belong to it.
     ...(record.legs.length === 1 && egressTransitS > 0 ? { egressTransitS } : {}),
     ...(record.credentialGroup === undefined ? {} : { credentialGroup: record.credentialGroup }),
+    ...(record.duty === undefined ? {} : { duty: record.duty }),
   };
 }
 

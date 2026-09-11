@@ -24,6 +24,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { loadConfig } from '../config/loader.js';
 import type { LoadedConfig, ResolvedBuilding, TrafficProfiles } from '../config/types.js';
 import { StreamSet } from '../random/index.js';
+import { withDuty } from '../sim/duty.test-helper.js';
 
 import { intensityAt, splitAt } from './demandTemplate.js';
 import { planDemand, generateTrace } from './generator.js';
@@ -125,6 +126,7 @@ const PARAMETERS_BY_CONFIG_FIELD = {
   interfloorWeighting: ['traffic.interfloorWeighting'],
   credentialAssignment: ['traffic.credentialAssignment'],
   credentialGap: ['traffic.credentialGap.wrongZoneShare'],
+  duty: ['traffic.duty.shares.goods', 'traffic.duty.shares.bed', 'traffic.duty.shares.service'],
   maxLegs: ['traffic.maxLegs'],
   batchSize: [
     'traffic.batchSize.distribution',
@@ -192,7 +194,7 @@ describe('traffic tunables declare their schema', () => {
     // Pinned as a count as well as a set, because `TRAFFIC_PARAMETERS`' own docstring quotes this
     // number in prose and said "two" while four were declared. A sentence nothing checks goes
     // stale; this is what makes the next edit to it fail rather than drift.
-    expect(nullDefaults.length).toBe(16);
+    expect(nullDefaults.length).toBe(19);
     expect(new Set(nullDefaults)).toEqual(
       new Set([
         'traffic.arrivalRatePctPop5min',
@@ -224,6 +226,11 @@ describe('traffic tunables declare their schema', () => {
         // rather than a measurement. Declaring a second copy here would make two places that state
         // it — and the one nobody is reading is the one that is right.
         'traffic.credentialGap.wrongZoneShare',
+        // GitHub issue #481, and null for the credential gap's reason: each share is a figure in
+        // `data/traffic-profiles.json` stated as a proposal with its reasoning, not a measurement.
+        'traffic.duty.shares.goods',
+        'traffic.duty.shares.bed',
+        'traffic.duty.shares.service',
       ]),
     );
 
@@ -482,6 +489,21 @@ const PROBES: readonly Probe[] = [
     },
     expected: false,
   },
+  // GitHub issue #481. One probe per share, each turning its own duty off: the base is the data's
+  // share, which already draws that duty wherever a car declares one, so zero is the one value that
+  // separates the two — the credential gap's argument above. Observed on Midtown Office with one car
+  // declared goods, because a building that declares no duty records none at any share.
+  ...(['goods', 'bed', 'service'] as const).map((key) => ({
+    ids: [`traffic.duty.shares.${key}`],
+    buildingId: 'midtown-office',
+    probe: { duty: { shares: { [key]: 0 } } },
+    observe: (config: TrafficConfig) =>
+      generateTrace({
+        ...config,
+        building: withDuty(config.building, { 'main-A': 'goods' }),
+      }).passengers.some((passenger) => passenger.duty === key),
+    expected: false,
+  })),
   {
     ids: ['traffic.maxLegs'],
     buildingId: 'vertical-city',

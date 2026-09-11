@@ -76,6 +76,9 @@ const DEMAND_SAMPLE = {
   // record most needs to survive the round trip, and the one a projection that dropped the block
   // would silently turn back into the shipped share.
   credentialGap: { wrongZoneShare: 0 },
+  // GitHub issue #481. One share named alone, so a parser or a projection that dropped the other
+  // two's fallback, or the block, is caught rather than reading as the data's shares.
+  duty: { shares: { goods: 0.1 } },
   maxLegs: 4,
   peakWindowS: 420,
   baselineFraction: 0.25,
