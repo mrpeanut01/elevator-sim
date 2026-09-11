@@ -193,7 +193,9 @@ reaches `Car.estimateCost()`, a dispatch term or a car, so a run's legs are byte
 convention — a travel sample records its convention whenever it is not the default, and
 `metrics/comparability.ts#ENERGY_CONVENTION_SENSITIVE_METRICS` names `energyKJ` and
 `energyPerServedLegKJ` in a disclaimer on every run that uses one. Two arms on different scales are
-still possible, and never silent. Background: [`DECISIONS.md` § D106](../DECISIONS.md).
+still possible. Each run says so in that disclaimer, and the viewer's Day report refuses to pair the
+energy rows of two runs whose banks differ, naming equipment as the reason, while it pairs every
+other row. Background: [`DECISIONS.md` § D106](../DECISIONS.md).
 
 **Energy is an axis, never a score.** Measured across the full experiment matrix, `nearest-car` — the
 weakest shipped dispatcher — is on the Pareto front at six of eight cells, because it is best on

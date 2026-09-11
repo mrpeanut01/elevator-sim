@@ -461,7 +461,9 @@ export const STANDARD_GRAVITY_MPS2 = 9.80665;
  * priced records that convention, so a reader can redo the sum; and
  * `metrics/comparability.ts#ENERGY_CONVENTION_SENSITIVE_METRICS` names the two figures a convention
  * changes, which `Simulation` quotes in a disclaimer on every run that uses one. Two arms on
- * different scales are still possible, and they are never silent. The owner's ruling of 2026-09-10
+ * different scales are still possible. Each run says so in that disclaimer, and the viewer's Day
+ * report refuses to pair the energy figures of two runs whose banks differ, naming equipment as the
+ * reason (`packages/viz/src/dev/reportPanel.ts#reportDeltaOf`). The owner's ruling of 2026-09-10
  * is the scope: an energy-only machine choice that moves `energyKJ`, `workPerServedLegKJ` and the
  * 80 kJ goal's verdict, and never a leg.
  */

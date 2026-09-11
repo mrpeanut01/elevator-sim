@@ -43,7 +43,9 @@
  */
 
 import {
+  DEFAULT_ENERGY_CONVENTION,
   Simulation,
+  energyConventionOf,
   loadedDepartureTimes,
   resolveDemandTemplate,
   type Car,
@@ -63,6 +65,7 @@ import { StepSeriesBuilder, constantSeries } from '../contract/series.js';
 import {
   VIZ_SCHEMA_VERSION,
   type StepSeries,
+  type VizBankEquipment,
   type VizFloor,
   type VizLanding,
   type VizLeg,
@@ -420,6 +423,24 @@ function describeRun(
    */
   const loadedDepartures = loadedDepartureTimes(result.record.travelSamples);
   if (loadedDepartures !== undefined) recording.loadedDepartures = loadedDepartures;
+  /*
+   * What each bank was fitted with — version 14, `DECISIONS.md` § D539. From `core`'s own reading of
+   * the resolved bank, the call `Simulation` prices every move with, so the sheet's equipment axis
+   * (`shift/report.ts#ReportBasis.equipment`) cannot disagree with the joules. Absent when every bank
+   * is at the default, which is every shipped building, so a shipped run's recording carries nothing
+   * new.
+   */
+  const bankEquipment: VizBankEquipment[] = [];
+  for (const bank of building.banks) {
+    const convention = energyConventionOf(bank);
+    if (convention === DEFAULT_ENERGY_CONVENTION) continue;
+    bankEquipment.push({
+      bankId: bank.id,
+      counterweightBalanceRatio: convention.counterweightBalanceRatio,
+      regenerativeRecoveryFraction: convention.regenerativeRecoveryFraction,
+    });
+  }
+  if (bankEquipment.length > 0) recording.bankEquipment = bankEquipment;
   return recording;
 }
 

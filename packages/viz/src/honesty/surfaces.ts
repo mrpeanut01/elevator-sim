@@ -2900,6 +2900,11 @@ interface ShiftDay {
   readonly shorterShift: WeekDayReport;
   /** The same day built from a **different arrival pattern** — issue #126's second new axis. */
   readonly otherPattern: WeekDayReport;
+  /**
+   * The same run recorded as though a bank had been re-balanced — § D539's axis, and GitHub PR #515's
+   * review finding L1. The one pairing that is neither drawn whole nor refused whole.
+   */
+  readonly otherEquipment: WeekDayReport;
 }
 
 interface ShiftBundle {
@@ -3105,6 +3110,28 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
        */
       plan: { ...shiftPlan, patternId: context.trafficProfiles.profiles[0]?.id ?? 'office-standard' },
     }) as WeekDayReport;
+    const otherEquipment = dayReportOf({
+      ...common,
+      subject: { kind: 'week-day' },
+      plan: shiftPlan,
+      /*
+       * One bank re-balanced to the foot of the cited band, and nothing else — § D539, GitHub PR #515's
+       * review finding L1. Not re-simulated, on `shorterShift`'s footing, and here that hides nothing a
+       * reader could see: equipment moves no leg, so every figure the block may pair prints what a
+       * real refitted run would print, and the two energy rows it would re-price are the rows this
+       * pairing refuses.
+       */
+      recording: {
+        ...recording,
+        bankEquipment: [
+          {
+            bankId: recording.shafts[0]?.bankId ?? 'bank',
+            counterweightBalanceRatio: 0.4,
+            regenerativeRecoveryFraction: 0,
+          },
+        ],
+      },
+    }) as WeekDayReport;
     /*
      * The **same day, shaped as a single run** — driven beside the week-day sheet rather than
      * instead of it.
@@ -3137,6 +3164,7 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       swapped,
       shorterShift,
       otherPattern,
+      otherEquipment,
     };
   });
 
@@ -4175,11 +4203,12 @@ interface ReportPairing {
 }
 
 /**
- * The six pairings, and the branch of `reportDeltaOf` each one reaches.
+ * The seven pairings, and the branch of `reportDeltaOf` each one reaches.
  *
  * A list rather than six inline calls, because the claim being made is about **coverage**: every
  * branch of the block is drawn by a state a player can produce, and a branch nobody reaches is a
- * branch nobody sweeps. Three draw and three refuse, which is the split the block itself has.
+ * branch nobody sweeps. Three draw, three refuse, and one draws with its energy rows refused, which
+ * is the split the block itself has.
  *
  * | pairing | what a player did | branch |
  * |---|---|---|
@@ -4189,6 +4218,7 @@ interface ReportPairing {
  * | `free-play-then-week` | finished a Free Play run, opened a scenario day | refused — mode and traffic |
  * | `shorter-shift` | changed the run length between days | refused — the stretch (#126) |
  * | `other-pattern` | changed the arrival pattern between days | refused — the pattern (#126) |
+ * | `other-equipment` | refitted a bank between runs | drawn, energy rows refused — the equipment (§ D539) |
  *
  * **`swap` is the one that carries the block's content**, and on a case whose two arms are the same
  * profile it degenerates to `retry`'s branch — see `run.ts#comparisonConfigFor`. That is left as it
@@ -4212,6 +4242,7 @@ function reportPairingsOf(bundle: ShiftBundle): readonly ReportPairing[] {
     { label: 'free-play-then-week', previous: first.singleRunReport, current: first.report },
     { label: 'shorter-shift', previous: first.shorterShift, current: first.report },
     { label: 'other-pattern', previous: first.otherPattern, current: first.report },
+    { label: 'other-equipment', previous: first.otherEquipment, current: first.report },
   ];
 }
 
@@ -4351,7 +4382,7 @@ function deltaSeeds(
  * the shape § D227 rates above a stale figure: a stale figure is wrong, a stale refusal tells a
  * reader not to look.
  *
- * {@link REPORT_PAIRINGS} is what closes it — six pairings over the sheets `shiftBundleOf` builds,
+ * {@link REPORT_PAIRINGS} is what closes it — seven pairings over the sheets `shiftBundleOf` builds,
  * chosen so that each of the block's branches is reached by a **shipped** state rather than by a
  * constructed one, and so that every refusal names one axis a reader could have moved.
  */
@@ -4573,7 +4604,7 @@ const REPORT_PANEL: SurfaceAdapter = {
     /*
      * The delta block — GitHub issue #127, and the first time these strings have been in the corpus.
      *
-     * Six pairings, drawn through the shipped `reportViewOf` with a real `previous` rather than
+     * Seven pairings, drawn through the shipped `reportViewOf` with a real `previous` rather than
      * through a second implementation, so what the search checks is what the panel and the
      * dispatcher editor's strip both draw. See {@link reportPairingsOf} for what each pair is a
      * player doing, and {@link deltaSeeds} for why a figure row keeps the sheet's own role.
