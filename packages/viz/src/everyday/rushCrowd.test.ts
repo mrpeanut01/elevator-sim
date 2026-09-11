@@ -21,6 +21,11 @@
  * And one structural check with no simulation: every field the run reads under a rush is one the press
  * writes, or the building or the dispatcher the player brings — `rush.ts#RUSH_FIELD_ROLES`' other half.
  *
+ * GitHub issue #518 adds three: a player's levers and weight-set selector do not reach a rush, which
+ * runs from the shipped settings; *Run the rush again* meets the same fresh state as the first press;
+ * and the structural check holds in its second direction, so a field the player brings that the press
+ * wrongly resets goes red too.
+ *
  * The press goes through `createEverydayHost` exactly as `rushScreen.ts` presses it, so this reads
  * what a player's press writes rather than what `rushPatchOf` is handed. The first half is PR #513's
  * `rushHoldAgreement.test.ts`'s first `describe`; that file's second half replays a table that lives
@@ -97,6 +102,8 @@ function standingsOn(buildingId: string, dispatcherId = 'collective'): readonly 
 interface Pressable {
   readonly host: EverydayHost;
   readonly state: () => ViewerState;
+  /** Write the state directly, as `dev/main.ts#interveneAt` does, rather than through the host. */
+  readonly write: (patch: Partial<ViewerState>) => void;
 }
 
 /** A host over `standing`, bound the way `rushScreen.ts`'s page binds it, with its own career store. */
@@ -134,7 +141,13 @@ function hostOn(standing: ViewerState, career?: CampaignCareer): Pressable {
   /* Its own store: under node the page's store is a singleton, and a second host would read this one's career (#375). */
   const store = createCareerStore(undefined);
   if (career !== undefined) store.save(career);
-  return { host: createEverydayHost(bindings, store), state: () => state };
+  return {
+    host: createEverydayHost(bindings, store),
+    state: () => state,
+    write: (patch) => {
+      state = { ...state, ...patch };
+    },
+  };
 }
 
 /** *Start the rush*, pressed through `EverydayHost` exactly as `rushScreen.ts` presses it. */
@@ -275,13 +288,85 @@ describe('a campaign day does not reach the rush — PR #517’s review, § D548
   });
 });
 
+describe('a player’s levers and selector do not reach the rush — GitHub issue #518, item 1', () => {
+  /*
+   * A rush runs from the shipped settings. The owner's ruling on #372 makes a sitting consecutive runs
+   * from an as-shipped start; the house rows are measured from a fresh session; and PR #513's server
+   * replay carries a round's dispatcher id, rule rows and interventions, and no lever or selector. A
+   * door dwell set on the tuner used to ride in: this rush held 1 280 s with a patient dwell and
+   * 1 528 s with express, on the clean run's legs, where the clean run holds 1 640 s.
+   */
+  it('Midtown Office under collective holds where the clean rush holds, with a patient dwell or express set before the press', () => {
+    const own = ownStanding('midtown-office');
+    const measured = {
+      patient: measuredRush(pressedRush({ ...own, levers: { ...own.levers, dwell: 'patient' } })),
+      express: measuredRush(pressedRush({ ...own, levers: { ...own.levers, express: true } })),
+    };
+    const clean = cleanRushOn('midtown-office');
+    expect(measured).toEqual({ patient: clean, express: clean });
+    /* Non-vacuity: the dwell is live on this run — written after the press, it moves the hold — so the press is what takes it off. */
+    const pressed = pressedRush(own);
+    expect(measuredRush({ ...pressed, levers: { ...pressed.levers, dwell: 'patient' } })).not.toEqual(clean);
+  });
+
+  it('and with the weight-set selector moved off the shipped policy', () => {
+    const own = ownStanding('midtown-office');
+    const selectorSpec: ViewerState['selectorSpec'] = { ...own.selectorSpec, policy: own.selectorSpec.policy === 'fuzzy' ? 'off' : 'fuzzy' };
+    const clean = cleanRushOn('midtown-office');
+    expect(measuredRush(pressedRush({ ...own, selectorSpec }))).toEqual(clean);
+    /* Non-vacuity, as above: the moved selector is live on this rush when it is written after the press. */
+    const pressed = pressedRush(own);
+    expect(measuredRush({ ...pressed, selectorSpec })).not.toEqual(clean);
+  });
+
+  it('leaving the rush hands the player’s levers and selector back', () => {
+    const own = ownStanding('midtown-office');
+    const fresh = initialState(resources, RUSH_SEED);
+    const standing: ViewerState = {
+      ...own,
+      levers: { ...own.levers, dwell: 'patient', express: true },
+      selectorSpec: { ...own.selectorSpec, policy: own.selectorSpec.policy === 'fuzzy' ? 'off' : 'fuzzy' },
+    };
+    const fieldsOf = (state: ViewerState) => ({ levers: state.levers, selectorSpec: state.selectorSpec });
+    /* Non-vacuity: the player's values are not a fresh session's. */
+    expect(fieldsOf(standing)).not.toEqual(fieldsOf(fresh));
+    const pressable = hostOn(standing);
+    expect(pressable.host.startRush()).toBeUndefined();
+    expect(fieldsOf(pressable.state())).toEqual(fieldsOf(fresh));
+    pressable.host.leaveRush();
+    expect(fieldsOf(pressable.state())).toEqual(fieldsOf(standing));
+  });
+});
+
+describe('*Run the rush again* meets the same stream and the same fresh state — GitHub issue #518, item 2', () => {
+  it('after an intervention and a moved lever on the first attempt, the second press runs the clean rush', () => {
+    const pressable = hostOn(ownStanding('midtown-office'));
+    expect(pressable.host.startRush()).toBeUndefined();
+    const clean = cleanRushOn('midtown-office');
+    /* `dev/main.ts#interveneAt`'s own write: the stage's intervention controls stay live during a rush. */
+    const first = pressable.state();
+    pressable.write({ interventions: [...first.interventions, { atS: 300, change: { kind: 'park-cars-lobby' } }] });
+    /* Non-vacuity: the intervention moves this rush, so a second press that kept it would not run the clean one. At 600 s or later it does not. */
+    expect(measuredRush(pressable.state())).not.toEqual(clean);
+    /* And a lever moved on the Workshop, which the rail offers during a rush. */
+    pressable.write({ levers: { ...pressable.state().levers, dwell: 'patient' } });
+    expect(pressable.host.startRush()).toBeUndefined();
+    const fresh = initialState(resources, RUSH_SEED);
+    expect({ interventions: pressable.state().interventions, levers: pressable.state().levers }).toEqual({
+      interventions: fresh.interventions,
+      levers: fresh.levers,
+    });
+    expect(measuredRush(pressable.state())).toEqual(clean);
+  });
+});
+
 describe('what reaches a rush is a whitelist — § D548 clause 5', () => {
   /**
    * The fields the player brings into a rush: the building they stand on and the dispatcher they test —
    * `rush.ts#RUSH_FIELD_ROLES`' `building` and `dispatcher` rows, named here rather than imported so
    * that the table and this list have to agree by being read, not by being the same object.
    */
-  const BROUGHT: readonly string[] = ['buildingId', 'savedBuildings', 'savedClasses', 'dispatcherId', 'savedDispatchers', 'ruleRows', 'selectorSpec', 'levers'];
+  const BROUGHT: readonly string[] = ['buildingId', 'savedBuildings', 'savedClasses', 'dispatcherId', 'savedDispatchers', 'ruleRows'];
 
   it('every field the run reads under a rush is one the press writes, or the building or the dispatcher the player brings', () => {
     const read = new Set<string>();
@@ -303,5 +388,29 @@ describe('what reaches a rush is a whitelist — § D548 clause 5', () => {
     expect(written).toContain('campaignFitOut');
     expect(BROUGHT.filter((field) => !read.has(field))).toEqual([]);
     expect([...read].filter((field) => !written.has(field) && !BROUGHT.includes(field)).sort()).toEqual([]);
+  });
+
+  it('and every field the player brings reaches the run as they had it, so a brought field wrongly reset goes red — GitHub issue #518, item 3', () => {
+    /*
+     * The case above holds one direction: nothing reaches a rush that the table does not let in. It
+     * stays green with `dispatcherId` reclassified `fresh`, because the press then writes the field
+     * and the run still reads it; the rush simply runs a fresh session's dispatcher. This is the other
+     * direction. The standing is off a fresh session on every brought field: another building, another
+     * dispatcher, and shelves and rule rows that are not a fresh session's own objects. So a field reset
+     * to a fresh session's value cannot agree with the player's by accident, and identity is the test.
+     */
+    const valuesOf = (state: ViewerState): Readonly<Record<string, unknown>> =>
+      Object.fromEntries(BROUGHT.map((field) => [field, (state as unknown as Readonly<Record<string, unknown>>)[field]]));
+    const own = ownStanding('midtown-office', 'eta');
+    const standing: ViewerState = { ...own, savedBuildings: [], savedClasses: [], savedDispatchers: [], ruleRows: [] };
+    const brought = valuesOf(standing);
+    const fresh = valuesOf(initialState(resources, RUSH_SEED));
+    /* Non-vacuity: no brought field is a fresh session's value. */
+    expect(BROUGHT.filter((field) => Object.is(brought[field], fresh[field]))).toEqual([]);
+    const patch = rushPatchOf(resources, standing);
+    if (patch === undefined) throw new Error('no building is standing on midtown-office');
+    expect(BROUGHT.filter((field) => Object.hasOwn(patch, field))).toEqual([]);
+    const pressed = valuesOf(pressedRush(standing));
+    expect(BROUGHT.filter((field) => !Object.is(pressed[field], brought[field]))).toEqual([]);
   });
 });
