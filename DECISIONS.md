@@ -35051,6 +35051,8 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 
 ## D547 — The Endless rush standings are the house's measured runs: one pinned run per shipped dispatcher per shipped building on the rush's one seed, and the two handles are dropped
 
+> **Status 2026-09-11: AMENDED by [§ D548](#d548).** A rush's crowd is sized from the building it runs on, never the player's week, and the 26 house rows on Midtown Office and Chancery House are re-measured through the corrected path. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-11 · GitHub issue #418 · Implements the product owner's ruling of 2026-09-10, given on the issue · Amends [§ D376](#d376).**
 
 **Why an entry.** It moves a recorded decision: § D376 kept the handoff's five fixtures under a marker. It also binds a data file, a tier registry and a scheduled workflow that `everyday/` does not own.
@@ -35063,5 +35065,18 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 6. **The two handles survive in two places, by rule.** [§ D377](#d377) quotes one as the figure the corpus had not read, and a decision entry is not rewritten after the fact. `docs/design/` is the vendored handoff they were transcribed from. `rushStandingsAreRuns.test.ts` asserts they appear nowhere else in the package sources, `data/`, `docs/`, `.github/` or a root document, and that both exempt places still hold one.
 
 **What this found and does not fix.** On the two towers whose first contract scales occupancy, a rush's crowd is not the size it is elsewhere. Through the host's path, `midtown-office` records 8 788 legs and `chancery-house` 3 336. With the population read off the building unscaled, they record 3 584 and 3 578. `garden-apartments` records 3 466 either way. The house rows follow the host, so they match what a player's rush produces. Whether the host's population read is a defect is unmeasured, and it is not decided here.
+
+---
+
+## D548 — A rush's crowd is sized from the building it runs on, never the player's week, and the 26 house rows measured through the week are re-measured
+
+**Date: 2026-09-11 · GitHub issues #372 and #418 · Extracted from GitHub PR #513's review, finding 1 · Amends [§ D547](#d547).**
+
+**Why an entry.** It answers the question § D547 left open, moves 26 of the rows that entry published, and binds `data/rush-house-runs.json`, which `everyday/` does not own ([§ D405](#d405)).
+
+1. **The host's population read was a defect.** `EverydayHost.startRush` converted wave 30's rate with the population of the building under the state the player pressed from: their week, grown to its day and handed over by its contract. The run it started was the rush's own week on the building as authored. So a rush's crowd moved with the player. Measured on `c13d06e7` through the host's own press, Midtown Office under `collective` held **664 s** on **8 788** legs from a day-1 `c2` week, **962 s** on **6 011** from the same week on day 5, and **1 640 s** on **3 584** from Free Play. The press wrote a rate other than the building's on every shipped tower from a day-5 week, and on Midtown Office and Chancery House from day 1. Standings keyed on the building (§ D547 clause 3) mean something only if everybody on a building meets one crowd.
+2. **The fix.** `everyday/rush.ts#rushBuildingOf` reads the building under the rush's own state, and `#rushPatchOf` takes the resources and converts from it, so no caller can choose whose population sizes the stream. `everyday/rushCrowd.test.ts` presses the rush from all three standings: the rate on every shipped building, then the legs and the hold moment on Midtown Office.
+3. **The rows.** § D547's rows follow the host's path, so the 26 on `midtown-office` and `chancery-house` were measured with the defect. The other seven buildings' 91 rows are unchanged: a house run stands on a day-1 week, and from there the press already wrote those buildings' own rate, which `rushCrowd.test.ts`'s run on `c13d06e7` measured. Re-measured with the table's recorded command: Midtown Office `collective` 664 → 1 640 s and `eta` 546 → 1 542 s, Chancery House `collective` 2 688 → 2 820 s and `nearest-car` 2 504 → 1 936 s. Legs are now 3 584 and 3 578, the figures § D547 recorded for the population read unscaled. `provenance.tree` names `7b621a24`, the PR #513 commit the rows were measured on, and `rushHouseSweep.test.ts` reproduces all 117 on the tree this entry lands on. § D547's closing paragraph stands as the record of what was measured then.
+4. **The default suite replays two cells.** § D547 clause 5's garden cell cannot see whose population sizes the stream: from a day-1 week the press already wrote Garden Apartments' own rate, and § D547 measured 3 466 legs there either way. `rushHouse.test.ts` adds `chancery-house` × `collective`, which fails against the old row once the fix is in.
 
 ---
