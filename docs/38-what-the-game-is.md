@@ -273,7 +273,10 @@ what a mode lets them reach. They are the reason to save up: a scenario you cann
 right change for, a contract that needs a bigger purse, a rush record that needs a better start.
 
 **Earned by completing a turn, never by a run's figures.** A scenario cleared, a contract day paid,
-a rush wave survived. Each pays a flat amount authored in `data/` (invariant 7). Harder scenarios
+a rush wave survived. Each pays a flat amount authored in `data/` (invariant 7). **First time only**
+([§ D533](../DECISIONS.md), the owner's ruling of 2026-09-10): a scenario pays once per account, a
+rush pays only the waves beyond the account's best, and the server keeps the record, so posting a
+turn again pays nothing. A contract day is outside that ruling and pays each day it is posted. Harder scenarios
 may pay more, by their survivor-count band, because that is a property of the scenario and not of
 the run — **that permission is not taken up, and the shipped table pays every scenario the same**:
 `data/scenario-survivors.json` records survivor *counts* and no band, nothing the earn route reads
@@ -307,9 +310,10 @@ month has exactly what they had.
 `packages/server/` already carries accounts ([§ D214](../DECISIONS.md)) and Everyday its own sign-in
 ([§ D458](../DECISIONS.md)); the balance is a ledger of entries on that account and the server holds
 it. **The play surface has one read and two verbs against it: the balance, earn, and spend.** It
-never knows where an entry came from. A scenario cleared posts an earn; a budget widened posts a
-spend; the screen shows what is in the account and lets the player spend or earn against it, and
-that is the whole of its contract. Without an account the ledger is on this device alone and says
+never knows where an entry came from. A fix case cleared posts an earn today, and a campaign stage
+or brief will once it is playable in Everyday; a budget widened posts a spend; the screen shows what
+is in the account and lets the player spend or earn against it, and that is the whole of its
+contract. Without an account the ledger is on this device alone and says
 so, in the shape the tree already uses for device-only artefacts, and a run played with device-only
 chimes can be played and not posted.
 
@@ -383,7 +387,9 @@ Named so the next lane does not discover it. None of it is built by this page.
 - **A chime ledger on the account**, with its sources and sinks authored in `data/`, a device-only
   fallback that says so, and the server checking a posted modified run against a real spend.
   **Partly built**: the ledger, the balance read, the earn, the spend route and the posted-run check
-  ship, and the balance is read by Settings and paid by a filed contract day. The **device-only
+  ship, and the balance is read by Settings and paid by a filed contract day, a fix case's first
+  clear and a rush's waves beyond the account's best (#499); a campaign stage or brief will pay its
+  first clear once it is playable in Everyday. The **device-only
   fallback** does not — see § 2.4 for the ruling it is waiting on — and **no screen spends a chime
   yet**, which the panel that lists the prices says on its own face (#371, #372).
 - The stage's opening speed moves to a watching rung, reopening [§ D354](../DECISIONS.md)'s

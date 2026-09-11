@@ -1269,6 +1269,11 @@ function mountFixit(
     /* Bound here rather than read inside the callback: the run's resources are the ones the press
      * was made against, and a narrowed local is also what makes the callback body total. */
     const resources = loaded.resources;
+    /*
+     * The host, bound here for the resources' reason — GitHub issue #499. The run can land after this
+     * mount is gone, and the host is the shell's, so it outlives every mount that could ask.
+     */
+    const scenarioHost = context.host;
     const entry = currentEntry();
     if (entry === undefined) return;
     const session = sessionOf(entry);
@@ -1328,6 +1333,14 @@ function mountFixit(
         // In both directions — see `keepSolved`. A case that has just stopped being FIXED stops
         // being kept, or a reload would restore a badge this run has already taken away.
         keepSolved();
+        /*
+         * **And the ledger hears about a case this run fixed** — GitHub issue #499. A fix case is
+         * Scenario content (`docs/38` § 2.1, § D525), and the badge this run just earned is the clear
+         * being filed: `keepSolved` wrote it one line up. A run that did not fix the case files no
+         * clear and posts nothing, and the server pays a scenario once per account however often one
+         * case is fixed again. Nothing is drawn and nothing is awaited, on `host.ts#closeDay`'s ground.
+         */
+        if (session.fixed) scenarioHost.bankScenarioClear(entry.id);
         // Through `live`, never through this mount: the player may have left and come back, and
         // the screen that must draw this outcome is the one on the page now.
         live?.redraw();

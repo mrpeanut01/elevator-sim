@@ -303,6 +303,12 @@ export interface ChimeEntryRow {
   readonly balanceAfter: number;
   /** What a spend bought, as authored in `data/chime-ledger.json`. `undefined` on an earn. */
   readonly modifier: ChimeSpentModifier | undefined;
+  /**
+   * The turn this earn paid for, where a source pays a turn once — GitHub issue **#499**. The
+   * scenario id on a scenario clear, the wave's number on a rush wave, and `undefined` on a contract
+   * day, the sign-in gift and every spend. Server-side only, like {@link entryKey}.
+   */
+  readonly turnKey: string | undefined;
   readonly writtenAtMs: number;
 }
 
@@ -963,7 +969,8 @@ export class Store {
    * [§ D526](../../../../DECISIONS.md) clause 6, and the reason a store method is not somewhere a
    * purchase could be added quietly.
    *
-   * `undefined` means **refused**: the balance would go negative, or `notWithinMs` says this key
+   * `undefined` means **refused**: the balance would go negative, `turnKey` names a turn this
+   * account has already been paid for (GitHub issue #499), or `notWithinMs` says this key
    * has already been written to this account inside its own window — the sign-in gift,
    * [§ D531](../../../../DECISIONS.md), whose *it does not compound* is therefore a fact about this
    * statement rather than about whoever calls it.
@@ -984,6 +991,20 @@ export class Store {
      * `concurrency.test-helper.ts` reads one literal here and not a branch between two.
      */
     readonly notWithinMs?: number | undefined;
+    /**
+     * Refuse if this account already holds an entry for this source **and this turn** — GitHub issue
+     * **#499**, the owner's ruling of 2026-09-10: a scenario pays once per account, and a rush pays
+     * each wave once, which is *only the waves beyond the account's best* written as a key.
+     *
+     * `undefined` for a turn that may be paid again — a contract day, the gift, every spend — where
+     * the clause reads `NULL IS NULL` and does nothing. In the statement rather than beside it, for
+     * {@link notWithinMs}'s reason; and `chime_entries_turn` refuses the row in the table as well,
+     * so a future statement that forgot the clause would be refused by the index rather than paid.
+     * A writer that loses to that index takes the same retry branch as one that loses the `seq` race.
+     * That branch is unexercised for this key, because one PGlite session cannot interleave two
+     * statements; `migrations.test.ts` asserts the index refuses a duplicate row directly.
+     */
+    readonly turnKey?: string | undefined;
   }): Promise<ChimeEntryRow | undefined> {
     const move = input.direction === 'earn' ? input.chimes : -input.chimes;
     const modifierJson = input.modifier === undefined ? null : JSON.stringify(input.modifier);
@@ -998,16 +1019,18 @@ export class Store {
       try {
         written = await this.#sql.query(
           'INSERT INTO chime_entries (id, user_id, seq, direction, entry_key, chimes, ' +
-            'balance_after, modifier_json, written_at_ms) ' +
+            'balance_after, modifier_json, written_at_ms, turn_key) ' +
             'SELECT $1, $2, ' +
             'COALESCE((SELECT MAX(seq) FROM chime_entries WHERE user_id = $2), 0) + 1, ' +
             '$3, $4, $5, ' +
             'COALESCE((SELECT balance_after FROM chime_entries WHERE user_id = $2 ' +
-            'ORDER BY seq DESC LIMIT 1), 0) + $6, $7, $8 ' +
+            'ORDER BY seq DESC LIMIT 1), 0) + $6, $7, $8, $10::text ' +
             'WHERE COALESCE((SELECT balance_after FROM chime_entries WHERE user_id = $2 ' +
             'ORDER BY seq DESC LIMIT 1), 0) + $6 >= 0 ' +
             'AND NOT EXISTS (SELECT 1 FROM chime_entries WHERE user_id = $2 AND entry_key = $4 ' +
             'AND written_at_ms > $8::bigint - $9::bigint) ' +
+            'AND ($10::text IS NULL OR NOT EXISTS (SELECT 1 FROM chime_entries WHERE user_id = $2 ' +
+            'AND entry_key = $4 AND turn_key = $10::text)) ' +
             'RETURNING id, seq, balance_after',
           [
             randomUUID(),
@@ -1019,10 +1042,12 @@ export class Store {
             modifierJson,
             writtenAtMs,
             input.notWithinMs ?? 0,
+            input.turnKey ?? null,
           ],
         );
       } catch (error) {
-        // Lost the `seq` race. Read the winner's row on the next pass and re-decide against it.
+        // Lost the `seq` race, or the turn index (#499). Read the winner's row on the next pass and
+        // re-decide against it — where the turn clause refuses a turn the winner was just paid.
         if (isUniqueViolation(error)) continue;
         throw await this.#asOwnerError(error, input.userId, 'recordChimeEntry');
       }
@@ -1037,6 +1062,7 @@ export class Store {
         chimes: input.chimes,
         balanceAfter: Number(row['balance_after']),
         modifier: input.modifier,
+        turnKey: input.turnKey,
         writtenAtMs,
       });
     }
@@ -1077,6 +1103,22 @@ export class Store {
         .filter((value): value is string => typeof value === 'string')
         .map((value) => JSON.parse(value) as ChimeSpentModifier),
     );
+  }
+
+  /**
+   * The turns this account has already been paid for one source — GitHub issue **#499**.
+   *
+   * Read by `chimes/ledger.ts#earnCompletion` to skip the rush waves it need not write. It is a
+   * shortcut and not the guard: the guard is {@link recordChimeEntry}'s turn clause and the
+   * `chime_entries_turn` index, so a turn paid between this read and the write is refused there
+   * rather than paid twice.
+   */
+  async chimeTurnKeys(userId: string, entryKey: string): Promise<ReadonlySet<string>> {
+    const result = await this.#sql.query(
+      'SELECT turn_key FROM chime_entries WHERE user_id = $1 AND entry_key = $2 AND turn_key IS NOT NULL',
+      [userId, entryKey],
+    );
+    return new Set(result.rows.map((row) => String(row['turn_key'])));
   }
 
   /* ------------------------------------------------------------ challenges */
@@ -1698,9 +1740,16 @@ CREATE TABLE IF NOT EXISTS chime_entries (
   -- What a spend bought, so a posted run can be checked against a real spend. NULL on an earn.
   modifier_json  TEXT,
   written_at_ms  BIGINT NOT NULL,
+  -- The turn an earn paid for, where a source pays a turn once per account -- GitHub issue #499:
+  -- the scenario id on a scenario clear, the wave's number on a rush wave. NULL on a contract day,
+  -- the sign-in gift and every spend, which the index below therefore never constrains.
+  turn_key       TEXT,
   UNIQUE (user_id, seq)
 );
 CREATE INDEX IF NOT EXISTS chime_entries_account ON chime_entries (user_id, seq);
+-- One entry per account, source and turn: what makes a turn paid once a property of the table
+-- rather than of the one statement that remembers to ask.
+CREATE UNIQUE INDEX IF NOT EXISTS chime_entries_turn ON chime_entries (user_id, entry_key, turn_key) WHERE turn_key IS NOT NULL;
 `;
 
 /* -------------------------------------------------------------------------- *
@@ -1896,6 +1945,30 @@ const MIGRATIONS: readonly Migration[] = Object.freeze([
     version: 5,
     name: 'entries.modifiers_json, null on every row played with the standard set',
     sql: 'ALTER TABLE entries ADD COLUMN IF NOT EXISTS modifiers_json TEXT;',
+  }),
+  /*
+   * GitHub issue #499, the owner's ruling of 2026-09-10: a scenario pays once per account and a rush
+   * pays only the waves beyond the account's best. The column says which turn an earn paid for, and
+   * the partial unique index makes one entry per account, source and turn a fact about the table.
+   *
+   * **Two statements in one migration, because the index needs the column.** The batch is one
+   * implicit transaction (see {@link applyMigrations}), so no database is left holding the column
+   * without the index that stops a racing duplicate. Migration 1's `IF NOT EXISTS` shape and for its
+   * reason: a database created today has both from migration 0, and this does nothing.
+   *
+   * **Nothing is backfilled, and the null is exact rather than a concession.** Before this commit the
+   * only completion a shipped path posted was a contract day, which has no turn. A scenario clear or
+   * a rush wave could only have been posted by a client composing the request itself; such an entry
+   * keeps its chimes, carries no turn, and blocks nothing — which is § D526 clause 2's refusal to
+   * derive a ledger from anything but what was written.
+   */
+  Object.freeze({
+    version: 6,
+    name: 'chime_entries.turn_key and its unique index, null on every entry that predates a turn',
+    sql:
+      'ALTER TABLE chime_entries ADD COLUMN IF NOT EXISTS turn_key TEXT;\n' +
+      'CREATE UNIQUE INDEX IF NOT EXISTS chime_entries_turn ON chime_entries (user_id, entry_key, turn_key) ' +
+      'WHERE turn_key IS NOT NULL;',
   }),
 ]);
 

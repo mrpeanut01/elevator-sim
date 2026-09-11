@@ -21,6 +21,10 @@
  *   turns it into a source. The sign-in gift is a source with no completion, so there is no
  *   completion a client could name that would reach it, and {@link awardSignInGift} is called by
  *   the redemption route rather than by anything a request chooses.
+ * - **A client names a turn, and a turn is not an amount** — GitHub issue #499. First time only needs
+ *   to know *which* scenario was cleared and *how many* waves a rush outlasted; {@link earnCompletion}
+ *   takes both as a `ChimeTurn`, bounds each by what the shipped build can produce
+ *   ({@link ChimeTurnBounds}), and still reads every award out of the table.
  * - **A client never names an amount.** Neither verb has a chimes argument. What an earn pays and
  *   what a spend costs are read out of `data/chime-ledger.json`. A purchase is, mechanically, a
  *   client naming an amount, so this absence is [§ D526](../../../../DECISIONS.md) clause 6
@@ -62,8 +66,9 @@ import {
   chimeSinkById,
   chimeSpendPrice,
   parseChimeLedger,
-  type ChimeCompletion,
   type ChimeLedgerTable,
+  type ChimeTurn,
+  type TrafficProfiles,
 } from '@elevator-sim/core';
 
 import type { ChimeSpentModifier, Store } from '../store/store.js';
@@ -89,10 +94,129 @@ export type ChimeOutcome =
  * naming something the shipped table does not sell, which is a build mismatch rather than a
  * shortfall and reads differently on the wire.
  */
-export type ChimeRefusal = 'unknown-completion' | 'unknown-modifier' | 'not-enough-chimes';
+export type ChimeRefusal =
+  | 'unknown-completion'
+  | 'unknown-scenario'
+  | 'unknown-wave'
+  | 'unknown-modifier'
+  | 'not-enough-chimes';
 
 /**
- * Bank a completed turn, at the flat award the table names for it.
+ * The template `data/traffic-profiles.json` authors for the rush. It is
+ * `packages/viz/src/everyday/rush.ts#RUSH_TEMPLATE_ID`'s literal, which this package may not import;
+ * a rename there fails {@link loadChimeTurnBounds} at boot rather than bounding nothing.
+ */
+const RUSH_TEMPLATE_ID = 'endless-rush';
+
+/**
+ * Which turns a shipped build will pay for — GitHub issue **#499**.
+ *
+ * First time only needs a turn to have a name, and a name a client can invent is a turn a client can
+ * farm: an unbounded scenario id pays for `a`, `b`, `c` … once each, which is every post paying again
+ * with extra steps. So the names are the shipped ones and nothing else, and a wave count stops at the
+ * waves the stream generates.
+ */
+export interface ChimeTurnBounds {
+  /**
+   * Every scenario a shipped path can clear, by id — the fix cases, today. Scenario-mode clears only
+   * (the owner's ruling of 2026-09-10): {@link loadChimeTurnBounds} says why a week contract is not one.
+   */
+  readonly scenarioIds: ReadonlySet<string>;
+  /** How many waves the rush's stream generates — the most a run can outlast before it breaks. */
+  readonly rushWaves: number;
+}
+
+/**
+ * How many waves `endless-rush` generates, counted off the template rather than transcribed — or
+ * `undefined` when the profiles carry no such template, or one with no waves in it.
+ *
+ * A wave is a phase whose intensity holds: the stream holds each wave's rate and climbs to the next
+ * over a phase of its own, and the last wave holds to the end. `packages/viz/src/everyday/rush.test.ts`
+ * pins these holds against `rushScreenModel.ts#LAST_GENERATED_WAVE` on the other side of the package
+ * boundary, and `chimes/ledger.test.ts` pins this count on the shipped template, so the two readings
+ * meet in `data/` rather than in a transcription.
+ */
+export function rushWaveCountOf(profiles: TrafficProfiles): number | undefined {
+  const template = profiles.demandTemplates.find((candidate) => candidate.id === RUSH_TEMPLATE_ID);
+  const holds = (template?.phases ?? []).filter((phase) => phase.startIntensity === phase.endIntensity).length;
+  return holds > 0 ? holds : undefined;
+}
+
+/**
+ * Read the turns a shipped build pays for, at boot — GitHub issue **#499**.
+ *
+ * **Scenario-mode clears only**, the owner's ruling of 2026-09-10 after the review of PR #505. The
+ * scenario ids are the fix cases' (`data/fixit-cases.json`, each keyed `id`), because a fix case is
+ * the one kind of Scenario content a shipped path files a clear for today. Campaign stages and the
+ * E1–E6 briefs join this set once they are playable in Everyday, and not before: an id for a clear
+ * no shipped path can file is an id only a hand-built request would post.
+ *
+ * **A daily-loop week contract (`data/contract-ladder.json`, `c1`–`c8`) is not here, and that is the
+ * ruling rather than an omission.** A contract's days already pay `earn-career-day`, and `docs/38`
+ * § 2.4 lists *a scenario cleared* and *a contract day paid* as separate turns. The first cut of #499
+ * read the contracts in as well, and the review found what that paid for: `dev/main.ts#closeShift`
+ * banked a week contract's clear, and a Career day closed into whatever week was standing, so a
+ * Career day could post a scenario clear for another building's contract. A contract id now names no
+ * scenario, and {@link earnCompletion} refuses it as `unknown-scenario`, like any other name it does
+ * not hold.
+ *
+ * Only the ids are read, because the document's shape is the viewer's to validate and this package
+ * may not import that validation.
+ *
+ * **Throws**, on {@link loadChimeLedger}'s ground: a server that cannot say which turns it pays would
+ * refuse every scenario clear at the moment a player finished one. It refuses a missing or empty
+ * list, an entry with no id, an id named twice, and a rush it cannot count.
+ */
+export async function loadChimeTurnBounds(dataDir: string, profiles: TrafficProfiles): Promise<ChimeTurnBounds> {
+  const cases = await idsIn(join(dataDir, 'fixit-cases.json'), 'cases', 'id');
+  const rushWaves = rushWaveCountOf(profiles);
+  if (rushWaves === undefined) {
+    throw new Error(
+      `chime turns: the traffic profiles carry no "${RUSH_TEMPLATE_ID}" template with waves in it, so no rush result can be bounded.`,
+    );
+  }
+  return Object.freeze({ scenarioIds: new Set(cases), rushWaves });
+}
+
+/** The `field` of every entry in one document's list, refusing the shapes {@link loadChimeTurnBounds} names. */
+async function idsIn(path: string, key: string, field: string): Promise<readonly string[]> {
+  const document = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown> | null;
+  const entries: unknown = document?.[key];
+  if (!Array.isArray(entries) || entries.length === 0) {
+    throw new Error(`chime turns: ${path} has no "${key}" list, so none of its scenarios could be paid.`);
+  }
+  const ids: unknown[] = entries.map((entry: unknown) => (entry as Record<string, unknown> | null)?.[field]);
+  const missing = ids.findIndex((id) => typeof id !== 'string' || id === '');
+  if (missing !== -1) throw new Error(`chime turns: ${path} ${key}[${String(missing)}] has no ${field}.`);
+  const named = ids as string[];
+  const repeated = named.filter((id, index) => named.indexOf(id) !== index);
+  if (repeated.length > 0) throw new Error(`chime turns: ${path} names ${repeated.join(', ')} twice.`);
+  return named;
+}
+
+/**
+ * Bank a completed turn, at the flat award the table names for it — and a scenario or a rush wave
+ * **once per account**.
+ *
+ * ## First time only — GitHub issue #499, the owner's ruling of 2026-09-10
+ *
+ * - **A scenario pays once per account.** The entry carries the scenario id as its turn, and
+ *   `store.ts#recordChimeEntry` refuses a second entry for that turn in the same statement that
+ *   writes it, so a second clear — posted later, or twice at once — answers the balance and pays
+ *   nothing.
+ * - **A rush pays only the waves beyond the account's best.** Each wave outlasted is its own turn,
+ *   numbered from one, so the account's best is the waves already paid rather than a second figure
+ *   that could disagree with them. A run that beats the best writes the waves above it; one that
+ *   does not writes none.
+ * - **A contract day is untouched.** The ruling does not reach it, and nothing here can tell a second
+ *   day from one day posted twice.
+ *
+ * Every entry is the table's flat award whatever the run measured, which is § D526 clause 2: a wave
+ * count is a count of turns, and nothing else a run measured reaches this function.
+ *
+ * **What is unchecked, and first-time-only is the cap on it:** nothing here can tell whether the
+ * clear happened or the rush got that far. A client can post every shipped scenario once and a rush
+ * at the stream's last wave once, and be paid for each exactly once.
  *
  * ## The band that used to be here, and why it is not
  *
@@ -102,9 +226,10 @@ export type ChimeRefusal = 'unknown-completion' | 'unknown-modifier' | 'not-enou
  * the earn request's body — `http/api.ts` read `body.band` and passed it here — so a client could
  * post `single` on the easiest scenario and be paid ten instead of four. Nor could it have been
  * derived: `data/scenario-survivors.json` carries survivor **counts** and no band, nothing this route
- * reads maps a count to one, and this route is never told which scenario was cleared. The one
- * survivor band in the tree — `data/scenario-survivor-bands.json`, GitHub issue #234's approved
- * difficulty band per ladder position — has a viz acceptance check as its only reader.
+ * reads maps a count to one, and this route was not then told which scenario was cleared (since
+ * GitHub issue #499 it is told a fix-case id, which pays once and maps to no band). The one survivor
+ * band in the tree — `data/scenario-survivor-bands.json`, GitHub issue #234's approved difficulty band
+ * per ladder position — has a viz acceptance check as its only reader.
  *
  * [§ D256](../../../../DECISIONS.md) decides what happens next — a stated mechanism is measured or
  * **withdrawn**, and a second plausible sentence in its place is the same defect with new wording.
@@ -113,36 +238,57 @@ export type ChimeRefusal = 'unknown-completion' | 'unknown-modifier' | 'not-enou
  * grow one back without the mapping arriving with it.
  *
  * What would bring it back, in order: a band on each scenario's pinned record (or a boundary table
- * turning `survivors` into one), a scenario id on the earn, and this function resolving the band
- * from the record rather than from the request.
+ * turning `survivors` into one), and this function resolving the band from that record by the
+ * scenario id the earn now carries (#499) rather than from the request. The id alone maps to no band.
  */
 export async function earnCompletion(input: {
   readonly store: Store;
   readonly table: ChimeLedgerTable;
+  readonly bounds: ChimeTurnBounds;
   readonly userId: string;
-  readonly completion: ChimeCompletion;
+  readonly turn: ChimeTurn;
 }): Promise<ChimeOutcome> {
-  const { table, completion } = input;
-  const award = chimeAwardFor(table, completion);
-  if (award === undefined) return { ok: false, reason: 'unknown-completion' };
+  const { store, table, bounds, userId, turn } = input;
+  const award = chimeAwardFor(table, turn.completion);
   const source = table.sources.find(
-    (candidate) => candidate.earnedBy === 'completion' && candidate.completion === completion,
+    (candidate) => candidate.earnedBy === 'completion' && candidate.completion === turn.completion,
   );
-  if (source === undefined) return { ok: false, reason: 'unknown-completion' };
-  const written = await input.store.recordChimeEntry({
-    userId: input.userId,
-    direction: 'earn',
-    entryKey: source.id,
-    chimes: award,
-  });
-  /*
-   * An earn cannot be refused by the balance — it only ever moves it up — so `undefined` here is
-   * unreachable. Answered rather than asserted, so a future guard on this statement refuses instead
-   * of reporting a balance nobody wrote.
-   */
-  return written === undefined
-    ? { ok: false, reason: 'unknown-completion' }
-    : { ok: true, balanceChimes: written.balanceAfter };
+  if (award === undefined || source === undefined) return { ok: false, reason: 'unknown-completion' };
+  const entry = { userId, direction: 'earn', entryKey: source.id, chimes: award } as const;
+  switch (turn.completion) {
+    case 'career-day-paid': {
+      const written = await store.recordChimeEntry(entry);
+      /*
+       * An earn with no turn cannot be refused by the balance — it only ever moves it up — so
+       * `undefined` here is unreachable. Answered rather than asserted, so a future guard on this
+       * statement refuses instead of reporting a balance nobody wrote.
+       */
+      return written === undefined
+        ? { ok: false, reason: 'unknown-completion' }
+        : { ok: true, balanceChimes: written.balanceAfter };
+    }
+    case 'scenario-cleared': {
+      if (!bounds.scenarioIds.has(turn.scenarioId)) return { ok: false, reason: 'unknown-scenario' };
+      const written = await store.recordChimeEntry({ ...entry, turnKey: turn.scenarioId });
+      /* `undefined` is the clear already paid: answered with the balance, because re-posting is not a fault. */
+      return { ok: true, balanceChimes: written?.balanceAfter ?? (await store.chimeBalance(userId)) };
+    }
+    case 'rush-wave-survived': {
+      if (!Number.isInteger(turn.waves) || turn.waves < 1 || turn.waves > bounds.rushWaves) {
+        return { ok: false, reason: 'unknown-wave' };
+      }
+      /*
+       * Ascending, so the waves paid are always a run from one: a write that fails part-way leaves
+       * the best where the last written wave put it, and the next post pays the rest. The read is a
+       * shortcut past waves already paid; the statement's turn clause is the guard.
+       */
+      const paid = await store.chimeTurnKeys(userId, source.id);
+      for (let wave = 1; wave <= turn.waves; wave += 1) {
+        if (!paid.has(String(wave))) await store.recordChimeEntry({ ...entry, turnKey: String(wave) });
+      }
+      return { ok: true, balanceChimes: await store.chimeBalance(userId) };
+    }
+  }
 }
 
 /**

@@ -32,6 +32,12 @@ the first three in one conversation, the last three later the same day:
 | [§ D531](../DECISIONS.md) | The **sign-in bonus ships at launch**, in the one shape § D526 clause 7 permits — small, flat, unconditional, no compounding, no streak, nothing lost by missing it. Closes § D526's second open item, so `docs/38` § 5 has none left |
 | [§ D535](../DECISIONS.md) | *Taken 2026-09-10, on GitHub issue #467.* Not for sale is not priced high: the **weight-set selector** and the **arrival predictor** are withheld from every scenario, declared once in `data/price-schedule.json`; `every-declared-dimension` is every declared dimension less what is withheld; the other twenty-two dials are priced, as proposals awaiting the owner |
 
+One ruled later, on 2026-09-10, narrowing how often § D526's awards pay rather than what they are:
+
+| decision | what it rules |
+|---|---|
+| [§ D533](../DECISIONS.md) | **First time only.** A scenario pays once per account; a rush pays only the waves beyond the account's best; the server keeps the record, so posting a turn again pays nothing. A contract day is outside the ruling and still pays each day posted. **Scenario-mode clears only**, ruled the same day after the review of PR #505: a fix case pays today, campaign stages and the E1–E6 briefs pay once they are playable in Everyday, and a daily-loop week contract's clear pays no scenario award |
+
 The standing decisions those three rest on, unchanged and cited rather than restated:
 
 | decision | what it still says |

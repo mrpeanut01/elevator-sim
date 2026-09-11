@@ -18,15 +18,17 @@
  * same bytes, which needs both branches driven through the same route.
  */
 
+import { readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 
-import { runSimulation } from '@elevator-sim/core';
+import { chimeAwardFor, parseChimeLedger, runSimulation } from '@elevator-sim/core';
 
 import { LOGIN_TTL_MS, signLoginToken } from '../accounts/credentials.js';
+import { rushWaveCountOf } from '../chimes/ledger.js';
 import { bootstrap, UnsafeConfigurationError, type Server } from '../bootstrap.js';
 import { DAILY_FIXTURE_CONFIG, dailyDateOf, dailySeedFor } from '../leaderboard/boardKey.js';
 import { configFor, metricsOf } from '../leaderboard/verify.js';
@@ -38,6 +40,31 @@ import type { Submission, SubmittedRun } from '../leaderboard/submission.js';
 
 const DATA_DIR = new URL('../../../../data/', import.meta.url).pathname;
 const SECRET = 'a'.repeat(48);
+
+/**
+ * What the ledger pays, and which turns it pays for — GitHub issue #499.
+ *
+ * Read from the documents the server itself reads rather than transcribed, so a retuned award or a
+ * renamed case moves every case below with it instead of leaving a literal behind.
+ */
+const LEDGER = parseChimeLedger(JSON.parse(readFileSync(join(DATA_DIR, 'chime-ledger.json'), 'utf8')) as unknown);
+const SCENARIO_AWARD = chimeAwardFor(LEDGER, 'scenario-cleared') ?? Number.NaN;
+const RUSH_WAVE_AWARD = chimeAwardFor(LEDGER, 'rush-wave-survived') ?? Number.NaN;
+const CAREER_DAY_AWARD = chimeAwardFor(LEDGER, 'career-day-paid') ?? Number.NaN;
+function idsIn(file: string, key: string, field: string): readonly string[] {
+  const document = JSON.parse(readFileSync(join(DATA_DIR, file), 'utf8')) as Record<string, readonly Record<string, string>[] | undefined>;
+  return (document[key] ?? []).map((entry) => entry[field] ?? '');
+}
+/**
+ * Every scenario a shipped path can clear, by id: the fix cases, keyed `id`.
+ *
+ * Scenario-mode clears only — the owner's ruling of 2026-09-10, after the review of PR #505. Campaign
+ * stages and the E1–E6 briefs join once they are playable in Everyday, and a daily-loop week contract
+ * is not Scenario content at all.
+ */
+const SCENARIO_IDS: readonly string[] = idsIn('fixit-cases.json', 'cases', 'id');
+/** The daily loop's week contracts, keyed `contractId` — ids the earn route must refuse as scenarios. */
+const WEEK_CONTRACT_IDS: readonly string[] = idsIn('contract-ladder.json', 'contracts', 'contractId');
 
 let server: Server;
 let outbox: OutboxMailer;
@@ -1800,7 +1827,7 @@ describe('the chime ledger over the wire', () => {
     for (let i = 0; i < 3; i += 1) {
       await call('POST', '/api/chimes/earn', {
         token: player.token,
-        body: { completion: 'scenario-cleared' },
+        body: { completion: 'scenario-cleared', scenarioId: SCENARIO_IDS[i] },
       });
     }
     await call('POST', '/api/chimes/spend', {
@@ -1841,12 +1868,13 @@ describe('the chime ledger over the wire', () => {
     const other = await signIn();
     const paid = await call('POST', '/api/chimes/earn', {
       token: other.token,
-      body: { completion: 'rush-wave-survived' },
+      body: { completion: 'rush-wave-survived', waves: 1 },
     });
     const greedy = await call('POST', '/api/chimes/earn', {
       token: player.token,
       body: {
         completion: 'rush-wave-survived',
+        waves: 1,
         chimes: 9999,
         amount: 9999,
         balanceChimes: 9999,
@@ -1904,7 +1932,7 @@ describe('the chime ledger over the wire', () => {
     for (let i = 0; i < 3; i += 1) {
       await call('POST', '/api/chimes/earn', {
         token: player.token,
-        body: { completion: 'scenario-cleared' },
+        body: { completion: 'scenario-cleared', scenarioId: SCENARIO_IDS[i] },
       });
     }
     const spent = await call('POST', '/api/chimes/spend', {
@@ -1975,7 +2003,7 @@ describe('the chime ledger over the wire', () => {
     for (let i = 0; i < 3; i += 1) {
       await call('POST', '/api/chimes/earn', {
         token: player.token,
-        body: { completion: 'scenario-cleared' },
+        body: { completion: 'scenario-cleared', scenarioId: SCENARIO_IDS[i] },
       });
     }
     const spent = await call('POST', '/api/chimes/spend', {
@@ -2003,6 +2031,180 @@ describe('the chime ledger over the wire', () => {
 });
 
 /* -------------------------------------------------------------------------- *
+ * First time only — GitHub issue #499, the owner's ruling of 2026-09-10
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **A scenario pays once per account, a rush pays only the waves beyond the account's best, and the
+ * server keeps the record.**
+ *
+ * Every case here is written against the route as it stood before #499, which took `{ completion }`
+ * and nothing else — so it could not tell one scenario from another, or a new best from a replayed
+ * climb, and every post paid. The positive control in each case is the post that must now pay
+ * nothing; on that route it paid.
+ */
+describe('a scenario and a rush pay first time only, and the server keeps the record — issue #499', () => {
+  async function balanceOf(token: string): Promise<number> {
+    return Number(bodyOf(await call('GET', '/api/chimes', { token }))['balanceChimes']);
+  }
+
+  async function earn(token: string, body: Record<string, unknown>): Promise<ApiResponse> {
+    return call('POST', '/api/chimes/earn', { token, body });
+  }
+
+  it('pays a scenario the first time it is cleared, and nothing the second', async () => {
+    const player = await signIn();
+    const [first, second] = SCENARIO_IDS;
+    const before = await balanceOf(player.token);
+    const cleared = await earn(player.token, { completion: 'scenario-cleared', scenarioId: first });
+    expect(cleared.status).toBe(200);
+    expect(Number(bodyOf(cleared)['balanceChimes'])).toBe(before + SCENARIO_AWARD);
+
+    const again = await earn(player.token, { completion: 'scenario-cleared', scenarioId: first });
+    /* Answered rather than refused: a client re-posting a clear it already banked has done nothing wrong. */
+    expect(again.status).toBe(200);
+    expect(Object.keys(bodyOf(again))).toEqual(['balanceChimes']);
+    expect(Number(bodyOf(again)['balanceChimes']), 'a second clear of one scenario paid again').toBe(
+      before + SCENARIO_AWARD,
+    );
+
+    /* The record is per scenario rather than per completion: a different scenario still pays. */
+    const other = await earn(player.token, { completion: 'scenario-cleared', scenarioId: second });
+    expect(Number(bodyOf(other)['balanceChimes'])).toBe(before + SCENARIO_AWARD * 2);
+  });
+
+  it('keeps the record per account, so one player’s clear is not another’s', async () => {
+    const ada = await signIn();
+    const bo = await signIn();
+    const id = SCENARIO_IDS[0];
+    await earn(ada.token, { completion: 'scenario-cleared', scenarioId: id });
+    const before = await balanceOf(bo.token);
+    const theirs = await earn(bo.token, { completion: 'scenario-cleared', scenarioId: id });
+    expect(Number(bodyOf(theirs)['balanceChimes'])).toBe(before + SCENARIO_AWARD);
+  });
+
+  it('pays a rush the waves beyond the account’s best, and nothing for a run that does not beat it', async () => {
+    const player = await signIn();
+    const start = await balanceOf(player.token);
+    const after = async (waves: number): Promise<number> =>
+      Number(bodyOf(await earn(player.token, { completion: 'rush-wave-survived', waves }))['balanceChimes']);
+    expect(await after(3), 'a first rush did not pay every wave it outlasted').toBe(start + 3 * RUSH_WAVE_AWARD);
+    expect(await after(2), 'a rush short of the best paid').toBe(start + 3 * RUSH_WAVE_AWARD);
+    expect(await after(3), 'a rush equal to the best paid').toBe(start + 3 * RUSH_WAVE_AWARD);
+    expect(await after(5), 'a new best paid something other than the difference').toBe(
+      start + 5 * RUSH_WAVE_AWARD,
+    );
+    expect(await after(5), 'the same best, posted again, paid').toBe(start + 5 * RUSH_WAVE_AWARD);
+  });
+
+  it('never pays one turn twice when the same post arrives twice at once', async () => {
+    const player = await signIn();
+    const start = await balanceOf(player.token);
+    const id = SCENARIO_IDS[1];
+    await Promise.all([
+      earn(player.token, { completion: 'scenario-cleared', scenarioId: id }),
+      earn(player.token, { completion: 'scenario-cleared', scenarioId: id }),
+    ]);
+    await Promise.all([
+      earn(player.token, { completion: 'rush-wave-survived', waves: 4 }),
+      earn(player.token, { completion: 'rush-wave-survived', waves: 4 }),
+    ]);
+    expect(await balanceOf(player.token)).toBe(start + SCENARIO_AWARD + 4 * RUSH_WAVE_AWARD);
+  });
+
+  it('pays exactly the table’s award whatever the post says the run measured — § D526 clause 2', async () => {
+    /*
+     * A body carrying every figure a run has — a wait, how long it held, how many were over the
+     * line — pays exactly what a bare post pays, because the route reads none of them.
+     */
+    const measured = { awtS: 3.2, wt95S: 9, heldS: 5_000, overLine: 40, carried: 900, longestWaitS: 400 };
+    const bare = await signIn();
+    const loud = await signIn();
+    const bareStart = await balanceOf(bare.token);
+    const loudStart = await balanceOf(loud.token);
+    await earn(bare.token, { completion: 'scenario-cleared', scenarioId: SCENARIO_IDS[2] });
+    await earn(loud.token, { completion: 'scenario-cleared', scenarioId: SCENARIO_IDS[2], ...measured });
+    await earn(bare.token, { completion: 'rush-wave-survived', waves: 2 });
+    await earn(loud.token, { completion: 'rush-wave-survived', waves: 2, ...measured });
+    const bareMoved = (await balanceOf(bare.token)) - bareStart;
+    expect(bareMoved).toBe(SCENARIO_AWARD + 2 * RUSH_WAVE_AWARD);
+    expect((await balanceOf(loud.token)) - loudStart).toBe(bareMoved);
+  });
+
+  it('refuses a scenario this build cannot clear, and pays nothing for it', async () => {
+    const player = await signIn();
+    const before = await balanceOf(player.token);
+    for (const body of [
+      { completion: 'scenario-cleared' },
+      { completion: 'scenario-cleared', scenarioId: '' },
+      { completion: 'scenario-cleared', scenarioId: 'a-scenario-nobody-wrote' },
+      { completion: 'scenario-cleared', scenarioId: 7 },
+    ]) {
+      const refused = await earn(player.token, body);
+      expect(refused.status, JSON.stringify(body)).toBe(400);
+      expect(bodyOf(refused)['error'], JSON.stringify(body)).toBe('unknown-scenario');
+    }
+    expect(await balanceOf(player.token)).toBe(before);
+  });
+
+  it('refuses a daily-loop week contract as a scenario, and pays nothing for it — the ruling of 2026-09-10', async () => {
+    /*
+     * **Scenario-mode clears only.** A week contract's clear pays no scenario award: its days already
+     * pay `earn-career-day`, and `docs/38` § 2.4 lists *a scenario cleared* and *a contract day paid*
+     * as separate turns. The review of PR #505 found the viewer posting one, from a Career day closed
+     * into whatever week contract was standing, and this route paid it because it accepted contract
+     * ids. It is refused with the code any other unknown id gets, because to this route a contract
+     * id names no scenario.
+     */
+    expect(WEEK_CONTRACT_IDS.length, 'data/contract-ladder.json names no contract, so this case tests nothing').toBeGreaterThan(0);
+    const player = await signIn();
+    const before = await balanceOf(player.token);
+    for (const scenarioId of WEEK_CONTRACT_IDS) {
+      const refused = await earn(player.token, { completion: 'scenario-cleared', scenarioId });
+      expect(refused.status, scenarioId).toBe(400);
+      expect(bodyOf(refused)['error'], scenarioId).toBe('unknown-scenario');
+    }
+    expect(await balanceOf(player.token), 'a week contract was paid as a scenario').toBe(before);
+  });
+
+  it('refuses a wave count the stream never generated, and pays nothing for it', async () => {
+    /* The ceiling is the server's own reading of `endless-rush`; `chimes/ledger.test.ts` pins it. */
+    const ceiling = rushWaveCountOf(server.config.trafficProfiles) ?? 0;
+    expect(ceiling).toBeGreaterThan(0);
+    const player = await signIn();
+    const before = await balanceOf(player.token);
+    for (const body of [
+      { completion: 'rush-wave-survived' },
+      { completion: 'rush-wave-survived', waves: 0 },
+      { completion: 'rush-wave-survived', waves: 2.5 },
+      { completion: 'rush-wave-survived', waves: '3' },
+      { completion: 'rush-wave-survived', waves: ceiling + 1 },
+    ]) {
+      const refused = await earn(player.token, body);
+      expect(refused.status, JSON.stringify(body)).toBe(400);
+      expect(bodyOf(refused)['error'], JSON.stringify(body)).toBe('unknown-wave');
+    }
+    expect(await balanceOf(player.token)).toBe(before);
+    /* The ceiling itself is a count a run can outlast — a break at the stream's last bucket — so it pays. */
+    const top = await earn(player.token, { completion: 'rush-wave-survived', waves: ceiling });
+    expect(Number(bodyOf(top)['balanceChimes'])).toBe(before + ceiling * RUSH_WAVE_AWARD);
+  });
+
+  it('still pays a contract day on every post, which the ruling does not reach — stated, not hidden', async () => {
+    /*
+     * The ruling names two awards. A contract day is a different turn each time and the route is
+     * told nothing that could tell a second day from one day posted twice, so it pays per post.
+     * This case exists so that keying it later is a deliberate change to a green test.
+     */
+    const player = await signIn();
+    const before = await balanceOf(player.token);
+    await earn(player.token, { completion: 'career-day-paid' });
+    await earn(player.token, { completion: 'career-day-paid' });
+    expect(await balanceOf(player.token)).toBe(before + 2 * CAREER_DAY_AWARD);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * The two write verbs are bounded — the review of PR #485, medium 6
  * -------------------------------------------------------------------------- */
 
@@ -2024,7 +2226,7 @@ describe('the chime write verbs are bounded like every other write on this surfa
     for (let n = 0; n < 200 && refusal === undefined; n += 1) {
       const response = await call('POST', '/api/chimes/earn', {
         token: player.token,
-        body: { completion: 'rush-wave-survived' },
+        body: { completion: 'rush-wave-survived', waves: 1 },
       });
       if (response.status === 429) refusal = response;
     }
@@ -2040,7 +2242,7 @@ describe('the chime write verbs are bounded like every other write on this surfa
         n % 2 === 0
           ? await call('POST', '/api/chimes/earn', {
               token: player.token,
-              body: { completion: 'rush-wave-survived' },
+              body: { completion: 'rush-wave-survived', waves: 1 },
             })
           : await call('POST', '/api/chimes/spend', {
               token: player.token,
@@ -2056,14 +2258,14 @@ describe('the chime write verbs are bounded like every other write on this surfa
     for (let n = 0; n < 200; n += 1) {
       const response = await call('POST', '/api/chimes/earn', {
         token: noisy.token,
-        body: { completion: 'rush-wave-survived' },
+        body: { completion: 'rush-wave-survived', waves: 1 },
       });
       if (response.status === 429) break;
     }
     const quiet = await signIn();
     const theirs = await call('POST', '/api/chimes/earn', {
       token: quiet.token,
-      body: { completion: 'rush-wave-survived' },
+      body: { completion: 'rush-wave-survived', waves: 1 },
     });
     expect(theirs.status, 'one account exhausting its budget locked another out').toBe(200);
   });
@@ -2120,7 +2322,7 @@ describe('a board row carries the modifier and never the spend — issue #371', 
   async function bought(sinkId: string, steps: number): Promise<{ token: string; id: string }> {
     const player = await signIn();
     for (let i = 0; i < 8; i += 1) {
-      await call('POST', '/api/chimes/earn', { token: player.token, body: { completion: 'scenario-cleared' } });
+      await call('POST', '/api/chimes/earn', { token: player.token, body: { completion: 'scenario-cleared', scenarioId: SCENARIO_IDS[i] } });
     }
     for (let i = 0; i < steps; i += 1) {
       const spent = await call('POST', '/api/chimes/spend', {

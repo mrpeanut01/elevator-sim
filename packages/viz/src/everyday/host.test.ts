@@ -17,13 +17,14 @@ import {
   parseElevatorSpecs,
   parseTrafficProfiles,
   resolveBuilding,
+  type ChimeTurn,
 } from '@elevator-sim/core/browser';
 import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
-import { RUSH_SEED, RUSH_TEMPLATE_ID } from './rush.js';
+import { RUSH_SEED, RUSH_TEMPLATE_ID, rushOutcomeOf, rushPatchOf } from './rush.js';
 import { REPLAY_COPY } from './replay.js';
 import { RUSH_CONTRACT_ID, REPLAY_CONTRACT_ID } from '../shift/week.js';
 
@@ -125,6 +126,11 @@ interface Harness {
   watching: { readonly run: WatchableRun; readonly view: WatchingView } | undefined;
   /** § 7.4's race, as the shell would report it — GitHub issue #226. */
   ghostRace: EverydayGhostRace;
+  /**
+   * Every turn the host asked the ledger to bank, in order — GitHub issue #499. Kept apart from
+   * {@link calls} so the sequences asserted there are not re-ordered by a post nothing waits on.
+   */
+  readonly banked: ChimeTurn[];
 }
 
 /**
@@ -170,6 +176,7 @@ function harnessOf(
     },
     watching: undefined,
     ghostRace: { pick: 'none', rival: undefined, refusal: undefined, pending: false },
+    banked: [],
     bindings: {
       resources,
       state: () => harness.state,
@@ -236,6 +243,10 @@ function harnessOf(
       watching: () => harness.watching,
       /* No page, so no API origin, so nothing to ask — the honest no-server arm. */
       dailyBoard: undefined,
+      /* Recorded rather than posted: what is asserted is which turn the host names, and when. */
+      bankCompletion: (turn) => {
+        harness.banked.push(turn);
+      },
       onChange: (listener) => {
         calls.push('onChange');
         void listener;
@@ -1822,6 +1833,75 @@ describe('the rush — GitHub issue #220, § D515', () => {
     host.leaveRush();
     expect(h.patches).toHaveLength(2);
   });
+});
+
+describe('what the host banks — GitHub issue #499, first time only', () => {
+  /**
+   * The rush on the standing building, simulated once for the block — the stream crosses the hold
+   * line on Garden Apartments (`rush.test.ts` measures that), so it is a run with a breaking point.
+   */
+  let rush: VizRecording;
+  beforeAll(() => {
+    const state = base();
+    const building = resources.buildings.find((entry) => entry.id === state.buildingId);
+    if (building === undefined) throw new Error(state.buildingId);
+    const patched = { ...state, ...rushPatchOf(state, building.totalPopulation) } as ViewerState;
+    rush = recordRun(shiftRunConfigOf(resources, patched).config, { recordDecisions: false }).recording;
+    // No timeout annotation: the `viz` project's hook default is the simulating ceiling already,
+    // and `testCost.test.ts` holds the census of annotations `vitest.config.ts` states.
+  });
+
+  it('banks the waves a broken rush outlasted, once, when the rush ends at its line', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    host.startRush();
+    /* The harness does not apply patches, so the run landing is written in by hand. */
+    h.state = { ...h.state, recording: rush };
+    const holdAtS = host.rush()?.holdAtS;
+    expect(holdAtS, 'the rush never crossed its line, so this case tests nothing').toBeDefined();
+    /* Starting and playing bank nothing: a turn is banked when it is finished. */
+    expect(h.banked).toEqual([]);
+
+    host.endRush(holdAtS ?? 0);
+    expect(h.banked).toEqual([
+      { completion: 'rush-wave-survived', waves: rushOutcomeOf(rush, holdAtS).wave - 1 },
+    ]);
+    /* A second end of the same run — the stage on a later frame — is not a second turn. */
+    host.endRush(holdAtS ?? 0);
+    expect(h.banked).toHaveLength(1);
+    /* *Run the rush again* is a new run, and its end is a new turn to offer; the server decides whether it beat the best. */
+    host.startRush();
+    host.endRush(holdAtS ?? 0);
+    expect(h.banked).toHaveLength(2);
+  });
+
+  it('banks nothing for a rush ended by hand, which has no breaking point — § D515', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    host.startRush();
+    h.state = { ...h.state, recording: rush };
+    const holdAtS = host.rush()?.holdAtS ?? 0;
+    host.endRush(holdAtS - 60);
+    expect(h.banked).toEqual([]);
+  });
+
+  it('banks nothing for a rush ended before its run landed, or outside a rush at all', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    host.endRush(600);
+    host.startRush();
+    host.endRush(0);
+    expect(h.banked).toEqual([]);
+  });
+
+  it('banks a cleared scenario by its id, and answers nothing a screen could draw', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    const answer: unknown = host.bankScenarioClear('sleeping-sky-lobby');
+    expect(answer).toBeUndefined();
+    expect(h.banked).toEqual([{ completion: 'scenario-cleared', scenarioId: 'sleeping-sky-lobby' }]);
+  });
+
 });
 
 describe('the replay — GitHub issue #177 item 1, § D517', () => {
