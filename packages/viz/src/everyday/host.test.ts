@@ -1962,4 +1962,25 @@ describe('the replay — GitHub issue #177 item 1, § D517', () => {
     host.leaveReplay();
     expect(h.patches).toHaveLength(2);
   });
+
+  it('leaving cancels the run in flight before the week is put back — GitHub issue #522', () => {
+    /*
+     * The rush's #518 item 4, on the replay. A replay's day runs through the same `startRun` a day
+     * uses, on a worker, and leaving does not wait for it; `dev/main.ts#applyShift` adopts whatever
+     * run lands, so a replay left mid-generation landed on the week this restore had just put back,
+     * as this shell's own unfiled run, where `closeShift` files it. So leaving cancels, and first.
+     */
+    const start = { ...base(), week: { ...base().week, day: 4, dayIdx: 3 } };
+    const h = harnessOf(start);
+    const host = createEverydayHost(h.bindings);
+    expect(host.startReplay(2)).toBeUndefined();
+    host.startRun();
+    expect(h.calls).toContain('startRun');
+    const beforeLeaving = h.calls.length;
+    host.leaveReplay();
+    expect(h.calls.slice(beforeLeaving)).toEqual(['cancelRun', 'applyPatch']);
+    /* Outside a replay, leaving cancels nothing: a day's own run is not the replay's to stop. */
+    host.leaveReplay();
+    expect(h.calls).toHaveLength(beforeLeaving + 2);
+  });
 });
