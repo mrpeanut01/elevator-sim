@@ -47,7 +47,8 @@
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import type { VizRecording, VizSaturation } from '../contract/types.js';
-import type { ViewerState } from '../dev/state.js';
+import type { BrowserResources } from '../dev/data.js';
+import { resolvedBuildingOf, type ViewerState } from '../dev/state.js';
 import { demandDisclosureOf, type DemandBand } from '../fixit/parse.js';
 import { waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
@@ -109,14 +110,52 @@ export function rushBeforeOf(state: ViewerState): RushBefore {
   };
 }
 
-/** The state a rush runs in: the player's week parked, the rush week open, the stream selected. */
-export function rushPatchOf(state: ViewerState, population: number): Partial<ViewerState> {
+/** The fields a rush writes over the player's state — {@link rushPatchOf}'s answer. */
+export type RushPatch = Pick<ViewerState, 'playMode' | 'week' | 'parkedWeeks' | 'freePlay' | 'shiftLengthS' | 'windowStartS' | 'seed'>;
+
+/**
+ * **The building a rush's stream arrives at** — the standing building read under the rush's own
+ * state, never under the state the player pressed from.
+ *
+ * The difference is the whole of PR #513's finding 1. `dev/state.ts#shiftRunConfigOf` grows a building
+ * to its week's day and hands a contract's own week its rung's occupancy, and a rush runs in neither:
+ * its week is the rush week, opened on day 1, and its play mode is `endless`, which no rung reaches.
+ * So the building read here is the one the run is built on, and on a shipped tower it is the building
+ * as `data/buildings/` authors it. That is what makes a rush's crowd a function of the building
+ * alone, which standings keyed on the building need (§ D547, § D548).
+ *
+ * `undefined` when no building is standing, `resolvedBuildingOf`'s own answer.
+ */
+export function rushBuildingOf(resources: BrowserResources, state: ViewerState): ResolvedBuilding | undefined {
+  return resolvedBuildingOf(resources, { ...state, ...rushStandingOf(state, null) });
+}
+
+/**
+ * The state a rush runs in: the player's week parked, the rush week open, the stream selected at wave
+ * 30's rate converted to {@link rushBuildingOf}'s population — or `undefined` when no building is
+ * standing.
+ *
+ * **It takes the resources rather than a population**, and that is deliberate: it took a population,
+ * and its one shipped caller passed the wrong one (see {@link rushBuildingOf}). A caller cannot
+ * now choose whose people the stream is sized for.
+ */
+export function rushPatchOf(resources: BrowserResources, state: ViewerState): RushPatch | undefined {
+  const building = rushBuildingOf(resources, state);
+  return building === undefined ? undefined : rushStandingOf(state, rushTopRatePctPop5min(building.totalPopulation));
+}
+
+/**
+ * {@link rushPatchOf} at a given rate. `null` is the profile's own rate — a selection
+ * (`dev/state.ts#FreePlayOverride`) — which is what {@link rushBuildingOf} resolves under, because the
+ * rate reaches the demand and never the building.
+ */
+function rushStandingOf(state: ViewerState, ratePctPop5min: number | null): RushPatch {
   const moved = switchWeek(state.week, state.parkedWeeks, RUSH_CONTRACT_ID, 'restart');
   return {
     playMode: 'endless',
     week: moved.week.contractId === RUSH_CONTRACT_ID ? moved.week : openRush(),
     parkedWeeks: moved.parked,
-    freePlay: { demandTemplateId: RUSH_TEMPLATE_ID, arrivalRatePctPop5min: rushTopRatePctPop5min(population) },
+    freePlay: { demandTemplateId: RUSH_TEMPLATE_ID, arrivalRatePctPop5min: ratePctPop5min },
     shiftLengthS: RUSH_STREAM.lengthS,
     /*
      * A window from the period's own start rather than `null`: an authored phase list refuses a

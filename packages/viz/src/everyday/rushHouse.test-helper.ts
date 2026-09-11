@@ -5,14 +5,17 @@
  *
  * ## The path is a player's, step for step
  *
- * `EverydayHost.startRush` reads the standing state, takes the population from
- * `resolvedBuildingOf` on it, applies `rushPatchOf`, and runs; `dev/shiftWorker.ts` calls `recordRun`
+ * `EverydayHost.startRush` reads the standing state, applies `rushPatchOf` — which converts the
+ * stream's rate with the population of `rushBuildingOf`, the building under the rush's own state — and
+ * runs; `dev/shiftWorker.ts` calls `recordRun`
  * with the plan's out-of-service cars beside the config. This does the same, from a fresh session
  * standing on the building through `withBuilding` and on the dispatcher through `withDispatcher` —
  * the two setters the pickers call. A bare `buildingId` write would leave the first contract's week
  * in place, and `withBuilding`'s own docstring records that as a defect rather than a shortcut. The
- * population is read **before** the patch, as the host reads it, because a week can scale a tower's
- * occupancy and the rush's rate is people per tower.
+ * population is **not** the standing week's: a week scales a tower's occupancy and grows it by day, and
+ * this helper read it before the patch because the host then did — which is how the Midtown Office and
+ * Chancery House rows were measured on a crowd sized by the week (PR #513's review, finding 1). A rush's
+ * crowd is the building's alone, and `rushPatchOf` taking the resources is what keeps it so.
  *
  * `recordDecisions` is off: it decides whether the recording keeps the dispatcher's decision log,
  * which no house row reads, and the legs are the same either way.
@@ -28,7 +31,7 @@ import { join } from 'node:path';
 import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 
 import type { BrowserResources } from '../dev/data.js';
-import { initialState, resolvedBuildingOf, shiftRunConfigOf, withBuilding, withDispatcher } from '../dev/state.js';
+import { initialState, shiftRunConfigOf, withBuilding, withDispatcher } from '../dev/state.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
@@ -45,8 +48,8 @@ export const RUSH_HOUSE_COMMAND =
   'npx vitest run --project viz src/everyday/rushHouseSweep.test.ts';
 
 const PATH =
-  'initialState → dev/state.ts#withBuilding → #withDispatcher; population from ' +
-  '#resolvedBuildingOf on that state, as EverydayHost.startRush reads it; everyday/rush.ts#rushPatchOf ' +
+  'initialState → dev/state.ts#withBuilding → #withDispatcher → everyday/rush.ts#rushPatchOf, its ' +
+  'population read from #rushBuildingOf under the rush’s own state as EverydayHost.startRush reads it ' +
   '→ dev/state.ts#shiftRunConfigOf → record/recordRun.ts#recordRun with the plan’s out-of-service ' +
   'cars; read at everyday/rush.ts#rushHoldAt and #rushOutcomeOf';
 
@@ -79,9 +82,9 @@ export async function loadRushHouseResources(): Promise<BrowserResources> {
 /** One house run, measured — see the module docstring for why each step is the one it is. */
 export function measureRushHouseRun(resources: BrowserResources, buildingId: string, dispatcherId: string): RushHouseRun {
   const standing = withDispatcher(withBuilding(initialState(resources, RUSH_SEED), resources, buildingId), resources, dispatcherId);
-  const building = resolvedBuildingOf(resources, standing);
-  if (building === undefined) throw new Error(`no shipped building "${buildingId}" to run the rush on`);
-  const state = { ...standing, ...rushPatchOf(standing, building.totalPopulation) };
+  const patch = rushPatchOf(resources, standing);
+  if (patch === undefined) throw new Error(`no shipped building "${buildingId}" to run the rush on`);
+  const state = { ...standing, ...patch };
   const plan = shiftRunConfigOf(resources, state);
   const { recording } = recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds });
   const holdAt = rushHoldAt(recording);

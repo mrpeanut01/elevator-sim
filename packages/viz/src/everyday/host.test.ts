@@ -1843,9 +1843,9 @@ describe('what the host banks — GitHub issue #499, first time only', () => {
   let rush: VizRecording;
   beforeAll(() => {
     const state = base();
-    const building = resources.buildings.find((entry) => entry.id === state.buildingId);
-    if (building === undefined) throw new Error(state.buildingId);
-    const patched = { ...state, ...rushPatchOf(state, building.totalPopulation) } as ViewerState;
+    const patch = rushPatchOf(resources, state);
+    if (patch === undefined) throw new Error(state.buildingId);
+    const patched = { ...state, ...patch } as ViewerState;
     rush = recordRun(shiftRunConfigOf(resources, patched).config, { recordDecisions: false }).recording;
     // No timeout annotation: the `viz` project's hook default is the simulating ceiling already,
     // and `testCost.test.ts` holds the census of annotations `vitest.config.ts` states.
