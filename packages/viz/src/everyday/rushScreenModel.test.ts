@@ -32,7 +32,6 @@ import {
   LAST_GENERATED_WAVE,
   RUSH_ABSENCES,
   RUSH_BANDS,
-  RUSH_BESTS,
   MORNING_RUSH_RATE,
   RUSH_HOLD_LINE,
   RUSH_SCREEN_COPY,
@@ -210,17 +209,15 @@ describe('what the screen refuses, and where the refusal sits', () => {
     expect(refined.timeline).toBeUndefined();
   });
 
-  it('names the one absence the engine did not close, and none the engine did', () => {
+  it('names no absence the engine and the house runs closed — GitHub issues #220 and #418', () => {
     /*
-     * GitHub issue #220 built the stream, the held-time stage and the result (§ D515), and the
-     * three entries that named them left on that commit. What remains is #177's: the standings are
-     * the handoff's fixtures until a rush posts somewhere, which nothing does yet.
+     * #220 built the stream, the held-time stage and the result (§ D515), and the three entries that
+     * named them left on that commit. #418 measured the standings (§ D547), and the last entry left
+     * on that one. An empty register is a state that keeps being checked, so the case stays.
      */
-    expect(RUSH_ABSENCES).toHaveLength(1);
-    expect(RUSH_ABSENCES[0]).toMatch(/^the standings/);
+    expect(RUSH_ABSENCES).toHaveLength(0);
     for (const absence of RUSH_ABSENCES) {
-      expect(absence.trim().length).toBeGreaterThan(20);
-      expect(absence).not.toMatch(/climbing stream|stage of its own|result screen/);
+      expect(absence).not.toMatch(/climbing stream|stage of its own|result screen|standings/);
     }
   });
 
@@ -246,18 +243,6 @@ describe('what the screen refuses, and where the refusal sits', () => {
     expect(climb?.value).toBe('+11%');
   });
 
-  it('labels the two reference runs as reference runs, and withholds the player’s own row', () => {
-    // § 9.1: *five entries including two reference runs, labelled as reference runs*.
-    expect(RUSH_BESTS).toHaveLength(5);
-    expect(RUSH_BESTS.filter((best) => best.reference)).toHaveLength(2);
-    for (const best of RUSH_BESTS.filter((entry) => entry.reference)) {
-      expect(best.who).toBe('reference run');
-    }
-    const mine = RUSH_BESTS.find((best) => best.who.startsWith('you'));
-    expect(mine?.wave).toBe(RUSH_SCREEN_COPY.noRun);
-    expect(mine?.held).toBe(RUSH_SCREEN_COPY.noRun);
-  });
-
   it('states who would drive rather than offering a select that writes another mode’s run', () => {
     const line = rushDrivingLine('Collective control');
     expect(line).toContain('Collective control');
@@ -280,8 +265,8 @@ describe('what the screen refuses, and where the refusal sits', () => {
  * because of what #293 found, which is worth stating precisely, because the shape recurs and the
  * two earlier instances recorded in this file were both caught only after they had shipped.
  *
- * {@link RUSH_BESTS} prints two invented handles against held times — `delft_vt · wave 19 · 57 min`
- * and one more — and is the only place this build prints another player's name against a figure.
+ * `RUSH_BESTS` printed two invented handles against held times, and was the only place this build
+ * printed another player's name against a figure (both deleted since, GitHub issue #418, § D547).
  * What licensed that was its own docstring: *"this build has measured none of them, which
  * {@link RUSH_ABSENCES} says **on the same screen**"*. The register left this screen on the merge
  * that closed issue #207. `rushScreen.ts` has not imported it since, and `modes.ts` carried the same
@@ -300,7 +285,7 @@ describe('what the screen refuses, and where the refusal sits', () => {
  * it. A **module name** is checkable, which is why the docstrings above now carry one.
  *
  * Scanning the prose for the phrase was tried and rejected: {@link RUSH_ABSENCES}' own docstring
- * says *"not on this screen"* and {@link RUSH_BESTS_FIXTURE_NOTE}'s says *"putting `RUSH_ABSENCES`
+ * says *"not on this screen"* and `RUSH_BESTS_FIXTURE_NOTE`'s says *"putting `RUSH_ABSENCES`
  * back on this screen would re-litigate #207"*. Both are true, and both match any pattern loose
  * enough to catch the defect. A test a truthful author trips over is a test that gets deleted.
  *
@@ -308,8 +293,8 @@ describe('what the screen refuses, and where the refusal sits', () => {
  *
  * It **can** catch: a constant whose declared renderer stopped importing it (the #207 move, from
  * either end); a new player-facing constant with no declared renderer at all; a docstring naming a
- * module that no longer draws the thing it describes; and the standings being drawn on a surface
- * that does not also draw their fixture marker.
+ * module that no longer draws the thing it describes; and the house standings being drawn by a module
+ * other than the one `rushHouse.ts` names (their fixture marker, which this used to check, is deleted).
  *
  * It **cannot** catch: a module that imports a constant and never renders it — an import is
  * evidence, not proof, and the browser tier is what proves a string reaches a page; whether the
@@ -357,7 +342,7 @@ describe('every rush constant names the module that draws it — § D227, GitHub
    *
    * The lead rather than the whole block, and the reason is a defect this case had on its first
    * draft. It asked whether the docstring contained the module's name anywhere, and
-   * {@link RUSH_BESTS} satisfied that from a section recording the history of #293, which mentions
+   * `RUSH_BESTS` satisfied that from a section recording the history of #293, which mentions
    * `rushScreen.ts` only to say what it *does not* import. Restoring the exact stale wording the
    * issue reported left the case green: the instrument was measuring a word, not a claim.
    *
@@ -401,8 +386,6 @@ describe('every rush constant names the module that draws it — § D227, GitHub
      * checkable rather than remembered, and it is the row #293 would have failed on.
      */
     RUSH_ABSENCES: 'buildNotes.ts',
-    RUSH_BESTS: 'rushScreen.ts',
-    RUSH_BESTS_FIXTURE_NOTE: 'rushScreen.ts',
     /*
      * § D529 clause 2's framing line (GitHub issue #380). In-file: `rushTutorialWorkedAnswerOf`
      * hands it to `workedAnswer.ts#workedAnswerViewOf` and the rush setup screen draws the *view*,
@@ -468,28 +451,24 @@ describe('every rush constant names the module that draws it — § D227, GitHub
     ).toEqual([]);
   });
 
-  it('draws the standings’ fixture marker wherever it draws the standings, and nowhere else', () => {
+  it('draws the house standings in one module, and their note travels inside the same view', () => {
     /*
-     * **The § 20.11 relation, and the one case here that is not about a docstring.** § 20.11 lists
-     * `RUSH_BESTS` among the authored fixtures and gives each one a real source or *"an explicit
-     * `FIXTURE` marker so nobody ships them as truth"*. The engine that would be the real source is
-     * GitHub issue #220's and is not built, so the marker is the whole of the compliance — and a
-     * marker on a different surface from the fixture is not one.
-     *
-     * Asserted as set equality rather than as *the note is drawn somewhere*, which is the direction
-     * that matters: a second screen that grew a standings list without the marker would satisfy the
-     * weaker form and be precisely the defect back again. Neither side may be empty, or two absent
-     * things would compare equal and the case would pass over a build that draws no standings at
-     * all.
+     * **The § 20.11 relation, after GitHub issue #418.** This case asserted that the module drawing
+     * `RUSH_BESTS` also drew `RUSH_BESTS_FIXTURE_NOTE`, because a fixture's marker had to travel with
+     * the fixture. Both are deleted (§ D547): the rows are the house's measured runs, and the note
+     * saying so is a field of `rushHouse.ts#rushStandingsOf`'s view rather than a constant beside it,
+     * so no module can draw the rows without being handed the note. What is left to check is that the
+     * view has exactly one renderer, and that it is the one `rushHouse.ts`'s docstring lead names.
      */
-    const rows = importersOf('RUSH_BESTS');
-    const marker = importersOf('RUSH_BESTS_FIXTURE_NOTE');
-    expect(rows.length).toBeGreaterThan(0);
-    expect(
-      marker,
-      'the five standings carry two invented handles against held times, and § 20.11 lets a ' +
-        'fixture ship only with a real source or a marker beside it. These two must be drawn by ' +
-        'the same modules — moving one without the other is GitHub issue #293 exactly.',
-    ).toEqual(rows);
+    const importers = readdirSync(HERE)
+      .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && file !== 'rushHouse.ts')
+      .filter((file) =>
+        /import\s*\{[^}]*\brushStandingsOf\b[^}]*\}\s*from\s*'\.\/rushHouse\.js'/u.test(
+          readFileSync(`${HERE}${file}`, 'utf8'),
+        ),
+      )
+      .sort();
+    expect(importers, 'the house standings must have exactly one renderer, rushScreen.ts').toEqual(['rushScreen.ts']);
+    expect(readFileSync(`${HERE}rushHouse.ts`, 'utf8').split('\n * ## ')[0]).toContain('rushScreen.ts');
   });
 });
