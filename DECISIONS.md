@@ -35276,17 +35276,29 @@ ceiling means for a row with more than one price is a rule those modules share a
 
 1. **A row is flat or rated, never both.** A flat row carries `priceUnits`, as every shipped row
    does. A rated row carries `rate: { unitsPer, quantity }` and no `priceUnits`. `pricing/parse.ts`
-   refuses a row carrying both, and refuses any other key inside `rate` — no bands, no curve, no
-   fixed part — which is *linear only* made mechanical. `PricedChange` is a union on that split, so
-   a reader that takes `priceUnits` off a rated row does not compile.
-2. **What buying costs is one function.** `pricing/parse.ts#purchaseUnits(change, quantity)` is the
-   only place a price is multiplied: `unitsPer × quantity` for a rated row, the flat figure for a
-   flat row. It refuses a rated row bought with no quantity rather than charging one unit, because
-   one unit is a quantity chosen for the player; and it refuses a quantity on a flat row rather than
-   multiplying a figure that declared no rate. Every path that summed `priceUnits` goes through it —
-   repair patches, scenario moves, the fix-it editor, the campaign shop, the live works control and
-   the survivor bundles — and none of them has a quantity to give, so a rated row reached through
-   one of them fails loudly.
+   refuses a row carrying both, and refuses any other key at every level of a rated row: inside
+   `rate`; inside its `quantity`, which carries only `type`, `unit`, `min`, `max` and `default`;
+   inside its `schema`, which carries the same five; and beside it on the row, where any key a flat
+   row does not define is refused. No bands, no curve, no fixed part, wherever one is written — which
+   is *linear only* made mechanical. **Flat rows are not held to it**: their parser has never refused
+   a key it does not read, and this decision does not start. `PricedChange` is a union on that split,
+   so a reader that takes `priceUnits` off a rated row does not compile.
+2. **What buying costs is one function, with one known exception.**
+   `pricing/parse.ts#purchaseUnits(change, quantity)` is the only place a **rate** is multiplied by
+   a quantity: `unitsPer × quantity` for a rated row, the flat figure for a flat row. It refuses a
+   rated row bought with no quantity rather than charging one unit, because one unit is a quantity
+   chosen for the player; and it refuses a quantity on a flat row rather than multiplying a figure
+   that declared no rate. Every path that summed `priceUnits` goes through it — repair patches,
+   scenario moves, the fix-it editor, the campaign shop, the live works control and the survivor
+   bundles — and none of them passes it a quantity, so a rated row reached through one of them fails
+   loudly. **The exception is the fix-it editor, which multiplies a flat price in code.**
+   `fixit/engine.ts#editorPricingFrom` reads `faster-machines` and `larger-car-step` through
+   `purchaseUnits` as flat figures, and `fixit/engine.ts#spendOf` multiplies each by the step count
+   the player chose: `speedSteps × speedUnitsPerHalfMps` and
+   `capacitySteps × capacityUnitsPerTwoPlaces`. Those two multiplications produce identical figures
+   today to what the seam would charge a rated row at the same price for the same count. GitHub
+   issue #528 tracks moving them onto the seam; until it lands, turning either row into a rated one
+   makes `editorPricingFrom`, and `spendOf` with it, throw. `fixit/engine.test.ts` holds both halves.
 3. **Invariant 8, twice.** A rated row's `schema` describes its rate, as a flat row's describes its
    price: in range, and a default equal to the figure. The quantity declares its own integer schema —
    its unit, a floor and a default of **0**, meaning none bought, and a ceiling of at least one. A

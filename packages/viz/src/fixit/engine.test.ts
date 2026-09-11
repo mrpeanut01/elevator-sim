@@ -11,7 +11,9 @@ import { describe, expect, it } from 'vitest';
 
 import { PARKING_STRATEGIES } from '@elevator-sim/core/browser';
 
+import { priceOf, purchaseUnits } from '../pricing/parse.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+import type { PricedChange, PriceSchedule } from '../pricing/types.js';
 
 import {
   BASIS_LINE,
@@ -576,5 +578,53 @@ describe("the editor's zoning and parking are priced by the rows a repair alread
       expect(PARKING_STRATEGIES as readonly string[]).toContain(strategy);
     }
     expect(EDITOR_PARKING_STRATEGIES.length).toBeLessThan(PARKING_STRATEGIES.length);
+  });
+});
+
+/**
+ * **§ D552 clause 2's known exception, held by a run rather than a sentence.** The editor reads
+ * `faster-machines` and `larger-car-step` as flat figures and {@link spendOf} multiplies each by a
+ * step count the player chose: a flat price times a quantity, in code rather than through
+ * `pricing/parse.ts#purchaseUnits`. GitHub issue #528 tracks moving it onto that seam. Until then two
+ * things are true and both are held here: each step costs exactly what the seam would charge a rated
+ * row at the same price, and turning either row into a rated one throws rather than charging a
+ * quantity nobody chose. The commit that closes #528 replaces this block.
+ */
+describe('the editor multiplies two flat rows in code — § D552 clause 2, GitHub issue #528', () => {
+  const STEPS = 6;
+  const withRated = (schedule: PriceSchedule, id: string): PriceSchedule => ({
+    ...schedule,
+    changes: schedule.changes.map((change): PricedChange => {
+      if (change.id !== id || change.rate !== undefined) return change;
+      const { priceUnits, ...fields } = change;
+      return {
+        ...fields,
+        rate: {
+          unitsPer: priceUnits,
+          quantity: { type: 'integer', unit: 'step', min: 0, max: STEPS, default: 0 },
+        },
+      };
+    }),
+  });
+
+  it('charges each step exactly what the seam would charge a rated row at the same price', () => {
+    const schedule = shippedPriceSchedule();
+    const speedTwin = priceOf(withRated(schedule, 'faster-machines'), 'faster-machines');
+    const placeTwin = priceOf(withRated(schedule, 'larger-car-step'), 'larger-car-step');
+    const none = spendOf(CASE, emptyFixitState(), schedule).editorUnits;
+    for (let steps = 0; steps <= STEPS; steps += 1) {
+      const speed = spendOf(CASE, { ...emptyFixitState(), speedSteps: steps }, schedule).editorUnits;
+      const places = spendOf(CASE, { ...emptyFixitState(), capacitySteps: steps }, schedule).editorUnits;
+      expect(speed - none, `speed × ${String(steps)}`).toBe(purchaseUnits(speedTwin, steps));
+      expect(places - none, `capacity × ${String(steps)}`).toBe(purchaseUnits(placeTwin, steps));
+    }
+  });
+
+  it('throws once either row carries a rate, rather than charging a quantity nobody chose', () => {
+    for (const id of ['faster-machines', 'larger-car-step']) {
+      const schedule = withRated(shippedPriceSchedule(), id);
+      expect(() => editorPricingFrom(schedule), id).toThrow(/without a quantity/);
+      expect(() => spendOf(CASE, emptyFixitState(), schedule), id).toThrow(/without a quantity/);
+    }
   });
 });

@@ -39,7 +39,11 @@
  *
  * - **A row is flat or rated, never both**, and a rate carries one per-unit figure and its quantity
  *   and nothing else. *Linear only, no curves* is the owner's ruling, so a key that would bend the
- *   line is refused rather than ignored.
+ *   line is refused rather than ignored, **at every level of a rated row**: inside `rate`, inside its
+ *   `quantity` and its `schema`, and beside it on the row, where any key a flat row does not define is
+ *   refused. Until the review of GitHub PR #527 only the top of `rate` was read, so
+ *   `rate.quantity.bands` and a row-level `fixedUnits` parsed clean. **Flat rows are not held to
+ *   this**: their parser has never refused a key it does not read, and this rule does not start.
  * - **The rate sits inside the row's own schema**, as a flat price does, and a rate of zero or less is
  *   refused: a row that charges nothing per unit is a free flat row wearing a multiplier.
  * - **The quantity declares its own schema, from none.** Its floor and default are 0 — an unset
@@ -96,6 +100,33 @@ const WITHHELD_KEYS: readonly string[] = ['id', 'note', 'covers'];
 /** Every key a rate may carry — one per-unit figure and its quantity, and nothing that bends the line. */
 const RATE_KEYS: readonly string[] = ['unitsPer', 'quantity'];
 
+/**
+ * Every key a declared range may carry — a rated row's schema or its quantity's: a type, a unit, a
+ * floor, a ceiling and a default, and nothing that would make the line a band or a curve (§ D552).
+ */
+const RANGE_KEYS: readonly string[] = ['type', 'unit', 'min', 'max', 'default'];
+
+/**
+ * Every key a flat row defines, which is what the flat parser reads. Beside a rate, a key outside this
+ * list that is not `rate` itself is refused (§ D552). A flat row is **not** checked against it: its
+ * parser has never refused a key it does not read, and every shipped row is flat.
+ */
+const FLAT_ROW_KEYS: readonly string[] = [
+  'id',
+  'tier',
+  'name',
+  'priceUnits',
+  'nights',
+  'note',
+  'covers',
+  'schema',
+];
+
+/** The keys of an entry that a list does not name, in the order the document wrote them. */
+function keysBeyond(entry: Record<string, unknown>, allowed: readonly string[]): readonly string[] {
+  return Object.keys(entry).filter((key) => !allowed.includes(key));
+}
+
 /** Whether two config paths name the same field, or one is a dotted group holding the other. */
 function pathsOverlap(left: string, right: string): boolean {
   return left === right || left.startsWith(`${right}.`) || right.startsWith(`${left}.`);
@@ -122,11 +153,10 @@ function parseSchema(raw: unknown, where: string): PriceSchema {
   };
 }
 
-/** A row's rate, with any key beyond the two a line needs reported into `shape` (#478, § D552). */
+/** A row's rate, with any key beyond a line's reported into `shape`, at both its levels (#478, § D552). */
 function parseRate(raw: unknown, where: string, id: string, shape: string[]): PriceRate {
   const entry = record(raw, where);
-  for (const key of Object.keys(entry)) {
-    if (RATE_KEYS.includes(key)) continue;
+  for (const key of keysBeyond(entry, RATE_KEYS)) {
     shape.push(
       `change "${id}" carries "${key}" in its rate. Linear only, no curves: a rate is one per-unit ` +
         'figure times a quantity, so there is no field for a band, a curve or a fixed part (GitHub ' +
@@ -134,6 +164,13 @@ function parseRate(raw: unknown, where: string, id: string, shape: string[]): Pr
     );
   }
   const quantity = record(entry['quantity'], `${where}.quantity`);
+  for (const key of keysBeyond(quantity, RANGE_KEYS)) {
+    shape.push(
+      `change "${id}" carries "${key}" in its rate's quantity. Linear only, no curves: a quantity is ` +
+        'a whole number of things with a floor, a ceiling and a default, so there is no field for a ' +
+        'band, a curve or a fixed part (GitHub issue #478, § D552).',
+    );
+  }
   if (str(quantity['type'], `${where}.quantity.type`) !== 'integer') {
     throw new PriceScheduleError(`${where}.quantity.type: a quantity is a whole number of things.`);
   }
@@ -194,6 +231,22 @@ export function parsePriceSchedule(raw: unknown): PriceSchedule {
         `change "${id}" carries both a flat price and a rate. A row is priced flat or per unit, ` +
           'never both, so a flat price cannot quietly become a fixed part under a rate (GitHub ' +
           'issue #478, § D552).',
+      );
+    }
+    /* Every level of a rated row, not only the top of its rate — the review of GitHub PR #527. */
+    for (const key of keysBeyond(change, [...FLAT_ROW_KEYS, 'rate'])) {
+      shape.push(
+        `change "${id}" carries "${key}" beside its rate, and a price row defines no such field. ` +
+          'Linear only, no curves: beside a rate there is no field for a band, a curve or a fixed ' +
+          'part, so a key the row does not read is refused rather than ignored (GitHub issue #478, ' +
+          '§ D552).',
+      );
+    }
+    for (const key of keysBeyond(record(change['schema'], `${where}.schema`), RANGE_KEYS)) {
+      shape.push(
+        `change "${id}" carries "${key}" in the schema of its rate. Linear only, no curves: a rate's ` +
+          'schema is its range and its default, so there is no field for a band, a curve or a fixed ' +
+          'part (GitHub issue #478, § D552).',
       );
     }
     const rate = parseRate(change['rate'], `${where}.rate`, id, shape);
@@ -425,14 +478,22 @@ export function changeCovering(
 }
 
 /**
- * **What buying a change costs — the one place a price is multiplied.** GitHub issue **#478**,
- * [§ D552](../../../../DECISIONS.md).
+ * **What buying a change costs — the one place a rate is multiplied by a quantity.** GitHub issue
+ * **#478**, [§ D552](../../../../DECISIONS.md).
  *
  * A flat row costs its price and takes no quantity. A rated row costs `unitsPer × quantity`, linear
  * and nothing else, for a whole-number quantity inside its declared range.
  *
- * **Both refusals are the point.** Every path that priced a change before #478 summed a flat figure
- * and has no quantity to give, so a rated row reached through one of them throws here rather than
+ * **It is not the only place a price is multiplied, and the exception is known.** The fix-it editor
+ * reads `faster-machines` and `larger-car-step` through here as flat figures
+ * (`fixit/engine.ts#editorPricingFrom`), and `fixit/engine.ts#spendOf` multiplies each by the step
+ * count the player chose: a flat price times a quantity, in code. The figures are identical today to
+ * what this function would charge a rated row at the same price for the same count, and GitHub issue
+ * #528 tracks moving them onto this seam. Until it does, turning either row into a rated one makes
+ * `editorPricingFrom` throw here, and `spendOf` with it; `fixit/engine.test.ts` holds both halves.
+ *
+ * **Both refusals are the point.** Every other path that priced a change before #478 summed a flat
+ * figure and has no quantity to give, so a rated row reached through one of them throws here rather than
  * being charged for one unit — one unit is a quantity chosen for the player, which is the private
  * multiplier the issue exists to prevent, arrived at by default. And a quantity on a flat row throws
  * rather than multiplying a figure that declared no rate.

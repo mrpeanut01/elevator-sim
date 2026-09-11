@@ -172,8 +172,62 @@ describe('linear only, no curves', () => {
     }
   });
 
+  /**
+   * **Every level of a rated row, not only the top of its rate.** The review of GitHub PR #527 found
+   * `rate.quantity.bands`, `rate.quantity.exponent` and a row-level `fixedUnits` beside a rate all
+   * parsing with no violation, so a banded draft would have loaded clean and been charged linearly.
+   * The first three values below are the reviewer's.
+   */
+  it('refuses a band, a curve or a fixed part inside the rate’s quantity', () => {
+    const base = ratedRow(rawShipped());
+    const rate = base['rate'] as RawRow;
+    const quantity = rate['quantity'] as RawRow;
+    const extras: RawRow = { bands: [[1, 9], [6, 5]], exponent: 2, fixedUnits: 5, curve: 'quadratic' };
+    for (const [key, value] of Object.entries(extras)) {
+      const row = { ...base, rate: { ...rate, quantity: { ...quantity, [key]: value } } };
+      expect(() => parsePriceSchedule(rawWith(row)), key).toThrow(/linear only, no curves/i);
+      expect(() => parsePriceSchedule(rawWith(row)), key).toThrow(`"${key}" in its rate's quantity`);
+    }
+  });
+
+  it('refuses a fixed part, a band or any key a flat row does not define, beside a rate', () => {
+    const base = ratedRow(rawShipped());
+    const extras: RawRow = { fixedUnits: 5, bands: [[1, 9], [6, 5]], exponent: 2, unitsPer: 4, quantity: 3 };
+    for (const [key, value] of Object.entries(extras)) {
+      const row = { ...base, [key]: value };
+      expect(() => parsePriceSchedule(rawWith(row)), key).toThrow(/linear only, no curves/i);
+      expect(() => parsePriceSchedule(rawWith(row)), key).toThrow(`carries "${key}" beside its rate`);
+    }
+  });
+
+  it('refuses a band or a curve inside the schema its rate is checked against', () => {
+    const base = ratedRow(rawShipped());
+    const schema = base['schema'] as RawRow;
+    const extras: RawRow = { bands: [[1, 9], [6, 5]], exponent: 2 };
+    for (const [key, value] of Object.entries(extras)) {
+      const row = { ...base, schema: { ...schema, [key]: value } };
+      expect(() => parsePriceSchedule(rawWith(row)), key).toThrow(/linear only, no curves/i);
+      expect(() => parsePriceSchedule(rawWith(row)), key).toThrow(`"${key}" in the schema of its rate`);
+    }
+  });
+
   it('and parses the same row without the extra key, so the refusal is not vacuous', () => {
     expect(() => scheduleWithRate()).not.toThrow();
+  });
+
+  /**
+   * **Scoped to rated rows, deliberately.** The flat parser has never refused a key it does not read,
+   * and this guard does not start: it exists so a rate cannot be bent, and every shipped row is flat.
+   * Whether flat rows should refuse unknown keys too is a separate change. This case records where the
+   * refusal stops, so nobody reads the rule above as covering them.
+   */
+  it('leaves flat rows as they were: a key a flat row does not read is refused only beside a rate', () => {
+    const raw = rawShipped();
+    const first = raw.changes[0];
+    if (first === undefined) throw new Error('the shipped schedule prices nothing');
+    const flat = { ...raw, changes: [{ ...first, fixedUnits: 5 }, ...raw.changes.slice(1)] };
+    expect(() => parsePriceSchedule(flat)).not.toThrow();
+    expect(() => parsePriceSchedule(rawWith({ ...ratedRow(raw), fixedUnits: 5 }))).toThrow(/beside its rate/);
   });
 
   it('refuses a row carrying both a flat price and a rate', () => {
