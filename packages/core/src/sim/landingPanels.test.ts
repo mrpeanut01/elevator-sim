@@ -60,10 +60,12 @@ const INTERFLOOR_MIX = {
 
 /**
  * An up-peak at 4 %, the § D333 heavy point's level. The move-the-control cases run here rather than
- * at the interfloor mix, and that was measured, not assumed: at 1.5 % interfloor the lobby's calls
- * arrive one rider at a time and every one is answered by the car that was coming anyway, so a panel
- * at G promised the very car each rider boarded and the legs came out identical. A lobby that holds a
- * batch is where a panel has a decision to change — which is also where the literature puts it.
+ * at the interfloor mix because at 1.5 % interfloor, at {@link SEED}, a panel at G alone left every
+ * leg identical to the run with none. That is an **observation at one seed, not a property of the
+ * mix**, and no mechanism is offered for it: the review of PR #532 found the null seed-dependent,
+ * and at the very next seed the same panel moves the legs. AC4's last case pins both halves, so the
+ * reason this constant exists is held by a run rather than by this paragraph; § D553 records the
+ * sweep that found it.
  */
 const UP_PEAK = {
   durationS: 1800,
@@ -241,6 +243,23 @@ describe('AC4: adding a panel to one floor changes the legs', () => {
     // Level 0 is still the conventional passenger model: nobody is promised anything.
     expect(promisedLegs(kiosk)).toHaveLength(0);
     expect(kiosk.comparability).toStrictEqual(buttons.comparability);
+  });
+
+  it('at the interfloor mix the same panel leaves the legs alone at one seed and moves them at the next', () => {
+    // Why the two cases above run at `UP_PEAK`, pinned as an observation at two named seeds rather
+    // than as a mechanism: the null at `SEED` is a fact about that seed's traces, not about the mix.
+    const legsUnmovedAt = (seed: number): boolean => {
+      const none = run(
+        reauthored('midtown-office', everywhere('midtown-office', 'up-down-buttons')),
+        PANEL(),
+        { seed },
+      );
+      const lobby = run(reauthored('midtown-office', panelsOnlyAt('midtown-office', 'G')), PANEL(), { seed });
+      expect(promisedLegs(lobby).length, `seed ${String(seed)}: the panel did promise cars`).toBeGreaterThan(0);
+      return trajectory(lobby) === trajectory(none);
+    };
+    expect(legsUnmovedAt(SEED), 'the file’s seed: every leg identical').toBe(true);
+    expect(legsUnmovedAt(SEED + 1), 'the next seed: the legs move').toBe(false);
   });
 });
 

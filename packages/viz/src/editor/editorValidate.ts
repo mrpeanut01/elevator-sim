@@ -26,6 +26,20 @@
  * `ED-T7`: every `ConfigWarning` listed separately as suspicious-not-fatal, and `UX.md` § C.3's
  * warning-only state keeps **Run enabled**. A blocked run for a warning teaches the reader to
  * ignore warnings.
+ *
+ * ## One refusal that is the viewer's, not the schema's
+ *
+ * A landing call type — per-floor destination panels, GitHub issue #437 — is legal in core since
+ * § D553, and this module still refuses it, which is the single exception to *nothing here decides
+ * what is legal*. It is not a second opinion about the document: the loader and the CLI accept it
+ * and run it. It is a refusal about **what this viewer can show**. A building whose landings take
+ * different calls runs as the `hybrid` passenger model, and the viewer's disclosure, pinned-queue
+ * overlay and report still describe every rider taking whichever car answers while the riders at a
+ * panel landing are held to one car. So each declaration is one located issue, the document still
+ * opens so the field can be removed, and Run stays disabled. `validateBuilding` is the one door a
+ * player's building enters the viewer by — the editor's pasted text and file import, its form
+ * edits, and `persist/validate.ts`'s library restore — which is why the refusal lives here and in
+ * no caller. Stage 2 deletes it on the commit that teaches the viewer hybrid runs (§ D553 clause 9).
  */
 
 import {
@@ -119,11 +133,23 @@ export function validateBuilding(
     };
   }
 
+  const refusals = landingPanelRefusals(building, file);
   try {
     const resolved = resolveBuilding(building, specs, {
       file,
       trafficProfileIds: options.trafficProfileIds,
     });
+    if (refusals.length > 0) {
+      // Everything core checks passed, so these are every issue of the furthest stage reached.
+      return {
+        valid: false,
+        stage: 'resolve',
+        issues: refusals,
+        warnings: resolved.warnings,
+        building,
+        resolved: undefined,
+      };
+    }
     return {
       valid: true,
       stage: 'resolve',
@@ -140,12 +166,52 @@ export function validateBuilding(
     return {
       valid: false,
       stage: 'resolve',
-      issues: error.issues,
+      issues: [...error.issues, ...refusals],
       warnings: [],
       building,
       resolved: undefined,
     };
   }
+}
+
+/** The issue code a landing call type is refused under — § D553 clause 9. */
+const LANDING_PANEL_REFUSAL_CODE = 'landing-call-type-not-playable';
+
+const LANDING_PANEL_REFUSAL =
+  'per-floor destination panels are not playable in the viewer yet (GitHub issue #437). ' +
+  'A landing that takes its own kind of call can make the run hybrid, holding the riders at some ' +
+  'landings to one car, and this viewer would still show every rider taking whichever car answers. ' +
+  'Remove this field to run the building here.';
+
+/**
+ * One located issue per floor and per floor range that declares a landing call type, floors first,
+ * each in document order. Any declaration is refused, including one naming the dispatcher's own
+ * call type: the dispatcher is chosen separately in the viewer, so a declaration that is uniform
+ * under one dispatcher is a hybrid under the next.
+ */
+function landingPanelRefusals(building: BuildingConfig, file: string): readonly ConfigIssue[] {
+  const declared = [
+    ...(building.floors ?? []).map((floor, index) => ({
+      at: `floors[${String(index)}]`,
+      callType: floor.landingCallType,
+    })),
+    ...(building.floorRanges ?? []).map((range, index) => ({
+      at: `floorRanges[${String(index)}]`,
+      callType: range.landingCallType,
+    })),
+  ];
+  return declared.flatMap(({ at, callType }) =>
+    callType === undefined
+      ? []
+      : [
+          {
+            file,
+            path: `${at}.landingCallType`,
+            message: LANDING_PANEL_REFUSAL,
+            code: LANDING_PANEL_REFUSAL_CODE,
+          },
+        ],
+  );
 }
 
 /**

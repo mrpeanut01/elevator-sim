@@ -290,6 +290,16 @@ describe('an entry this build cannot parse is dropped, and only that entry', () 
       label: MIDTOWN.name,
     },
     {
+      what: 'a building declaring a per-floor destination panel, which the viewer cannot yet describe (GitHub issue #437)',
+      shelf: 'buildings',
+      break: (entry) => {
+        const config = entry['config'] as Record<string, unknown>;
+        const floors = config['floors'] as Record<string, unknown>[];
+        (floors[1] as Record<string, unknown>)['landingCallType'] = 'destination-entry';
+      },
+      label: MIDTOWN.name,
+    },
+    {
       what: 'a building naming a machine class that is not loaded',
       shelf: 'buildings',
       break: (entry) => {
