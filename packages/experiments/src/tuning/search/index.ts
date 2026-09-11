@@ -10,7 +10,7 @@
  *
  * ```ts
  * const result = await successiveHalving({
- *   space,                                    // tuning/space, sampling DISPATCH_PARAMETERS
+ *   space,                                    // tuning/space, every row a profile can hold
  *   objective: runnerObjective({              // the Phase 3 runner, one experiment per round
  *     resources: await loadConfig('data'),
  *     buildingId: 'garden-apartments',
@@ -182,7 +182,7 @@
  *   round is one `ExperimentSpec` at one seed; `runner/crn.ts` derives the replication seeds; there
  *   is no stopping rule underneath a rung, because a sequential rule would give two candidates in
  *   the same rung different replication counts and *un-pair them*.
- * - **It does not know what a parameter is.** Sampling `DISPATCH_PARAMETERS`, honouring
+ * - **It does not know what a parameter is.** Sampling the space `tuning/space` collects, honouring
  *   `activeWhen`, and writing a candidate back through a dotted `id` are `tuning/space`'s, injected
  *   as {@link CandidateSampler} and {@link RunnerObjectiveOptions.materialize}. That is the contract
  *   docs/06 § The parameter schema exists to create, and this module is the proof it holds: there

@@ -27,8 +27,8 @@ import type { PredictorIdleSource, ResolvedPredictorConfig } from './types.js';
 
 /**
  * The schema's lookups, derived here from the schema and the resolved config. `core` stopped
- * exporting id-set and read-back helpers that were waiting for a Bayesian and OCBA optimizer over this
- * schema, which the project owner withdrew (GitHub issue #416). What this file checks is the schema against the config the model reads, and these two
+ * exporting id-set and read-back helpers that were waiting for a schema-driven search entry point the
+ * project owner withdrew (GitHub issue #416); `tuning/search` still samples this schema. What this file checks is the schema against the config the model reads, and these two
  * helpers are that check's vocabulary rather than a surface of their own.
  */
 const declared = (id: string): DispatchParameterSpec | undefined =>

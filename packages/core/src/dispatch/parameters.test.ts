@@ -49,8 +49,8 @@ const EVERY_PARAMETER: readonly DispatchParameterSpec[] = Object.freeze([
 /**
  * A declared parameter by id, whichever of the three schemas declares it. The policy and predictor
  * lookups are derived here from their schemas: `core` stopped exporting id-set helpers that were
- * waiting for a Bayesian and OCBA optimizer over these schemas, which the project owner withdrew
- * (GitHub issue #416). `tuning/search` is unaffected.
+ * waiting for a schema-driven search entry point the project owner withdrew (GitHub issue #416).
+ * The search that does sample these schemas, `tuning/search`, ships and is unaffected.
  */
 const declared = (id: string): DispatchParameterSpec | undefined =>
   dispatchParameter(id) ??

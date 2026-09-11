@@ -34941,14 +34941,14 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 
 ---
 
-## D538 — Phase 7's Bayesian optimization and OCBA are withdrawn, the six helpers waiting for them are deleted, and invariant 8 stops promising them
+## D538 — Phase 7's schema-driven search entry point, Bayesian optimization and OCBA are withdrawn, the six helpers waiting for the entry point are deleted, and invariant 8 stops promising them
 
 **Date: 2026-09-10 · GitHub issue #416 · A ruling by the project owner, given in session, amending `CLAUDE.md` invariant 8.**
 
-**Why an entry.** It amends a non-negotiable invariant. It also moves a recorded scope item, `docs/05` Phase 7's *"Bayesian optimization, CMA-ES; OCBA for final selection"*, from unbuilt to withdrawn. Both reach past every module this change touches ([§ D405](DECISIONS.md)).
+**Why an entry.** It amends a non-negotiable invariant. It also moves two items of `docs/05` Phase 7's scope — the Bayesian optimization and the OCBA in *"Random search baseline, Bayesian optimization, CMA-ES; OCBA for final selection"* — from unbuilt to withdrawn. Both reach past every module this change touches ([§ D405](DECISIONS.md)).
 
-1. **Not built, by ruling rather than by default.** Phase 7's Bayesian optimization and OCBA were never implemented, as `tuning/search/index.ts` said, and nothing currently needs them. #367's survivor sweep judged 480 configurations with ordinary paired replication and no allocator. The owner chose disposal over the XL build.
-2. **Six `core` exports are deleted.** Their only recorded reason, in `dispatch/deadCode.test.ts`'s `PUBLIC_API_ONLY`, was that a Phase 7 optimizer would read them:
+1. **Not built, by ruling rather than by default.** Phase 7's Bayesian optimization and OCBA were never implemented, as `tuning/search/index.ts` said, and neither was the schema-driven generic search entry point #416's triage named as the six helpers' consumer. Nothing currently needs any of them: #367's survivor sweep made 480 judgements with fixed paired replication and no allocator. The owner chose disposal over the XL build.
+2. **Six `core` exports are deleted.** Their only recorded reason, in `dispatch/deadCode.test.ts`'s `PUBLIC_API_ONLY`, was that a Phase 7 optimizer would read them. #416's triage identified that consumer as a schema-driven generic search entry point — not OCBA, a finalist allocator that would not have acquired them:
    - `POLICY_PARAMETER_IDS`
    - `policyParameter`
    - `PREDICTOR_PARAMETER_IDS`
@@ -34957,11 +34957,11 @@ reservation was open, and the numbers below D537 are not written on this lane's 
    - `tunablePredictorPathsOf`
 
    The schemas they read, `POLICY_PARAMETERS` and `PREDICTOR_PARAMETERS`, stay. The tests that used the helpers now derive the same lookups from those schemas, and the assertions that tested only a deleted helper's own behaviour went with it.
-3. **What invariant 8 now says.** Every tunable still declares its schema. The purpose clause no longer promises an optimizer beyond what ships, and names what does ship: `tuning/search`'s random search, successive halving and sep-CMA-ES, which already sample `DISPATCH_PARAMETERS` without an elevator-specific line.
+3. **What invariant 8 now says.** Every tunable still declares its schema. The purpose clause no longer promises an optimizer beyond what ships, and names what does ship: `tuning/search`'s random search, successive halving and sep-CMA-ES, which already sample the space `tuning/space` collects — every declared row a dispatcher profile can hold, from `DISPATCH_PARAMETERS`, `POLICY_PARAMETERS`, `PREDICTOR_PARAMETERS` and eight `answer.*` rows — without an elevator-specific line.
 4. **What is unchanged.**
    - `tuning/search` and `tuning/space`.
    - Every `*_PARAMETERS` declaration, including `RUNNER_PARAMETERS` and `SEARCH_PARAMETERS`. Their register reasons now say nothing searches them, rather than that a reader that does not exist will.
-   - The docstrings where *a generic optimizer* or *a Phase 7 optimizer* means the tuning search that exists. Rewording those would make true sentences false.
+   - The docstrings where *a generic optimizer* or *a Phase 7 optimizer* means the tuning search that exists, which rewording would make false. Four that promised more than it does are corrected with this entry: `sim/types.ts` and two in `traffic/types.ts` (the collected space holds no `sim.*` or `traffic.*` row), and `runner/replicationRunner.ts#runPlan` (only `runExperiment` calls it).
 
 **What this does not claim.** That an allocator could not help at larger budgets: #416's own record is that OCBA's value grows with the replication budget. This entry records that none is planned, not that none could matter.
 

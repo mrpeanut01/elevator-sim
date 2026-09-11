@@ -272,8 +272,9 @@ function asVerdict(answer: StoppingVerdict | boolean): StoppingVerdict {
  * Run an already-resolved plan.
  *
  * Separated from {@link runExperiment} so a caller can inspect, print or assert on the plan before
- * spending an hour of CPU on it — and so a Phase 7 optimizer can re-run one plan across candidate
- * weight vectors without re-validating a spec each time.
+ * spending an hour of CPU on it. It was also meant to let a Phase 7 optimizer re-run one plan across
+ * candidate weight vectors without re-validating a spec, and nothing does: {@link runExperiment} is
+ * its only caller, and `tuning/search`'s `runnerObjective` calls that with a new spec every round.
  *
  * The plan is authoritative for `parallel`, `keepRecords` and `onReplicationError`: those are
  * resolved when the plan is built, so the matching fields of `options` are ignored here and only

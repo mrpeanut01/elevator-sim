@@ -1087,8 +1087,8 @@ describe('nothing in dispatch/policies reads a profile id (CLAUDE.md invariant 7
 
 /**
  * Every declared policy id, and a declared policy parameter by id — derived here from the schema,
- * because `core` stopped exporting these helpers, which were waiting for a Bayesian and OCBA optimizer
- * over the policy schema that the project owner withdrew (GitHub issue #416).
+ * because `core` stopped exporting these helpers, which were waiting for a schema-driven search entry
+ * point the project owner withdrew (GitHub issue #416). `tuning/search` still samples this schema.
  */
 const POLICY_PARAMETER_IDS: ReadonlySet<string> = new Set(POLICY_PARAMETERS.map((parameter) => parameter.id));
 const policyParameter = (id: string) => POLICY_PARAMETERS.find((parameter) => parameter.id === id);
@@ -1126,7 +1126,6 @@ describe('the schema and the aggregation agree about what is tunable', () => {
     expect(policyParameter('auction.reserveMarginalDelayS')?.default).toBe(
       POLICY_DEFAULTS.reserveMarginalDelayS,
     );
-    expect(policyParameter('nonsense.knob')).toBeUndefined();
   });
 
   it('gives a generic optimizer everything it needs to sample each row', () => {

@@ -96,8 +96,10 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
 
 // -- Invariant 8 schema declarations. Each package declares its tunables so the space is explicit and
 // checkable; no optimizer beyond `tuning/search` is planned (GitHub issue #416).
-// `DISPATCH_PARAMETERS` is the one the tuner consumes today; the rest are the same contract for
-// parameters no shipped search varies yet. They are data about
+// `tuning/space` collects every row a dispatcher profile can hold — all of `DISPATCH_PARAMETERS`,
+// `POLICY_PARAMETERS` and `PREDICTOR_PARAMETERS`, and eight `answer.*` rows declared elsewhere — and
+// `tuning/search` samples them; which rows of the schemas below it reaches is `collect.ts`'s answer,
+// not this list's. They are data about
 // code, and a consumer outside this repository is exactly who they are for.
 'analytical/ANALYTICAL_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 'metrics/METRICS_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',

@@ -1255,9 +1255,10 @@ violations as bugs, and reject changes that introduce them.
 8. **Every tunable declares its schema** — type, range, default, and `activeWhen` for
    conditional parameters — so the space is explicit and checkable, and a search over it needs no
    elevator-specific knowledge: `tuning/search`'s random search, successive halving and sep-CMA-ES
-   sample `DISPATCH_PARAMETERS` without one. **No generic optimizer beyond that is planned** —
-   Phase 7's Bayesian optimization and OCBA were withdrawn by the project owner on 2026-09-10
-   (GitHub issue #416, [§ D538](DECISIONS.md)), and the declaration stands on its own.
+   sample the space `tuning/space` collects — every declared row a dispatcher profile can hold —
+   without one. **Nothing beyond that is planned**: Phase 7's schema-driven search entry point,
+   Bayesian optimization and OCBA were withdrawn by the project owner on 2026-09-10 (GitHub issue
+   #416, [§ D538](DECISIONS.md)), and the declaration stands on its own.
 
 ## Statistical discipline
 

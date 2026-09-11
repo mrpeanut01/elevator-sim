@@ -748,7 +748,7 @@ The audit itself found **no dead symbol**: all 72 exports of `dispatch/policies/
 public API — the four stage-5 result accessors and `parkingFloorIds`, `fixedForecast`, the
 compile-time assertion `profileAsPolicySource`, `prepositionPlan`, and the six parameter-schema
 introspection functions whose consumer was to be the Phase 7 optimizer (invariant 8) — deleted on
-2026-09-10 with GitHub issue #416, when the project owner withdrew the Bayesian and OCBA optimizer they waited for.
+2026-09-10 with GitHub issue #416, when the project owner withdrew the schema-driven search entry point they waited for.
 
 ---
 
@@ -1404,7 +1404,9 @@ point: it read *"green. The machinery is complete and wired"* when nothing outsi
 reach the module; that was corrected to **NOT ACCEPTED** by
 [review finding #1](08-review-findings.md); the blockers were then closed by real work rather than
 by rewording, and the verdict is accepted on the evidence below. **Both scope bullets that were
-never built are marked not-done above rather than swept into this verdict.**
+never built at the time are marked above rather than swept into this verdict: the fuzzy detector,
+since built and marked done, and Bayesian optimization with OCBA, since withdrawn (GitHub issue
+#416).**
 
 **What was wrong, recorded so the shape stays visible.** There was no
 `packages/experiments/src/tuning/index.ts`; `packages/experiments/src/index.ts` exported nothing
