@@ -125,6 +125,10 @@ export const TERM_PHRASES: Readonly<Record<string, { readonly measures: string; 
       serves: 'Pre-positioning',
     },
     crowding: { measures: 'hall queue length at the pickup floor', serves: 'Parallel service' },
+    dutyMismatch: {
+      measures: "mismatch between the rider's duty and the car's",
+      serves: 'Duty-bound cars: goods, bed, service',
+    },
   });
 
 /**

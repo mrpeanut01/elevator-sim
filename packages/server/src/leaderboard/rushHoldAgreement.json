@@ -1,0 +1,19 @@
+{
+  "generatedBy": "packages/server/src/leaderboard/rushHoldAgreement.test.ts",
+  "command": "ELEVATOR_SIM_REGENERATE_RUSH_AGREEMENT=1 npx vitest run --project server src/leaderboard/rushHoldAgreement.test.ts",
+  "cells": [
+    {"buildingId":"garden-apartments","dispatcherProfileId":"collective","heldS":1178},
+    {"buildingId":"midtown-office","dispatcherProfileId":"collective","heldS":1640},
+    {"buildingId":"midtown-office","dispatcherProfileId":"eta","heldS":1542},
+    {"buildingId":"midtown-office","dispatcherProfileId":"collective","interventions":[{"atS":60,"change":{"kind":"switch-dispatcher","toProfileId":"nearest-car"}}],"heldS":1510},
+    {"buildingId":"midtown-office","dispatcherProfileId":"collective","interventions":[{"atS":60,"change":{"kind":"park-cars-lobby"}}],"heldS":1536},
+    {"buildingId":"secure-tower","dispatcherProfileId":"collective","heldS":2842},
+    {"buildingId":"mixed-use-high-rise","dispatcherProfileId":"collective","heldS":4584},
+    {"buildingId":"vertical-city","dispatcherProfileId":"nearest-car","heldS":3546},
+    {"buildingId":"chancery-house","dispatcherProfileId":"collective","heldS":2820},
+    {"buildingId":"chancery-house","dispatcherProfileId":"nearest-car","heldS":1936},
+    {"buildingId":"crown-hotel","dispatcherProfileId":"collective","heldS":2096},
+    {"buildingId":"st-jude-hospital","dispatcherProfileId":"collective","heldS":3012},
+    {"buildingId":"burj-class-reference","dispatcherProfileId":"nearest-car","heldS":5170}
+  ]
+}

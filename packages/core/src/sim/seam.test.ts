@@ -55,6 +55,7 @@ import { LOAD_SENSOR_DEFAULTS } from '../model/car/loadSensor.js';
 import { dwellSecondsFor } from '../physics/doors/doorMachine.js';
 import { DOOR_DEFAULTS } from '../physics/doors/types.js';
 
+import { withDuty } from './duty.test-helper.js';
 import { BUILDING_IDS, load } from './fixtures.test-helper.js';
 import { Simulation, runSimulation } from './simulation.js';
 import type { SimulationConfig, SimulationResult } from './types.js';
@@ -548,7 +549,11 @@ describe('every weighted cost term prices something through the shipped engine',
     const cfg = await load();
     const counts = tally();
     const simulation = new Simulation({
-      building: cfg.buildingsById.get('midtown-office') as ResolvedBuilding,
+      // With car A declared goods (GitHub issue #481): `dutyMismatch` prices a call only in a building
+      // where some car declares a duty, and the data's shares then give riders duties to carry.
+      building: withDuty(cfg.buildingsById.get('midtown-office') as ResolvedBuilding, {
+        'main-A': 'goods',
+      }),
       dispatcherProfile: EVERY_TERM,
       trafficProfiles: cfg.trafficProfiles,
       elevatorSpecs: cfg.elevatorSpecs,

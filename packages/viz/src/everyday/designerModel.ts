@@ -279,8 +279,11 @@ export function stepAtOrBelow(steps: readonly number[], value: number): number {
  * `data/buildings/README.md` § *Duty*, GitHub issue #481 — so this refusal and `fixitScreen.ts`'s
  * point at a contract rather than only at each other. Two things a reader should take from it
  * before reaching for a field: *out of service* is **not** a duty but `CarConfig.mode`, authorable
- * today; and the demand side has to be able to express a duty-bound trip before dispatch can be
- * right or wrong about one, or the field is § D265's shape — a caller with no behaviour to reach.
+ * today; and the demand side had to express a duty-bound trip before dispatch could be right or
+ * wrong about one, or the field would have been § D265's shape. **Both are built in `core` now** —
+ * a rider draws a duty and `dutyMismatch` prices one (§ D549) — so a duty control here would bind
+ * something real. What is still missing is `BuildingSpec` carrying a duty and the control that
+ * writes it.
  */
 export function automaticClassFor(
   classes: readonly MachineClass[],

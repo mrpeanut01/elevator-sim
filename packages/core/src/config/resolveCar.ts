@@ -325,6 +325,9 @@ export function resolveCar(
     // answer instead of each re-deriving it. Unlike `passengerTransferS` there is a safe
     // default, so this is resolved rather than left absent.
     mode: car.mode ?? 'in-service',
+    // Omitted rather than defaulted — `mode`'s choice reversed, and `ResolvedCar.duty` says why: a
+    // building that declares no duty must resolve to the object it resolved to before issue #481.
+    ...(car.duty === undefined ? {} : { duty: car.duty }),
     ratedSpeedMps,
     ...(descentSpeedMps === undefined ? {} : { descentSpeedMps }),
     ...(cabinPressurised ? { cabinPressurised } : {}),

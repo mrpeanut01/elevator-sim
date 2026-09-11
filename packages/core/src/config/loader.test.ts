@@ -144,7 +144,7 @@ describe('loadConfig against the real data/ directory', () => {
       'hotel',
       'hospital',
     ]);
-    expect(config.costTermsById.size).toBe(13);
+    expect(config.costTermsById.size).toBe(14);
     expect(config.costTermsById.get('waitTime')?.serves).toBe('AWT');
     expect([...config.dispatcherProfilesById.keys()]).toContain('predictive-balanced');
   });

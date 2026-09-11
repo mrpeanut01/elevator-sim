@@ -23,6 +23,7 @@ import {
   configFor,
   metricsAgree,
   metricsOf,
+  rushRoundConfigFor,
   verifySubmission,
   type VerificationResources,
 } from './verify.js';
@@ -511,14 +512,36 @@ describe('the one intervention kind a submission may not carry, and the switch t
     if (!verification.ok) expect(verification.code).toBe('unknown-dispatcher');
   });
 
-  it('refuses a run under a template no list offers, on the code the board uses for one it does not ship', () => {
-    // `endless-rush` declares `selectable: false` (GitHub issue #220): a mode's own stream, which no
-    // shipped surface lets a player choose or post under. Refused before anything simulates.
-    const rush = config.trafficProfiles.demandTemplates.find((entry) => entry.selectable === false);
-    expect(rush, 'the shipped data carries at least one unselectable template').toBeDefined();
+  it('refuses a single run under the rush stream, naming the sitting a rush posts as — GitHub issue #372', () => {
+    /*
+     * This case pinned `unknown-template` for `endless-rush` from GitHub issue #220 until #372 lifted
+     * that refusal. A rush now posts as a sitting (`rushSitting.ts`, `POST /api/rush-sittings`),
+     * replayed round by round and ranked by how long it held; a single run under its stream on the
+     * score route is still refused before anything simulates, on a code that is true — this server
+     * does ship the template, and the sentence has to say where a rush goes instead.
+     */
+    const rush = config.trafficProfiles.demandTemplates.find((entry) => entry.id === 'endless-rush');
+    expect(rush?.selectable).toBe(false);
     const verification = verifySubmission(
       {
-        run: { ...RUN, demandTemplateId: rush?.id ?? '' },
+        run: { ...RUN, demandTemplateId: 'endless-rush' },
+        claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
+      },
+      resources,
+    );
+    expect(verification.ok).toBe(false);
+    if (!verification.ok) {
+      expect(verification.code).toBe('rush-posts-as-a-sitting');
+      expect(verification.detail).toContain('/api/rush-sittings');
+    }
+    // And the sitting path is where it is admitted: a round's configuration resolves on the same data.
+    expect(typeof rushRoundConfigFor('garden-apartments', { dispatcherProfileId: 'collective' }, resources)).toBe('object');
+  });
+
+  it('still refuses a template this server does not ship, on the code it always has', () => {
+    const verification = verifySubmission(
+      {
+        run: { ...RUN, demandTemplateId: 'a-template-nobody-ships' },
         claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },
       },
       resources,

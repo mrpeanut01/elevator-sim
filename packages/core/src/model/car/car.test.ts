@@ -1179,6 +1179,8 @@ describe('CAR_PARAMETERS', () => {
       'car.doorOpenS',
       'car.doorType',
       'car.mode',
+      // GitHub issue #481: `carConfigSchema`'s `z.enum(DUTIES)` is its schema, for `mode`'s reason.
+      'car.duty',
     ]) {
       expect(ids.has(id)).toBe(false);
     }

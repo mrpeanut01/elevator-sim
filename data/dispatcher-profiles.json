@@ -14,7 +14,8 @@
     { "id": "starvation", "measures": "Escalating penalty on the longest-waiting call", "serves": "WT95, % > 60s" },
     { "id": "zoneAffinity", "measures": "Deviation from the car's assigned zone", "serves": "Zoning strategies" },
     { "id": "predictedDemand", "measures": "Misalignment with forecast future calls", "serves": "Pre-positioning" },
-    { "id": "crowding", "measures": "Hall queue length at the pickup floor", "serves": "Parallel service" }
+    { "id": "crowding", "measures": "Hall queue length at the pickup floor", "serves": "Parallel service" },
+    { "id": "dutyMismatch", "measures": "Mismatch between the rider's duty and the car's", "serves": "Duty-bound cars: goods, bed, service" }
   ],
   "normalization": {
     "required": true,

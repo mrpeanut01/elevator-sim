@@ -310,6 +310,45 @@ const REMEDIES: Readonly<Record<string, readonly Remedy[]>> = Object.freeze({
     },
   ],
 
+  /*
+   * A posted rush sitting — GitHub issue #372, § D542. `recordEntry`'s shape on a table of its own: it
+   * reads the account, then inserts one row referencing it.
+   */
+  recordRushEntry: [
+    {
+      risks: ['foreign-key'],
+      remedy: 'mapped',
+      because:
+        '`recordEntry`’s site and `recordEntry`’s answer. `rush_entries.user_id` references `users`, so ' +
+        'an account deleted between the `userById` read and the insert fails the key, and `#asOwnerError` ' +
+        'turns it into the `NoSuchUserError` the route answers `401` to (§ D358). The replay of every round ' +
+        'has already run by then, which is the cost of checking after the expensive part rather than a ' +
+        'correctness hole: nothing is written for an account that is gone.',
+      player:
+        '`401`, the sentence a posted score gets, rather than a `500`. The sitting is not posted, which is ' +
+        'right: the account it would be posted to is gone.',
+    },
+    {
+      risks: ['unique'],
+      remedy: 'nothing-can-fire',
+      because:
+        'The one unique key on `rush_entries` is its primary key, and every value inserted is a fresh ' +
+        '`randomUUID` this member mints itself. There is deliberately no natural key: every post is kept ' +
+        'and the board takes each player’s best, so two identical sittings posted at once are two rows ' +
+        'and one board row, rather than a conflict for the database to arbitrate.',
+      player: 'Both posts land; the board shows the player once, at their longest hold.',
+    },
+    {
+      risks: ['cascade'],
+      remedy: 'nothing-can-fire',
+      because:
+        'It inserts a row rather than reading one, on `createUser`’s ground. `deleteUser` takes a ' +
+        'player’s sittings with the account through `ON DELETE CASCADE`, which is what erasure means for ' +
+        'a board row, and `store.test.ts` asserts it on a populated row rather than on an empty table.',
+      player: 'Unchanged. A deleted account has no sittings on any rush board.',
+    },
+  ],
+
   recordChimeEntry: [
     {
       risks: ['unique'],
@@ -475,14 +514,17 @@ function derivedRisks(site: Site): readonly Risk[] {
 }
 
 describe('the enumeration of read-then-write pairs', () => {
-  it('is derived from the store’s own source, and there are five rather than the two #266 named', () => {
+  it('is derived from the store’s own source, and there are six rather than the two #266 named', () => {
     // #266's table lists `recordEntry` and `recordChallengeEntry`, which is what a reader looking for
     // a *foreign key* violation finds. The other three pre-check something else: `createUser` and
     // `setDisplayName` pre-check uniqueness, and `userForSession` reads a row before sweeping it.
+    // The sixth is GitHub issue #372's `recordRushEntry`, which pre-checks the account on
+    // `recordEntry`'s shape and is answered the same way in `REMEDIES`.
     expect(memberReadsBeforeWriting(SOURCE)).toEqual([
       'createUser',
       'recordChallengeEntry',
       'recordEntry',
+      'recordRushEntry',
       'setDisplayName',
       'userForSession',
     ]);

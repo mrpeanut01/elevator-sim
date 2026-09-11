@@ -65,6 +65,9 @@ const DEMAND_JSON = {
   // § D265. A parser that accepted the block and dropped it would run the arm at the shipped
   // share while the spec said 0, which is the failure this whole table exists to catch.
   credentialGap: { wrongZoneShare: 0 },
+  // GitHub issue #481. One share named alone, so a parser or a projection that dropped the other
+  // two's fallback, or the block, is caught rather than reading as the data's shares.
+  duty: { shares: { goods: 0.1 } },
   maxLegs: 4,
   peakWindowS: 420,
   baselineFraction: 0.25,

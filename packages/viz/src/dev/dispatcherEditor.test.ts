@@ -40,6 +40,7 @@ import {
   dwellChipsOf,
   dwellHintOf,
   editorRunReadOutOf,
+  editorTermRowsOf,
   flagRowsOf,
   humanTermName,
   leverRowsOf,
@@ -53,6 +54,7 @@ import {
   termRowsOf,
   vectorLineOf,
 } from './dispatcherEditor.js';
+import { withGoodsCar } from '../fixtures.test-helper.js';
 import { reportViewOf } from './reportPanel.js';
 import { shiftRunConfigOf, type ViewerState } from './state.js';
 
@@ -71,6 +73,13 @@ const profile = (id: string): DispatcherProfile => {
 };
 
 const specOf = (id: string): DispatcherSpec => specFromProfile(profile(id), profile(id).name);
+
+/** A shipped tower on which no car declares a duty — every shipped building, § D549 clause 6. */
+const MIDTOWN = (() => {
+  const found = RESOURCES.buildings.find((building) => building.id === 'midtown-office');
+  if (found === undefined) throw new Error('no shipped midtown-office');
+  return found;
+})();
 
 describe('the twelve term rows', () => {
   it('draws one row per declared term, in the file’s own order', () => {
@@ -104,7 +113,7 @@ describe('the twelve term rows', () => {
       weights: { ...base.weights, rideTime: 50 },
       flags: { ...base.flags, pool: false },
     };
-    const inert = inertTerms(weighted);
+    const inert = inertTerms(weighted, MIDTOWN);
     expect(inert).toHaveLength(1);
 
     const drawn = termRowsOf(TERMS, weighted, inert);
@@ -115,19 +124,61 @@ describe('the twelve term rows', () => {
     // And the notice disappears the moment the flag makes the term live again — the refusal is a
     // fact about the *pair*, not a permanent label on rideTime.
     const pooled: DispatcherSpec = { ...weighted, flags: { ...weighted.flags, pool: true } };
-    const relit = termRowsOf(TERMS, pooled, inertTerms(pooled));
+    const relit = termRowsOf(TERMS, pooled, inertTerms(pooled, MIDTOWN));
     expect(relit.every((row) => row.inertWhy === undefined)).toBe(true);
   });
 
   it('never marks a term inert that the model did not name', () => {
     for (const entry of LIBRARY.profiles) {
       const spec = specFromProfile(entry, entry.name);
-      const rows = termRowsOf(TERMS, spec, inertTerms(spec));
-      const named = new Set(inertTerms(spec).map((row) => row.termId));
+      const rows = termRowsOf(TERMS, spec, inertTerms(spec, MIDTOWN));
+      const named = new Set(inertTerms(spec, MIDTOWN).map((row) => row.termId));
       for (const row of rows) {
         expect(row.inertWhy !== undefined).toBe(named.has(row.termId));
       }
     }
+  });
+});
+
+describe('the Engineer editor draws the duty refusal from the standing building — § D549', () => {
+  /**
+   * The duty row the editor draws for a standing state whose draft weights the duty term.
+   *
+   * Through `editorTermRowsOf`, the rows `render` draws, rather than `termRowsOf` with a building the
+   * test chose: the defect was never in the row builder, it was that nothing handed the editor a
+   * building, so the test goes through the lookup from the state that picks one. (The mount itself
+   * needs `HTMLInputElement`, which the node recorder does not provide.)
+   */
+  const dutyRowOn = (patch: Partial<ViewerState>) => {
+    const state = baseState();
+    const rows = editorTermRowsOf({
+      state: {
+        ...state,
+        ...patch,
+        dispatcherSpec: {
+          ...state.dispatcherSpec,
+          weights: { ...state.dispatcherSpec.weights, dutyMismatch: 40 },
+        },
+      },
+      resources: RESOURCES,
+    });
+    const row = rows.find((entry) => entry.termId === 'dutyMismatch');
+    // The positive control: the row is drawn and weighted in both states, so no refusal means none.
+    expect(row?.weighted).toBe(true);
+    return row;
+  };
+
+  it('says beside the slider that the weight is inert on Midtown Office, where no car declares a duty', () => {
+    expect(dutyRowOn({ buildingId: 'midtown-office' })?.inertWhy).toMatch(
+      /no car in this building declares a duty/,
+    );
+  });
+
+  it('draws no refusal once the standing building declares a duty on a car', () => {
+    const authored = RESOURCES.entries.find((entry) => entry.config.id === 'midtown-office')?.config;
+    if (authored === undefined) throw new Error('no shipped midtown-office document');
+    const saved = { id: 'midtown-with-a-goods-car', config: withGoodsCar(authored) };
+    expect(dutyRowOn({ buildingId: saved.id, savedBuildings: [saved] })?.inertWhy).toBeUndefined();
   });
 });
 

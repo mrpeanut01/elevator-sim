@@ -113,6 +113,19 @@ export const STREAM_NAMES = [
    * what it is for.
    */
   'credential',
+  /**
+   * **What a journey needs a car for** — GitHub issue #481, `DECISIONS.md` § D549. Appended for
+   * `batchSize`'s reason: the spelling decides the parameters, so the eleven names above keep the
+   * draws their golden vectors pin.
+   *
+   * Drawn **once per generated passenger, in final trace order**, on every run, for `credential`'s
+   * reason exactly: a draw taken only in a building that declares a duty would make the sequence a
+   * function of which cars are declared, and two arms that differ only in which car is the goods
+   * lift would stop being the same crowd. The value is recorded only where some car declares a
+   * duty, so a building that declares none materializes this stream, consumes from it, and produces
+   * a byte-identical trace (`traffic/dutyIdentity.test.ts`).
+   */
+  'duty',
 ] as const;
 
 export type StreamName = (typeof STREAM_NAMES)[number];
@@ -251,6 +264,7 @@ const TRAFFIC_STREAM_NAMES: ReadonlySet<string> = new Set([
   'modeChoice',
   'dayVariation',
   'credential',
+  'duty',
 ]);
 
 /** Optional second seed, for separating demand from machine. See {@link StreamSet}. */
@@ -357,6 +371,13 @@ export class StreamSet {
    * property beside it is a source the architecture declares and the type does not.
    */
   readonly credential: Rng;
+  /**
+   * A journey's duty, one draw per passenger. See {@link STREAM_NAMES} § `duty`.
+   *
+   * Materialized here for {@link batchSize}'s reason — a name in {@link STREAM_NAMES} without a
+   * property beside it is a source the architecture declares and the type does not.
+   */
+  readonly duty: Rng;
 
   readonly #streams = new Map<string, Pcg32>();
 
@@ -376,6 +397,7 @@ export class StreamSet {
     this.modeChoice = this.#derive('modeChoice');
     this.dayVariation = this.#derive('dayVariation');
     this.credential = this.#derive('credential');
+    this.duty = this.#derive('duty');
   }
 
   /** Typed accessor for the required streams. Returns the same instance as the property. */

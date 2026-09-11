@@ -427,7 +427,7 @@ function mountWorkshop(
   function drawTerms(): HTMLElement {
     const spec = api.workingSpec();
     const file = api.dispatcherProfilesFile();
-    const view = termDisclosureOf(file.terms, spec);
+    const view = termDisclosureOf(file.terms, spec, api.resolvedBuilding());
     const box = disclosure(doc, 'terms', view.summary);
     const hint = el(doc, 'p', undefined, view.hint);
     hint.style.cssText = `${NOTE};margin:0 0 10px`;

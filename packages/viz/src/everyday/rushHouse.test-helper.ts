@@ -14,8 +14,9 @@
  * in place, and `withBuilding`'s own docstring records that as a defect rather than a shortcut. The
  * population is **not** the standing week's: a week scales a tower's occupancy and grows it by day, and
  * this helper read it before the patch because the host then did — which is how the Midtown Office and
- * Chancery House rows were measured on a crowd sized by the week (PR #513's review, finding 1). A rush's
- * crowd is the building's alone, and `rushPatchOf` taking the resources is what keeps it so.
+ * Chancery House rows were measured on a crowd sized by the week and came to disagree with the
+ * server's replay (PR #513's review, finding 1). A rush's crowd is the building's alone, and
+ * `rushPatchOf` taking the resources is what keeps it so.
  *
  * `recordDecisions` is off: it decides whether the recording keeps the dispatcher's decision log,
  * which no house row reads, and the legs are the same either way.

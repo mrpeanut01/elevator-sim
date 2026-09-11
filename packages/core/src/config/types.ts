@@ -63,6 +63,47 @@ export const SERVICE_MODES = ['in-service', 'independent', 'fire-recall', 'out-o
 export type ServiceMode = (typeof SERVICE_MODES)[number];
 
 /**
+ * **What a car is for** — GitHub issue #481, `DECISIONS.md` § D549, `data/buildings/README.md`
+ * § *Duty*.
+ *
+ * A closed vocabulary declared per car, by the project owner's ruling of 2026-09-10, and declared
+ * here for {@link SERVICE_MODES}' reason: `carConfigSchema` builds its `z.enum` from it at run time.
+ * It is **purpose**, and it is none of the four things it is most easily collapsed into — not
+ * {@link ServiceMode} (how the car is running now; *out of service* is a mode, not a duty), not
+ * `servesFloors` (service zoning, a hard physical filter), not `accessZones` (access zoning, a
+ * credential filter), and not the dispatcher's own operational zoning. **A duty filters nothing**:
+ * it prices a mismatch, through `dispatch/terms/dutyMismatch.ts`, at a weight a profile declares.
+ */
+export const DUTIES = ['passenger', 'goods', 'bed', 'service'] as const;
+
+/** What a car is for, and what a journey needs one for. See {@link DUTIES}. */
+export type Duty = (typeof DUTIES)[number];
+
+/**
+ * The duty of a car that declares none: a passenger car.
+ *
+ * Applied where a duty is *read* — `dutyMismatchTerm` — and never written onto a resolved car or a
+ * snapshot, so a building that declares no duty resolves to exactly the object it did before the
+ * field existed. It matters only in a building where some car does declare one, because only there
+ * does a journey carry a duty to compare it with.
+ */
+export const DEFAULT_CAR_DUTY: Duty = 'passenger';
+
+/**
+ * The duties a journey can be drawn into, in draw order; everybody else is a passenger.
+ *
+ * `passenger` is the remainder rather than a fourth share, so the shares cannot fail to sum to one —
+ * they can only exceed it, which the schema and the generator both refuse.
+ */
+export const DUTY_SHARE_KEYS = ['goods', 'bed', 'service'] as const satisfies readonly Exclude<
+  Duty,
+  'passenger'
+>[];
+
+/** A share, `0..1`, of journeys per {@link DUTY_SHARE_KEYS} entry. Their sum is at most `1`. */
+export type DutyShares = { readonly [K in (typeof DUTY_SHARE_KEYS)[number]]: number };
+
+/**
  * Door types are a closed set because this module resolves a car's `doorType` against
  * `elevator-specs.json → doors`. Adding a type means adding its timings to that file and
  * its name here.
@@ -462,6 +503,20 @@ export interface CredentialGapConfig extends Commented {
   readonly wrongZoneShare: number;
 }
 
+/**
+ * `data/traffic-profiles.json → duty`: how many journeys need a car for something other than
+ * carrying people — GitHub issue #481, `DECISIONS.md` § D549.
+ *
+ * {@link CredentialGapConfig}'s shape and its reason: a statement about the crowd rather than the
+ * building, so it lives beside it, and a building's own car declarations decide whether it costs
+ * anybody anything. **Read only where some car declares a duty**; everywhere else the draw is taken
+ * and discarded, and the trace is byte-identical at every value.
+ */
+export interface DutyDemandConfig extends Commented {
+  /** Share of journeys per non-passenger duty, {@link DUTY_SHARE_KEYS}. The rest are passengers. */
+  readonly shares: DutyShares;
+}
+
 /** The whole of `data/traffic-profiles.json`. */
 export interface TrafficProfiles extends Commented {
   readonly version: number;
@@ -470,6 +525,12 @@ export interface TrafficProfiles extends Commented {
   readonly demandTemplates: readonly DemandTemplate[];
   readonly passengerMass: PassengerMassConfig;
   readonly credentialGap: CredentialGapConfig;
+  /**
+   * Required by the schema and optional here, for one reason: a `TrafficProfiles` built by hand in a
+   * test or a viewer fixture has no duty to state, and the generator asks for these shares only in a
+   * building that declares a duty — where their absence is refused rather than read as zero.
+   */
+  readonly duty?: DutyDemandConfig | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -1257,6 +1318,12 @@ export interface CarConfig extends Commented {
    * unless a {@link ServiceEventConfig} puts it back. See {@link BuildingConfig.serviceEvents}.
    */
   readonly mode?: ServiceMode | undefined;
+  /**
+   * What this car is for — {@link DUTIES}, GitHub issue #481. Absent means undeclared, which
+   * dispatch reads as {@link DEFAULT_CAR_DUTY}; and a building in which no car declares one generates
+   * no journey with a duty at all, so it runs exactly as it did before the field existed.
+   */
+  readonly duty?: Duty | undefined;
   /** Top speed, m/s. Defaults to the class typical. Upwards; see {@link descentSpeedMps}. */
   readonly ratedSpeedMps?: number | undefined;
   /**
@@ -1666,6 +1733,13 @@ export interface ResolvedCar {
    * consumer to re-derive it.
    */
   readonly mode: ServiceMode;
+  /**
+   * {@link CarConfig.duty}, **omitted rather than defaulted** when the car declares none — the
+   * opposite choice from {@link mode}, for the reason that choice gives: `mode` has a default every
+   * consumer shares, while a defaulted duty would put a field on every resolved car of every shipped
+   * building and change the object a run echoes. {@link DEFAULT_CAR_DUTY} is applied where it is read.
+   */
+  readonly duty?: Duty | undefined;
   readonly ratedSpeedMps: number;
   /**
    * Top speed downwards, m/s — present **only when it differs from {@link ratedSpeedMps}**.

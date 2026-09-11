@@ -154,6 +154,44 @@ export const HOUSE_DISPLAY_NAME = 'The house';
 const HOUSE_EMAIL = 'house@elevator-sim.invalid';
 
 /** One accepted score. The **server's** metrics; a claim is never persisted (§ D214 § 3). */
+/**
+ * One round of a stored rush sitting — what the player drove it with, and what the server's replay of it
+ * derived. The held time a client claimed is not here: it was compared and discarded.
+ */
+export interface RushEntryRound {
+  readonly dispatcherProfileId: string;
+  readonly ruleRows?: readonly unknown[] | undefined;
+  readonly interventions?: readonly unknown[] | undefined;
+  readonly heldS: number | null;
+  readonly wavesOutlasted: number;
+  readonly purseBeforeUnits: number;
+  readonly paidUnits: number;
+  readonly purseAfterUnits: number;
+}
+
+/**
+ * One posted rush sitting, as stored — GitHub issue #372, § D542. The column comments in {@link SCHEMA}
+ * say what each field is and whose figure it is.
+ */
+export interface RushEntryRow {
+  readonly id: string;
+  /** `rush:<building>:YYYY-MM-DD`, with `/<set>` on a modifier set's board — `boardKey.ts#rushPlacementOf`. */
+  readonly boardKey: string;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly buildingId: string;
+  /** The rush's one seed, derived and kept for invariant 5. */
+  readonly seed: string;
+  /** How long the last round held, from the server's replay. */
+  readonly heldS: number;
+  /** The wave the last round's line was crossed in, one-based. */
+  readonly furthestWave: number;
+  readonly rounds: readonly RushEntryRound[];
+  /** Canonical, and empty on the standard board. Never a price. */
+  readonly modifiers: readonly { readonly sinkId: string; readonly steps: number }[];
+  readonly submittedAtMs: number;
+}
+
 export interface EntryRow {
   readonly id: string;
   /**
@@ -940,6 +978,95 @@ export class Store {
     );
   }
 
+  /* ---------------------------------------------------------- rush sittings */
+
+  /**
+   * Write one posted rush sitting — GitHub issue #372, § D542.
+   *
+   * Every figure arrives from `leaderboard/rushSitting.ts#replayRushSitting`, the server's own replay;
+   * nothing a request carried reaches a column except the ids and the log the replay already ran. Every
+   * post is kept, for `recordEntry`'s reason: the board takes a player's best, and a row is never
+   * deleted to make room for a better one.
+   */
+  async recordRushEntry(input: {
+    readonly boardKey: string;
+    readonly userId: string;
+    readonly buildingId: string;
+    readonly seed: string;
+    readonly heldS: number;
+    readonly furthestWave: number;
+    readonly rounds: readonly RushEntryRound[];
+    readonly modifiers: readonly { readonly sinkId: string; readonly steps: number }[];
+  }): Promise<RushEntryRow> {
+    const user = await this.userById(input.userId);
+    if (user === undefined) throw new NoSuchUserError('recordRushEntry');
+    const id = randomUUID();
+    const submittedAtMs = this.#now();
+    try {
+      await this.#sql.query(
+        'INSERT INTO rush_entries (id, board_key, user_id, building_id, seed, held_s, furthest_wave, ' +
+          'rounds_json, modifiers_json, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+        [
+          id,
+          input.boardKey,
+          input.userId,
+          input.buildingId,
+          input.seed,
+          input.heldS,
+          input.furthestWave,
+          JSON.stringify(input.rounds),
+          // The standard set is `NULL`, on `recordEntry`'s own reading of the same column.
+          input.modifiers.length === 0 ? null : JSON.stringify(input.modifiers),
+          submittedAtMs,
+        ],
+      );
+    } catch (error) {
+      throw await this.#asOwnerError(error, input.userId, 'recordRushEntry');
+    }
+    return Object.freeze({
+      id,
+      boardKey: input.boardKey,
+      userId: input.userId,
+      displayName: user.displayName,
+      buildingId: input.buildingId,
+      seed: input.seed,
+      heldS: input.heldS,
+      furthestWave: input.furthestWave,
+      rounds: input.rounds,
+      modifiers: input.modifiers,
+      submittedAtMs,
+    });
+  }
+
+  /**
+   * One rush board, **longest held first** — the one figure a rush posts, and the one ranking on which
+   * more is better. Best sitting per player, with the earlier post winning a tie, on {@link board}'s
+   * `DISTINCT ON` for {@link board}'s reason: a board of every post would rank persistence.
+   */
+  async rushBoard(boardKey: string, limit: number): Promise<readonly RushEntryRow[]> {
+    const result = await this.#sql.query(
+      'SELECT * FROM (' +
+        'SELECT DISTINCT ON (r.user_id) r.*, u.display_name AS display_name ' +
+        'FROM rush_entries r JOIN users u ON u.id = r.user_id WHERE r.board_key = $1 ' +
+        'ORDER BY r.user_id, r.held_s DESC, r.submitted_at_ms ASC' +
+        ') best ORDER BY best.held_s DESC, best.submitted_at_ms ASC LIMIT $2',
+      [boardKey, limit],
+    );
+    return Object.freeze(result.rows.map((row) => rushEntryOf(row)));
+  }
+
+  /** Every contributing player's best held time on one rush board, with its entry — the ladder's observations. */
+  async rushHeldObservations(
+    boardKey: string,
+  ): Promise<readonly { readonly entryId: string; readonly value: number }[]> {
+    const result = await this.#sql.query(
+      'SELECT DISTINCT ON (r.user_id) r.id AS id, r.held_s AS value FROM rush_entries r WHERE r.board_key = $1 ' +
+        'ORDER BY r.user_id, r.held_s DESC, r.submitted_at_ms ASC',
+      [boardKey],
+    );
+    return Object.freeze(result.rows.map((row) => ({ entryId: String(row['id']), value: Number(row['value']) })));
+  }
+
   /* ---------------------------------------------------------- chime ledger */
 
   /**
@@ -1573,6 +1700,26 @@ function entryOf(row: Record<string, unknown>): EntryRow {
   });
 }
 
+/** One stored rush row, read back. See {@link RushEntryRow}. */
+function rushEntryOf(row: Record<string, unknown>): RushEntryRow {
+  return Object.freeze({
+    id: String(row['id']),
+    boardKey: String(row['board_key']),
+    userId: String(row['user_id']),
+    displayName: String(row['display_name']),
+    buildingId: String(row['building_id']),
+    seed: String(row['seed']),
+    heldS: Number(row['held_s']),
+    furthestWave: Number(row['furthest_wave']),
+    rounds: JSON.parse(String(row['rounds_json'])) as readonly RushEntryRound[],
+    modifiers:
+      typeof row['modifiers_json'] === 'string'
+        ? (JSON.parse(row['modifiers_json']) as readonly { readonly sinkId: string; readonly steps: number }[])
+        : [],
+    submittedAtMs: Number(row['submitted_at_ms']),
+  });
+}
+
 /**
  * The schema, as one statement, and **migration 0**.
  *
@@ -1750,6 +1897,30 @@ CREATE INDEX IF NOT EXISTS chime_entries_account ON chime_entries (user_id, seq)
 -- One entry per account, source and turn: what makes a turn paid once a property of the table
 -- rather than of the one statement that remembers to ask.
 CREATE UNIQUE INDEX IF NOT EXISTS chime_entries_turn ON chime_entries (user_id, entry_key, turn_key) WHERE turn_key IS NOT NULL;
+-- A posted rush sitting -- GitHub issue #372, DECISIONS.md section D542. Every figure in a row is the
+-- SERVER's, read off its own replay of every round: held_s is how long the last round held before forty
+-- people had stood two minutes at once, and rounds_json carries each round's dispatcher, rules and
+-- intervention log beside the purse the server derived for it. The claim a client posted is compared
+-- and discarded, exactly as a single run's metrics are. seed is the rush's one seed, derived rather than
+-- posted and kept for invariant 5: every persisted run record carries its seed. modifiers_json is the
+-- canonical set, NULL for the standard one, and never a price. board_key is rush:<building>:<date>, with
+-- /<set> for a modifier set's board -- leaderboard/boardKey.ts#rushPlacementOf, section D543.
+-- Its own table rather than rows in entries, because a rush has no quotable mean: the stream is built to
+-- break the building, so every NOT NULL wait figure entries carries would be a figure the run did not
+-- produce.
+CREATE TABLE IF NOT EXISTS rush_entries (
+  id               TEXT PRIMARY KEY,
+  board_key        TEXT NOT NULL,
+  user_id          TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  building_id      TEXT NOT NULL,
+  seed             TEXT NOT NULL,
+  held_s           DOUBLE PRECISION NOT NULL,
+  furthest_wave    INTEGER NOT NULL,
+  rounds_json      TEXT NOT NULL,
+  modifiers_json   TEXT,
+  submitted_at_ms  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS rush_entries_board ON rush_entries (board_key, held_s);
 `;
 
 /* -------------------------------------------------------------------------- *
@@ -1969,6 +2140,22 @@ const MIGRATIONS: readonly Migration[] = Object.freeze([
       'ALTER TABLE chime_entries ADD COLUMN IF NOT EXISTS turn_key TEXT;\n' +
       'CREATE UNIQUE INDEX IF NOT EXISTS chime_entries_turn ON chime_entries (user_id, entry_key, turn_key) ' +
       'WHERE turn_key IS NOT NULL;',
+  }),
+  /*
+   * **Migration 7 — the rush board's table**, GitHub issue #372, section D542. A new table on a database
+   * that predates it, arriving empty: no sitting was ever posted before this, so there is nothing to
+   * backfill. `SCHEMA` carries the same statement, so a fresh database gets it from migration 0 and this
+   * is a no-op there.
+   */
+  Object.freeze({
+    version: 7,
+    name: 'rush_entries, the posted rush sittings, and the index a rush board reads',
+    sql:
+      'CREATE TABLE IF NOT EXISTS rush_entries (id TEXT PRIMARY KEY, board_key TEXT NOT NULL, ' +
+      'user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE, building_id TEXT NOT NULL, ' +
+      'seed TEXT NOT NULL, held_s DOUBLE PRECISION NOT NULL, furthest_wave INTEGER NOT NULL, ' +
+      'rounds_json TEXT NOT NULL, modifiers_json TEXT, submitted_at_ms BIGINT NOT NULL);\n' +
+      'CREATE INDEX IF NOT EXISTS rush_entries_board ON rush_entries (board_key, held_s);',
   }),
 ]);
 

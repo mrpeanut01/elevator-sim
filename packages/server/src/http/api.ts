@@ -64,8 +64,10 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 
 import {
   CHIME_COMPLETIONS,
+  RUSH_STREAM,
   type ChimeLedgerTable,
   type ChimeTurn,
+  type RushPurseTable,
   chimeSinkById,
 } from '@elevator-sim/core';
 
@@ -105,11 +107,13 @@ import {
 } from '../challenge/submission.js';
 import { verifyChallengeSubmission } from '../challenge/verify.js';
 import { signInMessage, type Mailer } from '../mail/mailer.js';
-import { BOARD_KEYS, dailyFixtureAt, placeSubmission, runDataHashOf } from '../leaderboard/boardKey.js';
-import { boardDistributionOf, type AxisObservation } from '../leaderboard/distribution.js';
+import { BOARD_KEYS, dailyFixtureAt, placeSubmission, runDataHashOf, rushPlacementOf } from '../leaderboard/boardKey.js';
+import { boardDistributionOf, heldLadderOf, type AxisObservation } from '../leaderboard/distribution.js';
 import { submissionIssues, type ResolvedDataFacts, type Submission } from '../leaderboard/submission.js';
 import { seedDailyBoard } from '../leaderboard/seed.js';
 import { verifySubmission, type VerificationResources } from '../leaderboard/verify.js';
+import { rushSittingIssues, type SubmittedRushSitting } from '../leaderboard/rushSitting.js';
+import type { RushReplayLease, RushReplays } from '../leaderboard/rushReplayPool.js';
 import { ID_PATTERN, batchIssues, type TelemetryBatch } from '../telemetry/schema.js';
 import {
   BOARD_METRICS,
@@ -118,6 +122,7 @@ import {
   type BoardMetric,
   type ChallengeEntryRow,
   type EntryRow,
+  type RushEntryRow,
   type Store,
   type UserRow,
 } from '../store/store.js';
@@ -151,6 +156,11 @@ export interface ApiRequest {
 export interface ApiResponse {
   readonly status: number;
   readonly body: unknown;
+  /**
+   * Headers a route adds to the ones `serve.ts` writes on every answer — so far only `Retry-After` on a
+   * rush sitting refused for capacity, which a client can act on only if it arrives as a header.
+   */
+  readonly headers?: Readonly<Record<string, string>> | undefined;
 }
 
 /** Everything the API is wired to. Assembled once at boot by {@link createApi}'s caller. */
@@ -200,6 +210,18 @@ export interface ApiDeps {
    * could be paid once per invented id, which is every post paying again.
    */
   readonly chimeTurns: ChimeTurnBounds;
+  /**
+   * The rush purse — GitHub issue **#372**: `data/rush-purse.json`, read at boot and checked against
+   * {@link chimeLedger}. The server derives every round's purse from it and its own replay of the round;
+   * no route takes a purse or an amount from a request, which is {@link chimeLedger}'s rule one mode over.
+   */
+  readonly rushPurse: RushPurseTable;
+  /**
+   * Where a posted sitting is replayed: worker threads, one replay at a time on each, under one limit for
+   * the whole process — PR #513's review, finding 2. Built by `bootstrap.ts` from
+   * `ELEVATOR_SIM_RUSH_REPLAYS`; the argument is `leaderboard/rushSitting.ts`'s cost section.
+   */
+  readonly rushReplays: RushReplays;
 }
 
 export type Api = (request: ApiRequest) => Promise<ApiResponse>;
@@ -466,6 +488,15 @@ export function createApi(deps: ApiDeps): Api {
         return board(deps, request);
       case 'GET /api/board-distribution':
         return boardDistribution(deps, request);
+      /*
+       * A rush sitting, posted whole, and the board it lands on — GitHub issue #372, § D542 and
+       * § D543. The post shares {@link nextSubmitMs} with the two other replaying routes, for that
+       * budget's own reason, and is charged per round.
+       */
+      case 'POST /api/rush-sittings':
+        return submitRushSitting(deps, request, nextSubmitMs);
+      case 'GET /api/rush-board':
+        return rushBoardOf(deps, request);
       case 'GET /api/challenges':
         return challenges(deps);
       case 'GET /api/challenge':
@@ -1338,6 +1369,183 @@ async function boardDistribution(deps: ApiDeps, request: ApiRequest): Promise<Ap
   return { status: 200, body: boardDistributionOf(boardKey, byAxis) };
 }
 
+/* ------------------------------------------------------------------- the rush */
+
+/**
+ * **Post a rush sitting, whole** — GitHub issue #372, under the owner's ruling of 2026-09-10, and
+ * [§ D542](../../../../DECISIONS.md).
+ *
+ * `submit`'s order, for `submit`'s reasons, with a sitting in place of a run: the cheap gate first,
+ * so a shape error — a purse a client named included — commands nothing; then the cooldown, **charged
+ * per round** at the rush's ninety simulated minutes, so a twelve-round sitting costs what twelve
+ * replays cost; then the ledger, so a top-up nobody paid for commands no replay either; then the
+ * replay of every round (`leaderboard/rushSitting.ts#replayRushSitting`); then the board.
+ *
+ * What is stored is the server's: every round's held time, waves outlasted and purse from the replay,
+ * beside the ids and the log that produced them. The held time the client claimed is compared and
+ * discarded, as a single run's metrics are.
+ */
+async function submitRushSitting(
+  deps: ApiDeps,
+  request: ApiRequest,
+  nextSubmitMs: Map<string, number>,
+): Promise<ApiResponse> {
+  const user = await authenticate(deps, request);
+  if (user === undefined) {
+    return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to post a rush.' } };
+  }
+  const issues = rushSittingIssues(request.body, deps.rushPurse);
+  if (issues.length > 0) return { status: 400, body: { error: 'invalid-sitting', issues } };
+  const sitting = request.body as SubmittedRushSitting;
+
+  /*
+   * **A slot first, and before anything is charged** — PR #513's review, finding 2. The replay runs on a
+   * worker thread so this thread keeps answering everyone else, and the number of replays at once is one
+   * limit for the whole process, because the per-account cooldown below bounds one account and nothing
+   * else bounded how many replay together. No slot is `503` rather than a queue: a queued caller waits
+   * behind replays of unknown length holding a socket open, and a refused one is told when to come back.
+   * Taken before the cooldown so a refusal for the server's capacity costs the player nothing, and
+   * released in `finally` so no way out of the route — a refusal, a replay that throws, a store fault —
+   * can keep it.
+   */
+  const lease = deps.rushReplays.tryAcquire();
+  if (lease === undefined) return replayBusy(deps.rushReplays.retryAfterS());
+  try {
+    return await replayAndPostRushSitting(deps, user, sitting, lease, nextSubmitMs);
+  } finally {
+    lease.release();
+  }
+}
+
+/**
+ * `503` with `Retry-After`, for a sitting that found every replay slot taken. **503 rather than 429**:
+ * `429 too-many-submissions` is this API's answer to one account posting faster than its cooldown, a
+ * fact about the caller, and a client that backs off on it tells the player they posted too soon. A full
+ * pool is a fact about the server — the caller may not have posted anything for an hour — and `503` with
+ * `Retry-After` is the status that says *not you, not now, try at this time* (RFC 9110 § 15.6.4).
+ */
+function replayBusy(retryAfterS: number): ApiResponse {
+  return {
+    status: 503,
+    headers: { 'retry-after': String(retryAfterS) },
+    body: {
+      error: 'replay-busy',
+      detail:
+        'Every rush this server can replay at once is being replayed. Nothing was charged and nothing was ' +
+        `posted — send the same sitting again in about ${String(retryAfterS)} s.`,
+      retryAfterS,
+    },
+  };
+}
+
+/** The rest of {@link submitRushSitting}, on the replay slot it holds and gives back. */
+async function replayAndPostRushSitting(
+  deps: ApiDeps,
+  user: UserRow,
+  sitting: SubmittedRushSitting,
+  lease: RushReplayLease,
+  nextSubmitMs: Map<string, number>,
+): Promise<ApiResponse> {
+  const limited = chargeCooldown(deps, user.id, nextSubmitMs, sitting.rounds.length, RUSH_STREAM.lengthS);
+  if (limited !== undefined) return limited;
+
+  const claimed = sitting.modifiers ?? [];
+  if (claimed.length > 0) {
+    const unbacked = unbackedModifiers(claimed, await deps.store.chimeSpends(user.id), deps.chimeLedger);
+    if (unbacked.length > 0) {
+      return {
+        status: 422,
+        body: {
+          error: 'modifier-not-bought',
+          detail:
+            'That sitting says it was played with something this account has not bought: ' +
+            `${unbacked.join(', ')}. A rush with a wider purse ranks among rushes with the same, so the ` +
+            'claim has to be one the ledger can support.',
+        },
+      };
+    }
+  }
+
+  // `rushSitting.ts#replayRushSitting`, run on the slot's worker thread against the same `data/`.
+  const verification = await lease.replay(sitting);
+  if (!verification.ok) {
+    // 422, on `submit`'s reading: well formed, and the content did not check out — which is not an
+    // accusation, and the round a refusal is about travels so a client can say which one.
+    return {
+      status: 422,
+      body: {
+        error: verification.code,
+        detail: verification.detail,
+        ...(verification.round === undefined ? {} : { round: verification.round }),
+      },
+    };
+  }
+
+  const placement = rushPlacementOf(sitting.buildingId, deps.now(), claimed);
+  let entry: RushEntryRow;
+  try {
+    entry = await deps.store.recordRushEntry({
+      boardKey: placement.key,
+      userId: user.id,
+      buildingId: sitting.buildingId,
+      seed: String(RUSH_STREAM.seed),
+      heldS: verification.heldS,
+      furthestWave: verification.furthestWave,
+      rounds: sitting.rounds.map((round, index) => {
+        const replayed = verification.rounds[index];
+        if (replayed === undefined) throw new Error('the replay answers for every round it verified');
+        return {
+          dispatcherProfileId: round.dispatcherProfileId,
+          ...(round.ruleRows === undefined ? {} : { ruleRows: round.ruleRows }),
+          ...(round.interventions === undefined ? {} : { interventions: round.interventions }),
+          heldS: replayed.heldS,
+          wavesOutlasted: replayed.wavesOutlasted,
+          purseBeforeUnits: replayed.purseBeforeUnits,
+          paidUnits: replayed.paidUnits,
+          purseAfterUnits: replayed.purseAfterUnits,
+        };
+      }),
+      modifiers: placement.modifiers,
+    });
+  } catch (error) {
+    if (error instanceof NoSuchUserError) return accountVanished();
+    throw error;
+  }
+  return { status: 201, body: { boardKey: placement.key, entry: publicRushEntry(deps, entry, 'whole') } };
+}
+
+/** What a rush board says it ranks on, on the wire — `board`'s note, for a board with one figure. */
+const RUSH_BOARD_NOTE =
+  'Ranked on how long each player’s best sitting held before forty people had stood two minutes at once, ' +
+  'on this tower, on this day, with this set of modifiers. Every figure is the server’s replay of every round.';
+
+/**
+ * One rush board and its ladder — GitHub issue #372, [§ D543](../../../../DECISIONS.md).
+ *
+ * One body rather than `board` and `board-distribution`'s two, because a rush board has one figure: the
+ * rows rank on it and the ladder is over it, and splitting them would be two requests for one number.
+ * The ladder is `leaderboard/distribution.ts#heldLadderOf`, so § D506's floor withholds it below twenty
+ * players and publishes the count regardless.
+ */
+async function rushBoardOf(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+  const boardKey = request.query.get('board') ?? '';
+  if (!boardKey.startsWith('rush:')) {
+    return { status: 400, body: { error: 'no-board', detail: 'Name a rush board with ?board=rush:…' } };
+  }
+  const limit = Math.min(Math.max(Number(request.query.get('limit') ?? '25') || 25, 1), 100);
+  const entries = await deps.store.rushBoard(boardKey, limit);
+  const ladder = heldLadderOf(boardKey, await deps.store.rushHeldObservations(boardKey));
+  return {
+    status: 200,
+    body: {
+      boardKey,
+      note: RUSH_BOARD_NOTE,
+      entries: entries.map((entry) => publicRushEntry(deps, entry, 'row')),
+      ladder,
+    },
+  };
+}
+
 /* ----------------------------------------------------------------- challenges */
 
 /**
@@ -1954,6 +2162,30 @@ function publicEntry(deps: ApiDeps, entry: EntryRow): Record<string, unknown> {
     // stated reason: R13's clause one is that the count travels in the same unit as the figure, and
     // a board row that could not draw one had to draw a bare mean.
     legs: entry.legs,
+    submittedAtMs: entry.submittedAtMs,
+  };
+}
+
+/**
+ * A rush entry on the wire — GitHub issue #372.
+ *
+ * **`whole`** is the poster's own answer, carrying every round with the purse the server derived for it,
+ * because the player who played the sitting is the one reader for whom a purse is a fact about their
+ * own record. **`row`** is a board row, which carries how long it held, the wave, how many rounds and the
+ * modifiers — and no purse, because a purse is a mode's money and a board row is a comparison between
+ * players. **Neither carries a price or a chime**: the modifier travels through {@link publicModifiers},
+ * which names the fields it sends for exactly that reason (§ D526 clause 3).
+ */
+function publicRushEntry(deps: ApiDeps, entry: RushEntryRow, shape: 'whole' | 'row'): Record<string, unknown> {
+  return {
+    id: entry.id,
+    displayName: entry.displayName,
+    buildingId: entry.buildingId,
+    seed: entry.seed,
+    heldS: entry.heldS,
+    furthestWave: entry.furthestWave,
+    ...(shape === 'whole' ? { rounds: entry.rounds } : { roundCount: entry.rounds.length }),
+    ...(entry.modifiers.length === 0 ? {} : { modifiers: publicModifiers(deps, entry.modifiers) }),
     submittedAtMs: entry.submittedAtMs,
   };
 }
