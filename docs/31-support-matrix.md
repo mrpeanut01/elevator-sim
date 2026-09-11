@@ -483,8 +483,8 @@ shape of the answer rather than as a current figure.
 > **Two numbers in that sentence and only one of them is a claim about now.** The 25 is a *dated*
 > figure — a correct record of what the ~157 s was measured over — so it is written without the
 > backticked filename that `viewportGateClaims.test.ts`'s shape keys on, and no guard re-derives it,
-> because re-deriving it would replace a true record with today's count. The 33 is a claim about the
-> tree and sits in a shape that guard reads. It said **29** through the wave that corrected four of
+> because re-deriving it would replace a true record with today's count. The other is a claim about
+> the tree and sits in a shape that guard reads. It said **29** through the wave that corrected four of
 > its siblings, because the sentence wrapped between `29` and the shape's next token and the regex
 > matched a literal space. GitHub issue #230, [§ D423](../DECISIONS.md).
 
@@ -627,7 +627,7 @@ Recorded because a specification that hides its own open items is the defect it 
 7. **One of the two counts in this document that were read off the tree drifted, exactly as this
    item said it would.** It read ~~*25*~~ where the tree held **28** when GitHub issue #292 re-ran
    the command, and `M2_MEASUREMENT.md` § 3 published **26** for the same set at the same moment, so
-   the two documents disagreed with each other as well as with the tree. The tier holds **33** now
+   the two documents disagreed with each other as well as with the tree. The tier holds **47** now
    and the figure is **derived** — `packages/viz/src/everyday/viewportGateClaims.test.ts` reads the
    count off disk and requires every published shape of it in both documents to match, which is why
    the number moved again on the commit that closed it: `viewportGates.browser.test.ts` is the
