@@ -128,7 +128,10 @@ describe('the Burj-class reference building — issue #376', () => {
       );
 
       expect(recording.summary.undelivered).toBe(0);
-      expect(recording.summary.generated).toBeGreaterThan(2000);
+      /* A floor, not a pin. 2 532 journeys on the arrangement as first authored and 1 910 since GitHub
+         issue #438 put most of the population on the `residential` and `hotel` profiles; the floor
+         moved from 2 000 to 1 500 on that commit, and `burjOperator.test.ts` pins the counts. */
+      expect(recording.summary.generated).toBeGreaterThan(1500);
       /* The mean is quotable — no saturation, no censoring, nothing past the abandonment horizon. */
       expect(recording.summary.awtIsValid).toBe(true);
       expect(recording.summary.meanWaitS).toBeLessThan(120);
@@ -194,6 +197,9 @@ describe('the Burj-class reference building — issue #376', () => {
    *    quotes that figure, so it is asserted here rather than left to a reader to re-derive. It was
    *    published as 24 first, by arithmetic rather than by a run; the count below is what the run
    *    says. `CLAUDE.md`: *if you publish a number, pin it to the run that produced it*.
+   *    **GitHub issue #438 moved it to 832** — 164, 266, 238 and 164 — on the arrangement that
+   *    issue corrected: a single-deck shuttle stopping at each sky lobby's lower level, and 3.645 m floors.
+   *    Re-pinned on that commit, and each escalator's own `$comment` is now read back against the run.
    * 3. With a *pair* of escalators at each landing — which is what the reference tower has — **four
    *    of the eight took zero hops**. As modelled an escalator is an undirected, uncapacitated edge,
    *    so the second of an identical pair can never be chosen. One edge per landing is declared and
@@ -237,7 +243,17 @@ describe('the Burj-class reference building — issue #376', () => {
     expect(
       Object.fromEntries([...hopsByMode].sort(([a], [b]) => a.localeCompare(b))),
       'the escalator hop count docs/04 § 9 publishes has moved',
-    ).toEqual({ 'escalator-1': 6, 'escalator-2': 8, 'escalator-3': 8, 'escalator-4': 6 });
-    expect([...hopsByMode.values()].reduce((sum, n) => sum + n, 0)).toBe(28);
+    ).toEqual({ 'escalator-1': 164, 'escalator-2': 266, 'escalator-3': 238, 'escalator-4': 164 });
+    expect([...hopsByMode.values()].reduce((sum, n) => sum + n, 0)).toBe(832);
+
+    /* Each escalator's own `$comment` publishes its count. A count the run no longer gives is a
+       published number gone stale, so it is read back against the run rather than trusted. */
+    const raw = dataFile(join('buildings', FILE)) as {
+      readonly transportModes: readonly { readonly id: string; readonly $comment: string }[];
+    };
+    for (const mode of raw.transportModes) {
+      const stated = /lies on the shortest route for ([\d,]+) of them/u.exec(mode.$comment)?.[1];
+      expect(Number(stated?.replace(/,/gu, '')), `${mode.id}'s $comment`).toBe(hopsByMode.get(mode.id));
+    }
   });
 });

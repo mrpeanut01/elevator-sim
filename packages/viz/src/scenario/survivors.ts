@@ -261,9 +261,10 @@ export interface SurvivorProvenance {
   /**
    * What the count is a count of, in one sentence, so a reader meets the scope beside the number.
    *
-   * Not decoration: this measurement reaches four of the schedule's twenty-five priced changes and
-   * varies twenty-four of the search space's fifty-nine dimensions, and a survivor count read
-   * without that is read as a claim about the whole ladder.
+   * Not decoration: this measurement reaches only some of the schedule's priced changes and varies
+   * only the dimensions a scenario sells, and a survivor count read without that is read as a claim
+   * about the whole ladder. The figures are the sentence's own, derived at regeneration, rather than
+   * repeated here — where they went stale the first time the schedule grew (GitHub issue #467).
    */
   readonly scope: string;
   /** Price-schedule change ids a scenario run can apply. */
@@ -272,6 +273,12 @@ export interface SurvivorProvenance {
   readonly unreachableChangeIds: readonly string[];
   /** Search-space dimensions the schedule prices nothing for, and which are therefore not varied. */
   readonly unpricedDimensionCount: number;
+  /**
+   * Search-space dimensions `data/price-schedule.json` **withholds** from every scenario, and which
+   * no configuration varies for the opposite reason — no rung reaches them. GitHub issue #467,
+   * [§ D535](../../../../DECISIONS.md).
+   */
+  readonly withheldDimensionCount: number;
   readonly declaredDimensionCount: number;
 }
 

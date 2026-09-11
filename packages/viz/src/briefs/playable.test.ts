@@ -5,9 +5,10 @@
  * survive"*, and it makes the bottom of that scale a ship condition: *"Many survivors is easy. One
  * survivor is the hardest a scenario is allowed to be. **Zero is not a scenario**"* unless it
  * declares itself a diagnosis. GitHub issue **#367** measured that count for the ten campaign stages
- * and found **six of ten with zero survivors at every budget rung**, so this is not a hypothetical
- * failure mode — it is the commonest outcome in the tree, and a brief authored without checking
- * would very likely be unplayable.
+ * and found **six of ten with zero survivors at every budget rung** — **seven** since GitHub issue
+ * #467 priced twenty-two more dials and the sweep was re-run — so this is not a hypothetical failure
+ * mode — it is the commonest outcome in the tree, and a brief authored without checking would very
+ * likely be unplayable.
  *
  * ## What is proved here, and what is not
  *

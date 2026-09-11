@@ -30,6 +30,7 @@ the first three in one conversation, the last three later the same day:
 | [§ D529](../DECISIONS.md) | The first session is a **two-screen tutorial** before Scenario — walk the player through the editor, then let a building fall apart and show the fix. Screen two is reused as the Rush tutorial. **A worked answer is permitted in the tutorial and nowhere else** |
 | [§ D530](../DECISIONS.md) | The cross-mode currency is named **chimes**, closing the first of § D526's two open items |
 | [§ D531](../DECISIONS.md) | The **sign-in bonus ships at launch**, in the one shape § D526 clause 7 permits — small, flat, unconditional, no compounding, no streak, nothing lost by missing it. Closes § D526's second open item, so `docs/38` § 5 has none left |
+| [§ D535](../DECISIONS.md) | *Taken 2026-09-10, on GitHub issue #467.* Not for sale is not priced high: the **weight-set selector** and the **arrival predictor** are withheld from every scenario, declared once in `data/price-schedule.json`; `every-declared-dimension` is every declared dimension less what is withheld; the other twenty-two dials are priced, as proposals the owner approved as drafted on 2026-09-11 |
 
 One ruled later, on 2026-09-10, narrowing how often § D526's awards pay rather than what they are:
 
@@ -64,6 +65,7 @@ The standing decisions those three rest on, unchanged and cited rather than rest
 | [§ D538](../DECISIONS.md) | Phase 7's schema-driven search entry point, Bayesian optimization and OCBA are **withdrawn** by the project owner (GitHub issue #416): the six introspection helpers waiting for the entry point are deleted, and `CLAUDE.md` invariant 8 keeps every tunable declaring its schema while naming `tuning/search` as the search over the space `tuning/space` collects |
 | [§ D542](../DECISIONS.md) | **A rush round is a sitting, posted whole** — the product owner's ruling of 2026-09-10 on GitHub issue #372. The server replays every round, reads each hold moment with the stage's own reader, and derives every purse from the waves a round outlasted; a client-named purse or amount is refused. The replay cost was **measured first** (one simulation and 326–1 541 ms a round), and `verify.ts`'s refusal of `endless-rush` was then lifted with its argument written down. The per-wave figure (2 units a wave, schema 1–20), the purse as a balance that carries between rounds and the twelve-round bound are **approved as drafted by the product owner on 2026-09-11**; no between-round rebuild travels yet, so nothing spends a purse |
 | [§ D543](../DECISIONS.md) | A rush board is keyed **building × date × modifier set** — the building because rows on one board must have met the identical crowd — and inherits § D506's twenty-player floor and § D509's reset. A row shows how long it held and its modifiers, never a price or a purse; the key and that row are **approved as drafted by the product owner on 2026-09-11** |
+| [§ D545](../DECISIONS.md) | The Burj-class reference follows its operator (GitHub issue #438): two double-deck observation cars, Emaar's use stacking and level 124 at 452 m, with every chosen figure **drafted for the owner's approval, and approved as drafted on 2026-09-11**. Its 57-lift bracket is re-measured and pinned, and the figures first published for it did not reproduce |
 
 ## 2. Superseded or amended
 
@@ -99,6 +101,8 @@ the same thing in one sentence.
 | `docs/23` § 4 | The per-mode declaration, built from the handoff's four-row session-shapes table | **Superseded in part.** The mode set is three; the per-mode loop analysis stands unchanged and is marked as standing | § D525 |
 | `docs/32` § 3.1 | There are three currencies, not one, and only one of them is money | **Amended.** A fourth ships — chimes, earned by completing turns and spent on modifiers; the three-currency analysis stands | § D526, § D530 |
 | `docs/12` § 4 | The deviation register carried thirteen rows, 4.1–4.13 | **Extended.** Two rows added — § 4.14 the four-mode session table, § 4.15 the authored repair lists. CLAUDE.md's canonical-for-the-interface rule is **unchanged and still wins**; a deviation recorded in the register that exists for deviations is that rule working, not an exception to it | § D525 |
+| [§ D525](../DECISIONS.md) clause 2 | The whole editor is open in every scenario | **Amended.** The whole editor less the weight-set selector and the arrival predictor, which no scenario sells at any price. Per-scenario scarcity is still a price, never a removed control | § D535 |
+| `docs/38` § 2.1 | The dispatcher tier prices the weight-set selector, and every knob is priced | **Amended.** The selector and the arrival predictor are withheld rather than priced; every knob a scenario offers is priced | § D535 |
 
 ## 3. The rename map
 

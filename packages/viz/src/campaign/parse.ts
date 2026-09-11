@@ -54,7 +54,13 @@ import { FAIL_STATES, type Campaign, type CampaignStage, type EditableDimensions
 import { probabilityWordIn } from './words.js';
 import { MAX_REPLICATION_BUDGET, MIN_REPLICATION_BUDGET } from '../batch/report.js';
 import type { PriceSchedule } from '../pricing/types.js';
-import { admitPurchase, budgetViolations, decodeScenarioBudget, rungsOf } from '../scenario/budget.js';
+import {
+  admitPurchase,
+  budgetViolations,
+  decodeScenarioBudget,
+  rungsOf,
+  withholdingDimension,
+} from '../scenario/budget.js';
 import { GOAL_KINDS, GOAL_TAKES_THRESHOLD, goalLabel, type GoalKind, type GoalSpec } from '../scenario/goals.js';
 import type { PublishedGoalRates, PublishedScenario, PublishedSeedSet } from '../scenario/published.js';
 
@@ -104,16 +110,29 @@ export interface CampaignContext {
  * -------------------------------------------------------------------------- */
 
 /**
- * The dimension ids a stage lets the player move, resolved against the discovered space.
+ * The dimension ids a stage lets the player move, resolved against the discovered space **and the
+ * price schedule**.
  *
  * Exported because the panel and the judge both need the same answer, and two answers to *"may I
  * move this?"* is one more than the product can defend.
+ *
+ * **What `data/price-schedule.json` withholds is resolved out here, in both modes** — GitHub issue
+ * **#467**, [§ D535](../../../../DECISIONS.md). The product owner ruled that the weight-set selector
+ * and the arrival predictor are sold in no scenario, and this is the one place that ruling reaches
+ * an editable set: `every-declared-dimension` is every declared dimension the schedule does not
+ * withhold, and a `listed` set is filtered the same way. A listed id the schedule withholds is also
+ * refused at load by {@link validateCampaign}, so the filter here never hides an authoring mistake —
+ * it only means no caller that builds a stage by hand can open a withheld dial either. The schedule
+ * is a required argument rather than an optional one, because an optional exclusion is an exclusion
+ * some caller will not pass.
  */
 export function editableIdsOf(
   editable: EditableDimensions,
   dimensionIds: readonly string[],
+  schedule: PriceSchedule,
 ): readonly string[] {
-  return editable.mode === 'every-declared-dimension' ? dimensionIds : editable.ids;
+  const opened = editable.mode === 'every-declared-dimension' ? dimensionIds : editable.ids;
+  return opened.filter((id) => withholdingDimension(schedule, id) === undefined);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -265,6 +284,14 @@ function checkConfiguration(
       }
       if (already.has(id)) violations.push(`${where}: offers dimension "${id}" twice.`);
       already.add(id);
+      const withheld = withholdingDimension(context.schedule, id);
+      if (withheld !== undefined) {
+        violations.push(
+          `${where}: offers dimension "${id}", which data/price-schedule.json withholds as ` +
+            `"${withheld.id}". It is sold in no scenario at any price (GitHub issue #467, § D535), ` +
+            'so no stage can open it — and not for sale is a different answer from priced high.',
+        );
+      }
     }
   }
   return violations;
@@ -391,7 +418,9 @@ function checkLevers(
   context: CampaignContext,
 ): readonly string[] {
   const violations: string[] = [];
-  const editable = new Set(editableIdsOf(stage.dispatcher.editable, context.dimensionIds));
+  const editable = new Set(
+    editableIdsOf(stage.dispatcher.editable, context.dimensionIds, context.schedule),
+  );
   const restricted = context.restrictedFloorIdsByBuilding.get(stage.building) ?? [];
 
   for (const state of FAIL_STATES) {
