@@ -212,6 +212,13 @@ describe('the replay — every round re-simulated, every purse derived', () => {
     if (!topped.ok) throw new Error(`${topped.code}: ${topped.detail}`);
     expect(topped.rounds[0]?.purseBeforeUnits).toBe(chimeGrantUnits(sink, 2));
     expect(topped.rounds[0]?.paidUnits).toBe(plain.wavesOutlasted * purse.unitsPerWaveOutlasted);
+    /*
+     * **And the purse it opens moves no run, pinned by a run rather than by a sentence** (§ D227). No
+     * between-round rebuild travels, so a bought top-up widens a purse nothing spends: the replay holds
+     * at the same moment it holds without one. The day a rebuild travels, this is the assertion that
+     * has to change with it — which is what makes the absence a stated refusal rather than a quiet one.
+     */
+    expect(topped.rounds[0]?.heldS).toBe(plain.heldS);
   }, 300_000);
 
   it('ignores a purse the client smuggles past the gate — every purse is the replay’s, whatever the body says', () => {
