@@ -65,13 +65,18 @@ export {
   MODEL_SENSITIVE_METRICS,
   MODEL_SENSITIVE_METRIC_IDS,
   PASSENGER_MODELS,
+  comparabilityBetween,
   comparabilityDisclaimer,
   comparabilityOf,
+  comparabilityOfLandings,
+  landingPassengerModelOf,
   passengerModelOf,
 } from './comparability.js';
 
 export type {
+  LandingDeclaration,
   ModelSensitiveMetric,
+  PairComparability,
   PassengerModel,
   RunComparability,
 } from './comparability.js';

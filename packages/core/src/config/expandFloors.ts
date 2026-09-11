@@ -6,7 +6,7 @@
  * individual `floors` entries override the exceptions (a sky lobby, a plant floor with no
  * population).
  *
- * A range's `label`, `isEntrance`, `isTransferFloor` and `trafficProfile` apply to every
+ * A range's `label`, `isEntrance`, `isTransferFloor`, `trafficProfile` and `landingCallType` apply to every
  * floor it expands to. `{index}` is substituted in both `idPattern` and `label`.
  */
 
@@ -125,6 +125,7 @@ export function expandFloors(source: FloorSource, options: ExpandFloorsOptions =
         ...(range.isEntrance === true ? { isEntrance: true } : {}),
         ...(range.isTransferFloor === true ? { isTransferFloor: true } : {}),
         ...(range.trafficProfile === undefined ? {} : { trafficProfile: range.trafficProfile }),
+        ...(range.landingCallType === undefined ? {} : { landingCallType: range.landingCallType }),
         ...(label === undefined ? {} : { label }),
       });
       rangeOfIndex.set(index, rangeIndex);

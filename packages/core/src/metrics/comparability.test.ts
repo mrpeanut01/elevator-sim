@@ -138,7 +138,8 @@ describe('the nine metrics destination dispatch makes uncomparable', () => {
 
 describe('the passenger model a stage produces', () => {
   it('is conventional for both non-panel call types and for disclosure', () => {
-    expect(PASSENGER_MODELS).toEqual(['conventional', 'destination-dispatch']);
+    // `hybrid` is a run whose landings disagree (GitHub issue #437, § D553); `landingComparability.test.ts`.
+    expect(PASSENGER_MODELS).toEqual(['conventional', 'destination-dispatch', 'hybrid']);
     for (const callType of ['up-down-buttons', 'destination-entry', 'mobile-credential'] as const) {
       expect(passengerModelOf({ callType, passengerAssignment: 'none' })).toBe('conventional');
     }

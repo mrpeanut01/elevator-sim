@@ -189,6 +189,8 @@ export const runRecordSchema = z.strictObject({
   carIds: z.array(identifier).optional(),
   carTimings: carTimingsSchema.optional(),
   passengerModel: z.enum(PASSENGER_MODELS).optional(),
+  // A hybrid run's pairing key (GitHub issue #437, § D553); absent on every other record.
+  assigningFloorIds: z.array(identifier).optional(),
   startedAt: simTime,
   endedAt: simTime,
   reportWindow: reportWindowSchema.optional(),

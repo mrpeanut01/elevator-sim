@@ -78,17 +78,24 @@ import type {
  * That is the mechanical heart of destination dispatch and the reason the call count rises with
  * the number of distinct destinations rather than with the number of directions.
  *
+ * **And it is the landing's, not the run's** (GitHub issue #437, § D553). A call stamped with a
+ * non-destination `callType` came from an up/down landing, which has no panel to key a request on,
+ * so it keys on the button whatever the dispatcher would have named. A call that carries no
+ * `callType` keys exactly as it always did, because a `panel` dispatcher's own call type is a
+ * destination one — `resolveDispatchConfig` refuses the other combination.
+ *
  * A `panel` call with no destination falls back to the button key rather than collapsing every
  * such call onto one shared identity — the runner always supplies a destination under a panel,
  * and a hand-built call that does not is better treated as a button than as "the request to
  * nowhere", which two unrelated landings would then share.
  */
 export function batchKeyOf(
-  call: Pick<DispatchCall, 'floorId' | 'direction' | 'destinationFloorId'>,
+  call: Pick<DispatchCall, 'floorId' | 'direction' | 'destinationFloorId' | 'callType'>,
   config?: Pick<ResolvedDispatchConfig, 'dispatch'> | undefined,
 ): string {
   if (
     config?.dispatch.passengerAssignment === 'panel' &&
+    isDestinationCallType(call.callType ?? config.dispatch.callType) &&
     call.destinationFloorId !== undefined
   ) {
     return `${call.floorId}→${call.destinationFloorId}`;
@@ -169,7 +176,10 @@ export function costRequestFor(
   config: ResolvedDispatchConfig,
   observation: DispatchObservation,
 ): CostRequest {
-  const callType = config.dispatch.callType;
+  // The landing's fixture where the building declares one that differs from the dispatcher's
+  // (GitHub issue #437, § D553), and the dispatcher's own everywhere else — which, in a building
+  // that declares nothing, is every call and the request this function has always built.
+  const callType = call.callType ?? config.dispatch.callType;
   const knowsDestination = isDestinationCallType(callType);
   const knowsCredential = callCarriesCredential(callType, call.panelAuthorized === true);
 

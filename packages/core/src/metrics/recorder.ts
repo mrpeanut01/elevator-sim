@@ -179,6 +179,11 @@ export interface MetricsRecorderOptions {
    * metrics stop being comparable with a record that does not carry it.
    */
   readonly passengerModel?: PassengerModel | undefined;
+  /**
+   * The landings whose panel named a car, when {@link passengerModel} is `hybrid` — GitHub issue
+   * #437, `DECISIONS.md` § D553. Omitted otherwise, and then absent from the record.
+   */
+  readonly assigningFloorIds?: readonly string[] | undefined;
   /** Simulated time the run starts. Defaults to `0`. */
   readonly startedAt?: SimTime | undefined;
   /** The window this run intends to be reported over, when the demand template names one. */
@@ -241,6 +246,7 @@ export class MetricsRecorder {
   readonly #carIds: readonly string[] | undefined;
   readonly #carTimings: CarTimings | undefined;
   readonly #passengerModel: PassengerModel | undefined;
+  readonly #assigningFloorIds: readonly string[] | undefined;
   readonly #startedAt: SimTime;
   readonly #reportWindow: ReportWindow | undefined;
   readonly #metadata: Readonly<Record<string, string | number | boolean>> | undefined;
@@ -281,6 +287,10 @@ export class MetricsRecorder {
     this.#carTimings =
       options.carTimings === undefined ? undefined : Object.freeze({ ...options.carTimings });
     this.#passengerModel = options.passengerModel;
+    this.#assigningFloorIds =
+      options.assigningFloorIds === undefined
+        ? undefined
+        : Object.freeze([...options.assigningFloorIds]);
     this.#startedAt = options.startedAt ?? 0;
     if (!Number.isFinite(this.#startedAt)) {
       throw new MetricsError(`Run start time must be finite; received ${this.#startedAt}.`);
@@ -903,6 +913,9 @@ export class MetricsRecorder {
       ...(this.#carIds === undefined ? {} : { carIds: this.#carIds }),
       ...(this.#carTimings === undefined ? {} : { carTimings: this.#carTimings }),
       ...(this.#passengerModel === undefined ? {} : { passengerModel: this.#passengerModel }),
+      ...(this.#assigningFloorIds === undefined
+        ? {}
+        : { assigningFloorIds: this.#assigningFloorIds }),
       startedAt: this.#startedAt,
       endedAt,
       ...(this.#reportWindow === undefined

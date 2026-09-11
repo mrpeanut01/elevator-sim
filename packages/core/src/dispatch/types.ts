@@ -125,6 +125,18 @@ export interface DispatchCall {
   /** Known under a mobile credential; absent with up/down buttons. */
   readonly credentialGroup?: CredentialGroup | undefined;
   /**
+   * **The call type of the landing that registered this call**, when the building declares one that
+   * differs from the dispatcher's own `dispatch.callType` — GitHub issue #437, `DECISIONS.md` § D553.
+   *
+   * Absent for every call in a building that declares no `landingCallType`, and for every call whose
+   * landing declares the dispatcher's own type, so such a call is the object it always was. Present,
+   * it replaces `dispatch.callType` for this one call in the two stage-1 decisions that read it:
+   * what `costRequestFor` lets the car know, and what `batchKeyOf` counts as the same request. A
+   * panel is a fact about a landing, and the group cannot know more at a landing than the fixture
+   * there can ask.
+   */
+  readonly callType?: CallType | undefined;
+  /**
    * The duty of the passenger this call speaks for — GitHub issue #481, `DECISIONS.md` § D549.
    *
    * Unlike the two fields above it is **not** gated by call type: a goods or bed trip is summoned
