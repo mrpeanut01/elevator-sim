@@ -2,13 +2,14 @@
  * **The house's rush rows, always-on** — GitHub issue #418 and § D547.
  *
  * The default suite pays for none of the sweep. `rushHouseSweep.test.ts` replays every cell behind
- * `ELEVATOR_SIM_RUSH_HOUSE=deep`. What this file holds costs a table read, one `loadConfig` and one
- * rush on the smallest shipped building:
+ * `ELEVATOR_SIM_RUSH_HOUSE=deep`. What this file holds costs a table read, one `loadConfig` and two
+ * rushes — one on the smallest shipped building, one on a tower whose first contract scales occupancy:
  *
  * - the table is pinned to the stream this build generates and names its own command;
  * - it covers every shipped dispatcher on every shipped building, and nothing else;
  * - its cheapest cell replays here, so a moved `core` fails the default suite and does not wait for a
- *   week's schedule;
+ *   week's schedule, and so does a Chancery House cell, so a rush sized from the player's week rather
+ *   than the building fails it too;
  * - the screen's rows are the house's, in § D521's word, with no mean on any of them;
  * - a building the house never ran, or a table from a different climb, draws a refusal rather than
  *   borrowed rows.
@@ -76,6 +77,21 @@ describe('the table is a measurement, pinned to this build’s stream', () => {
     );
     expect(published).toBeDefined();
     expect(measureRushHouseRun(resources, 'garden-apartments', 'collective')).toEqual(published);
+  });
+
+  it('replays a cell on a tower whose first contract scales occupancy, and matches the file to the figure', () => {
+    /*
+     * `chancery-house` × `collective`. The garden cell cannot see whose population sizes the stream:
+     * from a day-1 week the press already wrote Garden Apartments' own rate, and § D547 measured 3 466
+     * legs there either way. Midtown Office and Chancery House are the two towers where it moved, and the
+     * table's 26 rows on them were first measured with the stream sized from the player's week (§ D548).
+     */
+    const resources = browserResourcesFrom(config);
+    const published = RUSH_HOUSE_TABLE.runs.find(
+      (run) => run.buildingId === 'chancery-house' && run.dispatcherId === 'collective',
+    );
+    expect(published).toBeDefined();
+    expect(measureRushHouseRun(resources, 'chancery-house', 'collective')).toEqual(published);
   });
 });
 

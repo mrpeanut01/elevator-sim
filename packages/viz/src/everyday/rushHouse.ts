@@ -20,8 +20,9 @@
  *
  * ## Keyed on the building, because the waves are only the same on the same tower
  *
- * `RUSH_STREAM.seed` is one seed for everybody, and `rushPatchOf` scales the rate to the standing
- * building's population so every tower meets the same number of people. The **crowd** is shared;
+ * `RUSH_STREAM.seed` is one seed for everybody, and `rushPatchOf` scales the rate to the population of
+ * the building the rush runs — the standing tower as authored, whatever week the player is standing in
+ * (PR #513's review, finding 1) — so every tower meets the same number of people. The **crowd** is shared;
  * the building it arrives at is the player's. A house row from Garden Apartments beside a player
  * standing on Vertical City would be a comparison between two different runs, so the standings are
  * the house's runs on the building the player is standing on — and a building drawn in the designer,
