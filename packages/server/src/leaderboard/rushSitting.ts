@@ -184,10 +184,46 @@ export interface SubmittedRushSitting {
  */
 const MAX_SITTING_ROUNDS = 12;
 
+/**
+ * **The largest request body `POST /api/rush-sittings` reads** — PR #513's review, finding 3, and the
+ * one route `http/serve.ts#bodyCapFor` does not give `MAX_BODY_BYTES`.
+ *
+ * **Sized from the gate, not chosen.** Every sitting {@link rushSittingIssues} accepts has to reach the
+ * gate, and at 64 KiB a legal one did not: the review measured twelve rounds of twenty switches with
+ * four rule rows each at about 110 KiB, answered `400 bad-request` by the transport. Worse, the gate had
+ * no maximum to size a cap from — a `$comment` on a rule row, a switch id of any length and a key
+ * nothing reads on an intervention or a modifier all passed it. So the gate was given one first (every
+ * key below a round is refused unless something reads it, and a switch's id is bounded like every other
+ * id), and the largest sitting it now accepts — built in `http/bodyCap.test.ts` from the gate's own
+ * bounds, each probed from both sides: twelve rounds, sixteen rule rows, sixty-four switches of sixteen
+ * rows, sixteen modifiers, 64-character ids and the longest number JSON writes — serialises to about
+ * 1.3 MB. This is the round figure above it, and that test holds the cap to less than a quarter above
+ * that body, so it cannot drift into padding or fall below a legal sitting unnoticed.
+ *
+ * **Why a cap sized to the gate rather than a gate cut to the cap.** The other way to make them agree
+ * was to refuse sittings a player can play — a total of rule rows per round, say — and nothing about a
+ * round supplies that figure: the per-round bounds are `submission.ts`'s, set for one run on their own
+ * ground, and a sitting is up to twelve of those runs. What a body read before authentication owes is to
+ * be bounded, which is the whole of `MAX_BODY_BYTES`'s own argument, and this one is. Recorded here under
+ * [§ D405](../../../../DECISIONS.md), with § D542 naming it.
+ */
+export const MAX_RUSH_SITTING_BODY_BYTES = 1.5 * 1024 * 1024;
+
 /** The keys a sitting may carry. Every other key is refused, by name. */
 const SITTING_KEYS: readonly string[] = Object.freeze(['buildingId', 'rounds', 'modifiers']);
 /** The keys a round may carry. */
 const ROUND_KEYS: readonly string[] = Object.freeze(['dispatcherProfileId', 'ruleRows', 'interventions', 'claimedHeldS']);
+/**
+ * The keys below a round, each refused by name when something else is sent — the strictness that gives
+ * the gate a maximum ({@link MAX_RUSH_SITTING_BODY_BYTES}). `submission.ts`'s gates check what a row and
+ * an entry *say* and leave what else they carry alone, which is right for a single run's lenient gate
+ * and is the reason this one adds the rest rather than changing those.
+ */
+const RULE_ROW_KEYS: readonly string[] = Object.freeze(['when', 'whenValue', 'then', 'thenValue']);
+const INTERVENTION_KEYS: readonly string[] = Object.freeze(['atS', 'change']);
+const SWITCH_KEYS: readonly string[] = Object.freeze(['kind', 'toProfileId', 'ruleRows']);
+const BARE_CHANGE_KEYS: readonly string[] = Object.freeze(['kind']);
+const MODIFIER_KEYS: readonly string[] = Object.freeze(['sinkId', 'steps']);
 
 /**
  * Why a key a client might think to send is refused — the two things a sitting may never carry, each
@@ -219,6 +255,40 @@ function keyIssues(entry: Record<string, unknown>, allowed: readonly string[], w
   return Object.keys(entry)
     .filter((key) => !allowed.includes(key))
     .map((key) => `${where} carries "${key}", ${NEVER_ON_THE_WIRE[key] ?? 'which nothing on a sitting reads'}`);
+}
+
+/** The object entries of `value` with their indices, when it is an array — the rest is the shape gates' to report. */
+function objectsIn(value: unknown): readonly (readonly [number, Record<string, unknown>])[] {
+  if (!Array.isArray(value)) return [];
+  const out: (readonly [number, Record<string, unknown>])[] = [];
+  for (const [index, entry] of value.entries()) {
+    if (typeof entry === 'object' && entry !== null && !Array.isArray(entry)) out.push([index, entry as Record<string, unknown>]);
+  }
+  return out;
+}
+
+/** Keys nothing reads, below a round: on rule rows, on an intervention, on its change and on a switch's rows. */
+function nestedKeyIssues(round: Record<string, unknown>, where: string): string[] {
+  const rows = (value: unknown, at: string): string[] =>
+    objectsIn(value).flatMap(([index, row]) => keyIssues(row, RULE_ROW_KEYS, `${at}[${String(index)}]`));
+  const issues = rows(round['ruleRows'], `${where}.ruleRows`);
+  for (const [index, entry] of objectsIn(round['interventions'])) {
+    const at = `${where}.interventions[${String(index)}]`;
+    issues.push(...keyIssues(entry, INTERVENTION_KEYS, at));
+    const change = entry['change'];
+    if (typeof change !== 'object' || change === null || Array.isArray(change)) continue;
+    const fields = change as Record<string, unknown>;
+    const isSwitch = fields['kind'] === 'switch-dispatcher';
+    issues.push(...keyIssues(fields, isSwitch ? SWITCH_KEYS : BARE_CHANGE_KEYS, `${at}.change`));
+    if (!isSwitch) continue;
+    // A missing or empty id is `submission.ts#interventionIssues`' refusal already; the length is this gate's.
+    const target = fields['toProfileId'];
+    if (typeof target === 'string' && target.length > 64) {
+      issues.push(`${at}.change.toProfileId must be a non-empty id under 64 characters`);
+    }
+    issues.push(...rows(fields['ruleRows'], `${at}.change.ruleRows`));
+  }
+  return issues;
 }
 
 function idIssue(value: unknown, where: string): string | undefined {
@@ -275,12 +345,14 @@ export function rushSittingIssues(body: unknown, purse: RushPurseTable): readonl
       issues.push(
         ...interventionIssues(round['interventions'] as SubmittedRushRound['interventions']).map((issue) => `${where}.${issue}`),
       );
+      issues.push(...nestedKeyIssues(round, where));
     }
   }
 
   const modifiers = sitting['modifiers'];
   const shape = claimedModifierIssues(modifiers);
   issues.push(...shape);
+  for (const [index, claim] of objectsIn(modifiers)) issues.push(...keyIssues(claim, MODIFIER_KEYS, `modifiers[${String(index)}]`));
   if (shape.length === 0 && Array.isArray(modifiers)) {
     for (const [index, claim] of (modifiers as readonly ClaimedModifier[]).entries()) {
       if (!purse.topUpSinkIds.includes(claim.sinkId)) {

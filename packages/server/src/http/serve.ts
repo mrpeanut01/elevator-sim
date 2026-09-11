@@ -26,15 +26,35 @@ import {
   type PreviewOrigins,
   type StaticBundle,
 } from './static.js';
+import { MAX_RUSH_SITTING_BODY_BYTES } from '../leaderboard/rushSitting.js';
 
 /**
- * The largest request body the server will read.
+ * The largest request body the server will read, on every route but one.
  *
  * A submission is a handful of ids, four numbers and a seed — under a kilobyte. 64 KB is generous
  * by two orders of magnitude and still bounded, which is the point: an unauthenticated endpoint
  * that will buffer whatever it is sent is a memory-exhaustion invitation.
+ *
+ * **The one is `POST /api/rush-sittings`** ({@link bodyCapFor}), whose cap is sized from what its gate
+ * accepts — `leaderboard/rushSitting.ts#MAX_RUSH_SITTING_BODY_BYTES` says how — because a legal sitting
+ * is up to twelve runs and did not fit here (PR #513's review, finding 3). A body over its route's cap
+ * is answered **`413 body-too-large`** rather than `400 bad-request`: it was not malformed, it was
+ * larger than this server reads, and a client can only act on the difference if it is told it.
  */
 export const MAX_BODY_BYTES = 64 * 1024;
+
+/** The largest body {@link respond} reads for `method` and `pathname` — see {@link MAX_BODY_BYTES}. */
+export function bodyCapFor(method: string | undefined, pathname: string): number {
+  return method === 'POST' && pathname === '/api/rush-sittings' ? MAX_RUSH_SITTING_BODY_BYTES : MAX_BODY_BYTES;
+}
+
+/** A body over its route's cap — {@link readJson}'s one refusal that is not a `400`. */
+class BodyTooLargeError extends Error {
+  constructor(readonly capBytes: number) {
+    super(`a request body on this route may not exceed ${String(capBytes)} bytes`);
+    this.name = 'BodyTooLargeError';
+  }
+}
 
 export interface ServeOptions {
   readonly api: Api;
@@ -294,8 +314,13 @@ async function respond(options: ServeOptions, incoming: IncomingMessage, respons
 
   let body: unknown;
   try {
-    body = await readJson(incoming);
+    body = await readJson(incoming, bodyCapFor(incoming.method, url.pathname));
   } catch (error) {
+    if (error instanceof BodyTooLargeError) {
+      response.writeHead(413, headers);
+      response.end(JSON.stringify({ error: 'body-too-large', detail: error.message }));
+      return;
+    }
     response.writeHead(400, headers);
     response.end(
       JSON.stringify({
@@ -402,8 +427,8 @@ function hostOf(origin: string): string {
   }
 }
 
-/** Read and parse the body, refusing anything over {@link MAX_BODY_BYTES}. */
-async function readJson(incoming: IncomingMessage): Promise<unknown> {
+/** Read and parse the body, refusing anything over `capBytes` — {@link bodyCapFor}'s answer for the route. */
+async function readJson(incoming: IncomingMessage, capBytes: number): Promise<unknown> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of incoming) {
@@ -411,7 +436,7 @@ async function readJson(incoming: IncomingMessage): Promise<unknown> {
     size += buffer.length;
     // Checked per chunk, not after the fact: a limit enforced once the whole body is in memory is
     // not a limit.
-    if (size > MAX_BODY_BYTES) throw new Error(`a request body may not exceed ${String(MAX_BODY_BYTES)} bytes`);
+    if (size > capBytes) throw new BodyTooLargeError(capBytes);
     chunks.push(buffer);
   }
   const text = Buffer.concat(chunks).toString('utf8');
