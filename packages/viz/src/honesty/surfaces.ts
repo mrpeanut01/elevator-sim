@@ -1830,12 +1830,12 @@ const ACCESS: SurfaceAdapter = {
 };
 
 /**
- * The case's building document with one landing call type declared — on its first floor, or its
+ * The case’s building document with one landing call type declared — on its first floor, or its
  * first floor range when it authors no floor — for the editor adapter's refusal seed below.
  */
-function withOneLandingPanel(document: unknown): object | undefined {
-  if (typeof document !== 'object' || document === null) return undefined;
-  const doc = document as Record<string, unknown>;
+function withOneLandingPanel(buildingDocument: unknown): object | undefined {
+  if (typeof buildingDocument !== 'object' || buildingDocument === null) return undefined;
+  const doc = buildingDocument as Record<string, unknown>;
   for (const key of ['floors', 'floorRanges']) {
     const list = doc[key];
     if (!Array.isArray(list)) continue;
