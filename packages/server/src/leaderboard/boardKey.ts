@@ -87,14 +87,16 @@
  * key names the sink and the steps; `chime-ledger.json`'s `priceChimes` is on the server and
  * reaches neither the key, the row, nor the wire.
  *
- * **The modifier does not yet reach the replay, and that is a seam rather than an omission.**
- * `SubmittedRun` is what `verify.ts` re-simulates, and neither `purse-units` nor `prefit` has a
- * field on it, because no mode that spends a purse posts yet. So a modified run today replays to
- * the same figures a standard one would and is separated **on the board** rather than in the
- * simulation. GitHub issue #372 is where the rush purse reaches the run; when it does, the purse
- * becomes part of `SubmittedRun` and this axis starts separating runs that really are different.
- * Until then the separation is the honest one: the account paid for something, and the board says
- * which runs were played by accounts that did.
+ * **On a single run, the modifier still reaches no replay, and that is a seam rather than an
+ * omission.** `SubmittedRun` is what `verify.ts` re-simulates, and neither `purse-units` nor `prefit`
+ * has a field on it. So a modified single run replays to the same figures a standard one would and is
+ * separated **on the board** rather than in the simulation. **GitHub issue #372 gave a purse a replay
+ * to reach and not a run**: a posted rush sitting's `rush-purse-top-up` opens the purse
+ * `leaderboard/rushSitting.ts` derives, and the sitting's rows and board key carry the set — but no
+ * between-round rebuild travels yet, so nothing spends that purse and the legs are unchanged by it.
+ * `rush-prefit` is refused on a sitting, because its fitted building is one this server cannot build.
+ * Until a rebuild travels the separation stays the honest one: the account paid for something, and
+ * the board says which runs were played by accounts that did.
  */
 
 import type { ClaimedModifier } from '../chimes/ledger.js';
@@ -127,8 +129,9 @@ export interface BoardKeyRow {
  * personal log     = anything else
  * ```
  *
- * The first line is § 12.1's `date` **as amended by § D526 clause 3**; the other two are the
- * contract's unchanged.
+ * The first line is § 12.1's `date` **as amended by § D526 clause 3**; the next two are the
+ * contract's unchanged. **A fourth row is not the contract's**: the rush board GitHub issue #372 built,
+ * keyed `building × date × modifier set` and argued where it is declared ([§ D543](../../../../DECISIONS.md)).
  *
  * `boardKey.test.ts` asserts both directions: every row with a `route` is produced by
  * {@link placeSubmission} on some submission, and the row with no `route` is produced by none.
@@ -158,6 +161,25 @@ export const BOARD_KEYS: readonly BoardKeyRow[] = Object.freeze([
     key: 'anything else',
     board: 'a personal-record log, one per player',
     route: 'placeSubmission, for every run that is not the day’s fixture',
+  }),
+  Object.freeze({
+    /*
+     * **Not one of § 12.1's three, and said so here rather than slipped in** — GitHub issue #372,
+     * [§ D543](../../../../DECISIONS.md). The contract predates a postable rush; the owner's ruling of
+     * 2026-09-10 made one, and a posted sitting needs a board a client can label. The building is in
+     * it because § 12.1's own last sentence requires it — *rows within a board must have met the
+     * identical crowd* — and a rush is the same number of people on every tower, arriving at a
+     * different tower's floors. It is the one player-chosen axis in any key, and it is admitted on
+     * this module's own test for the modifier set: the space is the shipped buildings, enumerable and
+     * small, not a combinatorial product. The date resets it (§ D509) and the set separates bought
+     * starts (§ D526 clause 3). The dispatcher, the rules and the log are what a player brings, as on
+     * the daily board, and are in no key.
+     */
+    key: 'building × date × modifier set',
+    board:
+      'the rush board — how long a posted sitting held, one board a day for each tower and modifier set, ' +
+      'everybody who sat that tower with that set on it',
+    route: 'rushPlacementOf, for a sitting the server replayed round by round',
   }),
 ]);
 
@@ -405,6 +427,39 @@ export function placeSubmission(
     });
   }
   return Object.freeze({ kind: 'personal', key: `personal:${userId}`, userId, modifiers });
+}
+
+/** Where a posted rush sitting lands — GitHub issue #372, [§ D543](../../../../DECISIONS.md). */
+export interface RushPlacement {
+  readonly kind: 'rush';
+  /** `rush:<building>:YYYY-MM-DD`, with `/<set>` on a modifier set's board. */
+  readonly key: string;
+  readonly date: string;
+  readonly buildingId: string;
+  /** The set this board is, canonical. Empty on the standard board. */
+  readonly modifiers: ModifierSet;
+}
+
+/**
+ * The board a posted rush sitting belongs on: **the tower, the day, and the modifier set** — the fourth
+ * row of {@link BOARD_KEYS}, whose comment carries the argument.
+ *
+ * Decided against **this server's** clock, for {@link placeSubmission}'s reason: a client cannot choose
+ * which day's board it lands on. The set goes through {@link canonicalModifierSet} and
+ * {@link modifierSetKeyOf}, so a rush board's suffix is spelled exactly as a daily board's is and the
+ * standard set appends nothing. The claim reaching here has already been checked against the account's
+ * spends by `http/api.ts`, so a set nobody paid for reaches no key.
+ */
+export function rushPlacementOf(
+  buildingId: string,
+  nowMs: number,
+  claimedModifiers: ModifierSet | undefined,
+): RushPlacement {
+  const modifiers = canonicalModifierSet(claimedModifiers);
+  const date = dailyDateOf(nowMs);
+  const setKey = modifierSetKeyOf(modifiers);
+  const board = `rush:${buildingId}:${date}`;
+  return Object.freeze({ kind: 'rush', key: setKey === '' ? board : `${board}/${setKey}`, date, buildingId, modifiers });
 }
 
 /* -------------------------------------------------------------------------- *

@@ -28,6 +28,7 @@ import { TRAFFIC_DEFAULTS, loadConfig, type LoadedConfig } from '@elevator-sim/c
 
 import { requireSecret } from './accounts/credentials.js';
 import { loadChimeLedger, loadChimeTurnBounds } from './chimes/ledger.js';
+import { loadRushPurse } from './leaderboard/rushSitting.js';
 import {
   CHALLENGE_ROTATION,
   challengeDefinitionIssues,
@@ -126,6 +127,12 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
    * ledger's own reason one statement up.
    */
   const chimeTurns = await loadChimeTurnBounds(options.dataDir, config.trafficProfiles);
+  /*
+   * And the rush purse — GitHub issue #372. After the ledger, because every top-up it names has to be a
+   * sink that ledger sells; a throw here is right on the ledger's own ground, since a server whose
+   * purse will not load would refuse every sitting at the moment a player posted one.
+   */
+  const rushPurse = await loadRushPurse(options.dataDir, chimeLedger);
   const now = options.now ?? ((): number => Date.now());
 
   // Three sources, most explicit first: what a test passed, what the environment configures, and
@@ -166,6 +173,7 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
     signInUrl: signInUrlFor(options.publicOrigin),
     chimeLedger,
     chimeTurns,
+    rushPurse,
   };
 
   return {

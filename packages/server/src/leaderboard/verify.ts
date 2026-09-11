@@ -53,6 +53,7 @@ export type RejectionCode =
   | 'unknown-building'
   | 'unknown-dispatcher'
   | 'unknown-template'
+  | 'rush-posts-as-a-sitting'
   | 'metrics-do-not-reproduce'
   | 'awt-not-quotable'
   | 'simulation-failed';
@@ -99,12 +100,56 @@ export function configFor(
   run: SubmittedRun,
   resources: VerificationResources,
 ): SimulationConfig | RejectionCode {
-  // A template that declares itself unselectable (`endless-rush`, GitHub issue #220) is one the
-  // board does not know: no shipped list offers it, so a submission naming it was built by hand,
-  // and a run under a stream that leaves every profile's declared band is not a run this board
-  // ranks. Refused on the same code, because to the board the two are the same fact.
+  /*
+   * **The rush posts as a sitting, and this is where the refusal of it was lifted** — GitHub issue
+   * #372, [§ D542](../../../../DECISIONS.md), under the owner's ruling of 2026-09-10.
+   *
+   * It read, from GitHub issue #220: *a template that declares itself unselectable is one the board
+   * does not know: no shipped list offers it, so a submission naming it was built by hand, and a run
+   * under a stream that leaves every profile's declared band is not a run this board ranks* — and
+   * `endless-rush` was refused here as `unknown-template`. **Both halves are still true of this path**,
+   * which ranks a quotable mean on the daily board and the personal log, so a single run under the
+   * rush is still refused before anything simulates. What is lifted is the refusal of the rush as a
+   * thing a server can verify and rank, and the argument, in the order the ruling asked for it:
+   *
+   * 1. **The rush has something to rank that it produces.** A rush's mean is unquotable by design —
+   *    the stream is built to break the building, and `measureRun`'s `awt-not-quotable` would refuse
+   *    every one — so the rank is how long it held, read off the replay at the hold moment by the
+   *    reader the stage stops on (`@elevator-sim/core`'s `rushHoldAtLegs`). A stopped-by-hand run and a
+   *    run that never broke post nothing (`rushSitting.ts`, `no-breaking-point`).
+   * 2. **What posts is a sitting, whole** — the owner's reading (b): consecutive runs from an
+   *    as-shipped start, every round's intervention log on the wire.
+   * 3. **Every round is verified from causes, and every effect is derived** — § D486's shape. A round
+   *    carries a building id, a shipped dispatcher id, its rows and its log on
+   *    `submission.ts`'s allow-list; {@link rushRoundConfigFor} derives the seed, the stream, the
+   *    length and the rate; the server re-simulates it and compares the held time; and every purse is
+   *    derived from the replay. A client-named purse, amount, wave count, seed or stream is refused by
+   *    name. So a posted sitting cannot carry a gentler climb, a kinder seed, a purse or a figure its
+   *    own replay did not produce.
+   * 4. **It is a ranking on one crowd.** The seed is shared (§ D515), and a rush board is keyed by the
+   *    tower, the day and the modifier set (`boardKey.ts#rushPlacementOf`, § D543), so rows on one
+   *    board met the identical crowd and a bought start ranks only beside the same bought start.
+   * 5. **What it costs was measured first.** One simulation a round, 326–1 541 ms a round across the
+   *    nine shipped buildings and linear in the chain, charged against the cooldown per round, twelve
+   *    rounds at most (`rushSitting.ts`'s table and its command, measured on the commit before this
+   *    one).
+   *
+   * **What stays refused, each on its own ground:** a bought change mid-run (`interventionWire.ts` —
+   * no submission carries the entitlement to it), an incident answer (§ D486, permanent), a pre-fitted
+   * start (its fitted building is one this server cannot build), and a between-round rebuild, which no
+   * wire carries yet.
+   */
+  if (run.demandTemplateId === RUSH_TEMPLATE_ID) return 'rush-posts-as-a-sitting';
+  // Any other template that declares itself unselectable is one the board does not know, on #220's
+  // ground above: no shipped list offers it, so a submission naming it was built by hand.
   return configOver(run, resources, (template) => template.selectable !== false);
 }
+
+/** What a single run under the rush stream is told, on the score route — {@link configFor}'s refusal. */
+const RUSH_POSTS_AS_A_SITTING =
+  'A rush posts as a sitting, not as a single run: send every round, from the building as shipped, to ' +
+  'POST /api/rush-sittings, where each round is replayed and the sitting is ranked by how long its last ' +
+  'round held. A rush has no average wait to rank here — the stream is built to break the building.';
 
 /**
  * The configuration of one round of a posted rush sitting — GitHub issue **#372**, and
@@ -374,7 +419,9 @@ export function measureRun(
           ? `This server does not ship a building "${run.buildingId}".`
           : config === 'unknown-dispatcher'
             ? `This server does not ship a dispatcher "${run.dispatcherProfileId}".`
-            : `This server does not ship a demand template "${run.demandTemplateId}".`,
+            : config === 'rush-posts-as-a-sitting'
+              ? RUSH_POSTS_AS_A_SITTING
+              : `This server does not ship a demand template "${run.demandTemplateId}".`,
     };
   }
 
