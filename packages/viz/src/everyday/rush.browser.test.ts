@@ -156,5 +156,5 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
     } finally {
       await page.close();
     }
-  }, 180_000);
+  });
 });
