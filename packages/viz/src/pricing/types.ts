@@ -121,10 +121,40 @@ export interface PricedExtra {
   readonly priceUnits: number;
 }
 
+/**
+ * A change **no scenario sells at any price** — GitHub issue **#467**, [§ D535](../../../../DECISIONS.md).
+ *
+ * The issue's own sentence is why this is a type rather than a large number on a
+ * {@link PricedChange}: *"not purchasable and priced high are different answers."* A price, however
+ * high, is a claim that the change is for sale and that a wide enough budget reaches it; a withheld
+ * change makes the opposite claim. So it carries **no price, no tier and no nights** —
+ * `pricing/parse.ts` refuses a withheld entry that tries to carry one — and nothing that reads a
+ * price can mistake it for a dear row.
+ *
+ * `covers` is matched the way a search-space dimension's price is matched,
+ * `scenario/budget.ts#changePricingDimension`'s dotted-prefix walk: a path withholds itself and
+ * every dotted descendant, so `dispatcher.selection` withholds a selector knob `core` declares
+ * tomorrow with no edit. That is also why `pricing/parse.ts` refuses a withheld path that meets a
+ * priced one **by prefix** as well as exactly.
+ *
+ * The ruling is the product owner's rather than a proposal, and the entry's `note` says so. Read by
+ * `campaign/parse.ts#editableIdsOf`, which resolves every withheld dimension out of every scenario's
+ * editable set, and by `scenario/budget.ts#admitPurchase`, which refuses a move that touches one.
+ */
+export interface WithheldChange {
+  readonly id: string;
+  /** Whose ruling, and why. Provenance for a reviewer, drawn on no screen. */
+  readonly note: string;
+  /** Config paths withheld — each path and every dotted descendant of it. */
+  readonly covers: readonly string[];
+}
+
 /** `data/price-schedule.json`, parsed. */
 export interface PriceSchedule {
   readonly version: number;
   readonly tiers: readonly PriceTier[];
   readonly changes: readonly PricedChange[];
   readonly extras: readonly PricedExtra[];
+  /** What no scenario sells at any price — GitHub issue #467. Required, and empty is a statement. */
+  readonly withheld: readonly WithheldChange[];
 }

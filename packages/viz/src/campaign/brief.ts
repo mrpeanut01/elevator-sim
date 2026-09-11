@@ -22,6 +22,7 @@ import { editableIdsOf } from './parse.js';
 import { playerSafeDescription } from './words.js';
 import type { CampaignStage } from './types.js';
 import { goalLabel } from '../scenario/goals.js';
+import type { PriceSchedule } from '../pricing/types.js';
 import type { PublishedScenario } from '../scenario/published.js';
 import { glossaryFor, type GlossaryTerm } from '../mode/glossary.js';
 
@@ -67,6 +68,12 @@ export interface BriefingInput {
   readonly dimensionIds: readonly string[];
   /** `SearchParameter.description` by id, so a dial is described in the schema's own words. */
   readonly dimensionHelp: ReadonlyMap<string, string>;
+  /**
+   * `data/price-schedule.json` — what `every-declared-dimension` withholds (GitHub issue #467).
+   * Required, for `editableIdsOf`'s reason: a brief that listed a withheld dial as editable would be
+   * the one screen offering what no scenario sells.
+   */
+  readonly schedule: PriceSchedule;
 }
 
 export function briefingFor(input: BriefingInput): StageBriefing {
@@ -124,7 +131,7 @@ export function briefingFor(input: BriefingInput): StageBriefing {
      * that carries a probability word with the reason it is not being printed — one shipped
      * declaration does, and it would otherwise arrive here unread by any rule.
      */
-    editable: editableIdsOf(stage.dispatcher.editable, input.dimensionIds).map((id) => ({
+    editable: editableIdsOf(stage.dispatcher.editable, input.dimensionIds, input.schedule).map((id) => ({
       id,
       help: playerSafeDescription(input.dimensionHelp.get(id)),
     })),

@@ -62,6 +62,7 @@ import {
   samplerSeedFor,
   unpricedDimensionIds,
   unreachableChangeIdsOf,
+  withheldDimensionIds,
 } from './survivorSpace.js';
 
 const fixture = useCampaignFixture();
@@ -262,17 +263,33 @@ describe('what a scenario run can reach is derived from the schedule, never writ
     }
   });
 
-  it('leaves every unpriced dimension out of the reachable set, and says how many there are', () => {
+  /**
+   * **Priced, unpriced and withheld partition the space, and the table publishes two of the three.**
+   * GitHub issue #467 split what used to be one exclusion: a dimension the schedule prices nothing
+   * for is free and reachable at every rung, while a dimension it **withholds** is sold in no
+   * scenario at any rung ([§ D535](../../../../DECISIONS.md)). Neither is varied, for opposite
+   * reasons, so the table counts them separately rather than folding the second into the first.
+   */
+  it('leaves every unpriced and every withheld dimension out of the reachable set, and says how many of each', () => {
     const priced = new Set(
       reachableChangesOf(fixture.space, schedule).flatMap((change) => change.dimensionIds),
     );
     const unpriced = unpricedDimensionIds(fixture.space, schedule);
-    for (const id of unpriced) expect(priced.has(id), id).toBe(false);
-    expect(unpriced.length + priced.size).toBe(fixture.space.parameters.length);
+    const withheld = withheldDimensionIds(fixture.space, schedule);
+    for (const id of [...unpriced, ...withheld]) expect(priced.has(id), id).toBe(false);
+    expect(unpriced.filter((id) => withheld.includes(id)), 'a withheld dial is not unpriced').toEqual(
+      [],
+    );
+    expect(withheld.length, 'the schedule withholds something').toBeGreaterThan(0);
+    expect(unpriced.length + withheld.length + priced.size).toBe(fixture.space.parameters.length);
     expect(
       table.provenance.unpricedDimensionCount,
       'the table publishes the exclusion it was measured under',
     ).toBe(unpriced.length);
+    expect(
+      table.provenance.withheldDimensionCount,
+      'the table publishes what no scenario sells beside what it was measured over',
+    ).toBe(withheld.length);
     expect(table.provenance.declaredDimensionCount).toBe(fixture.space.parameters.length);
   });
 });

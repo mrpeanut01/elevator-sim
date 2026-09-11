@@ -250,7 +250,7 @@ describe('stage 2, played on an edited weight vector — the thing a dropdown co
       space,
       requireProfile(stage.dispatcher.startingProfileId),
       outOfScope.profile,
-      editableIdsOf(stage.dispatcher.editable, space.ids),
+      editableIdsOf(stage.dispatcher.editable, space.ids, fixture.context.schedule),
     );
     expect(admission.admissible).toBe(false);
     expect(admission.sentence).toContain('idle.parkingStrategy');
