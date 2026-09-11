@@ -154,6 +154,8 @@ describe('normalization keeps every term comparable', () => {
       ['zoneAffinity', 20],
       ['predictedDemand', 25],
       ['crowding', 0.5],
+      // A mismatch is the only non-zero value the term has (GitHub issue #481).
+      ['dutyMismatch', 1],
     ]);
 
     for (const term of COST_TERMS) {
@@ -202,6 +204,7 @@ describe('normalization keeps every term comparable', () => {
       'loadFactor',
       'stopCount',
       'crowding',
+      'dutyMismatch',
     ]);
 
     // A bounded term reaches exactly 1 at its full scale; a saturating one never does.
@@ -216,15 +219,16 @@ describe('normalization keeps every term comparable', () => {
     }
   });
 
-  it('gives only the four genuinely bounded terms a linear map', () => {
+  it('gives only the five genuinely bounded terms a linear map', () => {
     // The distinction the whole scheme rests on: `bounded` is for a raw value with a **known
     // finite maximum**, because a clamp destroys ordering above it. Two direction changes, two
-    // stops, rated load and a whole landing left behind are all real ceilings; a wait, a ride, a
+    // stops, rated load, a whole landing left behind and a duty that either matches or does not
+    // (GitHub issue #481) are all real ceilings; a wait, a ride, a
     // delay and a distance are not, and clamping one would stop distinguishing two distant cars
     // exactly when the choice matters most.
     for (const term of COST_TERMS) {
       if (term.normalization.mode !== 'bounded') continue;
-      expect(['directionReversal', 'loadFactor', 'stopCount', 'crowding'], term.id).toContain(
+      expect(['directionReversal', 'loadFactor', 'stopCount', 'crowding', 'dutyMismatch'], term.id).toContain(
         term.id,
       );
       expect(term.normalization.fullScale, term.id).toBeGreaterThan(0);
@@ -263,6 +267,7 @@ describe('every term documents the reference scale it is normalized on', () => {
       ['zoneAffinity', 30],
       ['predictedDemand', 30],
       ['crowding', 0.5],
+      ['dutyMismatch', 0.5],
     ]);
 
     for (const term of COST_TERMS) {

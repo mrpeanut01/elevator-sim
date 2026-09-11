@@ -364,8 +364,15 @@ describe('every parameter core declares is accounted for', () => {
     // `fixed-floor` parking strategy heads for. Authorable (`idle.parkingFloorIndex` on the
     // profile schema), gated on `idle.parkingStrategy: fixed-floor`, so it moves the space as
     // well as the row count.
-    expect(rows).toBe(131);
-    expect(SPACE.parameters.length).toBe(59);    // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
+    //
+    // **And four more from GitHub issue #481** (`DECISIONS.md` § D549), in the two shapes above at
+    // once. `weights.dutyMismatch` is derived from the new cost term and a profile can author it, so
+    // it moves the space as well as the row count (59 → 60). The three `traffic.duty.shares.*` rows
+    // carry `default: null` for the credential gap's reason — each share lives in
+    // `data/traffic-profiles.json` as a proposal with its reasoning — so they land in
+    // `space.unsearchable` and move the row count alone.
+    expect(rows).toBe(135);
+    expect(SPACE.parameters.length).toBe(60);    // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.
     expect(authorable).toBeGreaterThan(0);
     expect(authorable).toBeLessThan(rows);

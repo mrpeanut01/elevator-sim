@@ -49,6 +49,7 @@
  * - Every value the policy hands back is frozen.
  */
 
+import type { Duty } from '../config/types.js';
 import type {
   AssignmentMode,
   AssignmentTiming,
@@ -123,6 +124,15 @@ export interface DispatchCall {
   readonly destinationFloorId?: string | undefined;
   /** Known under a mobile credential; absent with up/down buttons. */
   readonly credentialGroup?: CredentialGroup | undefined;
+  /**
+   * The duty of the passenger this call speaks for — GitHub issue #481, `DECISIONS.md` § D549.
+   *
+   * Unlike the two fields above it is **not** gated by call type: a goods or bed trip is summoned
+   * on the landing's own duty control, so a conventional group knows it too, and `costRequestFor`
+   * forwards it whatever `dispatch.callType` says. Absent when the passenger carries none, which is
+   * every call in a building where no car declares a duty.
+   */
+  readonly duty?: Duty | undefined;
   /**
    * The **landing panel already performed the access check** for this request.
    *

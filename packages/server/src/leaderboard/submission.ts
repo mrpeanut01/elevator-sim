@@ -435,8 +435,13 @@ const MAX_INTERVENTIONS = 64;
  */
 export const SUBMITTABLE_INTERVENTION_KINDS: readonly string[] = CARRIED_INTERVENTION_KINDS;
 
-/** Everything structurally wrong with a submitted rule list, or nothing. */
-function ruleRowIssues(rows: readonly RuleRowConfig[] | undefined): readonly string[] {
+/**
+ * Everything structurally wrong with a submitted rule list, or nothing.
+ *
+ * Exported for `rushSitting.ts`, whose rounds carry the same rows and are bounded by the same
+ * vocabulary — one gate for one shape, rather than a second copy that could admit what this refuses.
+ */
+export function ruleRowIssues(rows: readonly RuleRowConfig[] | undefined): readonly string[] {
   if (rows === undefined) return [];
   if (!Array.isArray(rows)) return ['ruleRows must be an array'];
   if (rows.length > MAX_RULE_ROWS) return [`ruleRows must hold at most ${MAX_RULE_ROWS} rows`];
@@ -513,8 +518,13 @@ export interface SubmittedSwitch {
  */
 export type SubmittedIntervention = WireIntervention;
 
-/** Everything structurally wrong with a submitted intervention log, or nothing. */
-function interventionIssues(log: readonly SubmittedIntervention[] | undefined): readonly string[] {
+/**
+ * Everything structurally wrong with a submitted intervention log, or nothing.
+ *
+ * Exported for `rushSitting.ts`, whose rounds carry the same log under the same allow-list — a rush
+ * round with mid-run changes is refused on exactly the kinds a single run is refused on.
+ */
+export function interventionIssues(log: readonly SubmittedIntervention[] | undefined): readonly string[] {
   if (log === undefined) return [];
   if (!Array.isArray(log)) return ['interventions must be an array'];
   if (log.length > MAX_INTERVENTIONS) {

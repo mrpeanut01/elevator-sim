@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import {
+  parseBuilding,
   parseDispatcherProfiles,
   HARD_CONSTRAINT_WORDS,
   RULE_ACTIONS,
@@ -36,6 +37,7 @@ import {
 } from '../authoring/dispatcherSpec.js';
 import { defaultRuleRow } from '../authoring/ruleSpec.js';
 import { selectorContextFrom, defaultSelectorSpec } from '../authoring/selectorSpec.js';
+import { withGoodsCar } from '../fixtures.test-helper.js';
 import { applyPlainLever } from '../mode/plainLevers.js';
 import {
   behaviourBlockOf,
@@ -71,6 +73,15 @@ const profileOf = (id: string): DispatcherProfile => {
 const COLLECTIVE = profileOf('collective');
 const SPEC: DispatcherSpec = specFromProfile(COLLECTIVE, COLLECTIVE.name);
 const LEVERS: GroupLevers = DEFAULT_LEVERS;
+/** A shipped tower, as authored — no car of it declares a duty, like every shipped building (§ D549). */
+const MIDTOWN = parseBuilding(
+  JSON.parse(
+    readFileSync(
+      fileURLToPath(new URL('../../../../data/buildings/midtown-office.json', import.meta.url)),
+      'utf8',
+    ),
+  ),
+);
 
 describe('the drawers are two views of one vector', () => {
   it('moves the printed cost line when the patience lever moves', () => {
@@ -91,7 +102,7 @@ describe('the drawers are two views of one vector', () => {
   it('shows the same number on the term slider that the lever holds', () => {
     const { spec } = applyPlainLever(SPEC, LEVERS, 'room', 37);
     const lever = workshopLeversOf(spec, LEVERS).find((view) => view.id === 'room');
-    const row = termDisclosureOf(FILE.terms, spec).rows.find((entry) => entry.termId === 'loadFactor');
+    const row = termDisclosureOf(FILE.terms, spec, MIDTOWN).rows.find((entry) => entry.termId === 'loadFactor');
 
     expect(lever?.value).toBe(37);
     expect(row?.value).toBe(37);
@@ -106,7 +117,7 @@ describe('the drawers are two views of one vector', () => {
 
 describe('the thirteen, behind a door that counts its own contents', () => {
   it('derives both numbers in the summary from the library and the vector', () => {
-    const view = termDisclosureOf(FILE.terms, SPEC);
+    const view = termDisclosureOf(FILE.terms, SPEC, MIDTOWN);
     expect(view.summary).toBe(
       `the ${String(FILE.terms.length)} cost terms — ${String(view.weighted)} weighted`,
     );
@@ -115,11 +126,11 @@ describe('the thirteen, behind a door that counts its own contents', () => {
     expect(view.weighted).toBe(1);
 
     const { spec } = applyPlainLever(SPEC, LEVERS, 'patience', 50);
-    expect(termDisclosureOf(FILE.terms, spec).weighted).toBe(2);
+    expect(termDisclosureOf(FILE.terms, spec, MIDTOWN).weighted).toBe(2);
   });
 
   it('reads every sub-line from core’s own player words, never an engine id', () => {
-    const rows = termDisclosureOf(FILE.terms, SPEC).rows;
+    const rows = termDisclosureOf(FILE.terms, SPEC, MIDTOWN).rows;
     for (const row of rows) {
       const term = COST_TERMS_BY_ID.get(row.termId);
       if (term === undefined) continue;
@@ -143,11 +154,21 @@ describe('the thirteen, behind a door that counts its own contents', () => {
       weights: { ...SPEC.weights, rideTime: 60 },
       flags: { ...SPEC.flags, pool: false },
     };
-    const row = termDisclosureOf(FILE.terms, weighted).rows.find(
+    const row = termDisclosureOf(FILE.terms, weighted, MIDTOWN).rows.find(
       (entry) => entry.termId === 'rideTime',
     );
     expect(row?.value).toBe(60);
     expect(row?.inertWhy).toMatch(/inert until the call carries a destination/);
+  });
+
+  it('draws the duty refusal beside its slider where no car declares a duty, and not where one does — § D549', () => {
+    const weighted: DispatcherSpec = { ...SPEC, weights: { ...SPEC.weights, dutyMismatch: 40 } };
+    const rowOn = (building: typeof MIDTOWN) =>
+      termDisclosureOf(FILE.terms, weighted, building).rows.find((entry) => entry.termId === 'dutyMismatch');
+    expect(rowOn(MIDTOWN)?.value).toBe(40);
+    expect(rowOn(MIDTOWN)?.inertWhy).toMatch(/no car in this building declares a duty/);
+    expect(rowOn(withGoodsCar(MIDTOWN))?.value).toBe(40);
+    expect(rowOn(withGoodsCar(MIDTOWN))?.inertWhy).toBeUndefined();
   });
 });
 

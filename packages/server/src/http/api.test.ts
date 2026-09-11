@@ -25,13 +25,21 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 
-import { chimeAwardFor, parseChimeLedger, runSimulation } from '@elevator-sim/core';
+import {
+  chimeAwardFor,
+  chimeGrantUnits,
+  chimeSinkById,
+  parseChimeLedger,
+  parseRushPurse,
+  rushHoldAtLegs,
+  runSimulation,
+} from '@elevator-sim/core';
 
 import { LOGIN_TTL_MS, signLoginToken } from '../accounts/credentials.js';
 import { rushWaveCountOf } from '../chimes/ledger.js';
 import { bootstrap, UnsafeConfigurationError, type Server } from '../bootstrap.js';
 import { DAILY_FIXTURE_CONFIG, dailyDateOf, dailySeedFor } from '../leaderboard/boardKey.js';
-import { configFor, metricsOf } from '../leaderboard/verify.js';
+import { configFor, metricsOf, rushRoundConfigFor } from '../leaderboard/verify.js';
 import { OutboxMailer } from '../mail/mailer.js';
 import { PgliteSql } from '../store/pglite.test-helper.js';
 import { RacingSql } from '../store/racingSql.test-helper.js';
@@ -2462,5 +2470,182 @@ describe('a board row carries the modifier and never the spend — issue #371', 
       String(row['boardKey']),
     );
     expect(keys.some((key) => key.includes('rush-prefit'))).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A rush sitting, posted whole — GitHub issue #372
+ * -------------------------------------------------------------------------- */
+
+describe('a rush sitting, posted whole — GitHub issue #372', () => {
+  /*
+   * The owner's ruling of 2026-09-10: a round is a sitting, posted whole; the posted result carries
+   * every round's intervention log; the server replays the chain and derives each round's purse. Each
+   * case below is one clause of that, driven through the route a client posts to.
+   */
+  const PURSE = parseRushPurse(JSON.parse(readFileSync(join(DATA_DIR, 'rush-purse.json'), 'utf8')) as unknown);
+  let gardenHeldS: number | null = null;
+
+  /** A round's held time, measured the way the server measures it: its own configuration, its own replay. */
+  function heldOf(buildingId: string): number | null {
+    const resources = {
+      buildingsById: server.config.buildingsById,
+      dispatcherProfilesById: server.config.dispatcherProfilesById,
+      trafficProfiles: server.config.trafficProfiles,
+      elevatorSpecs: server.config.elevatorSpecs,
+      dispatcherProfiles: server.config.dispatcherProfiles,
+    };
+    const built = rushRoundConfigFor(buildingId, { dispatcherProfileId: 'collective' }, resources);
+    if (typeof built === 'string') throw new Error(`the fixture does not resolve: ${built}`);
+    const { record } = runSimulation(built);
+    const hold = rushHoldAtLegs(record.passengers, record.startedAt, record.endedAt);
+    return hold === undefined ? null : hold - record.startedAt;
+  }
+
+  beforeAll(() => {
+    gardenHeldS = heldOf('garden-apartments');
+  }, 300_000);
+
+  function sitting(rounds: number, extra: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      buildingId: 'garden-apartments',
+      rounds: Array.from({ length: rounds }, () => ({ dispatcherProfileId: 'collective', claimedHeldS: gardenHeldS })),
+      ...extra,
+    };
+  }
+
+  async function rushBoard(key: string): Promise<Record<string, unknown>> {
+    const board = await call('GET', '/api/rush-board', { query: { board: key } });
+    expect(board.status, JSON.stringify(board.body)).toBe(200);
+    return bodyOf(board);
+  }
+
+  /** Every object key anywhere in a body — for asserting a currency figure is absent, not merely unprinted. */
+  function keysIn(value: unknown): readonly string[] {
+    if (Array.isArray(value)) return value.flatMap((entry) => keysIn(entry));
+    if (typeof value !== 'object' || value === null) return [];
+    return Object.entries(value).flatMap(([key, entry]) => [key, ...keysIn(entry)]);
+  }
+
+  it('refuses a sitting from nobody signed in', async () => {
+    const posted = await call('POST', '/api/rush-sittings', { body: sitting(1) });
+    expect(posted.status).toBe(401);
+    expect(bodyOf(posted)['error']).toBe('not-signed-in');
+  });
+
+  it('refuses a purse or an amount the client names, before anything simulates, and posts nothing', async () => {
+    const player = await signIn();
+    const key = `rush:garden-apartments:${dailyDateOf(clock)}`;
+    const before = ((await rushBoard(key))['entries'] as readonly unknown[]).length;
+    for (const [named, body] of [
+      ['purseUnits', sitting(1, { purseUnits: 40 })],
+      ['paidUnits', { buildingId: 'garden-apartments', rounds: [{ dispatcherProfileId: 'collective', claimedHeldS: gardenHeldS, paidUnits: 40 }] }],
+    ] as const) {
+      const posted = await call('POST', '/api/rush-sittings', { token: player.token, body });
+      expect(posted.status, named).toBe(400);
+      expect(bodyOf(posted)['error'], named).toBe('invalid-sitting');
+      expect(JSON.stringify(bodyOf(posted)['issues']), named).toContain(`\\"${named}\\"`);
+    }
+    expect(((await rushBoard(key))['entries'] as readonly unknown[]).length).toBe(before);
+  });
+
+  it('posts an honest sitting onto the building’s rush board for the day, and every figure on it is the server’s', async () => {
+    const player = await signIn();
+    const date = dailyDateOf(clock);
+    const posted = await call('POST', '/api/rush-sittings', { token: player.token, body: sitting(2) });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(201);
+    expect(bodyOf(posted)['boardKey']).toBe(`rush:garden-apartments:${date}`);
+    const entry = bodyOf(posted)['entry'] as Record<string, unknown>;
+    expect(entry['heldS']).toBe(gardenHeldS);
+    // Invariant 5: every persisted run record carries its seed — the rush's one seed, derived, never posted.
+    expect(entry['seed']).toBe('90210');
+    const rounds = entry['rounds'] as readonly Record<string, unknown>[];
+    expect(rounds).toHaveLength(2);
+    expect(rounds[0]?.['purseBeforeUnits']).toBe(0);
+    expect(Number(rounds[0]?.['paidUnits']) % PURSE.unitsPerWaveOutlasted).toBe(0);
+    expect(rounds[1]?.['purseBeforeUnits']).toBe(rounds[0]?.['purseAfterUnits']);
+    const board = await rushBoard(`rush:garden-apartments:${date}`);
+    const row = (board['entries'] as readonly Record<string, unknown>[]).find((candidate) => candidate['id'] === entry['id']);
+    expect(row?.['heldS']).toBe(gardenHeldS);
+    expect(row?.['roundCount']).toBe(2);
+  }, 300_000);
+
+  it('refuses a top-up the account never bought, and once it is bought posts on that set’s board carrying the modifier and never the spend', async () => {
+    const player = await signIn();
+    const withTopUp = sitting(1, { modifiers: [{ sinkId: 'rush-purse-top-up', steps: 1 }] });
+    const refused = await call('POST', '/api/rush-sittings', { token: player.token, body: withTopUp });
+    expect(refused.status).toBe(422);
+    expect(bodyOf(refused)['error']).toBe('modifier-not-bought');
+    for (let i = 0; i < 2; i += 1) {
+      await call('POST', '/api/chimes/earn', { token: player.token, body: { completion: 'scenario-cleared', scenarioId: SCENARIO_IDS[i] } });
+    }
+    const spent = await call('POST', '/api/chimes/spend', { token: player.token, body: { modifier: 'rush-purse-top-up', steps: 1 } });
+    expect(spent.status, JSON.stringify(spent.body)).toBe(200);
+    const date = dailyDateOf(clock);
+    const posted = await call('POST', '/api/rush-sittings', { token: player.token, body: withTopUp });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(201);
+    expect(bodyOf(posted)['boardKey']).toBe(`rush:garden-apartments:${date}/rush-purse-top-up=1`);
+    const sink = chimeSinkById(LEDGER, 'rush-purse-top-up');
+    if (sink === undefined) throw new Error('the shipped ledger sells no rush-purse-top-up');
+    const entry = bodyOf(posted)['entry'] as Record<string, unknown>;
+    expect((entry['rounds'] as readonly Record<string, unknown>[])[0]?.['purseBeforeUnits']).toBe(chimeGrantUnits(sink, 1));
+    expect(entry['modifiers']).toEqual([{ sinkId: 'rush-purse-top-up', steps: 1, name: sink.name }]);
+    const board = await rushBoard(String(bodyOf(posted)['boardKey']));
+    expect(keysIn(board).filter((key) => /chime/iu.test(key))).toEqual([]);
+    expect(keysIn(bodyOf(posted)).filter((key) => /chime/iu.test(key))).toEqual([]);
+  }, 300_000);
+
+  it('refuses a sitting whose last round never breaks — a tower that held the whole stream has nothing to post', async () => {
+    const player = await signIn();
+    const posted = await call('POST', '/api/rush-sittings', {
+      token: player.token,
+      body: { buildingId: 'vertical-city', rounds: [{ dispatcherProfileId: 'collective', claimedHeldS: null }] },
+    });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(422);
+    expect(bodyOf(posted)['error']).toBe('no-breaking-point');
+    expect(bodyOf(posted)['round']).toBe(1);
+  }, 300_000);
+
+  it('refuses a round that does not replay, and names it', async () => {
+    const player = await signIn();
+    const posted = await call('POST', '/api/rush-sittings', {
+      token: player.token,
+      body: { buildingId: 'garden-apartments', rounds: [{ dispatcherProfileId: 'collective', claimedHeldS: (gardenHeldS ?? 0) + 2 }] },
+    });
+    expect(posted.status).toBe(422);
+    expect(bodyOf(posted)['error']).toBe('held-does-not-reproduce');
+    expect(bodyOf(posted)['round']).toBe(1);
+  }, 300_000);
+
+  it('withholds the ladder below twenty players, and publishes how many posted', async () => {
+    const player = await signIn();
+    const key = `rush:garden-apartments:${dailyDateOf(clock)}`;
+    expect((await call('POST', '/api/rush-sittings', { token: player.token, body: sitting(1) })).status).toBe(201);
+    const board = await rushBoard(key);
+    const ladder = board['ladder'] as Record<string, unknown>;
+    expect(Number(ladder['n'])).toBeGreaterThan(0);
+    expect(Number(ladder['n'])).toBeLessThan(20);
+    expect(ladder['rungs']).toBeUndefined();
+    expect(String(ladder['withheld'])).toContain('20');
+  }, 300_000);
+
+  it('charges the cooldown per round, so a long sitting cannot be followed straight away', async () => {
+    const player = await signIn();
+    const first = await call('POST', '/api/rush-sittings', { token: player.token, body: sitting(4) });
+    expect(first.status, JSON.stringify(first.body)).toBe(201);
+    const second = await call('POST', '/api/rush-sittings', { token: player.token, body: sitting(1) });
+    expect(second.status).toBe(429);
+  }, 300_000);
+
+  it('refuses a single run under the rush stream on the score route, and names the sitting a rush posts as', async () => {
+    const player = await signIn();
+    const truth = honest();
+    const posted = await call('POST', '/api/scores', {
+      token: player.token,
+      body: { ...truth, run: { ...truth.run, demandTemplateId: 'endless-rush' } },
+    });
+    expect(posted.status).toBe(422);
+    expect(bodyOf(posted)['error']).toBe('rush-posts-as-a-sitting');
+    expect(String(bodyOf(posted)['detail'])).toContain('/api/rush-sittings');
   });
 });

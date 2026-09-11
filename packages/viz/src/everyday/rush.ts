@@ -50,7 +50,13 @@
  * shipped for the fixit cases, drawn on the setup screen and on the result.
  */
 
-import type { ResolvedBuilding } from '@elevator-sim/core/browser';
+import {
+  RUSH_TEMPLATE_ID,
+  rushHoldAtLegs,
+  rushTopArrivalsPerMinute,
+  rushTopRatePctPop5min,
+  type ResolvedBuilding,
+} from '@elevator-sim/core/browser';
 
 import type { VizRecording, VizSaturation } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -73,25 +79,24 @@ import {
 /** The bar's refusal between the press and the landing — a run on a worker arrives as a notification. */
 export const RUSH_NOT_LANDED = 'the stream has not landed yet — the waves are being generated';
 
-/** The template `data/traffic-profiles.json` authors for the stream. */
-export const RUSH_TEMPLATE_ID = 'endless-rush';
+/*
+ * The template id, wave 30's rate and the rate converted to a building's own population are
+ * `@elevator-sim/core`'s now (`sim/rush.ts`, GitHub issue #372), because the server rebuilds a posted
+ * round's run from a building id and may not import this package. Re-exported under the same names,
+ * so nothing that read them here moved.
+ *
+ * **They are the same three answers only if the population is the same one, and for a while it was
+ * not.** The host converted the rate with the population of the week the player was *standing in* —
+ * grown to its day and handed over by its contract — while the run it started was the rush's own week
+ * on the building as authored. PR #513's review measured Midtown Office holding 664 s on a day-1 `c2`
+ * week where the server replays 1 640 s, and every tower moved once a week was past its first day.
+ * {@link rushPatchOf} now reads the population itself, from {@link rushBuildingOf}, and
+ * `rushHoldAgreement.test.ts` pins the press against the server's replay on every shipped building.
+ */
+export { RUSH_TEMPLATE_ID, rushTopArrivalsPerMinute, rushTopRatePctPop5min };
 
 /** § 3.2's one seed, as the run carries it. */
 export const RUSH_SEED = BigInt(RUSH_STREAM.seed);
-
-/** Wave 30's arrivals a minute — the top of the ramp, and the template's intensity 1. */
-export function rushTopArrivalsPerMinute(): number {
-  return arrivalsPerMinute(LAST_GENERATED_WAVE - 1);
-}
-
-/**
- * Wave 30's rate as `arrivalRatePctPop5min` for a building of `population` — the override the run
- * carries, so the stream is the same number of **people** on every tower.
- */
-export function rushTopRatePctPop5min(population: number): number {
-  if (!(population > 0)) throw new Error('a rush needs a building with people in it');
-  return (rushTopArrivalsPerMinute() * 5 * 100) / population;
-}
 
 /** What one `ViewerState` field is to a rush — see {@link RUSH_FIELD_ROLES}. */
 type RushFieldRole = 'building' | 'dispatcher' | 'rush' | 'fresh' | 'surface';
@@ -228,9 +233,11 @@ export type RushPatch = Pick<ViewerState, RushFieldWithRole<'rush'> | RushFieldW
  * to its week's day and hands a contract's own week its rung's occupancy, and a rush runs in neither:
  * its week is the rush week, opened on day 1, and its play mode is `endless`, which no rung reaches.
  * So the building read here is the one the run is built on, and on a shipped tower it is the building
- * as `data/buildings/` authors it. That is what makes a rush's crowd a function of the building
- * alone, which standings keyed on the building need (§ D547, § D548). It is read under every field
- * {@link RUSH_FIELD_ROLES} runs fresh as well, so nothing a day or a session wrote reaches it either.
+ * as `data/buildings/` authors it — the one `packages/server`'s `verify.ts#rushRoundConfigFor`
+ * converts from. That is what makes a rush's crowd a function of the building alone, which a board
+ * keyed on the building and the date needs (§ D543) and standings keyed on the building need
+ * (§ D547, § D548). It is read under every field {@link RUSH_FIELD_ROLES} runs fresh as well, so
+ * nothing a day or a session wrote reaches it either.
  *
  * `undefined` when no building is standing, `resolvedBuildingOf`'s own answer.
  */
@@ -244,8 +251,8 @@ export function rushBuildingOf(resources: BrowserResources, state: ViewerState):
  * standing.
  *
  * **It takes the resources rather than a population**, and that is deliberate: it took a population,
- * and its one shipped caller passed the wrong one (see {@link rushBuildingOf}). A caller cannot
- * now choose whose people the stream is sized for.
+ * and its one shipped caller passed the wrong one (see the note above the re-exports, and
+ * {@link rushBuildingOf}). A caller cannot now choose whose people the stream is sized for.
  */
 export function rushPatchOf(resources: BrowserResources, state: ViewerState): RushPatch | undefined {
   const building = rushBuildingOf(resources, state);
@@ -307,12 +314,14 @@ export function rushDisclosureOf(building: ResolvedBuilding, band: DemandBand | 
  * two-second buckets from the run's start.
  */
 export function rushHoldAt(recording: Pick<VizRecording, 'legs' | 'startedAt' | 'endedAt'>): number | undefined {
-  const bandIndex = 3;
-  for (let t = recording.startedAt; t <= recording.endedAt; t += RUSH_STREAM.bucketS) {
-    const count = waitBandsAt(recording as VizRecording, t).counts[bandIndex]?.count ?? 0;
-    if (count >= RUSH_HOLD_LINE.people) return t;
-  }
-  return undefined;
+  /*
+   * `core`'s reader over the recording's legs — GitHub issue #372. This was a loop over
+   * `live/bands.ts#waitBandsAt`'s fourth count, and it moved so the server's replay of a posted
+   * sitting reads the hold moment the stage stops on rather than a second reading of it.
+   * `rush.test.ts` still checks the answer against `waitBandsAt` at the bucket named and the one
+   * before, which is the agreement that makes the move safe.
+   */
+  return rushHoldAtLegs(recording.legs, recording.startedAt, recording.endedAt);
 }
 
 /** How many people are past the hold line's two minutes at `t`. */

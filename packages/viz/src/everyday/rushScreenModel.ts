@@ -46,6 +46,16 @@
  * is real, so the refusal is on the control that cannot act, not on the screen.
  */
 
+import {
+  LAST_GENERATED_WAVE,
+  RUSH_HOLD_LINE,
+  RUSH_STREAM,
+  arrivalsPerMinute,
+  expectedPerBucket,
+  playerWaveAt,
+  waveIndexAt,
+} from '@elevator-sim/core/browser';
+
 import type { ActionBarModel } from './actionBar.js';
 import {
   workedAnswerViewOf,
@@ -57,59 +67,15 @@ import {
  * ENGINE_CONTRACT § 3.2 — the stream, as arithmetic
  * -------------------------------------------------------------------------- */
 
-/**
- * § 3.2's constants, in one frozen record so every figure on the screen is a function of them.
- *
- * `bucketS` is the contract's *two-second buckets*: {@link expectedPerBucket} is people per bucket,
- * and any per-minute figure divides by it. `waveS` is *three minutes*, which is what makes the
- * ramp *+11 % of a normal morning's rate every three minutes*.
- *
- * Read by `everyday/rush.ts`, which turns the stream into a run (GitHub issue #220, § D515).
+/*
+ * § 3.2's constants and both wave numberings are `@elevator-sim/core`'s now — `sim/rush.ts`, GitHub
+ * issue #372 — because a posted rush sitting is replayed by the server, which may not import this
+ * package and has to read the same stream. They are re-exported here under the same names, so every
+ * figure on this screen is still a function of them and nothing that read them from this module
+ * moved. Their docstrings went with them: `RUSH_STREAM`'s two-second buckets and three-minute wave,
+ * and the rule that `waveIndexAt` is the expression's numbering and `playerWaveAt` the screen's.
  */
-export const RUSH_STREAM = Object.freeze({
-  /** Ninety minutes. The contract's own length for the generated climb. */
-  lengthS: 90 * 60,
-  /** Two-second buckets. */
-  bucketS: 2,
-  /** `wave = floor(t / 180)`. */
-  waveS: 180,
-  /** The `0.34` of `(0.34 + wave × 0.11) × 2 / 3`. */
-  baseRate: 0.34,
-  /** The `0.11` — the per-wave climb, which is the *+11 %* the screen quotes. */
-  waveStep: 0.11,
-  /** The `× 2 / 3`. */
-  scale: 2 / 3,
-  /** Constant across the whole climb — § 3.2 says so in one word. */
-  upShare: 0.62,
-  /** The one seed every player's waves are generated from. */
-  seed: 90_210,
-} as const);
-
-/** § 3.2's zero-based `wave = floor(t / 180)` — the arrival expression's own index. */
-export function waveIndexAt(t: number): number {
-  return Math.floor(Math.max(0, t) / RUSH_STREAM.waveS);
-}
-
-/**
- * § 3.2's `floor((t − OPEN) / 180) + 1` — the wave a player is told they are on.
- *
- * `t` is seconds since the rush opened, so `OPEN` has already been subtracted; the `+ 1` is what
- * makes the first three minutes *wave 1*. Kept separate from {@link waveIndexAt} on purpose — see
- * the module docstring.
- */
-export function playerWaveAt(t: number): number {
-  return waveIndexAt(t) + 1;
-}
-
-/** `expected = (0.34 + wave × 0.11) × 2 / 3`, people per two-second bucket, for a zero-based wave. */
-export function expectedPerBucket(waveIndex: number): number {
-  return (RUSH_STREAM.baseRate + waveIndex * RUSH_STREAM.waveStep) * RUSH_STREAM.scale;
-}
-
-/** The same expression read as arrivals a minute, which is the unit a player can picture. */
-export function arrivalsPerMinute(waveIndex: number): number {
-  return (expectedPerBucket(waveIndex) * 60) / RUSH_STREAM.bucketS;
-}
+export { RUSH_STREAM, arrivalsPerMinute, expectedPerBucket, playerWaveAt, waveIndexAt };
 
 /**
  * § 3.1's morning-rush phase rate — the *normal morning* § 3.2's headline is measured against.
@@ -164,26 +130,14 @@ export function rushOpeningLine(): string {
  * § 20.5 — the hold line
  * -------------------------------------------------------------------------- */
 
-/**
- * The line the run ends on: **forty people who have each been standing over two minutes, at once**.
- *
- * Both halves matter and § 20.5 exists because the prototype dropped the second. `overS` is
- * deliberately `live/bands.ts`'s own fourth band boundary (`fromS: 120`, *past two minutes*), which
- * is the derivation a measured run would go through — `waitBandsAt(recording, t)`'s fourth count
- * against {@link people}. Naming it here rather than importing that module keeps this half pure and
- * free of a recording; the test asserts the two numbers agree.
- *
- * `live/honesty.ts` refuses an invented `40` for its *falling behind* chip, on the ground that forty
- * is a crowd in one building and a quiet second in another. The rush is the stated exception and the
- * reason is in § 9.2: *the same line for everybody*. A rush whose ending moved with the tower would
- * not be a leaderboard.
- *
- * Read by `everyday/rush.ts`, which turns the stream into a run (GitHub issue #220, § D515).
+/*
+ * The hold line — forty people each standing over two minutes, at once (§ 20.5) — is `core`'s
+ * `RUSH_HOLD_LINE` now (GitHub issue #372), read by the server's replay of a posted sitting as well
+ * as by the stage. Its reasoning moved with it: `overS` is `live/bands.ts`'s own fourth band boundary,
+ * which `rushScreenModel.test.ts` still asserts, and the rush is `live/honesty.ts`'s stated exception
+ * to refusing an invented forty because § 9.2 wants *the same line for everybody*.
  */
-export const RUSH_HOLD_LINE = Object.freeze({
-  people: 40,
-  overS: 120,
-} as const);
+export { RUSH_HOLD_LINE };
 
 /* -------------------------------------------------------------------------- *
  * The copy — the prototype's, transcribed
@@ -407,17 +361,12 @@ export interface RushBandView extends RushBandSpec {
   readonly barPct: number;
 }
 
-/**
- * The last wave a player is shown in the generated stream — {@link playerWaveAt} at its final
- * second, so the two numberings meet in exactly one place.
- *
- * The open-ended band needs a last wave to average over, and this is it. So *absurd* is priced at
- * what the generated climb actually reaches rather than at an arbitrary distance up an infinite
- * ramp — the bar is a fact about the run, not about the idea.
- *
- * Read by `everyday/rush.ts`, which turns the stream into a run (GitHub issue #220, § D515).
+/*
+ * The last wave a player is shown — `core`'s `LAST_GENERATED_WAVE` now (GitHub issue #372), where the
+ * two numberings meet. The open-ended *absurd* band averages up to it, so that band is priced at what
+ * the generated climb reaches rather than at a distance up an infinite ramp.
  */
-export const LAST_GENERATED_WAVE = playerWaveAt(RUSH_STREAM.lengthS - 1);
+export { LAST_GENERATED_WAVE };
 
 /** Mean arrivals a minute over a one-based, inclusive wave span. */
 function meanPerMinute(fromWave: number, toWave: number): number {

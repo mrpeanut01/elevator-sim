@@ -15,7 +15,7 @@ import { applyPlainLever, plainLeverEchoOf, plainLeversOf, type PlainLeverId } f
  *
  * The property under test is the slice's whole point: **there is no lever state.** A lever is a
  * view onto the spec and group levers the run is built from, so the tinker drawer and the
- * thirteen-term drawer agree by identity, and moving a lever changes the printed cost line for
+ * fourteen-term drawer agree by identity, and moving a lever changes the printed cost line for
  * the same reason moving the term slider does.
  */
 
@@ -91,7 +91,7 @@ describe('slice 1’s acceptance check, in unit form', () => {
     expect(after).toContain('0.85');
   });
 
-  it('opening the thirteen shows the number the lever wrote — one expression, two drawers', () => {
+  it('opening the fourteen shows the number the lever wrote — one expression, two drawers', () => {
     const applied = applyPlainLever(SPEC, LEVERS, 'room', 55);
     // The term drawer reads spec.weights directly; the lever reads the same field. Identity,
     // not synchronisation.

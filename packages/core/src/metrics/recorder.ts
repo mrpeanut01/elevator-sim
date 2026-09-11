@@ -38,6 +38,7 @@
  * - **No RNG** (invariant 2). Nothing here is stochastic.
  */
 
+import type { Duty } from '../config/types.js';
 import type { SimTime } from '../kernel/types.js';
 import type { PassengerModel } from './comparability.js';
 import type { CredentialGroup, Direction } from '../model/types.js';
@@ -87,6 +88,8 @@ export interface RecordablePassenger {
   readonly arrivedAt: SimTime;
   readonly journeyStartedAt: SimTime;
   readonly credentialGroup?: CredentialGroup | undefined;
+  /** GitHub issue #481. Absent where no car of the building declares a duty. */
+  readonly duty?: Duty | undefined;
   /**
    * Seconds of declared non-lift travel owed after this leg alights. Optional so that a test
    * literal and every pre-transport-mode caller satisfy the shape unchanged; `0` when absent,
@@ -203,6 +206,7 @@ interface LegState {
     readonly direction: Direction;
     readonly massKg: number;
     readonly credentialGroup: CredentialGroup | undefined;
+    readonly duty: Duty | undefined;
     readonly arrivedAt: SimTime;
     readonly journeyStartedAt: SimTime;
     readonly egressTransitSeconds: number;
@@ -406,6 +410,7 @@ export class MetricsRecorder {
         direction: passenger.direction,
         massKg: passenger.massKg,
         credentialGroup: passenger.credentialGroup,
+        duty: passenger.duty,
         arrivedAt: passenger.arrivedAt,
         journeyStartedAt: passenger.journeyStartedAt,
         egressTransitSeconds: passenger.egressTransitS ?? 0,
@@ -982,6 +987,8 @@ function freezeLeg(leg: LegState): PassengerRecord {
     direction: source.direction,
     massKg: source.massKg,
     ...(source.credentialGroup === undefined ? {} : { credentialGroup: source.credentialGroup }),
+    // Spread-or-omit, so a leg from a building that declares no duty is the record it was (#481).
+    ...(source.duty === undefined ? {} : { duty: source.duty }),
     arrivedAt: source.arrivedAt,
     journeyStartedAt: source.journeyStartedAt,
     // Omitted at zero so a record from a building with no transport mode is byte-identical to

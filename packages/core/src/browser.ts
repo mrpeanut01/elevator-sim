@@ -218,6 +218,12 @@ export {
   violationsInChimeLedger,
   REFUSED_MODIFIER_KINDS,
   CHIME_SCHEMA_UNITS,
+  // The rush purse — GitHub issue #372; `config/rushPurse.ts`.
+  RushPurseError,
+  parseRushPurse,
+  rushPurseOpeningUnits,
+  rushPurseRounds,
+  violationsInRushPurse,
 } from './config/index.js';
 
 export type {
@@ -317,6 +323,9 @@ export type {
   ChimeSpendTable,
   ChimeSource,
   ChimeTurn,
+  RushPurseRound,
+  RushPurseSchema,
+  RushPurseTable,
 } from './config/index.js';
 
 /* -------------------------------------------------------------------------- *
@@ -541,6 +550,7 @@ export {
   TRAFFIC_PARAMETERS,
   TrafficError,
   batchesPerSecond,
+  buildingDeclaresDuty,
   constantDemandTemplate,
   drawBatchSize,
   drawExplicitBatchSize,
@@ -579,6 +589,7 @@ export type {
   ConstantDemandOptions,
   CredentialAssignment,
   CredentialGapOverride,
+  DutyDemandOverride,
   DayVariationConfig,
   DemandConfig,
   DemandLevel,
@@ -1154,6 +1165,19 @@ export {
   runSimulation,
   serviceChangeEvent,
   transferArrivalEvent,
+  // Endless rush's arithmetic — GitHub issue #372; `sim/rush.ts` says why it is in `core`.
+  LAST_GENERATED_WAVE,
+  RUSH_HOLD_LINE,
+  RUSH_STREAM,
+  RUSH_TEMPLATE_ID,
+  arrivalsPerMinute,
+  expectedPerBucket,
+  playerWaveAt,
+  rushHoldAtLegs,
+  rushTopArrivalsPerMinute,
+  rushTopRatePctPop5min,
+  rushWavesOutlasted,
+  waveIndexAt,
 } from './sim/index.js';
 
 export type {
@@ -1192,4 +1216,5 @@ export type {
   TransferArrivalPayload,
   UndeliveredJourney,
   UndeliveredReason,
+  RushHoldLeg,
 } from './sim/index.js';

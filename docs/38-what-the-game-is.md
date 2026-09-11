@@ -259,6 +259,17 @@ state only, because until now nothing else survived the replay; it widens to *be
 recorded interventions*, and S5's rule that the predicate has one derivation and two consumers is
 unchanged. `scope/runIdentity.ts` is where the refusal lives and where it moves. A rush board is
 permitted for the same reason today's board is: it ranks runs on one crowd, never dispatchers.
+
+**What a round is, ruled and built on the server** ([§ D542](../DECISIONS.md), the owner's ruling
+of 2026-09-10 on GitHub issue #372). A round is a **sitting, posted whole**: consecutive runs from an
+as-shipped start, every round's intervention log on the wire, and the server replays each round,
+reads its hold moment with the stage's own reader, and derives each round's purse from the waves it
+outlasted. The seed, the stream and every purse are derived and never posted. The replay was
+measured before `leaderboard/verify.ts`'s refusal of `endless-rush` was lifted — one simulation a
+round — and a sitting lands on a board keyed by the tower, the day and the modifier set
+([§ D543](../DECISIONS.md)). **Two halves are not built**: no between-round rebuild travels, so the
+purse is derived and nothing spends it, and the viewer does not yet post a sitting.
+
 **A run carries its modifiers onto the board.** The standard board is the standard purse and the
 building as shipped, the same for everyone; a run with a bought purse or a pre-fitted building ranks
 among runs with the same modifiers and shows them. What the board never shows is the chimes spent:
@@ -403,7 +414,10 @@ Named so the next lane does not discover it. None of it is built by this page.
 - `docs/16`'s `ranked` row and `scope/runIdentity.ts` widen to carry recorded interventions and the
   run's modifiers, and the server's replay consumes them; boards are keyed by modifier set.
 - The rush ships ([§ D515](../DECISIONS.md)); it gains a per-wave purse authored in its own data, recorded
-  interventions on its round, and a postable result.
+  interventions on its round, and a postable result. **Built on the server** ([§ D542](../DECISIONS.md),
+  [§ D543](../DECISIONS.md)): the purse in `data/rush-purse.json`, a sitting replayed round by round,
+  every purse derived, and a board. **Not built:** a between-round rebuild the server can price and
+  apply, and the viewer posting a sitting (GitHub issue #372).
 - The design handoff's § 5 session-shapes table names four modes and § 10 authors repair lists, and
   [`CLAUDE.md`](../CLAUDE.md) makes the handoff canonical for the interface. Both are deviations,
   recorded in [`12-design-handoff.md`](12-design-handoff.md) § 4 like every other one, with this

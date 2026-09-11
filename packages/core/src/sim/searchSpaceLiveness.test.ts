@@ -73,7 +73,9 @@ import type { DispatcherProfile, LoadedConfig, ResolvedBuilding } from '../confi
 import { COST_TERMS } from '../dispatch/index.js';
 import { activeWhenSatisfied, isActiveWhenRange } from '../dispatch/parameters.js';
 import type { ActiveWhenCondition, DispatchParameterSpec } from '../dispatch/types.js';
+import { buildingDeclaresDuty } from '../traffic/generator.js';
 
+import { withDuty } from './duty.test-helper.js';
 import { BUILDING_IDS, load } from './fixtures.test-helper.js';
 import { runSimulation } from './simulation.js';
 import type { SimulationConfig, SimulationResult } from './types.js';
@@ -492,9 +494,28 @@ interface InertReason {
   readonly liveUnder?: Authored | undefined;
   /** Run options that make the dimension live. */
   readonly liveWith?: RunOverrides | undefined;
+  /**
+   * Set when the live condition is a building that declares a duty — GitHub issue #481. No shipped
+   * building does, so the probe derives one: Midtown Office with car A declared goods, under a demand
+   * that gives it goods trips to be right or wrong about.
+   */
+  readonly liveOnDutyBuilding?: boolean | undefined;
 }
 
 const DECLARED_INERT: Readonly<Record<string, InertReason>> = Object.freeze({
+  /*
+   * GitHub issue #481. A duty is priced only on a call that carries one, and a call carries one only
+   * in a building where some car declares a duty — which no shipped building does, by design: the
+   * control that lets a player declare one is the next step of `data/buildings/README.md` § *Duty*.
+   * Not a gate `activeWhen` can express, because the condition is a building rather than any
+   * dispatcher parameter; the proof obligation below derives that building and requires a run to move.
+   */
+  'weights.dutyMismatch': {
+    reason:
+      'a mismatch can be priced only on a call that carries a duty, and only a building in which some car declares a duty generates one; no shipped building declares one',
+    liveOnDutyBuilding: true,
+  },
+
   /*
    * A theorem, not a plateau. With one round there is no round to reallocate a declined contract
    * into, so the sealed-bid winner is the lowest bid — which is what the central scorer picks.
@@ -843,6 +864,37 @@ describe('every searchable dimension can change a run, or declares why it cannot
     for (const [id, entry] of Object.entries(DECLARED_INERT)) {
       const spec = byId.get(id) as DispatchParameterSpec;
       expect(spec, `${id} is no longer a dimension`).toBeDefined();
+
+      if (entry.liveOnDutyBuilding === true) {
+        const building = withDuty(
+          harness.cfg.buildingsById.get('midtown-office') as ResolvedBuilding,
+          { 'main-A': 'goods' },
+        );
+        /*
+         * The register's condition and the product's are one predicate: `viz` refuses this weight and
+         * withholds this dial on exactly the buildings `buildingDeclaresDuty` refuses (§ D549). So the
+         * building this obligation derives must be one it accepts, and the shipped tower it is derived
+         * from one it refuses — otherwise the probe would prove liveness somewhere the product does not
+         * look.
+         */
+        expect(
+          buildingDeclaresDuty(harness.cfg.buildingsById.get('midtown-office') as ResolvedBuilding),
+        ).toBe(false);
+        expect(buildingDeclaresDuty(building)).toBe(true);
+        const verdict = sweepDimension(
+          harness,
+          spec,
+          byId,
+          { demand: { duty: { shares: { goods: 0.2, bed: 0, service: 0 } } } },
+          [building.id],
+          building,
+        );
+        expect(
+          verdict.live,
+          `${id} is allowlisted as "live only on a building that declares a duty" and did not move a run there either`,
+        ).toBe(true);
+        continue;
+      }
 
       const enriched: Harness = {
         ...harness,

@@ -16,6 +16,7 @@ import { demandPhaseIssues } from './demandPhases.js';
 import {
   AGGREGATIONS,
   ASSIGNMENT_MODES,
+  DUTIES,
   PASSENGER_ASSIGNMENT_MODES,
   ASSIGNMENT_TIMINGS,
   BUILDING_TYPES,
@@ -625,6 +626,12 @@ export const trafficProfileSchema = z.strictObject({
   directionalSplit: directionalSplitSchema,
 });
 
+/** One `duty.shares` entry: a share of journeys, GitHub issue #481. */
+const dutyShare = z
+  .number()
+  .min(0, 'a duty share is a share of journeys and cannot be negative')
+  .max(1, 'a duty share is a share of journeys and cannot exceed 1');
+
 export const trafficProfilesSchema = z
   .strictObject({
     $comment: comment,
@@ -706,6 +713,18 @@ export const trafficProfilesSchema = z
         .number()
         .min(0, 'wrongZoneShare is a share of journeys and cannot be negative')
         .max(1, 'wrongZoneShare is a share of journeys and cannot exceed 1'),
+    }),
+    // Required for credentialGap's reason (DECISIONS.md § D549): an absent block would read as
+    // "nobody ever makes a goods or a bed trip", which leaves a car's declared duty able only to
+    // turn passengers away — somebody not having decided, reading exactly like a decision.
+    duty: z.strictObject({
+      $comment: comment,
+      shares: z
+        .strictObject({ goods: dutyShare, bed: dutyShare, service: dutyShare })
+        // The tolerance is float arithmetic's: 0.4 + 0.3 + 0.3 must be allowed to mean one.
+        .refine((shares) => shares.goods + shares.bed + shares.service <= 1 + 1e-9, {
+          message: 'duty shares divide one set of journeys and cannot sum to more than 1',
+        }),
     }),
   })
   .superRefine((profiles, ctx) => {
@@ -1197,6 +1216,11 @@ export const carConfigSchema = z.strictObject({
   // hold a `car.*` id, which is the same mechanical rule that excludes `car.passengerTransferS`
   // (see `experiments/src/tuning/space/collect.ts`).
   mode: z.enum(SERVICE_MODES).optional(),
+  // What the car is for, GitHub issue #481: a closed vocabulary declared per car (DECISIONS.md
+  // § D549). Its schema is this `z.enum`, exactly as `mode`'s is, and for `mode`'s reason it is not a
+  // `CAR_PARAMETERS` row: re-purposing a building's own fleet is not a dimension a dispatcher search
+  // may hold.
+  duty: z.enum(DUTIES).optional(),
   ratedSpeedMps: positive.optional(),
   // Two speeds, GitHub issue #444. Omitted is symmetric; the air-pressure cap is applied by
   // `resolveBuilding`, which knows the shaft's travel, and is not authorable here.

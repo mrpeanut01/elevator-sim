@@ -56,6 +56,7 @@ import type {
   BatchSizeCurve,
   CredentialAssignment,
   CredentialGapOverride,
+  DutyDemandOverride,
   DayVariationConfig,
   DemandLevel,
   DemandTemplateId,
@@ -309,6 +310,13 @@ export interface SimulationDemandOptions {
    * figure this repository published before it was measured under.
    */
   readonly credentialGap?: CredentialGapOverride | undefined;
+  /**
+   * Override `data/traffic-profiles.json`'s `duty` block — GitHub issue #481, `DECISIONS.md` § D549.
+   *
+   * Unset means the reference data decides. Read only where some car of the building declares a
+   * duty; a building in which none does runs byte-identically at every value.
+   */
+  readonly duty?: DutyDemandOverride | undefined;
   readonly maxLegs?: number | undefined;
   /** How long demand holds at peak, which is also the reported window. `rise-and-fall` only. */
   readonly peakWindowS?: number | undefined;

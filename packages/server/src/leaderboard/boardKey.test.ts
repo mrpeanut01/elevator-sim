@@ -21,6 +21,7 @@ import {
   modifierSetKeyOf,
   placeSubmission,
   runDataHashOf,
+  rushPlacementOf,
 } from './boardKey.js';
 import { ACCEPTED_DURATIONS_S, type SubmittedRun } from './submission.js';
 
@@ -178,6 +179,8 @@ describe('the contract’s three keys, and which of them this build reaches', ()
       'date × modifier set',
       'dispatcher id',
       'anything else',
+      // Not § 12.1's: the rush board GitHub issue #372 built, § D543. Its own describe block below.
+      'building × date × modifier set',
     ]);
   });
 
@@ -192,7 +195,9 @@ describe('the contract’s three keys, and which of them this build reaches', ()
     expect(BOARD_KEYS.filter((row) => row.route !== null).map((row) => row.key)).toEqual([
       'date × modifier set',
       'anything else',
+      'building × date × modifier set',
     ]);
+    expect(rushPlacementOf('garden-apartments', NOW_MS, undefined).kind).toBe('rush');
   });
 
   it('reaches none of the keys that claim no route, and says which those are', () => {
@@ -457,5 +462,39 @@ describe('the modifier set is the daily key’s fourth axis — issue #371', () 
       module,
       `boardKey.ts’s docstring no longer quotes the ${String(boardsPerDay)} the shipped ledger produces`,
     ).toContain(`${String(boardsPerDay)} keys a day`);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The rush board — GitHub issue #372, § D543
+ * -------------------------------------------------------------------------- */
+
+describe('the rush board — building × date × modifier set', () => {
+  it('keys a posted sitting by its building, the day and the set, and appends nothing for the standard set', () => {
+    expect(rushPlacementOf('garden-apartments', NOW_MS, undefined)).toEqual({
+      kind: 'rush',
+      key: 'rush:garden-apartments:2026-09-01',
+      date: '2026-09-01',
+      buildingId: 'garden-apartments',
+      modifiers: [],
+    });
+    const set = [{ sinkId: 'rush-purse-top-up', steps: 2 }];
+    expect(rushPlacementOf('garden-apartments', NOW_MS, set).key).toBe(`rush:garden-apartments:2026-09-01/${modifierSetKeyOf(set)}`);
+  });
+
+  it('puts another tower on another board, because rows on one board must have met the identical crowd', () => {
+    // § 12.1's last sentence. The rush is the same number of people on every tower, not the same
+    // people: they arrive at a different building's floors, so a sort across towers ranks buildings.
+    expect(rushPlacementOf('midtown-office', NOW_MS, undefined).key).not.toBe(rushPlacementOf('garden-apartments', NOW_MS, undefined).key);
+  });
+
+  it('resets by construction, as every board does under § D509: tomorrow is another key and nothing is deleted', () => {
+    const tomorrow = NOW_MS + 24 * 60 * 60 * 1000;
+    expect(rushPlacementOf('garden-apartments', tomorrow, undefined).key).toBe('rush:garden-apartments:2026-09-02');
+  });
+
+  it('is the row BOARD_KEYS names, with this function as its route', () => {
+    const row = BOARD_KEYS.find((candidate) => candidate.key === 'building × date × modifier set');
+    expect(row?.route).toContain('rushPlacementOf');
   });
 });

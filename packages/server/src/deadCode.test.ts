@@ -120,6 +120,22 @@ const WIRING: readonly (readonly [string, string, 'import' | 'same file'])[] = O
   ['awardSignInGift', 'server/src/http/api.ts', 'import'],
   ['claimedModifierIssues', 'server/src/http/api.ts', 'import'],
   ['unbackedModifiers', 'server/src/http/api.ts', 'import'],
+  // GitHub issue #372: a rush sitting, posted whole. The purse is read at boot; the gate, the replay, the
+  // placement and the ladder are the two rush routes'; a round's configuration and the two shared gates
+  // are the replay's.
+  ['loadRushPurse', 'server/src/bootstrap.ts', 'import'],
+  ['rushSittingIssues', 'server/src/http/api.ts', 'import'],
+  // PR #513's review, finding 2: the replay moved off the request thread. `api.ts` leases a slot from
+  // the pool `bootstrap.ts` builds; the pool starts `rushReplayWorker.ts` by URL — the one link no import
+  // can name, so it is stated here instead — and that entry loads the thread module, which is what
+  // imports the replay.
+  ['createRushReplays', 'server/src/bootstrap.ts', 'import'],
+  ['replayRushSitting', 'server/src/leaderboard/rushReplayThread.ts', 'import'],
+  ['rushPlacementOf', 'server/src/http/api.ts', 'import'],
+  ['heldLadderOf', 'server/src/http/api.ts', 'import'],
+  ['rushRoundConfigFor', 'server/src/leaderboard/rushSitting.ts', 'import'],
+  ['ruleRowIssues', 'server/src/leaderboard/rushSitting.ts', 'import'],
+  ['interventionIssues', 'server/src/leaderboard/rushSitting.ts', 'import'],
   ['newSessionToken', 'server/src/http/api.ts', 'import'],
   ['signInMessage', 'server/src/http/api.ts', 'import'],
   ['normaliseEmail', 'server/src/http/api.ts', 'import'],

@@ -31,6 +31,7 @@
  * what goes on disk. `DECISIONS.md` § D395.
  */
 
+import { DUTIES } from '../config/types.js';
 import { z } from 'zod';
 
 import { DIRECTIONS } from '../model/types.js';
@@ -79,6 +80,8 @@ export const passengerRecordSchema = z.strictObject({
   direction: z.enum(DIRECTIONS),
   massKg: z.number().gt(0),
   credentialGroup: z.string().min(1).optional(),
+  // GitHub issue #481: absent on every leg of a building that declares no duty.
+  duty: z.enum(DUTIES).optional(),
   arrivedAt: simTime,
   journeyStartedAt: simTime,
   // Absent on every run of every building that declares no transport mode, so a stored record

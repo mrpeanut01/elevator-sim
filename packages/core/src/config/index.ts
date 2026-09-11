@@ -92,6 +92,16 @@ export {
   REFUSED_MODIFIER_KINDS,
   CHIME_SCHEMA_UNITS,
 } from './chimeLedger.js';
+
+/** The rush purse — `data/rush-purse.json`'s reader and the balance across a sitting (GitHub issue #372). */
+export {
+  RushPurseError,
+  parseRushPurse,
+  rushPurseOpeningUnits,
+  rushPurseRounds,
+  violationsInRushPurse,
+} from './rushPurse.js';
+export type { RushPurseRound, RushPurseSchema, RushPurseTable } from './rushPurse.js';
 export type {
   ChimeCompletion,
   ChimeCurrency,

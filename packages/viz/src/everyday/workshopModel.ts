@@ -78,6 +78,7 @@ import {
   costFunctionLine,
   inertTerms,
   type DispatcherSpec,
+  type DutyDeclarations,
   type GroupLevers,
 } from '../authoring/dispatcherSpec.js';
 import {
@@ -383,12 +384,17 @@ export interface TermDisclosure {
  * The rows are `termRowsOf` in its `basic` register, which is where §16 rule 11 is met: each row's
  * sub-line is `core`'s `PlayerTermWords` — the plain serves clause and both slider ends — and the
  * inert-term refusal is `inertTerms`', drawn beside the control rather than dropped (§D112).
+ *
+ * `building` is the standing selection — `EverydayHost.resolvedBuilding`, the building the next run
+ * is built from — because the duty refusal is a fact about that building (§ D549), and it is the same
+ * decision the Engineer editor draws: one function, two renderings.
  */
 export function termDisclosureOf(
   terms: readonly CostTerm[],
   spec: DispatcherSpec,
+  building: DutyDeclarations | undefined,
 ): TermDisclosure {
-  const rows = termRowsOf(terms, spec, inertTerms(spec), 'basic');
+  const rows = termRowsOf(terms, spec, inertTerms(spec, building), 'basic');
   const weighted = rows.filter((row) => row.weighted).length;
   return Object.freeze({
     summary: `the ${String(rows.length)} cost terms — ${String(weighted)} weighted`,
