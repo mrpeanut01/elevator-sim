@@ -1007,6 +1007,16 @@ export interface ExperimentResult {
   readonly execution: ExecutionReport;
 }
 
+/**
+ * What an experiment **measured**: an {@link ExperimentResult} without its {@link ExecutionReport}.
+ *
+ * The type `fingerprintExperiment()` reads, and the type `runner/shard.ts#mergeShards` returns. A
+ * merge of replication blocks that several executors ran has no single executor to report, and
+ * inventing one would put a fact about scheduling inside the object that is compared for identity.
+ * So a merged result is this type, and what the fan-out cost is reported beside it.
+ */
+export type MeasuredExperiment = Omit<ExperimentResult, 'execution'>;
+
 /* -------------------------------------------------------------------------- *
  * Run options — the injected, non-serializable half
  * -------------------------------------------------------------------------- */

@@ -73,11 +73,13 @@ import type {
   ExperimentResult,
   ExperimentRunOptions,
   ExperimentSpec,
+  MeasuredExperiment,
   MetricAggregate,
   RawReplicationOutcome,
   ReplicationFailure,
   ReplicationRecord,
   ReplicationTask,
+  ResolvedReplicationPolicy,
   StoppingEvaluation,
   StoppingReason,
   StoppingSummary,
@@ -140,8 +142,13 @@ export function runReplication(
   return recordOf(outcome);
 }
 
-/** Shape a successful outcome into the reported record, adding the scalar projection. */
-function recordOf(outcome: Extract<RawReplicationOutcome, { ok: true }>): ReplicationRecord {
+/**
+ * Shape a successful outcome into the reported record, adding the scalar projection.
+ *
+ * Exported for `runner/shard.ts#runShard`, which runs a block's outcomes through this same function
+ * so that a record from a block is the record {@link runPlan} makes at that index.
+ */
+export function recordOf(outcome: Extract<RawReplicationOutcome, { ok: true }>): ReplicationRecord {
   const { summary } = outcome;
   return {
     replication: outcome.replication,
@@ -439,14 +446,10 @@ function decide(
   const reachedMin = state.issued >= policy.minReplications;
   const reachedMax = state.issued >= policy.maxReplications;
 
-  if (state.records.length === 0 && reachedMin) {
+  const stoppedByRecords = recordsStopReason(state.records, policy, reachedMin);
+  if (stoppedByRecords !== undefined) {
     state.done = true;
-    state.reason = 'no-samples';
-    return;
-  }
-  if (policy.stopOnSaturation && reachedMin && state.records.some((record) => record.saturated)) {
-    state.done = true;
-    state.reason = 'saturated';
+    state.reason = stoppedByRecords;
     return;
   }
   if (rule === undefined) {
@@ -487,8 +490,30 @@ function decide(
   }
 }
 
-function stoppingSummaryOf(state: CellState, plan: ExperimentPlan): StoppingSummary {
-  const { policy } = plan;
+/**
+ * Steps 1 and 2 of {@link decide}: whether a cell's records alone stop it, before any rule is asked.
+ *
+ * One function rather than two copies, because {@link fixedBudgetStoppingSummary} must reach the
+ * reason this loop reaches.
+ */
+function recordsStopReason(
+  records: readonly ReplicationRecord[],
+  policy: ResolvedReplicationPolicy,
+  reachedMin: boolean,
+): 'no-samples' | 'saturated' | undefined {
+  if (records.length === 0 && reachedMin) return 'no-samples';
+  if (policy.stopOnSaturation && reachedMin && records.some((record) => record.saturated)) {
+    return 'saturated';
+  }
+  return undefined;
+}
+
+function summaryOf(
+  policy: ResolvedReplicationPolicy,
+  replicationsRun: number,
+  reason: StoppingReason,
+  evaluations: readonly StoppingEvaluation[],
+): StoppingSummary {
   return {
     metric: policy.stoppingMetric,
     minReplications: policy.minReplications,
@@ -496,11 +521,33 @@ function stoppingSummaryOf(state: CellState, plan: ExperimentPlan): StoppingSumm
     checkEvery: policy.checkEvery,
     confidence: policy.confidence,
     acceptableRange: policy.acceptableRange,
-    replicationsRun: state.issued,
-    stoppedEarly: state.issued < policy.maxReplications,
-    reason: state.reason,
-    evaluations: Object.freeze([...state.evaluations]),
+    replicationsRun,
+    stoppedEarly: replicationsRun < policy.maxReplications,
+    reason,
+    evaluations: Object.freeze([...evaluations]),
   };
+}
+
+function stoppingSummaryOf(state: CellState, plan: ExperimentPlan): StoppingSummary {
+  return summaryOf(plan.policy, state.issued, state.reason, state.evaluations);
+}
+
+/**
+ * The stopping summary {@link runPlan} gives a cell of a **fixed-budget** plan run with no stopping
+ * rule, once all `maxReplications` have run: `no-samples` or `saturated` when its records say so,
+ * `fixed-budget` otherwise, and no evaluations.
+ *
+ * For `runner/shard.ts#mergeShards`, which assembles such a cell from blocks and must report the
+ * reason the cell run whole reports. It is that reason only where `minReplications` equals
+ * `maxReplications` and no rule was consulted — the one kind of plan `ShardedExperiment.of` accepts
+ * — and `shard.test.ts` compares the two on a plan whose cells stop for both reasons.
+ */
+export function fixedBudgetStoppingSummary(
+  plan: ExperimentPlan,
+  records: readonly ReplicationRecord[],
+): StoppingSummary {
+  const reason = recordsStopReason(records, plan.policy, true) ?? 'fixed-budget';
+  return summaryOf(plan.policy, plan.policy.maxReplications, reason, []);
 }
 
 /**
@@ -542,7 +589,7 @@ export async function runExperiment(
  * Keys are sorted, so an incidental property ordering is not mistaken for a difference; run it on
  * a small experiment, since it serializes every retained record.
  */
-export function fingerprintExperiment(result: ExperimentResult): string {
+export function fingerprintExperiment(result: MeasuredExperiment): string {
   return canonicalJson({
     experimentId: result.experimentId,
     experimentSeed: result.experimentSeed,

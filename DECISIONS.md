@@ -34811,3 +34811,45 @@ reviewed: **it does not compound, it carries no streak, and missing it costs not
 awards it twice in one window, or that makes a missed window reduce anything, fails.
 
 ---
+
+## D532 — Phase B's fan-out is a replication block over the whole plan, on a fixed budget, under a ceiling in replication-runs
+
+**Date: 2026-09-10 · GitHub issue #413 · Implements [`docs/15`](docs/15-compute-offload-contract.md) § 3 against § 4's criteria 1, 2, 5, 6 and 7.**
+
+**Why an entry.** These rulings bind code the module that took them does not own —
+`elevator-sim compare`'s flags and its block file — and move the recorded status of `docs/15`'s
+Phase B from *designed* to *built for one consumer*. The argument is in
+`packages/experiments/src/runner/shard.ts`'s docstring; this entry records what is ruled and what is
+refused.
+
+1. **A shard is a replication block over every cell of the plan.** `runShard` takes a block index and
+   a progress hook; `ShardingRequest` is a count or block sizes plus a ceiling; `ShardedExperiment` is
+   nominal. There is no field on which a subset of arms could be written, which is `batch/types.ts`'s
+   *misaligned batch unexpressible* one level up. A one-arm plan can still be sharded, because it is a
+   whole experiment of its own; its blocks carry its own digest and cells and do not merge into any
+   other plan.
+2. **Sharding refuses any plan whose results could decide which replications run.** A budget with
+   `minReplications < maxReplications` (a saturating cell stops at the minimum), a stopping rule, and
+   `onReplicationError: 'record'` are refused before anything runs. `runner/deadCode.test.ts`'s pin
+   that no study injects a stopping rule is untouched.
+3. **A merge aggregates the differences a block computed, and nothing a block summarised.** A block
+   stores `candidate − baseline` per replication for every pair in a CRN cohort; the merge concatenates
+   those, refuses a row whose stored differences its records do not give, and rebuilds per-arm
+   aggregates from per-replication records at the merged `n`. A block file carries no aggregate.
+4. **The ceiling is declared in replication-runs** — cells × replications — and compared with the
+   plan's own count before a block runs. Not CPU-seconds, which are unknown before the run, and not
+   enforced by aborting, which would let a clock decide which replications exist. Spend is reported per
+   block and in total beside the merged result, whose type has no field for it.
+5. **The resolution limit belongs to the consumer and is recomputed at the merged `n`.** `compare`
+   computes § D151's smallest detectable effect from whatever difference series it is handed: a block
+   prints its own, labelled as its own, and a merge prints the one the whole series gives. No block file
+   stores a limit, so there is nothing to inherit.
+
+**What this does not decide, and does not claim.** Whether two machines derive the same plan digest
+from the same data, or keep their magnitudes inside § D202's tolerance: unchecked, since every run
+behind this entry was taken on one machine. Running blocks from a workflow: not built. Sharding a
+`benchmark/` study: not built. ARM: deferred, as `docs/15` § 0.2 has it. And a merge does not
+authenticate a file — a block assembled by hand from two runs with its differences recomputed is
+indistinguishable from a genuine one.
+
+---

@@ -40,11 +40,12 @@
  * It is not available here, and inverting it would be a lie. This package's centre of gravity —
  * the replication runner's worker pool, NDJSON persistence, and every acceptance gate that reads
  * the real `data/` directory — is environment-bound *by purpose*, not by accident. Measured from
- * `src/index.ts`, three modules reach a Node builtin:
+ * `src/index.ts`, four modules reach a Node builtin:
  *
  * | module | builtins | reached via |
  * |---|---|---|
  * | `runner/parallel.ts` | `node:os`, `node:worker_threads` | `index.ts → runner/index.ts` |
+ * | `runner/shard.ts` | `node:crypto` | `index.ts → runner/index.ts` |
  * | `reports/persistence.ts` | `node:fs/promises`, `node:path` | `index.ts → reports/index.ts` |
  * | `validation/harness.ts` | `node:url` | `index.ts → benchmark/index.ts → benchmark/verdict.ts` |
  *

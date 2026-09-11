@@ -663,6 +663,13 @@ export type { BenchmarkCase } from './arms.js';
 
 export { CELL_VERDICTS, classify, compareCell, replicationsToResolve } from './verdict.js';
 
+/*
+ * The resolution limit § D151 defined and § D156 measured at each cell: the smallest effect a paired
+ * interval at `n` can detect at 80 % power. On the barrel because `cli/src/commands/compare.ts`
+ * re-measures it at a merged budget (docs/15 § 4 criterion 5) and must not transcribe the formula.
+ */
+export { RESOLUTION_POWER, smallestDetectableEffect } from './selectionSweep.js';
+
 export type { CellComparison, CellComparisonInput, CellVerdict } from './verdict.js';
 
 /* -------------------------------------------------------------------------- *

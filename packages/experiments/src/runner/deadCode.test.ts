@@ -39,6 +39,9 @@
  * of all nine dead behaviours.
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { auditModules, corpus, nonTestImportersOf } from '../tuning/callers.test-helper.js';
@@ -186,6 +189,31 @@ describe('every export of runner/ has a caller or a stated reason', () => {
    * *cells*, so a paired comparison's arms would stop at different `n`. That argument must be
    * re-made, not silently outgrown.
    */
+  /*
+   * `docs/15-compute-offload-contract.md` § 4 criterion 6, GitHub issue #413: *the shard runner names
+   * its non-test caller.* The audit above proves each export has **a** caller; this proves the one
+   * the docstring **names** is the one that calls, in both directions — every file the section names
+   * imports a shard entry point, and every non-test file importing one is named. So the sentence
+   * cannot outlive the wiring, and a second caller cannot arrive unnamed.
+   */
+  it('holds runner/shard.ts to the non-test caller its docstring names', () => {
+    const source = readFileSync(fileURLToPath(new URL('./shard.ts', import.meta.url)), 'utf8');
+    const section = /## The non-test caller\n([\s\S]*?)\n \* ## /u.exec(source)?.[1];
+    expect(section, 'shard.ts no longer has a "## The non-test caller" section').toBeDefined();
+    const named = [...(section ?? '').matchAll(/`packages\/([^`]+\.ts)`/gu)].map((match) => match[1]);
+    expect(named.length, 'the section names no file').toBeGreaterThan(0);
+
+    const scope = corpus();
+    const entryPoints = ['ShardedExperiment', 'runShard', 'mergeShards', 'serializeShard', 'deserializeShard'];
+    const importers = new Set(entryPoints.flatMap((name) => nonTestImportersOf(scope, name)));
+    expect([...importers].sort(), 'the non-test importers of the shard entry points').toEqual(
+      [...new Set(named)].sort(),
+    );
+    for (const name of entryPoints) {
+      expect(nonTestImportersOf(scope, name), `${name} has no named non-test caller`).not.toEqual([]);
+    }
+  });
+
   it('pins the exemption: the composed stopping rule still has no non-test caller', () => {
     const scope = corpus();
 
