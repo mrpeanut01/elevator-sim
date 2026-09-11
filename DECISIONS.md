@@ -34374,6 +34374,8 @@ unmoved. The range event has no equivalent writer yet; § D523 says whose questi
 
 ## D525 — Three modes: Scenario, Career and Rush; no proposed fixes; difficulty is the number of ways through; everything plays live
 
+> **Status 2026-09-10: AMENDED by [§ D535](#d535).** Clause 2's whole editor is every declared dial less the weight-set selector and the arrival predictor, which no scenario sells at any price; per-scenario scarcity is still a price, never a removed control. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/38`](docs/38-what-the-game-is.md), [§ D373](#d373), [§ D477](#d477), [§ D354](#d354), [§ D497](#d497), [§ D514](#d514), [§ D515](#d515), `docs/32` § 1.2 and GD4, `docs/23` § 4, `docs/16` S5's `ranked` row, the design handoff §§ 5 and 10, GitHub issues #217 and #220.**
 
 **Decided by the product owner, 2026-09-06** — given in conversation and confirmed the same day.
@@ -34936,6 +34938,63 @@ never a source or an amount (clause 5).
 
 ---
 
+## D535 — Not for sale is not priced high: the weight-set selector and the arrival predictor are withheld from every scenario, and the other twenty-two dials are priced
+
+**Date: 2026-09-10 · Owner: product owner (the ruling) · GitHub issue #467 · Amends [§ D525](#d525) clause 2 and [`docs/38`](docs/38-what-the-game-is.md) § 2.1's ladder table.**
+
+**Decided by the product owner, 2026-09-10**, on the issue: *"Hide the advanced families, price the
+rest. The `selection.*` (7) and `idle.predictor*` (6) dimensions stop being player-editable in
+scenarios. The other 22 get price rows, drafted for approval. The both-directions register in
+`scenario/budget.test.ts` moves with them, so the gap can still neither grow silently nor close by
+faking."*
+
+**Why an entry.** The mechanism binds code and data no one module owns — `data/price-schedule.json`
+and its parser, what a campaign stage's `every-declared-dimension` resolves to, the survivor table's
+provenance, and the engineering briefs that open the same mode — and it moves two things already
+recorded: § D525 clause 2's *"the whole editor is open in every scenario"*, and `docs/38` § 2.1's
+ladder table, which put *the weight-set selector* among what the dispatcher tier prices.
+
+1. **Not for sale and priced high are different answers, and the schedule says which.**
+   `data/price-schedule.json` carries a `withheld` block beside its `changes`:
+   `weight-set-selector`, the group `dispatcher.selection` (seven dials), and `arrival-predictor`,
+   six exact `dispatcher.idle.predictor*` paths — exact rather than a group, because
+   `dispatcher.idle` also holds the parking dials the schedule prices. A withheld entry carries no
+   price, no tier and no nights. `pricing/parse.ts` refuses one that tries, refuses a path both
+   withheld and priced — exactly or through a group — and refuses a document with no block.
+2. **`every-declared-dimension` is every dimension the search space declares, less every dimension
+   the schedule withholds.** Resolved in one place, `campaign/parse.ts#editableIdsOf`, which takes
+   the schedule as a required argument and filters both modes; a `listed` stage that names a
+   withheld dial fails to load. `scenario/budget.ts#admitPurchase` refuses a move that touches one
+   at any budget, and `scenario/survivorSpace.ts` leaves a dropdown profile that moves one out of
+   the population — which excludes nothing on the shipped profiles.
+3. **The other twenty-two are priced, and every figure is an agent's proposal, approved as drafted by the owner on 2026-09-11.**
+   Six new rows — `call-timing`, `reassignment`, `auction`, `cost-scaling` and `door-reopening` at
+   the dispatcher tier, `load-weighing` at the equipment tier — and five dials added to
+   `dispatch-rules` at its unchanged 2 u. Each note says field by field what is measured, what is
+   derived and what is chosen. No existing dial's price moved; the tier typicals are 2, 9 and 20 u
+   on both sides; the schedule totals 381 u, so every scenario's budget ceiling moved from 368.
+4. **The shipped content bounded the figures, and the loader is what said so.** Four stages open on
+   4 u, and `scenario/budget.test.ts` re-derives every opening budget as the dearest dial a stage
+   offers plus the dispatcher typical, so nothing those four offer may cost more than 2 u. And
+   stages 9 and 10 suggest `constraints.noDirectionReversal` and
+   `answer.allowBypassIfSoleEligibleCar` beside a 13 u landing-panel lever at a 15 u opening: the
+   first draft of this issue priced those two dials on rows of their own, `campaign/parse.ts`
+   refused both stages at 17 u, and that is why they sit on `dispatch-rules`.
+
+**What this does not decide.** Whether the prices are right: they are game feel, drafted rather than
+measured, for the owner to accept, tighten or reject, and the owner accepted them as drafted on 2026-09-11. Per-scenario scarcity: [§ D528](#d528)'s *a
+price, never a removed control* is untouched, because this withholds two families from every
+scenario alike rather than from one. And the Engineer parameter controls, which have no budget: they
+still draw every declared dimension. `data/scenario-survivors.json` is re-measured against the new
+schedule on the change that lands this, and its diff is published with it. Re-measured, one scenario
+leaves its [§ D537](#d537) band: stage 7 reads 0 of 24 at its base rung where it read 2 of 24, both
+through dial edits, so `scenario/survivorBands.test.ts` registers eight of ten outside rather than
+seven. The twelve dial edits drawn are not the ones drawn before — the same sample seed draws them
+from 511 bundles where it drew from 11 — so this measures that none of the twelve gets through, not
+that the two earlier ways through were closed.
+
+---
+
 ## D537 — The survivor band narrows by ladder position: shares in data, drafted for approval, judged at the base rung, read by one acceptance check
 
 **Date: 2026-09-10 · GitHub issue #234 · Rules on: [§ D525](#d525) clause 3, [§ D528](#d528) clause 2, `docs/33` DC-4's band as the precedent for shape, GitHub issues #367 and #467.**
@@ -35046,6 +35105,30 @@ reservation was open, and the numbers below D537 are not written on this lane's 
    - The docstrings where *a generic optimizer* or *a Phase 7 optimizer* means the tuning search that exists, which rewording would make false. Four that promised more than it does are corrected with this entry: `sim/types.ts` and two in `traffic/types.ts` (the collected space holds no `sim.*` or `traffic.*` row), and `runner/replicationRunner.ts#runPlan` (only `runExperiment` calls it).
 
 **What this does not claim.** That an allocator could not help at larger budgets: #416's own record is that OCBA's value grows with the replication budget. This entry records that none is planned, not that none could matter.
+
+---
+
+## D545 — The Burj-class reference follows its operator: two double-deck observation cars, Emaar's use stacking and level 124 at 452 m, drafted for approval, with the 57-lift bracket re-measured
+
+**Date: 2026-09-11 · GitHub issue #438 · Rules on: `data/buildings/burj-class-reference.json`, `docs/04` § 9, the reference building [§ D527](#d527) asked for. The corrections are the product owner's ruling of 2026-09-10; every chosen figure in them is an agent's proposal awaiting that owner's approval.**
+
+**Why an entry.** It moves figures recorded outside the file that changed: `docs/04` § 9's population bracket, hop count, recording size and oracle round trips, and pins in `core`, `experiments` and `viz` tests. It also takes § D527's reference further from one thing that ruling's own text gives it, *about 154 populated floors*, which is now 135.
+
+**The ruling, given on #438:** *"Apply all five comment drafts — the hop counts, occupancy, deck load, the 504 m record and the 57-lift count. Then correct the model: the double-deck shuttles, the use stacking and the floor heights, drafted for approval. Re-run the 57-lift measurement afterwards and publish the result whichever way it falls."*
+
+**Approved as drafted by the product owner on 2026-09-11.** Every figure this entry and the building mark as an agent's proposal stands as drafted.
+
+1. **The five drafts were already on `main`**, applied by PR #502; none was missing. Their verdicts stand. Three of them described the model, and those sentences are revised where the model moved: the per-deck figures now describe this file's own two double-deck cars, the travel note gives 448.335 m runs, and the lift-count note records the unsourced shuttle claim as corrected. The assumption paragraph is kept word for word ([§ D227](#d227)), and a dated paragraph beside it says its figures describe the arrangement as first authored.
+2. **Double decks.** Cited: Otis's release of 2024-03-06 and Al-Kodmany 2015 give the tower two double-deck cars, both serving the observation deck. So `observation` is two double-deck cars paired G/1 and 123/124, and the sky-lobby shuttle is single-deck. **Proposed:** the shuttle stops at G, 43, 76 and 123 and takes the two cars `observation` gave up, sixteen, so § D527's 57 holds and no local bank's count moves; the upper pair is 123/124 rather than Otis's 124/125, keeping Al-Kodmany's level-123 transfer; and the observation cars are rated 2,000 lb a deck, inside the class's 12–14 persons.
+3. **Stacking.** Cited: Emaar's fact sheet ranges — Armani Hotel to level 8 and on 38–39, Armani Residences 9–16, The Residence 19–37, 43–72 and 76–108, the Corporate Suites 112–121 and 125–154. Hotel ranges take the `hotel` profile and residence ranges `residential`; the fact sheet's floors with no use carry nobody. **Proposed:** 3,198 is kept and shared out in proportion to the fact sheet's counts at stated, uncited densities — two people a home, 1.5 a hotel room, 10 m² an office worker — as 14, 23, 18 and 44 a floor. Populated floors go from 146 to 135 against § D527's *about 154*, which is the owner's to rule on.
+4. **Floor height.** Cited: Emaar puts observation level 124 at 452 m. **Proposed:** one 3.645 m floor-to-floor height, putting 124 at 451.98 m, with deck separation and escalator rise following it. It is checked against the upper anchors rather than fitted to them, because they disagree with each other.
+5. **The 57-lift bracket, re-measured and pinned.** The harness is seed 376, `collective`, 1,800 s, every floor's population scaled in proportion, in `packages/viz/src/record/burjOperator.test.ts`; seeds 376–425 are `burjOperator.sweep.test.ts` under `BURJ_BRACKET_SWEEP=1`, registered in `deepTiers.test.ts` as not scheduled.
+   - **The published figures did not reproduce.** The file said 35 s and 98 s at 3,198, saturation at 5,307 (175 s), and 422 of 4,457 unserved at 10,614. The harness gives the same answer at `63a9521`, which landed the file, and at `731bd82c`, the parent of the correction: 23.6 s and 67.6 s over 1,284 journeys, saturation, and 487 of 4,473 undelivered. The verdicts agree and the figures do not. Which run produced the published figures is not established. Over seeds 376–425, that arrangement saturated at 3,198 on **16 of 50**.
+   - **On the corrected arrangement**, 3,198 people wait 11.4 s on average, with a 32.9 s 95th percentile, over 989 journeys, and the AWT is valid. 5,307 saturate. 10,614 saturate and leave 30 of 3,473 undelivered. Over seeds 376–425, saturation occurs on 1, 37 and 50 of 50, and 10,614 leaves journeys undelivered on 32. No AWT interval is published at any of the three populations, because each saturates on at least one seed.
+   - The same 3,198 people make 989 journeys in the window rather than 1,284, because most now arrive on the `residential` and `hotel` profiles. No share of the change in wait is attributed to the lower demand or to the new arrangement ([§ D256](#d256)).
+6. **What moved, each re-pinned on this commit and named there:** `core`'s `model/bank.test.ts` double-deck list (`burj-class-reference/shuttle` → `/observation`); `model/building.test.ts` shared floors (44 and 77 leave); `metrics/interval.test.ts`'s no-threshold list (the shuttle leaves, at a 39.8 s reopen against a 70.0 s round trip); `viz`'s `record/burjReference.test.ts` escalator hops (28 → 832) and full-day journey floor (2,000 → 1,500, 1,910 measured). Each escalator's traversal goes from 19.2 s to 17.78 s, derived from the rise. The oracle round trips go from 32.83 s and 29.68 s to 32.32 s and 29.34 s, and every bank still refuses. The 3,600 s recording goes from 17.36 MB to 16.42 MB.
+
+**What this does not decide.** Whether `totalPopulation` should move, now that the corrected arrangement serves 3,198 on 49 of 50 seeds. Whether the office floors take `office-standard`. The service lifts, which the file still has none of. Emaar's mosque on 158 and occupied level 160, against § D527's mechanical top. Escalator capacity or direction. #376's closed-form oracle criterion, which stays open.
 
 ---
 

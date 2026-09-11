@@ -61,10 +61,22 @@ export type FailState = (typeof FAIL_STATES)[number];
 /**
  * Which dimensions the player may move.
  *
- * `every-declared-dimension` is not a shortcut for "all 56": it is the statement stage 7 needs —
+ * `every-declared-dimension` is not a shortcut for a count: it is the statement stage 7 needs —
  * *"the dispatcher editor (§ 8) with a batch goal and a holdout set"* — and it resolves against
  * whatever the search space declares at the moment it is asked. Writing the ids out would make the
  * campaign file the second place that has to change when `core` declares a knob.
+ *
+ * **What the mode claims, exactly, since GitHub issue #467** — [§ D535](../../../../DECISIONS.md):
+ * *every dimension the search space declares, less every dimension `data/price-schedule.json`
+ * withholds.* The product owner withheld two families from every scenario — the weight-set selector
+ * and the arrival predictor — and the mode no longer opens them. It is still not a list: both halves
+ * are resolved at the moment of asking, by `campaign/parse.ts#editableIdsOf`, so a knob `core`
+ * declares tomorrow is opened with no edit here unless the schedule withholds its family, and a
+ * family the schedule stops withholding is opened again with no edit here either.
+ *
+ * `listed` is narrowed by the same ruling from the other side: a listed id the schedule withholds is
+ * refused at load rather than silently dropped, because a stage that names a dial it cannot open is
+ * an authoring mistake a reader should be told about.
  */
 export type EditableDimensions =
   | { readonly mode: 'listed'; readonly ids: readonly string[] }

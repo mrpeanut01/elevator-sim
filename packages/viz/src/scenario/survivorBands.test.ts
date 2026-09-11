@@ -55,18 +55,26 @@ import {
 import type { PublishedSurvivorScenario, PublishedSurvivors } from './survivors.js';
 
 /**
- * **Scenarios outside their ladder position's band**, read on 2026-09-10 on `main` at `b7d513e` —
- * the survivor table measured on `4159520` — against the band as drafted.
+ * **Scenarios outside their ladder position's band**, read on 2026-09-10 against the approved band
+ * and the survivor table GitHub issue #467 re-measured on `88c0f0ad`, after the price schedule
+ * withheld the weight-set selector and the arrival predictor and priced the other dials (§ D535).
  *
- * Seven of ten, and every one is **below**: too few ways through, none too many. Stages 9 and 10 are
+ * Eight of ten, and every one is **below**: too few ways through, none too many. Stages 9 and 10 are
  * below over runs that all refused their own mean, which is the distinction #234's comment of
- * 2026-09-10 asks a reader to keep; the other five had at least one configuration that stood behind
- * its numbers. The three inside are stages 3, 5 and 7, and **inside is not rebalanced**: the one way
+ * 2026-09-10 asks a reader to keep; the other six had at least one configuration that stood behind
+ * its numbers. The two inside are stages 3 and 5, and **inside is not rebalanced**: the one way
  * through stage 3 and the one through stage 5 are shipped profiles picked from the dropdown, which
  * § D528 clause 2 forbids from position three and `campaign/difficultyCurve.test.ts` holds — stage 3's
  * in `DROPDOWN_CLEARS`, and stage 5's, `predictive-balanced`, in `DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE`,
  * because stage 5's `editable` list refuses it and DC-2 never plays it. `DROPDOWN_CLEARS`' own stage-5
  * row is `eta`, which the holdout refuses ([§ D556](../../../../DECISIONS.md)).
+ *
+ * **Stage 7 joined on #467, and a rebalance should read what moved first.** On the table measured on
+ * `4159520` it was inside, at 2 of 24 through two dial edits; re-measured, it is 0 of 24. The twelve
+ * dial edits are not the same configurations: the same sample seed now draws them from 511 bundles
+ * where it drew from 11. So the table says none of the twelve drawn gets through, not that the two
+ * earlier ways through were closed, and a table drawn on another seed could read stage 7 inside again
+ * with nothing in the campaign moved.
  *
  * The owner approved the band as drafted on 2026-09-10, so every entry is a scenario outside an
  * approved band. If the band moves, this register moves with it on the same commit, and that is the
@@ -77,6 +85,7 @@ const OUTSIDE_THEIR_BAND: Readonly<Record<string, OutsideVerdict>> = Object.free
   'stage-2-morning-rush': 'below',
   'stage-4-two-banks': 'below',
   'stage-6-the-tall-one': 'below',
+  'stage-7-prove-it': 'below',
   'stage-8-the-headline-address': 'below',
   'stage-9-both-ways-at-once': 'below-over-suppressed-runs',
   'stage-10-the-bed-and-the-visitor': 'below-over-suppressed-runs',

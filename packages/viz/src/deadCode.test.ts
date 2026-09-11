@@ -353,6 +353,13 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    * under. Its consumers are the regeneration driver, which writes it onto the table's own face,
    * and `survivors.test.ts`, which asserts it partitions the schedule in both directions. A count
    * published without it would read as a claim about the whole ladder.
+   *
+   * `withheldDimensionIds` is the same shape for GitHub issue #467's other exclusion: the
+   * dimensions `data/price-schedule.json` withholds from every scenario (§ D535). The driver counts
+   * them onto the table's face beside the unpriced ones, and the guard asserts the three lists —
+   * priced, unpriced, withheld — partition the space. The shipped path reaches the same ruling
+   * through `budget.ts#withholdingDimension`, which `campaign/parse.ts#editableIdsOf` calls; this
+   * list-shaped reading of it exists for the table and nothing else.
    */
   'scenario/measureScenarioSurvivors':
     'the instrument that produced data/scenario-survivors.json; its caller is the regeneration driver',
@@ -362,6 +369,8 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
     'the sampled half’s exact binomial interval, derived at read time; the guard is its consumer',
   'scenario/unreachableChangeIdsOf':
     'the bound this measurement is taken under, published on the table and asserted by the guard',
+  'scenario/withheldDimensionIds':
+    'what no scenario sells (#467, § D535), counted onto the table and partitioned by the guard',
   'scenario/CANDIDATE_SCENARIOS':
     'the driver’s and the guard’s shared scenario list (goalReport imports only CANDIDATE_GOALS)',
   /*
