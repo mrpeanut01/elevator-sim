@@ -34854,6 +34854,86 @@ indistinguishable from a genuine one.
 
 ---
 
+## D533 — A scenario and a rush wave pay first time only, and the server keeps the record
+
+**Date: 2026-09-10 · Owner: product owner (both rulings); the lane that built GitHub issue #499 (the readings under them) · Rules on: [§ D526](#d526) clause 2, `data/chime-ledger.json`'s `earn-scenario-clear` and `earn-rush-wave`, [`docs/38`](docs/38-what-the-game-is.md) § 2.4, GitHub issue #499.**
+
+**Why an entry.** The rulings bind code no one module owns: the server's store schema and earn
+route, the viewer's fix-it screen and rush host, and the ledger's authored notes. They also narrow a
+clause already recorded. § D526 clause 2 says *a scenario cleared, a contract day paid, a rush wave
+survived, each paying a flat amount*, and it said neither how often nor which clears are a
+scenario's.
+
+**Ruling, given by the product owner on 2026-09-10: first time only.** A scenario pays
+`earn-scenario-clear` once per account. A rush pays `earn-rush-wave` only for waves beyond the
+account's previous best, because the rush runs on one shared seed and paying every wave every run
+would let the same climb be replayed for chimes. The server keeps the record, so a client cannot farm
+either award by posting again.
+
+**Second ruling, given by the product owner on 2026-09-10 after the review of PR #505: the
+scenario-clear award is paid for Scenario-mode clears only.**
+
+- **Fix cases** pay it today.
+- **Campaign stages and the E1–E6 briefs** pay it once they are playable in Everyday. They are not
+  playable there today, so nothing posts one and the server accepts none of their ids.
+- **A daily-loop week contract's clear (`c1`–`c8`) pays no scenario award.** Contract days keep
+  paying `earn-career-day`, and `docs/38` § 2.4 lists *a scenario cleared* and *a contract day paid*
+  as separate turns.
+
+First time only is unchanged by it: a fix case pays once per account, and a rush pays only the waves
+beyond the account's best.
+
+**Why the second ruling was needed.** The first cut of this change read a week contract as a
+scenario. `dev/main.ts#closeShift` banked a contract's first clear, and the server accepted every id
+`data/contract-ladder.json` names. The review of PR #505 found the path that made this wrong rather
+than merely generous. A Career day (`everyday/host.ts#runCampaignDay`) writes neither the week nor
+the play mode, so it closes through `closeShift` into whatever week contract is standing, including
+another building's. A Career day that cleared that contract posted a scenario clear for it, beside
+its own contract day. The reviewer reproduced it with a probe, and
+`everyday/chimeTurns.browser.test.ts` reproduces it on the shipped bundle: on the first cut, a Career
+day on a fresh page posted `scenario-cleared` for `c1` and then `career-day-paid`. So the bank call,
+the helper that decided it and the contract ids are removed rather than guarded. Under the ruling no
+week contract's clear is a scenario's, however it is reached.
+
+**What had to be read into it, and how it was read.**
+
+1. **The record is the turns themselves.** `chime_entries.turn_key` (migration 6) holds the scenario
+   id on a scenario clear and the wave's number on a rush wave, and a partial unique index over
+   `(user_id, entry_key, turn_key)` makes one entry per account, source and turn a property of the
+   table rather than of the one statement that asks. A rush that beats its best writes one entry per
+   new wave at the flat award, so the account's best is the waves already paid rather than a second
+   figure that could disagree with them. A re-post is answered `200` with the balance and pays nothing.
+2. **A wave survived is a wave outlasted.** The result's *furthest wave* is the one the hold line was
+   crossed in, which was reached and not survived, so a broken rush posts that number less one. A run
+   that breaks inside its first wave posts nothing, and so does a run ended by hand, which has no
+   breaking point ([§ D515](#d515)).
+3. **A scenario clear is a fix case's, today.** A fix case is Scenario content under
+   [§ D525](#d525), and `everyday/fixitScreen.ts#primary` keeps a case FIXED and banks it through
+   `everyday/host.ts#bankScenarioClear`. The server accepts exactly the ids `data/fixit-cases.json`
+   names and refuses any other as `unknown-scenario`, a week contract's included; an unbounded id
+   would pay for every name a client invents, once each. Campaign stages and the E1–E6 briefs join
+   that set on the change that makes them playable in Everyday. A single day of the daily loop is a
+   score and not a pass, in the Scenario hub's own words, so a day posts nothing, and under the
+   second ruling neither does the contract it counts toward. The Engineer campaign panel draws a
+   stage verdict and files no clear, and is not wired.
+4. **A contract day is outside the ruling** and still pays on every post: nothing on the wire can
+   tell a second day from one day posted twice. `http/api.test.ts` asserts that it still does, so
+   keying it later is a deliberate change to a green test rather than an accident.
+
+**What is unchecked, and first-time-only is the cap on it.** The server cannot verify that a fix
+case was cleared or that a rush reached the waves it claims; a contract day has been believed the
+same way since #368, and a rush result is not replayed until #372. The bounds are the shipped fix-case
+ids and the rush template's wave count (`chimes/ledger.ts#rushWaveCountOf`), so a client composing
+its own requests can collect each fix case's award and a full rush's awards once per account, and no
+more.
+
+**What this does not change.** Every entry is the table's flat award, and no award varies with
+anything a run measures ([§ D526](#d526) clause 2). No chime figure reaches a results page: every post
+is fire and forget and nothing reads its answer (clause 3, `docs/32` GD13). A client names a turn and
+never a source or an amount (clause 5).
+
+---
+
 ## D537 — The survivor band narrows by ladder position: shares in data, drafted for approval, judged at the base rung, read by one acceptance check
 
 **Date: 2026-09-10 · GitHub issue #234 · Rules on: [§ D525](#d525) clause 3, [§ D528](#d528) clause 2, `docs/33` DC-4's band as the precedent for shape, GitHub issues #367 and #467.**

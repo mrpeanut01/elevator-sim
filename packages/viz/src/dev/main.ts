@@ -4093,12 +4093,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
               : { kind: 'unreachable', detail: answer.detail };
           },
     /*
-     * The earn verb — GitHub issue #368, and `everyday/host.ts#closeDay` is its caller.
+     * The earn verb — GitHub issues #368 and #499. The Everyday host calls it from `closeDay` (a
+     * contract day), `endRush` (the waves a broken rush outlasted) and `bankScenarioClear` (a fixed
+     * case), and `everyday/chimeTurns.browser.test.ts` reads what those posts put on the wire.
+     * `closeShift` banks nothing: a daily-loop week contract's clear is not a scenario's (§ D533's
+     * second ruling), and a Career day closes through `closeShift` into whatever week is standing.
      *
-     * Fire and forget, deliberately: `closeDay` is a synchronous path that files a day, and a day
-     * that could fail to close because a network call failed would be a worse trade than a chime
-     * nobody banked. The ledger is append-only and the balance is re-read whenever Settings opens,
-     * so a dropped bank costs one award and corrupts nothing.
+     * Fire and forget, deliberately: each caller is a synchronous path that files something — a day,
+     * a rush's end, a clear — and a filing that could fail because a network call failed would be a
+     * worse trade than a chime nobody banked. The ledger is append-only and the balance is re-read
+     * whenever Settings opens, so a dropped bank costs one award and corrupts nothing.
      *
      * Silent on refusal for the same reason it is silent on success: § D526 clause 3 keeps a
      * currency figure off a results page, and a *could not bank that* notice on one would be the
@@ -4107,10 +4111,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     bankCompletion:
       client === undefined
         ? undefined
-        : (completion) => {
+        : (turn) => {
             const token = accountState.token;
             if (token === undefined) return;
-            void client.bankCompletion(token, completion);
+            void client.bankCompletion(token, turn);
           },
     /*
      * **This binding and `accountActions` below are absent together, and a screen reads that.**

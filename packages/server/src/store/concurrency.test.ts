@@ -322,10 +322,16 @@ const REMEDIES: Readonly<Record<string, readonly Remedy[]>> = Object.freeze({
         'lands. The loser’s `23505` is **retried** rather than mapped, and on the retry it reads the ' +
         'winner’s row and re-decides against the new balance — which is the only reason a ledger can be ' +
         'correct in a store that has no transactions (§ D361). The primary key in the derived list is a ' +
-        'fresh `randomUUID` and cannot collide with a row this store wrote.',
+        'fresh `randomUUID` and cannot collide with a row this store wrote. **And since GitHub issue #499 a ' +
+        'third key, `chime_entries_turn` over `(user_id, entry_key, turn_key)` where the turn is set**: ' +
+        'the statement’s own `NOT EXISTS` clause refuses a turn already paid, and a writer that loses ' +
+        'to this index takes the same `isUniqueViolation` branch as a lost `seq`. That branch is ' +
+        'unexercised for this key — one PGlite session cannot interleave two statements — and ' +
+        '`migrations.test.ts` asserts the index refuses a duplicate row directly.',
       player:
         'Two spends fired at once cost what two spends cost, and the second is refused if the first ' +
-        'emptied the balance. Never a negative balance, and never a modifier bought twice for one price.',
+        'emptied the balance. Never a negative balance, and never a modifier bought twice for one price. ' +
+        'And a scenario, or a rush wave, is paid once however many times it is posted at once.',
     },
     {
       risks: ['foreign-key'],

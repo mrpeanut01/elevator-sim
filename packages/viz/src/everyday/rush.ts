@@ -211,6 +211,27 @@ export function rushOutcomeOf(recording: VizRecording, stoppedAtS: number | unde
   };
 }
 
+/**
+ * How many waves a rush **outlasted**, as the chime ledger is told it — GitHub issue #499 — or
+ * `undefined` when the run has no turn to bank.
+ *
+ * *A rush wave survived* (`data/chime-ledger.json`'s `rush-wave-survived`) is a wave the run got
+ * through. {@link RushOutcome.wave} is the wave the line was crossed in — the result's *furthest
+ * wave* — which was reached and not survived, so the count is the waves before it. Two runs bank
+ * nothing: one ended by hand, which has no breaking point (§ D515, and the result says *not posted*
+ * for the same reason), and one that broke inside its first wave, which outlasted none.
+ *
+ * A count of turns and nothing else the run measured: how long it held, how many were carried and how
+ * long anybody waited are all on the outcome, and none of them reaches this answer, which is § D526
+ * clause 2. Which of the waves are paid is the server's to decide — only those beyond the account's
+ * best (`packages/server/src/chimes/ledger.test.ts`).
+ */
+export function rushWavesOutlastedOf(outcome: RushOutcome): number | undefined {
+  if (outcome.kind !== 'broke') return undefined;
+  const outlasted = outcome.wave - 1;
+  return outlasted >= 1 ? outlasted : undefined;
+}
+
 /* -------------------------------------------------------------------------- *
  * The stage header in the rush context — § 9.2: held time, the wave, no timeline
  * -------------------------------------------------------------------------- */

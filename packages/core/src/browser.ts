@@ -315,6 +315,7 @@ export type {
   ChimeSink,
   ChimeSpendTable,
   ChimeSource,
+  ChimeTurn,
 } from './config/index.js';
 
 /* -------------------------------------------------------------------------- *

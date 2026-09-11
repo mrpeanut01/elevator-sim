@@ -517,3 +517,85 @@ function catalogRace(): Error & { code: string } {
     code: '23505',
   });
 }
+
+/* -------------------------------------------------------------------------- *
+ * Migration 6 — a turn paid once, GitHub issue #499
+ * -------------------------------------------------------------------------- */
+
+/** Whether the ledger has `turn_key`, asked of the catalog rather than of a failed query. */
+async function turnKeyColumn(sql: Sql): Promise<{ present: boolean; nullable: boolean }> {
+  const found = await sql.query(
+    `SELECT is_nullable FROM information_schema.columns WHERE table_name = 'chime_entries' AND column_name = 'turn_key'`,
+  );
+  const row = found.rows[0];
+  return { present: row !== undefined, nullable: row?.['is_nullable'] === 'YES' };
+}
+
+/** The index that makes a turn unique per account and source, as the catalog prints it. */
+async function turnIndex(sql: Sql): Promise<string | undefined> {
+  const found = await sql.query(
+    `SELECT indexdef FROM pg_indexes WHERE tablename = 'chime_entries' AND indexname = 'chime_entries_turn'`,
+  );
+  const row = found.rows[0];
+  return row === undefined ? undefined : String(row['indexdef']);
+}
+
+async function accountOn(store: Store): Promise<string> {
+  const created = await store.createUser({ email: 'ada@example.test', displayName: 'Ada', displayNameChosen: true });
+  if (!created.ok) throw new Error(`migrations.test.ts: ${created.reason}`);
+  return created.user.id;
+}
+
+describe('a chime ledger that predates the turn a scenario or a wave is paid once for', () => {
+  it('gains turn_key, nullable, and the unique index over it, and keeps every entry it held', async () => {
+    /*
+     * The fixture is a database as migrations 0 to 5 left it before #499: opened today, then the
+     * column dropped — which takes the index that depends on it — and migration 6 unrecorded. That is
+     * a database this code did not create in exactly the respect under test, which is the rule this
+     * file's header sets for a fixture, and dropping one named column keeps reproducing it however the
+     * rest of the schema moves.
+     */
+    const sql = await emptyDatabase();
+    const today = await Store.open({ sql, now: () => CLOCK });
+    const userId = await accountOn(today);
+    await today.recordChimeEntry({ userId, direction: 'earn', entryKey: 'earn-career-day', chimes: 3 });
+    await sql.exec('ALTER TABLE chime_entries DROP COLUMN turn_key;\nDELETE FROM schema_migrations WHERE version = 6;');
+    expect(await turnKeyColumn(sql)).toEqual({ present: false, nullable: false });
+    expect(await turnIndex(sql)).toBeUndefined();
+
+    const store = await Store.open({ sql, now: () => CLOCK });
+    expect((await register(sql)).map((row) => row.version)).toEqual(SHIPPED_VERSIONS);
+    expect(await turnKeyColumn(sql)).toEqual({ present: true, nullable: true });
+    expect(await turnIndex(sql)).toMatch(/UNIQUE INDEX[\s\S]*\(user_id, entry_key, turn_key\)[\s\S]*turn_key IS NOT NULL/u);
+    /* The entry written before the column is still the balance, and carries no turn rather than an invented one. */
+    expect(await store.chimeBalance(userId)).toBe(3);
+    expect(await store.chimeTurnKeys(userId, 'earn-career-day')).toEqual(new Set());
+    /* And the ledger pays a turn once on this database, rather than merely having a column for it. */
+    const clear = { userId, direction: 'earn', entryKey: 'earn-scenario-clear', chimes: 6, turnKey: 'c1' } as const;
+    expect(await store.recordChimeEntry(clear)).toBeDefined();
+    expect(await store.recordChimeEntry(clear)).toBeUndefined();
+    expect(await store.chimeBalance(userId)).toBe(9);
+  });
+
+  it('refuses a duplicate turn in the table itself, not only in the statement that writes one', async () => {
+    /*
+     * The index asked directly: a second row naming one account, one source and one turn is a `23505`
+     * whichever statement writes it. That is what makes *never paid twice* a property of the table
+     * rather than of the one caller that remembers the clause — and a `NULL` turn is exempt, so contract
+     * days and spends are untouched.
+     */
+    const sql = await emptyDatabase();
+    const store = await Store.open({ sql, now: () => CLOCK });
+    const userId = await accountOn(store);
+    const insert = async (id: string, seq: number, turn: string | null): Promise<SqlResult> =>
+      sql.query(
+        'INSERT INTO chime_entries (id, user_id, seq, direction, entry_key, chimes, balance_after, ' +
+          'modifier_json, written_at_ms, turn_key) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8, $9)',
+        [id, userId, seq, 'earn', 'earn-scenario-clear', 6, 6 * seq, CLOCK, turn],
+      );
+    await insert('first', 1, 'c1');
+    await expect(insert('again', 2, 'c1')).rejects.toMatchObject({ code: '23505' });
+    await insert('no-turn', 2, null);
+    await insert('no-turn-again', 3, null);
+  });
+});

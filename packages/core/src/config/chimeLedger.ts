@@ -85,6 +85,36 @@ export const CHIME_COMPLETIONS = ['scenario-cleared', 'career-day-paid', 'rush-w
 export type ChimeCompletion = (typeof CHIME_COMPLETIONS)[number];
 
 /**
+ * One finished turn, as the play surface posts it — GitHub issue **#499**, the product owner's
+ * ruling of 2026-09-10: *first time only*.
+ *
+ * A scenario pays once per account and a rush pays only the waves beyond the account's best, so the
+ * earn verb has to be told **which** scenario and **how far** — and neither is a source or an
+ * amount, which is the line [§ D526](../../../../DECISIONS.md) clause 5 draws. A scenario id says
+ * what was cleared and the ledger still decides what that is worth; a wave count says how many turns
+ * a rush finished and the ledger still pays each one the table's flat award. No member carries a
+ * figure a run measured, and none can name a chime.
+ *
+ * - `scenarioId` is a fix case's id (`data/fixit-cases.json`). **Scenario-mode clears only**, the
+ *   owner's ruling of 2026-09-10 after the review of PR #505: campaign stages and the E1–E6 briefs
+ *   join once they are playable in Everyday, a daily-loop week contract's clear pays no scenario
+ *   award (its days pay `career-day-paid`), and the server refuses any id that is not a fix case's.
+ * - `waves` is how many whole waves the rush **outlasted** before its breaking point; the wave the
+ *   line was crossed in was reached and not survived. The server refuses a count above the waves the
+ *   stream generates.
+ * - A contract day carries nothing. The ruling does not reach it, and each posted day still pays.
+ *
+ * **What the server cannot check, stated rather than hidden:** that the clear happened, or that the
+ * run reached the waves it claims. Nothing replays a scenario clear or a rush result before paying
+ * it — a rush result's replay is GitHub issue #372's — so these fields are believed within their
+ * bounds, and first-time-only is what caps what believing them can cost.
+ */
+export type ChimeTurn =
+  | { readonly completion: 'scenario-cleared'; readonly scenarioId: string }
+  | { readonly completion: 'career-day-paid' }
+  | { readonly completion: 'rush-wave-survived'; readonly waves: number };
+
+/**
  * How a source came to exist. **Two values, and there is no third.**
  *
  * `completion` is a turn the player finished. `gift` is the sign-in award
@@ -192,8 +222,9 @@ export type ChimeSchemaUnit = (typeof CHIME_SCHEMA_UNITS)[number];
  * *survivor-count band*, and `chimes/ledger.ts` described that band as *"a property of the scenario
  * … known before anybody plays"*. It was not. The band arrived **verbatim in the request body**
  * (`http/api.ts`'s earn route), `data/scenario-survivors.json` carries survivor **counts** and no
- * band at all, nothing the earn route reads maps a count to one, and the server is never told which
- * scenario was cleared. A client could post `single` on the easiest scenario and be paid 10 instead
+ * band at all, nothing the earn route reads maps a count to one, and the server was not then told which
+ * scenario was cleared (since GitHub issue #499 it is told a fix-case id, which pays a scenario once
+ * and maps to no band). A client could post `single` on the easiest scenario and be paid 10 instead
  * of 4. (A survivor band does exist since GitHub issue #234 — `data/scenario-survivor-bands.json`, a
  * **difficulty** band per ladder position, approved by the owner on 2026-09-10, whose only reader is a
  * viz acceptance check ([§ D537](../../../../DECISIONS.md)). It is on no scenario's pinned record, and
@@ -391,7 +422,7 @@ function parseSource(raw: unknown, where: string): ChimeSource {
       `${where}.bands: an award may not be banded. Nothing the earn route reads maps a survivor ` +
         'count to a band: data/scenario-survivors.json carries counts and no band, the one survivor ' +
         'band in the tree (data/scenario-survivor-bands.json) is an approved difficulty band whose only ' +
-        'reader is an acceptance check, and the earn route is never told which scenario was cleared ' +
+        'reader is an acceptance check, and nothing maps the fix-case id the earn route is told to one ' +
         '— so a band could only arrive from the client that is paid for it. ' +
         'DECISIONS.md D256: a stated mechanism is measured or withdrawn, never re-worded.',
     );

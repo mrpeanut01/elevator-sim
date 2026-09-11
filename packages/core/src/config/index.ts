@@ -103,6 +103,7 @@ export type {
   ChimeSink,
   ChimeSpendTable,
   ChimeSource,
+  ChimeTurn,
 } from './chimeLedger.js';
 
 export {
