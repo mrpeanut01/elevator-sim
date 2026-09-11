@@ -51,6 +51,7 @@
  * ```
  */
 
+import type { Duty } from '../../config/types.js';
 import type { SimTime } from '../../kernel/types.js';
 import type { AnswerStageConfig, LoadSensorConfig, ResolvedCar } from '../../config/types.js';
 import {
@@ -222,6 +223,12 @@ export interface CarInit {
   readonly clock: CarClock;
   /** Service mode at t=0 and after a reset. Defaults to `in-service`. */
   readonly mode?: ServiceMode | undefined;
+  /**
+   * What the car is for — `DUTIES`, GitHub issue #481. Unlike {@link mode} it has no runtime state:
+   * a duty is a property of the shaft as built and never changes during a run, so a reset has
+   * nothing to restore. Absent means undeclared, and the snapshot then carries no `duty` at all.
+   */
+  readonly duty?: Duty | undefined;
   /** The dispatcher profile's answer stage: door and load-sensor control tunables. */
   readonly answer?: AnswerStageConfig | undefined;
   /** `data/elevator-specs.json → loadSensor`. Defaults to `LOAD_SENSOR_DEFAULTS`. */
@@ -281,6 +288,8 @@ export class Car implements CarLike {
 
   readonly #clock: CarClock;
   readonly #initialMode: ServiceMode;
+  /** See {@link CarInit.duty}. Fixed for the life of the car. */
+  readonly #duty: Duty | undefined;
 
   #mode: ServiceMode;
   #floor: ServedFloor;
@@ -317,6 +326,7 @@ export class Car implements CarLike {
     this.homeFloor = home;
     this.#clock = init.clock;
     this.#initialMode = init.mode ?? 'in-service';
+    this.#duty = init.duty;
     this.#mode = this.#initialMode;
     this.#floor = home;
     this.#door = createDoorState(0);
@@ -1316,6 +1326,9 @@ export class Car implements CarLike {
       bankId: this.bankId,
       at,
       mode: this.#mode,
+      // Spread-or-omit (GitHub issue #481): a car that declares no duty hands dispatch the snapshot
+      // it handed it before the field existed, and `dutyMismatchTerm` applies the default.
+      ...(this.#duty === undefined ? {} : { duty: this.#duty }),
       floorId: this.#floor.id,
       floorIndex: this.#floor.index,
       heightM: this.positionAt(at),

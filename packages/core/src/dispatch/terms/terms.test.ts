@@ -35,7 +35,7 @@ const SCALES = resolveNormalization();
  * -------------------------------------------------------------------------- */
 
 describe('the cost-term registry', () => {
-  it('implements all thirteen terms of the library, in the order the data file declares them', () => {
+  it('implements all fourteen terms of the library, in the order the data file declares them', () => {
     expect(IMPLEMENTED_TERM_IDS).toEqual([
       'waitTime',
       'rideTime',
@@ -50,6 +50,7 @@ describe('the cost-term registry', () => {
       'zoneAffinity',
       'predictedDemand',
       'crowding',
+      'dutyMismatch',
     ]);
     expect(IMPLEMENTED_TERM_IDS).toEqual(DECLARED_TERM_IDS);
   });

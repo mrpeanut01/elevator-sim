@@ -42,6 +42,7 @@
  *   to confuse them.
  */
 
+import type { Duty } from '../config/types.js';
 import type { SimTime } from '../kernel/types.js';
 import type { CredentialGroup, Direction } from '../model/types.js';
 import type { TrafficModelVersion } from '../traffic/types.js';
@@ -229,6 +230,13 @@ export interface PassengerRecord {
   /** Body mass in kilograms, as drawn from the `passengerMass` stream. */
   readonly massKg: number;
   readonly credentialGroup?: CredentialGroup | undefined;
+  /**
+   * What the journey needed a car for — `DUTIES`, GitHub issue #481. **Absent on every leg of every
+   * run of a building in which no car declares a duty**, so such a record is byte-identical to one
+   * written before the field existed. Where present, the leg's `carId` names the car it was put in,
+   * which is how a mismatch is counted on the legs rather than inferred from a mean.
+   */
+  readonly duty?: Duty | undefined;
 
   /**
    * When this leg's wait began — registration at the landing.

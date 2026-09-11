@@ -27,6 +27,7 @@ import {
   type TrafficProfiles,
 } from '@elevator-sim/core/browser';
 
+import { withGoodsCar } from '../fixtures.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
 
 import {
@@ -66,6 +67,7 @@ import {
   DEFAULT_LEVERS,
   DWELL_SETTINGS,
   costFunctionLine,
+  dimensionIdsLiveOn,
   doorTimingFor,
   inertTerms,
   profileFromSpec,
@@ -98,6 +100,8 @@ const read = (path: string): unknown =>
 const SPECS: ElevatorSpecs = parseElevatorSpecs(read('elevator-specs.json'));
 const TRAFFIC: TrafficProfiles = parseTrafficProfiles(read('traffic-profiles.json'));
 const PROFILES = parseDispatcherProfiles(read('dispatcher-profiles.json'));
+/** A shipped tower on which no car declares a duty — every shipped building, § D549 clause 6. */
+const MIDTOWN = resolveBuilding(parseBuilding(read('buildings/midtown-office.json')), SPECS);
 /*
  * The project's own list, not a second copy of it — GitHub issue #108.
  *
@@ -166,9 +170,32 @@ describe('the dispatcher spec', () => {
   it('names rideTime as inert until the call carries a destination — § D112’s defect as a rule', () => {
     const base = specFromProfile(PROFILES.profiles[0] as DispatcherProfile, 'x');
     const weighted = { ...base, weights: { ...base.weights, rideTime: 50 }, flags: { ...base.flags, pool: false } };
-    expect(inertTerms(weighted).map((entry) => entry.termId)).toStrictEqual(['rideTime']);
+    expect(inertTerms(weighted, MIDTOWN).map((entry) => entry.termId)).toStrictEqual(['rideTime']);
     const pooled = { ...weighted, flags: { ...weighted.flags, pool: true } };
-    expect(inertTerms(pooled)).toStrictEqual([]);
+    expect(inertTerms(pooled, MIDTOWN)).toStrictEqual([]);
+  });
+
+  it('names dutyMismatch as inert while no car of the building declares a duty, and not once one does — § D549', () => {
+    const base = specFromProfile(PROFILES.profiles[0] as DispatcherProfile, 'x');
+    const weighted = {
+      ...base,
+      weights: { ...base.weights, dutyMismatch: 50 },
+      flags: { ...base.flags, pool: true },
+    };
+    const named = inertTerms(weighted, MIDTOWN);
+    expect(named.map((entry) => entry.termId)).toStrictEqual(['dutyMismatch']);
+    expect(named[0]?.why).toMatch(/no car in this building declares a duty/);
+    expect(inertTerms(weighted, withGoodsCar(MIDTOWN))).toStrictEqual([]);
+    // § D112's shape, kept: the refusal is about a weight the engine will not read, so a term
+    // nobody weighted draws none.
+    const unweighted = { ...weighted, weights: { ...weighted.weights, dutyMismatch: 0 } };
+    expect(inertTerms(unweighted, MIDTOWN)).toStrictEqual([]);
+  });
+
+  it('withholds the duty weight from the dimensions a building can use, only while it declares none — § D549', () => {
+    const ids = ['weights.waitTime', 'weights.dutyMismatch', 'dispatch.callType'];
+    expect(dimensionIdsLiveOn(ids, MIDTOWN)).toStrictEqual(['weights.waitTime', 'dispatch.callType']);
+    expect(dimensionIdsLiveOn(ids, withGoodsCar(MIDTOWN))).toStrictEqual(ids);
   });
 
   it('reports dirty exactly when something moved', () => {

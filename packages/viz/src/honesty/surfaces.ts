@@ -450,6 +450,7 @@ import {
   flagLineOf,
   flagRowsOf,
   leverRowsOf,
+  editorTermRowsOf,
   termRowsOf,
 } from '../dev/dispatcherEditor.js';
 import {
@@ -3901,6 +3902,19 @@ const AUTHORING: SurfaceAdapter = {
           flags: { pool: false, zone: false, bypass: true },
         },
       },
+      /*
+       * § D549's vector: a weighted `dutyMismatch` on the case's own building, which declares no duty
+       * — no shipped building does — so the refusal the editor and the workshop draw is swept.
+       */
+      {
+        label: 'inert-dutymismatch',
+        spec: {
+          name: 'My dispatcher',
+          weights: { dutyMismatch: 50, waitTime: 100 },
+          families: {},
+          flags: { pool: true, zone: false, bypass: true },
+        },
+      },
     ];
     for (const { label, spec } of dispatcherSpecs) {
       seeds.push({ field: `specFromProfile(${label}).name`, text: spec.name, role: 'label' });
@@ -3910,7 +3924,7 @@ const AUTHORING: SurfaceAdapter = {
         role: 'observation',
       });
       seeds.push({ field: `adviceFor(${label})`, text: adviceFor(spec), role: 'prose' });
-      for (const inert of inertTerms(spec)) {
+      for (const inert of inertTerms(spec, context.building)) {
         seeds.push({
           field: `inertTerms(${label}).${inert.termId}`,
           text: inert.why,
@@ -5029,6 +5043,7 @@ const EDITOR_PANELS: SurfaceAdapter = {
     'dev/buildingEditor.ts#transportNoteOf',
     'dev/buildingEditor.ts#checkBuilding',
     'dev/dispatcherEditor.ts#termRowsOf',
+    'dev/dispatcherEditor.ts#editorTermRowsOf',
     'dev/dispatcherEditor.ts#flagRowsOf',
     'dev/dispatcherEditor.ts#flagLineOf',
     'dev/dispatcherEditor.ts#leverRowsOf',
@@ -5347,9 +5362,20 @@ const EDITOR_PANELS: SurfaceAdapter = {
 
     /* ---- M8, the dispatcher editor ---- */
     const terms = context.dispatcherProfiles.terms;
+    /*
+     * Through `editorTermRowsOf`, the rows the mount draws, on a state standing on the case's own
+     * building — so the inert-term refusal is decided the way the editor decides it (§ D549), from the
+     * standing selection rather than from a building this adapter picked.
+     */
+    const editorResources = browserResourcesOf(context);
+    const standing = { ...initialState(editorResources, 1n), buildingId: context.case.buildingId };
     for (const profile of context.profiles) {
       const spec = specFromProfile(profile);
-      for (const view of termRowsOf(terms, spec, inertTerms(spec))) {
+      const rows = editorTermRowsOf({
+        state: { ...standing, dispatcherSpec: spec, mode: 'advanced' },
+        resources: editorResources,
+      });
+      for (const view of rows) {
         seeds.push({
           field: `termRowsOf(${profile.id}).${view.termId}.label`,
           text: `${view.label} ${String(view.value)}`,
@@ -11935,7 +11961,7 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
         seeds.push({ field: `${label}.lever.${lever.id}.help`, text: plainLeverHelp(lever), role: 'reason' });
       }
 
-      const terms = termDisclosureOf(file.terms, spec);
+      const terms = termDisclosureOf(file.terms, spec, context.building);
       seeds.push({ field: `${label}.terms.summary`, text: terms.summary, role: 'label' });
       seeds.push({ field: `${label}.terms.hint`, text: terms.hint, role: 'prose', provenance: 'authored' });
       for (const row of terms.rows) {

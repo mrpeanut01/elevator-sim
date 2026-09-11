@@ -57,7 +57,8 @@ import { PROBABILITY_WORDS, playerSafeDescription, probabilityWordIn } from './w
 import { GOAL_READS, isPerReplicationGoal, type GoalKind } from '../scenario/goals.js';
 import { withholdingDimension } from '../scenario/budget.js';
 import { validatePublishedGoalRates } from '../scenario/published.js';
-import { requireBuilding } from '../fixtures.test-helper.js';
+import { dimensionIdsLiveOn } from '../authoring/dispatcherSpec.js';
+import { requireBuilding, withGoodsCar } from '../fixtures.test-helper.js';
 
 const fixture = useCampaignFixture();
 const { stageAt, mutate, publishedFor, requireProfile, playStage, failStatesFor } = fixture;
@@ -467,6 +468,35 @@ describe('a stage judges only the changes it offered', () => {
         space.ids,
         context.schedule,
       ),
+    ).toEqual(space.ids.filter((id) => !withheld.includes(id)));
+  });
+
+  it('offers neither a withheld dimension nor the duty weight on a building that declares no duty, and opens the duty weight where one does — § D535 and § D549 at once', () => {
+    /*
+     * The ids `dev/campaignPanel.ts` resolves a stage's editable set against: the space's, less
+     * what the stage's own building gives nothing to act on (§ D549), then less what the price
+     * schedule withholds from every scenario (§ D535) — both filters, in the panel's own
+     * composition. `every-declared-dimension` is the mode that would otherwise open all of them, so
+     * that is the stage asked. Non-vacuity first: each filter must have something to remove, and
+     * the two must remove different ids, or this case could not tell one reading from the other.
+     */
+    const { campaign, space, context } = fixture;
+    const stage = campaign.stages.find((entry) => entry.dispatcher.editable.mode === 'every-declared-dimension');
+    if (stage === undefined) throw new Error('no stage opens every declared dimension');
+    const building = fixture.resourcesFor(stage).building;
+    const withheld = space.ids.filter((id) => withholdingDimension(context.schedule, id) !== undefined);
+    expect(withheld.length, 'the schedule withholds nothing, so the § D535 filter is vacuous').toBeGreaterThan(0);
+    expect(space.ids).toContain('weights.dutyMismatch');
+    expect(withheld, 'the duty weight is withheld, so the two filters cannot be told apart').not.toContain(
+      'weights.dutyMismatch',
+    );
+    const offered = editableIdsOf(stage.dispatcher.editable, dimensionIdsLiveOn(space.ids, building), context.schedule);
+    expect(offered).not.toContain('weights.dutyMismatch');
+    for (const id of withheld) expect(offered, id).not.toContain(id);
+    expect(offered).toEqual(space.ids.filter((id) => id !== 'weights.dutyMismatch' && !withheld.includes(id)));
+    const declared = withGoodsCar(building);
+    expect(
+      editableIdsOf(stage.dispatcher.editable, dimensionIdsLiveOn(space.ids, declared), context.schedule),
     ).toEqual(space.ids.filter((id) => !withheld.includes(id)));
   });
 });

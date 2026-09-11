@@ -235,6 +235,7 @@ The dispatcher assigns the call to the eligible car with the lowest cost.
 | `zoneAffinity` | Deviation from the car's assigned zone | Zoning strategies |
 | `predictedDemand` | Misalignment with forecast future calls | Pre-positioning |
 | `crowding` | Hall queue length at the pickup floor | Parallel service |
+| `dutyMismatch` | Whether the car's duty differs from the rider's — 1 or 0, so the weight is the whole price | Duty-bound cars: goods, bed, service ([§ D549](../DECISIONS.md)) |
 
 **Normalize every term** to a comparable scale before weighting. Without it, `waitTime`
 (seconds, 0–120) and `stopCount` (0–20) produce weights that are uninterpretable and a

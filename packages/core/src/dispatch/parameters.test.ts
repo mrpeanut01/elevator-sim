@@ -69,7 +69,7 @@ const declared = (id: string): DispatchParameterSpec | undefined =>
 const PROBE_PROFILE: DispatcherProfileSource = {
   id: 'probe',
   name: 'Probe',
-  // All thirteen, each a different value: the schema derives one row per implemented term, and a
+  // All fourteen, each a different value: the schema derives one row per implemented term, and a
   // probe that skipped a term would not notice a row wired to the wrong weight. `callType` below
   // is `mobile-credential` deliberately — it is what makes `weights.rideTime`'s `activeWhen`
   // satisfied — and `eligibility.enRouteDiversion` does the same for `weights.diversionDetour`, so
@@ -88,6 +88,7 @@ const PROBE_PROFILE: DispatcherProfileSource = {
     zoneAffinity: 1.05,
     predictedDemand: 1.15,
     crowding: 1.35,
+    dutyMismatch: 1.45,
   },
   hardConstraints: ['noDirectionReversal'],
   dispatch: {
@@ -170,6 +171,7 @@ const PROBE_VALUES: ReadonlyMap<string, number | string | boolean> = new Map<
   ['weights.zoneAffinity', 1.05],
   ['weights.predictedDemand', 1.15],
   ['weights.crowding', 1.35],
+  ['weights.dutyMismatch', 1.45],
   ['normalization.waitTimeS', 95],
   ['normalization.distanceM', 44],
   ['constraints.noDirectionReversal', true],
