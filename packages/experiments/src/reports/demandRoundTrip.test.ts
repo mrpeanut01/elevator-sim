@@ -107,7 +107,8 @@ describe('the stored record carries every demand override', () => {
    * not quietly shrinking either — a row deleted to make a failure go away shows up here.
    */
   it('samples every field the demand surface declares', () => {
-    expect(Object.keys(DEMAND_SAMPLE).length).toBe(15);
+    // 16 since GitHub issue #481's `duty` override.
+    expect(Object.keys(DEMAND_SAMPLE).length).toBe(16);
   });
 
   /**

@@ -62,6 +62,7 @@ The standing decisions those three rest on, unchanged and cited rather than rest
 | [§ D520](../DECISIONS.md) | The dropdown sweep is built and tiered, and names the stages that still clear from the dropdown |
 | [§ D537](../DECISIONS.md) | The survivor band **narrows by ladder position**, authored in `data/scenario-survivor-bands.json` as shares of the configurations judged at a scenario's base rung. The owner ruled the shape on 2026-09-10; **the owner approved every figure as drafted the same day**, and the band's only reader is an acceptance check |
 | [§ D538](../DECISIONS.md) | Phase 7's schema-driven search entry point, Bayesian optimization and OCBA are **withdrawn** by the project owner (GitHub issue #416): the six introspection helpers waiting for the entry point are deleted, and `CLAUDE.md` invariant 8 keeps every tunable declaring its schema while naming `tuning/search` as the search over the space `tuning/space` collects |
+| [§ D549](../DECISIONS.md) | Duty is a **closed vocabulary declared per car** — passenger, goods, bed, service. A journey draws one on its own stream, recorded only where some car declares one; dispatch prices a mismatch through **one weighted term** and filters nothing. A building that declares no duty is byte-identical. `capacity-aware`'s weight and the shares are proposals awaiting the owner (GitHub issue #481) |
 
 ## 2. Superseded or amended
 
