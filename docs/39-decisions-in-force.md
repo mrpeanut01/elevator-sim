@@ -31,6 +31,7 @@ the first three in one conversation, the last three later the same day:
 | [§ D530](../DECISIONS.md) | The cross-mode currency is named **chimes**, closing the first of § D526's two open items |
 | [§ D531](../DECISIONS.md) | The **sign-in bonus ships at launch**, in the one shape § D526 clause 7 permits — small, flat, unconditional, no compounding, no streak, nothing lost by missing it. Closes § D526's second open item, so `docs/38` § 5 has none left |
 | [§ D535](../DECISIONS.md) | *Taken 2026-09-10, on GitHub issue #467.* Not for sale is not priced high: the **weight-set selector** and the **arrival predictor** are withheld from every scenario, declared once in `data/price-schedule.json`; `every-declared-dimension` is every declared dimension less what is withheld; the other twenty-two dials are priced, as proposals the owner approved as drafted on 2026-09-11 |
+| [§ D552](../DECISIONS.md) | *Taken 2026-09-10, on GitHub issue #478.* A price row may carry **one rate**, multiplied by a quantity the player chooses — linear only, and every row without one stays flat at its shipped price. A scenario ceiling counts a rated row at its declared most, and nothing charges a rated row one unit by default. No shipped row carries a rate yet; the first is #437's to draft for approval. |
 
 One ruled later, on 2026-09-10, narrowing how often § D526's awards pay rather than what they are:
 

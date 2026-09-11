@@ -41,7 +41,7 @@
  */
 
 import { probabilityWordIn } from '../campaign/words.js';
-import { priceOf } from '../pricing/parse.js';
+import { priceOf, purchaseUnits } from '../pricing/parse.js';
 import { repairPriceUnits, unpricedPathsIn } from '../pricing/repairPrice.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type {
@@ -160,7 +160,7 @@ export const DIAGNOSED_MAX_UNITS = 9;
  * it was already agreed and is only being moved. Nothing here may hold a second copy of it.
  */
 export function newShaftUnits(schedule: PriceSchedule): number {
-  return priceOf(schedule, 'new-car').priceUnits;
+  return purchaseUnits(priceOf(schedule, 'new-car'));
 }
 
 /**

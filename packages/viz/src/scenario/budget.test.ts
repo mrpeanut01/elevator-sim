@@ -47,8 +47,9 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { parseEngineeringBriefs, type EngineeringBriefs } from '../briefs/parse.js';
 import { editableIdsOf, parseCampaign, type CampaignContext } from '../campaign/parse.js';
 import type { Campaign, CampaignStage } from '../campaign/types.js';
+import { purchaseUnits } from '../pricing/parse.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
-import type { PriceSchedule } from '../pricing/types.js';
+import type { PriceSchedule, PricedChange } from '../pricing/types.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 
 const VIZ_SRC = join(DATA_DIR, '..', 'packages', 'viz', 'src');
@@ -158,7 +159,7 @@ describe('every shipped scenario carries a budget, and it parses', () => {
       const reachable = editableIdsOf(stage.dispatcher.editable, space.ids, schedule)
         .map((id) => changePricingDimension(schedule, id))
         .filter((change) => change !== undefined)
-        .map((change) => change.priceUnits);
+        .map((change) => purchaseUnits(change));
       expect(reachable.length, `${stage.id} reaches something the schedule prices`).toBeGreaterThan(
         0,
       );
@@ -256,7 +257,7 @@ describe('a step no price schedule can reach fails to load — #365 criterion 2'
    * figures are derived here rather than written down, so a re-priced schedule moves the case.
    */
   it('refuses a rung that affords exactly what the rung below afforded', () => {
-    const prices = [...new Set(schedule.changes.map((change) => change.priceUnits))].sort(
+    const prices = [...new Set(schedule.changes.map((change) => purchaseUnits(change)))].sort(
       (a, b) => a - b,
     );
     const bounds = scheduleBoundsOf(schedule);
@@ -642,3 +643,149 @@ function expensiveLeverStage(): CampaignStage {
   }
   return found;
 }
+
+/* -------------------------------------------------------------------------- *
+ * What a ceiling means for a row priced per unit — GitHub issue #478, § D552
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **A ceiling is every change on the ladder bought at once, and a rate row is bought at its most.**
+ *
+ * A budget's `schema.max` is selected from the ladder rather than authored beside it — the whole
+ * schedule's cost — and until #478 every row had one price, so *the whole schedule* had one reading.
+ * A row priced per unit has as many prices as its quantity has values, so the reading has to be
+ * chosen, and § D552 chooses the only one that keeps the ceiling's sentence true: *above it there is
+ * nothing left to buy*. Counted at one unit, a rung could sit above the ceiling and still buy more
+ * panels. So a rate row enters {@link scheduleBoundsOf} at its declared maximum quantity for the
+ * total and for the dearest single change, and at **one unit** for the cheapest purchase that costs
+ * anything — the smallest thing a step can buy.
+ *
+ * The rung rule moves with it, and the third case is why: *a rung enlarges what is affordable* used
+ * to count affordable **rows**, and a rung that lets a player buy a second panel of a row whose first
+ * was already affordable enlarges what they can buy without adding a row. Counted by row, that rung
+ * would be refused as the rung below wearing a second price. Counted by affordable **units** — a flat
+ * row is one unit — every flat-only schedule, the shipped one included, counts exactly as before.
+ */
+describe('what a ceiling means for a row priced per unit — #478, § D552', () => {
+  const RATE = 5;
+  const MOST = 12;
+
+  function meteredRow(over: { readonly id?: string; readonly covers?: readonly string[] } = {}): PricedChange {
+    return {
+      id: over.id ?? 'metered-fitting-fixture',
+      tier: 'equipment',
+      name: 'A metered fitting',
+      nights: 1,
+      note: 'A fixture for GitHub issue #478. Ships nowhere.',
+      covers: over.covers ?? ['fixture.rated.path'],
+      rate: {
+        unitsPer: RATE,
+        quantity: { type: 'integer', unit: 'panel', min: 0, max: MOST, default: 0 },
+      },
+      schema: { type: 'integer', unit: 'units', min: 0, max: 10, default: RATE },
+    };
+  }
+
+  function withMetered(): PriceSchedule {
+    return { ...schedule, changes: [...schedule.changes, meteredRow()] };
+  }
+
+  it('counts a rate row at its declared most for the ceiling, and at one unit for the cheapest step', () => {
+    const flat = scheduleBoundsOf(schedule);
+    const metered = scheduleBoundsOf(withMetered());
+    expect(metered.totalUnits).toBe(flat.totalUnits + RATE * MOST);
+    expect(metered.dearestChangeUnits).toBe(Math.max(flat.dearestChangeUnits, RATE * MOST));
+    expect(metered.cheapestPositiveUnits).toBe(Math.min(flat.cheapestPositiveUnits, RATE));
+    expect(metered.cheapestTierTypicalUnits).toBe(flat.cheapestTierTypicalUnits);
+  });
+
+  it('refuses a ceiling that leaves a rate row out, and accepts one that counts it at its most', () => {
+    const rich = withMetered();
+    const shippedCeiling = aBudget();
+    expect(budgetViolations('a stage', shippedCeiling, rich).join('\n')).toMatch(
+      /The ceiling is selected from the ladder/,
+    );
+    const counted: ScenarioBudget = {
+      ...shippedCeiling,
+      schema: { ...shippedCeiling.schema, max: shippedCeiling.schema.max + RATE * MOST },
+      steps: shippedCeiling.steps.map((step) => ({
+        ...step,
+        schema: { ...step.schema, max: step.schema.max + RATE * MOST },
+      })),
+    };
+    expect(
+      budgetViolations('a stage', counted, rich).filter((line) => /The ceiling is selected/.test(line)),
+    ).toEqual([]);
+  });
+
+  describe('a rung that buys one more unit of a rate row enlarges what is affordable', () => {
+    /** One tier, one flat row and one rate row at the same unit price. Total 4 + 4 × 5 = 24. */
+    const tiny = (): PriceSchedule => ({
+      version: 1,
+      tiers: [{ id: 'only', order: 1, name: 'Only', typicalUnits: 4, note: 'fixture' }],
+      changes: [
+        {
+          id: 'flat',
+          tier: 'only',
+          name: 'Flat',
+          priceUnits: 4,
+          nights: 0,
+          note: 'fixture',
+          covers: ['fixture.flat'],
+          schema: { type: 'integer', unit: 'units', min: 0, max: 10, default: 4 },
+        },
+        {
+          id: 'metered',
+          tier: 'only',
+          name: 'Metered',
+          rate: { unitsPer: 4, quantity: { type: 'integer', unit: 'panel', min: 0, max: 5, default: 0 } },
+          nights: 0,
+          note: 'fixture',
+          covers: ['fixture.metered'],
+          schema: { type: 'integer', unit: 'units', min: 0, max: 10, default: 4 },
+        },
+      ],
+      extras: [],
+      withheld: [],
+    });
+
+    const ladder = (base: number, adds: number): ScenarioBudget => {
+      const budget = aBudget();
+      const step = firstStepOf(budget);
+      return {
+        ...budget,
+        startingUnits: base,
+        schema: { ...budget.schema, min: 0, max: 24, default: base },
+        steps: [{ ...step, addsUnits: adds, schema: { ...step.schema, min: 0, max: 24, default: adds, activeWhen: null } }],
+      };
+    };
+
+    it('passes a rung from 4 to 8 units, which buys the flat row and a second panel', () => {
+      expect(budgetViolations('a stage', ladder(4, 4), tiny())).toEqual([]);
+    });
+
+    it('and still refuses a rung from 8 to 10, which buys neither another row nor another panel', () => {
+      expect(budgetViolations('a stage', ladder(8, 2), tiny()).join('\n')).toMatch(
+        /the rung below wearing a second price/,
+      );
+    });
+  });
+
+  /**
+   * **A scenario move names dimensions, and a dimension carries no quantity.** So until GitHub issue
+   * #437 gives a rate row a quantity the player chooses, a rate row reached through
+   * {@link admitPurchase} is refused loudly rather than charged for one unit — the same refusal
+   * `pricing/rate.test.ts` holds on the purchase function itself, shown here on the scenario path.
+   */
+  it('refuses to price a scenario move that reaches a rate row, rather than charging one unit', () => {
+    const rules = changePricingDimension(schedule, 'weights.waitTime');
+    if (rules === undefined) throw new Error('weights.waitTime is priced by nothing');
+    const metered = meteredRow({ id: rules.id, covers: rules.covers });
+    const reshaped: PriceSchedule = {
+      ...schedule,
+      changes: schedule.changes.map((change) => (change.id === rules.id ? metered : change)),
+    };
+    expect(admitPurchase(schedule, 999, ['weights.waitTime']).admitted).toBe(true);
+    expect(() => admitPurchase(reshaped, 999, ['weights.waitTime'])).toThrow(/#478/);
+  });
+});

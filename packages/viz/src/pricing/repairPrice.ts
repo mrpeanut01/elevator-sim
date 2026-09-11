@@ -31,7 +31,7 @@
  * one, and `fixit/parse.ts#PRICE_ORDER_OUTSTANDING` holds it where it cannot be forgotten.
  */
 
-import { changeCovering } from './parse.js';
+import { changeCovering, purchaseUnits } from './parse.js';
 import type { PriceSchedule, PricedChange } from './types.js';
 
 /**
@@ -137,9 +137,14 @@ export function unpricedPathsIn(
   return pathsIn(patch).filter((path) => changeCovering(schedule, path) === undefined);
 }
 
-/** What a repair costs: the sum of the distinct changes it buys. An empty patch is free. */
+/**
+ * What a repair costs: the sum of the distinct changes it buys. An empty patch is free.
+ *
+ * A patch names paths and carries no count, so a row priced per unit is refused here by
+ * `pricing/parse.ts#purchaseUnits` rather than charged for one unit — GitHub issue #478, § D552.
+ */
 export function repairPriceUnits(schedule: PriceSchedule, patch: RepairPatchShape): number {
-  return changesBought(schedule, patch).reduce((sum, change) => sum + change.priceUnits, 0);
+  return changesBought(schedule, patch).reduce((sum, change) => sum + purchaseUnits(change), 0);
 }
 
 /*

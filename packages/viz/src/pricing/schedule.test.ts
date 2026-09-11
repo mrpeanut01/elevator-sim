@@ -12,7 +12,14 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { parsePriceSchedule, priceOf, violationsIn, PriceScheduleError } from './parse.js';
+import {
+  parsePriceSchedule,
+  priceOf,
+  purchaseUnits,
+  smallestPurchaseUnitsOf,
+  violationsIn,
+  PriceScheduleError,
+} from './parse.js';
 import type { PriceSchedule } from './types.js';
 
 const SCHEDULE_PATH = fileURLToPath(new URL('../../../../data/price-schedule.json', import.meta.url));
@@ -53,7 +60,7 @@ describe('data/price-schedule.json — issue #366', () => {
     for (const tier of schedule.tiers) {
       const prices = schedule.changes
         .filter((change) => change.tier === tier.id)
-        .map((change) => change.priceUnits)
+        .map((change) => smallestPurchaseUnitsOf(change))
         .sort((a, b) => a - b);
       expect(tier.typicalUnits, `tier ${tier.id}`).toBe(prices[Math.floor(prices.length / 2)]);
     }
@@ -72,7 +79,7 @@ describe('data/price-schedule.json — issue #366', () => {
   it('lets a dear change in a cheap tier outprice a cheap one in a dear tier', () => {
     const schedule = shipped();
     const priceIn = (tierId: string): readonly number[] =>
-      schedule.changes.filter((change) => change.tier === tierId).map((change) => change.priceUnits);
+      schedule.changes.filter((change) => change.tier === tierId).map((change) => purchaseUnits(change));
     const equipment = priceIn('equipment');
     const building = priceIn('building');
     expect(Math.max(...equipment)).toBeGreaterThan(Math.min(...building));
@@ -201,7 +208,7 @@ describe('the schedule validator refuses what it claims to refuse', () => {
   it('catches a price outside its own declared range', () => {
     const found = broken((schedule) => {
       const [first, ...rest] = schedule.changes;
-      if (first === undefined) throw new Error('fixture');
+      if (first === undefined || first.rate !== undefined) throw new Error('fixture');
       return {
         ...schedule,
         changes: [{ ...first, priceUnits: first.schema.max + 1 }, ...rest],

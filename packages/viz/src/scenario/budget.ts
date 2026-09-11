@@ -39,7 +39,8 @@
  * - **A rung at or below the dearest single change enlarges what is affordable.** Two rungs that
  *   afford the same set of changes are one rung wearing two prices. Its second form.
  * - **No rung exceeds what the whole schedule costs.** Above that total every change on the ladder
- *   is already bought and there is nothing left for chimes to reach. Its third form.
+ *   is already bought and there is nothing left for chimes to reach. Its third form. A row priced
+ *   per unit is counted at its declared most, for that sentence's sake ([§ D552](../../../../DECISIONS.md)).
  * - **Every value sits inside its own declared schema, and the default is the shipped value** —
  *   `CLAUDE.md` invariant 8's range, and `pricing/parse.ts`'s own rule that *"the default is the
  *   shipped price, not a second opinion"*.
@@ -82,6 +83,7 @@
  * data file those two read, so no `DECISIONS.md` number is owed for it.
  */
 
+import { ceilingUnitsOf, purchaseUnits, smallestPurchaseUnitsOf } from '../pricing/parse.js';
 import type { PriceSchedule, PricedChange, WithheldChange } from '../pricing/types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -202,30 +204,46 @@ export function rungsOf(budget: ScenarioBudget): readonly BudgetRung[] {
 export interface ScheduleBounds {
   /** The typical of the tier at the bottom of the ladder — the floor a base must clear. */
   readonly cheapestTierTypicalUnits: number;
-  /** The cheapest change that costs anything at all. A step below this buys nothing. */
+  /** The cheapest change that costs anything at all — a rated row at one unit. A step below this buys nothing. */
   readonly cheapestPositiveUnits: number;
-  /** The dearest single change. Above this rung, what a step buys is a combination. */
+  /** The dearest single change — a rated row at its declared most. Above this rung, a step buys a combination. */
   readonly dearestChangeUnits: number;
-  /** Every change on the ladder, bought at once. No rung may exceed it. */
+  /** Every change on the ladder, bought at once, each rated row at its declared most (§ D552). No rung may exceed it. */
   readonly totalUnits: number;
 }
 
 /** {@link ScheduleBounds}, derived. A schedule pricing nothing yields zeroes and is its own bug. */
 export function scheduleBoundsOf(schedule: PriceSchedule): ScheduleBounds {
-  const prices = schedule.changes.map((change) => change.priceUnits);
-  const positive = prices.filter((price) => price > 0);
+  const smallest = schedule.changes.map((change) => smallestPurchaseUnitsOf(change));
+  const most = schedule.changes.map((change) => ceilingUnitsOf(change));
+  const positive = smallest.filter((price) => price > 0);
   const byOrder = [...schedule.tiers].sort((a, b) => a.order - b.order);
   return {
     cheapestTierTypicalUnits: byOrder[0]?.typicalUnits ?? 0,
     cheapestPositiveUnits: positive.length === 0 ? 0 : Math.min(...positive),
-    dearestChangeUnits: prices.length === 0 ? 0 : Math.max(...prices),
-    totalUnits: prices.reduce((sum, price) => sum + price, 0),
+    dearestChangeUnits: most.length === 0 ? 0 : Math.max(...most),
+    totalUnits: most.reduce((sum, price) => sum + price, 0),
   };
 }
 
-/** The changes a rung of `units` can afford one at a time. */
+/** The changes a rung of `units` can afford one at a time — a rated row once one unit of it is. */
 export function affordableChanges(schedule: PriceSchedule, units: number): readonly PricedChange[] {
-  return schedule.changes.filter((change) => change.priceUnits <= units);
+  return schedule.changes.filter((change) => smallestPurchaseUnitsOf(change) <= units);
+}
+
+/**
+ * How many purchases a rung of `units` affords, one change at a time: a flat change is one, and a
+ * rated change counts every unit of it the rung can pay for, up to its declared most. *A rung
+ * enlarges what is affordable* counts this rather than rows, so a rung that buys a second panel is
+ * not refused as the rung below wearing a second price, and a flat-only schedule counts exactly as
+ * it did before § D552.
+ */
+function affordablePurchasesAt(schedule: PriceSchedule, units: number): number {
+  return affordableChanges(schedule, units).reduce((count, change) => {
+    if (change.rate === undefined) return count + 1;
+    const { unitsPer, quantity } = change.rate;
+    return count + Math.min(quantity.max, Math.floor(units / unitsPer));
+  }, 0);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -327,6 +345,11 @@ export interface PurchaseAdmission {
  * move is refused whatever `units` holds, and the reason says so rather than quoting a price. The
  * priced dimensions beside it are still summed into {@link PurchaseAdmission.units}, so a reader can
  * see the refusal is about the withheld dial and not about the bill.
+ *
+ * **A dimension priced per unit throws** ([§ D552](../../../../DECISIONS.md)). A move names dimensions
+ * and carries no count, so there is no quantity to multiply a rate by, and charging one unit would be
+ * choosing how many for the player. `pricing/parse.ts#purchaseUnits` refuses it; no shipped row
+ * carries a rate until GitHub issue #437 gives one a quantity the player chooses.
  */
 export function admitPurchase(
   schedule: PriceSchedule,
@@ -348,7 +371,7 @@ export function admitPurchase(
     if (change === undefined) unpriced.push(id);
     else bought.set(change.id, change);
   }
-  const cost = [...bought.values()].reduce((sum, change) => sum + change.priceUnits, 0);
+  const cost = [...bought.values()].reduce((sum, change) => sum + purchaseUnits(change), 0);
   const changeIds = [...bought.keys()];
   if (withheld.length > 0) {
     return {
@@ -451,12 +474,12 @@ export function budgetViolations(
             'nothing above it left to buy.',
         );
       } else if (rung.units <= bounds.dearestChangeUnits) {
-        const now = affordableChanges(schedule, rung.units).length;
-        const wasBefore = affordableChanges(schedule, below.units).length;
+        const now = affordablePurchasesAt(schedule, rung.units);
+        const wasBefore = affordablePurchasesAt(schedule, below.units);
         if (now <= wasBefore) {
           out.push(
             `${at}: lifts the budget from ${String(below.units)} to ${String(rung.units)} units ` +
-              `and the same ${String(now)} changes are affordable either side of it. No price ` +
+              `and the same ${String(now)} purchases are affordable either side of it. No price ` +
               'schedule can reach this step: it is the rung below wearing a second price.',
           );
         }

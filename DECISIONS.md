@@ -35305,6 +35305,70 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 
 ---
 
+## D552 — A price row may carry one rate, multiplied by a quantity the player chooses: linear, flat rows unchanged, a ceiling at the declared most, and no purchase without a quantity
+
+**Date: 2026-09-11 · GitHub issue #478 · The product owner's ruling of 2026-09-10 on that issue · Extends [§ D525](#d525) clause 2's one price schedule and the schedule format [§ D535](#d535) last changed.**
+
+**Decided by the product owner, 2026-09-10**, on the issue: *"Linear rate × quantity. A price-schedule
+row may carry one data-declared per-unit rate, multiplied by a quantity the player chooses —
+destination panels per floor is the first case. Linear only, no curves. Rows without a rate stay
+flat, so every existing price is unchanged. Figures are drafted for approval under the standing
+`data/` ruling. This unblocks #437."*
+
+**Why an entry.** The shape is `data/price-schedule.json`'s, and every module that charges a price
+reads it: `scenario/budget.ts` derives every scenario's ceiling from it, and `fixit/`,
+`campaign/economy.ts`, `live/interventions.ts` and `scenario/survivorSpace.ts` charge from it. What a
+ceiling means for a row with more than one price is a rule those modules share and none of them owns.
+
+1. **A row is flat or rated, never both.** A flat row carries `priceUnits`, as every shipped row
+   does. A rated row carries `rate: { unitsPer, quantity }` and no `priceUnits`. `pricing/parse.ts`
+   refuses a row carrying both, and refuses any other key at every level of a rated row: inside
+   `rate`; inside its `quantity`, which carries only `type`, `unit`, `min`, `max` and `default`;
+   inside its `schema`, which carries the same five; and beside it on the row, where any key a flat
+   row does not define is refused. No bands, no curve, no fixed part, wherever one is written — which
+   is *linear only* made mechanical. **Flat rows are not held to it**: their parser has never refused
+   a key it does not read, and this decision does not start. `PricedChange` is a union on that split,
+   so a reader that takes `priceUnits` off a rated row does not compile.
+2. **What buying costs is one function, with one known exception.**
+   `pricing/parse.ts#purchaseUnits(change, quantity)` is the only place a **rate** is multiplied by
+   a quantity: `unitsPer × quantity` for a rated row, the flat figure for a flat row. It refuses a
+   rated row bought with no quantity rather than charging one unit, because one unit is a quantity
+   chosen for the player; and it refuses a quantity on a flat row rather than multiplying a figure
+   that declared no rate. Every path that summed `priceUnits` goes through it — repair patches,
+   scenario moves, the fix-it editor, the campaign shop, the live works control and the survivor
+   bundles — and none of them passes it a quantity, so a rated row reached through one of them fails
+   loudly. **The exception is the fix-it editor, which multiplies a flat price in code.**
+   `fixit/engine.ts#editorPricingFrom` reads `faster-machines` and `larger-car-step` through
+   `purchaseUnits` as flat figures, and `fixit/engine.ts#spendOf` multiplies each by the step count
+   the player chose: `speedSteps × speedUnitsPerHalfMps` and
+   `capacitySteps × capacityUnitsPerTwoPlaces`. Those two multiplications produce identical figures
+   today to what the seam would charge a rated row at the same price for the same count. GitHub
+   issue #528 tracks moving them onto the seam; until it lands, turning either row into a rated one
+   makes `editorPricingFrom`, and `spendOf` with it, throw. `fixit/engine.test.ts` holds both halves.
+3. **Invariant 8, twice.** A rated row's `schema` describes its rate, as a flat row's describes its
+   price: in range, and a default equal to the figure. The quantity declares its own integer schema —
+   its unit, a floor and a default of **0**, meaning none bought, and a ceiling of at least one. A
+   rate of 0 is refused as a free flat row wearing a multiplier.
+4. **A ceiling is every change bought at once, and a rated row is bought at its most.**
+   `scenario/budget.ts#scheduleBoundsOf` counts a rated row at `unitsPer × quantity.max` for the
+   whole schedule and for the dearest single change, and at `unitsPer` — one unit — for the cheapest
+   purchase that costs anything. The ceiling's own sentence chose this: above it there is nothing
+   left to buy, which stops being true if a rated row counts at one unit. `pricing/parse.ts`'s tier
+   median reads a rated row at one unit too, the price on its face. The rung rule counts affordable
+   **units** rather than affordable rows — a flat row is one unit — so a rung that buys a second
+   panel enlarges what is affordable, and a flat-only schedule counts exactly as before.
+5. **No shipped row carries a rate yet.** Every price in `data/price-schedule.json` is unchanged, so
+   are the tier typicals and the schedule's total, and so is every scenario's ceiling.
+   `pricing/rate.test.ts` holds that empty register, and the change that adds the first rated row
+   replaces it with that row's run-change test.
+
+**What this does not decide.** Any figure: the first rate, its tier, its nights and its quantity's
+ceiling are GitHub issue #437's to draft for approval. And where a quantity comes from: a scenario
+move names dimensions and a repair patch names paths, neither carries a count, so how a player
+chooses one is #437's too.
+
+---
+
 ## D555 — A day left unfinished, or put down for a campaign offer, files nothing: the run in flight is cancelled and the run that stands is refused at filing
 
 **Date: 2026-09-11 · GitHub issue #526 · Found by the independent review of GitHub PR #525 · Extends #136's refusal in `shift/banking.ts`.**
