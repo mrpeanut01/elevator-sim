@@ -1859,9 +1859,10 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     {
       reason:
         'A template id, not prose — GitHub issue #220, § D515. `endless-rush` names the record in ' +
-        '`data/traffic-profiles.json` and `rushPatchOf` writes it into `ViewerState.freePlay`; what ' +
-        'a player reads of the rush is `EVERYDAY_RUSH`’s result and stage header, which it seeds.',
-      ids: ['everyday/rush.ts#RUSH_TEMPLATE_ID', 'everyday/rush.ts#rushPatchOf'],
+        '`data/traffic-profiles.json` and `rushPatchOf` writes it into `ViewerState.freePlay`, and ' +
+        '`rushBuildingOf` resolves the building under that same selection (§ D548); what a player ' +
+        'reads of the rush is `EVERYDAY_RUSH`’s result and stage header, which it seeds.',
+      ids: ['everyday/rush.ts#RUSH_TEMPLATE_ID', 'everyday/rush.ts#rushBuildingOf', 'everyday/rush.ts#rushPatchOf'],
     },
     {
       reason:
