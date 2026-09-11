@@ -17,7 +17,7 @@
  *
  * ## The library is now complete
  *
- * `data/dispatcher-profiles.json → terms` declares thirteen terms and all thirteen are implemented,
+ * `data/dispatcher-profiles.json → terms` declares fourteen terms and all fourteen are implemented,
  * so {@link IMPLEMENTED_TERM_IDS} and {@link DECLARED_TERM_IDS} name the same set and
  * `ResolvedDispatchConfig.pendingWeights` is empty for every profile the file ships.
  *
@@ -59,6 +59,7 @@
 import type { CostTermDefinition } from '../types.js';
 
 import { crowdingTerm } from './crowding.js';
+import { dutyMismatchTerm } from './dutyMismatch.js';
 import { detourPenaltyTerm } from './detourPenalty.js';
 import { diversionDetourTerm } from './diversionDetour.js';
 import { directionReversalTerm } from './directionReversal.js';
@@ -75,8 +76,10 @@ import { zoneAffinityTerm } from './zoneAffinity.js';
 /**
  * Every implemented cost term, in the order `data/dispatcher-profiles.json` declares them.
  *
- * All thirteen of docs/06-parameterization-and-tuning.md § Term library: the three Phase 2 owed
- * (the AWT term, the energy proxy, the collective-behaviour term) and the nine Phase 5 owed.
+ * All fourteen of docs/06-parameterization-and-tuning.md § Term library: the three Phase 2 owed
+ * (the AWT term, the energy proxy, the collective-behaviour term), the nine Phase 5 owed,
+ * `diversionDetour` (`DECISIONS.md` § D211) and `dutyMismatch` (GitHub issue #481, § D549). This
+ * sentence said *"thirteen"* over a list that summed to twelve until the last one was added.
  */
 export const COST_TERMS: readonly CostTermDefinition[] = Object.freeze([
   waitTimeTerm,
@@ -92,10 +95,11 @@ export const COST_TERMS: readonly CostTermDefinition[] = Object.freeze([
   zoneAffinityTerm,
   predictedDemandTerm,
   crowdingTerm,
+  dutyMismatchTerm,
 ]);
 
 /**
- * Every term id the library declares, implemented or not — the thirteen rows of
+ * Every term id the library declares, implemented or not — the fourteen rows of
  * `data/dispatcher-profiles.json → terms`, in file order.
  *
  * The vocabulary a profile may weight. A weight on anything else is a typo, and a typo is not a
@@ -124,6 +128,7 @@ export const DECLARED_TERM_IDS: readonly string[] = Object.freeze([
   'zoneAffinity',
   'predictedDemand',
   'crowding',
+  'dutyMismatch',
 ]);
 
 const DECLARED_TERM_ID_SET: ReadonlySet<string> = new Set(DECLARED_TERM_IDS);
@@ -158,6 +163,7 @@ export function isImplementedTerm(id: string): boolean {
  * -------------------------------------------------------------------------- */
 
 export { crowdingTerm, spareSeatsOnArrival, unservedQueueFraction } from './crowding.js';
+export { dutyMismatchOf, dutyMismatchTerm } from './dutyMismatch.js';
 
 export { detourPassengerSeconds, detourPenaltyTerm } from './detourPenalty.js';
 export {

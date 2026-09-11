@@ -152,8 +152,12 @@ describe('a candidate survives the trip to a profile and back, exactly', () => {
     // a declared vocabulary, not dimensions an optimizer samples (the same standing as the
     // file-level `patternSwitching` arm map) — so it is the one section absent from the space's
     // own section set below.
+    //
+    // And the space alone moved with GitHub issue #481: `weights.dutyMismatch` joins the `weights`
+    // section, so the space goes 59 → 60 and the section count does not — a new knob, not a schema
+    // change.
     expect(PROFILE_OBJECT_SECTIONS.length).toBe(8);
-    expect(SPACE.parameters.length).toBe(59);
+    expect(SPACE.parameters.length).toBe(60);
     expect(new Set(SPACE.parameters.map((parameter) => parameter.section))).toStrictEqual(
       new Set([
         'weights',

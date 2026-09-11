@@ -27,8 +27,9 @@
  *
  * Two consequences here, and both are enforced rather than documented:
  *
- * 1. {@link inertTerms} names, for a given spec, every weighted term the engine will not read —
- *    today that is `rideTime` under a non-destination `callType`, which is exactly § D112's case.
+ * 1. {@link inertTerms} names, for a given spec on a given building, every weighted term the engine
+ *    will not read — today that is `rideTime` under a non-destination `callType`, which is exactly
+ *    § D112's case, and `dutyMismatch` on a building no car of which declares a duty (§ D549).
  *    The editor draws the refusal beside the control rather than dropping it (the pattern
  *    `docs/10` § 11 W4 established for the generated parameter form).
  * 2. {@link toProfile} never writes a weight of zero. Saturating normalization maps a raw zero to
@@ -36,7 +37,7 @@
  *    honest spelling, because it does not claim the dispatcher considers something it does not.
  */
 
-import { COST_TERMS_BY_ID, type DispatcherProfile } from '@elevator-sim/core/browser';
+import { COST_TERMS_BY_ID, buildingDeclaresDuty, type DispatcherProfile } from '@elevator-sim/core/browser';
 import {
   applyPatch,
   candidateFromProfile,
@@ -410,18 +411,71 @@ function assignOrDelete(target: Record<string, unknown>, key: string, value: obj
 }
 
 /**
- * Terms this spec weights that the engine will not read, with the reason.
+ * The part of a building the inert-term rule reads: which of its cars declare a duty.
  *
- * `rideTime` is the whole of the list today, and it is § D112's defect stated as a rule rather than
- * discovered again: the term's own `activeWhen` declares it inert unless the call carries a
- * destination, so weighting it under `up-down-buttons` is authoring decoration.
+ * `core`'s own parameter type for `buildingDeclaresDuty`, so the authored document (the Engineer
+ * editor's standing selection) and the resolved building (the workshop's, a scenario's, the honesty
+ * corpus's) are both accepted, and no surface resolves a building only to ask this.
+ */
+export type DutyDeclarations = Parameters<typeof buildingDeclaresDuty>[0];
+
+/** An inert term and the sentence drawn beside its control. */
+interface InertTerm {
+  readonly termId: TermId;
+  readonly why: string;
+}
+
+/**
+ * Terms no weight can make bite on this building, whatever else the dispatcher says, with the reason.
+ *
+ * `dutyMismatch` is the whole of the list today — GitHub issue #481, `DECISIONS.md` § D549. A
+ * mismatch is priced only on a call that carries a duty, and only a building in which some car
+ * declares one generates such a call. That is the condition `core`'s liveness register states for
+ * `weights.dutyMismatch`, and it is asked through `core`'s `buildingDeclaresDuty` — the predicate the
+ * trace generator asks before it draws a duty at all — rather than by a second reading of the cars.
+ *
+ * A standing id that names no building (`undefined`) declares nothing: no run can be built on it, so
+ * no run carries a duty either.
+ */
+function termsInertOnBuilding(building: DutyDeclarations | undefined): readonly InertTerm[] {
+  if (building !== undefined && buildingDeclaresDuty(building)) return [];
+  return [
+    {
+      termId: 'dutyMismatch',
+      why:
+        'inert on this building — no car in this building declares a duty, so no call carries one ' +
+        'to be wrong about and this weight changes no decision (§ D549).',
+    },
+  ];
+}
+
+/**
+ * Terms this spec weights that the engine will not read on this building, with the reason.
+ *
+ * Two rules, each stated as a rule rather than discovered again:
+ *
+ * - `rideTime` is § D112's defect: the term's own `activeWhen` declares it inert unless the call
+ *   carries a destination, so weighting it under `up-down-buttons` is authoring decoration.
+ * - `dutyMismatch` is § D549's: inert on a building no car of which declares a duty
+ *   ({@link termsInertOnBuilding}). Not a gate `activeWhen` can express, because the condition is the
+ *   building rather than any dispatcher parameter — which is why the building is an argument here.
+ *
+ * **The building is required**, for `scenario/survivorSpace.ts`'s reason on #475: an optional
+ * building is a refusal some caller will not pass, and the defect this closes was exactly that — the
+ * Engineer editor and the Everyday workshop drew a duty slider with no refusal beside it, because
+ * nothing handed them a building. Callers pass the **standing** selection, the building the next run
+ * is built from, because that is the run a weight moved there reaches.
  *
  * Returned rather than corrected. Silently turning the flag on would change the passenger model
  * under a reader who moved a slider; silently dropping the weight would hide that they had asked
- * for something. The editor draws the sentence.
+ * for something. The editor draws the sentence — and only for a term the spec **weights**, which is
+ * § D112's shape kept: the refusal is about a weight the engine will not read.
  */
-export function inertTerms(spec: DispatcherSpec): readonly { readonly termId: TermId; readonly why: string }[] {
-  const out: { termId: TermId; why: string }[] = [];
+export function inertTerms(
+  spec: DispatcherSpec,
+  building: DutyDeclarations | undefined,
+): readonly { readonly termId: TermId; readonly why: string }[] {
+  const out: InertTerm[] = [];
   if ((spec.weights['rideTime'] ?? 0) > 0 && !spec.flags.pool) {
     out.push({
       termId: 'rideTime',
@@ -430,7 +484,29 @@ export function inertTerms(spec: DispatcherSpec): readonly { readonly termId: Te
         'weight changes no decision, which is exactly what destination-eta shipped doing (§ D112).',
     });
   }
+  for (const inert of termsInertOnBuilding(building)) {
+    if ((spec.weights[inert.termId] ?? 0) > 0) out.push(inert);
+  }
   return out;
+}
+
+/**
+ * The dimension ids a player can be offered on this building: `ids` less every `weights.<term>` no
+ * weight can make bite there ({@link termsInertOnBuilding}), in the order given.
+ *
+ * The scenario half of the decision the editor's refusal draws from — § D549. A scenario does not
+ * draw a refusal beside a dial; it neither offers the dial nor lets its survivor sweep draw and price
+ * it, because a dial that cannot change a run on the scenario's own building is not one the budget
+ * reaches (`scenario/survivorSpace.ts`'s module docstring). `dev/campaignPanel.ts` resolves a stage's
+ * editable set against these ids, and `survivorSpace.ts#sampleReachableConfigurations` draws only
+ * from them. Order is kept, because the space's order is the order gates are written in.
+ */
+export function dimensionIdsLiveOn(
+  ids: readonly string[],
+  building: DutyDeclarations | undefined,
+): readonly string[] {
+  const inert = new Set(termsInertOnBuilding(building).map((entry) => `weights.${entry.termId}`));
+  return inert.size === 0 ? ids : ids.filter((id) => !inert.has(id));
 }
 
 /** Whether the editor's copy differs from the profile it was read from. */

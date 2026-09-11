@@ -28,6 +28,7 @@ import { TRAFFIC_DEFAULTS, loadConfig, type LoadedConfig } from '@elevator-sim/c
 
 import { requireSecret } from './accounts/credentials.js';
 import { loadChimeLedger, loadChimeTurnBounds } from './chimes/ledger.js';
+import { loadRushPurse } from './leaderboard/rushSitting.js';
 import {
   CHALLENGE_ROTATION,
   challengeDefinitionIssues,
@@ -35,6 +36,7 @@ import {
 } from './challenge/schedule.js';
 import type { ChallengeDataFacts } from './challenge/submission.js';
 import { createApi, type Api, type ApiDeps } from './http/api.js';
+import { createRushReplays } from './leaderboard/rushReplayPool.js';
 import { acsMailerFrom } from './mail/acsMailer.js';
 import { OutboxMailer, type Mailer } from './mail/mailer.js';
 import { digestOf, type ResolvedDataFacts, type SubmittedRun } from './leaderboard/submission.js';
@@ -109,8 +111,32 @@ function seedTokenFrom(env: Readonly<Record<string, string | undefined>>): strin
   return token;
 }
 
+/**
+ * How many rush sittings this process replays at once — `ELEVATOR_SIM_RUSH_REPLAYS`, PR #513's review,
+ * finding 2; the argument is `leaderboard/rushSitting.ts`'s cost section.
+ *
+ * **One unless configured.** The container this ships to is given half a core
+ * (`infra/azure/main.bicep`), and what two replays at once cost there is unmeasured — so the figure is
+ * the one that is certainly safe, and an operator who measures a larger box can raise it. Refused when
+ * set to anything but a whole number from one to eight, on {@link seedTokenFrom}'s ground: a limit an
+ * operator mistyped should stop the boot, not quietly become some other limit.
+ */
+function rushReplayLimitFrom(env: Readonly<Record<string, string | undefined>>): number {
+  const raw = env['ELEVATOR_SIM_RUSH_REPLAYS'];
+  if (raw === undefined || raw.trim().length === 0) return 1;
+  const limit = Number(raw);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 8) {
+    throw new UnsafeConfigurationError(
+      `ELEVATOR_SIM_RUSH_REPLAYS is "${raw}". It is how many rush sittings this server replays at once, ` +
+        'and it must be a whole number from 1 to 8.',
+    );
+  }
+  return limit;
+}
+
 export async function bootstrap(options: BootstrapOptions): Promise<Server> {
   const secret = requireSecret(options.env);
+  const rushReplayLimit = rushReplayLimitFrom(options.env);
   const config = await loadConfig(options.dataDir);
   /*
    * The chime ledger's table — GitHub issue #368. Loaded here with everything else that reads the
@@ -126,6 +152,14 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
    * ledger's own reason one statement up.
    */
   const chimeTurns = await loadChimeTurnBounds(options.dataDir, config.trafficProfiles);
+  /*
+   * And the rush purse — GitHub issue #372. After the ledger, because every top-up it names has to be a
+   * sink that ledger sells; a throw here is right on the ledger's own ground, since a server whose
+   * purse will not load would refuse every sitting at the moment a player posted one.
+   */
+  const rushPurse = await loadRushPurse(options.dataDir, chimeLedger);
+  // Threads start on the first sitting that needs one, so a boot that throws below leaves none running.
+  const rushReplays = createRushReplays({ dataDir: options.dataDir, limit: rushReplayLimit });
   const now = options.now ?? ((): number => Date.now());
 
   // Three sources, most explicit first: what a test passed, what the environment configures, and
@@ -166,6 +200,8 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
     signInUrl: signInUrlFor(options.publicOrigin),
     chimeLedger,
     chimeTurns,
+    rushPurse,
+    rushReplays,
   };
 
   return {
@@ -174,6 +210,7 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
     mailer,
     config,
     close: async () => {
+      await rushReplays.close();
       await store.close();
     },
   };

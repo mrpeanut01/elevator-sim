@@ -137,16 +137,63 @@ export function boardDistributionOf(
 ): BoardDistribution {
   const ladders = [...byAxis.entries()].map(([axis, observations]) => axisLadderOf(axis, observations));
   const n = Math.max(0, ...ladders.map((ladder) => ladder.n));
-  const withheld =
-    n < MIN_LADDER_N
-      ? `${String(n)} ${n === 1 ? 'player has' : 'players have'} posted to this board. A ladder needs ${String(MIN_LADDER_N)}: below that its outer rungs are one player's run, and a world figure that is one person is not a world figure.`
-      : undefined;
+  const withheld = withheldFor(n);
   return {
     boardKey,
     n,
     ladders,
     withheld,
     absent: [{ axis: 'energy', reason: ENERGY_ABSENT_REASON }],
+    note: DISTRIBUTION_NOTE,
+  };
+}
+
+/** Why a board's ladder is withheld, or `undefined` when it is published — one sentence for every board. */
+function withheldFor(n: number): string | undefined {
+  return n < MIN_LADDER_N
+    ? `${String(n)} ${n === 1 ? 'player has' : 'players have'} posted to this board. A ladder needs ${String(MIN_LADDER_N)}: below that its outer rungs are one player's run, and a world figure that is one person is not a world figure.`
+    : undefined;
+}
+
+/**
+ * The rush board's ladder — how long each player's best sitting held — GitHub issue **#372**, § D543.
+ *
+ * **One axis, on every rule the four above keep.** The same type-7 rungs at the same five points, the
+ * same real sitting at the lower median, the same count published beside a ladder withheld below
+ * {@link MIN_LADDER_N} (§ D506's floor, inherited rather than restated), and no interval, for the
+ * reason the module note gives. It is its own function rather than a fifth {@link AxisLadder} because
+ * a rush has none of the four ranked waits — its mean is not quotable by design — and held seconds is
+ * not a `BoardMetric`; widening that type would let the daily board rank on a figure no daily run has.
+ *
+ * Longer is better on this axis and shorter on the other four. The rungs do not care: a quantile is
+ * the same value read from either end, and the ladder publishes values rather than an order.
+ */
+export interface HeldLadder {
+  readonly boardKey: string;
+  /** Players contributing, one best sitting each. Published even when the ladder is withheld. */
+  readonly n: number;
+  readonly rungs: Readonly<Record<'p10' | 'p25' | 'p50' | 'p75' | 'p90', number>> | undefined;
+  /** A real sitting at the lower median, or `undefined` with the ladder. */
+  readonly medianEntryId: string | undefined;
+  readonly withheld: string | undefined;
+  readonly note: string;
+}
+
+export function heldLadderOf(boardKey: string, observations: readonly AxisObservation[]): HeldLadder {
+  const sorted = [...observations].sort((a, b) => a.value - b.value || a.entryId.localeCompare(b.entryId));
+  const n = sorted.length;
+  const withheld = withheldFor(n);
+  if (withheld !== undefined) {
+    return { boardKey, n, rungs: undefined, medianEntryId: undefined, withheld, note: DISTRIBUTION_NOTE };
+  }
+  const values = sorted.map((row) => row.value);
+  const [p10, p25, p50, p75, p90] = LADDER_RUNGS.map((p) => quantileOf(values, p)) as [number, number, number, number, number];
+  return {
+    boardKey,
+    n,
+    rungs: { p10, p25, p50, p75, p90 },
+    medianEntryId: sorted[Math.floor((n - 1) / 2)]?.entryId,
+    withheld: undefined,
     note: DISTRIBUTION_NOTE,
   };
 }

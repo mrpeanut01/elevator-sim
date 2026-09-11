@@ -11,6 +11,7 @@ import {
   MIN_LADDER_N,
   axisLadderOf,
   boardDistributionOf,
+  heldLadderOf,
   quantileOf,
   type AxisObservation,
 } from './distribution.js';
@@ -95,5 +96,28 @@ describe('boardDistributionOf', () => {
     );
     expect(enough.withheld).toBeUndefined();
     expect(enough.ladders[0]?.rungs?.p50).toBeCloseTo(19.5, 9);
+  });
+});
+
+describe('the rush board’s ladder — how long people held, GitHub issue #372', () => {
+  it('withholds the rungs below twenty players and still publishes the count', () => {
+    const ladder = heldLadderOf('rush:garden-apartments:2026-09-01', observations([1_178, 1_092, 1_114]));
+    expect(ladder.n).toBe(3);
+    expect(ladder.rungs).toBeUndefined();
+    expect(ladder.medianEntryId).toBeUndefined();
+    expect(ladder.withheld).toContain(String(MIN_LADDER_N));
+  });
+
+  it('publishes the same five rungs every ladder does at twenty, and a real sitting at the median', () => {
+    const values = Array.from({ length: MIN_LADDER_N }, (_unused, index) => 1_000 + index * 30);
+    const ladder = heldLadderOf('rush:garden-apartments:2026-09-01', observations([...values].reverse()));
+    expect(ladder.n).toBe(MIN_LADDER_N);
+    expect(ladder.withheld).toBeUndefined();
+    expect(ladder.rungs?.p50).toBeCloseTo(quantileOf(values, 0.5), 9);
+    expect(ladder.rungs?.p10).toBeCloseTo(quantileOf(values, 0.1), 9);
+    // The lower median of twenty ascending held times is the tenth, and it is somebody's sitting.
+    const median = observations([...values].reverse()).find((row) => row.value === values[9]);
+    expect(ladder.medianEntryId).toBe(median?.entryId);
+    expect(ladder.note).toBe(DISTRIBUTION_NOTE);
   });
 });

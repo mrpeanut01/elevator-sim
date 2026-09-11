@@ -429,6 +429,25 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
     scheduled: true,
   },
   /*
+   * GitHub issue #372's replay-cost measurement, and a fourth reason a tier is not scheduled.
+   *
+   * The owner's ruling put the order in words: the replay cost per round is measured **before**
+   * `leaderboard/verify.ts`'s refusal of `endless-rush` is lifted. That happened once, on the commit
+   * before the lift, and the table it wrote is dated and published in `rushSitting.ts`'s docstring
+   * beside its command. What it measures is wall time on a machine, which this repository refuses to
+   * turn into a gate; what a pull request must keep true of the same path — one simulation a round —
+   * is asserted ungated by `rushSitting.test.ts` (`simulations` on every verification), so a nightly
+   * re-run would publish a machine's afternoon and check nothing the ordinary suite does not.
+   */
+  'packages/server/src/leaderboard/rushSitting.cost.test.ts': {
+    gates: ['RUSH_SITTING_COST_OUT'],
+    reason:
+      'the replay cost of one rush round on the server’s own path, measured once before the refusal ' +
+      'of endless-rush was lifted and published with its command; the count it owns is asserted ungated ' +
+      'by rushSitting.test.ts, and a wall-clock figure is a claim about a machine rather than a check',
+    scheduled: false,
+  },
+  /*
    * The one that must stay off, and the reason it is in this table rather than absent from it.
    *
    * `ELEVATOR_SIM_REGENERATE_GOAL_RATES=1` does not open a tier — it **closes** one. Measured with

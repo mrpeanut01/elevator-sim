@@ -76,6 +76,9 @@ const DEMAND_SAMPLE = {
   // record most needs to survive the round trip, and the one a projection that dropped the block
   // would silently turn back into the shipped share.
   credentialGap: { wrongZoneShare: 0 },
+  // GitHub issue #481. One share named alone, so a parser or a projection that dropped the other
+  // two's fallback, or the block, is caught rather than reading as the data's shares.
+  duty: { shares: { goods: 0.1 } },
   maxLegs: 4,
   peakWindowS: 420,
   baselineFraction: 0.25,
@@ -104,7 +107,8 @@ describe('the stored record carries every demand override', () => {
    * not quietly shrinking either — a row deleted to make a failure go away shows up here.
    */
   it('samples every field the demand surface declares', () => {
-    expect(Object.keys(DEMAND_SAMPLE).length).toBe(15);
+    // 16 since GitHub issue #481's `duty` override.
+    expect(Object.keys(DEMAND_SAMPLE).length).toBe(16);
   });
 
   /**

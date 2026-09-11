@@ -65,6 +65,8 @@ function profilesWith(template: Record<string, unknown>): unknown {
     demandTemplates: [template],
     passengerMass: { distribution: 'normal', meanKg: 75, stdDevKg: 15, minKg: 40 },
     credentialGap: { wrongZoneShare: 0 },
+    // Required beside credentialGap, for its reason (GitHub issue #481).
+    duty: { shares: { goods: 0, bed: 0, service: 0 } },
   };
 }
 

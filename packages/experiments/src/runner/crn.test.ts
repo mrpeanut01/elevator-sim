@@ -209,6 +209,7 @@ describe('traceKeyOf', () => {
        * be arithmetic across two populations.
        */
       credentialGap: { credentialGap: { wrongZoneShare: 0 } },
+      duty: { duty: { shares: { goods: 0.5 } } },
       maxLegs: { maxLegs: 4 },
       peakWindowS: { peakWindowS: 420 },
       baselineFraction: { baselineFraction: 0.25 },

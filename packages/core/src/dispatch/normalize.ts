@@ -230,6 +230,8 @@ export const TERM_SCALE_NOTES: Readonly<Record<string, string>> = Object.freeze(
     'Demand-weighted mean metres between where the car ends up and where demand is forecast. A shaft distance, so distanceM.',
   crowding:
     'Share of the landing this car would leave behind. A fraction of a queue cannot exceed the queue, so bounded at 1.',
+  dutyMismatch:
+    'An indicator: 1 when the rider’s duty is not the car’s, 0 when it is. Bounded at 1 because there is nothing between a match and a mismatch, so the weight alone is the price of sending a car that is not for the trip (GitHub issue #481).',
 });
 
 /** One term's place on the shared scale: which map, and the raw values that reach half and full. */

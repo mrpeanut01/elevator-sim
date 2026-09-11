@@ -30,7 +30,13 @@
  * by the config module.
  */
 
-import type { DirectionalSplit, ResolvedBuilding, TrafficProfiles } from '../config/types.js';
+import type {
+  DirectionalSplit,
+  Duty,
+  DutyShares,
+  ResolvedBuilding,
+  TrafficProfiles,
+} from '../config/types.js';
 import type { SimTime } from '../kernel/index.js';
 import type { CredentialGroup } from '../model/index.js';
 // A *value* import, and the narrow path rather than the barrel: `TRAFFIC_PARAMETERS` declares the
@@ -478,6 +484,15 @@ export interface GeneratedPassenger {
   readonly massKg: number;
   /** Access credential, or `undefined` for an unbadged visitor. */
   readonly credentialGroup: CredentialGroup | undefined;
+  /**
+   * What this journey needs a car for — `DUTIES`, GitHub issue #481.
+   *
+   * **Absent — not `undefined`-valued — in every building in which no car declares a duty**, for
+   * {@link transportHops}' reason: a trace from such a building must be the object it was before
+   * this field existed. The draw behind it is taken for every passenger regardless, from the `duty`
+   * stream, so declaring a goods car changes this column and nothing else.
+   */
+  readonly duty?: Duty | undefined;
   readonly category: DirectionCategory;
   /** Floor whose population generated this trip. */
   readonly demandFloorId: string;
@@ -680,6 +695,18 @@ export type CredentialAssignment = (typeof CREDENTIAL_ASSIGNMENTS)[number];
 export interface CredentialGapOverride {
   /** Share, `0..1`. See `config/types.ts` § `CredentialGapConfig`. */
   readonly wrongZoneShare: number;
+}
+
+/**
+ * Override `data/traffic-profiles.json`'s `duty` block — GitHub issue #481.
+ *
+ * {@link CredentialGapOverride}'s shape, with one difference: each share may be named alone, and an
+ * unnamed one falls back to the data. A search that moves the goods share should not have to restate
+ * the bed share to do it, and restating it would be a second source of truth for a number the data
+ * already states.
+ */
+export interface DutyDemandOverride {
+  readonly shares: Partial<DutyShares>;
 }
 
 /**
@@ -959,6 +986,13 @@ export interface TrafficConfig {
    */
   readonly credentialGap?: CredentialGapOverride | undefined;
   /**
+   * Override `data/traffic-profiles.json`'s `duty` block. GitHub issue #481, `DECISIONS.md` § D549.
+   *
+   * Consumed only where some car of the building declares a duty; a building in which none does
+   * produces a byte-identical trace at every value, and is never asked whether the shares are shares.
+   */
+  readonly duty?: DutyDemandOverride | undefined;
+  /**
    * Drop a journey needing more than this many elevator legs. Default 6.
    *
    * Three legs cover any trip from a street entrance, which is the bound
@@ -1205,9 +1239,10 @@ export interface TrafficParameterSpec {
 /**
  * Every demand tunable this module honours.
  *
- * **Fifteen entries carry `default: null`**, meaning "unset, and unset is meaningful" — the count is
+ * **Nineteen entries carry `default: null`**, meaning "unset, and unset is meaningful" — the count is
  * asserted in `parameters.test.ts` rather than only stated here, because this sentence said "two"
- * while four were declared and would otherwise still say it now there are fifteen.
+ * while four were declared, and then "fifteen" while the assertion read sixteen. The three newest are
+ * GitHub issue #481's duty shares.
  *
  * `traffic.arrivalRatePctPop5min` unset means "use the profile's own number for the selected
  * `demandLevel`", which is not a number this schema can name — naming one would silently run
@@ -1346,6 +1381,39 @@ export const TRAFFIC_PARAMETERS: readonly TrafficParameterSpec[] = [
     default: null,
     description:
       "Share of journeys that begin inside the building and end inside an access zone the traveller's own floor does not already reach, which are made by somebody not holding a credential for it. Unset means the credentialGap block in data/traffic-profiles.json, which is the only honest default: the number is an uncited assumption stated there with its reasoning, and a second value here would be a second source of truth for it. 0 is the control arm — every rider holds a credential for wherever they are going. It is consumed only where a building declares accessZones; a building that declares none is byte-identical at every value.",
+  },
+  {
+    id: 'traffic.duty.shares.goods',
+    type: 'continuous',
+    // The unit interval, for wrongZoneShare's reason: a share of journeys. The shipped value is an
+    // agent's proposal with its reasoning in `data/traffic-profiles.json`, never a search bound.
+    range: [0, 1],
+    scale: 'linear',
+    default: null,
+    description:
+      "Share of journeys that need a goods car — deliveries, stock, waste. Unset means the duty block in data/traffic-profiles.json, which states the shipped value as a proposal with its reasoning. The three duty shares divide one set of journeys, so they may not sum to more than 1; everybody else is a passenger. Consumed only where some car of the building declares a duty (GitHub issue #481); a building in which none does is byte-identical at every value.",
+  },
+  {
+    id: 'traffic.duty.shares.bed',
+    type: 'continuous',
+    // The unit interval, for wrongZoneShare's reason: a share of journeys. The shipped value is an
+    // agent's proposal with its reasoning in `data/traffic-profiles.json`, never a search bound.
+    range: [0, 1],
+    scale: 'linear',
+    default: null,
+    description:
+      "Share of journeys that need a bed car — a patient on a bed or a trolley. Unset means the duty block in data/traffic-profiles.json, which states the shipped value as a proposal with its reasoning. The three duty shares divide one set of journeys, so they may not sum to more than 1; everybody else is a passenger. Consumed only where some car of the building declares a duty (GitHub issue #481); a building in which none does is byte-identical at every value.",
+  },
+  {
+    id: 'traffic.duty.shares.service',
+    type: 'continuous',
+    // The unit interval, for wrongZoneShare's reason: a share of journeys. The shipped value is an
+    // agent's proposal with its reasoning in `data/traffic-profiles.json`, never a search bound.
+    range: [0, 1],
+    scale: 'linear',
+    default: null,
+    description:
+      "Share of journeys that need a service car — staff, housekeeping and maintenance with their equipment. Unset means the duty block in data/traffic-profiles.json, which states the shipped value as a proposal with its reasoning. The three duty shares divide one set of journeys, so they may not sum to more than 1; everybody else is a passenger. Consumed only where some car of the building declares a duty (GitHub issue #481); a building in which none does is byte-identical at every value.",
   },
   {
     id: 'traffic.maxLegs',

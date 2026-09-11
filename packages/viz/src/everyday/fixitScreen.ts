@@ -48,12 +48,12 @@
  * - **Shafts.** A new shaft is `building.addCars[]` and *is* priced (`new-car`, 34 u) — but it is
  *   already sold as each case's fourth repair, at a price no shipped budget can take. A second
  *   control for the same purchase would be one act at two places, which is what #366 abolished.
- * - **Who-drives — per-shaft duty, the goods car and the bed car.** There is no `duty` field to
- *   write. `CarConfig` carries `mode`, which is not the same concept, and
- *   `everyday/designerModel.ts` names the same absence from the other side, so it is one missing
- *   concept two screens want rather than a gap in this one. **What duty is and is not is settled
- *   in `data/buildings/README.md` § *Duty*** (GitHub issue #481), which is where a lane that wants
- *   the control should start.
+ * - **Who-drives — per-shaft duty, the goods car and the bed car.** `core` carries the concept now
+ *   — `CarConfig.duty`, a rider's duty and the `dutyMismatch` term (GitHub issue #481, § D549) —
+ *   but nothing on this screen writes a duty, so the refusal stands as a refusal of the *control*,
+ *   the one step of `data/buildings/README.md` § *Duty* not yet built. `CarConfig.mode` is still not
+ *   the same concept, and `everyday/designerModel.ts` names the same absence from the other side,
+ *   so it is one control two screens want rather than a gap in this one.
  *
  *   **This row used to end *"the one out of service"*, and that was over-scoped.** A car out of
  *   service is `CarConfig.mode: 'out-of-service'` — authorable today, and a `ServiceEventConfig`

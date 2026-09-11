@@ -260,6 +260,14 @@ describe('an empty database', () => {
     expect(written?.balanceAfter).toBe(3);
   });
 
+  it('creates the rush board’s table on a database that predates it, empty — GitHub issue #372', async () => {
+    const sql = await databaseBeforeLegs();
+    const store = await Store.open({ sql, now: () => CLOCK });
+    const found = await sql.query(`SELECT 1 FROM information_schema.tables WHERE table_name = 'rush_entries'`);
+    expect(found.rows.length).toBe(1);
+    expect(await store.rushBoard('rush:garden-apartments:2026-09-01', 10)).toEqual([]);
+  });
+
   it('applies nothing on a second open, and does not restamp the first', async () => {
     const sql = await emptyDatabase();
     let clock = CLOCK;
