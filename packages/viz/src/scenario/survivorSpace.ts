@@ -26,15 +26,20 @@
  *    only on an unpriced dimension is reachable at **every** rung including the base, so counting
  *    those would make every rung's survivor count identical and the budget — the whole subject of
  *    this issue — inert. **The excluded set is published rather than hidden**:
- *    {@link unpricedDimensionIds} is 35 of the 59 dimensions the space declares, and
- *    `survivors.ts` carries the count on every record so a reader meets the exclusion beside the
- *    number it shaped.
+ *    {@link unpricedDimensionIds} names it and `survivors.ts` carries its count on every record, so
+ *    a reader meets the exclusion beside the number it shaped. It held 35 of the 59 declared
+ *    dimensions until GitHub issue #467 priced twenty-two of them and **withheld** the other
+ *    thirteen, and a withheld dimension is excluded for the opposite reason — no rung reaches it at
+ *    all, because no scenario sells it ([§ D535](../../../../DECISIONS.md)). {@link withheldDimensionIds}
+ *    names those, and the record counts them apart from the unpriced ones rather than folding one
+ *    exclusion into the other.
  * 2. **Only changes that can reach a scenario run are counted as reachable.** A campaign scenario
  *    runs through `campaign/stageRun.ts#batchRequestForStage`, whose two knobs are a dispatcher
  *    profile and an edited weight vector. A priced change whose `covers` list names only
  *    `shop.*`, `building.*` or `editor.*` paths prices something no scenario run can apply, so it
- *    is **not** reachable here — {@link unreachableChangeIdsOf} names them, and it is 21 of the
- *    schedule's 25. That is a bound on this measurement rather than a claim about the schedule, and
+ *    is **not** reachable here — {@link unreachableChangeIdsOf} names them, and `survivors.ts`
+ *    publishes the list on the table's header. That is a bound on this measurement rather than a
+ *    claim about the schedule, and
  *    saying so is the difference between a count that is small and a count that is wrong.
  * 3. **The empty bundle is excluded.** Buying nothing is the scenario as it was handed over, not a
  *    way through it — and it is measured in every cell anyway, because it is arm 0 of every batch
@@ -159,7 +164,7 @@ import { movedDimensions } from '../campaign/dimensions.js';
 import { admitEditedVector, applyEdit, valuesFromProfile } from '../controls/editedProfile.js';
 import type { PriceSchedule, PricedChange } from '../pricing/types.js';
 
-import { admitPurchase } from './budget.js';
+import { admitPurchase, withholdingDimension } from './budget.js';
 
 /* -------------------------------------------------------------------------- *
  * What the schedule prices that a scenario run can actually reach
@@ -226,7 +231,7 @@ export function reachableChangesOf(
 /**
  * The priced changes a scenario run **cannot** apply, named rather than dropped.
  *
- * A count of survivors taken over three of twenty-five priced changes is a different claim from one
+ * A count of survivors taken over a few of the schedule's priced changes is a different claim from one
  * taken over all of them, and a reader who is not told which is which will read the first as the
  * second. `survivors.ts` publishes this list on the table's header for that reason.
  */
@@ -242,13 +247,33 @@ export function unreachableChangeIdsOf(
 /**
  * Dimensions the schedule prices nothing for — the exclusion decision 1 of the module docstring
  * takes, as a list a reader can check.
+ *
+ * **Not the withheld ones**, which are {@link withheldDimensionIds}: a dimension nothing prices is
+ * free and reachable at every rung, and a dimension the schedule withholds is reachable at none. The
+ * two are excluded from the sample for opposite reasons, so they are two lists.
  */
 export function unpricedDimensionIds(
   space: SearchSpace,
   schedule: PriceSchedule,
 ): readonly string[] {
   const priced = new Set(reachableChangesOf(space, schedule).flatMap((change) => change.dimensionIds));
-  return space.parameters.map((parameter) => parameter.id).filter((id) => !priced.has(id));
+  return space.parameters
+    .map((parameter) => parameter.id)
+    .filter((id) => !priced.has(id) && withholdingDimension(schedule, id) === undefined);
+}
+
+/**
+ * Dimensions `data/price-schedule.json` withholds from every scenario — GitHub issue **#467**,
+ * [§ D535](../../../../DECISIONS.md). No configuration varies one and no dropdown entry may move
+ * one, so a survivor count is a count over a space these are not in, and the table says how many.
+ */
+export function withheldDimensionIds(
+  space: SearchSpace,
+  schedule: PriceSchedule,
+): readonly string[] {
+  return space.parameters
+    .map((parameter) => parameter.id)
+    .filter((id) => withholdingDimension(schedule, id) !== undefined);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -371,6 +396,18 @@ export interface DropdownConfiguration {
  * function: a player who switches to a profile whose weights differ has re-tuned the dispatcher
  * once, whatever the profile is called, and a profile that moves only dimensions the schedule
  * prices nothing for costs nothing and says so.
+ *
+ * **A profile that moves a dimension the schedule withholds is not in the population** — GitHub
+ * issue **#467**, [§ D535](../../../../DECISIONS.md). Picking it by name would set a dial no
+ * scenario sells, so it is no more a way through than the baseline is, and `admitPurchase` refuses
+ * it at any budget. That is the ruling applied to the countable stratum, and on the shipped profiles
+ * it excludes nothing: read off `data/dispatcher-profiles.json`, no profile authors a `selection`
+ * dial, and the one that authors a predictor dial, `predictive-balanced`, sets
+ * `idle.predictorHorizonS` to 300, which is the declared default — so against a baseline that holds
+ * the default it moves nothing withheld. Both halves are held in `survivors.test.ts`: *leaves out a
+ * profile that moves a withheld dial, and keeps one that moves only priced dials* holds the drop,
+ * and *offers every shipped profile that runs a different system, and never the baseline itself*
+ * holds that no shipped profile is dropped against `collective`.
  */
 export function dropdownConfigurationsOf(
   space: SearchSpace,
@@ -386,6 +423,7 @@ export function dropdownConfigurationsOf(
     const moved = movedDimensions(space, baseline, candidate).map((dimension) => dimension.id);
     if (moved.length === 0) continue;
     const admission = admitPurchase(schedule, Number.MAX_SAFE_INTEGER, moved);
+    if (admission.withheld.length > 0) continue;
     const bought = admission.changeIds
       .map((id) => byId.get(id))
       .filter((change): change is PricedChange => change !== undefined);

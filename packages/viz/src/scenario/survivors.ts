@@ -121,8 +121,18 @@
  *    2026-09-10, stage 1's base rung counts 19 there against a dropdown census of 8. What does not
  *    ship is a per-tier comparison: the band § D537 records is over every configuration judged, not
  *    over one tier, so a scenario whose one survivor is a dropdown profile can sit inside it.
- *    `campaign/difficultyCurve.test.ts`'s `DROPDOWN_CLEARS` holds the dropdown half, on
- *    `metOnTuningSeeds` rather than on this table's `cleared`.
+ *    `campaign/difficultyCurve.test.ts` holds the dropdown half, and **its `DROPDOWN_CLEARS` is not
+ *    {@link PublishedSurvivorStep.dropdown}'s survivors read another way**: the two differ in exactly
+ *    two places, measured rather than argued ([§ D556](../../../../DECISIONS.md)). It reads
+ *    `metOnTuningSeeds` where this table reads `cleared`, so a profile the holdout refuses is there
+ *    and not here — `eta` on stage 5, `destination-panel` on stage 7. And it plays only what a
+ *    stage's `editable` list admits, where this census plays every profile the rung affords, so a
+ *    profile the list refuses is here and not there — `predictive-balanced` on stage 5, `zoned-uppeak`
+ *    on stage 1. The seeds, the replications, the horizon and the judge are the same run on both
+ *    sides. That file names both differences in two registers and asserts, simulating nothing, that
+ *    this table's base-rung dropdown survivors are exactly what its registers leave, in both
+ *    directions — so a regeneration that moves a dropdown survivor is red there until a register
+ *    moves with it.
  */
 
 import type { PriceSchedule } from '../pricing/types.js';
@@ -251,9 +261,10 @@ export interface SurvivorProvenance {
   /**
    * What the count is a count of, in one sentence, so a reader meets the scope beside the number.
    *
-   * Not decoration: this measurement reaches four of the schedule's twenty-five priced changes and
-   * varies twenty-four of the search space's fifty-nine dimensions, and a survivor count read
-   * without that is read as a claim about the whole ladder.
+   * Not decoration: this measurement reaches only some of the schedule's priced changes and varies
+   * only the dimensions a scenario sells, and a survivor count read without that is read as a claim
+   * about the whole ladder. The figures are the sentence's own, derived at regeneration, rather than
+   * repeated here — where they went stale the first time the schedule grew (GitHub issue #467).
    */
   readonly scope: string;
   /** Price-schedule change ids a scenario run can apply. */
@@ -262,6 +273,12 @@ export interface SurvivorProvenance {
   readonly unreachableChangeIds: readonly string[];
   /** Search-space dimensions the schedule prices nothing for, and which are therefore not varied. */
   readonly unpricedDimensionCount: number;
+  /**
+   * Search-space dimensions `data/price-schedule.json` **withholds** from every scenario, and which
+   * no configuration varies for the opposite reason — no rung reaches them. GitHub issue #467,
+   * [§ D535](../../../../DECISIONS.md).
+   */
+  readonly withheldDimensionCount: number;
   readonly declaredDimensionCount: number;
 }
 

@@ -362,7 +362,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   function smallestAdmissibleChange(stage: CampaignStage): string | undefined {
     const baseline = profileById(stage.dispatcher.startingProfileId);
     if (baseline === undefined) return undefined;
-    const editable = editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage));
+    const editable = editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage), resources.priceSchedule);
     let best: { readonly id: string; readonly moved: number } | undefined;
     for (const profile of resources.dispatcherProfiles.profiles) {
       if (profile.id === baseline.id) continue;
@@ -379,7 +379,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     if (smallestAdmissibleChange(stage) !== undefined) {
       return 'Change “your setting” for a stage you can clear.';
     }
-    const opened = editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage)).length;
+    const opened = editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage), resources.priceSchedule).length;
     return (
       `No shipped dispatcher stays inside the ${String(opened)} dimensions this stage opens, so ` +
       'the weight editor is the way to play it: tick “edit the weights”, move one of them, and ' +
@@ -435,7 +435,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   let weightBaseId = '';
 
   function editableSetFor(stage: CampaignStage): ReadonlySet<string> {
-    return new Set(editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage)));
+    return new Set(editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage), resources.priceSchedule));
   }
 
   /** The controls this stage opens, in the space's own gate order. */
@@ -605,6 +605,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       published,
       dimensionIds: dimensionIdsFor(stage),
       dimensionHelp: loaded.dimensionHelp,
+      schedule: resources.priceSchedule,
     });
     ui.brief.append(...briefNodes(briefing, stage));
   }
@@ -688,7 +689,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       loaded.space,
       baseline,
       candidate,
-      editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage)),
+      editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage), resources.priceSchedule),
     );
     return {
       node: row(
@@ -785,7 +786,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       loaded.space,
       baseline,
       outcome.profile,
-      editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage)),
+      editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage), resources.priceSchedule),
     );
     if (!admission.admissible) {
       fail(admission.sentence);

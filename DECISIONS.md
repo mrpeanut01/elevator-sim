@@ -34374,6 +34374,8 @@ unmoved. The range event has no equivalent writer yet; § D523 says whose questi
 
 ## D525 — Three modes: Scenario, Career and Rush; no proposed fixes; difficulty is the number of ways through; everything plays live
 
+> **Status 2026-09-10: AMENDED by [§ D535](#d535).** Clause 2's whole editor is every declared dial less the weight-set selector and the arrival predictor, which no scenario sells at any price; per-scenario scarcity is still a price, never a removed control. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/38`](docs/38-what-the-game-is.md), [§ D373](#d373), [§ D477](#d477), [§ D354](#d354), [§ D497](#d497), [§ D514](#d514), [§ D515](#d515), `docs/32` § 1.2 and GD4, `docs/23` § 4, `docs/16` S5's `ranked` row, the design handoff §§ 5 and 10, GitHub issues #217 and #220.**
 
 **Decided by the product owner, 2026-09-06** — given in conversation and confirmed the same day.
@@ -34936,6 +34938,63 @@ never a source or an amount (clause 5).
 
 ---
 
+## D535 — Not for sale is not priced high: the weight-set selector and the arrival predictor are withheld from every scenario, and the other twenty-two dials are priced
+
+**Date: 2026-09-10 · Owner: product owner (the ruling) · GitHub issue #467 · Amends [§ D525](#d525) clause 2 and [`docs/38`](docs/38-what-the-game-is.md) § 2.1's ladder table.**
+
+**Decided by the product owner, 2026-09-10**, on the issue: *"Hide the advanced families, price the
+rest. The `selection.*` (7) and `idle.predictor*` (6) dimensions stop being player-editable in
+scenarios. The other 22 get price rows, drafted for approval. The both-directions register in
+`scenario/budget.test.ts` moves with them, so the gap can still neither grow silently nor close by
+faking."*
+
+**Why an entry.** The mechanism binds code and data no one module owns — `data/price-schedule.json`
+and its parser, what a campaign stage's `every-declared-dimension` resolves to, the survivor table's
+provenance, and the engineering briefs that open the same mode — and it moves two things already
+recorded: § D525 clause 2's *"the whole editor is open in every scenario"*, and `docs/38` § 2.1's
+ladder table, which put *the weight-set selector* among what the dispatcher tier prices.
+
+1. **Not for sale and priced high are different answers, and the schedule says which.**
+   `data/price-schedule.json` carries a `withheld` block beside its `changes`:
+   `weight-set-selector`, the group `dispatcher.selection` (seven dials), and `arrival-predictor`,
+   six exact `dispatcher.idle.predictor*` paths — exact rather than a group, because
+   `dispatcher.idle` also holds the parking dials the schedule prices. A withheld entry carries no
+   price, no tier and no nights. `pricing/parse.ts` refuses one that tries, refuses a path both
+   withheld and priced — exactly or through a group — and refuses a document with no block.
+2. **`every-declared-dimension` is every dimension the search space declares, less every dimension
+   the schedule withholds.** Resolved in one place, `campaign/parse.ts#editableIdsOf`, which takes
+   the schedule as a required argument and filters both modes; a `listed` stage that names a
+   withheld dial fails to load. `scenario/budget.ts#admitPurchase` refuses a move that touches one
+   at any budget, and `scenario/survivorSpace.ts` leaves a dropdown profile that moves one out of
+   the population — which excludes nothing on the shipped profiles.
+3. **The other twenty-two are priced, and every figure is an agent's proposal, approved as drafted by the owner on 2026-09-11.**
+   Six new rows — `call-timing`, `reassignment`, `auction`, `cost-scaling` and `door-reopening` at
+   the dispatcher tier, `load-weighing` at the equipment tier — and five dials added to
+   `dispatch-rules` at its unchanged 2 u. Each note says field by field what is measured, what is
+   derived and what is chosen. No existing dial's price moved; the tier typicals are 2, 9 and 20 u
+   on both sides; the schedule totals 381 u, so every scenario's budget ceiling moved from 368.
+4. **The shipped content bounded the figures, and the loader is what said so.** Four stages open on
+   4 u, and `scenario/budget.test.ts` re-derives every opening budget as the dearest dial a stage
+   offers plus the dispatcher typical, so nothing those four offer may cost more than 2 u. And
+   stages 9 and 10 suggest `constraints.noDirectionReversal` and
+   `answer.allowBypassIfSoleEligibleCar` beside a 13 u landing-panel lever at a 15 u opening: the
+   first draft of this issue priced those two dials on rows of their own, `campaign/parse.ts`
+   refused both stages at 17 u, and that is why they sit on `dispatch-rules`.
+
+**What this does not decide.** Whether the prices are right: they are game feel, drafted rather than
+measured, for the owner to accept, tighten or reject, and the owner accepted them as drafted on 2026-09-11. Per-scenario scarcity: [§ D528](#d528)'s *a
+price, never a removed control* is untouched, because this withholds two families from every
+scenario alike rather than from one. And the Engineer parameter controls, which have no budget: they
+still draw every declared dimension. `data/scenario-survivors.json` is re-measured against the new
+schedule on the change that lands this, and its diff is published with it. Re-measured, one scenario
+leaves its [§ D537](#d537) band: stage 7 reads 0 of 24 at its base rung where it read 2 of 24, both
+through dial edits, so `scenario/survivorBands.test.ts` registers eight of ten outside rather than
+seven. The twelve dial edits drawn are not the ones drawn before — the same sample seed draws them
+from 511 bundles where it drew from 11 — so this measures that none of the twelve gets through, not
+that the two earlier ways through were closed.
+
+---
+
 ## D537 — The survivor band narrows by ladder position: shares in data, drafted for approval, judged at the base rung, read by one acceptance check
 
 **Date: 2026-09-10 · GitHub issue #234 · Rules on: [§ D525](#d525) clause 3, [§ D528](#d528) clause 2, `docs/33` DC-4's band as the precedent for shape, GitHub issues #367 and #467.**
@@ -35049,6 +35108,30 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 
 ---
 
+## D545 — The Burj-class reference follows its operator: two double-deck observation cars, Emaar's use stacking and level 124 at 452 m, drafted for approval, with the 57-lift bracket re-measured
+
+**Date: 2026-09-11 · GitHub issue #438 · Rules on: `data/buildings/burj-class-reference.json`, `docs/04` § 9, the reference building [§ D527](#d527) asked for. The corrections are the product owner's ruling of 2026-09-10; every chosen figure in them is an agent's proposal awaiting that owner's approval.**
+
+**Why an entry.** It moves figures recorded outside the file that changed: `docs/04` § 9's population bracket, hop count, recording size and oracle round trips, and pins in `core`, `experiments` and `viz` tests. It also takes § D527's reference further from one thing that ruling's own text gives it, *about 154 populated floors*, which is now 135.
+
+**The ruling, given on #438:** *"Apply all five comment drafts — the hop counts, occupancy, deck load, the 504 m record and the 57-lift count. Then correct the model: the double-deck shuttles, the use stacking and the floor heights, drafted for approval. Re-run the 57-lift measurement afterwards and publish the result whichever way it falls."*
+
+**Approved as drafted by the product owner on 2026-09-11.** Every figure this entry and the building mark as an agent's proposal stands as drafted.
+
+1. **The five drafts were already on `main`**, applied by PR #502; none was missing. Their verdicts stand. Three of them described the model, and those sentences are revised where the model moved: the per-deck figures now describe this file's own two double-deck cars, the travel note gives 448.335 m runs, and the lift-count note records the unsourced shuttle claim as corrected. The assumption paragraph is kept word for word ([§ D227](#d227)), and a dated paragraph beside it says its figures describe the arrangement as first authored.
+2. **Double decks.** Cited: Otis's release of 2024-03-06 and Al-Kodmany 2015 give the tower two double-deck cars, both serving the observation deck. So `observation` is two double-deck cars paired G/1 and 123/124, and the sky-lobby shuttle is single-deck. **Proposed:** the shuttle stops at G, 43, 76 and 123 and takes the two cars `observation` gave up, sixteen, so § D527's 57 holds and no local bank's count moves; the upper pair is 123/124 rather than Otis's 124/125, keeping Al-Kodmany's level-123 transfer; and the observation cars are rated 2,000 lb a deck, inside the class's 12–14 persons.
+3. **Stacking.** Cited: Emaar's fact sheet ranges — Armani Hotel to level 8 and on 38–39, Armani Residences 9–16, The Residence 19–37, 43–72 and 76–108, the Corporate Suites 112–121 and 125–154. Hotel ranges take the `hotel` profile and residence ranges `residential`; the fact sheet's floors with no use carry nobody. **Proposed:** 3,198 is kept and shared out in proportion to the fact sheet's counts at stated, uncited densities — two people a home, 1.5 a hotel room, 10 m² an office worker — as 14, 23, 18 and 44 a floor. Populated floors go from 146 to 135 against § D527's *about 154*, which is the owner's to rule on.
+4. **Floor height.** Cited: Emaar puts observation level 124 at 452 m. **Proposed:** one 3.645 m floor-to-floor height, putting 124 at 451.98 m, with deck separation and escalator rise following it. It is checked against the upper anchors rather than fitted to them, because they disagree with each other.
+5. **The 57-lift bracket, re-measured and pinned.** The harness is seed 376, `collective`, 1,800 s, every floor's population scaled in proportion, in `packages/viz/src/record/burjOperator.test.ts`; seeds 376–425 are `burjOperator.sweep.test.ts` under `BURJ_BRACKET_SWEEP=1`, registered in `deepTiers.test.ts` as not scheduled.
+   - **The published figures did not reproduce.** The file said 35 s and 98 s at 3,198, saturation at 5,307 (175 s), and 422 of 4,457 unserved at 10,614. The harness gives the same answer at `63a9521`, which landed the file, and at `731bd82c`, the parent of the correction: 23.6 s and 67.6 s over 1,284 journeys, saturation, and 487 of 4,473 undelivered. The verdicts agree and the figures do not. Which run produced the published figures is not established. Over seeds 376–425, that arrangement saturated at 3,198 on **16 of 50**.
+   - **On the corrected arrangement**, 3,198 people wait 11.4 s on average, with a 32.9 s 95th percentile, over 989 journeys, and the AWT is valid. 5,307 saturate. 10,614 saturate and leave 30 of 3,473 undelivered. Over seeds 376–425, saturation occurs on 1, 37 and 50 of 50, and 10,614 leaves journeys undelivered on 32. No AWT interval is published at any of the three populations, because each saturates on at least one seed.
+   - The same 3,198 people make 989 journeys in the window rather than 1,284, because most now arrive on the `residential` and `hotel` profiles. No share of the change in wait is attributed to the lower demand or to the new arrangement ([§ D256](#d256)).
+6. **What moved, each re-pinned on this commit and named there:** `core`'s `model/bank.test.ts` double-deck list (`burj-class-reference/shuttle` → `/observation`); `model/building.test.ts` shared floors (44 and 77 leave); `metrics/interval.test.ts`'s no-threshold list (the shuttle leaves, at a 39.8 s reopen against a 70.0 s round trip); `viz`'s `record/burjReference.test.ts` escalator hops (28 → 832) and full-day journey floor (2,000 → 1,500, 1,910 measured). Each escalator's traversal goes from 19.2 s to 17.78 s, derived from the rise. The oracle round trips go from 32.83 s and 29.68 s to 32.32 s and 29.34 s, and every bank still refuses. The 3,600 s recording goes from 17.36 MB to 16.42 MB.
+
+**What this does not decide.** Whether `totalPopulation` should move, now that the corrected arrangement serves 3,198 on 49 of 50 seeds. Whether the office floors take `office-standard`. The service lifts, which the file still has none of. Emaar's mosque on 158 and occupied level 160, against § D527's mechanical top. Escalator capacity or direction. #376's closed-form oracle criterion, which stays open.
+
+---
+
 ## D547 — The Endless rush standings are the house's measured runs: one pinned run per shipped dispatcher per shipped building on the rush's one seed, and the two handles are dropped
 
 > **Status 2026-09-11: AMENDED by [§ D548](#d548).** A rush's crowd is sized from the building it runs on, never the player's week, and the 26 house rows on Midtown Office and Chancery House are re-measured through the corrected path. See [`docs/39`](docs/39-decisions-in-force.md).
@@ -35088,6 +35171,15 @@ reservation was open, and the numbers below D537 are not written on this lane's 
    - A day's or a session's state runs at a fresh session's value while the rush stands, and `leaveRush` puts the player's own back. That state is the three campaign fields plus `calendar`, `commissioning`, `interventions`, `patience` and `pattern`. The run reads all five, and whether each moved a rush before the table existed was not measured.
 
    `rushCrowd.test.ts` covers each campaign field, the calendared event and the way back. It also asserts that every field the run reads under a rush is either one the press writes or the building or the dispatcher. No house row moves, because every house run already stands on a fresh session.
+6. **The player's levers and selector run fresh too, and every press writes the rush's standing.** Found by the same review, GitHub issue #518. `RUSH_FIELD_ROLES` classified `levers` and `selectorSpec` as the dispatcher the player brings, so a setting made on the Everyday tuner or the Workshop rode into the rush. On Midtown Office × `collective`, whose clean rush holds 1 640 s on 3 584 legs, a patient dwell set before the press held 1 280 s, express 1 528 s and the fuzzy selector 1 550 s, all on the same legs. The crowd was the building's; the hold was not the house row's, and PR #513's `verify.ts#rushRoundConfigFor` replays neither field.
+
+   **The ruling taken, which the owner may reverse.** Both are now `fresh`: a rush runs from the shipped settings. The ground is the owner's ruling on #372, *a sitting is consecutive runs from an as-shipped start*, which the house rows (measured from a fresh session) and the server replay already assume. **The alternative** is to record both fields in the posted sitting and in the board's modifier-set key, and to replay them on the server. The rush setup screen offers no lever or selector control of its own (`rushScreenModel.ts#rushDrivingLine` draws the driver as a statement), so nothing is removed from the rush itself. The Workshop and the tuner stay on the rail during a rush, and what they write there runs from the next day, not the rush.
+
+   **Every press writes the rush's standing.** `EverydayHost.startRush` wrote it on the first press only, so *Run the rush again* kept the first attempt's interventions: the review's probe held 1 640 s, then 1 516 s after one `park-cars-lobby`. Inside a rush the patch moves no week, since `switchWeek` is the identity on the live contract.
+
+   **Leaving cancels the run in flight first.** `leaveRush` put the day back without stopping the worker, and `dev/main.ts#applyShift` adopts whatever lands, so a rush left mid-generation landed over the restored day. The host now calls an optional `cancelRun` binding, bound to the shift runner's `cancel`, before the restore.
+
+   `rushCrowd.test.ts` covers the levers, the selector, the re-press and the second direction of the whitelist check: a field the player brings that the press wrongly resets goes red. `host.test.ts` covers the cancel's order, and `rush.browser.test.ts` the binding on the shipped bundle. No house row moves: every house run already stands on a fresh session, and the deep sweep (`ELEVATOR_SIM_RUSH_HOUSE=deep`, not regenerating) reproduced all 117 rows of `data/rush-house-runs.json` on this change.
 
 ---
 
@@ -35110,5 +35202,22 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 9. **The duty weight is refused where it cannot bite, and a scenario neither offers nor draws it there.** An independent review of this branch found the new slider offered as a working control on every building the viewer can load, with no refusal beside it, while a scenario priced it: no shipped building declares a duty, so moving it changed no leg (40 of 40 digests identical at `dutyMismatch: 5`). The refusal and the exclusion now come from one decision. `core` exports `traffic/generator.ts#buildingDeclaresDuty` — the predicate the generator already asked before it draws a duty — and `sim/searchSpaceLiveness.test.ts`'s proof for `weights.dutyMismatch` asserts it in both directions, so the register's condition and the product's are one function. `viz`'s `authoring/dispatcherSpec.ts#inertTerms` takes the **standing** building and names a weighted `dutyMismatch` where no car declares a duty, in § D112's shape — *"inert on this building — no car in this building declares a duty, so no call carries one to be wrong about and this weight changes no decision"*. The Engineer editor draws it through `dev/dispatcherEditor.ts#editorTermRowsOf`, from the viewer state's standing selection, and the Everyday workshop through `everyday/workshopModel.ts#termDisclosureOf`, from `EverydayHost.resolvedBuilding`. `dimensionIdsLiveOn` withholds `weights.dutyMismatch` from the same buildings: `dev/campaignPanel.ts` resolves every stage's editable set, and its briefing, against it, and `scenario/survivorSpace.ts#sampleReachableConfigurations` skips the dial **before** its value is drawn, so no other dial's draw moves. Where a building does declare a duty, all three stop — the refusal is not drawn, the dial is offered, and the sweep draws it — and each direction is a test.
 
 **What this does not claim.** That duty improves any metric. `sim/dutySeam.test.ts` runs one seed on Midtown Office with car A declared goods and a 20 % goods share, under `predictive-balanced` with the weight authored onto it, and requires the legs to change when the weight moves. Measured with `DUTY_SEAM_REPORT=1 npx vitest run --project core packages/core/src/sim/dutySeam.test.ts`, legs put in a car that is not for their trip go **244 → 243** at the drafted 0.35 and **→ 223** at 5, of 734 boarded. That is a mechanism check on one trace, not a paired comparison, and **why the fall is that small is unmeasured**. Two facts of the model bear on it and neither has been isolated: a landing call carries only its head's duty, and boarding is not filtered by duty. **The control — the picker two screens refuse — is not built**, and is step 3 of `data/buildings/README.md` § *Duty*.
+
+---
+
+## D556 — `DROPDOWN_CLEARS` and the survivor table are two readings of the same runs: the two differences are registered, and the relationship is held in both directions
+
+**Date: 2026-09-11 · GitHub issue #234 · The product owner's ruling of 2026-09-10, recorded in § D537 clause 7: which survivor got through stays `DROPDOWN_CLEARS`' question, and that register is to be reconciled against the survivor table.**
+
+**Why an entry.** It binds a file the deciding module does not own: from this commit, a regeneration of `data/scenario-survivors.json` that moves a base-rung dropdown survivor is red in `campaign/difficultyCurve.test.ts` until a register moves with it, and two open pull requests (#506, #516) regenerate that table. It also corrects `survivorBands.test.ts`, which said `DROPDOWN_CLEARS` holds the one way through stage 5 ([§ D405](DECISIONS.md)).
+
+1. **The disagreement, re-measured on `f691a97a`, and neither side is stale.** `DROPDOWN_CLEARS` names `fairness-first` on stage 3, `eta` on stage 5 and `destination-panel` on stage 7, and its deep tier reproduced all three over the same 45 admitted cells. The survivor table's base rung names `zoned-uppeak` on stage 1, `fairness-first` on stage 3 and `predictive-balanced` on stage 5, and no dropdown profile on stage 7, whose two survivors are dial edits. Re-measured for stages 5 and 7 at all three rungs, every count and every name reproduced.
+2. **Six of the eight candidate differences are not differences.** Both play a cell through `campaign/stageSequence.ts#runStageToVerdict` with the same `runBatch` resources: `tuning-20260730` and `holdout-20260731` at 50 replications each, the stage's own 900 s, `judge.ts#judgeStage`, and no purchase applied to the run. A dropdown configuration's price decides only whether the rung affords it, and every profile either side names is affordable at its stage's base rung — `eta` at 0 u and `predictive-balanced` at 5 u against 15 u on stage 5, `destination-panel` at 15 u against 15 u on stage 7. Suppression gates neither: the table counts it beside the verdict, DC-2 does not read it, and every configuration on stage 5 is suppressed while `predictive-balanced` still clears.
+3. **The reading produces the `eta` and `destination-panel` halves.** DC-2 reads `metOnTuningSeeds`, for `docs/33` § 2.3's reason; the table counts `cleared`. Every shipped profile was played on both stages and each verdict read both ways. `eta` on stage 5 meets all five goals on the tuning seeds and misses `deliver-everyone`, `no-divergence` and `answer-the-demand` on the holdout. `destination-panel` on stage 7 meets both goals on the tuning seeds and misses `beat-the-baseline` on the holdout. Both are admitted and affordable, so each is a DC-2 breach and not a survivor.
+4. **The population produces the `predictive-balanced` half, and stage 1's.** DC-2 plays only what `admitProfile` admits over the stage's `editable` list. `survivorSpace.ts#dropdownConfigurationsOf` plays every profile that runs a different system and that the rung affords, on § D525 clause 2. Stage 5's six-entry list refuses `predictive-balanced`, which meets every bar on both seed sets, so DC-2 never plays it. Four more profiles sit outside that list on stage 5 — `energy-aware`, `fairness-first`, `capacity-aware` and `auction` — and each meets every bar on the tuning seeds and is refused on the holdout, so neither side names them. Stage 1's `zoned-uppeak` is the out-of-list shape at position one.
+5. **Both are kept, because they measure different things, and the relationship is asserted.** DC-2 asks whether the dropdown a stage admits can meet its bars at all; the table asks whether a pick survives both seed sets over the price-bounded space. `difficultyCurve.test.ts` gains `DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT`, pinned by the same deep tier from the holdout batch it already plays, and `DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE`, read off the table. An always-on case that simulates nothing asserts, per stage, that the table's base-rung dropdown survivors are exactly `DROPDOWN_CLEARS` less its holdout refusals, within the base-rung census, plus the out-of-list survivors. It is red on a survivor the registers miss and on a registered clear the table does not count.
+6. **Nothing is weakened.** `DROPDOWN_CLEARS` keeps all three rows and its exact deep-tier match, a holdout refusal is still a DC-2 breach, and § D528 clause 2's position-three rule is untouched. The out-of-list register turns `predictive-balanced` on stage 5 — a clause 2 breach at position five that no register held — into a named row.
+
+**What this does not decide.** Whether DC-2 should play the whole census rather than a stage's `editable` list: GitHub issue #233 re-authors the lists, and on that commit the out-of-list rows move into `DROPDOWN_CLEARS`. The rebalance of stages 3, 5 and 7.
 
 ---

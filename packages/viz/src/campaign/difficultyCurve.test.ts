@@ -64,8 +64,12 @@ import { editableIdsOf, parseCampaign, type CampaignContext } from './parse.js';
 import type { Campaign, CampaignStage } from './types.js';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+import { rungsOf } from '../scenario/budget.js';
 import { isPerReplicationGoal, type GoalKind } from '../scenario/goals.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
+import { SCENARIO_SURVIVORS_PATH } from '../scenario/regenerateSurvivors.test-helper.js';
+import { dropdownConfigurationsOf } from '../scenario/survivorSpace.js';
+import type { PublishedSurvivors } from '../scenario/survivors.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 
 /**
@@ -326,6 +330,11 @@ describe('the derivation reads the rates it claims to read', () => {
  * is #234's *fails the build* clause with the measured breaches named rather than hidden: the
  * rebalance (docs/33 C2, by demand or fabric, never a bar) empties it row by row, and nothing can
  * quietly reintroduce a clear. The pinned sets are stated as measured, with the tree, in § D520.
+ *
+ * A third check, always on and simulating nothing, reconciles {@link DROPDOWN_CLEARS} with the
+ * dropdown survivors `data/scenario-survivors.json` publishes — the owner's ruling of 2026-09-10,
+ * [§ D556](../../../../DECISIONS.md). The two are different readings of the same runs, and
+ * {@link dropdownReconciliationIssues} holds the relationship between them in both directions.
  */
 const fixture = useCampaignFixture();
 
@@ -343,7 +352,29 @@ const DC2B_SHORT: ReadonlySet<string> = new Set([
  * none. The three are `docs/33` § 3.1's three, and each is one profile: `fairness-first` on stage 3,
  * `eta` on stage 5, `destination-panel` on stage 7. Emptying this table is C2's rebalance, by demand
  * or fabric and never by a bar (DC-R1); a row leaves on the commit that makes it stop reproducing.
- * See § D520 for the run.
+ * See § D520 for the run. Re-run 2026-09-11 on `f691a97a`: the same three, over the same 45 cells.
+ *
+ * ## It is not the survivor table's dropdown column read another way
+ *
+ * `data/scenario-survivors.json` also names the shipped profiles that get through a stage from the
+ * dropdown, and on stages 1, 5 and 7 it names different ones. **Both play a cell through the same
+ * `runStageToVerdict`** — the stage's two seed sets at fifty replications each, its own 900 s, the
+ * same judge, and no purchase applied to the run — so a profile both play gets one verdict, and every
+ * profile either side names is affordable at its stage's base rung. Suppression gates neither: the
+ * table counts it beside the verdict and this register does not read it. They differ in exactly two
+ * places, measured on `f691a97a` by playing every shipped profile on stages 5 and 7 and reading each
+ * verdict both ways ([§ D556](../../../../DECISIONS.md)):
+ *
+ * 1. **The reading.** This register is `metOnTuningSeeds`, for `docs/33` § 2.3's reason; the table
+ *    counts `cleared`, which needs the holdout batch as well. `eta` on stage 5 and
+ *    `destination-panel` on stage 7 are here and not there — {@link DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT}.
+ * 2. **The population.** This register plays only what the stage's own `editable` list admits
+ *    (`admitProfile`); the table plays every shipped profile that runs a different system and that
+ *    the rung affords (`survivorSpace.ts#dropdownConfigurationsOf`, which does not apply the list, on
+ *    § D525 clause 2's ruling). `predictive-balanced` on stage 5 and `zoned-uppeak` on stage 1 are
+ *    there and not here — {@link DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE}.
+ *
+ * Stage 3 is the one stage both name, and the only row that needs neither register.
  */
 const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   'stage-3-overwhelmed': ['fairness-first'],
@@ -351,10 +382,64 @@ const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.free
   'stage-7-prove-it': ['destination-panel'],
 });
 
+/**
+ * The entries of {@link DROPDOWN_CLEARS} the **holdout** batch refuses: they meet every bar on the
+ * tuning seeds and not on the stage's `holdoutSeeds`, so `cleared` is `false` and the survivor table
+ * does not count them. Pinned by the same deep tier, which reads it off the holdout batch
+ * `runStageToVerdict` already plays for every cell that met on the tuning seeds, so this half costs no
+ * simulation. Measured 2026-09-11 on `f691a97a`:
+ *
+ * - `eta` on stage 5 meets all five goals on `tuning-20260730` and misses `deliver-everyone`,
+ *   `no-divergence` and `answer-the-demand` on `holdout-20260731` — `stageFiveClears.test.ts`'s
+ *   finding, reached here by a different route.
+ * - `destination-panel` on stage 7 meets both goals on the tuning seeds and misses
+ *   `beat-the-baseline` on the holdout.
+ *
+ * **A holdout refusal is still a DC-2 breach**, and this register takes neither row out of
+ * {@link DROPDOWN_CLEARS}: DC-2 asks whether the dropdown can meet a stage's bars at all (`docs/33`
+ * § 2.3). What it records is why the survivor table, which asks the stronger question, does not name
+ * them. A row leaves when its profile stops meeting on the tuning seeds, or starts holding on the
+ * holdout too — and then the table has to count it, which the always-on case turns red until it does.
+ */
+const DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  'stage-5-credentials': ['eta'],
+  'stage-7-prove-it': ['destination-panel'],
+});
+
+/**
+ * Profiles the survivor table counts as a way through a stage from the dropdown, at the **base** rung,
+ * that the stage's own `editable` list refuses — so DC-2 never plays them and {@link DROPDOWN_CLEARS}
+ * cannot name them, however they score. `admitProfile` still applies the list and
+ * `dev/campaignPanel.ts` still admits through it; `survivorSpace.ts#dropdownConfigurationsOf` does
+ * not, and GitHub issue #233 re-authors the lists. Read off the table measured on `4159520`, and
+ * reproduced for stage 5 on `f691a97a` 2026-09-11:
+ *
+ * - `predictive-balanced` on stage 5 — **position five, so a § D528 clause 2 breach that
+ *   {@link DROPDOWN_CLEARS} cannot hold**: it meets every bar on both seed sets, and stage 5's
+ *   six-entry list does not open the dimensions it moves. It is the one way through stage 5, and the
+ *   disagreement the owner's ruling of 2026-09-10 names.
+ * - `zoned-uppeak` on stage 1 — position one, exempt from clause 2, and registered because the
+ *   relationship is checked over every stage rather than from position three.
+ *
+ * A row leaves when the table stops counting it, or when the stage's list starts admitting it — and
+ * then DC-2 plays it and it belongs in {@link DROPDOWN_CLEARS}.
+ */
+const DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  'stage-1-first-call': ['zoned-uppeak'],
+  'stage-5-credentials': ['predictive-balanced'],
+});
+
+/** A register with each stage's profiles sorted, so two registers compare as sets. */
+function sortedRegister(
+  register: Readonly<Record<string, readonly string[]>>,
+): Record<string, string[]> {
+  return Object.fromEntries(Object.entries(register).map(([id, ids]) => [id, [...ids].sort()]));
+}
+
 /** The shipped profiles a stage admits from its dropdown, its own baseline excluded. */
 function admittedProfilesOf(stage: CampaignStage): readonly string[] {
   const baseline = fixture.requireProfile(stage.dispatcher.startingProfileId);
-  const editable = editableIdsOf(stage.dispatcher.editable, fixture.space.ids);
+  const editable = editableIdsOf(stage.dispatcher.editable, fixture.space.ids, fixture.context.schedule);
   return fixture.config.dispatcherProfiles.profiles
     .filter((candidate) => candidate.id !== baseline.id)
     .filter((candidate) => admitProfile(fixture.space, baseline, candidate, editable).admissible)
@@ -380,31 +465,278 @@ describe('DC-2b — a stage admits at least two profiles other than its own base
     const ids = new Set(fixture.campaign.stages.map((stage) => stage.id));
     for (const id of DC2B_SHORT) expect(ids.has(id), id).toBe(true);
     for (const id of Object.keys(DROPDOWN_CLEARS)) expect(ids.has(id), id).toBe(true);
+    for (const id of Object.keys(DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT)) expect(ids.has(id), id).toBe(true);
+    for (const id of Object.keys(DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE)) expect(ids.has(id), id).toBe(true);
+  });
+});
+
+/** The three registers {@link dropdownReconciliationIssues} reads, passed in so a control can hand it copies. */
+interface DropdownRegisters {
+  readonly clears: Readonly<Record<string, readonly string[]>>;
+  readonly refusedOnHoldout: Readonly<Record<string, readonly string[]>>;
+  readonly outsideEditable: Readonly<Record<string, readonly string[]>>;
+}
+
+/** One stage's two populations: what DC-2 plays, and what the survivor table's base rung plays. */
+interface DropdownPopulations {
+  readonly stageId: string;
+  /** {@link admittedProfilesOf}: `admitProfile` over the stage's `editable` list, baseline excluded. */
+  readonly admitted: ReadonlySet<string>;
+  /** `dropdownConfigurationsOf`, affordable at the stage's starting units — the base rung's census. */
+  readonly census: ReadonlySet<string>;
+}
+
+/** Every shipped stage's two populations, through the shipped admission and the shipped price. */
+function dropdownPopulationsOf(): readonly DropdownPopulations[] {
+  const profiles = fixture.config.dispatcherProfiles.profiles;
+  return fixture.campaign.stages.map((stage) => {
+    const baseline = fixture.requireProfile(stage.dispatcher.startingProfileId);
+    const base = rungsOf(stage.budget).find((rung) => rung.stepId === null);
+    if (base === undefined) throw new Error(`${stage.id} declares no base rung`);
+    const census = dropdownConfigurationsOf(fixture.space, fixture.context.schedule, baseline, profiles)
+      .filter((entry) => entry.units <= base.units)
+      .map((entry) => entry.profileId);
+    return { stageId: stage.id, admitted: new Set(admittedProfilesOf(stage)), census: new Set(census) };
+  });
+}
+
+/**
+ * **The relationship between the DC-2 registers and the survivor table's base-rung dropdown
+ * survivors**, returned as disagreements. Pure, and exact rather than approximate: both are verdicts
+ * of the same runs, and `judge.ts` defines `cleared` as `metOnTuningSeeds` and the holdout. So, per
+ * stage:
+ *
+ * ```
+ * table = ((DROPDOWN_CLEARS − REFUSED_ON_HOLDOUT) ∩ census) ∪ OUTSIDE_EDITABLE
+ * REFUSED_ON_HOLDOUT ⊆ DROPDOWN_CLEARS ⊆ admitted,  and  OUTSIDE_EDITABLE ∩ admitted = ∅
+ * ```
+ *
+ * A profile the table counts that the registers do not account for is red, and so is one the
+ * registers account for that the table does not count. The base rung only, because that is the rung
+ * the survivor band judges. The census intersection is not a third difference: a registered clear the
+ * base rung cannot afford is not a way through there, so its absence from the table says nothing.
+ */
+function dropdownReconciliationIssues(
+  table: PublishedSurvivors,
+  populations: readonly DropdownPopulations[],
+  profileIds: ReadonlySet<string>,
+  registers: DropdownRegisters,
+): readonly string[] {
+  const issues: string[] = [];
+  const listed = (
+    register: Readonly<Record<string, readonly string[]>>,
+    stageId: string,
+  ): ReadonlySet<string> => new Set(register[stageId] ?? []);
+  for (const { stageId, admitted, census } of populations) {
+    const base = table.scenarios
+      .find((scenario) => scenario.id === stageId)
+      ?.steps.find((step) => step.stepId === null);
+    if (base === undefined) {
+      issues.push(`${stageId}: data/scenario-survivors.json publishes no base rung for this stage`);
+      continue;
+    }
+    const counted = new Set(base.survivorNames.filter((name) => profileIds.has(name)));
+    if (counted.size !== base.dropdown.survivors) {
+      issues.push(
+        `${stageId}: the table names ${String(counted.size)} shipped profiles among its base-rung ` +
+          `survivors and counts ${String(base.dropdown.survivors)} dropdown survivors`,
+      );
+    }
+    const clears = listed(registers.clears, stageId);
+    const refused = listed(registers.refusedOnHoldout, stageId);
+    const outside = listed(registers.outsideEditable, stageId);
+    for (const id of clears) {
+      if (admitted.has(id)) continue;
+      issues.push(
+        `${stageId}: DROPDOWN_CLEARS names ${id}, which this stage's editable list does not admit, so ` +
+          'DC-2 cannot have played it',
+      );
+    }
+    for (const id of refused) {
+      if (clears.has(id)) continue;
+      issues.push(
+        `${stageId}: DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT names ${id}, which DROPDOWN_CLEARS does not — ` +
+          'only a profile that met every bar on the tuning seeds can be refused on the holdout',
+      );
+    }
+    for (const id of outside) {
+      if (!admitted.has(id)) continue;
+      issues.push(
+        `${stageId}: DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE names ${id}, and this stage's editable list ` +
+          'admits it — DC-2 plays it, so it belongs in DROPDOWN_CLEARS',
+      );
+    }
+    for (const id of counted) {
+      if (outside.has(id)) continue;
+      if (!admitted.has(id)) {
+        issues.push(
+          `${stageId}: the table counts ${id} as a way through from the dropdown, and this stage's ` +
+            'editable list refuses it, so DC-2 never plays it — name it in ' +
+            'DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE, or find what moved',
+        );
+      } else if (!clears.has(id)) {
+        issues.push(
+          `${stageId}: the table counts ${id} as clearing both seed sets, and DROPDOWN_CLEARS, which ` +
+            'plays it, does not register it meeting every bar on the tuning seeds — a clear implies ' +
+            'that, so one of the two measurements has moved',
+        );
+      } else if (refused.has(id)) {
+        issues.push(
+          `${stageId}: the table counts ${id} as holding on the holdout, and ` +
+            'DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT registers the holdout refusing it',
+        );
+      } else if (!census.has(id)) {
+        issues.push(
+          `${stageId}: the table counts ${id} at the base rung, and the shipped price schedule does ` +
+            'not afford it there',
+        );
+      }
+    }
+    for (const id of clears) {
+      if (refused.has(id) || !census.has(id) || counted.has(id)) continue;
+      issues.push(
+        `${stageId}: DROPDOWN_CLEARS registers ${id} meeting every bar with no holdout refusal, the ` +
+          'base rung affords it, and the table does not count it — if the holdout refuses it, ' +
+          'register that in DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT; otherwise one of the two ' +
+          'measurements has moved',
+      );
+    }
+    for (const id of outside) {
+      if (admitted.has(id) || counted.has(id)) continue;
+      issues.push(
+        `${stageId}: DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE names ${id}, and the table's base rung ` +
+          'does not count it',
+      );
+    }
+  }
+  return issues;
+}
+
+describe('DROPDOWN_CLEARS and the survivor table — two readings of the dropdown, every difference named', () => {
+  let table: PublishedSurvivors;
+  beforeAll(async () => {
+    table = JSON.parse(await readFile(SCENARIO_SURVIVORS_PATH, 'utf8')) as PublishedSurvivors;
+  });
+
+  const profileIds = (): ReadonlySet<string> =>
+    new Set(fixture.config.dispatcherProfiles.profiles.map((profile) => profile.id));
+
+  it('agree in both directions once the holdout and the editable list are accounted for', () => {
+    const populations = dropdownPopulationsOf();
+    /* § 6.3 row 12: something on both sides to compare. */
+    expect(populations.some((row) => row.admitted.size > 0 && row.census.size > 0)).toBe(true);
+    expect(
+      table.scenarios.some((scenario) =>
+        scenario.steps.some((step) => step.stepId === null && step.dropdown.survivors > 0),
+      ),
+    ).toBe(true);
+    expect(
+      dropdownReconciliationIssues(table, populations, profileIds(), {
+        clears: DROPDOWN_CLEARS,
+        refusedOnHoldout: DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT,
+        outsideEditable: DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE,
+      }),
+    ).toEqual([]);
+  });
+
+  it('is red on a way through the registers miss, and on a registered clear the table does not count', () => {
+    /*
+     * Synthetic populations and registers over a clone of the real table, so no control depends on
+     * what the shipped registers hold today: a rebalance that empties them must not break these.
+     */
+    const [row] = table.scenarios;
+    if (row === undefined) throw new Error('the survivor table publishes no scenario');
+    const [inList, offList] = [...profileIds()].filter((id) => id !== row.baselineProfileId);
+    if (inList === undefined || offList === undefined) throw new Error('fewer than two shipped profiles');
+    interface MutableStep {
+      stepId: string | null;
+      survivorNames: string[];
+      dropdown: { survivors: number };
+    }
+    const counting = (names: readonly string[]): PublishedSurvivors => {
+      const copy = JSON.parse(JSON.stringify(table)) as PublishedSurvivors;
+      const base = copy.scenarios
+        .find((scenario) => scenario.id === row.id)
+        ?.steps.find((step) => step.stepId === null) as unknown as MutableStep | undefined;
+      if (base === undefined) throw new Error(`${row.id} publishes no base rung`);
+      base.survivorNames = [...base.survivorNames.filter((name) => !profileIds().has(name)), ...names];
+      base.dropdown.survivors = names.length;
+      return copy;
+    };
+    const at = (ids: readonly string[]): Record<string, readonly string[]> => ({ [row.id]: ids });
+    const issues = (
+      names: readonly string[],
+      registers: Partial<DropdownRegisters>,
+      census: readonly string[] = [inList, offList],
+    ): string =>
+      dropdownReconciliationIssues(
+        counting(names),
+        [{ stageId: row.id, admitted: new Set([inList]), census: new Set(census) }],
+        profileIds(),
+        { clears: {}, refusedOnHoldout: {}, outsideEditable: {}, ...registers },
+      ).join('\n');
+
+    /* The floor: nothing counted and nothing registered agrees. */
+    expect(issues([], {})).toBe('');
+    /* A way through that DC-2 plays and has not registered. */
+    expect(issues([inList], {})).toContain(`counts ${inList} as clearing both seed sets`);
+    /* A registered clear with no holdout refusal that the table does not count: stage 7 before § D556. */
+    expect(issues([], { clears: at([inList]) })).toContain(`DROPDOWN_CLEARS registers ${inList}`);
+    /* Naming the refusal reconciles it, and a table that then counts the profile contradicts it. */
+    expect(issues([], { clears: at([inList]), refusedOnHoldout: at([inList]) })).toBe('');
+    expect(issues([inList], { clears: at([inList]), refusedOnHoldout: at([inList]) })).toContain(
+      'registers the holdout refusing it',
+    );
+    expect(issues([], { refusedOnHoldout: at([inList]) })).toContain('which DROPDOWN_CLEARS does not');
+    /* A way through the list refuses: stage 5 before § D556, and the register that names it. */
+    expect(issues([offList], {})).toContain(`counts ${offList} as a way through from the dropdown`);
+    expect(issues([offList], { outsideEditable: at([offList]) })).toBe('');
+    expect(issues([], { outsideEditable: at([offList]) })).toContain('does not count it');
+    expect(issues([inList], { clears: at([inList]), outsideEditable: at([inList]) })).toContain(
+      'belongs in DROPDOWN_CLEARS',
+    );
+    expect(issues([], { clears: at([offList]) })).toContain('does not admit');
+    /* A registered clear the base rung cannot afford is not a disagreement. */
+    expect(issues([], { clears: at([inList]) }, [offList])).toBe('');
   });
 });
 
 describe.skipIf(process.env['ELEVATOR_SIM_DEEP'] !== '1')('DC-2 — no stage clears from the dispatcher dropdown alone, beyond the register', () => {
   it('plays every admitted cell and matches the register in both directions', async () => {
     const measured: Record<string, string[]> = {};
+    const refused: Record<string, string[]> = {};
     let cells = 0;
     const lines: string[] = [];
     for (const stage of fixture.campaign.stages) {
       const admitted = admittedProfilesOf(stage);
       const met: string[] = [];
+      const heldBack: string[] = [];
       for (const id of admitted) {
         cells += 1;
         const attempt = await fixture.playToVerdict(stage, id);
-        if (attempt.verdict.metOnTuningSeeds) met.push(id);
+        if (!attempt.verdict.metOnTuningSeeds) continue;
+        met.push(id);
+        /* `runStageToVerdict` has already played this cell's holdout batch, so reading it is free. */
+        if (!attempt.verdict.cleared) heldBack.push(id);
       }
       if (met.length > 0) measured[stage.id] = met;
-      lines.push(`${stage.id}: admitted ${String(admitted.length)}, met on tuning seeds ${met.length === 0 ? 'none' : met.join(' ')}`);
+      if (heldBack.length > 0) refused[stage.id] = heldBack;
+      lines.push(
+        `${stage.id}: admitted ${String(admitted.length)}, met on tuning seeds ` +
+          `${met.length === 0 ? 'none' : met.join(' ')}, refused on the holdout ` +
+          `${heldBack.length === 0 ? 'none' : heldBack.join(' ')}`,
+      );
     }
     process.stderr.write(`DC-2 sweep over ${String(cells)} admitted cells\n${lines.join('\n')}\n`);
     expect(cells, 'the sweep admitted no cell at all').toBeGreaterThan(0);
-    const expected = Object.fromEntries(
-      Object.entries(DROPDOWN_CLEARS).map(([id, ids]) => [id, [...ids].sort()]),
-    );
-    const got = Object.fromEntries(Object.entries(measured).map(([id, ids]) => [id, [...ids].sort()]));
-    expect(got, 'the register and the measurement disagree — a new dropdown clear, or a registered one that stopped').toEqual(expected);
+    expect(
+      sortedRegister(measured),
+      'the register and the measurement disagree — a new dropdown clear, or a registered one that stopped',
+    ).toEqual(sortedRegister(DROPDOWN_CLEARS));
+    expect(
+      sortedRegister(refused),
+      'DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT and the holdout disagree — a registered clear that now holds ' +
+        'on the holdout too, or a new refusal',
+    ).toEqual(sortedRegister(DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT));
   }, 3_600_000);
 });

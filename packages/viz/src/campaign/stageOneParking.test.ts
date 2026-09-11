@@ -209,7 +209,7 @@ async function play(stage: CampaignStage, edit: EditedVector) {
 describe('the stage opens the dial its building says decides it', () => {
   it('offers where idle cars wait, and the two dimensions moving it brings to life', () => {
     const stage = subject();
-    const editable = editableIdsOf(stage.dispatcher.editable, space.ids);
+    const editable = editableIdsOf(stage.dispatcher.editable, space.ids, shippedPriceSchedule());
     const dependants = gatedBy(PARKING_ID).filter(
       (id) => id !== 'idle.parkingFloorIndex',
     );
@@ -226,7 +226,7 @@ describe('the stage opens the dial its building says decides it', () => {
   it('did not widen what the dropdown offers, so DC-2 and DC-2b are where they were', () => {
     const stage = subject();
     const baseline = requireDispatcher(config, stage.dispatcher.startingProfileId);
-    const editable = editableIdsOf(stage.dispatcher.editable, space.ids);
+    const editable = editableIdsOf(stage.dispatcher.editable, space.ids, shippedPriceSchedule());
     const withoutIdle = editable.filter((id) => !id.startsWith('idle.'));
     const admittedUnder = (ids: readonly string[]): readonly string[] =>
       [...config.dispatcherProfilesById.values()]
@@ -305,7 +305,7 @@ describe('the stage has a witness, and it is admissible here', () => {
       space,
       baseline,
       resolved.profile,
-      editableIdsOf(stage.dispatcher.editable, space.ids),
+      editableIdsOf(stage.dispatcher.editable, space.ids, shippedPriceSchedule()),
     );
     expect(admission.admissible, admission.sentence).toBe(true);
 

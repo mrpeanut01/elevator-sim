@@ -187,6 +187,8 @@ describe('double-deck pairing', () => {
         .filter((built) => built.isDoubleDeck)
         .map((built) => `${resolved.id}/${built.id}`),
     );
-    expect(doubleDeckBanks).toEqual(['burj-class-reference/shuttle', 'vertical-city/shuttle']);
+    // GitHub issue #438 moved the Burj-class reference's decks from its sky-lobby shuttle to its
+    // observation run, which is where every source read puts the real tower's two double-deck cars.
+    expect(doubleDeckBanks).toEqual(['burj-class-reference/observation', 'vertical-city/shuttle']);
   });
 });

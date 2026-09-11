@@ -54,7 +54,7 @@ describe('stage 5, played — the credential is named, and the lesson is that it
 
   it('opens the dial the lesson needs and refuses a profile that changes anything else', () => {
     const { space } = fixture;
-    const editable = editableIdsOf(stage.dispatcher.editable, space.ids);
+    const editable = editableIdsOf(stage.dispatcher.editable, space.ids, fixture.context.schedule);
     expect(editable).toContain('dispatch.callType');
     expect(
       admitProfile(space, requireProfile('collective'), requireProfile('destination-eta'), editable)

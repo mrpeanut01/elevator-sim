@@ -55,6 +55,7 @@ import { editableIdsOf, parseCampaign, playerFacingStrings, validateCampaign } f
 import { FAIL_STATES } from './types.js';
 import { PROBABILITY_WORDS, playerSafeDescription, probabilityWordIn } from './words.js';
 import { GOAL_READS, isPerReplicationGoal, type GoalKind } from '../scenario/goals.js';
+import { withholdingDimension } from '../scenario/budget.js';
 import { validatePublishedGoalRates } from '../scenario/published.js';
 import { dimensionIdsLiveOn } from '../authoring/dispatcherSpec.js';
 import { requireBuilding, withGoodsCar } from '../fixtures.test-helper.js';
@@ -107,7 +108,7 @@ describe('the shipped campaign', () => {
     const { campaign, space } = fixture;
     const declared = new Set(space.ids);
     for (const stage of campaign.stages) {
-      for (const id of editableIdsOf(stage.dispatcher.editable, space.ids)) {
+      for (const id of editableIdsOf(stage.dispatcher.editable, space.ids, fixture.context.schedule)) {
         expect(declared.has(id), `${stage.id} offers ${id}`).toBe(true);
       }
     }
@@ -240,7 +241,13 @@ describe('every shipped goal came from the measured table', () => {
     const { space, dimensionHelp } = fixture;
     for (const stage of fixture.campaign.stages) {
       const entry = publishedFor(stage);
-      const briefing = briefingFor({ stage, published: entry, dimensionIds: space.ids, dimensionHelp });
+      const briefing = briefingFor({
+        stage,
+        published: entry,
+        dimensionIds: space.ids,
+        dimensionHelp,
+        schedule: fixture.context.schedule,
+      });
       expect(briefing.facts).toHaveLength(entry.configurationFacts.length);
       expect(briefing.withheld).toHaveLength(entry.withheld.length);
       /* `everyone-can-get-there` is published as withheld and must reach the reader as withheld. */
@@ -332,7 +339,7 @@ describe('the guard fires — negative controls, applied to the shipped campaign
       const stage = mutated.stages[0];
       if (stage === undefined) return;
       const outside = space.ids.find(
-        (id) => !editableIdsOf(stage.dispatcher.editable, space.ids).includes(id),
+        (id) => !editableIdsOf(stage.dispatcher.editable, space.ids, fixture.context.schedule).includes(id),
       );
       if (outside === undefined) return;
       (stage.levers as Record<string, string | null>)['overwhelmed'] = outside;
@@ -409,7 +416,7 @@ describe('a stage judges only the changes it offered', () => {
       space,
       requireProfile(stage.dispatcher.startingProfileId),
       requireProfile('nearest-car'),
-      editableIdsOf(stage.dispatcher.editable, space.ids),
+      editableIdsOf(stage.dispatcher.editable, space.ids, fixture.context.schedule),
     );
     expect(admission.admissible).toBe(true);
     expect(admission.withinScope.map((moved) => moved.id)).toContain('weights.waitTime');
@@ -423,7 +430,7 @@ describe('a stage judges only the changes it offered', () => {
       space,
       requireProfile(stage.dispatcher.startingProfileId),
       requireProfile('energy-aware'),
-      editableIdsOf(stage.dispatcher.editable, space.ids),
+      editableIdsOf(stage.dispatcher.editable, space.ids, fixture.context.schedule),
     );
     expect(admission.admissible).toBe(false);
     expect(admission.outOfScope.length).toBeGreaterThan(0);
@@ -434,36 +441,63 @@ describe('a stage judges only the changes it offered', () => {
     const { space } = fixture;
     const stage = stageAt(0);
     const profile = requireProfile(stage.dispatcher.startingProfileId);
-    const admission = admitProfile(space, profile, profile, editableIdsOf(stage.dispatcher.editable, space.ids));
+    const admission = admitProfile(space, profile, profile, editableIdsOf(stage.dispatcher.editable, space.ids, fixture.context.schedule));
     expect(admission.admissible).toBe(true);
     expect(admission.withinScope).toEqual([]);
     expect(admission.sentence).toContain('the control this surface is meant to survive');
   });
 
-  it('opens every declared dimension on the stage that says so, without listing them', () => {
-    const { campaign, space } = fixture;
+  /**
+   * **Every declared dimension the price schedule does not withhold** — GitHub issue #467,
+   * [§ D535](../../../../DECISIONS.md). This case used to assert the stage opened `space.ids` whole,
+   * which was the mode's meaning until the product owner withheld the weight-set selector and the
+   * arrival predictor from every scenario. Non-vacuity first: if the schedule withheld nothing, the
+   * two readings would agree and this case could not tell which one shipped.
+   */
+  it('opens every declared dimension the schedule does not withhold, on the stage that says so, without listing them', () => {
+    const { campaign, space, context } = fixture;
     const stage = campaign.stages[6];
     expect(stage?.dispatcher.editable.mode).toBe('every-declared-dimension');
-    expect(editableIdsOf(stage?.dispatcher.editable ?? { mode: 'listed', ids: [] }, space.ids)).toEqual(
-      space.ids,
+    const withheld = space.ids.filter(
+      (id) => withholdingDimension(context.schedule, id) !== undefined,
     );
+    expect(withheld.length, 'the schedule withholds nothing, so both readings agree').toBeGreaterThan(0);
+    expect(
+      editableIdsOf(
+        stage?.dispatcher.editable ?? { mode: 'listed', ids: [] },
+        space.ids,
+        context.schedule,
+      ),
+    ).toEqual(space.ids.filter((id) => !withheld.includes(id)));
   });
 
-  it('does not open the duty weight where the stage’s building declares no duty, and opens it where one does — § D549', () => {
+  it('offers neither a withheld dimension nor the duty weight on a building that declares no duty, and opens the duty weight where one does — § D535 and § D549 at once', () => {
     /*
      * The ids `dev/campaignPanel.ts` resolves a stage's editable set against: the space's, less
-     * what the stage's own building gives nothing to act on. `every-declared-dimension` is the
-     * mode that would otherwise open the dial, so that is the stage asked.
+     * what the stage's own building gives nothing to act on (§ D549), then less what the price
+     * schedule withholds from every scenario (§ D535) — both filters, in the panel's own
+     * composition. `every-declared-dimension` is the mode that would otherwise open all of them, so
+     * that is the stage asked. Non-vacuity first: each filter must have something to remove, and
+     * the two must remove different ids, or this case could not tell one reading from the other.
      */
-    const { campaign, space } = fixture;
+    const { campaign, space, context } = fixture;
     const stage = campaign.stages.find((entry) => entry.dispatcher.editable.mode === 'every-declared-dimension');
     if (stage === undefined) throw new Error('no stage opens every declared dimension');
     const building = fixture.resourcesFor(stage).building;
+    const withheld = space.ids.filter((id) => withholdingDimension(context.schedule, id) !== undefined);
+    expect(withheld.length, 'the schedule withholds nothing, so the § D535 filter is vacuous').toBeGreaterThan(0);
     expect(space.ids).toContain('weights.dutyMismatch');
-    const offered = editableIdsOf(stage.dispatcher.editable, dimensionIdsLiveOn(space.ids, building));
-    expect(offered).toEqual(space.ids.filter((id) => id !== 'weights.dutyMismatch'));
+    expect(withheld, 'the duty weight is withheld, so the two filters cannot be told apart').not.toContain(
+      'weights.dutyMismatch',
+    );
+    const offered = editableIdsOf(stage.dispatcher.editable, dimensionIdsLiveOn(space.ids, building), context.schedule);
+    expect(offered).not.toContain('weights.dutyMismatch');
+    for (const id of withheld) expect(offered, id).not.toContain(id);
+    expect(offered).toEqual(space.ids.filter((id) => id !== 'weights.dutyMismatch' && !withheld.includes(id)));
     const declared = withGoodsCar(building);
-    expect(editableIdsOf(stage.dispatcher.editable, dimensionIdsLiveOn(space.ids, declared))).toEqual(space.ids);
+    expect(
+      editableIdsOf(stage.dispatcher.editable, dimensionIdsLiveOn(space.ids, declared), context.schedule),
+    ).toEqual(space.ids.filter((id) => !withheld.includes(id)));
   });
 });
 
@@ -506,6 +540,7 @@ describe('R10 — no probability word reaches a player-facing string', () => {
         published: publishedFor(stage),
         dimensionIds: space.ids,
         dimensionHelp,
+        schedule: fixture.context.schedule,
       });
       const texts = [
         briefing.configuration,

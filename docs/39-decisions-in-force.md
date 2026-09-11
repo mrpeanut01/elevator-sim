@@ -30,6 +30,7 @@ the first three in one conversation, the last three later the same day:
 | [§ D529](../DECISIONS.md) | The first session is a **two-screen tutorial** before Scenario — walk the player through the editor, then let a building fall apart and show the fix. Screen two is reused as the Rush tutorial. **A worked answer is permitted in the tutorial and nowhere else** |
 | [§ D530](../DECISIONS.md) | The cross-mode currency is named **chimes**, closing the first of § D526's two open items |
 | [§ D531](../DECISIONS.md) | The **sign-in bonus ships at launch**, in the one shape § D526 clause 7 permits — small, flat, unconditional, no compounding, no streak, nothing lost by missing it. Closes § D526's second open item, so `docs/38` § 5 has none left |
+| [§ D535](../DECISIONS.md) | *Taken 2026-09-10, on GitHub issue #467.* Not for sale is not priced high: the **weight-set selector** and the **arrival predictor** are withheld from every scenario, declared once in `data/price-schedule.json`; `every-declared-dimension` is every declared dimension less what is withheld; the other twenty-two dials are priced, as proposals the owner approved as drafted on 2026-09-11 |
 
 One ruled later, on 2026-09-10, narrowing how often § D526's awards pay rather than what they are:
 
@@ -62,6 +63,7 @@ The standing decisions those three rest on, unchanged and cited rather than rest
 | [§ D520](../DECISIONS.md) | The dropdown sweep is built and tiered, and names the stages that still clear from the dropdown |
 | [§ D537](../DECISIONS.md) | The survivor band **narrows by ladder position**, authored in `data/scenario-survivor-bands.json` as shares of the configurations judged at a scenario's base rung. The owner ruled the shape on 2026-09-10; **the owner approved every figure as drafted the same day**, and the band's only reader is an acceptance check |
 | [§ D538](../DECISIONS.md) | Phase 7's schema-driven search entry point, Bayesian optimization and OCBA are **withdrawn** by the project owner (GitHub issue #416): the six introspection helpers waiting for the entry point are deleted, and `CLAUDE.md` invariant 8 keeps every tunable declaring its schema while naming `tuning/search` as the search over the space `tuning/space` collects |
+| [§ D545](../DECISIONS.md) | The Burj-class reference follows its operator (GitHub issue #438): two double-deck observation cars, Emaar's use stacking and level 124 at 452 m, with every chosen figure **drafted for the owner's approval, and approved as drafted on 2026-09-11**. Its 57-lift bracket is re-measured and pinned, and the figures first published for it did not reproduce |
 | [§ D549](../DECISIONS.md) | Duty is a **closed vocabulary declared per car** — passenger, goods, bed, service. A journey draws one on its own stream, recorded only where some car declares one; dispatch prices a mismatch through **one weighted term** and filters nothing. A building that declares no duty is byte-identical. **No shipped profile weights the term while no shipped building declares a duty**; the shares, and a drafted weight for `capacity-aware`, are proposals awaiting the owner (GitHub issue #481) |
 
 ## 2. Superseded or amended
@@ -98,6 +100,8 @@ the same thing in one sentence.
 | `docs/23` § 4 | The per-mode declaration, built from the handoff's four-row session-shapes table | **Superseded in part.** The mode set is three; the per-mode loop analysis stands unchanged and is marked as standing | § D525 |
 | `docs/32` § 3.1 | There are three currencies, not one, and only one of them is money | **Amended.** A fourth ships — chimes, earned by completing turns and spent on modifiers; the three-currency analysis stands | § D526, § D530 |
 | `docs/12` § 4 | The deviation register carried thirteen rows, 4.1–4.13 | **Extended.** Two rows added — § 4.14 the four-mode session table, § 4.15 the authored repair lists. CLAUDE.md's canonical-for-the-interface rule is **unchanged and still wins**; a deviation recorded in the register that exists for deviations is that rule working, not an exception to it | § D525 |
+| [§ D525](../DECISIONS.md) clause 2 | The whole editor is open in every scenario | **Amended.** The whole editor less the weight-set selector and the arrival predictor, which no scenario sells at any price. Per-scenario scarcity is still a price, never a removed control | § D535 |
+| `docs/38` § 2.1 | The dispatcher tier prices the weight-set selector, and every knob is priced | **Amended.** The selector and the arrival predictor are withheld rather than priced; every knob a scenario offers is priced | § D535 |
 
 ## 3. The rename map
 

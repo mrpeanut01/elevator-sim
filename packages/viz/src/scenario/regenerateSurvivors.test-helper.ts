@@ -61,6 +61,7 @@ import { parseCampaign, type CampaignContext } from '../campaign/parse.js';
 import type { Campaign } from '../campaign/types.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
+import { dimensionIdsLiveOn } from '../authoring/dispatcherSpec.js';
 
 import { measureScenarioSurvivors, type SurvivorTally } from './measureSurvivors.js';
 import type { PublishedGoalRates } from './published.js';
@@ -74,6 +75,7 @@ import {
   reachableChangesOf,
   unpricedDimensionIds,
   unreachableChangeIdsOf,
+  withheldDimensionIds,
 } from './survivorSpace.js';
 
 /** Where the published table lives. One constant, so the guard and the writer cannot diverge. */
@@ -160,6 +162,7 @@ export async function measurePublishedSurvivors(
   const firstHour = firstHourScenarioIds(campaign.stages);
 
   const scenarios: PublishedSurvivorScenario[] = [];
+  const scenarioBuildings: ReturnType<typeof requireBuilding>[] = [];
   for (const [index, stage] of campaign.stages.entries()) {
     const row = published.scenarios.find((entry) => entry.id === stage.id);
     if (row === undefined) throw new Error(`no published goal row for ${stage.id}`);
@@ -173,6 +176,7 @@ export async function measurePublishedSurvivors(
       trafficProfiles: config.trafficProfiles,
       elevatorSpecs: config.elevatorSpecs,
     };
+    scenarioBuildings.push(resources.building);
     const started = Date.now();
     const tallies = await measureScenarioSurvivors({
       stage,
@@ -219,6 +223,35 @@ export async function measurePublishedSurvivors(
   }
 
   const reachable = reachableChangesOf(space, schedule);
+  const unpriced = unpricedDimensionIds(space, schedule);
+  const withheld = withheldDimensionIds(space, schedule);
+  const priced = space.parameters.length - unpriced.length - withheld.length;
+  /*
+   * A priced dimension no scenario's own building gives anything to act on is priced and still
+   * varied by no configuration: `sampleReachableConfigurations` skips it before its value is drawn
+   * (§ D549). `weights.dutyMismatch` is that dimension on every shipped scenario, so the scope names
+   * it rather than counting it among the varied. The words below are the duty weight's own, so any
+   * other dimension in that position is refused here until somebody writes the sentence it needs.
+   */
+  const liveOnSomeScenario = new Set(
+    scenarioBuildings.flatMap((building) => dimensionIdsLiveOn(space.ids, building)),
+  );
+  const pricedNotVaried = space.parameters
+    .map((parameter) => parameter.id)
+    .filter((id) => !unpriced.includes(id) && !withheld.includes(id) && !liveOnSomeScenario.has(id));
+  const unworded = pricedNotVaried.filter((id) => id !== 'weights.dutyMismatch');
+  if (unworded.length > 0) {
+    throw new Error(`the scope has no words for a priced dimension no scenario draws: ${unworded.join(', ')}`);
+  }
+  const dutyWeightChange = reachable.find((change) => change.dimensionIds.includes('weights.dutyMismatch'));
+  const varied =
+    pricedNotVaried.length === 0
+      ? `are priced and therefore varied,`
+      : `are priced, of which ${String(priced - pricedNotVaried.length)} are varied — ` +
+        `weights.dutyMismatch is declared and priced by ${dutyWeightChange?.changeId ?? 'no change'}, ` +
+        `which covers dispatcher.weights, and is not varied on a building that declares no duty, ` +
+        `which no scenario's building does, because a dial its building gives nothing to act on is ` +
+        `not drawn (DECISIONS.md § D549) —`;
   return {
     generatedBy: 'packages/viz/src/scenario/regenerateSurvivors.test-helper.ts',
     contract:
@@ -241,13 +274,15 @@ export async function measurePublishedSurvivors(
         `${String(reachable.length)} of ${String(schedule.changes.length)} priced changes can ` +
         `reach a scenario run at all — the rest price shafts, machines and fittings that ` +
         `campaign/stageRun.ts cannot apply — and ` +
-        `${String(space.parameters.length - unpricedDimensionIds(space, schedule).length)} of ` +
-        `${String(space.parameters.length)} declared dimensions are priced and therefore varied. ` +
-        `A configuration differing only on an unpriced dimension is reachable at every rung, so ` +
-        `counting it would make the budget inert.`,
+        `${String(priced)} of ${String(space.parameters.length)} declared dimensions ${varied} ` +
+        `and ${String(withheld.length)} are withheld from every scenario by ` +
+        `data/price-schedule.json and varied by no configuration. A configuration differing only ` +
+        `on an unpriced dimension is reachable at every rung, so counting it would make the budget ` +
+        `inert.`,
       reachableChangeIds: reachable.map((change) => change.changeId),
       unreachableChangeIds: unreachableChangeIdsOf(space, schedule),
-      unpricedDimensionCount: unpricedDimensionIds(space, schedule).length,
+      unpricedDimensionCount: unpriced.length,
+      withheldDimensionCount: withheld.length,
       declaredDimensionCount: space.parameters.length,
     },
     scenarios,
