@@ -383,6 +383,18 @@ function mountWeek(
     render();
     context.host.watchRun(run, (checked) => {
       checking = undefined;
+      /*
+       * **A check that lands after the player has left this screen enters nothing** — GitHub issue
+       * #526 item 3. The gate is a worker round trip, and a player can press *Watch* and walk away
+       * before it answers; the shell's `enterWatch` would then pull them off wherever they went and onto
+       * somebody else's run. The host has already entered the spectator state by the time `settled`
+       * runs, so that session is ended too — and only if it is the one this press entered, by identity,
+       * because a watch the player has since opened elsewhere is not this press's to end.
+       */
+      if (!alive) {
+        if (checked.blocked === null && context.host.watching()?.run === checked) context.host.stopWatching();
+        return;
+      }
       if (checked.blocked !== null) {
         refused.set(run.id, checked);
         render();

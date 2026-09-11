@@ -78,11 +78,14 @@ import {
   HAS_BROWSER,
   enterEngineerStage,
   enterEverydayStage,
+  openEverydayDoor,
   openPage,
   returnToEverydayMode,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
+import { openingCareer } from '../campaign/career.js';
+import { CAREER_STORAGE_KEY, encodeCareer } from '../campaign/careerPersist.js';
 import { STAGE_DAY_OVER, STAGE_SPEEDS, stageBarModelOf } from './stageScreenModel.js';
 
 /** The run the address asks for, in simulated seconds. See the module docstring. */
@@ -441,4 +444,199 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
       await page.close();
     }
   }, 300_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * A day left unfinished — GitHub issue #526 item 1
+ * -------------------------------------------------------------------------- */
+
+/** `#run` is the Engineer's Run button; `dev/main.ts#onRunning` labels it from the runner's own transition. */
+const RUN_IDLE = 'Run this shift';
+
+/** § 3.4's question for a day-shaped context, read off the strip the shell draws. */
+const LEAVE_UNFINISHED = 'Leave the day unfinished?';
+
+/** The score under each of the front door's chips. A filed day is the only thing that puts a figure there. */
+async function doorScores(page: Page): Promise<readonly string[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('.everyday-door-chip-score')].map((node) => node.textContent ?? ''),
+  );
+}
+
+/**
+ * From the Everyday menu: the Engineer surface's `Ctrl`+`Enter`, back, and the front door's scores.
+ *
+ * `replay.browser.test.ts`'s instrument for #522, and the press the issue reproduced with. That key is
+ * `dev/main.ts#closeShift` with no playhead gate, live once that surface has the page (#287), so it
+ * files whatever run of this shell's own stands unfiled. The Day report tab and the export press reach
+ * the same function behind a playhead gate, so a run this refuses they refuse too.
+ */
+async function scoresAfterEngineerClose(page: Page): Promise<readonly string[]> {
+  await enterEngineerStage(page);
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+  });
+  await page.keyboard.press('Control+Enter');
+  await returnToEverydayMode(page);
+  await openEverydayDoor(page);
+  return doorScores(page);
+}
+
+/** The scores that carry a figure. `[]` is a door on which no day has been filed. */
+const figuresIn = (scores: readonly string[]): readonly string[] => scores.filter((score) => /\d/u.test(score));
+
+describe.skipIf(!HAS_BROWSER)('a day left unfinished — GitHub issue #526 item 1', () => {
+  /*
+   * The strip says *"Today's run will not be scored"*, and until #526 nothing on the way out made that
+   * true: `everyday/shell.ts#doLeave` put the player on the menu and left the run behind it, in flight or
+   * landed, for the Engineer surface to file. Two cases, because the promise is made in two states and a
+   * cancel alone could only keep it in one of them.
+   */
+  it('left while its run is still generating, files nothing onto the week', async () => {
+    const page = await coldLoad();
+    try {
+      await openEverydayDoor(page);
+      await page.locator('.everyday-bar-primary').click(); // Set up today
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+      await page.waitForFunction((label) => document.getElementById('run')?.textContent === label, RUN_IDLE, {
+        timeout: 60_000,
+      });
+      /*
+       * Start the day and leave inside one task, `rush.browser.test.ts`'s #518 case: the worker answers
+       * with a message, which is a task of its own, so the run cannot land between the press and the
+       * leave, and this case cannot pass by the run being quick.
+       */
+      const seen = await page.evaluate(() => {
+        const label = (): string => document.getElementById('run')?.textContent ?? '';
+        document.querySelector<HTMLButtonElement>('.everyday-bar-primary')?.click(); // Start the day
+        const pressed = label();
+        document.querySelector<HTMLButtonElement>('.everyday-bar-leave')?.click();
+        const asked = document.querySelector('.everyday-bar-question')?.textContent ?? '';
+        document.querySelector<HTMLButtonElement>('.everyday-bar-confirm-leave')?.click();
+        return { pressed, asked };
+      });
+      expect(seen.pressed).toBe('Cancel this run');
+      expect(seen.asked).toBe(LEAVE_UNFINISHED);
+      await page.waitForFunction((label) => document.getElementById('run')?.textContent === label, RUN_IDLE, {
+        timeout: 60_000,
+      });
+      const scores = await scoresAfterEngineerClose(page);
+      expect(scores.length).toBeGreaterThan(0);
+      expect(figuresIn(scores)).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('left after its run has landed, files nothing onto the week', async () => {
+    const page = await coldLoad();
+    try {
+      await enterEverydayStage(page);
+      await page.locator('.everyday-bar-leave').click();
+      expect(await page.textContent('.everyday-bar-question')).toBe(LEAVE_UNFINISHED);
+      await page.locator('.everyday-bar-confirm-leave').click();
+      await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
+      const scores = await scoresAfterEngineerClose(page);
+      expect(scores.length).toBeGreaterThan(0);
+      expect(figuresIn(scores)).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('and a day walked away from by a rail row, where no strip promised anything, still files — the control', async () => {
+    /*
+     * The instrument's positive half, and the boundary's. A rail row leaves the stage with no question
+     * asked, so the day is still the player's and the same press files it; `replay.browser.test.ts`'s
+     * #522 control depends on exactly that. Were the refusal drawn on every leave rather than on the
+     * one the strip confirms, this case goes red, and without it the two above would pass on a build
+     * where the press files nothing at all.
+     */
+    const page = await coldLoad();
+    try {
+      await enterEverydayStage(page);
+      await page.click('.everyday-rail button:has-text("Your week")');
+      await page.waitForSelector('.everyday-week', { timeout: 15_000 });
+      await page.locator('.everyday-rail-menu').click();
+      await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
+      const scores = await scoresAfterEngineerClose(page);
+      expect(figuresIn(scores).length).toBeGreaterThan(0);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('taking a campaign offer while the day’s run is still generating files nothing onto the new week — item 2', async () => {
+    const page = await openPage(browser, { viewport: { ...VIEWPORTS[0] } });
+    try {
+      /*
+       * A career one slot up, so an offer can be taken at all: standing 14 opens the second slot
+       * (`campaign/economy.ts#SLOTS`) and the opening career holds one tower. Seeded as the career a
+       * returning player's device carries, through the codec the store itself decodes.
+       */
+      const stored = encodeCareer({ ...openingCareer('collective'), carry: 14 });
+      await page.addInitScript(
+        ({ key, value }) => {
+          try {
+            window.localStorage.setItem(key, value);
+          } catch {
+            /* No storage, no career — the case then fails on the offer rather than passing on nothing. */
+          }
+        },
+        { key: CAREER_STORAGE_KEY, value: stored },
+      );
+      await page.goto(`${origin}?building=garden-apartments&seed=424242&duration=${String(RUN_S)}`, { waitUntil: 'load' });
+      await page.waitForFunction(() => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true, undefined, {
+        timeout: 30_000,
+      });
+      await openEverydayDoor(page);
+      const towerBefore = await page.textContent('.everyday-door-seed');
+      await page.locator('.everyday-bar-primary').click(); // Set up today
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+      await page.waitForFunction((label) => document.getElementById('run')?.textContent === label, RUN_IDLE, {
+        timeout: 60_000,
+      });
+      /*
+       * Start the day, walk off the stage by a rail row — no strip, so item 1's refusal is not what this
+       * measures — to the menu, into the campaign and take the first offer the career can take, all inside
+       * one task, so the run is still generating when the week switches under it.
+       */
+      const seen = await page.evaluate(() => {
+        const label = (): string => document.getElementById('run')?.textContent ?? '';
+        const railRow = (text: string): HTMLButtonElement | undefined =>
+          [...document.querySelectorAll<HTMLButtonElement>('.everyday-rail button')].find((row) =>
+            (row.textContent ?? '').includes(text),
+          );
+        document.querySelector<HTMLButtonElement>('.everyday-bar-primary')?.click(); // Start the day
+        const pressed = label();
+        const week = railRow('Your week');
+        week?.click();
+        const menu = document.querySelector<HTMLElement>('.everyday-rail-menu');
+        menu?.click();
+        const tile = document.querySelector<HTMLElement>('.everyday-mode[data-screen="towers"]');
+        tile?.click();
+        const take = [...document.querySelectorAll<HTMLButtonElement>('.everyday-towers-offer-take')].find(
+          (button) => !button.disabled,
+        );
+        take?.click();
+        return { pressed, walked: week !== undefined && menu !== null && tile !== null, took: take !== undefined, left: label() };
+      });
+      expect(seen.pressed).toBe('Cancel this run');
+      expect(seen.walked).toBe(true);
+      expect(seen.took).toBe(true);
+      await page.waitForFunction((label) => document.getElementById('run')?.textContent === label, RUN_IDLE, {
+        timeout: 60_000,
+      });
+      await page.locator('.everyday-rail-menu').click();
+      await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
+      const scores = await scoresAfterEngineerClose(page);
+      /* The door is reading the week the offer switched to — otherwise this would measure the parked one. */
+      expect(await page.textContent('.everyday-door-seed'), `the runner read "${seen.left}" as the offer was taken`).not.toBe(
+        towerBefore,
+      );
+      expect(figuresIn(scores)).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  });
 });

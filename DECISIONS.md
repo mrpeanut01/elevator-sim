@@ -35323,6 +35323,21 @@ chooses one is #437's too.
 
 ---
 
+## D555 — A day left unfinished, or put down for a campaign offer, files nothing: the run in flight is cancelled and the run that stands is refused at filing
+
+**Date: 2026-09-11 · GitHub issue #526 · Found by the independent review of GitHub PR #525 · Extends #136's refusal in `shift/banking.ts`.**
+
+**Why an entry.** The decision is taken in `everyday/` and binds `dev/main.ts`, `shift/banking.ts` and `honesty/surfaces.ts`, and it adds a ground to a refusal already recorded ([§ D405](#d405)).
+
+1. **A daily day left mid-run.** § 3.4's strip says *today's run will not be scored*, and `everyday/shell.ts#doLeave` then left the run behind for the Engineer surface's `Ctrl`+`Enter`, Day report tab or export press to file. Measured on `origin/main` at `e88f6e82` by `autoFile.browser.test.ts`: left while generating, the press filed today at **100 %**; left after the run had landed, likewise. **A cancel alone was measured and is not enough.** With the leave calling only #521's `cancelRun`, both cases still filed 100 %: left after landing, the landed run is untouched by a cancel, and left while generating, the run standing behind the cancelled one filed instead — by reading, boot's own run, which the *Start the day* press had made filable. So the leave does both, through one binding, `abandonDay`: the shift runner's `cancel`, then the standing recording is refused. The refusal is `bankingRefusalFor`'s third argument, compared by identity for that function's own reason, so the next run pressed on the same configuration files as it always did; `closeShift`, the posting gate and both unfiled-sheet sentences read it, and `runIsOwn` excludes it so a stage re-entered presses a fresh run. **Only the strip's *Leave it* abandons.** A rail row walks off a stage without asking, the day is still the player's, and `replay.browser.test.ts`'s #522 control depends on it filing; `autoFile.browser.test.ts`'s control case holds that boundary.
+2. **Taking a campaign offer while a daily run is in flight — reproduced.** Start the day, walk off by a rail row (no strip, so item 1 is not what is measured), take an offer in the same task: on `e88f6e82` the Engineer press filed **100 %** onto the new contract's week. `take-offer` now calls `abandonDay` before `switchWeek`. **Refused rather than starting the new contract's run**, because a run nobody pressed on the new week would be filed by the same three presses.
+3. **A watch check that lands after the player has left.** Measured by `watchStage.browser.test.ts`: *Watch* and *Test bench* pressed in one task, and on `e88f6e82` the landing pulled the player onto the stage, `WATCHING · THE HOUSE BASELINE`. `weekScreen.ts` and `boardScreen.ts` now enter nothing from an unmounted screen, and because the host has already entered the spectator state when `settled` runs, they end that session — only when `watching().run` is the row this press entered, by identity. The board's copy of those lines has no browser case: the browser tier runs no board server.
+4. **Leaving a replay from its brief.** § D548's `leaveReplay` cancel stopped whatever was in flight, and `startReplay` presses nothing, so a replay left from its brief stopped the player's own day-2 run. The session now records whether the host's `startRun` or `intervene` was pressed inside it, and `leaveReplay` cancels only then; `host.test.ts` read `['cancelRun', 'applyPatch']` on `e88f6e82`.
+
+**What it moves.** One seeded string per honesty case, `leftUnfinishedCannotBank` on the `REPLAY` adapter; the corpus row is the integrator's to re-measure ([§ D343](#d343)). **What it does not decide.** A campaign day's strip makes the same promise and is not wired: `shell.ts#leaveUnfinished` abandons in the daily context only, and says so.
+
+---
+
 ## D556 — `DROPDOWN_CLEARS` and the survivor table are two readings of the same runs: the two differences are registered, and the relationship is held in both directions
 
 **Date: 2026-09-11 · GitHub issue #234 · The product owner's ruling of 2026-09-10, recorded in § D537 clause 7: which survivor got through stays `DROPDOWN_CLEARS`' question, and that register is to be reconciled against the survivor table.**

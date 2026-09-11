@@ -32,7 +32,7 @@ import { DATA_DIR, fixtureConfig } from '../fixtures.test-helper.js';
 import { readRecordingDocument, writeRecordingDocument } from '../record/document.js';
 import { recordRun } from '../record/recordRun.js';
 
-import { LOADED_RUN_CANNOT_BANK, bankingRefusalFor } from './banking.js';
+import { LEFT_UNFINISHED_CANNOT_BANK, LOADED_RUN_CANNOT_BANK, bankingRefusalFor } from './banking.js';
 
 let config: LoadedConfig;
 
@@ -150,5 +150,28 @@ describe('the refusal is a sentence a player can act on', () => {
     // The honesty corpus judges this string with everything else on the surface; this is the one
     // property worth failing fast on rather than discovering in a sweep.
     expect(LOADED_RUN_CANNOT_BANK).not.toMatch(/\d/);
+  });
+});
+
+describe('a day left unfinished — GitHub issue #526', () => {
+  /* Identity is the whole of the rule, so the fixtures carry one id between them on purpose. */
+  const left = { runId: 'same-config' } as unknown as VizRecording;
+  const next = { runId: 'same-config' } as unknown as VizRecording;
+
+  it('refuses the run that stood when the day was left, and files the next run pressed on the same config', () => {
+    expect(bankingRefusalFor(left, left, left)).toBe(LEFT_UNFINISHED_CANNOT_BANK);
+    expect(bankingRefusalFor(next, next, left)).toBeNull();
+    expect(bankingRefusalFor(left, left)).toBeNull();
+  });
+
+  it('still names a loaded run as loaded, the ground that comes first', () => {
+    const loaded = { runId: 'same-config' } as unknown as VizRecording;
+    expect(bankingRefusalFor(loaded, left, loaded)).toBe(LOADED_RUN_CANNOT_BANK);
+  });
+
+  it('says what happened to the run, and names the press that does count', () => {
+    expect(LEFT_UNFINISHED_CANNOT_BANK).toContain('left unfinished');
+    expect(LEFT_UNFINISHED_CANNOT_BANK).toContain('banks nothing');
+    expect(LEFT_UNFINISHED_CANNOT_BANK).toContain('Run this shift');
   });
 });
