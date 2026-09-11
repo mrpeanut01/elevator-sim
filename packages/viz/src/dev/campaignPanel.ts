@@ -62,6 +62,7 @@ import {
   type FailStateReport,
 } from '../campaign/failStates.js';
 import type { StageReport } from '../campaign/judge.js';
+import { dimensionIdsLiveOn } from '../authoring/dispatcherSpec.js';
 import { editableIdsOf } from '../campaign/parse.js';
 import { runStageToVerdict, type StageSequenceOutcome } from '../campaign/stageSequence.js';
 import {
@@ -335,6 +336,20 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   }
 
   /**
+   * The dimension ids a stage's editable set is resolved against: the space's, less any dial the
+   * stage's own building gives nothing to act on — § D549, `authoring/dispatcherSpec.ts#dimensionIdsLiveOn`.
+   *
+   * Every `editableIdsOf` in this panel, and the briefing, read this rather than `loaded.space.ids`,
+   * so the controls drawn, the briefing's list, the admission check and the way-out count cannot
+   * disagree about whether the duty weight is on offer. It is the set the survivor sweep draws from,
+   * which keeps the published difficulty about the dials this panel offers.
+   */
+  function dimensionIdsFor(stage: CampaignStage): readonly string[] {
+    const building = resources.buildings.find((candidate) => candidate.id === stage.building);
+    return dimensionIdsLiveOn(loaded.space.ids, building);
+  }
+
+  /**
    * The admissible profile nearest the baseline, or `undefined` when there is none.
    *
    * **Two shipped stages have none**, which the walk over all ten found rather than assumed:
@@ -347,7 +362,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   function smallestAdmissibleChange(stage: CampaignStage): string | undefined {
     const baseline = profileById(stage.dispatcher.startingProfileId);
     if (baseline === undefined) return undefined;
-    const editable = editableIdsOf(stage.dispatcher.editable, loaded.space.ids);
+    const editable = editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage));
     let best: { readonly id: string; readonly moved: number } | undefined;
     for (const profile of resources.dispatcherProfiles.profiles) {
       if (profile.id === baseline.id) continue;
@@ -364,7 +379,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     if (smallestAdmissibleChange(stage) !== undefined) {
       return 'Change “your setting” for a stage you can clear.';
     }
-    const opened = editableIdsOf(stage.dispatcher.editable, loaded.space.ids).length;
+    const opened = editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage)).length;
     return (
       `No shipped dispatcher stays inside the ${String(opened)} dimensions this stage opens, so ` +
       'the weight editor is the way to play it: tick “edit the weights”, move one of them, and ' +
@@ -420,7 +435,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   let weightBaseId = '';
 
   function editableSetFor(stage: CampaignStage): ReadonlySet<string> {
-    return new Set(editableIdsOf(stage.dispatcher.editable, loaded.space.ids));
+    return new Set(editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage)));
   }
 
   /** The controls this stage opens, in the space's own gate order. */
@@ -588,7 +603,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     const briefing = briefingFor({
       stage,
       published,
-      dimensionIds: loaded.space.ids,
+      dimensionIds: dimensionIdsFor(stage),
       dimensionHelp: loaded.dimensionHelp,
     });
     ui.brief.append(...briefNodes(briefing, stage));
@@ -673,7 +688,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       loaded.space,
       baseline,
       candidate,
-      editableIdsOf(stage.dispatcher.editable, loaded.space.ids),
+      editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage)),
     );
     return {
       node: row(
@@ -770,7 +785,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       loaded.space,
       baseline,
       outcome.profile,
-      editableIdsOf(stage.dispatcher.editable, loaded.space.ids),
+      editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage)),
     );
     if (!admission.admissible) {
       fail(admission.sentence);

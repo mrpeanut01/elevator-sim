@@ -146,6 +146,7 @@ export type { RouteTopology } from './route.js';
  * -------------------------------------------------------------------------- */
 
 export {
+  buildingDeclaresDuty,
   generateTrace,
   planDemand,
   routeOf,

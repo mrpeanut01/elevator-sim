@@ -3899,6 +3899,19 @@ const AUTHORING: SurfaceAdapter = {
           flags: { pool: false, zone: false, bypass: true },
         },
       },
+      /*
+       * § D549's vector: a weighted `dutyMismatch` on the case's own building, which declares no duty
+       * — no shipped building does — so the refusal the editor and the workshop draw is swept.
+       */
+      {
+        label: 'inert-dutymismatch',
+        spec: {
+          name: 'My dispatcher',
+          weights: { dutyMismatch: 50, waitTime: 100 },
+          families: {},
+          flags: { pool: true, zone: false, bypass: true },
+        },
+      },
     ];
     for (const { label, spec } of dispatcherSpecs) {
       seeds.push({ field: `specFromProfile(${label}).name`, text: spec.name, role: 'label' });
@@ -3908,7 +3921,7 @@ const AUTHORING: SurfaceAdapter = {
         role: 'observation',
       });
       seeds.push({ field: `adviceFor(${label})`, text: adviceFor(spec), role: 'prose' });
-      for (const inert of inertTerms(spec)) {
+      for (const inert of inertTerms(spec, context.building)) {
         seeds.push({
           field: `inertTerms(${label}).${inert.termId}`,
           text: inert.why,
@@ -5347,7 +5360,7 @@ const EDITOR_PANELS: SurfaceAdapter = {
     const terms = context.dispatcherProfiles.terms;
     for (const profile of context.profiles) {
       const spec = specFromProfile(profile);
-      for (const view of termRowsOf(terms, spec, inertTerms(spec))) {
+      for (const view of termRowsOf(terms, spec, inertTerms(spec, context.building))) {
         seeds.push({
           field: `termRowsOf(${profile.id}).${view.termId}.label`,
           text: `${view.label} ${String(view.value)}`,
@@ -11910,7 +11923,7 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
         seeds.push({ field: `${label}.lever.${lever.id}.help`, text: plainLeverHelp(lever), role: 'reason' });
       }
 
-      const terms = termDisclosureOf(file.terms, spec);
+      const terms = termDisclosureOf(file.terms, spec, context.building);
       seeds.push({ field: `${label}.terms.summary`, text: terms.summary, role: 'label' });
       seeds.push({ field: `${label}.terms.hint`, text: terms.hint, role: 'prose', provenance: 'authored' });
       for (const row of terms.rows) {

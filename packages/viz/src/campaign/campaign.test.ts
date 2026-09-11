@@ -56,7 +56,8 @@ import { FAIL_STATES } from './types.js';
 import { PROBABILITY_WORDS, playerSafeDescription, probabilityWordIn } from './words.js';
 import { GOAL_READS, isPerReplicationGoal, type GoalKind } from '../scenario/goals.js';
 import { validatePublishedGoalRates } from '../scenario/published.js';
-import { requireBuilding } from '../fixtures.test-helper.js';
+import { dimensionIdsLiveOn } from '../authoring/dispatcherSpec.js';
+import { requireBuilding, withGoodsCar } from '../fixtures.test-helper.js';
 
 const fixture = useCampaignFixture();
 const { stageAt, mutate, publishedFor, requireProfile, playStage, failStatesFor } = fixture;
@@ -446,6 +447,23 @@ describe('a stage judges only the changes it offered', () => {
     expect(editableIdsOf(stage?.dispatcher.editable ?? { mode: 'listed', ids: [] }, space.ids)).toEqual(
       space.ids,
     );
+  });
+
+  it('does not open the duty weight where the stage’s building declares no duty, and opens it where one does — § D549', () => {
+    /*
+     * The ids `dev/campaignPanel.ts` resolves a stage's editable set against: the space's, less
+     * what the stage's own building gives nothing to act on. `every-declared-dimension` is the
+     * mode that would otherwise open the dial, so that is the stage asked.
+     */
+    const { campaign, space } = fixture;
+    const stage = campaign.stages.find((entry) => entry.dispatcher.editable.mode === 'every-declared-dimension');
+    if (stage === undefined) throw new Error('no stage opens every declared dimension');
+    const building = fixture.resourcesFor(stage).building;
+    expect(space.ids).toContain('weights.dutyMismatch');
+    const offered = editableIdsOf(stage.dispatcher.editable, dimensionIdsLiveOn(space.ids, building));
+    expect(offered).toEqual(space.ids.filter((id) => id !== 'weights.dutyMismatch'));
+    const declared = withGoodsCar(building);
+    expect(editableIdsOf(stage.dispatcher.editable, dimensionIdsLiveOn(space.ids, declared))).toEqual(space.ids);
   });
 });
 

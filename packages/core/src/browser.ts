@@ -540,6 +540,7 @@ export {
   TRAFFIC_PARAMETERS,
   TrafficError,
   batchesPerSecond,
+  buildingDeclaresDuty,
   constantDemandTemplate,
   drawBatchSize,
   drawExplicitBatchSize,

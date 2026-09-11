@@ -566,8 +566,20 @@ function resolveCredentialGap(config: DemandConfig): number {
 /**
  * Whether any car of the building declares a duty — the one question that decides whether a trace
  * carries duties at all. GitHub issue #481, `DECISIONS.md` § D549.
+ *
+ * **Exported because it is also the question that decides whether `dutyMismatch` can bite.** A
+ * mismatch is priced only on a call that carries a duty, and this is what decides that a call can
+ * carry one. So `sim/searchSpaceLiveness.test.ts`'s register entry for `weights.dutyMismatch` is live
+ * on a building this returns `true` for, and `viz`'s `authoring/dispatcherSpec.ts` refuses the weight
+ * beside its slider, and withholds the dial from a scenario, on a building it returns `false` for —
+ * one predicate, so the three cannot disagree about which building that is.
+ *
+ * Structural rather than `ResolvedBuilding`, because the Engineer editor asks it of the authored
+ * document, and the answer is the same for both: resolution copies a car's `duty` and invents none.
  */
-function buildingDeclaresDuty(building: DemandConfig['building']): boolean {
+export function buildingDeclaresDuty(building: {
+  readonly banks: readonly { readonly cars: readonly { readonly duty?: Duty | undefined }[] }[];
+}): boolean {
   return building.banks.some((bank) => bank.cars.some((car) => car.duty !== undefined));
 }
 

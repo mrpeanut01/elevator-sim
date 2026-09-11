@@ -107,7 +107,7 @@ import {
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import { instantiateControlNode } from './parameterForm.js';
 import { reportViewOf, runProgressOf, type RunProgress } from './reportPanel.js';
-import { allDispatchers, profileById } from './state.js';
+import { allDispatchers, buildingConfigOf, profileById } from './state.js';
 
 /* -------------------------------------------------------------------------- *
  * Shared plumbing the other three editors import
@@ -277,6 +277,30 @@ export function termRowsOf(
       inertWhy: why.get(term.id),
     };
   });
+}
+
+/**
+ * The term rows the editor draws for a view — {@link termRowsOf}, with the inert-term refusal decided
+ * against the **standing** building.
+ *
+ * The standing selection as authored (`state.ts#buildingConfigOf`) is the building the next run is
+ * built from, which is the run a weight moved here reaches. Not `ViewAt.building`, which is the
+ * building the *current* run resolved to and is `undefined` before the first run: a refusal read off
+ * it would be about the last tower, or about none. § D549 — a duty weight on a building no car of
+ * which declares a duty changes no decision, and the reader is told so beside the slider.
+ *
+ * A function rather than three lines in `render`, so the lookup is testable without a document: the
+ * defect was that nothing handed the editor a building, not that the row builder was wrong.
+ */
+export function editorTermRowsOf(at: Pick<ViewAt, 'state' | 'resources'>): readonly TermRow[] {
+  const { state, resources } = at;
+  const standing = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
+  return termRowsOf(
+    resources.dispatcherProfiles.terms,
+    state.dispatcherSpec,
+    inertTerms(state.dispatcherSpec, standing),
+    state.mode,
+  );
 }
 
 /**
@@ -1837,7 +1861,7 @@ export function mountDispatcherEditor(
     setHidden(plainEcho, pulledRow === undefined);
     setText(plainCost, costFunctionLine(current, (id) => shortTermNameOf(id, allIds), state.mode));
 
-    const rows = termRowsOf(terms, current, inertTerms(current), state.mode);
+    const rows = editorTermRowsOf(at);
     const weighted = rows.filter((row) => row.weighted).length;
     setText(
       elements.termsUsed,

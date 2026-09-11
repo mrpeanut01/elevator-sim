@@ -32,6 +32,7 @@ import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { useCampaignFixture } from '../campaign/campaign.test-helper.js';
+import { withGoodsCar } from '../fixtures.test-helper.js';
 import { movedDimensions } from '../campaign/dimensions.js';
 import { admitEditedVector } from '../controls/editedProfile.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
@@ -422,6 +423,30 @@ describe('the draw is reproducible, affordable and live', () => {
       );
       expect(admission.admissible, admission.reason ?? '').toBe(true);
     }
+  });
+
+  it('never draws a dial the scenario’s building gives nothing to act on, and draws it where it does — § D549', () => {
+    /*
+     * `weights.dutyMismatch` is priced — `dispatch-rules` covers `dispatcher.weights` — and a duty
+     * is priced only on a call that carries one, which only a building declaring a duty generates.
+     * So on the first stage's own tower, which declares none, the dial is not offered and a
+     * configuration that moves it is not one the budget reaches. The same tower with one goods
+     * car is the other direction: the dial is live there and must still be drawn.
+     */
+    const moving = (building: ReturnType<typeof target>['building']): number =>
+      sampleReachableConfigurations({
+        space: fixture.space,
+        schedule,
+        baseline: baseline(),
+        building,
+        elevatorSpecs: target().elevatorSpecs,
+        units: 54,
+        sampleSize: 16,
+        seed: 20_260_910,
+      }).configurations.filter((configuration) => 'weights.dutyMismatch' in configuration.values).length;
+    expect(fixture.space.ids).toContain('weights.dutyMismatch');
+    expect(moving(target().building), 'a no-duty tower drew the duty weight').toBe(0);
+    expect(moving(withGoodsCar(target().building)), 'a duty tower never drew it').toBeGreaterThan(0);
   });
 
   it('reports a short sample rather than looping when the draw budget runs out', () => {

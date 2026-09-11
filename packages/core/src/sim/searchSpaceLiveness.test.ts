@@ -73,6 +73,7 @@ import type { DispatcherProfile, LoadedConfig, ResolvedBuilding } from '../confi
 import { COST_TERMS } from '../dispatch/index.js';
 import { activeWhenSatisfied, isActiveWhenRange } from '../dispatch/parameters.js';
 import type { ActiveWhenCondition, DispatchParameterSpec } from '../dispatch/types.js';
+import { buildingDeclaresDuty } from '../traffic/generator.js';
 
 import { withDuty } from './duty.test-helper.js';
 import { BUILDING_IDS, load, tinyBuilding } from './fixtures.test-helper.js';
@@ -878,6 +879,17 @@ describe('every searchable dimension can change a run, or declares why it cannot
           harness.cfg.buildingsById.get('midtown-office') as ResolvedBuilding,
           { 'main-A': 'goods' },
         );
+        /*
+         * The register's condition and the product's are one predicate: `viz` refuses this weight and
+         * withholds this dial on exactly the buildings `buildingDeclaresDuty` refuses (§ D549). So the
+         * building this obligation derives must be one it accepts, and the shipped tower it is derived
+         * from one it refuses — otherwise the probe would prove liveness somewhere the product does not
+         * look.
+         */
+        expect(
+          buildingDeclaresDuty(harness.cfg.buildingsById.get('midtown-office') as ResolvedBuilding),
+        ).toBe(false);
+        expect(buildingDeclaresDuty(building)).toBe(true);
         const verdict = sweepDimension(
           harness,
           spec,
