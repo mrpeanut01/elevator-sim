@@ -11,6 +11,8 @@
  * two populations. `random/streams.test.ts`'s golden vectors hold the eleven existing streams to
  * their recorded draws; this file holds the trace to it.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -213,5 +215,25 @@ describe('the shares are the demand side, and moving them moves the trace', () =
     expect(() => traceOf(declared(), { goods: 0.6, bed: 0.3, service: 0.3 })).toThrow(/share/);
     // A building that declares none never asks the question, so it cannot fail it.
     expect(() => traceOf(buildingOf('midtown-office'), { goods: -0.1 })).not.toThrow();
+  });
+});
+
+describe('the shares are a proposal the owner approved, and the record says both', () => {
+  it('keeps the proposal provenance beside the approval, and awaits nothing — § D549 clause 7', () => {
+    /*
+     * The product owner approved the three shares and the drafted 0.35 weight as drafted on
+     * 2026-09-11. The approval is recorded where the figures live and does not replace their
+     * provenance: they are still an agent's proposal, not a citation and not a measurement. It does
+     * not apply the weight either — the shipped-weight case above still holds it out of every
+     * shipped profile while no shipped building declares a duty.
+     */
+    const file = JSON.parse(readFileSync(join(DATA_DIR, 'traffic-profiles.json'), 'utf8')) as {
+      readonly duty: { readonly shares: Readonly<Record<string, number>>; readonly $comment: string };
+    };
+    expect(file.duty.shares).toEqual({ goods: 0.02, bed: 0.01, service: 0.02 });
+    expect(file.duty.$comment).toContain("AN AGENT'S PROPOSAL");
+    expect(file.duty.$comment).toContain('NOT A CITATION AND NOT A MEASUREMENT');
+    expect(file.duty.$comment).toContain('APPROVED AS DRAFTED by the product owner on 2026-09-11');
+    expect(file.duty.$comment).not.toMatch(/awaiting/i);
   });
 });
