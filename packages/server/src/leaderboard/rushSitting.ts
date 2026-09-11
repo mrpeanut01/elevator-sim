@@ -92,11 +92,44 @@
  *
  * Three things follow and each is taken here. **The cooldown is charged per round** at the rush's
  * ninety simulated minutes, the unit `http/api.ts#cooldownForReplay` already charges a single run in.
- * **{@link MAX_SITTING_ROUNDS} is twelve**: at the dearest measured round that is under nineteen
- * seconds of one core for a post, and the cooldown it charges is forty-five. And **two shipped towers
+ * **{@link MAX_SITTING_ROUNDS} is twelve**: at the dearest round in the table that is under nineteen
+ * seconds of one core for a post, and the cooldown it charges is forty-five. (The table is `collective`;
+ * PR #513's review measured a twelve-round Burj-class sitting under nearest-car at 21 537 ms, and the
+ * next section is what that measurement changed.) And **two shipped towers
  * never break under the stream** — Vertical City and the Burj-class reference hold all thirty waves
  * and drain — so a sitting there has no breaking point to post, which is the refusal below rather
  * than a board row claiming a figure the run did not produce.
+ *
+ * ## Where a replay runs, and what a full server answers — PR #513's review, finding 2
+ *
+ * **Not on the request thread.** Nineteen seconds of one core bounded *one post*, and was the wrong
+ * frame for a server with one thread: the review posted that honest Burj-class sitting and every other
+ * request — a sign-in, a board, `/api/wake` — waited the 21.5 s behind it, while the per-account
+ * cooldown does nothing about two accounts posting at once. `http/replayOffThread.test.ts` measured the
+ * same shape on this tree before the move: a `/api/wake` due 400 ms into a four-round Midtown Office
+ * sitting answered **9 612 ms late**, after the sitting had settled. After it, the same test answered
+ * **3 ms** after it was due, with the sitting settling 3 376 ms later on its thread.
+ *
+ * So a sitting is replayed on a worker thread (`rushReplayPool.ts`, `rushReplayWorker.ts`), and the
+ * threads are **one limit for the whole process** — `ELEVATOR_SIM_RUSH_REPLAYS`, one unless an operator
+ * sets it, because the container is given half a core and what two replays cost there is unmeasured. A
+ * thread loads `data/` itself from the directory the server loaded and runs this module's own
+ * {@link replayRushSitting}, so the answer is the same function over the same tables, and
+ * `rushReplayPool.test.ts` holds the thread's answer equal to the request thread's.
+ *
+ * **When every slot is taken, the post is refused rather than queued**: `503 replay-busy`, with
+ * `Retry-After` set to the rounds in flight at 1.8 s a round. `503` rather than `429`, because `429` is
+ * already this API's word for *this account posted too soon* and a full pool says nothing about the
+ * caller; no queue, because a queued post holds a socket open behind replays of unknown length. The
+ * slot is taken before the cooldown is charged, so the refusal costs the player nothing, and it is
+ * given back on every way out of the route.
+ *
+ * **Why a worker rather than the next-best bound.** A global single-flight queue would have bounded
+ * the CPU and left the thread blocked, which is the finding. Nothing about the deployment ruled a worker
+ * out: the image runs `node packages/server/dist/main.js` on Node 26 (`Dockerfile`), the worker's entry
+ * is a `.js` beside this file in `dist/`, and `experiments`' replication pool already starts threads
+ * the same way. Under the test runner the entry is `.ts`, and `rushReplayWorker.ts` says how it resolves
+ * its imports there.
  */
 
 import { readFile } from 'node:fs/promises';

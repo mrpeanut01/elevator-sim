@@ -125,7 +125,12 @@ const WIRING: readonly (readonly [string, string, 'import' | 'same file'])[] = O
   // are the replay's.
   ['loadRushPurse', 'server/src/bootstrap.ts', 'import'],
   ['rushSittingIssues', 'server/src/http/api.ts', 'import'],
-  ['replayRushSitting', 'server/src/http/api.ts', 'import'],
+  // PR #513's review, finding 2: the replay moved off the request thread. `api.ts` leases a slot from
+  // the pool `bootstrap.ts` builds; the pool starts `rushReplayWorker.ts` by URL — the one link no import
+  // can name, so it is stated here instead — and that entry loads the thread module, which is what
+  // imports the replay.
+  ['createRushReplays', 'server/src/bootstrap.ts', 'import'],
+  ['replayRushSitting', 'server/src/leaderboard/rushReplayThread.ts', 'import'],
   ['rushPlacementOf', 'server/src/http/api.ts', 'import'],
   ['heldLadderOf', 'server/src/http/api.ts', 'import'],
   ['rushRoundConfigFor', 'server/src/leaderboard/rushSitting.ts', 'import'],

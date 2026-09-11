@@ -112,7 +112,8 @@ import { boardDistributionOf, heldLadderOf, type AxisObservation } from '../lead
 import { submissionIssues, type ResolvedDataFacts, type Submission } from '../leaderboard/submission.js';
 import { seedDailyBoard } from '../leaderboard/seed.js';
 import { verifySubmission, type VerificationResources } from '../leaderboard/verify.js';
-import { replayRushSitting, rushSittingIssues, type SubmittedRushSitting } from '../leaderboard/rushSitting.js';
+import { rushSittingIssues, type SubmittedRushSitting } from '../leaderboard/rushSitting.js';
+import type { RushReplayLease, RushReplays } from '../leaderboard/rushReplayPool.js';
 import { ID_PATTERN, batchIssues, type TelemetryBatch } from '../telemetry/schema.js';
 import {
   BOARD_METRICS,
@@ -155,6 +156,11 @@ export interface ApiRequest {
 export interface ApiResponse {
   readonly status: number;
   readonly body: unknown;
+  /**
+   * Headers a route adds to the ones `serve.ts` writes on every answer — so far only `Retry-After` on a
+   * rush sitting refused for capacity, which a client can act on only if it arrives as a header.
+   */
+  readonly headers?: Readonly<Record<string, string>> | undefined;
 }
 
 /** Everything the API is wired to. Assembled once at boot by {@link createApi}'s caller. */
@@ -210,6 +216,12 @@ export interface ApiDeps {
    * no route takes a purse or an amount from a request, which is {@link chimeLedger}'s rule one mode over.
    */
   readonly rushPurse: RushPurseTable;
+  /**
+   * Where a posted sitting is replayed: worker threads, one replay at a time on each, under one limit for
+   * the whole process — PR #513's review, finding 2. Built by `bootstrap.ts` from
+   * `ELEVATOR_SIM_RUSH_REPLAYS`; the argument is `leaderboard/rushSitting.ts`'s cost section.
+   */
+  readonly rushReplays: RushReplays;
 }
 
 export type Api = (request: ApiRequest) => Promise<ApiResponse>;
@@ -1386,6 +1398,54 @@ async function submitRushSitting(
   if (issues.length > 0) return { status: 400, body: { error: 'invalid-sitting', issues } };
   const sitting = request.body as SubmittedRushSitting;
 
+  /*
+   * **A slot first, and before anything is charged** — PR #513's review, finding 2. The replay runs on a
+   * worker thread so this thread keeps answering everyone else, and the number of replays at once is one
+   * limit for the whole process, because the per-account cooldown below bounds one account and nothing
+   * else bounded how many replay together. No slot is `503` rather than a queue: a queued caller waits
+   * behind replays of unknown length holding a socket open, and a refused one is told when to come back.
+   * Taken before the cooldown so a refusal for the server's capacity costs the player nothing, and
+   * released in `finally` so no way out of the route — a refusal, a replay that throws, a store fault —
+   * can keep it.
+   */
+  const lease = deps.rushReplays.tryAcquire();
+  if (lease === undefined) return replayBusy(deps.rushReplays.retryAfterS());
+  try {
+    return await replayAndPostRushSitting(deps, user, sitting, lease, nextSubmitMs);
+  } finally {
+    lease.release();
+  }
+}
+
+/**
+ * `503` with `Retry-After`, for a sitting that found every replay slot taken. **503 rather than 429**:
+ * `429 too-many-submissions` is this API's answer to one account posting faster than its cooldown, a
+ * fact about the caller, and a client that backs off on it tells the player they posted too soon. A full
+ * pool is a fact about the server — the caller may not have posted anything for an hour — and `503` with
+ * `Retry-After` is the status that says *not you, not now, try at this time* (RFC 9110 § 15.6.4).
+ */
+function replayBusy(retryAfterS: number): ApiResponse {
+  return {
+    status: 503,
+    headers: { 'retry-after': String(retryAfterS) },
+    body: {
+      error: 'replay-busy',
+      detail:
+        'Every rush this server can replay at once is being replayed. Nothing was charged and nothing was ' +
+        `posted — send the same sitting again in about ${String(retryAfterS)} s.`,
+      retryAfterS,
+    },
+  };
+}
+
+/** The rest of {@link submitRushSitting}, on the replay slot it holds and gives back. */
+async function replayAndPostRushSitting(
+  deps: ApiDeps,
+  user: UserRow,
+  sitting: SubmittedRushSitting,
+  lease: RushReplayLease,
+  nextSubmitMs: Map<string, number>,
+): Promise<ApiResponse> {
   const limited = chargeCooldown(deps, user.id, nextSubmitMs, sitting.rounds.length, RUSH_STREAM.lengthS);
   if (limited !== undefined) return limited;
 
@@ -1406,11 +1466,8 @@ async function submitRushSitting(
     }
   }
 
-  const verification = replayRushSitting(sitting, {
-    resources: deps.resources,
-    purse: deps.rushPurse,
-    ledger: deps.chimeLedger,
-  });
+  // `rushSitting.ts#replayRushSitting`, run on the slot's worker thread against the same `data/`.
+  const verification = await lease.replay(sitting);
   if (!verification.ok) {
     // 422, on `submit`'s reading: well formed, and the content did not check out — which is not an
     // accusation, and the round a refusal is about travels so a client can say which one.

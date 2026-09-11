@@ -360,7 +360,9 @@ async function respond(options: ServeOptions, incoming: IncomingMessage, respons
     return;
   }
 
-  response.writeHead(result.status, headers);
+  // A route's own headers over the ones every answer carries — `api.ts#ApiResponse.headers`, today only
+  // a refused sitting's `Retry-After`.
+  response.writeHead(result.status, result.headers === undefined ? headers : { ...headers, ...result.headers });
   response.end(JSON.stringify(result.body));
 }
 
