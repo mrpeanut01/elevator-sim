@@ -167,25 +167,32 @@ independently**.
 
 | content type | key | today | **target** | how the target is derived | play-hours it adds |
 |---|---|---|---|---|---|
-| Buildings | `buildings` | 9 | **12** | § 4.3 | 0 directly; multiplies every other row |
-| Contracts | `contracts` | 8 | **12** | one per shipped building — `docs/12` § 4.7's own rule, *a shipped building with no contract is a scenario the reader can never take* | 4 × 3 clean days × 1 800 s = 21 600 s = 12 watch-min × 5 = **+1.00** |
-| Campaign stages | `campaign-stages` | 10 | **14** | one per building, plus the two stages that teach a mechanic rather than a tower (stage 3 *Overwhelmed* and stage 7 *Tune it*, both on `midtown-office`). Today that rule gives exactly the shipped 10 | 4 × 900 s = 3 600 s = 2 watch-min × 5 = **+0.17** |
+| Buildings | `buildings` | 9 | **22** | owner ruling, 2026-09-10 (#232): every open reference tower plus Harbour Point and Ashgate, each playable. § 4.3's rotation arithmetic set the earlier floor of 12 | 0 directly; multiplies every other row |
+| Contracts | `contracts` | 8 | **22** | one per shipped building — `docs/12` § 4.7's own rule, *a shipped building with no contract is a scenario the reader can never take* | 14 × 3 clean days × 1 800 s = 75 600 s = 42 watch-min × 5 = **+3.50** |
+| Campaign stages | `campaign-stages` | 10 | **24** | one per building, plus the two stages that teach a mechanic rather than a tower (stage 3 *Overwhelmed* and stage 7 *Tune it*, both on `midtown-office`). Today that rule gives exactly the shipped 10, and at 22 buildings it gives 24 | 14 × 900 s = 12 600 s = 7 watch-min × 5 = **+0.58** |
 | Fix cases | `fix-cases` | 18 | **44** | § 10.6 of the gameplay guide names **26** further cases by name, with authoring rules; 18 + 26. **16 of the 26 are authorable today** — § 5.2 | 26 × 7.67 min = **+3.32** |
 | Proof cases | `proof-cases` | 40 | **40** | **unchanged, by rule.** A rating is only comparable if the cases never move; growing the building set must not touch this list. § 7 is the one permitted move | 0 |
 | Dispatchers | `dispatchers` | 13 | **13** | **unchanged.** `CLAUDE.md` invariant 7: only a genuinely new *cost term* justifies new dispatcher code, and a weight vector adds no run to watch | 0, by construction |
 | Demand templates | `demand-templates` | 8 | **9** | § 4.4, and one of the eight is #220's unselectable stream, so seven are the rotation's | 0 directly; multiplies the rotation |
 | Wrinkle templates | *(new)* | 0 | **20** | § 4.3, and it is the gameplay guide's own figure | unbounded — this is the row that makes the daily loop not run out |
 
-**4.38 + 1.00 + 0.17 + 3.32 = 8.87 play-hours**, against a band of 6.5–10.8 and a midpoint target of
-8.5. Seven independently derived targets landing inside a band derived from a different document is
-the strongest form this argument can take; it would have been worth recording had they landed
-outside it too.
+**At the targets as first derived, 4.38 + 1.00 + 0.17 + 3.32 = 8.87 play-hours**, against a band of
+6.5–10.8 and a midpoint target of 8.5. Seven independently derived targets landing inside a band
+derived from a different document was the strongest form this argument could take, and this
+paragraph said it would have been worth recording had they landed outside it too.
+
+**They now land outside it, and it is recorded rather than bent.** The owner's 2026-09-10 ruling on
+#232 raised buildings and contracts to 22, and campaign stages follow at 24 by their own rule:
+`4.38 + 3.50 + 0.58 + 3.32 = 11.78 play-hours`, **about one hour above the band's 10.8 ceiling**. The
+band is § 4.1's estimate of what one quarter of sessions consumes, and it is not moved to fit. A
+plan that ships more than a quarter needs is a choice about headroom, and it is stated here as one.
 
 **And the number that would be reached by doing only the unblocked work is stated beside it, because
 that is the schedule anybody will actually run.** Sixteen of the twenty-six fix cases are authorable
-today (§ 5.2), so a beta that ships the four new buildings, the four new contracts, the four new
-stages and **only the unblocked cases** reaches `4.38 + 1.00 + 0.17 + (16 × 7.67 min) = 7.60
-play-hours` — inside the 6.5–10.8 band and **below the 8.5 midpoint**. The four schema-blocked cases
+today (§ 5.2), so a beta that ships the thirteen new buildings, the fourteen new contracts, the
+fourteen new stages and **only the unblocked cases** reaches `4.38 + 3.50 + 0.58 + (16 × 7.67 min) =
+10.51 play-hours` — inside the 6.5–10.8 band and **above the 8.5 midpoint**. (At the first targets,
+the same schedule reached 7.60.) The four schema-blocked cases
 are worth `+0.51` and cost one `fixit/` schema change; the six engine-blocked ones are worth `+0.77`
 and cost six scheduled engine issues. **That ordering is the plan's actual recommendation**: the
 schema widening buys more play-hours per unit of engine work than anything else on this list.
@@ -199,13 +206,13 @@ constraints and they are where the building target comes from.
 
 | rule | minimum for satisfiability | legal choices a day at the minimum | at the target |
 |---|---|---|---|
-| no tower twice in 7 days | **8 towers** | `8 − 7 = 1` — a fixed cycle, not a draw | **12** → `12 − 7 = 5` |
+| no tower twice in 7 days | **8 towers** | `8 − 7 = 1` — a fixed cycle, not a draw | **22** → `22 − 7 = 15` (the first target, 12, left 5) |
 | no template twice in 14 days | **15 templates** | `15 − 14 = 1` — same defect | **20** → `20 − 14 = 6` |
-| pair never inside a month | 31 pairs | — | 12 × 20 = **240** against a 30-day window |
+| pair never inside a month | 31 pairs | — | 22 × 20 = **440** against a 30-day window (240 at 12) |
 
 **Eight buildings satisfies the first rule and defeats its purpose**, which is the finding: at
 exactly the minimum there is one legal tower each day and the rotation is a deterministic cycle a
-player learns in a fortnight. Twelve leaves five. The guide's own *"twenty templates × their
+player learns in a fortnight. Twelve left five; the 22 ruled on 2026-09-10 leaves fifteen. The guide's own *"twenty templates × their
 parameters is thousands of legible days"* fixes the second target at 20 rather than at the
 satisfiability floor of 15, for the same reason.
 
@@ -484,7 +491,7 @@ nothing a display name does not already buy them.
 
 | issue | what this document gives it |
 |---|---|
-| **#232** — expand the building set | **AC1 target: 12 buildings** (§ 4.3, from § 17's rotation arithmetic). **AC2:** Harbour Point and Ashgate Mixed-Use are **authored**, not accepted (§ 7.3) — two of the four new buildings are therefore already specified, and § 7.3 states what each needs. **AC3/AC4** are unchanged and this document adds one clause to AC4: a new building's validation includes CR-4 — every configuration block it declares must be one a shipped code path reads |
+| **#232** — expand the building set | **AC1 target: 22 buildings** (owner ruling, 2026-09-10; § 4.3's rotation arithmetic set the earlier floor of 12). **AC2:** Harbour Point and Ashgate Mixed-Use are **authored**, not accepted (§ 7.3) — two of the thirteen new buildings are therefore already specified, and § 7.3 states what each needs. **AC3/AC4** are unchanged and this document adds one clause to AC4: a new building's validation includes CR-4 — every configuration block it declares must be one a shipped code path reads |
 | **#233** — expand Fix a building | **AC1 target: 44 cases** (§ 4.2, from § 10.6's own catalogue of 26). **Do the schema widening first** (§ 5.2): `FixitCase.run`'s three fields reach the demand *level* and not its *shape*, which blocks four catalogue cases for a `fixit/` reason rather than an engine one. **Six of the 26 are blocked outright** and § 5.2 names all ten and the check that confirms the classification. So the realistic first tranche is **16**, not 26. **AC4** is already specified — `docs/33` § 5.3's DC-7 bands, and new cases take a band rather than an index. **Plus the disclosure paragraph** § 7.3 says is owed |
 | **#249** — publish a content cadence | **The honest input, which is not the one the issue expects.** At the § 4.1 rate a median player consumes ~40 min a week; one fix case is 7.67 min. **A cadence cannot be justified as content replacement** — a weekly case replaces a sixth of a week's play — so it must be justified as *a reason to return*, which is a different design argument and belongs in #249 rather than here. What this document does give it: the per-type authoring costs in § 6 (285 lines a fix case today), so the cadence is set by what the pipeline sustains rather than by ambition |
 | **#158** — the two proof-case buildings | **Resolved: option 1, author them** (§ 7.3), with the deadline condition — **before the daily board ships**, after which option 2 becomes the only honest exit and must be recorded rather than applied to the vendored file. #158's own option 2 as worded (*amend § 12.3*) is **unavailable**; § 7.3 says why and what replaces it |
