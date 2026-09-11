@@ -306,9 +306,11 @@ time to interactive.
 
 - **What a pass looks like:** the browser tier is green, which includes
   `packages/viz/src/everyday/builtBundle.browser.test.ts` asserting the whole of `dist-web`, gzipped
-  at level 9, is at or under **1 160 kB**. There is a second, tighter assertion at 90 % of that, so
+  at level 9, is at or under **1 240 kB**. There is a second, tighter assertion at 90 % of that, so
   the run goes red with headroom left rather than at the cliff.
-- **Where the number comes from:** measured at 930.0 kB on 2026-09-07, plus 25 %.
+- **Where the number comes from:** measured at 930.0 kB on 2026-09-07, plus 25 %, which set
+  1 160 kB. **Raised to 1 240 kB by the product owner on 2026-09-11**, when GitHub PR #532's CI
+  measured 1 046.9 kB against the 90 % line; the 90 % line is now 1 116 kB.
 - **Its own anti-vacuity control:** the test requires more than five files, an `index.html` and a
   `.js`, because an unbuilt directory reads as zero bytes and passes a budget.
 - **Who:** anybody with a checkout; CI on every pull request.

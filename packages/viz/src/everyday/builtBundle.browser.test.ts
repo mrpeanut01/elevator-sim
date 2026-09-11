@@ -170,11 +170,19 @@ const DIST_WEB = fileURLToPath(new URL('../../dist-web', import.meta.url));
  * Measured on `3404649`, 2026-09-07: **930.0 kB**. Plus 25 % is 1 162.5, so the budget is **1 160**
  * — tighter than the unmeasured ceiling, which is the direction that document asked for.
  *
+ * **Raised to 1 240 on 2026-09-11, by the product owner.** GitHub PR #532's CI measured the bundle at
+ * **1 046.9 kB** against the 90 % line at 1 044, and a local build of `main` at `099140c5` put it at
+ * about 1 043 kB before that PR: the week's merges had grown it from 930.0 kB, and #532 adds about
+ * 4 kB gzipped, because `core` ships in the page bundle and in both workers (+1.3 kB each). The owner
+ * chose to raise the budget rather than hold #532 for a trim. 1 240 is above the 1 200 `docs/31` § 3
+ * named unmeasured, and it is stated here and in `docs/41` § 4.1 so that is visible; the 90 % line is
+ * now 1 116 kB.
+ *
  * Tighten it when the bundle shrinks. Raising it is a visible edit a reviewer can refuse, which is
  * the mechanism `docs/31` asks for in place of a vendor metric whose definition can move underneath
  * the number.
  */
-const BUNDLE_BUDGET_KB = 1_160;
+const BUNDLE_BUDGET_KB = 1_240;
 
 /** One shipped file and what it costs on the wire. */
 interface ShippedFile {
