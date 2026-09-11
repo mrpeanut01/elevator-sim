@@ -643,10 +643,11 @@ describe('criterion 2 — a comparison’s arms cannot be split across shards', 
           { onReplication: tick },
         ),
       () => runShard(sharded, 0, options({ onReplication: tick, stoppingRule: () => true })),
-      // `private` binds only the compiler; built past it, the instance was never minted.
+      // `private` binds only the compiler. Built past it — the right plan and digest, and a ceiling
+      // of 1 that `ShardedExperiment.of` would have refused — the instance was never minted.
       () =>
         runShard(
-          Reflect.construct(ShardedExperiment, [onlyA, sharded.planDigest, sharded.blocks, CEILING, 28]) as ShardedExperiment,
+          Reflect.construct(ShardedExperiment, [plan, sharded.planDigest, [{ index: 0, from: 0, to: REPS }], { replicationRuns: 1 }, 28]) as ShardedExperiment,
           0,
           { onReplication: tick },
         ),
