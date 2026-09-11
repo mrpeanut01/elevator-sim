@@ -89,9 +89,18 @@ const ENTRIES: readonly ScenarioEntry[] = Object.freeze([
  * that this list cannot reach them and that four of the six are refused at load, so the entry says
  * both rather than being deleted. § D227 in the direction that bites after a lane lands: an absence
  * that stopped being true is as wrong as one that was never recorded.
+ *
+ * **The first row named a door that does not exist, and is corrected rather than deleted.** It said
+ * the ten stages *"are reached from Career"*. No module under `everyday/` calls stage code — no
+ * `loadCampaign`, `parseCampaign`, `runStageToVerdict` or `judgeStage` — and the only runtime
+ * import route from here to `campaign/judge.ts` is `boot.ts`'s side-effect import of
+ * `dev/main.ts`, which mounts the Engineer surface's campaign panel, `dev/campaignPanel.ts`. That
+ * panel files no clear: it imports nothing from the Career side, and `campaign/career.ts` and
+ * `campaign/careerPersist.ts` import no stage module. So the row now says where the stages are
+ * played and that a clear there does not carry, in the second row's own terms.
  */
 export const SCENARIO_ABSENCES: readonly string[] = Object.freeze([
-  'The ten campaign stages are authored to the campaign record rather than to the scenario schema, so they are reached from Career until the two are one thing.',
+  'The ten campaign stages are authored to the campaign record rather than to the scenario schema, so this list cannot reach them until the two are one thing. They are played on the Engineer surface, and a stage cleared there does not count toward your Career.',
   'Two of the six engineering challenges ship, and they are played on the Engineer surface rather than from this list. The other four ask for something a scenario run cannot do yet, and each says which.',
 ]);
 

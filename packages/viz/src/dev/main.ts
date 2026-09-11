@@ -4207,7 +4207,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     /*
      * The runner's own cancel, the Run button's cancel face: the result is dropped unread, and
      * `onRunning(false)` takes the rival's flag and the recompute beat down with it. A no-op with
-     * nothing in flight. `everyday/host.ts#leaveRush` is the caller — GitHub issue #518.
+     * nothing in flight. `everyday/host.ts#leaveRush` and `#leaveReplay` are the callers — GitHub
+     * issues #518 and #522.
      */
     cancelRun: () => {
       shiftRunner.cancel();
