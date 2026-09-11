@@ -20,6 +20,7 @@ import type { CallType, PassengerAssignmentMode } from '../config/types.js';
 
 import {
   COMPARABLE_METRIC_IDS,
+  ENERGY_CONVENTION_SENSITIVE_METRICS,
   MODEL_SENSITIVE_METRIC_IDS,
   comparabilityBetween,
   comparabilityDisclaimer,
@@ -213,5 +214,82 @@ describe('the disclaimer a hybrid run carries', () => {
     expect(comparabilityDisclaimer('destination-dispatch', undefined)).toBe(
       comparabilityDisclaimer('destination-dispatch'),
     );
+  });
+});
+
+/*
+ * The merge of GitHub PR #515 (§ D539, per-bank equipment) into #437's branch (§ D553): the two axes
+ * a pairing can fail on meet in one rule, and a pair that fails both must be refused on both.
+ */
+describe('a pair that differs in its landings and in its equipment', () => {
+  type Basis = NonNullable<Parameters<typeof comparabilityBetween>[2]>['a'];
+  const ENERGY = ENERGY_CONVENTION_SENSITIVE_METRICS.map((metric) => metric.id);
+  const conventional = comparabilityOf('conventional');
+  const full = comparabilityOf('destination-dispatch');
+  const lobby = comparabilityOfLandings(PANEL, landings(panelsOnlyAt('G')));
+  const lobbyAgain = comparabilityOfLandings(KIOSK_PANEL, landings(panelsOnlyAt('G')));
+  const asBuilt: Basis = { banks: [{ id: 'low' }, { id: 'high' }] };
+  const explicitDefault: Basis = {
+    banks: [{ id: 'low', counterweightBalanceRatio: 0.5 }, { id: 'high' }],
+  };
+  const regenerative: Basis = {
+    banks: [{ id: 'low' }, { id: 'high', regenerativeRecoveryFraction: 0.3 }],
+  };
+  const rebalanced: Basis = { banks: [{ id: 'low', counterweightBalanceRatio: 0.45 }] };
+
+  it('refuses a hybrid on energy as well as on the nine, and pairs only what is left of the fourteen', () => {
+    expect(ENERGY).toEqual(['energyKJ', 'energyPerServedLegKJ']);
+    for (const uniform of [conventional, full]) {
+      for (const fitted of [regenerative, rebalanced]) {
+        for (const [x, y, ex, ey] of [
+          [lobby, uniform, asBuilt, fitted],
+          [uniform, lobby, fitted, asBuilt],
+        ] as const) {
+          const pair = comparabilityBetween(x, y, { a: ex, b: ey });
+          expect(pair.sameLandingModels).toBe(false);
+          expect(pair.sameEnergyConvention).toBe(false);
+          expect(pair.notComparableMetrics).toEqual([...MODEL_SENSITIVE_METRIC_IDS, ...ENERGY]);
+          expect(pair.comparableMetrics).toEqual(
+            COMPARABLE_METRIC_IDS.filter((id) => !ENERGY.includes(id)),
+          );
+          expect(pair.comparableMetrics).toHaveLength(COMPARABLE_METRIC_IDS.length - ENERGY.length);
+          for (const id of pair.comparableMetrics) expect(COMPARABLE_METRIC_IDS).toContain(id);
+          expect(pair.comparableMetrics[0]).toBe('ttdMeanS');
+          expect([...pair.comparableMetrics, ...pair.notComparableMetrics].sort()).toEqual(ALL_23);
+        }
+      }
+    }
+  });
+
+  it('refuses only the two energy figures between hybrids whose landings agree and whose banks do not', () => {
+    const pair = comparabilityBetween(lobby, lobbyAgain, { a: asBuilt, b: regenerative });
+    expect(pair.sameLandingModels).toBe(true);
+    expect(pair.sameEnergyConvention).toBe(false);
+    expect(pair.notComparableMetrics).toEqual(ENERGY);
+    expect(pair.comparableMetrics).toContain('ttdMeanS');
+    expect([...pair.comparableMetrics, ...ENERGY].sort()).toEqual(ALL_23);
+  });
+
+  it('is the landing rule exactly when the equipment agrees, an explicit default and an absent bank included', () => {
+    for (const [x, y] of [
+      [lobby, conventional],
+      [lobby, full],
+      [lobby, lobbyAgain],
+      [conventional, conventional],
+    ] as const) {
+      const without = comparabilityBetween(x, y);
+      expect(without.sameEnergyConvention).toBe(true);
+      for (const equipment of [
+        { a: asBuilt, b: explicitDefault },
+        { a: regenerative, b: regenerative },
+        { a: { banks: [{ id: 'low' }] }, b: asBuilt },
+      ]) {
+        const pair = comparabilityBetween(x, y, equipment);
+        expect(pair.sameEnergyConvention).toBe(true);
+        expect(pair.sameLandingModels).toBe(without.sameLandingModels);
+        expect(pair.comparableMetrics).toEqual(without.comparableMetrics);
+        expect(pair.notComparableMetrics).toEqual(without.notComparableMetrics);
+      }
+    }
   });
 });

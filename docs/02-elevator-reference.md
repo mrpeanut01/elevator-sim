@@ -147,17 +147,24 @@ taken at **empty, half and full load**: the mid point is the balance point.
 
 | Quantity | Convention | Notes |
 |---|---|---|
-| Counterweight balance ratio | **0.5** of rated load | Literature range 0.4–0.5. `COUNTERWEIGHT_BALANCE_RATIO` in `core/src/metrics/types.ts`; a code constant, never configuration — see below |
+| Counterweight balance ratio | **0.5** of rated load by default; per bank within **0.4–0.5** | Literature range 0.4–0.5, cited in `core/src/config/schema.ts#BANK_ENERGY_TUNABLES`. `COUNTERWEIGHT_BALANCE_RATIO` in `core/src/metrics/types.ts` is the default, and since [§ D539](../DECISIONS.md) a bank may declare `counterweightBalanceRatio` — see below |
 | Standard gravity | 9.80665 m/s² | CODATA / ISO 80000-3 conventional value |
-| Regeneration | **Assumed absent** | A drive without regeneration dissipates the overhauling direction in a brake resistor, so both directions cost |
+| Regeneration | **Absent by default**; a bank may fit `regenerativeDrive` | Without regeneration the overhauling direction is dissipated in a brake resistor, so both directions cost. A fitted drive returns `elevator-specs.json#regenerativeDrive.recoveryFraction` of each overhauling move — 0.6, an agent's proposal derived from Al-Kodmany's cited 20–40 % band and awaiting the owner |
 
 ### The simulator's energy proxy
 
 `RunSummary.energy` reports **out-of-balance mechanical work**, summed per completed car move:
 
 ```
-workJ = |loadKg − 0.5 · ratedLoadKg| · g · distanceM
+workJ = |loadKg − r · ratedLoadKg| · g · distanceM      r = 0.5 unless the bank declares one
+workJ · (1 − f)                                        for an overhauling move, when the bank's drive returns f
 ```
+
+A move **overhauls** when gravity drives it — climbing with the counterweight side heavier, or
+descending with the car side heavier — and **motors** otherwise. Only an overhauling move has anything
+for a regenerative drive to return, and it is charged the share the drive does not return rather than
+credited with the share it does, so the figure is never negative and a drive that returns nothing
+prices a run exactly as no drive does ([§ D539](../DECISIONS.md)).
 
 It is sampled **per move and attributed at arrival**, so it windows exactly as every other statistic
 does — a whole-run odometer beside a peak-5-minute AWT would not be describing the same 300 seconds.
@@ -171,14 +178,24 @@ need car and counterweight masses, which no shipped spec carries), drive and gea
 door-motor energy, and **standby/idle power** — ISO 25745-2's other half, which on a lightly-used
 lift dominates the running term and is a property of the machine rather than of the dispatcher. What
 it measures is *the work the dispatch decisions caused*, which is the quantity a comparison between
-dispatchers is asking about. Because regeneration is assumed absent, a regenerative installation's
-true consumption is bounded **above** by this figure.
+dispatchers is asking about. On a bank without regeneration — every shipped bank — a regenerative
+installation's true consumption is bounded **above** by this figure; a bank that fits a drive is priced
+by the drive instead.
 
-**Why 0.5 is a constant.** A per-run counterweight ratio would let two arms of one comparison be
-scored on different scales, and every figure this project publishes is a paired difference between
-arms. 0.5 is also the value at which the proxy is symmetric — an empty car and a full car of equal
-travel cost the same — so the number describes how far cars drove out of balance rather than one
-installation's counterweight order. Full reasoning: [`DECISIONS.md` § D106](../DECISIONS.md).
+**Why 0.5 is the default, and why a per-bank ratio is not a silent change of scale.** 0.5 is the
+value at which the proxy is symmetric — an empty car and a full car of equal travel cost the same — so
+at the default the number describes how far cars drove out of balance rather than one installation's
+counterweight order. Until GitHub issue #431 the ratio was also refused as configuration, because a
+per-run ratio would let two arms of one comparison be scored on different scales. [§ D539](../DECISIONS.md)
+moved that refusal by the owner's ruling of 2026-09-10 and answered its reason rather than dropping it:
+the counterweight and the drive are **per-bank equipment that move energy and never a leg** — neither
+reaches `Car.estimateCost()`, a dispatch term or a car, so a run's legs are byte-identical under every
+convention — a travel sample records its convention whenever it is not the default, and
+`metrics/comparability.ts#ENERGY_CONVENTION_SENSITIVE_METRICS` names `energyKJ` and
+`energyPerServedLegKJ` in a disclaimer on every run that uses one. Two arms on different scales are
+still possible. Each run says so in that disclaimer, and the viewer's Day report refuses to pair the
+energy rows of two runs whose banks differ, naming equipment as the reason, while it pairs every
+other row. Background: [`DECISIONS.md` § D106](../DECISIONS.md).
 
 **Energy is an axis, never a score.** Measured across the full experiment matrix, `nearest-car` — the
 weakest shipped dispatcher — is on the Pareto front at six of eight cells, because it is best on

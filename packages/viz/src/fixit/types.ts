@@ -79,6 +79,26 @@ export interface CarPatch {
   };
 }
 
+/**
+ * A per-bank equipment setting — GitHub issue #431, `DECISIONS.md` § D539. Only these keys may appear
+ * in a patch's `set`.
+ *
+ * **Both are energy-only**, by the owner's ruling of 2026-09-10: the counterweight's balance ratio and
+ * a regenerative drive price a bank's moves in the energy proxy and reach nothing a dispatcher reads,
+ * so a repair buying either moves `energyKJ`, `workPerServedLegKJ` and the fifth goal's verdict and
+ * moves no leg. `pricing/bankEquipmentReachesTheGoal.test.ts` compares the legs whole to hold that.
+ */
+export interface BankEquipmentPatch {
+  /** Bank ids within the building, or the single entry `"*"` for every bank. */
+  readonly bankIds: readonly string[];
+  readonly set: {
+    /** The counterweight's share of rated load, 0.4–0.5 (`core` `config/schema.ts#BANK_ENERGY_TUNABLES`). */
+    readonly counterweightBalanceRatio?: number | undefined;
+    /** Fit a regenerative drive, priced by `elevator-specs.json`'s `regenerativeDrive` block. */
+    readonly regenerativeDrive?: boolean | undefined;
+  };
+}
+
 /** Fabric changes, applied to the authored building document and re-resolved through the loader. */
 export interface BuildingPatch {
   /** Population overrides, floor id → headcount. */
@@ -90,6 +110,8 @@ export interface BuildingPatch {
    */
   readonly banks?: unknown;
   readonly cars?: readonly CarPatch[] | undefined;
+  /** Per-bank equipment — the counterweight and the drive (GitHub issue #431). */
+  readonly bankEquipment?: readonly BankEquipmentPatch[] | undefined;
   /** New cars cloned from an existing one — how a case adds a shaft, or the as-built adds a car. */
   readonly addCars?: readonly { readonly bankId: string; readonly copyCarId: string; readonly id: string }[] | undefined;
 }

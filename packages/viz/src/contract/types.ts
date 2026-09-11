@@ -80,6 +80,7 @@ import type {
  * | 11 | {@link VizLeg.legIndex} and {@link VizLeg.finalDestinationFloorId} added — and, in the same version because it was never a shape change, {@link VizRecording.buildVersion}, the commit of the bundle that wrote the file (GitHub issue #246), which `record/document.ts` quotes when it refuses a file from another build so the report says which build rather than which schema. Optional, absent on a fixture, and read by nothing that decides a frame. The two leg fields are — which leg of its journey a leg is, and where the whole journey ends. `legIndex` is `0` for the arrival the traffic generator issued and `n` for the leg minted at the n-th sky-lobby transfer. A projection of `PassengerRecord.legIndex`, which `core` has carried since transfers existed. **Its consumer lands in the same change**: `src/record/crowd.ts` decides whether two recordings met the same crowd (GitHub issue #350), and measured on the shipped fix-it cases the naive answer — every leg's `(passengerId, arrivedAt, origin, destination)` — came back *different* on all seven cases set in the three transfer buildings while the generator's own arrivals were identical. A transfer leg's `arrivedAt` is the instant the first car dropped its rider, which is the dispatcher's doing and not the crowd's; without this field a recording cannot tell the two apart, and the same-crowd check would either refuse every transfer building or compare nothing. The second field is the same finding one repair over: a **zoning** repair on `secure-tower` turned a direct `3 → 21` ride into `3 → G` then `G → 21`, so the first leg's `destinationFloorId` moved while the person, the instant and where they were going did not — a route is the building's doing, and the crowd is who arrives, when, from where, wanting to reach where. A projection of `PassengerRecord.finalDestinationFloorId`. **Both optional, and absent is a first leg going where it says**: `recordRun` writes them on every leg, and a recording without them is a hand-built fixture, since `record/document.ts` refuses a file below this version outright. |
  * | 13 | {@link VizSummary.saturation} added — `core`'s own trend test over the report window, carried as {@link VizSaturation} (GitHub issue #220, § D515). The rush's result screen names where the queue stopped draining and `docs/35` `PM-RU3` forbids a second definition of *when it broke* computed in the viewer, so the diagnosis travels rather than being re-derived from `saturated`. Optional, because a version-12 recording carries only the boolean; a reader that quotes the slope says the record predates the field rather than inventing one. |
  * | 12 | {@link VizLeg.structuralRefusal} added — the structural reason every car refused a waiting rider's call, joined to the leg by `core` at reconcile time (GitHub issue #178 item 9, § D511). Optional and absent on every leg that boarded, so a version-11 recording reads as a version-12 one with no rider refused structurally; the bump is because a reader that draws the reason must know a recording without the field is *older* rather than *clean*. |
+ * | 14 | {@link VizRecording.bankEquipment} added — what each bank was fitted with when it is not the default, read off the resolved building the run was simulated on through `core`'s `energyConventionOf` (`DECISIONS.md` § D539, and GitHub PR #515's review finding L1). The Day report's before/after block reads it as `shift/report.ts#ReportBasis.equipment`, so the energy rows of two runs priced on different scales are refused rather than paired. Absent on every shipped building, so a shipped run's recording differs from version 13's in this number and nothing else. |
  *
  * ## What version 4 fixed, measured rather than predicted
  *
@@ -112,7 +113,7 @@ import type {
  * a recording arrives from somewhere other than this build and the versions genuinely can
  * disagree (`UX.md` `PB-07`/`PB-15`).
  */
-export const VIZ_SCHEMA_VERSION = 13;
+export const VIZ_SCHEMA_VERSION = 14;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -946,8 +947,39 @@ export interface VizRecording {
    * {@link VizLeg}'s optional fields keep.
    */
   readonly loadedDepartures?: readonly SimTime[] | undefined;
+  /**
+   * What each bank that is **not** at the default was fitted with — version 14, `DECISIONS.md` § D539.
+   *
+   * One entry per such bank, in the building's bank order. The field is absent when every bank is at
+   * the default, a counterweight at one half of rated load and no regeneration, and it is written as
+   * absent rather than `[]` or an explicit `undefined`, so a shipped run's recording carries nothing
+   * it did not carry at version 13.
+   *
+   * Written from the resolved building the run was simulated on, through `core`'s own
+   * `energyConventionOf`, so it cannot disagree with the joules in {@link VizSummary.energy}. Its
+   * reader is `shift/report.ts#ReportBasis.equipment`: two runs whose entries differ price the same
+   * moves on different scales, and the Day report's before/after block refuses to pair their energy
+   * rows (GitHub PR #515's review finding L1). It moves no leg, and nothing that draws a leg reads it.
+   */
+  readonly bankEquipment?: readonly VizBankEquipment[] | undefined;
   /** Non-fatal diagnostics from the run, for the viewer's warning strip. */
   readonly warnings: readonly string[];
+}
+
+/**
+ * One fitted bank on {@link VizRecording.bankEquipment}: `core`'s `EnergyConvention`, keyed by the
+ * bank it prices.
+ *
+ * Both numbers are the resolved values the run was priced with rather than the building document's
+ * fields, so a fitted drive is its `elevator-specs.json` recovery fraction and never `true`.
+ */
+export interface VizBankEquipment {
+  /** The bank's id, as the building declares it. */
+  readonly bankId: string;
+  /** The counterweight's share of rated load. */
+  readonly counterweightBalanceRatio: number;
+  /** The share of an overhauling move's out-of-balance work the drive returns; `0` without regeneration. */
+  readonly regenerativeRecoveryFraction: number;
 }
 
 /* -------------------------------------------------------------------------- *

@@ -441,8 +441,8 @@ export interface LoadReading {
 export const STANDARD_GRAVITY_MPS2 = 9.80665;
 
 /**
- * **The counterweight balance ratio: the fraction of rated load the counterweight carries on
- * top of the car's own mass.**
+ * **The default counterweight balance ratio: the fraction of rated load the counterweight carries
+ * on top of the car's own mass, on every bank that declares none.**
  *
  * 0.5 — the near-universal traction-lift convention. The counterweight is sized at
  * `car mass + 0.4…0.5 × rated load`, so the drive sees zero static out-of-balance at half load
@@ -452,18 +452,55 @@ export const STANDARD_GRAVITY_MPS2 = 9.80665;
  * empty, half and full load precisely because the mid point is the balance point. See
  * docs/02-elevator-reference.md.
  *
- * **Why 0.5 and not 0.45.** The range in the literature is 0.4–0.5 and real installations vary.
+ * **Why 0.5 and not 0.45, as the default.** The range in the literature is 0.4–0.5 and real
+ * installations vary; Al-Kodmany (Buildings 2015, 5(3), doi:10.3390/buildings5031070) § 2.1.4 gives
+ * the same band — *"approximately to a car loaded to 40%–50% of capacity"*.
  * 0.5 is chosen because it is the value at which the proxy is *symmetric* — an empty car and a
  * full car of the same travel cost the same — which makes the number a statement about how far
  * cars drove out of balance rather than about a particular machine's counterweight order. A
  * proxy whose value depended on an unmeasured per-installation choice would put a fitted
  * constant inside a published axis.
  *
- * Not a tunable (CLAUDE.md invariant 7 governs *dispatch strategy*, which is data; this is
- * reference data about the machine) and deliberately not configurable: a per-run counterweight
- * ratio would let two arms of one comparison be scored on different scales.
+ * **This docstring used to refuse the setting, and `DECISIONS.md` § D539 moved the refusal.** Until
+ * GitHub issue #431 it read *"deliberately not configurable: a per-run counterweight ratio would let
+ * two arms of one comparison be scored on different scales."* The reason is answered rather than
+ * dropped. A bank may now declare `counterweightBalanceRatio` inside that cited 0.4–0.5 band, and fit
+ * a regenerative drive (`config/types.ts#BankConfig`); every travel sample a non-default convention
+ * priced records that convention, so a reader can redo the sum; and
+ * `metrics/comparability.ts#ENERGY_CONVENTION_SENSITIVE_METRICS` names the two figures a convention
+ * changes, which `Simulation` quotes in a disclaimer on every run that uses one. Two arms on
+ * different scales are still possible. Each run says so in that disclaimer, and the viewer's Day
+ * report refuses to pair the energy figures of two runs whose banks differ, naming equipment as the
+ * reason (`packages/viz/src/dev/reportPanel.ts#reportDeltaOf`). The owner's ruling of 2026-09-10
+ * is the scope: an energy-only machine choice that moves `energyKJ`, `workPerServedLegKJ` and the
+ * 80 kJ goal's verdict, and never a leg.
  */
 export const COUNTERWEIGHT_BALANCE_RATIO = 0.5;
+
+/**
+ * **How one bank's moves are priced** — the two equipment settings § D539 made per-bank.
+ *
+ * Both are properties of the machine rather than of a dispatch decision, which is why neither
+ * reaches `Car.estimateCost()` and neither can move a leg: under every convention a run's
+ * passengers, boardings and car movements are identical, and only the joules differ.
+ * `energyConvention.test.ts` compares the legs whole to hold that.
+ */
+export interface EnergyConvention {
+  /** The counterweight's share of rated load: {@link COUNTERWEIGHT_BALANCE_RATIO} unless the bank declares one. */
+  readonly counterweightBalanceRatio: number;
+  /**
+   * The share of an **overhauling** move's out-of-balance work a regenerative drive returns: `0`, a
+   * drive without regeneration, unless the bank fits one — and then `elevator-specs.json`'s
+   * `regenerativeDrive.recoveryFraction`, resolved onto the bank by `config/parse.ts`.
+   */
+  readonly regenerativeRecoveryFraction: number;
+}
+
+/** Balanced at one half, and no regeneration: the convention every shipped bank runs. */
+export const DEFAULT_ENERGY_CONVENTION: EnergyConvention = Object.freeze({
+  counterweightBalanceRatio: COUNTERWEIGHT_BALANCE_RATIO,
+  regenerativeRecoveryFraction: 0,
+});
 
 /**
  * One completed car move, as the energy proxy reads it.
@@ -491,14 +528,25 @@ export interface TravelSample {
   /** The car's rated load, kg. The counterweight's reference. */
   readonly ratedLoadKg: number;
   /**
+   * The balance ratio that priced this move, **present only when it is not the default** (§ D539).
+   * Absent on every shipped run, so a record from a bank at the default serialises byte-identically
+   * with one written before per-bank conventions existed.
+   */
+  readonly counterweightBalanceRatio?: number | undefined;
+  /** The regenerative recovery fraction that priced this move, present only when it is not zero. */
+  readonly regenerativeRecoveryFraction?: number | undefined;
+  /**
    * **The energy proxy for this move, in joules of out-of-balance mechanical work.**
    *
-   * `|loadKg − COUNTERWEIGHT_BALANCE_RATIO · ratedLoadKg| · g · distanceM`.
+   * `|loadKg − r · ratedLoadKg| · g · distanceM`, where `r` is the bank's balance ratio
+   * ({@link COUNTERWEIGHT_BALANCE_RATIO} unless it declares one) — multiplied by `1 − f` when the
+   * move overhauls and the bank's drive regenerates a fraction `f`. See {@link outOfBalanceWorkJ}.
    *
    * The absolute value is the **non-regenerative** convention: a drive without regeneration
    * dissipates the overhauling direction in a brake resistor rather than returning it, so both
    * directions cost. ISO 25745-2 measures a non-regenerative unit exactly this way, and it is
-   * the conservative choice — a regenerative drive's figure is bounded above by this one.
+   * the conservative choice — a regenerative drive's figure is bounded above by this one, and since
+   * § D539 a bank that fits one is priced by it rather than by this bound.
    *
    * **What it deliberately omits, so nobody reads it as kWh:** acceleration losses (which need
    * the car and counterweight masses, which no shipped spec carries), drive and gearing
@@ -519,10 +567,38 @@ export interface TravelReading {
   readonly ratedLoadKg: number;
 }
 
-/** `|load − ratio·rated| · g · distance`, in joules. Pure and total. See {@link TravelSample.workJ}. */
-export function outOfBalanceWorkJ(reading: TravelReading): number {
-  const netKg = Math.abs(reading.loadKg - COUNTERWEIGHT_BALANCE_RATIO * reading.ratedLoadKg);
-  return netKg * STANDARD_GRAVITY_MPS2 * Math.abs(reading.distanceM);
+/**
+ * The energy proxy for one move, in joules. Pure and total. See {@link TravelSample.workJ}.
+ *
+ * **Motoring or overhauling is decided by a sign.** The out-of-balance mass
+ * `loadKg − r · ratedLoadKg` is positive when the car side is the heavier. Travelling **up** with the
+ * car side heavier, or **down** with the counterweight side heavier, the drive lifts the
+ * out-of-balance mass and motors; otherwise gravity drives the move and the drive brakes it, which is
+ * overhauling, and the only direction a regenerative drive can return anything from. Al-Kodmany
+ * § 2.1.4 names exactly those two cases: *"traveling up cars are light, or traveling down cars are
+ * heavy"*.
+ *
+ * **An overhauling move is charged `1 − f` of its work, never a credit.** A signed credit of `−f` of
+ * it was the alternative, and § D539 refuses it for three reasons. It is discontinuous at `f = 0`: this
+ * convention already charges the overhauling direction, so a regenerative drive recovering nothing
+ * would roughly halve the figure of an otherwise identical run. It lets `workPerServedLegKJ` go
+ * negative, which an `at-most` goal would grade `met` for a reason no player could see. And a
+ * persisted `workJ` has always been non-negative (`serialization.ts#travelSampleSchema`).
+ *
+ * **At the default, this is the old expression evaluated the old way.** The same three operations in
+ * the same order, so every published energy figure is byte-identical; `energyConvention.test.ts`
+ * compares the float with `Object.is` rather than a tolerance.
+ */
+export function outOfBalanceWorkJ(
+  reading: TravelReading,
+  convention: EnergyConvention = DEFAULT_ENERGY_CONVENTION,
+): number {
+  const signedKg = reading.loadKg - convention.counterweightBalanceRatio * reading.ratedLoadKg;
+  const workJ = Math.abs(signedKg) * STANDARD_GRAVITY_MPS2 * Math.abs(reading.distanceM);
+  const recovery = convention.regenerativeRecoveryFraction;
+  if (recovery === 0) return workJ;
+  const motoring = reading.direction === 'up' ? signedKg > 0 : signedKg < 0;
+  return motoring ? workJ : (1 - recovery) * workJ;
 }
 
 /**

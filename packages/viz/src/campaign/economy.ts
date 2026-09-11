@@ -39,7 +39,7 @@
  * testable against a published number without a screen anywhere near them.
  */
 
-import { priceOf } from '../pricing/parse.js';
+import { priceOf, purchaseUnits } from '../pricing/parse.js';
 import type { PriceSchedule } from '../pricing/types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -542,7 +542,7 @@ export function shopTotalUnits(schedule: PriceSchedule): number {
   return SHOP.reduce(
     (total, category) =>
       total +
-      category.tiers.reduce((sum, tier) => sum + priceOf(schedule, tier.priceId).priceUnits, 0),
+      category.tiers.reduce((sum, tier) => sum + purchaseUnits(priceOf(schedule, tier.priceId)), 0),
     0,
   );
 }
@@ -553,7 +553,7 @@ export function shopTierPrice(
   tier: ShopTier,
 ): { readonly units: number; readonly nights: number } {
   const priced = priceOf(schedule, tier.priceId);
-  return { units: priced.priceUnits, nights: priced.nights };
+  return { units: purchaseUnits(priced), nights: priced.nights };
 }
 
 /** The category for an id, or `undefined`. */

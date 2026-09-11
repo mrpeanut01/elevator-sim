@@ -63,6 +63,7 @@ const BASIS: ReportBasis = Object.freeze({
   demand: 'day 2 · an ordinary day',
   extent: '30 minutes from 06:00',
   patternId: 'building',
+  equipment: '',
 });
 
 const figure = (over: Partial<ReportFigure> & Pick<ReportFigure, 'id' | 'label' | 'value'>): ReportFigure => ({

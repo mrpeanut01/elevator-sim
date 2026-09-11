@@ -41,11 +41,12 @@
  */
 
 import { probabilityWordIn } from '../campaign/words.js';
-import { priceOf } from '../pricing/parse.js';
+import { priceOf, purchaseUnits } from '../pricing/parse.js';
 import { repairPriceUnits, unpricedPathsIn } from '../pricing/repairPrice.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type {
   BuildingPatch,
+  BankEquipmentPatch,
   CarPatch,
   ComplaintMeasure,
   ComplaintScope,
@@ -159,7 +160,7 @@ export const DIAGNOSED_MAX_UNITS = 9;
  * it was already agreed and is only being moved. Nothing here may hold a second copy of it.
  */
 export function newShaftUnits(schedule: PriceSchedule): number {
-  return priceOf(schedule, 'new-car').priceUnits;
+  return purchaseUnits(priceOf(schedule, 'new-car'));
 }
 
 /**
@@ -417,6 +418,7 @@ function isEmptyPatch(patch: FixitPatch): boolean {
     ((building.floorPopulations ?? []).length === 0 &&
       building.banks === undefined &&
       (building.cars ?? []).length === 0 &&
+      (building.bankEquipment ?? []).length === 0 &&
       (building.addCars ?? []).length === 0);
   return dispatcherEmpty && buildingEmpty;
 }
@@ -707,6 +709,33 @@ function decodeBuildingPatch(raw: Record_, at: string, violations: string[]): Bu
       });
     }
   }
+  /*
+   * **Per-bank equipment** — GitHub issue #431, `DECISIONS.md` § D539. Decoded exactly as a car patch
+   * is, and refused the same way when it names a key the table does not have. The ratio's range is
+   * the loader's to enforce, where every other bank field's is, so a case that sets 0.3 is refused by
+   * `parseBuilding` when the run is planned rather than twice with two messages.
+   */
+  const bankEquipment: BankEquipmentPatch[] = [];
+  if (Array.isArray(raw['bankEquipment'])) {
+    for (const entry of raw['bankEquipment']) {
+      if (!isRecord(entry) || !isRecord(entry['set'])) {
+        violations.push(`${at}: a bankEquipment entry needs bankIds and a set.`);
+        continue;
+      }
+      const set = entry['set'];
+      const allowed = ['counterweightBalanceRatio', 'regenerativeDrive'];
+      for (const key of Object.keys(set)) {
+        if (!allowed.includes(key)) violations.push(`${at}: a bank equipment patch may not set "${key}".`);
+      }
+      bankEquipment.push({
+        bankIds: strings(entry['bankIds']),
+        set: {
+          ...(num(set['counterweightBalanceRatio']) === undefined ? {} : { counterweightBalanceRatio: num(set['counterweightBalanceRatio']) }),
+          ...(typeof set['regenerativeDrive'] === 'boolean' ? { regenerativeDrive: set['regenerativeDrive'] } : {}),
+        },
+      });
+    }
+  }
   const addCars: { bankId: string; copyCarId: string; id: string }[] = [];
   if (Array.isArray(raw['addCars'])) {
     for (const entry of raw['addCars']) {
@@ -725,6 +754,7 @@ function decodeBuildingPatch(raw: Record_, at: string, violations: string[]): Bu
     ...(populations.length > 0 ? { floorPopulations: populations } : {}),
     ...(raw['banks'] === undefined ? {} : { banks: raw['banks'] }),
     ...(cars.length > 0 ? { cars } : {}),
+    ...(bankEquipment.length > 0 ? { bankEquipment } : {}),
     ...(addCars.length > 0 ? { addCars } : {}),
   };
 }

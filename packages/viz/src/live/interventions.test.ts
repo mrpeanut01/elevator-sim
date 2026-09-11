@@ -18,6 +18,8 @@ import {
 } from '@elevator-sim/core/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { purchaseUnits } from '../pricing/parse.js';
+
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import type { PricedChange } from '../pricing/types.js';
@@ -300,7 +302,7 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
 
   /** The cheapest and dearest shipped changes on each of the two tiers, found rather than named. */
   const onTier = (tier: string): readonly PricedChange[] =>
-    schedule.changes.filter((change) => change.tier === tier).sort((a, b) => a.priceUnits - b.priceUnits);
+    schedule.changes.filter((change) => change.tier === tier).sort((a, b) => purchaseUnits(a) - purchaseUnits(b));
 
   const cheapestEquipment = onTier('equipment')[0];
   const dearestBuilding = onTier('building').at(-1);
@@ -387,7 +389,7 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
 
     const afforded = admitWorks({
       schedule,
-      budgetUnits: dear.priceUnits,
+      budgetUnits: purchaseUnits(dear),
       interventions: [],
       changeId: dear.id,
       kind: 'building-change',
@@ -401,7 +403,7 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
     // One unit short — the boundary, not a round number, so the comparison is `<=` and not `<`.
     const refused = admitWorks({
       schedule,
-      budgetUnits: dear.priceUnits - 1,
+      budgetUnits: purchaseUnits(dear) - 1,
       interventions: [],
       changeId: dear.id,
       kind: 'building-change',
@@ -412,7 +414,7 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
     // The refusal names the price, the budget and what is already committed — a sentence saying
     // only *you cannot afford this* leaves a player unable to tell a dear change from a spent purse.
     expect(refused.reason).toContain(String(dear.priceUnits));
-    expect(refused.reason).toContain(String(dear.priceUnits - 1));
+    expect(refused.reason).toContain(String(purchaseUnits(dear) - 1));
     expect(refused.reason).toContain(dear.name);
     expect(refused.reason).toContain('already spent');
   });
@@ -420,7 +422,7 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
   it('prices a second purchase against what the day has already spent', () => {
     const first = onTier('building')[0] as PricedChange;
     const second = onTier('building').find(
-      (change) => change.id !== first.id && change.priceUnits > 0,
+      (change) => change.id !== first.id && purchaseUnits(change) > 0,
     ) as PricedChange;
     const log: readonly RunInterventionConfig[] = [
       {
@@ -436,7 +438,7 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
     expect(spentOnWorks(schedule, log)).toBe(first.priceUnits);
 
     // A rung that covers the second change on its own and not beside the first.
-    const rung = Math.max(first.priceUnits, second.priceUnits);
+    const rung = Math.max(purchaseUnits(first), purchaseUnits(second));
     const alone = admitWorks({ schedule, budgetUnits: rung, interventions: [], changeId: second.id, kind: 'building-change', building: singleDeck, serviceEvents: [] });
     expect(alone.admitted).toBe(true);
     const afterTheFirst = admitWorks({ schedule, budgetUnits: rung, interventions: log, changeId: second.id, kind: 'building-change', building: singleDeck, serviceEvents: [] });
@@ -455,7 +457,7 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
     expect(spentOnWorks(schedule, log)).toBe(change.priceUnits);
     const again = admitWorks({
       schedule,
-      budgetUnits: change.priceUnits,
+      budgetUnits: purchaseUnits(change),
       interventions: log,
       changeId: change.id,
       kind: 'building-change',
@@ -556,7 +558,7 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
     const admission = admitWorks({
       schedule,
       // A rung that covers the change several times over, so the refusal cannot be about money.
-      budgetUnits: rezone.priceUnits * 10,
+      budgetUnits: purchaseUnits(rezone) * 10,
       interventions: [],
       changeId: rezone.id,
       kind: 'building-change',
@@ -581,7 +583,7 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
     const before: readonly RunInterventionConfig[] = [];
     const admission = admitWorks({
       schedule,
-      budgetUnits: rezone.priceUnits * 10,
+      budgetUnits: purchaseUnits(rezone) * 10,
       interventions: before,
       changeId: rezone.id,
       kind: 'building-change',
@@ -601,7 +603,7 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
     expect(local).toBeDefined();
     const admission = admitWorks({
       schedule,
-      budgetUnits: rezone.priceUnits * 10,
+      budgetUnits: purchaseUnits(rezone) * 10,
       interventions: [],
       changeId: rezone.id,
       kind: 'building-change',
@@ -620,7 +622,7 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
     const rezone = schedule.changes.find((row) => row.id === 'rezone-bank') as PricedChange;
     const admission = admitWorks({
       schedule,
-      budgetUnits: rezone.priceUnits * 10,
+      budgetUnits: purchaseUnits(rezone) * 10,
       interventions: [],
       changeId: rezone.id,
       kind: 'building-change',

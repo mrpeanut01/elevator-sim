@@ -116,6 +116,7 @@ import {
 import type { ViewMode } from '../mode/types.js';
 import {
   clockOf,
+  ENERGY_FIGURE_IDS,
   type ReportBasis,
   type ReportNextStep,
   type ShapedDayReport,
@@ -373,7 +374,7 @@ export interface ReportDeltaView {
    *
    * Empty when none did — **and empty whenever {@link refused} is non-null**, which is the whole of
    * the fix for issues #117 and #102. The two emptinesses are told apart by {@link note}, never by
-   * the reader guessing.
+   * the reader guessing. It also carries no energy row whenever {@link energyRefused} is non-null.
    */
   readonly figures: readonly DeltaRowView[];
   /**
@@ -383,6 +384,20 @@ export interface ReportDeltaView {
    * for: one building, one shape of run, one demand, and a dispatcher swapped between them.
    */
   readonly refused: DeltaRefusal | null;
+  /**
+   * Why the energy rows are not paired while every other row is, or `null` — § D539, and GitHub
+   * PR #515's review finding L1.
+   *
+   * Non-null when the two runs' banks were fitted differently and nothing that refuses the whole
+   * comparison differs. Equipment moves energy and never a leg, so the two runs carried the same
+   * passengers the same way: every other figure is a true pairing and stays in {@link figures}, and
+   * only {@link ENERGY_FIGURE_IDS}' rows are withheld, because the two runs price the same moves on
+   * different scales. Always `null` when {@link refused} is non-null, which withholds them already.
+   *
+   * Read by no renderer. {@link note} carries the refusal in words and {@link figures} already lacks
+   * the rows, so the Day report and the editor result strip draw it without deciding anything.
+   */
+  readonly energyRefused: DeltaRefusal | null;
   /** The sentence under the rows — the refusal, or the reason nothing moved. Never empty. */
   readonly note: string;
 }
@@ -921,7 +936,24 @@ const SELECTION_ROWS: readonly { readonly label: string; readonly of: 'title' | 
   ]);
 
 /**
- * Each axis of {@link ReportBasis}, in the words the refusal says it in.
+ * One axis of {@link ReportBasis}: the clause the refusal says it in, and what a difference on it
+ * refuses — § D539.
+ *
+ * `'comparison'` refuses every figure row, which is issues #117 and #102: the two runs were asked
+ * different questions. `'energy'` refuses only {@link ENERGY_FIGURE_IDS}' rows, because the axis
+ * changes how moves are priced and no journey, so every other figure of the two runs is a true
+ * pairing.
+ */
+interface BasisAxis {
+  readonly phrase: string;
+  readonly refuses: 'comparison' | 'energy';
+}
+
+/** {@link ENERGY_FIGURE_IDS}, as the set the pairing loop asks. */
+const ENERGY_FIGURES: ReadonlySet<string> = new Set<string>(ENERGY_FIGURE_IDS);
+
+/**
+ * Each axis of {@link ReportBasis}, in the words the refusal says it in, and with what it refuses.
  *
  * An exhaustive `Record` over the basis's own keys, for the reason {@link VERDICT_COLOUR} is one: a
  * fourth axis added to the sheet must be a **compile error here** rather than an axis that silently
@@ -932,10 +964,10 @@ const SELECTION_ROWS: readonly { readonly label: string; readonly of: 'title' | 
  * traffic"*) rather than nouns, so the note reads as English at one, two or three of them without
  * this file assembling grammar.
  */
-const BASIS_DIFFERENCES: Readonly<Record<keyof ReportBasis, string>> = Object.freeze({
-  buildingId: 'in a different building',
-  subject: 'in a different mode',
-  demand: 'against different traffic',
+const BASIS_DIFFERENCES: Readonly<Record<keyof ReportBasis, BasisAxis>> = Object.freeze({
+  buildingId: { phrase: 'in a different building', refuses: 'comparison' },
+  subject: { phrase: 'in a different mode', refuses: 'comparison' },
+  demand: { phrase: 'against different traffic', refuses: 'comparison' },
   /*
    * The two GitHub issue #126 added, and the table's exhaustiveness is what made adding them a
    * compile error rather than an edit somebody had to remember. Both are clauses of the same
@@ -950,8 +982,15 @@ const BASIS_DIFFERENCES: Readonly<Record<keyof ReportBasis, string>> = Object.fr
    * asked for — its day number and event, or a Free Play selection line; `patternId` is which
    * authored arrival pattern the day was built out of.
    */
-  extent: 'over a different stretch of the day',
-  patternId: 'built from a different arrival pattern',
+  extent: { phrase: 'over a different stretch of the day', refuses: 'comparison' },
+  patternId: { phrase: 'built from a different arrival pattern', refuses: 'comparison' },
+  /*
+   * The one axis that refuses less — § D539, GitHub PR #515's review finding L1. A counterweight
+   * ratio or a regenerative drive re-prices every move and moves no journey, so a difference here
+   * withholds the two energy rows and pairs the rest. *On* rather than *in* or *against*, so it reads
+   * as a clause of the same sentence when a whole refusal names it beside a building.
+   */
+  equipment: { phrase: 'on different equipment', refuses: 'energy' },
 });
 
 /**
@@ -961,13 +1000,13 @@ const BASIS_DIFFERENCES: Readonly<Record<keyof ReportBasis, string>> = Object.fr
  * frozen table's and a field the table does not name cannot be compared silently. The two are the
  * same set by construction: the table is typed as a total `Record` over the basis.
  */
-function basisDifferencesOf(previous: ReportBasis, current: ReportBasis): readonly string[] {
-  const differs: string[] = [];
-  for (const [axis, phrase] of Object.entries(BASIS_DIFFERENCES) as readonly [
+function basisDifferencesOf(previous: ReportBasis, current: ReportBasis): readonly BasisAxis[] {
+  const differs: BasisAxis[] = [];
+  for (const [axis, entry] of Object.entries(BASIS_DIFFERENCES) as readonly [
     keyof ReportBasis,
-    string,
+    BasisAxis,
   ][]) {
-    if (previous[axis] !== current[axis]) differs.push(phrase);
+    if (previous[axis] !== current[axis]) differs.push(entry);
   }
   return differs;
 }
@@ -1003,6 +1042,32 @@ function refusalNoteOf(differsOn: readonly string[]): string {
     '50 or more times each, with an interval that excludes zero — which is what Compare is for.'
   );
 }
+
+/**
+ * The clause a pairing carries when its energy rows are refused and no other row is — § D539, and
+ * GitHub PR #515's review finding L1.
+ *
+ * It names the axis for {@link refusalNoteOf}'s reason, and says why only these rows: equipment
+ * changes what a move costs and no journey. It prints neither energy figure and says neither went up
+ * or down, because a figure beside the words *not paired* reads as the pairing, which is the trap the
+ * withheld cells in {@link reportDeltaOf} are refused for.
+ */
+function energyRefusalNoteOf(differsOn: readonly string[]): string {
+  return (
+    `The run before this one was ${andList(differsOn)}, so no energy figure is paired. Equipment ` +
+    'changes what each move costs and not a single journey, and the two runs price the same moves ' +
+    'on different scales.'
+  );
+}
+
+/**
+ * The note's first sentence when a pairing's energy rows are refused and no other row differs.
+ *
+ * *Nothing moved* would be false here, since the energy did move on a scale this block will not set
+ * beside the other, and *it reproduces exactly* would be false of the energy for the same reason. So
+ * this says only what is true of the rows that could be paired.
+ */
+const EQUIPMENT_ONLY_NOTE = 'Every figure that can be paired printed the same on both sheets.';
 
 /**
  * The sentence a cell already published about **what its value was computed over**, or `null`.
@@ -1061,8 +1126,10 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
     }
   }
 
-  const differsOn = basisDifferencesOf(previous.basis, current.basis);
-  if (differsOn.length > 0) {
+  const differs = basisDifferencesOf(previous.basis, current.basis);
+  if (differs.some((axis) => axis.refuses === 'comparison')) {
+    // Every axis that differs is named, an energy-only one included: a refusal lists all its grounds.
+    const differsOn = differs.map((axis) => axis.phrase);
     return {
       /*
        * A different caption, because the old one is a promise the block is about to break. *What
@@ -1073,9 +1140,18 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
       selection,
       figures: [],
       refused: { differsOn },
+      energyRefused: null,
       note: refusalNoteOf(differsOn),
     };
   }
+
+  /*
+   * Whatever still differs refuses the energy rows only — § D539. Checked here, ahead of the pairing,
+   * for the reason the whole refusal is: a row that was paired and then filtered would be a second
+   * decision about the same two sheets.
+   */
+  const energyRefused: DeltaRefusal | null =
+    differs.length === 0 ? null : { differsOn: differs.map((axis) => axis.phrase) };
 
   /*
    * The earlier sheet's whole **cell**, not just its value — issue #137.
@@ -1112,6 +1188,8 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
     const wasCell = was.get(cell.id);
     // A figure the earlier sheet did not carry is not a change; it is a sheet of a different shape.
     if (wasCell === undefined || wasCell.value === cell.value) continue;
+    // Re-priced by the equipment, so not paired across two of it. See {@link ReportDeltaView.energyRefused}.
+    if (energyRefused !== null && ENERGY_FIGURES.has(cell.id)) continue;
     if (cell.tone === 'withheld') {
       withheldHere.push(cell.label);
       continue;
@@ -1152,6 +1230,7 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
     selection,
     figures,
     refused: null,
+    energyRefused,
     note:
       (moved
       ? /*
@@ -1164,9 +1243,13 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
         'Two runs are two runs. This is what the two sheets printed, side by side — not a result, ' +
         'and not a direction. Which setting is better needs 50 or more paired runs against the ' +
         'same passengers and an interval that excludes zero, which is what Compare is for.'
-      : 'Nothing moved. A run is identified by its building, its dispatcher and its seed, so this ' +
+      : energyRefused !== null
+        ? EQUIPMENT_ONLY_NOTE
+        : 'Nothing moved. A run is identified by its building, its dispatcher and its seed, so this ' +
         'is the same day simulated again and it reproduces exactly — the sheet is not stale, ' +
-        'there was nothing new to say.') + withheldNote,
+        'there was nothing new to say.') +
+      (energyRefused === null ? '' : ` ${energyRefusalNoteOf(energyRefused.differsOn)}`) +
+      withheldNote,
   };
 }
 

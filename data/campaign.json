@@ -1,5 +1,5 @@
 {
-  "$comment": "THE SCENARIO SCHEMA'S BUDGET HALF \u2014 GitHub issue #365, docs/38-what-the-game-is.md \u00a7 2.1, DECISIONS.md \u00a7 D525 clause 1, and packages/viz/src/scenario/budget.ts for the shape and the argument. docs/38 \u00a7 2.1: \"that record, plus a budget, is the scenario schema\". Each stage below now carries a `budget`: what it opens with, and the ladder chimes can buy it up by. THERE IS DELIBERATELY NO GOAL, NO THRESHOLD, NO BAR AND NO DIFFICULTY ON A BUDGET \u2014 charter non-goal 6 and \u00a7 D345 forbid buying a verdict, so two players who post the same run read the same verdict whatever they paid, and scenario/budget.ts REFUSES an unknown key on a budget rather than ignoring it, because a field that does not exist cannot be authored. The survivor count that makes a budget a difficulty is #367's and is NOT here: a count is a measurement and these are choices, so it is keyed by (scenarioId, stepId) in its own published table the way data/scenario-goals.json is keyed by stage id, and every step below carries the stable id it will be keyed by. PROVENANCE, per the product owner's 2026-09-08 standing ruling on governed data/ values: THESE FIGURES ARE AN AGENT'S PROPOSAL, drafted for the owner to accept, tighten or reject, and the line that ruling asks for is drawn field by field. What is DERIVED, from data/price-schedule.json and from each stage's own editable set, is the ARITHMETIC: a base is the dearest change the stage's own dials can reach plus the cheapest tier's typical (2 u); step 1 lifts the budget to the dearest equipment change (full-destination, 24 u); step 2 lifts it to the dearest change on the whole ladder (fifth-car, 54 u); and every schema ceiling is what the whole schedule costs (381 u — 357 until GitHub issue #444 added the 11 u cabin-pressurisation row at the equipment tier, and 368 until GitHub issue #467 priced twenty-two more dials, on six new rows costing 13 u together and three paths added to dispatch-rules at no change to its price; the ceiling is derived from data/price-schedule.json by packages/viz/src/scenario/budget.ts and moves whenever the ladder does, so this figure is a consequence of that file rather than a choice made here). What is CHOSEN is the RULE ITSELF \u2014 that a scenario opens one typical dispatcher change above its own dearest dial, and that the ladder has two rungs rather than one or four \u2014 and the chime price of each rung, set at one chime per unit bought because nothing measures an exchange rate and inventing a curve would be manufacturing precision. A price ladder is game feel, not a measurement, and no amount of arithmetic makes it one. So a reader disagreeing with a number here is disagreeing with a judgement, not correcting an error, and the lever is these fields rather than anything in code.",
+  "$comment": "THE SCENARIO SCHEMA'S BUDGET HALF \u2014 GitHub issue #365, docs/38-what-the-game-is.md \u00a7 2.1, DECISIONS.md \u00a7 D525 clause 1, and packages/viz/src/scenario/budget.ts for the shape and the argument. docs/38 \u00a7 2.1: \"that record, plus a budget, is the scenario schema\". Each stage below now carries a `budget`: what it opens with, and the ladder chimes can buy it up by. THERE IS DELIBERATELY NO GOAL, NO THRESHOLD, NO BAR AND NO DIFFICULTY ON A BUDGET \u2014 charter non-goal 6 and \u00a7 D345 forbid buying a verdict, so two players who post the same run read the same verdict whatever they paid, and scenario/budget.ts REFUSES an unknown key on a budget rather than ignoring it, because a field that does not exist cannot be authored. The survivor count that makes a budget a difficulty is #367's and is NOT here: a count is a measurement and these are choices, so it is keyed by (scenarioId, stepId) in its own published table the way data/scenario-goals.json is keyed by stage id, and every step below carries the stable id it will be keyed by. PROVENANCE, per the product owner's 2026-09-08 standing ruling on governed data/ values: THESE FIGURES ARE AN AGENT'S PROPOSAL, drafted for the owner to accept, tighten or reject, and the line that ruling asks for is drawn field by field. What is DERIVED, from data/price-schedule.json and from each stage's own editable set, is the ARITHMETIC: a base is the dearest change the stage's own dials can reach plus the cheapest tier's typical (2 u); step 1 lifts the budget to the dearest equipment change (full-destination, 24 u); step 2 lifts it to the dearest change on the whole ladder (fifth-car, 54 u); and every schema ceiling is what the whole schedule costs (396 u \u2014 357 until GitHub issue #444 added the 11 u cabin-pressurisation row at the equipment tier, 368 until GitHub issue #467 priced twenty-two more dials, on six new rows costing 13 u together and three paths added to dispatch-rules at no change to its price, and 381 until GitHub issue #431 added the 12 u regenerative-drive and 3 u counterweight-rebalance rows at the equipment tier; the ceiling is derived from data/price-schedule.json by packages/viz/src/scenario/budget.ts and moves whenever the ladder does, so this figure is a consequence of that file rather than a choice made here). What is CHOSEN is the RULE ITSELF \u2014 that a scenario opens one typical dispatcher change above its own dearest dial, and that the ladder has two rungs rather than one or four \u2014 and the chime price of each rung, set at one chime per unit bought because nothing measures an exchange rate and inventing a curve would be manufacturing precision. A price ladder is game feel, not a measurement, and no amount of arithmetic makes it one. So a reader disagreeing with a number here is disagreeing with a judgement, not correcting an error, and the lever is these fields rather than anything in code.",
   "generatedBy": "Authored. Validated at load by packages/viz/src/campaign/parse.ts against data/scenario-goals.json, against collectSearchSpace(), against data/buildings/ and \u2014 for each stage's budget, GitHub issue #365 \u2014 against data/price-schedule.json. packages/viz/src/campaign/campaign.test.ts runs that validator over this file.",
   "contract": "docs/10-experience-layer-contract.md \u00a7 5.2 (the scenario shape), \u00a7 5.3 (the four fail states), \u00a7 5.4 (the seven-stage progression). Goals are SELECTED, never authored: every kind below appears in this stage's `goals` bucket in data/scenario-goals.json, and the bar each is judged against is the count that table published for the shipped setting on these same seeds. DECISIONS.md \u00a7 D160 \u2014 a rate of 0 or 1 is a fact for the brief, anything between is a batch goal, and there is no single-run goal left for a stage to carry.",
   "stages": [
@@ -61,7 +61,7 @@
           "type": "integer",
           "unit": "units",
           "min": 0,
-          "max": 381,
+          "max": 396,
           "default": 4,
           "activeWhen": null
         },
@@ -76,7 +76,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 20,
               "activeWhen": null
             }
@@ -91,7 +91,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 30,
               "activeWhen": "equipment-rung"
             }
@@ -175,7 +175,7 @@
           "type": "integer",
           "unit": "units",
           "min": 0,
-          "max": 381,
+          "max": 396,
           "default": 4,
           "activeWhen": null
         },
@@ -190,7 +190,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 20,
               "activeWhen": null
             }
@@ -205,7 +205,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 30,
               "activeWhen": "equipment-rung"
             }
@@ -285,7 +285,7 @@
           "type": "integer",
           "unit": "units",
           "min": 0,
-          "max": 381,
+          "max": 396,
           "default": 4,
           "activeWhen": null
         },
@@ -300,7 +300,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 20,
               "activeWhen": null
             }
@@ -315,7 +315,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 30,
               "activeWhen": "equipment-rung"
             }
@@ -406,7 +406,7 @@
           "type": "integer",
           "unit": "units",
           "min": 0,
-          "max": 381,
+          "max": 396,
           "default": 15,
           "activeWhen": null
         },
@@ -421,7 +421,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 9,
               "activeWhen": null
             }
@@ -436,7 +436,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 30,
               "activeWhen": "equipment-rung"
             }
@@ -518,7 +518,7 @@
           "type": "integer",
           "unit": "units",
           "min": 0,
-          "max": 381,
+          "max": 396,
           "default": 15,
           "activeWhen": null
         },
@@ -533,7 +533,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 9,
               "activeWhen": null
             }
@@ -548,7 +548,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 30,
               "activeWhen": "equipment-rung"
             }
@@ -651,7 +651,7 @@
           "type": "integer",
           "unit": "units",
           "min": 0,
-          "max": 381,
+          "max": 396,
           "default": 15,
           "activeWhen": null
         },
@@ -666,7 +666,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 9,
               "activeWhen": null
             }
@@ -681,7 +681,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 30,
               "activeWhen": "equipment-rung"
             }
@@ -743,7 +743,7 @@
           "type": "integer",
           "unit": "units",
           "min": 0,
-          "max": 381,
+          "max": 396,
           "default": 15,
           "activeWhen": null
         },
@@ -758,7 +758,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 9,
               "activeWhen": null
             }
@@ -773,7 +773,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 30,
               "activeWhen": "equipment-rung"
             }
@@ -845,7 +845,7 @@
           "type": "integer",
           "unit": "units",
           "min": 0,
-          "max": 381,
+          "max": 396,
           "default": 4,
           "activeWhen": null
         },
@@ -860,7 +860,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 20,
               "activeWhen": null
             }
@@ -875,7 +875,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 30,
               "activeWhen": "equipment-rung"
             }
@@ -947,7 +947,7 @@
           "type": "integer",
           "unit": "units",
           "min": 0,
-          "max": 381,
+          "max": 396,
           "default": 15,
           "activeWhen": null
         },
@@ -962,7 +962,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 9,
               "activeWhen": null
             }
@@ -977,7 +977,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 30,
               "activeWhen": "equipment-rung"
             }
@@ -1053,7 +1053,7 @@
           "type": "integer",
           "unit": "units",
           "min": 0,
-          "max": 381,
+          "max": 396,
           "default": 15,
           "activeWhen": null
         },
@@ -1068,7 +1068,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 9,
               "activeWhen": null
             }
@@ -1083,7 +1083,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 381,
+              "max": 396,
               "default": 30,
               "activeWhen": "equipment-rung"
             }

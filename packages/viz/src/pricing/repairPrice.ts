@@ -31,7 +31,7 @@
  * one, and `fixit/parse.ts#PRICE_ORDER_OUTSTANDING` holds it where it cannot be forgotten.
  */
 
-import { changeCovering } from './parse.js';
+import { changeCovering, purchaseUnits } from './parse.js';
 import type { PriceSchedule, PricedChange } from './types.js';
 
 /**
@@ -73,6 +73,14 @@ export function pathsIn(patch: RepairPatchShape): readonly string[] {
       if ('dwellCarCallS' in set) out.push('building.cars[].set.dwellCarCallS');
       if ('ratedSpeedDeltaMps' in set) out.push('building.cars[].set.ratedSpeedDeltaMps');
       if ('cabinPressurised' in set) out.push('building.cars[].set.cabinPressurised');
+    }
+    // GitHub issue #431: the counterweight and the drive, each its own equipment row.
+    for (const entry of arrayOf(building['bankEquipment']) ?? []) {
+      const set = objectOf(objectOf(entry)?.['set']) ?? {};
+      if ('counterweightBalanceRatio' in set) {
+        out.push('building.bankEquipment[].set.counterweightBalanceRatio');
+      }
+      if ('regenerativeDrive' in set) out.push('building.bankEquipment[].set.regenerativeDrive');
     }
   }
   for (const [group, fields] of Object.entries(objectOf(patch.dispatcher) ?? {})) {
@@ -129,9 +137,14 @@ export function unpricedPathsIn(
   return pathsIn(patch).filter((path) => changeCovering(schedule, path) === undefined);
 }
 
-/** What a repair costs: the sum of the distinct changes it buys. An empty patch is free. */
+/**
+ * What a repair costs: the sum of the distinct changes it buys. An empty patch is free.
+ *
+ * A patch names paths and carries no count, so a row priced per unit is refused here by
+ * `pricing/parse.ts#purchaseUnits` rather than charged for one unit — GitHub issue #478, § D552.
+ */
 export function repairPriceUnits(schedule: PriceSchedule, patch: RepairPatchShape): number {
-  return changesBought(schedule, patch).reduce((sum, change) => sum + change.priceUnits, 0);
+  return changesBought(schedule, patch).reduce((sum, change) => sum + purchaseUnits(change), 0);
 }
 
 /*

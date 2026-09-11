@@ -23,7 +23,14 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
+import {
+  loadConfig,
+  parseBuilding,
+  resolveBuilding,
+  type BuildingConfig,
+  type LoadedConfig,
+  type SimulationConfig,
+} from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { DATA_DIR, fixtureConfig } from '../fixtures.test-helper.js';
@@ -1700,6 +1707,135 @@ describe('two runs that were not asked the same question — issues #117 and #10
       });
     const delta = deltaOf(booked(SHIFT_EVENTS.ordinary), booked(SHIFT_EVENTS['move-in']));
     expect(delta.refused?.differsOn).toEqual(['against different traffic']);
+  });
+});
+
+describe('two runs on different equipment — § D539, and PR #515’s review finding L1', () => {
+  /*
+   * ## What was reported
+   *
+   * The comparison basis checks the building, the mode, the traffic, the stretch of the day and the
+   * arrival pattern, and equipment was none of them. A player who ran a building, fitted a
+   * regenerative drive to its banks and ran it again read `WORK PER DELIVERED LEG` paired
+   * `was … → …` with no refusal: two figures priced on different scales, set side by side as though
+   * the second were something the dispatcher did. Each run carried its own disclaimer in its
+   * warnings. The pairing carried none, so § D539's *"never silent"* held per run and not per
+   * comparison.
+   *
+   * ## The line this suite holds
+   *
+   * Equipment moves energy and never a leg (the owner's ruling, § D539), so a difference in equipment
+   * refuses **the energy rows and nothing else**. Every other figure is the same passengers carried
+   * the same way, and refusing those would silence a pairing that is true — the premise test below
+   * measures that on the two sheets rather than asserting it.
+   */
+  const ENERGY_IDS: readonly string[] = ['energy-work', 'energy-per-leg'];
+  let fitted: VizRecording;
+
+  beforeAll(() => {
+    /*
+     * `clean`'s own run with every bank fitted with a regenerative drive, resolved the way
+     * `pricing/bankEquipmentReachesTheGoal.test.ts` resolves one: the shipped document, one field
+     * added per bank, parsed and resolved again. Nothing else about the call differs from `runOf`.
+     */
+    const shipped = config.buildingsById.get('garden-apartments');
+    if (shipped === undefined) throw new Error('no shipped building "garden-apartments"');
+    const document = structuredClone(shipped.config) as BuildingConfig;
+    const banks = document.banks.map((bank) => ({ ...bank, regenerativeDrive: true }));
+    const file = 'garden-apartments.json';
+    const building = resolveBuilding(parseBuilding({ ...document, banks }, file), config.elevatorSpecs, {
+      file,
+      trafficProfileIds: new Set(config.trafficProfiles.profiles.map((profile) => profile.id)),
+    });
+    const base = fixtureConfig(config, {
+      buildingId: 'garden-apartments',
+      durationS: 900,
+      onTimeout: 'report',
+    });
+    fitted = recordRun(
+      { ...base, building, demand: { arrivalRatePctPop5min: 12 } },
+      { recordDecisions: false },
+    ).recording;
+  }, 120_000);
+
+  const deltaOf = (previous: ShapedDayReport, current: ShapedDayReport): ReportDeltaView => {
+    const delta = reportViewOf(current, { kind: 'played-out' }, previous).delta;
+    if (delta === null) throw new Error('expected a delta');
+    return delta;
+  };
+
+  const energyLabelsOf = (report: ShapedDayReport): readonly string[] =>
+    report.figures.filter((figure) => ENERGY_IDS.includes(figure.id)).map((figure) => figure.label);
+
+  it('moves the two energy figures and nothing else on the sheet — the premise, measured', () => {
+    expect(JSON.stringify(fitted.legs), 'a fitted drive moved a leg').toBe(JSON.stringify(clean.legs));
+    const before = new Map(reportOf(clean).figures.map((figure) => [figure.id, figure.value]));
+    const moved = reportOf(fitted)
+      .figures.filter((figure) => before.get(figure.id) !== figure.value)
+      .map((figure) => figure.id);
+    expect(moved).toEqual(ENERGY_IDS);
+  });
+
+  it('does not pair the energy rows of a fitted and an unfitted run, and names equipment as why', () => {
+    const current = reportOf(fitted);
+    const energyLabels = energyLabelsOf(current);
+    expect(energyLabels).toHaveLength(2);
+    const delta = deltaOf(reportOf(clean), current);
+    expect(
+      delta.figures.map((row) => row.label).filter((label) => energyLabels.includes(label)),
+      'an energy row was paired across two equipment conventions',
+    ).toEqual([]);
+    expect(delta.refused, 'equipment alone refused the whole comparison').toBeNull();
+    expect(delta.energyRefused?.differsOn).toEqual(['on different equipment']);
+    expect(delta.note).toContain('on different equipment');
+    // And the note does not claim the day reproduced exactly, which is untrue of its energy.
+    expect(delta.note).not.toContain('reproduces exactly');
+  });
+
+  it('refuses only the energy rows — a dispatcher swapped at the same time is still paired', () => {
+    const current = reportOf(fitted);
+    const energyLabels = energyLabelsOf(current);
+    const delta = deltaOf(reportOf(swapped), current);
+    expect(delta.refused).toBeNull();
+    expect(delta.energyRefused?.differsOn).toEqual(['on different equipment']);
+    expect(delta.figures.length, 'the non-energy rows went unpaired').toBeGreaterThan(0);
+    expect(delta.figures.some((row) => energyLabels.includes(row.label))).toBe(false);
+    expect(delta.selection.map((row) => row.label)).toContain('BUILDING & DISPATCHER');
+  });
+
+  it('names the equipment in a whole refusal, and adds no energy clause beside it', () => {
+    const delta = deltaOf(reportOf(saturated), reportOf(fitted));
+    expect(delta.refused?.differsOn).toEqual(['in a different building', 'on different equipment']);
+    expect(delta.energyRefused).toBeNull();
+    expect(delta.figures).toEqual([]);
+  });
+
+  it('refuses nothing when the equipment matches, and a shipped run records none', () => {
+    expect(clean.bankEquipment, 'a shipped run wrote an equipment field').toBeUndefined();
+    expect(fitted.bankEquipment?.length).toBeGreaterThan(0);
+    expect(deltaOf(reportOf(clean), reportOf(again)).energyRefused).toBeNull();
+    expect(deltaOf(reportOf(fitted), reportOf(fitted)).energyRefused).toBeNull();
+  });
+
+  it('is decided once, in the view — no renderer reads the refusal to decide what to draw', async () => {
+    /*
+     * The Day report and § D310's editor result strip both draw `note` and
+     * `[...selection, ...figures]` straight off `reportViewOf`'s delta. A renderer that consulted
+     * `energyRefused` would be a second place deciding which rows pair, and the two would disagree
+     * the day one was edited — the argument `drawDelta`'s own comment makes about `refused`.
+     */
+    const read = (name: string): Promise<string> =>
+      readFile(fileURLToPath(new URL(name, import.meta.url)), 'utf8');
+    const [panel, editor, screen] = await Promise.all([
+      read('./reportPanel.ts'),
+      read('./dispatcherEditor.ts'),
+      read('../everyday/reportScreen.ts'),
+    ]);
+    const drawAt = panel.indexOf('function drawDelta(');
+    expect(drawAt).toBeGreaterThan(-1);
+    expect(panel.slice(drawAt, drawAt + 700)).not.toContain('energyRefused');
+    expect(editor).not.toContain('energyRefused');
+    expect(screen).not.toContain('energyRefused');
   });
 });
 

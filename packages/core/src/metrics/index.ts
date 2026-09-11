@@ -62,6 +62,7 @@
 
 export {
   COMPARABLE_METRIC_IDS,
+  ENERGY_CONVENTION_SENSITIVE_METRICS,
   MODEL_SENSITIVE_METRICS,
   MODEL_SENSITIVE_METRIC_IDS,
   PASSENGER_MODELS,
@@ -69,6 +70,8 @@ export {
   comparabilityDisclaimer,
   comparabilityOf,
   comparabilityOfLandings,
+  energyConventionDisclaimer,
+  energyConventionOf,
   landingPassengerModelOf,
   passengerModelOf,
 } from './comparability.js';
@@ -83,6 +86,7 @@ export type {
 
 export {
   COUNTERWEIGHT_BALANCE_RATIO,
+  DEFAULT_ENERGY_CONVENTION,
   DEPARTURE_GAP_BASES,
   METRICS_SCHEMA_VERSION,
   MetricsError,
@@ -132,6 +136,7 @@ export type {
   SaturationVerdict,
   ServiceLevelDiagnosis,
   TravelReading,
+  EnergyConvention,
   TravelSample,
   ServiceLevelVerdict,
   AbandonmentStatistics,

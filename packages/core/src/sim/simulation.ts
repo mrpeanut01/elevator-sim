@@ -151,13 +151,21 @@ import {
   comparabilityDisclaimer,
   comparabilityOf,
   comparabilityOfLandings,
+  energyConventionDisclaimer,
+  energyConventionOf,
   type PassengerModel,
   type RunComparability,
 } from '../metrics/comparability.js';
 import { MetricsRecorder } from '../metrics/recorder.js';
 import { PEAK_WINDOW_S, departureGapBracket, summarizeRun } from '../metrics/summarize.js';
-import { MetricsError } from '../metrics/types.js';
-import type { CarTimings, ReportWindow, RunRecord, RunSummary } from '../metrics/types.js';
+import { DEFAULT_ENERGY_CONVENTION, MetricsError } from '../metrics/types.js';
+import type {
+  CarTimings,
+  EnergyConvention,
+  ReportWindow,
+  RunRecord,
+  RunSummary,
+} from '../metrics/types.js';
 import {
   CAR_DEFAULTS,
   Car,
@@ -573,6 +581,12 @@ export class Simulation {
   readonly #capacityMonitors = new Map<string, CapacityReassignmentMonitor>();
   readonly #carsById = new Map<string, Car>();
   /**
+   * The energy convention each bank prices its moves with, by bank id — `DECISIONS.md` § D539. Holds
+   * only banks whose convention is not the default, so on every shipped building it is empty and every
+   * travel sample is taken exactly as it was before per-bank conventions existed.
+   */
+  readonly #energyConventionByBankId = new Map<string, EnergyConvention>();
+  /**
    * Car id to the one arrival event its current run will produce, so a diversion can cancel
    * the arrival it supersedes. Deleted when the arrival fires. See {@link #considerDiversion}.
    */
@@ -925,6 +939,22 @@ export class Simulation {
       },
     });
     for (const car of this.#building.cars) this.#carsById.set(car.id, car);
+
+    /*
+     * **The counterweight and the drive, read once per bank** — GitHub issue #431, § D539. This is
+     * the non-test caller of `energyConventionOf` and `energyConventionDisclaimer`, and the only place a
+     * bank's energy convention enters a run: the arrival handler below passes it to `sampleTravel`,
+     * and nothing a dispatcher, a car or `estimateCost` reads is touched. That is the whole of why the
+     * setting moves energy and never a leg.
+     */
+    for (const bank of resolved.banks) {
+      const convention = energyConventionOf(bank);
+      if (convention !== DEFAULT_ENERGY_CONVENTION) {
+        this.#energyConventionByBankId.set(bank.id, convention);
+      }
+    }
+    const energyDisclaimer = energyConventionDisclaimer(resolved);
+    if (energyDisclaimer !== undefined) this.#disclaimers.push(energyDisclaimer);
 
     /*
      * A service schedule that was authored and not resolved, said out loud.
@@ -4122,6 +4152,7 @@ export class Simulation {
             context.time,
             arriving.id,
             arriving.completeArrival(context.time),
+            this.#energyConventionByBankId.get(arriving.bankId),
           );
           this.#stepCar(arriving, context.time);
         }),
