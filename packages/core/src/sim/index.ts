@@ -107,6 +107,28 @@ export type {
 } from './interventionWire.js';
 
 /**
+ * Endless rush's arithmetic — the stream, the run's identity, the hold line read off legs, and the
+ * waves a round outlasted. In `core` so a posted sitting's replay on the server and the stage in the
+ * viewer read one derivation (GitHub issue #372); see `sim/rush.ts` for why it moved.
+ */
+export {
+  LAST_GENERATED_WAVE,
+  RUSH_HOLD_LINE,
+  RUSH_STREAM,
+  RUSH_TEMPLATE_ID,
+  arrivalsPerMinute,
+  expectedPerBucket,
+  playerWaveAt,
+  rushHoldAtLegs,
+  rushTopArrivalsPerMinute,
+  rushTopRatePctPop5min,
+  rushWavesOutlasted,
+  waveIndexAt,
+} from './rush.js';
+
+export type { RushHoldLeg } from './rush.js';
+
+/**
  * The one description of what a stored service-event effect may be — GitHub issue #476. See
  * `sim/storedEffect.ts` for why it is in `core` and why every reader of an untrusted record
  * consults it rather than spelling its own.

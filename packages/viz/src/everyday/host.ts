@@ -2573,8 +2573,9 @@ export function createEverydayHost(
        * **The rush's building, never the standing week's** — PR #513's review, finding 1. This read
        * `resolvedBuildingOf` on the state the press came from, so the stream was sized from the
        * player's week — its contract's occupancy, its day's growth — while the run was the rush's own
-       * week: Midtown Office held 664 s from a day-1 week and 1 640 s from Free Play. Both reads below go
-       * through `rush.ts#rushBuildingOf`, so the rate, the disclosure and the run are one building's.
+       * week: Midtown Office held 664 s here from a day-1 week, and 1 640 s both from Free Play and on the
+       * server. Both reads below go through `rush.ts#rushBuildingOf`, so the rate, the disclosure and the
+       * run are one building's.
        *
        * **And the rush's standing is a whitelist** — PR #517's review. This presses the binding's
        * `startRun`, not this host's, so the kit and the event a campaign day wrote were never taken off

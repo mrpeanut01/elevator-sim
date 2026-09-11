@@ -598,6 +598,18 @@ async function populate(store: Store, userId: string, suffix: string): Promise<v
   // `earn-career-day`, and the two are deliberately different strings so a module naming one is
   // distinguishable from a module naming the other (`data/chime-ledger.json`'s own comment).
   await store.recordChimeEntry({ userId, direction: 'earn', entryKey: 'earn-career-day', chimes: 3 });
+  // GitHub issue #372. A posted rush sitting is a board row the account owns, so erasure has to take it
+  // — and, as above, the assertion is only worth anything with a row here to take.
+  await store.recordRushEntry({
+    boardKey: 'rush:garden-apartments:2026-09-01',
+    userId,
+    buildingId: 'garden-apartments',
+    seed: '90210',
+    heldS: 1_178,
+    furthestWave: 7,
+    rounds: [{ dispatcherProfileId: 'collective', heldS: 1_178, wavesOutlasted: 6, purseBeforeUnits: 0, paidUnits: 12, purseAfterUnits: 12 }],
+    modifiers: [],
+  });
 }
 
 describe('deleting an account', () => {
