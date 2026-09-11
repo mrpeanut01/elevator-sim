@@ -800,6 +800,16 @@ export interface RunRecord {
    * Recorded rather than derived, because a stored record outlives the profile that made it.
    */
   readonly passengerModel?: PassengerModel | undefined;
+  /**
+   * The landings whose panel named a car, in building order — **present only when
+   * {@link passengerModel} is `hybrid`** (GitHub issue #437, `DECISIONS.md` § D553).
+   *
+   * Recorded for the reason the model is: a stored hybrid record may be paired on the nine
+   * model-sensitive metrics only with a record whose landings assign identically, and the building
+   * and profile that made it will not be beside it when somebody tries. Absent on every other
+   * record, so none of them changes by a byte.
+   */
+  readonly assigningFloorIds?: readonly string[] | undefined;
   /** Identity of this replication, unique within an experiment. */
   readonly runId: string;
   /** The `StreamSet` master seed, as a decimal string. Invariant 5. */

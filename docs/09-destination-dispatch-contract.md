@@ -999,6 +999,34 @@ That is the Phase 5 configuration with a larger blast radius.
 
 ---
 
+## 11. Per-landing panels — the hybrid configuration
+
+Everything above treats the landing panel as a property of the run. Al-Kodmany (Buildings 2015)
+§ 2.2.1, quoted on GitHub issue #437, describes the *hybrid configuration* as ordinary practice:
+destination panels on the busiest landings — usually the lobby — and up/down buttons on the rest.
+Stage 1 of that issue makes it expressible, and [DECISIONS.md § D553](../DECISIONS.md) is the
+decision. What it changes in this contract, section by section:
+
+- **§ 1.1, per landing.** A building may declare `landingCallType` on a floor; absent means the
+  dispatcher's `dispatch.callType`. A landing is Level 0 when its call type is a destination one and
+  the dispatcher does not assign, Level 1 when its call type is a destination one and
+  `passengerAssignment` is `panel`, and conventional whenever its fixture is an up/down button.
+- **§ 1.3, per landing.** In one run, a destination landing under a panel keys its calls on the
+  origin-destination pair and a button landing keys them on floor and direction.
+- **§ 1.6, per landing.** A run whose landings disagree is `hybrid` and carries the landings that
+  assign. It pairs the nine model-sensitive metrics only with a run whose landings assign
+  identically — never with a conventional run, a full destination-dispatch run, or a hybrid with
+  panels elsewhere — and pairs the fourteen with anything. A disclosure-only run stays conventional
+  however its landings mix.
+- **§ 1.7.** No shipped building declares a landing call type, so no oracle configuration moves. A
+  building that declares a destination landing is not an up-peak oracle configuration either, for
+  that section's own reason.
+
+What a hybrid is *worth* is not stated here. It is stage 2's pinned measurement: entrance-only
+against full and against none on `midtown-office`, on the legs, with paired intervals.
+
+---
+
 ## Sources
 
 Every measurement in this document was produced in the `T14-dd-contract` worktree on 2026-07-27,

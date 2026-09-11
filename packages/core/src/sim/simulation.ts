@@ -111,7 +111,7 @@
  */
 
 import { findPassengerTransferS } from '../config/resolveCar.js';
-import { SERVICE_MODES, isDestinationCallType } from '../config/types.js';
+import { SERVICE_MODES, isDestinationCallType, type CallType } from '../config/types.js';
 import type {
   DispatcherProfile,
   FloorConfig,
@@ -147,12 +147,14 @@ import {
 } from '../dispatch/index.js';
 import { SimKernel, type ScheduledEvent, type SimTime } from '../kernel/index.js';
 import {
+  comparabilityBetween,
   comparabilityDisclaimer,
   comparabilityOf,
+  comparabilityOfLandings,
   energyConventionDisclaimer,
   energyConventionOf,
-  passengerModelOf,
   type PassengerModel,
+  type RunComparability,
 } from '../metrics/comparability.js';
 import { MetricsRecorder } from '../metrics/recorder.js';
 import { PEAK_WINDOW_S, departureGapBracket, summarizeRun } from '../metrics/summarize.js';
@@ -481,6 +483,13 @@ export class Simulation {
   /**
    * **The Level-0 / Level-1 switch, resolved once.**
    *
+   * **Whether any landing names a car**, since GitHub issue #437 (§ D553): a building may declare a
+   * landing's own call type, so a `panel` run whose every landing keeps its up/down button is
+   * `false`, and a run whose landings disagree asks {@link #assignsAt} landing by landing. That is
+   * this boolean at every landing of a run whose landings agree — every run of a building that
+   * declares nothing, which is every shipped building — so each gate below that asks it per landing
+   * is the run-wide gate that stood there.
+   *
    * `true` only under `dispatch.passengerAssignment: 'panel'`. Read all over the run loop, and
    * read from the *policy's resolved config* rather than from the authored profile, so a default
    * and an authored value cannot disagree. Every bank of a run shares one profile, so one boolean
@@ -492,6 +501,22 @@ export class Simulation {
    */
   readonly #panelAssigns: boolean;
   readonly #passengerModel: PassengerModel;
+  /**
+   * The run's comparability, decided landing by landing once at construction (GitHub issue #437,
+   * `DECISIONS.md` § D553) and handed to the result unchanged. `comparabilityOf` of the stage's own
+   * model — the object the result always carried — whenever no landing declares a call type.
+   */
+  readonly #comparability: RunComparability;
+  /**
+   * **The landings whose panel names a car, when that is some of them and not all.** `undefined`
+   * in every run whose landings agree, and then {@link #assignsAt} is {@link #panelAssigns}.
+   */
+  readonly #assigningFloorIds: ReadonlySet<string> | undefined;
+  /**
+   * Each landing whose declared call type differs from the dispatcher's own, with what it declares.
+   * Empty for a building that declares nothing, so no call is stamped with `DispatchCall.callType`.
+   */
+  readonly #landingCallTypes: ReadonlyMap<string, CallType>;
   /**
    * The traffic draw ordering this run asked for, or `undefined` for the default.
    *
@@ -737,6 +762,11 @@ export class Simulation {
    * at the kiosk) — which is every profile `data/dispatcher-profiles.json` ships.
    */
   readonly #kioskWithoutCredential: boolean;
+  /**
+   * The bare kiosks, landing by landing, when the building declares a landing's own call type
+   * (§ D553); `undefined` otherwise, and then {@link #kioskAt} is {@link #kioskWithoutCredential}.
+   */
+  readonly #kioskFloorIds: ReadonlySet<string> | undefined;
   /** Legs the bare kiosk refused. See {@link #kioskAllows}. */
   readonly #kioskRefusedLegs = new Set<string>();
   /** Legs turned away for want of a credential. See {@link #refuseAccess}. */
@@ -981,9 +1011,26 @@ export class Simulation {
     // stamped on the record equal to the model the cars actually ran.
     const [firstPolicy] = [...this.#policies.values()];
     const stage = firstPolicy?.config.dispatch;
-    this.#passengerModel =
-      stage === undefined ? 'conventional' : passengerModelOf(stage);
-    this.#panelAssigns = this.#passengerModel === 'destination-dispatch';
+    // **Landing by landing** (GitHub issue #437, § D553): a building may declare a landing's own
+    // call type, so the model is decided per landing through the one function every pairing reads.
+    // With no declaration it is `comparabilityOf(passengerModelOf(stage))` — exactly what this line
+    // used to derive — so every shipped run takes the branches it always took.
+    this.#comparability =
+      stage === undefined
+        ? comparabilityOf('conventional')
+        : comparabilityOfLandings(stage, this.#building.floors);
+    this.#passengerModel = this.#comparability.passengerModel;
+    this.#panelAssigns = this.#passengerModel !== 'conventional';
+    this.#assigningFloorIds =
+      this.#comparability.assigningFloorIds === undefined
+        ? undefined
+        : new Set(this.#comparability.assigningFloorIds);
+    const landingCallTypes = new Map<string, CallType>();
+    for (const floor of this.#building.floors) {
+      if (stage === undefined || floor.landingCallType === undefined) continue;
+      if (floor.landingCallType !== stage.callType) landingCallTypes.set(floor.id, floor.landingCallType);
+    }
+    this.#landingCallTypes = landingCallTypes;
     // The bare kiosk, off the same resolved stage and through the same two functions
     // `costRequestFor` asks. `stage === undefined` cannot happen for a run with a bank; a
     // building with none discloses nothing because it opens no calls.
@@ -991,6 +1038,32 @@ export class Simulation {
       stage !== undefined &&
       isDestinationCallType(stage.callType) &&
       !callCarriesCredential(stage.callType, this.#panelAssigns);
+    // …and per landing where a landing declares its own fixture, through the same two functions
+    // again, so a kiosk on one floor refuses at that floor and a reader on the next does not.
+    if (stage === undefined || landingCallTypes.size === 0) {
+      this.#kioskFloorIds = undefined;
+    } else {
+      const kiosks = new Set<string>();
+      for (const floor of this.#building.floors) {
+        const callType = landingCallTypes.get(floor.id) ?? stage.callType;
+        if (isDestinationCallType(callType) && !callCarriesCredential(callType, this.#assignsAt(floor.id))) {
+          kiosks.add(floor.id);
+        }
+      }
+      this.#kioskFloorIds = kiosks;
+      // A kiosk holds a person at a screen, so it cannot defer: `resolveDispatchConfig` refuses the
+      // pair for a whole run, and a kiosk declared on one landing under a deferring dispatcher is the
+      // same system on one floor. A mobile-credential reader is not refused, on that function's own
+      // asymmetry.
+      const kiosk = this.#building.floors.find(
+        (floor) => floor.landingCallType === 'destination-entry',
+      );
+      if (kiosk !== undefined && stage.assignmentTiming === 'deferred') {
+        throw new SimulationError(
+          `Floor "${kiosk.id}" of building "${resolved.id}" declares landingCallType "destination-entry" and dispatcher "${profile.id}" defers assignment (dispatch.assignmentTiming: "deferred"). A destination-entry kiosk holds a person at a screen, so it cannot defer — the combination resolveDispatchConfig refuses for a whole run, refused here for one landing (docs/06-parameterization-and-tuning.md § Stage 4, DECISIONS.md § D553). Declare "mobile-credential" or "up-down-buttons" at that landing, or run a dispatcher that assigns immediately.`,
+        );
+      }
+    }
 
     /*
      * The comparability disclaimer, raised at construction beside the double-deck one.
@@ -1000,7 +1073,10 @@ export class Simulation {
      * configuration a reader will assume. "AWT" on a panel run is a different quantity from
      * "AWT" on a conventional one, and nothing about the number says so.
      */
-    const disclaimer = comparabilityDisclaimer(this.#passengerModel);
+    const disclaimer = comparabilityDisclaimer(
+      this.#passengerModel,
+      this.#comparability.assigningFloorIds,
+    );
     if (disclaimer !== undefined) this.#disclaimers.push(disclaimer);
 
     this.#factory = new PassengerFactory({
@@ -1085,6 +1161,9 @@ export class Simulation {
       ...(this.#passengerModel === 'conventional'
         ? {}
         : { passengerModel: this.#passengerModel }),
+      ...(this.#comparability.assigningFloorIds === undefined
+        ? {}
+        : { assigningFloorIds: this.#comparability.assigningFloorIds }),
       runId: this.#runId,
       buildingId: resolved.id,
       dispatcherProfileId: profile.id,
@@ -1894,9 +1973,30 @@ export class Simulation {
     this.#syncButton(passenger.originFloorId, passenger.direction);
   }
 
+  /**
+   * **Whether the panel at this landing names a car** — GitHub issue #437, `DECISIONS.md` § D553.
+   *
+   * {@link #panelAssigns} at every landing of a run whose landings agree, which is every run of a
+   * building that declares no `landingCallType`; so each gate that asks this is the run-wide gate
+   * that stood there before. In a `hybrid` run it is membership of the assigning landings. Asked of
+   * a call's floor, or of a passenger's origin, which is the landing they stand on.
+   */
+  #assignsAt(floorId: string): boolean {
+    return this.#assigningFloorIds === undefined
+      ? this.#panelAssigns
+      : this.#assigningFloorIds.has(floorId);
+  }
+
+  /** Whether this landing is a bare kiosk (§ T50-D1) — per landing where the building declares one. */
+  #kioskAt(floorId: string): boolean {
+    return this.#kioskFloorIds === undefined
+      ? this.#kioskWithoutCredential
+      : this.#kioskFloorIds.has(floorId);
+  }
+
   /** The waiters of this call whom the panel promised to this car. Empty conventionally. */
   #promisedTo(active: ActiveCall, car: Car): readonly Passenger[] {
-    if (!this.#panelAssigns) return [];
+    if (!this.#assignsAt(active.floorId)) return [];
     const floor = this.#building.requireFloor(active.floorId);
     return this.#waitingForCall(floor, active).filter(
       (passenger) => passenger.assignedCarId === car.id,
@@ -2006,16 +2106,21 @@ export class Simulation {
       if (entry.change.kind === 'switch-dispatcher') {
         const profile = entry.change.profile;
         this.#switchWeights.set(index, resolveWeights(profile.weights, profile.id).weights);
-        // Through `passengerModelOf` — the one statement of the model rule, the same function
-        // the run's own model was stamped by — with the stage defaults applied exactly as
+        // Through `comparabilityOfLandings` — the one statement of the model rule, over this
+        // building's landings (§ D553), the same function the run's own model was stamped by — with
+        // the stage defaults applied exactly as
         // `resolveDispatchConfig` applies them. A second inline copy of the rule here was
         // review-flagged as the two-sources shape and is gone.
-        const switchedModel: PassengerModel = passengerModelOf({
-          callType: profile.dispatch?.callType ?? DISPATCH_DEFAULTS.callType,
-          passengerAssignment:
-            profile.dispatch?.passengerAssignment ?? DISPATCH_DEFAULTS.passengerAssignment,
-        });
-        if (switchedModel !== this.#passengerModel) {
+        const switched = comparabilityOfLandings(
+          {
+            callType: profile.dispatch?.callType ?? DISPATCH_DEFAULTS.callType,
+            passengerAssignment:
+              profile.dispatch?.passengerAssignment ?? DISPATCH_DEFAULTS.passengerAssignment,
+          },
+          this.#building.floors,
+        );
+        const switchedModel: PassengerModel = switched.passengerModel;
+        if (!comparabilityBetween(switched, this.#comparability).sameLandingModels) {
           this.#disclaimers.push(
             `interventions[${index}] switches to dispatcher "${profile.id}", which authors the ${switchedModel} passenger model; this run stays ${this.#passengerModel}. Only the weight vector switches mid-run — a record that changed passenger model at ${entry.atS} s would publish metrics not comparable with themselves (metrics/comparability.ts) — so every stage setting of the opening profile still stands.`,
           );
@@ -2492,7 +2597,7 @@ export class Simulation {
 
       const carried = new Set<string>();
       for (const bank of this.#building.banksServing(floor.id)) {
-        for (const destinationFloorId of this.#requestKeys(waiting)) {
+        for (const destinationFloorId of this.#requestKeys(floor, waiting)) {
           let count = 0;
           let massKg = 0;
           for (const passenger of waiting) {
@@ -2564,8 +2669,8 @@ export class Simulation {
    * Queue order and not a sort, so the order calls are opened in is arrival order — the same
    * FIFO the rest of this module is deterministic by.
    */
-  #requestKeys(waiting: readonly Passenger[]): readonly (string | undefined)[] {
-    if (!this.#panelAssigns) return [undefined];
+  #requestKeys(floor: Floor, waiting: readonly Passenger[]): readonly (string | undefined)[] {
+    if (!this.#assignsAt(floor.id)) return [undefined];
     const keys: string[] = [];
     const seen = new Set<string>();
     for (const passenger of waiting) {
@@ -2735,7 +2840,7 @@ export class Simulation {
    * left group control is the defect that decision closed.
    */
   #withPromiseHolders(active: ActiveCall, chosen: readonly string[]): readonly string[] {
-    if (!this.#panelAssigns) return chosen;
+    if (!this.#assignsAt(active.floorId)) return chosen;
     const floor = this.#building.requireFloor(active.floorId);
     const owed: string[] = [];
     for (const passenger of this.#waitingForCall(floor, active)) {
@@ -2799,7 +2904,7 @@ export class Simulation {
    * nothing, and whom D29 says nothing about.
    */
   #tellThePanel(active: ActiveCall, carIds: readonly string[], at: SimTime): void {
-    if (!this.#panelAssigns) return;
+    if (!this.#assignsAt(active.floorId)) return;
     const floor = this.#building.requireFloor(active.floorId);
     const bank = this.#building.bankById(active.bankId);
     /* c8 ignore next -- every active call belongs to a bank of this building. */
@@ -3040,7 +3145,7 @@ export class Simulation {
     // while everybody left here is one of them, and `#applyDecision` keeps a promised car on the
     // call even when the group names another for the unpromised — so the count is the price of
     // committing at the panel rather than a fault.
-    if (this.#panelAssigns) {
+    if (this.#assignsAt(active.floorId)) {
       const floor = this.#building.requireFloor(active.floorId);
       for (const passenger of this.#waitingForCall(floor, active)) {
         if (passenger.assignedCarId === car.id) this.#brokenPromises += 1;
@@ -3819,7 +3924,7 @@ export class Simulation {
    * Trivially `true` under every conventional run, where nobody is assigned anything.
    */
   #promiseAllows(car: Car, passenger: Passenger, at: SimTime): boolean {
-    if (!this.#panelAssigns) return true;
+    if (!this.#assignsAt(passenger.originFloorId)) return true;
     const assignedCarId = passenger.assignedCarId;
     if (assignedCarId !== car.id) return false;
     const assignedAt = passenger.assignedAt ?? 0;
@@ -4340,6 +4445,7 @@ export class Simulation {
       duty = passenger.duty;
       break;
     }
+    const landingCallType = this.#landingCallTypes.get(floor.id);
     return Object.freeze({
       id,
       floorId: floor.id,
@@ -4348,6 +4454,10 @@ export class Simulation {
       registeredAt,
       ...(credentialGroup === undefined ? {} : { credentialGroup }),
       ...(destinationFloorId === undefined ? {} : { destinationFloorId }),
+      // The landing's own fixture, where the building declares one that differs from the
+      // dispatcher's (GitHub issue #437, § D553): `costRequestFor` and `batchKeyOf` read it in place
+      // of `dispatch.callType`. Absent on every call of a building that declares nothing.
+      ...(landingCallType === undefined ? {} : { callType: landingCallType }),
       // The head's duty, GitHub issue #481: the landing's duty control, pressed by the person this
       // call already speaks for. Carried under every call type — `costRequestFor` says why — and
       // omitted where the head has none, which is every call in a building that declares no duty.
@@ -4369,7 +4479,7 @@ export class Simulation {
       // carry, and the trace's route planner never generates one. Building a "rejected at the
       // panel" accounting path that nothing in this simulator can reach would be a ninth dead
       // seam, which is the defect this phase is most at risk of shipping.
-      ...(this.#panelAssigns ? { panelAuthorized: true } : {}),
+      ...(this.#assignsAt(floor.id) ? { panelAuthorized: true } : {}),
     });
   }
 
@@ -4507,7 +4617,7 @@ export class Simulation {
    */
   #bankMayServe(bank: Bank<Car>, passenger: Passenger): boolean {
     if (!this.#bankCanCarry(bank, passenger)) return false;
-    if (!this.#panelAssigns) return true;
+    if (!this.#assignsAt(passenger.originFloorId)) return true;
     const assignedCarId = passenger.assignedCarId;
     if (assignedCarId === undefined) return true;
     return this.#carsById.get(assignedCarId)?.bankId === bank.id;
@@ -4579,7 +4689,7 @@ export class Simulation {
    * refused it.
    */
   #kioskAllows(passenger: Passenger): boolean {
-    if (!this.#kioskWithoutCredential) return true;
+    if (!this.#kioskAt(passenger.originFloorId)) return true;
     // The question `infeasibilityOf` step 4 will ask, asked with the credential the call will
     // actually carry — which under this configuration is none.
     if (this.#building.isAccessPermitted(undefined, passenger.destinationFloorId)) return true;
@@ -4757,7 +4867,7 @@ export class Simulation {
     active: ActiveCall,
     snapshots: readonly CarSnapshot[],
   ): readonly CarSnapshot[] {
-    if (!this.#panelAssigns) return snapshots;
+    if (!this.#assignsAt(active.floorId)) return snapshots;
     const floor = this.#building.requireFloor(active.floorId);
     const bank = this.#building.bankById(active.bankId);
     /* c8 ignore next -- every active call belongs to a bank of this building. */
@@ -4797,7 +4907,7 @@ export class Simulation {
    * occupied landings of one bank, not the building's floor count.
    */
   #callsAt(bankId: string, floorId: string): readonly ActiveCall[] {
-    if (!this.#panelAssigns) {
+    if (!this.#assignsAt(floorId)) {
       const found: ActiveCall[] = [];
       for (const direction of DIRECTIONS) {
         const active = this.#activeCalls.get(callIdOf(bankId, floorId, direction));
@@ -4827,6 +4937,24 @@ export class Simulation {
   /* ---------------------------------------------------------------- *
    * Closing the books
    * ---------------------------------------------------------------- */
+
+  /**
+   * Claim 5's denominator in a `hybrid` run (GitHub issue #437, § D553): the same identity, taken
+   * over the legs that began at a landing whose panel names a car. A leg that began at an up/down
+   * landing was never promisable, and counting it would fail every hybrid run's audit for a reason
+   * that is not a defect. Abandoned, access-refused and stranded legs are netted out as they are in
+   * a uniform run.
+   */
+  #promisableLegsAtPanels(assigning: ReadonlySet<string>): number {
+    let count = 0;
+    for (const [id, leg] of this.#legs) {
+      if (!assigning.has(leg.originFloorId)) continue;
+      if (this.#abandonedLegs.has(id) || this.#accessRefusedLegs.has(id)) continue;
+      if (this.#strandedLegs.has(id)) continue;
+      count += 1;
+    }
+    return count;
+  }
 
   #finish(endReason: RunEndReason): SimulationResult {
     this.#diagnoseStuckCalls();
@@ -4906,7 +5034,7 @@ export class Simulation {
       events: this.#kernel.processedCount(),
       warnings,
       stageActivity: this.stageActivity,
-      comparability: comparabilityOf(this.#passengerModel),
+      comparability: this.#comparability,
     });
 
     // Reported **before** the audit, and unconditionally — not under `onTimeout`. That option
@@ -5063,8 +5191,14 @@ export class Simulation {
     // reports nothing else at all — the call completed — so without this line the only trace of
     // a turned-away passenger is a row in `undelivered` that looks like ordinary overflow.
     if (this.#kioskRefusedLegs.size > 0) {
+      // Named where the kiosk is when a building declares it landing by landing (§ D553), and the
+      // run-wide sentence otherwise, byte for byte.
+      const kioskSource =
+        this.#kioskFloorIds === undefined
+          ? 'dispatch.callType "destination-entry"'
+          : `the destination-entry landing(s) ${[...this.#kioskFloorIds].map((id) => `"${id}"`).join(', ')}`;
       this.#warnings.push(
-        `${String(this.#kioskRefusedLegs.size)} leg(s) were refused by the destination kiosk: dispatch.callType "destination-entry" discloses a destination and carries no credential, so an access-restricted destination is infeasible for every car in the building and no car is ever sent for it. Those legs are named in undelivered and are the measured cost of a kiosk that does not authorize (DECISIONS.md § D30, § T50-D1); passengers behind them in the same landing queue are collected normally. A credential-aware call type ("mobile-credential") or a landing panel serves them.`,
+        `${String(this.#kioskRefusedLegs.size)} leg(s) were refused by the destination kiosk: ${kioskSource} discloses a destination and carries no credential, so an access-restricted destination is infeasible for every car in the building and no car is ever sent for it. Those legs are named in undelivered and are the measured cost of a kiosk that does not authorize (DECISIONS.md § D30, § T50-D1); passengers behind them in the same landing queue are collected normally. A credential-aware call type ("mobile-credential") or a landing panel serves them.`,
       );
     }
 
@@ -5390,7 +5524,9 @@ export class Simulation {
     // A stranded leg is netted out too (§ D523): its promise, if it held one, was voided at the
     // stranding and counted in `promisesRevoked`, so it is neither promisable nor in force.
     const promisableLegs =
-      legsCreated - abandonedLegs - this.#accessRefusedLegs.size - this.#strandedLegs.size;
+      this.#assigningFloorIds === undefined
+        ? legsCreated - abandonedLegs - this.#accessRefusedLegs.size - this.#strandedLegs.size
+        : this.#promisableLegsAtPanels(this.#assigningFloorIds);
     if (this.#panelAssigns && undelivered.length === 0 && promisesInForce !== promisableLegs) {
       problems.push(
         `${promisableLegs} legs were created and not abandoned and every journey was delivered, but ${promisesInForce} promises were in force at the end (${this.#legsAssigned} made, ${this.#promisesRevoked} revoked, ${this.#promisesAbandoned} voided by abandonment); ${promisableLegs - promisesInForce} boarded without being promised anything`,

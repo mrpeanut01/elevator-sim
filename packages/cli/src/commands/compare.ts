@@ -96,10 +96,11 @@ import {
   type ShardResult,
 } from '@elevator-sim/experiments';
 import {
-  comparabilityOf,
-  passengerModelOf,
+  comparabilityBetween,
+  comparabilityOfLandings,
   resolveDispatchConfig,
   type DispatcherProfile,
+  type LandingDeclaration,
   type LoadedConfig,
   type PassengerModel,
   type ResolvedBuilding,
@@ -511,7 +512,7 @@ function renderComparison(
   const window = invocation.window;
   const { cellA, cellB } = view;
 
-  const crossModel = crossModelNotice(aProfile, bProfile);
+  const crossModel = crossModelNotice(aProfile, bProfile, prepared.base.floors);
   const gate = gateMetricFor(crossModel);
 
   // CRN is the whole basis of the comparison, so it is verified rather than assumed.
@@ -1146,7 +1147,9 @@ function printBlockAlone(
 ): void {
   const { yellow } = out.palette;
   heading(out, 'This block alone  (not a verdict: the merge recomputes every figure at the merged n)');
-  const gate = gateMetricFor(crossModelNotice(prepared.aProfile, prepared.bProfile));
+  const gate = gateMetricFor(
+    crossModelNotice(prepared.aProfile, prepared.bProfile, prepared.base.floors),
+  );
   const { unit, digits } = unitOf(gate.metric);
   const columnOf = (armId: string): number => plan.cells.findIndex((cell) => cell.dispatcherArmId === armId);
   const [a, b] = [columnOf('A'), columnOf('B')];
@@ -1237,37 +1240,40 @@ export interface CrossModelNotice {
 }
 
 /**
- * The passenger model an arm will run under, off the **resolved** dispatch stage.
+ * `undefined` when every landing of the building runs the same passenger model under both arms,
+ * and the notice when one does not.
  *
- * `resolveDispatchConfig` is what applies the defaults and what refuses `panel` under a call type
- * that cannot ask for a destination, and `passengerModelOf` is the same function `Simulation`
- * uses to stamp `RunRecord.passengerModel`. Reading the authored
- * `profile.dispatch?.passengerAssignment` instead would be a second opinion about a question
- * `core` has already answered, and would disagree the first time a default changed.
- */
-export function modelOfProfile(profile: DispatcherProfile): PassengerModel {
-  return passengerModelOf(resolveDispatchConfig(profile).dispatch);
-}
-
-/**
- * `undefined` when the two arms share a passenger model, and the notice when they do not.
+ * Decided by `core`'s `comparabilityBetween` over each arm's `comparabilityOfLandings` (GitHub
+ * issue #437, `DECISIONS.md` § D553): the per-landing model and the pairing rule are `core`'s, and
+ * this is the shipped command that enforces them. `landings` is the building's floors. A building
+ * that declares no `landingCallType` gives each arm exactly `passengerModelOf` of its resolved stage,
+ * so the notice is the one this function has always raised; a building with panels on some
+ * landings makes a `panel` arm `hybrid`, and refuses it against a uniform arm on the nine.
  *
- * `notComparable` is `core`'s own list — `comparabilityOf('destination-dispatch')` — so a metric
- * added to or removed from the nine appears here without this file being edited. That matters:
- * the list exists precisely because nobody remembers it, and a copy in the CLI would be the
- * stale-published-number shape one directory over.
+ * **Off the resolved dispatch stage, never the authored profile.** `resolveDispatchConfig` is what
+ * applies the defaults and what refuses `panel` under a call type that cannot ask for a destination,
+ * and `comparabilityOfLandings` is the function `Simulation` stamps the run's model with. Reading the
+ * authored `profile.dispatch?.passengerAssignment` instead would be a second opinion about a question
+ * `core` has already answered, and would disagree the first time a default changed. (This reason
+ * used to sit on `modelOfProfile`, whose one caller this was; it was deleted with the caller.)
+ *
+ * `notComparable` is `core`'s own list, so a metric added to or removed from the nine appears here
+ * without this file being edited. That matters: the list exists precisely because nobody remembers
+ * it, and a copy in the CLI would be the stale-published-number shape one directory over.
  */
 export function crossModelNotice(
   a: DispatcherProfile,
   b: DispatcherProfile,
+  landings: readonly LandingDeclaration[] = [],
 ): CrossModelNotice | undefined {
-  const aModel = modelOfProfile(a);
-  const bModel = modelOfProfile(b);
-  if (aModel === bModel) return undefined;
+  const aRun = comparabilityOfLandings(resolveDispatchConfig(a).dispatch, landings);
+  const bRun = comparabilityOfLandings(resolveDispatchConfig(b).dispatch, landings);
+  const pair = comparabilityBetween(aRun, bRun);
+  if (pair.sameLandingModels) return undefined;
   return {
-    aModel,
-    bModel,
-    notComparable: comparabilityOf('destination-dispatch').notComparableMetrics,
+    aModel: aRun.passengerModel,
+    bModel: bRun.passengerModel,
+    notComparable: pair.notComparableMetrics,
   };
 }
 

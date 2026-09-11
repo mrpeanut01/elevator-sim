@@ -233,6 +233,73 @@ describe('validateBuildingText — ED-18', () => {
   }, 120_000);
 });
 
+describe('a per-floor destination panel is refused until the viewer can describe a hybrid run — GitHub issue #437', () => {
+  /**
+   * The review of PR #532 ran exactly this document through the Engineer editor: midtown-office with
+   * up/down buttons declared on every landing but G. Core accepts it — `landingCallType` is a schema
+   * field since § D553 — and the viewer would run it as the `hybrid` passenger model, which its
+   * disclosure, its pinned-queue overlay and its report still describe as a run whose riders take
+   * whichever car answers. So the editor refuses it at every landing that declares one, and the
+   * document still opens so the field can be removed here: an invalid file is precisely the one
+   * somebody wants to open in an editor.
+   */
+  async function midtownWithButtonsExceptAt(...kept: readonly string[]): Promise<string> {
+    const raw = JSON.parse(
+      await readFile(join(DATA_DIR, 'buildings', 'midtown-office.json'), 'utf8'),
+    ) as { floors: Record<string, unknown>[] };
+    const floors = raw.floors.map((floor) =>
+      kept.includes(String(floor['id'])) ? floor : { ...floor, landingCallType: 'up-down-buttons' },
+    );
+    return JSON.stringify({ ...raw, floors });
+  }
+
+  it('refuses the text form at every declaring landing, and still hands back the document to fix', async () => {
+    const report = validateBuildingText(await midtownWithButtonsExceptAt('G'), config.elevatorSpecs, {
+      file: 'midtown-office.json',
+      trafficProfileIds,
+    });
+    expect(report.valid, 'the Run control stays disabled').toBe(false);
+    expect(report.stage).toBe('resolve');
+    expect(report.building?.id, 'opened, so the field can be removed here').toBe('midtown-office');
+    expect(report.resolved, 'nothing for the Run control to run').toBeUndefined();
+
+    const floors = report.building?.floors ?? [];
+    const declaring = floors.flatMap((floor, index) =>
+      floor.landingCallType === undefined ? [] : [`floors[${String(index)}].landingCallType`],
+    );
+    expect(declaring).toHaveLength(floors.length - 1);
+    expect(report.issues.map((issue) => issue.path), 'one issue per declaring landing, located').toEqual(declaring);
+    for (const issue of report.issues) {
+      expect(issue.code).toBe('landing-call-type-not-playable');
+      expect(issue.message).toContain('not playable in the viewer yet');
+      expect(issue.message).toContain('GitHub issue #437');
+    }
+    expect(issuesMayBeIncomplete(report)).toBe(false);
+    expect(summariseReport(report)).toContain(`${String(declaring.length)} problems`);
+  }, 120_000);
+
+  it('refuses a floor range that declares one, located at the range, through the form path too', async () => {
+    const raw = JSON.parse(
+      await readFile(join(DATA_DIR, 'buildings', 'vertical-city.json'), 'utf8'),
+    ) as { floorRanges: Record<string, unknown>[] };
+    const floorRanges = raw.floorRanges.map((range, index) =>
+      index === 0 ? { ...range, landingCallType: 'destination-entry' } : range,
+    );
+    const report = check({ ...raw, floorRanges });
+    expect(report.valid).toBe(false);
+    expect(report.issues.map((issue) => [issue.path, issue.code])).toEqual([
+      ['floorRanges[0].landingCallType', 'landing-call-type-not-playable'],
+    ]);
+  }, 120_000);
+
+  it('still accepts the same shipped buildings with nothing declared', async () => {
+    for (const id of ['midtown-office', 'vertical-city']) {
+      const text = await readFile(join(DATA_DIR, 'buildings', `${id}.json`), 'utf8');
+      expect(validateBuildingText(text, config.elevatorSpecs, { trafficProfileIds }).valid, id).toBe(true);
+    }
+  }, 120_000);
+});
+
 describe('a duplicate id is caught — ED-09, ED-13', () => {
   it('names the other floor when two floors share an id', () => {
     const floors = garden.floors ?? [];

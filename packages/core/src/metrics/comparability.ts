@@ -37,18 +37,35 @@
  * published figures in this repository did.
  */
 
-import type { CallType, PassengerAssignmentMode, ResolvedBank } from '../config/types.js';
+import {
+  isDestinationCallType,
+  type CallType,
+  type PassengerAssignmentMode,
+  type ResolvedBank,
+} from '../config/types.js';
 
-import { COUNTERWEIGHT_BALANCE_RATIO, DEFAULT_ENERGY_CONVENTION, type EnergyConvention } from './types.js';
+import {
+  COUNTERWEIGHT_BALANCE_RATIO,
+  DEFAULT_ENERGY_CONVENTION,
+  MetricsError,
+  type EnergyConvention,
+} from './types.js';
 
 /**
- * The two passenger models this simulator can run.
+ * The passenger models this simulator can run.
  *
  * `conventional` covers both the up/down button and destination *disclosure*: the destination
  * reaches the cost request earlier, and the passenger still walks to whichever car opens. Only
  * `dispatch.passengerAssignment: 'panel'` changes what a passenger *is*.
+ *
+ * **`hybrid` is a run whose landings disagree** — GitHub issue #437, `DECISIONS.md` § D553. A
+ * destination panel is installed on a landing, so the model is decided per landing
+ * ({@link landingPassengerModelOf}), and a run in which some landings name a car while others keep
+ * their up/down button measures each passenger's wait in whichever construct their own landing
+ * has. It is listed last so both values this array held before keep their positions, and no shipped
+ * building produces it: every shipped floor leaves `landingCallType` unset.
  */
-export const PASSENGER_MODELS = ['conventional', 'destination-dispatch'] as const;
+export const PASSENGER_MODELS = ['conventional', 'destination-dispatch', 'hybrid'] as const;
 
 export type PassengerModel = (typeof PASSENGER_MODELS)[number];
 
@@ -58,6 +75,33 @@ export function passengerModelOf(stage: {
   readonly passengerAssignment: PassengerAssignmentMode;
 }): PassengerModel {
   return stage.passengerAssignment === 'panel' ? 'destination-dispatch' : 'conventional';
+}
+
+/**
+ * The passenger model **one landing** runs under — GitHub issue #437, `DECISIONS.md` § D553.
+ *
+ * The landing's own call type where the building declares one, the dispatcher's otherwise. A
+ * landing whose declared fixture cannot ask for a destination is an up/down button whatever the
+ * dispatcher would have named — `resolveDispatchConfig`'s own sentence — so it is `conventional`
+ * even under `passengerAssignment: 'panel'`. A landing that declares nothing is exactly
+ * {@link passengerModelOf} of the stage, which is why a building with no declaration cannot move.
+ */
+export function landingPassengerModelOf(
+  stage: {
+    readonly callType: CallType;
+    readonly passengerAssignment: PassengerAssignmentMode;
+  },
+  landingCallType: CallType | undefined,
+): PassengerModel {
+  if (landingCallType === undefined) return passengerModelOf(stage);
+  if (!isDestinationCallType(landingCallType)) return 'conventional';
+  return passengerModelOf({ callType: landingCallType, passengerAssignment: stage.passengerAssignment });
+}
+
+/** One landing, as far as its passenger model is concerned: its id and what the building declares. */
+export interface LandingDeclaration {
+  readonly id: string;
+  readonly landingCallType?: CallType | undefined;
 }
 
 /** One metric that changes construct under destination dispatch, and why it does. */
@@ -193,9 +237,41 @@ export interface RunComparability {
    * first among them.
    */
   readonly comparableMetrics: readonly string[];
+  /**
+   * The landings whose panel names a car, in building order — **present only when the model is
+   * `hybrid`** (GitHub issue #437, `DECISIONS.md` § D553), and absent under the two uniform models,
+   * so their object is the one it always was.
+   *
+   * Carried because it, and not the label, is what decides whether two hybrid runs mean the same
+   * thing by AWT: see {@link comparabilityBetween}.
+   */
+  readonly assigningFloorIds?: readonly string[] | undefined;
 }
 
-export function comparabilityOf(model: PassengerModel): RunComparability {
+/**
+ * A run's comparability from its model — and, for `hybrid`, from the landings that make it one.
+ *
+ * @throws MetricsError for `hybrid` without a non-empty `assigningFloorIds`: a run whose landings
+ *   disagree cannot be described without saying which landings assign, because that set is its
+ *   pairing key.
+ */
+export function comparabilityOf(
+  model: PassengerModel,
+  assigningFloorIds?: readonly string[] | undefined,
+): RunComparability {
+  if (model === 'hybrid') {
+    if (assigningFloorIds === undefined || assigningFloorIds.length === 0) {
+      throw new MetricsError(
+        'A hybrid run is one whose landings disagree, so it cannot be described without the assigning landings that make it one (DECISIONS.md § D553). Pass assigningFloorIds, or derive it with comparabilityOfLandings.',
+      );
+    }
+    return Object.freeze({
+      passengerModel: model,
+      assigningFloorIds: Object.freeze([...assigningFloorIds]),
+      notComparableMetrics: MODEL_SENSITIVE_METRIC_IDS,
+      comparableMetrics: COMPARABLE_METRIC_IDS,
+    });
+  }
   const conventional = model === 'conventional';
   return Object.freeze({
     passengerModel: model,
@@ -207,6 +283,153 @@ export function comparabilityOf(model: PassengerModel): RunComparability {
 }
 
 /**
+ * **A run's comparability, decided landing by landing** — GitHub issue #437, `DECISIONS.md` § D553.
+ *
+ * `landings` is the building's floors in building order, each with what it declares. When none
+ * declares a call type this is {@link comparabilityOf} of the stage's own model, the object every
+ * run has always carried. Otherwise each landing's model is taken by
+ * {@link landingPassengerModelOf}: landings that all agree give that model's ordinary object, and
+ * landings that disagree give `hybrid`, carrying the ids of the landings that assign.
+ *
+ * Every floor counts, served or not, and the reason is the service-range event (§ D523): the set a
+ * bank serves can change mid-run, and a run's pairing key must not. A declaration on a floor no bank
+ * reaches can therefore only make a pairing *stricter* — the direction a comparability rule is
+ * allowed to be wrong in.
+ */
+export function comparabilityOfLandings(
+  stage: {
+    readonly callType: CallType;
+    readonly passengerAssignment: PassengerAssignmentMode;
+  },
+  landings: readonly LandingDeclaration[],
+): RunComparability {
+  if (landings.every((landing) => landing.landingCallType === undefined)) {
+    return comparabilityOf(passengerModelOf(stage));
+  }
+  const assigning = landings
+    .filter(
+      (landing) =>
+        landingPassengerModelOf(stage, landing.landingCallType) === 'destination-dispatch',
+    )
+    .map((landing) => landing.id);
+  if (assigning.length === 0) return comparabilityOf('conventional');
+  if (assigning.length === landings.length) return comparabilityOf('destination-dispatch');
+  return comparabilityOf('hybrid', assigning);
+}
+
+/**
+ * What one run's banks were fitted with, as far as energy is concerned — `DECISIONS.md` § D539. The
+ * shape {@link energyConventionDisclaimer} already takes, so a resolved building is one.
+ */
+type EnergyBasis = Parameters<typeof energyConventionDisclaimer>[0];
+
+/** Whether two runs may be paired, metric by metric. See {@link comparabilityBetween}. */
+export interface PairComparability {
+  /** Every landing runs the same passenger model in both runs. */
+  readonly sameLandingModels: boolean;
+  /**
+   * Every bank prices its moves under the same energy convention in both runs (§ D539). `true` when
+   * the caller passed no equipment, which is a caller holding the building fixed.
+   */
+  readonly sameEnergyConvention: boolean;
+  /** Metric ids that may be paired between these two runs. `ttdMeanS` is always among them. */
+  readonly comparableMetrics: readonly string[];
+  /**
+   * Metric ids that may not be. Empty exactly when both {@link sameLandingModels} and
+   * {@link sameEnergyConvention}.
+   */
+  readonly notComparableMetrics: readonly string[];
+}
+
+/**
+ * **The pairing rule, and the place it is enforced** — GitHub issue #437, `DECISIONS.md` § D553.
+ *
+ * Two runs may pair all twenty-three metrics only when every landing runs the same passenger model
+ * in both: the same model, and — for `hybrid` — the same set of assigning landings, compared as a
+ * set. Otherwise they pair the fourteen that keep their construct, `ttdMeanS` first, and the nine
+ * are refused.
+ *
+ * That refuses a hybrid against a conventional run and against a full destination-dispatch run,
+ * which a label comparison would also catch, and it refuses a hybrid against a hybrid with panels on
+ * other landings, which a label comparison would silently permit: both say `hybrid`, and their AWTs
+ * are different mixtures of two constructs. What it permits is a hybrid against a hybrid whose
+ * landings agree with it landing for landing — each passenger is then measured in the same
+ * construct in both runs, whatever dispatcher or call type got them there.
+ *
+ * The two uniform models pair exactly as they always have: each with itself on all twenty-three,
+ * and with each other on the fourteen.
+ *
+ * **The machine is a second axis, and the two compose rather than override** — § D539 meeting
+ * § D553. Given `equipment`, the two figures of {@link ENERGY_CONVENTION_SENSITIVE_METRICS} are also
+ * refused whenever any bank, matched by id, prices its moves under a different convention in the two
+ * runs; a bank one run has and the other lacks counts as the default, which can only make a pairing
+ * stricter. So a hybrid against a uniform run on differently fitted banks pairs the fourteen less
+ * the two energy figures, `ttdMeanS` still first, and refuses the nine and the two; a hybrid against
+ * a hybrid whose landings agree refuses only the two. Without `equipment` the rule is the landing
+ * rule alone, which is what both shipped callers need: `cli/commands/compare.ts#crossModelNotice`
+ * runs both arms on one building, and `Simulation`'s mid-run dispatcher switch changes no bank. The
+ * docstring is the record under § D405: the rule binds nothing outside this module.
+ */
+export function comparabilityBetween(
+  a: RunComparability,
+  b: RunComparability,
+  equipment?: { readonly a: EnergyBasis; readonly b: EnergyBasis } | undefined,
+): PairComparability {
+  const same =
+    a.passengerModel === b.passengerModel &&
+    sameLandingSet(a.assigningFloorIds, b.assigningFloorIds);
+  if (equipment === undefined || sameEnergyBasis(equipment.a, equipment.b)) {
+    return Object.freeze({
+      sameLandingModels: same,
+      sameEnergyConvention: true,
+      comparableMetrics: same
+        ? Object.freeze([...MODEL_SENSITIVE_METRIC_IDS, ...COMPARABLE_METRIC_IDS])
+        : COMPARABLE_METRIC_IDS,
+      notComparableMetrics: same ? Object.freeze([]) : MODEL_SENSITIVE_METRIC_IDS,
+    });
+  }
+  const energy = ENERGY_CONVENTION_SENSITIVE_METRICS.map((metric) => metric.id);
+  const landingComparable = same
+    ? [...MODEL_SENSITIVE_METRIC_IDS, ...COMPARABLE_METRIC_IDS]
+    : COMPARABLE_METRIC_IDS;
+  return Object.freeze({
+    sameLandingModels: same,
+    sameEnergyConvention: false,
+    comparableMetrics: Object.freeze(landingComparable.filter((id) => !energy.includes(id))),
+    notComparableMetrics: Object.freeze([...(same ? [] : MODEL_SENSITIVE_METRIC_IDS), ...energy]),
+  });
+}
+
+/** Whether every bank, matched by id, prices its moves the same way in both runs. */
+function sameEnergyBasis(a: EnergyBasis, b: EnergyBasis): boolean {
+  const byId = (basis: EnergyBasis): Map<string, EnergyConvention> =>
+    new Map(basis.banks.map((bank) => [bank.id, energyConventionOf(bank)]));
+  const inA = byId(a);
+  const inB = byId(b);
+  for (const id of new Set([...inA.keys(), ...inB.keys()])) {
+    const x = inA.get(id) ?? DEFAULT_ENERGY_CONVENTION;
+    const y = inB.get(id) ?? DEFAULT_ENERGY_CONVENTION;
+    if (
+      x.counterweightBalanceRatio !== y.counterweightBalanceRatio ||
+      x.regenerativeRecoveryFraction !== y.regenerativeRecoveryFraction
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function sameLandingSet(
+  a: readonly string[] | undefined,
+  b: readonly string[] | undefined,
+): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  if (a.length !== b.length) return false;
+  const inB = new Set(b);
+  return a.every((id) => inB.has(id));
+}
+
+/**
  * The disclaimer a destination-dispatch run carries in `result.warnings`, or `undefined`.
  *
  * Phrased as a *disclaimer* rather than an advisory, and ordered with the double-deck one, for
@@ -214,11 +437,27 @@ export function comparabilityOf(model: PassengerModel): RunComparability {
  * the model is not the configuration a reader will assume. A wait under a panel is not the wait
  * a reader of "AWT" assumes.
  */
-export function comparabilityDisclaimer(model: PassengerModel): string | undefined {
+export function comparabilityDisclaimer(
+  model: PassengerModel,
+  assigningFloorIds?: readonly string[] | undefined,
+): string | undefined {
   if (model === 'conventional') return undefined;
   const listed = MODEL_SENSITIVE_METRICS.map(
     (metric) => `${metric.id} (${metric.reason})`,
   ).join('; ');
+  if (model === 'hybrid') {
+    // GitHub issue #437, § D553. Named landing by landing, because the set is the pairing key.
+    const landings = (assigningFloorIds ?? []).map((id) => `"${id}"`).join(', ');
+    return (
+      `this run uses the hybrid passenger model (DECISIONS.md § D553): the landing panel named a car at ${landings}, ` +
+      `and every other landing kept its up/down button, so each passenger's wait was measured in whichever construct their own landing has. ` +
+      `${String(MODEL_SENSITIVE_METRICS.length)} of the recorded metrics change construct between those two kinds of landing and must not be ` +
+      `paired against a run whose landings assign differently — a conventional run, a full destination-dispatch run, or a hybrid with panels on other landings — ${listed}. ` +
+      `Time to destination (ttdMeanS, ttdP95S), ride time, load factor, unserved fraction and the ` +
+      `queue-growth slope keep their definitions and are the comparable set (DECISIONS.md § D27: ` +
+      `gate on TTD, and report AWT and WT95 with explicit verdicts rather than omitting them).`
+    );
+  }
   return (
     `this run uses the destination-dispatch passenger model (dispatch.passengerAssignment: "panel"): ` +
     `each passenger was told which car to walk to at the landing and boarded only that car. ` +
@@ -242,7 +481,9 @@ export function comparabilityDisclaimer(model: PassengerModel): string | undefin
  * list is about what a *passenger* is, and its partition with {@link COMPARABLE_METRIC_IDS} is exact;
  * both of these stay in the comparable half, because a landing panel does not change what a metre of
  * travel costs. What changes it is the machine, so the pairing this list guards is between two runs
- * whose banks are priced differently, whatever their passenger model.
+ * whose banks are priced differently, whatever their passenger model. {@link comparabilityBetween}
+ * refuses both when it is handed the two runs' equipment and a bank differs, on top of whatever the
+ * landings refuse.
  *
  * `carDistanceM` and `carStarts` are **not** here, and `energyConvention.test.ts` asserts the
  * absence: a convention is an energy-only machine choice by the owner's ruling, so the odometer and

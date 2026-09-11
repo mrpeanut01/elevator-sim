@@ -1185,6 +1185,8 @@ export const floorConfigSchema = z.strictObject({
   isEntrance: z.boolean().optional(),
   isTransferFloor: z.boolean().optional(),
   trafficProfile: identifier.optional(),
+  // GitHub issue #437, § D553: the landing's own call type; absent means the dispatcher's.
+  landingCallType: z.enum(CALL_TYPES).optional(),
   label: z.string().min(1).optional(),
 });
 
@@ -1201,6 +1203,7 @@ export const floorRangeSchema = z
     isEntrance: z.boolean().optional(),
     isTransferFloor: z.boolean().optional(),
     trafficProfile: identifier.optional(),
+    landingCallType: z.enum(CALL_TYPES).optional(),
   })
   .refine((range) => range.fromIndex <= range.toIndex, {
     message: 'expected fromIndex <= toIndex',

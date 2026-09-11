@@ -224,6 +224,19 @@ that changes no decision is the shape [`DECISIONS.md`](../../DECISIONS.md) found
 `data/dispatcher-profiles.json`, and `data/buildings/` is not exempt from it. If you add a mode, add
 its measured hop count beside it.
 
+
+## Landing call types
+
+| Field | On | Meaning |
+|---|---|---|
+| `landingCallType` | floor, range | What the hall fixture at that landing is — `up-down-buttons`, `destination-entry` or `mobile-credential`, the vocabulary of a dispatcher's `dispatch.callType`. Absent means the dispatcher's own call type, which is every floor of every shipped building. A range copies it to every floor it expands to. |
+
+A panel is none of the three zonings: it decides what a call registered at that landing discloses,
+and restricts no car and no rider. A dispatcher that names a car at the panel
+(`passengerAssignment: panel`) does so only at destination landings, so declaring buttons on some
+landings and not others makes a run **hybrid**, and its wait metrics pair only with a run whose
+panels are on the same landings — [`DECISIONS.md`](../../DECISIONS.md) § D553.
+
 ## Transfer floors and per-floor traffic
 
 | Field | On | Meaning |

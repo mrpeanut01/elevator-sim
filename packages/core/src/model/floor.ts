@@ -27,7 +27,7 @@
  */
 
 import type { SimTime } from '../kernel/index.js';
-import type { FloorConfig } from '../config/types.js';
+import type { CallType, FloorConfig } from '../config/types.js';
 
 import {
   DIRECTIONS,
@@ -64,6 +64,12 @@ export class Floor {
   readonly isTransferFloor: boolean;
   /** Per-floor traffic profile override, or `undefined` to use the building's. */
   readonly trafficProfile: string | undefined;
+  /**
+   * The hall fixture's call type at this landing, or `undefined` to use the dispatcher's
+   * `dispatch.callType` — GitHub issue #437, `DECISIONS.md` § D553. See
+   * {@link FloorConfig.landingCallType}; `Simulation` is the reader.
+   */
+  readonly landingCallType: CallType | undefined;
   /** Optional human name, e.g. `Lobby`. */
   readonly label: string | undefined;
 
@@ -80,6 +86,7 @@ export class Floor {
     this.isEntrance = config.isEntrance === true;
     this.isTransferFloor = config.isTransferFloor === true;
     this.trafficProfile = config.trafficProfile;
+    this.landingCallType = config.landingCallType;
     this.label = config.label;
   }
 

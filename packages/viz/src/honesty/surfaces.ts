@@ -1830,6 +1830,23 @@ const ACCESS: SurfaceAdapter = {
   },
 };
 
+/**
+ * The case’s building document with one landing call type declared — on its first floor, or its
+ * first floor range when it authors no floor — for the editor adapter's refusal seed below.
+ */
+function withOneLandingPanel(buildingDocument: unknown): object | undefined {
+  if (typeof buildingDocument !== 'object' || buildingDocument === null) return undefined;
+  const doc = buildingDocument as Record<string, unknown>;
+  for (const key of ['floors', 'floorRanges']) {
+    const list = doc[key];
+    if (!Array.isArray(list)) continue;
+    const first: unknown = list[0];
+    if (typeof first !== 'object' || first === null) continue;
+    return { ...doc, [key]: [{ ...first, landingCallType: 'destination-entry' }, ...list.slice(1)] };
+  }
+  return undefined;
+}
+
 const EDITOR: SurfaceAdapter = {
   id: 'editor/editorValidate.ts#summariseReport',
   covers: [
@@ -1849,6 +1866,19 @@ const EDITOR: SurfaceAdapter = {
     }
     for (const [index, warning] of report.warnings.entries()) {
       seeds.push({ field: `validateBuilding.warnings[${String(index)}]`, text: warning.message, role: 'reason' });
+    }
+    /*
+     * The landing call type refusal — GitHub issue #437, § D553 clause 9. No shipped building
+     * declares one, so the case's own document never draws it; it is seeded by validating that
+     * document with one declared, through the validator the editor and the library restore both
+     * call, rather than by quoting the sentence.
+     */
+    const panelled = withOneLandingPanel(context.buildingDocument);
+    if (panelled !== undefined) {
+      const refused = validateBuilding(panelled, context.elevatorSpecs, {});
+      for (const [index, issue] of refused.issues.entries()) {
+        seeds.push({ field: `validateBuilding.landingPanelRefusal[${String(index)}]`, text: issue.message, role: 'reason' });
+      }
     }
     seeds.push({ field: 'OPERATIONAL_ZONING_NOTE', text: OPERATIONAL_ZONING_NOTE, role: 'prose' });
 

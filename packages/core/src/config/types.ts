@@ -1289,6 +1289,26 @@ export interface FloorConfig extends Commented {
    * building-level profile.
    */
   readonly trafficProfile?: string | undefined;
+  /**
+   * **What the hall fixture at this landing is** — GitHub issue #437, `DECISIONS.md` § D553.
+   *
+   * One of {@link CALL_TYPES}, the vocabulary `dispatch.callType` already declares: an up/down
+   * button, a destination-entry panel, or a mobile-credential reader. Absent means *the dispatcher's
+   * own `dispatch.callType`*, which is every floor of every shipped building, so a building that
+   * declares nothing registers exactly the calls it did before the field existed.
+   *
+   * Building fabric, because a panel is installed on a landing and bought per landing (docs/38
+   * § 2.1 prices destination panels at the building tier). **It is none of the three zonings**:
+   * service zoning decides which cars stop here, access zoning which credentials may travel, and
+   * operational zoning which cars the dispatcher prefers. This decides what a call registered here
+   * *discloses* — lifecycle stage 1 — and restricts no car and no rider. Its one refusal is the bare
+   * kiosk's (§ T50-D1), asked at this landing rather than across the run.
+   *
+   * Whether the panel also *names a car* stays the dispatcher's `dispatch.passengerAssignment`: a
+   * `panel` dispatcher assigns at every destination landing and at no up/down one, which is what
+   * makes a run whose landings disagree the `hybrid` passenger model (`metrics/comparability.ts`).
+   */
+  readonly landingCallType?: CallType | undefined;
   /** Optional human name, e.g. `Lobby`. */
   readonly label?: string | undefined;
 }
@@ -1317,6 +1337,8 @@ export interface FloorRange extends Commented {
   readonly isTransferFloor?: boolean | undefined;
   /** Per-floor traffic profile override, applied to every floor in the range. */
   readonly trafficProfile?: string | undefined;
+  /** Landing call type, applied to every floor in the range. See {@link FloorConfig.landingCallType}. */
+  readonly landingCallType?: CallType | undefined;
 }
 
 /**

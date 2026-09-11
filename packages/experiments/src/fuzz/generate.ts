@@ -280,7 +280,7 @@ const CREDENTIALED_CALL_TYPE: CallType = 'mobile-credential';
  * So `destination-entry` beside `eta` is a call with a destination and no credential, and
  * `destination-entry` beside a panel profile is a call with both. **The middle rung is not one arm;
  * it is two, and which one it is depends on the profile.** Read off the **resolved** stage for the
- * reason `cli/commands/compare.ts` § `modelOfProfile` gives: `resolveDispatchConfig` is what applies
+ * reason `cli/commands/compare.ts` § `crossModelNotice` gives: `resolveDispatchConfig` is what applies
  * the defaults, and reading the authored `dispatch.passengerAssignment` would be a second opinion
  * about a question `core` has already answered.
  *
