@@ -1845,13 +1845,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'shift/legibility.ts#LEGIBILITY_SWEEP',
       ],
     },
-    {
-      reason:
-        'A template id, not prose — GitHub issue #220, § D515. `endless-rush` names the record in ' +
-        '`data/traffic-profiles.json` and `rushPatchOf` writes it into `ViewerState.freePlay`; what ' +
-        'a player reads of the rush is `EVERYDAY_RUSH`’s result and stage header, which it seeds.',
-      ids: ['everyday/rush.ts#RUSH_TEMPLATE_ID', 'everyday/rush.ts#rushPatchOf'],
-    },
+    /*
+     * An exclusion for `everyday/rush.ts#RUSH_TEMPLATE_ID` and `#rushPatchOf` stood here — the
+     * `endless-rush` template id, which reads as two hyphenated words. It is deleted rather than
+     * kept, on this list's own rule: since GitHub issue #372 the id is declared in
+     * `@elevator-sim/core`'s `sim/rush.ts` (the server replays a posted rush sitting and may not
+     * import this package), so no module under `viz/src` produces the literal and neither id is a
+     * producer the deriver can find.
+     */
     {
       reason:
         'A table keyed by building id and a kind vocabulary, not prose — GitHub issue #169 item 3, ' +

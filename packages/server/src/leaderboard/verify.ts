@@ -25,8 +25,11 @@
  */
 
 import {
+  RUSH_STREAM,
+  RUSH_TEMPLATE_ID,
   type RunInterventionConfig,
   runSimulation,
+  rushTopRatePctPop5min,
   type RuleRowConfig,
   type RunSummary,
   type SimulationConfig,
@@ -96,6 +99,60 @@ export function configFor(
   run: SubmittedRun,
   resources: VerificationResources,
 ): SimulationConfig | RejectionCode {
+  // A template that declares itself unselectable (`endless-rush`, GitHub issue #220) is one the
+  // board does not know: no shipped list offers it, so a submission naming it was built by hand,
+  // and a run under a stream that leaves every profile's declared band is not a run this board
+  // ranks. Refused on the same code, because to the board the two are the same fact.
+  return configOver(run, resources, (template) => template.selectable !== false);
+}
+
+/**
+ * The configuration of one round of a posted rush sitting — GitHub issue **#372**, and
+ * `rushSitting.ts`'s one way into the replay.
+ *
+ * **Nothing about the round's run is submitted except what a player chose.** The building id names
+ * the tower; the template, the seed, the ninety minutes, the window from the period's start and the
+ * rate that makes the stream the same number of people on every tower are all derived here, from
+ * `@elevator-sim/core`'s `sim/rush.ts`, which is the same derivation `packages/viz/src/everyday/rush.ts`
+ * writes into the viewer's patch. So a round cannot post a gentler stream, a kinder seed or a shorter
+ * climb: there is no field that could say one. The player's dispatcher, rules and intervention log
+ * go through {@link configOver} exactly as a single run's do.
+ *
+ * It admits **only** the rush template, which is the whole of the difference from {@link configFor}.
+ */
+export function rushRoundConfigFor(
+  buildingId: string,
+  round: Pick<SubmittedRun, 'dispatcherProfileId' | 'ruleRows' | 'interventions'>,
+  resources: VerificationResources,
+): SimulationConfig | RejectionCode {
+  const building = resources.buildingsById.get(buildingId);
+  if (building === undefined) return 'unknown-building';
+  const run: SubmittedRun = {
+    buildingId,
+    dispatcherProfileId: round.dispatcherProfileId,
+    demandTemplateId: RUSH_TEMPLATE_ID,
+    arrivalRatePctPop5min: rushTopRatePctPop5min(building.totalPopulation),
+    durationS: RUSH_STREAM.lengthS,
+    // From the period's own start rather than `null`, for `rush.ts#rushPatchOf`'s reason: an authored
+    // phase list refuses a `durationS` override (§ D275), and a window is what carries the length.
+    windowStartS: 0,
+    seed: String(RUSH_STREAM.seed),
+    ...(round.ruleRows === undefined ? {} : { ruleRows: round.ruleRows }),
+    ...(round.interventions === undefined ? {} : { interventions: round.interventions }),
+  };
+  return configOver(run, resources, (template) => template.id === RUSH_TEMPLATE_ID);
+}
+
+/**
+ * The shared half of {@link configFor} and {@link rushRoundConfigFor}: resolve every id against the
+ * server's own `data/`, in the order the refusals have always come in, with the one question that
+ * differs between them — *which templates this path admits* — asked by the caller.
+ */
+function configOver(
+  run: SubmittedRun,
+  resources: VerificationResources,
+  admits: (template: SimulationConfig['trafficProfiles']['demandTemplates'][number]) => boolean,
+): SimulationConfig | RejectionCode {
   const building = resources.buildingsById.get(run.buildingId);
   if (building === undefined) return 'unknown-building';
   const shipped = resources.dispatcherProfilesById.get(run.dispatcherProfileId);
@@ -103,11 +160,7 @@ export function configFor(
   const template = resources.trafficProfiles.demandTemplates.find(
     (entry) => entry.id === run.demandTemplateId,
   );
-  // A template that declares itself unselectable (`endless-rush`, GitHub issue #220) is one the
-  // board does not know: no shipped list offers it, so a submission naming it was built by hand,
-  // and a run under a stream that leaves every profile's declared band is not a run this board
-  // ranks. Refused on the same code, because to the board the two are the same fact.
-  if (template === undefined || template.selectable === false) return 'unknown-template';
+  if (template === undefined || !admits(template)) return 'unknown-template';
 
   // The player's rules over the **server's** profile. Never a profile the submission carried.
   const dispatcherProfile = profileWithRules(shipped, run.ruleRows ?? []);

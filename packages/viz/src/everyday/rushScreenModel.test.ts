@@ -388,11 +388,14 @@ describe('every rush constant names the module that draws it — § D227, GitHub
    * are exempt from the docstring case below, for the reason the suite docstring gives.
    */
   const DRAWN_BY: Readonly<Record<string, string | null>> = Object.freeze({
-    /* Read by the engine since GitHub issue #220 — `rush.ts` turns the stream into a run. */
-    RUSH_STREAM: 'rush.ts',
+    /*
+     * `RUSH_STREAM`, `RUSH_HOLD_LINE` and `LAST_GENERATED_WAVE` were rows here, read by `rush.ts`
+     * since GitHub issue #220. Since #372 they are declared in `@elevator-sim/core`'s `sim/rush.ts`,
+     * because the server replays a posted rush sitting and may not import this package, and this
+     * module only re-exports them. This case enumerates what this file *declares*, so it no longer
+     * owns them; core's docstrings name their readers, and the values are still pinned above.
+     */
     MORNING_RUSH_RATE: null,
-    RUSH_HOLD_LINE: 'rush.ts',
-    LAST_GENERATED_WAVE: 'rush.ts',
     /* `rushBandViews` shapes these into the screen's five rows; the raw table is never imported. */
     RUSH_BANDS: 'rushScreenModel.ts',
     RUSH_SCREEN_COPY: 'rushScreen.ts',

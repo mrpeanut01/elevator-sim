@@ -44,7 +44,13 @@
  * shipped for the fixit cases, drawn on the setup screen and on the result.
  */
 
-import type { ResolvedBuilding } from '@elevator-sim/core/browser';
+import {
+  RUSH_TEMPLATE_ID,
+  rushHoldAtLegs,
+  rushTopArrivalsPerMinute,
+  rushTopRatePctPop5min,
+  type ResolvedBuilding,
+} from '@elevator-sim/core/browser';
 
 import type { VizRecording, VizSaturation } from '../contract/types.js';
 import type { ViewerState } from '../dev/state.js';
@@ -66,25 +72,16 @@ import {
 /** The bar's refusal between the press and the landing — a run on a worker arrives as a notification. */
 export const RUSH_NOT_LANDED = 'the stream has not landed yet — the waves are being generated';
 
-/** The template `data/traffic-profiles.json` authors for the stream. */
-export const RUSH_TEMPLATE_ID = 'endless-rush';
+/*
+ * The template id, wave 30's rate and the rate converted to a building's own population are
+ * `@elevator-sim/core`'s now (`sim/rush.ts`, GitHub issue #372): the server rebuilds a posted round's
+ * run from a building id with the same three answers this module writes into the patch, and it may
+ * not import this package. Re-exported under the same names, so nothing that read them here moved.
+ */
+export { RUSH_TEMPLATE_ID, rushTopArrivalsPerMinute, rushTopRatePctPop5min };
 
 /** § 3.2's one seed, as the run carries it. */
 export const RUSH_SEED = BigInt(RUSH_STREAM.seed);
-
-/** Wave 30's arrivals a minute — the top of the ramp, and the template's intensity 1. */
-export function rushTopArrivalsPerMinute(): number {
-  return arrivalsPerMinute(LAST_GENERATED_WAVE - 1);
-}
-
-/**
- * Wave 30's rate as `arrivalRatePctPop5min` for a building of `population` — the override the run
- * carries, so the stream is the same number of **people** on every tower.
- */
-export function rushTopRatePctPop5min(population: number): number {
-  if (!(population > 0)) throw new Error('a rush needs a building with people in it');
-  return (rushTopArrivalsPerMinute() * 5 * 100) / population;
-}
 
 /** What the rush leaves behind to be put back — {@link rushPatchOf}'s inverse. */
 export interface RushBefore {
@@ -154,12 +151,14 @@ export function rushDisclosureOf(building: ResolvedBuilding, band: DemandBand | 
  * two-second buckets from the run's start.
  */
 export function rushHoldAt(recording: Pick<VizRecording, 'legs' | 'startedAt' | 'endedAt'>): number | undefined {
-  const bandIndex = 3;
-  for (let t = recording.startedAt; t <= recording.endedAt; t += RUSH_STREAM.bucketS) {
-    const count = waitBandsAt(recording as VizRecording, t).counts[bandIndex]?.count ?? 0;
-    if (count >= RUSH_HOLD_LINE.people) return t;
-  }
-  return undefined;
+  /*
+   * `core`'s reader over the recording's legs — GitHub issue #372. This was a loop over
+   * `live/bands.ts#waitBandsAt`'s fourth count, and it moved so the server's replay of a posted
+   * sitting reads the hold moment the stage stops on rather than a second reading of it.
+   * `rush.test.ts` still checks the answer against `waitBandsAt` at the bucket named and the one
+   * before, which is the agreement that makes the move safe.
+   */
+  return rushHoldAtLegs(recording.legs, recording.startedAt, recording.endedAt);
 }
 
 /** How many people are past the hold line's two minutes at `t`. */
