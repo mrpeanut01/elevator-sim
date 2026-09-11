@@ -1257,7 +1257,7 @@ violations as bugs, and reject changes that introduce them.
    elevator-specific knowledge: `tuning/search`'s random search, successive halving and sep-CMA-ES
    sample `DISPATCH_PARAMETERS` without one. **No generic optimizer beyond that is planned** —
    Phase 7's Bayesian optimization and OCBA were withdrawn by the project owner on 2026-09-10
-   (GitHub issue #416), and the declaration stands on its own.
+   (GitHub issue #416, [§ D538](DECISIONS.md)), and the declaration stands on its own.
 
 ## Statistical discipline
 
