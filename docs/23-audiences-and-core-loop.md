@@ -3,7 +3,8 @@
 **Status: M0 concept artefact. Written 2026-08-24 on the charter programme branch, against issues
 #188 (the two audiences) and #191 (the core loop statement), and answering the dependency #217
 names.** Documents and decisions only — nothing here changes a `.ts` file, a `data/*.json` file, or
-a shipped string.
+a shipped string. **§ 1.5 was added on 2026-09-11** for GitHub issue #379, on the product owner's
+ruling, and changes none of those either.
 
 **This is the sibling of [`docs/22-charter.md`](22-charter.md), and the charter delegates to it
 twice by name.** Charter § 3 carries a five-row summary of the two audiences and states that it *"is
@@ -182,6 +183,81 @@ The design handoff supplies the vocabulary this rule is executed with — *away 
 *AWT*; *the longest anybody stood*, not *WT95* — and states the same constraint in its own voice:
 Everyday Mode *"may change what it says and how it asks. It may never change what is true"*
 (`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md` § 1, lines 31-62).
+
+### 1.5 The playtest personas — who the agentic harness plays, and who they are
+
+**Added 2026-09-11 for GitHub issue #379, on the product owner's ruling of 2026-09-10.** The agentic
+playtest harness is `elevator-sim-test-harness`, a separate repository whose `claude -p` agents drive
+the live build, each reading a persona. When #379 was filed, from the harness's design brief of
+2026-09-06, it played five personas of its own — `curious-player`, `five-minutes-phone`,
+`systems-regular`, `leaderboard-chaser` and `number-averse` — and none of them played § 1.2. The
+ruling, verbatim:
+
+> **Personas for both documented audiences**, written in `docs/23`'s own words: the curious player
+> and the practising engineer. **Keep `five-minutes-phone` and `number-averse`**, and name who they
+> are in the docs. The harness change lands in `elevator-sim-test-harness`; the documentation half
+> lands here.
+
+This section is that documentation half. The harness's personas file is the other repository's to
+change, and nothing in this one can read it. **When this section was written, no file in this
+repository named any of those five ids**; they appear in #379 and in the harness.
+
+**Three things a persona is not**, stated before the table because each is a reading the table would
+otherwise invite:
+
+1. **Not an audience.** § 1 names two, and still names two after this section. The two personas the
+   owner kept are players the harness plays, not people the product is defined for, and their rows
+   say so in those words. Nor are the harness's five the five roles of
+   [`packages/viz/UX.md`](../packages/viz/UX.md) that § 2 reconciles.
+2. **Not a tester.** [`docs/30`](30-playtest-programme.md) § 3.2's cohort A and cohort B carry the
+   names of the first two personas below, and they are people, recruited and consented under that
+   document's rules. An agent reading a persona belongs to neither cohort.
+3. **Not gate evidence.** #379 says of itself that nothing in it counts against charter S1–S8, and
+   that its round is the [`docs/19`](19-everyday-playtest-audit.md) and
+   [`docs/20`](20-everyday-playtest-audit-2.md) class of observation: a walk by an agent, whose
+   findings are claims to verify.
+
+**The two documented audiences, as personas.** Each is its audience's *What they arrive with*
+paragraph, word for word, with nothing added. That is what *written in `docs/23`'s own words* means
+here, and `packages/experiments/src/validation/playtestPersonas.test.ts` holds it: an edit to § 1.1
+or § 1.2 that is not made here as well goes red on the commit that makes it.
+
+**The curious player** (§ 1.1):
+
+> No lift knowledge and no vocabulary for it. Roughly ten minutes of patience. They arrived from a
+> link, they did not come to learn anything, and they will leave the moment the screen asks them a
+> question they cannot parse.
+
+**The enthusiast or practising engineer** (§ 1.2):
+
+> Domain knowledge, and a working suspicion that the model is fake. They have seen tower sims before
+> and they expect the numbers to be decoration. They are not looking for a game; they are looking for
+> the place where the product overclaims, and they will find it in under ten minutes if it exists.
+
+**What the ruling does not say about these two, and this section does not supply.** Which id each
+plays under: #379 proposed that § 1.1's words replace the harness's description of `curious-player`,
+and no id played § 1.2 when the ruling was made, so both ids are the harness change's to write. And
+what the debrief asks: #379 proposed A1–A4 and B1–B4, and the ruling is silent on it.
+
+**The table, one row a persona.** *Standing* says whether § 1 defines the player; *premise* says
+whether anything has measured what the row assumes about them.
+
+| Persona | Standing | Who they are | Premise |
+|---|---|---|---|
+| The curious player | **Documented audience** — § 1.1 | The audience § 1.1 defines, played in § 1.1's words as quoted above | **Unmeasured.** *Roughly ten minutes of patience* is § 1.1's premise. Charter § 4's S3 cell, dated 2026-09-10, reads the median-first-session instrument as **unevaluated**, and on 2026-09-11 `docs/30` recorded no round run |
+| The practising engineer | **Documented audience** — § 1.2 | The audience § 1.2 defines, played in § 1.2's words as quoted above. No harness persona played it before the ruling | **Unmeasured.** *In under ten minutes* is § 1.2's premise. A cohort-B session is where it would be read (`docs/30` § 4.7), and on 2026-09-11 none had been run |
+| `five-minutes-phone` | **Kept by the owner** — not a documented audience | A player on a phone with about five minutes to spare, who closes the game if it has not grabbed them in a minute or two, in #379's wording of the harness's persona. Against § 1.1 it is a shorter budget, and its minute or two is about the window A1 gives a first load. It plays on a device [`docs/31`](31-support-matrix.md) § 2 splits in two: layout at 360 px and above, in a tier-1 browser, is in scope for launch and gated, and touch interaction is out of scope, so a phone is not a promised way to play. A finding from this persona is read against that split — a layout that fails at that width breaks a commitment, and a touch that fails breaks none | **Unmeasured.** *About five minutes* and *a minute or two* are the harness's premise, and charter § 4's S3 cell, dated 2026-09-10, reads the session-length instrument as **unevaluated** |
+| `number-averse` | **Kept by the owner** — not a documented audience | A player put off by statistics and charts, who plays games for the feel of them, in #379's wording of the harness's persona. Neither audience is defined that way: § 1.1's player lacks the vocabulary, and this one would rather not meet the figures at all. § 1.4 calls its rule *the clause most likely to be violated by somebody trying to be kind*, and this is the player that kindness would be for, so its sessions test that rule from the side it fails on: a figure may be reworded for this player, and may not be lost | **Unmeasured.** It is a disposition the harness gives an agent, not something observed in a player, and nothing in this repository has measured how many players share it |
+
+**Why the owner kept those two is not recorded, and this section does not supply a reason.** #379 put
+the question with the note that both produced the sharpest attention signals of its round. That is
+the harness's observation, unverified in this repository, and the ruling does not cite it.
+
+**The two personas the ruling does not name.** `systems-regular` and `leaderboard-chaser` were played
+in #379's round and appear nowhere in the ruling, so this section neither keeps nor drops them. If
+`leaderboard-chaser` lives anywhere, #379 places it on the board as a return mechanism, which is
+[§ D526](../DECISIONS.md)'s *a record to beat*. #379 cites § D498 for it, which is a draft number;
+[`docs/39`](39-decisions-in-force.md) § 4 records why the three rulings were renumbered.
 
 ---
 
@@ -549,6 +625,9 @@ they may be denied.**
   offered for ranking may carry no state outside `between-games`*. Recorded rather than resolved:
   renaming a set is an M0-A and human decision, and the conditions above are numbered **A1–A4** and
   **B1–B4** so that this document adds no third claimant to the letter.
+- **Which personas the harness plays beyond § 1.5's four, which id each plays under, and what the
+  debrief asks.** § 1.5 records the owner's ruling on #379 and names what it left open. The personas
+  file is `elevator-sim-test-harness`'s, and nothing in this repository can read it.
 
 ---
 
@@ -581,3 +660,8 @@ they may be denied.**
 - [`CLAUDE.md`](../CLAUDE.md) — the eight invariants, the statistical discipline, and the standing
   rule that a published number and a stated refusal go stale the same way.
 - [`CHARTER_PROGRAMME.md`](../CHARTER_PROGRAMME.md) § M2 — the gate that measures A2 and A4.
+- Issue **#379** and the product owner's ruling on it of 2026-09-10 — § 1.5's personas, and #379's
+  wording of the two the owner kept.
+- [`docs/30-playtest-programme.md`](30-playtest-programme.md) § 3.2 and
+  [`docs/31-support-matrix.md`](31-support-matrix.md) § 2 — the two cohorts § 1.5's personas are
+  not, and the split between the layout a phone is promised and the touch it is not.
