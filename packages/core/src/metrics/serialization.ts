@@ -148,7 +148,9 @@ export const carTimingsSchema = z.strictObject({
  * measurement convention; recomputing on read would silently restate an old dataset's energy under
  * a new convention and make two runs of the same building incomparable across a version boundary.
  * The four inputs travel with it, so a reader that disagrees with the convention can redo the sum
- * and see that it did.
+ * and see that it did — and since `DECISIONS.md` § D539 made the convention per-bank, so does the
+ * convention itself whenever it is not the default. Both fields are absent on a default move, which is
+ * every move a shipped building makes, so no record written before § D539 reads differently after it.
  */
 export const travelSampleSchema = z.strictObject({
   at: simTime,
@@ -157,6 +159,8 @@ export const travelSampleSchema = z.strictObject({
   direction: z.enum(DIRECTIONS),
   loadKg: z.number().min(0),
   ratedLoadKg: z.number().gt(0),
+  counterweightBalanceRatio: z.number().gt(0).lt(1).optional(),
+  regenerativeRecoveryFraction: z.number().gt(0).lt(1).optional(),
   workJ: z.number().min(0),
 });
 

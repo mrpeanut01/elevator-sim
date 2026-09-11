@@ -560,11 +560,31 @@ export function resolveBuilding(
       }
     }
 
+    /*
+     * **The bank's energy convention** — `DECISIONS.md` § D539, GitHub issue #431. Resolved here, where
+     * the specs are in view, so `Simulation` reads one number off the bank rather than re-deriving a
+     * drive's recovery from a data directory it may not have. Both keys are spread only when present,
+     * so a bank that declares neither — every shipped bank — resolves to the object it always did.
+     */
+    const recoveryFraction =
+      bank.regenerativeDrive === true ? specs.regenerativeDrive?.recoveryFraction : undefined;
+    if (bank.regenerativeDrive === true && recoveryFraction === undefined) {
+      addWarning(
+        `${at}.regenerativeDrive`,
+        `bank "${bank.id}" fits a regenerative drive, but this data directory's elevator-specs.json declares no regenerativeDrive block, so there is no recovery fraction to price it with. The bank's moves are priced as non-regenerative: the drive is fitted and buys nothing here.`,
+        WARNING_CODES.regenerativeDriveBuysNothing,
+      );
+    }
+
     banks.push({
       id: bank.id,
       ...(bank.name === undefined ? {} : { name: bank.name }),
       servesFloors: bank.servesFloors,
       ...(bank.servesFloorPairs === undefined ? {} : { servesFloorPairs: bank.servesFloorPairs }),
+      ...(bank.counterweightBalanceRatio === undefined
+        ? {}
+        : { counterweightBalanceRatio: bank.counterweightBalanceRatio }),
+      ...(recoveryFraction === undefined ? {} : { regenerativeRecoveryFraction: recoveryFraction }),
       cars,
     });
   });

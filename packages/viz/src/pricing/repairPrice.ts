@@ -74,6 +74,14 @@ export function pathsIn(patch: RepairPatchShape): readonly string[] {
       if ('ratedSpeedDeltaMps' in set) out.push('building.cars[].set.ratedSpeedDeltaMps');
       if ('cabinPressurised' in set) out.push('building.cars[].set.cabinPressurised');
     }
+    // GitHub issue #431: the counterweight and the drive, each its own equipment row.
+    for (const entry of arrayOf(building['bankEquipment']) ?? []) {
+      const set = objectOf(objectOf(entry)?.['set']) ?? {};
+      if ('counterweightBalanceRatio' in set) {
+        out.push('building.bankEquipment[].set.counterweightBalanceRatio');
+      }
+      if ('regenerativeDrive' in set) out.push('building.bankEquipment[].set.regenerativeDrive');
+    }
   }
   for (const [group, fields] of Object.entries(objectOf(patch.dispatcher) ?? {})) {
     for (const field of Object.keys(objectOf(fields) ?? {})) out.push(`dispatcher.${group}.${field}`);
