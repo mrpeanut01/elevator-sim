@@ -29,8 +29,10 @@ is the point.**
 > declared before the first fan-out. It should also require the **expected** figure to be
 > reproducible from the template, because the ceiling was right and the expectation was not. That
 > requirement now applies to Phase B. As built (§ 3.1), the one expected figure Phase B publishes is
-> the planned replication-runs, derived from the plan — cells × replications — by the same code that
-> refuses the ceiling. No expected wall-clock or money figure is published, because none is derived.
+> the planned replication-runs, cells × replications, read from the plan: `ShardedExperiment.of`
+> refuses the ceiling against it, and `compare`'s hint for a missing `--ceiling` reads the same plan
+> rather than assuming two arms. No expected wall-clock or money figure is published, because none is
+> derived.
 >
 > **Nothing here rules out self-hosted CI later.** It rules out *this* design, whose billing model
 > was fixed capacity wearing the language of per-job ephemerality. Per-job billing needs scale-from-
@@ -147,8 +149,9 @@ of arms.
 ### 3.1 What is built — 2026-09-10, GitHub issue #413
 
 **One consumer, measured on one machine.** `packages/experiments/src/runner/shard.ts` implements the
-contract above, and `elevator-sim compare` is its non-test caller: `compare --shard k/n --ceiling
-<runs> --out <file>` runs replication block `k` of `n` for both arms and writes it, and
+contract above, and `elevator-sim compare` is its non-test caller: `compare --shard k/n --seed <n>
+--ceiling <runs> --out <file>` runs replication block `k` of `n` for both arms and writes it — with
+the same `--seed` on every block, which the command requires — and
 `compare --merge <file...>` merges the blocks into the verdict the unsharded command prints
 ([§ D532](../DECISIONS.md)).
 

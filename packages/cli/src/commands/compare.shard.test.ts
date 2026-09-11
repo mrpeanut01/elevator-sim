@@ -337,6 +337,12 @@ describe('elevator-sim compare --shard / --merge (docs/15 Phase B)', () => {
     expect(text).not.toContain('replications\n  … ');
     expect(text).not.toMatch(/… \d+\/\d+ replications/u);
     expect(existsSync(file)).toBe(false);
+
+    // The hint for a missing --ceiling names the figure the refusal above was checked against.
+    const hint = await cli(['compare', ...CONTRAST, '--reps', '6', '--shard', '1/2', '--out', file]);
+    expect(hint.code).toBe(EXIT_USAGE);
+    expect(hint.text).toContain('12 replication-runs: 2 cells × 6 replications');
+    expect(existsSync(file)).toBe(false);
   });
 
   it('criterion 7: reports spend after the verdict, per block and in total, and on no verdict line', async () => {
@@ -416,6 +422,8 @@ describe('elevator-sim compare --shard / --merge (docs/15 Phase B)', () => {
     const { files } = await shardFiles('flags', [...CONTRAST, '--reps', '4'], 1, 8);
     const file = files[0] ?? '';
     const out = join(dir, 'flags-never-written.json');
+    const unseeded = CONTRAST.filter((flag, index) => flag !== '--seed' && CONTRAST[index - 1] !== '--seed');
+    const noDirectory = join(dir, 'no-such-directory');
     const cases: readonly { readonly argv: readonly string[]; readonly says: string }[] = [
       { argv: ['compare', '--merge', file, '--seed', '3'], says: '--seed' },
       { argv: ['compare', '--merge', file, '--building', 'garden-apartments'], says: '--building' },
@@ -428,6 +436,13 @@ describe('elevator-sim compare --shard / --merge (docs/15 Phase B)', () => {
       { argv: ['compare', ...CONTRAST, '--reps', '4', '--shard', '1/5', '--ceiling', '8', '--out', out], says: '5' },
       { argv: ['compare', ...CONTRAST, '--reps', '4', '--ceiling', '8'], says: '--ceiling' },
       { argv: ['compare', ...CONTRAST, '--reps', '4', '--out', out], says: '--out' },
+      // Without --seed every block draws its own, so no two could merge.
+      { argv: ['compare', ...unseeded, '--reps', '4', '--shard', '1/2', '--ceiling', '8', '--out', out], says: '--seed' },
+      // An --out that cannot be written is refused before the block runs, not after.
+      {
+        argv: ['compare', ...CONTRAST, '--reps', '4', '--shard', '1/2', '--ceiling', '8', '--out', join(noDirectory, 'block.json')],
+        says: 'was not run',
+      },
     ];
     for (const entry of cases) {
       const { code, text } = await cli(entry.argv);
@@ -436,6 +451,7 @@ describe('elevator-sim compare --shard / --merge (docs/15 Phase B)', () => {
       expect(text).not.toMatch(/… \d+\/\d+ replications/u);
     }
     expect(existsSync(out)).toBe(false);
+    expect(existsSync(noDirectory)).toBe(false);
   });
 
   it('names the new flags in its help, and how the two halves fit together', async () => {

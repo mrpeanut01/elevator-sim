@@ -41,16 +41,21 @@
  * code it ran before either existed, and `compare.shard.test.ts` holds its output to skeletons
  * captured before the first sharding commit.
  *
- * - `--shard k/n --ceiling <runs> --out <file>` plans the same experiment the unsharded command
- *   plans, cuts it with `ShardedExperiment.of` — which refuses a ceiling below 2 × `--reps`
- *   replication-runs before anything runs — runs replication block `k` of `n` for **both** arms with
- *   `runShard`, and writes it with `serializeShard`. A block prints no verdict. It prints its own
+ * - `--shard k/n --seed <n> --ceiling <runs> --out <file>` plans the same experiment the unsharded
+ *   command plans, cuts it with `ShardedExperiment.of` — which refuses a ceiling below the plan's
+ *   cells × replications before anything runs — runs replication block `k` of `n` for **both** arms
+ *   with `runShard`, and writes it with `serializeShard`. `--seed` is required, because without it
+ *   every block draws its own and no two blocks could merge; and an `--out` that cannot be written is
+ *   refused before the block runs rather than after. A block prints no verdict. It prints its own
  *   resolution limit, labelled as its own, so that a merge's figure can be told apart from it.
  * - `--merge <file...>` reads the blocks, requires every file to record the same comparison, rebuilds
  *   the plan from those flags and this machine's `data/`, and hands the blocks to `mergeShards`,
  *   which refuses a block of another plan, a missing or repeated block, and a block missing an arm.
  *   The verdict is rendered by the same code as the unsharded one, over the merged cells, with every
- *   paired interval taken on the differences each block computed. The resolution limit is recomputed
+ *   paired interval read from the differences each block stored. `mergeShards` has already required
+ *   those to equal, value for value, the differences each block's own records give, so reading them
+ *   rather than re-pairing the pooled records moves no number — and so no test can tell the two
+ *   readings apart: which array is read is stated here, not pinned. The resolution limit is recomputed
  *   from the merged differences at the merged `n`, and the spend is printed after the verdict, never
  *   on a line of it.
  *
@@ -59,7 +64,8 @@
  * same plan digest from their data, and whether they do is unchecked.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { accessSync, constants as fsConstants, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, resolve as resolvePath } from 'node:path';
 
 import type { ReplicationMetric } from '@elevator-sim/experiments';
 import {
@@ -211,14 +217,14 @@ export const COMPARE_FLAGS: readonly FlagSpec[] = [
     name: 'shard',
     kind: 'string',
     placeholder: '<k/n>',
-    summary: 'run replication block k of n, both arms, and write it to --out; merge the blocks with --merge',
+    summary: 'run replication block k of n, both arms, and write it to --out; needs the same --seed on every block; merge the blocks with --merge',
   },
   { name: 'out', kind: 'string', placeholder: '<file>', summary: 'where --shard writes its block' },
   {
     name: 'ceiling',
     kind: 'integer',
     placeholder: '<runs>',
-    summary: 'most replication-runs (2 × --reps) the whole fan-out may spend; required with --shard, checked before it runs',
+    summary: 'most replication-runs (every planned cell × --reps) the whole fan-out may spend; required with --shard, checked before it runs',
     min: 1,
   },
   {
@@ -245,7 +251,7 @@ export const COMPARE_HELP: CommandHelp = {
     'If every paired difference is exactly zero the answer is IDENTICAL instead: the two arms ' +
       'produced bit-identical runs, which is no effect rather than a small one, and no --reps ' +
       'resolves it.',
-    'A large budget can be split into replication blocks, each run in its own process: --shard k/n ' +
+    'A large budget can be split into replication blocks, each run in its own process: --shard k/n --seed <n> ' +
       'runs block k of n for both arms, so no arm is ever separated from its pair, and writes it to ' +
       '--out. --ceiling declares the most replication-runs the whole fan-out may spend and is checked ' +
       'before a block runs. compare --merge <file...> refuses blocks of different comparisons, a ' +
@@ -305,6 +311,12 @@ export async function runCompare(
       );
     }
     return await runSingle(out, config, invocationOf(parsed));
+  }
+  if (numberFlag(parsed, 'seed') === undefined) {
+    throw new UsageError(
+      `${context}: --shard needs --seed <n>. Without it every block draws its own seed, so no two blocks run the same comparison and --merge would refuse them all, after every block had run.`,
+      ['pass the same --seed to every block of one fan-out'],
+    );
   }
   return await runBlock(out, config, invocationOf(parsed), { shard, outFile, ceiling }, context);
 }
@@ -880,6 +892,24 @@ function invocationFromContext(context: ShardContext, file: string, command: str
   };
 }
 
+/**
+ * An `--out` that cannot be written is refused before the block runs. The file is written only after
+ * every replication of the block has run, so finding the path unwritable then would spend the block.
+ */
+function refuseUnwritable(outFile: string, context: string): void {
+  const target = resolvePath(outFile);
+  try {
+    accessSync(dirname(target), fsConstants.W_OK);
+  } catch (error) {
+    throw new UsageError(`${context}: cannot write the block to ${outFile}, so the block was not run.`, [
+      error instanceof Error ? error.message : String(error),
+    ]);
+  }
+  if (existsSync(target) && statSync(target).isDirectory()) {
+    throw new UsageError(`${context}: --out ${outFile} is a directory, so the block was not run.`);
+  }
+}
+
 /** A refusal from the fan-out is the user's to fix, so it leaves as a usage error. */
 function refusedAsUsage<T>(context: string, action: () => T): T {
   try {
@@ -899,12 +929,6 @@ async function runBlock(
   context: string,
 ): Promise<number> {
   const { bold, dim, cyan } = out.palette;
-  if (flags.ceiling === undefined) {
-    throw new UsageError(`${context}: --shard needs --ceiling <runs>, declared before any block runs.`, [
-      `this comparison's whole fan-out spends ${count(2 * invocation.reps)} replication-runs: 2 arms × --reps ${invocation.reps}`,
-      'docs/15-compute-offload-contract.md § 4 criterion 7: the ceiling is declared before the first fan-out',
-    ]);
-  }
   if (flags.outFile === undefined) {
     throw new UsageError(`${context}: --shard needs --out <file> to write its block to.`);
   }
@@ -922,16 +946,26 @@ async function runBlock(
       [`use at most ${invocation.reps} blocks, or raise --reps`],
     );
   }
-  const ceiling = flags.ceiling;
   const outFile = flags.outFile;
 
   const prepared = prepareComparison(config, invocation);
   const plan = planExperiment(prepared.spec, prepared.resources, { keepRecords: false });
+  if (flags.ceiling === undefined) {
+    // Read from the plan rather than assumed from two arms: cells × replications is the figure
+    // `ShardedExperiment.of` checks a ceiling against, and `compare.shard.test.ts` holds the two equal.
+    const replications = plan.policy.maxReplications;
+    throw new UsageError(`${context}: --shard needs --ceiling <runs>, declared before any block runs.`, [
+      `this comparison's whole fan-out spends ${count(plan.cells.length * replications)} replication-runs: ${plan.cells.length} cells × ${replications} replications, read from its plan`,
+      'docs/15-compute-offload-contract.md § 4 criterion 7: the ceiling is declared before the first fan-out',
+    ]);
+  }
+  const ceiling = flags.ceiling;
   const sharded = refusedAsUsage(context, () =>
     ShardedExperiment.of(plan, { shards: n, ceiling: { replicationRuns: ceiling } }),
   );
   const block = sharded.blocks[k - 1];
   if (block === undefined) throw new Error(`compare: no block ${k} of ${n}.`);
+  refuseUnwritable(outFile, context);
 
   heading(out, `Replication block ${k} of ${n}`);
   field(out, 'building', `${prepared.base.name}  ${dim(`(${invocation.building})`)}`);
