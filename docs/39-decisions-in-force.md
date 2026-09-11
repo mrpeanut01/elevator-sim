@@ -54,7 +54,7 @@ The standing decisions those three rest on, unchanged and cited rather than rest
 | [§ D503](../DECISIONS.md), [§ D516](../DECISIONS.md) | Every report lever opens the surface that changes it; a screen inside a mode offers only what the mode permits |
 | [§ D506](../DECISIONS.md), [§ D509](../DECISIONS.md), [§ D521](../DECISIONS.md), [§ D522](../DECISIONS.md) | Boards publish a quantile ladder withheld below twenty players; ratings never reset and boards reset by construction; the house seeds a daily board on a schedule |
 | [§ D520](../DECISIONS.md) | The dropdown sweep is built and tiered, and names the stages that still clear from the dropdown |
-| [§ D537](../DECISIONS.md) | The survivor band **narrows by ladder position**, authored in `data/scenario-survivor-bands.json` as shares of the configurations judged at a scenario's base rung. The owner ruled the shape on 2026-09-10; **every figure is a draft awaiting approval**, and the band's only reader is an acceptance check |
+| [§ D537](../DECISIONS.md) | The survivor band **narrows by ladder position**, authored in `data/scenario-survivor-bands.json` as shares of the configurations judged at a scenario's base rung. The owner ruled the shape on 2026-09-10; **the owner approved every figure as drafted the same day**, and the band's only reader is an acceptance check |
 
 ## 2. Superseded or amended
 

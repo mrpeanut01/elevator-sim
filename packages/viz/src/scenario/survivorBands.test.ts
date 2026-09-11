@@ -46,6 +46,7 @@ import {
   decodeSurvivorBands,
   isOutside,
   registerDisagreements,
+  sampleSizeIssue,
   survivorBandIssues,
   type OutsideVerdict,
   type SurvivorBand,
@@ -65,9 +66,9 @@ import type { PublishedSurvivorScenario, PublishedSurvivors } from './survivors.
  * § D528 clause 2 forbids from position three and `campaign/difficultyCurve.test.ts#DROPDOWN_CLEARS`
  * holds.
  *
- * The band is a draft, so every entry is a scenario outside a band the owner has not approved. If the
- * band moves on approval, this register moves with it on the same commit, and that is the band moving
- * rather than a scenario.
+ * The owner approved the band as drafted on 2026-09-10, so every entry is a scenario outside an
+ * approved band. If the band moves, this register moves with it on the same commit, and that is the
+ * band moving rather than a scenario.
  */
 const OUTSIDE_THEIR_BAND: Readonly<Record<string, OutsideVerdict>> = Object.freeze({
   'stage-1-first-call': 'below',
@@ -163,6 +164,7 @@ function controlBands(approval: 'draft' | 'approved' = 'draft'): SurvivorBands {
       ruling: 'a control, owned by survivorBands.test.ts',
       draftedOn: '2026-09-10',
       approvedOn: approval === 'approved' ? '2026-09-10' : null,
+      approvedAtSampleSize: approval === 'approved' ? 12 : null,
     },
     bands: [bandOf(1, 2, 0.25, 0.5), bandOf(3, null, 0, 0.2)],
   };
@@ -194,6 +196,16 @@ function edgesOf(scenario: PublishedSurvivorScenario) {
 describe('the survivor band is authored in data, chosen, and covers every position', () => {
   it('passes its own schema', () => {
     expect(survivorBandIssues(rawBands)).toEqual([]);
+  });
+
+  it('holds the survivor table to the sample size the band was approved at', () => {
+    // A share is survivors over the affordable census plus `sampleSize` dial draws, so a table
+    // regenerated at another sample size moves every share without any scenario moving.
+    expect(bands.provenance.approval).toBe('approved');
+    expect(sampleSizeIssue(bands, table)).toBeUndefined();
+    const resampled = { ...table, provenance: { ...table.provenance, sampleSize: table.provenance.sampleSize * 2 } };
+    expect(sampleSizeIssue(bands, resampled)).toMatch(/approved against 12/u);
+    expect(sampleSizeIssue(controlBands('draft'), resampled)).toBeUndefined();
   });
 
   it('declares itself chosen, and says whether the owner has approved it', () => {
@@ -431,7 +443,7 @@ interface LooseBand {
 }
 
 interface LooseDocument {
-  provenance: { kind: string; approval: string; approvedOn: string | null };
+  provenance: { kind: string; approval: string; approvedOn: string | null; approvedAtSampleSize?: number | null };
   bands: LooseBand[];
   [key: string]: unknown;
 }
@@ -477,8 +489,24 @@ describe('the band’s schema refuses what the ruling forbids', () => {
     ).toBe(true);
     expect(
       issuesAfter((document) => {
+        document.provenance.approval = 'draft';
         document.provenance.approvedOn = '2026-09-10';
       }).some((line) => line.includes('a draft that carries an approval date')),
+    ).toBe(true);
+  });
+
+  it('refuses an approval that names no sample size, and a draft that names one', () => {
+    // An approval is of shares at one survivor-table sample size, so it has to say which.
+    expect(
+      issuesAfter((document) => {
+        document.provenance.approvedAtSampleSize = null;
+      }).some((line) => line.includes('does not record approvedAtSampleSize')),
+    ).toBe(true);
+    expect(
+      issuesAfter((document) => {
+        document.provenance.approval = 'draft';
+        document.provenance.approvedOn = null;
+      }).some((line) => line.includes('a draft that records approvedAtSampleSize')),
     ).toBe(true);
   });
 
