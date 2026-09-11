@@ -35046,3 +35046,50 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 **What this does not claim.** That an allocator could not help at larger budgets: #416's own record is that OCBA's value grows with the replication budget. This entry records that none is planned, not that none could matter.
 
 ---
+
+## D542 — A rush round is a sitting, posted whole: the server replays every round, derives every purse, and the refusal of `endless-rush` is lifted after its replay cost was measured
+
+**Date: 2026-09-11 · Owner: product owner (the ruling, 2026-09-10); the lane that built GitHub issue #372 (the readings under it) · Rules on: [§ D515](#d515), [§ D525](#d525) clause 6, [§ D526](#d526) clauses 2 and 3, [§ D486](#d486), `packages/server/src/leaderboard/verify.ts`, `data/rush-purse.json`, [`docs/38`](docs/38-what-the-game-is.md) § 2.3, GitHub issue #372.**
+
+**Why an entry.** The ruling binds code no one module owns: the rush's arithmetic moved into `core`, a new file in `data/`, the server's verifier, its store and two routes. It also lifts a refusal already recorded — `verify.ts` refused `endless-rush` since GitHub issue #220 — and the ruling asked for the argument to be written down with the change.
+
+**The ruling, verbatim, given by the product owner on 2026-09-10 on #372:** *"A round is a sitting, posted whole — reading (b) above. A sitting is consecutive runs from an as-shipped start. The posted result carries every round's intervention log, and the server replays the chain and derives each round's purse from the previous round's hold moment. The replay cost per round is measured before `leaderboard/verify.ts`'s refusal of `endless-rush` is lifted, and the argument for lifting it is written down with the change."*
+
+**What had to be read into it, and how it was read.**
+
+1. **A sitting on the wire is a building id, the rounds in order, and the modifiers bought.** A round carries its shipped dispatcher id, its rule rows, its intervention log on `submission.ts`'s allow-list, and the held time the player saw. **Nothing else, refused by name**: the seed, the template, the length, the window and the rate are derived from the building by `verify.ts#rushRoundConfigFor`, and a purse, a paid figure, a wave count or a budget named by a client is refused before a simulation starts (`leaderboard/rushSitting.ts#rushSittingIssues`). A purse smuggled past the gate reaches no figure, because the replay reads no field that could carry one. Both are asserted, with positive controls, in `rushSitting.test.ts`.
+2. **The hold moment is read by one reader on both ends.** The stream's constants, the run's identity and the hold line moved from `packages/viz/src/everyday/` into `core`'s `sim/rush.ts`; the viewer re-exports them and `rush.ts#rushHoldAt` delegates to `rushHoldAtLegs`. `packages/viz/src/everyday/rush.test.ts` still checks the answer against `live/bands.ts#waitBandsAt` on a real run.
+3. **A round's purse is paid on the waves it outlasted, read at its hold moment, and on nothing else** — `core`'s `rushWavesOutlasted` and `config/rushPurse.ts`. A replay has no hand stop, so a round whose replay never crosses the line outlasted every generated wave, and a crossing during the drain is not a thirty-first wave.
+4. **A purse is a balance within the sitting.** It opens at what a listed top-up sink bought (nothing on the standard board), each round pays into it, and the next round opens with the whole of it. The ruling does not say whether unspent units are kept; this reading is the one under which *a player who lasts longer has more to rebuild with* holds across rounds. **It is a proposal for the owner**, and changing it is one function.
+5. **What posts is the last round's held time.** A last round with no breaking point posts nothing (`no-breaking-point`), which is § D515's rule for a hand stop arriving from the replay's side. Vertical City and the Burj-class reference never break under the stream, so neither can post.
+
+**The per-wave figure is an agent's proposal, drafted for the owner.** `data/rush-purse.json` authors **2 units a wave outlasted** with a schema of 1–20 (invariant 8); its note gives the reasoning and the measured waves each shipped tower outlasts, as context rather than derivation.
+
+**The replay cost, measured before the lift** (the commit before it, `rushSitting.cost.test.ts`, gated on `RUSH_SITTING_COST_OUT`): **one simulation a round**, **326–1 541 ms a round** across the nine shipped buildings, and **linear in the chain** — 348, 333 and 327 ms a round at one, two and four rounds on Garden Apartments. Dated 2026-09-11 on an Apple M1 Max under a load average of 5.47. The table and its command are in `rushSitting.ts`'s docstring. So the cooldown is charged per round, and a sitting carries at most twelve.
+
+**The lift.** `verify.ts#configFor` still refuses a single run under `endless-rush` before anything simulates — both halves of #220's reason are still true of the path that ranks a quotable mean — but on a true code, `rush-posts-as-a-sitting`, naming `POST /api/rush-sittings`. The argument for lifting the refusal of the rush as a thing a server can verify and rank is written where the refusal lived, in five parts: the rush ranks what it produces (held time, since its mean is unquotable by design); what posts is a sitting whole; every round is verified from causes with every effect derived (§ D486's shape); a board is one crowd ([§ D543](#d543)); and the cost was measured first.
+
+**What stays refused, each on its own ground.** A bought change mid-run (`core/src/sim/interventionWire.ts`: no submission carries the entitlement), an incident answer (§ D486, permanent), and a pre-fitted start: `rush-prefit`'s fitted building is derived in the viewer (`campaign/fitOut.ts` over `commissioning/`), which the server may not import, so a sitting claiming it is refused rather than put on a board labelled *pre-fitted* for runs of the building as shipped.
+
+**What is not built.**
+
+- **No between-round rebuild travels, so nothing spends a purse.** `docs/38` § 2.3 rebuilds the building from the price schedule with the fit-out kit, and no module the server can read applies a priced change to a building. The purse is derived, stored on the sitting and returned to the poster, and it moves no run: that is the issue's second criterion, open.
+- **The viewer does not post a sitting.** The rush host keeps no round list and draws no posted state, so no player-facing string moved and the honesty corpus is untouched.
+
+---
+
+## D543 — A rush board is keyed by building × date × modifier set
+
+**Date: 2026-09-11 · Owner: the lane that built GitHub issue #372 · Rules on: `ENGINE_CONTRACT.md` § 12.1 (`docs/design/design_handoff_casual_mode/`), `packages/server/src/leaderboard/boardKey.ts#BOARD_KEYS`, [§ D506](#d506), [§ D509](#d509), [§ D526](#d526) clause 3.**
+
+**Why an entry.** It amends the contract's board-key table the way [§ D526](#d526) clause 3 amended its first row, and it admits the one player-chosen axis any key carries.
+
+1. **The key is `rush:<building>:<date>`, with `/<set>` on a modifier set's board** (`boardKey.ts#rushPlacementOf`), and `BOARD_KEYS` carries it as a fourth row with its route. The dispatcher, the rules and the log are what a player brings, as on the daily board, and are in no key.
+2. **The building is in it because § 12.1 requires it.** *Rows within a board must have met the identical crowd* — and the rush is the same number of people on every tower, arriving at a different tower's floors, so a sort across towers ranks buildings. § 12.1's other rule, *no player-settable parameter in a key*, is kept in the sense `boardKey.ts` already reads it for the modifier set: the space is the shipped buildings, enumerable and small, not a combinatorial product that mints a board per selection.
+3. **The date resets it by construction** (§ D509), and the set separates bought starts (§ D526 clause 3). The server's clock decides the day.
+4. **A board ranks a player's best sitting, longest held first**, with a held-seconds ladder on § D506's rules — the same five rungs, a real sitting at the lower median, withheld below twenty players with the count still published (`distribution.ts#heldLadderOf`).
+5. **A row shows how long it held, the wave, how many rounds and the modifiers with their names — and never a price, a chime or a purse.** The purse is on the poster's own answer only; a board row is a comparison between players.
+
+**Bookkeeping.** This lane was reserved D542–D544 and spent D542 and D543. D544 is returned unspent.
+
+---
