@@ -1699,7 +1699,17 @@ type DecisionReservation = {
  * than holes, because only a number written below the highest is a hole. The charter row
  * reconciles to D507 on this same commit.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/**
+ * **A block is open, D533 to D538, and it was opened on GitHub issue #234's lane branch rather than
+ * at dispatch.** That lane was reserved D537–D538 and wrote § D537, and nothing had opened a
+ * reservation, so this file read every number below D537 as an unregistered hole. The floor is D533
+ * because that is what the charter row already names — #413's lane returned D533–D535 unspent, and
+ * whether they went back to the pool is the integrator's call under § D404 — and the top is D538,
+ * the highest number that lane was told is reserved. The integrator widens `to` if a sibling lane
+ * holds more, registers any number the block never writes, and closes it on the commit that
+ * reconciles the charter row.
+ */
+const OPEN_RESERVATION = { wave: 'of 2026-09-10', from: 533, to: 538 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
