@@ -10,7 +10,7 @@
  *
  * ```ts
  * const result = await successiveHalving({
- *   space,                                    // tuning/space, sampling DISPATCH_PARAMETERS
+ *   space,                                    // tuning/space, every row a profile can hold
  *   objective: runnerObjective({              // the Phase 3 runner, one experiment per round
  *     resources: await loadConfig('data'),
  *     buildingId: 'garden-apartments',
@@ -182,7 +182,7 @@
  *   round is one `ExperimentSpec` at one seed; `runner/crn.ts` derives the replication seeds; there
  *   is no stopping rule underneath a rung, because a sequential rule would give two candidates in
  *   the same rung different replication counts and *un-pair them*.
- * - **It does not know what a parameter is.** Sampling `DISPATCH_PARAMETERS`, honouring
+ * - **It does not know what a parameter is.** Sampling the space `tuning/space` collects, honouring
  *   `activeWhen`, and writing a candidate back through a dotted `id` are `tuning/space`'s, injected
  *   as {@link CandidateSampler} and {@link RunnerObjectiveOptions.materialize}. That is the contract
  *   docs/06 § The parameter schema exists to create, and this module is the proof it holds: there
@@ -195,7 +195,7 @@
  * - **It does not implement OCBA.** docs/06 lists it for final selection among finalists, and the
  *   ladder's top rung is where it would go — allocating rung 4's 900 replications unevenly toward
  *   the pair whose ranking is least certain, rather than 300 each. Uniform allocation is the
- *   conservative choice and is what ships; the extension point is {@link Rung}.
+ *   conservative choice and is what ships; the extension point is {@link Rung}, and since GitHub issue #416 withdrew OCBA nothing is planned to use it.
  *
  * ## 5. How this joins `tuning/space` and `tuning/report`
  *

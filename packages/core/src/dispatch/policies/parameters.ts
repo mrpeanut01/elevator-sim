@@ -154,13 +154,3 @@ export const POLICY_PARAMETERS: readonly DispatchParameterSpec[] = Object.freeze
       'A bidder’s own ceiling on the delay it will impose on the passengers it is already committed to. Above it the car declines the contract, whatever the group’s objective says. Distinct from the existingCallDelay cost term and from eligibility.maxLoadFactorForAssignment in exactly one way, and it is the way the agent-autonomy hypothesis turns on: those are the group deciding, this is a car refusing. Inert at the 600 s default: the largest marginal delay measured across 2 981 bids on midtown-office, garden-apartments and secure-tower is 47.8 s, so no bidder on any shipped building reaches it. Its other two inert conditions are declared rather than described — aggregation must be contract-net, and rounds must be 2 or more.',
   },
 ] as const);
-
-/** Every declared id, for a quick membership test. */
-export const POLICY_PARAMETER_IDS: ReadonlySet<string> = new Set(
-  POLICY_PARAMETERS.map((parameter) => parameter.id),
-);
-
-/** A declared parameter by id. */
-export function policyParameter(id: string): DispatchParameterSpec | undefined {
-  return POLICY_PARAMETERS.find((parameter) => parameter.id === id);
-}

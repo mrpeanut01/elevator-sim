@@ -17,16 +17,11 @@ import {
   tunablePathsOf,
 } from './parameters.js';
 import { resolveAuctionConfig } from './policies/auction.js';
-import { POLICY_PARAMETERS, policyParameter } from './policies/parameters.js';
+import { POLICY_PARAMETERS } from './policies/parameters.js';
 import type { AuctionProfileSource } from './policies/types.js';
 import { createDispatchPolicy, resolveDispatchConfig } from './policy.js';
 import { resolvePredictorConfig } from './predictor/arrivalModel.js';
-import {
-  PREDICTOR_PARAMETERS,
-  PREDICTOR_PARAMETER_IDS,
-  predictorParameter,
-  predictorParameterValue,
-} from './predictor/parameters.js';
+import { PREDICTOR_PARAMETERS } from './predictor/parameters.js';
 import type { PredictorIdleSource } from './predictor/types.js';
 import { COST_TERMS, costTerm } from './terms/index.js';
 import type { WeightSetSource } from './selector.js';
@@ -51,9 +46,16 @@ const EVERY_PARAMETER: readonly DispatchParameterSpec[] = Object.freeze([
   ...PREDICTOR_PARAMETERS,
 ]);
 
-/** A declared parameter by id, whichever of the three schemas declares it. */
+/**
+ * A declared parameter by id, whichever of the three schemas declares it. The policy and predictor
+ * lookups are derived here from their schemas: `core` stopped exporting id-set helpers that were
+ * waiting for a schema-driven search entry point the project owner withdrew (GitHub issue #416).
+ * The search that does sample these schemas, `tuning/search`, ships and is unaffected.
+ */
 const declared = (id: string): DispatchParameterSpec | undefined =>
-  dispatchParameter(id) ?? policyParameter(id) ?? predictorParameter(id);
+  dispatchParameter(id) ??
+  POLICY_PARAMETERS.find((parameter) => parameter.id === id) ??
+  PREDICTOR_PARAMETERS.find((parameter) => parameter.id === id);
 
 /**
  * A profile whose every tunable differs from its default, with `normalization` supplied as an
@@ -619,11 +621,12 @@ function readBack(
     const key = id.slice('auction.'.length);
     return (resolved.auction as unknown as Readonly<Record<string, number | string>>)[key];
   }
-  if (PREDICTOR_PARAMETER_IDS.has(id)) {
-    return predictorParameterValue(
-      resolvePredictorConfig(profile['idle'] as PredictorIdleSource | undefined),
-      id,
-    );
+  if (PREDICTOR_PARAMETERS.some((parameter) => parameter.id === id)) {
+    const resolved = resolvePredictorConfig(profile['idle'] as PredictorIdleSource | undefined);
+    const key = id.slice('idle.'.length);
+    if (!Object.hasOwn(resolved, key)) return undefined;
+    const value = (resolved as unknown as Readonly<Record<string, unknown>>)[key];
+    return typeof value === 'number' ? value : undefined;
   }
   // The library goes in for every id, not only the `selection.*` ones: a profile whose
   // `selection.policy` gate was satisfied from the spec (`profileWith` above) asks for a selector

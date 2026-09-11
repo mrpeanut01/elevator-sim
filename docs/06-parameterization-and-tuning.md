@@ -428,11 +428,12 @@ through an options object.
 
 The one declared id whose authored form is **not** its dotted path is
 `constraints.noDirectionReversal`, which is written as membership in the `hardConstraints` array —
-because a set-valued parameter is not something a generic optimizer can sample, and a boolean per
+because a set-valued parameter is not something a search can sample, and a boolean per
 constraint is. That translation is one line, and it is asserted rather than assumed.
 
-**This schema is the contract.** A generic optimizer reads it, samples valid
-configurations, and never needs a line of elevator-specific code.
+**This schema is the contract.** A search reads it, samples valid configurations, and never needs
+a line of elevator-specific code — `tuning/search` does exactly that today. No generic optimizer
+beyond it is planned (GitHub issue #416).
 
 ### A description is machine-readable, so a false one is a wrong answer
 
@@ -531,9 +532,9 @@ This reuses the Phase 3 replication infrastructure directly — no separate mach
 |---|---|
 | **Random search** | The honest baseline. Beats grid search in higher dimensions and is embarrassingly parallel. Always run it for comparison. |
 | **Successive halving / Hyperband** | Default. Best fit given replication count is a natural fidelity dimension. |
-| **Bayesian optimization** (noise-aware GP) | When each evaluation is expensive and the budget is ~50–200 evaluations. |
+| **Bayesian optimization** (noise-aware GP) | When each evaluation is expensive and the budget is ~50–200 evaluations. **Withdrawn, not built** — the project owner, 2026-09-10 (GitHub issue #416). |
 | **CMA-ES** | Continuous weight vectors with a larger budget; handles moderate noise with adaptive sampling. |
-| **OCBA** | Final selection among finalists — allocates remaining replications to the candidates whose ranking is most uncertain. |
+| **OCBA** | Final selection among finalists — allocates remaining replications to the candidates whose ranking is most uncertain. **Withdrawn, not built** — the project owner, 2026-09-10 (GitHub issue #416). |
 
 ### Guardrails
 

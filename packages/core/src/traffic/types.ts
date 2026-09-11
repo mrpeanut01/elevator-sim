@@ -20,8 +20,9 @@
  *    `(seed, config)`. Drawing it later, during the run, would make it a function of
  *    arrival *order*, which the dispatcher can change.
  * 3. **Every tunable declares its schema** ({@link TRAFFIC_PARAMETERS}), per CLAUDE.md
- *    invariant 8, so a generic optimizer can sample demand configurations without knowing
- *    anything about elevators.
+ *    invariant 8, so the demand space is explicit and checkable. No shipped search samples it:
+ *    `tuning/space` collects only the rows a dispatcher profile can hold, and no `traffic.*` row is
+ *    one.
  *
  * Naming note: config's `DemandTemplate` is the record as authored in
  * `data/traffic-profiles.json`; {@link ResolvedDemandTemplate} is the runtime view of it,
@@ -1160,9 +1161,10 @@ export type TrafficParameterType = 'continuous' | 'integer' | 'categorical' | 'b
  * A self-describing tunable, in the shape docs/06-parameterization-and-tuning.md § The
  * parameter schema defines and `physics/doors` already uses.
  *
- * The point is that a generic optimizer can sample a valid demand configuration knowing
- * nothing about elevators: `type` plus `range`/`values` bound the search, `default` gives a
- * starting point, and `activeWhen` keeps it from tuning a knob that is inert.
+ * The point is that a search could sample a valid demand configuration knowing nothing about
+ * elevators: `type` plus `range`/`values` bound it, `default` gives a starting point, and
+ * `activeWhen` keeps it from tuning a knob that is inert. No shipped search does: `tuning/space`
+ * collects only the rows a dispatcher profile can hold.
  */
 export interface TrafficParameterSpec {
   /** Dotted path of the value, e.g. `traffic.demandLevel`. */

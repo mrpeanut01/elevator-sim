@@ -174,8 +174,6 @@ export {
   MAX_AUCTION_ROUNDS,
   POLICY_DEFAULTS,
   POLICY_PARAMETERS,
-  POLICY_PARAMETER_IDS,
-  policyParameter,
 } from './parameters.js';
 
 /* -------------------------------------------------------------------------- *

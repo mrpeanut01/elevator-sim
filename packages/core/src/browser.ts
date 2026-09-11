@@ -818,7 +818,6 @@ export {
   POLICY_DEFAULTS,
   POLICY_FACTORIES,
   POLICY_PARAMETERS,
-  POLICY_PARAMETER_IDS,
   WITHDRAWAL_REASONS,
   aggregationOf,
   bandRange,
@@ -837,7 +836,6 @@ export {
   observedContext,
   parkingFloorIds,
   peakReassignments,
-  policyParameter,
   prepositionPlan,
   profileAsPolicySource,
   repositionContextFor,
@@ -893,13 +891,9 @@ export type {
 export {
   PREDICTOR_DEFAULTS,
   PREDICTOR_PARAMETERS,
-  PREDICTOR_PARAMETER_IDS,
   PredictorError,
   createArrivalModel,
-  predictorParameter,
-  predictorParameterValue,
   resolvePredictorConfig,
-  tunablePredictorPathsOf,
 } from './dispatch/index.js';
 
 export type {

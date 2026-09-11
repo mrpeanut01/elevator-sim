@@ -55,6 +55,7 @@ The standing decisions those three rest on, unchanged and cited rather than rest
 | [§ D506](../DECISIONS.md), [§ D509](../DECISIONS.md), [§ D521](../DECISIONS.md), [§ D522](../DECISIONS.md) | Boards publish a quantile ladder withheld below twenty players; ratings never reset and boards reset by construction; the house seeds a daily board on a schedule |
 | [§ D520](../DECISIONS.md) | The dropdown sweep is built and tiered, and names the stages that still clear from the dropdown |
 | [§ D537](../DECISIONS.md) | The survivor band **narrows by ladder position**, authored in `data/scenario-survivor-bands.json` as shares of the configurations judged at a scenario's base rung. The owner ruled the shape on 2026-09-10; **the owner approved every figure as drafted the same day**, and the band's only reader is an acceptance check |
+| [§ D538](../DECISIONS.md) | Phase 7's schema-driven search entry point, Bayesian optimization and OCBA are **withdrawn** by the project owner (GitHub issue #416): the six introspection helpers waiting for the entry point are deleted, and `CLAUDE.md` invariant 8 keeps every tunable declaring its schema while naming `tuning/search` as the search over the space `tuning/space` collects |
 
 ## 2. Superseded or amended
 
