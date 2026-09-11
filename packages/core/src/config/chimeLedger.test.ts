@@ -317,16 +317,17 @@ describe('the scenario authors its own budget price, and this table may not', ()
  * -------------------------------------------------------------------------- */
 
 /**
- * **No source is banded, because nothing in this repository can say what band a scenario is in.**
+ * **No source is banded, because nothing the earn route reads can say what band a scenario is in.**
  *
  * `ledger.ts` called the band *"a property of the scenario … known before anybody plays"*. It was
  * not: the server took it verbatim from the request body, `data/scenario-survivors.json` carries
- * counts and no band, and nothing anywhere maps a count to one. A claim that a mechanism exists
- * when it does not is [§ D256](../../../../DECISIONS.md)'s own refusal, so the band is withdrawn
- * rather than re-described — and the parser refuses the key, so it cannot come back without the
- * mapping arriving with it.
+ * counts and no band, and nothing the earn route reads maps a count to one — the difficulty band
+ * GitHub issue #234 drafted, `data/scenario-survivor-bands.json`, is read only by an acceptance
+ * check. A claim that a mechanism exists when it does not is [§ D256](../../../../DECISIONS.md)'s
+ * own refusal, so the band is withdrawn rather than re-described — and the parser refuses the key,
+ * so it cannot come back without the mapping arriving with it.
  */
-describe('no award is banded until something can say which band a scenario is in', () => {
+describe('no award is banded until the earn route can say which band a scenario is in', () => {
   it('ships no banded source', () => {
     for (const source of shipped().sources) {
       expect(Object.hasOwn(source, 'bands'), source.id).toBe(false);
@@ -340,7 +341,7 @@ describe('no award is banded until something can say which band a scenario is in
           sourcesOf(doc)[0]!['bands'] = [{ id: 'wide', awardChimes: 4, note: 'x' }];
         }),
       ),
-    ).toThrow(/Nothing in this repository maps a survivor count to a band/u);
+    ).toThrow(/Nothing the earn route reads maps a survivor count to a band/u);
   });
 
   it('positive control: the survivor table really does carry counts and really carries no band', () => {

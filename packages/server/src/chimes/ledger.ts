@@ -101,8 +101,10 @@ export type ChimeRefusal = 'unknown-completion' | 'unknown-modifier' | 'not-enou
  * before anybody plays"*. **That was false about the code beside it.** The band arrived verbatim in
  * the earn request's body — `http/api.ts` read `body.band` and passed it here — so a client could
  * post `single` on the easiest scenario and be paid ten instead of four. Nor could it have been
- * derived: `data/scenario-survivors.json` carries survivor **counts** and no band, nothing anywhere
- * maps a count to one, and this route is never told which scenario was cleared.
+ * derived: `data/scenario-survivors.json` carries survivor **counts** and no band, nothing this route
+ * reads maps a count to one, and this route is never told which scenario was cleared. The one
+ * survivor band in the tree — `data/scenario-survivor-bands.json`, GitHub issue #234's approved
+ * difficulty band per ladder position — has a viz acceptance check as its only reader.
  *
  * [§ D256](../../../../DECISIONS.md) decides what happens next — a stated mechanism is measured or
  * **withdrawn**, and a second plausible sentence in its place is the same defect with new wording.
