@@ -209,7 +209,8 @@ const REFUSED_HERE: readonly string[] = ['crown-hotel', 'st-jude-hospital'];
  * `observation` do not"*. Measured over every bank at `FIRST_SEED`, none reduces: `shuttle` and
  * `observation` throw on a zero served population, and `local-lower`, `local-zone1`, `local-zone2`
  * and `local-zone3` all throw `departureGapBracket` — *the longest door reopen (37.00 s) is not
- * shorter than the shortest round trip (32.83 s for `local-lower`, 29.68 s for the three zones)*.
+ * shorter than the shortest round trip (32.32 s for `local-lower`, 29.34 s for the three zones)*,
+ * re-measured on GitHub issue #438's 3.645 m floors; they were 32.83 s and 29.68 s on the 4.0 m floors.
  * That is the same ground on which `st-jude-hospital` is REFUSED, and the case below asserts it
  * rather than restating it.
  *

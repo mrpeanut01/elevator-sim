@@ -592,7 +592,10 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       rows.filter((row) => row.minRoundTripS === undefined).map((row) => row.id).sort(),
       detail,
     ).toEqual([
-      ...['burj-class-reference/local-lower', 'burj-class-reference/local-zone1', 'burj-class-reference/local-zone2', 'burj-class-reference/local-zone3', 'burj-class-reference/observation', 'burj-class-reference/shuttle'],
+      // Five of the Burj-class reference's six since GitHub issue #438: its sky-lobby shuttle became
+      // single-deck and stops only at G, 43, 76 and 123, so its shortest round trip is a whole zone
+      // (70.0 s against a 39.8 s reopen, measured on that commit) and a threshold exists for it.
+      ...['burj-class-reference/local-lower', 'burj-class-reference/local-zone1', 'burj-class-reference/local-zone2', 'burj-class-reference/local-zone3', 'burj-class-reference/observation'],
       'crown-hotel/main',
       'mixed-use-high-rise/residential-local',
       'st-jude-hospital/main',

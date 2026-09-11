@@ -455,6 +455,16 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
    * a `.github/` change, which was outside the scope of the lane that wrote the deriver, and it is
    * GitHub issue #344's remaining piece of work.
    */
+  'packages/viz/src/record/burjOperator.sweep.test.ts': {
+    gates: ['BURJ_BRACKET_SWEEP'],
+    reason:
+      'GitHub issue #438’s instrument — the Burj-class reference’s 57-lift bracket at 3 198, 5 307 and ' +
+      '10 614 people over seeds 376–425, whose saturation counts the building’s $comment publishes. ' +
+      'Not scheduled because burjOperator.test.ts pins seed 376 of the same bracket on every run, ' +
+      'and a nightly re-derivation would write counts nothing reads; it is re-run by hand when the ' +
+      'building moves',
+    scheduled: false,
+  },
   'packages/viz/src/shift/legibility.sweep.test.ts': {
     gates: ['LEGIBILITY_SWEEP'],
     reason:

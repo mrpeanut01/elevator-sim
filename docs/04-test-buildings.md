@@ -27,7 +27,7 @@ failed: *checkable by looking* is not checkable.
 | [Chancery House](../data/buildings/chancery-house.json) | 19 | 6 × gearless, 5 m/s, 3,000 lb | none | Prestige service level on an oversupplied bank |
 | [Crown Hotel](../data/buildings/crown-hotel.json) | 24 | 4 × gearless 3 m/s + 1 × geared 1.75 m/s service | back of house | Two-way demand, unlike cars, a single-floor crowd |
 | [St Jude Hospital](../data/buildings/st-jude-hospital.json) | 13 | 3 × gearless 2.5 m/s + 2 × geared 1.75 m/s bed | clinical + diagnostics | Never off-peak, bed cars, the first shipped stair |
-| [Burj-class reference tower](../data/buildings/burj-class-reference.json) | 165 | 14 double-deck shuttle @ 10 m/s, 4 locals (10/10/11/8), 4 observation | none | Scale: 57 cars, 3 sky lobbies, what the engine and the stage cost at the top of the range |
+| [Burj-class reference tower](../data/buildings/burj-class-reference.json) | 165 | 16-car single-deck shuttle @ 10 m/s, 4 locals (10/10/11/8), 2 double-deck observation | none | Scale: 57 cars, 3 sky lobbies, what the engine and the stage cost at the top of the range |
 
 ---
 
@@ -214,10 +214,20 @@ stair takes off the lifts.
 **Config:** [`burj-class-reference.json`](../data/buildings/burj-class-reference.json)
 
 A hundred and sixty-five levels — two basements, ground, and floors 1–162 — with **57 cars in six
-banks** and speeds to 10 m/s: one 14-car double-deck sky-lobby shuttle serving G/1 and all three
-two-level sky lobbies (43/44, 76/77, 123/124), four locals of 10, 10, 11 and 8 cars, and four
-observation expresses. About 1.6× the floors and the cars of Vertical City, which was the tallest
-thing this tree had run.
+banks** and speeds to 10 m/s: a 16-car single-deck sky-lobby shuttle stopping at G and the lower
+level of each two-level sky lobby (43, 76, 123), four locals of 10, 10, 11 and 8 cars, and two
+double-deck observation cars serving G/1 and 123/124. About 1.6× the floors and the cars of Vertical
+City, which was the tallest thing this tree had run.
+
+**Corrected against its operator by GitHub issue #438** ([§ D545](../DECISIONS.md)), with every
+chosen figure in the correction **drafted for the owner's approval** rather than settled. As first
+authored the file had a 14-car double-deck shuttle, offices on 2–75 with residential above, and
+4.0 m floors that put level 124 at 496 m. No source read gives the sky lobbies a double-deck shuttle —
+the real tower's two double-deck cars serve the observation deck (Otis, 2024; Al-Kodmany, 2015) —
+Emaar's fact sheet stacks the Armani Hotel low, the residences through the middle and the Corporate
+Suites at 112–121 and 125–154, and Emaar puts observation level 124 at 452 m. The file now follows
+all three. The 3.645 m floor, the per-use densities, the shuttle's stops and the observation pair at
+123/124 are the agent's proposals, and the building's `$comment` gives the reasoning for each.
 
 **It is a *reference*, not a scenario, and that is the whole of why it is here.**
 [§ D527](../DECISIONS.md)'s point is that *"the reference is a floor, not a ceiling"* — the product
@@ -227,13 +237,35 @@ above names a dispatch problem; this one names a scale, and the interesting resu
 the engine, the closed form and the stage do when handed one.
 
 **The population is an assumption, not a citation, and the file says so on its own face.** No
-published occupancy for the reference tower was available, so `totalPopulation: 3198` is what this
-arrangement serves with a valid AWT, bracketed by measurement over a 1,800 s window at seed 376
-under `collective`: 3,198 people give a 35 s mean wait, a 98 s 95th percentile and nothing
-undelivered; **5,307 saturate** (175 s, AWT suppressed); 10,614 leave 422 of 4,457 journeys unserved
-at a 791 s mean. So a higher published occupancy would not merely correct a field — it would say the
-real tower's lift count is not 57 on this arrangement, which is the kind of thing a reference
-building exists to expose. Do not restate the figure as though it were sourced.
+published occupancy for the reference tower was available when it was authored, and the two figures
+#438 found are recorded in the file as checked and not admitted. `totalPopulation: 3198` was published
+as what this arrangement serves with a valid AWT, bracketed over a 1,800 s window at seed 376 under
+`collective`: 3,198 people giving a 35 s mean wait and a 98 s 95th percentile, 5,307 saturating and
+10,614 leaving 422 of 4,457 journeys unserved. **Those figures do not reproduce** — not on the tree
+that landed the file (`63a9521`), nor on the parent of #438's correction, where the harness now
+pinned in `packages/viz/src/record/burjOperator.test.ts` gives 23.6 s and 67.6 s over 1,284 journeys
+at 3,198, saturation at 5,307, and 487 of 4,473 undelivered at 10,614. The verdicts agree and the
+figures do not, and which run produced the published ones is not established. Seed 376 was also a
+favourable seed for that arrangement: over seeds 376–425 it saturated at 3,198 on **16 of 50**.
+
+**Re-measured on the corrected arrangement** — same seed, window and dispatcher, every floor's
+population scaled in proportion:
+
+| people | journeys | mean wait | 95th percentile | undelivered | AWT at seed 376 | saturated, seeds 376–425 |
+|---|---|---|---|---|---|---|
+| 3,198 | 989 | 11.4 s | 32.9 s | 0 | valid | 1 of 50 |
+| 5,307 | 1,646 | withheld | withheld | 0 | suppressed — saturated | 37 of 50 |
+| 10,614 | 3,473 | withheld | withheld | 30 | suppressed — saturated | 50 of 50, undelivered on 32 |
+
+The seed-376 rows are pinned in `burjOperator.test.ts`; the last column is
+`burjOperator.sweep.test.ts` under `BURJ_BRACKET_SWEEP=1`. **No AWT interval is published at any of
+the three**, because each saturates on at least one seed. Read the journey counts beside the waits:
+the same 3,198 people make 989 journeys in the window rather than 1,284, because most of them now
+arrive on the `residential` and `hotel` profiles rather than on `office-standard`, so the corrected
+arrangement carries less demand as well as different demand, and no share of the change in wait is
+attributed to either. A higher published occupancy would still say something about the real tower's
+lift count on this arrangement, which is what a reference building exists to expose. Do not restate
+the figure as though it were sourced.
 
 **There are no service lifts, and that is a finding about the model rather than a simplification.**
 Five were declared at first. While they served the passenger lobby they were the only banks spanning
@@ -247,8 +279,9 @@ banks. The honest shape is a building without them.
 
 **Escalators are declared four where the reference has eight**, for the reason
 [`data/buildings/README.md`](../data/buildings/README.md) gives: a declared mode with zero hops is a
-dead field. Routed over every one of the 27,060 ordered floor pairs, all are reachable and **28 hops**
-are taken across the four declared edges — 6, 8, 8 and 6 — which is that same README's *"if you add a
+dead field. Routed over every one of the 27,060 ordered floor pairs, all are reachable and **832 hops**
+are taken across the four declared edges — 164, 266, 238 and 164 on the arrangement GitHub issue #438
+corrected, and 28 (6, 8, 8 and 6) before it — which is that same README's *"if you add a
 mode, add its measured hop count beside it"*. With a *pair* at each landing, four of the eight took
 **zero** hops, because as modelled an escalator is an undirected, uncapacitated edge and the second of
 an identical pair can never be chosen. One edge per landing is declared and the finding recorded,
@@ -260,9 +293,9 @@ measurements; the fifth is the stage's drawing and belongs to GitHub issue #377:
 | case | what it holds |
 |---|---|
 | *is the shape § D527 names* | 165 floors, 57 cars, a fastest car at 10 m/s, and **zero loader warnings** — the bar the other eight meet |
-| *runs a full day without aborting* | 3,600 s at seed 376 under `collective`: 0 undelivered, `awtIsValid`, and a recording **measured at 17.36 MB**, asserted as a ceiling because it is the first thing here that could be too big to post to a worker |
-| *costs a bounded wall clock per replication* | **1.33–1.38 s per 3,600 s replication on an Apple M1 Max** (10 cores, 32 GB, Node v26.5.0). Asserted only as a generous ceiling — a test-cost figure is a claim about a machine ([§ D483](../DECISIONS.md)) |
-| *routes every floor pair* | all 27,060 pairs reachable, no declared escalator with zero hops, and **28 hops** across the four edges (6, 8, 8, 6) |
+| *runs a full day without aborting* | 3,600 s at seed 376 under `collective`: 0 undelivered, `awtIsValid`, and a recording **measured at 17.36 MB** as first authored and **16.42 MB** since GitHub issue #438, asserted as a ceiling because it is the first thing here that could be too big to post to a worker |
+| *costs a bounded wall clock per replication* | **1.33–1.38 s per 3,600 s replication on an Apple M1 Max** (10 cores, 32 GB, Node v26.5.0) as first authored, and **0.72–0.84 s** on the same machine since GitHub issue #438, three runs in a later sitting, so the two ranges are not a controlled comparison. Asserted only as a generous ceiling — a test-cost figure is a claim about a machine ([§ D483](../DECISIONS.md)) |
+| *routes every floor pair* | all 27,060 pairs reachable, no declared escalator with zero hops, and **832 hops** across the four edges (164, 266, 238, 164; 28 before GitHub issue #438) |
 
 That wall-clock figure is the one to carry away: the live re-simulate-on-press path is comfortable at
 ~1.4 s, and 50–200 replications behind a published interval is **~2.3 to ~4.6 minutes serially** at
@@ -273,7 +306,8 @@ this size, so anything replicated here wants fan-out rather than a loop.
 > **The closed-form oracle does not cover it — all six banks refuse.** `shuttle` and `observation`
 > throw on a zero served population; `local-lower`, `local-zone1`, `local-zone2` and `local-zone3`
 > all throw `departureGapBracket` — the longest door reopen, **37.00 s**, is not shorter than the
-> shortest round trip (32.83 s for `local-lower`, **29.68 s** for the three zones).
+> shortest round trip (32.32 s for `local-lower`, **29.34 s** for the three zones, on
+> GitHub issue #438's 3.645 m floors; 32.83 s and 29.68 s on the 4.0 m floors before it).
 > `packages/experiments/src/oracle/remainingBuildings.test.ts` carries it in `OWED_ELSEWHERE` and
 > asserts the refusal on every bank rather than restating it. So the correctness oracle
 > [`CLAUDE.md`](../CLAUDE.md) describes is **not** available here, #376's third criterion is open,
