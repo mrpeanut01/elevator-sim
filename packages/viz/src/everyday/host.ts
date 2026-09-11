@@ -1486,9 +1486,10 @@ export interface EverydayHostBindings {
   startRun(): void;
   /**
    * Stop the run in flight, if there is one — `dev/main.ts`'s shift runner's `cancel`, which drops the
-   * result unread. {@link EverydayHost.leaveRush} calls it before the day is put back (GitHub issue
-   * #518). **Optional** on {@link chimeBalance}'s ground: the binding literals that never start a rush
-   * would otherwise have to gain a field, and a shell that omits it cancels nothing.
+   * result unread. {@link EverydayHost.leaveRush} and {@link EverydayHost.leaveReplay} call it before
+   * what they parked is put back (GitHub issues #518 and #522). **Optional** on {@link chimeBalance}'s
+   * ground: the binding literals that never start a rush or a replay would otherwise have to gain a
+   * field, and a shell that omits it cancels nothing.
    */
   cancelRun?(): void;
   /**
@@ -2681,6 +2682,17 @@ export function createEverydayHost(
       if (replaySession === undefined) return;
       const before = replaySession.before;
       replaySession = undefined;
+      /*
+       * **The run in flight goes before the week comes back** — GitHub issue #522, `leaveRush`'s
+       * #518 item 4 on the replay. A replay's day is pressed through the same `startRun` any day is, the
+       * run is generated on a worker, leaving does not wait for it, and `dev/main.ts#applyShift` adopts
+       * whatever lands. So a replay left mid-generation landed on the week this restore had just put
+       * back, as this shell's own unfiled run, and `closeShift` filed it there as the player's standing
+       * day — `replay.browser.test.ts` measures that on the shipped bundle. Whatever is in flight when
+       * the player leaves would land over the recording this restore puts back, so it is cancelled, and
+       * first. A no-op once it has landed. Recorded here under § D405: the decision is this function's.
+       */
+      b.cancelRun?.();
       b.applyPatch(replayRestorePatchOf(b.state(), before));
       notifyCampaign();
     },
