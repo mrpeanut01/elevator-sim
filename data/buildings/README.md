@@ -152,8 +152,10 @@ is not for the trip, so a car whose duty differs is still sent when it is the on
 2. **Dispatch.** The landing call carries the duty of the passenger it speaks for, under every call
    type, and the `dutyMismatch` cost term prices 1 when that duty is not the car's. The weight a
    profile gives it is the whole price: a small weight is a preference, and a weight above the sum
-   of the profile's other weights is near-exclusive use. `capacity-aware` weights it at 0.35, and the
-   shares are 0.02 goods, 0.01 bed and 0.02 service — **all proposals awaiting the owner's approval**.
+   of the profile's other weights is near-exclusive use. **No shipped profile weights it yet**: while
+   no shipped building declares a duty a weight would be decoration, and `traffic/dutyIdentity.test.ts`
+   refuses one; § D549 drafts `capacity-aware` at 0.35 for when one does. The shares — 0.02 goods,
+   0.01 bed and 0.02 service — are applied, and are **proposals awaiting the owner's approval**.
 3. **The control.** Not built: the picker the two screens want, on § D219's test.
 
 **The precedent that set that order is `accessZones`, this defect with its polarity reversed**
