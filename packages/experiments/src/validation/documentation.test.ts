@@ -1708,8 +1708,16 @@ type DecisionReservation = {
  * the highest number that lane was told is reserved. The integrator widens `to` if a sibling lane
  * holds more, registers any number the block never writes, and closes it on the commit that
  * reconciles the charter row.
+ *
+ * **Widened to D556 on 2026-09-11, before the next wave's lanes wrote anything.** GitHub issue #467's
+ * decision, D535 on its still-open PR #506, waits on the owner's approval of the prices it drafts, so
+ * the block cannot close yet, and a second
+ * open reservation is not a shape this file has. The lanes hold D539–D541 (#431 and #433), D542–D544
+ * (#372), D545–D546 (#438), D547–D548 (#418), D549–D550 (#481) and D551 (#379); D552–D554 are held
+ * for #478 and #437, and D555–D556 are the integrator's. D534 and D536 are still unwritten, and are
+ * registered as holes when the block closes, not before.
  */
-const OPEN_RESERVATION = { wave: 'of 2026-09-10', from: 533, to: 538 } as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'of 2026-09-10, widened 2026-09-11', from: 533, to: 556 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
