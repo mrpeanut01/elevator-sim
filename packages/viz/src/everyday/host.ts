@@ -2567,6 +2567,11 @@ export function createEverydayHost(
        * player's week — its contract's occupancy, its day's growth — while the run was the rush's own
        * week: Midtown Office held 664 s from a day-1 week and 1 640 s from Free Play. Both reads below go
        * through `rush.ts#rushBuildingOf`, so the rate, the disclosure and the run are one building's.
+       *
+       * **And the rush's standing is a whitelist** — PR #517's review. This presses the binding's
+       * `startRun`, not this host's, so the kit and the event a campaign day wrote were never taken off
+       * here, and they rode into the rush with its held cars. `rush.ts#RUSH_FIELD_ROLES` decides what a
+       * rush takes from the player, and `leaveRush` puts the rest back (§ D548 clause 5).
        */
       const building = rushBuildingOf(b.resources, state);
       const patch = rushSession === undefined ? rushPatchOf(b.resources, state) : undefined;

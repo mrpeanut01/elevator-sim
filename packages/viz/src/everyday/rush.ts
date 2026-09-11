@@ -15,6 +15,12 @@
  * the same `SimulationConfig` it builds for any day, and the stage plays the recording as it plays
  * any recording. Nothing here is a second simulator, a second clock or a second playback.
  *
+ * **What the player brings into it is a whitelist, not whatever the patch leaves alone.**
+ * {@link RUSH_FIELD_ROLES} says what every `ViewerState` field is to a rush: the building and the
+ * dispatcher ride in, the rush writes its own identity, and a day's or a session's state — a campaign
+ * day's kit, event and held cars among it — runs at a fresh session's value and comes back when the
+ * player leaves (§ D548 clause 5).
+ *
  * ## The fail state, and the design question § D477 left open
  *
  * § D477: *the run ends when the lobby overfills*. § 20.5 and `RUSH_HOLD_LINE`: *forty people
@@ -48,7 +54,7 @@ import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import type { VizRecording, VizSaturation } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
-import { resolvedBuildingOf, type ViewerState } from '../dev/state.js';
+import { initialState, resolvedBuildingOf, type ViewerState } from '../dev/state.js';
 import { demandDisclosureOf, type DemandBand } from '../fixit/parse.js';
 import { waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
@@ -87,6 +93,96 @@ export function rushTopRatePctPop5min(population: number): number {
   return (rushTopArrivalsPerMinute() * 5 * 100) / population;
 }
 
+/** What one `ViewerState` field is to a rush — see {@link RUSH_FIELD_ROLES}. */
+type RushFieldRole = 'building' | 'dispatcher' | 'rush' | 'fresh' | 'surface';
+
+/**
+ * **What each field of the player's state is to a rush** — the whitelist behind § D548 clause 5.
+ *
+ * A rush used to be a patch: it wrote its seven fields over the player's state and every other field
+ * rode in. PR #517's review found a campaign day's `campaignFitOut`, `campaignEventId` and
+ * `outOfServiceCarIds` among the riders — `EverydayHost.startRush` presses the binding's `startRun`,
+ * not the host's own, which is where § 6's day takes the kit and the event off — so two players on one
+ * building met different crowds, and Crown Hotel's calendared coach party threw inside the rush,
+ * because it fixes a directional mix `endless-rush` varies. Routing the press through the host's
+ * clearing would have taken two of the three off and left the next field to be found the same way.
+ * So the rule is inverted: a field reaches a rush only where this table says the player brings it.
+ *
+ * - `building` — the tower the player stands on, their own designs included. The rush runs on it.
+ * - `dispatcher` — the dispatcher they bring, with its rules, selector and levers. The rush tests it.
+ * - `rush` — the rush's own identity, which {@link rushPatchOf} writes.
+ * - `fresh` — a day's or a session's state: a fresh session's value while the rush stands, and the
+ *   player's own back when they leave ({@link RushBefore}). `calendar`, `commissioning`,
+ *   `interventions`, `patience` and `pattern` are here on the campaign fields' ground — the run reads
+ *   each of them — and whether each one moved a rush before this table was not measured.
+ * - `surface` — what the screens show and edit, and no run under a rush reads. `savedPatterns` is
+ *   here because a run reads it only through `pattern`, which is `fresh`.
+ *
+ * **Exhaustive by type**: `satisfies Record<keyof ViewerState, RushFieldRole>` refuses a new field
+ * until somebody says what it is to a rush, so the next campaign field cannot ride in by default.
+ * `rushCrowd.test.ts` holds the other half on the run: every field `shiftRunConfigOf` reads under a
+ * rush is one the press writes, or the building or the dispatcher the player brings.
+ */
+const RUSH_FIELD_ROLES = Object.freeze({
+  playMode: 'rush',
+  calendar: 'fresh',
+  commissioning: 'fresh',
+  campaignFitOut: 'fresh',
+  campaignEventId: 'fresh',
+  commissioningConstraintId: 'surface',
+  mode: 'surface',
+  showMaths: 'surface',
+  tab: 'surface',
+  revealedTabs: 'surface',
+  railSegment: 'surface',
+  drawerOpen: 'surface',
+  buildingId: 'building',
+  dispatcherId: 'dispatcher',
+  pattern: 'fresh',
+  shiftLengthS: 'rush',
+  windowStartS: 'rush',
+  freePlay: 'rush',
+  seed: 'rush',
+  outOfServiceCarIds: 'fresh',
+  interventions: 'fresh',
+  levers: 'dispatcher',
+  selectorSpec: 'dispatcher',
+  ruleRows: 'dispatcher',
+  patience: 'fresh',
+  week: 'rush',
+  parkedWeeks: 'rush',
+  savedDispatchers: 'dispatcher',
+  savedPatterns: 'surface',
+  savedClasses: 'building',
+  savedBuildings: 'building',
+  dispatcherSpec: 'surface',
+  editingDispatcherId: 'surface',
+  patternSpec: 'surface',
+  editingPatternId: 'surface',
+  machineSpec: 'surface',
+  editingClassId: 'surface',
+  buildingSpec: 'surface',
+  editingBuildingId: 'surface',
+  recording: 'surface',
+  report: 'surface',
+  withheld: 'surface',
+  tomorrow: 'surface',
+} as const satisfies Record<keyof ViewerState, RushFieldRole>);
+
+/** The fields {@link RUSH_FIELD_ROLES} gives one role. */
+type RushFieldWithRole<R extends RushFieldRole> = {
+  [K in keyof typeof RUSH_FIELD_ROLES]: (typeof RUSH_FIELD_ROLES)[K] extends R ? K : never;
+}[keyof typeof RUSH_FIELD_ROLES];
+
+const RUSH_FRESH_FIELDS = (Object.keys(RUSH_FIELD_ROLES) as (keyof typeof RUSH_FIELD_ROLES)[]).filter(
+  (field): field is RushFieldWithRole<'fresh'> => RUSH_FIELD_ROLES[field] === 'fresh',
+);
+
+/** `state`'s own values of the fields a rush runs fresh. */
+function freshFieldsOf(state: ViewerState): Pick<ViewerState, RushFieldWithRole<'fresh'>> {
+  return Object.fromEntries(RUSH_FRESH_FIELDS.map((field) => [field, state[field]])) as Pick<ViewerState, RushFieldWithRole<'fresh'>>;
+}
+
 /** What the rush leaves behind to be put back — {@link rushPatchOf}'s inverse. */
 export interface RushBefore {
   readonly contractId: string;
@@ -96,6 +192,8 @@ export interface RushBefore {
   readonly windowStartS: number | null;
   readonly seed: bigint;
   readonly recording: ViewerState['recording'];
+  /** The player's own values of every field a rush runs fresh — a campaign day's kit, event and held cars among them. */
+  readonly fresh: Pick<ViewerState, RushFieldWithRole<'fresh'>>;
 }
 
 export function rushBeforeOf(state: ViewerState): RushBefore {
@@ -107,11 +205,12 @@ export function rushBeforeOf(state: ViewerState): RushBefore {
     windowStartS: state.windowStartS,
     seed: state.seed,
     recording: state.recording,
+    fresh: freshFieldsOf(state),
   };
 }
 
-/** The fields a rush writes over the player's state — {@link rushPatchOf}'s answer. */
-export type RushPatch = Pick<ViewerState, 'playMode' | 'week' | 'parkedWeeks' | 'freePlay' | 'shiftLengthS' | 'windowStartS' | 'seed'>;
+/** The fields a rush writes over the player's state — its own identity and every field it runs fresh; {@link rushPatchOf}'s answer. */
+export type RushPatch = Pick<ViewerState, RushFieldWithRole<'rush'> | RushFieldWithRole<'fresh'>>;
 
 /**
  * **The building a rush's stream arrives at** — the standing building read under the rush's own
@@ -122,12 +221,13 @@ export type RushPatch = Pick<ViewerState, 'playMode' | 'week' | 'parkedWeeks' | 
  * its week is the rush week, opened on day 1, and its play mode is `endless`, which no rung reaches.
  * So the building read here is the one the run is built on, and on a shipped tower it is the building
  * as `data/buildings/` authors it. That is what makes a rush's crowd a function of the building
- * alone, which standings keyed on the building need (§ D547, § D548).
+ * alone, which standings keyed on the building need (§ D547, § D548). It is read under every field
+ * {@link RUSH_FIELD_ROLES} runs fresh as well, so nothing a day or a session wrote reaches it either.
  *
  * `undefined` when no building is standing, `resolvedBuildingOf`'s own answer.
  */
 export function rushBuildingOf(resources: BrowserResources, state: ViewerState): ResolvedBuilding | undefined {
-  return resolvedBuildingOf(resources, { ...state, ...rushStandingOf(state, null) });
+  return resolvedBuildingOf(resources, { ...state, ...rushStandingOf(resources, state, null) });
 }
 
 /**
@@ -141,7 +241,7 @@ export function rushBuildingOf(resources: BrowserResources, state: ViewerState):
  */
 export function rushPatchOf(resources: BrowserResources, state: ViewerState): RushPatch | undefined {
   const building = rushBuildingOf(resources, state);
-  return building === undefined ? undefined : rushStandingOf(state, rushTopRatePctPop5min(building.totalPopulation));
+  return building === undefined ? undefined : rushStandingOf(resources, state, rushTopRatePctPop5min(building.totalPopulation));
 }
 
 /**
@@ -149,9 +249,14 @@ export function rushPatchOf(resources: BrowserResources, state: ViewerState): Ru
  * (`dev/state.ts#FreePlayOverride`) — which is what {@link rushBuildingOf} resolves under, because the
  * rate reaches the demand and never the building.
  */
-function rushStandingOf(state: ViewerState, ratePctPop5min: number | null): RushPatch {
+function rushStandingOf(resources: BrowserResources, state: ViewerState, ratePctPop5min: number | null): RushPatch {
   const moved = switchWeek(state.week, state.parkedWeeks, RUSH_CONTRACT_ID, 'restart');
   return {
+    /*
+     * Every `fresh` field at a fresh session's value, read off the session a player opens rather than
+     * written out here, so a field the table gains takes its value from where every session's does.
+     */
+    ...freshFieldsOf(initialState(resources, RUSH_SEED)),
     playMode: 'endless',
     week: moved.week.contractId === RUSH_CONTRACT_ID ? moved.week : openRush(),
     parkedWeeks: moved.parked,
@@ -171,6 +276,7 @@ function rushStandingOf(state: ViewerState, ratePctPop5min: number | null): Rush
 export function rushRestorePatchOf(state: ViewerState, before: RushBefore): Partial<ViewerState> {
   const moved = switchWeek(state.week, state.parkedWeeks, before.contractId, 'resume');
   return {
+    ...before.fresh,
     week: moved.week,
     parkedWeeks: moved.parked,
     playMode: before.playMode,
