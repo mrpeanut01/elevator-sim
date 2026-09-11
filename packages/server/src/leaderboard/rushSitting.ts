@@ -100,8 +100,8 @@
  * under it and drain — so a sitting there under `collective` has no breaking point to post, which is
  * the refusal below rather than a board row claiming a figure the run did not produce. **They do break
  * under other dispatchers**, and this sentence first said they never did (PR #513's review, finding 4):
- * `data/rush-house-runs.json`, GitHub PR #514's table measured on `8f1e2036`, has the Burj-class
- * reference crossing the line at 4 402 s under `nearest-car`, and Vertical City at 3 546 s under
+ * `data/rush-house-runs.json`, GitHub PR #514's table with its Burj-class rows re-measured by PR #512 on the corrected building, has the Burj-class
+ * reference crossing the line at 5 170 s under `nearest-car` and 4 390 s under `destination-panel`, and Vertical City at 3 546 s under
  * `nearest-car` and 5 432 s under `destination-panel`; every other shipped dispatcher holds both to
  * the end. So a sitting on either tower can post, and `rushHoldAgreement.json` pins the two
  * `nearest-car` breaks on both ends.
