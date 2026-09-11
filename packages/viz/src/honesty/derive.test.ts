@@ -1857,12 +1857,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
       ],
     },
     /*
-     * An exclusion for `everyday/rush.ts#RUSH_TEMPLATE_ID` and `#rushPatchOf` stood here — the
-     * `endless-rush` template id, which reads as two hyphenated words. It is deleted rather than
-     * kept, on this list's own rule: since GitHub issue #372 the id is declared in
-     * `@elevator-sim/core`'s `sim/rush.ts` (the server replays a posted rush sitting and may not
-     * import this package), so no module under `viz/src` produces the literal and neither id is a
-     * producer the deriver can find.
+     * An exclusion for `everyday/rush.ts#RUSH_TEMPLATE_ID`, `#rushPatchOf` and (after PR #517)
+     * `#rushBuildingOf` stood here — the `endless-rush` template id, which reads as two hyphenated
+     * words. It is deleted rather than kept, on this list's own rule: since GitHub issue #372 the id
+     * is declared in `@elevator-sim/core`'s `sim/rush.ts` (the server replays a posted rush sitting
+     * and may not import this package), so no module under `viz/src` produces the literal and none
+     * of the three ids is a producer the deriver can find.
      */
     {
       reason:
