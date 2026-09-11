@@ -74,7 +74,7 @@ import { COST_TERMS } from '../dispatch/index.js';
 import { activeWhenSatisfied, isActiveWhenRange } from '../dispatch/parameters.js';
 import type { ActiveWhenCondition, DispatchParameterSpec } from '../dispatch/types.js';
 
-import { BUILDING_IDS, load, tinyBuilding } from './fixtures.test-helper.js';
+import { BUILDING_IDS, load } from './fixtures.test-helper.js';
 import { runSimulation } from './simulation.js';
 import type { SimulationConfig, SimulationResult } from './types.js';
 
@@ -492,8 +492,6 @@ interface InertReason {
   readonly liveUnder?: Authored | undefined;
   /** Run options that make the dimension live. */
   readonly liveWith?: RunOverrides | undefined;
-  /** Set when the live condition is a *building* no shipped configuration provides. */
-  readonly liveOnOneCarBank?: boolean | undefined;
 }
 
 const DECLARED_INERT: Readonly<Record<string, InertReason>> = Object.freeze({
@@ -535,15 +533,27 @@ const DECLARED_INERT: Readonly<Record<string, InertReason>> = Object.freeze({
   },
 
   /*
-   * A starvation guard, and a guard that does not fire is not a dead one. Its call site is live —
-   * `Simulation` passes the group snapshots that `filterEligible`'s guard needs on every
-   * decision — but the guard needs *exactly one* eligible car, rejected *solely* on load, which
-   * no shipped building's fleet produces. A one-car bank does, and that is the obligation below.
+   * A starvation guard, and it does fire on a shipped building. This entry used to be proven only on
+   * a synthesised one-car bank, with the reason that every shipped fleet always leaves another car
+   * eligible, and that reason was false. An independent review of GitHub PR #506 found the dial
+   * moving legs under `collective`, the shipped baseline stage 3 opens on, on `midtown-office`.
+   * Measured again before this entry changed, comparing each leg's car, boarding and alighting:
+   * under `collective` at 900 s it differs at 217 of 408 leg positions on this sweep's seed and at
+   * 322 of 417 on stage 3's replication-0 seed, while this sweep's own base is flat on all four
+   * probe buildings.
+   *
+   * The condition below is the one difference that does it, found by applying `collective`'s
+   * differences to the base one at a time at this sweep's seed and duration: its
+   * `noDirectionReversal` hard constraint makes the dial live on `midtown-office`, and neither its
+   * bypass threshold nor its single-car immediate assignment does. **Why the constraint is the
+   * condition is read off `filterEligible`, not measured**: the guard admits a car only when every
+   * car was rejected and exactly one of them solely on load, and a hard constraint supplies
+   * rejections the base profile does not.
    */
   'answer.allowBypassIfSoleEligibleCar': {
     reason:
-      'the guard needs exactly one eligible car rejected solely on load; every shipped building has a fleet large enough that another car is always eligible',
-    liveOnOneCarBank: true,
+      'the guard admits a car only when every car was rejected and exactly one solely on load, which the base profile does not produce on a shipped building; the noDirectionReversal hard constraint, which the shipped collective baseline carries, does on midtown-office',
+    liveUnder: { hardConstraints: ['noDirectionReversal'] },
   },
 
   /*
@@ -833,25 +843,6 @@ describe('every searchable dimension can change a run, or declares why it cannot
     for (const [id, entry] of Object.entries(DECLARED_INERT)) {
       const spec = byId.get(id) as DispatchParameterSpec;
       expect(spec, `${id} is no longer a dimension`).toBeDefined();
-
-      if (entry.liveOnOneCarBank === true) {
-        // A synthesised one-car bank at a demand level that fills it: the only configuration in
-        // which "exactly one eligible car, rejected on load" can happen at all.
-        const building = tinyBuilding(harness.cfg, 1000);
-        const verdict = sweepDimension(
-          harness,
-          spec,
-          byId,
-          { demand: { arrivalRatePctPop5min: 30 }, durationS: 1800 },
-          [building.id],
-          building,
-        );
-        expect(
-          verdict.live,
-          `${id} is allowlisted as "live only on a one-car bank" and did not move a run there either`,
-        ).toBe(true);
-        continue;
-      }
 
       const enriched: Harness = {
         ...harness,
