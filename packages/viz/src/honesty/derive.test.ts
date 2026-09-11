@@ -1139,9 +1139,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'name is the prose, and that name **is** driven by the `AUTHORING` adapter. ' +
         '`demandFromSpec` returns the `SimulationDemandOptions` fragment the runner consumes; the ' +
         'reader sees that choice as `patternSummary` and as `PEAK_ORDER_INFO`\'s label and note, ' +
-        'both driven. Same group as `batch/runBatch.ts#runBatch` above, for the same reason.',
+        'both driven. Same group as `batch/runBatch.ts#runBatch` above, for the same reason. ' +
+        '`dimensionIdsLiveOn` returns dimension ids — which dials a scenario offers on a building — ' +
+        'and is derived only because the refusal it shares a decision with sits in its file; that ' +
+        'refusal is `inertTerms`\', driven by the `AUTHORING` adapter on a weighted duty spec (§ D549).',
       ids: [
         'authoring/dispatcherSpec.ts#specIsDirty',
+        'authoring/dispatcherSpec.ts#dimensionIdsLiveOn',
         'authoring/machineSpec.ts#machineIsDirty',
         'authoring/patternSpec.ts#demandFromSpec',
         // Returns a boolean — *is this a time condition* — and is derived only because the
