@@ -90,6 +90,7 @@ describe('a stage played — the bar reproduces and standing still clears nothin
       published: publishedFor(stage),
       dimensionIds: fixture.space.ids,
       dimensionHelp: fixture.dimensionHelp,
+      schedule: fixture.context.schedule,
     });
     expect(briefing.seedNote).toContain(stage.seeds.seed);
     expect(briefing.seedNote).toContain(stage.holdoutSeeds.seed);

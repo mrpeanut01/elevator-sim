@@ -2729,6 +2729,7 @@ const CAMPAIGN: SurfaceAdapter = {
       published,
       dimensionIds: bundle.dimensionIds,
       dimensionHelp: bundle.dimensionHelp,
+      schedule: shippedPriceSchedule(),
     });
     seeds.push({ field: 'briefing.configuration', text: briefing.configuration, role: 'label' });
     seeds.push({ field: 'briefing.seedNote', text: briefing.seedNote, role: 'label' });

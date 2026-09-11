@@ -30,6 +30,7 @@ the first three in one conversation, the last three later the same day:
 | [§ D529](../DECISIONS.md) | The first session is a **two-screen tutorial** before Scenario — walk the player through the editor, then let a building fall apart and show the fix. Screen two is reused as the Rush tutorial. **A worked answer is permitted in the tutorial and nowhere else** |
 | [§ D530](../DECISIONS.md) | The cross-mode currency is named **chimes**, closing the first of § D526's two open items |
 | [§ D531](../DECISIONS.md) | The **sign-in bonus ships at launch**, in the one shape § D526 clause 7 permits — small, flat, unconditional, no compounding, no streak, nothing lost by missing it. Closes § D526's second open item, so `docs/38` § 5 has none left |
+| [§ D535](../DECISIONS.md) | *Taken 2026-09-10, on GitHub issue #467.* Not for sale is not priced high: the **weight-set selector** and the **arrival predictor** are withheld from every scenario, declared once in `data/price-schedule.json`; `every-declared-dimension` is every declared dimension less what is withheld; the other twenty-two dials are priced, as proposals the owner approved as drafted on 2026-09-11 |
 
 One ruled later, on 2026-09-10, narrowing how often § D526's awards pay rather than what they are:
 
@@ -97,6 +98,8 @@ the same thing in one sentence.
 | `docs/23` § 4 | The per-mode declaration, built from the handoff's four-row session-shapes table | **Superseded in part.** The mode set is three; the per-mode loop analysis stands unchanged and is marked as standing | § D525 |
 | `docs/32` § 3.1 | There are three currencies, not one, and only one of them is money | **Amended.** A fourth ships — chimes, earned by completing turns and spent on modifiers; the three-currency analysis stands | § D526, § D530 |
 | `docs/12` § 4 | The deviation register carried thirteen rows, 4.1–4.13 | **Extended.** Two rows added — § 4.14 the four-mode session table, § 4.15 the authored repair lists. CLAUDE.md's canonical-for-the-interface rule is **unchanged and still wins**; a deviation recorded in the register that exists for deviations is that rule working, not an exception to it | § D525 |
+| [§ D525](../DECISIONS.md) clause 2 | The whole editor is open in every scenario | **Amended.** The whole editor less the weight-set selector and the arrival predictor, which no scenario sells at any price. Per-scenario scarcity is still a price, never a removed control | § D535 |
+| `docs/38` § 2.1 | The dispatcher tier prices the weight-set selector, and every knob is priced | **Amended.** The selector and the arrival predictor are withheld rather than priced; every knob a scenario offers is priced | § D535 |
 
 ## 3. The rename map
 

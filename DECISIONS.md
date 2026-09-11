@@ -34374,6 +34374,8 @@ unmoved. The range event has no equivalent writer yet; § D523 says whose questi
 
 ## D525 — Three modes: Scenario, Career and Rush; no proposed fixes; difficulty is the number of ways through; everything plays live
 
+> **Status 2026-09-10: AMENDED by [§ D535](#d535).** Clause 2's whole editor is every declared dial less the weight-set selector and the arrival predictor, which no scenario sells at any price; per-scenario scarcity is still a price, never a removed control. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/38`](docs/38-what-the-game-is.md), [§ D373](#d373), [§ D477](#d477), [§ D354](#d354), [§ D497](#d497), [§ D514](#d514), [§ D515](#d515), `docs/32` § 1.2 and GD4, `docs/23` § 4, `docs/16` S5's `ranked` row, the design handoff §§ 5 and 10, GitHub issues #217 and #220.**
 
 **Decided by the product owner, 2026-09-06** — given in conversation and confirmed the same day.
@@ -34933,6 +34935,63 @@ more.
 anything a run measures ([§ D526](#d526) clause 2). No chime figure reaches a results page: every post
 is fire and forget and nothing reads its answer (clause 3, `docs/32` GD13). A client names a turn and
 never a source or an amount (clause 5).
+
+---
+
+## D535 — Not for sale is not priced high: the weight-set selector and the arrival predictor are withheld from every scenario, and the other twenty-two dials are priced
+
+**Date: 2026-09-10 · Owner: product owner (the ruling) · GitHub issue #467 · Amends [§ D525](#d525) clause 2 and [`docs/38`](docs/38-what-the-game-is.md) § 2.1's ladder table.**
+
+**Decided by the product owner, 2026-09-10**, on the issue: *"Hide the advanced families, price the
+rest. The `selection.*` (7) and `idle.predictor*` (6) dimensions stop being player-editable in
+scenarios. The other 22 get price rows, drafted for approval. The both-directions register in
+`scenario/budget.test.ts` moves with them, so the gap can still neither grow silently nor close by
+faking."*
+
+**Why an entry.** The mechanism binds code and data no one module owns — `data/price-schedule.json`
+and its parser, what a campaign stage's `every-declared-dimension` resolves to, the survivor table's
+provenance, and the engineering briefs that open the same mode — and it moves two things already
+recorded: § D525 clause 2's *"the whole editor is open in every scenario"*, and `docs/38` § 2.1's
+ladder table, which put *the weight-set selector* among what the dispatcher tier prices.
+
+1. **Not for sale and priced high are different answers, and the schedule says which.**
+   `data/price-schedule.json` carries a `withheld` block beside its `changes`:
+   `weight-set-selector`, the group `dispatcher.selection` (seven dials), and `arrival-predictor`,
+   six exact `dispatcher.idle.predictor*` paths — exact rather than a group, because
+   `dispatcher.idle` also holds the parking dials the schedule prices. A withheld entry carries no
+   price, no tier and no nights. `pricing/parse.ts` refuses one that tries, refuses a path both
+   withheld and priced — exactly or through a group — and refuses a document with no block.
+2. **`every-declared-dimension` is every dimension the search space declares, less every dimension
+   the schedule withholds.** Resolved in one place, `campaign/parse.ts#editableIdsOf`, which takes
+   the schedule as a required argument and filters both modes; a `listed` stage that names a
+   withheld dial fails to load. `scenario/budget.ts#admitPurchase` refuses a move that touches one
+   at any budget, and `scenario/survivorSpace.ts` leaves a dropdown profile that moves one out of
+   the population — which excludes nothing on the shipped profiles.
+3. **The other twenty-two are priced, and every figure is an agent's proposal, approved as drafted by the owner on 2026-09-11.**
+   Six new rows — `call-timing`, `reassignment`, `auction`, `cost-scaling` and `door-reopening` at
+   the dispatcher tier, `load-weighing` at the equipment tier — and five dials added to
+   `dispatch-rules` at its unchanged 2 u. Each note says field by field what is measured, what is
+   derived and what is chosen. No existing dial's price moved; the tier typicals are 2, 9 and 20 u
+   on both sides; the schedule totals 381 u, so every scenario's budget ceiling moved from 368.
+4. **The shipped content bounded the figures, and the loader is what said so.** Four stages open on
+   4 u, and `scenario/budget.test.ts` re-derives every opening budget as the dearest dial a stage
+   offers plus the dispatcher typical, so nothing those four offer may cost more than 2 u. And
+   stages 9 and 10 suggest `constraints.noDirectionReversal` and
+   `answer.allowBypassIfSoleEligibleCar` beside a 13 u landing-panel lever at a 15 u opening: the
+   first draft of this issue priced those two dials on rows of their own, `campaign/parse.ts`
+   refused both stages at 17 u, and that is why they sit on `dispatch-rules`.
+
+**What this does not decide.** Whether the prices are right: they are game feel, drafted rather than
+measured, for the owner to accept, tighten or reject, and the owner accepted them as drafted on 2026-09-11. Per-scenario scarcity: [§ D528](#d528)'s *a
+price, never a removed control* is untouched, because this withholds two families from every
+scenario alike rather than from one. And the Engineer parameter controls, which have no budget: they
+still draw every declared dimension. `data/scenario-survivors.json` is re-measured against the new
+schedule on the change that lands this, and its diff is published with it. Re-measured, one scenario
+leaves its [§ D537](#d537) band: stage 7 reads 0 of 24 at its base rung where it read 2 of 24, both
+through dial edits, so `scenario/survivorBands.test.ts` registers eight of ten outside rather than
+seven. The twelve dial edits drawn are not the ones drawn before — the same sample seed draws them
+from 511 bundles where it drew from 11 — so this measures that none of the twelve gets through, not
+that the two earlier ways through were closed.
 
 ---
 

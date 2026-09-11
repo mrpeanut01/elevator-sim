@@ -200,6 +200,7 @@ function wiredSurfaces(): readonly { readonly name: string; readonly glossary: r
         published: scenario,
         dimensionIds: space.ids,
         dimensionHelp: new Map(),
+        schedule: shippedPriceSchedule(),
       }).glossary,
     },
     {

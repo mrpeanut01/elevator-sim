@@ -82,7 +82,7 @@
  * data file those two read, so no `DECISIONS.md` number is owed for it.
  */
 
-import type { PriceSchedule, PricedChange } from '../pricing/types.js';
+import type { PriceSchedule, PricedChange, WithheldChange } from '../pricing/types.js';
 
 /* -------------------------------------------------------------------------- *
  * The shape
@@ -233,6 +233,17 @@ export function affordableChanges(schedule: PriceSchedule, units: number): reado
  * -------------------------------------------------------------------------- */
 
 /**
+ * The dotted prefixes of `dispatcher.<id>`, longest first — the one matching rule by which a
+ * dimension is priced **or withheld**, so the two answers cannot drift into two readings of a path.
+ */
+function coveringPathsOf(dimensionId: string): readonly string[] {
+  const parts = `dispatcher.${dimensionId}`.split('.');
+  const out: string[] = [];
+  for (let length = parts.length; length > 0; length -= 1) out.push(parts.slice(0, length).join('.'));
+  return out;
+}
+
+/**
  * The change that prices a **search-space dimension id**, or `undefined` where nothing does.
  *
  * `pricing/parse.ts#changeCovering` matches a `covers` path exactly, which is right for a fix-it
@@ -247,10 +258,32 @@ export function changePricingDimension(
   schedule: PriceSchedule,
   dimensionId: string,
 ): PricedChange | undefined {
-  const parts = `dispatcher.${dimensionId}`.split('.');
-  for (let length = parts.length; length > 0; length -= 1) {
-    const prefix = parts.slice(0, length).join('.');
+  for (const prefix of coveringPathsOf(dimensionId)) {
     const found = schedule.changes.find((change) => change.covers.includes(prefix));
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+/**
+ * The `withheld` entry that takes a dimension off sale in **every** scenario, or `undefined` —
+ * GitHub issue **#467**, [§ D535](../../../../DECISIONS.md).
+ *
+ * The product owner's ruling on that issue split the thirty-five dimensions it measured into the two
+ * answers its register could not tell apart: the weight-set selector and the arrival predictor are
+ * sold at no price, and the rest are priced. `data/price-schedule.json` declares the first answer
+ * once, in its `withheld` block, and this is the lookup every reader of it goes through —
+ * `campaign/parse.ts#editableIdsOf` to resolve the families out of a scenario's editable set, and
+ * {@link admitPurchase} to refuse a move that touches one. Same walk as
+ * {@link changePricingDimension}, so a withheld group reaches a knob declared tomorrow exactly as a
+ * priced group does, and nothing anywhere names a withheld dimension in code.
+ */
+export function withholdingDimension(
+  schedule: PriceSchedule,
+  dimensionId: string,
+): WithheldChange | undefined {
+  for (const prefix of coveringPathsOf(dimensionId)) {
+    const found = schedule.withheld.find((entry) => entry.covers.includes(prefix));
     if (found !== undefined) return found;
   }
   return undefined;
@@ -265,6 +298,12 @@ export interface PurchaseAdmission {
   readonly changeIds: readonly string[];
   /** Dimensions the schedule prices nothing for — reported, never silently charged. */
   readonly unpriced: readonly string[];
+  /**
+   * Dimensions the schedule **withholds** — sold in no scenario at any price (GitHub issue #467,
+   * [§ D535](../../../../DECISIONS.md)). Unlike {@link PurchaseAdmission.unpriced}, one of these
+   * refuses the whole move, whatever the budget holds.
+   */
+  readonly withheld: readonly string[];
   /** Why it is refused. Never `undefined` when {@link PurchaseAdmission.admitted} is `false`. */
   readonly reason: string | undefined;
 }
@@ -280,7 +319,14 @@ export interface PurchaseAdmission {
  * {@link PurchaseAdmission.unpriced}. It is not charged a guessed price and it is not refused:
  * inventing a price here would be the second price list #366 exists to end, and refusing would
  * make a control the editor offers unusable for a reason no player could read. The shipped set of
- * such dimensions is registered and checked in `scenario/budget.test.ts`.
+ * such dimensions is registered and checked in `scenario/budget.test.ts`, and since GitHub issue
+ * #467 priced the last of them it is empty.
+ *
+ * **A dimension the schedule withholds is the other answer, and it is refused** —
+ * [§ D535](../../../../DECISIONS.md). Not for sale is not priced high: no budget reaches it, so the
+ * move is refused whatever `units` holds, and the reason says so rather than quoting a price. The
+ * priced dimensions beside it are still summed into {@link PurchaseAdmission.units}, so a reader can
+ * see the refusal is about the withheld dial and not about the bill.
  */
 export function admitPurchase(
   schedule: PriceSchedule,
@@ -289,21 +335,43 @@ export function admitPurchase(
 ): PurchaseAdmission {
   const bought = new Map<string, PricedChange>();
   const unpriced: string[] = [];
+  const withheld: string[] = [];
+  const rulings = new Set<string>();
   for (const id of dimensionIds) {
+    const withholding = withholdingDimension(schedule, id);
+    if (withholding !== undefined) {
+      withheld.push(id);
+      rulings.add(withholding.id);
+      continue;
+    }
     const change = changePricingDimension(schedule, id);
     if (change === undefined) unpriced.push(id);
     else bought.set(change.id, change);
   }
   const cost = [...bought.values()].reduce((sum, change) => sum + change.priceUnits, 0);
   const changeIds = [...bought.keys()];
+  if (withheld.length > 0) {
+    return {
+      admitted: false,
+      units: cost,
+      changeIds,
+      unpriced,
+      withheld,
+      reason:
+        `${withheld.join(', ')} ${withheld.length === 1 ? 'is' : 'are'} sold in no scenario at any ` +
+        `price — data/price-schedule.json withholds ${[...rulings].join(', ')} (§ D535) — so no ` +
+        'budget buys this move, and not for sale is a different answer from priced high.',
+    };
+  }
   if (cost <= units) {
-    return { admitted: true, units: cost, changeIds, unpriced, reason: undefined };
+    return { admitted: true, units: cost, changeIds, unpriced, withheld, reason: undefined };
   }
   return {
     admitted: false,
     units: cost,
     changeIds,
     unpriced,
+    withheld,
     reason:
       `this change costs ${String(cost)} units (${changeIds.join(', ')}) and the budget holds ` +
       `${String(units)}. A wider budget is bought with chimes; the bar the run is judged against ` +

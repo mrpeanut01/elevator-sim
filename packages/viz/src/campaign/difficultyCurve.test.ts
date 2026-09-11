@@ -439,7 +439,7 @@ function sortedRegister(
 /** The shipped profiles a stage admits from its dropdown, its own baseline excluded. */
 function admittedProfilesOf(stage: CampaignStage): readonly string[] {
   const baseline = fixture.requireProfile(stage.dispatcher.startingProfileId);
-  const editable = editableIdsOf(stage.dispatcher.editable, fixture.space.ids);
+  const editable = editableIdsOf(stage.dispatcher.editable, fixture.space.ids, fixture.context.schedule);
   return fixture.config.dispatcherProfiles.profiles
     .filter((candidate) => candidate.id !== baseline.id)
     .filter((candidate) => admitProfile(fixture.space, baseline, candidate, editable).admissible)
