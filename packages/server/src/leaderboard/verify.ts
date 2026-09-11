@@ -145,49 +145,6 @@ export function configFor(
   return configOver(run, resources, (template) => template.selectable !== false);
 }
 
-/** What a single run under the rush stream is told, on the score route — {@link configFor}'s refusal. */
-const RUSH_POSTS_AS_A_SITTING =
-  'A rush posts as a sitting, not as a single run: send every round, from the building as shipped, to ' +
-  'POST /api/rush-sittings, where each round is replayed and the sitting is ranked by how long its last ' +
-  'round held. A rush has no average wait to rank here — the stream is built to break the building.';
-
-/**
- * The configuration of one round of a posted rush sitting — GitHub issue **#372**, and
- * `rushSitting.ts`'s one way into the replay.
- *
- * **Nothing about the round's run is submitted except what a player chose.** The building id names
- * the tower; the template, the seed, the ninety minutes, the window from the period's start and the
- * rate that makes the stream the same number of people on every tower are all derived here, from
- * `@elevator-sim/core`'s `sim/rush.ts`, which is the same derivation `packages/viz/src/everyday/rush.ts`
- * writes into the viewer's patch. So a round cannot post a gentler stream, a kinder seed or a shorter
- * climb: there is no field that could say one. The player's dispatcher, rules and intervention log
- * go through {@link configOver} exactly as a single run's do.
- *
- * It admits **only** the rush template, which is the whole of the difference from {@link configFor}.
- */
-export function rushRoundConfigFor(
-  buildingId: string,
-  round: Pick<SubmittedRun, 'dispatcherProfileId' | 'ruleRows' | 'interventions'>,
-  resources: VerificationResources,
-): SimulationConfig | RejectionCode {
-  const building = resources.buildingsById.get(buildingId);
-  if (building === undefined) return 'unknown-building';
-  const run: SubmittedRun = {
-    buildingId,
-    dispatcherProfileId: round.dispatcherProfileId,
-    demandTemplateId: RUSH_TEMPLATE_ID,
-    arrivalRatePctPop5min: rushTopRatePctPop5min(building.totalPopulation),
-    durationS: RUSH_STREAM.lengthS,
-    // From the period's own start rather than `null`, for `rush.ts#rushPatchOf`'s reason: an authored
-    // phase list refuses a `durationS` override (§ D275), and a window is what carries the length.
-    windowStartS: 0,
-    seed: String(RUSH_STREAM.seed),
-    ...(round.ruleRows === undefined ? {} : { ruleRows: round.ruleRows }),
-    ...(round.interventions === undefined ? {} : { interventions: round.interventions }),
-  };
-  return configOver(run, resources, (template) => template.id === RUSH_TEMPLATE_ID);
-}
-
 /**
  * The shared half of {@link configFor} and {@link rushRoundConfigFor}: resolve every id against the
  * server's own `data/`, in the order the refusals have always come in, with the one question that
@@ -304,6 +261,49 @@ function configOver(
      */
     ...(log.length === 0 ? {} : { interventions: log }),
   } as SimulationConfig;
+}
+
+/** What a single run under the rush stream is told, on the score route — {@link configFor}'s refusal. */
+const RUSH_POSTS_AS_A_SITTING =
+  'A rush posts as a sitting, not as a single run: send every round, from the building as shipped, to ' +
+  'POST /api/rush-sittings, where each round is replayed and the sitting is ranked by how long its last ' +
+  'round held. A rush has no average wait to rank here — the stream is built to break the building.';
+
+/**
+ * The configuration of one round of a posted rush sitting — GitHub issue **#372**, and
+ * `rushSitting.ts`'s one way into the replay.
+ *
+ * **Nothing about the round's run is submitted except what a player chose.** The building id names
+ * the tower; the template, the seed, the ninety minutes, the window from the period's start and the
+ * rate that makes the stream the same number of people on every tower are all derived here, from
+ * `@elevator-sim/core`'s `sim/rush.ts`, which is the same derivation `packages/viz/src/everyday/rush.ts`
+ * writes into the viewer's patch. So a round cannot post a gentler stream, a kinder seed or a shorter
+ * climb: there is no field that could say one. The player's dispatcher, rules and intervention log
+ * go through {@link configOver} exactly as a single run's do.
+ *
+ * It admits **only** the rush template, which is the whole of the difference from {@link configFor}.
+ */
+export function rushRoundConfigFor(
+  buildingId: string,
+  round: Pick<SubmittedRun, 'dispatcherProfileId' | 'ruleRows' | 'interventions'>,
+  resources: VerificationResources,
+): SimulationConfig | RejectionCode {
+  const building = resources.buildingsById.get(buildingId);
+  if (building === undefined) return 'unknown-building';
+  const run: SubmittedRun = {
+    buildingId,
+    dispatcherProfileId: round.dispatcherProfileId,
+    demandTemplateId: RUSH_TEMPLATE_ID,
+    arrivalRatePctPop5min: rushTopRatePctPop5min(building.totalPopulation),
+    durationS: RUSH_STREAM.lengthS,
+    // From the period's own start rather than `null`, for `rush.ts#rushPatchOf`'s reason: an authored
+    // phase list refuses a `durationS` override (§ D275), and a window is what carries the length.
+    windowStartS: 0,
+    seed: String(RUSH_STREAM.seed),
+    ...(round.ruleRows === undefined ? {} : { ruleRows: round.ruleRows }),
+    ...(round.interventions === undefined ? {} : { interventions: round.interventions }),
+  };
+  return configOver(run, resources, (template) => template.id === RUSH_TEMPLATE_ID);
 }
 
 /**
