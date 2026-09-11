@@ -43,6 +43,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The house’s rush table — GitHub issue #418, § D547. `parseRushHouseTable`’s literals are ' +
+        'load-time refusals addressed to whoever edited `data/rush-house-runs.json` ("carried more ' +
+        'people than had arrived", "measures a pair a second time"), and `RUSH_HOUSE_TABLE` is ' +
+        'only the classifier following that parser. Neither reaches a player. What a player reads ' +
+        'off the table is `rushStandingsOf`’s view — the names, the house tag, the waves and held ' +
+        'times, the note and both refusals — and the EVERYDAY_STANDALONE_SCREENS adapter seeds all ' +
+        'of it on every case. The wrinkle parser’s entry below is the same argument.',
+      ids: ['everyday/rushHouse.ts#parseRushHouseTable', 'everyday/rushHouse.ts#RUSH_HOUSE_TABLE'],
+    },
+    {
+      reason:
         'Telemetry’s machinery, which renders nothing — GitHub issue #340. Each of these is derived ' +
         'only because the two-adjacent-words scanner reaches a hyphenated key through it: the four ' +
         'consent writers and the reader all touch `CONSENT_KEY`, which is `elevator-sim.telemetry`, ' +
