@@ -266,7 +266,8 @@ describe('the replay — every round re-simulated, every purse derived', () => {
   }, 300_000);
 
   it('refuses a sitting whose last round never breaks — a tower that held the whole stream has no breaking point to post', () => {
-    // Measured in `rushSitting.cost.test.ts`: Vertical City's thirty-five cars hold all thirty waves.
+    // Measured in `rushSitting.cost.test.ts`: under collective, Vertical City's thirty-five cars hold all
+    // thirty waves. Only under collective — nearest-car breaks it at 3 546 s (`rushHoldAgreement.json`).
     const held = truthOf(PLAIN, 'vertical-city');
     expect(held.heldS).toBeNull();
     expect(held.wavesOutlasted).toBe(30);
