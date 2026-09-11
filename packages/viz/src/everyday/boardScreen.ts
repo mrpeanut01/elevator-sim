@@ -830,6 +830,14 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
             redraw();
             context.host.watchRun(context.host.postedRun(source, place), (checked) => {
               watchChecking = undefined;
+              /*
+               * A check that lands after the board has gone enters nothing — GitHub issue #526 item 3,
+               * and `everyday/weekScreen.ts#press` carries the argument for the same three lines.
+               */
+              if (disposed) {
+                if (checked.blocked === null && context.host.watching()?.run === checked) context.host.stopWatching();
+                return;
+              }
               if (checked.blocked !== null) {
                 watchRefused.set(entry.id, checked.blocked.reason);
                 redraw();
