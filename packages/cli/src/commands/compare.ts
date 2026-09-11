@@ -98,7 +98,6 @@ import {
 import {
   comparabilityBetween,
   comparabilityOfLandings,
-  passengerModelOf,
   resolveDispatchConfig,
   type DispatcherProfile,
   type LandingDeclaration,
@@ -1241,28 +1240,22 @@ export interface CrossModelNotice {
 }
 
 /**
- * The passenger model an arm will run under, off the **resolved** dispatch stage.
- *
- * `resolveDispatchConfig` is what applies the defaults and what refuses `panel` under a call type
- * that cannot ask for a destination, and `passengerModelOf` is the same function `Simulation`
- * uses to stamp `RunRecord.passengerModel`. Reading the authored
- * `profile.dispatch?.passengerAssignment` instead would be a second opinion about a question
- * `core` has already answered, and would disagree the first time a default changed.
- */
-export function modelOfProfile(profile: DispatcherProfile): PassengerModel {
-  return passengerModelOf(resolveDispatchConfig(profile).dispatch);
-}
-
-/**
  * `undefined` when every landing of the building runs the same passenger model under both arms,
  * and the notice when one does not.
  *
  * Decided by `core`'s `comparabilityBetween` over each arm's `comparabilityOfLandings` (GitHub
  * issue #437, `DECISIONS.md` § D553): the per-landing model and the pairing rule are `core`'s, and
  * this is the shipped command that enforces them. `landings` is the building's floors. A building
- * that declares no `landingCallType` gives each arm exactly the model {@link modelOfProfile} reads,
+ * that declares no `landingCallType` gives each arm exactly `passengerModelOf` of its resolved stage,
  * so the notice is the one this function has always raised; a building with panels on some
  * landings makes a `panel` arm `hybrid`, and refuses it against a uniform arm on the nine.
+ *
+ * **Off the resolved dispatch stage, never the authored profile.** `resolveDispatchConfig` is what
+ * applies the defaults and what refuses `panel` under a call type that cannot ask for a destination,
+ * and `comparabilityOfLandings` is the function `Simulation` stamps the run's model with. Reading the
+ * authored `profile.dispatch?.passengerAssignment` instead would be a second opinion about a question
+ * `core` has already answered, and would disagree the first time a default changed. (This reason
+ * used to sit on `modelOfProfile`, whose one caller this was; it was deleted with the caller.)
  *
  * `notComparable` is `core`'s own list, so a metric added to or removed from the nine appears here
  * without this file being edited. That matters: the list exists precisely because nobody remembers
