@@ -1025,6 +1025,21 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    */
   function enterEngineer(): void {
     if (world === 'engineer') return;
+    /*
+     * **A rush ends before the page is handed over** — GitHub issue #523, item 1, § D548 clause 7.
+     *
+     * The Engineer surface writes almost every field `rush.ts#RUSH_FIELD_ROLES` runs fresh — the
+     * levers, the selector, patience, the pattern, the building, the seed — and
+     * `dev/main.ts#interveneAt` re-runs over whatever it finds. A posted sitting records none of
+     * them, so a rush that survived the trip could bank a wave count its own replay would not
+     * produce. Re-applying the fresh fields on each re-run was the other fix, and it would make the
+     * panel's controls inert for as long as a rush stood, which is § D177's class. `go('rush')` is
+     * the route the rail's other rows already take: its guard calls {@link leaveRush}, which cancels
+     * the run in flight and puts the player's day back, and the way back lands on the setup screen
+     * rather than on a stage whose rush is gone. The row's note says so in a rush
+     * (`types.ts#ENGINEER_SWAP_RUSH_NOTE`).
+     */
+    if (state.ctx === 'rush') go('rush');
     world = 'engineer';
     setCoveredInert(false);
     setEverydayCovered(true);
@@ -1035,16 +1050,30 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * The way back — `dev/main.ts`'s header control, through `everyday/swap.ts`'s port.
    *
    * The mirror of {@link enterEngineer}, in the mirrored order: this shell comes back first, then
-   * {@link coverEngineer} re-inerts everything behind it and re-arms the observer. Nothing is
-   * re-drawn and nothing is re-mounted — `state`, the mounted screen, § 3.4's latch and the data
-   * host's subscription were all untouched by the trip, which is what makes the return land on the
-   * screen the player left rather than at the front door.
+   * {@link coverEngineer} re-inerts everything behind it and re-arms the observer. `state`, § 3.4's
+   * latch and the data host's subscription were all untouched by the trip, which is what makes the
+   * return land on the screen the player left rather than at the front door.
+   *
+   * **One screen is drawn again, and only that one** — GitHub PR #530's review, finding 1. The rush
+   * setup screen reads the player's settings once, when it is drawn, and {@link enterEngineer} draws
+   * it at the swap (`go('rush')`). The Engineer panel then writes the fields it prints — the
+   * dispatcher, the levers, patience, the pattern — and nothing on this side hears it, because that
+   * screen wires no control and takes no host subscription. So it named the driver and the settings
+   * that stood at the swap. The return now draws it through {@link draw}, the route every navigation
+   * takes, so it reads the state at the moment it becomes visible whatever wrote it.
+   *
+   * A subscription on the screen was the other fix, and the larger one: the host's listeners fire at
+   * the end of every `dev/main.ts#renderAll`, which is every state change the other world makes, so a
+   * subscribed screen would rebuild behind the cover on each of them, and it would need unmount
+   * plumbing on a mount that has none. Every other screen is left mounted — the stage above all, whose canvas keeps its box
+   * across the trip (`shell.browser.test.ts`).
    */
   function returnToEveryday(): void {
     if (world === 'everyday') return;
     world = 'everyday';
     setEverydayCovered(false);
     coverEngineer();
+    if (state.screen === 'rush') draw();
   }
 
   /**

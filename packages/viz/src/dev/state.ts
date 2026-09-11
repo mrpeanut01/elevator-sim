@@ -1291,6 +1291,27 @@ export function profileById(
 }
 
 /**
+ * **The selector a fresh session would seed from the dispatcher `state` names** — {@link initialState}'s
+ * own derivation, over the profile the state brings rather than the one a session opens on.
+ *
+ * It has two readers, and one function is the point. `scope/runIdentity.ts`'s `selectorSpec` row
+ * compares the standing spec against it, because a submission carries a dispatcher id and the server
+ * replays that profile's own `selection`. `everyday/rush.ts#rushStandingOf` writes it, because a rush
+ * runs the dispatcher as PR #513's server replays it. The press used to write a fresh session's spec,
+ * seeded from the *opening* dispatcher, and the two agreed only because no shipped profile declares a
+ * selection — GitHub issue #523, item 2, recorded in § D548 clause 7.
+ */
+export function declaredSelectorSpecOf(
+  resources: BrowserResources,
+  state: Pick<ViewerState, 'savedDispatchers' | 'dispatcherId'>,
+): SelectorSpec {
+  return selectorSpecFromProfile(
+    profileById(resources, state.savedDispatchers, state.dispatcherId),
+    selectorContextFrom(resources.dispatcherProfiles),
+  );
+}
+
+/**
  * The profile this state actually drives — the base by id, then the levers, then the selector,
  * then the rules, in {@link shiftRunConfigOf}'s own order and extracted from it so there is one
  * derivation rather than two (review finding 2: the stage's switch-dispatcher control must

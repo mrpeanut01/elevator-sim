@@ -143,6 +143,7 @@ import {
   rushFactViews,
   rushGeneratedRangeLine,
   rushHoldLineFigure,
+  rushLeftBehindLine,
   rushOpeningLine,
 } from '../everyday/rushScreenModel.js';
 import { RUSH_HOUSE_COPY, rushStandingsOf } from '../everyday/rushHouse.js';
@@ -8384,6 +8385,7 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/rushScreenModel.ts#rushBandViews',
     'everyday/rushScreenModel.ts#rushFactViews',
     'everyday/rushScreenModel.ts#rushDrivingLine',
+    'everyday/rushScreenModel.ts#rushLeftBehindLine',
     'everyday/rushScreenModel.ts#rushHoldLineFigure',
     'everyday/rushScreenModel.ts#rushGeneratedRangeLine',
     'everyday/rushScreenModel.ts#rushOpeningLine',
@@ -8459,6 +8461,29 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       text: rushDrivingLine('Collective control'),
       role: 'prose',
     });
+    /*
+     * What a rush leaves behind of the player's settings — GitHub issue #523, item 3. The
+     * `lobby-anchor` card's one lever, every setting the line can name, the two run settings with no
+     * lever moved (GitHub PR #530's review, finding 2), and the arm that says nothing, which the corpus
+     * filters as the empty string.
+     */
+    for (const [arm, text] of [
+      ['lobby-anchor', rushLeftBehindLine({ parking: true, express: false, dwell: undefined })],
+      [
+        'every-setting',
+        rushLeftBehindLine(
+          { parking: true, express: true, dwell: 'patient' },
+          { switching: true, patience: true, pattern: true },
+        ),
+      ],
+      [
+        'patience-and-pattern',
+        rushLeftBehindLine({ parking: false, express: false, dwell: undefined }, { patience: true, pattern: true }),
+      ],
+      ['none', rushLeftBehindLine({ parking: false, express: false, dwell: undefined })],
+    ] as const) {
+      seeds.push({ field: `rush.leftBehind.${arm}`, text: text ?? '', role: 'prose' });
+    }
     for (const band of rushBandViews()) {
       seeds.push({ field: `rush.band.${band.waves}.waves`, text: band.waves, role: 'label' });
       seeds.push({ field: `rush.band.${band.waves}.rate`, text: band.rate, role: 'label' });
@@ -11807,6 +11832,7 @@ const ENGINEER_DOOR: SurfaceAdapter = {
   id: 'everyday/types.ts#ENGINEER_SWAP_NOTE',
   covers: [
     'everyday/types.ts#ENGINEER_SWAP_NOTE',
+    'everyday/types.ts#ENGINEER_SWAP_RUSH_NOTE',
     'everyday/types.ts#ENGINEER_RETURN_LABEL',
     'everyday/types.ts#ENGINEER_RETURN_TITLE',
   ],
@@ -11820,6 +11846,15 @@ const ENGINEER_DOOR: SurfaceAdapter = {
        * carries — it may name the thing it is refusing — is one this sentence has no claim on.
        */
       { field: 'rail.footer.swap.note', text: swap.note, role: 'prose' },
+      /*
+       * The same row with a rush standing, which ends the rush before it hands the page over —
+       * GitHub issue #523, item 1. The rail draws it on the rush's stage and its result.
+       */
+      {
+        field: 'rail.footer.swap.note.rush',
+        text: railModel({ screen: 'stage', ctx: 'rush' }).footer.engineerSwap.note,
+        role: 'prose',
+      },
       { field: 'engineer.header.back.label', text: ENGINEER_RETURN_LABEL, role: 'label' },
       { field: 'engineer.header.back.title', text: ENGINEER_RETURN_TITLE, role: 'prose' },
     ]);

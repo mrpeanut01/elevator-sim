@@ -105,6 +105,7 @@ import type {
   DispatcherProfile,
   DispatcherProfiles,
   ElevatorSpecs,
+  PatienceConfig,
   ResolvedBuilding,
   RunInterventionConfig,
   SimulationConfig,
@@ -179,6 +180,7 @@ import {
   shiftLengthForContract,
   specsWithSaved,
   withDispatcher,
+  type PatternSelection,
   type SavedDispatcher,
   type ViewerState,
 } from '../dev/state.js';
@@ -680,8 +682,14 @@ export interface EverydayHost {
   /** The most recently closed day's record, or `undefined` before any day has closed. */
   lastOutcome(): DayOutcome | undefined;
 
-  /** What the standing config points at — the ids the next run will be built from. */
-  selection(): { readonly buildingId: string; readonly dispatcherId: string };
+  /**
+   * What the standing config points at — the ids the next run will be built from.
+   *
+   * `pattern` is `ViewerState.pattern`: `'building'` for the building's own demand, or the id of a
+   * shipped profile or a saved pattern. The rush setup screen reads it to say a rush leaves it behind
+   * (GitHub PR #530's review, finding 2).
+   */
+  selection(): { readonly buildingId: string; readonly dispatcherId: string; readonly pattern: PatternSelection };
 
   /**
    * The crowd the next run will meet, as the number two players compare — `ViewerState.seed`.
@@ -894,6 +902,14 @@ export interface EverydayHost {
 
   /** The group levers applied over whichever dispatcher drives — see `GroupLevers`' docstring. */
   groupLevers(): GroupLevers;
+
+  /**
+   * The rider patience the next run applies — `ViewerState.patience`, which the Engineer parameter
+   * form's `sim.patience.*` writes, and `null` when the run applies none (`core`'s rule: there is no
+   * default patience). The rush setup screen reads it to say a rush leaves it behind (GitHub PR #530's
+   * review, finding 2).
+   */
+  patience(): PatienceConfig | null;
 
   /** The profile the working copy was read from, or `undefined` when it no longer exists. */
   editingSource(): DispatcherProfile | undefined;
@@ -1955,7 +1971,7 @@ export function createEverydayHost(
     lastOutcome: () => b.state().week.history.at(-1),
     selection: () => {
       const state = b.state();
-      return { buildingId: state.buildingId, dispatcherId: state.dispatcherId };
+      return { buildingId: state.buildingId, dispatcherId: state.dispatcherId, pattern: state.pattern };
     },
     seed: () => b.state().seed,
     resolvedBuilding: () => resolvedBuildingOf(b.resources, b.state()),
@@ -2048,6 +2064,7 @@ export function createEverydayHost(
     dispatcherProfilesFile: () => b.resources.dispatcherProfiles,
     workingSpec: () => b.state().dispatcherSpec,
     groupLevers: () => b.state().levers,
+    patience: () => b.state().patience,
     editingSource: () => {
       const state = b.state();
       return allDispatchers(b.resources, state.savedDispatchers).find(

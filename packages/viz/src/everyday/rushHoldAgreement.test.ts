@@ -28,6 +28,12 @@
  * the same cells through the server's `rushRoundConfigFor`. The table is read as a file rather than
  * imported, on `scope/runIdentity.test.ts`'s precedent for reading `packages/server`'s
  * `submission.ts`: this package may not import that one.
+ *
+ * A cell carrying `declaredSelection` is a fixture — GitHub issue #523, item 2. Its profile is given
+ * that `selection` before anything is resolved, in this half and the server's, because no shipped
+ * profile declares one and so no shipped cell can tell a selector read off the dispatcher the player
+ * brings from one read off a fresh session. `rushHoldAgreement.test.ts` beside the table says why the
+ * cell is the one it is.
  */
 
 import { readFileSync } from 'node:fs';
@@ -52,6 +58,7 @@ interface AgreementCell {
   readonly buildingId: string;
   readonly dispatcherProfileId: string;
   readonly interventions?: readonly WireIntervention[];
+  readonly declaredSelection?: NonNullable<BrowserResources['dispatcherProfiles']['profiles'][number]['selection']>;
   readonly heldS: number | null;
 }
 
@@ -75,15 +82,28 @@ beforeAll(async () => {
 });
 
 /** Standing on `buildingId` the way a player arrives there: its own contract's week, on day 1. */
-function standingOn(buildingId: string, dispatcherId = 'collective'): ViewerState {
-  return withDispatcher(withBuilding(initialState(resources, RUSH_SEED), resources, buildingId), resources, dispatcherId);
+function standingOn(buildingId: string, dispatcherId = 'collective', using: BrowserResources = resources): ViewerState {
+  return withDispatcher(withBuilding(initialState(using, RUSH_SEED), using, buildingId), using, dispatcherId);
+}
+
+/** The shipped resources, with the cell's profile declaring its fixture selection where it has one. */
+function resourcesFor(cell: AgreementCell): BrowserResources {
+  const selection = cell.declaredSelection;
+  if (selection === undefined) return resources;
+  return {
+    ...resources,
+    dispatcherProfiles: {
+      ...resources.dispatcherProfiles,
+      profiles: resources.dispatcherProfiles.profiles.map((profile) => (profile.id === cell.dispatcherProfileId ? { ...profile, selection } : profile)),
+    },
+  };
 }
 
 /** *Start the rush*, pressed through `EverydayHost` exactly as `rushScreen.ts` presses it. */
-function pressedRush(standing: ViewerState): ViewerState {
+function pressedRush(standing: ViewerState, using: BrowserResources = resources): ViewerState {
   let state = standing;
   const bindings = {
-    resources,
+    resources: using,
     state: () => state,
     applyPatch: (patch: Partial<ViewerState>) => {
       state = { ...state, ...patch };
@@ -141,17 +161,26 @@ describe('the rush hold agreement table — the viewer’s half (PR #513, findin
     expect([...new Set(table.cells.map((cell) => cell.buildingId))].sort()).toEqual(config.buildings.map((building) => building.id).sort());
   });
 
-  it.each(table.cells.map((cell) => [`${cell.buildingId} ${cell.dispatcherProfileId}${cell.interventions === undefined ? '' : ' logged'}`, cell] as const))(
+  it.each(
+    table.cells.map(
+      (cell) =>
+        [
+          `${cell.buildingId} ${cell.dispatcherProfileId}${cell.declaredSelection === undefined ? '' : ` declaring ${JSON.stringify(cell.declaredSelection)}`}${cell.interventions === undefined ? '' : ' logged'}`,
+          cell,
+        ] as const,
+    ),
+  )(
     '%s',
     (label, cell) => {
-      const pressed = pressedRush(standingOn(cell.buildingId, cell.dispatcherProfileId));
+      const using = resourcesFor(cell);
+      const pressed = pressedRush(standingOn(cell.buildingId, cell.dispatcherProfileId, using), using);
       const log: RunInterventionConfig[] = (cell.interventions ?? []).map((entry) => {
         if (entry.change.kind !== 'switch-dispatcher') return { atS: entry.atS, change: { kind: entry.change.kind } } as RunInterventionConfig;
-        const profile = switchTargetFromWire(entry.change, resources.dispatcherProfiles.profiles);
+        const profile = switchTargetFromWire(entry.change, using.dispatcherProfiles.profiles);
         if (profile === undefined) throw new Error(`${label}: no shipped dispatcher "${entry.change.toProfileId}"`);
         return { atS: entry.atS, change: { kind: 'switch-dispatcher', profile } };
       });
-      const plan = shiftRunConfigOf(resources, log.length === 0 ? pressed : { ...pressed, interventions: log });
+      const plan = shiftRunConfigOf(using, log.length === 0 ? pressed : { ...pressed, interventions: log });
       const { recording } = recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds });
       expect(recording.startedAt).toBe(0);
       const hold = rushHoldAt(recording);

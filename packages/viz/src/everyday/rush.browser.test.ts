@@ -10,6 +10,16 @@
  * stops that run, so nothing lands over the day the way out has just put back. The host's half of that
  * is `host.test.ts`, and the runner's is `dev/shiftRunner.test.ts` (a result arriving after a cancel is
  * not applied); this case holds the binding between them, on the shipped bundle.
+ *
+ * The third is GitHub issue #523, item 1: *Switch to Engineer* pressed mid-rush leaves the rush before
+ * it hands the page over. The full panel writes the levers, the selector and every other field a rush
+ * runs fresh, and a posted sitting records none of them, so a rush that survived the trip could bank
+ * a wave count its own replay would not produce. Coming back lands on the setup screen.
+ *
+ * The fourth is GitHub PR #530's review, finding 1: that setup screen is drawn at the moment of the
+ * swap, so what the Engineer panel writes in between — a lever, another dispatcher — has to reach the
+ * lines it prints on the way back, or the screen names a driver and a set of settings that are no
+ * longer the player's.
  */
 
 import { chromium, type Browser, type Page } from 'playwright-core';
@@ -153,6 +163,95 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       const settled = await page.evaluate(() => document.getElementById('status')?.textContent ?? '');
       expect(seen.left, `left with status "${seen.status}"; once the runner was idle it read "${settled}"`).toBe(idle);
       await page.waitForSelector('.everyday-mode[data-screen="scenario"]', { timeout: 15_000 });
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('switched to Engineer mid-rush, leaves the rush first, and comes back to the setup screen — GitHub issue #523', async () => {
+    const page = await coldLoad();
+    try {
+      await leaveTutorialIfOffered(page);
+      await page.locator('.everyday-mode[data-screen="rush"]').click();
+      await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForFunction(
+        () => /^WAVE \d+$/u.test(document.querySelector('.everyday-stage-phase')?.textContent ?? ''),
+        undefined,
+        { timeout: 60_000 },
+      );
+      /* Non-vacuity: a rush is standing on its stage when the player swaps. */
+      expect(await page.textContent('.everyday-bar-primary')).toBe('End the rush');
+      const note = await page.textContent('.everyday-engineer-swap');
+      await page.locator('.everyday-engineer-swap').click();
+      await page.locator('#back-to-everyday').click();
+      /*
+       * Where the swap does not leave, the stage is still there with *End the rush* on it, and anything
+       * the panel wrote in between runs under the rush's next re-run.
+       */
+      const back = await page.evaluate(() => ({
+        setup: document.querySelector('.everyday-rush-driving') !== null,
+        stage: document.querySelector('.everyday-stage-phase') !== null,
+        primary: document.querySelector('.everyday-bar-primary')?.textContent ?? '',
+      }));
+      expect(back).toEqual({ setup: true, stage: false, primary: 'Start the rush' });
+      /* And the row said so before it was pressed. */
+      expect(note).toContain('ends the rush first');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('comes back from Engineer naming what the panel wrote there, not what stood at the swap — GitHub PR #530', async () => {
+    const page = await coldLoad();
+    try {
+      await leaveTutorialIfOffered(page);
+      await page.locator('.everyday-mode[data-screen="rush"]').click();
+      await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForFunction(
+        () => /^WAVE \d+$/u.test(document.querySelector('.everyday-stage-phase')?.textContent ?? ''),
+        undefined,
+        { timeout: 60_000 },
+      );
+      await page.locator('.everyday-engineer-swap').click();
+      /* Non-vacuity: the setup screen the swap drew, before the panel has written anything. */
+      const atSwap = await page.evaluate(() => ({
+        driving: document.querySelector('.everyday-rush-driving')?.textContent ?? '',
+        leftBehind: document.querySelector('.everyday-rush-left-behind')?.textContent ?? null,
+      }));
+      expect(atSwap.driving).toContain('Conventional collective');
+      expect(atSwap.leftBehind).toBeNull();
+
+      /* Another dispatcher, from the Engineer rail's own list. */
+      await page.locator('#rail-dispatcher-list .pick', { hasText: 'Nearest car' }).first().click();
+      /* And lobby parking, on the dispatcher editor's group lever. */
+      await page.locator('#rail-open-dispatcher').first().click();
+      const parking = page.locator('button.toggle', { hasText: 'Park the cars in the lobby before the rush' }).first();
+      expect(await parking.getAttribute('aria-pressed')).toBe('false');
+      await parking.click();
+      await page.waitForFunction(
+        () =>
+          [...document.querySelectorAll('button.toggle')].some(
+            (button) =>
+              button.textContent?.includes('Park the cars in the lobby before the rush') === true &&
+              button.getAttribute('aria-pressed') === 'true',
+          ),
+        undefined,
+        { timeout: 15_000 },
+      );
+
+      await page.locator('#back-to-everyday').click();
+      const back = await page.evaluate(() => ({
+        setup: document.querySelector('.everyday-rush-setup') !== null,
+        driving: document.querySelector('.everyday-rush-driving')?.textContent ?? '',
+        leftBehind: document.querySelector('.everyday-rush-left-behind')?.textContent ?? null,
+      }));
+      expect(back.setup).toBe(true);
+      /* Soft, so a run that fails says which of the two lines stood still rather than only the first. */
+      expect.soft(back.driving).toContain('Nearest car');
+      expect.soft(back.driving).not.toContain('Conventional collective');
+      expect.soft(back.leftBehind).toContain('lobby parking');
     } finally {
       await page.close();
     }

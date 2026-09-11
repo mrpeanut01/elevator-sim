@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
 import { actionBarFor } from './actionBar.js';
 import { routeFor } from './screens.js';
 import { WAIT_BANDS } from '../live/bands.js';
@@ -25,6 +26,7 @@ import {
   rushBarModel,
   rushDrivingLine,
   rushFactViews,
+  rushLeftBehindLine,
   rushGeneratedRangeLine,
   rushHoldLineFigure,
   rushOpeningLine,
@@ -254,6 +256,53 @@ describe('what the screen refuses, and where the refusal sits', () => {
      */
     expect(line).toContain('brief');
     expect(line).not.toMatch(/not built/);
+  });
+
+  /*
+   * GitHub issue #523, item 3. A rush runs from the shipped levers (§ D548 clause 6), so the
+   * `lobby-anchor` style card — collective with parking on — reaches the rush as plain collective,
+   * and the driving line names only the profile. The line under it names what stays behind, and
+   * says nothing when nothing does.
+   */
+  it('names the levers a rush leaves behind, and nothing when the player set none', () => {
+    expect(rushLeftBehindLine(DEFAULT_LEVERS)).toBeUndefined();
+    const anchor = rushLeftBehindLine({ ...DEFAULT_LEVERS, parking: true });
+    expect(anchor).toContain('lobby parking');
+    expect(anchor).toContain('stays behind');
+    expect(anchor).not.toMatch(/express|dwell/u);
+    expect(rushLeftBehindLine({ parking: true, express: true, dwell: 'patient' })).toMatch(
+      /lobby parking, express zoning and patient door dwell stay behind/u,
+    );
+    expect(rushLeftBehindLine({ ...DEFAULT_LEVERS, dwell: 'snappy' })).toContain('snappy door dwell stays behind');
+  });
+
+  /*
+   * GitHub PR #530's review, finding 2. A rush runs `patience` and `pattern` fresh too
+   * (`rush.ts#RUSH_FIELD_ROLES`), and the Engineer panel writes both — the parameter form's
+   * `sim.patience.*` and the rail's *Arrival pattern* list — so the line that names what a rush leaves
+   * behind names them when the player has moved them, and § D548 clause 7 says it does.
+   */
+  it('names rider patience and the arrival pattern when the player moved them, beside the levers and the selector', () => {
+    expect(rushLeftBehindLine(DEFAULT_LEVERS, {})).toBeUndefined();
+    expect(rushLeftBehindLine(DEFAULT_LEVERS, { patience: false, pattern: false, switching: false })).toBeUndefined();
+    expect(rushLeftBehindLine(DEFAULT_LEVERS, { patience: true })).toBe(
+      'A rush runs it as shipped, so your rider patience stays behind until you leave.',
+    );
+    expect(rushLeftBehindLine(DEFAULT_LEVERS, { pattern: true })).toBe(
+      'A rush runs it as shipped, so your arrival pattern stays behind until you leave.',
+    );
+    expect(rushLeftBehindLine(DEFAULT_LEVERS, { switching: true })).toBe(
+      'A rush runs it as shipped, so your pattern switching stays behind until you leave.',
+    );
+    expect(
+      rushLeftBehindLine(
+        { parking: true, express: true, dwell: 'patient' },
+        { switching: true, patience: true, pattern: true },
+      ),
+    ).toBe(
+      'A rush runs it as shipped, so your lobby parking, express zoning, patient door dwell, rider patience, ' +
+        'arrival pattern and pattern switching stay behind until you leave.',
+    );
   });
 });
 

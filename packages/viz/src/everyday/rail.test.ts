@@ -20,6 +20,7 @@ import { railFooter, railGroups, railModel, sublineFor } from './rail.js';
 import { EVERYDAY_SCREENS_BUILT, UNBUILT_REASONS } from './screens.js';
 import {
   ENGINEER_SWAP_NOTE,
+  ENGINEER_SWAP_RUSH_NOTE,
   EVERYDAY_SCREENS,
   RUN_CONTEXTS,
   type EverydayScreen,
@@ -233,6 +234,25 @@ describe('the footer', () => {
     expect(swap.note).toContain('this visit only');
     // The stale-refusal guard proper: no wording of "not built" may come back onto this row.
     expect(swap.note).not.toMatch(/not built/);
+  });
+
+  /*
+   * GitHub issue #523, item 1. Inside a rush the swap ends the rush before it hands the page over
+   * (`shell.ts#enterEngineer`), so *nothing stops* would be false on exactly the row that stops
+   * something. Every other context keeps the note above; the rush's two screens with a rush
+   * standing carry this one.
+   */
+  it('says in a rush that the swap ends the rush first, and only in a rush', () => {
+    for (const screen of ['stage', 'report'] as const) {
+      const note = railFooter({ screen, ctx: 'rush' }).engineerSwap.note;
+      expect(note).toBe(ENGINEER_SWAP_RUSH_NOTE);
+      expect(note).toContain('ends the rush first');
+      expect(note).not.toContain('nothing stops');
+      expect(note).toContain('this visit only');
+    }
+    for (const ctx of RUN_CONTEXTS.filter((context) => context !== 'rush')) {
+      expect(railFooter({ screen: 'stage', ctx }).engineerSwap.note, ctx).toBe(ENGINEER_SWAP_NOTE);
+    }
   });
 });
 

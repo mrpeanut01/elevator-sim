@@ -60,7 +60,7 @@ import {
 
 import type { VizRecording, VizSaturation } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
-import { initialState, resolvedBuildingOf, type ViewerState } from '../dev/state.js';
+import { declaredSelectorSpecOf, initialState, resolvedBuildingOf, type ViewerState } from '../dev/state.js';
 import { demandDisclosureOf, type DemandBand } from '../fixit/parse.js';
 import { waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
@@ -127,7 +127,10 @@ type RushFieldRole = 'building' | 'dispatcher' | 'rush' | 'fresh' | 'surface';
  *   start*, which the house rows and PR #513's server replay already assume. The alternative is the
  *   owner's to choose: record both in the sitting and in the board's modifier-set key (§ D548
  *   clause 6). **Every press writes them**, *Run the rush again* included (`EverydayHost.startRush`),
- *   so a second attempt does not inherit the first one's interventions.
+ *   so a second attempt does not inherit the first one's interventions. **`selectorSpec`'s value is
+ *   the one a fresh session would seed from the dispatcher the player brings**, not from the dispatcher
+ *   a session opens on: the server replays that profile's own `selection`, and the two agreed only
+ *   while no shipped profile declared one (GitHub issue #523, item 2; § D548 clause 7).
  * - `surface` — what the screens show and edit, and no run under a rush reads. `savedPatterns` is
  *   here because a run reads it only through `pattern`, which is `fresh`.
  *
@@ -272,6 +275,12 @@ function rushStandingOf(resources: BrowserResources, state: ViewerState, ratePct
      * written out here, so a field the table gains takes its value from where every session's does.
      */
     ...freshFieldsOf(initialState(resources, RUSH_SEED)),
+    /*
+     * Except the selector. A fresh session seeds it from the dispatcher it opens on, and a rush runs
+     * the one the player brings, whose own `selection` is what `verify.ts#rushRoundConfigFor` replays.
+     * GitHub issue #523, item 2.
+     */
+    selectorSpec: declaredSelectorSpecOf(resources, state),
     playMode: 'endless',
     week: moved.week.contractId === RUSH_CONTRACT_ID ? moved.week : openRush(),
     parkedWeeks: moved.parked,

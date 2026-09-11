@@ -145,11 +145,6 @@ import {
 } from '@elevator-sim/core/browser';
 
 import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
-// The two are aliased at every site that needs both — `authoring/selectorSpec.ts`'s naming hazard.
-import {
-  specFromProfile as selectorSpecFromProfile,
-  selectorContextFrom,
-} from '../authoring/selectorSpec.js';
 import { fitOutIsAsBuilt } from '../campaign/fitOut.js';
 import { commissionedBuilding } from '../commissioning/building.js';
 import { commissionableClasses } from '../commissioning/types.js';
@@ -157,7 +152,7 @@ import type { BrowserResources } from '../dev/data.js';
 import {
   buildingConfigOf,
   calendarAskInputOf,
-  profileById,
+  declaredSelectorSpecOf,
   specsWithSaved,
   type ViewerState,
 } from '../dev/state.js';
@@ -661,10 +656,8 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
    * would start refusing honest runs the day a profile declares a selector of its own.
    */
   selectorSpec: (state, resources) => {
-    const declared = selectorSpecFromProfile(
-      profileById(resources, state.savedDispatchers, state.dispatcherId),
-      selectorContextFrom(resources.dispatcherProfiles),
-    );
+    // One derivation with the rush's press (`everyday/rush.ts#rushStandingOf`), GitHub issue #523.
+    const declared = declaredSelectorSpecOf(resources, state);
     if (JSON.stringify(state.selectorSpec) === JSON.stringify(declared)) return undefined;
     return (
       `the weight-set selector is set to “${state.selectorSpec.policy}”, which is not what the ` +
