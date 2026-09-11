@@ -99,27 +99,30 @@
  * construction rather than by exemption: this table is keyed by `data/campaign.json`'s stages, and
  * the tutorial is not one.
  *
- * ## Two clauses of #367 that are **carried and not asserted**, named rather than left to be found
+ * ## Two clauses of #367 — one now asserted against a drafted band, one still carried
  *
- * Both wait on a figure nobody has authored, and inventing one here would be this file doing the
- * thing its own first paragraph says it never does.
- *
- * 1. **DC-2's replacement.** GitHub issue #365's comment re-expresses *no stage clears from the
- *    dispatcher dropdown alone* as *the dispatcher tier's survivors are inside the ladder
- *    position's budget, positions one and two exempt*. The **reading** ships:
- *    {@link PublishedSurvivorStep.perTier}'s `dispatcher` column is exactly that count, and it is
- *    exact rather than sampled because the dropdown half is a census. What does not ship is the
- *    comparison, because **no field of `data/` says what a ladder position's survivor budget is**.
- * 2. **A count outside its position's budget fails rather than being noted** — the same missing
- *    figure, one clause along. {@link PublishedSurvivorScenario.ladderPosition} is carried and is
- *    checked against the campaign's own ordered path, so the key the ruling will need is here and
- *    is derived rather than authored.
- *
- * What a rule needs is a band per position — `docs/33` DC-4's `[1/3, 2/3]` is that shape for a miss
- * rate, and `data/contract-ladder.json` is where such a figure would live, marked **chosen** the way
- * every figure in that file is. Choosing it is a designer's decision about pacing, which is
- * `data/contract-ladder.json`'s own provenance note in as many words: *"no amount of sweeping makes
- * it one."* This file measures; it does not choose.
+ * 1. **A count outside its position's band fails rather than being noted.** Asserted since GitHub
+ *    issue #234 ([§ D537](../../../../DECISIONS.md)) by `survivorBands.test.ts`, against
+ *    `data/scenario-survivor-bands.json`: a band per ladder position, authored as shares of the
+ *    configurations judged, and **chosen and drafted for the owner's approval** rather than measured.
+ *    That is why it is a file of its own rather than a field of this table, and why nothing in this
+ *    file reads it: this file measures, and a band is a choice about pacing — `docs/33` DC-4's
+ *    `[1/3, 2/3]` is the same shape for a miss rate, and `data/contract-ladder.json`'s provenance note
+ *    says of such a figure *"no amount of sweeping makes it one."*
+ *    {@link PublishedSurvivorScenario.ladderPosition} is the key the band is read by;
+ *    {@link validatePublishedSurvivors} checks it against the table's own rows, and the band check
+ *    checks the rows against `data/campaign.json`'s order.
+ * 2. **DC-2's replacement, per tier — carried, and still not asserted.** GitHub issue #365's comment
+ *    re-expresses *no stage clears from the dispatcher dropdown alone* as *the dispatcher tier's
+ *    survivors are inside the ladder position's budget, positions one and two exempt*. The
+ *    **reading** ships: {@link PublishedSurvivorStep.dropdown} is the census of shipped profiles,
+ *    exact rather than sampled. {@link PublishedSurvivorStep.perTier}'s `dispatcher` column is not the
+ *    same number, because it also counts dial draws priced at that tier — on the table measured
+ *    2026-09-10, stage 1's base rung counts 19 there against a dropdown census of 8. What does not
+ *    ship is a per-tier comparison: the band § D537 records is over every configuration judged, not
+ *    over one tier, so a scenario whose one survivor is a dropdown profile can sit inside it.
+ *    `campaign/difficultyCurve.test.ts`'s `DROPDOWN_CLEARS` holds the dropdown half, on
+ *    `metOnTuningSeeds` rather than on this table's `cleared`.
  */
 
 import type { PriceSchedule } from '../pricing/types.js';

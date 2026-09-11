@@ -272,8 +272,10 @@ right change for, a contract that needs a bigger purse, a rush record that needs
 a rush wave survived. Each pays a flat amount authored in `data/` (invariant 7). Harder scenarios
 may pay more, by their survivor-count band, because that is a property of the scenario and not of
 the run — **that permission is not taken up, and the shipped table pays every scenario the same**:
-`data/scenario-survivors.json` records survivor *counts* and no band, nothing turns a count into
-one, and a band the client chose was what the first attempt at this shipped (the review of PR #485;
+`data/scenario-survivors.json` records survivor *counts* and no band, nothing the earn route reads
+turns a count into one — GitHub issue #234's drafted difficulty band,
+`data/scenario-survivor-bands.json`, is read only by an acceptance check — and a band the client
+chose was what the first attempt at this shipped (the review of PR #485;
 `packages/core/src/config/chimeLedger.ts` now refuses a `bands` key by name). A band becomes
 available when a scenario's pinned record carries one. **No chime is ever scaled by a wait figure or
 any quantity the run can suppress.** That is
