@@ -109,11 +109,12 @@ describe('dispatcherPlateOf', () => {
 
   it('counts weighted terms against the library rather than a literal thirteen', () => {
     // The denominator tracks `data/`'s term list, which is the point of the test's name: it moved
-    // from twelve to thirteen when `diversionDetour` landed (`DECISIONS.md` § D211) and the plate
-    // followed without a code change, which a literal would not have.
-    expect(valueOf(dispatcherPlateOf(profile('collective')), 'terms weighted')).toBe('1 of 13');
+    // from twelve to thirteen when `diversionDetour` landed (`DECISIONS.md` § D211), and to fourteen
+    // when `dutyMismatch` did (GitHub issue #481), and the plate followed each time without a code
+    // change, which a literal would not have.
+    expect(valueOf(dispatcherPlateOf(profile('collective')), 'terms weighted')).toBe('1 of 14');
     expect(valueOf(dispatcherPlateOf(profile('predictive-balanced')), 'terms weighted')).toBe(
-      '10 of 13',
+      '10 of 14',
     );
   });
 
@@ -269,7 +270,7 @@ describe('the dispatcher list’s words', () => {
     const collective = profile('collective');
     expect(collective.$comment).toBeUndefined();
     const blurb = dispatcherBlurbOf(collective);
-    expect(blurb).toContain('1 of 13 terms weighted');
+    expect(blurb).toContain('1 of 14 terms weighted');
     expect(blurb).toContain('waitTime 1.00');
   });
 
@@ -1024,29 +1025,29 @@ describe('a suppressed run yields no mean anywhere in the right rail', () => {
  * beside the row that prints it.
  */
 const ENGINEER_BLURBS: Readonly<Record<string, string>> = Object.freeze({
-  'nearest-car': '1 of 13 terms weighted; heaviest distanceTravelled 1.00.',
-  eta: '1 of 13 terms weighted; heaviest waitTime 1.00.',
+  'nearest-car': '1 of 14 terms weighted; heaviest distanceTravelled 1.00.',
+  eta: '1 of 14 terms weighted; heaviest waitTime 1.00.',
   collective:
-    '1 of 13 terms weighted; heaviest waitTime 1.00; hard constraint noDirectionReversal.',
+    '1 of 14 terms weighted; heaviest waitTime 1.00; hard constraint noDirectionReversal.',
   'collective-enroute':
-    '2 of 13 terms weighted; heaviest waitTime 1.00, detourPenalty 0.20; hard constraint ' +
+    '2 of 14 terms weighted; heaviest waitTime 1.00, detourPenalty 0.20; hard constraint ' +
     'noDirectionReversal; stops en route for calls it passes.',
   'energy-aware':
-    '3 of 13 terms weighted; heaviest waitTime 0.60, stopCount 0.30, distanceTravelled 0.10.',
-  'fairness-first': '2 of 13 terms weighted; heaviest starvation 0.50, waitTime 0.50.',
+    '3 of 14 terms weighted; heaviest waitTime 0.60, stopCount 0.30, distanceTravelled 0.10.',
+  'fairness-first': '2 of 14 terms weighted; heaviest starvation 0.50, waitTime 0.50.',
   'capacity-aware':
-    '3 of 13 terms weighted; heaviest waitTime 0.70, loadFactor 0.20, crowding 0.10.',
+    '3 of 14 terms weighted; heaviest waitTime 0.70, loadFactor 0.20, crowding 0.10.',
   'predictive-balanced':
-    '10 of 13 terms weighted; heaviest waitTime 1.00, directionReversal 0.80, starvation 0.70.',
+    '10 of 14 terms weighted; heaviest waitTime 1.00, directionReversal 0.80, starvation 0.70.',
   auction:
-    '3 of 13 terms weighted; heaviest waitTime 1.00, existingCallDelay 0.40, loadFactor 0.30; ' +
+    '3 of 14 terms weighted; heaviest waitTime 1.00, existingCallDelay 0.40, loadFactor 0.30; ' +
     'contract-net over 1 bidding round.',
   'auction-multi-round':
-    '3 of 13 terms weighted; heaviest waitTime 1.00, existingCallDelay 0.40, loadFactor 0.30; ' +
+    '3 of 14 terms weighted; heaviest waitTime 1.00, existingCallDelay 0.40, loadFactor 0.30; ' +
     'contract-net over 3 bidding rounds.',
-  'zoned-uppeak': '2 of 13 terms weighted; heaviest waitTime 0.70, zoneAffinity 0.30.',
-  'destination-eta': '2 of 13 terms weighted; heaviest waitTime 1.00, rideTime 0.50.',
-  'destination-panel': '2 of 13 terms weighted; heaviest rideTime 1.00, waitTime 1.00.',
+  'zoned-uppeak': '2 of 14 terms weighted; heaviest waitTime 0.70, zoneAffinity 0.30.',
+  'destination-eta': '2 of 14 terms weighted; heaviest waitTime 1.00, rideTime 0.50.',
+  'destination-panel': '2 of 14 terms weighted; heaviest rideTime 1.00, waitTime 1.00.',
 });
 
 describe('Engineer is pinned whole — § D299 § 1, in the file it is about', () => {

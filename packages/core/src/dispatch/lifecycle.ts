@@ -185,6 +185,12 @@ export function costRequestFor(
     ...(knowsCredential && call.credentialGroup !== undefined
       ? { credentialGroup: call.credentialGroup }
       : {}),
+    // Forwarded under every call type, unlike the two above (GitHub issue #481, DECISIONS.md
+    // § D549). A duty trip is summoned on the landing's own duty control — the goods or bed call a
+    // duty lift is fitted with — so a conventional group knows it exactly as a destination-entry
+    // group does. Omitted when the call carries none, which is every call in a building that
+    // declares no duty, so the request is the object it was.
+    ...(call.duty === undefined ? {} : { duty: call.duty }),
     // Omitted rather than zeroed when nobody counted: the car then charges its own
     // `assumedBoardingPassengers`, which is the honest price of a bare up/down button.
     ...(observation.waitingPassengers > 0

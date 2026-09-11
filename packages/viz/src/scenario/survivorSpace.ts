@@ -88,6 +88,15 @@
  * configuration exactly when destination panels were also bought and the drawn call type opened the
  * gate, which is § D112's finding as a property of the sample rather than as a sentence about it.
  *
+ * **A dial the scenario's own building gives nothing to act on is not drawn at all** — § D549. A shut
+ * gate is decided by the partly-built vector; this is decided by the building, which no draw can
+ * change, so the dial is left out **before** its value is drawn rather than dropped after. The order
+ * is load-bearing: every draw in a cell comes from one stream, and a value drawn and thrown away
+ * would shift every later draw. `weights.dutyMismatch` is the case — priced, because `dispatch-rules`
+ * covers `dispatcher.weights`, and inert on a building no car of which declares a duty
+ * (`authoring/dispatcherSpec.ts#dimensionIdsLiveOn`). `dev/campaignPanel.ts` does not offer it on
+ * such a building either, so a configuration that moves it there is not one the player was offered.
+ *
  * Two further draws are discarded rather than kept, and both are counted:
  *
  * - **A draw that moves nothing** — every dial dead, or every drawn value equal to the one the
@@ -150,6 +159,7 @@ import {
   type SearchSpace,
 } from '@elevator-sim/experiments/browser';
 
+import { dimensionIdsLiveOn } from '../authoring/dispatcherSpec.js';
 import { movedDimensions } from '../campaign/dimensions.js';
 import { admitEditedVector, applyEdit, valuesFromProfile } from '../controls/editedProfile.js';
 import type { PriceSchedule, PricedChange } from '../pricing/types.js';
@@ -538,6 +548,8 @@ export function sampleReachableConfigurations(request: SampleRequest): SampledSp
   const order = tierOrderOf(schedule);
   const rng = policyNoiseStream(seed);
   const held = valuesFromProfile(space, baseline);
+  /* What this building lets a player be offered — see the module docstring on why before the draw. */
+  const offered = new Set(dimensionIdsLiveOn(space.ids, building));
 
   const configurations: DrawnConfiguration[] = [];
   const seen = new Set<string>();
@@ -561,6 +573,7 @@ export function sampleReachableConfigurations(request: SampleRequest): SampledSp
     let values = held;
     const moved: Record<string, ParameterValue> = {};
     for (const id of bundle.flatMap((change) => change.dimensionIds)) {
+      if (!offered.has(id)) continue;
       const drawn = sampleValue(parameterOf(space, id), rng);
       if (values.get(id) === drawn) continue;
       const step = applyEdit(space, values, { [id]: drawn });

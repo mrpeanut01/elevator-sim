@@ -28,6 +28,7 @@
  * a constant by accident.
  */
 
+import type { Duty } from '../config/types.js';
 import type { SimTime } from '../kernel/index.js';
 import type { PassengerMassConfig } from '../config/types.js';
 import type { Rng, StreamSet } from '../random/index.js';
@@ -137,6 +138,11 @@ export interface PassengerInit {
   readonly arrivedAt: SimTime;
   /** Access-control credential. `undefined` means an unbadged visitor. */
   readonly credentialGroup?: CredentialGroup | undefined;
+  /**
+   * What this journey needs a car for, off the trace (GitHub issue #481). Absent in every building
+   * in which no car declares a duty, so such a passenger is the object it was.
+   */
+  readonly duty?: Duty | undefined;
   /** 0 for the first leg. Increments at each transfer. */
   readonly legIndex?: number | undefined;
   /** Where the journey started. Defaults to this leg's origin. */
@@ -231,6 +237,8 @@ export class Passenger {
   readonly massKg: number;
   /** Access-control credential, or `undefined` for an unbadged visitor. Constant across legs. */
   readonly credentialGroup: CredentialGroup | undefined;
+  /** What the journey needs a car for, or `undefined` where no car declares a duty. Constant across legs. */
+  readonly duty: Duty | undefined;
   /** When this leg's wait began. */
   readonly arrivedAt: SimTime;
   /** Which way this leg travels, from the floor *indices*. */
@@ -290,6 +298,7 @@ export class Passenger {
     this.journeyStartedAt = journeyStartedAt;
     this.massKg = init.massKg;
     this.credentialGroup = init.credentialGroup;
+    this.duty = init.duty;
     this.arrivedAt = init.arrivedAt;
     this.direction = init.destinationFloorIndex > init.originFloorIndex ? 'up' : 'down';
     const egressTransitS = init.egressTransitS ?? 0;
@@ -558,6 +567,8 @@ export class Passenger {
       journeyStartedAt: this.journeyStartedAt,
       massKg: this.massKg,
       ...(this.credentialGroup === undefined ? {} : { credentialGroup: this.credentialGroup }),
+      // A duty belongs to the journey, so the next leg rides with the same one (GitHub issue #481).
+      ...(this.duty === undefined ? {} : { duty: this.duty }),
       arrivedAt: init.arrivedAt,
       ...(init.egressTransitS === undefined ? {} : { egressTransitS: init.egressTransitS }),
     });

@@ -58,6 +58,7 @@ export type {
   BatchSizeCurve,
   CredentialAssignment,
   CredentialGapOverride,
+  DutyDemandOverride,
   DayVariationConfig,
   DemandLevel,
   DemandPhase,
@@ -145,6 +146,7 @@ export type { RouteTopology } from './route.js';
  * -------------------------------------------------------------------------- */
 
 export {
+  buildingDeclaresDuty,
   generateTrace,
   planDemand,
   routeOf,

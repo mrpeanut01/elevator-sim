@@ -96,15 +96,28 @@ concept from `accessZones` (credential-based) and from any operational zoning th
 dispatcher applies dynamically. See
 [docs/01-architecture.md](../../docs/01-architecture.md#security-zones-are-three-different-things).
 
-## Duty — the fourth thing, and it is not in the schema
+`duty` says what a car is *for* — a goods, bed, service or passenger lift — and it is none of those
+three zoning concepts either. See § *Duty* below.
 
-**A car has no `duty` field, and this section exists so that the next lane to want one adds the
-concept rather than a field.** GitHub issue #481; two shipped screens refuse the control from
-opposite sides — `everyday/designerModel.ts` and `everyday/fixitScreen.ts` — and each names the
-other, which is what says it is one missing concept two screens want rather than a gap in either.
+## Duty — the fourth thing
 
-**Duty is what a car is *for*: a goods lift, a bed lift, a passenger lift.** It is a property of the
-shaft as built, and it does not change during a run.
+**A car may declare what it is for, and this section is the contract for it.** GitHub issue #481,
+[§ D549](../../DECISIONS.md). Two shipped screens still refuse the control from opposite sides —
+`everyday/designerModel.ts` and `everyday/fixitScreen.ts` — because the control is the one step below
+that is not built.
+
+**Duty is what a car is *for*: a goods lift, a bed lift, a passenger lift, a service lift.** It is a
+property of the shaft as built, and it does not change during a run.
+
+```json
+{ "id": "A", "spec": "gearless-traction", "duty": "goods" }
+```
+
+`duty` is one of `passenger`, `goods`, `bed` or `service` — a closed list, declared per car, by the
+project owner's ruling of 2026-09-10. **Absent means a passenger car.** A building in which no car
+declares a duty runs exactly as it did before the field existed: its riders are drawn a duty and the
+draw is thrown away, so its traces and its legs are byte-identical (`traffic/dutyIdentity.test.ts`,
+all nine shipped buildings). **No shipped building declares one.**
 
 ### What duty is not, and each of these already exists
 
@@ -123,42 +136,37 @@ one most likely to be mistaken for duty:
 of service"* is **not** a duty — it is `mode: 'out-of-service'`, authorable today, and a
 `ServiceEventConfig` can put the car back mid-run. `CarConfig.mode`'s own docstring settles it: *"A
 building with a car under maintenance, a bank in fire recall, an attendant-operated car — all of them
-are `mode`."* So the concept duty still owes is narrower than the screens' refusals suggest: it is
+are `mode`."* So duty is
 **purpose**, and nothing else.
 
-### What has to be true before a `duty` field is added
+**And duty filters nothing, which is what keeps it out of all four.** `servesFloors` and
+`accessZones` decide which cars *may* take a call; a duty only says what it costs to send one that
+is not for the trip, so a car whose duty differs is still sent when it is the only one.
 
-**A duty no dispatcher or generator consults is a label**, and this repository keeps a register of
-behaviours that were configurable, unit-tested and reached by nothing — **eleven times in code and
-twice in `data/`**. So the standing requirement binds here in its usual form: *move the control and
-require the run to change, compared on the legs.*
+### How a duty reaches a run
 
-**The precedent to read first is `accessZones`, because it is this defect with its polarity
-reversed** ([§ D265](../../DECISIONS.md)). It was loaded, schema-checked, cross-validated with four
-dedicated warning codes, indexed by `Bank` and consulted by `Simulation` in three places — and could
-not change a result, because `traffic/generator.ts` issued every rider the credential their own route
-needed, so every generated trip was authorised by construction and the gate never bit. **Not a
-behaviour with no caller: a caller with no behaviour to reach.**
+1. **The demand side.** Every journey draws a duty — one uniform per passenger from the `duty`
+   stream, in final trace order — against `../traffic-profiles.json → duty.shares` (goods, bed and
+   service; everybody else is a passenger). It is recorded on the journey, on every leg and in the
+   leg record only where some car of the building declares a duty.
+2. **Dispatch.** The landing call carries the duty of the passenger it speaks for, under every call
+   type, and the `dutyMismatch` cost term prices 1 when that duty is not the car's. The weight a
+   profile gives it is the whole price: a small weight is a preference, and a weight above the sum
+   of the profile's other weights is near-exclusive use. **No shipped profile weights it yet**: while
+   no shipped building declares a duty a weight would be decoration, and `traffic/dutyIdentity.test.ts`
+   refuses one; § D549 drafts `capacity-aware` at 0.35 for when one does. The shares — 0.02 goods,
+   0.01 bed and 0.02 service — are applied, and are **proposals awaiting the owner's approval**.
+3. **The control.** Not built: the picker the two screens want, on § D219's test.
 
-A `duty` field lands in exactly that position unless the **demand side** can express a duty-bound
-trip. A goods lift that dispatch prefers for a goods journey does nothing if no journey is a goods
-journey. So the order is:
+**The precedent that set that order is `accessZones`, this defect with its polarity reversed**
+([§ D265](../../DECISIONS.md)): loaded, validated, indexed and consulted, and unable to change a
+result, because every generated trip was authorised by construction. A duty field would have landed
+in the same position without step 1, so step 1 came first — and `sim/dutySeam.test.ts` moves the
+weight on a building that declares a duty and requires the legs to change.
 
-1. **This paragraph** — what duty is and is not. Done here; it binds no code and needs no field.
-2. **The demand side** — a trip that *has* a duty, in `traffic/`, so there is something for a
-   dispatcher to be right or wrong about.
-3. **Dispatch** — a duty-bound car preferred, avoided, or refused for a call, with the legs moving.
-4. **The control** — the picker the two screens want, on § D219's test.
-
-Doing 4 before 2 produces a screen that looks finished and binds nothing, which is what both
-refusals are currently protecting against.
-
-### Not decided here
-
-Whether duty is a closed vocabulary or free text; whether it sits on the car or on the bank; and
-whether a duty-bound car is *preferred*, *reserved* or merely *scored* for a matching call. Those
-reach past this document into `core`'s model, so they want a `DECISIONS.md` entry rather than a
-schema note ([§ D404](../../DECISIONS.md), [§ D405](../../DECISIONS.md)).
+**Decided by § D549**, which this section used to leave open: a closed vocabulary rather than free
+text; on the car rather than the bank; and *scored* — one weighted mismatch term — rather than
+preferred or reserved by a filter.
 
 ## Access zones
 

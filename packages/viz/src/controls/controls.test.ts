@@ -422,6 +422,11 @@ describe('coverage of the shipped schema — the one claim that needs the real o
       'traffic.directionalSplit.incoming',
       'traffic.directionalSplit.interfloor',
       'traffic.directionalSplit.outgoing',
+      // GitHub issue #481. Each duty share is `default: null` for the credential gap's reason: the
+      // number lives in `data/traffic-profiles.json` as a proposal with its reasoning attached.
+      'traffic.duty.shares.bed',
+      'traffic.duty.shares.goods',
+      'traffic.duty.shares.service',
       'traffic.passengerMass.distribution',
       'traffic.passengerMass.maxKg',
       'traffic.passengerMass.meanKg',
