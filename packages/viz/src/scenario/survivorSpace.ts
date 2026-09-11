@@ -152,6 +152,7 @@ import {
 
 import { movedDimensions } from '../campaign/dimensions.js';
 import { admitEditedVector, applyEdit, valuesFromProfile } from '../controls/editedProfile.js';
+import { purchaseUnits } from '../pricing/parse.js';
 import type { PriceSchedule, PricedChange } from '../pricing/types.js';
 
 import { admitPurchase, withholdingDimension } from './budget.js';
@@ -211,7 +212,7 @@ export function reachableChangesOf(
     out.push({
       changeId: change.id,
       tier: change.tier,
-      priceUnits: change.priceUnits,
+      priceUnits: purchaseUnits(change),
       dimensionIds,
     });
   }
@@ -424,7 +425,7 @@ export function dropdownConfigurationsOf(
         bought.map((change) => ({
           changeId: change.id,
           tier: change.tier,
-          priceUnits: change.priceUnits,
+          priceUnits: purchaseUnits(change),
           dimensionIds: [],
         })),
         order,
