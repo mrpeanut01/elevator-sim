@@ -4,7 +4,7 @@
   "provenance": {
     "kind": "measured",
     "command": "ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz src/scenario/survivorSweep.test.ts",
-    "tree": "4877cc31",
+    "tree": "d9e39473",
     "measuredAt": "2026-09-11",
     "masterSeed": 20260910,
     "sampleSize": 12,
@@ -100,9 +100,9 @@
             "seed": 951829162,
             "bundles": 5,
             "enumerable": false,
-            "draws": 15,
+            "draws": 14,
             "refusedDraws": 0,
-            "inertDraws": 3,
+            "inertDraws": 2,
             "duplicateDraws": 0
           }
         },
@@ -128,7 +128,7 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 16,
+              "examined": 18,
               "survivors": 1
             },
             "unpriced": {
@@ -136,7 +136,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 7,
+              "examined": 5,
               "survivors": 0
             }
           },
@@ -147,9 +147,9 @@
             "seed": 1644787431,
             "bundles": 15,
             "enumerable": false,
-            "draws": 12,
+            "draws": 13,
             "refusedDraws": 0,
-            "inertDraws": 0,
+            "inertDraws": 1,
             "duplicateDraws": 0
           }
         },
@@ -175,7 +175,7 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 16,
+              "examined": 17,
               "survivors": 1
             },
             "unpriced": {
@@ -183,7 +183,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 7,
+              "examined": 6,
               "survivors": 0
             }
           },
@@ -194,10 +194,10 @@
             "seed": 1896623623,
             "bundles": 15,
             "enumerable": false,
-            "draws": 15,
+            "draws": 16,
             "refusedDraws": 0,
             "inertDraws": 3,
-            "duplicateDraws": 0
+            "duplicateDraws": 1
           }
         }
       ]
@@ -231,7 +231,7 @@
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 2,
+          "suppressed": 3,
           "unbuildable": 0,
           "dropdown": {
             "examined": 8,
@@ -258,9 +258,9 @@
             "seed": 989916867,
             "bundles": 5,
             "enumerable": false,
-            "draws": 13,
+            "draws": 12,
             "refusedDraws": 0,
-            "inertDraws": 1,
+            "inertDraws": 0,
             "duplicateDraws": 0
           }
         },
@@ -272,7 +272,7 @@
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 4,
+          "suppressed": 3,
           "unbuildable": 0,
           "dropdown": {
             "examined": 12,
@@ -284,7 +284,7 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 15,
+              "examined": 17,
               "survivors": 0
             },
             "unpriced": {
@@ -292,7 +292,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 8,
+              "examined": 6,
               "survivors": 0
             }
           },
@@ -303,9 +303,9 @@
             "seed": 50924351,
             "bundles": 15,
             "enumerable": false,
-            "draws": 13,
+            "draws": 14,
             "refusedDraws": 0,
-            "inertDraws": 1,
+            "inertDraws": 2,
             "duplicateDraws": 0
           }
         },
@@ -317,7 +317,7 @@
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 3,
+          "suppressed": 5,
           "unbuildable": 0,
           "dropdown": {
             "examined": 12,
@@ -348,9 +348,9 @@
             "seed": 898620172,
             "bundles": 15,
             "enumerable": false,
-            "draws": 15,
+            "draws": 14,
             "refusedDraws": 0,
-            "inertDraws": 3,
+            "inertDraws": 2,
             "duplicateDraws": 0
           }
         }
@@ -414,9 +414,9 @@
             "seed": 1802987014,
             "bundles": 5,
             "enumerable": false,
-            "draws": 14,
+            "draws": 12,
             "refusedDraws": 0,
-            "inertDraws": 2,
+            "inertDraws": 0,
             "duplicateDraws": 0
           }
         },
@@ -442,7 +442,7 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 16,
+              "examined": 18,
               "survivors": 1
             },
             "unpriced": {
@@ -450,7 +450,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 7,
+              "examined": 5,
               "survivors": 0
             }
           },
@@ -461,8 +461,8 @@
             "seed": 2056965768,
             "bundles": 15,
             "enumerable": false,
-            "draws": 13,
-            "refusedDraws": 0,
+            "draws": 14,
+            "refusedDraws": 1,
             "inertDraws": 1,
             "duplicateDraws": 0
           }
@@ -508,9 +508,9 @@
             "seed": 902852627,
             "bundles": 15,
             "enumerable": false,
-            "draws": 15,
-            "refusedDraws": 1,
-            "inertDraws": 2,
+            "draws": 13,
+            "refusedDraws": 0,
+            "inertDraws": 1,
             "duplicateDraws": 0
           }
         }
@@ -545,7 +545,7 @@
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 4,
+          "suppressed": 6,
           "unbuildable": 0,
           "dropdown": {
             "examined": 12,
@@ -590,6 +590,51 @@
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
+          "suppressed": 5,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 16,
+              "survivors": 0
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 7,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 583472238,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 12,
+            "refusedDraws": 0,
+            "inertDraws": 0,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "building-rung",
+          "units": 54,
+          "chimesSpent": 39,
+          "examined": 24,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 0,
           "suppressed": 4,
           "unbuildable": 0,
           "dropdown": {
@@ -618,57 +663,12 @@
             "method": "sampled",
             "sampleSize": 12,
             "masterSeed": 20260910,
-            "seed": 583472238,
-            "bundles": 15,
-            "enumerable": false,
-            "draws": 12,
-            "refusedDraws": 0,
-            "inertDraws": 0,
-            "duplicateDraws": 0
-          }
-        },
-        {
-          "stepId": "building-rung",
-          "units": 54,
-          "chimesSpent": 39,
-          "examined": 24,
-          "survivors": 0,
-          "survivorNames": [],
-          "unjudged": 0,
-          "suppressed": 2,
-          "unbuildable": 0,
-          "dropdown": {
-            "examined": 12,
-            "survivors": 0
-          },
-          "dials": {
-            "examined": 12,
-            "survivors": 0
-          },
-          "perTier": {
-            "dispatcher": {
-              "examined": 17,
-              "survivors": 0
-            },
-            "unpriced": {
-              "examined": 1,
-              "survivors": 0
-            },
-            "equipment": {
-              "examined": 6,
-              "survivors": 0
-            }
-          },
-          "sampling": {
-            "method": "sampled",
-            "sampleSize": 12,
-            "masterSeed": 20260910,
             "seed": 123683065,
             "bundles": 15,
             "enumerable": false,
-            "draws": 13,
+            "draws": 14,
             "refusedDraws": 0,
-            "inertDraws": 1,
+            "inertDraws": 2,
             "duplicateDraws": 0
           }
         }
@@ -717,53 +717,6 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 21,
-              "survivors": 1
-            },
-            "unpriced": {
-              "examined": 1,
-              "survivors": 0
-            },
-            "equipment": {
-              "examined": 2,
-              "survivors": 0
-            }
-          },
-          "sampling": {
-            "method": "sampled",
-            "sampleSize": 12,
-            "masterSeed": 20260910,
-            "seed": 1359977640,
-            "bundles": 11,
-            "enumerable": false,
-            "draws": 13,
-            "refusedDraws": 0,
-            "inertDraws": 1,
-            "duplicateDraws": 0
-          }
-        },
-        {
-          "stepId": "equipment-rung",
-          "units": 24,
-          "chimesSpent": 9,
-          "examined": 24,
-          "survivors": 1,
-          "survivorNames": [
-            "predictive-balanced"
-          ],
-          "unjudged": 0,
-          "suppressed": 24,
-          "unbuildable": 0,
-          "dropdown": {
-            "examined": 12,
-            "survivors": 1
-          },
-          "dials": {
-            "examined": 12,
-            "survivors": 0
-          },
-          "perTier": {
-            "dispatcher": {
               "examined": 16,
               "survivors": 1
             },
@@ -780,19 +733,19 @@
             "method": "sampled",
             "sampleSize": 12,
             "masterSeed": 20260910,
-            "seed": 1670001683,
-            "bundles": 15,
+            "seed": 1359977640,
+            "bundles": 11,
             "enumerable": false,
             "draws": 13,
-            "refusedDraws": 0,
-            "inertDraws": 1,
+            "refusedDraws": 1,
+            "inertDraws": 0,
             "duplicateDraws": 0
           }
         },
         {
-          "stepId": "building-rung",
-          "units": 54,
-          "chimesSpent": 39,
+          "stepId": "equipment-rung",
+          "units": 24,
+          "chimesSpent": 9,
           "examined": 24,
           "survivors": 1,
           "survivorNames": [
@@ -820,6 +773,53 @@
             },
             "equipment": {
               "examined": 8,
+              "survivors": 0
+            }
+          },
+          "sampling": {
+            "method": "sampled",
+            "sampleSize": 12,
+            "masterSeed": 20260910,
+            "seed": 1670001683,
+            "bundles": 15,
+            "enumerable": false,
+            "draws": 14,
+            "refusedDraws": 0,
+            "inertDraws": 2,
+            "duplicateDraws": 0
+          }
+        },
+        {
+          "stepId": "building-rung",
+          "units": 54,
+          "chimesSpent": 39,
+          "examined": 24,
+          "survivors": 1,
+          "survivorNames": [
+            "predictive-balanced"
+          ],
+          "unjudged": 0,
+          "suppressed": 24,
+          "unbuildable": 0,
+          "dropdown": {
+            "examined": 12,
+            "survivors": 1
+          },
+          "dials": {
+            "examined": 12,
+            "survivors": 0
+          },
+          "perTier": {
+            "dispatcher": {
+              "examined": 19,
+              "survivors": 1
+            },
+            "unpriced": {
+              "examined": 1,
+              "survivors": 0
+            },
+            "equipment": {
+              "examined": 4,
               "survivors": 0
             }
           },
@@ -867,7 +867,7 @@
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 0,
+          "suppressed": 1,
           "unbuildable": 0,
           "dropdown": {
             "examined": 12,
@@ -879,7 +879,7 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 19,
+              "examined": 17,
               "survivors": 0
             },
             "unpriced": {
@@ -887,7 +887,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 4,
+              "examined": 6,
               "survivors": 0
             }
           },
@@ -912,7 +912,7 @@
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 2,
+          "suppressed": 3,
           "unbuildable": 0,
           "dropdown": {
             "examined": 12,
@@ -943,10 +943,10 @@
             "seed": 1215951009,
             "bundles": 15,
             "enumerable": false,
-            "draws": 15,
+            "draws": 12,
             "refusedDraws": 0,
-            "inertDraws": 2,
-            "duplicateDraws": 1
+            "inertDraws": 0,
+            "duplicateDraws": 0
           }
         },
         {
@@ -969,7 +969,7 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 17,
+              "examined": 16,
               "survivors": 0
             },
             "unpriced": {
@@ -977,7 +977,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 6,
+              "examined": 7,
               "survivors": 0
             }
           },
@@ -1022,9 +1022,10 @@
           "units": 15,
           "chimesSpent": 0,
           "examined": 24,
-          "survivors": 1,
+          "survivors": 2,
           "survivorNames": [
-            "edit-1"
+            "edit-1",
+            "edit-3"
           ],
           "unjudged": 0,
           "suppressed": 1,
@@ -1035,19 +1036,19 @@
           },
           "dials": {
             "examined": 12,
-            "survivors": 1
+            "survivors": 2
           },
           "perTier": {
             "dispatcher": {
-              "examined": 16,
-              "survivors": 1
+              "examined": 18,
+              "survivors": 2
             },
             "unpriced": {
               "examined": 1,
               "survivors": 0
             },
             "equipment": {
-              "examined": 7,
+              "examined": 5,
               "survivors": 0
             }
           },
@@ -1058,9 +1059,9 @@
             "seed": 357179212,
             "bundles": 11,
             "enumerable": false,
-            "draws": 12,
+            "draws": 13,
             "refusedDraws": 0,
-            "inertDraws": 0,
+            "inertDraws": 1,
             "duplicateDraws": 0
           }
         },
@@ -1084,7 +1085,7 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 18,
+              "examined": 16,
               "survivors": 0
             },
             "unpriced": {
@@ -1092,7 +1093,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 5,
+              "examined": 7,
               "survivors": 0
             }
           },
@@ -1114,8 +1115,10 @@
           "units": 54,
           "chimesSpent": 39,
           "examined": 24,
-          "survivors": 0,
-          "survivorNames": [],
+          "survivors": 1,
+          "survivorNames": [
+            "edit-8"
+          ],
           "unjudged": 0,
           "suppressed": 1,
           "unbuildable": 0,
@@ -1125,12 +1128,12 @@
           },
           "dials": {
             "examined": 12,
-            "survivors": 0
+            "survivors": 1
           },
           "perTier": {
             "dispatcher": {
               "examined": 18,
-              "survivors": 0
+              "survivors": 1
             },
             "unpriced": {
               "examined": 1,
@@ -1148,9 +1151,9 @@
             "seed": 549340453,
             "bundles": 15,
             "enumerable": false,
-            "draws": 13,
+            "draws": 15,
             "refusedDraws": 0,
-            "inertDraws": 1,
+            "inertDraws": 3,
             "duplicateDraws": 0
           }
         }
@@ -1212,9 +1215,9 @@
             "seed": 2104205868,
             "bundles": 5,
             "enumerable": false,
-            "draws": 15,
+            "draws": 16,
             "refusedDraws": 0,
-            "inertDraws": 3,
+            "inertDraws": 4,
             "duplicateDraws": 0
           }
         },
@@ -1257,10 +1260,10 @@
             "seed": 2097791607,
             "bundles": 15,
             "enumerable": false,
-            "draws": 13,
+            "draws": 18,
             "refusedDraws": 0,
-            "inertDraws": 1,
-            "duplicateDraws": 0
+            "inertDraws": 3,
+            "duplicateDraws": 3
           }
         },
         {
@@ -1283,7 +1286,7 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 15,
+              "examined": 16,
               "survivors": 0
             },
             "unpriced": {
@@ -1291,7 +1294,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 8,
+              "examined": 7,
               "survivors": 0
             }
           },
@@ -1302,9 +1305,9 @@
             "seed": 247181573,
             "bundles": 15,
             "enumerable": false,
-            "draws": 13,
+            "draws": 14,
             "refusedDraws": 0,
-            "inertDraws": 1,
+            "inertDraws": 2,
             "duplicateDraws": 0
           }
         }
@@ -1351,7 +1354,7 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 17,
+              "examined": 19,
               "survivors": 0
             },
             "unpriced": {
@@ -1359,7 +1362,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 6,
+              "examined": 4,
               "survivors": 0
             }
           },
@@ -1370,9 +1373,9 @@
             "seed": 30329684,
             "bundles": 11,
             "enumerable": false,
-            "draws": 14,
+            "draws": 12,
             "refusedDraws": 0,
-            "inertDraws": 2,
+            "inertDraws": 0,
             "duplicateDraws": 0
           }
         },
@@ -1396,7 +1399,7 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 17,
+              "examined": 18,
               "survivors": 0
             },
             "unpriced": {
@@ -1404,7 +1407,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 6,
+              "examined": 5,
               "survivors": 0
             }
           },
@@ -1460,10 +1463,10 @@
             "seed": 519516764,
             "bundles": 15,
             "enumerable": false,
-            "draws": 13,
-            "refusedDraws": 0,
+            "draws": 15,
+            "refusedDraws": 1,
             "inertDraws": 1,
-            "duplicateDraws": 0
+            "duplicateDraws": 1
           }
         }
       ]
@@ -1509,7 +1512,7 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 17,
+              "examined": 20,
               "survivors": 0
             },
             "unpriced": {
@@ -1517,7 +1520,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 6,
+              "examined": 3,
               "survivors": 0
             }
           },
@@ -1573,9 +1576,9 @@
             "seed": 1343276222,
             "bundles": 15,
             "enumerable": false,
-            "draws": 13,
+            "draws": 14,
             "refusedDraws": 0,
-            "inertDraws": 1,
+            "inertDraws": 2,
             "duplicateDraws": 0
           }
         },
@@ -1599,7 +1602,7 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 16,
+              "examined": 14,
               "survivors": 0
             },
             "unpriced": {
@@ -1607,7 +1610,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 7,
+              "examined": 9,
               "survivors": 0
             }
           },
