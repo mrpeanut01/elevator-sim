@@ -8419,12 +8419,23 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     });
     /*
      * What a rush leaves behind of the player's settings — GitHub issue #523, item 3. The
-     * `lobby-anchor` card's one lever, every setting the line can name, and the arm that says
-     * nothing, which the corpus filters as the empty string.
+     * `lobby-anchor` card's one lever, every setting the line can name, the two run settings with no
+     * lever moved (GitHub PR #530's review, finding 2), and the arm that says nothing, which the corpus
+     * filters as the empty string.
      */
     for (const [arm, text] of [
       ['lobby-anchor', rushLeftBehindLine({ parking: true, express: false, dwell: undefined })],
-      ['every-setting', rushLeftBehindLine({ parking: true, express: true, dwell: 'patient' }, true)],
+      [
+        'every-setting',
+        rushLeftBehindLine(
+          { parking: true, express: true, dwell: 'patient' },
+          { switching: true, patience: true, pattern: true },
+        ),
+      ],
+      [
+        'patience-and-pattern',
+        rushLeftBehindLine({ parking: false, express: false, dwell: undefined }, { patience: true, pattern: true }),
+      ],
       ['none', rushLeftBehindLine({ parking: false, express: false, dwell: undefined })],
     ] as const) {
       seeds.push({ field: `rush.leftBehind.${arm}`, text: text ?? '', role: 'prose' });

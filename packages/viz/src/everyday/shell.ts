@@ -1050,16 +1050,30 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * The way back — `dev/main.ts`'s header control, through `everyday/swap.ts`'s port.
    *
    * The mirror of {@link enterEngineer}, in the mirrored order: this shell comes back first, then
-   * {@link coverEngineer} re-inerts everything behind it and re-arms the observer. Nothing is
-   * re-drawn and nothing is re-mounted — `state`, the mounted screen, § 3.4's latch and the data
-   * host's subscription were all untouched by the trip, which is what makes the return land on the
-   * screen the player left rather than at the front door.
+   * {@link coverEngineer} re-inerts everything behind it and re-arms the observer. `state`, § 3.4's
+   * latch and the data host's subscription were all untouched by the trip, which is what makes the
+   * return land on the screen the player left rather than at the front door.
+   *
+   * **One screen is drawn again, and only that one** — GitHub PR #530's review, finding 1. The rush
+   * setup screen reads the player's settings once, when it is drawn, and {@link enterEngineer} draws
+   * it at the swap (`go('rush')`). The Engineer panel then writes the fields it prints — the
+   * dispatcher, the levers, patience, the pattern — and nothing on this side hears it, because that
+   * screen wires no control and takes no host subscription. So it named the driver and the settings
+   * that stood at the swap. The return now draws it through {@link draw}, the route every navigation
+   * takes, so it reads the state at the moment it becomes visible whatever wrote it.
+   *
+   * A subscription on the screen was the other fix, and the larger one: the host's listeners fire at
+   * the end of every `dev/main.ts#renderAll`, which is every state change the other world makes, so a
+   * subscribed screen would rebuild behind the cover on each of them, and it would need unmount
+   * plumbing on a mount that has none. Every other screen is left mounted — the stage above all, whose canvas keeps its box
+   * across the trip (`shell.browser.test.ts`).
    */
   function returnToEveryday(): void {
     if (world === 'everyday') return;
     world = 'everyday';
     setEverydayCovered(false);
     coverEngineer();
+    if (state.screen === 'rush') draw();
   }
 
   /**

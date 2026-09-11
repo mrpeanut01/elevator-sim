@@ -275,6 +275,35 @@ describe('what the screen refuses, and where the refusal sits', () => {
     );
     expect(rushLeftBehindLine({ ...DEFAULT_LEVERS, dwell: 'snappy' })).toContain('snappy door dwell stays behind');
   });
+
+  /*
+   * GitHub PR #530's review, finding 2. A rush runs `patience` and `pattern` fresh too
+   * (`rush.ts#RUSH_FIELD_ROLES`), and the Engineer panel writes both — the parameter form's
+   * `sim.patience.*` and the rail's *Arrival pattern* list — so the line that names what a rush leaves
+   * behind names them when the player has moved them, and § D548 clause 7 says it does.
+   */
+  it('names rider patience and the arrival pattern when the player moved them, beside the levers and the selector', () => {
+    expect(rushLeftBehindLine(DEFAULT_LEVERS, {})).toBeUndefined();
+    expect(rushLeftBehindLine(DEFAULT_LEVERS, { patience: false, pattern: false, switching: false })).toBeUndefined();
+    expect(rushLeftBehindLine(DEFAULT_LEVERS, { patience: true })).toBe(
+      'A rush runs it as shipped, so your rider patience stays behind until you leave.',
+    );
+    expect(rushLeftBehindLine(DEFAULT_LEVERS, { pattern: true })).toBe(
+      'A rush runs it as shipped, so your arrival pattern stays behind until you leave.',
+    );
+    expect(rushLeftBehindLine(DEFAULT_LEVERS, { switching: true })).toBe(
+      'A rush runs it as shipped, so your pattern switching stays behind until you leave.',
+    );
+    expect(
+      rushLeftBehindLine(
+        { parking: true, express: true, dwell: 'patient' },
+        { switching: true, patience: true, pattern: true },
+      ),
+    ).toBe(
+      'A rush runs it as shipped, so your lobby parking, express zoning, patient door dwell, rider patience, ' +
+        'arrival pattern and pattern switching stay behind until you leave.',
+    );
+  });
 });
 
 /**

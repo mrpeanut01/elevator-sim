@@ -495,13 +495,27 @@ export function rushDrivingLine(name: string): string {
  * right; saying nothing about it was the gap. Each lever is named when it is off its shipped value, and
  * pattern switching when the player's differs from what the dispatcher declares — the caller decides
  * that, because it needs the profile and this module holds no resources.
+ *
+ * **Rider patience and the arrival pattern are named too** — GitHub PR #530's review, finding 2.
+ * `rush.ts#RUSH_FIELD_ROLES` runs `patience` and `pattern` fresh as well, and the Engineer panel writes
+ * both: `sim.patience.*` on its parameter form and the rail's *Arrival pattern* list. The line named
+ * the levers and the selector only, which was less than § D548 clause 7 said it names. `moved.patience`
+ * is `ViewerState.patience` set, and `moved.pattern` is a pattern other than the building's own —
+ * `dev/state.ts#initialState` seeds `null` and `'building'`, and a rush runs a fresh session's values.
+ * *Rider* keeps it apart from the workshop's plain lever of the same id, which is labelled *How long
+ * anyone should wait* and writes a dispatcher weight rather than this field.
  */
-export function rushLeftBehindLine(levers: GroupLevers, switchingMoved = false): string | undefined {
+export function rushLeftBehindLine(
+  levers: GroupLevers,
+  moved: { readonly switching?: boolean; readonly patience?: boolean; readonly pattern?: boolean } = {},
+): string | undefined {
   const names: string[] = [];
   if (levers.parking) names.push('lobby parking');
   if (levers.express) names.push('express zoning');
   if (levers.dwell !== undefined) names.push(`${levers.dwell} door dwell`);
-  if (switchingMoved) names.push('pattern switching');
+  if (moved.patience === true) names.push('rider patience');
+  if (moved.pattern === true) names.push('arrival pattern');
+  if (moved.switching === true) names.push('pattern switching');
   const last = names.at(-1);
   if (last === undefined) return undefined;
   const list = names.length === 1 ? last : `${names.slice(0, -1).join(', ')} and ${last}`;
