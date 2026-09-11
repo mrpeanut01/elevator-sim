@@ -1,5 +1,5 @@
 {
-  "$comment": "A Burj-class reference building — GitHub issue #376, DECISIONS.md § D527, docs/38 § 2.5. 165 levels, 57 lifts, 8 escalators, speeds to 10 m/s. THE ARITHMETIC, so nobody re-derives it: two basements (B2, B1) plus G and floors 1–162 is 165 levels, of which 163 are at or above ground. Floors 154–162 are mechanical and carry no population; 2–153 are populated, which is 152 floors, and the reference's 'about 154 populated floors' is honoured as a shape rather than transcribed floor by floor — the six sky-lobby levels (43/44, 76/77, 123/124) are transfer floors and carry no residents either. POPULATION AND MIX ARE AN ASSUMPTION, NOT A CITATION, which § D527 leaves to this file: the per-floor figures fall from 29 in the lower office zone to 12 in the upper residential one, summing to 3198, and no published occupancy for the reference tower was available to the author. THE FIGURE IS MEASURED RATHER THAN GUESSED: it is what this 57-lift arrangement serves at `office-standard` with a valid AWT. Measured over a 1 800 s window, seed 376, `collective`: 3 198 people give a 35 s mean wait, a 98 s 95th percentile and nothing undelivered; 5 307 saturate (175 s, AWT suppressed) and 10 614 leave 422 of 4 457 journeys unserved at a 791 s mean. So a published occupancy higher than this does not merely change a field — it says the reference tower's real lift count is not 57 on this arrangement, which is the kind of thing this building exists to expose. Declared as an assumption so a later citation replaces a stated one rather than a silent one. OCCUPANCY, CHECKED AND NOT ADMITTED — GitHub issue #438, approved by the owner on 2026-09-10. The sentence above saying no published occupancy was available was true when it was written and is kept; what changed is that two published figures were found on 2026-09-10, and neither is an occupancy this file can use. 35,000 is published by Arcadis, which lists itself as the tower's architect and engineer of record, as the workers and residents the tower would accommodate, and by Al-Kodmany, Buildings 2015, 5(3), doi:10.3390/buildings5031070, § 3.3.1, as what the tower can hold. Neither states a basis and neither says daily; the daily wording that prompted #438 comes from a 2026 trade article whose only link carries no such figure. It is rejected as a resident-plus-worker count on arithmetic rather than taste: Emaar's own fact sheet gives 900 homes, 144 Armani residences and over 300,000 sq ft of office, and at a generous four people a home and two a room over CTBUH's 304 hotel rooms, the office would have to hold about 30,200 people in about 27,900 m², under 1 m² each. What 35,000 does count is not established, and no mechanism is offered here. 12,000 residents and workers appears once, in Gulf News on 2010-02-01, with no source, and is not a citation. BOTH SIT ABOVE THIS FILE'S OWN BRACKETS — 5 307 saturate and 10 614 leave 422 of 4 457 journeys unserved — so if either is ever confirmed as a resident-plus-worker population, the measurement above already says 57 lifts on this arrangement do not serve it at `office-standard`, and a run at that figure would say by how much. Rejecting 35,000 does not place the real figure below 5 307 either. The figure stays 3198, and it stays an assumption. The traffic profile is office-standard because the lower half is offices and the profile library ships nothing mixed-use with a supertall's shape; that too is an assumption. The reference is a floor, not a ceiling (§ D527). DECK LOAD, CHECKED AND NOT ADMITTED — GitHub issue #438, approved by the owner on 2026-09-10. Three published per-deck figures exist and they disagree about the same two cars: 23 persons a deck in Otis's 2005 contract announcement as FMLink reported it; 12 to 14 people per cab in the completion coverage quoting Emaar (Dubai Chronicle, 2009-12-30) and in Al-Kodmany 2015; and 21 persons a deck in Gulf News and on a Prysmian page, neither citing a source. No rated load in kilograms was found from Otis, Emaar or CTBUH. Every one of them describes the tower's two double-deck OBSERVATION cars, not a sky-lobby shuttle, so none is a figure for the `shuttle` bank. MEASURED AGAINST THE CATALOGUE: 21 a deck is a 6 300 lb car by this file's ratedLoadLb / 150 and a 7 055 lb car at EN 81-20 Table 6's 1 600 kg row, 1.26x and 1.41x the `ultra-high-speed` ceiling of 5 000 lb, and 21 is also outside that class's 12-14 persons a deck. That is two warnings, `load-outside-class-range` and `deck-persons-outside-class-range`, not one. The shuttle stays at 2 000 lb a deck: 13 persons at 150 lb and 12 at 75 kg, inside both ranges and inside Emaar's 12 to 14. THE 504 m RECORD, CHECKED — GitHub issue #438, approved by the owner on 2026-09-10. 504 m is a published record (Guinness World Records, 2014; Emaar's fact sheet; Al-Kodmany 2015), and the operator gives it to a SERVICE lift: Emaar's fact sheet lists it as the tallest service elevator, and the completion coverage quoting Emaar gives the main service elevator that rise, at 9 m/s (Dubai Chronicle, 2009-12-30). Otis's 2005 announcement and the Skyscraper Museum's pre-completion page gave the longest travel to the observation cars instead; as built, the observation deck is at 452 m (Emaar), so no post-completion source shows a passenger car running 504 m. That moves nothing here: `observation` serves only G, 1, 123 and 124, so a trip from the lobby to 124 is a single run of up to 496.0 m, and `shuttle` spans the same rise — 44 m more than the real observation run, because every floor in this file is 4.0 m. The car the record belongs to is a service lift, and this file has none, for the measured reason in its notes. 57 LIFTS AND 60 SECONDS, CHECKED — GitHub issue #438, approved by the owner on 2026-09-10. 57 elevators and 8 escalators is Otis's own count (press release, 2024-03-06) and the count in the 2009 completion coverage quoting Emaar; CTBUH's Skyscraper Center counts 58 cars including freight. The 57 counts lifts only, and it includes lifts that are not passenger cars — the completion coverage names a main service elevator and a spire service lift, and Al-Kodmany 2015 names 5 500 kg service elevators and a circular restaurant lift — so this file's 57 passenger cars are more than the tower's passenger fleet, and 5 307 is optimistic rather than conservative. Otis gives the tower two double-deck cars, both observation, running ground to levels 124 and 125 in 60 s at up to 10 m/s; that agrees with the 10.0 m/s `observation` bank, apart from its 44 m of extra rise. No source found shows the sky lobbies served by double-deck cars, so the note calling the 14-car double-deck shuttle the arrangement the reference tower uses is unsourced.",
+  "$comment": "A Burj-class reference building — GitHub issue #376, DECISIONS.md § D527, docs/38 § 2.5. 165 levels, 57 lifts, 8 escalators, speeds to 10 m/s. THE ARITHMETIC, so nobody re-derives it: two basements (B2, B1) plus G and floors 1–162 is 165 levels, of which 163 are at or above ground. Floors 155–162 are mechanical and carry no population, which is § D527's 'top floors (155–163) are mechanical'. Since GitHub issue #438's correction 135 floors are populated rather than 146: the six sky-lobby levels (43/44, 76/77, 123/124) are transfer floors and carry nobody, and neither do the thirteen levels Emaar's fact sheet gives no use (17–18, 40–42, 73–75, 109–111 and 122), so § D527's 'about 154 populated floors' is honoured less closely than it was, and that is the owner's to rule on. POPULATION AND MIX ARE AN ASSUMPTION, NOT A CITATION, which § D527 leaves to this file: the per-floor figures fall from 29 in the lower office zone to 12 in the upper residential one, summing to 3198, and no published occupancy for the reference tower was available to the author. THE FIGURE IS MEASURED RATHER THAN GUESSED: it is what this 57-lift arrangement serves at `office-standard` with a valid AWT. Measured over a 1 800 s window, seed 376, `collective`: 3 198 people give a 35 s mean wait, a 98 s 95th percentile and nothing undelivered; 5 307 saturate (175 s, AWT suppressed) and 10 614 leave 422 of 4 457 journeys unserved at a 791 s mean. So a published occupancy higher than this does not merely change a field — it says the reference tower's real lift count is not 57 on this arrangement, which is the kind of thing this building exists to expose. Declared as an assumption so a later citation replaces a stated one rather than a silent one. CORRECTED AGAINST THE OPERATOR — GitHub issue #438, ruled by the owner on 2026-09-10 and drafted for approval, and APPROVED AS DRAFTED by the product owner on 2026-09-11: every figure in this paragraph that carries no citation is an AGENT'S PROPOSAL, with its reasoning. (1) DOUBLE DECKS. Otis's release of 2024-03-06 and Al-Kodmany 2015 give the tower two double-deck cars, both serving the observation deck, and Al-Kodmany adds that they carry office staff changing lifts at level 123; no source read gives the sky lobbies a double-deck shuttle. So `observation` is two double-deck cars over G/1 and 123/124, and `shuttle` is single-deck. Proposal: the shuttle stops at G, 43, 76 and 123 — the sky lobbies the 2009 completion coverage names, at their lower level — and takes the two cars `observation` gave up, sixteen rather than fourteen, so § D527's 57 is kept and no local bank's count moves; each lobby's upper level is reached by its escalator or its local bank. Pairing 123/124 rather than Otis's 124/125 is a proposal too: it keeps Al-Kodmany's level-123 transfer and this file's sky lobby, and the observation deck itself is not a destination in this model. (2) STACKING, from Emaar's fact sheet: the Armani Hotel from the concourse to level 8 and on 38–39, the Armani Residences on 9–16, The Residence on 19–37, 43–72 and 76–108, and the Corporate Suites on 112–121 and 125–154. This file had offices on 2–75 and residential above, which is that order inverted. The fact sheet gives no use to 17–18, 40–42, 73–75, 109–111 or 122, so they carry nobody, and the sky-lobby levels inside its residence ranges stay transfer floors. Hotel floors take the `hotel` profile and residence floors `residential`. Proposal: 3 198 is kept and shared out in proportion to the fact sheet's own counts at stated densities — 900 homes and 144 Armani Residences at 2 people each, 160 hotel rooms at 1.5, and over 300,000 sq ft (27 871 m²) of office at 10 m² a worker, 5 115 people in all — which at 3 198 is 14.4 a floor in The Residence, 22.5 in the Armani Residences, 16.7 on a hotel floor and 43.6 on an office floor, authored as 14, 23, 18 and 44, the hotel taken to 18 rather than 17 so the floors sum to 3 198 exactly. The densities are the author's and uncited, and only their ratios reach this file. (3) FLOOR HEIGHT. Emaar's At the Top page puts the observation levels 124–125 at 452 m, and 4.0 m floors put 124 at 496 m. Proposal: one floor-to-floor height of 3.645 m, which puts 124 at 451.98 m, with the observation cars' deck separation and the escalators' rise following it. It is fitted to that one anchor and checked against the others rather than fitted to them, because they disagree with each other: it puts level 148 at 539.46 m against the same page's 555 m, and level 160 at 583.2 m against the fact sheet's 1,918 ft (584.6 m) and CTBUH's highest occupied floor at 585.4 m, while the same page puts a lounge at 585 m on 152–154, which cannot share a height with level 160. RE-MEASURED AFTER THE CORRECTION — GitHub issue #438, 2026-09-11. The assumption paragraph above is kept word for word, and it describes the arrangement as first authored: 4.0 m floors, offices on 2–75, a fourteen-car double-deck shuttle. Its figures do not reproduce. Re-run by packages/viz/src/record/burjOperator.test.ts's harness — seed 376, `collective`, 1 800 s, every floor's population scaled in proportion — on the tree that landed this file (63a9521) and on the parent of the correcting commit (731bd82c), identically on both, that arrangement gave 3 198 people a 23.6 s mean wait and a 67.6 s 95th percentile over 1 284 journeys with nothing undelivered; 5 307 saturated, AWT suppressed; and 10 614 saturated and left 487 of 4 473 undelivered. The verdicts agree with the paragraph above and the figures do not, and which run produced the published ones is not established. Seed 376 was also a favourable seed for it: over seeds 376–425, 3 198 people saturated on 16 of 50. On the corrected arrangement the same command gives 3 198 people an 11.4 s mean wait and a 32.9 s 95th percentile over 989 journeys with nothing undelivered; 5 307 saturate, AWT suppressed; and 10 614 saturate and leave 30 of 3 473 undelivered. No mean or 95th percentile is quoted for a run whose AWT is suppressed. Over seeds 376–425 (packages/viz/src/record/burjOperator.sweep.test.ts, BURJ_BRACKET_SWEEP=1), 3 198 saturate on 1 of 50, 5 307 on 37 of 50, and 10 614 on 50 of 50 with journeys undelivered on 32. So 3 198 is still what 57 lifts serve at seed 376, and on one seed in fifty it is not; no AWT interval is published at any of the three populations, because each saturates on at least one seed. Read the journey counts beside the waits: the same 3 198 people make 989 journeys in the window rather than 1 284, because most of them now arrive on the `residential` and `hotel` profiles rather than on `office-standard`, so the corrected arrangement carries less demand as well as different demand, and no share of the change in wait is attributed to either. OCCUPANCY, CHECKED AND NOT ADMITTED — GitHub issue #438, approved by the owner on 2026-09-10. The sentence above saying no published occupancy was available was true when it was written and is kept; what changed is that two published figures were found on 2026-09-10, and neither is an occupancy this file can use. 35,000 is published by Arcadis, which lists itself as the tower's architect and engineer of record, as the workers and residents the tower would accommodate, and by Al-Kodmany, Buildings 2015, 5(3), doi:10.3390/buildings5031070, § 3.3.1, as what the tower can hold. Neither states a basis and neither says daily; the daily wording that prompted #438 comes from a 2026 trade article whose only link carries no such figure. It is rejected as a resident-plus-worker count on arithmetic rather than taste: Emaar's own fact sheet gives 900 homes, 144 Armani residences and over 300,000 sq ft of office, and at a generous four people a home and two a room over CTBUH's 304 hotel rooms, the office would have to hold about 30,200 people in about 27,900 m², under 1 m² each. What 35,000 does count is not established, and no mechanism is offered here. 12,000 residents and workers appears once, in Gulf News on 2010-02-01, with no source, and is not a citation. BOTH SIT ABOVE THIS FILE'S OWN BRACKETS — 5 307 saturate and 10 614 leave 422 of 4 457 journeys unserved — so if either is ever confirmed as a resident-plus-worker population, the measurement above already says 57 lifts on this arrangement do not serve it at `office-standard`, and a run at that figure would say by how much. Rejecting 35,000 does not place the real figure below 5 307 either. The figure stays 3198, and it stays an assumption. The building-level traffic profile is office-standard, and since #438 it governs arrivals from the entrance and from the office floors only: the hotel and residence ranges carry the library's `hotel` and `residential` profiles, in `vertical-city.json`'s idiom, because the operator's stacking puts most of the population there. That the office floors take `office-standard` rather than `office-prestige`, and that the library ships nothing mixed-use with a supertall's shape, remain assumptions. The reference is a floor, not a ceiling (§ D527). DECK LOAD, CHECKED AND NOT ADMITTED — GitHub issue #438, approved by the owner on 2026-09-10. Three published per-deck figures exist and they disagree about the same two cars: 23 persons a deck in Otis's 2005 contract announcement as FMLink reported it; 12 to 14 people per cab in the completion coverage quoting Emaar (Dubai Chronicle, 2009-12-30) and in Al-Kodmany 2015; and 21 persons a deck in Gulf News and on a Prysmian page, neither citing a source. No rated load in kilograms was found from Otis, Emaar or CTBUH. Every one of them describes the tower's two double-deck OBSERVATION cars, not a sky-lobby shuttle, and since #438 those are this file's only double-deck cars: `observation`'s OB-1 and OB-2. MEASURED AGAINST THE CATALOGUE: 21 a deck is a 6 300 lb car by this file's ratedLoadLb / 150 and a 7 055 lb car at EN 81-20 Table 6's 1 600 kg row, 1.26x and 1.41x the `ultra-high-speed` ceiling of 5 000 lb, and 21 is also outside that class's 12-14 persons a deck. That is two warnings, `load-outside-class-range` and `deck-persons-outside-class-range`, not one. AGENT'S PROPOSAL, #438, approved as drafted on 2026-09-11: the observation cars are authored at 2 000 lb a deck, the rating the double-deck shuttle carried before its decks moved — 13 persons at 150 lb and 12 at 75 kg, inside both ranges and inside Emaar's 12 to 14 — and 21 and 23 stay unadmitted. THE 504 m RECORD, CHECKED — GitHub issue #438, approved by the owner on 2026-09-10. 504 m is a published record (Guinness World Records, 2014; Emaar's fact sheet; Al-Kodmany 2015), and the operator gives it to a SERVICE lift: Emaar's fact sheet lists it as the tallest service elevator, and the completion coverage quoting Emaar gives the main service elevator that rise, at 9 m/s (Dubai Chronicle, 2009-12-30). Otis's 2005 announcement and the Skyscraper Museum's pre-completion page gave the longest travel to the observation cars instead; as built, the observation deck is at 452 m (Emaar), so no post-completion source shows a passenger car running 504 m. That moves nothing here: since #438 `observation` is double-deck over G/1 and 123/124, so each car travels 448.335 m and a rider rises from the ground lobby's upper level to 124 in one run of that length, and `shuttle` makes the same run from G to 123. Before #438 corrected the floor height both runs were 44 m longer, because every floor in this file was 4.0 m. The car the record belongs to is a service lift, and this file has none, for the measured reason in its notes. 57 LIFTS AND 60 SECONDS, CHECKED — GitHub issue #438, approved by the owner on 2026-09-10. 57 elevators and 8 escalators is Otis's own count (press release, 2024-03-06) and the count in the 2009 completion coverage quoting Emaar; CTBUH's Skyscraper Center counts 58 cars including freight. The 57 counts lifts only, and it includes lifts that are not passenger cars — the completion coverage names a main service elevator and a spire service lift, and Al-Kodmany 2015 names 5 500 kg service elevators and a circular restaurant lift — so this file's 57 passenger cars are more than the tower's passenger fleet, and 5 307 is optimistic rather than conservative. Otis gives the tower two double-deck cars, both observation, running ground to levels 124 and 125 in 60 s at up to 10 m/s; since #438 the `observation` bank is those two cars, at 10.0 m/s over a 448.335 m run that the catalogue's typical 1.2 m/s² and 1.2 m/s³ put at 54.2 s of motion. No source found shows the sky lobbies served by double-deck cars, so the note that called the 14-car double-deck shuttle the arrangement the reference tower uses was unsourced, and #438 corrected it.",
   "id": "burj-class-reference",
   "name": "Burj-class reference tower",
   "type": "mixed-use",
@@ -8,7 +8,7 @@
     {
       "id": "B2",
       "index": -2,
-      "heightM": -8.0,
+      "heightM": -7.29,
       "population": 0,
       "isTransferFloor": false,
       "label": "Lower car park and plant"
@@ -16,7 +16,7 @@
     {
       "id": "B1",
       "index": -1,
-      "heightM": -4.0,
+      "heightM": -3.645,
       "population": 0,
       "isTransferFloor": false,
       "label": "Upper car park and loading"
@@ -28,107 +28,194 @@
       "population": 0,
       "isEntrance": true,
       "isTransferFloor": true,
-      "label": "Ground lobby (street entrance, lower deck boarding)"
+      "label": "Ground lobby (street entrance; the shuttle, and the observation cars’ lower deck)"
     },
     {
       "id": "1",
       "index": 1,
-      "heightM": 4.0,
+      "heightM": 3.645,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Ground lobby upper level (upper deck boarding)"
+      "label": "Ground lobby upper level (the observation cars’ upper deck)"
     },
     {
       "id": "43",
       "index": 43,
-      "heightM": 172.0,
+      "heightM": 156.735,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Sky lobby at 43 — lower deck"
+      "label": "Sky lobby at 43 — lower level (shuttle stop)"
     },
     {
       "id": "44",
       "index": 44,
-      "heightM": 176.0,
+      "heightM": 160.38,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Sky lobby at 43 — upper deck"
+      "label": "Sky lobby at 43 — upper level"
     },
     {
       "id": "76",
       "index": 76,
-      "heightM": 304.0,
+      "heightM": 277.02,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Sky lobby at 76 — lower deck"
+      "label": "Sky lobby at 76 — lower level (shuttle stop)"
     },
     {
       "id": "77",
       "index": 77,
-      "heightM": 308.0,
+      "heightM": 280.665,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Sky lobby at 76 — upper deck"
+      "label": "Sky lobby at 76 — upper level"
     },
     {
       "id": "123",
       "index": 123,
-      "heightM": 492.0,
+      "heightM": 448.335,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Sky lobby at 123 — lower deck"
+      "label": "Sky lobby at 123 — lower level (shuttle stop, observation lower deck)"
     },
     {
       "id": "124",
       "index": 124,
-      "heightM": 496.0,
+      "heightM": 451.98,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Sky lobby at 123 — upper deck"
+      "label": "Sky lobby at 123 — upper level (observation upper deck)"
     }
   ],
   "floorRanges": [
     {
       "fromIndex": 2,
-      "toIndex": 42,
-      "startHeightM": 8.0,
-      "floorToFloorM": 4.0,
-      "populationPerFloor": 29,
+      "toIndex": 8,
+      "startHeightM": 7.29,
+      "floorToFloorM": 3.645,
+      "populationPerFloor": 18,
+      "trafficProfile": "hotel",
       "idPattern": "{index}",
-      "label": "Lower zone — offices"
+      "label": "Armani Hotel (operator’s fact sheet: concourse to level 8)"
+    },
+    {
+      "fromIndex": 9,
+      "toIndex": 16,
+      "startHeightM": 32.805,
+      "floorToFloorM": 3.645,
+      "populationPerFloor": 23,
+      "trafficProfile": "residential",
+      "idPattern": "{index}",
+      "label": "Armani Residences (operator’s fact sheet: 9–16)"
+    },
+    {
+      "fromIndex": 17,
+      "toIndex": 18,
+      "startHeightM": 61.965,
+      "floorToFloorM": 3.645,
+      "populationPerFloor": 0,
+      "idPattern": "{index}",
+      "label": "No use given in the operator’s fact sheet — unpopulated"
+    },
+    {
+      "fromIndex": 19,
+      "toIndex": 37,
+      "startHeightM": 69.255,
+      "floorToFloorM": 3.645,
+      "populationPerFloor": 14,
+      "trafficProfile": "residential",
+      "idPattern": "{index}",
+      "label": "The Residence (operator’s fact sheet: 19–37)"
+    },
+    {
+      "fromIndex": 38,
+      "toIndex": 39,
+      "startHeightM": 138.51,
+      "floorToFloorM": 3.645,
+      "populationPerFloor": 18,
+      "trafficProfile": "hotel",
+      "idPattern": "{index}",
+      "label": "Armani Hotel (operator’s fact sheet: 38–39)"
+    },
+    {
+      "fromIndex": 40,
+      "toIndex": 42,
+      "startHeightM": 145.8,
+      "floorToFloorM": 3.645,
+      "populationPerFloor": 0,
+      "idPattern": "{index}",
+      "label": "No use given in the operator’s fact sheet — unpopulated"
     },
     {
       "fromIndex": 45,
-      "toIndex": 75,
-      "startHeightM": 180.0,
-      "floorToFloorM": 4.0,
-      "populationPerFloor": 26,
+      "toIndex": 72,
+      "startHeightM": 164.025,
+      "floorToFloorM": 3.645,
+      "populationPerFloor": 14,
+      "trafficProfile": "residential",
       "idPattern": "{index}",
-      "label": "Zone 1 — offices over the first sky lobby"
+      "label": "The Residence (operator’s fact sheet: 43–72, over the first sky lobby)"
+    },
+    {
+      "fromIndex": 73,
+      "toIndex": 75,
+      "startHeightM": 266.085,
+      "floorToFloorM": 3.645,
+      "populationPerFloor": 0,
+      "idPattern": "{index}",
+      "label": "No use given in the operator’s fact sheet — unpopulated"
     },
     {
       "fromIndex": 78,
-      "toIndex": 122,
-      "startHeightM": 312.0,
-      "floorToFloorM": 4.0,
-      "populationPerFloor": 19,
+      "toIndex": 108,
+      "startHeightM": 284.31,
+      "floorToFloorM": 3.645,
+      "populationPerFloor": 14,
+      "trafficProfile": "residential",
       "idPattern": "{index}",
-      "label": "Zone 2 — residential"
+      "label": "The Residence (operator’s fact sheet: 76–108, over the second sky lobby)"
+    },
+    {
+      "fromIndex": 109,
+      "toIndex": 111,
+      "startHeightM": 397.305,
+      "floorToFloorM": 3.645,
+      "populationPerFloor": 0,
+      "idPattern": "{index}",
+      "label": "No use given in the operator’s fact sheet — unpopulated"
+    },
+    {
+      "fromIndex": 112,
+      "toIndex": 121,
+      "startHeightM": 408.24,
+      "floorToFloorM": 3.645,
+      "populationPerFloor": 44,
+      "idPattern": "{index}",
+      "label": "The Corporate Suites — offices (operator’s fact sheet: 112–121)"
+    },
+    {
+      "fromIndex": 122,
+      "toIndex": 122,
+      "startHeightM": 444.69,
+      "floorToFloorM": 3.645,
+      "populationPerFloor": 0,
+      "idPattern": "{index}",
+      "label": "No use given in the operator’s fact sheet — unpopulated"
     },
     {
       "fromIndex": 125,
-      "toIndex": 153,
-      "startHeightM": 500.0,
-      "floorToFloorM": 4.0,
-      "populationPerFloor": 12,
+      "toIndex": 154,
+      "startHeightM": 455.625,
+      "floorToFloorM": 3.645,
+      "populationPerFloor": 44,
       "idPattern": "{index}",
-      "label": "Zone 3 — residential and hotel over the third sky lobby"
+      "label": "The Corporate Suites — offices (operator’s fact sheet: 125–154)"
     },
     {
-      "fromIndex": 154,
+      "fromIndex": 155,
       "toIndex": 162,
-      "startHeightM": 616.0,
-      "floorToFloorM": 4.0,
+      "startHeightM": 564.975,
+      "floorToFloorM": 3.645,
       "populationPerFloor": 0,
       "idPattern": "{index}",
       "label": "Mechanical and spire plant — unpopulated"
@@ -138,34 +225,12 @@
   "banks": [
     {
       "id": "shuttle",
-      "name": "Double-deck sky lobby shuttle",
+      "name": "Sky lobby shuttle",
       "servesFloors": [
         "G",
-        "1",
         "43",
-        "44",
         "76",
-        "77",
-        "123",
-        "124"
-      ],
-      "servesFloorPairs": [
-        [
-          "G",
-          "1"
-        ],
-        [
-          "43",
-          "44"
-        ],
-        [
-          "76",
-          "77"
-        ],
-        [
-          "123",
-          "124"
-        ]
+        "123"
       ],
       "cars": [
         {
@@ -174,10 +239,7 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
         },
         {
           "id": "S2",
@@ -185,10 +247,7 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
         },
         {
           "id": "S3",
@@ -196,10 +255,7 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
         },
         {
           "id": "S4",
@@ -207,10 +263,7 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
         },
         {
           "id": "S5",
@@ -218,10 +271,7 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
         },
         {
           "id": "S6",
@@ -229,10 +279,7 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
         },
         {
           "id": "S7",
@@ -240,10 +287,7 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
         },
         {
           "id": "S8",
@@ -251,10 +295,7 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
         },
         {
           "id": "S9",
@@ -262,10 +303,7 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
         },
         {
           "id": "S10",
@@ -273,10 +311,7 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
         },
         {
           "id": "S11",
@@ -284,10 +319,7 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
         },
         {
           "id": "S12",
@@ -295,10 +327,7 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
         },
         {
           "id": "S13",
@@ -306,10 +335,7 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
         },
         {
           "id": "S14",
@@ -317,10 +343,23 @@
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening",
-          "passengerTransferS": 1.75,
-          "ratedLoadLbPerDeck": 2000,
-          "doubleDeck": true,
-          "deckSeparationM": 4.0
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "S15",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
+        },
+        {
+          "id": "S16",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.75
         }
       ]
     },
@@ -835,12 +874,22 @@
     },
     {
       "id": "observation",
-      "name": "Observation express",
+      "name": "Double-deck observation express",
       "servesFloors": [
         "G",
         "1",
         "123",
         "124"
+      ],
+      "servesFloorPairs": [
+        [
+          "G",
+          "1"
+        ],
+        [
+          "123",
+          "124"
+        ]
       ],
       "cars": [
         {
@@ -848,6 +897,9 @@
           "spec": "ultra-high-speed",
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 3.645,
           "doorType": "centerOpening",
           "passengerTransferS": 1.75
         },
@@ -856,22 +908,9 @@
           "spec": "ultra-high-speed",
           "ratedSpeedMps": 10.0,
           "ratedLoadLb": 4000,
-          "doorType": "centerOpening",
-          "passengerTransferS": 1.75
-        },
-        {
-          "id": "OB-3",
-          "spec": "ultra-high-speed",
-          "ratedSpeedMps": 10.0,
-          "ratedLoadLb": 4000,
-          "doorType": "centerOpening",
-          "passengerTransferS": 1.75
-        },
-        {
-          "id": "OB-4",
-          "spec": "ultra-high-speed",
-          "ratedSpeedMps": 10.0,
-          "ratedLoadLb": 4000,
+          "ratedLoadLbPerDeck": 2000,
+          "doubleDeck": true,
+          "deckSeparationM": 3.645,
           "doorType": "centerOpening",
           "passengerTransferS": 1.75
         }
@@ -880,51 +919,51 @@
   ],
   "transportModes": [
     {
-      "$comment": "The escalator at the ground lobby, joining the two boarding decks a double-deck shuttle serves. Traversal time is DERIVED, not quoted, by `vertical-city.json`'s own method so the two files cannot disagree: rise 4.0 m; inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise and which is the common commercial compromise below it; nominal speed 0.5 m/s (EN 115-1 permits up to 0.75 m/s at 30 degrees). Incline length = 4.0 / sin 30 = 8.00 m, so 16.0 s on the incline; EN 115-1's two flat steps at each landing at 0.40 m step depth add 1.60 m of horizontal run, or 3.2 s. Total landing to landing 19.2 s. No CIBSE Guide D lumped escalator traversal figure was available to check this against; see docs/02-elevator-reference.md. MEASURED, and say which count this is: routing all 27,060 ordered floor pairs through RoutePlanner/routeTopologyOf, this edge lies on the shortest route for 6 of them (6, 8, 8 and 6 across the four, 28 in all) -- pinned in packages/viz/src/record/burjReference.test.ts and published in docs/04-test-buildings.md § 9. This is a count over the TOPOLOGY, every pair weighted once. It is NOT the quantity vertical-city's modes record: traffic/transportRoute.test.ts#HOPS_BY_MODE counts hops taken by the 1,956 passengers of a generated day, so its 266 and its two zeros are demand-weighted and this number is not comparable with them. The dead-field question data/buildings/README.md's rule exists for -- does anybody actually use this machine? -- is the demand-weighted one, and for this building it is UNMEASURED.",
+      "$comment": "The escalator at the ground lobby, joining its two levels: the double-deck observation cars board at both, and before GitHub issue #438 a double-deck shuttle did. Traversal time is DERIVED, not quoted, by `vertical-city.json`'s own method so the two files cannot disagree: rise 3.645 m, one floor at the height GitHub issue #438 proposes; inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise and which is the common commercial compromise below it; nominal speed 0.5 m/s (EN 115-1 permits up to 0.75 m/s at 30 degrees). Incline length = 3.645 / sin 30 = 7.29 m, so 14.58 s on the incline; EN 115-1's two flat steps at each landing at 0.40 m step depth add 1.60 m of horizontal run, or 3.2 s. Total landing to landing 17.78 s, where the 4.0 m floor this file had before #438 gave 19.2 s. No CIBSE Guide D lumped escalator traversal figure was available to check this against; see docs/02-elevator-reference.md. MEASURED, and say which count this is: routing all 27,060 ordered floor pairs through RoutePlanner/routeTopologyOf, this edge lies on the shortest route for 164 of them (164, 266, 238 and 164 across the four, 832 in all, on the arrangement #438 corrected; 6, 8, 8 and 6, 28 in all, before it) -- pinned in packages/viz/src/record/burjReference.test.ts and published in docs/04-test-buildings.md § 9. This is a count over the TOPOLOGY, every pair weighted once. It is NOT the quantity vertical-city's modes record: traffic/transportRoute.test.ts#HOPS_BY_MODE counts hops taken by the 1,956 passengers of a generated day, so its 266 and its two zeros are demand-weighted and this number is not comparable with them. The dead-field question data/buildings/README.md's rule exists for -- does anybody actually use this machine? -- is the demand-weighted one, and for this building it is UNMEASURED.",
       "id": "escalator-1",
       "name": "The ground lobby escalator (G <-> 1)",
       "connects": [
         "G",
         "1"
       ],
-      "traversalTimeS": 19.2
+      "traversalTimeS": 17.78
     },
     {
-      "$comment": "The escalator at the first sky lobby, joining the two boarding decks a double-deck shuttle serves. Traversal time is DERIVED, not quoted, by `vertical-city.json`'s own method so the two files cannot disagree: rise 4.0 m; inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise and which is the common commercial compromise below it; nominal speed 0.5 m/s (EN 115-1 permits up to 0.75 m/s at 30 degrees). Incline length = 4.0 / sin 30 = 8.00 m, so 16.0 s on the incline; EN 115-1's two flat steps at each landing at 0.40 m step depth add 1.60 m of horizontal run, or 3.2 s. Total landing to landing 19.2 s. No CIBSE Guide D lumped escalator traversal figure was available to check this against; see docs/02-elevator-reference.md. MEASURED, and say which count this is: routing all 27,060 ordered floor pairs through RoutePlanner/routeTopologyOf, this edge lies on the shortest route for 8 of them (6, 8, 8 and 6 across the four, 28 in all) -- pinned in packages/viz/src/record/burjReference.test.ts and published in docs/04-test-buildings.md § 9. This is a count over the TOPOLOGY, every pair weighted once. It is NOT the quantity vertical-city's modes record: traffic/transportRoute.test.ts#HOPS_BY_MODE counts hops taken by the 1,956 passengers of a generated day, so its 266 and its two zeros are demand-weighted and this number is not comparable with them. The dead-field question data/buildings/README.md's rule exists for -- does anybody actually use this machine? -- is the demand-weighted one, and for this building it is UNMEASURED.",
+      "$comment": "The escalator at the first sky lobby, joining its two levels: the single-deck shuttle stops at the lower and the local bank serves both, where before GitHub issue #438 a double-deck shuttle served both. Traversal time is DERIVED, not quoted, by `vertical-city.json`'s own method so the two files cannot disagree: rise 3.645 m, one floor at the height GitHub issue #438 proposes; inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise and which is the common commercial compromise below it; nominal speed 0.5 m/s (EN 115-1 permits up to 0.75 m/s at 30 degrees). Incline length = 3.645 / sin 30 = 7.29 m, so 14.58 s on the incline; EN 115-1's two flat steps at each landing at 0.40 m step depth add 1.60 m of horizontal run, or 3.2 s. Total landing to landing 17.78 s, where the 4.0 m floor this file had before #438 gave 19.2 s. No CIBSE Guide D lumped escalator traversal figure was available to check this against; see docs/02-elevator-reference.md. MEASURED, and say which count this is: routing all 27,060 ordered floor pairs through RoutePlanner/routeTopologyOf, this edge lies on the shortest route for 266 of them (164, 266, 238 and 164 across the four, 832 in all, on the arrangement #438 corrected; 6, 8, 8 and 6, 28 in all, before it) -- pinned in packages/viz/src/record/burjReference.test.ts and published in docs/04-test-buildings.md § 9. This is a count over the TOPOLOGY, every pair weighted once. It is NOT the quantity vertical-city's modes record: traffic/transportRoute.test.ts#HOPS_BY_MODE counts hops taken by the 1,956 passengers of a generated day, so its 266 and its two zeros are demand-weighted and this number is not comparable with them. The dead-field question data/buildings/README.md's rule exists for -- does anybody actually use this machine? -- is the demand-weighted one, and for this building it is UNMEASURED.",
       "id": "escalator-2",
       "name": "The first sky lobby escalator (43 <-> 44)",
       "connects": [
         "43",
         "44"
       ],
-      "traversalTimeS": 19.2
+      "traversalTimeS": 17.78
     },
     {
-      "$comment": "The escalator at the second sky lobby, joining the two boarding decks a double-deck shuttle serves. Traversal time is DERIVED, not quoted, by `vertical-city.json`'s own method so the two files cannot disagree: rise 4.0 m; inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise and which is the common commercial compromise below it; nominal speed 0.5 m/s (EN 115-1 permits up to 0.75 m/s at 30 degrees). Incline length = 4.0 / sin 30 = 8.00 m, so 16.0 s on the incline; EN 115-1's two flat steps at each landing at 0.40 m step depth add 1.60 m of horizontal run, or 3.2 s. Total landing to landing 19.2 s. No CIBSE Guide D lumped escalator traversal figure was available to check this against; see docs/02-elevator-reference.md. MEASURED, and say which count this is: routing all 27,060 ordered floor pairs through RoutePlanner/routeTopologyOf, this edge lies on the shortest route for 8 of them (6, 8, 8 and 6 across the four, 28 in all) -- pinned in packages/viz/src/record/burjReference.test.ts and published in docs/04-test-buildings.md § 9. This is a count over the TOPOLOGY, every pair weighted once. It is NOT the quantity vertical-city's modes record: traffic/transportRoute.test.ts#HOPS_BY_MODE counts hops taken by the 1,956 passengers of a generated day, so its 266 and its two zeros are demand-weighted and this number is not comparable with them. The dead-field question data/buildings/README.md's rule exists for -- does anybody actually use this machine? -- is the demand-weighted one, and for this building it is UNMEASURED.",
+      "$comment": "The escalator at the second sky lobby, joining its two levels: the single-deck shuttle stops at the lower and the local bank serves both, where before GitHub issue #438 a double-deck shuttle served both. Traversal time is DERIVED, not quoted, by `vertical-city.json`'s own method so the two files cannot disagree: rise 3.645 m, one floor at the height GitHub issue #438 proposes; inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise and which is the common commercial compromise below it; nominal speed 0.5 m/s (EN 115-1 permits up to 0.75 m/s at 30 degrees). Incline length = 3.645 / sin 30 = 7.29 m, so 14.58 s on the incline; EN 115-1's two flat steps at each landing at 0.40 m step depth add 1.60 m of horizontal run, or 3.2 s. Total landing to landing 17.78 s, where the 4.0 m floor this file had before #438 gave 19.2 s. No CIBSE Guide D lumped escalator traversal figure was available to check this against; see docs/02-elevator-reference.md. MEASURED, and say which count this is: routing all 27,060 ordered floor pairs through RoutePlanner/routeTopologyOf, this edge lies on the shortest route for 238 of them (164, 266, 238 and 164 across the four, 832 in all, on the arrangement #438 corrected; 6, 8, 8 and 6, 28 in all, before it) -- pinned in packages/viz/src/record/burjReference.test.ts and published in docs/04-test-buildings.md § 9. This is a count over the TOPOLOGY, every pair weighted once. It is NOT the quantity vertical-city's modes record: traffic/transportRoute.test.ts#HOPS_BY_MODE counts hops taken by the 1,956 passengers of a generated day, so its 266 and its two zeros are demand-weighted and this number is not comparable with them. The dead-field question data/buildings/README.md's rule exists for -- does anybody actually use this machine? -- is the demand-weighted one, and for this building it is UNMEASURED.",
       "id": "escalator-3",
       "name": "The second sky lobby escalator (76 <-> 77)",
       "connects": [
         "76",
         "77"
       ],
-      "traversalTimeS": 19.2
+      "traversalTimeS": 17.78
     },
     {
-      "$comment": "The escalator at the third sky lobby, joining the two boarding decks a double-deck shuttle serves. Traversal time is DERIVED, not quoted, by `vertical-city.json`'s own method so the two files cannot disagree: rise 4.0 m; inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise and which is the common commercial compromise below it; nominal speed 0.5 m/s (EN 115-1 permits up to 0.75 m/s at 30 degrees). Incline length = 4.0 / sin 30 = 8.00 m, so 16.0 s on the incline; EN 115-1's two flat steps at each landing at 0.40 m step depth add 1.60 m of horizontal run, or 3.2 s. Total landing to landing 19.2 s. No CIBSE Guide D lumped escalator traversal figure was available to check this against; see docs/02-elevator-reference.md. MEASURED, and say which count this is: routing all 27,060 ordered floor pairs through RoutePlanner/routeTopologyOf, this edge lies on the shortest route for 6 of them (6, 8, 8 and 6 across the four, 28 in all) -- pinned in packages/viz/src/record/burjReference.test.ts and published in docs/04-test-buildings.md § 9. This is a count over the TOPOLOGY, every pair weighted once. It is NOT the quantity vertical-city's modes record: traffic/transportRoute.test.ts#HOPS_BY_MODE counts hops taken by the 1,956 passengers of a generated day, so its 266 and its two zeros are demand-weighted and this number is not comparable with them. The dead-field question data/buildings/README.md's rule exists for -- does anybody actually use this machine? -- is the demand-weighted one, and for this building it is UNMEASURED.",
+      "$comment": "The escalator at the third sky lobby, joining its two levels: the double-deck observation cars stop at both and the single-deck shuttle at the lower, where before GitHub issue #438 a double-deck shuttle served both. Traversal time is DERIVED, not quoted, by `vertical-city.json`'s own method so the two files cannot disagree: rise 3.645 m, one floor at the height GitHub issue #438 proposes; inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise and which is the common commercial compromise below it; nominal speed 0.5 m/s (EN 115-1 permits up to 0.75 m/s at 30 degrees). Incline length = 3.645 / sin 30 = 7.29 m, so 14.58 s on the incline; EN 115-1's two flat steps at each landing at 0.40 m step depth add 1.60 m of horizontal run, or 3.2 s. Total landing to landing 17.78 s, where the 4.0 m floor this file had before #438 gave 19.2 s. No CIBSE Guide D lumped escalator traversal figure was available to check this against; see docs/02-elevator-reference.md. MEASURED, and say which count this is: routing all 27,060 ordered floor pairs through RoutePlanner/routeTopologyOf, this edge lies on the shortest route for 164 of them (164, 266, 238 and 164 across the four, 832 in all, on the arrangement #438 corrected; 6, 8, 8 and 6, 28 in all, before it) -- pinned in packages/viz/src/record/burjReference.test.ts and published in docs/04-test-buildings.md § 9. This is a count over the TOPOLOGY, every pair weighted once. It is NOT the quantity vertical-city's modes record: traffic/transportRoute.test.ts#HOPS_BY_MODE counts hops taken by the 1,956 passengers of a generated day, so its 266 and its two zeros are demand-weighted and this number is not comparable with them. The dead-field question data/buildings/README.md's rule exists for -- does anybody actually use this machine? -- is the demand-weighted one, and for this building it is UNMEASURED.",
       "id": "escalator-4",
       "name": "The third sky lobby escalator (123 <-> 124)",
       "connects": [
         "123",
         "124"
       ],
-      "traversalTimeS": 19.2
+      "traversalTimeS": 17.78
     }
   ],
   "notes": [
-    "57 lifts in six banks: one double-deck sky-lobby shuttle of 14 cars serving G/1 and all three sky-lobby pairs, four local banks (10, 10, 11 and 8) and four observation expresses. 14+10+10+11+8+4 = 57.",
-    "THERE ARE NO SERVICE LIFTS, and that is a finding about the model rather than a simplification. Five were declared at first, reaching every level as a real building's do. Two measurements refused them. **One**: while they served the passenger lobby they were the only banks spanning the entrance to the top, so the dispatcher never had to transfer anybody — the fourteen shuttle cars carried ZERO legs and `service-high`'s two carried 277 of 827 at a 624 s mean wait, with 1.03 legs a journey against `vertical-city`'s 1.65. **Two**: moved to the loading dock they still overlapped every local, and `config/buildingConnectivity.test.ts` requires every floor served by more than one bank to be declared a transfer floor — which would have made 148 of 165 floors transfer floors and emptied the concept. This model has no notion of a staff-only bank; `accessZones` gates floors, not banks. So the honest shape is a building without them, recorded here, rather than 148 floors mislabelled. The plant floors 154–162 are reached by `local-zone3`, so every level is still routable.",
-    "The three sky lobbies are at 43, 76 and 123, each a two-level transfer served by a double-deck shuttle — the arrangement the reference tower uses and the one § D131's paired stops model.",
-    "Escalators are eight, in four pairs, each joining the two boarding decks of a double-deck level. #376's fourth criterion measures their hop count before any capacity or direction is added: as modelled they are undirected and uncapacitated, and data/buildings/README.md's rule is that a declared mode with zero hops is a dead field.",
-    "FOUR ESCALATORS ARE DECLARED AND THE REFERENCE TOWER HAS EIGHT, which is #376's fourth criterion answered by measurement rather than by transcription. All 27 060 ordered floor pairs were routed: every one is reachable, 24 routes use an escalator, and with eight declared — a pair at each double-deck landing — **four of them took zero hops**. As modelled an escalator is an undirected, uncapacitated edge with a traversal time, so the second of an identical pair can never be chosen: the router takes one and the other is a dead field, which `data/buildings/README.md` forbids. So one edge per landing is declared, and the finding is recorded here rather than papered over. THIS IS THE MEASUREMENT § D527 ASKED FOR BEFORE ADDING CAPACITY OR DIRECTION: a second escalator can only change a decision once an escalator can be full or one-way, and until then declaring eight would be declaring four lies."
+    "57 lifts in six banks: a single-deck sky-lobby shuttle of 16 cars serving G and the lower level of each sky lobby, four local banks (10, 10, 11 and 8), and two double-deck observation cars serving G/1 and 123/124. 16+10+10+11+8+2 = 57. Before GitHub issue #438 the shuttle was 14 double-deck cars and the observation bank four single-deck ones, 14+10+10+11+8+4.",
+    "THERE ARE NO SERVICE LIFTS, and that is a finding about the model rather than a simplification. Five were declared at first, reaching every level as a real building's do. Two measurements refused them. **One**: while they served the passenger lobby they were the only banks spanning the entrance to the top, so the dispatcher never had to transfer anybody — the fourteen shuttle cars carried ZERO legs and `service-high`'s two carried 277 of 827 at a 624 s mean wait, with 1.03 legs a journey against `vertical-city`'s 1.65. **Two**: moved to the loading dock they still overlapped every local, and `config/buildingConnectivity.test.ts` requires every floor served by more than one bank to be declared a transfer floor — which would have made 148 of 165 floors transfer floors and emptied the concept. This model has no notion of a staff-only bank; `accessZones` gates floors, not banks. So the honest shape is a building without them, recorded here, rather than 148 floors mislabelled. The plant floors 155–162 are reached by `local-zone3`, so every level is still routable.",
+    "The three sky lobbies are at 43, 76 and 123, each two levels, as Emaar’s fact sheet and the 2009 completion coverage give them. This note used to say each was served by a double-deck shuttle, the arrangement the reference tower uses; no source read supports that, because the tower’s two double-deck cars serve the observation deck. So since GitHub issue #438 the shuttle is single-deck and stops at each lobby’s lower level, which is an agent’s proposal set out in $comment, and § D131’s paired stops model the observation cars at G/1 and 123/124.",
+    "Escalators are eight, in four pairs, each joining the two levels of a two-level lobby. #376's fourth criterion measures their hop count before any capacity or direction is added: as modelled they are undirected and uncapacitated, and data/buildings/README.md's rule is that a declared mode with zero hops is a dead field.",
+    "FOUR ESCALATORS ARE DECLARED AND THE REFERENCE TOWER HAS EIGHT, which is #376's fourth criterion answered by measurement rather than by transcription. All 27 060 ordered floor pairs were routed: every one is reachable, 24 routes use an escalator, and with eight declared — a pair at each two-level landing — **four of them took zero hops**. As modelled an escalator is an undirected, uncapacitated edge with a traversal time, so the second of an identical pair can never be chosen: the router takes one and the other is a dead field, which `data/buildings/README.md` forbids. So one edge per landing is declared, and the finding is recorded here rather than papered over. THIS IS THE MEASUREMENT § D527 ASKED FOR BEFORE ADDING CAPACITY OR DIRECTION: a second escalator can only change a decision once an escalator can be full or one-way, and until then declaring eight would be declaring four lies. Those counts were taken on the arrangement as first authored. Re-routed on the arrangement GitHub issue #438 corrected, the four declared edges take 832 hops — 164, 266, 238 and 164 — pinned in packages/viz/src/record/burjReference.test.ts."
   ]
 }

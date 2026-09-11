@@ -166,7 +166,8 @@ describe('the airPressure block', () => {
     const cfg = await load();
     const car = { id: 'A', spec: 'ultra-high-speed', ratedSpeedMps: 20 };
     const withoutBlock = { ...cfg.elevatorSpecs, airPressure: undefined };
-    // 496 m of travel — burj-class-reference's shuttle — at twice the cap, and still symmetric.
+    // 496 m of travel — burj-class-reference's shuttle before GitHub issue #438 corrected its floor
+    // height — at twice the cap, and still symmetric.
     expect(
       resolveCar(car, withoutBlock, { buildingType: 'office', travelM: 496 }).descentSpeedMps,
     ).toBeUndefined();
@@ -320,7 +321,7 @@ describe('every shipped building is symmetric, so no pin moves', () => {
     /*
      * The reason matters, and it is the sentence a future data change will falsify first. Two
      * shipped banks *are* above the 300 m threshold — `vertical-city`'s shuttle at 307.5 m and
-     * `burj-class-reference`'s at 496 m — so the cap is reaching them. It does not bite because
+     * `burj-class-reference`'s at 448.3 m (496 m until GitHub issue #438) — so the cap is reaching them. It does not bite because
      * every shipped car is rated at or below 10.0 m/s, which is exactly the figure Al-Kodmany
      * records as the state of the art. Author an 11 m/s shuttle and the row above goes red,
      * which is correct: the pins really would move.

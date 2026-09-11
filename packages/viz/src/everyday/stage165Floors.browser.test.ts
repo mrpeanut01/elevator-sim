@@ -16,7 +16,8 @@
  * ## The building is real, and worth confirming before measuring the drawing
  *
  * `data/buildings/burj-class-reference.json` lists **ten** floors and looks at a glance like a stub.
- * It is not: the tower is expressed as four `floorRanges` plus ten explicit anchors, and the config
+ * It is not: the tower is expressed as fourteen `floorRanges` plus ten explicit anchors (four ranges until
+ * GitHub issue #438 restacked its uses), and the config
  * layer expands them. Resolved, it is **165 floors, 6 banks, 57 cars** — which is what § D527 asked
  * for. A measurement taken against the ten would have been measuring the file rather than the
  * building.
@@ -217,7 +218,7 @@ describe.skipIf(!HAS_BROWSER)('the stage at 165 floors — GitHub issue #377', (
     /*
      * The measurement above is only about the reference tower if the reference tower is 165 floors.
      * `data/buildings/burj-class-reference.json` lists **ten**, and is not a stub: four
-     * `floorRanges` carry the rest. Asserted here so a future edit that flattened the ranges — or
+     * `floorRanges` carry the rest (four until GitHub issue #438). Asserted here so a future edit that flattened the ranges — or
      * an expansion that silently stopped working — could not quietly turn the case above into a
      * measurement of a ten-storey building, which it would still pass.
      */
