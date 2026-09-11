@@ -1025,6 +1025,21 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    */
   function enterEngineer(): void {
     if (world === 'engineer') return;
+    /*
+     * **A rush ends before the page is handed over** — GitHub issue #523, item 1, § D548 clause 7.
+     *
+     * The Engineer surface writes almost every field `rush.ts#RUSH_FIELD_ROLES` runs fresh — the
+     * levers, the selector, patience, the pattern, the building, the seed — and
+     * `dev/main.ts#interveneAt` re-runs over whatever it finds. A posted sitting records none of
+     * them, so a rush that survived the trip could bank a wave count its own replay would not
+     * produce. Re-applying the fresh fields on each re-run was the other fix, and it would make the
+     * panel's controls inert for as long as a rush stood, which is § D177's class. `go('rush')` is
+     * the route the rail's other rows already take: its guard calls {@link leaveRush}, which cancels
+     * the run in flight and puts the player's day back, and the way back lands on the setup screen
+     * rather than on a stage whose rush is gone. The row's note says so in a rush
+     * (`types.ts#ENGINEER_SWAP_RUSH_NOTE`).
+     */
+    if (state.ctx === 'rush') go('rush');
     world = 'engineer';
     setCoveredInert(false);
     setEverydayCovered(true);

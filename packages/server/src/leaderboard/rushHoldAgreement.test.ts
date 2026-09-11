@@ -28,13 +28,24 @@
  *
  * The cheapest cells rather than a sweep: every shipped dispatcher on every building is 117 runs and
  * over two minutes a side, and the always-on tier pays for none of that.
+ *
+ * ## One cell is a fixture, and it is the one no shipped cell could be — GitHub issue #523, item 2
+ *
+ * This replay resolves a round's dispatcher id against the server's own `data/` and runs that
+ * profile's own `selection`. The viewer's press took the selector from a fresh session instead,
+ * which seeds it from the *opening* dispatcher. The two agreed on every shipped cell only because no
+ * shipped profile declares a selection, so no shipped cell could tell them apart. A cell carrying
+ * `declaredSelection` gives its profile that block in **both** halves before anything is resolved —
+ * the day a shipped profile declares one — and the viewer's half fails where its press does not read
+ * the selector off the profile it brings. Chancery House under `nearest-car` with a fuzzy selection
+ * is the cell because the selection moves the hold there by more than fifteen minutes.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { loadConfig, rushHoldAtLegs, runSimulation } from '@elevator-sim/core';
+import { loadConfig, rushHoldAtLegs, runSimulation, type SimulationConfig } from '@elevator-sim/core';
 
 import type { SubmittedIntervention } from './submission.js';
 import { rushRoundConfigFor, type VerificationResources } from './verify.js';
@@ -47,6 +58,8 @@ interface AgreementCell {
   readonly buildingId: string;
   readonly dispatcherProfileId: string;
   readonly interventions?: readonly SubmittedIntervention[];
+  /** A `selection` both halves give this cell's profile before resolving it — see the docstring's last section. */
+  readonly declaredSelection?: NonNullable<SimulationConfig['dispatcherProfile']['selection']>;
   /** Seconds from the round's start to the line being crossed, or `null` when it never was. */
   readonly heldS: number | null;
 }
@@ -63,7 +76,8 @@ function labelOf(cell: AgreementCell): string {
   const log = (cell.interventions ?? []).map((entry) =>
     entry.change.kind === 'switch-dispatcher' ? `→${entry.change.toProfileId}@${String(entry.atS)}` : `${entry.change.kind}@${String(entry.atS)}`,
   );
-  return [cell.buildingId, cell.dispatcherProfileId, ...log].join(' ');
+  const declared = cell.declaredSelection === undefined ? [] : [`declaring ${JSON.stringify(cell.declaredSelection)}`];
+  return [cell.buildingId, cell.dispatcherProfileId, ...declared, ...log].join(' ');
 }
 
 let resources: VerificationResources;
@@ -81,6 +95,22 @@ beforeAll(async () => {
   };
   shippedBuildingIds = [...config.buildingsById.keys()];
 });
+
+/** The shipped resources, with the cell's profile declaring its fixture selection where it has one. */
+function resourcesFor(cell: AgreementCell): VerificationResources {
+  const selection = cell.declaredSelection;
+  if (selection === undefined) return resources;
+  const declaring = (profile: SimulationConfig['dispatcherProfile']): SimulationConfig['dispatcherProfile'] =>
+    profile.id === cell.dispatcherProfileId ? { ...profile, selection } : profile;
+  return {
+    ...resources,
+    dispatcherProfilesById: new Map([...resources.dispatcherProfilesById].map(([id, profile]) => [id, declaring(profile)] as const)),
+    // `verify.ts#configOver`'s own guard: the file is optional on a verification's resources.
+    ...(resources.dispatcherProfiles === undefined
+      ? {}
+      : { dispatcherProfiles: { ...resources.dispatcherProfiles, profiles: resources.dispatcherProfiles.profiles.map(declaring) } }),
+  };
+}
 
 afterAll(() => {
   if (!REGENERATE || measured.size !== table.cells.length) return;
@@ -103,7 +133,7 @@ describe('the rush hold agreement table — the server’s replay half (PR #513,
     const config = rushRoundConfigFor(
       cell.buildingId,
       { dispatcherProfileId: cell.dispatcherProfileId, ...(cell.interventions === undefined ? {} : { interventions: cell.interventions }) },
-      resources,
+      resourcesFor(cell),
     );
     if (typeof config === 'string') throw new Error(`${label} does not resolve on this server: ${config}`);
     const { record } = runSimulation(config);

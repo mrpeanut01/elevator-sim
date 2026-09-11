@@ -47,7 +47,7 @@ import { EM_DASH, percentFigure } from './figures.js';
 import { avatarInitialOf, DEFAULT_EVERYDAY_PROFILE, effectiveNameOf } from './profile.js';
 import { isScreenBuilt, UNBUILT_REASONS } from './screens.js';
 import { REPLAY_COPY } from './replay.js';
-import { ENGINEER_SWAP_NOTE } from './types.js';
+import { ENGINEER_SWAP_NOTE, ENGINEER_SWAP_RUSH_NOTE } from './types.js';
 import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 
 /**
@@ -472,7 +472,8 @@ export function railFooter(state: EverydayState, options: RailOptions = {}): Rai
     },
     engineerSwap: {
       label: 'Switch to Engineer',
-      note: ENGINEER_SWAP_NOTE,
+      // With a rush standing the swap ends it first (GitHub issue #523), so *nothing stops* would be false there.
+      note: state.ctx === 'rush' ? ENGINEER_SWAP_RUSH_NOTE : ENGINEER_SWAP_NOTE,
     },
   };
 }

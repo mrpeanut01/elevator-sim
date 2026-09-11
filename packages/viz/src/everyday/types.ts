@@ -277,6 +277,18 @@ export const ENGINEER_SWAP_NOTE =
   'the same day on the full instrument panel — nothing stops, and this visit only: reloading opens Everyday Mode again';
 
 /**
+ * **The swap's note while a rush stands** — GitHub issue #523, item 1, § D548 clause 7.
+ *
+ * {@link ENGINEER_SWAP_NOTE} says *nothing stops*, and inside a rush the swap stops the rush:
+ * `shell.ts#enterEngineer` leaves it before handing the page over, because the full panel writes the
+ * levers, the selector and every other field a rush runs fresh, and a posted sitting records none of
+ * them. So the row says so before it is pressed. It lives here, beside its sibling, for that
+ * constant's reason: a word in this module cannot be caught in an import cycle.
+ */
+export const ENGINEER_SWAP_RUSH_NOTE =
+  'ends the rush first, because a rush runs as shipped and the full panel can change that — and this visit only: reloading opens Everyday Mode again';
+
+/**
  * The Engineer header's way back, as a label — `dev/main.ts#wireHeaderAndFooter` writes it onto
  * `#back-to-everyday`.
  *

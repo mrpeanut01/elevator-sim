@@ -35,6 +35,7 @@
 import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { selectorContextFrom, specFromProfile as selectorSpecFromProfile } from '../authoring/selectorSpec.js';
 import { freshTower, openingCareer, type CampaignCareer, type CampaignTower } from '../campaign/career.js';
 import { fitOutOf } from '../campaign/fitOut.js';
 import { campaignEventFor } from '../campaign/incidents.js';
@@ -59,8 +60,8 @@ beforeAll(async () => {
 });
 
 /** A fresh session standing on the building and the dispatcher, through the two setters the pickers call. */
-function ownStanding(buildingId: string, dispatcherId = 'collective'): ViewerState {
-  return withDispatcher(withBuilding(initialState(resources, RUSH_SEED), resources, buildingId), resources, dispatcherId);
+function ownStanding(buildingId: string, dispatcherId = 'collective', using: BrowserResources = resources): ViewerState {
+  return withDispatcher(withBuilding(initialState(using, RUSH_SEED), using, buildingId), using, dispatcherId);
 }
 
 /**
@@ -107,10 +108,10 @@ interface Pressable {
 }
 
 /** A host over `standing`, bound the way `rushScreen.ts`'s page binds it, with its own career store. */
-function hostOn(standing: ViewerState, career?: CampaignCareer): Pressable {
+function hostOn(standing: ViewerState, career?: CampaignCareer, using: BrowserResources = resources): Pressable {
   let state = standing;
   const bindings = {
-    resources,
+    resources: using,
     state: () => state,
     applyPatch: (patch: Partial<ViewerState>) => {
       state = { ...state, ...patch };
@@ -151,8 +152,8 @@ function hostOn(standing: ViewerState, career?: CampaignCareer): Pressable {
 }
 
 /** *Start the rush*, pressed through `EverydayHost` exactly as `rushScreen.ts` presses it. */
-function pressedRush(standing: ViewerState): ViewerState {
-  const pressable = hostOn(standing);
+function pressedRush(standing: ViewerState, using: BrowserResources = resources): ViewerState {
+  const pressable = hostOn(standing, undefined, using);
   const refusal = pressable.host.startRush();
   if (refusal !== undefined) throw new Error(`the rush would not start: ${refusal}`);
   return pressable.state();
@@ -182,8 +183,8 @@ interface Measured {
 }
 
 /** The rush a pressed state runs, played through the shipped path and read on the legs. */
-function measuredRush(pressed: ViewerState): Measured {
-  const plan = shiftRunConfigOf(resources, pressed);
+function measuredRush(pressed: ViewerState, using: BrowserResources = resources): Measured {
+  const plan = shiftRunConfigOf(using, pressed);
   const { recording } = recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds });
   return { legs: recording.legs.length, holdAtS: rushHoldAt(recording) ?? null };
 }
@@ -338,6 +339,61 @@ describe('a player’s levers and selector do not reach the rush — GitHub issu
   });
 });
 
+describe('the rush’s selector is the one the dispatcher declares — GitHub issue #523, item 2', () => {
+  /*
+   * PR #513's server replays a round under the shipped profile's own `selection`:
+   * `verify.ts#rushRoundConfigFor` resolves the dispatcher id against its own `data/`. The press took
+   * the selector from a fresh session instead, and a fresh session seeds it from the *opening*
+   * dispatcher, so the two agreed only because no shipped profile declares a selection. The fixture
+   * is the day one does: `nearest-car` declaring a fuzzy selection, on Chancery House, where that
+   * selection moves the hold (measured 1 936 s undeclared, 2 880 s declared, on this seed).
+   */
+  const DECLARED_SELECTION = Object.freeze({ policy: 'fuzzy' as const });
+
+  /** The shipped resources with one profile declaring {@link DECLARED_SELECTION}. */
+  function declaring(profileId: string): BrowserResources {
+    return {
+      ...resources,
+      dispatcherProfiles: {
+        ...resources.dispatcherProfiles,
+        profiles: resources.dispatcherProfiles.profiles.map((profile) =>
+          profile.id === profileId ? { ...profile, selection: DECLARED_SELECTION } : profile,
+        ),
+      },
+    };
+  }
+
+  it('Chancery House under a nearest-car that declares a fuzzy selection runs that selection, and holds where the declared profile holds', () => {
+    const using = declaring('nearest-car');
+    const profile = using.dispatcherProfiles.profiles.find((entry) => entry.id === 'nearest-car');
+    if (profile === undefined) throw new Error('no nearest-car in the shipped library');
+    const own = ownStanding('chancery-house', 'nearest-car', using);
+    /* Non-vacuity: the player's own selector is not the declared one, so a press that kept it, or took a fresh session's, cannot pass. */
+    expect(own.selectorSpec.policy).not.toBe('fuzzy');
+    const pressed = pressedRush(own, using);
+    /* The spec a fresh session would seed from this profile — `dev/state.ts#initialState`'s own derivation, over the brought profile. */
+    expect(pressed.selectorSpec).toEqual(selectorSpecFromProfile(profile, selectorContextFrom(using.dispatcherProfiles)));
+    const plan = shiftRunConfigOf(using, pressed);
+    expect(plan.config.dispatcherProfile.selection).toEqual(DECLARED_SELECTION);
+    /* On the legs: the profile as declared, which is the one the server resolves, holds at the same moment. */
+    const asDeclared = recordRun({ ...plan.config, dispatcherProfile: profile }, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds });
+    const run = measuredRush(pressed, using);
+    expect(run).toEqual({ legs: asDeclared.recording.legs.length, holdAtS: rushHoldAt(asDeclared.recording) ?? null });
+    /* And the declaration is live on this run, so the agreement is not one the undeclared profile would also reach. */
+    expect(run.holdAtS).not.toBe(measuredRush(pressedRush(ownStanding('chancery-house', 'nearest-car'))).holdAtS);
+  });
+
+  it('leaving the rush still hands the player’s own selector back', () => {
+    const using = declaring('nearest-car');
+    const standing = ownStanding('chancery-house', 'nearest-car', using);
+    const pressable = hostOn(standing, undefined, using);
+    expect(pressable.host.startRush()).toBeUndefined();
+    expect(pressable.state().selectorSpec.policy).toBe('fuzzy');
+    pressable.host.leaveRush();
+    expect(pressable.state().selectorSpec).toBe(standing.selectorSpec);
+  });
+});
+
 describe('*Run the rush again* meets the same stream and the same fresh state — GitHub issue #518, item 2', () => {
   it('after an intervention and a moved lever on the first attempt, the second press runs the clean rush', () => {
     const pressable = hostOn(ownStanding('midtown-office'));
@@ -348,7 +404,11 @@ describe('*Run the rush again* meets the same stream and the same fresh state �
     pressable.write({ interventions: [...first.interventions, { atS: 300, change: { kind: 'park-cars-lobby' } }] });
     /* Non-vacuity: the intervention moves this rush, so a second press that kept it would not run the clean one. At 600 s or later it does not. */
     expect(measuredRush(pressable.state())).not.toEqual(clean);
-    /* And a lever moved on the Workshop, which the rail offers during a rush. */
+    /*
+     * And a lever written straight onto the state. The Engineer panel could write one mid-rush until
+     * GitHub issue #523 made the swap leave the rush (`shell.ts#enterEngineer`); the rail's Workshop
+     * and tuner rows already left it (`shell.ts#go`). A second press must not inherit it either way.
+     */
     pressable.write({ levers: { ...pressable.state().levers, dwell: 'patient' } });
     expect(pressable.host.startRush()).toBeUndefined();
     const fresh = initialState(resources, RUSH_SEED);

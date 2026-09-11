@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
 import { actionBarFor } from './actionBar.js';
 import { routeFor } from './screens.js';
 import { WAIT_BANDS } from '../live/bands.js';
@@ -25,6 +26,7 @@ import {
   rushBarModel,
   rushDrivingLine,
   rushFactViews,
+  rushLeftBehindLine,
   rushGeneratedRangeLine,
   rushHoldLineFigure,
   rushOpeningLine,
@@ -254,6 +256,24 @@ describe('what the screen refuses, and where the refusal sits', () => {
      */
     expect(line).toContain('brief');
     expect(line).not.toMatch(/not built/);
+  });
+
+  /*
+   * GitHub issue #523, item 3. A rush runs from the shipped levers (§ D548 clause 6), so the
+   * `lobby-anchor` style card — collective with parking on — reaches the rush as plain collective,
+   * and the driving line names only the profile. The line under it names what stays behind, and
+   * says nothing when nothing does.
+   */
+  it('names the levers a rush leaves behind, and nothing when the player set none', () => {
+    expect(rushLeftBehindLine(DEFAULT_LEVERS)).toBeUndefined();
+    const anchor = rushLeftBehindLine({ ...DEFAULT_LEVERS, parking: true });
+    expect(anchor).toContain('lobby parking');
+    expect(anchor).toContain('stays behind');
+    expect(anchor).not.toMatch(/express|dwell/u);
+    expect(rushLeftBehindLine({ parking: true, express: true, dwell: 'patient' })).toMatch(
+      /lobby parking, express zoning and patient door dwell stay behind/u,
+    );
+    expect(rushLeftBehindLine({ ...DEFAULT_LEVERS, dwell: 'snappy' })).toContain('snappy door dwell stays behind');
   });
 });
 

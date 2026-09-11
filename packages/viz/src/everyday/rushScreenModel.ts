@@ -56,6 +56,8 @@ import {
   waveIndexAt,
 } from '@elevator-sim/core/browser';
 
+import type { GroupLevers } from '../authoring/dispatcherSpec.js';
+
 import type { ActionBarModel } from './actionBar.js';
 import {
   workedAnswerViewOf,
@@ -481,6 +483,29 @@ export function rushFactViews(): readonly RushFactView[] {
  */
 export function rushDrivingLine(name: string): string {
   return `${name} would drive it. Picking another is on the brief, which today's tower opens.`;
+}
+
+/**
+ * **What a rush leaves behind of the player's settings**, or `undefined` when they moved none —
+ * GitHub issue #523, item 3, § D548 clause 7.
+ *
+ * A rush runs from the shipped levers (§ D548 clause 6), so the `lobby-anchor` style card — collective
+ * with parking on — reaches a rush as plain collective, and {@link rushDrivingLine} names only the
+ * profile. PR #513's sitting records neither the levers nor the selector, so a rush dropping them is
+ * right; saying nothing about it was the gap. Each lever is named when it is off its shipped value, and
+ * pattern switching when the player's differs from what the dispatcher declares — the caller decides
+ * that, because it needs the profile and this module holds no resources.
+ */
+export function rushLeftBehindLine(levers: GroupLevers, switchingMoved = false): string | undefined {
+  const names: string[] = [];
+  if (levers.parking) names.push('lobby parking');
+  if (levers.express) names.push('express zoning');
+  if (levers.dwell !== undefined) names.push(`${levers.dwell} door dwell`);
+  if (switchingMoved) names.push('pattern switching');
+  const last = names.at(-1);
+  if (last === undefined) return undefined;
+  const list = names.length === 1 ? last : `${names.slice(0, -1).join(', ')} and ${last}`;
+  return `A rush runs it as shipped, so your ${list} ${names.length === 1 ? 'stays' : 'stay'} behind until you leave.`;
 }
 
 /* -------------------------------------------------------------------------- *

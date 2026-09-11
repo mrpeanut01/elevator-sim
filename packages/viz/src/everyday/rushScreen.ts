@@ -24,6 +24,8 @@
  * for the measurement that moved it and for why nothing replaced it.
  */
 
+import { specIsDirty } from '../authoring/selectorSpec.js';
+
 import { actionBarFor } from './actionBar.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -34,6 +36,7 @@ import {
   rushFactViews,
   rushGeneratedRangeLine,
   rushHoldLineFigure,
+  rushLeftBehindLine,
   rushOpeningLine,
   rushTutorialWorkedAnswerOf,
   RUSH_SCREEN_COPY as COPY,
@@ -234,9 +237,24 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     rushDrivingLine(driver?.name ?? selection.dispatcherId),
   );
   driving.style.cssText = 'font-size:13.5px;font-weight:600;line-height:1.5';
+  drivingBlock.append(drivingEyebrow, driving);
+  /*
+   * What a rush does not run of the player's settings, under the driver it names — GitHub issue #523,
+   * item 3. This screen is drawn with no rush standing (every way onto it leaves one, `shell.ts#go`),
+   * so the levers and the selector read here are the player's own.
+   */
+  const leftBehindLine = rushLeftBehindLine(
+    context.host.groupLevers(),
+    driver !== undefined && specIsDirty(context.host.selectorSpec(), driver, context.host.selectorContext()),
+  );
+  if (leftBehindLine !== undefined) {
+    const leftBehind = el(doc, 'p', 'everyday-rush-left-behind', leftBehindLine);
+    leftBehind.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:9px 0 0`;
+    drivingBlock.append(leftBehind);
+  }
   const drivingNote = el(doc, 'p', undefined, COPY.drivingNote);
   drivingNote.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:9px 0 0`;
-  drivingBlock.append(drivingEyebrow, driving, drivingNote);
+  drivingBlock.append(drivingNote);
   /* § D478: a stream this far outside the building's band says so before it starts. */
   const disclosureLine = context.host.rushDisclosure();
   if (disclosureLine !== undefined) {
