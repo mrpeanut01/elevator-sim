@@ -18,8 +18,8 @@
  * **What the player brings into it is a whitelist, not whatever the patch leaves alone.**
  * {@link RUSH_FIELD_ROLES} says what every `ViewerState` field is to a rush: the building and the
  * dispatcher ride in, the rush writes its own identity, and a day's or a session's state — a campaign
- * day's kit, event and held cars among it — runs at a fresh session's value and comes back when the
- * player leaves (§ D548 clause 5).
+ * day's kit, event and held cars among it, and the player's levers and selector — runs at a fresh
+ * session's value and comes back when the player leaves (§ D548 clauses 5 and 6).
  *
  * ## The fail state, and the design question § D477 left open
  *
@@ -109,12 +109,20 @@ type RushFieldRole = 'building' | 'dispatcher' | 'rush' | 'fresh' | 'surface';
  * So the rule is inverted: a field reaches a rush only where this table says the player brings it.
  *
  * - `building` — the tower the player stands on, their own designs included. The rush runs on it.
- * - `dispatcher` — the dispatcher they bring, with its rules, selector and levers. The rush tests it.
+ * - `dispatcher` — the dispatcher they bring, and its rule rows. The rush tests it.
  * - `rush` — the rush's own identity, which {@link rushPatchOf} writes.
  * - `fresh` — a day's or a session's state: a fresh session's value while the rush stands, and the
  *   player's own back when they leave ({@link RushBefore}). `calendar`, `commissioning`,
  *   `interventions`, `patience` and `pattern` are here on the campaign fields' ground — the run reads
  *   each of them — and whether each one moved a rush before this table was not measured.
+ *   `levers` and `selectorSpec` joined them for GitHub issue #518, and those two were measured: on
+ *   Midtown Office × `collective`, whose clean rush holds 1 640 s on 3 584 legs, a patient dwell set
+ *   before the press held 1 280 s, express 1 528 s and the fuzzy selector 1 550 s, on the same legs.
+ *   The ground is the owner's ruling on #372, *a sitting is consecutive runs from an as-shipped
+ *   start*, which the house rows and PR #513's server replay already assume. The alternative is the
+ *   owner's to choose: record both in the sitting and in the board's modifier-set key (§ D548
+ *   clause 6). **Every press writes them**, *Run the rush again* included (`EverydayHost.startRush`),
+ *   so a second attempt does not inherit the first one's interventions.
  * - `surface` — what the screens show and edit, and no run under a rush reads. `savedPatterns` is
  *   here because a run reads it only through `pattern`, which is `fresh`.
  *
@@ -145,8 +153,8 @@ const RUSH_FIELD_ROLES = Object.freeze({
   seed: 'rush',
   outOfServiceCarIds: 'fresh',
   interventions: 'fresh',
-  levers: 'dispatcher',
-  selectorSpec: 'dispatcher',
+  levers: 'fresh',
+  selectorSpec: 'fresh',
   ruleRows: 'dispatcher',
   patience: 'fresh',
   week: 'rush',

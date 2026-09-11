@@ -188,6 +188,9 @@ function harnessOf(
       startRun: () => {
         calls.push('startRun');
       },
+      cancelRun: () => {
+        calls.push('cancelRun');
+      },
       intervene: (atS, change) => {
         calls.push(`intervene:${String(atS)}:${change.kind}`);
       },
@@ -1820,18 +1823,43 @@ describe('the rush — GitHub issue #220, § D515', () => {
     expect(session?.endedAtS).toBeUndefined();
     host.endRush(300);
     expect(host.rush()?.endedAtS).toBe(300);
-    /* Pressed again inside the rush, the same waves are asked for and the record is cleared. */
+    /*
+     * Pressed again inside the rush, the same waves are asked for and the record is cleared — and the
+     * press writes the rush's standing again, so a second attempt meets the same fresh state as the
+     * first (GitHub issue #518, item 2). The harness does not apply patches, so the two are equal.
+     */
     expect(host.startRush()).toBeUndefined();
-    expect(h.calls).toEqual(['applyPatch', 'startRun', 'startRun']);
+    expect(h.calls).toEqual(['applyPatch', 'startRun', 'applyPatch', 'startRun']);
+    expect(h.patches[1]).toEqual(h.patches[0]);
     expect(host.rush()?.endedAtS).toBeUndefined();
     host.leaveRush();
     expect(host.rush()).toBeUndefined();
-    const restore = h.patches[1];
+    const restore = h.patches[2];
     expect(restore?.seed).toBe(base().seed);
     expect(restore?.week?.contractId).toBe(base().week.contractId);
     /* Leaving twice is a no-op. */
+    const callsAfterLeaving = h.calls.length;
     host.leaveRush();
-    expect(h.patches).toHaveLength(2);
+    expect(h.patches).toHaveLength(3);
+    expect(h.calls).toHaveLength(callsAfterLeaving);
+  });
+
+  it('leaving cancels the run in flight before the day is put back — GitHub issue #518, item 4', () => {
+    /*
+     * A rush's stream is generated on a worker, and leaving does not wait for it. `dev/main.ts`'s
+     * `applyShift` adopts whatever run lands, with no check that the state it was asked for is still
+     * standing, so a rush left mid-generation landed over the day `leaveRush` had just put back. The
+     * run in flight inside a rush is the rush's, so leaving cancels it, and it does so first: a
+     * cancel after the restore would leave a window in which the stale run could still land.
+     */
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    expect(host.startRush()).toBeUndefined();
+    host.leaveRush();
+    expect(h.calls).toEqual(['applyPatch', 'startRun', 'cancelRun', 'applyPatch']);
+    /* Outside a rush, leaving cancels nothing: a day's own run is not the rush's to stop. */
+    host.leaveRush();
+    expect(h.calls).toEqual(['applyPatch', 'startRun', 'cancelRun', 'applyPatch']);
   });
 });
 

@@ -5,6 +5,11 @@
  * a wave pill where a day has a clock and a phase → *End the rush* → the result, its own screen. Then
  * the way out: *Leave the rush* puts the player's parked week back, which the front door shows by
  * naming the same tower it named before.
+ *
+ * The second case is GitHub issue #518, item 4: a rush left while its stream is still being generated
+ * stops that run, so nothing lands over the day the way out has just put back. The host's half of that
+ * is `host.test.ts`, and the runner's is `dev/shiftRunner.test.ts` (a result arriving after a cancel is
+ * not applied); this case holds the binding between them, on the shipped bundle.
  */
 
 import { chromium, type Browser, type Page } from 'playwright-core';
@@ -110,6 +115,44 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       const seedLine = await page.textContent('.everyday-door-seed');
       expect(seedLine).toContain('tower garden-apartments');
       expect(seedLine).toContain('crowd 424242');
+    } finally {
+      await page.close();
+    }
+  }, 180_000);
+
+  it('left while its stream is still generating, stops that run, so it cannot land over the day put back — GitHub issue #518', async () => {
+    const page = await coldLoad();
+    try {
+      await leaveTutorialIfOffered(page);
+      await page.locator('.everyday-mode[data-screen="rush"]').click();
+      await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      /* `#run` is the Engineer's Run button; `dev/main.ts#onRunning` labels it from the runner's own transition. */
+      const idle = 'Run this shift';
+      await page.waitForFunction((label) => document.getElementById('run')?.textContent === label, idle, { timeout: 60_000 });
+      /*
+       * Press and leave inside one task. The worker answers with a message, which is a task of its own,
+       * so the stream cannot land between the two, and this case cannot pass by the stream being quick.
+       * The confirm is clicked where the shell draws one.
+       */
+      const seen = await page.evaluate(() => {
+        const label = (): string => document.getElementById('run')?.textContent ?? '';
+        document.querySelector<HTMLButtonElement>('.everyday-bar-primary')?.click();
+        const pressed = label();
+        document.querySelector<HTMLButtonElement>('.everyday-bar-leave')?.click();
+        document.querySelector<HTMLButtonElement>('.everyday-bar-confirm-leave')?.click();
+        return { pressed, left: label(), status: document.getElementById('status')?.textContent ?? '' };
+      });
+      /* Non-vacuity: the press started the rush's run, and it was in flight when the player left. */
+      expect(seen.pressed).toBe('Cancel this run');
+      /*
+       * Where the leave does not cancel, the run stays in flight and lands later, and
+       * `dev/main.ts#applyShift` adopts it over the restored day. The status line after that landing is
+       * carried in the message, so a red run shows what landed.
+       */
+      await page.waitForFunction((label) => document.getElementById('run')?.textContent === label, idle, { timeout: 120_000 });
+      const settled = await page.evaluate(() => document.getElementById('status')?.textContent ?? '');
+      expect(seen.left, `left with status "${seen.status}"; once the runner was idle it read "${settled}"`).toBe(idle);
+      await page.waitForSelector('.everyday-mode[data-screen="scenario"]', { timeout: 15_000 });
     } finally {
       await page.close();
     }
