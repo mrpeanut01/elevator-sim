@@ -16,9 +16,24 @@
  *   caption instead of a fact.
  * - **The typicals ascend with `order`**, strictly. That is the ladder, checked.
  * - **Every price sits inside its own declared schema**, which is what invariant 8's range is for.
- * - **No change covers a path another change also covers.** Two rows claiming one field is the
- *   same defect as two prices, arrived at from the other side, and it is the check that would have
- *   caught the speed conflict this file was written to end.
+ * - **No change covers a path another change also covers** — exactly, or through a group. Two rows
+ *   claiming one field is the same defect as two prices, arrived at from the other side, and it is
+ *   the check that would have caught the speed conflict this file was written to end. A group
+ *   prices every path under it, so the match is {@link pathsOverlap}, the one the `withheld` block
+ *   uses: GitHub issue #467 added group covers, and until the review of GitHub PR #506 this matched
+ *   exact paths only, so a row covering one leaf under another row's group passed it.
+ *
+ * And four for the `withheld` block GitHub issue **#467** added ([§ D535](../../../../DECISIONS.md)),
+ * each the rule above pointed at what no scenario sells:
+ *
+ * - **A path is withheld or priced, never both** — exactly, or through a group that holds the
+ *   other. A dial sold at one price and at none is two answers to one question.
+ * - **A withheld entry carries no price, no tier and no nights.** Not for sale is a different answer
+ *   from priced high, so a field for one does not exist to be authored; an unknown key is refused
+ *   rather than ignored.
+ * - **Every withheld entry says why**, and covers something.
+ * - **The block is required.** An absent one is refused rather than read as *nothing withheld*,
+ *   because a file nobody finished and a file that withholds nothing must not look alike.
  */
 
 import {
@@ -27,6 +42,7 @@ import {
   type PricedChange,
   type PricedExtra,
   type PriceTier,
+  type WithheldChange,
 } from './types.js';
 
 /** Raised when the document cannot be read as a schedule at all. */
@@ -61,6 +77,14 @@ function int(value: unknown, where: string): number {
 function list(value: unknown, where: string): readonly unknown[] {
   if (!Array.isArray(value)) throw new PriceScheduleError(`${where}: expected an array.`);
   return value;
+}
+
+/** Every key a withheld entry may carry — and none of them is a price. */
+const WITHHELD_KEYS: readonly string[] = ['id', 'note', 'covers'];
+
+/** Whether two config paths name the same field, or one is a dotted group holding the other. */
+function pathsOverlap(left: string, right: string): boolean {
+  return left === right || left.startsWith(`${right}.`) || right.startsWith(`${left}.`);
 }
 
 /** The median of a sorted-in-place copy — the upper of the two middles on an even count. */
@@ -133,13 +157,35 @@ export function parsePriceSchedule(raw: unknown): PriceSchedule {
     };
   });
 
-  const violations = violationsIn({ version, tiers, changes, extras });
+  const shape: string[] = [];
+  const withheld: WithheldChange[] = list(doc['withheld'], 'withheld').map((entry, index) => {
+    const where = `withheld[${String(index)}]`;
+    const item = record(entry, where);
+    const id = str(item['id'], `${where}.id`);
+    for (const key of Object.keys(item)) {
+      if (WITHHELD_KEYS.includes(key)) continue;
+      shape.push(
+        `withheld "${id}" carries "${key}", and not for sale is a different answer from priced ` +
+          'high: a withheld change has no price, no tier and no nights, so there is no field for ' +
+          'one to be authored in (GitHub issue #467).',
+      );
+    }
+    return {
+      id,
+      note: typeof item['note'] === 'string' ? item['note'] : '',
+      covers: list(item['covers'], `${where}.covers`).map((path, i) =>
+        str(path, `${where}.covers[${String(i)}]`),
+      ),
+    };
+  });
+
+  const violations = [...shape, ...violationsIn({ version, tiers, changes, extras, withheld })];
   if (violations.length > 0) {
     throw new PriceScheduleError(
       `data/price-schedule.json is not a usable schedule:\n  ${violations.join('\n  ')}`,
     );
   }
-  return { version, tiers, changes, extras };
+  return { version, tiers, changes, extras, withheld };
 }
 
 /**
@@ -162,6 +208,37 @@ export function violationsIn(schedule: PriceSchedule): readonly string[] {
   duplicates(schedule.tiers.map((tier) => tier.id), 'tier');
   duplicates(schedule.changes.map((change) => change.id), 'change');
   duplicates(schedule.extras.map((extra) => extra.id), 'extra');
+  duplicates(schedule.withheld.map((entry) => entry.id), 'withheld change');
+
+  /* What no scenario sells — GitHub issue #467. Withheld and priced may not meet, by path or group. */
+  const pricedIds = new Set(schedule.changes.map((change) => change.id));
+  for (const entry of schedule.withheld) {
+    if (pricedIds.has(entry.id)) {
+      out.push(
+        `"${entry.id}" is both a priced change and a withheld one. Not for sale is a different ` +
+          'answer from priced high, and one id cannot give both.',
+      );
+    }
+    if (entry.note.trim() === '') {
+      out.push(
+        `withheld "${entry.id}" says nothing about why. Not for sale is a ruling, and a ruling ` +
+          'says whose it is.',
+      );
+    }
+    if (entry.covers.length === 0) {
+      out.push(`withheld "${entry.id}" covers nothing, so it withholds nothing.`);
+    }
+    for (const path of entry.covers) {
+      for (const change of schedule.changes) {
+        const met = change.covers.find((covered) => pathsOverlap(path, covered));
+        if (met === undefined) continue;
+        out.push(
+          `"${met}" is both withheld and priced — withheld by "${entry.id}" through "${path}" and ` +
+            `priced by "${change.id}". A dial is sold at one price or at none (GitHub issue #467).`,
+        );
+      }
+    }
+  }
 
   const tierIds = new Set(schedule.tiers.map((tier) => tier.id));
   for (const change of schedule.changes) {
@@ -184,18 +261,32 @@ export function violationsIn(schedule: PriceSchedule): readonly string[] {
     if (change.nights < 0) out.push(`change "${change.id}" books negative nights.`);
   }
 
-  /* Two rows claiming one field is two prices for one change, from the other side. */
-  const claimed = new Map<string, string>();
+  /* Two rows claiming one field, by path or through a group, is two prices for one change. */
+  const claimed: { readonly path: string; readonly changeId: string }[] = [];
   for (const change of schedule.changes) {
     for (const path of change.covers) {
-      const already = claimed.get(path);
-      if (already !== undefined) {
+      for (const earlier of claimed) {
+        if (!pathsOverlap(path, earlier.path)) continue;
+        if (path === earlier.path) {
+          out.push(
+            `"${path}" is priced by both "${earlier.changeId}" and "${change.id}". ` +
+              'One change, one price — that is the whole of GitHub issue #366.',
+          );
+          continue;
+        }
+        if (earlier.changeId === change.id) continue;
+        const pathIsGroup = path.length < earlier.path.length;
+        const [group, leaf] = pathIsGroup ? [path, earlier.path] : [earlier.path, path];
+        const [groupOwner, leafOwner] = pathIsGroup
+          ? [change.id, earlier.changeId]
+          : [earlier.changeId, change.id];
         out.push(
-          `"${path}" is priced by both "${already}" and "${change.id}". One change, one price — ` +
-            'that is the whole of GitHub issue #366.',
+          `"${leaf}" is priced by both "${leafOwner}" and "${groupOwner}", which covers it ` +
+            `through the group "${group}". A group prices every path under it, so one change, ` +
+            'one price — that is the whole of GitHub issue #366.',
         );
       }
-      claimed.set(path, change.id);
+      claimed.push({ path, changeId: change.id });
     }
   }
 

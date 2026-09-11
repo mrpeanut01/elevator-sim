@@ -53,12 +53,12 @@
       },
       "budget": {
         "startingUnits": 15,
-        "note": "DERIVED: 15 u is \"Destination panels\" at 13 u — the dearest change on data/price-schedule.json that every dimension the search space declares can reach — plus the dispatcher tier's own typical of 2 u, so the lesson is never the last thing this brief can afford. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial. It is stage-7-prove-it's arithmetic verbatim, because this brief opens the whole editor exactly as that stage does and a second derivation of the same quantity would be a second answer to one question.",
+        "note": "DERIVED: 15 u is \"Destination panels\" at 13 u — the dearest change on data/price-schedule.json that every dimension a scenario sells can reach — plus the dispatcher tier's own typical of 2 u, so the lesson is never the last thing this brief can afford. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial. It is stage-7-prove-it's arithmetic verbatim, because this brief opens the whole editor exactly as that stage does and a second derivation of the same quantity would be a second answer to one question.",
         "schema": {
           "type": "integer",
           "unit": "units",
           "min": 0,
-          "max": 383,
+          "max": 396,
           "default": 15,
           "activeWhen": null
         },
@@ -73,7 +73,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 383,
+              "max": 396,
               "default": 9,
               "activeWhen": null
             }
@@ -88,7 +88,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 383,
+              "max": 396,
               "default": 30,
               "activeWhen": "equipment-rung"
             }
@@ -158,12 +158,12 @@
       },
       "budget": {
         "startingUnits": 15,
-        "note": "DERIVED: 15 u is \"Destination panels\" at 13 u — the dearest change on data/price-schedule.json that every dimension the search space declares can reach — plus the dispatcher tier's own typical of 2 u. It is also exactly what this brief's four suggested levers cost together, which parse.ts checks: a hint pointing at a dial the player cannot pay to move is the locked-dial hint with a price on it. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial, which is stage-7-prove-it's verbatim.",
+        "note": "DERIVED: 15 u is \"Destination panels\" at 13 u — the dearest change on data/price-schedule.json that every dimension a scenario sells can reach — plus the dispatcher tier's own typical of 2 u. It is also exactly what this brief's four suggested levers cost together, which parse.ts checks: a hint pointing at a dial the player cannot pay to move is the locked-dial hint with a price on it. CHOSEN: the rule that a scenario opens one typical dispatcher change above its own dearest dial, which is stage-7-prove-it's verbatim.",
         "schema": {
           "type": "integer",
           "unit": "units",
           "min": 0,
-          "max": 383,
+          "max": 396,
           "default": 15,
           "activeWhen": null
         },
@@ -178,7 +178,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 383,
+              "max": 396,
               "default": 9,
               "activeWhen": null
             }
@@ -193,7 +193,7 @@
               "type": "integer",
               "unit": "units",
               "min": 0,
-              "max": 383,
+              "max": 396,
               "default": 30,
               "activeWhen": "equipment-rung"
             }

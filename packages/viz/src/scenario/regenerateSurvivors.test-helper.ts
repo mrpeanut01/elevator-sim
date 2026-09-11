@@ -74,6 +74,7 @@ import {
   reachableChangesOf,
   unpricedDimensionIds,
   unreachableChangeIdsOf,
+  withheldDimensionIds,
 } from './survivorSpace.js';
 
 /** Where the published table lives. One constant, so the guard and the writer cannot diverge. */
@@ -219,6 +220,9 @@ export async function measurePublishedSurvivors(
   }
 
   const reachable = reachableChangesOf(space, schedule);
+  const unpriced = unpricedDimensionIds(space, schedule);
+  const withheld = withheldDimensionIds(space, schedule);
+  const priced = space.parameters.length - unpriced.length - withheld.length;
   return {
     generatedBy: 'packages/viz/src/scenario/regenerateSurvivors.test-helper.ts',
     contract:
@@ -241,13 +245,15 @@ export async function measurePublishedSurvivors(
         `${String(reachable.length)} of ${String(schedule.changes.length)} priced changes can ` +
         `reach a scenario run at all — the rest price shafts, machines and fittings that ` +
         `campaign/stageRun.ts cannot apply — and ` +
-        `${String(space.parameters.length - unpricedDimensionIds(space, schedule).length)} of ` +
-        `${String(space.parameters.length)} declared dimensions are priced and therefore varied. ` +
-        `A configuration differing only on an unpriced dimension is reachable at every rung, so ` +
-        `counting it would make the budget inert.`,
+        `${String(priced)} of ${String(space.parameters.length)} declared dimensions are priced ` +
+        `and therefore varied, and ${String(withheld.length)} are withheld from every scenario by ` +
+        `data/price-schedule.json and varied by no configuration. A configuration differing only ` +
+        `on an unpriced dimension is reachable at every rung, so counting it would make the budget ` +
+        `inert.`,
       reachableChangeIds: reachable.map((change) => change.changeId),
       unreachableChangeIds: unreachableChangeIdsOf(space, schedule),
-      unpricedDimensionCount: unpricedDimensionIds(space, schedule).length,
+      unpricedDimensionCount: unpriced.length,
+      withheldDimensionCount: withheld.length,
       declaredDimensionCount: space.parameters.length,
     },
     scenarios,

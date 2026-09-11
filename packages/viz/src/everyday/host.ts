@@ -220,7 +220,7 @@ import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import type { DemandBand } from '../fixit/parse.js';
-import { rushBeforeOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
+import { rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
 import { REPLAY_COPY, replayBeforeOf, replayPatchOf, replayRestorePatchOf, replayableDay, type ReplayBefore } from './replay.js';
 
 import { campaignDayVerdict, campaignTestRows } from './campaignModel.js';
@@ -1485,6 +1485,13 @@ export interface EverydayHostBindings {
   /** The latching run press — `MountContext.runShift`. */
   startRun(): void;
   /**
+   * Stop the run in flight, if there is one — `dev/main.ts`'s shift runner's `cancel`, which drops the
+   * result unread. {@link EverydayHost.leaveRush} calls it before the day is put back (GitHub issue
+   * #518). **Optional** on {@link chimeBalance}'s ground: the binding literals that never start a rush
+   * would otherwise have to gain a field, and a shell that omits it cancels nothing.
+   */
+  cancelRun?(): void;
+  /**
    * § 1.4's *record growing*: append at `atS`, re-run with cause `'intervention'`, and seek the
    * shell's own transport to `atS` once the new recording is adopted. One implementation, shared
    * with the Engineer stage's own button — two would be two different runs from one press.
@@ -2561,7 +2568,20 @@ export function createEverydayHost(
     },
     startRush: () => {
       const state = b.state();
-      const building = resolvedBuildingOf(b.resources, state);
+      /*
+       * **The rush's building, never the standing week's** — PR #513's review, finding 1. This read
+       * `resolvedBuildingOf` on the state the press came from, so the stream was sized from the
+       * player's week — its contract's occupancy, its day's growth — while the run was the rush's own
+       * week: Midtown Office held 664 s from a day-1 week and 1 640 s from Free Play. Both reads below go
+       * through `rush.ts#rushBuildingOf`, so the rate, the disclosure and the run are one building's.
+       *
+       * **And the rush's standing is a whitelist** — PR #517's review. This presses the binding's
+       * `startRun`, not this host's, so the kit and the event a campaign day wrote were never taken off
+       * here, and they rode into the rush with its held cars. `rush.ts#RUSH_FIELD_ROLES` decides what a
+       * rush takes from the player, and `leaveRush` puts the rest back (§ D548 clause 5).
+       */
+      const building = rushBuildingOf(b.resources, state);
+      const patch = rushPatchOf(b.resources, state);
       if (building === undefined) return 'no building is standing, so there is nothing for the stream to arrive at';
       if (rushSession === undefined) {
         rushSession = {
@@ -2571,10 +2591,20 @@ export function createEverydayHost(
           hold: undefined,
           endedAtS: undefined,
         };
-        b.applyPatch(rushPatchOf(state, building.totalPopulation));
       } else {
         rushSession = { ...rushSession, hold: undefined, endedAtS: undefined };
       }
+      /*
+       * **Every press writes the rush's standing, *Run the rush again* included** — GitHub issue #518.
+       * It was written on the first press alone, so a second attempt kept what the first had left on
+       * the state: an intervention appended from the stage, a lever moved on the Workshop. The
+       * review's probe: Midtown Office × `collective` held 1 640 s, and pressed again after one
+       * `park-cars-lobby` it held 1 516 s with the intervention still in the config. Inside a rush
+       * the patch moves no week, because `shift/week.ts#switchWeek` is the identity on the live
+       * contract, so writing it again puts every `fresh` field back at a fresh session's value and
+       * restates the rush's identity. `before` is still taken on the first press only.
+       */
+      if (patch !== undefined) b.applyPatch(patch);
       b.startRun();
       notifyCampaign();
       return undefined;
@@ -2616,11 +2646,22 @@ export function createEverydayHost(
       if (rushSession === undefined) return;
       const before = rushSession.before;
       rushSession = undefined;
+      /*
+       * **The run in flight goes before the day comes back** — GitHub issue #518, item 4. A rush's
+       * stream is generated on a worker, leaving does not wait for it, and `dev/main.ts#applyShift`
+       * adopts whatever run lands with no check that the state it was asked for still stands. So a
+       * rush left mid-generation landed over the day this restore had just put back. Any run in flight
+       * inside a rush is the rush's — the press, an intervention's re-run, or the rival raced after
+       * one — so it is cancelled, and first, so that no stale landing is still due once the day is
+       * back. A no-op once the stream has landed.
+       */
+      b.cancelRun?.();
       b.applyPatch(rushRestorePatchOf(b.state(), before));
       notifyCampaign();
     },
     rushDisclosure: () => {
-      const building = resolvedBuildingOf(b.resources, b.state());
+      // The rush's building, on `startRush`'s ground: the setup screen describes the stream the press sends.
+      const building = rushBuildingOf(b.resources, b.state());
       return building === undefined ? undefined : rushDisclosureOf(building, bandOf(building));
     },
     bankScenarioClear: (scenarioId) => {

@@ -1,5 +1,5 @@
 {
-  "$comment": "One price schedule — GitHub issue #366, DECISIONS.md § D525 clause 2, docs/38 § 2.1. Every price a player pays for a change, in one place, so the same change costs the same in Scenario, in Career and in the fix-a-building editor. The figures are DRAFTED, not measured: a price is game feel and the ladder's ordering is the product owner's. Where two shipped lists already agreed the agreed figure is kept and said so; where they disagreed the disagreement is recorded in the entry's note. See packages/viz/src/pricing/parse.ts.",
+  "$comment": "One price schedule — GitHub issue #366, DECISIONS.md § D525 clause 2, docs/38 § 2.1. Every price a player pays for a change, in one place, so the same change costs the same in Scenario, in Career and in the fix-a-building editor. The figures are DRAFTED, not measured: a price is game feel and the ladder's ordering is the product owner's. Where two shipped lists already agreed the agreed figure is kept and said so; where they disagreed the disagreement is recorded in the entry's note. See packages/viz/src/pricing/parse.ts. GitHub issue #467 (DECISIONS.md § D535) added two things. Six new rows and three paths added to dispatch-rules, at no change to its price, price the twenty-two dials the scenarios used to offer for nothing, and every note that carries them is an AGENT'S PROPOSAL, APPROVED AS DRAFTED by the product owner on 2026-09-11, saying field by field what is MEASURED (nothing about the figure), what is DERIVED (the ceiling the shipped opening budgets and stage hints put on it) and what is CHOSEN. And a `withheld` block names what no scenario sells at any price, by the product owner's own ruling: not for sale is a different answer from priced high, so it is a list of paths and a note rather than a row carrying a large number.",
   "version": 1,
   "tiers": [
     {
@@ -52,11 +52,14 @@
       "name": "How calls are assigned",
       "priceUnits": 2,
       "nights": 0,
-      "note": "The fix cases price an assignment-mode change at 2 units as a diagnosis and at 8 as a costly fix. 2 is taken: the 8 was a case where the same press also bought a split threshold, which is priced on its own row now.",
+      "note": "The fix cases price an assignment-mode change at 2 units as a diagnosis and at 8 as a costly fix. 2 is taken: the 8 was a case where the same press also bought a split threshold, which is priced on its own row now. GitHub issue #467 WIDENED WHAT THIS ROW COVERS AND DID NOT MOVE ITS PRICE: the three eligibility filters, the direction-reversal constraint and the sole-car bypass guard were free in every scenario that offered them, and they are bought here now. AGENT'S PROPOSAL, drafted for the product owner to accept, tighten or reject under the 2026-09-08 standing ruling on governed data/ values, and priced rather than withheld by the owner's 2026-09-10 ruling on that issue (DECISIONS.md § D535). APPROVED AS DRAFTED by the product owner on 2026-09-11. MEASURED: nothing about the figure, which is this row's unchanged 2 u; what is measured is only that buying this row reaches a run (packages/viz/src/scenario/pricedRowsReachTheRun.test.ts). DERIVED: that these five dials cannot sit on a row of their own. Stages 9 and 10 open on 15 u and suggest constraints.noDirectionReversal and answer.allowBypassIfSoleEligibleCar respectively beside dispatch.assignmentMode, weights.starvation and a landing-panel lever at 13 u, and packages/viz/src/campaign/parse.ts prices a stage's suggested levers together at its opening rung — measured by the loader on the first draft of this issue, which priced them on two 2 u rows of their own and was refused at 17 u against 15 on both stages. CHOSEN: this row rather than re-authoring two stages' hints or their opening rule, because the dials are part of the same act this row already sells — core declares the eligibility filters and the hard constraint in the stage of its dispatch pipeline that decides which cars a call may go to, and its own descriptions name opposite-direction pickup and no direction reversal as the two halves of conventional collective behaviour — and because the bypass guard is a starvation rule, as weights.starvation beside it is. Covered as groups where core groups them, so an eligibility filter or a hard constraint core declares tomorrow is priced here with no edit. FOR THE OWNER: the hints on stage-2-morning-rush, stage-7-prove-it, stage-8-the-headline-address, stage-10-the-bed-and-the-visitor and brief-e5-handling-capacity name answer.allowBypassIfSoleEligibleCar, a dial this row now sells, and on each of those scenarios moving it alone leaves every replication of both seed sets unchanged, so following that hint now costs 2 u for an unchanged run; packages/viz/src/scenario/pricedRowsReachTheRun.test.ts measures this and holds it in both directions as HINTS_THAT_DO_NOT_MOVE_THE_RUN, which an entry leaves only on the commit that makes its move change a replication.",
       "covers": [
         "dispatcher.dispatch.assignmentMode",
         "dispatcher.dispatch.splitThresholdPassengers",
-        "dispatcher.weights"
+        "dispatcher.weights",
+        "dispatcher.eligibility",
+        "dispatcher.constraints",
+        "dispatcher.answer.allowBypassIfSoleEligibleCar"
       ],
       "schema": {
         "type": "integer",
@@ -87,6 +90,103 @@
       }
     },
     {
+      "id": "call-timing",
+      "tier": "dispatcher",
+      "name": "When a call is handed to a car",
+      "priceUnits": 2,
+      "nights": 0,
+      "note": "AGENT'S PROPOSAL — GitHub issue #467, drafted for the product owner to accept, tighten or reject under the 2026-09-08 standing ruling on governed data/ values, and priced rather than withheld by the owner's 2026-09-10 ruling on that issue (DECISIONS.md § D535). APPROVED AS DRAFTED by the product owner on 2026-09-11. MEASURED: nothing about the figure. No shipped list priced these dials — until this row every scenario that offered them offered them for nothing — so there is no agreed figure to keep and no disagreement to record. What is measured is only that the purchase reaches a run: packages/viz/src/scenario/pricedRowsReachTheRun.test.ts finds a shipped scenario whose opening budget buys it and whose legs it moves. DERIVED: the ceiling. No stage that opens on 4 u offers these dials, and the scenarios that do offer them open on 15 u, which packages/viz/src/scenario/budget.test.ts re-derives as the dearest dial they reach — destination-panels at 13 u — plus the dispatcher tier's typical of 2 u; so this row may cost up to 13 u before those budgets move. CHOSEN: 2 u, the dispatcher tier's typical. The window a deferred assignment waits and the window a call is held so near-simultaneous presses merge are both answers to one question — how long the controller waits before it decides — and dispatch.deferWindowS is live only when dispatch.assignmentTiming is deferred, so selling the window apart from the timing would sell a disabled control. That is the defect packages/viz/src/scenario/budgetReachesTheRun.test.ts found when a landing panel's call type was bought without its assignment.",
+      "covers": [
+        "dispatcher.dispatch.assignmentTiming",
+        "dispatcher.dispatch.deferWindowS",
+        "dispatcher.dispatch.batchWindowS"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 20,
+        "default": 2
+      }
+    },
+    {
+      "id": "reassignment",
+      "tier": "dispatcher",
+      "name": "Let a call move to another car",
+      "priceUnits": 2,
+      "nights": 0,
+      "note": "AGENT'S PROPOSAL — GitHub issue #467, drafted for the product owner to accept, tighten or reject under the 2026-09-08 standing ruling on governed data/ values, and priced rather than withheld by the owner's 2026-09-10 ruling on that issue (DECISIONS.md § D535). APPROVED AS DRAFTED by the product owner on 2026-09-11. MEASURED: nothing about the figure. No shipped list priced these dials — until this row every scenario that offered them offered them for nothing — so there is no agreed figure to keep and no disagreement to record. What is measured is only that the purchase reaches a run: packages/viz/src/scenario/pricedRowsReachTheRun.test.ts finds a shipped scenario whose opening budget buys it and whose legs it moves. DERIVED: the ceiling. Stages 2 and 3 open on 4 u and offer all four dials, and packages/viz/src/scenario/budget.test.ts re-derives every opening budget as the dearest dial a stage offers plus the dispatcher tier's typical of 2 u, so this row cannot cost more than 2 u without re-authoring those budgets. CHOSEN: 2 u, the dispatcher tier's typical. One row, because core gates the other three dials on dispatch.reassignmentPolicy — each is live only under a policy that lets a call move — and a hysteresis bought without the policy it tunes would be a disabled control sold at a price.",
+      "covers": [
+        "dispatcher.dispatch.reassignmentPolicy",
+        "dispatcher.dispatch.commitmentPoint",
+        "dispatcher.dispatch.reassignmentHysteresisS",
+        "dispatcher.dispatch.maxReassignmentsPerCall"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 20,
+        "default": 2
+      }
+    },
+    {
+      "id": "auction",
+      "tier": "dispatcher",
+      "name": "Let the cars bid for calls",
+      "priceUnits": 2,
+      "nights": 0,
+      "note": "AGENT'S PROPOSAL — GitHub issue #467, drafted for the product owner to accept, tighten or reject under the 2026-09-08 standing ruling on governed data/ values, and priced rather than withheld by the owner's 2026-09-10 ruling on that issue (DECISIONS.md § D535). APPROVED AS DRAFTED by the product owner on 2026-09-11. MEASURED: nothing about the figure. No shipped list priced these dials — until this row every scenario that offered them offered them for nothing — so there is no agreed figure to keep and no disagreement to record. What is measured is only that the purchase reaches a run: packages/viz/src/scenario/pricedRowsReachTheRun.test.ts finds a shipped scenario whose opening budget buys it and whose legs it moves. DERIVED: the ceiling. No stage that opens on 4 u offers these dials, and the scenarios that do offer them open on 15 u, which packages/viz/src/scenario/budget.test.ts re-derives as the dearest dial they reach — destination-panels at 13 u — plus the dispatcher tier's typical of 2 u; so this row may cost up to 13 u before those budgets move. CHOSEN: 2 u, the dispatcher tier's typical, because choosing who aggregates the prices is a rule the controller is told, the same kind of act as dispatch-rules' assignment mode; core's own description says both aggregations compute an identical price for an identical car and only the allocation rule differs. One row, because auction.rounds is live only under contract-net and auction.reserveMarginalDelayS only at two rounds or more.",
+      "covers": [
+        "dispatcher.auction"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 20,
+        "default": 2
+      }
+    },
+    {
+      "id": "cost-scaling",
+      "tier": "dispatcher",
+      "name": "How a wait and a distance are scaled before they are weighed",
+      "priceUnits": 2,
+      "nights": 0,
+      "note": "AGENT'S PROPOSAL — GitHub issue #467, drafted for the product owner to accept, tighten or reject under the 2026-09-08 standing ruling on governed data/ values, and priced rather than withheld by the owner's 2026-09-10 ruling on that issue (DECISIONS.md § D535). APPROVED AS DRAFTED by the product owner on 2026-09-11. MEASURED: nothing about the figure. No shipped list priced these dials — until this row every scenario that offered them offered them for nothing — so there is no agreed figure to keep and no disagreement to record. What is measured is only that the purchase reaches a run: packages/viz/src/scenario/pricedRowsReachTheRun.test.ts finds a shipped scenario whose opening budget buys it and whose legs it moves. DERIVED: the ceiling. No stage that opens on 4 u offers these dials, and the scenarios that do offer them open on 15 u, which packages/viz/src/scenario/budget.test.ts re-derives as the dearest dial they reach — destination-panels at 13 u — plus the dispatcher tier's typical of 2 u; so this row may cost up to 13 u before those budgets move. CHOSEN: 2 u, the price dispatch-rules charges to re-tune the weights, because this re-tunes the curve those weights are applied to — core's description: it changes the curvature of the map rather than its gain, so no rescaled weight recovers it. Its own row rather than a path added to dispatch-rules: the paths this issue did add to that row are the five that shipped stage hints price beside it, which this curve is not. Worth knowing before buying it: core measures each of these dials inert on a profile with a single weighted term.",
+      "covers": [
+        "dispatcher.normalization"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 20,
+        "default": 2
+      }
+    },
+    {
+      "id": "door-reopening",
+      "tier": "dispatcher",
+      "name": "When doors reopen, and how long boarding may hold them",
+      "priceUnits": 3,
+      "nights": 0,
+      "note": "AGENT'S PROPOSAL — GitHub issue #467, drafted for the product owner to accept, tighten or reject under the 2026-09-08 standing ruling on governed data/ values, and priced rather than withheld by the owner's 2026-09-10 ruling on that issue (DECISIONS.md § D535). APPROVED AS DRAFTED by the product owner on 2026-09-11. MEASURED: nothing about the figure. No shipped list priced these dials — until this row every scenario that offered them offered them for nothing — so there is no agreed figure to keep and no disagreement to record. What is measured is only that the purchase reaches a run: packages/viz/src/scenario/pricedRowsReachTheRun.test.ts finds a shipped scenario whose opening budget buys it and whose legs it moves. DERIVED: the ceiling. No stage that opens on 4 u offers these dials, and the scenarios that do offer them open on 15 u, which packages/viz/src/scenario/budget.test.ts re-derives as the dearest dial they reach — destination-panels at 13 u — plus the dispatcher tier's typical of 2 u; so this row may cost up to 13 u before those budgets move. CHOSEN: 3 u, dwell-policy's own price, because it is the same act on the same machine — telling the controller when the doors may close — and core declares all six of those door dials in one schema, DOOR_PARAMETERS. Dispatcher tier for dwell-policy's stated reason: nothing is re-fitted. One row, because the reopen budget bounds the reopening the late-arrival hold asks for, and the transfer ceiling bounds the same stop from the other side; core describes each as a bound on how long one stop can last.",
+      "covers": [
+        "dispatcher.answer.reopenOnLateArrival",
+        "dispatcher.answer.maxReopensPerStop",
+        "dispatcher.answer.maxTransferSeconds"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 20,
+        "default": 3
+      }
+    },
+    {
       "id": "door-dwell",
       "tier": "equipment",
       "name": "Trim the door dwell",
@@ -96,6 +196,25 @@
       "covers": [
         "building.cars[].set.dwellHallCallS",
         "building.cars[].set.dwellCarCallS"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 20,
+        "default": 2
+      }
+    },
+    {
+      "id": "load-weighing",
+      "tier": "equipment",
+      "name": "Re-set the load-weighing thresholds",
+      "priceUnits": 2,
+      "nights": 0,
+      "note": "AGENT'S PROPOSAL — GitHub issue #467, drafted for the product owner to accept, tighten or reject under the 2026-09-08 standing ruling on governed data/ values, and priced rather than withheld by the owner's 2026-09-10 ruling on that issue (DECISIONS.md § D535). APPROVED AS DRAFTED by the product owner on 2026-09-11. MEASURED: nothing about the figure. No shipped list priced these dials — until this row every scenario that offered them offered them for nothing — so there is no agreed figure to keep and no disagreement to record. What is measured is only that the purchase reaches a run: packages/viz/src/scenario/pricedRowsReachTheRun.test.ts finds a shipped scenario whose opening budget buys it and whose legs it moves. DERIVED: the ceiling. Stages 2 and 3 open on 4 u and offer answer.bypassLoadThreshold, and packages/viz/src/scenario/budget.test.ts re-derives every opening budget as the dearest dial a stage offers plus the dispatcher tier's typical of 2 u, so this row cannot cost more than 2 u without re-authoring those budgets. CHOSEN: 2 u and no nights, door-dwell's figures — the precedent in this file for a value re-set on kit already fitted. Equipment tier because both dials are settings of the car's load-weighing device, which core declares in LOAD_SENSOR_PARAMETERS, and docs/38 § 2.1 puts a setting on installed kit at the equipment tier. One row, because core requires the overload threshold not to be below the bypass threshold, so the two are set together. The equipment tier's median is 9 u with this row in it, as it was without.",
+      "covers": [
+        "dispatcher.answer.bypassLoadThreshold",
+        "dispatcher.answer.overloadThreshold"
       ],
       "schema": {
         "type": "integer",
@@ -550,6 +669,27 @@
       "id": "call-out-cover",
       "name": "Call-out cover",
       "priceUnits": 6
+    }
+  ],
+  "withheld": [
+    {
+      "id": "weight-set-selector",
+      "note": "RULED BY THE PRODUCT OWNER on 2026-09-10, on GitHub issue #467: 'Hide the advanced families, price the rest' — DECISIONS.md § D535. Not a price and not an agent's proposal. The issue that measured the gap named this family: the weight-set selector is the machinery Phase 6c refused three times (§ D145, § D156, and the re-measurement § D162 pre-registered), and offering it for sale is a different product claim from offering a fifth car. So no scenario offers a dial under dispatcher.selection at any rung: packages/viz/src/campaign/parse.ts#editableIdsOf resolves the whole group out of every scenario's editable set, and packages/viz/src/scenario/budget.ts#admitPurchase refuses a move that touches one. Withheld as a group, so a selector knob core declares tomorrow is withheld with no edit here. It carries no price, no tier and no nights because not for sale is a different answer from priced high. The Engineer parameter controls, which have no budget, still draw these dials.",
+      "covers": [
+        "dispatcher.selection"
+      ]
+    },
+    {
+      "id": "arrival-predictor",
+      "note": "RULED BY THE PRODUCT OWNER on 2026-09-10, on GitHub issue #467 — DECISIONS.md § D535, the same ruling as weight-set-selector's. Not a price and not an agent's proposal. The six tuning knobs of what core's predictor schema calls the learned arrival model. Withheld by exact path rather than as a group, because dispatcher.idle also holds the parking dials idle-parking prices: a predictor knob core declares tomorrow therefore arrives neither priced nor withheld, and packages/viz/src/scenario/budget.test.ts's register turns red until somebody decides which answer it gets. The predicted-demand parking strategy stays on sale under idle-parking: a scenario may park cars by the forecast and may not re-tune the forecaster. The Engineer parameter controls, which have no budget, still draw these dials.",
+      "covers": [
+        "dispatcher.idle.predictorHorizonS",
+        "dispatcher.idle.predictorLearningRate",
+        "dispatcher.idle.predictorBucketWidthS",
+        "dispatcher.idle.predictorCycleS",
+        "dispatcher.idle.predictorPriorRatePerS",
+        "dispatcher.idle.predictorPriorStrength"
+      ]
     }
   ]
 }

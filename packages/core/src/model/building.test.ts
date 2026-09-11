@@ -433,7 +433,9 @@ describe('boarding a floor that more than one bank serves', () => {
     }
 
     expect(shared).toEqual({
-      'burj-class-reference': ['G', '1', '43', '44', '76', '77', '123', '124'],
+      // 44 and 77 left this list with GitHub issue #438: the single-deck shuttle stops at each sky
+      // lobby's lower level only, so each upper level is served by its local bank alone.
+      'burj-class-reference': ['G', '1', '43', '76', '123', '124'],
       'mixed-use-high-rise': ['G', '31'],
       'secure-tower': ['G'],
       'vertical-city': ['G', '2', '26', '27', '51', '52', '76', '77'],

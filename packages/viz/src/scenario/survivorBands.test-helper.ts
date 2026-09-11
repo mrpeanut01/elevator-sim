@@ -76,9 +76,11 @@
  * **Which configuration got through.** A scenario whose only survivor is a shipped profile picked from
  * the dropdown can sit inside its band at position three or later, where § D528 clause 2 says no
  * single profile may meet every bar on its own. That clause is not asserted here — the owner authored
- * this band over every configuration examined, not per tier — and `campaign/difficultyCurve.test.ts`'s
- * `DROPDOWN_CLEARS` holds its dropdown half, on `metOnTuningSeeds` rather than on this table's
- * `cleared`. Inside a band is not the same claim as rebalanced.
+ * this band over every configuration examined, not per tier — and `campaign/difficultyCurve.test.ts`
+ * holds its dropdown half: `DROPDOWN_CLEARS` on `metOnTuningSeeds` rather than on this table's
+ * `cleared`, and over a stage's `editable` list rather than the whole census, with a register beside
+ * it for each difference and a check that the two agree once both are named
+ * ([§ D556](../../../../DECISIONS.md)). Inside a band is not the same claim as rebalanced.
  */
 
 import { fileURLToPath } from 'node:url';

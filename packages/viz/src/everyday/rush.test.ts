@@ -93,9 +93,9 @@ describe('the template is the contract’s stream — ENGINE_CONTRACT § 3.2', (
 /** An ordinary Garden day, and the rush on the same building — both through the shipped path. */
 function runOf(rush: boolean): VizRecording {
   const state = baseState();
-  const building = RESOURCES.buildings.find((entry) => entry.id === state.buildingId);
-  if (building === undefined) throw new Error(state.buildingId);
-  const patched = rush ? ({ ...state, ...rushPatchOf(state, building.totalPopulation) } as typeof state) : state;
+  const patch = rush ? rushPatchOf(RESOURCES, state) : undefined;
+  if (rush && patch === undefined) throw new Error(state.buildingId);
+  const patched = patch === undefined ? state : ({ ...state, ...patch } as typeof state);
   return recordRun(shiftRunConfigOf(RESOURCES, patched).config, { recordDecisions: false }).recording;
 }
 
@@ -205,7 +205,8 @@ describe('the hold line — forty past two minutes at once, read at the stream�
 describe('the run — the player’s week parked, the stream on the building, compared on the legs', () => {
   it('patches a rush week and its identity, and the restore puts the week back exactly', () => {
     const state = baseState();
-    const patch = rushPatchOf(state, 120);
+    const patch = rushPatchOf(RESOURCES, state);
+    if (patch === undefined) throw new Error(state.buildingId);
     expect(patch.week?.contractId).toBe(RUSH_CONTRACT_ID);
     expect(patch.parkedWeeks?.map((week) => week.contractId)).toContain(state.week.contractId);
     expect(patch.freePlay?.demandTemplateId).toBe(RUSH_TEMPLATE_ID);
@@ -220,9 +221,7 @@ describe('the run — the player’s week parked, the stream on the building, co
 
   it('runs on Garden Apartments through the shipped path, and the stream is not an ordinary day', () => {
     const state = baseState();
-    const building = RESOURCES.buildings.find((entry) => entry.id === state.buildingId);
-    if (building === undefined) throw new Error(state.buildingId);
-    const rush = { ...state, ...rushPatchOf(state, building.totalPopulation) } as typeof state;
+    const rush = { ...state, ...rushPatchOf(RESOURCES, state) } as typeof state;
     const recording = runOf(true);
     expect(recording.endedAt - recording.startedAt).toBeGreaterThanOrEqual(RUSH_STREAM.lengthS - 1);
     /* Wave 1 is 6.8 a minute on every tower, so the first three minutes bring about twenty people. */
