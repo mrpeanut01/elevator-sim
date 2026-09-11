@@ -321,7 +321,7 @@ describe('what no scenario sells is declared beside what one does — #467, § D
   });
 
   /**
-   * **Every row #467 priced says it is a proposal, field by field.** The standing `data/` ruling of
+   * **Every row #467 priced says it is a proposal, field by field, and that the owner approved it as drafted on 2026-09-11.** The standing `data/` ruling of
    * 2026-09-08 asks that a governed figure say which half is measured and which is chosen, and the
    * rows this issue drafted have no shipped list to have been kept from — so each note must carry
    * both words, and the provenance label, rather than one sentence for the lot.
@@ -331,6 +331,7 @@ describe('what no scenario sells is declared beside what one does — #467, § D
     expect(drafted.length, 'no row cites #467').toBeGreaterThan(0);
     for (const change of drafted) {
       expect(change.note, change.id).toContain("AGENT'S PROPOSAL");
+      expect(change.note, change.id).toContain('APPROVED AS DRAFTED by the product owner on 2026-09-11');
       expect(change.note, change.id).toContain('MEASURED:');
       expect(change.note, change.id).toContain('CHOSEN:');
     }

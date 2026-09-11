@@ -466,7 +466,7 @@ describe('a rung permits what it can pay for and refuses what it cannot', () => 
  *   block and resolved out of every scenario's editable set by `campaign/parse.ts#editableIdsOf`,
  *   so no scenario offers them; and
  * - **the other twenty-two are priced**, on rows the file marks field by field as an agent's
- *   proposal awaiting the owner's approval.
+ *   proposal, approved as drafted by the owner on 2026-09-11.
  *
  * The check now runs over the engineering briefs as well as the ten stages, because two of them
  * open `every-declared-dimension` exactly as stage 7 does, and a register blind to them would be

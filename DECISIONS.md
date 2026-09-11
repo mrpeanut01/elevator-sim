@@ -34967,7 +34967,7 @@ ladder table, which put *the weight-set selector* among what the dispatcher tier
    withheld dial fails to load. `scenario/budget.ts#admitPurchase` refuses a move that touches one
    at any budget, and `scenario/survivorSpace.ts` leaves a dropdown profile that moves one out of
    the population — which excludes nothing on the shipped profiles.
-3. **The other twenty-two are priced, and every figure is an agent's proposal awaiting the owner.**
+3. **The other twenty-two are priced, and every figure is an agent's proposal, approved as drafted by the owner on 2026-09-11.**
    Six new rows — `call-timing`, `reassignment`, `auction`, `cost-scaling` and `door-reopening` at
    the dispatcher tier, `load-weighing` at the equipment tier — and five dials added to
    `dispatch-rules` at its unchanged 2 u. Each note says field by field what is measured, what is
@@ -34982,7 +34982,7 @@ ladder table, which put *the weight-set selector* among what the dispatcher tier
    refused both stages at 17 u, and that is why they sit on `dispatch-rules`.
 
 **What this does not decide.** Whether the prices are right: they are game feel, drafted rather than
-measured, for the owner to accept, tighten or reject. Per-scenario scarcity: [§ D528](#d528)'s *a
+measured, for the owner to accept, tighten or reject, and the owner accepted them as drafted on 2026-09-11. Per-scenario scarcity: [§ D528](#d528)'s *a
 price, never a removed control* is untouched, because this withholds two families from every
 scenario alike rather than from one. And the Engineer parameter controls, which have no budget: they
 still draw every declared dimension. `data/scenario-survivors.json` is re-measured against the new
