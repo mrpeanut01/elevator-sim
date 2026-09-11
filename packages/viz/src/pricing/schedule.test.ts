@@ -147,6 +147,36 @@ describe('the schedule validator refuses what it claims to refuse', () => {
     expect(found.some((line) => line.includes('is priced by both'))).toBe(true);
   });
 
+  /**
+   * **A group prices every path under it, so a leaf beneath another row's group is a second
+   * price.** GitHub issue #467 added group covers — `dispatcher.eligibility` and
+   * `dispatcher.constraints` on `dispatch-rules`, among others — and until the review of GitHub PR
+   * #506 the check matched exact paths only, so a row pricing one eligibility filter under that
+   * group passed it. Tried with the leaf on the row just before the group's and on the row just
+   * after it, because the check walks rows in order.
+   */
+  it('catches a row covering a leaf under another row’s group cover, on either side of it', () => {
+    const group = 'dispatcher.eligibility';
+    const leaf = `${group}.enRouteDiversion`;
+    const schedule = shipped();
+    const at = schedule.changes.findIndex((change) => change.covers.includes(group));
+    const sides = [at - 1, at + 1].filter((index) => index >= 0 && index < schedule.changes.length);
+    expect(at, `no row covers ${group} as a group`).toBeGreaterThanOrEqual(0);
+    expect(sides, 'the group row has a row on each side of it').toHaveLength(2);
+    for (const index of sides) {
+      const found = violationsIn({
+        ...schedule,
+        changes: schedule.changes.map((change, i) =>
+          i === index ? { ...change, covers: [...change.covers, leaf] } : change,
+        ),
+      });
+      expect(
+        found.filter((line) => line.includes('is priced by both') && line.includes(leaf)),
+        `${leaf} added to ${String(schedule.changes[index]?.id)}`,
+      ).toHaveLength(1);
+    }
+  });
+
   it('catches a tier whose typical is not its own median', () => {
     const found = broken((schedule) => ({
       ...schedule,

@@ -29,6 +29,8 @@
 
 import { readFile } from 'node:fs/promises';
 
+import type { DispatcherProfile } from '@elevator-sim/core';
+import type { ParameterValue, SearchParameter } from '@elevator-sim/experiments/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { useCampaignFixture } from '../campaign/campaign.test-helper.js';
@@ -515,6 +517,78 @@ describe('the dropdown stratum is a census, priced by the same ladder as the dia
       expect([...entry.changeIds].sort(), entry.profileId).toEqual([...admission.changeIds].sort());
       if (entry.changeIds.length === 0) expect(entry.tier, entry.profileId).toBe(UNPRICED_TIER);
     }
+  });
+
+  /**
+   * **A profile that moves a withheld dial is left out of the census, and one that moves only
+   * priced dials is kept** — GitHub issue #467, [§ D535](../../../../DECISIONS.md), and the drop
+   * `dropdownConfigurationsOf` takes on `admitPurchase`'s `withheld`. No shipped profile shows the
+   * first half, because none moves a withheld dial against `collective` — the first case in this
+   * `describe` holds that every shipped profile that moves anything is offered — so the profiles
+   * here are that baseline with declared dials written through their own section and key, and what
+   * each moves is read back through `movedDimensions` before anything is asserted about the census.
+   */
+  it('leaves out a profile that moves a withheld dial, and keeps one that moves only priced dials', () => {
+    const baseline = fixture.requireProfile('collective');
+    const { space } = fixture;
+    const otherValueOf = (parameter: SearchParameter, held: unknown): ParameterValue => {
+      const at = held ?? parameter.default;
+      switch (parameter.type) {
+        case 'categorical':
+          return parameter.values.find((value) => value !== at) ?? parameter.default;
+        case 'boolean':
+          return at !== true;
+        case 'integer':
+        case 'continuous':
+          return at === parameter.max ? parameter.min : parameter.max;
+      }
+    };
+    const withDials = (id: string, parameters: readonly SearchParameter[]): DispatcherProfile => {
+      const profile: Record<string, unknown> = { ...baseline, id };
+      for (const parameter of parameters) {
+        const section = { ...(profile[parameter.section] as Record<string, unknown> | undefined) };
+        section[parameter.key] = otherValueOf(parameter, section[parameter.key]);
+        profile[parameter.section] = section;
+      }
+      return profile as unknown as DispatcherProfile;
+    };
+    const movedIn = (profile: DispatcherProfile): readonly string[] =>
+      movedDimensions(space, baseline, profile).map((row) => row.id);
+    /* The first dial of a pool that, written alone, moves itself and nothing outside the pool. */
+    const firstMovingOnly = (pool: ReadonlySet<string>, what: string): SearchParameter => {
+      for (const parameter of space.parameters) {
+        if (!pool.has(parameter.id)) continue;
+        const moved = movedIn(withDials(what, [parameter]));
+        if (moved.includes(parameter.id) && moved.every((id) => pool.has(id))) return parameter;
+      }
+      throw new Error(`no ${what} dial moves on its own against ${baseline.id}`);
+    };
+    const withheldIds = new Set(withheldDimensionIds(space, schedule));
+    const withheldDial = firstMovingOnly(withheldIds, 'withheld');
+    const pricedDial = firstMovingOnly(
+      new Set(reachableChangesOf(space, schedule).flatMap((change) => change.dimensionIds)),
+      'priced',
+    );
+    const onlyWithheld = withDials('moves-a-withheld-dial', [withheldDial]);
+    const both = withDials('moves-a-withheld-and-a-priced-dial', [withheldDial, pricedDial]);
+    const onlyPriced = withDials('moves-only-priced-dials', [pricedDial]);
+
+    const bothAdmission = admitPurchase(schedule, Number.MAX_SAFE_INTEGER, movedIn(both));
+    expect(bothAdmission.withheld, 'premise: it moves a withheld dial').toContain(withheldDial.id);
+    expect(bothAdmission.changeIds, 'premise: it buys a priced change too').not.toEqual([]);
+    const pricedAdmission = admitPurchase(schedule, Number.MAX_SAFE_INTEGER, movedIn(onlyPriced));
+    expect(pricedAdmission.withheld, 'premise: it moves nothing withheld').toEqual([]);
+    expect(pricedAdmission.changeIds, 'premise: it buys a priced change').not.toEqual([]);
+
+    const offered = dropdownConfigurationsOf(space, schedule, baseline, [
+      onlyWithheld,
+      both,
+      onlyPriced,
+    ]).map((entry) => entry.profileId);
+    const refused = `${withheldDial.id} is sold in no scenario`;
+    expect(offered, refused).not.toContain(onlyWithheld.id);
+    expect(offered, `${refused}, whatever else the profile buys`).not.toContain(both.id);
+    expect(offered, `${pricedDial.id} is priced, nothing withheld`).toContain(onlyPriced.id);
   });
 });
 

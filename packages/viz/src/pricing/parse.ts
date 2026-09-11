@@ -16,9 +16,12 @@
  *   caption instead of a fact.
  * - **The typicals ascend with `order`**, strictly. That is the ladder, checked.
  * - **Every price sits inside its own declared schema**, which is what invariant 8's range is for.
- * - **No change covers a path another change also covers.** Two rows claiming one field is the
- *   same defect as two prices, arrived at from the other side, and it is the check that would have
- *   caught the speed conflict this file was written to end.
+ * - **No change covers a path another change also covers** — exactly, or through a group. Two rows
+ *   claiming one field is the same defect as two prices, arrived at from the other side, and it is
+ *   the check that would have caught the speed conflict this file was written to end. A group
+ *   prices every path under it, so the match is {@link pathsOverlap}, the one the `withheld` block
+ *   uses: GitHub issue #467 added group covers, and until the review of GitHub PR #506 this matched
+ *   exact paths only, so a row covering one leaf under another row's group passed it.
  *
  * And four for the `withheld` block GitHub issue **#467** added ([§ D535](../../../../DECISIONS.md)),
  * each the rule above pointed at what no scenario sells:
@@ -258,18 +261,32 @@ export function violationsIn(schedule: PriceSchedule): readonly string[] {
     if (change.nights < 0) out.push(`change "${change.id}" books negative nights.`);
   }
 
-  /* Two rows claiming one field is two prices for one change, from the other side. */
-  const claimed = new Map<string, string>();
+  /* Two rows claiming one field, by path or through a group, is two prices for one change. */
+  const claimed: { readonly path: string; readonly changeId: string }[] = [];
   for (const change of schedule.changes) {
     for (const path of change.covers) {
-      const already = claimed.get(path);
-      if (already !== undefined) {
+      for (const earlier of claimed) {
+        if (!pathsOverlap(path, earlier.path)) continue;
+        if (path === earlier.path) {
+          out.push(
+            `"${path}" is priced by both "${earlier.changeId}" and "${change.id}". ` +
+              'One change, one price — that is the whole of GitHub issue #366.',
+          );
+          continue;
+        }
+        if (earlier.changeId === change.id) continue;
+        const pathIsGroup = path.length < earlier.path.length;
+        const [group, leaf] = pathIsGroup ? [path, earlier.path] : [earlier.path, path];
+        const [groupOwner, leafOwner] = pathIsGroup
+          ? [change.id, earlier.changeId]
+          : [earlier.changeId, change.id];
         out.push(
-          `"${path}" is priced by both "${already}" and "${change.id}". One change, one price — ` +
-            'that is the whole of GitHub issue #366.',
+          `"${leaf}" is priced by both "${leafOwner}" and "${groupOwner}", which covers it ` +
+            `through the group "${group}". A group prices every path under it, so one change, ` +
+            'one price — that is the whole of GitHub issue #366.',
         );
       }
-      claimed.set(path, change.id);
+      claimed.push({ path, changeId: change.id });
     }
   }
 

@@ -394,7 +394,10 @@ export interface DropdownConfiguration {
  * it excludes nothing: read off `data/dispatcher-profiles.json`, no profile authors a `selection`
  * dial, and the one that authors a predictor dial, `predictive-balanced`, sets
  * `idle.predictorHorizonS` to 300, which is the declared default — so against a baseline that holds
- * the default it moves nothing withheld. `survivors.test.ts` asserts both halves.
+ * the default it moves nothing withheld. Both halves are held in `survivors.test.ts`: *leaves out a
+ * profile that moves a withheld dial, and keeps one that moves only priced dials* holds the drop,
+ * and *offers every shipped profile that runs a different system, and never the baseline itself*
+ * holds that no shipped profile is dropped against `collective`.
  */
 export function dropdownConfigurationsOf(
   space: SearchSpace,

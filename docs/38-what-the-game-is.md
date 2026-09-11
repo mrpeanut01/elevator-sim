@@ -115,7 +115,7 @@ offers.
 
 | tier | what it covers | price |
 |---|---|---|
-| dispatcher | weights, rules, idle strategy — the weight-set selector is withheld, [§ D535](../DECISIONS.md) | cheap, and tuning is nearly free |
+| dispatcher | weights, rules, idle strategy — the weight-set selector and the arrival predictor are withheld, [§ D535](../DECISIONS.md) | cheap, and tuning is nearly free |
 | equipment settings | door dwell, door speed, a car's parking floor, anything set on kit already installed | dearer |
 | building | a new shaft or car, a faster or larger machine, a rezoned bank, destination panels | dearest |
 
