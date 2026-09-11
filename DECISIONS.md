@@ -25570,6 +25570,8 @@ either. AC1 is answered by this recorded decision rather than literally.
 
 ## D376 — a licence is drawn on the thing it licenses, not filed in a register
 
+> **Status 2026-09-11: AMENDED by [§ D547](#d547).** The rows are the house's measured runs on the standing building, the fixture marker is replaced by the house note, and both handles are dropped. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Rules on:** GitHub issue #293. Settles the marker owed at `everyday/rushScreenModel.ts`.
 
 **Decision.** The Endless rush standings **keep their five rows** and gain
@@ -35047,6 +35049,23 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 
 ---
 
+## D547 — The Endless rush standings are the house's measured runs: one pinned run per shipped dispatcher per shipped building on the rush's one seed, and the two handles are dropped
+
+**Date: 2026-09-11 · GitHub issue #418 · Implements the product owner's ruling of 2026-09-10, given on the issue · Amends [§ D376](#d376).**
+
+**Why an entry.** It moves a recorded decision: § D376 kept the handoff's five fixtures under a marker. It also binds a data file, a tier registry and a scheduled workflow that `everyday/` does not own.
+
+1. **What a house row is.** A run of a shipped dispatcher profile on a shipped building on `RUSH_STREAM.seed`, played through the path a player's rush takes and read at `rushHoldAt`. The path is `EverydayHost.startRush`'s population read, `rushPatchOf`, `shiftRunConfigOf` and `recordRun`. `data/rush-house-runs.json` carries 117 runs, 9 buildings × 13 profiles, as counts, with the command, commit, seed, stream length and hold line they were measured on. Nothing in it is chosen.
+2. **Labelled as the house, in [§ D521](#d521)'s word.** Every row carries the daily board's `house` tag, and a test holds the two equal. A note above the rows says nobody played them and that one crowd with one run each does not rank the dispatchers. § D376's fixture marker is deleted on the same commit as the fixtures, and `RUSH_ABSENCES` loses its last entry.
+3. **Keyed on the standing building.** The crowd is the rush's and the building is the player's, so the standings are the house's runs on the building the player stands on: all thirteen, furthest first. A building the house has not run, such as one drawn in the designer, draws a refusal. So does a table measured on a different stream. Neither ever draws another tower's rows. § 9.1's *five entries* is not kept, because a top five would be a selection among dispatchers made from one run each, which is the ranking the note refuses.
+4. **No mean.** A row publishes the wave the hold line was crossed in and how long that took, both read off one recording. A run that never crossed the line reads *never broke*, not a wave past the generated climb. `awtIsValid` and the saturation verdict are recorded in the table and drawn nowhere.
+5. **The cost has a gate of its own.** Measured 2026-09-11 on a shared ten-core machine: 117 runs in 137.5 s quiet and 189.8 s under load. That is a little over two minutes, too much for the default suite and far from the survivor sweep's 932 s. `rushHouseSweep.test.ts` replays every cell behind `ELEVATOR_SIM_RUSH_HOUSE=deep`, one case per building, in its own `deep-tiers.yml` job. The default suite replays one cell and checks the table's provenance and coverage.
+6. **The two handles survive in two places, by rule.** [§ D377](#d377) quotes one as the figure the corpus had not read, and a decision entry is not rewritten after the fact. `docs/design/` is the vendored handoff they were transcribed from. `rushStandingsAreRuns.test.ts` asserts they appear nowhere else in the package sources, `data/`, `docs/`, `.github/` or a root document, and that both exempt places still hold one.
+
+**What this found and does not fix.** On the two towers whose first contract scales occupancy, a rush's crowd is not the size it is elsewhere. Through the host's path, `midtown-office` records 8 788 legs and `chancery-house` 3 336. With the population read off the building unscaled, they record 3 584 and 3 578. `garden-apartments` records 3 466 either way. The house rows follow the host, so they match what a player's rush produces. Whether the host's population read is a defect is unmeasured, and it is not decided here.
+
+---
+
 ## D549 — Duty is a closed vocabulary declared per car; a journey draws one on its own stream, and dispatch prices a mismatch through one weighted term
 
 **Date: 2026-09-11 · GitHub issue #481 · Builds the project owner's ruling of 2026-09-10, given on the issue: *"Duty binds dispatch through a cost term. A mismatch between a rider's duty and a car's costs a weighted penalty declared in data, so a profile can express anything from a preference to near-exclusive use. The vocabulary is a closed list, declared per car."***
@@ -35062,5 +35081,7 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 7. **Proposals in data, awaiting the owner.** `capacity-aware` weights the term at **0.35**, a preference: half its `waitTime` weight, and `waitTime` normalizes to 0.5 at 60 s, so a mismatch costs what a 60 s longer estimated wait costs. The shares are **0.02** goods, **0.01** bed and **0.02** service. All four figures are chosen, not cited or measured, and each says so in its own `$comment`.
 
 **What this does not claim.** That duty improves any metric. `sim/dutySeam.test.ts` runs one seed on Midtown Office with car A declared goods and a 20 % goods share, and requires the legs to change when the weight moves. Measured with `DUTY_SEAM_REPORT=1 npx vitest run --project core packages/core/src/sim/dutySeam.test.ts`, legs put in a car that is not for their trip go **247 → 231** at 0.35 and **→ 229** at 5, of 734 boarded. That is a mechanism check on one trace, not a paired comparison, and **why the fall is that small is unmeasured**. Two facts of the model bear on it and neither has been isolated: a landing call carries only its head's duty, and boarding is not filtered by duty. **The control — the picker two screens refuse — is not built**, and is step 3 of `data/buildings/README.md` § *Duty*.
+
+---
 
 ---

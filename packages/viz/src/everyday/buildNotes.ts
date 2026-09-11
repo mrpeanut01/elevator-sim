@@ -310,8 +310,15 @@ export function buildNotesViewOf(): BuildNotesView {
     },
     {
       heading: 'Endless rush',
-      note: 'The setup screen draws; what it would start does not exist yet.',
+      /*
+       * The note used to read *"The setup screen draws; what it would start does not exist yet"* —
+       * stale since GitHub issue #220 built the engine (§ D515), and kept alive by the one entry
+       * under it. GitHub issue #418 made that entry false as well: the standings are the house's
+       * measured runs now (§ D547), so the register is empty and the arm below draws the empty line.
+       */
+      note: 'The rush and its standings, which are the house’s own measured runs on each shipped tower.',
       entries: RUSH_ABSENCES,
+      ...(RUSH_ABSENCES.length === 0 ? { empty: REGISTER_EMPTY_LINE } : {}),
     },
     {
       heading: 'The first session',
