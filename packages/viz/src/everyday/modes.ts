@@ -127,9 +127,9 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
      * sentence that used to stand here named one that had moved (issue #293):
      *
      * - what the rush lacks — `buildNotes.ts`, the Settings build-information panel;
-     * - the standings' fixture marker — `RUSH_BESTS_FIXTURE_NOTE`, declared in
-     *   `rushScreenModel.ts` and drawn by `rushScreen.ts` beside the five rows, because § 20.11
-     *   requires a fixture's marker to travel with the fixture rather than sit two clicks away.
+     * - the standings and the note saying they are the house's runs — `rushHouse.ts#rushStandingsOf`,
+     *   drawn by `rushScreen.ts`, one view carrying both, so the note cannot be drawn without the rows
+     *   it is about (GitHub issue #418; the fixture marker this bullet used to name is deleted).
      *
      * `modes.test.ts` checks both against the import graph rather than against a reader's
      * diligence, so the next register to move fails here instead of on a player's screen.

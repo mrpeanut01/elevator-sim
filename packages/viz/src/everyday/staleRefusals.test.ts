@@ -284,7 +284,12 @@ describe('a refusal that outlived the thing it refused — GitHub issue #423', (
      * one entry, about the standings. `RISKS.md` R38 at the shortest possible range — a number
      * written into prose beside the thing it counts.
      */
-    expect(RUSH_ABSENCES.length).toBe(1);
+    /*
+     * One entry, then none: GitHub issue #418 measured the standings, and the register lost its last
+     * entry on that commit (§ D547). The count is still asserted rather than described, which is the
+     * point of this case.
+     */
+    expect(RUSH_ABSENCES.length).toBe(0);
     onlyInRetraction(
       sourceOf('./rushScreenModel.ts'),
       'three entries about the missing engine',

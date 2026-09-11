@@ -263,9 +263,10 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   /*
    * The rush. Three of its four entries were one issue, because they were one missing engine, and
    * GitHub issue #220 built it (§ D515): the climbing stream, the held-time stage and the result
-   * screen left the register on that commit. The standings are #177's and stay.
+   * screen left the register on that commit. The fourth, *the standings*, was #177's and then
+   * #418's, and it left with its row when #418 replaced the handoff's fixtures with the house's
+   * measured runs (§ D547). The register is empty, so the panel draws its `empty` line.
    */
-  { register: 'RUSH_ABSENCES', fragment: 'the standings', issue: 177 },
 
   /*
    * The designer. All three were #177 § 5's, and there used to be five: the other two said the
