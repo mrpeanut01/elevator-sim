@@ -5,7 +5,7 @@
  * § 20.5 hold line, the register of absences and the § 3.3 refinement live and are argued. This
  * file draws that model with `tokens.ts`'s § 19 values, in the prototype's two-column geometry: the
  * paper column carries the title, the three facts and the five bands; the ink column carries the
- * hold rule, the standings under the marker that says what they are, and who would drive.
+ * hold rule, the house’s standings under the note that says what they are, and who would drive.
  *
  * It wires **no control**. § 3.3 gives the screen one primary (`Start the rush`) and the shell owns
  * it; the prototype's dispatcher select is not drawn for the reason `rushDrivingLine`'s docstring
@@ -36,10 +36,9 @@ import {
   rushHoldLineFigure,
   rushOpeningLine,
   rushTutorialWorkedAnswerOf,
-  RUSH_BESTS,
-  RUSH_BESTS_FIXTURE_NOTE,
   RUSH_SCREEN_COPY as COPY,
 } from './rushScreenModel.js';
+import { rushStandingsOf } from './rushHouse.js';
 import { mountWorkedAnswer } from './tutorialScreens.js';
 import {
   EVERYDAY_COLORS as C,
@@ -169,46 +168,52 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   bestsBlock.style.cssText = 'margin-top:22px';
   const bestsEyebrow = el(doc, 'div', undefined, COPY.bestsEyebrow);
   bestsEyebrow.style.cssText = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};margin-bottom:11px`;
+  bestsBlock.append(bestsEyebrow);
   /*
-   * **The fixture marker, above the rows rather than under them** — GAMEPLAY § 20.11, GitHub issue
-   * #293. The five standings are authored fixtures carrying two handles that read as accounts, and
-   * § 20.11 gives a fixture two ways to ship: a real source, or a marker so nobody takes it for
-   * truth. The engine that would be the real source is #220's, so the marker is what there is.
+   * **The house's runs on the building the player is standing on** — GitHub issue #418, § D547.
    *
-   * It goes *before* the list for the reason `dev/menuPanel.ts#exampleBoard` puts its own
-   * disclaimer before its two example rows: a reader who has already read five names and two held
-   * times has formed the belief the note exists to prevent. The note is not part of the list, so it
-   * sits outside `bestsList` and no row's geometry moves.
+   * These rows were the handoff's five fixtures under a marker saying so (#293, § D376). They are now
+   * `everyday/rushHouse.ts#rushStandingsOf`: one measured run per shipped dispatcher on this building,
+   * on the rush's one seed, each tagged `house`. The note goes above the rows for § D376's reason,
+   * which survives the change of subject: a reader who has already read the names has formed the
+   * belief the note is there to correct. Note and rows come out of one view, so this module cannot
+   * draw either without the other.
    *
-   * It is drawn here and nowhere else, and `rushScreenModel.test.ts` requires that this module and
-   * the module drawing `RUSH_BESTS` stay the same module. That is the § D227 relation rather than a
-   * pinned string: the licence and the thing it licenses cannot be separated without a red test.
+   * A building the house never ran — anything drawn in the designer — and a table measured on a
+   * different climb both draw the view's refusal in the rows' place, never another tower's rows.
    */
-  const bestsNote = el(doc, 'p', 'everyday-rush-bests-note', RUSH_BESTS_FIXTURE_NOTE);
-  bestsNote.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.label};margin:0 0 11px;text-wrap:pretty`;
-  const bestsList = el(doc, 'div', 'everyday-rush-bests');
-  bestsList.style.cssText = 'display:grid;gap:7px';
-  for (const best of RUSH_BESTS) {
-    const row = el(doc, 'div', 'everyday-rush-best');
-    row.style.cssText = `display:flex;align-items:baseline;gap:10px;padding:9px 11px;border-radius:${String(R.row)}px;background:${best.reference ? '#2A2620' : RAIL_SURFACE.card}`;
-    const left = el(doc, 'span');
-    left.style.cssText = 'min-width:0';
-    const name = el(doc, 'span', undefined, best.name);
-    name.style.cssText = 'display:block;font-size:13px;font-weight:600';
-    const who = el(doc, 'span', undefined, best.who);
-    who.style.cssText = `display:block;font-size:11.5px;color:${C.label};margin-top:1px`;
-    left.append(name, who);
-    const right = el(doc, 'span');
-    right.style.cssText = 'margin-left:auto;text-align:right;flex:none';
-    const wave = el(doc, 'span', undefined, best.wave);
-    wave.style.cssText = `display:block;font:500 13px ${TYPE.mono};color:${best.wave === COPY.noRun ? C.label : C.sun}`;
-    const held = el(doc, 'span', undefined, best.held);
-    held.style.cssText = `display:block;font:500 11px ${TYPE.mono};color:${C.label};margin-top:1px`;
-    right.append(wave, held);
-    row.append(left, right);
-    bestsList.append(row);
+  const standings = rushStandingsOf(context.host.selection().buildingId, (id) => context.host.dispatcherById(id)?.name);
+  if (standings.kind === 'withheld') {
+    const refusal = el(doc, 'p', 'everyday-rush-house-refusal', standings.refusal);
+    refusal.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.label};margin:0;text-wrap:pretty`;
+    bestsBlock.append(refusal);
+  } else {
+    const houseNote = el(doc, 'p', 'everyday-rush-house-note', standings.note);
+    houseNote.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.label};margin:0 0 11px;text-wrap:pretty`;
+    const bestsList = el(doc, 'div', 'everyday-rush-bests');
+    bestsList.style.cssText = 'display:grid;gap:5px';
+    for (const standing of standings.rows) {
+      const row = el(doc, 'div', 'everyday-rush-best');
+      row.style.cssText = `display:flex;align-items:baseline;gap:10px;padding:6px 11px;border-radius:${String(R.row)}px;background:${standing.heldThrough ? '#2A2620' : RAIL_SURFACE.card}`;
+      const left = el(doc, 'span');
+      left.style.cssText = 'min-width:0;display:flex;align-items:baseline;gap:8px';
+      const name = el(doc, 'span', undefined, standing.name);
+      name.style.cssText = 'font-size:12.5px;font-weight:600;min-width:0';
+      const tag = el(doc, 'span', 'everyday-rush-best-house', standing.tag);
+      tag.style.cssText = `flex:none;font:600 9.5px ${TYPE.mono};letter-spacing:.12em;text-transform:uppercase;color:${C.label};border:1px solid ${INK_RULE};border-radius:${String(R.row)}px;padding:0 5px`;
+      left.append(name, tag);
+      const right = el(doc, 'span');
+      right.style.cssText = 'margin-left:auto;text-align:right;flex:none';
+      const wave = el(doc, 'span', undefined, standing.wave);
+      wave.style.cssText = `display:block;font:500 12.5px ${TYPE.mono};color:${C.sun}`;
+      const held = el(doc, 'span', undefined, standing.held);
+      held.style.cssText = `display:block;font:500 11px ${TYPE.mono};color:${C.label};margin-top:1px`;
+      right.append(wave, held);
+      row.append(left, right);
+      bestsList.append(row);
+    }
+    bestsBlock.append(houseNote, bestsList);
   }
-  bestsBlock.append(bestsEyebrow, bestsNote, bestsList);
   ink.append(bestsBlock);
 
   const drivingBlock = el(doc, 'div');
