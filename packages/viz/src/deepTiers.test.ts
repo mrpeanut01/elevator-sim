@@ -186,6 +186,16 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'sample size: 932 s over 480 judgements on a quiet ten-core box',
     scheduled: true,
   },
+  'packages/viz/src/everyday/rushHouseSweep.test.ts': {
+    gates: ['ELEVATOR_SIM_RUSH_HOUSE'],
+    reason:
+      'GitHub issue #418 and § D547: every shipped dispatcher on every shipped building, one ' +
+      'Endless rush each on the rush’s one seed through the path a player’s rush takes, matched ' +
+      'figure by figure against data/rush-house-runs.json. A gate of its own on this workflow’s ' +
+      'argument for one job per tier. Measured 2026-09-11 on a shared ten-core box: 117 runs in ' +
+      '137.5 s quiet and 189.8 s under load, one case per building, none near the 300 s ceiling',
+    scheduled: true,
+  },
   'packages/experiments/src/fuzz/deep.test.ts': {
     gates: ['ELEVATOR_SIM_FUZZ'],
     reason:

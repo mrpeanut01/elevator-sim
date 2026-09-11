@@ -336,6 +336,7 @@ on:
           - perf-scaling
           - difficulty-curve
           - survivor-counts
+          - rush-house-runs
           - honesty-deep
           - corpus-figures
           - benchmark
@@ -666,6 +667,34 @@ jobs:
           ELEVATOR_SIM_SURVIVORS: deep
         run: npx vitest run --passWithNoTests=false --project viz --testTimeout=10800000 src/scenario/survivorSweep.test.ts
 
+  # ---------------------------------------------------------------------------
+  # The house's rush rows — GitHub issue #418, § D547. Every shipped dispatcher on every shipped
+  # building, one Endless rush each on the rush's one seed through the path a player's rush takes,
+  # compared figure by figure with `data/rush-house-runs.json`. A moved row is a finding to report
+  # rather than a number to edit.
+  #
+  # A gate of its own (`ELEVATOR_SIM_RUSH_HOUSE=deep`) on this file's argument for one job per tier.
+  # Measured 2026-09-11 on a shared ten-core developer machine: 117 runs in 137.5 s on a quiet
+  # stretch and 189.8 s under load. One case per building, each well inside the viz project's 300 s
+  # ceiling, so the step raises no test timeout; the minutes below are a ceiling, not an expectation.
+  # ---------------------------------------------------------------------------
+  rush-house-runs:
+    name: rush — house runs on every shipped tower
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'rush-house-runs'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Re-run every house rush and match the pinned rows
+        env:
+          ELEVATOR_SIM_RUSH_HOUSE: deep
+        run: npx vitest run --passWithNoTests=false --project viz src/everyday/rushHouseSweep.test.ts
+
   honesty-deep:
     name: honesty — the deep corpus
     # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
@@ -963,6 +992,7 @@ jobs:
       - honesty-deep
       - difficulty-curve
       - survivor-counts
+      - rush-house-runs
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census
@@ -1021,6 +1051,7 @@ jobs:
       - perf-scaling
       - honesty-deep
       - survivor-counts
+      - rush-house-runs
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census

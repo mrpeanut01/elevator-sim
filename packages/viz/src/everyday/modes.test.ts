@@ -337,15 +337,20 @@ describe('modes.ts’ prose is checked against the tree, not against a reader’
    * rush screen makes `rushScreen.ts` import it, and this fails until the sentence above is
    * revisited. That is § D227 in the direction that bites after a lane lands.
    */
-  const RUSH_CLAIMS: readonly { readonly symbol: string; readonly drawnBy: string }[] =
+  const RUSH_CLAIMS: readonly { readonly symbol: string; readonly from: string; readonly drawnBy: string }[] =
     Object.freeze([
-      { symbol: 'RUSH_ABSENCES', drawnBy: 'buildNotes.ts' },
-      { symbol: 'RUSH_BESTS_FIXTURE_NOTE', drawnBy: 'rushScreen.ts' },
+      { symbol: 'RUSH_ABSENCES', from: 'rushScreenModel', drawnBy: 'buildNotes.ts' },
+      /*
+       * The standings and their note, one view since GitHub issue #418 (§ D547). The row that stood
+       * here named `RUSH_BESTS_FIXTURE_NOTE`, deleted with the fixtures it marked; the claim moved
+       * with the constant to the module that builds the view, which is why a claim names its module.
+       */
+      { symbol: 'rushStandingsOf', from: 'rushHouse', drawnBy: 'rushScreen.ts' },
     ]);
 
   it('names, for each rush sentence, a module that really draws it — § D227, issue #293', () => {
     const wrong: string[] = [];
-    for (const { symbol, drawnBy } of RUSH_CLAIMS) {
+    for (const { symbol, from, drawnBy } of RUSH_CLAIMS) {
       expect(MODES_SOURCE, `the rush comment no longer names ${drawnBy}`).toContain(drawnBy);
       /*
        * Derived per claim rather than listed: the modules that import the constant from the rush
@@ -355,10 +360,10 @@ describe('modes.ts’ prose is checked against the tree, not against a reader’
       const importers = readdirSync(SRC + 'everyday')
         .filter(
           (file) =>
-            file.endsWith('.ts') && !file.endsWith('.test.ts') && file !== 'rushScreenModel.ts',
+            file.endsWith('.ts') && !file.endsWith('.test.ts') && file !== `${from}.ts`,
         )
         .filter((file) => {
-          const block = /import\s*\{([^}]*)\}\s*from\s*'\.\/rushScreenModel\.js'/u.exec(
+          const block = new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*'\\./${from}\\.js'`, 'u').exec(
             readFileSync(`${SRC}everyday/${file}`, 'utf8'),
           );
           return (block?.[1] ?? '')

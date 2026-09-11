@@ -135,9 +135,7 @@ import {
 import { RAIL_DRAWER_COPY, railModel, sublineFor } from '../everyday/rail.js';
 import {
   RUSH_ABSENCES,
-  RUSH_BESTS,
   RUSH_HOLD_LINE,
-  RUSH_BESTS_FIXTURE_NOTE,
   RUSH_SCREEN_COPY,
   rushBandViews,
   rushBarModel,
@@ -147,6 +145,7 @@ import {
   rushHoldLineFigure,
   rushOpeningLine,
 } from '../everyday/rushScreenModel.js';
+import { RUSH_HOUSE_COPY, rushStandingsOf } from '../everyday/rushHouse.js';
 import {
   TUNER_COPY,
   TUNE_CARDS,
@@ -8303,14 +8302,15 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      * `rushBarModel` now produces no text, so it is no longer covered here.
      */
     'everyday/rushScreenModel.ts#RUSH_BANDS',
-    'everyday/rushScreenModel.ts#RUSH_BESTS',
     /*
-     * The standings' fixture marker — GitHub issue #293. It belongs on this adapter rather than on
-     * {@link EVERYDAY_BUILD_NOTES} for the same rule that once split the primary's refusal from
-     * `#RUSH_ABSENCES` just above: a refusal drawn on the thing it is about is swept with that
-     * thing, and `rushScreen.ts` draws this one directly above the five rows it describes.
+     * The standings — GitHub issue #418, § D547. They were `RUSH_BESTS`, the handoff's five
+     * fixtures, under `RUSH_BESTS_FIXTURE_NOTE` (#293); both are deleted and the rows are the
+     * house's measured runs. The note travels inside `rushStandingsOf`'s view, so claiming the
+     * function claims the note together with the rows it is about; the copy table carries the two
+     * refusals, which are seeded on every case.
      */
-    'everyday/rushScreenModel.ts#RUSH_BESTS_FIXTURE_NOTE',
+    'everyday/rushHouse.ts#RUSH_HOUSE_COPY',
+    'everyday/rushHouse.ts#rushStandingsOf',
     'everyday/rushScreenModel.ts#rushBandViews',
     'everyday/rushScreenModel.ts#rushFactViews',
     'everyday/rushScreenModel.ts#rushDrivingLine',
@@ -8410,22 +8410,30 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       seeds.push({ field: `rush.fact.${fact.label}.label`, text: fact.label, role: 'prose' });
     }
     /*
-     * The marker before the rows, in the order the screen draws them — GitHub issue #293. It is a
-     * `reason`: it refuses the five rows below it, and R3's exemption is exactly for a refusal that
-     * has to name what it is refusing.
+     * The house's standings on this case's building, in the order the screen draws them — GitHub
+     * issue #418, § D547. The note is prose rather than a `reason`: it refuses nothing, it says what
+     * the rows are. Every cell a row draws is seeded, § D377's rule — the name, the tag, the wave and
+     * the held time — and `wave` and `held` are observations of one run's hold moment, never a mean,
+     * so R13 has no `n` to ask them for.
      */
-    seeds.push({ field: 'rush.bests.fixtureNote', text: RUSH_BESTS_FIXTURE_NOTE, role: 'reason' });
-    for (const best of RUSH_BESTS) {
-      seeds.push({ field: `rush.best.${best.name}.name`, text: best.name, role: 'label' });
-      seeds.push({ field: `rush.best.${best.name}.who`, text: best.who, role: 'label' });
-      seeds.push({ field: `rush.best.${best.name}.wave`, text: best.wave, role: 'label' });
-      /*
-       * **`held` had never been in the corpus, and it is the figure the issue is about.** The row
-       * draws four cells and this adapter seeded three: `57 min` against a handle is precisely the
-       * *other player's figure* #293 opens on, and the search had never read one. Found while
-       * adding the marker above; the rule it produced is § D377.
-       */
-      seeds.push({ field: `rush.best.${best.name}.held`, text: best.held, role: 'label' });
+    {
+      const nameOf = (id: string): string | undefined =>
+        context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name;
+      const standings = rushStandingsOf(context.building.id, nameOf);
+      if (standings.kind === 'rows') {
+        seeds.push({ field: 'rush.house.note', text: standings.note, role: 'prose' });
+        for (const row of standings.rows) {
+          seeds.push({ field: `rush.house.${row.dispatcherId}.name`, text: row.name, role: 'label' });
+          seeds.push({ field: `rush.house.${row.dispatcherId}.tag`, text: row.tag, role: 'label' });
+          seeds.push({ field: `rush.house.${row.dispatcherId}.wave`, text: row.wave, role: 'observation' });
+          seeds.push({ field: `rush.house.${row.dispatcherId}.held`, text: row.held, role: 'observation' });
+        }
+      } else {
+        seeds.push({ field: 'rush.house.refusal', text: standings.refusal, role: 'reason' });
+      }
+      /* Both refusals on every case — a drawn building, and a table from a different climb. */
+      seeds.push({ field: 'rush.house.withheld.unrun', text: RUSH_HOUSE_COPY.unrun, role: 'reason' });
+      seeds.push({ field: 'rush.house.withheld.stale', text: RUSH_HOUSE_COPY.stale, role: 'reason' });
     }
 
     /* ------------------------------------------------------- § 13 designer */
@@ -12667,7 +12675,12 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
      * than the rendering, which is what an emptied-and-refilled register is supposed to look like.
      */
     'everyday/stageScreenModel.ts#STAGE_ABSENCES',
-    'everyday/rushScreenModel.ts#RUSH_ABSENCES',
+    /*
+     * `everyday/rushScreenModel.ts#RUSH_ABSENCES` stood here until GitHub issue #418 emptied it — the
+     * standings entry left when the rows became the house's measured runs (§ D547). An empty array
+     * produces no prose, so a `covers` entry for it would claim coverage of nothing; the register is
+     * still drawn below, with the rest, and its empty line is seeded with the others.
+     */
     /*
      * `everyday/designerModel.ts#DESIGNER_ABSENCES` stood here until GitHub issue #420 emptied it —
      * the machine-per-shaft pickers made its last row false, so the row and its triage entry went
