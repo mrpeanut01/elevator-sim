@@ -63,8 +63,10 @@ import type { PublishedSurvivorScenario, PublishedSurvivors } from './survivors.
  * 2026-09-10 asks a reader to keep; the other five had at least one configuration that stood behind
  * its numbers. The three inside are stages 3, 5 and 7, and **inside is not rebalanced**: the one way
  * through stage 3 and the one through stage 5 are shipped profiles picked from the dropdown, which
- * § D528 clause 2 forbids from position three and `campaign/difficultyCurve.test.ts#DROPDOWN_CLEARS`
- * holds.
+ * § D528 clause 2 forbids from position three and `campaign/difficultyCurve.test.ts` holds — stage 3's
+ * in `DROPDOWN_CLEARS`, and stage 5's, `predictive-balanced`, in `DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE`,
+ * because stage 5's `editable` list refuses it and DC-2 never plays it. `DROPDOWN_CLEARS`' own stage-5
+ * row is `eta`, which the holdout refuses ([§ D556](../../../../DECISIONS.md)).
  *
  * The owner approved the band as drafted on 2026-09-10, so every entry is a scenario outside an
  * approved band. If the band moves, this register moves with it on the same commit, and that is the
