@@ -43,6 +43,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The energy figure ids — GitHub PR #515’s review finding L1, § D539. `ENERGY_FIGURE_IDS` holds ' +
+        '`energy-work` and `energy-per-leg`, the two `ReportFigure.id` keys `dev/reportPanel.ts#reportDeltaOf` ' +
+        'reads to withhold those rows between two runs on different equipment, and it is derived only ' +
+        'because the two-adjacent-words scanner reads a hyphenated id as prose. An id is a contract, not ' +
+        'a string a player reads: the two figures’ labels, values and notes are `dayReportOf`’s, which ' +
+        'the report adapters seed on every case, and the note the ids feed is seeded by the ' +
+        '`other-equipment` pairing in `honesty/surfaces.ts#reportPairingsOf`.',
+      ids: ['shift/report.ts#ENERGY_FIGURE_IDS'],
+    },
+    {
+      reason:
         'The house’s rush table — GitHub issue #418, § D547. `parseRushHouseTable`’s literals are ' +
         'load-time refusals addressed to whoever edited `data/rush-house-runs.json` ("carried more ' +
         'people than had arrived", "measures a pair a second time"), and `RUSH_HOUSE_TABLE` is ' +

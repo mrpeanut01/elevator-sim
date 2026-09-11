@@ -773,7 +773,130 @@ const DESCENT_CAP_HEIGHT_REASON =
   '`node packages/experiments/dist/benchmark/descentCapHeight.js`, which is the difference ' +
   'between a figure a reader can reproduce and one nobody can.';
 
+/** Shared by the eighteen `counterweightOptimum.ts` entries in {@link UNPINNED_INTERVALS}. */
+const COUNTERWEIGHT_OPTIMUM_REASON =
+  'Kind 4, a dated record rather than a pin — GitHub issue #431\'s fourth criterion, DECISIONS.md ' +
+  '§ D539, measured 2026-09-11 at n = 50, seed 20260911, by `main` in its own module. ' +
+  '`runCounterweightOptimumStudy` is classified `no-intervals` in STUDY_ENTRY_POINTS for ' +
+  '`runDescentCapHeightStudy`\'s reason: it computes intervals, and the assertions its suite makes on ' +
+  'it are structural — the minimiser equals a brute-force grid\'s, re-pricing a run equals ' +
+  're-simulating it — plus the finding itself, that no published replication saturates and every ' +
+  'optimum lies below the band. The digits are re-derivable with ' +
+  '`node packages/experiments/dist/benchmark/counterweightOptimum.js`.';
+
 export const UNPINNED_INTERVALS: readonly UnpinnedInterval[] = Object.freeze([
+  /*
+   * **GitHub issue #431's counterweight optimum — eighteen readings, one reason.** They are the two
+   * tables in `counterweightOptimum.ts`'s header, declared here for the descent-cap study's reason.
+   */
+  Object.freeze({
+    text: '+0.023 [+0.015, +0.030]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '+0.034 [+0.026, +0.042]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '+0.061 [+0.060, +0.062]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '+0.029 [+0.020, +0.038]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '+0.049 [+0.042, +0.056]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '+0.065 [+0.064, +0.066]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '−38.468 [−41.488, −35.447]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '−51.579 [−55.724, −47.434]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '−44.160 [−45.495, −42.825]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '−23.267 [−25.478, −21.057]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '−31.984 [−34.505, −29.463]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '−35.935 [−36.993, −34.877]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '−0.012 [−0.023, −0.000]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '−0.038 [−0.046, −0.031]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '−0.027 [−0.035, −0.019]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '−0.020 [−0.031, −0.010]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '−0.036 [−0.046, −0.027]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
+  Object.freeze({
+    text: '−0.016 [−0.023, −0.009]',
+    file: 'benchmark/counterweightOptimum.ts',
+    count: 1,
+    reason: COUNTERWEIGHT_OPTIMUM_REASON,
+  }),
   /*
    * **GitHub issue #444's height sweep — fifteen readings, one reason.** They are the table in
    * `descentCapHeight.ts`'s header, and they are declared here rather than pinned because the
@@ -1103,6 +1226,15 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     // times three arms times sixty replications on two templates, which belongs in neither
     // `regeneratePins.ts` nor `livenessSuite.ts`. Its non-test caller is `main` in its own module.
     runDescentCapHeightStudy: 'no-intervals',
+    // GitHub issue #431's fourth criterion (§ D539): whether the counterweight ratio that minimises a
+    // run's out-of-balance work differs across `rise-and-fall`, `office-down-peak` and `lunch-two-way`.
+    // Classified for `runDescentCapHeightStudy`'s reason. It computes intervals, and the assertions
+    // `counterweightOptimum.test.ts` makes on it are structural — the minimiser equals a brute-force
+    // grid's, re-pricing a run equals re-simulating it, no published replication saturates and every
+    // optimum lies below the band — while its
+    // digits are a dated record in its own header, re-derivable by `main` in its own module, which is
+    // its non-test caller.
+    runCounterweightOptimumStudy: 'no-intervals',
   });
 
 /* -------------------------------------------------------------------------- *

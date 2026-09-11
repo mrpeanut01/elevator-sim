@@ -141,6 +141,13 @@ export const WARNING_CODES = {
    */
   pressurisationBuysNothing: 'pressurisation-buys-nothing',
   /**
+   * A bank fits `regenerativeDrive` and the data directory's `elevator-specs.json` declares no
+   * `regenerativeDrive` block, so there is no recovery fraction to price the drive with —
+   * `DECISIONS.md` § D539. The bank's moves are priced as non-regenerative, and this says so rather
+   * than letting a purchase pass silently: {@link pressurisationBuysNothing}'s shape, for its reason.
+   */
+  regenerativeDriveBuysNothing: 'regenerative-drive-buys-nothing',
+  /**
    * The bank has double-deck cars and no `servesFloorPairs`, so **there is no deck geometry to
    * simulate** and the runtime runs the car as a single deck of the combined capacity.
    *
@@ -397,6 +404,17 @@ const airPressureSchema = z
     },
   );
 
+/**
+ * `elevator-specs.json`'s `regenerativeDrive` block — § D539. A recovery fraction of 0 would be a drive
+ * that returns nothing and of 1 a lossless one, so both ends are refused rather than accepted as a
+ * purchase that buys nothing or a machine that cannot exist.
+ */
+const regenerativeDriveSchema = z.strictObject({
+  $comment: comment,
+  recoveryFraction: z.number().gt(0).lt(1),
+  source: z.string().min(1),
+});
+
 export const elevatorSpecsSchema = z
   .strictObject({
     $comment: comment,
@@ -405,6 +423,7 @@ export const elevatorSpecsSchema = z
     conventions: conventionsSchema,
     classes: z.array(elevatorSpecSchema).min(1, 'at least one elevator class is required'),
     airPressure: airPressureSchema.optional(),
+    regenerativeDrive: regenerativeDriveSchema.optional(),
     codeMinimumSpeedByRise: z.array(
       z.strictObject({
         riseFtRange: z
@@ -1226,6 +1245,41 @@ export const carConfigSchema = z.strictObject({
   ratedLoadLbPerDeck: positive.optional(),
 });
 
+/**
+ * **The two per-bank energy settings, declared** — CLAUDE.md invariant 8, `DECISIONS.md` § D539,
+ * GitHub issue #431.
+ *
+ * Type, range, default, unit and source for each, in one place the parser below reads its bounds
+ * from, so the schema a reader sees and the one the loader enforces cannot drift. Neither is
+ * conditional, so neither carries an `activeWhen`. Neither is a *dispatch* tunable, which is why
+ * they are declared here beside the building schema rather than in `dispatch/parameters.ts`, and
+ * why `tuning/space` — which collects the rows a dispatcher profile can hold — does not collect them.
+ *
+ * The ratio's band is cited rather than chosen; the default is the old constant, and
+ * `metrics/energyConvention.test.ts` asserts it equals `metrics/types.ts#COUNTERWEIGHT_BALANCE_RATIO`
+ * so the two cannot disagree.
+ */
+export const BANK_ENERGY_TUNABLES = Object.freeze({
+  counterweightBalanceRatio: Object.freeze({
+    type: 'number',
+    unit: 'fraction of rated load',
+    min: 0.4,
+    max: 0.5,
+    default: 0.5,
+    source:
+      'Al-Kodmany, Buildings 2015, 5(3), 1070-1104, doi:10.3390/buildings5031070, s 2.1.4: the ' +
+      'counterweight "is sized in an optimal way, approximately to a car loaded to 40%-50% of ' +
+      'capacity". docs/02 gives the same 0.4-0.5 band from Barney & Al-Sharif and CIBSE Guide D s 13.',
+  }),
+  regenerativeDrive: Object.freeze({
+    type: 'boolean',
+    default: false,
+    source:
+      'An equipment choice, not a reference value. What it returns is elevator-specs.json ' +
+      'regenerativeDrive.recoveryFraction, which carries its own source.',
+  }),
+});
+
 export const bankConfigSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -1235,6 +1289,12 @@ export const bankConfigSchema = z.strictObject({
     .array(z.tuple([identifier, identifier]))
     .min(1, 'servesFloorPairs, when present, must list at least one [lower, upper] pair')
     .optional(),
+  counterweightBalanceRatio: z
+    .number()
+    .min(BANK_ENERGY_TUNABLES.counterweightBalanceRatio.min)
+    .max(BANK_ENERGY_TUNABLES.counterweightBalanceRatio.max)
+    .optional(),
+  regenerativeDrive: z.boolean().optional(),
   cars: z.array(carConfigSchema).min(1, 'a bank must have at least one car'),
 });
 

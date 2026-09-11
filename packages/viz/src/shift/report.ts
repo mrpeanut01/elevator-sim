@@ -286,6 +286,17 @@ export interface ShiftPlan {
  * issue rather than an implementation note — see {@link ShiftPlan} for the span that looks free and
  * is not.
  *
+ * ## The sixth axis refuses less than the other five — § D539
+ *
+ * {@link equipment} arrived with GitHub PR #515's review, which found the block pairing work per ride
+ * between a fitted and an unfitted run of one building without refusing. It is on the basis for the
+ * reason the other five are, and it is the one axis that does not refuse the whole comparison:
+ * equipment moves energy and never a leg (the owner's ruling, § D539), so two runs that differ only
+ * in it carried the same passengers the same way, and every figure but the two energy ones is a true
+ * pairing. `dev/reportPanel.ts#BASIS_DIFFERENCES` says which rows each axis refuses. Unlike
+ * {@link extent} and {@link patternId} it **is** read off the recording, because the recording is
+ * written from the building the run was priced on, and a shell's memory of what it set is not.
+ *
  * ## The gap this used to name is closed, and the shape of it is worth keeping
  *
  * It read: *the basis cannot see the event an authored calendar writes over a day*. {@link demand}'s
@@ -330,6 +341,14 @@ export interface ReportBasis {
   readonly extent: string;
   /** {@link ShiftPlan.patternId}, unaltered — the pattern the day's demand was built from. */
   readonly patternId: string;
+  /**
+   * What each bank was fitted with, as one string — § D539, and GitHub PR #515's review finding L1.
+   *
+   * {@link equipmentLineOf} composes it from {@link VizRecording.bankEquipment}, so it is the
+   * equipment the run was **priced** under. The empty string is every bank at the default. One string
+   * for {@link demand}'s reason: the only question asked of it is *are these two the same?*
+   */
+  readonly equipment: string;
 }
 
 /**
@@ -736,6 +755,23 @@ function extentLineOf(plan: ShiftPlan): string {
 }
 
 /**
+ * {@link ReportBasis.equipment}: each fitted bank's two settings in the recording's bank order, or the
+ * empty string when every bank is at the default.
+ *
+ * Nothing prints it. The refusal names the axis in words, and each run's own warning names the banks,
+ * so this string only has to be equal exactly when the two runs were priced alike.
+ */
+function equipmentLineOf(recording: VizRecording): string {
+  return (recording.bankEquipment ?? [])
+    .map(
+      (bank) =>
+        `${bank.bankId}: counterweight ${String(bank.counterweightBalanceRatio)}, ` +
+        `regeneration ${String(bank.regenerativeRecoveryFraction)}`,
+    )
+    .join('; ');
+}
+
+/**
  * What this sheet may be differenced against — issues #117 and #102, and see {@link ReportBasis}.
  *
  * Exhaustive over the subject, so a third shape of run is a compile error here rather than a sheet
@@ -761,6 +797,7 @@ function basisOf(input: DayReportInput): ReportBasis {
         : `day ${String(week.day)} · ${event.id}`,
     extent: extentLineOf(plan),
     patternId: plan.patternId,
+    equipment: equipmentLineOf(recording),
   };
 }
 
@@ -1479,6 +1516,16 @@ function deepestQueueNote(observations: Observations, dayStartS: SimTime): strin
 }
 
 /**
+ * The ids of the two figures a bank's equipment re-prices — § D539.
+ *
+ * `energy-work` is `metrics/comparability.ts#ENERGY_CONVENTION_SENSITIVE_METRICS`' `energyKJ` and
+ * `energy-per-leg` is its `energyPerServedLegKJ`, and no other figure on the sheet is on that list.
+ * `dev/reportPanel.ts#reportDeltaOf` reads this to refuse exactly these rows between two runs on
+ * different equipment, and {@link energyFigures} takes its ids from here, so the two cannot drift.
+ */
+export const ENERGY_FIGURE_IDS = Object.freeze(['energy-work', 'energy-per-leg'] as const);
+
+/**
  * The pair. Both or neither, never ranked, never summed. See the module docstring and § D106.
  *
  * `deliveredLegCount` rides in the per-leg figure's note because it is that ratio's denominator and
@@ -1489,7 +1536,7 @@ function energyFigures(summary: VizSummary): readonly ReportFigure[] {
   const measured = energy.measured;
   return [
     {
-      id: 'energy-work',
+      id: ENERGY_FIGURE_IDS[0],
       label: 'WORK DONE',
       value: measured && energy.workKJ !== null ? `${energy.workKJ.toFixed(0)} kJ` : NOT_RECORDED,
       note: 'out-of-balance mechanical work — an axis beside the waits, never a score',
@@ -1497,7 +1544,7 @@ function energyFigures(summary: VizSummary): readonly ReportFigure[] {
       axisOnly: true,
     },
     {
-      id: 'energy-per-leg',
+      id: ENERGY_FIGURE_IDS[1],
       label: 'WORK PER DELIVERED LEG',
       value:
         measured && energy.workPerServedLegKJ !== null

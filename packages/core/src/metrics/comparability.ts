@@ -37,7 +37,9 @@
  * published figures in this repository did.
  */
 
-import type { CallType, PassengerAssignmentMode } from '../config/types.js';
+import type { CallType, PassengerAssignmentMode, ResolvedBank } from '../config/types.js';
+
+import { COUNTERWEIGHT_BALANCE_RATIO, DEFAULT_ENERGY_CONVENTION, type EnergyConvention } from './types.js';
 
 /**
  * The two passenger models this simulator can run.
@@ -225,5 +227,94 @@ export function comparabilityDisclaimer(model: PassengerModel): string | undefin
     `Time to destination (ttdMeanS, ttdP95S), ride time, load factor, unserved fraction and the ` +
     `queue-growth slope keep their definitions and are the comparable set (DECISIONS.md § D27: ` +
     `gate on TTD, and report AWT and WT95 with explicit verdicts rather than omitting them).`
+  );
+}
+
+/* -------------------------------------------------------------------------- *
+ * The energy convention — DECISIONS.md § D539
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The two.** Metrics whose *scale* changes when a bank's counterweight ratio or drive is not the
+ * default — GitHub issue #431, § D539.
+ *
+ * A different axis from {@link MODEL_SENSITIVE_METRICS}, and deliberately not folded into it. That
+ * list is about what a *passenger* is, and its partition with {@link COMPARABLE_METRIC_IDS} is exact;
+ * both of these stay in the comparable half, because a landing panel does not change what a metre of
+ * travel costs. What changes it is the machine, so the pairing this list guards is between two runs
+ * whose banks are priced differently, whatever their passenger model.
+ *
+ * `carDistanceM` and `carStarts` are **not** here, and `energyConvention.test.ts` asserts the
+ * absence: a convention is an energy-only machine choice by the owner's ruling, so the odometer and
+ * the motor starts of two runs that differ only in convention are identical, and so are the legs.
+ */
+export const ENERGY_CONVENTION_SENSITIVE_METRICS: readonly ModelSensitiveMetric[] = Object.freeze([
+  Object.freeze({
+    id: 'energyKJ',
+    summaryPath: 'energy.workKJ',
+    reason:
+      'the same moves are priced on a different scale — a counterweight away from half load changes every move’s out-of-balance mass, and a regenerative drive charges an overhauling move only the share it does not return',
+  }),
+  Object.freeze({
+    id: 'energyPerServedLegKJ',
+    summaryPath: 'energy.workPerServedLegKJ',
+    reason:
+      'the same scale change divided by the same legs, so the 80 kJ goal’s verdict can move while every passenger’s journey is identical',
+  }),
+]);
+
+/**
+ * The convention one resolved bank prices its moves with.
+ *
+ * Returns {@link DEFAULT_ENERGY_CONVENTION} **by identity** when the bank's values are the default's,
+ * including a bank that declares `counterweightBalanceRatio: 0.5` explicitly, so a caller can ask
+ * "is this the default?" with `===` and an explicit default cannot write a disclaimer.
+ */
+export function energyConventionOf(
+  bank: Pick<ResolvedBank, 'counterweightBalanceRatio' | 'regenerativeRecoveryFraction'>,
+): EnergyConvention {
+  const ratio = bank.counterweightBalanceRatio ?? COUNTERWEIGHT_BALANCE_RATIO;
+  const recovery = bank.regenerativeRecoveryFraction ?? 0;
+  if (ratio === COUNTERWEIGHT_BALANCE_RATIO && recovery === 0) return DEFAULT_ENERGY_CONVENTION;
+  return Object.freeze({ counterweightBalanceRatio: ratio, regenerativeRecoveryFraction: recovery });
+}
+
+/**
+ * The disclaimer a run carries in `result.warnings` when any bank is priced under a convention other
+ * than the default, or `undefined`.
+ *
+ * A *disclaimer* for {@link comparabilityDisclaimer}'s reason: the energy figure is not the one a
+ * reader of "energy" assumes. It names each fitted bank, what it was fitted with, and the two
+ * figures that moved, and it says in terms that the legs did not — which is the owner's ruling
+ * written where a reader of the run will meet it. `Simulation` is its non-test caller.
+ */
+export function energyConventionDisclaimer(building: {
+  readonly banks: readonly Pick<
+    ResolvedBank,
+    'id' | 'counterweightBalanceRatio' | 'regenerativeRecoveryFraction'
+  >[];
+}): string | undefined {
+  const fitted = building.banks
+    .map((bank) => ({ id: bank.id, convention: energyConventionOf(bank) }))
+    .filter(({ convention }) => convention !== DEFAULT_ENERGY_CONVENTION);
+  if (fitted.length === 0) return undefined;
+  const described = fitted
+    .map(({ id, convention }) => {
+      const drive =
+        convention.regenerativeRecoveryFraction === 0
+          ? 'no regeneration'
+          : `a regenerative drive returning ${String(convention.regenerativeRecoveryFraction)} of each overhauling move`;
+      return `"${id}" (counterweight at ${String(convention.counterweightBalanceRatio)} of rated load, ${drive})`;
+    })
+    .join('; ');
+  const listed = ENERGY_CONVENTION_SENSITIVE_METRICS.map(
+    (metric) => `${metric.id} (${metric.reason})`,
+  ).join('; ');
+  return (
+    `this run prices its moves under a per-bank energy convention rather than the default of a ` +
+    `counterweight at ${String(COUNTERWEIGHT_BALANCE_RATIO)} of rated load and no regeneration ` +
+    `(DECISIONS.md § D539): bank ${described}. The legs, the distances and the motor starts are ` +
+    `exactly what they would be under the default, and ${String(ENERGY_CONVENTION_SENSITIVE_METRICS.length)} ` +
+    `figures are not — ${listed}. Do not pair either against a run of another convention without saying so.`
   );
 }

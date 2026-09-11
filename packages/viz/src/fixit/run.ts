@@ -92,6 +92,20 @@ function carsOf(doc: MutableBuildingDocument, carIds: readonly string[]): Mutabl
   });
 }
 
+/** The banks a patch names: every bank for `"*"`, otherwise each by id (GitHub issue #431). Throws on an id nothing matches. */
+function banksOf(doc: MutableBuildingDocument, bankIds: readonly string[]): MutableBank[] {
+  const all = doc.banks ?? [];
+  if (bankIds.length === 1 && bankIds[0] === '*') return all;
+  const byId = new Map(all.map((bank) => [bank.id, bank]));
+  return bankIds.map((id) => {
+    const bank = byId.get(id);
+    if (bank === undefined) {
+      throw new Error(`fixit: a patch names bank "${id}", which this building does not have.`);
+    }
+    return bank;
+  });
+}
+
 /** Apply one fabric patch to a cloned authored document. Throws on a name nothing matches. */
 function applyBuildingPatch(doc: MutableBuildingDocument, patch: NonNullable<FixitPatch['building']>): void {
   for (const population of patch.floorPopulations ?? []) {
@@ -144,6 +158,25 @@ function applyBuildingPatch(doc: MutableBuildingDocument, patch: NonNullable<Fix
       }
       if (carPatch.set.dwellCarCallS !== undefined) car.dwellCarCallS = carPatch.set.dwellCarCallS;
       if (carPatch.set.dwellHallCallS !== undefined) car.dwellHallCallS = carPatch.set.dwellHallCallS;
+    }
+  }
+  /*
+   * **Per-bank equipment: the counterweight and the drive** — GitHub issue #431, `DECISIONS.md` § D539.
+   *
+   * This is the scenario editor's non-test writer of `BankConfig.counterweightBalanceRatio` and
+   * `BankConfig.regenerativeDrive`. Written as declared, exactly as a pressurised cabin is above: the
+   * loader enforces the ratio's range and resolves the drive's recovery, and `Simulation` prices the
+   * bank's moves by both. Neither reaches a dispatcher, so this is the one patch in the table that can
+   * move a verdict without moving a leg — which is the owner's ruling, not an accident of the seam.
+   */
+  for (const equipment of patch.bankEquipment ?? []) {
+    for (const bank of banksOf(doc, equipment.bankIds)) {
+      if (equipment.set.counterweightBalanceRatio !== undefined) {
+        bank['counterweightBalanceRatio'] = equipment.set.counterweightBalanceRatio;
+      }
+      if (equipment.set.regenerativeDrive !== undefined) {
+        bank['regenerativeDrive'] = equipment.set.regenerativeDrive;
+      }
     }
   }
   for (const added of patch.addCars ?? []) {

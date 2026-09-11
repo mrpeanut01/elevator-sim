@@ -336,4 +336,25 @@ describe('what no scenario sells is declared beside what one does — #467, § D
       expect(change.note, change.id).toContain('CHOSEN:');
     }
   });
+
+  /**
+   * **Both rows #431 priced say they are proposals, and that the owner approved them as drafted on
+   * 2026-09-11.** The same standing `data/` ruling as the #467 rows above: `regenerative-drive` and
+   * `counterweight-rebalance` had no shipped list to be kept from, so each note carries the
+   * provenance label, the measured and chosen halves, and the approval. They are named by id rather
+   * than found by the issue number, so a note that stopped citing #431 fails here instead of leaving
+   * the filter and passing by absence.
+   */
+  it('marks both rows #431 priced as an agent’s proposal, approved as drafted on 2026-09-11', () => {
+    for (const id of ['regenerative-drive', 'counterweight-rebalance']) {
+      const change = shipped().changes.find((candidate) => candidate.id === id);
+      expect(change, `${id} is on the schedule`).toBeDefined();
+      const note = change?.note ?? '';
+      expect(note, id).toContain('#431');
+      expect(note, id).toContain("AGENT'S PROPOSAL");
+      expect(note, id).toContain('APPROVED AS DRAFTED by the product owner on 2026-09-11');
+      expect(note, id).toContain('MEASURED:');
+      expect(note, id).toContain('CHOSEN:');
+    }
+  });
 });
