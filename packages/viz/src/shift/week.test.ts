@@ -20,12 +20,16 @@ import { CONTRACTS } from './contracts.js';
 import { readGoals } from './goals.js';
 import { goalsForDay } from './goals.js';
 import {
+  ENDLESS_CONTRACT_ID,
   FREE_PLAY_CONTRACT_ID,
   HISTORY_DAYS,
   PARKED_WEEKS_MAX,
+  REPLAY_CONTRACT_ID,
+  RUSH_CONTRACT_ID,
   SANDBOX_CONTRACT_ID,
   WEEK_CONTRACT_SENTINELS,
   closeDay,
+  newlyClearedScenarioOf,
   nextDay,
   openWeek,
   outcomeOf,
@@ -763,5 +767,82 @@ describe('a sandbox day leaves the scoreboard where it found it — GitHub issue
     const after = closeDay(week, day(week, 'met', 100));
     expect(after.cleared).toBeNull();
     expect(after.completed).toEqual(week.completed);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The moment a scenario clear is filed — GitHub issue #499
+ * -------------------------------------------------------------------------- */
+
+/**
+ * `newlyClearedScenarioOf` is the decision `dev/main.ts#closeShift` asks before it banks a
+ * `scenario-cleared` turn, and every case below is a close that must **not** post except the two
+ * that say so. The server pays a scenario once per account whatever is posted; this is the client
+ * posting only what the week actually filed, so a retried clearing day is not a second request.
+ */
+describe('newlyClearedScenarioOf — the close that files a clear, and no other', () => {
+  const dayOf = (day: number, kind: 'met' | 'missed'): DayOutcome =>
+    outcomeOf({
+      record: null,
+      recordRefusal: null,
+      day,
+      dayIdx: 0,
+      eventId: 'ordinary',
+      readings: readings(day, kind),
+      minutePct: kind === 'met' ? 90 : 40,
+      carried: kind === 'met' ? 100 : 60,
+      arrived: 100,
+    });
+  const oneDay = CONTRACTS.find((contract) => contract.needClean === 1);
+  const twoDays = CONTRACTS.find((contract) => contract.needClean === 2);
+
+  it('names the contract on the close that clears it', () => {
+    expect(oneDay, 'no shipped contract clears in one day').toBeDefined();
+    const before = openWeek(oneDay?.id);
+    const after = closeDay(before, dayOf(1, 'met'));
+    expect(after.cleared?.contractId).toBe(oneDay?.id);
+    expect(newlyClearedScenarioOf(before, after)).toBe(oneDay?.id);
+  });
+
+  it('names nothing when the clearing day is run again, though the week still says cleared', () => {
+    const cleared = closeDay(openWeek(oneDay?.id), dayOf(1, 'met'));
+    const retried = closeDay(cleared, dayOf(1, 'met'));
+    /* The retry replays the close, so the banner is back — which is exactly the close a naive post would bank twice. */
+    expect(retried.cleared?.contractId).toBe(oneDay?.id);
+    expect(newlyClearedScenarioOf(cleared, retried)).toBeUndefined();
+  });
+
+  it('names nothing for a failed attempt, and the contract once a recovery clears it', () => {
+    const start = openWeek(oneDay?.id);
+    const missed = closeDay(start, dayOf(1, 'missed'));
+    expect(newlyClearedScenarioOf(start, missed)).toBeUndefined();
+    const recovered = closeDay(missed, dayOf(1, 'met'));
+    expect(newlyClearedScenarioOf(missed, recovered)).toBe(oneDay?.id);
+  });
+
+  it('names nothing for a clean day that does not yet finish its contract', () => {
+    expect(twoDays, 'no shipped contract needs two clean days').toBeDefined();
+    const start = openWeek(twoDays?.id);
+    const first = closeDay(start, dayOf(1, 'met'));
+    expect(first.cleared).toBeNull();
+    expect(newlyClearedScenarioOf(start, first)).toBeUndefined();
+  });
+
+  it('names nothing on a week no scenario runs — a replay, the sandbox, free play, endless and the rush', () => {
+    for (const contractId of [
+      REPLAY_CONTRACT_ID,
+      SANDBOX_CONTRACT_ID,
+      FREE_PLAY_CONTRACT_ID,
+      ENDLESS_CONTRACT_ID,
+      RUSH_CONTRACT_ID,
+    ]) {
+      const before: WeekState = { ...openWeek(oneDay?.id), contractId };
+      expect(newlyClearedScenarioOf(before, closeDay(before, dayOf(1, 'met'))), contractId).toBeUndefined();
+    }
+  });
+
+  it('names nothing when the mode left the week alone — `closedWeekOf` answers the same week', () => {
+    const week = closeDay(openWeek(oneDay?.id), dayOf(1, 'met'));
+    expect(newlyClearedScenarioOf(week, week)).toBeUndefined();
   });
 });

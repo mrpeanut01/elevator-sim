@@ -773,3 +773,30 @@ function awardFor(contractId: string, reward: string): ClearedAward {
         : `${next.label} — ${next.title}`,
   };
 }
+
+/**
+ * The contract a close has just cleared, or `undefined` — GitHub issue #499, the moment a scenario
+ * clear is filed.
+ *
+ * `before` is the week the close was made on and `after` is what {@link closeDay} made of it,
+ * through `dev/state.ts#closedWeekOf`. The answer is a contract id only when the close put a clear
+ * on the week **and** that contract was not already cleared before it, so:
+ *
+ * - a retry of the clearing day names nothing, though the week still says cleared — the retry
+ *   replays the close, and the clear was filed the first time;
+ * - a missed day, and a clean day short of `needClean`, name nothing;
+ * - a week no scenario runs names nothing, because `closeDay` clears nothing there — a replay, the
+ *   sandbox, free play, endless and the rush all resolve to no contract;
+ * - a mode that does not advance the week hands back the same week, and names nothing.
+ *
+ * Its non-test caller is `dev/main.ts#closeShift`, which banks the answer as a `scenario-cleared`
+ * turn once the week is written. The server pays a scenario once per account whatever is posted;
+ * this is the client posting only what the week actually filed.
+ */
+export function newlyClearedScenarioOf(before: WeekState, after: WeekState): string | undefined {
+  if (after === before) return undefined;
+  const contractId = after.cleared?.contractId;
+  if (contractId === undefined) return undefined;
+  if (before.completed.includes(contractId) || !after.completed.includes(contractId)) return undefined;
+  return contractId;
+}

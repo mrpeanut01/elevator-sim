@@ -38,7 +38,7 @@
  * the absence lexically, because *"we do not time out"* is a claim about every future edit.
  */
 
-import type { ChimeCompletion, WireIntervention as CoreWireIntervention } from '@elevator-sim/core/browser';
+import type { ChimeTurn, WireIntervention as CoreWireIntervention } from '@elevator-sim/core/browser';
 
 import type {
   ChallengeBoardPage,
@@ -630,8 +630,12 @@ export interface LeaderboardClient {
    * the caller says *what it finished* and `data/chime-ledger.json` decides what that is worth on
    * the server. The completion vocabulary is `core`'s and closed, so there is no string here that
    * reaches a **source** either — the sign-in gift has no completion and cannot be asked for.
+   *
+   * **Since GitHub issue #499 the argument is the whole turn**: which scenario was cleared, or how many
+   * waves a rush outlasted, beside the completion. Neither is an amount, and the server pays a scenario
+   * once per account and a rush only the waves beyond the account's best, whatever this sends.
    */
-  bankCompletion(token: string, completion: ChimeCompletion): Promise<Result<number>>;
+  bankCompletion(token: string, turn: ChimeTurn): Promise<Result<number>>;
 }
 
 /**
@@ -797,8 +801,8 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
     logout: (token) => call({ method: 'POST', url: `${base}/api/logout`, token, body: {} }, () => null),
     me: (token) => call({ method: 'GET', url: `${base}/api/me`, token, body: undefined }, user),
     chimes: (token) => call({ method: 'GET', url: `${base}/api/chimes`, token, body: undefined }, balance),
-    bankCompletion: (token, completion) =>
-      call({ method: 'POST', url: `${base}/api/chimes/earn`, token, body: { completion } }, balance),
+    bankCompletion: (token, turn) =>
+      call({ method: 'POST', url: `${base}/api/chimes/earn`, token, body: { ...turn } }, balance),
     setDisplayName: (token, displayName) =>
       call({ method: 'POST', url: `${base}/api/me/display-name`, token, body: { displayName } }, user),
     submit: (token, submission) =>

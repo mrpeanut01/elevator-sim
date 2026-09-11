@@ -64,8 +64,8 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 
 import {
   CHIME_COMPLETIONS,
-  type ChimeCompletion,
   type ChimeLedgerTable,
+  type ChimeTurn,
   chimeSinkById,
 } from '@elevator-sim/core';
 
@@ -83,6 +83,7 @@ import {
   earnCompletion,
   spendOnModifier,
   unbackedModifiers,
+  type ChimeTurnBounds,
 } from '../chimes/ledger.js';
 import {
   CHALLENGE_CLOCK_NOTE,
@@ -193,6 +194,12 @@ export interface ApiDeps {
    * no route below takes an amount from a request, because the amounts are all in here.
    */
   readonly chimeLedger: ChimeLedgerTable;
+  /**
+   * Which turns this build pays for — GitHub issue **#499**: the scenario ids a shipped path can
+   * clear and how many waves the rush generates, read from `data/` at boot. Without it a scenario
+   * could be paid once per invented id, which is every post paying again.
+   */
+  readonly chimeTurns: ChimeTurnBounds;
 }
 
 export type Api = (request: ApiRequest) => Promise<ApiResponse>;
@@ -1091,8 +1098,8 @@ async function chimeBalance(deps: ApiDeps, request: ApiRequest): Promise<ApiResp
 /**
  * Bank a completed turn — **and the body carries a turn, never an amount**.
  *
- * A client says *I cleared a scenario*, at a band the scenario declared, and the server prices it
- * from `data/chime-ledger.json`. There is no field here in which a number could arrive, which is
+ * A client says *I cleared this scenario*, *this contract day was paid* or *this rush outlasted this
+ * many waves*, and the server prices it from `data/chime-ledger.json`. There is no field here in which a number could arrive, which is
  * [§ D526](../../../../DECISIONS.md) clause 6 as a wire format rather than as a rule: a purchase
  * is a client naming an amount, and this route has nowhere to put one.
  *
@@ -1110,6 +1117,49 @@ async function chimeBalance(deps: ApiDeps, request: ApiRequest): Promise<ApiResp
  * **Bounded, like every other write on this surface**, by {@link CHIMES_PER_ACCOUNT} — see there
  * for the measurement that says why, and for why the key is the account rather than the address.
  */
+/*
+ * ## First time only — GitHub issue #499
+ *
+ * The owner's ruling of 2026-09-10 is enforced here and not on the client: a `scenarioId` pays once
+ * per account and a `waves` count pays only the waves beyond the account's best, and a post that
+ * pays nothing is answered `200` with the balance, because re-posting a turn is not a fault.
+ * `chimes/ledger.ts#earnCompletion` holds the rule and `store.ts` holds the record.
+ *
+ * **What it cannot check, stated rather than hidden:** that the scenario was cleared, or that the rush
+ * reached the waves claimed — a contract day has been believed the same way since #368, and a rush
+ * result is not replayed until #372. The bounds are the shipped scenario ids and the stream's wave
+ * count; within them a post is believed, once.
+ *
+ * **Its refusal details are drawn by no screen**, which is why they are not in `honesty/surfaces.ts`:
+ * `packages/viz/src/dev/main.ts#bankTurn` posts and discards the answer, on § D526 clause 3's ground
+ * that nothing about a chime reaches a results page.
+ */
+const EARN_REFUSAL_DETAIL: Readonly<Partial<Record<string, string>>> = Object.freeze({
+  'unknown-scenario': 'This build has no scenario by that name to pay for.',
+  'unknown-wave': 'A rush pays whole waves outlasted, from one up to the waves its stream generates.',
+});
+
+/**
+ * The turn a request names, or `undefined` for a completion this build does not know.
+ *
+ * A missing or mistyped `scenarioId` becomes `''` and a missing or mistyped `waves` becomes `NaN`, so
+ * the refusal is the ledger's and is made in one place, rather than by a second shape check here that
+ * could come to disagree with it. Every other key on the body is ignored, which is what keeps an
+ * amount — or any figure a run measured — from having anywhere to arrive.
+ */
+function turnOf(completion: string, body: Partial<Record<'scenarioId' | 'waves', unknown>> | null | undefined): ChimeTurn | undefined {
+  switch (completion) {
+    case 'scenario-cleared':
+      return { completion: 'scenario-cleared', scenarioId: typeof body?.scenarioId === 'string' ? body.scenarioId : '' };
+    case 'career-day-paid':
+      return { completion: 'career-day-paid' };
+    case 'rush-wave-survived':
+      return { completion: 'rush-wave-survived', waves: typeof body?.waves === 'number' ? body.waves : Number.NaN };
+    default:
+      return undefined;
+  }
+}
+
 async function chimeEarn(
   deps: ApiDeps,
   request: ApiRequest,
@@ -1121,9 +1171,10 @@ async function chimeEarn(
   }
   const limited = chargeChimeWrite(deps, user.id, perAccount);
   if (limited !== undefined) return limited;
-  const body = request.body as Partial<Record<'completion', unknown>>;
+  const body = request.body as Partial<Record<'completion' | 'scenarioId' | 'waves', unknown>> | null | undefined;
   const completion = typeof body?.completion === 'string' ? body.completion : '';
-  if (!(CHIME_COMPLETIONS as readonly string[]).includes(completion)) {
+  const turn = turnOf(completion, body);
+  if (turn === undefined) {
     return {
       status: 400,
       body: {
@@ -1135,15 +1186,19 @@ async function chimeEarn(
   const outcome = await earnCompletion({
     store: deps.store,
     table: deps.chimeLedger,
+    bounds: deps.chimeTurns,
     userId: user.id,
-    completion: completion as ChimeCompletion,
+    turn,
   }).catch((error: unknown) => {
     if (error instanceof NoSuchUserError) return undefined;
     throw error;
   });
   if (outcome === undefined) return accountVanished();
   if (!outcome.ok) {
-    return { status: 400, body: { error: outcome.reason, detail: 'This build does not pay that turn.' } };
+    return {
+      status: 400,
+      body: { error: outcome.reason, detail: EARN_REFUSAL_DETAIL[outcome.reason] ?? 'This build does not pay that turn.' },
+    };
   }
   return { status: 200, body: { balanceChimes: outcome.balanceChimes } };
 }

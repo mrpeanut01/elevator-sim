@@ -34853,3 +34853,59 @@ authenticate a file — a block assembled by hand from two runs with its differe
 indistinguishable from a genuine one.
 
 ---
+
+## D533 — A scenario and a rush wave pay first time only, and the server keeps the record
+
+**Date: 2026-09-10 · Owner: product owner (the ruling); the lane that built GitHub issue #499 (the readings under it) · Rules on: [§ D526](#d526) clause 2, `data/chime-ledger.json`'s `earn-scenario-clear` and `earn-rush-wave`, [`docs/38`](docs/38-what-the-game-is.md) § 2.4, GitHub issue #499.**
+
+**Why an entry.** The ruling binds code no one module owns — the server's store schema and earn
+route, the viewer's week filing, fix-it screen and rush host, and the ledger's authored notes — and it
+narrows a clause already recorded: § D526 clause 2 says *a scenario cleared, a contract day paid, a
+rush wave survived, each paying a flat amount*, and did not say how often.
+
+**Ruling, given by the product owner on 2026-09-10: first time only.** A scenario pays
+`earn-scenario-clear` once per account. A rush pays `earn-rush-wave` only for waves beyond the
+account's previous best, because the rush runs on one shared seed and paying every wave every run
+would let the same climb be replayed for chimes. The server keeps the record, so a client cannot farm
+either award by posting again.
+
+**What had to be read into it, and how it was read.**
+
+1. **The record is the turns themselves.** `chime_entries.turn_key` (migration 6) holds the scenario
+   id on a scenario clear and the wave's number on a rush wave, and a partial unique index over
+   `(user_id, entry_key, turn_key)` makes one entry per account, source and turn a property of the
+   table rather than of the one statement that asks. A rush that beats its best writes one entry per
+   new wave at the flat award, so the account's best is the waves already paid rather than a second
+   figure that could disagree with them. A re-post is answered `200` with the balance and pays nothing.
+2. **A wave survived is a wave outlasted.** The result's *furthest wave* is the one the hold line was
+   crossed in, which was reached and not survived, so a broken rush posts that number less one. A run
+   that breaks inside its first wave posts nothing, and so does a run ended by hand, which has no
+   breaking point ([§ D515](#d515)).
+3. **A scenario is a week's contract or a fix case.** Both are Scenario content under
+   [§ D525](#d525), and both file a clear today: `shift/week.ts#closeDay` appends a contract to the
+   week's `completed`, which `dev/main.ts#closeShift` banks through
+   `shift/week.ts#newlyClearedScenarioOf`; and `everyday/fixitScreen.ts` keeps a case FIXED, which it
+   banks through `everyday/host.ts#bankScenarioClear`. The server accepts exactly the ids
+   `data/contract-ladder.json` and `data/fixit-cases.json` name, and refuses to boot if the two share
+   one — an unbounded id would pay for every name a client invents, once each. A single day of the
+   daily loop is a score and not a pass, in the Scenario hub's own words, so a day posts nothing; the
+   contract it counts toward posts once its clean days clear it. The Engineer campaign panel draws a
+   stage verdict and files no clear, and is not wired.
+4. **A contract day is outside the ruling** and still pays on every post: nothing on the wire can
+   tell a second day from one day posted twice. `http/api.test.ts` asserts that it still does, so
+   keying it later is a deliberate change to a green test rather than an accident.
+
+**What is unchecked, and first-time-only is the cap on it.** The server cannot verify that a scenario
+was cleared or that a rush reached the waves it claims; a contract day has been believed the same way
+since #368, and a rush result is not replayed until #372. The bounds are the shipped scenario ids and
+the rush template's wave count (`chimes/ledger.ts#rushWaveCountOf`), so a client composing its own
+requests can collect each scenario's award and a full rush's awards once per account, and no more.
+Whether a Career day can clear a week's contract through `closeShift`, and so post a scenario clear,
+is not asserted by any test in this change.
+
+**What this does not change.** Every entry is the table's flat award, and no award varies with
+anything a run measures ([§ D526](#d526) clause 2). No chime figure reaches a results page: every post
+is fire and forget and nothing reads its answer (clause 3, `docs/32` GD13). A client names a turn and
+never a source or an amount (clause 5).
+
+---

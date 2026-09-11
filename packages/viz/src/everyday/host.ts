@@ -101,7 +101,7 @@
 
 import type {
   BuildingConfig,
-  ChimeCompletion,
+  ChimeTurn,
   DispatcherProfile,
   DispatcherProfiles,
   ElevatorSpecs,
@@ -220,7 +220,7 @@ import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import type { DemandBand } from '../fixit/parse.js';
-import { rushBeforeOf, rushDisclosureOf, rushHoldAt, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, type RushBefore } from './rush.js';
+import { rushBeforeOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
 import { REPLAY_COPY, replayBeforeOf, replayPatchOf, replayRestorePatchOf, replayableDay, type ReplayBefore } from './replay.js';
 
 import { campaignDayVerdict, campaignTestRows } from './campaignModel.js';
@@ -1417,6 +1417,16 @@ export interface EverydayHost {
   leaveRush(): void;
   /** § D478's line for a rush on the standing building, before one starts; `undefined` inside the band or with no building. */
   rushDisclosure(): string | undefined;
+  /**
+   * Bank a scenario the player has just cleared — GitHub issue **#499**. `scenarioId` is the
+   * scenario's own id, and the server pays it once per account whatever this is asked.
+   *
+   * Answers nothing, for {@link EverydayHostBindings.bankCompletion}'s reason: a clear is filed on a
+   * results screen, and a call whose answer nobody reads cannot put a chime on one. Its non-test
+   * caller is `everyday/fixitScreen.ts#primary`, on a case the run it pressed for has just fixed; a
+   * week's contract clear is banked by `dev/main.ts#closeShift` directly, where the week is filed.
+   */
+  bankScenarioClear(scenarioId: string): void;
 
   /**
    * § 6.1's replay: park the week and stand a replay week on `day` — `everyday/replay.ts`, GitHub
@@ -1535,7 +1545,7 @@ export interface EverydayHostBindings {
    */
   readonly chimeBalance?: (() => Promise<EverydayChimeBalance>) | undefined;
   /**
-   * Bank a turn the player finished — GitHub issue **#368**, the earn verb's **non-test caller**.
+   * Bank a turn the player finished — GitHub issues **#368** and **#499**.
    *
    * `undefined` with no API origin, on {@link dailyBoard}'s rule. It answers nothing on purpose:
    * a banked turn changes a number on the Settings screen and **nothing a player is looking at when
@@ -1544,8 +1554,13 @@ export interface EverydayHostBindings {
    *
    * The completion is `core`'s vocabulary rather than this file's, which is clause 5's other half:
    * a screen names *what it finished* and never *which source pays it*.
+   *
+   * **The argument is the whole turn since #499** — which scenario was cleared, or how many waves a
+   * rush outlasted. The server pays a scenario once per account and a rush only the waves beyond the
+   * account's best, and this port neither knows nor guesses what was already paid: a caller posts
+   * what it finished, and the record is the server's.
    */
-  readonly bankCompletion?: ((completion: ChimeCompletion) => void) | undefined;
+  readonly bankCompletion?: ((turn: ChimeTurn) => void) | undefined;
   /**
    * Post the run on screen — GitHub issue #221's write half. `undefined` when there is no API
    * origin, on {@link dailyBoard}'s rule: the absence is a property of the page, decided once at
@@ -2179,9 +2194,15 @@ export function createEverydayHost(
       setCareer(next);
       notifyCampaign();
       /*
-       * **And the ledger hears about it** — GitHub issue #368, and this is the earn verb's only
-       * non-test caller. `data/chime-ledger.json`'s `earn-career-day`: *a day the contract paid
-       * for — the completed turn, not the day's figures.*
+       * **And the ledger hears about it** — GitHub issue #368. `data/chime-ledger.json`'s
+       * `earn-career-day`: *a day the contract paid for — the completed turn, not the day's figures.*
+       *
+       * **No longer the earn verb's only non-test caller** (GitHub issue #499). It is posted from four
+       * places: this contract day; {@link EverydayHost.endRush} below, for the waves a broken rush
+       * outlasted; {@link EverydayHost.bankScenarioClear} below, which `everyday/fixitScreen.ts#primary`
+       * calls on a case its run has just fixed; and `dev/main.ts#closeShift`, which posts a week's
+       * contract clear through the same `bankTurn` this binding is. A contract day is the one turn the
+       * owner's first-time-only ruling does not reach, so it still pays on every post.
        *
        * Placed **after** `setCareer`, and gated on `next !== career` above, so it fires exactly
        * where a day is really filed: `fileDay` returns the record unchanged on a tower this career
@@ -2198,7 +2219,7 @@ export function createEverydayHost(
        * a worse trade than a chime nobody banked. The balance is read again next time Settings is
        * opened, and the ledger is append-only, so nothing is lost that was not already spent.
        */
-      if (verdict === 'cleared') b.bankCompletion?.('career-day-paid');
+      if (verdict === 'cleared') b.bankCompletion?.({ completion: 'career-day-paid' });
     },
     intervene: (atS, change) => {
       // Gated here as well as on the control, because the record cannot grow before it exists and
@@ -2570,8 +2591,22 @@ export function createEverydayHost(
     },
     endRush: (atS) => {
       if (rushSession === undefined) return;
+      const firstEnd = rushSession.endedAtS === undefined;
       rushSession = { ...rushSession, endedAtS: atS };
       notifyCampaign();
+      /*
+       * **And the ledger hears how far it got** — GitHub issue #499. At the end of the run, and once:
+       * a second end of the same run is not a second turn, and *Run the rush again* clears
+       * `endedAtS`, so its end is a new one. The count is `rush.ts#rushWavesOutlastedOf` over the
+       * outcome the result draws, so a run ended by hand — no breaking point, § D515 — posts nothing,
+       * and so does a rush whose run has not landed. Which waves are paid is the server's: only those
+       * beyond the account's best. Nothing is awaited and nothing is drawn, on `closeDay`'s ground.
+       */
+      if (!firstEnd) return;
+      const recording = b.state().recording;
+      if (recording === undefined) return;
+      const waves = rushWavesOutlastedOf(rushOutcomeOf(recording, atS));
+      if (waves !== undefined) b.bankCompletion?.({ completion: 'rush-wave-survived', waves });
     },
     leaveRush: () => {
       if (rushSession === undefined) return;
@@ -2583,6 +2618,9 @@ export function createEverydayHost(
     rushDisclosure: () => {
       const building = resolvedBuildingOf(b.resources, b.state());
       return building === undefined ? undefined : rushDisclosureOf(building, bandOf(building));
+    },
+    bankScenarioClear: (scenarioId) => {
+      b.bankCompletion?.({ completion: 'scenario-cleared', scenarioId });
     },
     startReplay: (day) => {
       const state = b.state();

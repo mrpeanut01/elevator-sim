@@ -1112,3 +1112,32 @@ function moduleFile(relative: string): string {
 function withoutComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//gu, ' ').replace(/(^|[^:'"`\\])\/\/[^\n]*/gu, '$1 ');
 }
+
+/* -------------------------------------------------------------------------- *
+ * The earn verb carries a turn — GitHub issue #499
+ * -------------------------------------------------------------------------- */
+
+describe('the earn verb carries the turn it finished, and never an amount — issue #499', () => {
+  it('posts which scenario was cleared and how many waves a rush outlasted, and nothing else', async () => {
+    const { transport, seen } = scripted({ status: 200, body: { balanceChimes: 9 } });
+    const client = createClient('https://x', transport);
+    await client.bankCompletion('t', { completion: 'scenario-cleared', scenarioId: 'c1' });
+    await client.bankCompletion('t', { completion: 'rush-wave-survived', waves: 4 });
+    await client.bankCompletion('t', { completion: 'career-day-paid' });
+    expect(seen.map((request) => [request.method, request.url, request.token])).toEqual([
+      ['POST', 'https://x/api/chimes/earn', 't'],
+      ['POST', 'https://x/api/chimes/earn', 't'],
+      ['POST', 'https://x/api/chimes/earn', 't'],
+    ]);
+    /*
+     * The body is the turn, exactly. A scenario id and a wave count say *what* was finished; neither
+     * is a source or an amount, which is the line § D526 clause 5 draws and the server holds — the
+     * award for either is read out of `data/chime-ledger.json` on the other side.
+     */
+    expect(seen.map((request) => request.body)).toEqual([
+      { completion: 'scenario-cleared', scenarioId: 'c1' },
+      { completion: 'rush-wave-survived', waves: 4 },
+      { completion: 'career-day-paid' },
+    ]);
+  });
+});

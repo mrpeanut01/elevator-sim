@@ -31,10 +31,11 @@ import {
   rushStageHeaderOf,
   rushTopArrivalsPerMinute,
   rushTopRatePctPop5min,
+  rushWavesOutlastedOf,
 } from './rush.js';
 import { waitBandsAt } from '../live/bands.js';
 
-import { RUSH_HOLD_LINE, RUSH_STREAM, arrivalsPerMinute } from './rushScreenModel.js';
+import { LAST_GENERATED_WAVE, RUSH_HOLD_LINE, RUSH_STREAM, arrivalsPerMinute, playerWaveAt } from './rushScreenModel.js';
 
 const template = RESOURCES.trafficProfiles.demandTemplates.find((entry) => entry.id === RUSH_TEMPLATE_ID);
 
@@ -144,6 +145,52 @@ describe('the hold line — forty past two minutes at once, read at the stream�
     expect(stoppedView.account).toHaveLength(2);
     expect(stoppedView.footer).toContain('not posted');
     expect(stoppedView.lede).toContain('does not have a breaking point');
+  });
+
+  it('banks the waves before the one it broke in, and a hand stop banks none — GitHub issue #499', () => {
+    /*
+     * *A rush wave survived* is a wave the run outlasted. The result's furthest wave is the one the
+     * line was crossed in, so it was reached and not survived, and the count banked is the waves
+     * before it. A run ended by hand has no breaking point (§ D515) and banks nothing however far it
+     * got — the result already says *not posted* for that reason.
+     */
+    const broke = rushOutcomeOf(rush, undefined);
+    expect(broke.kind).toBe('broke');
+    expect(rushWavesOutlastedOf(broke)).toBe(broke.wave - 1);
+    expect(rushWavesOutlastedOf(rushOutcomeOf(rush, (rushHoldAt(rush) ?? 0) - 60))).toBeUndefined();
+    expect(rushWavesOutlastedOf(rushOutcomeOf(day, undefined))).toBeUndefined();
+    /* A run that breaks inside its first wave has outlasted nothing, which is no turn at all. */
+    expect(rushWavesOutlastedOf({ ...broke, wave: 1 })).toBeUndefined();
+    expect(rushWavesOutlastedOf({ ...broke, wave: 2 })).toBe(1);
+  });
+
+  it('can never bank more waves than the stream generated — the ceiling the server reads off the same template', () => {
+    /*
+     * The server may not import this package, so `chimes/ledger.ts#rushWaveCountOf` counts the
+     * template's holds and `chimes/ledger.test.ts` pins thirty against them. This pins the other
+     * side: the holds are exactly the waves this module numbers, and the most a run can outlast — a
+     * break at the stream's very last bucket — is that count and no more.
+     */
+    const holds = (template?.phases ?? []).filter((phase) => phase.startIntensity === phase.endIntensity);
+    expect(holds).toHaveLength(LAST_GENERATED_WAVE);
+    const broke = rushOutcomeOf(rush, undefined);
+    expect(rushWavesOutlastedOf({ ...broke, wave: playerWaveAt(RUSH_STREAM.lengthS) })).toBe(LAST_GENERATED_WAVE);
+  });
+
+  it('draws no chime on the result, whichever way the rush ended — GD13', () => {
+    for (const outcome of [rushOutcomeOf(rush, undefined), rushOutcomeOf(rush, (rushHoldAt(rush) ?? 0) - 60)]) {
+      const view = rushResultViewOf(outcome, undefined);
+      for (const text of [
+        view.eyebrow,
+        view.head,
+        view.lede,
+        ...view.account,
+        ...view.figures.flatMap((figure) => [figure.label, figure.value, figure.note ?? '']),
+        view.footer,
+      ]) {
+        expect(text).not.toMatch(/chime|credit/iu);
+      }
+    }
   });
 
   it('shows held time and the wave on the stage header', () => {

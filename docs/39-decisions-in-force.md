@@ -31,6 +31,12 @@ the first three in one conversation, the last three later the same day:
 | [§ D530](../DECISIONS.md) | The cross-mode currency is named **chimes**, closing the first of § D526's two open items |
 | [§ D531](../DECISIONS.md) | The **sign-in bonus ships at launch**, in the one shape § D526 clause 7 permits — small, flat, unconditional, no compounding, no streak, nothing lost by missing it. Closes § D526's second open item, so `docs/38` § 5 has none left |
 
+One ruled later, on 2026-09-10, narrowing how often § D526's awards pay rather than what they are:
+
+| decision | what it rules |
+|---|---|
+| [§ D533](../DECISIONS.md) | **First time only.** A scenario pays once per account; a rush pays only the waves beyond the account's best; the server keeps the record, so posting a turn again pays nothing. A contract day is outside the ruling and still pays each day posted |
+
 The standing decisions those three rest on, unchanged and cited rather than restated:
 
 | decision | what it still says |

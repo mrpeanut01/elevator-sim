@@ -85,6 +85,34 @@ export const CHIME_COMPLETIONS = ['scenario-cleared', 'career-day-paid', 'rush-w
 export type ChimeCompletion = (typeof CHIME_COMPLETIONS)[number];
 
 /**
+ * One finished turn, as the play surface posts it — GitHub issue **#499**, the product owner's
+ * ruling of 2026-09-10: *first time only*.
+ *
+ * A scenario pays once per account and a rush pays only the waves beyond the account's best, so the
+ * earn verb has to be told **which** scenario and **how far** — and neither is a source or an
+ * amount, which is the line [§ D526](../../../../DECISIONS.md) clause 5 draws. A scenario id says
+ * what was cleared and the ledger still decides what that is worth; a wave count says how many turns
+ * a rush finished and the ledger still pays each one the table's flat award. No member carries a
+ * figure a run measured, and none can name a chime.
+ *
+ * - `scenarioId` is a week contract's id or a fix case's (`data/contract-ladder.json`,
+ *   `data/fixit-cases.json`). The server refuses one those documents do not name.
+ * - `waves` is how many whole waves the rush **outlasted** before its breaking point; the wave the
+ *   line was crossed in was reached and not survived. The server refuses a count above the waves the
+ *   stream generates.
+ * - A contract day carries nothing. The ruling does not reach it, and each posted day still pays.
+ *
+ * **What the server cannot check, stated rather than hidden:** that the clear happened, or that the
+ * run reached the waves it claims. Nothing replays a scenario clear or a rush result before paying
+ * it — a rush result's replay is GitHub issue #372's — so these fields are believed within their
+ * bounds, and first-time-only is what caps what believing them can cost.
+ */
+export type ChimeTurn =
+  | { readonly completion: 'scenario-cleared'; readonly scenarioId: string }
+  | { readonly completion: 'career-day-paid' }
+  | { readonly completion: 'rush-wave-survived'; readonly waves: number };
+
+/**
  * How a source came to exist. **Two values, and there is no third.**
  *
  * `completion` is a turn the player finished. `gift` is the sign-in award
@@ -192,8 +220,9 @@ export type ChimeSchemaUnit = (typeof CHIME_SCHEMA_UNITS)[number];
  * *survivor-count band*, and `chimes/ledger.ts` described that band as *"a property of the scenario
  * … known before anybody plays"*. It was not. The band arrived **verbatim in the request body**
  * (`http/api.ts`'s earn route), `data/scenario-survivors.json` carries survivor **counts** and no
- * band at all, nothing anywhere maps a count to one, and the server is never told which scenario
- * was cleared. A client could post `single` on the easiest scenario and be paid 10 instead of 4.
+ * band at all, nothing anywhere maps a count to one, and the server was not then told which
+ * scenario was cleared (since GitHub issue #499 it is told a scenario id, which pays a scenario once
+ * and maps to no band). A client could post `single` on the easiest scenario and be paid 10 instead of 4.
  *
  * [§ D256](../../../../DECISIONS.md) is the rule that decides what to do about that: a stated
  * mechanism is either measured or withdrawn, and offering a second plausible sentence in its place
@@ -386,7 +415,7 @@ function parseSource(raw: unknown, where: string): ChimeSource {
     throw new ChimeLedgerError(
       `${where}.bands: an award may not be banded. Nothing in this repository maps a survivor ` +
         'count to a band: data/scenario-survivors.json carries counts and no band, no document ' +
-        'declares a boundary, and the earn route is never told which scenario was cleared — so a ' +
+        'declares a boundary, and nothing maps the scenario id the earn route is told to one — so a ' +
         'band could only arrive from the client that is paid for it. DECISIONS.md D256: a stated ' +
         'mechanism is measured or withdrawn, never re-worded.',
     );

@@ -27,7 +27,7 @@
 import { TRAFFIC_DEFAULTS, loadConfig, type LoadedConfig } from '@elevator-sim/core';
 
 import { requireSecret } from './accounts/credentials.js';
-import { loadChimeLedger } from './chimes/ledger.js';
+import { loadChimeLedger, loadChimeTurnBounds } from './chimes/ledger.js';
 import {
   CHALLENGE_ROTATION,
   challengeDefinitionIssues,
@@ -120,6 +120,12 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
    * the moment a player finished a turn, which is the one moment with no words for it.
    */
   const chimeLedger = await loadChimeLedger(options.dataDir);
+  /*
+   * And which turns it pays for — GitHub issue #499. After `loadConfig`, because the rush's wave count
+   * is read off the traffic profiles that call has already validated; a throw here is right for the
+   * ledger's own reason one statement up.
+   */
+  const chimeTurns = await loadChimeTurnBounds(options.dataDir, config.trafficProfiles);
   const now = options.now ?? ((): number => Date.now());
 
   // Three sources, most explicit first: what a test passed, what the environment configures, and
@@ -159,6 +165,7 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
     now,
     signInUrl: signInUrlFor(options.publicOrigin),
     chimeLedger,
+    chimeTurns,
   };
 
   return {
