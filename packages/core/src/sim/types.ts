@@ -29,8 +29,9 @@
  * The runner introduces five numbers of its own — how long a sky-lobby transfer walk takes,
  * how often an unassignable call is retried, how long the drain tail may run, how many queue
  * samples to take, and how often a closing door is obstructed. All five are declared in
- * {@link SIM_PARAMETERS} with type, range, default and unit, so a Phase 7 optimizer can search
- * them without knowing what an elevator is. None of them selects behaviour by identity: there
+ * {@link SIM_PARAMETERS} with type, range, default and unit, per invariant 8, so the space is
+ * explicit and checkable. No shipped search varies them: `tuning/space` collects only the rows a
+ * dispatcher profile can hold, and no `sim.*` row is one. None of them selects behaviour by identity: there
  * is no `if (building.id === ...)` anywhere in this module.
  */
 

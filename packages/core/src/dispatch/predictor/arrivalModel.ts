@@ -142,7 +142,7 @@ const MAX_FORECAST_SEGMENTS = 10_000;
  *
  * Precedence is `profile > defaults`, the same order `resolveDispatchConfig` and
  * `resolveDoorConfig` use. Key order is the order {@link PREDICTOR_PARAMETERS} declares, so
- * `tunablePredictorPathsOf` and the schema can be compared as sequences.
+ * the config's keys and the schema can be compared as sequences, which `parameters.test.ts` does.
  *
  * Every rejection is a claim the model could not keep quietly:
  *

@@ -125,13 +125,14 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
 
   /*
    * -- The runner's own tunable schema (CLAUDE.md invariant 8). The same claim as `tuning/`'s
-   * `search/SEARCH_PARAMETERS`: the consumer is a generic optimizer configuring the runner, which
-   * does not exist. `experiment.test.ts` derives its assertions from `RUNNER_DEFAULTS`, so the
+   * `search/SEARCH_PARAMETERS`: invariant 8 requires the declaration, and nothing searches this space —
+   * `tuning/search` varies dispatch parameters only, and no optimizer beyond it is planned (GitHub
+   * issue #416). `experiment.test.ts` derives its assertions from `RUNNER_DEFAULTS`, so the
    * declaration cannot drift from the defaults it declares. Note that this is *why*
    * `runner.acceptableRange` being inert (§ D125) is a latent rather than a realized cost: nothing
    * searches this space, so nothing is currently burning budget on a flat dimension.
    */
-  'runner/RUNNER_PARAMETERS': 'the runner’s own tunable schema; its reader is a generic optimizer',
+  'runner/RUNNER_PARAMETERS': 'the runner’s own tunable schema (invariant 8); nothing searches this space',
 });
 
 /* -------------------------------------------------------------------------- *

@@ -78,7 +78,7 @@ import type {
 import { AuctionDispatchPolicy, createAuctionPolicy, resolveAuctionConfig } from './auction.js';
 import { board, call, clockAt, hallCall, makeCar, snapshotAt } from './fixtures.test-helper.js';
 import { groupContext } from './groupContext.js';
-import { MAX_AUCTION_ROUNDS, POLICY_DEFAULTS, POLICY_PARAMETERS, POLICY_PARAMETER_IDS, policyParameter } from './parameters.js';
+import { MAX_AUCTION_ROUNDS, POLICY_DEFAULTS, POLICY_PARAMETERS } from './parameters.js';
 import { POLICY_FACTORIES, createPolicyFor } from './registry.js';
 import {
   fixedForecast,
@@ -1085,6 +1085,14 @@ describe('nothing in dispatch/policies reads a profile id (CLAUDE.md invariant 7
  * Invariant 8
  * -------------------------------------------------------------------------- */
 
+/**
+ * Every declared policy id, and a declared policy parameter by id — derived here from the schema,
+ * because `core` stopped exporting these helpers, which were waiting for a schema-driven search entry
+ * point the project owner withdrew (GitHub issue #416). `tuning/search` still samples this schema.
+ */
+const POLICY_PARAMETER_IDS: ReadonlySet<string> = new Set(POLICY_PARAMETERS.map((parameter) => parameter.id));
+const policyParameter = (id: string) => POLICY_PARAMETERS.find((parameter) => parameter.id === id);
+
 describe('the schema and the aggregation agree about what is tunable', () => {
   it('declares every value the resolved aggregation carries', () => {
     const resolved = resolveAuctionConfig({ id: 'p', name: 'P', weights: { waitTime: 1 } });
@@ -1118,7 +1126,6 @@ describe('the schema and the aggregation agree about what is tunable', () => {
     expect(policyParameter('auction.reserveMarginalDelayS')?.default).toBe(
       POLICY_DEFAULTS.reserveMarginalDelayS,
     );
-    expect(policyParameter('nonsense.knob')).toBeUndefined();
   });
 
   it('gives a generic optimizer everything it needs to sample each row', () => {
