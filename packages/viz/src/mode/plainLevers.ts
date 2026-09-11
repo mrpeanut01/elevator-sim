@@ -9,7 +9,7 @@
  * reached its toy sim and thirteen cost terms that reached nothing, as two separate states. §20.1's
  * correction is adopted here structurally — **there is no lever state**. A lever reads the
  * `DispatcherSpec` / `GroupLevers` the run is already built from, and writes the same fields the
- * engineer's own controls write, so the tinker drawer and the thirteen-term drawer cannot disagree:
+ * engineer's own controls write, so the tinker drawer and the fourteen-term drawer cannot disagree:
  * they are two renderings of one vector. Moving a lever changes `costFunctionLine`'s printed
  * expression for the same reason moving the term slider does — it is the same weight.
  *

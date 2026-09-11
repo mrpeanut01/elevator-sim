@@ -23,7 +23,7 @@ import type { PlayerControlWords } from './types.js';
  */
 
 /**
- * Every row an Everyday surface can reach, by id — the thirteen weight sliders, the hard
+ * Every row an Everyday surface can reach, by id — the fourteen weight sliders, the hard
  * constraint's card, and the controls behind the workshop's flags, group levers and
  * traffic-pattern block (gameplay guide §6.4–§6.5, §11.3–§11.4).
  *
@@ -105,7 +105,7 @@ describe('cost-term player words (engine contract §6.3)', () => {
     }
   });
 
-  it('player names are distinct across the thirteen terms', () => {
+  it('player names are distinct across the fourteen terms', () => {
     const names = COST_TERMS.map((term) => term.player.name);
     expect(new Set(names).size).toBe(names.length);
   });
