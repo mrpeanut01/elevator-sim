@@ -826,6 +826,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   let simulatedRecording: VizRecording | undefined;
   /**
+   * The run standing when the player left a day unfinished — GitHub issue #526, and the third ground
+   * `shift/banking.ts#bankingRefusalFor` refuses on. Written by the Everyday host's `abandonDay` binding
+   * alone, on § 3.4's *Leave it* and on a campaign `take-offer`, and compared by identity, so the next run
+   * pressed files as it always did. Like {@link simulatedRecording}, not saved or restored by a watch.
+   */
+  let abandonedRecording: VizRecording | undefined;
+  /**
    * What the sheet on screen was shaped from, so a presentation setting can re-shape it.
    *
    * ## Why the input is held rather than the sheet re-assembled
@@ -2707,7 +2714,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * screen this shell's own?*, now asked by both the thing that banks a day and the thing that
      * posts one.
      */
-    const notOurs = bankingRefusalFor(recording, simulatedRecording);
+    const notOurs = bankingRefusalFor(recording, simulatedRecording, abandonedRecording);
     if (notOurs !== null) return { kind: 'refused', detail: `This run cannot be posted: ${notOurs}.` };
 
     const identity = runIdentityIssues(state, resources, 'ranked');
@@ -4198,7 +4205,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
     state: () => state,
     playheadS: () => playback?.simTimeS ?? state.recording?.startedAt ?? 0,
     dayClosed: () => state.recording !== undefined && filedRunId === state.recording.runId,
-    runIsOwn: () => state.recording !== undefined && state.recording === simulatedRecording,
+    // A day left unfinished is not the player's to close, so the stage re-entered presses a fresh run (#526).
+    runIsOwn: () =>
+      state.recording !== undefined &&
+      state.recording === simulatedRecording &&
+      state.recording !== abandonedRecording,
     playerHasChosen: () => playerHasChosen,
     dayStartS: () => runStartOfDayS,
     startRun: () => {
@@ -4212,6 +4223,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     cancelRun: () => {
       shiftRunner.cancel();
+    },
+    /*
+     * GitHub issue #526 items 1 and 2 — `everyday/host.ts#leaveDayUnfinished` and its `take-offer`. The
+     * cancel first, so no stale landing can replace the recording being refused; then the refusal, on
+     * the recording that stands, which `closeShift`, the posting gate and both unfiled-sheet sentences
+     * all read through `bankingRefusalFor`.
+     */
+    abandonDay: () => {
+      shiftRunner.cancel();
+      abandonedRecording = state.recording;
     },
     intervene: (atS, change) => {
       interveneAt(atS, change);
@@ -4405,7 +4426,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       recording !== undefined && runProgressOf({ recording, simTimeS }).kind === 'played-out';
     const refusal = !ranOut
       ? undefined
-      : (bankingRefusalFor(recording, simulatedRecording) ??
+      : (bankingRefusalFor(recording, simulatedRecording, abandonedRecording) ??
         (playerHasChosen ? undefined : UNCHOSEN_RUN_CANNOT_BANK));
     const fromPreviousSitting = !filedThisSitting && state.week.history.length > 0;
     if (refusal === undefined && !fromPreviousSitting) return undefined;
@@ -6130,7 +6151,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * and its argument are `shift/banking.ts`'s; the only thing that happens here is that it is
      * asked, before anything has been written.
      */
-    const cannotBank = bankingRefusalFor(recording, simulatedRecording);
+    // And a day the player left unfinished files nothing — the same function's third ground, GitHub issue #526.
+    const cannotBank = bankingRefusalFor(recording, simulatedRecording, abandonedRecording);
     if (cannotBank !== null) {
       setText(ui.transport.status, cannotBank);
       return;
@@ -7050,7 +7072,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       setText(
         ui.transport.status,
-        bankingRefusalFor(state.recording, simulatedRecording) ??
+        bankingRefusalFor(state.recording, simulatedRecording, abandonedRecording) ??
           (state.recording !== undefined && playheadHasRunOut() && !playerHasChosen
             ? UNCHOSEN_RUN_CANNOT_BANK
             : NO_SHEET_YET),
