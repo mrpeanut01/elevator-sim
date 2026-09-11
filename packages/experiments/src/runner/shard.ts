@@ -76,9 +76,10 @@
  * the first three as `null` and the last as `0` — and refuses, rather than drops, a `Map`, a `Set`, a
  * `bigint` or a function. {@link deserializeShard} checks the fields the merge reads and passes a
  * record's `summary` through unchecked. The plan digest is SHA-256 over the plan's canonical JSON with
- * every cell's simulation config in it, so on one machine a block run against a different data
- * directory is refused as a different plan. **Whether two machines derive the same digest for the
- * same data is unchecked**: no cross-machine run has been taken.
+ * every cell's simulation config in it, so a block run against different data — one re-weighted
+ * profile, with every cell id, seed and trace key unchanged — is refused as a different plan, which
+ * `shard.test.ts` runs. **Whether two machines derive the same digest for the same data is
+ * unchecked**: no cross-machine run has been taken.
  */
 
 import { createHash } from 'node:crypto';
@@ -224,7 +225,10 @@ export interface DeserializedShard {
  * Cutting a plan
  * -------------------------------------------------------------------------- */
 
-/** Every instance {@link ShardedExperiment.of} minted, so a forged one is refused at run time too. */
+/**
+ * Every instance {@link ShardedExperiment.of} minted, so a forged one is refused at run time too —
+ * including one built past the private constructor, which binds only the compiler.
+ */
 const MINTED = new WeakSet<object>();
 
 /**
@@ -254,7 +258,6 @@ export class ShardedExperiment {
     this.blocks = blocks;
     this.ceiling = ceiling;
     this.plannedReplicationRuns = plannedReplicationRuns;
-    MINTED.add(this);
     Object.freeze(this);
   }
 
@@ -294,7 +297,11 @@ export class ShardedExperiment {
         'ceiling',
       );
     }
-    return new ShardedExperiment(plan, planDigestOf(plan), blocks, ceiling, planned);
+    // Minted here and not in the constructor: `private` binds only the compiler, so an instance
+    // built past it with `Reflect.construct` must not read as minted.
+    const sharded = new ShardedExperiment(plan, planDigestOf(plan), blocks, ceiling, planned);
+    MINTED.add(sharded);
+    return sharded;
   }
 }
 

@@ -1,11 +1,13 @@
 # Compute offload — the contract
 
-**Status: designed. Criteria written before the implementation, which is the point.**
+**Status: Phase A withdrawn; Phase B built for one consumer on one machine (2026-09-10, GitHub issue
+#413, [§ D532](../DECISIONS.md)). The criteria in § 4 were written before the implementation, which
+is the point.**
 
 | Phase | State |
 |---|---|
 | A — self-hosted CI runners | **withdrawn (2026-08-05, project owner). Requirement, runbook and code all removed** — see below |
-| B — measurement fan-out | designed, not started |
+| B — measurement fan-out | **built for `elevator-sim compare`, measured on one machine** (2026-09-10, § 3.1). Criteria 1, 2, 5, 6 and 7 are each asserted by a run named in § 4. **Not built:** a workflow that runs a block anywhere, a cross-machine measurement, a sharded `benchmark/` study. ARM stays deferred (§ 0.2) |
 
 > **Phase A is withdrawn, and the withdrawal is recorded rather than the section quietly deleted.**
 > It was built as Bicep under `infra/azure/`, held inert behind an unset `CI_LINUX_RUNNER_LABEL`
@@ -26,7 +28,9 @@
 > **A criterion this contract should have had, and did not:** criterion 7 requires a *ceiling*
 > declared before the first fan-out. It should also require the **expected** figure to be
 > reproducible from the template, because the ceiling was right and the expectation was not. That
-> requirement now applies to Phase B, which has not been built.
+> requirement now applies to Phase B. As built (§ 3.1), the one expected figure Phase B publishes is
+> the planned replication-runs, derived from the plan — cells × replications — by the same code that
+> refuses the ceiling. No expected wall-clock or money figure is published, because none is derived.
 >
 > **Nothing here rules out self-hosted CI later.** It rules out *this* design, whose billing model
 > was fixed capacity wearing the language of per-job ephemerality. Per-job billing needs scale-from-
@@ -140,6 +144,44 @@ of arms.
   type must refuse it.
 - Sharding is opt-in and the un-sharded path is unchanged.
 
+### 3.1 What is built — 2026-09-10, GitHub issue #413
+
+**One consumer, measured on one machine.** `packages/experiments/src/runner/shard.ts` implements the
+contract above, and `elevator-sim compare` is its non-test caller: `compare --shard k/n --ceiling
+<runs> --out <file>` runs replication block `k` of `n` for both arms and writes it, and
+`compare --merge <file...>` merges the blocks into the verdict the unsharded command prints
+([§ D532](../DECISIONS.md)).
+
+- **A block is a set of replication indices over the whole plan.** `runShard` takes a block index and
+  a progress hook and nothing else; `ShardedExperiment` is nominal, so one built by hand around a
+  one-arm plan does not type; and `mergeShards` refuses a block of another plan, a missing or repeated
+  block, and a block lacking any cell. `runner/shard.test.ts` asserts each refusal by trying it — the
+  type refusals by compiling the attempts with `tsc`, the rest by running them.
+- **A merge aggregates the differences a block computed.** Each block stores `A − B` per replication
+  from its own records. The merge concatenates those in replication order, refuses a block whose stored
+  differences its records do not give, and rebuilds each arm's aggregate from per-replication records at
+  the merged `n` — a pooled sample, never a mean of block means.
+- **Sharding needs a fixed budget.** A plan its results could shorten (`minReplications <
+  maxReplications`), a stopping rule, and `onReplicationError: 'record'` are refused before anything
+  runs, because a block cannot see the results that would decide which replications exist.
+- **The ceiling is in replication-runs** — cells × replications — declared with `--ceiling` and compared
+  with the plan's own count before a block runs. CPU-seconds are not a ceiling here: they are not known
+  before the run, and a ceiling enforced by aborting part way would let a clock decide which
+  replications exist.
+
+**What is not built, and so not claimed:**
+
+- **No workflow fan-out.** No workflow or template runs a block; a block runs wherever a person runs it.
+- **No cross-machine measurement.** Every run behind § 4 was taken on one machine. A block records a
+  digest of the plan it ran, and a merge refuses a block whose digest differs from the one this machine
+  derives — but **whether two machines derive the same digest from the same data, and whether their
+  magnitudes stay inside § D202's tolerance, is unchecked.**
+- **No `benchmark/` study is sharded.** § 3's first sentence names `benchmark/` studies;
+  `benchmark/suite.ts#runBenchmark` still runs whole plans.
+- **ARM is still deferred** (§ 0.2), unchanged.
+- **A merge does not authenticate a file.** A block assembled by hand from two runs, with its
+  differences recomputed to match its records, is indistinguishable from a genuine one. Unchecked.
+
 ---
 
 ## 4. Acceptance criteria — written before the implementation
@@ -176,6 +218,18 @@ elsewhere citing "criterion 5" still points at the criterion it meant.
 7. **Cost is bounded and observable.** A ceiling is declared before the first fan-out, and spend is
    reported beside the result the way energy is reported beside AWT — never folded into a claim
    about how good an answer is.
+
+### Where each live criterion stands — 2026-09-10, one machine
+
+Each row names the run that asserts it. None of them is a cross-machine measurement.
+
+| criterion | asserted by |
+|---|---|
+| 1 | `runner/shard.test.ts` › *criterion 1*: one block is byte-identical to the unsharded result (fingerprint, and a walk that tells `NaN` and `-0` apart); 2, 3 and `[1, 5, 1]` blocks match on the structural digest exactly and on every magnitude within § D202's `1e-6` relative / `1e-5` absolute, and exactly; the same after the blocks are written and read back. `cli/src/commands/compare.shard.test.ts` › *criterion 1*: `--merge` prints the unsharded comparison line for line at 1, 2 and 3 blocks and on a saturated comparison |
+| 2 | `runner/shard.test.ts` › *criterion 2*: the compiler rejects eight attempts — arms or cells named on a block, arms assigned in a layout, a one-arm plan or a hand-built experiment run as a block, the private constructor, a stopping rule — each with the diagnostic named, and accepts a control; each attempt forced past the compiler is refused before a replication runs; one-arm plans, a file edited to drop an arm, and a row whose differences its records do not give are refused on merge |
+| 5 | `runner/shard.test.ts` and `compare.shard.test.ts` › *criterion 5*: each block's smallest detectable effect differs from the merge's, and the merge's is the one the whole difference series gives at the merged `n` |
+| 6 | `runner/deadCode.test.ts` › *holds runner/shard.ts to the non-test caller its docstring names*: the file the docstring names is the non-test importer of the five entry points, in both directions |
+| 7 | `runner/shard.test.ts` and `compare.shard.test.ts` › *criterion 7*: a fan-out over its ceiling is refused before a replication runs and writes no file; spend is reported per block and in total, after the verdict and on no verdict line. The planned replication-runs the ceiling is compared with are derived from the plan, which is the Phase A note's *expected figure reproducible* requirement for this phase |
 
 ---
 

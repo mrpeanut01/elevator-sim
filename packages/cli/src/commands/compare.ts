@@ -1133,7 +1133,7 @@ function printBlockAlone(
       : limit.kind === 'identical'
         ? `n = ${count(limit.n)}, every paired difference is exactly zero, so there is no effect to resolve`
         : yellow(`not computed — ${limit.reason}`);
-  out.line(`  ${padColumn(gate.label, 16)}  ${text}`);
+  field(out, gate.label, text);
 }
 
 /** The merge's figure, recomputed from every block's differences at the merged `n`. */

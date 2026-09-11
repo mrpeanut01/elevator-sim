@@ -15,9 +15,10 @@
  * (DECISIONS.md § D31–§ D33). Reading the imports is not enough, and this package proves it twice
  * over: `src/index.ts`'s own docstring said the barrel reaches `node:fs` and `node:worker_threads`
  * and named two modules, and `docs/07-handoff.md` § 8 named exactly one (`runner/parallel.ts`).
- * The walk finds **three**, the third down a path nobody would guess —
+ * The walk found **three**, the third down a path nobody would guess —
  * `index.ts → benchmark/index.ts → benchmark/verdict.ts → validation/harness.ts → node:url`.
- * Every one of those documents reads as correct in isolation. Only the graph shows the count.
+ * Every one of those documents reads as correct in isolation. Only the graph shows the count. It
+ * finds **four** now: `runner/shard.ts` reaches `node:crypto` for its plan digest (GitHub issue #413).
  *
  * ## What is asserted, and in which direction
  *
@@ -30,7 +31,7 @@
  *
  * 1. No `node:` specifier and no bare builtin name (`fs`, `path`, `worker_threads`, …) anywhere in
  *    the graph, reported as `<file> imports <specifier>` so a failure names the edge.
- * 2. The three modules that *do* reach a builtin are not in the graph, **and** the module beside
+ * 2. The four modules that *do* reach a builtin are not in the graph, **and** the module beside
  *    each of them that should be is — so the assertion is about placement, not about deletion.
  * 3. The external packages are exactly `{@elevator-sim/core}`. An asserted equality, so pulling a
  *    new npm dependency into a browser bundle is a deliberate edit to one line.
@@ -49,7 +50,7 @@
  *    whose centre of gravity is Node-bound: the complement is 70 files and would rot weekly. The
  *    equality is the same property from the other end and is strictly tighter: a module that
  *    joins the browser graph fails, and a module that silently drops out of it fails too.
- * 7. **The same walker, pointed at `src/index.ts`, must still find the three known builtin
+ * 7. **The same walker, pointed at `src/index.ts`, must still find the four modules' known builtin
  *    edges.** This is the assertion that catches a broken extractor. If `specifiersOf` stops
  *    matching an import form, or `resolveRelative` stops resolving, assertions 1–6 all go green
  *    and this one goes red. A guard nobody has seen fail is not a guard, and a guard that cannot
@@ -177,8 +178,9 @@ const BROWSER_GRAPH = [
 /**
  * Every module reachable from `src/index.ts` that imports a Node builtin, measured.
  *
- * Three, not the one `docs/07-handoff.md` § 8 names and not the two `src/index.ts`'s own docstring
- * describes. `runner/worker.ts` and `validation/{golden,goldenChild}.ts` import builtins too and
+ * Four. Three — not the one `docs/07-handoff.md` § 8 names and not the two `src/index.ts`'s own
+ * docstring describes — were measured when this list was written; the fourth is `runner/shard.ts`,
+ * whose plan digest is SHA-256 from `node:crypto` (GitHub issue #413). `runner/worker.ts` and `validation/{golden,goldenChild}.ts` import builtins too and
  * are **not** on this list because they are not reachable from `src/index.ts` — the worker entry is
  * addressed as a URL rather than imported (`workerEntryUrl`).
  */
@@ -187,6 +189,7 @@ const NODE_ENTRY_BUILTINS = [
   'reports/persistence.ts imports node:path',
   'runner/parallel.ts imports node:os',
   'runner/parallel.ts imports node:worker_threads',
+  'runner/shard.ts imports node:crypto',
   'validation/harness.ts imports node:url',
 ];
 
@@ -349,8 +352,8 @@ describe('the browser entry point reaches no Node builtin', () => {
     ).toEqual([]);
   });
 
-  it('does not reach any of the three modules that do import a builtin', () => {
-    for (const file of ['runner/parallel.ts', 'reports/persistence.ts', 'validation/harness.ts']) {
+  it('does not reach any of the four modules that do import a builtin', () => {
+    for (const file of ['runner/parallel.ts', 'runner/shard.ts', 'reports/persistence.ts', 'validation/harness.ts']) {
       expect(graph.files, `${file} is reachable from the browser barrel`).not.toContain(file);
     }
     // …nor the worker entry, which no barrel imports but which is one careless edit away.
@@ -432,9 +435,9 @@ describe('the walk is not vacuous', () => {
    * If the regex set stops matching an import form, or the resolver stops resolving `./x.js`, the
    * browser walk reaches fewer files, finds nothing, and every assertion above goes green. This one
    * goes red. It is asserted by equality rather than by "at least one", so a walk that finds only
-   * the shallowest of the three fails too — `validation/harness.ts` is three modules down.
+   * the shallowest of the four fails too — `validation/harness.ts` is three modules down.
    */
-  it('still finds the three known builtin edges when pointed at the Node entry', () => {
+  it('still finds the known builtin edges of all four modules when pointed at the Node entry', () => {
     expect(
       edges(nodeGraph),
       'the walker found a different set of Node builtins from src/index.ts than the measured ' +

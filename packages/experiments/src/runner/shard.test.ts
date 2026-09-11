@@ -12,15 +12,21 @@
  * be held to. **No cross-machine measurement is taken here**, and nothing in this file should be
  * read as one.
  *
- * ## How "refused by the type" is asserted, and why not with a suppression directive
+ * ## How "refused by the type" is asserted
  *
  * Criterion 2 asks for a test that *attempts* to split a comparison's arms and fails loudly at the
  * type. Two halves do that here. The constants under *The surface, pinned* are conditional types
  * that `tsc -b` evaluates when it compiles this file, and each goes to `false` — so `true` stops
  * being assignable and the build fails — the moment the shard surface grows a field or loses its
  * nominal brand. And *refuses at the type, by trying* hands the real compiler a file of attempts
- * and a control file, and requires a diagnostic on every attempt line and none on the control —
- * the same one-shot `tsc -p` `core/src/config/parse.test.ts` runs on the config module.
+ * and a control file, and requires on every attempt line **the diagnostic that attempt should
+ * raise**, and none on the control — the same one-shot `tsc -p` `core/src/config/parse.test.ts`
+ * runs on the config module. A per-line suppression directive would accept any error on the line,
+ * so an unrelated one could stand in for the refusal; naming the code per attempt does not allow it.
+ *
+ * Both halves were shown red before they were trusted: adding an arm selector to `ShardRunOptions`,
+ * and separately removing `#plan` from `ShardedExperiment`, each failed `tsc -b` on the matching pin
+ * and failed the by-trying case with `ACCEPTED by the compiler`.
  */
 
 import { execFile } from 'node:child_process';
@@ -637,6 +643,13 @@ describe('criterion 2 — a comparison’s arms cannot be split across shards', 
           { onReplication: tick },
         ),
       () => runShard(sharded, 0, options({ onReplication: tick, stoppingRule: () => true })),
+      // `private` binds only the compiler; built past it, the instance was never minted.
+      () =>
+        runShard(
+          Reflect.construct(ShardedExperiment, [onlyA, sharded.planDigest, sharded.blocks, CEILING, 28]) as ShardedExperiment,
+          0,
+          { onReplication: tick },
+        ),
       () => runShard(sharded, 2, { onReplication: tick }),
     ];
     for (const [index, attempt] of attempts.entries()) {
@@ -730,6 +743,27 @@ describe('criterion 2 — a comparison’s arms cannot be split across shards', 
     expect(() => mergeShards(sharded, [first, { ...foreign, planDigest: sharded.planDigest }])).toThrow(
       /seed/u,
     );
+  });
+
+  it('refuses a block run against different data, although its cells, seeds and trace keys all match', async () => {
+    const collective = config.dispatcherProfilesById.get('collective');
+    if (collective === undefined) throw new Error('no collective profile');
+    const retuned = new Map(config.dispatcherProfilesById);
+    retuned.set('collective', { ...collective, weights: { ...collective.weights, waitTime: 2 } });
+    const otherData = planExperiment(COMPARISON, { ...config, dispatcherProfilesById: retuned }, { keepRecords: false });
+
+    // Everything a structural check on ids could compare is equal; only the data is not.
+    expect(otherData.cells.map((cell) => [cell.cellId, cell.traceKey])).toEqual(
+      plan.cells.map((cell) => [cell.cellId, cell.traceKey]),
+    );
+    const sharded = ShardedExperiment.of(plan, { shards: 2, ceiling: CEILING });
+    const other = ShardedExperiment.of(otherData, { shards: 2, ceiling: CEILING });
+    expect(other.planDigest).not.toBe(sharded.planDigest);
+
+    const mine = await runShard(sharded, 0);
+    const theirs = await runShard(other, 1);
+    expect(theirs.rows[0]?.records[0]?.seed).toBe(replicationSeed(COMPARISON.seed, 4).toString());
+    expect(() => mergeShards(sharded, [mine, theirs])).toThrow(/different plan/u);
   });
 
   it('refuses a row whose stored differences its own records do not support', async () => {
