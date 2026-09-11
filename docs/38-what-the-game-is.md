@@ -104,14 +104,18 @@ kinds of content that have never been called one thing are authored to it:
 The whole editor is open in every scenario: the dispatcher's weights and rules, the equipment's
 settings, and the building's fabric. What varies between scenarios is the budget and the building,
 never which controls are offered. There have to be enough knobs that the player can change what
-they want to change, and every knob is priced.
+they want to change, and every knob is priced. *Amended by [§ D535](../DECISIONS.md) on 2026-09-10:*
+the weight-set selector and the arrival predictor are **withheld** from every scenario rather than
+priced — not for sale is a different answer from priced high — so the whole editor here is every
+declared dial less those two families, and *every knob is priced* holds of every knob a scenario
+offers.
 
 **The price ladder.** One schedule, in `data/`, because a price is a tunable and
 [`CLAUDE.md`](../CLAUDE.md) invariant 7 makes tunables data. Its ordering is the owner's:
 
 | tier | what it covers | price |
 |---|---|---|
-| dispatcher | weights, rules, idle strategy, the weight-set selector | cheap, and tuning is nearly free |
+| dispatcher | weights, rules, idle strategy — the weight-set selector is withheld, [§ D535](../DECISIONS.md) | cheap, and tuning is nearly free |
 | equipment settings | door dwell, door speed, a car's parking floor, anything set on kit already installed | dearer |
 | building | a new shaft or car, a faster or larger machine, a rezoned bank, destination panels | dearest |
 
