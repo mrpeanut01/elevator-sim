@@ -4204,6 +4204,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
     startRun: () => {
       context.runShift();
     },
+    /*
+     * The runner's own cancel, the Run button's cancel face: the result is dropped unread, and
+     * `onRunning(false)` takes the rival's flag and the recompute beat down with it. A no-op with
+     * nothing in flight. `everyday/host.ts#leaveRush` is the caller — GitHub issue #518.
+     */
+    cancelRun: () => {
+      shiftRunner.cancel();
+    },
     intervene: (atS, change) => {
       interveneAt(atS, change);
     },
