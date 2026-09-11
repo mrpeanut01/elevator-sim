@@ -4,7 +4,7 @@
   "provenance": {
     "kind": "measured",
     "command": "ELEVATOR_SIM_RUSH_HOUSE=deep ELEVATOR_SIM_REGENERATE_RUSH_HOUSE=1 npx vitest run --project viz src/everyday/rushHouseSweep.test.ts",
-    "tree": "7b621a24",
+    "tree": "32f31a4d",
     "measuredAt": "2026-09-11",
     "seed": "90210",
     "streamLengthS": 5400,
