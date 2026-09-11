@@ -35096,6 +35096,6 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 
    **Leaving cancels the run in flight first.** `leaveRush` put the day back without stopping the worker, and `dev/main.ts#applyShift` adopts whatever lands, so a rush left mid-generation landed over the restored day. The host now calls an optional `cancelRun` binding, bound to the shift runner's `cancel`, before the restore.
 
-   `rushCrowd.test.ts` covers the levers, the selector, the re-press and the second direction of the whitelist check: a field the player brings that the press wrongly resets goes red. `host.test.ts` covers the cancel's order, and `rush.browser.test.ts` the binding on the shipped bundle. Every house run already stands on a fresh session, so no row should move, and the deep sweep is the check rather than this sentence.
+   `rushCrowd.test.ts` covers the levers, the selector, the re-press and the second direction of the whitelist check: a field the player brings that the press wrongly resets goes red. `host.test.ts` covers the cancel's order, and `rush.browser.test.ts` the binding on the shipped bundle. No house row moves: every house run already stands on a fresh session, and the deep sweep (`ELEVATOR_SIM_RUSH_HOUSE=deep`, not regenerating) reproduced all 117 rows of `data/rush-house-runs.json` on this change.
 
 ---
