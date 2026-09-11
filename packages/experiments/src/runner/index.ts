@@ -134,6 +134,35 @@ export {
 } from './replicationRunner.js';
 
 /* -------------------------------------------------------------------------- *
+ * Fan-out by replication block (docs/15-compute-offload-contract.md Phase B)
+ * -------------------------------------------------------------------------- */
+
+export {
+  SHARD_FILE_FORMAT,
+  ShardedExperiment,
+  deserializeShard,
+  mergeShards,
+  runShard,
+  serializeShard,
+} from './shard.js';
+
+export type {
+  DeserializedShard,
+  FanOutSpend,
+  MergedExperiment,
+  MergedPair,
+  ReplicationBlock,
+  ReplicationRow,
+  ShardCeiling,
+  ShardContext,
+  ShardPair,
+  ShardResult,
+  ShardRunOptions,
+  ShardSpend,
+  ShardingRequest,
+} from './shard.js';
+
+/* -------------------------------------------------------------------------- *
  * Vocabulary and tunables (CLAUDE.md invariants 7 and 8)
  * -------------------------------------------------------------------------- */
 
@@ -160,6 +189,7 @@ export type {
   ExperimentResult,
   ExperimentRunOptions,
   ExperimentSpec,
+  MeasuredExperiment,
   MetricAggregate,
   ParallelMode,
   ParallelSpec,

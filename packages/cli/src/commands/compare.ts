@@ -34,17 +34,60 @@
  * measured the gap outside the self-comparison sanity check too: at the project's own operating
  * point `eta` and `fairness-first` — two distinct shipped profiles — produce 30/30 exactly-zero
  * paired AWT differences, and the CLI reported that as a resolution problem.
+ *
+ * ## Sharding — `docs/15-compute-offload-contract.md` Phase B, GitHub issue #413
+ *
+ * Opt-in, and the unsharded command is unchanged: without `--shard` or `--merge` this file runs the
+ * code it ran before either existed, and `compare.shard.test.ts` holds its output to skeletons
+ * captured before the first sharding commit.
+ *
+ * - `--shard k/n --ceiling <runs> --out <file>` plans the same experiment the unsharded command
+ *   plans, cuts it with `ShardedExperiment.of` — which refuses a ceiling below 2 × `--reps`
+ *   replication-runs before anything runs — runs replication block `k` of `n` for **both** arms with
+ *   `runShard`, and writes it with `serializeShard`. A block prints no verdict. It prints its own
+ *   resolution limit, labelled as its own, so that a merge's figure can be told apart from it.
+ * - `--merge <file...>` reads the blocks, requires every file to record the same comparison, rebuilds
+ *   the plan from those flags and this machine's `data/`, and hands the blocks to `mergeShards`,
+ *   which refuses a block of another plan, a missing or repeated block, and a block missing an arm.
+ *   The verdict is rendered by the same code as the unsharded one, over the merged cells, with every
+ *   paired interval taken on the differences each block computed. The resolution limit is recomputed
+ *   from the merged differences at the merged `n`, and the spend is printed after the verdict, never
+ *   on a line of it.
+ *
+ * What is not built here: any workflow that runs blocks on other machines, and any measurement of
+ * whether two machines agree. A merge of blocks from two machines is refused unless both derived the
+ * same plan digest from their data, and whether they do is unchecked.
  */
+
+import { readFileSync, writeFileSync } from 'node:fs';
 
 import type { ReplicationMetric } from '@elevator-sim/experiments';
 import {
+  RESOLUTION_POWER,
+  RunnerError,
+  ShardedExperiment,
+  aggregateCell,
+  deserializeShard,
   estimateMean,
   intervalContainsZero,
+  mergeShards,
   pairedDifferenceEstimate,
+  planExperiment,
+  replicationsToResolve,
   runExperiment,
+  runShard,
+  serializeShard,
+  smallestDetectableEffect,
   type CellResult,
+  type ExperimentPlan,
+  type ExperimentResources,
   type ExperimentSpec,
+  type FanOutSpend,
   type MeanEstimate,
+  type MergedPair,
+  type ReplicationRecord,
+  type ShardContext,
+  type ShardResult,
 } from '@elevator-sim/experiments';
 import {
   comparabilityOf,
@@ -53,6 +96,7 @@ import {
   type DispatcherProfile,
   type LoadedConfig,
   type PassengerModel,
+  type ResolvedBuilding,
 } from '@elevator-sim/core';
 
 import {
@@ -163,6 +207,25 @@ export const COMPARE_FLAGS: readonly FlagSpec[] = [
     defaultValue: 0.95,
   },
   { name: 'serial', kind: 'boolean', summary: 'never use worker threads' },
+  {
+    name: 'shard',
+    kind: 'string',
+    placeholder: '<k/n>',
+    summary: 'run replication block k of n, both arms, and write it to --out; merge the blocks with --merge',
+  },
+  { name: 'out', kind: 'string', placeholder: '<file>', summary: 'where --shard writes its block' },
+  {
+    name: 'ceiling',
+    kind: 'integer',
+    placeholder: '<runs>',
+    summary: 'most replication-runs (2 × --reps) the whole fan-out may spend; required with --shard, checked before it runs',
+    min: 1,
+  },
+  {
+    name: 'merge',
+    kind: 'boolean',
+    summary: 'merge the block files named after it into one verdict; takes no other flag but --data',
+  },
   { name: 'data', kind: 'string', placeholder: '<dir>', summary: 'data directory to read' },
   { name: 'no-color', kind: 'boolean', summary: 'never emit ANSI colour' },
   { name: 'help', kind: 'boolean', aliases: ['h'], summary: 'show this help' },
@@ -182,17 +245,28 @@ export const COMPARE_HELP: CommandHelp = {
     'If every paired difference is exactly zero the answer is IDENTICAL instead: the two arms ' +
       'produced bit-identical runs, which is no effect rather than a small one, and no --reps ' +
       'resolves it.',
+    'A large budget can be split into replication blocks, each run in its own process: --shard k/n ' +
+      'runs block k of n for both arms, so no arm is ever separated from its pair, and writes it to ' +
+      '--out. --ceiling declares the most replication-runs the whole fan-out may spend and is checked ' +
+      'before a block runs. compare --merge <file...> refuses blocks of different comparisons, a ' +
+      'missing block and a block missing an arm, then prints the same verdict the unsharded command ' +
+      'prints, the resolution limit recomputed at the merged n, and the spend beside it.',
   ],
   flags: COMPARE_FLAGS,
   examples: [
     `${BINARY} compare --building garden-apartments --a eta --b nearest-car --reps 100 --window full-run`,
     `${BINARY} compare --building midtown-office --a predictive-balanced --b eta --reps 200 --rate 8`,
     `${BINARY} compare --building garden-apartments --a eta --b eta --reps 20 --window full-run   # must be IDENTICAL`,
+    `${BINARY} compare --building midtown-office --a eta --b collective --reps 800 --seed 7 --shard 1/4 --ceiling 1600 --out block-1.json`,
+    `${BINARY} compare --merge block-1.json block-2.json block-3.json block-4.json`,
   ],
 };
 
 export async function compareCommand(out: Output, argv: readonly string[]): Promise<number> {
   const context = `${BINARY} compare`;
+  // `--merge` takes its whole comparison from the block files, so it is parsed against its own four
+  // flags: the required --building, --a and --b were recorded in every file when the block ran.
+  if (argv.includes('--merge')) return await mergeCommand(out, argv, context);
   const parsed = parseArgs(argv, COMPARE_FLAGS, context);
   rejectPositionals(parsed, context);
   if (parsed.values['help'] === true) {
@@ -208,25 +282,102 @@ export async function runCompare(
   config: LoadedConfig,
   parsed: ParsedArgs,
 ): Promise<number> {
-  const { bold, dim, cyan, green, red, yellow } = out.palette;
+  const context = `${BINARY} compare`;
+  if (booleanFlag(parsed, 'merge')) {
+    throw new UsageError(`${context}: write --merge on its own, followed by the block files.`, [
+      MERGE_USAGE,
+    ]);
+  }
+  const shard = stringFlag(parsed, 'shard');
+  const outFile = stringFlag(parsed, 'out');
+  const ceiling = numberFlag(parsed, 'ceiling');
+  if (shard === undefined) {
+    if (outFile !== undefined) {
+      throw new UsageError(
+        `${context}: --out writes one replication block, and there is no --shard to write.`,
+        ['add --shard <k/n> and --ceiling <runs>, or drop --out'],
+      );
+    }
+    if (ceiling !== undefined) {
+      throw new UsageError(
+        `${context}: --ceiling bounds a fan-out, and there is no --shard to bound.`,
+        ['add --shard <k/n> and --out <file>, or drop --ceiling'],
+      );
+    }
+    return await runSingle(out, config, invocationOf(parsed));
+  }
+  return await runBlock(out, config, invocationOf(parsed), { shard, outFile, ceiling }, context);
+}
 
-  const buildingId = requiredStringFlag(parsed, 'building');
-  const aId = requiredStringFlag(parsed, 'a');
-  const bId = requiredStringFlag(parsed, 'b');
+/* -------------------------------------------------------------------------- *
+ * One comparison, whichever way it ran
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Every flag that can move a number: the set the `reproduce:` line prints, and the set a block file
+ * records, so that `--merge` plans exactly the experiment each block ran.
+ */
+interface CompareInvocation {
+  readonly building: string;
+  readonly a: string;
+  readonly b: string;
+  readonly traffic?: string | undefined;
+  readonly reps: number;
+  readonly seed: number;
+  readonly confidence: number;
+  readonly duration?: number | undefined;
+  readonly rate?: number | undefined;
+  readonly window?: 'full-run' | 'peak-5min' | undefined;
+  /** Picks an executor and moves no number, so a block file does not record it. */
+  readonly serial: boolean;
+}
+
+function invocationOf(parsed: ParsedArgs): CompareInvocation {
+  const building = requiredStringFlag(parsed, 'building');
+  const a = requiredStringFlag(parsed, 'a');
+  const b = requiredStringFlag(parsed, 'b');
+  const traffic = stringFlag(parsed, 'traffic');
+  const duration = numberFlag(parsed, 'duration');
+  const rate = numberFlag(parsed, 'rate');
+  const window = stringFlag(parsed, 'window');
+  return {
+    building,
+    a,
+    b,
+    ...(traffic === undefined ? {} : { traffic }),
+    reps: numberFlag(parsed, 'reps') ?? 100,
+    seed: numberFlag(parsed, 'seed') ?? randomSeed(),
+    confidence: numberFlag(parsed, 'confidence') ?? 0.95,
+    ...(duration === undefined ? {} : { duration }),
+    ...(rate === undefined ? {} : { rate }),
+    ...(window === 'full-run' || window === 'peak-5min' ? { window } : {}),
+    serial: booleanFlag(parsed, 'serial'),
+  };
+}
+
+/** What `compare` resolved from the flags and `data/`: the arms, and the experiment they run. */
+interface PreparedComparison {
+  readonly invocation: CompareInvocation;
+  readonly base: ResolvedBuilding;
+  readonly aProfile: DispatcherProfile;
+  readonly bProfile: DispatcherProfile;
+  readonly trafficId: string;
+  readonly spec: ExperimentSpec;
+  readonly resources: ExperimentResources;
+}
+
+/** One spec for all three ways to run a comparison, so a block plans the plan the unsharded run plans. */
+function prepareComparison(config: LoadedConfig, invocation: CompareInvocation): PreparedComparison {
+  const { building: buildingId, a: aId, b: bId, reps, seed } = invocation;
   const base = requireBuilding(config, buildingId);
   const aProfile = requireDispatcher(config, aId, '--a');
   const bProfile = requireDispatcher(config, bId, '--b');
-  const trafficId = stringFlag(parsed, 'traffic') ?? base.trafficProfile;
+  const trafficId = invocation.traffic ?? base.trafficProfile;
   requireTrafficProfile(config, trafficId);
   const building = withTrafficProfile(base, trafficId);
-
-  const reps = numberFlag(parsed, 'reps') ?? 100;
-  const seed = numberFlag(parsed, 'seed') ?? randomSeed();
-  const confidence = numberFlag(parsed, 'confidence') ?? 0.95;
-  const durationS = numberFlag(parsed, 'duration');
-  const rate = numberFlag(parsed, 'rate');
-  const serial = booleanFlag(parsed, 'serial');
-  const window = stringFlag(parsed, 'window');
+  const durationS = invocation.duration;
+  const rate = invocation.rate;
+  const window = invocation.window;
 
   const spec: ExperimentSpec = {
     id: `cli-compare-${buildingId}-${aId}-vs-${bId}`,
@@ -247,9 +398,27 @@ export async function runCompare(
       },
     ],
     replication: { minReplications: reps, maxReplications: reps },
-    ...(serial ? { parallel: { mode: 'serial' as const } } : {}),
+    ...(invocation.serial ? { parallel: { mode: 'serial' as const } } : {}),
   };
 
+  const resources: ExperimentResources = {
+    buildingsById: new Map([[buildingId, building]]),
+    dispatcherProfilesById: config.dispatcherProfilesById,
+    trafficProfiles: config.trafficProfiles,
+    elevatorSpecs: config.elevatorSpecs,
+    // The file beside the profile index, so an arm whose profile opts into `selection.policy`
+    // finds the weight sets it names. Inert while no shipped profile opts in.
+    dispatcherProfiles: config.dispatcherProfiles,
+  };
+
+  return { invocation, base, aProfile, bProfile, trafficId, spec, resources };
+}
+
+function printComparisonHeader(out: Output, prepared: PreparedComparison): void {
+  const { bold, dim, cyan } = out.palette;
+  const { base, aProfile, bProfile, trafficId, invocation } = prepared;
+  const { building: buildingId, a: aId, b: bId, reps, seed } = invocation;
+  const window = invocation.window;
   heading(out, 'Paired comparison');
   field(out, 'building', `${base.name}  ${dim(`(${buildingId})`)}`);
   field(out, 'traffic', trafficId);
@@ -259,33 +428,76 @@ export async function runCompare(
   field(out, 'window', window ?? dim('the demand template’s own'));
   field(out, 'seed', bold(cyan(String(seed))));
   out.line();
+}
 
-  const total = reps * 2;
+/** The unsharded command: plan, run, render. The code this file ran before `--shard` existed. */
+async function runSingle(
+  out: Output,
+  config: LoadedConfig,
+  invocation: CompareInvocation,
+): Promise<number> {
+  const prepared = prepareComparison(config, invocation);
+  printComparisonHeader(out, prepared);
+
+  const total = invocation.reps * 2;
   const progress = createProgress(out, total);
-  const result = await runExperiment(
-    spec,
-    {
-      buildingsById: new Map([[buildingId, building]]),
-      dispatcherProfilesById: config.dispatcherProfilesById,
-      trafficProfiles: config.trafficProfiles,
-      elevatorSpecs: config.elevatorSpecs,
-      // The file beside the profile index, so an arm whose profile opts into `selection.policy`
-      // finds the weight sets it names. Inert while no shipped profile opts in.
-      dispatcherProfiles: config.dispatcherProfiles,
+  const result = await runExperiment(prepared.spec, prepared.resources, {
+    // The summaries and their scalar projections are all this command reads; keeping every
+    // RunRecord would cost hundreds of megabytes at 200 replications and buy nothing.
+    keepRecords: false,
+    onReplication: () => {
+      progress.tick();
     },
-    {
-      // The summaries and their scalar projections are all this command reads; keeping every
-      // RunRecord would cost hundreds of megabytes at 200 replications and buy nothing.
-      keepRecords: false,
-      onReplication: () => {
-        progress.tick();
-      },
-    },
-  );
+  });
   progress.done();
 
-  const cellA = requireCell(result.cells, 'A');
-  const cellB = requireCell(result.cells, 'B');
+  renderComparison(out, prepared, {
+    cellA: requireCell(result.cells, 'A'),
+    cellB: requireCell(result.cells, 'B'),
+    executed: `${result.replicationsRun} replications, ${result.execution.executor}${result.execution.executor === 'workers' ? ` ×${result.execution.workers}` : ''}, ${num(result.execution.elapsedMs / 1000, 1)} s`,
+  });
+  return 0;
+}
+
+/** The cells a verdict is rendered from, and how they came to be. */
+interface ComparisonView {
+  readonly cellA: CellResult;
+  readonly cellB: CellResult;
+  /** The `executed` line: how the replications ran. The one line a merge words differently. */
+  readonly executed: string;
+  /**
+   * A merge's stored differences, `A − B` per replication in replication order, each computed
+   * inside the block that ran both arms. Absent when both arms ran in this process.
+   */
+  readonly differencesFor?: ((metric: ReplicationMetric) => readonly number[] | undefined) | undefined;
+}
+
+/** What the rendered verdict rested on, for a merge's resolution section to read. */
+interface RenderedVerdict {
+  readonly usable: boolean;
+  readonly gate: { readonly metric: ReplicationMetric; readonly label: string };
+  readonly headline: Verdict | undefined;
+}
+
+/**
+ * Arms, paired differences, verdict, and the lines under it — for every mode.
+ *
+ * Moved here from `runCompare` byte for byte, apart from three reads: the `executed` line, the
+ * reproduce line's `--traffic`, and a merge's stored differences. `compare.shard.test.ts` holds the
+ * unsharded output to what it printed before the move, and a merge's to the unsharded output.
+ */
+function renderComparison(
+  out: Output,
+  prepared: PreparedComparison,
+  view: ComparisonView,
+): RenderedVerdict {
+  const { bold, dim, cyan, green, red, yellow } = out.palette;
+  const { aProfile, bProfile, trafficId, invocation } = prepared;
+  const { building: buildingId, a: aId, b: bId, reps, seed, confidence } = invocation;
+  const durationS = invocation.duration;
+  const rate = invocation.rate;
+  const window = invocation.window;
+  const { cellA, cellB } = view;
 
   const crossModel = crossModelNotice(aProfile, bProfile);
   const gate = gateMetricFor(crossModel);
@@ -412,7 +624,13 @@ export async function runCompare(
   }
 
   for (const entry of usable ? REPORTED : []) {
-    const difference = pairedEstimate(cellA, cellB, entry.metric, confidence);
+    const difference = pairedEstimate(
+      cellA,
+      cellB,
+      entry.metric,
+      confidence,
+      view.differencesFor?.(entry.metric),
+    );
     if (difference === undefined) {
       const missing =
         (cellA.aggregate.metrics[entry.metric]?.nonFiniteCount ?? 0) +
@@ -512,12 +730,7 @@ export async function runCompare(
 
   out.line();
   field(out, 'common RNs', crn, 20);
-  field(
-    out,
-    'executed',
-    `${result.replicationsRun} replications, ${result.execution.executor}${result.execution.executor === 'workers' ? ` ×${result.execution.workers}` : ''}, ${num(result.execution.elapsedMs / 1000, 1)} s`,
-    20,
-  );
+  field(out, 'executed', view.executed, 20);
   if (reps < 50) {
     out.line(
       yellow(
@@ -553,12 +766,428 @@ export async function runCompare(
         ...(window === undefined ? [] : [`--window ${window}`]),
         ...(durationS === undefined ? [] : [`--duration ${durationS}`]),
         ...(rate === undefined ? [] : [`--rate ${rate}`]),
-        ...(stringFlag(parsed, 'traffic') === undefined ? [] : [`--traffic ${trafficId}`]),
+        ...(invocation.traffic === undefined ? [] : [`--traffic ${trafficId}`]),
       ].join(' '),
     )}`,
   );
   out.line();
+  return { usable, gate, headline };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Sharding — docs/15-compute-offload-contract.md Phase B
+ * -------------------------------------------------------------------------- */
+
+const MERGE_USAGE = `usage: ${BINARY} compare --merge <file> [<file>…]`;
+
+/** The flags `--merge` accepts. Every other flag moves a number, and a merge reads those from its files. */
+const MERGE_FLAG_NAMES: ReadonlySet<string> = new Set(['merge', 'data', 'no-color', 'help']);
+
+async function mergeCommand(out: Output, argv: readonly string[], context: string): Promise<number> {
+  const ignored = COMPARE_FLAGS.filter(
+    (flag) =>
+      !MERGE_FLAG_NAMES.has(flag.name) &&
+      argv.some((token) => token === `--${flag.name}` || token.startsWith(`--${flag.name}=`)),
+  );
+  if (ignored.length > 0) {
+    throw new UsageError(
+      `${context}: --merge takes the comparison from its block files, so ${ignored.map((flag) => `--${flag.name}`).join(', ')} would be ignored.`,
+      ['every flag that moves a number was recorded in each block when it ran; drop it here', MERGE_USAGE],
+    );
+  }
+  const parsed = parseArgs(
+    argv,
+    COMPARE_FLAGS.filter((flag) => MERGE_FLAG_NAMES.has(flag.name)),
+    context,
+  );
+  if (parsed.positionals.length === 0) {
+    throw new UsageError(`${context}: --merge names no shard files.`, [MERGE_USAGE]);
+  }
+  const config = await loadData(resolveDataDir(stringFlag(parsed, 'data')));
+  return await runMerge(out, config, parsed.positionals, context);
+}
+
+/** A block file's record of the comparison it belongs to: {@link CompareInvocation} without `serial`. */
+function shardContextOf(invocation: CompareInvocation): ShardContext {
+  return {
+    building: invocation.building,
+    a: invocation.a,
+    b: invocation.b,
+    ...(invocation.traffic === undefined ? {} : { traffic: invocation.traffic }),
+    reps: invocation.reps,
+    seed: invocation.seed,
+    confidence: invocation.confidence,
+    ...(invocation.duration === undefined ? {} : { duration: invocation.duration }),
+    ...(invocation.rate === undefined ? {} : { rate: invocation.rate }),
+    ...(invocation.window === undefined ? {} : { window: invocation.window }),
+  };
+}
+
+const CONTEXT_KEYS: readonly string[] = [
+  'building',
+  'a',
+  'b',
+  'traffic',
+  'reps',
+  'seed',
+  'confidence',
+  'duration',
+  'rate',
+  'window',
+];
+
+function invocationFromContext(context: ShardContext, file: string, command: string): CompareInvocation {
+  const refuse = (detail: string): UsageError =>
+    new UsageError(`${command}: ${file} is not a block written by ${BINARY} compare --shard.`, [detail]);
+  for (const key of Object.keys(context)) {
+    if (!CONTEXT_KEYS.includes(key)) throw refuse(`it records "${key}", which compare never writes`);
+  }
+  const text = (key: string): string | undefined => {
+    const value = context[key];
+    if (value === undefined) return undefined;
+    if (typeof value !== 'string') throw refuse(`--${key} is recorded as ${JSON.stringify(value)}`);
+    return value;
+  };
+  const number = (key: string): number | undefined => {
+    const value = context[key];
+    if (value === undefined) return undefined;
+    if (typeof value !== 'number') throw refuse(`--${key} is recorded as ${JSON.stringify(value)}`);
+    return value;
+  };
+  const required = <T>(key: string, value: T | undefined): T => {
+    if (value === undefined) throw refuse(`it does not record --${key}`);
+    return value;
+  };
+  const traffic = text('traffic');
+  const duration = number('duration');
+  const rate = number('rate');
+  const window = text('window');
+  if (window !== undefined && window !== 'full-run' && window !== 'peak-5min') {
+    throw refuse(`--window is recorded as "${window}"`);
+  }
+  return {
+    building: required('building', text('building')),
+    a: required('a', text('a')),
+    b: required('b', text('b')),
+    ...(traffic === undefined ? {} : { traffic }),
+    reps: required('reps', number('reps')),
+    seed: required('seed', number('seed')),
+    confidence: required('confidence', number('confidence')),
+    ...(duration === undefined ? {} : { duration }),
+    ...(rate === undefined ? {} : { rate }),
+    ...(window === undefined ? {} : { window }),
+    serial: false,
+  };
+}
+
+/** A refusal from the fan-out is the user's to fix, so it leaves as a usage error. */
+function refusedAsUsage<T>(context: string, action: () => T): T {
+  try {
+    return action();
+  } catch (error) {
+    if (error instanceof RunnerError) throw new UsageError(`${context}: ${error.message}`);
+    throw error;
+  }
+}
+
+/** `--shard k/n`: run one replication block of both arms and write it. Prints no verdict. */
+async function runBlock(
+  out: Output,
+  config: LoadedConfig,
+  invocation: CompareInvocation,
+  flags: { readonly shard: string; readonly outFile: string | undefined; readonly ceiling: number | undefined },
+  context: string,
+): Promise<number> {
+  const { bold, dim, cyan } = out.palette;
+  if (flags.ceiling === undefined) {
+    throw new UsageError(`${context}: --shard needs --ceiling <runs>, declared before any block runs.`, [
+      `this comparison's whole fan-out spends ${count(2 * invocation.reps)} replication-runs: 2 arms × --reps ${invocation.reps}`,
+      'docs/15-compute-offload-contract.md § 4 criterion 7: the ceiling is declared before the first fan-out',
+    ]);
+  }
+  if (flags.outFile === undefined) {
+    throw new UsageError(`${context}: --shard needs --out <file> to write its block to.`);
+  }
+  const match = /^(\d+)\/(\d+)$/u.exec(flags.shard);
+  const k = Number(match?.[1]);
+  const n = Number(match?.[2]);
+  if (match === null || !(k >= 1 && k <= n)) {
+    throw new UsageError(
+      `${context}: --shard expects k/n with 1 ≤ k ≤ n, such as 2/4; received "${flags.shard}".`,
+    );
+  }
+  if (n > invocation.reps) {
+    throw new UsageError(
+      `${context}: --shard ${flags.shard} cuts ${invocation.reps} replications into ${n} blocks, and a block needs at least one.`,
+      [`use at most ${invocation.reps} blocks, or raise --reps`],
+    );
+  }
+  const ceiling = flags.ceiling;
+  const outFile = flags.outFile;
+
+  const prepared = prepareComparison(config, invocation);
+  const plan = planExperiment(prepared.spec, prepared.resources, { keepRecords: false });
+  const sharded = refusedAsUsage(context, () =>
+    ShardedExperiment.of(plan, { shards: n, ceiling: { replicationRuns: ceiling } }),
+  );
+  const block = sharded.blocks[k - 1];
+  if (block === undefined) throw new Error(`compare: no block ${k} of ${n}.`);
+
+  heading(out, `Replication block ${k} of ${n}`);
+  field(out, 'building', `${prepared.base.name}  ${dim(`(${invocation.building})`)}`);
+  field(out, 'traffic', prepared.trafficId);
+  field(out, 'A', `${prepared.aProfile.name}  ${dim(`(${invocation.a})`)}`);
+  field(out, 'B', `${prepared.bProfile.name}  ${dim(`(${invocation.b})`)}`);
+  field(
+    out,
+    'replications',
+    `${block.from}–${block.to - 1} of 0–${invocation.reps - 1}, both arms at each, common random numbers`,
+  );
+  field(out, 'window', invocation.window ?? dim('the demand template’s own'));
+  field(out, 'seed', bold(cyan(String(invocation.seed))));
+  field(out, 'ceiling', `${count(ceiling)} replication-runs for the whole fan-out, checked before this block ran`);
+  field(out, 'plan', `${sharded.planDigest.slice(0, 12)}  ${dim('every block of this comparison carries it, and --merge refuses any other')}`);
+  out.line();
+
+  const progress = createProgress(out, (block.to - block.from) * plan.cells.length);
+  const result = await runShard(sharded, block.index, {
+    onReplication: () => {
+      progress.tick();
+    },
+  });
+  progress.done();
+
+  try {
+    writeFileSync(outFile, serializeShard(result, shardContextOf(invocation)));
+  } catch (error) {
+    throw new UsageError(`${context}: could not write the block to ${outFile}.`, [
+      error instanceof Error ? error.message : String(error),
+    ]);
+  }
+
+  printBlockAlone(out, prepared, plan, result);
+
+  out.line();
+  field(out, 'wrote', outFile, 20);
+  field(out, 'spend', spendLine(result.spend.replicationRuns, result.spend.wallSeconds, result.spend.executor, result.spend.workers), 20);
+  field(out, 'merge with', `${BINARY} compare --merge <all ${n} block files>`, 20);
+  out.line();
   return 0;
+}
+
+/** `--merge <file...>`: every block of one comparison, merged into the unsharded verdict. */
+async function runMerge(
+  out: Output,
+  config: LoadedConfig,
+  files: readonly string[],
+  context: string,
+): Promise<number> {
+  const blocks = files.map((file) => {
+    let text: string;
+    try {
+      text = readFileSync(file, 'utf8');
+    } catch (error) {
+      throw new UsageError(`${context}: cannot read the block file ${file}.`, [
+        error instanceof Error ? error.message : String(error),
+      ]);
+    }
+    try {
+      return { file, ...deserializeShard(text) };
+    } catch (error) {
+      if (error instanceof RunnerError) {
+        throw new UsageError(`${context}: ${file} is not a block this command can merge.`, [error.message]);
+      }
+      throw error;
+    }
+  });
+  const first = blocks[0];
+  if (first === undefined) throw new UsageError(`${context}: --merge names no shard files.`, [MERGE_USAGE]);
+
+  for (const block of blocks.slice(1)) {
+    const keys = [...new Set([...Object.keys(first.context), ...Object.keys(block.context)])];
+    const disagreements = keys.filter((key) => first.context[key] !== block.context[key]);
+    if (disagreements.length > 0) {
+      throw new UsageError(`${context}: these files are blocks of different comparisons.`, [
+        ...disagreements.map(
+          (key) =>
+            `--${key} ${String(first.context[key] ?? '(unset)')} in ${first.file}, but ${String(block.context[key] ?? '(unset)')} in ${block.file}`,
+        ),
+        'a merge pairs A and B inside each block; blocks of two comparisons pair nothing with each other',
+      ]);
+    }
+  }
+
+  const invocation = invocationFromContext(first.context, first.file, context);
+  const prepared = prepareComparison(config, invocation);
+  const plan = planExperiment(prepared.spec, prepared.resources, { keepRecords: false });
+  const sharded = refusedAsUsage(context, () =>
+    ShardedExperiment.of(plan, { shards: [...first.result.layout], ceiling: first.result.ceiling }),
+  );
+  const merged = refusedAsUsage(context, () =>
+    mergeShards(
+      sharded,
+      blocks.map((block) => block.result),
+    ),
+  );
+
+  const cellA = requireCell(merged.result.cells, 'A');
+  const cellB = requireCell(merged.result.cells, 'B');
+  const pair = merged.pairs.find(
+    (candidate) => candidate.candidateCellId === cellA.cellId && candidate.baselineCellId === cellB.cellId,
+  );
+  if (pair === undefined) {
+    throw new UsageError(`${context}: the merged blocks carry no A − B pair, so there is nothing to compare.`);
+  }
+  const blockCount = merged.spend.shards.length;
+
+  printComparisonHeader(out, prepared);
+  const rendered = renderComparison(out, prepared, {
+    cellA,
+    cellB,
+    executed: `${merged.result.replicationsRun} replications, merged from ${blockCount} block${blockCount === 1 ? '' : 's'}`,
+    differencesFor: (metric) => pair.differences[metric],
+  });
+  printMergedResolution(out, rendered, pair, invocation.reps);
+  printSpend(out, merged.spend);
+  return 0;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Resolution and spend, beside the verdict
+ * -------------------------------------------------------------------------- */
+
+type ResolutionLimit =
+  | { readonly kind: 'limit'; readonly n: number; readonly sde: number; readonly required: number | undefined }
+  | { readonly kind: 'identical'; readonly n: number }
+  | { readonly kind: 'refused'; readonly reason: string };
+
+/**
+ * `docs/15` § 4 criterion 5's figure, from a difference series and nothing else: the smallest effect
+ * a paired interval at this `n` detects at `RESOLUTION_POWER`, by the formula § D151 defined, and the
+ * `n` the observed effect would need to clear zero. Computed from whatever series it is handed, so
+ * a block's figure is a block's and a merge's is the merge's; neither is ever stored or carried.
+ */
+function resolutionOf(
+  differences: readonly number[] | undefined,
+  usable: boolean,
+  label: string,
+): ResolutionLimit {
+  if (!usable) {
+    return { kind: 'refused', reason: 'the arms are not reportable, so neither is what this budget can resolve' };
+  }
+  if (differences === undefined || differences.length === 0 || !differences.every(Number.isFinite)) {
+    return { kind: 'refused', reason: `a replication produced no ${label} value` };
+  }
+  if (differences.length < 2) {
+    return { kind: 'refused', reason: `n = ${differences.length} has no spread to measure a limit against` };
+  }
+  if (differences.every((value) => value === 0)) return { kind: 'identical', n: differences.length };
+  const estimate = estimateMean(differences);
+  return {
+    kind: 'limit',
+    n: estimate.n,
+    sde: smallestDetectableEffect(estimate.stdDev, estimate.n),
+    required: replicationsToResolve(estimate.mean, estimate.stdDev),
+  };
+}
+
+function powerLabel(): string {
+  return `${num(RESOLUTION_POWER * 100, 0)} % power`;
+}
+
+function unitOf(metric: ReplicationMetric): { readonly unit: string; readonly digits: number } {
+  const entry = REPORTED.find((candidate) => candidate.metric === metric);
+  return { unit: entry?.unit ?? '', digits: entry?.digits ?? 2 };
+}
+
+/**
+ * A block's own figure, at the block's `n`, labelled as its own. Printed so that a merge's figure can
+ * be seen to differ from it; nothing in the block file carries it.
+ */
+function printBlockAlone(
+  out: Output,
+  prepared: PreparedComparison,
+  plan: ExperimentPlan,
+  result: ShardResult,
+): void {
+  const { yellow } = out.palette;
+  heading(out, 'This block alone  (not a verdict: the merge recomputes every figure at the merged n)');
+  const gate = gateMetricFor(crossModelNotice(prepared.aProfile, prepared.bProfile));
+  const { unit, digits } = unitOf(gate.metric);
+  const columnOf = (armId: string): number => plan.cells.findIndex((cell) => cell.dispatcherArmId === armId);
+  const [a, b] = [columnOf('A'), columnOf('B')];
+  const aggregateOf = (column: number): ReturnType<typeof aggregateCell> =>
+    aggregateCell(result.rows.map((row) => row.records[column] as ReplicationRecord));
+  const usable = aggregateOf(a).awtIsValid && aggregateOf(b).awtIsValid;
+  const pairIndex = result.pairs.findIndex(
+    (pair) => pair.candidateCellId === plan.cells[a]?.cellId && pair.baselineCellId === plan.cells[b]?.cellId,
+  );
+  const differences =
+    pairIndex === -1
+      ? undefined
+      : result.rows.map((row) => row.differences[pairIndex]?.[gate.metric] ?? Number.NaN);
+  const limit = resolutionOf(differences, usable, gate.label);
+  const text =
+    limit.kind === 'limit'
+      ? `n = ${count(limit.n)}, smallest detectable effect ${num(limit.sde, digits)} ${unit} at ${powerLabel()}`
+      : limit.kind === 'identical'
+        ? `n = ${count(limit.n)}, every paired difference is exactly zero, so there is no effect to resolve`
+        : yellow(`not computed — ${limit.reason}`);
+  out.line(`  ${padColumn(gate.label, 16)}  ${text}`);
+}
+
+/** The merge's figure, recomputed from every block's differences at the merged `n`. */
+function printMergedResolution(
+  out: Output,
+  rendered: RenderedVerdict,
+  pair: MergedPair,
+  reps: number,
+): void {
+  const { yellow } = out.palette;
+  heading(
+    out,
+    `Resolution at the merged n = ${count(reps)}  (recomputed from every block's differences; no block's figure is used)`,
+  );
+  const { unit, digits } = unitOf(rendered.gate.metric);
+  const limit =
+    rendered.usable && rendered.headline === undefined
+      ? ({ kind: 'refused', reason: `${rendered.gate.label} could not be estimated on both arms` } as const)
+      : resolutionOf(pair.differences[rendered.gate.metric], rendered.usable, rendered.gate.label);
+  const text =
+    limit.kind === 'limit'
+      ? `smallest detectable effect ${num(limit.sde, digits)} ${unit} at ${powerLabel()}` +
+        (limit.required === undefined
+          ? ''
+          : `; the observed effect would need n ≈ ${count(limit.required)} to clear zero`)
+      : limit.kind === 'identical'
+        ? 'every paired difference is exactly zero, so there is no effect to resolve'
+        : yellow(`not computed — ${limit.reason}`);
+  out.line(`  ${padColumn(rendered.gate.label, 20)}${text}`);
+}
+
+function spendLine(runs: number, wallSeconds: number, executor: string, workers: number): string {
+  return `${count(runs)} replication-runs, ${num(wallSeconds, 1)} s wall, ${executor}${workers > 1 ? ` ×${workers}` : ''}`;
+}
+
+/** docs/15 § 4 criterion 7's second half: what the answer cost, after it and on no line of it. */
+function printSpend(out: Output, spend: FanOutSpend): void {
+  heading(out, 'Spend  (what this answer cost: beside the verdict, never part of it)');
+  field(out, 'ceiling', `${count(spend.ceiling.replicationRuns)} replication-runs, declared before any block ran`, 20);
+  for (const [position, shard] of spend.shards.entries()) {
+    field(
+      out,
+      `block ${position + 1} of ${spend.shards.length}`,
+      `replications ${shard.block.from}–${shard.block.to - 1}, ${count(shard.replicationRuns)} runs, ${num(shard.wallSeconds, 1)} s wall, ${shard.executor}${shard.workers > 1 ? ` ×${shard.workers}` : ''}`,
+      20,
+    );
+  }
+  field(
+    out,
+    'total',
+    `${count(spend.replicationRuns)} of ${count(spend.ceiling.replicationRuns)} replication-runs, ${num(spend.wallSeconds, 1)} s of block wall time, summed`,
+    20,
+  );
+  out.line();
 }
 
 /* -------------------------------------------------------------------------- *
@@ -763,12 +1392,29 @@ function pairedEstimate(
   b: CellResult,
   metric: ReplicationMetric,
   confidence: number,
+  stored?: readonly number[] | undefined,
 ): PairedDifference | undefined {
   const left = finiteSamples(a, metric);
   const right = finiteSamples(b, metric);
   if (left === undefined || right === undefined) return undefined;
   const n = Math.min(left.length, right.length);
   if (n < 2) return undefined;
+  if (stored !== undefined) {
+    // A merge: the differences each block computed from its own records, in replication order.
+    // `mergeShards` has already refused a block whose stored differences its records do not give,
+    // so these are the values the branch below computes, taken from where they were paired.
+    if (stored.length !== n) {
+      throw new Error(`compare: ${stored.length} merged differences for ${n} replications of ${metric}.`);
+    }
+    let storedZeros = 0;
+    for (const value of stored) if (value === 0) storedZeros += 1;
+    return {
+      estimate: estimateMean(stored, { confidence }),
+      differences: stored,
+      exactZeroCount: storedZeros,
+      identical: storedZeros === n,
+    };
+  }
   const candidate = left.slice(0, n);
   const baseline = right.slice(0, n);
   const differences = candidate.map((value, index) => value - (baseline[index] as number));
