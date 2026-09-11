@@ -103,7 +103,7 @@ export type ChimeRefusal = 'unknown-completion' | 'unknown-modifier' | 'not-enou
  * post `single` on the easiest scenario and be paid ten instead of four. Nor could it have been
  * derived: `data/scenario-survivors.json` carries survivor **counts** and no band, nothing this route
  * reads maps a count to one, and this route is never told which scenario was cleared. The one
- * survivor band in the tree — `data/scenario-survivor-bands.json`, GitHub issue #234's drafted
+ * survivor band in the tree — `data/scenario-survivor-bands.json`, GitHub issue #234's approved
  * difficulty band per ladder position — has a viz acceptance check as its only reader.
  *
  * [§ D256](../../../../DECISIONS.md) decides what happens next — a stated mechanism is measured or
