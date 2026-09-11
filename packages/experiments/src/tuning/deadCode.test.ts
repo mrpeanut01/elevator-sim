@@ -60,12 +60,12 @@ const AUDITED_MODULES = [
  */
 const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
   /*
-   * -- The optimizer's own schema (CLAUDE.md invariant 8). Same shape of claim as `core`'s
-   * `POLICY_PARAMETER_IDS`: the consumer is a meta-optimizer that tunes the tuner, which does not
-   * exist. Shipping the declaration without a way to read it would make invariant 8 unenforceable
-   * one level up, and `types.test.ts` derives this list from SEARCH_DEFAULTS so it cannot drift.
+   * -- The search's own schema (CLAUDE.md invariant 8). Invariant 8 requires the declaration, and
+   * nothing reads it: no meta-optimizer that tunes the tuner is planned (GitHub issue #416, which also
+   * removed `core`'s six introspection helpers). Shipping the declaration keeps invariant 8 true one
+   * level up, and `types.test.ts` derives this list from SEARCH_DEFAULTS so it cannot drift.
    */
-  'search/SEARCH_PARAMETERS': 'the search’s own tunable schema; its reader is a meta-optimizer',
+  'search/SEARCH_PARAMETERS': 'the search’s own tunable schema (invariant 8); nothing reads it',
 
   /*
    * -- Plateau reporting rather than plateau detection. `runRound` needs the *count* of distinct

@@ -4,9 +4,9 @@
  * `dispatch/parameters.test.ts` makes the argument for why both directions matter equally, and it
  * applies verbatim here:
  *
- * 1. **Nothing hidden.** A knob the model reads but does not declare is invisible to a Phase 7
- *    optimizer, which will then report a tuned winner that is only optimal at whatever the hidden
- *    value happened to be.
+ * 1. **Nothing hidden.** A knob the model reads but does not declare is invisible to a search,
+ *    which will then report a tuned winner that is only optimal at whatever the hidden value
+ *    happened to be.
  * 2. **Nothing spurious.** A declared parameter nothing reads costs 50–200 replications per
  *    evaluation to discover is inert — and docs/03-traffic-and-statistics.md § flat plateaus says
  *    a noisy objective will attribute a difference to it anyway.
@@ -20,15 +20,27 @@ import { describe, expect, it } from 'vitest';
 import { dispatcherProfileSchema } from '../../config/schema.js';
 
 import { createArrivalModel, resolvePredictorConfig } from './arrivalModel.js';
-import {
-  PREDICTOR_DEFAULTS,
-  PREDICTOR_PARAMETERS,
-  PREDICTOR_PARAMETER_IDS,
-  predictorParameter,
-  predictorParameterValue,
-  tunablePredictorPathsOf,
-} from './parameters.js';
-import type { PredictorIdleSource } from './types.js';
+import type { DispatchParameterSpec } from '../types.js';
+
+import { PREDICTOR_DEFAULTS, PREDICTOR_PARAMETERS } from './parameters.js';
+import type { PredictorIdleSource, ResolvedPredictorConfig } from './types.js';
+
+/**
+ * The schema's lookups, derived here from the schema and the resolved config. `core` stopped
+ * exporting id-set and read-back helpers that were waiting for a Bayesian and OCBA optimizer over this
+ * schema, which the project owner withdrew (GitHub issue #416). What this file checks is the schema against the config the model reads, and these two
+ * helpers are that check's vocabulary rather than a surface of their own.
+ */
+const declared = (id: string): DispatchParameterSpec | undefined =>
+  PREDICTOR_PARAMETERS.find((parameter) => parameter.id === id);
+
+/** What a resolved config holds under `idle.<key>`: the field the model reads. */
+function readBack(config: ResolvedPredictorConfig, id: string): number | undefined {
+  const key = id.slice('idle.'.length);
+  if (!Object.hasOwn(config, key)) return undefined;
+  const value = (config as unknown as Readonly<Record<string, unknown>>)[key];
+  return typeof value === 'number' ? value : undefined;
+}
 
 const FLOORS: readonly string[] = Object.freeze(['1', '2', '3', '4', '5', '6']);
 
@@ -45,9 +57,9 @@ const PROBES: Readonly<Record<string, number>> = Object.freeze({
 describe('PREDICTOR_PARAMETERS', () => {
   it('declares every tunable the resolved config exposes, and nothing else', () => {
     const config = resolvePredictorConfig();
-    expect([...PREDICTOR_PARAMETERS.map((parameter) => parameter.id)]).toStrictEqual([
-      ...tunablePredictorPathsOf(config),
-    ]);
+    expect([...PREDICTOR_PARAMETERS.map((parameter) => parameter.id)]).toStrictEqual(
+      Object.keys(config).map((key) => `idle.${key}`),
+    );
   });
 
   it('quotes the defaults rather than repeating them', () => {
@@ -55,7 +67,7 @@ describe('PREDICTOR_PARAMETERS', () => {
     // optimizer a starting point the simulator never actually runs at.
     const config = resolvePredictorConfig();
     for (const parameter of PREDICTOR_PARAMETERS) {
-      expect(predictorParameterValue(config, parameter.id), parameter.id).toBe(parameter.default);
+      expect(readBack(config, parameter.id), parameter.id).toBe(parameter.default);
     }
   });
 
@@ -79,16 +91,11 @@ describe('PREDICTOR_PARAMETERS', () => {
   it('declares no id twice, and every id under the idle section a profile authors', () => {
     const ids = PREDICTOR_PARAMETERS.map((parameter) => parameter.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(PREDICTOR_PARAMETER_IDS.size).toBe(ids.length);
     for (const id of ids) {
       // `id` is the dotted path in `data/dispatcher-profiles.json`, so a tuned winner is written
       // back as a profile without translation.
       expect(id.startsWith('idle.predictor'), id).toBe(true);
-      expect(predictorParameter(id)?.id).toBe(id);
     }
-    expect(predictorParameter('idle.nonsense')).toBeUndefined();
-    expect(predictorParameterValue(resolvePredictorConfig(), 'idle.nonsense')).toBeUndefined();
-    expect(predictorParameterValue(resolvePredictorConfig(), 'weights.waitTime')).toBeUndefined();
   });
 
   it('every declared id is authorable as a profile path — all six, by parsing them', () => {
@@ -159,7 +166,7 @@ describe('PREDICTOR_PARAMETERS', () => {
     ).toBe(true);
     // The declared range starts at 0.01, so a schema-honouring optimizer never samples into the
     // gap. It is a hand-authored profile that falls in, which is why it is worth a test at all.
-    expect(predictorParameter('idle.predictorLearningRate')?.range?.[0]).toBeGreaterThan(0);
+    expect(declared('idle.predictorLearningRate')?.range?.[0]).toBeGreaterThan(0);
   });
 
   it('has a probe for every declared parameter', () => {
@@ -178,7 +185,7 @@ describe('PREDICTOR_PARAMETERS', () => {
       const idle = { [key]: probe } as PredictorIdleSource;
 
       const config = resolvePredictorConfig(idle);
-      expect(predictorParameterValue(config, parameter.id), parameter.id).toBe(probe);
+      expect(readBack(config, parameter.id), parameter.id).toBe(probe);
       expect(createArrivalModel({ floorIds: FLOORS, idle }).config, parameter.id).toStrictEqual(
         config,
       );
@@ -313,8 +320,8 @@ describe('PREDICTOR_PARAMETERS', () => {
     expect(ratio(0) / ratio(0.1)).toBeGreaterThan(10);
 
     // And the description must not have quietly reverted to claiming otherwise. The word is what a
-    // Phase 7 optimizer reads; there is no type that can check it, so a test does.
-    const description = predictorParameter('idle.predictorPriorRatePerS')?.description ?? '';
+    // search reads; there is no type that can check it, so a test does.
+    const description = declared('idle.predictorPriorRatePerS')?.description ?? '';
     expect(description).not.toMatch(/cancels out/);
     expect(description).toMatch(/NOT inert/);
   });
@@ -388,7 +395,7 @@ describe('PREDICTOR_PARAMETERS', () => {
      * asserts that every surviving gate's gated-**off** region is flat, so this class of wrong
      * bound is a red test rather than a comment.
      */
-    const horizon = predictorParameter('idle.predictorHorizonS');
+    const horizon = declared('idle.predictorHorizonS');
     expect(horizon?.activeWhen).toBeUndefined();
 
     // The folding happens above 1800 too, which is the measurement that removed the bound.

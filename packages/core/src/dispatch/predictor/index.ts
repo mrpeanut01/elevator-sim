@@ -97,10 +97,6 @@ export { createArrivalModel, resolvePredictorConfig } from './arrivalModel.js';
 export {
   PREDICTOR_DEFAULTS,
   PREDICTOR_PARAMETERS,
-  PREDICTOR_PARAMETER_IDS,
-  predictorParameter,
-  predictorParameterValue,
-  tunablePredictorPathsOf,
 } from './parameters.js';
 
 export { PredictorError } from './types.js';

@@ -747,7 +747,8 @@ The audit itself found **no dead symbol**: all 72 exports of `dispatch/policies/
 `dispatch/predictor/` either have a real importer or are one of the **14** recorded as deliberate
 public API — the four stage-5 result accessors and `parkingFloorIds`, `fixedForecast`, the
 compile-time assertion `profileAsPolicySource`, `prepositionPlan`, and the six parameter-schema
-introspection functions whose consumer is the Phase 7 optimizer (invariant 8).
+introspection functions whose consumer was to be the Phase 7 optimizer (invariant 8) — deleted on
+2026-09-10 with GitHub issue #416, when the project owner withdrew the Bayesian and OCBA optimizer they waited for.
 
 ---
 
@@ -1162,7 +1163,7 @@ a shape rather than by argument:
    changes is *which* vector, and when.
 2. *It strains invariant 8 — a 400-parameter policy vector is not obviously a declarable tunable.*
    **Dissolved by not building that.** A selection policy is a declarable tunable with type, range,
-   default and `activeWhen`, searchable by the generic optimizer invariant 8 exists for.
+   default and `activeWhen`, searchable by the schema-driven search invariant 8 exists for.
 3. *Decisively, its acceptance criterion was stated in the metrics 6b makes non-comparable.*
    **Answered first, in writing, before any code existed** — the criterion is
    [§ D139](../DECISIONS.md), gating on **TTD** because `comparabilityOf` lists AWT and WT95 among
@@ -1333,11 +1334,13 @@ Search the parameter space instead of hand-guessing weights. Full design in
 [Parameterization & Tuning](06-parameterization-and-tuning.md).
 
 - Self-describing parameter schema (`continuous` / `integer` / `categorical` / `boolean`,
-  with `activeWhen` for conditional parameters) so a generic optimizer needs no
+  with `activeWhen` for conditional parameters) so a search needs no
   elevator-specific code
 - Common random numbers across candidates within an optimization round
 - Successive halving on replication count as the fidelity dimension
-- Random search baseline, Bayesian optimization, CMA-ES; OCBA for final selection
+- Random search baseline, Bayesian optimization, CMA-ES; OCBA for final selection. **Bayesian
+  optimization and OCBA were withdrawn** by the project owner on 2026-09-10 (GitHub issue #416);
+  random search, successive halving and sep-CMA-ES ship in `tuning/search`
 - Held-out traffic seeds for validation
 - Pareto front reporting over (AWT, energy, WT95)
 - ✅ **DONE — Fuzzy traffic-pattern detector with hysteresis, driving per-pattern weight sets**

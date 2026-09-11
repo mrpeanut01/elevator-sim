@@ -195,7 +195,7 @@
  * - **It does not implement OCBA.** docs/06 lists it for final selection among finalists, and the
  *   ladder's top rung is where it would go — allocating rung 4's 900 replications unevenly toward
  *   the pair whose ranking is least certain, rather than 300 each. Uniform allocation is the
- *   conservative choice and is what ships; the extension point is {@link Rung}.
+ *   conservative choice and is what ships; the extension point is {@link Rung}, and since GitHub issue #416 withdrew OCBA nothing is planned to use it.
  *
  * ## 5. How this joins `tuning/space` and `tuning/report`
  *

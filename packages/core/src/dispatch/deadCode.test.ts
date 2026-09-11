@@ -29,8 +29,8 @@
  * ## What the allowlist is for, and why it cannot rot
  *
  * A symbol with no caller is not automatically a bug: some exports are genuinely public API, aimed
- * at a consumer that does not exist in this repository — a Phase 7 optimizer reading the parameter
- * schema, a report reading a stage-5 result. {@link PUBLIC_API_ONLY} names each one **with the
+ * at a consumer that does not exist in this repository — a search beyond `tuning/search` reading the
+ * parameter schema, a report reading a stage-5 result. {@link PUBLIC_API_ONLY} names each one **with the
  * reason it has no caller**, so the claim is recorded rather than assumed.
  *
  * The list is asserted in both directions. An entry whose symbol has since acquired a caller, or
@@ -94,9 +94,10 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
 'metrics/fractionAbove': 'distribution helper on the published surface',
 'metrics/waitPercentile': 'distribution helper on the published surface',
 
-// -- Invariant 8 schema declarations. Each package declares its tunables so a generic optimizer can
-// search without elevator knowledge. `DISPATCH_PARAMETERS` is the one the tuner consumes today;
-// the rest are the same contract for parameters no shipped search varies yet. They are data about
+// -- Invariant 8 schema declarations. Each package declares its tunables so the space is explicit and
+// checkable; no optimizer beyond `tuning/search` is planned (GitHub issue #416).
+// `DISPATCH_PARAMETERS` is the one the tuner consumes today; the rest are the same contract for
+// parameters no shipped search varies yet. They are data about
 // code, and a consumer outside this repository is exactly who they are for.
 'analytical/ANALYTICAL_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 'metrics/METRICS_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
@@ -172,16 +173,6 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    * consumer is the type checker.
    */
   'policies/profileAsPolicySource': 'a compile-time structural assertion; tsc is its consumer',
-
-  // -- Parameter-schema introspection (CLAUDE.md invariant 8). The consumer is Phase 7's generic
-  // optimizer, which does not exist yet; shipping the schema without a way to read it would make
-  // invariant 8 unenforceable.
-  'policies/POLICY_PARAMETER_IDS': 'parameter-schema introspection for a Phase 7 optimizer',
-  'policies/policyParameter': 'parameter-schema introspection for a Phase 7 optimizer',
-  'predictor/PREDICTOR_PARAMETER_IDS': 'parameter-schema introspection for a Phase 7 optimizer',
-  'predictor/predictorParameter': 'parameter-schema introspection for a Phase 7 optimizer',
-  'predictor/predictorParameterValue': 'parameter-schema introspection for a Phase 7 optimizer',
-  'predictor/tunablePredictorPathsOf': 'parameter-schema introspection for a Phase 7 optimizer',
 });
 
 /* -------------------------------------------------------------------------- *
