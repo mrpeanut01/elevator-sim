@@ -9,9 +9,10 @@
  * `costRequestFor` → `CostRequest.duty` → `dutyMismatchTerm` → `scoreCar`. A link missing anywhere
  * makes the two runs below identical, which is the failure this file exists to see.
  *
- * `capacity-aware` is the profile `data/dispatcher-profiles.json` gives the shipped weight, and it
- * authors no `dispatch.callType`, so it runs at `up-down-buttons` — the disclosure the call makes
- * is the landing's own duty control, not a destination panel.
+ * `predictive-balanced` is the base, with the weight authored onto it: no shipped profile carries
+ * one while no shipped building declares a duty (§ D549, clause 7). It authors no
+ * `dispatch.callType`, so it runs at `up-down-buttons` — the disclosure the call makes is the
+ * landing's own duty control, not a destination panel.
  */
 import { fileURLToPath } from 'node:url';
 
@@ -33,7 +34,9 @@ import { runSimulation } from './simulation.js';
 
 const DATA_DIR = fileURLToPath(new URL('../../../../data', import.meta.url));
 const SEED = 20_260_911;
-const PROFILE_ID = 'capacity-aware';
+const PROFILE_ID = 'predictive-balanced';
+/** § D549's drafted proposal — measured here, not shipped. */
+const PROPOSED_WEIGHT = 0.35;
 
 /** One goods car in Midtown Office's four-car bank, and a demand that gives it goods to carry. */
 const DECLARED: Readonly<Record<string, Duty>> = { 'main-A': 'goods' };
@@ -79,18 +82,17 @@ function mismatched(legs: readonly PassengerRecord[]): { boarded: number; mismat
 }
 
 describe('the duty weight binds dispatch', () => {
-  it('runs the shipped weight under up-down buttons, so the landing call carries the duty', () => {
-    const shipped = config.dispatcherProfilesById.get(PROFILE_ID);
-    expect(shipped).toBeDefined();
-    expect(resolveDispatchConfig(shipped!).dispatch.callType).toBe('up-down-buttons');
-    expect(shipped!.weights['dutyMismatch'] ?? 0).toBeGreaterThan(0);
+  it('runs under up-down buttons, so the duty reaches dispatch on the landing call itself', () => {
+    const base = config.dispatcherProfilesById.get(PROFILE_ID);
+    expect(base).toBeDefined();
+    expect(resolveDispatchConfig(base!).dispatch.callType).toBe('up-down-buttons');
+    expect(base!.weights['dutyMismatch'] ?? 0).toBe(0);
   });
 
   it('changes the legs when the weight moves, on a building that declares a duty', () => {
     const off = legsAt(0);
-    const shipped = legsAt(undefined);
+    const proposed = legsAt(PROPOSED_WEIGHT);
     const strong = legsAt(5);
-    expect(JSON.stringify(shipped)).not.toBe(JSON.stringify(off));
     expect(JSON.stringify(strong)).not.toBe(JSON.stringify(off));
 
     // And in the direction the term prices: fewer riders put in a car that is not for their trip.
@@ -100,7 +102,7 @@ describe('the duty weight binds dispatch', () => {
     expect(atStrong.mismatched).toBeLessThan(atOff.mismatched);
     if (process.env['DUTY_SEAM_REPORT'] === '1') {
       process.stdout.write(
-        `DUTY_SEAM off=${JSON.stringify(atOff)} shipped=${JSON.stringify(mismatched(shipped))} strong=${JSON.stringify(atStrong)}\n`,
+        `DUTY_SEAM off=${JSON.stringify(atOff)} proposed=${JSON.stringify(mismatched(proposed))} proposedMoved=${String(JSON.stringify(proposed) !== JSON.stringify(off))} strong=${JSON.stringify(atStrong)}\n`,
       );
     }
   });

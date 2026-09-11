@@ -79,10 +79,10 @@
     },
     {
       "id": "capacity-aware",
-      "$comment": "The profile the capacity mechanisms are named for, so it declares all three: split-demand for parallel service at a heavy landing, until-commitment reassignment so a car crossing its bypass threshold hands its uncommitted calls on, and the sole-eligible-car override so the guard against a starved floor is on while it does. DUTY (GitHub issue #481, DECISIONS.md section D549) - dutyMismatch 0.35 IS AN AGENT'S PROPOSAL AWAITING THE OWNER'S APPROVAL, chosen rather than measured or cited. The reasoning: a goods, bed or service trip is a load only the right car carries well, which is this profile's own subject. 0.35 is half of this profile's waitTime weight, and waitTime normalizes saturating with its half-cost point at normalization.waitTimeS (60 s), so a mismatch costs what a 60 s longer estimated wait costs: a car declared for the trip is preferred unless it would keep the rider waiting about a minute longer than one that is not, before load and crowding are counted. That is a PREFERENCE, the low end of the ruling's range; near-exclusive use needs a weight above the sum of the other three (1.0 here), and is a profile's choice to make rather than this one's. It is INERT on every shipped building, because none declares a duty and a building that declares none records no duty on any rider: traffic/dutyIdentity.test.ts holds all nine to byte-identical legs with and without this weight, and sim/searchSpaceLiveness.test.ts carries weights.dutyMismatch in DECLARED_INERT under the one condition that makes it live, a building that declares one. sim/dutySeam.test.ts moves this weight on Midtown Office with one car declared goods and requires the legs to change.",
+      "$comment": "The profile the capacity mechanisms are named for, so it declares all three: split-demand for parallel service at a heavy landing, until-commitment reassignment so a car crossing its bypass threshold hands its uncommitted calls on, and the sole-eligible-car override so the guard against a starved floor is on while it does.",
       "name": "Capacity aware",
       "blurb": "Splits a heavy landing across cars, reassigns a car that fills up on its way, and counts the load. Built for crowds, not for quiet mornings.",
-      "weights": { "waitTime": 0.7, "loadFactor": 0.2, "crowding": 0.1, "dutyMismatch": 0.35 },
+      "weights": { "waitTime": 0.7, "loadFactor": 0.2, "crowding": 0.1 },
       "dispatch": {
         "assignmentMode": "split-demand",
         "splitThresholdPassengers": 12,

@@ -49,8 +49,12 @@ const SHIPPED = [
 const NOBODY: DutyShares = { goods: 0, bed: 0, service: 0 };
 const EVERYBODY: DutyShares = { goods: 0.4, bed: 0.3, service: 0.3 };
 
-/** The profile that carries the shipped `dutyMismatch` weight in `data/dispatcher-profiles.json`. */
-const WEIGHTED_PROFILE_ID = 'capacity-aware';
+/**
+ * The generalist every search-space probe starts from. The duty weight is authored onto it here,
+ * because no shipped profile carries one while no shipped building declares a duty — the guard
+ * below is that rule, and § D549 is why.
+ */
+const BASE_PROFILE_ID = 'predictive-balanced';
 
 let config: LoadedConfig;
 
@@ -93,6 +97,20 @@ describe('a building that declares no duty is byte-identical', () => {
     }
   });
 
+  it('ships no weight on the term while no shipped building declares a duty', () => {
+    // `predictive-balanced`'s own $comment is the precedent: a weight that is decoration in every
+    // shipped configuration is dropped rather than shipped, and the Engineer rail describes a profile
+    // by the terms it weights. So a shipped weight lands with the first shipped building that
+    // declares a duty, or with the control that lets a player declare one — § D549, clause 7.
+    const declares = SHIPPED.some((id) =>
+      buildingOf(id).banks.some((bank) => bank.cars.some((car) => car.duty !== undefined)),
+    );
+    const weighting = config.dispatcherProfiles.profiles
+      .filter((profile) => (profile.weights['dutyMismatch'] ?? 0) > 0)
+      .map((profile) => profile.id);
+    expect(declares || weighting.length === 0, `weighted by ${weighting.join(', ')}`).toBe(true);
+  });
+
   it.each(SHIPPED)('%s draws the same trace, byte for byte, at any duty share', (id) => {
     const building = buildingOf(id);
     const shipped = JSON.stringify(traceOf(building, undefined));
@@ -105,13 +123,13 @@ describe('a building that declares no duty is byte-identical', () => {
     '%s runs the same legs, byte for byte, whether or not the profile weights duty',
     (id) => {
       const building = buildingOf(id);
-      const weighted = config.dispatcherProfilesById.get(WEIGHTED_PROFILE_ID);
-      if (weighted === undefined) throw new Error(`no profile "${WEIGHTED_PROFILE_ID}"`);
-      // The identity would be vacuous if the shipped profile did not weight the term.
-      expect(weighted.weights['dutyMismatch'] ?? 0).toBeGreaterThan(0);
-      const unweighted = { ...weighted, weights: { ...weighted.weights, dutyMismatch: 0 } };
+      const unweighted = config.dispatcherProfilesById.get(BASE_PROFILE_ID);
+      if (unweighted === undefined) throw new Error(`no profile "${BASE_PROFILE_ID}"`);
+      // Five, the top of the weight's range and the size of the rest of this vector: a single call
+      // priced anywhere would move a decision, so the identity is one the arm could have broken.
+      const weighted = { ...unweighted, weights: { ...unweighted.weights, dutyMismatch: 5 } };
 
-      const run = (profile: typeof weighted, shares: DutyShares | undefined) => {
+      const run = (profile: typeof unweighted, shares: DutyShares | undefined) => {
         const result = runSimulation({
           building,
           dispatcherProfile: profile,
@@ -124,10 +142,10 @@ describe('a building that declares no duty is byte-identical', () => {
         return JSON.stringify([result.record.passengers, result.summary]);
       };
 
-      const shipped = run(weighted, undefined);
-      expect(shipped.includes('"duty"')).toBe(false);
-      expect(run(unweighted, undefined)).toBe(shipped);
-      expect(run(weighted, EVERYBODY)).toBe(shipped);
+      const baseline = run(unweighted, undefined);
+      expect(baseline.includes('"duty"')).toBe(false);
+      expect(run(weighted, undefined)).toBe(baseline);
+      expect(run(weighted, EVERYBODY)).toBe(baseline);
     },
   );
 });
