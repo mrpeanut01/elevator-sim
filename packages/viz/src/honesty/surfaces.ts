@@ -11863,6 +11863,8 @@ const ENGINEER_DOOR: SurfaceAdapter = {
   covers: [
     'everyday/types.ts#ENGINEER_SWAP_NOTE',
     'everyday/types.ts#ENGINEER_SWAP_RUSH_NOTE',
+    'everyday/types.ts#ENGINEER_SWAP_REPLAY_NOTE',
+    'everyday/types.ts#ENGINEER_SWAP_WATCH_NOTE',
     'everyday/types.ts#ENGINEER_RETURN_LABEL',
     'everyday/types.ts#ENGINEER_RETURN_TITLE',
   ],
@@ -11883,6 +11885,23 @@ const ENGINEER_DOOR: SurfaceAdapter = {
       {
         field: 'rail.footer.swap.note.rush',
         text: railModel({ screen: 'stage', ctx: 'rush' }).footer.engineerSwap.note,
+        role: 'prose',
+      },
+      /*
+       * And the two other flows where the row does something of its own — GitHub issue #533 item 1.
+       * A replay ends on the swap, as a rush does (issue #531 item 3); a watch does not stop, and
+       * what its note corrects is the *subject* rather than the promise. Seeded per flow rather than
+       * once, because `swapNoteFor` is a table and an unseeded arm is an unswept sentence — which is
+       * how the rush's arm came to be added here on the commit that wrote it.
+       */
+      {
+        field: 'rail.footer.swap.note.replay',
+        text: railModel({ screen: 'brief', ctx: 'replay' }).footer.engineerSwap.note,
+        role: 'prose',
+      },
+      {
+        field: 'rail.footer.swap.note.watch',
+        text: railModel({ screen: 'stage', ctx: 'watch' }).footer.engineerSwap.note,
         role: 'prose',
       },
       { field: 'engineer.header.back.label', text: ENGINEER_RETURN_LABEL, role: 'label' },
