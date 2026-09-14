@@ -25,6 +25,26 @@
  * A spec the loader refuses throws out of the apply. The refusal is drawn where the reader is
  * rather than thrown at the console: `validateSpec` says what would be lost *before* the press, and
  * the catch says what the parser said if it happens anyway.
+ *
+ * ## Why a trip to the Engineer surface cannot leave this screen stale, and why it must not redraw
+ *
+ * GitHub issue #535 asked it of three screens that read the host once, when they are drawn, and
+ * take no subscription. Two of them can go stale and re-read on the way back
+ * (`screens.ts#EverydayScreenHandle.reread`, § D566). **This one cannot**, and it is the screen
+ * where the fix would be the defect.
+ *
+ * The board reads the host exactly twice, both at mount: `elevatorSpecs()`, which is
+ * `host.ts#EverydayHostBindings.resources` and is stable for the life of the page, and
+ * `buildingSpec()`, which seeds the drawing from the standing building. Everything drawn after that
+ * is `spec` — the player's own document — and every control writes it. So there is nothing on this
+ * screen that is a *view* of host state for the Engineer surface to move under: the one value it
+ * could move is the seed, and the seed was consumed. Re-reading it on the way back would replace a
+ * tower the player has been drawing with whatever building the other world happens to be standing
+ * on, which is a worse thing than a stale caption by a wide margin.
+ *
+ * `unitsNow()` is per draw and is deliberately not a counter-example: it reads
+ * `everydayProfileStore()`, not the host, and its own comment says why it is read per draw rather
+ * than captured.
  */
 
 import {
