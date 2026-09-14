@@ -2049,4 +2049,36 @@ describe('a run in flight when a day is left — GitHub issue #526', () => {
     expect(h.patches.at(-1)?.buildingId).toBe(offer.buildingId);
     expect(h.patches.at(-1)?.week?.contractId).toBe(offer.id);
   });
+
+  /**
+   * **A day already filed is stopped, not accused** — GitHub issue #531 item 4, § D565.
+   *
+   * `abandonDay` cancels *and* marks: `dev/main.ts` writes the standing recording into
+   * `abandonedRecording`, which `shift/banking.ts#bankingRefusalFor` then refuses with *“belongs to
+   * a day that was left unfinished”*. `dev/main.ts#postCurrentRun` asks that refusal **before** it
+   * asks whether the run reproduces from the selection, so after an offer a filed day was refused
+   * with a sentence that is false about it. The cancel is still right — a run in flight was asked
+   * for the week being parked — so the two halves are split by the fact that decides them, and the
+   * assertion is on which binding was called.
+   *
+   * The refusal itself is `shift/banking.test.ts`'s and is not restated here: what this file owns is
+   * which of `dev/main.ts`'s two presses this façade reaches, which is the whole of the fix.
+   */
+  it('stops the run but does not refuse a day that has already filed — item 4', () => {
+    const career = { ...openingCareer(base().dispatcherId), carry: 14 };
+    const store: CareerStore = {
+      load: () => ({ career, refusal: undefined, notice: undefined }),
+      save: () => {},
+      clear: () => {},
+    };
+    const offer = CONTRACTS.find((contract) => offerRefusalOf(career, contract.id) === undefined);
+    if (offer === undefined) throw new Error('no contract is takeable on a career one slot up — the fixture no longer opens one');
+    const h = harnessOf(base(), { dayClosed: true });
+    const host = createEverydayHost(h.bindings, store);
+    const beforeTaking = h.calls.length;
+    host.campaignAct({ kind: 'take-offer', contractId: offer.id });
+    expect(h.calls.slice(beforeTaking)).toEqual(['cancelRun', 'applyPatch']);
+    /* And the week still moves, so this is the refusal being dropped rather than the arm being skipped. */
+    expect(h.patches.at(-1)?.week?.contractId).toBe(offer.id);
+  });
 });
