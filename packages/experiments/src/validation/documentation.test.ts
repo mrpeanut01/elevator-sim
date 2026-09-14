@@ -1700,24 +1700,24 @@ type DecisionReservation = {
  * reconciles to D507 on this same commit.
  */
 /**
- * **A block is open, D533 to D538, and it was opened on GitHub issue #234's lane branch rather than
- * at dispatch.** That lane was reserved D537–D538 and wrote § D537, and nothing had opened a
- * reservation, so this file read every number below D537 as an unregistered hole. The floor is D533
- * because that is what the charter row already names — #413's lane returned D533–D535 unspent, and
- * whether they went back to the pool is the integrator's call under § D404 — and the top is D538,
- * the highest number that lane was told is reserved. The integrator widens `to` if a sibling lane
- * holds more, registers any number the block never writes, and closes it on the commit that
- * reconciles the charter row.
+ * **The D533–D556 block is closed, and wave Z's block D557–D580 is open in its place.**
  *
- * **Widened to D556 on 2026-09-11, before the next wave's lanes wrote anything.** GitHub issue #467's
- * decision, D535 on its still-open PR #506, waits on the owner's approval of the prices it drafts, so
- * the block cannot close yet, and a second
- * open reservation is not a shape this file has. The lanes hold D539–D541 (#431 and #433), D542–D544
- * (#372), D545–D546 (#438), D547–D548 (#418), D549–D550 (#481) and D551 (#379); D552–D554 are held
- * for #478 and #437, and D555–D556 are the integrator's. D534 and D536 are still unwritten, and are
- * registered as holes when the block closes, not before.
+ * The wave of 2026-09-10 (widened 2026-09-11) wrote fifteen of its twenty-four numbers. The nine it
+ * never reached — D534, D536, D540, D541, D544, D546, D550, D551 and D554 — are registered below as
+ * holes rather than backfilled, on § D430's rule that ids here are names: a number handed to a lane
+ * and reported unspent denotes *what that lane took*, and giving it to somebody else later would
+ * make it mean two things across time.
+ *
+ * **Wave Z reserves D557–D580, opened before its first lane commits rather than after.** That is
+ * the one procedural thing waves Q and the § D418 note above keep having to relearn, so it is done
+ * first here and not at integration. The block: D557–D559 lane A (GitHub issue #537, the deep
+ * corpus's whole-run figures), D560–D562 lane B (#528, the fix-it editor's pricing seam),
+ * D563–D567 lane C (#531, #533 and #535, the Everyday shell's leave, swap and staleness paths),
+ * D568–D571 lane D (#534, the hybrid landing panels' follow-ups), D572–D576 lane E (#500 and #501,
+ * Harbour Point and Ashgate) — and **D577–D580 are the integrator's**, which is the sizing lesson
+ * § D418's note asked the next wave to apply rather than repeat.
  */
-const OPEN_RESERVATION = { wave: 'of 2026-09-10, widened 2026-09-11', from: 533, to: 556 } as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'Z, of 2026-09-14', from: 557, to: 580 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
@@ -1812,6 +1812,60 @@ const OPEN_RESERVATION = { wave: 'of 2026-09-10, widened 2026-09-11', from: 533,
  */
 
 const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
+  [
+    534,
+    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
+      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
+      's what that lane took, and reissuing it would make it denote two things across time.',
+  ],
+  [
+    536,
+    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
+      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
+      's what that lane took, and reissuing it would make it denote two things across time.',
+  ],
+  [
+    540,
+    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
+      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
+      's what that lane took, and reissuing it would make it denote two things across time.',
+  ],
+  [
+    541,
+    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
+      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
+      's what that lane took, and reissuing it would make it denote two things across time.',
+  ],
+  [
+    544,
+    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
+      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
+      's what that lane took, and reissuing it would make it denote two things across time.',
+  ],
+  [
+    546,
+    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
+      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
+      's what that lane took, and reissuing it would make it denote two things across time.',
+  ],
+  [
+    550,
+    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
+      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
+      's what that lane took, and reissuing it would make it denote two things across time.',
+  ],
+  [
+    551,
+    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
+      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
+      's what that lane took, and reissuing it would make it denote two things across time.',
+  ],
+  [
+    554,
+    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
+      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
+      's what that lane took, and reissuing it would make it denote two things across time.',
+  ],
   [44, 'used by a per-lane record folded in without remapping — DECISIONS.md’s preamble'],
   [55, 'used by a per-lane record folded in without remapping — DECISIONS.md’s preamble'],
   [78, 'the T20-era per-lane records’ own numbering, never remapped on the fold'],
