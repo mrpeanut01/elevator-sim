@@ -29,7 +29,12 @@ import type {
   FixitRepair,
   FixitState,
 } from './types.js';
-import { priceOf, purchaseUnits } from '../pricing/parse.js';
+import {
+  priceOf,
+  purchaseUnits,
+  smallestPurchaseUnitsOf,
+  steppedPurchaseUnits,
+} from '../pricing/parse.js';
 import { changesAtPaths } from '../pricing/repairPrice.js';
 import type { PriceSchedule } from '../pricing/types.js';
 
@@ -61,6 +66,20 @@ import type { PriceSchedule } from '../pricing/types.js';
  * *each*; a rezone is 6 u however many floors it moves, which is the schedule's own finding about
  * the twelve shipped repairs that buy one. {@link spendOf} charges them through
  * `pricing/repairPrice.ts#changesAtPaths`, the same dedupe a repair's patch goes through.
+ *
+ * ## Three prices, and the two per-step ones are read off the row's face — issue **#528**
+ *
+ * The two steppers read `pricing/parse.ts#smallestPurchaseUnitsOf` and the shaft reads
+ * `#purchaseUnits`, and the difference is the whole of what this function knows about rates. A
+ * stepper's figure is *the price of one step*, which is a flat row's price and a rated row's
+ * `unitsPer` — the price on the row's face, which is what the panel prints beside the control
+ * (*"10 u per half a metre per second"*). A shaft is one purchase of a whole change, so a rated
+ * `new-car` would have to be bought with a quantity this function does not hold, and `purchaseUnits`
+ * correctly refuses rather than guessing one.
+ *
+ * **This function multiplies nothing, and never did** — which is the half of GitHub issue #528's
+ * premise that did not survive being checked. {@link spendOf} is where a step count meets a price,
+ * and since § D560 it meets it inside `pricing/`.
  */
 export function editorPricingFrom(schedule: PriceSchedule): {
   readonly shaftUnits: number;
@@ -69,8 +88,8 @@ export function editorPricingFrom(schedule: PriceSchedule): {
 } {
   return Object.freeze({
     shaftUnits: purchaseUnits(priceOf(schedule, 'new-car')),
-    speedUnitsPerHalfMps: purchaseUnits(priceOf(schedule, 'faster-machines')),
-    capacityUnitsPerTwoPlaces: purchaseUnits(priceOf(schedule, 'larger-car-step')),
+    speedUnitsPerHalfMps: smallestPurchaseUnitsOf(priceOf(schedule, 'faster-machines')),
+    capacityUnitsPerTwoPlaces: smallestPurchaseUnitsOf(priceOf(schedule, 'larger-car-step')),
   });
 }
 
@@ -184,13 +203,21 @@ export interface FixitSpend {
  * The third parameter is the one place this function is allowed to learn a price from. Before, two
  * of the three sums here read module constants and the third read a number authored beside the
  * repair, which is three price lists inside one function.
+ *
+ * ## The two steppers are multiplied in `pricing/` — GitHub issue **#528**, § D560
+ *
+ * This function used to read `editorPricingFrom` and write
+ * `state.speedSteps * pricing.speedUnitsPerHalfMps`, which is a magnitude term for a price, in code,
+ * where `data/price-schedule.json` could not see it or change it. It asks
+ * `pricing/parse.ts#steppedPurchaseUnits` now. **No price moves** — the arithmetic is the same
+ * arithmetic, in the module that owns it — and the two figures are pinned step by step in
+ * `editorPricesThroughTheSchedule.test.ts` on both sides of the move.
  */
 export function spendOf(
   entry: FixitCase,
   state: FixitState,
   schedule: PriceSchedule,
 ): FixitSpend {
-  const pricing = editorPricingFrom(schedule);
   const repairs = entry.repairs.filter((repair) => state.selectedRepairIds.includes(repair.id));
   const extras = standingExtrasFrom(schedule).filter((extra) =>
     state.selectedExtraIds.includes(extra.id),
@@ -202,8 +229,8 @@ export function spendOf(
     0,
   );
   const editorUnits =
-    state.speedSteps * pricing.speedUnitsPerHalfMps +
-    state.capacitySteps * pricing.capacityUnitsPerTwoPlaces +
+    steppedPurchaseUnits(priceOf(schedule, 'faster-machines'), state.speedSteps) +
+    steppedPurchaseUnits(priceOf(schedule, 'larger-car-step'), state.capacitySteps) +
     settingUnits;
   const shaftUnits = repairs
     .filter((repair) => repair.role === 'new-shaft')

@@ -33,6 +33,7 @@ import {
   priceOf,
   purchaseUnits,
   smallestPurchaseUnitsOf,
+  steppedPurchaseUnits,
   violationsIn,
 } from './parse.js';
 import { changesAtPaths, repairPriceUnits } from './repairPrice.js';
@@ -327,5 +328,60 @@ describe('rows without a rate stay flat, so every existing price is unchanged', 
     if (first === undefined) throw new Error('the shipped schedule prices nothing');
     const mutated = [{ ...first, rate: {} }, ...raw.changes.slice(1)];
     expect(mutated.filter((row) => 'rate' in row)).toHaveLength(1);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A stepped control asks the schedule — GitHub issue #528, § D560
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **{@link steppedPurchaseUnits} is where a step count meets a price**, and it exists because the
+ * fix-it editor was doing that arithmetic in `fixit/engine.ts#spendOf`, where the schedule could
+ * neither see it nor change it (GitHub issue **#528**, [§ D560](../../../../DECISIONS.md)).
+ *
+ * The flat arm is § D552's own refusal kept deliberately: a multiplier on a row that declares no
+ * rate. It is kept because withdrawing it moves a shipped price, and it is moved here because one
+ * visible multiplier is worth more than an invisible one. The rated arm is the point — the day
+ * either stepped row is given a `rate`, the data decides and no code changes.
+ */
+describe('a stepped control is priced here rather than by its screen — #528', () => {
+  it('charges a flat row its own price once per step, and nothing for no steps', () => {
+    const flat = priceOf(scheduleWithRate(), 'faster-machines');
+    expect(flat.rate).toBeUndefined();
+    expect(steppedPurchaseUnits(flat, 0)).toBe(0);
+    expect(steppedPurchaseUnits(flat, 1)).toBe(flat.priceUnits);
+    expect(steppedPurchaseUnits(flat, 4)).toBe(4 * (flat.priceUnits ?? 0));
+  });
+
+  it('charges a rated row through its rate, so the same control is priced by the data alone', () => {
+    const row = rated(scheduleWithRate());
+    const rate = row.rate?.unitsPer ?? Number.NaN;
+    for (const steps of [0, 1, 5, QUANTITY_MAX]) {
+      expect(steppedPurchaseUnits(row, steps), String(steps)).toBe(purchaseUnits(row, steps));
+      expect(steppedPurchaseUnits(row, steps), String(steps)).toBe(steps * rate);
+    }
+  });
+
+  it('refuses a step count that is not a whole number of steps, or is negative', () => {
+    const flat = priceOf(scheduleWithRate(), 'faster-machines');
+    for (const steps of [-1, 1.5, Number.NaN]) {
+      expect(() => steppedPurchaseUnits(flat, steps), String(steps)).toThrow(PriceScheduleError);
+      expect(() => steppedPurchaseUnits(flat, steps), String(steps)).toThrow(/#528/);
+    }
+  });
+
+  /**
+   * **The gap this seam leaves, pinned rather than left to be found.** A rated row declares a most;
+   * a stepper has no ceiling but the budget. So a player who steps past the declared most makes this
+   * throw, and the screen has nothing to refuse with. Nothing reaches it today — no shipped row is
+   * rated — and the row that changes that is GitHub issue #437's per-landing panels, whose lane owes
+   * the stepper a ceiling. Held here so the throw is a decision rather than a surprise.
+   */
+  it('throws past a rated row’s declared most, which is the ceiling a stepper still owes — #437', () => {
+    const row = rated(scheduleWithRate());
+    expect(steppedPurchaseUnits(row, QUANTITY_MAX)).toBeGreaterThan(0);
+    expect(() => steppedPurchaseUnits(row, QUANTITY_MAX + 1)).toThrow(PriceScheduleError);
+    expect(() => steppedPurchaseUnits(row, QUANTITY_MAX + 1)).toThrow(/sells 0–12 panel/);
   });
 });

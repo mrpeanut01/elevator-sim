@@ -59,6 +59,13 @@
  * has **no** `priceUnits` field, so a reader that summed flat figures fails to compile against one
  * rather than quietly charging a single unit, and `pricing/parse.ts#purchaseUnits` is the one place a
  * rate is multiplied by a quantity.
+ *
+ * ## And one place a flat price is multiplied by a step count — GitHub issue #528
+ *
+ * `pricing/parse.ts#steppedPurchaseUnits`, [§ D560](../../../../DECISIONS.md). A stepped control — the
+ * fix-it editor's `+0.5 m/s` and `+2 places` — charged its flat row per step inside `fixit/engine.ts`,
+ * which is a magnitude term this file could not see. The arithmetic is unchanged and no price moved;
+ * what moved is where it lives, and `pricesAreMultipliedOnlyHere.test.ts` keeps it there.
  */
 
 /** One rung of the ladder — `docs/38` § 2.1's three tiers. */

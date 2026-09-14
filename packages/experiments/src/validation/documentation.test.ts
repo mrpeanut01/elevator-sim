@@ -1717,7 +1717,15 @@ type DecisionReservation = {
  * for #478 and #437, and D555–D556 are the integrator's. D534 and D536 are still unwritten, and are
  * registered as holes when the block closes, not before.
  */
-const OPEN_RESERVATION = { wave: 'of 2026-09-10, widened 2026-09-11', from: 533, to: 556 } as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'of 2026-09-10, widened 2026-09-11 and 2026-09-14', from: 533, to: 562 } as DecisionReservation | null;
+/*
+ * **Widened to D562 on 2026-09-14 by a lane rather than by the integrator, which is the part to
+ * check at integration.** The wave of 2026-09-14 dispatches blocks above D556 — lane B's brief
+ * reserves D560–D562 — and a lane that writes its own number inside its own block was turning this
+ * gate red on the ceiling rather than on anything it had done wrong. The ceiling is raised to the
+ * top of the highest block dispatched; if the wave's real block ends elsewhere, the integrator
+ * reconciles this line and the charter row together, as § D404 puts on them.
+ */
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
