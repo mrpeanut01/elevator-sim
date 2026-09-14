@@ -35440,3 +35440,170 @@ chooses one is #437's too.
 **What this does not decide.** Whether DC-2 should play the whole census rather than a stage's `editable` list: GitHub issue #233 re-authors the lists, and on that commit the out-of-list rows move into `DROPDOWN_CLEARS`. The rebalance of stages 3, 5 and 7.
 
 ---
+## D572 — Harbour Point: the figures, drafted for approval, and the over-subscription measured on both sides rather than declared
+
+**Date: 2026-09-14 · GitHub issue [#500](https://github.com/mrpeanut01/elevator-sim/issues/500) · Rules on: [`docs/37`](docs/37-content-plan.md) § 7.3 clause 3, the product owner's 2026-09-08 standing ruling on governed `data/` values, and the owner's 2026-09-10 ruling on #232 (*the building target is 22, every building is playable and owes one contract*).**
+
+**Why an entry.** Two of [§ D405](#d405)'s three grounds. The authored figures need the owner's
+approval and are drafted for it here, which is what the standing `data/` ruling asks of a file with
+no schema of its own to hang a `provenance` block on. And it discharges a clause already recorded:
+`docs/37` § 7.3 says *author both buildings*, and this is half of that, with the half the owner
+overruled on 2026-09-10 (#419) — the proof-set swap — recorded as refused rather than deferred.
+
+**The shape is the vendored `ENGINE_CONTRACT.md` § 12.3's**: 16 floors, 6 lifts, *more demand than
+the group can clear, whatever you do*. `data/buildings/harbour-point.json` is one bank, six
+identical cars, one entrance, uniform floors, a uniform pitch and nothing else — deliberately the
+simplest building in `data/buildings/`, so that the finding is the arithmetic between the crowd and
+the group and cannot be attributed to a zone, a credential or a transfer.
+
+1. **What is CHOSEN, and awaits approval.** The floor count (16) and the car count (6), both § 12.3's;
+   the 3.7 m floor-to-floor; **104 people a floor over fifteen occupied floors, 1 560 in all**; the
+   car class (`geared-traction` at its 2.5 m/s typical and 2 500 lb, the *Office standard* row of
+   `data/elevator-specs.json` `capacities`); the side-opening doors; and `office-standard` as the
+   traffic profile. The building's `$comment` marks each of them and says so.
+2. **What is MEASURED, and is not a judgement.** The closed form gives the bank a handling capacity
+   of **155.0 persons / 5 min**, **9.94 %** of the population it serves, against the profile's
+   typical 12 % of which 0.85 is incoming — **10.2 % offered against 9.94 % carried**, before a
+   dispatcher decides anything. And the run: over the **thirteen shipped dispatcher profiles × five
+   seeds** (`20 260 824 + 7 919 n`) at 1 800 s, **64 of 65 runs report a diverging queue and have
+   the mean suppressed**.
+3. **The sixty-fifth is reported rather than rounded away.** `zoned-uppeak` at seed 20 276 662 comes
+   back `awtIsValid: true` and publishes a quotable **278.8 s** mean with **88 %** of arrivals over
+   the long-wait threshold and a queue rising at 12.3 persons a minute. That is the trend test's own
+   scatter ratio failing to clear, not a run that coped, and it is the shape `CLAUDE.md`
+   § Statistical discipline names: *neither gate sees a queue that grew enormously and drained just
+   in time*. **No AWT is published for this building**, and none may be.
+4. **The population departs from the design's own figure, and the departure is a measurement.**
+   `GAMEPLAY_AND_NAVIGATION.md` § 10.5 reads *"One start time for eleven hundred"*. Run over the
+   identical grid at 1 095 people, only **27 of 65** saturate — **38 of 65 publish a quotable
+   mean** — so eleven hundred does not hold § 12.3's *why* line on more than half the grid.
+   [`docs/12`](docs/12-design-handoff.md) § 4.4's *the file wins* is applied to a population, and
+   § 4.7's rule that a deviation is recorded rather than absorbed is why this clause exists. The
+   fix case is GitHub issue #233's and carries its own figure.
+5. **The oracle reaches it with no caveat.** `analyzeUpPeak` raises **no warning at all** on this
+   bank, which was true of exactly one shipped bank before it (`chancery-house/main`). Reconciled in
+   `packages/experiments/src/oracle/remainingBuildings.test.ts` at that file's own 64 replications
+   from seed 810 000: raw **+28.63 %**, residual **−0.14 %**, `explained` against a 4 % tolerance.
+   **A saturating building does not defeat the oracle**, and the reason is structural rather than
+   lucky: `measureUpPeak` isolates the bank and drives it at `OVERLOAD_FACTOR × %POP` of its own
+   computed capacity, so the experiment's demand is not the building's.
+6. **Playable, and let at three fifths to be so.** Contract `c9` hands the player the tower at
+   `occupancy: 0.60`; the rung, its bracket and its measured 0.42 of 50 are
+   `data/contract-ladder.json` and `docs/33` § 4.7j. **The building as built is what § D572 is
+   about; the scenario is a let of it**, and the two are deliberately different claims.
+
+**What this does not decide.** Whether the figures are right — they are game and modelling feel
+where they are not forced, and the owner's to accept, tighten or reject. And the proof set: the
+owner ruled on 2026-09-10 (#500, #419) that the forty stay fixed, so this tower does **not** enter
+`data/proof-cases.json` and that file's recorded substitution stands permanently.
+
+---
+
+## D573 — Ashgate Mixed-Use: the figures, drafted for approval, and a `servesFloors` restriction proved on the legs rather than asserted
+
+**Date: 2026-09-14 · GitHub issue [#501](https://github.com/mrpeanut01/elevator-sim/issues/501) · Rules on: [`docs/37`](docs/37-content-plan.md) § 7.3 clause 3, [§ D265](#d265)'s rule that a restriction no rider needs is a dead seam, and the product owner's 2026-09-08 standing ruling on governed `data/` values.**
+
+**Why an entry.** The same two grounds as [§ D572](#d572): authored figures drafted for the owner's
+approval, and a recorded clause discharged. It also records a **limit of the building schema** that
+binds anybody authoring a multi-entrance building, which is [§ D405](#d405)'s first ground.
+
+1. **What is CHOSEN, and awaits approval.** The floor count (22) and the car count (5), both
+   `ENGINE_CONTRACT.md` § 12.3's; the split of the 22 into `B2`, `B1`, `G`, three retail floors and
+   sixteen office floors; the 3.6 m basement pitch, the 4.5 m retail pitch and the 3.7 m office
+   pitch; 22 people a retail floor and 34 an office floor, **610** in all, with nobody housed in the
+   car park or the ground-floor shop lobby; the four-plus-one split of the five cars; the car classes
+   (`geared-traction` 2.5 m/s / 2 500 lb for the tower, `mrl-gearless-low` 1.6 m/s / 3 500 lb for
+   the car-park car); and `office-standard` as the traffic profile.
+2. **The restriction binds, and it is measured on the legs.** § D265's defect is a restriction no
+   generated rider ever needs, and it is not asserted away here. On seed 20 260 824 at 1 800 s under
+   `collective` the run draws **244 journeys and 381 legs**; 135 of those journeys begin in the car
+   park and **every one takes exactly 2.000 legs**, transferring at `G`. Give bank `main` the two
+   basement floors — the repair `GAMEPLAY_AND_NAVIGATION.md` § 10.5 case 6 names — and the **same
+   244 journeys take 244 legs**, no journey takes more than one, mean time to destination falls
+   **195.3 s → 150.8 s** and mean wait **rises 38.5 s → 50.2 s**. Two further seeds reproduce it
+   (383 against 246, 353 against 217). **The journey counts are identical on both arms**, so what
+   moved is the routing and not the demand — which is what makes this the standing requirement's
+   *move the control and require the run to change, compared on the legs* rather than a difference
+   of traffic.
+3. **One of five cars is expressible only as a bank of one, and that is physical as well as
+   schematic.** `servesFloors` is declared per **bank**. It is also the honest arrangement: a shaft
+   reaching both `B2` (−7.2 m) and floor 19 (+72.7 m) is a **79.9 m** rise, past
+   `geared-traction`'s 76 m `maxRiseM` — the counterfactual arm in clause 2 raises
+   `rise-exceeds-class` and the shipped building raises no loader warning at all.
+4. **The car-park share is a consequence and is recorded as one, because the schema cannot carry
+   it.** § 10.5 says the car park is what *a third of the building arrives through*.
+   `traffic/generator.ts` weights entrances **equally** unless a run passes `entranceWeights`, which
+   is a field of `SimulationDemandOptions` and not of the building schema, so three declared
+   entrances means a third of incoming demand each and, measured, **135 of 244 journeys (55 %)**
+   begin in the car park. The alternative — one basement an entrance and the other a served floor
+   nobody ever calls from or to — is § D265's shape exactly, so the share is **published rather than
+   approximated**. Anybody who wants the design's third sets `entranceWeights` on the run.
+5. **Every car states `passengerTransferS`, and every car states 1.2 s.** `data/buildings/README.md`
+   § Passenger transfer time refuses to default on a `mixed-use` building. Declaring the office row
+   five times is a claim rather than a shrug: this tower's whole population is people at work, so one
+   figure does describe every car — unlike `mixed-use-high-rise`, where a residential bank loads at
+   1.75 s against an office bank's 1.2 s. **No new reference value is authored.**
+6. **The closed form reaches one bank and refuses the other, and both are measured.** `main`
+   reconciles — raw **+31.21 %**, residual **−0.26 %**, `explained` against a 4 % tolerance at 64
+   replications from seed 810 000 — with three declared departures from the model
+   (`nonUniformFloorPopulations`, `nonUniformInterfloorDistance`, `expressZone`), asserted as a set
+   so a fourth arriving is red. `carpark` is **refused by a throw**: it serves no populated floor
+   above its terminal, because a parking deck houses nobody, and an up-peak round trip to a zone with
+   no occupants is not a quantity the Barney/CIBSE expression has. The refusal is liftable — author
+   a population above `G` on that bank — which is what makes asserting it worth anything
+   (`CLAUDE.md` § *A stated refusal goes stale the same way*).
+
+**What this does not decide.** Whether the figures are right. Whether `entranceWeights` should
+become a building field — that is a schema question with a run-comparability cost
+([`docs/37`](docs/37-content-plan.md) § 5.2's shape) and nothing here needs it. And the proof set:
+the owner ruled on 2026-09-10 (#501, #419) that the forty stay fixed.
+
+---
+
+## D574 — A new contract is placed in the ladder by its own measured miss rate, and `docs/33` § 4.7h's position 9 is superseded as arithmetic
+
+**Date: 2026-09-14 · GitHub issues [#500](https://github.com/mrpeanut01/elevator-sim/issues/500) and [#501](https://github.com/mrpeanut01/elevator-sim/issues/501) · Rules on: [`docs/33`](docs/33-difficulty-curve.md) § 4.7d's measured order and § 4.7h's *where the ninth contract goes*, and the owner's 2026-09-10 ruling on #232 that every building owes one contract.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: it moves something already recorded. § 4.7h says
+the ninth contract *goes at position 9, after `vertical-city`*, and two contracts have landed that
+do not. It also binds `packages/viz/src/shift/contracts.test.ts`, which pins the order, the labels
+and the bank-count sequence, and `data/contract-ladder.json`, neither of which the deciding lane
+owns outright.
+
+1. **The rule, stated once.** A contract is placed by **its own day-1 miss rate measured on the
+   shipped path**, at `docs/33` § 4.7d's budget and seeds, and inserted where that rate puts it.
+   Appending is what § 4.2 measured and #382 refused: it is ordering by arrival.
+2. **Measured.** `CONTRACT_CURVE_SWEEP=1 CONTRACT_CURVE_SEEDS=50 CONTRACT_CURVE_ONLY=c9,c10`, day 1,
+   `collective`, seeds `20 260 824 + 7 919 n`, the shipped five-goal set: `c9` (`harbour-point`, let
+   at 0.60) **21 of 50 = 0.42**, `c10` (`ashgate`, crowd at 13.5 %) **26 of 50 = 0.52**. They go at
+   positions **4** and **8**. DC-4 is green on **seven of ten**; DC-6 is green, the targets reading
+   0.36, 0.36, 0.40, 0.42, 0.46, 0.50, 0.52, 0.52, 0.65, 0.65.
+3. **Appending was available and is wrong on the measurement, not on taste.** `harbour-point` **as
+   built** reads 1.00 — § D572 clause 2 — and `ashgate` as built reads 0.13 at 30 seeds, under
+   DC-4's floor. Either at the end of the array would have been the ladder #382 replaced.
+4. **Each rung is bracketed on both sides.** `c9` by occupancy at 30 seeds (0.45 → 0.03 … 0.85 →
+   1.00) and `c10` by rate (11 % → 0.00 … 15 % → 0.83, and at 50 seeds 13 % → 0.44 and 14 % →
+   **0.66**, outside the band at the top). Neither figure is the first value that cleared.
+5. **Which substrate moves is decided per building.** `c9` moves the **let** and not the crowd,
+   because `office-standard`'s declared floor is 11 % and the building is short of its own handling
+   capacity at 12 — no admissible rate makes a fully let Harbour Point passable. `c10` moves the
+   **crowd** and leaves the fabric alone, because Ashgate's dispatch problem *is* its fabric.
+6. **The curriculum reading survived and was checked rather than hoped for.** Bank counts go
+   1, 1, 1, 1, 1, 2, 3, 7 → **1, 1, 1, 1, 1, 1, 2, 2, 3, 7**. Harbour Point is a one-bank tower whose
+   difficulty is entirely its crowd, so a miss rate placing it after Secure Tower would have put one
+   bank after two and falsified the reading; `contracts.test.ts` asserts the sequence, so that would
+   have been a red test rather than a quiet change to what the campaign teaches. **Had it fired, the
+   honest move is to re-argue the reading — not to reorder the ladder against its own measurement.**
+7. **§ 4.7h is superseded as arithmetic and intact as reasoning.** It was written about
+   `burj-class-reference`, which still has no contract
+   (`contracts.test.ts#REFERENCE_ONLY`), and the position it names was derived from an
+   eight-contract ladder. A Burj rung still goes after `vertical-city`; it is position **11**.
+8. **The ids do not move and the labels do.** `c1`–`c10` are names; `c2` is now *Scenario 5* and
+   `c4` *Scenario 9*, because a label is a position. `needClean` keeps the eight-contract shape at
+   ten — 1, 2, 2, 2, 2, 3, 3, 3, 3, 3 — so the stake still rises once and lands at the end.
+
+**What this does not decide.** The three contracts still outside DC-4's band (§ 4.7e, § 4.7f) or the
+playtest § 4.7i schedules. And it takes no position on the eleven buildings the target of 22 still
+owes: the rule above is what each of them meets, not a claim about when.
+
+---

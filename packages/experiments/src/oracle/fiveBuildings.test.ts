@@ -704,9 +704,11 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
     const named = new Set(PRINCIPAL_BANKS.map((bank) => bank.buildingId));
     const absent = [...config.buildingsById.keys()].filter((id) => !named.has(id)).sort();
     expect(absent).toEqual([
+      'ashgate',
       'burj-class-reference',
       'chancery-house',
       'crown-hotel',
+      'harbour-point',
       'st-jude-hospital',
     ]);
 
@@ -753,7 +755,21 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
     // The wrong step is the one to remember: identical cars within a bank does **not** imply
     // coverable. `st-jude-hospital` refuses on the bracket with a heterogeneous bank, so the bracket
     // is independent of heterogeneity and uniformity cannot license the converse.
-    const coverable = ['burj-class-reference', 'chancery-house'];
+    /*
+     * **Two more landed with the content plan, and both are covered** — GitHub issues #500 and
+     * #501, `docs/37` § 7.3's two buildings. `harbour-point` is a single uniform bank on which
+     * `analyzeUpPeak` raises **no warning at all**, which was true of exactly one shipped bank
+     * before it; `ashgate` reconciles on `main` and is refused on `carpark`, which serves two
+     * unpopulated parking decks and a transfer floor. Both are measured in
+     * `remainingBuildings.test.ts` at this file's own budget and seed base — raw +28.63 % /
+     * residual −0.14 %, and raw +31.21 % / residual −0.26 % — and they stay out of
+     * `PRINCIPAL_BANKS` for `chancery-house`'s reason: *the five* is a cited set.
+     *
+     * They are `coverable` in the strict sense the loop below checks: every bank of each is
+     * internally uniform. That is **not** the same as reduces — the remark under
+     * `burj-class-reference` says why, and it is the wrong step this guard exists to keep visible.
+     */
+    const coverable = ['ashgate', 'burj-class-reference', 'chancery-house', 'harbour-point'];
     const notCoverable = ['crown-hotel', 'st-jude-hospital'];
     expect([...coverable, ...notCoverable].sort()).toEqual(absent);
     for (const id of notCoverable) {

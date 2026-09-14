@@ -1569,6 +1569,12 @@ on the shipped order**. This section is the rebuilt lifecycle and the measuremen
 green** and **DC-4 is green on five of the eight**; the three that are not are § 4.7e and § 4.7f, and
 each is a finding with its probes attached rather than a reason to widen the band.
 
+> **Two contracts have landed since, and § 4.7j is their row.** `c9` (Harbour Point) and `c10`
+> (Ashgate Mixed-Use) were measured on the same instrument at the same budget and **inserted** into
+> the order at positions 4 and 8 rather than appended, so the ladder is ten long and DC-4 is green
+> on **seven of ten**. Everything in §§ 4.7a–4.7i describes the eight-contract ladder it was
+> measured on and is not rewritten; § 4.7j says what moved.
+
 #### 4.7a The instrument, and the first thing it found
 
 `packages/viz/src/shift/contractCurve.sweep.test.ts`, gated on `CONTRACT_CURVE_SWEEP=1`. It is
@@ -1860,6 +1866,63 @@ set, which is the direction that list says it is meant to move in.
   unchanged by this work — `grownBuilding` is applied after the rung, exactly as before.
 - **The playtest.** The owner's ruling schedules one after this re-implementation, and it is what
   should settle whether a ramp that is flat inside noise *feels* like a ramp.
+
+#### 4.7j The ninth and tenth contracts, inserted rather than appended
+
+**Landed 2026-09-14, GitHub issues [#500](https://github.com/mrpeanut01/elevator-sim/issues/500) and
+[#501](https://github.com/mrpeanut01/elevator-sim/issues/501)** — the two buildings
+[`docs/37` § 7.3](37-content-plan.md) says the content plan owes, each with the Career contract the
+owner's 2026-09-10 ruling on #232 says every building owes.
+
+**Run.** § 4.7d's, unchanged: `CONTRACT_CURVE_SWEEP=1 CONTRACT_CURVE_SEEDS=50
+CONTRACT_CURVE_ONLY=c9,c10 CONTRACT_CURVE_OUT=<path> npx vitest run --project viz
+packages/viz/src/shift/contractCurve.sweep.test.ts`, day 1, dispatcher `collective`, seeds
+`20 260 824 + 7 919 n`, the shipped five-goal set.
+
+| position | contract | building | what moves it | missed | of | rate | in band |
+|---|---|---|---|---|---|---|---|
+| 4 | c9 | `harbour-point` | let at 0.60 — 936 desks rather than 1 560 | 21 | 50 | **0.42** | **yes** |
+| 8 | c10 | `ashgate` | 13.5 % of population per 5 min, inside the profile's 11–15 | 26 | 50 | **0.52** | **yes** |
+
+**DC-4 is now green on seven of ten**, against five of eight. **DC-6 is green**: the targets in
+array order read 0.36, 0.36, 0.40, **0.42**, 0.46, 0.50, 0.52, **0.52**, 0.65, 0.65.
+
+**The insertion is the point, and appending was the available shortcut.** Both contracts could have
+gone at the end of the array, which is where § 4.7h put the ninth. Measured, neither belongs there:
+`harbour-point` **as built** reads 1.00 — its `data/buildings/` file is authored to be
+over-subscribed, and 64 of 65 runs across every shipped dispatcher × five seeds report a diverging
+queue — and `ashgate` **as built** reads 0.13 at 30 seeds, which is under DC-4's floor. Appending
+either would have reproduced exactly the defect #382 was filed about: a ladder ordered by arrival
+rather than by difficulty.
+
+**Each rung was bracketed on both sides rather than stopped at the first value that cleared.** For
+`c9`, occupancy at 30 seeds: 0.45 → 0.03, 0.55 → 0.20, 0.58 → 0.37, 0.60, 0.62 → 0.43, 0.65 → 0.63,
+0.75 → 0.93, 0.85 → 1.00. For `c10`, arrival rate at 30 seeds: 11 % → 0.00, 12 % → 0.13, 13 % →
+0.40, 14 % → 0.57, 15 % → 0.83; re-measured at 50, 13 % reads 0.44 and 14 % reads **0.66**, which is
+outside the band at the top, so 13.5 sits between the two figures that were each measured at the
+published budget.
+
+**Which substrate moves is decided per building rather than by preference.** `c9` moves the **let**
+and not the crowd, because the standard-office profile's declared floor is 11 % and Harbour Point is
+short of its own handling capacity at the typical 12 — no admissible rate makes a fully let Harbour
+Point passable, so the population is the only lever, exactly as on `c2`. `c10` moves the **crowd**
+and leaves the fabric alone, because Ashgate's dispatch problem *is* its fabric: one of five cars
+reaches the car park, and taking a car away or adding one would delete or dissolve the scenario.
+
+**The curriculum reading survived, and it was checked rather than assumed.** § 4.7d's bank-count
+sequence 1, 1, 1, 1, 1, 2, 3, 7 becomes **1, 1, 1, 1, 1, 1, 2, 2, 3, 7**. That was a live risk:
+Harbour Point is a one-bank tower whose difficulty is entirely its crowd, so a miss rate that had
+placed it after Secure Tower would have put one bank after two and made the reading false.
+`contracts.test.ts` asserts the sequence, so the honest move in that case — re-arguing the reading
+rather than reordering the ladder against its own measurement — would have been forced rather than
+optional.
+
+**What this does not settle.** § 4.7h's *ninth contract goes at position 9* is now **superseded as
+arithmetic and intact as reasoning**: it was written about `burj-class-reference`, which still has
+no contract (`contracts.test.ts#REFERENCE_ONLY`), and the position it names was derived from the
+eight-contract ladder. A Burj rung still goes after `vertical-city`; it is position **11** now, not
+9. And neither of these two buildings enters the bench's forty — the owner ruled on 2026-09-10
+(#419) that the proof cases stay fixed — so nothing in § 6 or in `data/proof-cases.json` moves.
 
 ---
 

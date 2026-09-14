@@ -1,0 +1,181 @@
+{
+  "$comment": "THE GROUP THAT CANNOT COPE, and the one shipped tower whose difficulty is its CROWD rather than its kit. GitHub issue #500; docs/37-content-plan.md SS 7.2 and SS 7.3, which author it because no tower in the shipped forty holds that role -- the proof set's substitute, secure-tower, tests a credential on every call, which is a different thing. The shape is the vendored ENGINE_CONTRACT.md SS 12.3's: 16 floors, 6 lifts, 'more demand than the group can clear, whatever you do'. One bank, six identical cars, one entrance, uniform floors and a uniform pitch -- deliberately the simplest building in data/buildings/, because the finding has to be the arithmetic between the crowd and the group and nothing else. PROVENANCE, per the product owner's 2026-09-08 standing ruling on governed data/ values: EVERY AUTHORED FIGURE BELOW IS AN AGENT'S PROPOSAL, drafted for the owner to accept, tighten or reject, and NOT YET APPROVED. The line the ruling asks for is drawn field by field. WHAT IS CHOSEN: the floor count (16, from SS 12.3) and the car count (6, from SS 12.3); the 3.7 m floor-to-floor, which is an ordinary 1970s office storey and puts the top floor at 55.5 m; the population of 104 a floor over the fifteen occupied floors, 1 560 in total; the car class (geared-traction at its 2.5 m/s typical, 2 500 lb -- the 'Office standard' row of elevator-specs.json capacities); the side-opening doors; and office-standard as the traffic profile. WHAT IS MEASURED, and what each of those figures was chosen against: at 104 a floor the closed form gives this bank a handling capacity of 155.0 persons / 5 min, which is 9.94 % of the population it serves, against the office-standard profile's typical 12 % per 5 min of which 0.85 is incoming -- 10.2 % offered against 9.94 % carried, so the group is short before a dispatcher makes a single decision. Run rather than reasoned: over the thirteen shipped dispatcher profiles x five seeds (20 260 824 + 7 919 n) at 1 800 s, 64 of 65 runs report a DIVERGING QUEUE and have their mean wait suppressed; the sixty-fifth (zoned-uppeak at seed 20 276 662) publishes a quotable mean of 278.8 s with 88 % of arrivals over the long-wait threshold, which is the trend test's own scatter ratio failing to clear rather than a run that coped. NO AWT IS QUOTED FOR THIS BUILDING and none may be: CLAUDE.md SS Statistical discipline suppresses the interval for a system whose queues grow without bound. WHY 1 560 AND NOT ELEVEN HUNDRED: GAMEPLAY_AND_NAVIGATION.md SS 10.5's fix case reads 'One start time for eleven hundred'. Measured, eleven hundred does not hold the SS 12.3 why line. The same building scaled to 0.7 -- 1 095 people -- was run over the identical grid of thirteen dispatcher profiles x five seeds, and only 27 of 65 runs saturate: 38 of 65 publish a quotable mean, against 1 of 65 at the shipped population. A building authored to the fix case's figure would ship with a why line its own runs refute on more than half of them, so docs/12 SS 4.4's rule that THE FILE WINS is applied to a population here and the departure is recorded rather than absorbed. The fix case is GitHub issue #233's and carries its own figure. WHAT THE CLOSED FORM SAYS ABOUT THIS BANK: analyzeUpPeak raises NO warning on it at all -- one entrance, one zone, six identical cars, uniform populations, uniform pitch, no express run -- so it is the second shipped bank the Barney/CIBSE round trip describes with no caveat, beside chancery-house/main. Reconciled in packages/experiments/src/oracle/remainingBuildings.test.ts at that file's own 64 replications from seed 810 000: raw divergence +28.63 %, residual -0.14 % once the two documented omissions are restored, explained against a 4 % tolerance. WHAT THIS BUILDING IS NOT FOR: it is not in data/proof-cases.json. The owner ruled on 2026-09-10 (GitHub issues #500 and #419) that it stays out of the bench's forty so every rating stays comparable; docs/37 SS 7.3's proposed swap is settled in the refusing direction.",
+  "id": "harbour-point",
+  "name": "Harbour Point",
+  "type": "office",
+  "trafficProfile": "office-standard",
+  "floors": [
+    {
+      "id": "G",
+      "index": 0,
+      "heightM": 0.0,
+      "population": 0,
+      "isEntrance": true,
+      "label": "Lobby"
+    },
+    {
+      "id": "1",
+      "index": 1,
+      "heightM": 3.7,
+      "population": 104
+    },
+    {
+      "id": "2",
+      "index": 2,
+      "heightM": 7.4,
+      "population": 104
+    },
+    {
+      "id": "3",
+      "index": 3,
+      "heightM": 11.1,
+      "population": 104
+    },
+    {
+      "id": "4",
+      "index": 4,
+      "heightM": 14.8,
+      "population": 104
+    },
+    {
+      "id": "5",
+      "index": 5,
+      "heightM": 18.5,
+      "population": 104
+    },
+    {
+      "id": "6",
+      "index": 6,
+      "heightM": 22.2,
+      "population": 104
+    },
+    {
+      "id": "7",
+      "index": 7,
+      "heightM": 25.9,
+      "population": 104
+    },
+    {
+      "id": "8",
+      "index": 8,
+      "heightM": 29.6,
+      "population": 104
+    },
+    {
+      "id": "9",
+      "index": 9,
+      "heightM": 33.3,
+      "population": 104
+    },
+    {
+      "id": "10",
+      "index": 10,
+      "heightM": 37.0,
+      "population": 104
+    },
+    {
+      "id": "11",
+      "index": 11,
+      "heightM": 40.7,
+      "population": 104
+    },
+    {
+      "id": "12",
+      "index": 12,
+      "heightM": 44.4,
+      "population": 104
+    },
+    {
+      "id": "13",
+      "index": 13,
+      "heightM": 48.1,
+      "population": 104
+    },
+    {
+      "id": "14",
+      "index": 14,
+      "heightM": 51.8,
+      "population": 104
+    },
+    {
+      "id": "15",
+      "index": 15,
+      "heightM": 55.5,
+      "population": 104
+    }
+  ],
+  "totalPopulation": 1560,
+  "banks": [
+    {
+      "id": "main",
+      "name": "Main bank",
+      "servesFloors": [
+        "G",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15"
+      ],
+      "cars": [
+        {
+          "id": "A",
+          "spec": "geared-traction",
+          "ratedSpeedMps": 2.5,
+          "ratedLoadLb": 2500,
+          "doorType": "sideOpening"
+        },
+        {
+          "id": "B",
+          "spec": "geared-traction",
+          "ratedSpeedMps": 2.5,
+          "ratedLoadLb": 2500,
+          "doorType": "sideOpening"
+        },
+        {
+          "id": "C",
+          "spec": "geared-traction",
+          "ratedSpeedMps": 2.5,
+          "ratedLoadLb": 2500,
+          "doorType": "sideOpening"
+        },
+        {
+          "id": "D",
+          "spec": "geared-traction",
+          "ratedSpeedMps": 2.5,
+          "ratedLoadLb": 2500,
+          "doorType": "sideOpening"
+        },
+        {
+          "id": "E",
+          "spec": "geared-traction",
+          "ratedSpeedMps": 2.5,
+          "ratedLoadLb": 2500,
+          "doorType": "sideOpening"
+        },
+        {
+          "id": "F",
+          "spec": "geared-traction",
+          "ratedSpeedMps": 2.5,
+          "ratedLoadLb": 2500,
+          "doorType": "sideOpening"
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "One bank and six identical cars, on purpose. Every other shipped tower makes the dispatcher's problem structural -- a zone, a credential, a transfer, a car unlike its neighbours. Here there is nothing to get right except who goes where and when, and it is still not enough, which is the only way a building can demonstrate that a group can be simply too small.",
+    "Side-opening doors cost 2.5 s to open and 4.0 s to close against a centre-opening car's 1.8 s and 3.0 s (elevator-specs.json doors) -- about 1.7 s a stop, or roughly 17 s on a round trip that makes ten. That is the building's age showing up in the round trip rather than a difficulty dial: a 1970s slab has the doors a 1970s slab has.",
+    "The whole population is above the lobby and the lobby holds nobody, so the arithmetic in the $comment is about the same set of people the closed form's U is about. Nothing here is a sky lobby, a transfer floor or a second entrance, and that is what makes the handling-capacity comparison a statement about the group rather than about the routing."
+  ]
+}

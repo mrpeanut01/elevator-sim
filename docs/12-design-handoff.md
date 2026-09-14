@@ -298,7 +298,7 @@ point, same `needClean`. Where a handoff stat line disagrees with the file (Gard
 6 floors in both; Midtown Office is 21 floors in both; Vertical City is 101 in both), the file wins
 and the line is generated from it.
 
-### 4.7 The campaign is eight scenarios, and the handoff specifies five
+### 4.7 The campaign is ten scenarios, and the handoff specifies five
 
 § 4.4 fixes the campaign at the five buildings shipped when the design was written. Three more
 buildings landed afterwards — `chancery-house`, `crown-hotel` and `st-jude-hospital`
@@ -341,6 +341,27 @@ specify exactly as it applies to one it did.
 > The handoff wins every disagreement about what the screen looks like, and this is not one: the
 > screen draws whatever order `CONTRACTS` holds. *Which order teaches best* is a claim about runs,
 > and `docs/33` § 4.7 settles it with 400 of them.
+
+> **Amended 2026-09-14 — the campaign is ten scenarios** ([GitHub issues #500](https://github.com/mrpeanut01/elevator-sim/issues/500)
+> and [#501](https://github.com/mrpeanut01/elevator-sim/issues/501), [`DECISIONS.md` § D574](../DECISIONS.md)).
+> `harbour-point` and `ashgate` — the two buildings [`docs/37`](37-content-plan.md) § 7.3 says the
+> content plan owes — landed with contracts `c9` and `c10`, so this section's heading and its *three
+> more buildings* are both counts of a set that has grown twice. The rule they were placed by is the
+> amendment above's, applied rather than extended: each was **measured** on the shipped path at
+> `docs/33` § 4.7d's budget and seeds — 0.42 and 0.52 of 50 — and **inserted** at positions 4 and 8
+> rather than appended, because appending is exactly what #382 refused.
+>
+> **The three clauses that survived the 2026-09-09 amendment survive this one too**, and one of them
+> was checked rather than assumed. The **ids** are unchanged and `c1`–`c10` are names. The
+> **teaching points** are unchanged. **The finale's reward has not moved**: `c5` still grants endless
+> mode and is still last, because the measurement still puts it there — a new contract that had
+> measured above 0.65 would have displaced it, and neither did. The **progression rule** holds at ten:
+> `needClean` reads 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, the eight-contract shape with one more at each
+> stake. What moved again is each contract's `label`, so `c2` is now *Scenario 5*.
+>
+> **Eleven buildings and ten contracts is not an arithmetic error**: `burj-class-reference` is a
+> *reference* building with no Career contract, named in `contracts.test.ts#REFERENCE_ONLY` and
+> asserted in both directions there.
 
 ### 4.6 Four corrections to the prototype, found by implementing it
 

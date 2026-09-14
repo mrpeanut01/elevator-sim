@@ -35,21 +35,29 @@ fix cases and forty proof cases*. **Four are right and one is wrong.**
 
 | content type | key | ships today | derived from |
 |---|---|---|---|
-| Buildings | `buildings` | **9** | `.json` files in [`data/buildings/`](../data/buildings/), and pinned both ways by `packages/viz/src/fixtures.test-helper.ts#BUILDING_IDS` against `readdirSync` |
+| Buildings | `buildings` | **11** | `.json` files in [`data/buildings/`](../data/buildings/), and pinned both ways by `packages/viz/src/fixtures.test-helper.ts#BUILDING_IDS` against `readdirSync` |
 | Campaign stages | `campaign-stages` | **10** | `stages` in [`data/campaign.json`](../data/campaign.json) |
-| Contracts (the daily loop's scenarios) | `contracts` | **8** | `CONTRACTS` in `packages/viz/src/shift/contracts.ts` — `c1`–`c8` |
+| Contracts (the daily loop's scenarios) | `contracts` | **10** | `CONTRACTS` in `packages/viz/src/shift/contracts.ts` — `c1`–`c10` |
 | Fix-a-building cases | `fix-cases` | **18** | `cases` in [`data/fixit-cases.json`](../data/fixit-cases.json) |
 | Proof cases | `proof-cases` | **40** | `towers` × `crowds` in [`data/proof-cases.json`](../data/proof-cases.json) — 8 × 5 |
 | Dispatcher profiles | `dispatchers` | **13** | `profiles` in [`data/dispatcher-profiles.json`](../data/dispatcher-profiles.json) |
 | Traffic demand templates | `demand-templates` | **8** | `demandTemplates` in [`data/traffic-profiles.json`](../data/traffic-profiles.json). The eighth, `endless-rush`, is GitHub issue #220's stream and declares `selectable: false`: a mode's own record that no list offers and no rotation may draw, so it counts here and buys the daily loop nothing |
 
-**The correction is the contracts row: there are eight, not five.** The issue's *five* is the number
+**The correction is the contracts row: there are ten, not five.** The issue's *five* is the number
 the design handoff specifies and the number this project shipped until `chancery-house`,
-`crown-hotel` and `st-jude-hospital` landed. `docs/12-design-handoff.md` § 4.7 records the deviation
-and gives its reason — *a shipped building with no contract is a scenario the reader can never take*
-— and `shift/contracts.ts` appends `c6`–`c8` accordingly. [`docs/33-difficulty-curve.md`](33-difficulty-curve.md)
-§ 4.2 already measures *"each of the eight contracts"*, so the tree has been consistent about this
-since the three contracts landed; only the issue was stale.
+`crown-hotel` and `st-jude-hospital` landed — which made it eight — and § 7.3's own two buildings,
+`harbour-point` and `ashgate`, have since made it **ten** (GitHub issues #500 and #501).
+`docs/12-design-handoff.md` § 4.7 records the deviation and gives its reason — *a shipped building
+with no contract is a scenario the reader can never take* — and `shift/contracts.ts` carries
+`c6`–`c10` accordingly. [`docs/33-difficulty-curve.md`](33-difficulty-curve.md)
+§ 4.2 measures *"each of the eight contracts"* as they then stood and § 4.7j adds the two new rows,
+so the tree has been consistent about this since the three contracts landed; only the issue was
+stale.
+
+**Eleven buildings and ten contracts is not an arithmetic error.** `burj-class-reference` is a
+*reference* building and has none, by GitHub issue #376's own ruling;
+`packages/viz/src/shift/contracts.test.ts#REFERENCE_ONLY` names it and asserts, in both directions,
+that it ships and has no contract, so the exception cannot quietly widen.
 
 **Three stale docstrings found beside it, named rather than fixed here.** The same *five* survives in
 prose in `packages/viz/src/shift/contracts.ts` (*"The five scenarios"*, and *"`contracts.test.ts`
@@ -108,25 +116,27 @@ day. So the multiplier is **at least 5×**, and 5 is what this document uses.
 
 | mode | simulated seconds shipped | derivation | watched? | real watch minutes at 30× |
 |---|---|---|---|---|
-| Daily loop | **36 000** | 19 clean days is the floor — `needClean` over `c1`–`c8` is 1+2+2+2+3+3+3+3 — at 1 800 s each, except `c1`'s authored 3 600 s: 3 600 + 18 × 1 800 | yes | **20.0** |
+| Daily loop | **45 000** | 24 clean days is the floor — `needClean` over `c1`–`c10` is 1+2+2+2+2+3+3+3+3+3 — at 1 800 s each, except `c1`'s authored 3 600 s: 3 600 + 23 × 1 800 | yes | **25.0** |
 | Campaign | **9 000** | 10 stages × `durationS` 900 | yes | **5.0** |
 | Fix a building | 33 900 | 18 cases, `run.durationS` 1 500–2 700 | no | 0 |
 | The gauntlet | 38 400 | 8 towers × (900 + 900 + 1 200 + 1 200 + 600) crowd horizons | no | 0 |
-| **watched total** | **45 000** | | | **25.0** |
+| **watched total** | **54 000** | | | **30.0** |
 
-**Twenty-five minutes.** That is the whole of what this game asks a player to watch, and it is worth
+**Thirty minutes.** That is the whole of what this game asks a player to watch, and it is worth
 stating in one line because it is the figure the issue's *"a few hours of content"* is hiding: the
-hours are real, and almost none of them are the simulator running.
+hours are real, and almost none of them are the simulator running. *(It read **twenty-five** until
+§ 7.3's two buildings shipped their contracts; five clean days at 1 800 s is five watch-minutes, and
+the row is re-derived here rather than left to drift — `RISKS.md` R38.)*
 
 **The finite play-hours, then:**
 
 | mode | arithmetic | play-hours |
 |---|---|---|
-| Daily loop + campaign | 25.0 watch-minutes × 5 (§ 2) = 125 min | **2.08** |
+| Daily loop + campaign | 30.0 watch-minutes × 5 (§ 2) = 150 min | **2.50** |
 | Fix a building | 18 cases × 7.67 min (below) = 138 min | **2.30** |
 | The gauntlet | one press per dispatcher a player wants rated | ~0 |
 | Endless rush | unbounded by construction | excluded |
-| **total** | | **≈ 4.4** |
+| **total** | | **≈ 4.8** |
 
 **Where 7.67 minutes a case comes from.** A clean solve is: understand the fault (the charter's own
 first-session standard is *understood why within three minutes*), choose among four repairs against a
@@ -157,7 +167,7 @@ measured against.
 The session rate is an assumption and the sensitivity is published rather than hidden, because it is
 the only free parameter: charter `S4` commits to **25 % of day-one players returning within 7 days**
 and to nothing about frequency. **The target is the midpoint of that band: 8.5 finite play-hours**,
-up from the measured 4.4.
+up from the measured 4.8.
 
 ### 4.2 The per-type targets, each derived separately
 
@@ -167,8 +177,8 @@ independently**.
 
 | content type | key | today | **target** | how the target is derived | play-hours it adds |
 |---|---|---|---|---|---|
-| Buildings | `buildings` | 9 | **22** | owner ruling, 2026-09-10 (#232): every open reference tower plus Harbour Point and Ashgate, each playable. § 4.3's rotation arithmetic set the earlier floor of 12 | 0 directly; multiplies every other row |
-| Contracts | `contracts` | 8 | **22** | one per shipped building — `docs/12` § 4.7's own rule, *a shipped building with no contract is a scenario the reader can never take* | 14 × 3 clean days × 1 800 s = 75 600 s = 42 watch-min × 5 = **+3.50** |
+| Buildings | `buildings` | 11 | **22** | owner ruling, 2026-09-10 (#232): every open reference tower plus Harbour Point and Ashgate, each playable. § 4.3's rotation arithmetic set the earlier floor of 12 | 0 directly; multiplies every other row |
+| Contracts | `contracts` | 10 | **22** | one per shipped building — `docs/12` § 4.7's own rule, *a shipped building with no contract is a scenario the reader can never take* | 12 × 3 clean days × 1 800 s = 64 800 s = 36 watch-min × 5 = **+3.00** |
 | Campaign stages | `campaign-stages` | 10 | **24** | one per building, plus the two stages that teach a mechanic rather than a tower (stage 3 *Overwhelmed* and stage 7 *Tune it*, both on `midtown-office`). Today that rule gives exactly the shipped 10, and at 22 buildings it gives 24 | 14 × 900 s = 12 600 s = 7 watch-min × 5 = **+0.58** |
 | Fix cases | `fix-cases` | 18 | **44** | § 10.6 of the gameplay guide names **26** further cases by name, with authoring rules; 18 + 26. **16 of the 26 are authorable today** — § 5.2 | 26 × 7.67 min = **+3.32** |
 | Proof cases | `proof-cases` | 40 | **40** | **unchanged, by rule.** A rating is only comparable if the cases never move; growing the building set must not touch this list. § 7 is the one permitted move | 0 |
@@ -183,16 +193,23 @@ paragraph said it would have been worth recording had they landed outside it too
 
 **They now land outside it, and it is recorded rather than bent.** The owner's 2026-09-10 ruling on
 #232 raised buildings and contracts to 22, and campaign stages follow at 24 by their own rule:
-`4.38 + 3.50 + 0.58 + 3.32 = 11.78 play-hours`, **about one hour above the band's 10.8 ceiling**. The
-band is § 4.1's estimate of what one quarter of sessions consumes, and it is not moved to fit. A
-plan that ships more than a quarter needs is a choice about headroom, and it is stated here as one.
+`4.80 + 3.00 + 0.58 + 3.32 = 11.70 play-hours`, **about nine tenths of an hour above the band's 10.8
+ceiling**. The band is § 4.1's estimate of what one quarter of sessions consumes, and it is not
+moved to fit. A plan that ships more than a quarter needs is a choice about headroom, and it is
+stated here as one.
+
+*(That total read `4.38 + 3.50 + … = 11.78` before § 7.3's two buildings shipped, and the **sum
+barely moved** — by 0.08 h — because the contracts they carry left the second column and entered the
+first. What changed is which column the play-hours sit in, which is what shipping content looks like
+from here. The 0.08 is the two new contracts asking for **five** clean days between them where the
+§ 4.2 arithmetic budgets three each.)*
 
 **And the number that would be reached by doing only the unblocked work is stated beside it, because
 that is the schedule anybody will actually run.** Sixteen of the twenty-six fix cases are authorable
-today (§ 5.2), so a beta that ships the thirteen new buildings, the fourteen new contracts, the
-fourteen new stages and **only the unblocked cases** reaches `4.38 + 3.50 + 0.58 + (16 × 7.67 min) =
-10.51 play-hours` — inside the 6.5–10.8 band and **above the 8.5 midpoint**. (At the first targets,
-the same schedule reached 7.60.) The four schema-blocked cases
+today (§ 5.2), so a beta that ships the eleven remaining new buildings, the twelve remaining new
+contracts, the fourteen new stages and **only the unblocked cases** reaches
+`4.80 + 3.00 + 0.58 + (16 × 7.67 min) = 10.43 play-hours` — inside the 6.5–10.8 band and **above the
+8.5 midpoint**. (At the first targets, the same schedule reached 7.60.) The four schema-blocked cases
 are worth `+0.51` and cost one `fixit/` schema change; the six engine-blocked ones are worth `+0.77`
 and cost six scheduled engine issues. **That ordering is the plan's actual recommendation**: the
 schema widening buys more play-hours per unit of engine work than anything else on this list.
@@ -400,11 +417,16 @@ inverse (a stale *refusal*) is worse than a stale figure.
 
 ### 7.1 What is actually standing in, and it is more than two
 
-§ 12.3 of the engine contract names eight proof-case towers. **Two are not in `data/buildings/`** —
-**Harbour Point** (16 fl · 6 lifts, *"more demand than the group can clear, whatever you do"*) and
-**Ashgate Mixed-Use** (22 fl · 5 lifts, *"offices over shops, and a car park below"*) — and
-`data/proof-cases.json` puts `mixed-use-high-rise` and `secure-tower` in their places, recording the
-substitution and its cost in its own `$comment`. That is #158, and
+§ 12.3 of the engine contract names eight proof-case towers. **Two were not in `data/buildings/`
+when this was written, and both are now** — **Harbour Point** (16 fl · 6 lifts, *"more demand than
+the group can clear, whatever you do"*) and **Ashgate Mixed-Use** (22 fl · 5 lifts, *"offices over
+shops, and a car park below"*) — authored on GitHub issues #500 and #501 and documented in
+[`docs/04`](04-test-buildings.md) §§ 10 and 11. `data/proof-cases.json` still puts
+`mixed-use-high-rise` and `secure-tower` in their places, recording the substitution and its cost in
+its own `$comment`, and **that substitution now stands permanently**: the owner ruled on 2026-09-10
+(#500, #501, #419) that the forty stay fixed so every rating stays comparable. So the two towers
+exist, they are playable, and they are deliberately not in the proof set — which is § 7.3's first
+two reasons honoured and its second reason overruled by the owner. That is #158, and
 [`docs/18-everyday-mode-tree-audit.md`](18-everyday-mode-tree-audit.md) carries it.
 
 **The finding this document adds: the same substitution runs through Fix a building, at six times
@@ -446,6 +468,16 @@ plausible sentence may not stand in for a measurement, and the argument in § 7.
 **Author both buildings, and do it before the daily board ships.** Three reasons, in the order that
 decides it:
 
+> **Status, 2026-09-14: both are authored and playable, and the proof-set half is settled the other
+> way.** `data/buildings/harbour-point.json` and `data/buildings/ashgate.json` ship (GitHub issues
+> #500, #501), each with a Career contract — `c9` and `c10` — placed in the ladder by its own
+> measured day-1 miss rate rather than appended. **Reason 2 below was overruled by the owner on
+> 2026-09-10**: the forty proof cases stay fixed so every rating stays comparable, so neither tower
+> enters the set and `data/proof-cases.json`'s recorded deviation stands permanently. Reasons 1 and
+> 3 are discharged: the role the set lost is now *authored somewhere*, and CR-4 held — neither
+> building needed a new engine capability, and the measurements are in
+> [`docs/04`](04-test-buildings.md) §§ 10 and 11.
+
 1. **The set loses a role it was chosen for.** § 7.2. `secure-tower` does not test what Harbour Point
    is there to test.
 2. **The comparability cost is at its all-time minimum now and rises the day a server exists.** § 12.3's
@@ -457,7 +489,13 @@ decides it:
 3. **Neither building needs a new capability, and the rating survives the harder one.** CR-4 passes:
    Harbour Point is floors, one bank of six cars and an arrival rate above the group's handling
    capacity; Ashgate is 22 floors with negative-index basements and a `servesFloors` restriction that
-   leaves one of five cars reaching B1–B2. And the objection a reader should raise — *an
+   leaves one of five cars reaching B1–B2. **Both halves held when they were built**, and one of
+   them was closer than this paragraph reads: the *restriction* is expressible only as a bank of
+   one, because `servesFloors` is declared per bank and not per car — see
+   [`docs/04` § 11](04-test-buildings.md). Harbour Point's over-subscription was measured against
+   the closed form rather than declared: handling capacity 9.94 % of served population per 5 min
+   against an offered 10.2 %, and 64 of 65 runs across every shipped dispatcher × five seeds report
+   a diverging queue. And the objection a reader should raise — *an
    over-subscribed tower saturates, and a saturated run has its mean suppressed* — does not bite:
    `gauntlet/rating.ts` scores on `pctOverLongWait`, an **observation**, precisely so that *"a rating
    that silently dropped a third of the forty whenever a tower saturated would move with the
@@ -491,10 +529,10 @@ nothing a display name does not already buy them.
 
 | issue | what this document gives it |
 |---|---|
-| **#232** — expand the building set | **AC1 target: 22 buildings** (owner ruling, 2026-09-10; § 4.3's rotation arithmetic set the earlier floor of 12). **AC2:** Harbour Point and Ashgate Mixed-Use are **authored**, not accepted (§ 7.3) — two of the thirteen new buildings are therefore already specified, and § 7.3 states what each needs. **AC3/AC4** are unchanged and this document adds one clause to AC4: a new building's validation includes CR-4 — every configuration block it declares must be one a shipped code path reads |
+| **#232** — expand the building set | **AC1 target: 22 buildings** (owner ruling, 2026-09-10; § 4.3's rotation arithmetic set the earlier floor of 12). **AC2:** Harbour Point and Ashgate Mixed-Use are **authored**, not accepted (§ 7.3) — and both have since landed (GitHub issues #500, #501), so eleven of the thirteen remain and § 7.3's status note records what CR-4 cost. **AC3/AC4** are unchanged and this document adds one clause to AC4: a new building's validation includes CR-4 — every configuration block it declares must be one a shipped code path reads |
 | **#233** — expand Fix a building | **AC1 target: 44 cases** (§ 4.2, from § 10.6's own catalogue of 26). **Do the schema widening first** (§ 5.2): `FixitCase.run`'s three fields reach the demand *level* and not its *shape*, which blocks four catalogue cases for a `fixit/` reason rather than an engine one. **Six of the 26 are blocked outright** and § 5.2 names all ten and the check that confirms the classification. So the realistic first tranche is **16**, not 26. **AC4** is already specified — `docs/33` § 5.3's DC-7 bands, and new cases take a band rather than an index. **Plus the disclosure paragraph** § 7.3 says is owed |
 | **#249** — publish a content cadence | **The honest input, which is not the one the issue expects.** At the § 4.1 rate a median player consumes ~40 min a week; one fix case is 7.67 min. **A cadence cannot be justified as content replacement** — a weekly case replaces a sixth of a week's play — so it must be justified as *a reason to return*, which is a different design argument and belongs in #249 rather than here. What this document does give it: the per-type authoring costs in § 6 (285 lines a fix case today), so the cadence is set by what the pipeline sustains rather than by ambition |
-| **#158** — the two proof-case buildings | **Resolved: option 1, author them** (§ 7.3), with the deadline condition — **before the daily board ships**, after which option 2 becomes the only honest exit and must be recorded rather than applied to the vendored file. #158's own option 2 as worded (*amend § 12.3*) is **unavailable**; § 7.3 says why and what replaces it |
+| **#158** — the two proof-case buildings | **Resolved: option 1, author them** (§ 7.3), with the deadline condition — **before the daily board ships**, after which option 2 becomes the only honest exit and must be recorded rather than applied to the vendored file. #158's own option 2 as worded (*amend § 12.3*) is **unavailable**; § 7.3 says why and what replaces it. **Both towers landed on 2026-09-14** (GitHub issues #500, #501) — and the owner's 2026-09-10 ruling on #419 keeps them **out of the forty**, so the recorded deviation in `data/proof-cases.json` stands permanently and #158's *naming* half is what the two buildings actually close |
 | **#159** — the wrinkle library | **Target: 20 templates** (§ 4.3, its own figure). **All six of its named kinds are authorable today** (§ 5.1; two were all-day only until #346 landed under § D523); the route the library takes into a run is the question it still has to settle. **#159 is on #249's critical path** — § 4.2's finite targets reach 8.87 h and the quarter needs up to 10.8; the daily rotation is what covers the difference, and it does not exist |
 | **#235** — traffic realism | Unchanged by this document. § 5.3 records that patience, lobby crowding and the stairs metrics have landed in `core` and that what blocks content using them is the content schemas, not the engine |
 
