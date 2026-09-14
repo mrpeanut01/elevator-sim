@@ -1717,7 +1717,23 @@ type DecisionReservation = {
  * for #478 and #437, and D555–D556 are the integrator's. D534 and D536 are still unwritten, and are
  * registered as holes when the block closes, not before.
  */
-const OPEN_RESERVATION = { wave: 'of 2026-09-10, widened 2026-09-11', from: 533, to: 556 } as DecisionReservation | null;
+/**
+ * **Widened to D567 on 2026-09-14, by the lane that first wrote above the old ceiling.**
+ *
+ * The block above closed at D556, which was the integrator's tail for the wave of 2026-09-11. The
+ * wave dispatched on 2026-09-14 reserved its lanes blocks starting at D557, and this lane holds
+ * D563–D567 (GitHub issues #531, #533 and #535) and spent all five. The paragraph above says the
+ * integrator widens `to` when a sibling lane holds more; this is a lane doing it on the commit that
+ * needs it, because the alternative is a branch that is red in `experiments` for bookkeeping that
+ * has nothing to do with what it changed.
+ *
+ * **What is deliberately not touched.** The charter row still names **D533**, the block's floor,
+ * which is what this file asserts while a reservation is open — a lane may not reconcile it, and
+ * § D404 puts that on the integrator at the commit that closes the wave. D557–D562 are held by
+ * sibling lanes of this wave and are registered as holes only when the block closes, not before;
+ * the same is still true of D534 and D536.
+ */
+const OPEN_RESERVATION = { wave: 'of 2026-09-10, widened 2026-09-11 and 2026-09-14', from: 533, to: 567 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
