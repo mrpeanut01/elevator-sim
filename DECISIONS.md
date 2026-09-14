@@ -35607,3 +35607,53 @@ playtest § 4.7i schedules. And it takes no position on the eleven buildings the
 owes: the rule above is what each of them meets, not a claim about when.
 
 ---
+## D575 — The campaign prices the two new towers: Ashgate's complexity is the contract's own, Harbour Point's is placed on fabric and not on difficulty
+
+**Date: 2026-09-14 · GitHub issues [#500](https://github.com/mrpeanut01/elevator-sim/issues/500) and [#501](https://github.com/mrpeanut01/elevator-sim/issues/501) · Rules on: [§ D519](#d519)'s placement rule for a complexity the contract does not publish, [§ D510](#d510)'s offer fee, and `campaign/economy.ts#COMPLEXITY`'s own recorded refusal to invent an `ashgate`.**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. It **discharges a refusal already recorded** —
+`COMPLEXITY`'s docstring said in terms that *"`ashgate` is not one of ours and is not invented into
+one"*, and the honest way out was always to author the building, which #501 did. And one of the two
+figures is authored and needs the owner's approval.
+
+**Why it is owed at all, which is the part worth reading.** `everyday/campaignModel.ts#offersView`
+**skips** a contract whose building has no complexity or no fee. So a shipped, playable building
+that landed without a row in these two tables would be offerable in the daily loop and **invisible
+on the campaign screen** — an absence rather than a refusal, which is [§ D265](#d265)'s shape one
+layer up. `economy.test.ts` now derives the check from `CONTRACTS` in both directions, so the
+twelfth building meets a red test rather than this paragraph.
+
+1. **`ashgate` is 2 and 6 u, both cited.** `ENGINE_CONTRACT.md` § 8.5 publishes
+   *garden 1 · ashgate 2 · chancery 2 · crown 3 · midtown 3 · stjude 4 · vertical 5*, and the design
+   file's offer fixture gives Ashgate **6 u a day** beside the three fees it already gave. Nothing
+   is mapped and nothing is measured: what changed is that the id now names a file. The fee does
+   **not** follow § D510's *complexity plus two* rule, exactly as Crown Hotel's 3 u does not — a
+   fixture outranks a derivation, and the test asserts the inequality so the rule is not applied to
+   it by a later tidy-up.
+2. **`harbour-point` is 2, authored, and it is placed on fabric rather than on difficulty.** Its
+   fabric is one bank, six identical cars, one entrance, no zone, no credential and no transfer —
+   Chancery House's fabric at three fewer floors, and Chancery House is the contract's own 2. **It
+   is simultaneously the hardest shipped tower to run**: as built, 64 of 65 runs across every
+   shipped dispatcher × five seeds diverge and have the mean suppressed ([§ D572](#d572)). Those two
+   facts point opposite ways and § 8.5's rule decides between them: *complexity is the designer's
+   judgement of the fabric a player has to understand rather than a clear rate*, which § D519
+   established by measuring Midtown at 0 of 50 on a 3 and Vertical City at 30 of 30 goals on a 5. A
+   4 or a 5 here would be a difficulty rating wearing the complexity column's name.
+3. **`harbour-point`'s fee is 4 u, by § D510's rule, and it is a bad bargain on purpose.** Complexity
+   2 plus two, which lands exactly on Chancery House's fixture. A career that takes this tower at
+   4 u a day is paying for days it will miss, and that is the scenario rather than a mispricing: the
+   fee prices the **fabric** and § 8.9's renewal prices the **record**.
+4. **Neither gets a quirk, and that is the existing pattern rather than an omission.**
+   `career.ts#QUIRKS` names six buildings; `secure-tower` and `mixed-use-high-rise` are already
+   absent and fall back to the contract's `teaches`, and these two do the same. **One observation
+   recorded rather than acted on**: the design file's own line for `ashgate` is *"Two crowds that
+   never overlap: office people at eight, shoppers from eleven"*, and `QUIRKS` already carries the
+   shortened *"Two crowds that never overlap."* against **`midtown-office`**. Moving it would be a
+   product change on a building this lane was not asked to touch, so it is named here and left.
+
+**What this does not decide.** Whether 2 and 4 u are right for Harbour Point — the complexity is an
+assumption with its reasoning attached, in § D519's manner, and the owner's to accept, tighten or
+reject. Whether `QUIRKS` should be re-sourced. And nothing about the renewal ladder, the shop or the
+calendar, none of which this touches.
+
+---

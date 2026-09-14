@@ -97,11 +97,21 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
       counts[contract.id] = legible;
       stretches[contract.id] = longest;
     }
-    /* The slice, measured 2026-09-06 by `legibility.sweep.test.ts` at LEGIBILITY_SEEDS=10. */
-    expect(counts).toEqual({ c1: 0, c2: 10, c3: 2, c4: 6, c5: 8, c6: 0, c7: 8, c8: 0 });
+    /*
+     * The slice, measured 2026-09-06 by `legibility.sweep.test.ts` at LEGIBILITY_SEEDS=10, and
+     * extended on 2026-09-14 by the two contracts GitHub issues #500 and #501 added. **The eight
+     * original rows reproduced unchanged** at both budgets, so the two new keys are the whole of
+     * the movement — which is what says the sweep's own extension did not disturb it.
+     */
+    expect(counts).toEqual({ c1: 0, c2: 10, c3: 2, c4: 6, c5: 8, c6: 0, c7: 8, c8: 0, c9: 10, c10: 2 });
     expect(stretches['c1']).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     expect(stretches['c3']).toEqual([163, 72, 143, 65, 77, 90, 103, 106, 97, 51]);
     expect(stretches['c6']).toEqual([0, 0, 60, 0, 28, 69, 10, 3, 70, 19]);
     expect(stretches['c8']).toEqual([35, 8, 18, 38, 31, 35, 36, 91, 19, 42]);
+    // Harbour Point holds a landing past the band for most of the day on every seed; Ashgate does
+    // it on two of ten, which is the difference between a crowd that cannot be cleared and a
+    // journey that takes two legs.
+    expect(stretches['c9']).toEqual([1026, 1373, 1665, 1255, 1321, 1474, 1462, 1512, 1126, 1133]);
+    expect(stretches['c10']).toEqual([121, 73, 68, 104, 57, 67, 95, 76, 276, 61]);
   }, 300_000);
 });

@@ -1881,7 +1881,7 @@ packages/viz/src/shift/contractCurve.sweep.test.ts`, day 1, dispatcher `collecti
 
 | position | contract | building | what moves it | missed | of | rate | in band |
 |---|---|---|---|---|---|---|---|
-| 4 | c9 | `harbour-point` | let at 0.60 — 936 desks rather than 1 560 | 21 | 50 | **0.42** | **yes** |
+| 4 | c9 | `harbour-point` | let at 0.60 — 930 desks rather than 1 560 | 21 | 50 | **0.42** | **yes** |
 | 8 | c10 | `ashgate` | 13.5 % of population per 5 min, inside the profile's 11–15 | 26 | 50 | **0.52** | **yes** |
 
 **DC-4 is now green on seven of ten**, against five of eight. **DC-6 is green**: the targets in
@@ -2192,14 +2192,24 @@ the problem; `docs/35` `PM-TT2` adds the legibility clause, and GitHub issue #35
 interval union over the legs, the longest contiguous stretch any landing holds somebody in the
 stage's third wait band (sixty seconds); a day is legible when that stretch reaches
 `LEGIBILITY_WINDOW_S` (120 s, a declared assumption with its reasoning beside it). The sweep is
-over § 4.6's own 400 days — every contract's day 1 under `collective`, seeds `20 260 824 + 7 919 n`,
+over § 4.6's own cell — every contract's day 1 under `collective`, seeds `20 260 824 + 7 919 n`,
 `n = 0…49` — and the table lives beside the constant. The reading that matters here: Garden
 Apartments is legible on **0 of 50** seeds, Chancery House on 2 and St Jude's on 1, so § D475's
 *eligible* set for a first session is measured rather than assumed, and it excludes the building
 the campaign opens on. No interval, because no arms are compared (§ 6.5). **The set is now read by
 code**: `shift/legibility.ts#LEGIBILITY_SWEEP` carries this table as data, `shift/firstSession.ts`
-derives the five from it, and a first session draws one of them on a named stream
+derives the eligible set from it, and a first session draws one of them on a named stream
 ([§ D514](../DECISIONS.md)).
+
+**Re-measured 2026-09-14 at ten contracts × 50 seeds = 500 days** (GitHub issues #500 and #501,
+§ 4.7j). **All eight original rows reproduced to the second**, so the two new rows are the whole of
+the movement: `c9` (`harbour-point`) is legible on **50 of 50** at a median **1 343 s** and joins
+the eligible set, and `c10` (`ashgate`) on **10 of 50** at a median **79 s** and does not. The pair
+is worth reading together — Harbour Point's problem is a landing that never clears, which is exactly
+what this instrument looks at; Ashgate's is a journey that takes two legs, which is a fact about
+time to destination and which a *held landing* measure cannot see. **A tower can present a real
+problem somewhere this arm does not look**, and that is the first shipped instance of the limit
+`docs/35` `PM-TT2` names.
 
 ### 6.5 Two things the sweep is not allowed to do
 

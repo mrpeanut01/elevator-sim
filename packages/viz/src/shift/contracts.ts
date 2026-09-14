@@ -175,7 +175,7 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
      * Harbour Point as authored is over-subscribed on purpose: thirteen shipped dispatcher
      * profiles × five seeds give 64 of 65 runs a diverging queue and a suppressed mean, which is
      * the role `docs/37` § 7.2 authors it for and is **not** a scenario, because a day nobody can
-     * pass teaches nothing. The rung lets it at 0.60 — 936 desks rather than 1 560 — exactly as
+     * pass teaches nothing. The rung lets it at 0.60 — 930 desks rather than 1 560 — exactly as
      * `c2` lets Midtown Office at 0.395, and the stat line beside this card is drawn from
      * `ladderTowersOf`, so the card and the run cannot disagree about which tower this is.
      */

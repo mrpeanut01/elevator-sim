@@ -1564,7 +1564,7 @@ export function shiftRunConfigOf(
    * GitHub issue #382, `docs/33` § 4.7. A scenario's difficulty is declared in
    * `data/contract-ladder.json`, and DC-R1 admits fabric as one of its three substrates; this is
    * where that half of a rung reaches the run. It goes through `commissionedBuilding` rather than
-   * through an edit to `data/buildings/` because the eight buildings are reference fixtures before
+   * through an edit to `data/buildings/` because the shipped buildings are reference fixtures before
    * they are game levels — `benchmark/published.ts` pins intervals against `midtown-office` — and
    * `shift/ladder.ts` argues that at length.
    *

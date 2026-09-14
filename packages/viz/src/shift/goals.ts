@@ -201,8 +201,13 @@ const WORST_WAIT_WHOLE_DAY_FACTOR = 2;
  *
  * ## What this bar does not do, stated so it is not over-read
  *
- * It does not discriminate between seeds on three of the eight contracts: c1 and c2 never miss it
- * and c4 always does. The other five sit between 2 and 35 of 50. The figure is dominated by how far cars have to travel, which is fabric, so
+ * It does not discriminate between seeds on three of the eight contracts **the 2026-09-04 cell
+ * measured**: c1 and c2 never miss it and c4 always does. The other five sit between 2 and 35 of 50.
+ * *(Eight, not ten: `c9` and `c10` landed on 2026-09-14 with GitHub issues #500 and #501 and are
+ * **unmeasured on this bar**. The figures above are a dated record of that run rather than a claim
+ * about today's catalogue, and re-deriving them is whoever next runs § 4.6's cell — the 80 kJ bar
+ * itself is not moved by a building being added, because it is pooled across contracts and § D468
+ * pins it to the run that set it.)* The figure is dominated by how far cars have to travel, which is fabric, so
  * on the shipped catalogue this is closer to a per-building test than a per-day one. That is
  * `docs/33` § 7's **O2**, whether a bar should move with the building rather than with the day,
  * arriving on a fifth goal, and it is reported rather than fixed here, because fixing it means
@@ -312,8 +317,11 @@ export const GOAL_BARS = Object.freeze({
  * have been the second kind arriving by accident.
  *
  * **`'period'` is the default and that is a decision rather than a convenience.** Three of the
- * eight shipped buildings have no authored day and never will until one is written for their crowd,
- * so a slice is the majority case, and every published figure in this repository was graded as one.
+ * **eleven** shipped buildings have no authored day and never will until one is written for their
+ * crowd, so a slice is the majority case, and every published figure in this repository was graded
+ * as one. *(The numerator has not moved and the denominator has twice: this read **eight** while
+ * nine shipped, and `harbour-point` and `ashgate` — both on `office-standard`, which `office-day`
+ * matches — took it to eleven without adding to the three. `RISKS.md` R38 on a count in prose.)*
  *
  * **The named gap the default was covering is closed, and what it cost is worth recording.** This
  * paragraph used to end by saying `dev/leftRail.ts` and `dev/main.ts` were *"not yet horizon-aware,

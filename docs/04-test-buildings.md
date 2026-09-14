@@ -391,7 +391,7 @@ raw divergence **+28.63 %**, residual **−0.14 %** once the two documented omis
 `explained` against a 4 % tolerance.
 
 **Playable, and let at three fifths to be so.** The Career contract `c9` hands the player the tower
-at `occupancy: 0.60` — 936 desks — because a day nobody can pass teaches nothing;
+at `occupancy: 0.60` — **930 desks**, which is the stat line `ladderTowersOf` draws once each floor is rounded — because a day nobody can pass teaches nothing;
 [`data/contract-ladder.json`](../data/contract-ladder.json) carries the rung and its bracket, and
 the measured day-1 miss rate there is **0.42 of 50 seeds**, inside `docs/33` DC-4's band. **The
 building as built is what this section is about; the scenario is a let of it.**

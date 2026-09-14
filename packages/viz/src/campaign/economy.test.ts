@@ -17,9 +17,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+import { CONTRACTS } from '../shift/contracts.js';
 
 import {
   CALENDAR_SPAN,
+  COMPLEXITY,
   CONTRACT_DAYS,
   COMPLEXITY_MAX,
   DIFFICULTIES,
@@ -49,6 +51,7 @@ import {
   legalStarts,
   nextSlot,
   oddsAfterWorksPct,
+  offerFeeOf,
   perfectMonthUnits,
   purseOf,
   rateOnDay,
@@ -447,6 +450,52 @@ describe('§ 8.5’s renewal pricing', () => {
     expect(complexityOf('mixed-use-high-rise')).toBe((complexityOf('vertical-city') ?? 0) - 1);
     // And an id no table names is still refused rather than defaulted.
     expect(complexityOf('nowhere-tower')).toBeUndefined();
+  });
+
+  it('prices the content plan’s two, one from the contract and one from § D519’s rule', () => {
+    /*
+     * GitHub issues #500 and #501, § D575. `ashgate` is the seventh short name § 8.5 publishes and
+     * the one that named no shipped file until now, so its 2 is **cited** rather than placed — and
+     * it is asserted equal to the contract's own figure for Chancery House, which § 8.5 also gives
+     * as 2, so a table edit that moved either has to move both or explain itself.
+     *
+     * `harbour-point` is **placed**, on the fabric rule: one bank, six identical cars, no zone, no
+     * credential, no transfer, which is Chancery House's fabric. It is deliberately *not* placed by
+     * difficulty — as built it is the hardest shipped tower to run — and this case is where that
+     * choice is visible rather than in prose alone.
+     */
+    expect(complexityOf('ashgate')).toBe(2);
+    expect(complexityOf('ashgate')).toBe(complexityOf('chancery-house'));
+    expect(complexityOf('harbour-point')).toBe(complexityOf('chancery-house'));
+
+    // The fee halves: Ashgate's is the design file's own fixture and does not follow the rule;
+    // Harbour Point's does, and lands where Chancery House's fixture already is.
+    expect(offerFeeOf('ashgate')).toBe(6);
+    expect(offerFeeOf('ashgate')).not.toBe((complexityOf('ashgate') ?? 0) + 2);
+    expect(offerFeeOf('harbour-point')).toBe((complexityOf('harbour-point') ?? 0) + 2);
+    expect(offerFeeOf('harbour-point')).toBe(offerFeeOf('chancery-house'));
+  });
+
+  it('leaves no shipped contract unofferable, in both directions', () => {
+    /*
+     * `campaignModel.ts#offersView` skips a contract whose building has no complexity or no fee, so
+     * a shipped building that landed without a row here would be **playable in the daily loop and
+     * invisible on the campaign screen** — a silent absence rather than a refusal, which is the
+     * shape § D265 is about one layer down. Derived from `CONTRACTS` rather than listed, so the
+     * eleventh building meets a red test rather than a paragraph.
+     */
+    const unpriced = CONTRACTS.filter(
+      (contract) =>
+        complexityOf(contract.buildingId) === undefined ||
+        offerFeeOf(contract.buildingId) === undefined,
+    ).map((contract) => contract.buildingId);
+    expect(unpriced, 'a shipped contract whose building the campaign cannot offer').toEqual([]);
+
+    // Non-vacuity, and the other direction: a table row for a building no contract names.
+    expect(CONTRACTS.length).toBeGreaterThan(5);
+    const named = new Set(CONTRACTS.map((contract) => contract.buildingId));
+    const orphans = Object.keys(COMPLEXITY).filter((id) => !named.has(id));
+    expect(orphans, 'a complexity for a building no contract runs').toEqual([]);
   });
 });
 
