@@ -1359,8 +1359,8 @@ export const dispatcherProfilesSchema = z
  * **Floor area, declared** — CLAUDE.md invariant 8, `DECISIONS.md` § D601, GitHub issue #429.
  *
  * One quantity in three places, because a plate is authored at whichever scale it is constant at:
- * `BuildingConfig.grossAreaPerFloorM2` is the building's typical plate, `FloorRange.
- * grossAreaPerFloorM2` a zone's, and `FloorConfig.grossAreaM2` one level's. **Precedence is floor,
+ * `BuildingConfig.grossAreaPerFloorM2` is the building's typical plate,
+ * `FloorRange.grossAreaPerFloorM2` a zone's, and `FloorConfig.grossAreaM2` one level's. **Precedence is floor,
  * then range, then building** — exactly `trafficProfile`'s, which is already authored at all three
  * scales for the same reason, so no reader has to learn a second rule.
  *

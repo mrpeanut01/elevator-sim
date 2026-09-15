@@ -311,6 +311,19 @@ export interface SpecCarriedFloor {
   readonly isTransferFloor?: boolean | undefined;
   readonly label?: string | undefined;
   readonly trafficProfile?: string | undefined;
+  /**
+   * This level's gross floor area, m² — GitHub issue #429, `DECISIONS.md` § D601.
+   *
+   * Carried for this interface's whole reason: no control here authors a plate, **every** shipped
+   * building declares one, and a round trip that dropped it would delete the building's core and
+   * lettable figures in silence. It is also the field that makes the rule in this file's docstring
+   * concrete for the first time since it was written — *"a model that cannot express something is
+   * a reason to carry it, not a licence to delete it"* — because it arrived after the rule did.
+   *
+   * Absent on a floor that declares none, which is how a building with no area at all round-trips
+   * to exactly the document it came from.
+   */
+  readonly grossAreaM2?: number | undefined;
 }
 
 /**
@@ -1696,6 +1709,13 @@ export function buildingFromSpec(
      */
     if (carried?.label !== undefined) config.label = carried.label;
     if (carried?.trafficProfile !== undefined) config.trafficProfile = carried.trafficProfile;
+    /*
+     * The plate, for the same reason one line up and one that is easier to miss: no control here
+     * writes it, and it is not decoration either — `config/parse.ts` derives the building's core
+     * and lettable area from it, so a floor that came back with no plate takes the whole building's
+     * area figures off the plate with it (GitHub issue #429, § D601).
+     */
+    if (carried?.grossAreaM2 !== undefined) config.grossAreaM2 = carried.grossAreaM2;
     floors.push(config);
   }
 
@@ -3035,6 +3055,9 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
       ...(floor.isTransferFloor === true ? { isTransferFloor: true } : {}),
       ...(floor.label === undefined ? {} : { label: floor.label }),
       ...(floor.trafficProfile === undefined ? {} : { trafficProfile: floor.trafficProfile }),
+      // GitHub issue #429, § D601. Read off the **resolved** floor, so a plate the building
+      // declared once and a plate a range declared come back the same way round.
+      ...(floor.grossAreaM2 === undefined ? {} : { grossAreaM2: floor.grossAreaM2 }),
     };
   };
   for (const floor of declared) {
