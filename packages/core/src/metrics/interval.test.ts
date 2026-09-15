@@ -557,7 +557,7 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
     // GitHub issues #500 and #501 added `harbour-point/main` and `ashgate`'s two, and **41 since
     // GitHub issues #424, #425 and #430** added three more reference towers — fifteen banks in one
     // wave, which is the largest single move this survey has taken.
-    expect(rows.length, detail).toBe(41);
+    expect(rows.length, detail).toBe(62);
 
     // 56.5 s — a 26-person hospital car at 2.5 s — against a 29.0 s floor on Midtown Office.
     expect(Math.max(...rows.map((row) => row.maxReopenS)), detail).toBeCloseTo(56.5, 6);
@@ -566,18 +566,26 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       Math.min(...ceilings),
     );
 
-    // Twenty-two of the forty-one sit at or above the fallback, so on those it would split one
+    // Twenty-nine of the sixty-two sit at or above the fallback, so on those it would split one
     // loading into two departures — the original defect, in the banks the fallback does not cover.
     //
     // **The 0.1 s margin is no longer one bank's curiosity, and that is the useful move.** It used
-    // to be `ashgate/carpark` alone at **26.4 s** against a 26.5 s fallback. Eleven banks now sit
-    // on that same figure — `ashgate/carpark`, `ctf-class-reference`'s two office locals,
-    // `shanghai-class-reference`'s four and `vertical-city`'s four — because it is not a
-    // coincidence at all: it is what a **23-person car at the office 1.2 s** costs to fill and
-    // empty, and four of the towers here author exactly that car. None of them was chosen against
-    // this constant. A transfer time of 1.21 s on any of those cars, or one more person in it,
-    // moves eleven banks into the list below at once, and the answer then is `CarTimings` for the
-    // building, never a nudged constant.
+    // to be `ashgate/carpark` alone at **26.4 s** against a 26.5 s fallback. **Seventeen** banks now
+    // sit on that same figure — `ashgate/carpark`, `ctf-class-reference`'s two office locals,
+    // `shanghai-class-reference`'s four, `vertical-city`'s four, `one-wtc-class-reference`'s four
+    // and `willis-class-reference`'s two — because it is not a coincidence at all: it is what a
+    // **23-person car at the office 1.2 s** costs to fill and empty, and six of the towers here
+    // author exactly that car. None of them was chosen against this constant. A transfer time of
+    // 1.21 s on any of those cars, or one more person in it, moves seventeen banks into the list
+    // below at once, and the answer then is `CarTimings` for the building, never a nudged constant.
+    //
+    // **The 2026-09-15 pair says the same thing from a third direction** (GitHub issues #428, #427
+    // and #426). `empire-state-class-reference` is the only shipped building **every** one of whose
+    // banks is *safe* for the fallback — eight banks, all at **24.0 s** — because a 1931 car is a
+    // 20-person car at the office 1.2 s and nothing in the tower is bigger. `willis-class-reference`
+    // is nearly its opposite: five of its seven sit at or above the fallback, four of them at
+    // **28.8 s**, which is what a 26-person car costs. Same constant, same transfer time, opposite
+    // verdicts, decided by the car.
     //
     // Six of the twenty-two arrived with the Burj-class reference tower (GitHub issue #376), which
     // is every one of its banks: at a 1.75 s transfer and 3 500–4 000 lb cars, a full load's dwell
@@ -595,11 +603,13 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       ...['merdeka-class-reference/local-high', 'merdeka-class-reference/local-hotel', 'merdeka-class-reference/local-low', 'merdeka-class-reference/shuttle'],
       'mixed-use-high-rise/residential-local',
       'mixed-use-high-rise/shuttle',
+      ...['one-wtc-class-reference/observatory', 'one-wtc-class-reference/shuttle'],
       ...['shanghai-class-reference/local-hotel', 'shanghai-class-reference/shuttle'],
       'st-jude-hospital/main',
       'vertical-city/shuttle',
       'vertical-city/zone-5-local',
       'vertical-city/zone-6-local',
+      ...['willis-class-reference/express-high', 'willis-class-reference/express-mid', 'willis-class-reference/local-low', 'willis-class-reference/local-mid', 'willis-class-reference/skydeck'],
     ]);
 
     // Stronger still, and worth stating in a test rather than in prose: on some banks *no*
@@ -623,6 +633,12 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       // siblings all have a threshold, which is what makes this a property of that bank's
       // population rather than of the building's size.
       'ctf-class-reference/local-apartments',
+      // **None of the twenty-one banks GitHub issues #428, #427 and #426 added is here**, and that
+      // is worth a line rather than a silence: every bank of all three towers has a threshold, even
+      // the five of Willis's that are unsafe for the *fallback*. A 2.5 m/s double-deck local fills
+      // slowly and its one-floor round trip is slow too, so the two move together; what defeats the
+      // reconstruction is a big door on a *fast* zone, which is the shape `ctf/local-apartments` and
+      // `vertical-city/zone-6-local` have.
       'mixed-use-high-rise/residential-local',
       'st-jude-hospital/main',
       'vertical-city/shuttle',

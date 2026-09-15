@@ -37,6 +37,9 @@ Adding the file alone turns the suite red, which is the intended way to find out
 | CTF-class reference tower | [`ctf-class-reference.json`](ctf-class-reference.json) | Complete — 20 m/s up and **10 m/s down**, the only shipped building with an asymmetric car |
 | Shanghai-class reference tower | [`shanghai-class-reference.json`](shanghai-class-reference.json) | Complete — 20.5 m/s, the top of the speed catalogue, and 106 cars over six banks |
 | Merdeka-class reference tower | [`merdeka-class-reference.json`](merdeka-class-reference.json) | Complete — one sky lobby over a 562 m rise: fifty-six office floors are one leg from the street |
+| One-WTC-class reference tower | [`one-wtc-class-reference.json`](one-wtc-class-reference.json) | Complete — the **second** building Phase 6a/6b has been measured on, and a **two-level** sky lobby whose escalator carries an eighth of the tower's rides |
+| Empire-State-class reference tower | [`empire-state-class-reference.json`](empire-state-class-reference.json) | Complete — a 1931 **relay**: eight banks, no express anywhere, and the only building the closed form reconciles on **every** bank |
+| Willis-class reference tower | [`willis-class-reference.json`](willis-class-reference.json) | Complete — sixteen double-deck **locals** pairing every floor in their zone, at 2.5 m/s |
 
 ## Schema
 
@@ -276,7 +279,17 @@ the next leg starts waiting or as seconds added after the last alighting.
 
 The `traversalTimeS` is reference data and must be cited in the mode's `$comment`; see
 [docs/02 § Non-lift transport](../../docs/02-elevator-reference.md). Declared by
-[`vertical-city.json`](vertical-city.json) and by no other shipped building, which declares **four**
+[`vertical-city.json`](vertical-city.json), and since 2026-09-15 by
+[`one-wtc-class-reference.json`](one-wtc-class-reference.json) and
+[`willis-class-reference.json`](willis-class-reference.json), which declare **one each** — GitHub
+issues #428 and #426. Both are worth reading before you declare a fourth, because between them they
+answer the question this section leaves open. One WTC's `sky-lobby-escalator` (64 ↔ 65) carries
+**391, 375 and 359 hops** at three seeds under `collective` at 1 800 s, and deleting it adds back
+**exactly one lift leg per hop**; Willis's `lobby-escalator` (G ↔ 2) carries **720, 725 and 653**,
+and drops to **zero** the moment its double-deck locals are made single-deck, because a deck-bound
+leg from the lower lobby is the only thing that makes the upper one worth reaching. So a mode is
+live when a *different* edge of the graph forces it, and dead when the lifts already reach — which
+is what `vertical-city`'s own two zero-hop pairs say from the other side. Vertical City declares **four**
 — one per two-level lobby, `G ↔ 2` and the three sky lobbies `26 ↔ 27`, `51 ↔ 52`, `76 ↔ 77`, all at
 21.2 s because every lobby pair rises exactly the 4.5 m deck separation. Before any of them existed,
 **292 of that building's 3,549 lift legs at the standard seed were the `G ↔ 2` lobby hop**, which

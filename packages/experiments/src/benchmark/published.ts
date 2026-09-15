@@ -773,6 +773,15 @@ const DESCENT_CAP_HEIGHT_REASON =
   '`node packages/experiments/dist/benchmark/descentCapHeight.js`, which is the difference ' +
   'between a figure a reader can reproduce and one nobody can.';
 
+/** Shared by the four `destinationSecondBuilding.test.ts` entries in {@link UNPINNED_INTERVALS}. */
+const DESTINATION_SECOND_BUILDING_REASON =
+  'Kind 1, no entry point — GitHub issue #428, § D595. The comparison is performed by the test ' +
+  'file itself at § D100\'s own apparatus (n = 200, common random numbers, TTD the gate), so the ' +
+  'four figures are re-derived on every run and the verdicts drawn from them are asserted; what ' +
+  'is missing is a `runDestinationSecondBuildingStudy` in STUDY_ENTRY_POINTS for ' +
+  'regeneratePins.ts to render a pin from. Lifting the comparison out of the test into a study ' +
+  'function would close it, and that is a refactor rather than a measurement.';
+
 /** Shared by the eighteen `counterweightOptimum.ts` entries in {@link UNPINNED_INTERVALS}. */
 const COUNTERWEIGHT_OPTIMUM_REASON =
   'Kind 4, a dated record rather than a pin — GitHub issue #431\'s fourth criterion, DECISIONS.md ' +
@@ -1092,6 +1101,51 @@ export const UNPINNED_INTERVALS: readonly UnpinnedInterval[] = Object.freeze([
    * exactly zero, which no entry ever declared because a zero interval is not a figure the guard
    * looks for.
    */
+  /*
+   * **The second-building result's four figures** — GitHub issue #428,
+   * [§ D595](../../../../DECISIONS.md). They are the ΔTTD for each destination arm against `eta` on
+   * `one-wtc-class-reference`, and the two costs reported beside them.
+   *
+   * **Declared rather than pinned, and the reason is a property of where the study lives.** The
+   * measurement is performed by `destinationSecondBuilding.test.ts` itself — the same apparatus as
+   * § D100, n = 200 under common random numbers — and that file asserts the *verdicts* it draws
+   * from the run: that `destination-eta` is INDISTINGUISHABLE and `destination-panel` BETTER with
+   * an upper bound below zero, that every arm is quotable with nothing saturated, and that the
+   * negative control is an order of magnitude smaller than either destination arm. So the numbers
+   * are re-derived on every run of the file and checked against the claims made from them; what
+   * they are not is *pinned*, because there is no `runDestinationSecondBuildingStudy` entry point in
+   * {@link STUDY_ENTRY_POINTS} for `regeneratePins.ts` to call.
+   *
+   * What would close the gap is exactly that: lift the comparison out of the test into a study
+   * function, register it, and let the pin table render these four. It is a refactor rather than a
+   * measurement, and doing it here would have meant regenerating the whole pin table on a
+   * contended box in the same wave that authored the building. Left as a stated gap, which is what
+   * this register is for.
+   */
+  Object.freeze({
+    text: '−0.092 [−0.804, +0.619]',
+    file: 'benchmark/destinationSecondBuilding.test.ts',
+    count: 1,
+    reason: DESTINATION_SECOND_BUILDING_REASON,
+  }),
+  Object.freeze({
+    text: '−1.293 [−2.069, −0.517]',
+    file: 'benchmark/destinationSecondBuilding.test.ts',
+    count: 1,
+    reason: DESTINATION_SECOND_BUILDING_REASON,
+  }),
+  Object.freeze({
+    text: '+1.730 [+1.572, +1.888]',
+    file: 'benchmark/destinationSecondBuilding.test.ts',
+    count: 1,
+    reason: DESTINATION_SECOND_BUILDING_REASON,
+  }),
+  Object.freeze({
+    text: '+1.512 [+1.183, +1.841]',
+    file: 'benchmark/destinationSecondBuilding.test.ts',
+    count: 1,
+    reason: DESTINATION_SECOND_BUILDING_REASON,
+  }),
 ]);
 
 /**

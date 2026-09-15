@@ -100,15 +100,20 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
     /*
      * The slice, measured 2026-09-06 by `legibility.sweep.test.ts` at LEGIBILITY_SEEDS=10, extended
      * on 2026-09-14 by the two contracts GitHub issues #500 and #501 added, and again on 2026-09-15
-     * by the three GitHub issues #424, #425 and #430 added. **Every earlier row reproduced
-     * unchanged** at every budget both times, so the new keys are the whole of the movement on each
-     * wave — which is what says the sweep's own extension did not disturb it. The three towers are
-     * ten of ten for the reason `firstSession.test.ts` spells out: on a building of thousands a held
-     * landing is the fabric rather than a problem a session can solve.
+     * by the three GitHub issues #424, #425 and #430 added — and a third time the same day by the
+     * three GitHub issues #428, #427 and #426 added. **Every earlier row reproduced unchanged** at
+     * every budget all three times, so the new keys are the whole of the movement on each wave —
+     * which is what says the sweep's own extension did not disturb it.
+     *
+     * **The three added here do not agree with each other, and that is the finding rather than the
+     * extension.** `c16` is ten of ten, `c15` eight, and `c14` **one** — on three towers of the same
+     * class within a factor of two in population. Whatever makes a landing hold, it is not how many
+     * people the building holds; {@link LEGIBILITY_WINDOW_S}'s docstring carries the fifty-seed
+     * figures and declines to offer a mechanism for the spread.
      */
     expect(counts).toEqual({
       c1: 0, c2: 10, c3: 2, c4: 6, c5: 8, c6: 0, c7: 8, c8: 0, c9: 10, c10: 2,
-      c11: 10, c12: 10, c13: 10,
+      c11: 10, c12: 10, c13: 10, c14: 1, c15: 8, c16: 10,
     });
     expect(stretches['c1']).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     expect(stretches['c3']).toEqual([163, 72, 143, 65, 77, 90, 103, 106, 97, 51]);
@@ -119,6 +124,17 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
     // journey that takes two legs.
     expect(stretches['c9']).toEqual([1026, 1373, 1665, 1255, 1321, 1474, 1462, 1512, 1126, 1133]);
     expect(stretches['c10']).toEqual([121, 73, 68, 104, 57, 67, 95, 76, 276, 61]);
+    // One WTC is the first supertall this slice has found below the window on nine seeds of ten —
+    // one landing reaches 128 s and the rest never hold anybody a full two minutes. Empire State is
+    // above it on eight, and the two seeds it misses on (115 s and 99 s) are the ones worth pinning:
+    // they are near misses rather than quiet days, so a change to the bands would move them first.
+    //
+    // **`c15` was re-measured on 2026-09-15** when GitHub issue #45's ladder moved two of its banks
+    // from 6.1 m/s to 6.0 (§ D600): eight of its ten stretches moved and the count did not, which is
+    // what a timing change looks like against a threshold nobody crossed. **`c14` is unmoved** —
+    // One WTC's speeds were already on the ladder — and that contrast is why both are pinned here.
+    expect(stretches['c14']).toEqual([11, 1, 14, 28, 16, 128, 76, 6, 91, 0]);
+    expect(stretches['c15']).toEqual([644, 601, 199, 568, 115, 738, 647, 99, 219, 683]);
   /*
    * **Thirteen contracts × ten seeds, and three of the thirteen are supertalls** — GitHub issues
    * #425, #424 and #430. This slice cost well inside 300 000 ms while the ladder was ten mid-rise
@@ -130,6 +146,20 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
    * is what makes this a *slice* of the fifty-seed table rather than a second measurement; taking
    * five would leave the constant beside {@link LEGIBILITY_WINDOW_S} pinned by half of what it
    * claims. `vitest.config.ts`'s rule is that a site that knows it runs a simulation may say so.
+   *
+   * **900 000 → 1 800 000 on 2026-09-15** — GitHub issues #428, #427 and #426 take the ladder to
+   * **sixteen** contracts, six of them supertalls, and this slice **timed out at 900 000 ms** on
+   * the tree that added them. Raised on the commit that made the tree exceed it, which is what the
+   * ratchet's own message asks for, and the ratchet's sum is re-derived on the same commit.
+   *
+   * **The raise was made on a contended box and the clean figure was taken afterwards**, which is
+   * the order worth recording rather than hiding. The timeout that forced it happened at load
+   * average 25–31 with three sibling suites running, so no per-case cost could honestly be quoted
+   * from it. **Measured alone on a quiet box afterwards: 324 s** — a **5.6×** margin against
+   * 1 800 000 ms, and only **2.8×** against the 900 000 ms it replaced, where `vitest.config.ts`'s
+   * own table targets roughly 4.5×. So the raise is justified by the margin rather than by the
+   * timeout: the slice is **not** slow in itself, it was slow in company, and 900 s never had the
+   * headroom this suite is supposed to carry.
    */
-  }, 900_000);
+  }, 1_800_000);
 });

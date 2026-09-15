@@ -67,6 +67,23 @@
  * alternative was to append the three in the order they were authored, which is ordering by arrival
  * inside a tie — the defect #382 was filed about, one level down.
  *
+ * ## Three more again, and this time the tie needed a second key — `DECISIONS.md` § D599
+ *
+ * `c14` (One-WTC-class), `c15` (Empire-State-class) and `c16` (Willis-class) are GitHub issues
+ * #428, #427 and #426. Measured on the shipped path at § 4.7d's budget and seeds, **every one reads
+ * 1.00**, for the reason the three before them did: `shift/goals.ts`'s energy bar asks 80 kJ per
+ * delivered ride and a ride in any of them costs more. So the tie at the ceiling is now **eight**
+ * contracts, and ordering it by bank count alone is no longer a total order — `one-wtc-class-reference`
+ * and `shanghai-class-reference` both have six banks, and `vertical-city` and `willis-class-reference`
+ * both have seven.
+ *
+ * **The second key is the car count, and it is a design choice stated as one.** Within a bank-count
+ * tie the smaller group runs first: 73 cars before 106, and 35 before 104. It is the same reading
+ * § D581 used one level up — *what a reader has to hold at once* — applied to the only other
+ * quantity of the arrangement that a reader meets on the screen. The sequence becomes
+ * **1, 1, 1, 1, 1, 1, 2, 2, 3, 4, 5, 6, 6, 7, 7, 8**, still non-decreasing and still with no step
+ * larger than one, and `contracts.test.ts` asserts both.
+ *
  * **The ids do not move with the order and never will.** `c1`–`c10` are names, and a saved week, a
  * career tower, a `data/` row and this repository's own prose all hold them; renumbering would make
  * an id mean two things. What moves is the array's order, each contract's `label` (which is its
@@ -112,7 +129,7 @@ import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 import type { ContractStatus, ScenarioContract, WeekState } from './types.js';
 
 /**
- * The handoff's five, and eight more, in **measured difficulty order** rather than the handoff's —
+ * The handoff's five, and eleven more, in **measured difficulty order** rather than the handoff's —
  * see the module docstring and `docs/33` § 4.7.
  *
  * Frozen, and every member frozen: this is shared, read-only reference data of exactly the kind
@@ -123,17 +140,17 @@ import type { ContractStatus, ScenarioContract, WeekState } from './types.js';
  * schema, a parser and a loader to protect nothing.
  */
 /**
- * **Thirteen contracts, and the handoff specifies five.** `docs/12` § 4.4 fixes the campaign at the five
+ * **Sixteen contracts, and the handoff specifies five.** `docs/12` § 4.4 fixes the campaign at the five
  * buildings shipped when the design was written; five more buildings have landed since, and a
  * shipped building with no contract is a scenario the reader can never take. The deviation is
  * recorded in `docs/12` § 4.7 rather than absorbed, which is the rule the handoff itself sets: it
  * wins every disagreement about what the screen looks like, and a disagreement it does not cover is
  * a decision to be written down.
  *
- * **Thirteen rather than fourteen, and the exception is a list rather than a silence.**
+ * **Sixteen rather than seventeen, and the exception is a list rather than a silence.**
  * `burj-class-reference` is a *reference* building and has no contract;
  * `contracts.test.ts#REFERENCE_ONLY` names it, asserts it ships, and asserts it has none, so the
- * exception cannot quietly widen into the rule. **Three more reference towers landed on 2026-09-15
+ * exception cannot quietly widen into the rule. **Six more reference towers landed on 2026-09-15
  * and every one of them has a contract**, on the owner's 2026-09-10 ruling on #232 that the target
  * is 22 buildings and 22 contracts and that every building is playable — so the list did not widen,
  * and the one member it still holds is the building that predates that ruling.
@@ -301,9 +318,20 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     reward: 'Destination dispatch · Energy aware · two more shafts',
   }),
   Object.freeze({
+    id: 'c14',
+    buildingId: 'one-wtc-class-reference',
+    label: 'Scenario 12',
+    title: 'The floor you press before you get in',
+    teaches: 'what a landing panel is for, on the building that made it famous',
+    brief:
+      'A hundred and four floors, six banks and one change on the way up — and the only sky lobby in the set with two levels, because the cars that go higher leave from the upper one. The escalator between them is not scenery: an eighth of this tower’s rides use it instead of a lift.',
+    needClean: 3,
+    reward: 'Destination dispatch · Destination panel · two more shafts',
+  }),
+  Object.freeze({
     id: 'c12',
     buildingId: 'shanghai-class-reference',
-    label: 'Scenario 12',
+    label: 'Scenario 13',
     title: 'A hundred and six cars',
     teaches: 'that the fastest lift in the catalogue is not fast on a short hop',
     brief:
@@ -314,13 +342,35 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
   Object.freeze({
     id: 'c5',
     buildingId: 'vertical-city',
-    label: 'Scenario 13',
+    label: 'Scenario 14',
     title: 'Vertical City',
     teaches: 'supertall traffic, and knowing when to stop',
     brief:
       'A hundred floors, 4,887 occupants, six local zones hanging off three two-level sky lobbies, and eight double-deck shuttles at 10 m/s. Every journey above floor 25 is two legs — three when the destination zone is anchored to the far lobby level. Clear three shifts here and the week simply keeps going.',
     needClean: 3,
     reward: 'Multi-round auction · Landing-panel destination dispatch · endless mode',
+  }),
+  Object.freeze({
+    id: 'c16',
+    buildingId: 'willis-class-reference',
+    label: 'Scenario 15',
+    title: 'Which deck are you on?',
+    teaches: 'that a double-decker is two cars that cannot disagree',
+    brief:
+      'Sixteen double-deckers, and they are the locals rather than the shuttles — every floor in a zone is paired with the one above it, so the floor you are going to decides which deck you board and the lobby you board from. At two and a half metres a second the stops are most of the round trip, which is exactly what the second deck is for.',
+    needClean: 3,
+    reward: 'Capacity aware · Pre-positioning · two more shafts',
+  }),
+  Object.freeze({
+    id: 'c15',
+    buildingId: 'empire-state-class-reference',
+    label: 'Scenario 16',
+    title: 'Change at eighty',
+    teaches: 'what a building does when nobody has invented the express yet',
+    brief:
+      'Eight banks, a hundred and two floors and not one express in the tower. The top is reached by riding a local to eighty, changing, riding to eighty-six, and changing again — three rides and two waits, which is the most this simulator will route. Every other tall building you have run hides its second leg behind a shuttle; this one cannot.',
+    needClean: 3,
+    reward: 'Fairness first · Energy aware · endless mode',
   }),
 
 ]);

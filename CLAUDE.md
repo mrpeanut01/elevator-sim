@@ -34,7 +34,19 @@ verdict:
   arms** — and say the shape, not just the verdict: the two light points stay INDISTINGUISHABLE,
   which is what an over-subscription defect predicts, since an unbounded promise cannot bite until
   a car fills. The cost is unchanged and still reported beside it (AWT and WT95 **WORSE** against
-  `eta` at that point). 6c (learned control) is **no longer deferred — it is implemented, measured, and NOT
+  `eta` at that point).
+  **That verdict now has a second building rather than a second seed, and half of it did not
+  reproduce** ([§ D595](DECISIONS.md), GitHub issue #428). Measured on `one-wtc-class-reference` at
+  the same apparatus — `eta` baseline, n = 200 under common random numbers, TTD the gate — at *that
+  tower's* highest quotable rate, which is 2 % rather than Midtown's 4 % and is censused at the
+  budget the run spends: **`destination-eta` is INDISTINGUISHABLE**, ΔTTD `−0.092 [−0.804, +0.619]`
+  with `requiredReplications` of **11 704** against a budget of 200, while **`destination-panel` is
+  BETTER**, `−1.293 [−2.069, −0.517]`, resolvable at n = 1. So the Level-0 arm that carries § D100's
+  accepted result does nothing on the second tower and the Level-1 panel does — **the reverse of the
+  shape above** — and what the pair establishes is that the effect is **building-dependent**. The
+  verdict is not moved: Midtown's interval is still Midtown's, this one is still this one, and
+  § D100's criterion is the criterion's own to restate. The costs are the same shape on both arms
+  (AWT and WT95 **WORSE**), and **no mechanism is offered** for the split. 6c (learned control) is **no longer deferred — it is implemented, measured, and NOT
   ACCEPTED**: ΔTTD `−0.213 [−0.440, +0.014]` against `collective` at n = 200 on a disjoint seed, an
   interval containing zero, unchanged at 24 and 64 search candidates ([§ D139](DECISIONS.md) is the
   criterion, dated before the code; [§ D145](DECISIONS.md) is the verdict). **That refusal is now
@@ -59,7 +71,19 @@ verdict:
   Double-deck operation is
   **simulated** — paired stops, per-deck design load, deck-bound legs ([§ D131](DECISIONS.md)) — and
   the disclaimer survives only in the narrower case of a double-deck bank declaring no
-  `servesFloorPairs`, which no shipped building raises.
+  `servesFloorPairs`, which no shipped building raises. **That last clause is now checked by a
+  building that could have raised it rather than by a set that happened not to**
+  ([§ D598](DECISIONS.md), GitHub issue #426): `willis-class-reference` runs its sixteen
+  double-deckers as the **locals**, pairing every floor in their zone rather than four transfer
+  levels, and it loads with zero warnings — while deleting one bank's pairs **does** raise
+  `missing-floor-pairs`, which is what makes the first half worth anything. Two things that tower
+  measured and the shuttle-only set could not: a double-deck **local** forces one uniform storey
+  height over its whole zone, because every pair must be exactly `deckSeparationM` apart; and its
+  lobby escalator carries 720 hops with the decks and **exactly zero** without them, so a transport
+  mode can be *produced by* the deck model rather than sit beside it. **No residual is published for
+  a double-deck bank**, and that is the apparatus rather than the building —
+  `oracle/upPeakCase.ts#isolateBank` drops the deck fields, so what it measures is a single-deck
+  bank of the same cars.
 - **Phase 8** — **both blocking property violations are closed**, and neither was closed by moving a
   bound: `fuzz-1001074` by a fourth `awtIsValid` ground, `fuzz-1000384` by revoking a promise a
   withdrawn car cannot keep. The deep tier is green at 2 000 cases. **All eight tracks have landed**;

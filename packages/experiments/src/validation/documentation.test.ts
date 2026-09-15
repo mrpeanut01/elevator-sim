@@ -1753,6 +1753,27 @@ type DecisionReservation = {
  */
 const OPEN_RESERVATION = { wave: 'AB, of 2026-09-15', from: 594, to: 620 } as DecisionReservation | null;
 /*
+ * **Wave AB opened this as `{ wave: 'AB', from: 594, to: 600 }` and lane A closed it, having spent
+ * every number in it.** The dispatch brief allocated lane A **D594–D600** and no others; wave AA's
+ * charter row says that range was the whole of what wave AA left free, so the block was the lane's
+ * and the wave's at once and there is nothing to widen it to.
+ *
+ * **Why it is `null` rather than left open, and the caveat the integrator needs.** The guard below
+ * refuses a reservation with no unfinished numbers in it, and it names the remedy in terms: set
+ * this to `null` and reconcile the charter row on the same commit. Lane A spent D594–D599 on the
+ * three towers and then **D600** on a defect the towers' own commissioning check found after the
+ * fact — two authored speeds off their machine class's ladder — which is [§ D405](../../../../DECISIONS.md)'s
+ * second ground and could not be left to a docstring, because it moves figures in three decisions
+ * this same wave had already recorded.
+ *
+ * **Lane D was still open when this landed, and that is deliberately not papered over.** A sibling
+ * lane holds D601 upward. Nulling this does not claim otherwise: with no reservation the guard
+ * asserts `row === highest + 1` on *every* commit, so the first number lane D writes turns it red
+ * until lane D moves the row with it. That is the guard working rather than a collision — the
+ * alternative was inventing a ceiling for a block this lane was never told, which is exactly the
+ * bookkeeping the comment above concludes lanes should stop inventing.
+ */
+/*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
  * for the integrator's findings. D507 is the campaign dock and the campaign's own event (#171,

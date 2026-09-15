@@ -72,7 +72,9 @@ const config = readFileSync(VITEST_CONFIG, 'utf8');
  *
  * Only the two `viz` projects are gated, and that is scope rather than judgement: this lane measured
  * the `viz` leg. `experiments` carries **168** above-ceiling annotations of which **123** are named
- * constants, `core` 5, `cli` 2 and `server` 1 — counted by the same scanner, published by the
+ * constants, `core` 6 (5 until 2026-09-15, when GitHub issue #428's three towers pushed
+ * `traffic/credentialGapIdentity.test.ts`'s byte-identity case past 300 000 ms), `cli` 2 and
+ * `server` 1 — counted by the same scanner, published by the
  * deriver, and gated by nothing here.
  */
 const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly totalMs: number }> =
@@ -161,7 +163,31 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      *
      * Raised on the commit that made the tree exceed it, with nothing existing raised to make room.
      */
-    ['viz', { count: 98, totalMs: 107_400_000 }],
+    /*
+     * **The count does not move and the sum rises by 1 800 000, which is the pair this entry pins
+     * doing exactly what it was written to do** — wave AB's three reference towers (GitHub issues
+     * #428, #427 and #426). Two budgets were raised and no case was added:
+     *
+     * - `shift/legibility.test.ts`, *"reproduces the table's slice"* — 900 000 → 1 800 000 ms.
+     * - `shift/firstSession.test.ts`, *"every eligible contract's day 1 is legible"* — 900 000 →
+     *   1 800 000 ms.
+     *
+     * 900 000 + 900 000 = **1 800 000**, which is precisely 109 200 000 − 107 400 000. Both sites
+     * were already above this project's ceiling, so `at its own ceiling` and `above 300 000 ms` are
+     * both unmoved and the count stays at 98 — a wave that raised two budgets and added none leaves
+     * the count level and moves only the sum, which is the reason this entry pins both.
+     *
+     * **Neither is a case annotated upward to satisfy a budget**, which is the thing this ratchet
+     * exists to catch. Both are instruments over the *shipped set*, and the shipped set grew from
+     * fourteen buildings to seventeen and from thirteen contracts to sixteen on this wave. The
+     * legibility slice walks every contract, so it gained three; the first-session walk is derived
+     * from that slice's own table, so it gained the two of the three that cleared the threshold.
+     * Both **timed out** on the tree that added them rather than merely running close, and the
+     * alternative — dropping seeds or members — would have made each case a claim about a subset
+     * of the set it names. Raised on the commit that made the tree exceed them, with nothing
+     * existing raised to make room.
+     */
+    ['viz', { count: 98, totalMs: 109_200_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this

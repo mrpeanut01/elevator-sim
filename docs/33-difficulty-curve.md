@@ -1700,6 +1700,10 @@ each is a finding with its probes attached rather than a reason to widen the ban
 > on **seven of ten**. Everything in §§ 4.7a–4.7i describes the eight-contract ladder it was
 > measured on and is not rewritten; § 4.7j says what moved.
 >
+> **And three more again, on the same day: § 4.7l is their row, and it is where bank count stops
+> being a total order.** `c14` (One-WTC-class), `c15` (Empire-State-class) and `c16` (Willis-class)
+> are GitHub issues #428, #427 and #426.
+>
 > **Three more have landed since that, and § 4.7k is their row — and it is the first one where the
 > measurement could not place them.** `c11`, `c12` and `c13` (the CTF-, Shanghai- and
 > Merdeka-class reference towers, GitHub issues #425, #424 and #430) each read **1.00**, as `c4` and
@@ -2131,6 +2135,70 @@ names.
 denominator is not, which is what adding three towers nothing can bring into the band looks like.
 **DC-6 is green**: the array's measured rates read 0.02, 0.36, 0.40, 0.42, 0.46, 0.50, 0.52, 0.52,
 1.00, 1.00, 1.00, 1.00, 1.00, which is non-decreasing.
+
+#### 4.7l The fourteenth, fifteenth and sixteenth — where the tie needed a second key
+
+**Landed 2026-09-15, GitHub issues [#428](https://github.com/mrpeanut01/elevator-sim/issues/428),
+[#427](https://github.com/mrpeanut01/elevator-sim/issues/427) and
+[#426](https://github.com/mrpeanut01/elevator-sim/issues/426)** — three more reference towers, each
+with the Career contract the owner's 2026-09-10 ruling on #232 says every building owes.
+
+**Run.** § 4.7d's, unchanged: `CONTRACT_CURVE_SWEEP=1 CONTRACT_CURVE_SEEDS=50
+CONTRACT_CURVE_ONLY=c14,c15,c16 CONTRACT_CURVE_OUT=<path> npx vitest run --project viz
+src/shift/contractCurve.sweep.test.ts`, day 1, dispatcher `collective`, seeds `20 260 824 + 7 919 n`,
+the shipped five-goal set.
+
+| position | contract | building | what moves it | missed | of | rate | in band | goals that missed |
+|---|---|---|---|---|---|---|---|---|
+| 12 | c14 | `one-wtc-class-reference` | **nothing reaches the band** | 50 | 50 | 1.00 | **no** | queue 50, energy 50 |
+| 15 | c16 | `willis-class-reference` | **nothing reaches the band** | 50 | 50 | 1.00 | **no** | queue 50, worst-wait 50, minute 43, energy 40 |
+| 16 | c15 | `empire-state-class-reference` | **nothing reaches the band** | 50 | 50 | 1.00 | **no** | queue 50, energy 50, worst-wait 4 |
+
+**So the tie at the ceiling is eight contracts**, and § 4.7k's tie-break — bank count — is no longer
+a total order: `one-wtc-class-reference` and `shanghai-class-reference` both have six banks, and
+`vertical-city` and `willis-class-reference` both have seven.
+
+**The second key is the car count, smaller group first**, which is § D581's own reading (*what a
+reader has to hold at once*) applied to the other quantity of the arrangement a reader meets on the
+screen: 73 cars before 106, and 35 before 104. The whole sequence reads
+**1, 1, 1, 1, 1, 1, 2, 2, 3, 4, 5, 6, 6, 7, 7, 8** — still non-decreasing, still no step larger than
+one, now with two repeats instead of a jump. `shift/contracts.test.ts` asserts the list, the
+non-decrease, **and the second key inside the tie alone** — the first eight positions are each a
+measured rate, and a bank-count repeat there (`chancery-house` then `st-jude-hospital`) is the
+measurement doing the ordering. Requiring the car count to rise across that would be a test
+overruling the sweep.
+
+**What a ride costs on each, for the table § 4.7k publishes:**
+
+| tower | work per delivered ride | the bar |
+|---|---|---|
+| **`willis-class-reference`** | **125.9 kJ** | 80 |
+| **`empire-state-class-reference`** | **151.9 kJ** | 80 |
+| **`one-wtc-class-reference`** | **263.1 kJ** | 80 |
+
+*(One run each, `collective`, seed 20 260 824, 1 800 s — a reading of the fabric rather than an
+interval, and no two arms are compared, so none is required.)* **`one-wtc-class-reference` is the
+most expensive ride in the shipped set**, above `burj-class-reference`'s 242.6: it is 73 cars over
+104 floors carrying 2 873 legs in half an hour, where the Willis-class tower's 104 cars carry 6 880.
+The bar is a per-leg quantity and the denominator is what moves.
+
+**`c16`'s energy goal misses on 40 of 50 rather than on all fifty, which is the only row in this
+family that does not.** It is still not in the band — the landing queue and the worst wait both miss
+on every seed — but it is the first tower at this end of the ladder where the energy bar is close
+enough to the fabric to vary, and that is a fact about a fleet of 104 slow cars rather than about the
+rung. Recorded rather than acted on: the remedy is still § 7's O2 and GitHub issue #234.
+
+**What moves and what does not.** `c12`'s label goes from *Scenario 12* to *Scenario 13* and `c5`'s
+from *Scenario 13* to *Scenario 14*; `c4`, `c13` and `c11` do not move at all; the eight contracts
+before position 9 are each still where their own measured rate put them. **The ids do not move**,
+for § 4.7j's reason — `c1`–`c16` are names — which is why `c15` is the *sixteenth* scenario and
+`c16` the fifteenth.
+
+**DC-4 is green on seven of sixteen**, against seven of thirteen: the numerator is unchanged for the
+third wave running and the denominator is not, which is what adding towers nothing can bring into
+the band looks like. **DC-6 is green**: 0.02, 0.36, 0.40, 0.42, 0.46, 0.50, 0.52, 0.52 and then
+eight 1.00s, which is non-decreasing.
+
 ### 5.1 What a fix case's difficulty is made of
 
 A case is a building, a dispatcher, a seed, a horizon and a demand level, plus an authored `asBuilt`
@@ -2413,6 +2481,25 @@ what this instrument looks at; Ashgate's is a journey that takes two legs, which
 time to destination and which a *held landing* measure cannot see. **A tower can present a real
 problem somewhere this arm does not look**, and that is the first shipped instance of the limit
 `docs/35` `PM-TT2` names.
+
+**Re-measured again the same day at sixteen contracts × 50 seeds = 800 days** (GitHub issues #428,
+#427 and #426), and **all thirteen earlier rows reproduced to the second for the third wave
+running** — every count, every median, and the six per-seed slices `legibility.test.ts` pins.
+The three new rows are `c14` (One-WTC-class) at **1 of 50**, median **13 s**; `c15`
+(Empire-State-class) at **45 of 50**, median **472 s**; and `c16` (Willis-class) at **50 of 50**,
+median **2 347 s**.
+
+**They refute the reading § 4.7k's row offered for the three before them, and that is the useful
+half.** That reading was that a supertall is legible *because* it is a tower of thousands — a held
+landing being the building rather than a problem a session can see and solve. These three span
+4 810 to 9 200 occupants and span the **whole range this instrument reports**: One WTC is the least
+legible contract shipped after Garden Apartments and the first supertall the table has found
+**ineligible** for a first session, while Willis is second only to Midtown Office. **Population does
+not predict legibility.** What does is unmeasured, and no mechanism is offered in its place — a
+sentence about the fabric here would be a plausible story standing where a run belongs
+([§ D256](../DECISIONS.md)). The eligible set § D475 draws from goes from nine members to **eleven**,
+`c15` and `c16` joining and `c14` staying out, and it is still derived from this table rather than
+chosen.
 
 ### 6.5 Two things the sweep is not allowed to do
 

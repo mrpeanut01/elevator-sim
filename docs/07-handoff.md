@@ -667,7 +667,12 @@ The table is five buildings because it was written when five shipped. The set we
 ([§ D213](../DECISIONS.md)), to nine with the Burj-class reference tower, to **eleven** with
 `harbour-point` and `ashgate` ([§ D572](../DECISIONS.md), [§ D573](../DECISIONS.md)), and to
 **fourteen** with the three reference towers of GitHub issues #425, #424 and #430
-([§ D577](../DECISIONS.md)–[§ D579](../DECISIONS.md)), and the table was never extended — which is
+([§ D577](../DECISIONS.md)–[§ D579](../DECISIONS.md)), and to **seventeen** with the three of
+GitHub issues #428, #427 and #426 ([§ D594](../DECISIONS.md), [§ D596](../DECISIONS.md),
+[§ D598](../DECISIONS.md)) — the last of which is the first shipped building the closed form
+reconciles on **every one of its banks**, eight of them, because its largest group has ten cars and
+what defeats this apparatus is the size of the group rather than the height of the shaft. The table
+was never extended — which is
 what GitHub issue #232's third acceptance criterion, *"a closed-form round-trip-time check like the
 existing five"*, is really asking about. `oracle/remainingBuildings.test.ts` closes eight of the
 nine, and they are five different kinds of answer rather than eight more rows:

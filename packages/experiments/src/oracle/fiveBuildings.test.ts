@@ -709,10 +709,13 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
       'chancery-house',
       'crown-hotel',
       'ctf-class-reference',
+      'empire-state-class-reference',
       'harbour-point',
       'merdeka-class-reference',
+      'one-wtc-class-reference',
       'shanghai-class-reference',
       'st-jude-hospital',
+      'willis-class-reference',
     ]);
 
     // And why each is absent, because "not covered" and "not coverable" are different statements.
@@ -788,14 +791,35 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
      * *measurable* either — the same wrong step this guard exists to keep visible, reached from a
      * third direction.
      */
+    /*
+     * **Three more landed on 2026-09-15** — GitHub issues #428, #427 and #426 — and one of them is
+     * the first shipped building **every** bank of which reduces. `empire-state-class-reference` is
+     * a 1931 relay tower of eight banks, six of ten cars and two of seven and six, and
+     * `remainingBuildings.test.ts` reconciles **all eight** at this file's own budget and seed base,
+     * residuals between **−0.044 %** and **−0.494 %**, every one of them negative. That is the
+     * counterweight to the paragraph above: the ground that refuses a supertall is the *size of
+     * the bank*, and a tower whose largest group has ten cars meets none of it, however tall it is.
+     *
+     * `one-wtc-class-reference` reconciles on `observatory` (+24.766 % / **−0.028 %**) and is
+     * refused on its other five; `willis-class-reference` reconciles on `skydeck` (+9.456 % /
+     * **−0.044 %**) and is refused on four. **No residual is published for either of Willis's
+     * double-deck banks**, and the reason is a property of the apparatus rather than of the
+     * building: `upPeakCase.ts#isolateBank` drops the deck fields with `servesFloorPairs`, so what
+     * it would measure is a single-deck bank of the same cars. Calling that a residual for a
+     * double-deck bank would be *"a different calculation wearing its name"*, which is the limit
+     * this file already words that way.
+     */
     const coverable = [
       'ashgate',
       'burj-class-reference',
       'chancery-house',
       'ctf-class-reference',
+      'empire-state-class-reference',
       'harbour-point',
       'merdeka-class-reference',
+      'one-wtc-class-reference',
       'shanghai-class-reference',
+      'willis-class-reference',
     ];
     const notCoverable = ['crown-hotel', 'st-jude-hospital'];
     expect([...coverable, ...notCoverable].sort()).toEqual(absent);

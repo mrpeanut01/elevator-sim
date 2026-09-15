@@ -37,6 +37,9 @@
  * | `ctf-class-reference` | **reconciles on `local-low`**, and is refused on two of its other four | one bank simulated |
  * | `shanghai-class-reference` | **reconciles on `local-hotel`**, and is refused on the other five | one bank simulated |
  * | `merdeka-class-reference` | **reconciles on `local-hotel`**, and is refused on the other three | one bank simulated |
+ * | `one-wtc-class-reference` | **reconciles on `observatory`**, and is refused on the other five | one bank simulated |
+ * | `empire-state-class-reference` | **reconciles on `bank-a`**, and is refused on *none* — all eight reduce | one bank simulated, plus eight at one seed |
+ * | `willis-class-reference` | **reconciles on `skydeck`**, refused on four, and publishes **no residual for a double-deck bank** | one bank simulated |
  * | `crown-hotel` | the closed form is **offered and refuses**, and the refusal is measured rather than asserted | one bank simulated |
  * | `st-jude-hospital` | refused **twice**, and both refusals are arithmetic — no simulation at all | free |
  *
@@ -66,6 +69,33 @@
  * So the largest lift group in `data/buildings/` is measurable by this apparatus on its *smallest*
  * bank and on none of its others, which is a fact about the reconstruction rather than about the
  * towers.
+ *
+ * ## The three of 2026-09-15, and one of them bounds the ground above
+ *
+ * `one-wtc-class-reference`, `empire-state-class-reference` and `willis-class-reference` are GitHub
+ * issues **#428**, **#427** and **#426**. Two behave like the three above — one bank reconciles,
+ * the rest are refused on grounds this file already enumerates. **The third is the counterweight
+ * and it is why this section exists.**
+ *
+ * `empire-state-class-reference` is a 1931 relay tower: eight banks, six of ten cars and two of
+ * seven and six, 102 floors, no express anywhere in it. **Every one of its eight banks reduces**,
+ * residuals between **−0.044 %** and **−0.494 %** at the full budget — **every one of them
+ * negative**, which is the direction the one-sided rule predicts and which only became true of
+ * all eight when GitHub issue #45's ladder moved two banks from 6.1 m/s to 6.0
+ * ([§ D600](../../../../DECISIONS.md)). Ground 3 above says the
+ * apparatus cannot drain what it offers a twenty- or thirty-car bank and that *no mechanism is
+ * offered for exactly where the threshold is*; that is still true, because one point is not a
+ * sweep. What this building does establish is the **quantity**: it is the size of the group and not
+ * the height of the shaft, measured on a tower as tall as `vertical-city` whose largest bank has
+ * ten cars.
+ *
+ * **And one refusal here is a refusal to publish rather than a throw**, which is a fourth kind.
+ * `willis-class-reference`'s two double-deck locals can be measured — `local-low` returns
+ * **−0.050 %** — but {@link isolateBank} *drops the deck fields with `servesFloorPairs`*, so what it
+ * measured is a single-deck bank of the same cars. That figure is recorded in the case below under
+ * exactly that label and is **not** published as this tower's double-deck residual, because calling
+ * it one would be *"a different calculation wearing its name"* — `fiveBuildings.test.ts`'s own words
+ * for this limit.
  *
  * ## The two that landed with the content plan
  *
@@ -260,6 +290,13 @@ const REFERENCE_TOWERS: readonly { readonly buildingId: string; readonly bankId:
   { buildingId: 'ctf-class-reference', bankId: 'local-low' },
   { buildingId: 'shanghai-class-reference', bankId: 'local-hotel' },
   { buildingId: 'merdeka-class-reference', bankId: 'local-hotel' },
+  // The three of 2026-09-15 — GitHub issues #428, #427 and #426. Same shape as the three above:
+  // the bank that reconciles is not the one a reader would pick first, because the apparatus is
+  // bounded by bank size rather than by height. `empire-state-class-reference` is the exception
+  // worth reading, and it has a case of its own below: **every** one of its eight banks reduces.
+  { buildingId: 'one-wtc-class-reference', bankId: 'observatory' },
+  { buildingId: 'empire-state-class-reference', bankId: 'bank-a' },
+  { buildingId: 'willis-class-reference', bankId: 'skydeck' },
 ];
 
 /**
@@ -284,6 +321,14 @@ const REFUSED_BANKS: readonly {
   { buildingId: 'shanghai-class-reference', bankId: 'local-1', ground: /did not deliver everybody/i },
   { buildingId: 'merdeka-class-reference', bankId: 'local-low', ground: /did not deliver everybody/i },
   { buildingId: 'merdeka-class-reference', bankId: 'local-high', ground: /did not deliver everybody/i },
+  // The 2026-09-15 towers, on the two grounds that cost nothing to assert. The drain-deadline
+  // ground is met by six more of their banks — `one-wtc-class-reference`'s four locals and
+  // `willis-class-reference`'s `local-high` and `local-top` — and none of the six is listed here,
+  // because that ground already has three members above and each new one costs 5 400 s of
+  // simulation to reach a refusal the list already demonstrates.
+  { buildingId: 'one-wtc-class-reference', bankId: 'shuttle', ground: /no populated floor above its terminal|no up-peak to analyse|finite, positive number/i },
+  { buildingId: 'willis-class-reference', bankId: 'express-mid', ground: /no populated floor above its terminal|no up-peak to analyse|finite, positive number/i },
+  { buildingId: 'willis-class-reference', bankId: 'local-mid', ground: /not shorter than/i },
 ];
 
 /**
@@ -797,6 +842,15 @@ describe('the three reference towers each reconcile on one bank and are refused 
        * | `ctf-class-reference/local-low` | **+48.935 %** | **−0.031 %** | 845 / 1 681 |
        * | `shanghai-class-reference/local-hotel` | **+34.983 %** | **−0.209 %** | 2 003 / 2 908 |
        * | `merdeka-class-reference/local-hotel` | **+34.485 %** | **−0.466 %** | 1 435 / 2 090 |
+       * | `one-wtc-class-reference/observatory` | **+24.766 %** | **−0.028 %** | 862 |
+       * | `empire-state-class-reference/bank-a` | **+27.467 %** | **−0.044 %** | 2 106 |
+       * | `willis-class-reference/skydeck` | **+9.456 %** | **−0.044 %** | 1 896 |
+       *
+       * The last row is the smallest raw divergence any bank in this file has produced, and it is
+       * the shape the textbook's simplification predicts rather than a better bank: `skydeck` runs
+       * G to 103 and stops nowhere else, so the two omissions the raw comparison leaves out —
+       * acceleration inside the stop time, and the minimum dwell — have one stop to accumulate on
+       * instead of twenty.
        *
        * All three inside a 4 % tolerance, and all three of the same sign as every other reconciled
        * bank — the closed form reads *fast*, which is what `CLOSED_FORM_COMPARISON_RULE` predicts
@@ -848,6 +902,56 @@ describe('the three reference towers each reconcile on one bank and are refused 
       `${label} now reduces — this file says it cannot`,
     ).toThrow(entry.ground);
   });
+
+  it('empire-state-class-reference is the first shipped building every bank of which reduces', () => {
+    /*
+     * **The counterweight to this file's own newest refusal ground, and it is a fact about the
+     * bank rather than about the tower.** Every supertall here is refused on most of its banks
+     * because `measureUpPeak` drives an isolated bank at `OVERLOAD_FACTOR × %POP` of its own
+     * capacity and cannot drain the crowd it hands a twenty- or thirty-car group. A 1931 relay
+     * tower has no such group: its largest bank is **ten** cars. So all eight reduce, on a
+     * 102-floor building — which says the threshold this file could not locate is about the size
+     * of the group, not the height of the shaft.
+     *
+     * **Asserted at one seed rather than sixty-four, and the split is deliberate.** The *residual*
+     * for this tower is published above for `bank-a` at the full {@link REPLICATIONS}, which is what
+     * a residual needs. What this case claims is narrower and cheaper: that the closed form is
+     * *offered* every bank and refuses none of them. Eight banks × 64 replications would be four
+     * hundred more simulations to support a claim one replication each already carries.
+     *
+     * Measured at the full budget on the tree this landed on, for the record and not as an
+     * assertion — raw divergence / corrected residual, 64 replications from seed 810 000:
+     * `bank-a` +27.467 % / **−0.044 %**, `bank-b` +29.048 % / **−0.076 %**, `bank-c` +30.318 % /
+     * **−0.126 %**, `bank-d` +28.984 % / **−0.309 %**, `bank-e` +30.143 % / **−0.494 %**, `bank-f`
+     * +20.737 % / **−0.109 %**, `bank-g` +25.773 % / **−0.119 %**, `bank-h` +33.626 % /
+     * **−0.184 %**. All eight inside the 4 % tolerance, and **all eight negative**.
+     *
+     * **Re-measured on this commit, and the six banks that did not move are what make the two that
+     * did worth reading.** `bank-e` and `bank-f` are the two whose cars were authored at 6.1 m/s — a
+     * speed absent from `gearless-traction`'s own ladder, which is GitHub issue #45's defect — and
+     * moving them to 6.0 moved exactly those two rows: `bank-e` −0.368 % → −0.494 % and `bank-f`
+     * **+0.047 % → −0.109 %**. The other six reproduced to the third decimal in both columns. So
+     * the earlier sentence *“the one positive residual is `bank-f`, the relay feeder”* was a fact
+     * about a 6.1 m/s bank rather than about the relay, and it did not survive the speed becoming
+     * one the player's own control can select. Recorded rather than quietly refreshed.
+     */
+    const building = config.buildingsById.get('empire-state-class-reference');
+    expect(building, 'empire-state-class-reference does not ship').toBeDefined();
+    expect(building?.banks).toHaveLength(8);
+
+    for (const bank of building?.banks ?? []) {
+      expect(() =>
+        measureUpPeak({
+          config,
+          buildingId: 'empire-state-class-reference',
+          bankId: bank.id,
+          seeds: [FIRST_SEED],
+          peakWindowS: PEAK_WINDOW_S,
+        }),
+        `empire-state-class-reference/${bank.id} is refused — this case says no bank of this tower is`,
+      ).not.toThrow();
+    }
+  }, 600_000);
 
   it('is the only shipped building whose cars are not one speed, and the oracle says so', () => {
     /*

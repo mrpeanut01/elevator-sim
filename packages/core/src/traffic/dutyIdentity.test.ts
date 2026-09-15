@@ -42,15 +42,18 @@ const SHIPPED = [
   'chancery-house',
   'crown-hotel',
   'ctf-class-reference',
+  'empire-state-class-reference',
   'garden-apartments',
   'harbour-point',
   'merdeka-class-reference',
   'midtown-office',
   'mixed-use-high-rise',
+  'one-wtc-class-reference',
   'secure-tower',
   'shanghai-class-reference',
   'st-jude-hospital',
   'vertical-city',
+  'willis-class-reference',
 ] as const;
 
 const NOBODY: DutyShares = { goods: 0, bed: 0, service: 0 };
