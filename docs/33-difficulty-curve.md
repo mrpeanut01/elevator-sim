@@ -2357,6 +2357,25 @@ time to destination and which a *held landing* measure cannot see. **A tower can
 problem somewhere this arm does not look**, and that is the first shipped instance of the limit
 `docs/35` `PM-TT2` names.
 
+**Re-measured again the same day at sixteen contracts × 50 seeds = 800 days** (GitHub issues #428,
+#427 and #426), and **all thirteen earlier rows reproduced to the second for the third wave
+running** — every count, every median, and the six per-seed slices `legibility.test.ts` pins.
+The three new rows are `c14` (One-WTC-class) at **1 of 50**, median **13 s**; `c15`
+(Empire-State-class) at **45 of 50**, median **437 s**; and `c16` (Willis-class) at **50 of 50**,
+median **2 314 s**.
+
+**They refute the reading § 4.7k's row offered for the three before them, and that is the useful
+half.** That reading was that a supertall is legible *because* it is a tower of thousands — a held
+landing being the building rather than a problem a session can see and solve. These three span
+4 810 to 9 200 occupants and span the **whole range this instrument reports**: One WTC is the least
+legible contract shipped after Garden Apartments and the first supertall the table has found
+**ineligible** for a first session, while Willis is second only to Midtown Office. **Population does
+not predict legibility.** What does is unmeasured, and no mechanism is offered in its place — a
+sentence about the fabric here would be a plausible story standing where a run belongs
+([§ D256](../DECISIONS.md)). The eligible set § D475 draws from goes from nine members to **eleven**,
+`c15` and `c16` joining and `c14` staying out, and it is still derived from this table rather than
+chosen.
+
 ### 6.5 Two things the sweep is not allowed to do
 
 **It may not report a mean.** Every figure it publishes is a count with its denominator — *3 of 10

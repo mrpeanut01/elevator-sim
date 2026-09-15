@@ -62,15 +62,26 @@ describe('the eligible set — § D512’s table read by arithmetic', () => {
      * whether a first session should open on a supertall at all is a design question this file
      * cannot answer and does not pretend to.
      */
+    /*
+     * **`c15` and `c16` joined on 2026-09-15 and `c14` did not** — GitHub issues #427, #426 and
+     * #428 — which is the first wave where three towers of one class split across this threshold.
+     * Empire-State-class is legible on 45 of 50 at a median 437 s and Willis-class on 50 of 50 at
+     * 2 314 s, so both clear it; **One-WTC-class is legible on 1 of 50 at a median 13 s** and is the
+     * first supertall this table has found ineligible. The paragraph above reads the three before
+     * them as legible *because* they are towers of thousands, and that reading is now refuted as a
+     * claim about size: these three span 4 810 to 9 200 occupants and span the whole range the
+     * instrument reports. The threshold is still § D512's and is still not moved here.
+     */
     expect(ELIGIBLE_FIRST_CONTRACT_IDS).toEqual([
-      'c2', 'c3', 'c4', 'c5', 'c7', 'c9', 'c11', 'c12', 'c13',
+      'c2', 'c3', 'c4', 'c5', 'c7', 'c9', 'c11', 'c12', 'c13', 'c15', 'c16',
     ]);
     for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) {
       const row = LEGIBILITY_SWEEP.find((entry) => entry.contractId === id);
       expect(row?.legibleOf50 ?? 0).toBeGreaterThan(50 / 3);
     }
-    /* The four the instrument found never or rarely legible are out, the campaign's opener first. */
-    for (const id of ['c1', 'c6', 'c8', 'c10']) expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(id);
+    /* The five the instrument found never or rarely legible are out, the campaign's opener first. */
+    for (const id of ['c1', 'c6', 'c8', 'c10', 'c14'])
+      expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(id);
     expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(FIRST_CONTRACT_ID);
   });
 
@@ -131,7 +142,19 @@ describe('the door’s line — derived from the week, never stored', () => {
      * from a stale one, so it asserts the *derivation*: the count is the eligible set's length and
      * the days are `rows × n`. `docs/37` § 6's rule, applied to the check as well as to the string.
      */
-    const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+    /*
+     * **Extended past `ten` on 2026-09-15** (GitHub issues #428, #427 and #426), on the same commit
+     * as `firstSession.ts`'s own list and for the same reason: the eligible set reached **eleven**,
+     * so `words[11]` was `undefined`, the `?? ''` arm made the assertion read `toContain(' towers')`
+     * — which passes on any sentence containing the word — and the non-vacuity bound below caught
+     * it. That bound is the whole reason this failed loudly rather than quietly, and it is why the
+     * list here is a **second, independent copy** rather than an import: a check that read
+     * `NUMBER_WORDS` from the module would agree with a wrong module.
+     */
+    const words = [
+      'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+      'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen',
+    ];
     expect(FIRST_SESSION_LINE).toContain(
       `${words[ELIGIBLE_FIRST_CONTRACT_IDS.length] ?? ''} towers`,
     );
@@ -175,6 +198,12 @@ describe('AC1 and AC2, asked of every member of the set on the pinned seeds', ()
      * joined it on 2026-09-14 at ten of ten (GitHub issue #500). Harbour Point's day 1 holds a
      * landing past the band on every seed, which is what a group short of its own handling capacity
      * looks like from this instrument even let at three fifths.
+     *
+     * **`c15` and `c16` joined on 2026-09-15** (GitHub issues #427 and #426) at eight and ten of
+     * ten. `c14` is absent from this walk because it is absent from the set — One-WTC-class is
+     * legible on 1 of 50 and did not clear the threshold — and its absence here is the same
+     * measurement the row above records, arriving through the derivation rather than through a
+     * second list.
      */
     expect(Object.fromEntries(Object.entries(legibleAt).map(([id, list]) => [id, list.length]))).toEqual({
       c2: 10,
@@ -186,6 +215,8 @@ describe('AC1 and AC2, asked of every member of the set on the pinned seeds', ()
       c11: 10,
       c12: 10,
       c13: 10,
+      c15: 8,
+      c16: 10,
     });
     /* AC1's clock: on every legible day the moment is inside the day, and never before the window. */
     for (const [id, list] of Object.entries(legibleAt)) {
@@ -205,6 +236,17 @@ describe('AC1 and AC2, asked of every member of the set on the pinned seeds', ()
    * dropping seeds or members would make AC1 and AC2 claims about a subset of the eligible set
    * rather than about it. `vitest.config.ts`'s rule is that a site that knows it runs a simulation
    * may say so.
+   *
+   * **900 000 → 1 800 000 on 2026-09-15** — GitHub issues #427 and #426 put `c15` and `c16` into
+   * the eligible set, taking this walk from nine members to **eleven**, two of them supertalls, and
+   * it **timed out at 900 000 ms** on the tree that added them. Raised on the commit that made the
+   * tree exceed it, with the ratchet's sum re-derived on the same commit.
+   *
+   * **Measured at 685 s alone earlier the same day** on a box already at load 25, against the old
+   * 900 s bound — so the margin was already thin before the two members landed, and a second file
+   * running beside it was enough to cross. The figure is quoted as what it is, a loaded-box reading
+   * rather than a per-case cost, because attributing seconds to members under that much contention
+   * would be arithmetic dressed as a measurement.
    */
-  }, 900_000);
+  }, 1_800_000);
 });

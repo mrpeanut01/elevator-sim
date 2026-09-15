@@ -73,7 +73,16 @@ export function isFirstDayOnALegibleTower(week: WeekState): boolean {
   );
 }
 
-/** English number words for the one count this line publishes. */
+/**
+ * English number words for the one count this line publishes.
+ *
+ * **Extended past `ten` on 2026-09-15** (GitHub issues #428, #427 and #426). The eligible set is the
+ * length of a derived list, and the fallback below is `String(n)` — so a set of eleven or more would
+ * have put a **digit** into a player-facing sentence, which is the one thing this line must not do:
+ * the honesty search asks whether a figure is *licensed*, and a bare numeral in prose is a figure
+ * with no source. The list covers the campaign's own size rather than an arbitrary ceiling, and the
+ * fallback is kept because a list that silently ran out is worse than one that reads oddly once.
+ */
 const NUMBER_WORDS: readonly string[] = Object.freeze([
   'zero',
   'one',
@@ -86,6 +95,12 @@ const NUMBER_WORDS: readonly string[] = Object.freeze([
   'eight',
   'nine',
   'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
 ]);
 
 /**
@@ -95,8 +110,9 @@ const NUMBER_WORDS: readonly string[] = Object.freeze([
  * `docs/37-content-plan.md` § 6's one rule for every content type: *a count published on any
  * player-facing surface is derived from the list, never authored beside it*. They were literals —
  * *"one of the **five** towers … measured over **400** days"* — and they were correct for an
- * eight-contract sweep of five eligible towers. The sweep is ten contracts now (GitHub issues #500
- * and #501), so both numbers moved, and a literal would have had to be remembered. The count is the
+ * eight-contract sweep of five eligible towers. The sweep is **sixteen** contracts now (GitHub issues
+ * #500 and #501, then #425, #424 and #430, then #428, #427 and #426), so both numbers have moved
+ * three times, and a literal would have had to be remembered on each. The count is the
  * eligible set's own length and the days are `rows × n`, so a contract entering or leaving the
  * legible set moves the sentence on the same commit that moves the table.
  */
