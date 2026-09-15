@@ -540,13 +540,17 @@ run corrected both of them ([§ D308](../DECISIONS.md)):
    against Standard and says so there too.
 4. **Still no mail has ever been sent** (`infra/README.md` § 0.2). This lane moves the origin that
    mail's link is built from, so it makes that unverified path *more* load-bearing rather than less.
-5. **No build has ever been put back on the live site.** § 11 is the procedure and **every step of it
-   is in this column** — it is derived from `deploy-viz.yml`, `provision.sh`, `deploy-azure.sh` and
-   `packages/viz/src/persist/`, and from nothing observed. That is not a hedge on a written
-   procedure: GitHub issues #241 (AC2), #242 (AC4) and #243 (AC4) ask for a rehearsal specifically,
-   and § 11.5 lists the six things a rehearsal has to observe. A rehearsal needs the Static Web App,
-   its federated identity and the Container App, so nothing that can be done from a checkout closes
-   it.
+5. **No build has ever been put back on the live site.** § 11 is the procedure. Until 2026-09-15
+   **every step of it** was in this column; **steps 0 and 2 are now in the verified one** — the git
+   half, rehearsed by `scripts/rehearse-revert.mjs` on three ranges with a negative control, which
+   found two failure modes the reasoning had not named (§ 11.5). Steps 1, 3 and 4 and the whole of
+   § 11.4 are still here, derived from `deploy-viz.yml`, `provision.sh`, `deploy-azure.sh` and
+   `packages/viz/src/persist/` and from nothing observed. That is not a hedge on a written
+   procedure: GitHub issues #241 (AC2), #242 (AC4) and #243 (AC4) ask for a rehearsal **on the
+   production deployment**, and the half that was rehearsed is the half that never touches it. Those
+   three stay open; § 11.5 lists what their rehearsal still has to observe. It needs the Static Web
+   App, its federated identity and the Container App, so nothing that can be done from a checkout
+   closes them.
 
 ---
 
@@ -679,6 +683,18 @@ Two things about this step that will otherwise be read as failures:
   git diff --stat "$target" HEAD -- packages data package.json package-lock.json 'tsconfig*.json'
   ```
 
+  Those five pathspecs are `deploy-viz.yml`'s own `paths:` list less the workflow file, which
+  triggers a run without being in the artifact. **They are transcribed here and derived in the
+  harness**: `scripts/rehearse-revert.mjs` reads them out of the workflow, so a sixth path added
+  there cannot quietly fall out of the comparison — and if this list and that one ever disagree,
+  the harness is the one to believe.
+
+**Rehearse this step before running it for real.** `node scripts/rehearse-revert.mjs "$target"`
+does steps 0 and 2 in a throwaway clone — no credential, no network, nothing live — and reports
+whether the range holds a merge commit, whether the revert applies, whether the tree comparison
+above really is empty, whether the revert crosses a saved-session bump, and what the page's build
+line will read afterwards. It costs about a second. § 11.5 records what it has been run on.
+
 - **The push deploys only if the revert touches one of the workflow's `paths:`** — `packages/**`,
   `data/**`, `package.json`, `package-lock.json`, `tsconfig*.json`,
   `.github/workflows/deploy-viz.yml`. A revert that touches none of them starts no run, and nothing
@@ -720,6 +736,8 @@ not need.
 |---|---|---|
 | The run is green in `build` and deployed nothing | The dispatch named a ref that is not `main`. `viz-production`'s branch policy refuses the deployment before the job authenticates, so `jobs.build` still runs and passes and the run is *partly* green | Dispatch on `main`. `provision.sh --deploy-now` refuses this case itself rather than letting GitHub produce it |
 | The push landed and no run appeared | The `paths:` filter (step 2) | `gh workflow run deploy-viz.yml --ref main` |
+| `git revert` stopped with *"commit … is a merge but no -m option was given"* | The range holds a merge commit. **Measured rather than inferred** (§ 11.5): the range form reverts every commit *newer* than the merge, leaves them **staged**, and only then aborts — and it writes no sequencer state, so there is nothing to `--continue` or `--abort`. An operator who does not read the error and types the next command in § 11.2 commits a **partial** revert, and the deploy that follows is green | `git reset --hard` back to the tip, then revert commit by commit with `git revert -m 1 <merge sha>` for each merge. `scripts/rehearse-revert.mjs` reports the merges in the range before you type anything |
+| `git rev-parse` or `git revert` calls the target an unknown revision | The checkout is **shallow**, so the target is not in it at all. `actions/checkout` defaults to depth 1 and **no workflow in `.github/workflows/` deepens it** (only `review.yml` names the setting, and it names 1), so this is not a procedure a runner can carry out; a workstation clone made with `--depth` behaves the same way. Git's wording says *unknown*, which reads like a typo rather than a truncated history | `git fetch --unshallow`, or run the revert from a full clone. The harness says which it is: it prints the shallow flag and the reachable commit count instead of git's message |
 | The run never started, or a queued one vanished | `deploy-viz.yml`'s production concurrency group is the literal string `deploy-viz-production`, so every production run shares it. `cancel-in-progress` is false for a push, so a running deploy is not cancelled — but GitHub keeps at most one **pending** run per group, so a third arrival evicts the queued one whatever the flag says (`CLAUDE.md`'s working agreements; [`RISKS.md`](../RISKS.md) R46, which measured this on `ci.yml`). **Inferred here from the group name and unobserved on this workflow** | Push nothing else to `main` while the revert deploy is in flight |
 | The page went back and every account surface dead-ends | `ELEVATOR_SIM_API_ORIGIN` is a repository variable read at **build** time, so rebuilding an old commit bakes in *today's* value, not the one that commit shipped against. Reverting the page does not revert the origin | Check `$api` before step 3. This is the failure mode of issues #21, #28, #29, #30, #32 and #34 (§ 4), and the workflow's own assertion catches only a build that disagrees with the variable, not a variable that has moved |
 | Players report their saved week is gone | The page went back past a bump in `packages/viz/src/persist/types.ts#SESSION_SCHEMA_VERSION`. An older build finds a version outside its `SESSION_SCHEMA_VERSIONS_READ`, refuses the session as *newer* (`persist/session.ts`), and `dev/main.ts` then **clears the slot** so it cannot re-fail forever | Nothing. See the warning below — this one is not recoverable |
@@ -781,23 +799,70 @@ answer.** The page and the API are independent deploys with no shared gate, noth
 and the only ordering rule this document states — § 3's *"half-armed is the worst of the three
 states"* — is about arming rather than reverting. A rehearsal is what would settle it; see § 11.5.
 
-### 11.5 What this procedure has been through, in § 9's voice — and it is nothing
+### 11.5 What this procedure has been through, in § 9's voice — half of it, and the half is named
 
-**No step of § 11 has been run against production, or against anything.** It is derived from
-`.github/workflows/deploy-viz.yml`, `infra/azure/swa/provision.sh`, `scripts/deploy-azure.sh`,
-`packages/viz/src/persist/` and `packages/viz/src/release/version.ts`, read at the commit that added
-this section — and from nothing observed. Everything above is therefore in § 9's *reasoned about
-only* column, and § 9 now carries it as item 5.
+**The procedure is not one operation, and until 2026-09-15 it was recorded as though it were.** Its
+steps 0 and 2 are git on a workstation and need no credential at all; steps 1, 3 and 4 and § 11.4
+need the Static Web App, its federated identity and the Container App. The first half is now
+**rehearsed**. The second **has not been run against production, or against anything**, and nothing
+that can be done from a checkout will change that.
 
-**#241 AC2, #242 AC4 and #243 AC4 are not met by this section existing.** They ask for a rehearsal,
-and a procedure nobody has run is a draft. What a rehearsal has to observe, and what it would
-correct if the reasoning above is wrong:
+#### The git half — rehearsed 2026-09-15, on `fb15704`
+
+`scripts/rehearse-revert.mjs` runs steps 0 and 2 in a throwaway clone under the system temp
+directory: it invokes `git` and no other binary, touches no network, and only ever reads the
+repository it is pointed at. Run on three ranges ending at `fb15704`, and on a fourth that is a
+negative control:
+
+| range | what it observed |
+|---|---|
+| `HEAD~4..HEAD` | 4 commits, no merge; the revert applies clean; **the tree comparison in step 2 prints nothing**; no saved-session bump crossed |
+| `HEAD~20..HEAD` | the same, over 20 commits |
+| `HEAD~50..HEAD` | the same, over 50 — the whole history this checkout holds |
+| a ref that is not an ancestor | **exit 1**, four observations failed, `history-reaches-target` first. The harness goes red when the claim is false, which is the only thing that makes the three rows above mean anything |
+
+**So step 2's central claim is now an observation rather than an inference**: a revert forward over
+this repository's recent history produces a tree that is byte-identical to the target over every
+path the artifact is built from. It also printed what the page's build line reads afterwards — the
+**revert** commit's ten characters, not the target's `097333ef04` — which is § 11.3's first failure
+mode made concrete instead of predicted. The revert commit's own id is deliberately not quoted here:
+it is a commit the rehearsal created, so it carries that run's timestamp and no second run
+reproduces it. A published id that cannot be re-derived is the defect this document's § 9 exists for.
+
+**Two failure modes were found by rehearsing that the reasoning had not named**, and both are now
+rows in § 11.3:
+
+1. **A merge commit in the range aborts the revert *part-way*.** Measured on a synthetic merge in a
+   throwaway clone, because this repository's reachable history is linear and could not produce
+   one: `git revert --no-commit A..B` reverts the commits newer than the merge, **leaves them
+   staged**, and then exits 128 with *"is a merge but no -m option was given"*. It writes no
+   sequencer state, so there is nothing to `--continue` or `--abort` — and the next command in
+   § 11.2 is `git commit`, which would commit a partial revert that then deploys green. § 11.2
+   mentioned `-m 1` as an alternative for undoing a single merge; it did not say that the range
+   form fails this way, and that is the gap a rehearsal closes and a reading does not.
+2. **A shallow checkout cannot revert at all**, and says so in git's *unknown revision* wording,
+   which reads like a typo. The tree this rehearsal ran on **is** shallow — 51 commits, the oldest
+   `479116e` — so the rehearsal is bounded at `HEAD~50` for that reason rather than by choice, and
+   `actions/checkout`'s default depth of 1 puts any CI-side revert in the same position.
+
+#### The production half — never run, by anything
+
+**Steps 1, 3 and 4, and the whole of § 11.4, remain derived from `.github/workflows/deploy-viz.yml`,
+`infra/azure/swa/provision.sh`, `scripts/deploy-azure.sh` and `packages/viz/src/persist/`, and from
+nothing observed.** They stay in § 9's *reasoned about only* column, which carries them as item 5.
+
+**#241 AC2, #242 AC4 and #243 AC4 are not met by this section.** They ask for a rehearsal *on the
+production deployment*, and the half that was rehearsed is the half that never touches it. What that
+rehearsal still has to observe — all six, with the one item the git half **partly** discharged
+marked as such and the other five untouched:
 
 1. A dispatch on a non-`main` ref really is refused at the environment rather than at the job, and
    the run really does look partly green. This is `provision.sh`'s stated mechanism and § 9 records
    only the branch policy's *existence* as verified.
-2. A revert-forward push really does deploy, and the tree comparison in step 2 really is empty while
-   the build line names the revert commit.
+2. A revert-forward push really does deploy. **Half of this item is discharged**: the tree
+   comparison in step 2 really is empty and the build line really does name the revert commit, both
+   observed by the harness above. What is not is *deploys* — the upload, and whether a green run put
+   those bytes on the site.
 3. The time from `git push` to the reverted page being served. Nothing in this repository has
    measured it, and an incident procedure whose duration is unknown is a procedure nobody can plan
    around.
@@ -808,13 +873,19 @@ correct if the reasoning above is wrong:
 6. Whether the API half is needed at all in the common case, and if both halves run, which order
    leaves the shorter broken window.
 
-A rehearsal needs the Static Web App, its federated identity and the Container App. Nothing that can
-be done from a checkout closes these.
+A rehearsal of **these** needs the Static Web App, its federated identity and the Container App.
+Nothing that can be done from a checkout closes them, and the harness above is careful not to look
+as though it had: it prints every one of them, on a clean run as loudly as on a failing one, and
+`packages/experiments/src/validation/rehearseRevert.test.ts` goes red if this section stops saying
+that the production half has not been run. See [§ D587](../DECISIONS.md).
 
 ---
 
 ## Sources
 
+- `scripts/rehearse-revert.mjs` — § 11.2's git half, run in a throwaway clone, and the register of
+  what it does not rehearse. [§ D587](../DECISIONS.md) is why the procedure is rehearsed in halves,
+  and [`docs/42-launch-record.md`](42-launch-record.md) is where its answers are recorded.
 - Azure Static Web Apps quotas and plan comparison, Microsoft Learn.
 - `Azure/static-web-apps` issue #1304 — the deploy action cannot use a federated credential.
 - Cold-start figures: measured against the live deployment at

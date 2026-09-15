@@ -5,8 +5,8 @@ rather than a topic. *"Check the browser matrix"* is not an item; *"on these bro
 reaches this state, verified by this command"* is.
 
 > **Read § 0 before you run anything.** Only five of the items below can be discharged from a
-> checkout — § 0.2 names them — and one of the rest, the rollback, has a written procedure that
-> nothing has ever exercised. A checklist that reads as though it had been executed when it has not is worse than no
+> checkout, plus half of a sixth — § 0.2 names them — and the half of the rollback that touches the
+> live site has still been exercised by nothing. A checklist that reads as though it had been executed when it has not is worse than no
 > checklist, so § 0 and § 9 keep the two apart in
 > [`docs/16-static-site-deployment.md`](16-static-site-deployment.md) § 9's voice.
 
@@ -14,9 +14,17 @@ reaches this state, verified by this command"* is.
 
 ## 0. What this document is, and what it is not
 
-**It is not a record of a launch.** Nothing here has been ticked. It is the list, the apparatus for
+**It is not a record of a launch.** Nothing here is ticked, and nothing here ever will be: an answer
+is a fact about a day, and a fact about a day written into a checklist is the next stale constant
+(§ 8 step 2 says the same thing about its own one-command job). It is the list, the apparatus for
 each item, and the honest state of each apparatus on the day it was written — 2026-09-10, against
 the tree carrying `packages/viz/src/persist/migrationMatrix.test.ts`.
+
+**Answers go in a record beside it.** [`docs/42-launch-record.md`](42-launch-record.md) is the first
+one: every item a checkout can discharge, executed on 2026-09-15 against `fb15704`, each with a
+verdict and a date, and every item it could not reach recorded as **not executable here** with the
+reason. It is a dress rehearsal rather than a launch, it says so in its own first line, and § 10's
+AC2 row says why that distinction is the whole point.
 
 **One item on it is mechanised rather than described**, and that is deliberate: the product owner's
 note on #243 asks for checks that are *mechanical over ones that are prose*, because *"a launch
@@ -54,7 +62,7 @@ Three roles, and the split is by credential rather than by seniority.
 
 | role | holds | can discharge |
 |---|---|---|
-| **Anybody with a checkout** | nothing | § 2.1, § 3, § 4.1, § 5.1, § 7.1 |
+| **Anybody with a checkout** | nothing | § 2.1, § 3, § 4.1, § 5.1, § 7.1, and the git half of § 6.3 |
 | **A repository maintainer** | `gh` against this repository | § 6.1, § 6.2, § 8 steps 1–3 |
 | **An Azure operator** | the subscription holding `elevator-sim` and `elevator-sim-viz` | § 2.2, § 4.2, § 5.2, § 6.3, § 6.4, § 7.2, § 10 AC4 |
 
@@ -71,6 +79,9 @@ per criterion rather than in aggregate.
 migration defect is a launch window wasted. Then the deployed page, then the API, then the
 irreversible ones.
 
+0. The git half of § 6.3 — `node scripts/rehearse-revert.mjs <target>` — if a revert is even
+   possible today. It costs about a second, it needs nothing, and it is the one item on this list
+   whose answer decides whether the *recovery* works rather than whether the launch does.
 1. § 3 — save migration (**MECHANISED**; run it before anything else, it costs seconds).
 2. § 4 — the cold-load budget (**MECHANISED** in one of its three parts; § 4.2 is the gap).
 3. § 2 — the browser matrix.
@@ -424,10 +435,10 @@ defence against a replay flood is a cooldown.
 - **The trap:** this probe runs inside the `deploy` job, which is gated on `AZURE_SWA_NAME` being
   set. Disarming removes the check along with the deploys.
 
-### 6.3 Reverting the live site — APPARATUS, DRIVEN BY HAND, AND NEVER REHEARSED
+### 6.3 Reverting the live site — APPARATUS, DRIVEN BY HAND; THE GIT HALF REHEARSED, THE LIVE HALF NEVER
 
 **[`docs/16-static-site-deployment.md`](16-static-site-deployment.md) § 11 is the procedure and this
-section does not restate it.** Three things an operator needs before opening it:
+section does not restate it.** Four things an operator needs before opening it:
 
 - **`gh variable delete AZURE_SWA_NAME` is *not* the rollback**, and reaching for it during an
   incident makes the incident permanent: it disarms every future deploy, the bytes a player is
@@ -440,14 +451,27 @@ section does not restate it.** Three things an operator needs before opening it:
   and reverting forward again does not bring it back. § 11.2 carries the command that checks for it.
   **§ 3 of this document is what makes that check cheap to reason about**, because the matrix says
   exactly which versions the current build can read.
+- **The range form can stop half-way through and look like it worked.** A merge commit inside the
+  range makes `git revert --no-commit` abort **after** it has staged the reverts of everything newer
+  than the merge, with nothing to continue or abort — and the next command in § 11.2 is `git commit`.
+  Rehearse it first (below); the harness reports the merges in the range before an operator types
+  anything.
 
 - **What a pass looks like:** the six observations `docs/16` § 11.5 lists — a non-`main` dispatch
   really being refused at the environment, a revert-forward push really deploying with an empty tree
   diff, the wall-clock time from push to reverted page, an older page against the current API, the
   save-clearing on a real browser, and which half goes first when both are needed.
 - **Who:** an Azure operator with a maintainer beside them.
-- **State:** **no step of it has been run, against production or anywhere.** § 11.5 says so in terms
-  and this section does not soften it.
+- **Rehearse the git half first, and it costs a second:** `node scripts/rehearse-revert.mjs <target>`
+  runs § 11.2's steps 0 and 2 in a throwaway clone — no credential, no network, nothing live. It
+  reports whether the range holds a merge commit, whether the revert applies, whether the tree
+  comparison is empty, whether the revert crosses a `SESSION_SCHEMA_VERSION` bump, and what build
+  line the page will show afterwards. **Anybody with a checkout can do this**, which is why it moved
+  out of the Azure operator's column in § 0.2.
+- **State:** **the git half is rehearsed (2026-09-15, three ranges and a negative control); the half
+  that touches the live site has been run by nothing.** `docs/16` § 11.5 splits the two and names
+  what the production half still has to observe, including its duration. This section does not
+  soften it, and AC4 in § 10 is not ticked by it.
 
 ### 6.4 The API half
 
@@ -561,9 +585,14 @@ This section is the point of the document, and it holds to the standard
 ### Not verified — reasoned about only
 
 1. **No item in this document has been executed against a launch.** That is #243 AC2 and it is what
-   § 10 says about it.
-2. **No step of the revert procedure has been run** (§ 6.3). Its duration is unknown, which is what
-   makes it a procedure nobody can plan around.
+   § 10 says about it. Every item that needs no credential **was** executed on 2026-09-15 against
+   the tree at `fb15704`, and the answers are in
+   [`docs/42-launch-record.md`](42-launch-record.md) — **a dress rehearsal, not a launch**, which
+   that document says about itself in its first line.
+2. **No step of the revert procedure has been run against production** (§ 6.3). Its git half was
+   rehearsed on 2026-09-15 (`scripts/rehearse-revert.mjs`); the upload, the branch policy, the API
+   half and the duration are still unobserved, and a duration nobody has measured is what makes it a
+   procedure nobody can plan around.
 3. **No browser other than Chromium has loaded this product** (§ 2.2).
 4. **No load harness has driven the leaderboard** (§ 5.2), and the cooldown's per-process scope has
    not been exercised against more than one replica.
@@ -581,9 +610,9 @@ This section is the point of the document, and it holds to the standard
 | # | criterion | state | what it still needs, and from whom |
 |---|---|---|---|
 | **AC1** | Checklist written and merged | **this document** | Nothing. It merges with the branch that carries § 3's matrix |
-| **AC2** | Every item executed and recorded before launch | **open** | A launch. Somebody runs § 8 and records the answers with dates. No credential closes this from a checkout |
+| **AC2** | Every item executed and recorded before launch | **open, and now partly executed** | A launch. Every item a checkout can discharge was run on 2026-09-15 and recorded per item, with the not-executable ones recorded as such and why, in [`docs/42-launch-record.md`](42-launch-record.md). **That is not this criterion**: AC2 says *before launch*, these answers are facts about one commit on one day, and the items that carry the launch risk — the browsers, the deployed page, the API, the revert — are exactly the ones a checkout cannot reach |
 | **AC3** | Save migration verified from every schema version that has been deployed | **met, on a superset** | § 3 is mechanised and green. § 8 step 2 narrows the superset to the exact deployed set and is a one-command job for anybody with a full clone. § 3.5 is the manual browser half and needs `$site` |
-| **AC4** | Rollback rehearsed on the production deployment | **open** | An Azure operator, the Static Web App, its federated identity and the Container App. The procedure is `docs/16` § 11 and its § 11.5 lists the six things a rehearsal has to observe. **The written procedure is not the rehearsal**, and this document does not claim otherwise |
+| **AC4** | Rollback rehearsed on the production deployment | **open; the git half is rehearsed** | An Azure operator, the Static Web App, its federated identity and the Container App. The procedure is `docs/16` § 11 and its § 11.5 lists what the production half still has to observe. Steps 0 and 2 — the git half — were rehearsed on 2026-09-15 by `scripts/rehearse-revert.mjs` over three ranges with a negative control, and found two failure modes the reasoning had not named. **That does not tick this row**: the criterion says *on the production deployment*, and the rehearsed half is the half that never touches it. **The written procedure is not the rehearsal**, and this document does not claim otherwise |
 | **AC5** | Preview environments can reach an API | **implemented, unverified** | An Azure operator. The server rule ships and its refusals are pinned by a run; the deployed app still carries the one-origin form, and `provision.sh`'s equality check has to move in the same change (§ 7.2) |
 
 **AC4's framing is worth one sentence of correction, because the issue's own analysis flagged it.**
@@ -610,6 +639,9 @@ and rehearsing it is what remains.
   versioned save slots. The matrix drives the first three; consent's single version is read by
   `readConsent`, which treats a mismatch as *unasked* rather than refusing, so it has no row.
 - `scripts/dead-page.mjs` — § 6.2's probe, and its own account of what it cannot see.
+- `scripts/rehearse-revert.mjs` — § 6.3's rehearsal of the revert's git half, and the register of
+  what it does not rehearse, which it prints on every run.
+- [`docs/42-launch-record.md`](42-launch-record.md) — the answers, which do not live in this file.
 - `packages/server/src/main.ts`, `packages/server/src/http/static.ts` — § 7's boot refusals.
 - [§ D405](../DECISIONS.md) — why this document's own reasoning is recorded here rather than as a
   separate entry: it binds no code and moves nothing already recorded, so this file is the record.
