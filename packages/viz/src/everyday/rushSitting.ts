@@ -23,9 +23,10 @@
  *
  * **Every refusal sentence here is owned by the module that decides the thing.** The two ids come
  * from `scope/runIdentity.ts#runIdentityIssues`, the switch target from `scope/switchWire.ts`, and
- * an intervention kind from `core`'s own `interventionKindRefusal`. This module authors exactly two
- * sentences of its own — the hand-stopped last round and the sitting that is too long — and both
- * are facts about a *sitting* that no other module has an opinion about.
+ * an intervention kind from `core`'s own `interventionKindRefusal`. This module authors four sentences of
+ * its own — a last round ended by hand, one that never broke, a sitting too long to post and one
+ * with nothing played yet — and every one is a fact about a *sitting* that no other module has an
+ * opinion about.
  *
  * ## Why the identity predicate is asked and then filtered
  *
@@ -252,7 +253,13 @@ export type RushSittingCheck =
   | { readonly ok: true; readonly body: RushSittingBody }
   | { readonly ok: false; readonly reasons: readonly string[] };
 
-/** The two sentences this module authors, both of them facts about a sitting rather than a round. */
+/**
+ * The four sentences this module authors, every one of them a fact about a **sitting** rather than
+ * about a round: a round's refusals are owned by the modules that decide them, which the module
+ * docstring names. Two of these four — the hand stop and the run that never broke — must never
+ * share a wording, because a run the player stopped is one they can play out and a run that held
+ * every wave is a tower this dispatcher does not break.
+ */
 export const RUSH_SITTING_COPY = Object.freeze({
   /** § D515's rule, from the client's side: the player ended it, so there is no breaking point. */
   handStopped:
