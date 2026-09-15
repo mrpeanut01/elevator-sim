@@ -164,6 +164,9 @@ export const travelSampleSchema = z.strictObject({
   ratedLoadKg: z.number().gt(0),
   counterweightBalanceRatio: z.number().gt(0).lt(1).optional(),
   regenerativeRecoveryFraction: z.number().gt(0).lt(1).optional(),
+  // § D583. Strictly positive: the sample omits the key entirely on a bank with no rope, so a
+  // persisted `0` would be a rope that was declared and weighed nothing.
+  ropeMassKg: z.number().gt(0).optional(),
   workJ: z.number().min(0),
 });
 

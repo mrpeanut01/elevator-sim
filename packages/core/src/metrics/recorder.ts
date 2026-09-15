@@ -61,6 +61,7 @@ import {
   type TravelReading,
   type TravelSample,
   outOfBalanceWorkJ,
+  ropeInertiaWorkJ,
   type RunRecord,
 } from './types.js';
 
@@ -810,6 +811,25 @@ export class MetricsRecorder {
         `Travel sample for car "${carId}" needs a regenerative recovery fraction in [0, 1); received ${recovery}. A drive cannot return more than the move gave up.`,
       );
     }
+    /*
+     * **The rope, refused rather than defaulted** — `DECISIONS.md` § D583, GitHub issue #433.
+     *
+     * `ropeInertiaWorkJ` returns 0 for a reading with no peak speed, which is right for a bank with
+     * no rope and wrong for a bank with one: a rope charged nothing is a rope that bought nothing,
+     * and that is the dead-seam shape this project has shipped thirteen times. So the pair is a
+     * `MetricsError` here rather than a quiet zero downstream.
+     */
+    const ropeKg = convention.ropeMassKg;
+    if (!Number.isFinite(ropeKg) || ropeKg < 0) {
+      throw new MetricsError(
+        `Travel sample for car "${carId}" needs a non-negative rope mass; received ${ropeKg}.`,
+      );
+    }
+    if (ropeKg > 0 && reading.peakSpeedMps === undefined) {
+      throw new MetricsError(
+        `Travel sample for car "${carId}" is priced with ${ropeKg} kg of rope and carries no peakSpeedMps, so the rope would be charged nothing. A reading taken from Car.completeArrival() always carries one.`,
+      );
+    }
     this.#travelSamples.push(
       Object.freeze({
         at,
@@ -820,7 +840,10 @@ export class MetricsRecorder {
         ratedLoadKg: reading.ratedLoadKg,
         ...(ratio === COUNTERWEIGHT_BALANCE_RATIO ? {} : { counterweightBalanceRatio: ratio }),
         ...(recovery === 0 ? {} : { regenerativeRecoveryFraction: recovery }),
-        workJ: outOfBalanceWorkJ(reading, convention),
+        ...(ropeKg === 0 ? {} : { ropeMassKg: ropeKg }),
+        // `+ 0` on every shipped run: the rope term is exactly zero where no bank declares one, so
+        // `energyConvention.test.ts` can compare the default's float with `Object.is`.
+        workJ: outOfBalanceWorkJ(reading, convention) + ropeInertiaWorkJ(reading, convention),
       }),
     );
     // **Deliberately does not `#observe(at)`, unlike every other recording method here.**

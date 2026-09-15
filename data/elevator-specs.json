@@ -177,6 +177,40 @@
     "recoveryFraction": 0.6,
     "source": "Band cited from Al-Kodmany, K. (2015). Tall Buildings and Elevators: A Review of Recent Technological Advances. Buildings 5(3), 1070-1104, doi:10.3390/buildings5031070, section 2.1.4 (20%-40% whole-consumption reduction). The fraction itself is an agent's derivation from that band and is not stated by the source."
   },
+  "ropeClasses": {
+    "$comment": "AGENT'S PROPOSAL \u2014 GitHub issue #433, DECISIONS.md \u00a7 D583. AWAITING THE PRODUCT OWNER'S APPROVAL; nothing here has been approved. The hoisting rope: what it weighs, and how far one hoistway may run on it. It sits beside the classes rather than inside one for airPressure's reason \u2014 a rope is a property of the shaft's travel and of what the operator bought, not of the machine class, and a bank buys a class of rope (buildings' banks[].ropeClass) exactly as it buys a regenerative drive. READ THE CITED / CHOSEN SPLIT FIELD BY FIELD BEFORE TREATING ANY FIGURE AS A REFERENCE VALUE. CITED, from Al-Kodmany, Buildings 2015, 5(3), 1070-1104, doi:10.3390/buildings5031070, s 2.1.5 verbatim: 'in very tall buildings, almost 70% of the elevator's weight is attributed to the cable itself, and when the rope gets too long it cannot support its own weight'; a steel installation with a 2000 kg car over 500 m of travel carries 'about 27,000 kg' of rope and KONE's carbon-fibre UltraRope 'about 2,500 kg' at the same travel; steel caps a single hoistway 'at roughly 500 m' and carbon fibre 'doubles it to 1000 m'. The same section records that UltraRope 'makes sense in buildings 200 m or taller' and that aramid (Schindler) and coated belt (Otis Gen2) 'sit in between' \u2014 with no figures for either, which is why two of the four rows below are wholly chosen. CHOSEN (an agent's, derived rather than measured): massKgPerMOfTravel for steel (54) and carbon-fibre (5) is the paper's own pair divided by the paper's own travel \u2014 27000/500 and 2500/500. The division assumes rope mass is linear in travel, which is true of a hanging rope's length and is the only step the source does not take itself. It is the mass of ALL the rope that moves with one car at car speed \u2014 every fall, both sides of the sheave, and whatever compensation is fitted \u2014 because that is what the paper's 27,000 kg is. CHOSEN OUTRIGHT (no figure in the source, and the weakest two rows here): coated-belt at 32 kg/m and 600 m, and aramid at 16 kg/m and 750 m. The source says only that both 'sit in between'; the ORDER between them is chosen too \u2014 a coated belt keeps a steel cord inside a polyurethane jacket and is placed nearer steel, an aramid rope is a synthetic fibre and is placed nearer carbon. A reader who disagrees with either is disagreeing with a judgement, not correcting an error. WHAT THE CEILING DOES: maxSingleTravelM is a HARD REFUSAL, not an advisory. A bank that declares a rope class and spans further than that class allows fails to load with rope-travel-exceeds-class (core config/schema.ts#ISSUE_CODES). The lift class's own maxRiseM stays ADVISORY and is untouched \u2014 the product owner re-asked and reversed that on GitHub issue #433 on 2026-09-10, because hardening it reds midtown-office by 0.9 m. UNBOUND BY THIS BLOCK: every shipped building. No bank in data/buildings/ declares a ropeClass, so no shipped figure moves and no shipped run is refused. Measured rather than assumed: the tallest shipped single-hoistway travel is burj-class-reference's observation bank at 452.0 m, then its shuttle at 448.3 m and vertical-city's shuttle at 307.5 m \u2014 so even if every bank were given steel by default, none would reach steel's 500 m and none would be refused. The ceiling is proved by a test configuration that breaches it (core config/rope.test.ts), which is the amendment the owner gave this issue's third acceptance criterion on 2026-09-11. NOT MODELLED, deliberately and said here rather than discovered later: rope mass does not change a leg. It reaches the energy proxy as the kinetic energy of the moving rope and nothing else, so no car goes slower for being roped in steel, no dispatcher reads it, and Car.estimateCost() never sees it \u2014 see core metrics/types.ts#ropeInertiaWorkJ for what is charged and what is left out. The paper's 'about 15% energy reduction' is a claim about a whole installation's consumption and is NOT what this proxy measures; what the carbon option is worth here is measured and published in DECISIONS.md \u00a7 D583 rather than quoted from the source.",
+    "classes": [
+    {
+      "id": "steel",
+      "name": "Steel wire rope",
+      "massKgPerMOfTravel": 54,
+      "maxSingleTravelM": 500,
+      "application": "The default of the industry and of this file's own reference classes. Heaviest, cheapest, and the constraint the whole block exists to express: at 500 m a single hoistway's rope weighs about what thirteen full cars do."
+    },
+    {
+      "id": "coated-belt",
+      "name": "Coated steel belt",
+      "massKgPerMOfTravel": 32,
+      "maxSingleTravelM": 600,
+      "application": "A steel cord in a polyurethane jacket (Otis Gen2 is the named example). Lighter than round rope and still steel inside, so it is placed nearest steel. CHOSEN: the source gives no figure."
+    },
+    {
+      "id": "aramid",
+      "name": "Aramid fibre rope",
+      "massKgPerMOfTravel": 16,
+      "maxSingleTravelM": 750,
+      "application": "A synthetic fibre rope (Schindler is the named example). CHOSEN: the source gives no figure."
+    },
+    {
+      "id": "carbon-fibre",
+      "name": "Carbon-fibre rope",
+      "massKgPerMOfTravel": 5,
+      "maxSingleTravelM": 1000,
+      "application": "KONE UltraRope. The source says it 'makes sense in buildings 200 m or taller' and that it doubles the single-hoistway ceiling; below that rise it is mass and money spent on a shaft that had no rope problem."
+    }
+    ],
+    "source": "Al-Kodmany, K. (2015). Tall Buildings and Elevators: A Review of Recent Technological Advances. Buildings 5(3), 1070-1104, doi:10.3390/buildings5031070, section 2.1.5. The steel and carbon-fibre rope masses at 500 m and the 500 m / 1000 m single-hoistway ceilings are quoted from it; massKgPerMOfTravel is those masses divided by that travel, an agent's derivation the source does not state. The aramid and coated-belt rows are chosen outright \u2014 the source places both 'in between' and gives no figure for either."
+  },
   "codeMinimumSpeedByRise": [
     {
       "riseFtRange": [

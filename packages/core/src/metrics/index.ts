@@ -99,6 +99,7 @@ export {
   legSecondsOf,
   rideSecondsOf,
   outOfBalanceWorkJ,
+  ropeInertiaWorkJ,
   STANDARD_GRAVITY_MPS2,
   waitSecondsOf,
   windowContains,

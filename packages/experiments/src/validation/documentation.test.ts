@@ -1742,18 +1742,6 @@ type DecisionReservation = {
  * because it is tidier, but because the alternative is every lane inventing bookkeeping the
  * integrator then has to throw away.
  */
-/**
- * **Wave AA reserves D576–D600, opened before its first lane commits.** Wave Z's own comment above
- * records why that ordering is not a nicety: two of its five lanes independently widened the
- * previous block because it was opened late, and each wrote a different ceiling with a different
- * justifying paragraph. The block: D576–D582 lane A (GitHub issues #425, #424 and #430, three
- * reference towers taken serially because every one of them edits the same eight registries),
- * D583–D586 lane B (#433, rope class and the single-hoistway travel ceiling), D587–D590 lane C
- * (#242, #243 and #355, error monitoring, the launch checklist and the rollback rehearsal),
- * D591–D594 lane D (#406, the screen-reader walkthrough) — and **D595–D600 are the integrator's**,
- * which wave Z spent none of and still wants reserved, because an integrator who finds something
- * mid-wave needs a number to record it under.
- */
 const OPEN_RESERVATION = { wave: 'AA, of 2026-09-15', from: 576, to: 600 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the

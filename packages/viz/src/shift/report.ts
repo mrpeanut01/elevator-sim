@@ -766,7 +766,10 @@ function equipmentLineOf(recording: VizRecording): string {
     .map(
       (bank) =>
         `${bank.bankId}: counterweight ${String(bank.counterweightBalanceRatio)}, ` +
-        `regeneration ${String(bank.regenerativeRecoveryFraction)}`,
+        `regeneration ${String(bank.regenerativeRecoveryFraction)}, ` +
+        // § D583. `0` where the field is absent, so a version-14 recording composes the line a
+        // version-15 recording of an unroped bank composes, and the two still pair.
+        `rope ${String(bank.ropeMassKg ?? 0)}`,
     )
     .join('; ');
 }

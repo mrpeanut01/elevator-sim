@@ -35866,3 +35866,202 @@ twelfth building meets a red test rather than this paragraph.
 assumption with its reasoning attached, in § D519's manner, and the owner's to accept, tighten or
 reject. Whether `QUIRKS` should be re-sourced. And nothing about the renewal ladder, the shop or the
 calendar, none of which this touches.
+
+---
+
+## D583 — Rope class and rope mass are per-bank data, the rope's travel ceiling is the first hard refusal on a hoistway, and the rope reaches the energy proxy as inertia rather than as out-of-balance work
+
+**Date: 2026-09-15 · GitHub issue [#433](https://github.com/mrpeanut01/elevator-sim/issues/433) · Stage 1 of the product owner's staged ruling of 2026-09-11, under the revised ruling of 2026-09-10 · Rules on: `core/src/metrics/types.ts`'s recorded omission of acceleration losses, `core/src/config/schema.ts`'s `WARNING_CODES.riseExceedsClass`, `packages/viz/src/contract/types.ts#VIZ_SCHEMA_VERSION`, `data/price-schedule.json`, `data/campaign.json` and `data/engineering-briefs.json`'s derived ceilings, and [`docs/02`](docs/02-elevator-reference.md) § Energy.**
+
+**Why an entry.** [§ D405](#d405)'s two grounds, both. It **moves something already recorded**:
+`metrics/types.ts#TravelSample.workJ` said the proxy *"deliberately omits acceleration losses (which
+need the car and counterweight masses, which no shipped spec carries)"*, and a bank that declares a
+rope class now carries one of those masses, so part of that omission is lifted. And it **binds code
+and data the module does not own**: a viz schema version, a price row, thirty-six derived ceilings,
+and a reference document.
+
+### 1. What is built, and the one sentence that decides its shape
+
+Two optional per-bank fields' worth of behaviour behind **one** authored field, `BankConfig.ropeClass`
+(`config/schema.ts#BANK_ROPE_TUNABLES`, CLAUDE.md invariant 8). What each class weighs and how far it
+may run is **data** — `data/elevator-specs.json#ropeClasses`, four classes, beside the machine classes
+for exactly `airPressure`'s reason (invariant 7). `config/parse.ts#resolveBuilding` resolves
+`ropeMassKg = massKgPerMOfTravel × the bank's own travel`, and `Simulation` reads it once through
+`metrics/comparability.ts#energyConventionOf`, which is § D539's seam with a third field on it.
+
+**The default is *absent*, and absent means the rope is not modelled** — not `"steel"`. That is the
+owner's staged ruling: stage 1 is *"rope class data, schema and the binding ceiling, where no shipped
+figure moves"*, and every bank in `data/buildings/` is at that default, so every published figure is
+byte-identical. `config/rope.test.ts` asserts it on the run rather than on the arithmetic.
+
+### 2. The ceiling refuses, and *refuse* is a reading of the ruling rather than a transcription of it
+
+The owner's amendment of 2026-09-11 says *"a test building whose run exceeds its rope's ceiling is
+**refused**, with a named **warning code**"*. In this repository those two words name opposite things —
+`WARNING_CODES` is advisory and `ISSUE_CODES` is fatal — so one of them had to give. **It is built as a
+refusal**, `ISSUE_CODES.ropeTravelExceedsClass`, and *named code* is what the second half is read as:
+
+- the revised ruling's own word is **binding**, and the whole reason the class rise envelope was left
+  alone is that an advisory ceiling binds nothing;
+- Al-Kodmany § 2.1.5's constraint is *"when the rope gets too long it cannot support its own weight"*,
+  which is a shaft that cannot be built rather than an envelope a designer may knowingly exceed;
+- the issue's own text asks for *"the style `config/schema.ts` already uses for `serviceEvents` and
+  `accessZones`"*, and those codes are in `ISSUE_CODES`.
+
+**`WARNING_CODES.riseExceedsClass` is untouched and still advisory.** The owner re-asked and reversed
+the proposal to harden it on 2026-09-10, because it immediately reds `midtown-office` at 76.9 m against
+76 m; `rope.test.ts` asserts that building still loads with that warning, so a later lane that hardened
+it would go red here rather than in seventeen benchmark studies.
+
+A third code, `WARNING_CODES.ropeClassBuysNothing`, covers a data directory with no library —
+`regenerative-drive-buys-nothing`'s shape, for its reason.
+
+### 3. No shipped building is refused, and that is measured rather than asserted
+
+The ceiling is proved by a configuration that breaches it: a two-floor tower whose hoistway runs
+620 m under steel fails to load, and the same shaft loads on carbon fibre and fails again 1 m above
+carbon's own ceiling (`config/rope.test.ts`). It is deliberately a test building, which is the owner's
+amendment.
+
+What the amendment does not settle is whether the ceiling would bite under stage 2's *"every bank
+carries a rope class, steel by default"*, and that is a fact about the shipped geometry rather than
+about this feature. **It would not.** Every one of the twenty-six shipped banks is inside steel's
+500 m, and the tallest single hoistway in `data/buildings/` is `burj-class-reference/observation` at
+**452.0 m**, then its shuttle at 448.3 m and `vertical-city/shuttle` at 307.5 m. The test measures the
+whole set rather than quoting the maximum.
+
+**A stale figure found beside it, recorded and not fixed.** `elevator-specs.json#airPressure`'s
+`$comment` says *"burj-class-reference's shuttle and observation cars at 496.0 m"*. Measured on this
+tree they are 448.3 m and 452.0 m. The sentence the figure supports — that exactly two shipped banks
+sit above the 300 m threshold — is still true, and that block is an owner-approved provenance note
+this lane does not own, so it is named here and left.
+
+### 4. The rope reaches the proxy as **inertia**, and the alternative was measured before it was refused
+
+`metrics/types.ts#ropeInertiaWorkJ`, charged per move beside `outOfBalanceWorkJ` and never inside it:
+`½·m·v²` to get the rope moving, which motors and is charged whole, and `½·m·v²` to stop it, which
+overhauls and is charged `1 − f` under a regenerative drive. `v` is the move's own peak speed
+(`MotionProfile.peakSpeedMps`, carried out on `CarTravel`), so a short hop that never reached rated
+speed is charged for the speed it actually reached.
+
+**The obvious model is the wrong one and the arithmetic says why.** A hanging rope's *static*
+out-of-balance is position-dependent, `μ·(H − 2h)`, and it is the textbook reason compensation exists.
+Modelled uncompensated, a 500 m steel shaft carries ±13 500 kg of unbalanced rope against a 1 350 kg
+rated load — ten times the load term — so `workPerServedLegKJ` would stop being a statement about
+dispatch and become a statement about where the cars happened to be. Real tall installations compensate,
+which takes that term to roughly zero. What a compensated rope unavoidably costs is inertia, and
+inertia is also the mechanism the source names: a 90 % rope-mass reduction *"reduces the total moving
+masses by no less than 45%"*.
+
+**What is not charged, said plainly.** The car's and the counterweight's own inertia, because no
+shipped spec carries either mass. So the omission `TravelSample.workJ` records is lifted **exactly as
+far as the data reaches and no further**, which is the honest form of the change rather than a
+half-measure.
+
+### 5. What the rope is worth, measured and pinned rather than quoted
+
+`collective`, n = 30 paired replications under common random numbers, seeds `20 260 824 + 7 919 n`
+(§ D468's formula), the shipped run, every arm the same building with only `ropeClass` moved.
+`workPerServedLegKJ`:
+
+| building | single travel | steel | carbon fibre | Δ carbon − steel | share |
+|---|---|---|---|---|---|
+| `midtown-office` | 76.9 m | 17.142 | 11.543 | **−5.599 [−5.851, −5.348]** | −32.7 % |
+| `vertical-city` | 307.5 m | 200.192 | 95.075 | **−105.117 [−107.877, −102.357]** | −52.5 % |
+| `burj-class-reference` | 452.0 m | 626.796 | 305.074 | **−321.722 [−332.610, −310.833]** | −51.3 % |
+
+The two intermediate classes sit where their masses put them: coated belt −14.7 / −23.6 / −23.0 % and
+aramid −25.3 / −40.7 / −39.8 % against steel. Unroped against steel is −36.0 / −57.9 / −56.6 %.
+
+**This is not the source's "about 15 % energy reduction" and must not be read as it.** That figure is
+a claim about a whole installation's consumption, which includes the standby term and the car and
+counterweight inertia this proxy omits; here the rope is the *only* inertial term, so its share of
+what is measured is necessarily larger. The number above is what the rope class is worth **to this
+proxy**, which is the only thing a run of this simulator can say.
+
+### 6. The finding stage 2 needs, and it is the reason stage 1 stopped here
+
+**Steel rope dominates the proxy on a supertall.** `burj-class-reference` reads 272.2 kJ per ride
+unroped and **626.8 roped in steel**; `vertical-city` reads 84.3 and **200.2**. The fifth goal's bar
+is 80 kJ per ride delivered (§ D468), so under stage 2's *"steel by default"* every tall contract
+would fail that goal by a factor of three to eight, every published energy pin would move by a
+similar factor, and the Pareto energy axis would be measuring rope mass rather than dispatch on any
+building over about 100 m. That is a product decision with a measurement attached, and it is the
+owner's rather than this lane's. **Stage 1 is therefore built so that stage 2 is a data change** — a
+default in one declaration — rather than a rebuild.
+
+### 7. Priced, and the price was decided by two derived constraints rather than by taste
+
+One flat row, `rope-upgrade`, **building tier**, **16 u / 6 nights**, `covers`
+`building.bankEquipment[].set.ropeClass`. Both figures are an **agent's proposal awaiting the owner's
+approval** and are marked so in `data/price-schedule.json`; nothing here is approved.
+
+The 16 is bracketed rather than chosen freely, and the brackets are worth reading because they were
+found by the schedule refusing to load:
+
+- **Above**: `pricing/parse.ts` derives a tier's `typicalUnits` as the **median of that tier's own
+  prices**. The building tier held eleven prices with a median of 20, so a twelfth above 20 moves the
+  tier's typical. Drafted at 28 — where the size of the job reads, between `machines-5mps` and
+  `larger-cars-21` — the schedule refused with *"tier building declares a typical of 20 u and its own
+  prices median at 25 u"*.
+- **Below**: `docs/35` § 10.2 caps a fix-a-building case's budget at 16 u and
+  `fixit/engine.ts#toggleRepair` refuses a repair a case cannot afford. At 20 u **both arms of the
+  seam test came back byte-identical**, which is indistinguishable from a rope that binds nothing.
+  That is recorded in `pricing/bankEquipmentReachesTheGoal.test.ts`'s own header, because the next
+  reader who prices a building-tier row into a fix-a-building case will meet it.
+
+16 is the dearest figure clearing both. **Per-class and per-rise pricing are deliberately not taken**:
+§ D552's magnitude seam could express either, `schedule.test.ts` forbids two rows covering one field,
+and a per-metre rate needs a declared maximum quantity that nothing measures. A dearer carbon rope is
+a second row and the owner's, not a correction to this one.
+
+**The schedule's whole cost moves 396 u → 412 u**, and every ceiling derived from it is re-derived on
+the same commit: 30 in `data/campaign.json` and 6 in `data/engineering-briefs.json`, which
+`scenario/budget.ts` requires to equal the total exactly. That figure is a **consequence** of the
+ladder rather than a choice, which is what `campaign.json`'s own header says about it.
+
+### 8. The non-test caller, named
+
+- **Reader**: `sim/simulation.ts`'s constructor, through `metrics/comparability.ts#energyConventionOf`,
+  and the arrival handler that hands the convention to `MetricsRecorder.sampleTravel`. It is the same
+  seam § D539 named, with a third field on it — which is why no dispatcher, no car and no
+  `Car.estimateCost()` sees a rope, and why no leg can move.
+- **Writer**: `packages/viz/src/fixit/run.ts#applyBuildingPatch`'s `bankEquipment` patch, decoded by
+  `fixit/parse.ts`, priced by `pricing/repairPrice.ts#pathsIn` against the row above.
+  `pricing/bankEquipmentReachesTheGoal.test.ts` drives a repair through it and requires the energy to
+  move and every leg to be identical.
+- **Refused loudly rather than defaulted quietly**: `MetricsRecorder.sampleTravel` throws when a
+  convention carries rope mass and the reading carries no peak speed, because a rope charged nothing
+  is the thirteen-times-shipped defect wearing a new name.
+
+### 9. Two arms on different scales, kept from being silent
+
+§ D539 answered that objection in three places and all three are extended:
+
+- the travel sample records `ropeMassKg` whenever it is not zero, so a reader can redo the sum;
+- `energyConventionDisclaimer` names the class **and** the mass on every roped bank, because a reader
+  given one cannot check the other;
+- **`VIZ_SCHEMA_VERSION` goes 14 → 15.** `VizBankEquipment` gains `ropeMassKg`, and the bump is not
+  bookkeeping: that record is the Day report's **pairing key** (`shift/report.ts#ReportBasis.equipment`),
+  so without the field two runs of one building roped differently carry identical entries and their
+  energy rows would be paired although they were priced on different scales — exactly the defect
+  GitHub PR #515's review found and version 14 exists to close. Absent, never `0`, so a version-14
+  recording and a version-15 recording of an unroped bank compose the same line.
+
+### 10. What this does not decide
+
+Whether the four classes' figures are right — two of them are chosen outright and all four await the
+owner. Whether stage 2 should happen at all, given § 6. Whether a rope should move a **leg**: the
+issue's third owner ruling asks for rope mass *in motion*, which needs a torque model this project
+does not have and would move every published interval, the survivor and rush-house tables and Phase 6's
+accepted verdicts; none of it is built here and `rope.test.ts` says so in its own header rather than
+leaving it to be discovered. Whether `new-car` and `fifth-car` being unaffordable inside a
+fix-a-building case is right — that is `repairPrice.ts`'s existing sentence and this row was priced to
+sit on the other side of it, which the owner may reverse.
+
+**Bookkeeping.** This lane was reserved D583–D586 and spent **D583**; D584, D585 and D586 are returned
+**unspent and free rather than holes**, because nothing above them was written (§ D430). The lane also
+**opened wave AA's reservation** in `documentation.test.ts#OPEN_RESERVATION` at `D576–D586` — the floor
+is the charter row's own figure and the ceiling is the top of *this lane's* block, written at the
+narrowest figure that is true from here; a lane of this wave holding a higher number should widen it,
+as wave Z's lanes B and C did.

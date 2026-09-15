@@ -282,7 +282,13 @@ export function repricedWorkKJ(
   let workJ = 0;
   for (const sample of samples) {
     if (!windowContains(window, sample.at)) continue;
-    workJ += outOfBalanceWorkJ(sample, { counterweightBalanceRatio, regenerativeRecoveryFraction });
+    // `ropeMassKg: 0` — this study reprices the counterweight and the drive and nothing else, and a
+    // repricing that silently carried a rope would answer a different question (§ D583).
+    workJ += outOfBalanceWorkJ(sample, {
+      counterweightBalanceRatio,
+      regenerativeRecoveryFraction,
+      ropeMassKg: 0,
+    });
   }
   return workJ / 1000;
 }

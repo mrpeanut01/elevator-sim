@@ -74,6 +74,9 @@ describe('the default convention is today’s arithmetic, bit for bit', () => {
     expect(DEFAULT_ENERGY_CONVENTION).toEqual({
       counterweightBalanceRatio: 0.5,
       regenerativeRecoveryFraction: 0,
+      // § D583's third field. Whole, rather than `toMatchObject`, so a fourth field arriving
+      // silently fails here — which is what this assertion is for.
+      ropeMassKg: 0,
     });
   });
 
@@ -96,14 +99,14 @@ describe('a ratio moves the work, and a drive returns part of the overhauling mo
   });
 
   it('balances at the declared ratio rather than at one half', () => {
-    const lighter = { counterweightBalanceRatio: 0.4, regenerativeRecoveryFraction: 0 };
+    const lighter = { counterweightBalanceRatio: 0.4, regenerativeRecoveryFraction: 0, ropeMassKg: 0 };
     expect(outOfBalanceWorkJ(at(400, 'up'), lighter)).toBe(0);
     expect(outOfBalanceWorkJ(at(400, 'up'))).toBeGreaterThan(0);
     expect(outOfBalanceWorkJ(at(500, 'up'), lighter)).toBeGreaterThan(0);
   });
 
   it('charges a motoring move whole and an overhauling move at one minus the recovery', () => {
-    const regen = { counterweightBalanceRatio: 0.5, regenerativeRecoveryFraction: 0.6 };
+    const regen = { counterweightBalanceRatio: 0.5, regenerativeRecoveryFraction: 0.6, ropeMassKg: 0 };
     // Motoring: a heavy car climbing, and a light car descending (the counterweight is lifted).
     for (const reading of [at(900, 'up'), at(100, 'down')]) {
       expect(outOfBalanceWorkJ(reading, regen)).toBe(outOfBalanceWorkJ(reading));
@@ -115,8 +118,8 @@ describe('a ratio moves the work, and a drive returns part of the overhauling mo
   });
 
   it('is continuous at zero recovery, never negative, and bounded above by the old figure', () => {
-    const none = { counterweightBalanceRatio: 0.5, regenerativeRecoveryFraction: 0 };
-    const most = { counterweightBalanceRatio: 0.5, regenerativeRecoveryFraction: 0.95 };
+    const none = { counterweightBalanceRatio: 0.5, regenerativeRecoveryFraction: 0, ropeMassKg: 0 };
+    const most = { counterweightBalanceRatio: 0.5, regenerativeRecoveryFraction: 0.95, ropeMassKg: 0 };
     for (const reading of readings()) {
       expect(Object.is(outOfBalanceWorkJ(reading, none), beforeD539(reading))).toBe(true);
       const recovered = outOfBalanceWorkJ(reading, most);

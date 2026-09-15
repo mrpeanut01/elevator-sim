@@ -105,6 +105,28 @@ export const ISSUE_CODES = {
    * empty building.
    */
   disconnectedBuilding: 'disconnected-building',
+  /**
+   * **The rope's travel ceiling, and it refuses rather than advises** — `DECISIONS.md` § D583,
+   * GitHub issue #433.
+   *
+   * A bank declares a `ropeClass` and spans further than that class's `maxSingleTravelM`. Al-Kodmany
+   * § 2.1.5's constraint is that *"when the rope gets too long it cannot support its own weight"* —
+   * so this is not an envelope a designer may knowingly exceed, it is a shaft that cannot be built,
+   * and a warning would be a ceiling that binds nothing.
+   *
+   * **Deliberately not {@link WARNING_CODES.riseExceedsClass}**, which stays advisory. The product
+   * owner re-asked and reversed the proposal to harden that one on GitHub issue #433 on 2026-09-10,
+   * because hardening it immediately reds `midtown-office` by 0.9 m. This code is the new ceiling
+   * that binds; that one is the old envelope that does not.
+   *
+   * Raised on **no shipped building**, because no bank in `data/buildings/` declares a rope class
+   * and the tallest shipped single hoistway (452.0 m) is inside steel's 500 m anyway. It is proved
+   * by a configuration that breaches it in `config/rope.test.ts`, which is the difference between a
+   * ceiling and a sentence about one.
+   */
+  ropeTravelExceedsClass: 'rope-travel-exceeds-class',
+  /** A bank names a `ropeClass` the data directory's `ropeClasses` library does not contain. */
+  unknownRopeClass: 'unknown-rope-class',
 } as const;
 
 /** Stable codes for non-fatal diagnostics. */
@@ -147,6 +169,14 @@ export const WARNING_CODES = {
    * than letting a purchase pass silently: {@link pressurisationBuysNothing}'s shape, for its reason.
    */
   regenerativeDriveBuysNothing: 'regenerative-drive-buys-nothing',
+  /**
+   * A bank declares a `ropeClass` and this data directory's `elevator-specs.json` declares no
+   * `ropeClasses` block, so there is no mass to rope it with and no ceiling to check it against —
+   * `DECISIONS.md` § D583. The bank's moves are priced with no rope, and this says so rather than
+   * letting the declaration pass silently: {@link regenerativeDriveBuysNothing}'s shape, for its
+   * reason.
+   */
+  ropeClassBuysNothing: 'rope-class-buys-nothing',
   /**
    * The bank has double-deck cars and no `servesFloorPairs`, so **there is no deck geometry to
    * simulate** and the runtime runs the car as a single deck of the combined capacity.
@@ -415,6 +445,35 @@ const regenerativeDriveSchema = z.strictObject({
   source: z.string().min(1),
 });
 
+/**
+ * `elevator-specs.json`'s `ropeClasses` block — § D583, GitHub issue #433.
+ *
+ * Both figures are strictly positive: a rope of zero mass per metre is a bank that bought nothing,
+ * and a ceiling of zero is a shaft nobody can build. Ids must be distinct, because
+ * `BankConfig.ropeClass` looks a class up by id and two rows sharing one would make the lookup
+ * depend on array order.
+ */
+const ropeClassesSchema = z.strictObject({
+  $comment: comment,
+  classes: z
+    .array(
+      z.strictObject({
+        $comment: comment,
+        id: identifier,
+        name: z.string().min(1),
+        massKgPerMOfTravel: positive,
+        maxSingleTravelM: positive,
+        application: z.string().min(1).optional(),
+      }),
+    )
+    .min(1, 'a ropeClasses block must declare at least one class')
+    .refine(
+      (classes) => new Set(classes.map((entry) => entry.id)).size === classes.length,
+      { message: 'rope class ids must be distinct; a bank names its rope by id' },
+    ),
+  source: z.string().min(1),
+});
+
 export const elevatorSpecsSchema = z
   .strictObject({
     $comment: comment,
@@ -424,6 +483,7 @@ export const elevatorSpecsSchema = z
     classes: z.array(elevatorSpecSchema).min(1, 'at least one elevator class is required'),
     airPressure: airPressureSchema.optional(),
     regenerativeDrive: regenerativeDriveSchema.optional(),
+    ropeClasses: ropeClassesSchema.optional(),
     codeMinimumSpeedByRise: z.array(
       z.strictObject({
         riseFtRange: z
@@ -1283,6 +1343,40 @@ export const BANK_ENERGY_TUNABLES = Object.freeze({
   }),
 });
 
+/**
+ * **The per-bank rope setting, declared** — CLAUDE.md invariant 8, `DECISIONS.md` § D583,
+ * GitHub issue #433.
+ *
+ * One row, beside {@link BANK_ENERGY_TUNABLES} and for its reasons: it is equipment rather than a
+ * *dispatch* tunable, so it is declared here with the building schema and `tuning/space` — which
+ * collects the rows a dispatcher profile can hold — does not collect it.
+ *
+ * **`values` is derived from the data directory, not listed here.** The rope library is data
+ * (invariant 7), so the declarable set is exactly `elevator-specs.json#ropeClasses.classes`' ids
+ * and a second list here would be a second authority on which ropes exist. `rope.test.ts` asserts
+ * the shipped file's ids against this row's `valuesFrom` path in both directions.
+ *
+ * **No `activeWhen`.** Whether a rope class may be declared does not depend on any other field —
+ * whether it *resolves* depends on the data directory carrying the library, and that is a
+ * `rope-class-buys-nothing` warning rather than a conditional parameter.
+ */
+export const BANK_ROPE_TUNABLES = Object.freeze({
+  ropeClass: Object.freeze({
+    type: 'enum',
+    valuesFrom: 'elevator-specs.json#ropeClasses.classes[].id',
+    /**
+     * **Absent, and absent means the rope is not modelled** — not `"steel"`. Every shipped bank is
+     * at this default, so every published figure is byte-identical to its value before § D583.
+     * Making steel the universal default is the second half of the owner's staged ruling of
+     * 2026-09-11 and moves every energy pin in the project; it is deliberately not taken here.
+     */
+    default: undefined,
+    source:
+      'An equipment choice, not a reference value. What each class weighs and how far it may run ' +
+      'is elevator-specs.json#ropeClasses, which carries its own source and its own CHOSEN/CITED split.',
+  }),
+});
+
 export const bankConfigSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -1298,6 +1392,10 @@ export const bankConfigSchema = z.strictObject({
     .max(BANK_ENERGY_TUNABLES.counterweightBalanceRatio.max)
     .optional(),
   regenerativeDrive: z.boolean().optional(),
+  // Which classes exist is `elevator-specs.json`'s to say (§ D583), so this is an identifier here
+  // and the cross-reference is `resolveBuilding`'s — where the library is in view and the failure
+  // can name the ids the data directory actually carries.
+  ropeClass: identifier.optional(),
   cars: z.array(carConfigSchema).min(1, 'a bank must have at least one car'),
 });
 
