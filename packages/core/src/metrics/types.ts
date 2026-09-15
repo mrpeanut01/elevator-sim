@@ -712,7 +712,13 @@ export function ropeInertiaWorkJ(
 export interface EnergyStatistics {
   /** Whether the run recorded any travel at all. `false` ⇒ every figure below is `NaN`. */
   readonly measured: boolean;
-  /** Out-of-balance mechanical work over the window, kilojoules. The Pareto energy axis. */
+  /**
+   * Mechanical work over the window, kilojoules. The Pareto energy axis.
+   *
+   * Out-of-balance work on every shipped bank, and out-of-balance work **plus the rope's
+   * inertia** on a bank that declares a rope class (§ D583) — the sum {@link TravelSample.workJ}
+   * carries, whatever priced it.
+   */
   readonly workKJ: number;
   /** Metres the fleet travelled in the window, summed over cars. */
   readonly distanceM: number;
