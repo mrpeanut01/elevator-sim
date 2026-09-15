@@ -1762,11 +1762,12 @@ type DecisionReservation = {
  * this block does not hold. The integrator reconciles both at close, sets this back to `null` and
  * moves the charter row on the same commit.
  *
- * **Spent by this lane: D611, D612 and D613** — GitHub issue #234's C2 rebalance, the demand axis
- * measured on stages 3 and 5, and stage 1's fabric lever confirmed and declined. **D614 and D615
- * were not reached**; whether they are free or holes is the integrator's call at close, because
- * that depends on what lands above them, which is § D430's distinction and the one thing about this
- * bookkeeping that no single branch can decide.
+ * **Spent by this lane: D611–D614** — GitHub issue #234's C2 rebalance, the demand axis measured on
+ * stages 3 and 5, stage 1's fabric lever confirmed and declined, and the survivor table's stale
+ * census sentence corrected by the regeneration that the rebalance obliged. **D615 was not
+ * reached**; whether it is free or a hole is the integrator's call at close, because that depends
+ * on what lands above it, which is § D430's distinction and the one thing about this bookkeeping
+ * that no single branch can decide.
  */
 const OPEN_RESERVATION = { wave: 'AB', from: 594, to: 615 } as DecisionReservation | null;
 /*

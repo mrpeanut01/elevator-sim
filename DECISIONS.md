@@ -36571,3 +36571,20 @@ not first reproduced the answer everybody already had would be measuring the app
 **Not taken, and the reason is a count.** `garden-apartments` is named by **282** `.ts` files in this tree; it is the CLI's default building, one of the two runs `data/reference-runs.json` pins figure-for-figure and re-simulates in `watch/reference.test.ts`, a matrix cell, a leaderboard board key and a fixture in four packages. Halving its fleet moves every one of those, and none of it is in this issue. Landing a one-line `data/` edit whose consequences are a wave's worth of re-pinned figures, inside a lane whose remaining budget is one suite run, would produce exactly the thing `CLAUDE.md` names first: a published number that no longer reproduces from the code that produced it.
 
 **So the register keeps its entry and gains this measurement**, which is a different state from *nobody tried*: the axis is measured **open**, the figure is confirmed on this tree rather than inherited, and what it needs is a wave that owns `garden-apartments`' pinned figures rather than a stage.
+
+## D614 — The survivor table's census sentence had gone stale one wave before anybody regenerated it, and the regeneration is what said so
+
+**Date: 2026-09-15 · GitHub issue [#234](https://github.com/mrpeanut01/elevator-sim/issues/234) · Rules on: [`data/scenario-survivors.json`](data/scenario-survivors.json)'s `provenance`.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: it corrects a published `data/` table's own account of itself, which [§ D535](#d535) and [§ D583](#d583) both have a claim on, and it is not the change the regeneration was run for.
+
+**What happened.** Stage 7's demand move ([§ D611](#d611)) obliged a regeneration of `data/scenario-survivors.json`, because a published number that no longer reproduces from the code that produced it is this repository's named defect. That run — 4 860 s over the whole ladder on this tree — came back with **nine of the ten scenarios byte-identical** and stage 7 moved in one field. It also rewrote two `provenance` fields that have nothing to do with #234:
+
+- `scope` read *"10 of **33** priced changes can reach a scenario run at all"* and now reads **34**.
+- `unreachableChangeIds` gained **`rope-upgrade`**.
+
+**Both are wave AA's rope row arriving in a census nobody re-derived.** GitHub issue #433 added the 16 u `rope-upgrade` row at the building tier ([§ D583](#d583)); `data/campaign.json`'s own budget comment records the ladder ceiling moving for it. The survivor table's census is derived from `data/price-schedule.json` at regeneration time, so the row entered the denominator the moment it landed — and the table on disk went on describing a 33-change schedule until something re-ran the sweep.
+
+**No count moved, and that is the point rather than a mitigation.** `rope-upgrade` is *unreachable*: `campaign/stageRun.ts` cannot apply a building-tier change to a scenario run, so it is in the denominator of *what the schedule prices* and in neither the numerator nor any survivor count. The figures were right the whole time. What was stale is the table's account of the space it counted over, which is the half a reader uses to decide whether a count means anything — and it is exactly the class `CLAUDE.md` records under *a published number goes stale the same way*, one level up from a number.
+
+**What this does not decide.** Whether the census sentence should be re-derived by a guard rather than by a regeneration. It is written by `regenerateSurvivors.test-helper.ts` from the shipped schedule, so it is derived rather than transcribed — the gap is that nothing re-derives it *between* regenerations, and the survivor sweep is a weekly deep tier by design. Naming a cheap always-on check for it here without measuring what it would cost would be inventing one.

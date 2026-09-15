@@ -4,11 +4,11 @@
   "provenance": {
     "kind": "measured",
     "command": "ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz src/scenario/survivorSweep.test.ts",
-    "tree": "2477b5ce",
-    "measuredAt": "2026-09-11",
+    "tree": "3ffa138",
+    "measuredAt": "2026-09-15",
     "masterSeed": 20260910,
     "sampleSize": 12,
-    "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, priced by data/price-schedule.json. 10 of 33 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 47 of 60 declared dimensions are priced, of which 46 are varied — weights.dutyMismatch is declared and priced by dispatch-rules, which covers dispatcher.weights, and is not varied on a building that declares no duty, which no scenario's building does, because a dial its building gives nothing to act on is not drawn (DECISIONS.md § D549) — and 13 are withheld from every scenario by data/price-schedule.json and varied by no configuration. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
+    "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, priced by data/price-schedule.json. 10 of 34 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 47 of 60 declared dimensions are priced, of which 46 are varied — weights.dutyMismatch is declared and priced by dispatch-rules, which covers dispatcher.weights, and is not varied on a building that declares no duty, which no scenario's building does, because a dial its building gives nothing to act on is not drawn (DECISIONS.md § D549) — and 13 are withheld from every scenario by data/price-schedule.json and varied by no configuration. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
     "reachableChangeIds": [
       "idle-parking",
       "dispatch-rules",
@@ -43,6 +43,7 @@
       "larger-car-step",
       "machines-4mps",
       "machines-5mps",
+      "rope-upgrade",
       "machines-gearless",
       "larger-cars-21"
     ],
@@ -974,7 +975,7 @@
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 2,
+          "suppressed": 1,
           "unbuildable": 0,
           "dropdown": {
             "examined": 12,
@@ -1015,7 +1016,7 @@
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 3,
+          "suppressed": 2,
           "unbuildable": 0,
           "dropdown": {
             "examined": 12,
@@ -1056,7 +1057,7 @@
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 1,
+          "suppressed": 0,
           "unbuildable": 0,
           "dropdown": {
             "examined": 12,

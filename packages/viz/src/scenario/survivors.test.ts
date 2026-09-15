@@ -133,11 +133,15 @@ const UNWINNABLE_AS_MEASURED: Readonly<Record<string, string>> = Object.freeze({
   'stage-4-two-banks': '0 of 24 at every rung; 4 or 5 a rung suppressed.',
   'stage-6-the-tall-one': '0 of 24 at every rung; 2 to 4 a rung suppressed.',
   'stage-7-prove-it':
-    '0 of 24 at every rung; 1 to 3 a rung suppressed. New with GitHub issue #467, and the shape ' +
+    '0 of 24 at every rung; 0 to 2 a rung suppressed. New with GitHub issue #467, and the shape ' +
     'is the sample rather than the stage: before it the dial half cleared 2 of 12 at the base rung ' +
     'and 1 of 12 at the building rung, and #467 widened what a draw can buy from four reachable ' +
     'priced changes to ten, so each rung’s twelve draws now land on a much larger space. Zero of ' +
-    'twelve bounds the dial share at about a quarter; it is not a finding that nothing gets through.',
+    'twelve bounds the dial share at about a quarter; it is not a finding that nothing gets ' +
+    'through. The suppression read 1 to 3 a rung until GitHub issue #234 moved this stage’s demand ' +
+    'from 1.5 to 1.25 %pop/5 min (DECISIONS.md § D611): re-measured, every rung is one lower — ' +
+    '2 → 1, 3 → 2 and 1 → 0 — which is what a lighter morning does, and it moved nothing else. ' +
+    'The other nine scenarios came back byte-identical on the same run.',
   'stage-8-the-headline-address':
     '0 of 18 at the base rung and 0 of 24 at both bought ones, with 1 to 3 a rung suppressed. It ' +
     'was the one row here with nothing suppressed anywhere until GitHub issue #467 redrew the dial ' +

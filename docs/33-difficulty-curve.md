@@ -1188,10 +1188,24 @@ closure is a window rather than a knife-edge; 1.25 is the smallest move inside i
 property that distinguishes it from 1.0 and 0.75. `answer-the-demand` stays `variable` on both seed
 sets, so DC-1 is untouched and the stage keeps the one non-comparative goal it had.
 
-**What it does not fix.** Stage 7 was already `below` its survivor band with 0 of 24 through at every
-rung (`scenario/survivorBands.test.ts`, `scenario/survivors.test.ts`), and a stage made harder does
-not come back inside a band it was under. Both registrations stand and neither moves; what leaves is
-the stage's row in `DROPDOWN_CLEARS` and in `DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT`.
+**What it does not fix, and this half was measured rather than assumed.** Stage 7 was already
+`below` its survivor band with 0 of 24 through at every rung, and a stage made harder does not come
+back inside a band it was under. `data/scenario-survivors.json` was regenerated on the changed tree
+— 4 860 s over the whole ladder — and **nine of the ten scenarios came back byte-identical**. Stage 7
+moved in exactly one field: `suppressed` fell by one at each rung, 2 → 1, 3 → 2 and 1 → 0, which is
+what a lighter morning does. Its survivor counts, survivor names, `examined`, `unjudged` and
+`unbuildable` are all unmoved, so `survivors.test.ts#UNWINNABLE_AS_MEASURED`,
+`survivorBands.test.ts#OUTSIDE_THEIR_BAND` and `DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE` all keep exactly
+the membership they had. What leaves is the stage's row in `DROPDOWN_CLEARS` and in
+`DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT`, and nothing else.
+
+**The same regeneration corrected two provenance fields that were stale before this lane started**,
+and they are not this rebalance's ([§ D614](../DECISIONS.md)). The table's `scope` sentence read
+*"10 of 33 priced changes can reach a scenario run"* and now reads **34**, and `rope-upgrade` joined
+`unreachableChangeIds` — GitHub issue #433's building-tier row, priced in the wave before this one
+and never swept into this census. Nothing about the counts was wrong; what was stale is the table's
+own account of the space it counted over, which is the half a reader uses to decide whether a count
+means anything.
 
 #### Stage 5 — open, measured, and deliberately **not taken** in this lane
 
