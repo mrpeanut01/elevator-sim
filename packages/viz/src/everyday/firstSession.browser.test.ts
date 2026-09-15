@@ -12,7 +12,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { CHROMIUM, HAS_BROWSER, openEverydayDoor, openPage, startShippedSite, type ShippedSite } from '../dev/browserTier.test-helper.js';
 import { CONTRACTS, contractById } from '../shift/contracts.js';
-import { ELIGIBLE_FIRST_CONTRACT_IDS, firstSessionContractFor } from '../shift/firstSession.js';
+import {
+  ELIGIBLE_FIRST_CONTRACT_IDS,
+  FIRST_SESSION_LINE,
+  firstSessionContractFor,
+} from '../shift/firstSession.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -64,21 +68,35 @@ describe.skipIf(!HAS_BROWSER)('the first session’s tower — GitHub issue #208
       expect(door.seed).toContain(`tower ${drawn?.buildingId ?? ''}`);
       expect(door.seed).toContain(`crowd ${String(SEED)}`);
       /*
-       * **Checked against the table rather than against a literal** — GitHub issues #500 and #501.
-       * This read `toContain('five towers')`, which was true of an eight-contract sweep; the sweep
-       * is ten now and the count moved, so the shipped line says six and this pinned five. A test
-       * that asserts the same literal the module authors cannot tell a correct sentence from a
-       * stale one, so it asserts the *derivation*: the count is the eligible set's own length.
-       * `docs/37` § 6's rule, applied to the check as well as to the string, and the same fix
-       * `shift/firstSession.test.ts` already carries — this file was missed because the browser
-       * tier was not run on the branch that moved the figure.
+       * **Checked against the shipped sentence rather than against a rebuild of it** — GitHub
+       * issues #500 and #501, and then #428/#427/#426.
+       *
+       * This first read `toContain('five towers')`, true of an eight-contract sweep and stale at
+       * ten. That was fixed by deriving the count — and the fix carried a *local copy* of the
+       * module's number words, eleven of them, `zero` to `ten`, guarded by
+       * `length < words.length`. Three more towers landed, two of them eligible, the set reached
+       * **eleven**, and that guard went red: `expected 11 to be less than 11`. The shipped line was
+       * correct the whole time, because `shift/firstSession.ts`'s own list runs to `sixteen`; what
+       * was stale was the test's duplicate of it.
+       *
+       * So the duplicate is gone. The assertion is now the module's own `FIRST_SESSION_LINE`, which
+       * is what the door is supposed to be drawing — a copy of a derivation is still a literal, and
+       * it goes stale exactly one wave later than the literal it replaced.
        */
-      const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-      expect(door.line).toContain(`${words[ELIGIBLE_FIRST_CONTRACT_IDS.length] ?? ''} towers`);
-      // Non-vacuity: the set is neither empty nor past the word list, so the line above is not
-      // asserting the presence of a bare ` towers`.
+      expect(door.line).toBe(FIRST_SESSION_LINE);
+      /*
+       * Non-vacuity, and it asserts the property the module's docstring names rather than a bound
+       * on a list this file no longer holds. `firstSession.ts` falls back to `String(n)` when its
+       * word list runs out, and says why that matters: a bare numeral in player-facing prose is a
+       * figure with no source, and the honesty search asks whether a figure is *licensed*. So the
+       * check is that the fallback was **not** taken — the count reaches the sentence as a word.
+       * The other numerals in the line (`day 1`, the sweep's day count) are licensed and stay.
+       */
       expect(ELIGIBLE_FIRST_CONTRACT_IDS.length).toBeGreaterThan(1);
-      expect(ELIGIBLE_FIRST_CONTRACT_IDS.length).toBeLessThan(words.length);
+      expect(FIRST_SESSION_LINE).toContain(' towers whose day 1 ');
+      expect(FIRST_SESSION_LINE).not.toContain(
+        `${String(ELIGIBLE_FIRST_CONTRACT_IDS.length)} towers`,
+      );
       /* Not the campaign's opener, which the instrument found never legible. */
       expect(door.seed).not.toContain('tower garden-apartments');
     } finally {

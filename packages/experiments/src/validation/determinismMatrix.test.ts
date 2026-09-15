@@ -100,17 +100,30 @@ import { DATA_DIR } from './harness.js';
 const DEEP = deepRequested();
 
 /**
- * **Measured against each half's own sweep rather than shared.** The always-on nine cost 48 s on a
- * quiet box, so 900 000 ms is ~19× that and ~4× the same sweep under this repository's measured
- * 4.5× contention — the condition it actually runs in, three or four worktrees at a time. The deep
- * fourteen cost 446 s, and its condition is *alone on a dedicated runner*, one tier per job, so
- * 3 600 000 ms is ~8× the figure that matters for it.
+ * **One literal for both halves, and the reason is a guard rather than a preference.** This was
+ * first written as `DEEP ? 3_600_000 : 900_000`, sized against each half's own sweep — and
+ * `packages/viz/src/testCost.test.ts` rejected it. That file censuses every timeout annotation in
+ * the repository and prices it, and it refuses an argument it cannot resolve to a number: a
+ * conditional has two values, so an annotation written as one is an annotation nobody can cost.
+ * It reported all six sites here as `unresolved constant` and went red, which is the guard doing
+ * exactly its job.
+ *
+ * So the value is a literal, and it is sized on the half that needs it. Measured on a quiet box:
+ * the deep seventeen run **7 tests in 176.5 s**, the always-on nine in **12.2 s**. 1 800 000 ms is
+ * ~10× the deep figure and matches `deep-tiers.yml`'s own `--testTimeout`, so the annotation and
+ * the workflow agree rather than one silently overriding the other — a per-test argument beats the
+ * CLI flag, which is the trap that shape invites.
+ *
+ * **The always-on half is therefore annotated far above what it needs**, and that is the accepted
+ * cost of being priceable. It is stated rather than hidden because the opposite error is the one
+ * this repository keeps finding: an annotation shorter than the job it holds fails for a reason
+ * that is not the code.
  *
  * The old single 300 000 ms was right for eight buildings and is what failed at fourteen. Raised
  * because the work grew, not to cover a case that got slow — the distinction `testCost.test.ts`'s
  * ratchet exists to police, and it is worth saying here too since this file annotates itself.
  */
-const TIMEOUT_MS = DEEP ? 3_600_000 : 900_000;
+const TIMEOUT_MS = 1_800_000;
 
 /** The audit's seed, so a cell that goes red here reproduces through `scripts/opcheck/`. */
 const SEED = 20260810;
