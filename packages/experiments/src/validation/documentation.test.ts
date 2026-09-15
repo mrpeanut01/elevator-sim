@@ -1742,7 +1742,33 @@ type DecisionReservation = {
  * because it is tidier, but because the alternative is every lane inventing bookkeeping the
  * integrator then has to throw away.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/**
+ * **Wave AB reserved D594–D615, and this block was opened by a lane rather than at dispatch — which
+ * is the failure the comment above predicts, arriving for the third recorded time.**
+ *
+ * Wave Z closed with the row reconciled to D594 and `OPEN_RESERVATION` set back to `null`, and
+ * wave AB then dispatched lane blocks without re-opening one here. So the first lane to write a
+ * number turned both bookkeeping cases red on the ceiling rather than on anything it had done:
+ * with no reservation open, the charter row must equal `highest + 1`, and every number between the
+ * row and the highest heading reads as an unregistered hole. Wave Z's lanes B and C each hit that
+ * wall alone and each widened the block on the commit that needed it; this is the same move, and
+ * it is recorded rather than done quietly because the lesson keeps having to be relearned.
+ *
+ * **The floor is the charter row, D594, and it is the one figure here that is not this lane's
+ * guess.** The ceiling, D615, is **this lane's own block's ceiling** and therefore a partial view:
+ * lane D of wave AB holds D611–D615 and was told not to exceed it. If a sibling lane holds numbers
+ * above D615, its branch will red here on the ceiling and the honest fix is to widen this `to`
+ * with a sentence saying so — exactly what wave Z's two lanes did — rather than to take a number
+ * this block does not hold. The integrator reconciles both at close, sets this back to `null` and
+ * moves the charter row on the same commit.
+ *
+ * **Spent by this lane: D611, D612 and D613** — GitHub issue #234's C2 rebalance, the demand axis
+ * measured on stages 3 and 5, and stage 1's fabric lever confirmed and declined. **D614 and D615
+ * were not reached**; whether they are free or holes is the integrator's call at close, because
+ * that depends on what lands above them, which is § D430's distinction and the one thing about this
+ * bookkeeping that no single branch can decide.
+ */
+const OPEN_RESERVATION = { wave: 'AB', from: 594, to: 615 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
