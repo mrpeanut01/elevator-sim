@@ -35156,6 +35156,8 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 
 ## D542 — A rush round is a sitting, posted whole: the server replays every round, derives every purse, and the refusal of `endless-rush` is lifted after its replay cost was measured
 
+> **Status 2026-09-15: one of the two things this entry records as unbuilt is built, by [§ D606](#d606).** *The viewer does not post a sitting* stopped being true on that commit — the rush's result screen keeps the round list and sends the sitting whole, and the honesty corpus moved with it. **The other is unchanged and is the open half of GitHub issue #372**: no between-round rebuild travels, so nothing spends a purse. § D606 names the boundary that blocks it and the three questions nobody has ruled on. This entry is left exactly as it was written.
+
 **Date: 2026-09-11 · Owner: product owner (the ruling, 2026-09-10, and the approval of the figures and readings under it as drafted, 2026-09-11); the lane that built GitHub issue #372 (the readings under it) · Rules on: [§ D515](#d515), [§ D525](#d525) clause 6, [§ D526](#d526) clauses 2 and 3, [§ D486](#d486), `packages/server/src/leaderboard/verify.ts`, `data/rush-purse.json`, [`docs/38`](docs/38-what-the-game-is.md) § 2.3, GitHub issue #372.**
 
 **Why an entry.** The ruling binds code no one module owns: the rush's arithmetic moved into `core`, a new file in `data/`, the server's verifier, its store and two routes. It also lifts a refusal already recorded — `verify.ts` refused `endless-rush` since GitHub issue #220 — and the ruling asked for the argument to be written down with the change.
