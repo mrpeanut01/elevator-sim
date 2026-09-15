@@ -131,7 +131,37 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * the census can now say so. A ratchet that fell while the tree it measures grew invisibly was
      * not protecting anything — it was reporting its own blind spot as good news.
      */
-    ['viz', { count: 96, totalMs: 104_700_000 }],
+    /*
+     * **96 → 98 on the count and 104 700 000 → 107 400 000 on the sum, and all three moves are
+     * named** — wave AA's three reference towers (GitHub issues #425, #424 and #430). **Not one of
+     * the three is a new annotation; all three are existing budgets raised**, which is why the
+     * `at its own ceiling` row falls by two in the same commit as this one rises by two. The two
+     * cases did not appear — they crossed.
+     *
+     * - `shift/legibility.test.ts`, *"reproduces the table's slice"* — 300 000 → 900 000 ms.
+     * - `shift/firstSession.test.ts`, *"every eligible contract's day 1 is legible"* — 300 000 → 900 000 ms.
+     * - `honesty/honesty.test.ts` — 900 000 → 1 800 000 ms.
+     *
+     * That all three are raises rather than additions is the whole reason this entry pins a **sum**
+     * beside a count. A wave that raised one budget and added none would leave the count level and
+     * move only the sum, and a reader watching the count alone would see nothing happen.
+     *
+     * **None is a case annotated upward to satisfy a budget, which is the thing this ratchet exists
+     * to catch.** All three are instruments over the *shipped set*, and the shipped set grew from
+     * eleven buildings to fourteen and from ten contracts to thirteen on the same wave. The
+     * legibility table gained three rows and is re-derived at 650 days; the first-session
+     * eligibility set is derived from that table, so it grew with it; and the honesty corpus now
+     * carries three more towers, which took it past its old ceiling under load — where a hook
+     * timeout reported all thirty cases as *skipped* and said nothing about any property.
+     *
+     * The honesty raise is the one to read, because it is the one that could have gone the other
+     * way: `STANDARD_CORPUS`'s own rule is that the corpus size is the claim, so a corpus quietly
+     * trimmed to fit a window is a weakened search that still publishes a verdict. Raising the
+     * window was the honest half of that choice.
+     *
+     * Raised on the commit that made the tree exceed it, with nothing existing raised to make room.
+     */
+    ['viz', { count: 98, totalMs: 107_400_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this

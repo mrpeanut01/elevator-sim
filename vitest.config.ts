@@ -113,9 +113,9 @@ const alias = {
  * |---|---|---|
  * | ceiling | 300 000 ms | 120 000 ms |
  * | annotations | 484 | 179 |
- * | above its own ceiling | **96** | **71** |
- * | at its own ceiling | 200 | 105 |
- * | above 300 000 ms | 96 | 4 |
+ * | above its own ceiling | **98** | **71** |
+ * | at its own ceiling | 198 | 105 |
+ * | above 300 000 ms | 98 | 4 |
  *
  * **The last two rows disagree for the browser tier, and that disagreement is a second finding.**
  * Counting *above 300 000 ms* is counting against a number rather than against a budget: it sees
@@ -150,7 +150,7 @@ const alias = {
  * had drifted within a day of being written: it read *"`packages/viz` carries **555** timeout
  * annotations in all, of which **182** sit exactly at 300 000 ms"*, which was exact on `13e7b93`
  * and is not exact here. Derived on this tree, and re-derived on every run of `testCost.test.ts`
- * rather than typed: `packages/viz` carries **663** timeout annotations in all, of which **226**
+ * rather than typed: `packages/viz` carries **663** timeout annotations in all, of which **224**
  * sit exactly at 300 000 ms. Removing them would be 185 edits whose only effect is to make those
  * sites depend silently on a line in another file. A site that knows it runs a simulation is
  * allowed to say so.
