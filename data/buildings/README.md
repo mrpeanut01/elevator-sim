@@ -318,6 +318,30 @@ the author meant: `descent-capped-by-air-pressure` (the cap is biting on this ca
 `descent-above-rated-speed` (a car quicker down than up — legal, and no reference asymmetry is of
 that sign) and `pressurisation-buys-nothing` (a cabin fitted where nothing was capping it).
 
+## The rope, and the only travel ceiling that refuses
+
+```json
+{ "id": "observation", "servesFloors": ["G", "154"], "ropeClass": "carbon-fibre", "cars": [] }
+```
+
+| Field | On | Meaning |
+|---|---|---|
+| `ropeClass` | bank | Which class of hoisting rope the shaft is roped in, an id from `elevator-specs.json#ropeClasses.classes`. **Absent means the rope is not modelled**, which is what every shipped building does. |
+
+Declaring one does two things and no third ([`DECISIONS.md` § D583](../../DECISIONS.md), GitHub
+issue #433). The class's `maxSingleTravelM` becomes a **hard refusal** — a bank that spans further
+fails to load with `rope-travel-exceeds-class`, because Al-Kodmany § 2.1.5's limit is a rope that
+cannot support its own weight rather than an envelope a designer may knowingly exceed. And the
+rope's mass, `massKgPerMOfTravel × the bank's own travel`, joins the moving mass the energy proxy
+sees, which moves `energyKJ` and `workPerServedLegKJ` and **never a leg**: nothing a dispatcher, a
+car or `Car.estimateCost()` reads is touched.
+
+This is the **only** hard ceiling on a hoistway's travel in this repository. A lift class's own
+`maxRiseM` stays advisory (`rise-exceeds-class`) — hardening it would refuse `midtown-office` at
+76.9 m against 76 m, and the product owner re-asked and reversed that on 2026-09-10. One warning
+comes out of the rope: `rope-class-buys-nothing`, a class declared where the data directory carries
+no `ropeClasses` block at all.
+
 ## Double-deck cars
 
 ```json
