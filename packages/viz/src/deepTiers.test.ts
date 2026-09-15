@@ -203,6 +203,16 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'the reason this table carries variables per tier rather than a list of two',
     scheduled: true,
   },
+  'packages/experiments/src/fuzz/hybrid.test.ts': {
+    gates: ['ELEVATOR_SIM_FUZZ'],
+    reason:
+      'the hybrid family — GitHub issue #534, § D570 — whose buildings carry per-landing hall ' +
+      'fixtures, so some landings name a car and some do not. 48 cases always-on and 250 deep, on ' +
+      'the same gate as deep.test.ts and in the same job, because both read one variable and this ' +
+      'one was measured at 634 s against that job’s 60 minutes. It is the only corpus that reaches ' +
+      'a hybrid run at all, so a red here is the only place that finding exists',
+    scheduled: true,
+  },
   'packages/experiments/src/oracle/deepCampaign.test.ts': {
     gates: ['ELEVATOR_SIM_DEEP'],
     reason: "CLAUDE.md's correctness oracle at full width — every measurable bank",
@@ -567,11 +577,28 @@ const runLines = (): readonly string[] =>
  * its file runs zero tests and reports green, which is the shape of every defect in this file's
  * docstring.
  */
+/**
+ * Every (project, file) a workflow step runs, **one entry per file named on the line**.
+ *
+ * **`matchAll` rather than `exec`, and the difference is a whole tier.** This read the first
+ * `src/…test.ts` on a run line and stopped. One `vitest run` step may legitimately name several
+ * files — they share a project, a timeout and an `env:` block, which is the whole reason to put
+ * them in one step — and every file after the first was then invisible here. GitHub issue #534's
+ * hybrid family was added beside `fuzz/deep.test.ts` in the `fuzz-deep` job, on the same gate, and
+ * § 2 reported it as running in no workflow at all.
+ *
+ * That is this file's own failure mode pointed at itself: it exists to catch a tier nothing opts
+ * into, and it would have forced the opposite error — a second job, or a second step, written to
+ * satisfy a parser rather than because the tiers wanted separating. The loud direction is the safe
+ * one and it is what happened, but a guard that can only see one file per step is a guard that
+ * quietly shapes the workflow it checks.
+ */
 const invocations = (): readonly { project: string; file: string; line: string }[] =>
   runLines().flatMap((line) => {
     const project = /--project\s+([\w-]+)/u.exec(line)?.[1];
-    const file = /\b(src\/[\w./-]+\.test\.ts)\b/u.exec(line)?.[1];
-    return project !== undefined && file !== undefined ? [{ project, file, line }] : [];
+    if (project === undefined) return [];
+    const files = [...line.matchAll(/\b(src\/[\w./-]+\.test\.ts)\b/gu)].map((m) => m[1] ?? '');
+    return files.map((file) => ({ project, file, line }));
   });
 
 /**

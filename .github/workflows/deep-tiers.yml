@@ -355,7 +355,10 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # The wide fuzz space. Six properties, 250 cases, minutes.
+  # The wide fuzz space. Six properties, 250 cases, minutes — and since GitHub issue #534 the
+  # hybrid family beside it, whose buildings carry per-landing hall fixtures so some landings
+  # name a car and some do not. Both files, one job, because both are gated on the same
+  # variable and the second was measured at 634 s contended against this job's 60 minutes.
   #
   # Gated on ELEVATOR_SIM_FUZZ=deep — the variable issue #163 does not name, and the reason this
   # workflow's gate list is derived from disk rather than from the issue.
@@ -382,7 +385,7 @@ jobs:
       - name: Deep fuzz campaign
         env:
           ELEVATOR_SIM_FUZZ: deep
-        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=600000 src/fuzz/deep.test.ts
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=600000 src/fuzz/deep.test.ts src/fuzz/hybrid.test.ts
 
   # ---------------------------------------------------------------------------
   # Byte-identical replay, at 6 goldens rather than 4, plus the replay from a bare node process.
