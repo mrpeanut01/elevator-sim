@@ -184,8 +184,8 @@ independently**.
 
 | content type | key | today | **target** | how the target is derived | play-hours it adds |
 |---|---|---|---|---|---|
-| Buildings | `buildings` | 14 | **22** | owner ruling, 2026-09-10 (#232): every open reference tower plus Harbour Point and Ashgate, each playable. § 4.3's rotation arithmetic set the earlier floor of 12 | 0 directly; multiplies every other row |
-| Contracts | `contracts` | 13 | **22** | one per shipped building — `docs/12` § 4.7's own rule, *a shipped building with no contract is a scenario the reader can never take* | 12 × 3 clean days × 1 800 s = 64 800 s = 36 watch-min × 5 = **+3.00** |
+| Buildings | `buildings` | 17 | **22** | owner ruling, 2026-09-10 (#232): every open reference tower plus Harbour Point and Ashgate, each playable. § 4.3's rotation arithmetic set the earlier floor of 12 | 0 directly; multiplies every other row |
+| Contracts | `contracts` | 16 | **22** | one per shipped building — `docs/12` § 4.7's own rule, *a shipped building with no contract is a scenario the reader can never take* | 12 × 3 clean days × 1 800 s = 64 800 s = 36 watch-min × 5 = **+3.00** |
 | Campaign stages | `campaign-stages` | 10 | **24** | one per building, plus the two stages that teach a mechanic rather than a tower (stage 3 *Overwhelmed* and stage 7 *Tune it*, both on `midtown-office`). Today that rule gives exactly the shipped 10, and at 22 buildings it gives 24 | 14 × 900 s = 12 600 s = 7 watch-min × 5 = **+0.58** |
 | Fix cases | `fix-cases` | 18 | **44** | § 10.6 of the gameplay guide names **26** further cases by name, with authoring rules; 18 + 26. **16 of the 26 are authorable today** — § 5.2 | 26 × 7.67 min = **+3.32** |
 | Proof cases | `proof-cases` | 40 | **40** | **unchanged, by rule.** A rating is only comparable if the cases never move; growing the building set must not touch this list. § 7 is the one permitted move | 0 |
