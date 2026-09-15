@@ -110,9 +110,9 @@ says exactly that about its populations, and this follows it, so that a later ci
 *stated* figure rather than a silent one. All of them are **an agent's proposal awaiting the product
 owner's approval**.
 
-The ten ordinary buildings carry one plate, derived from the modal populated floor at a chosen gross
-area per occupant — roughly 16 m² for an office, 22 for `office-prestige`, 25 for mixed-use, 30 for a
-hospital, 35 for residential, 40 for a hotel — then rounded:
+**Nine** of the fourteen carry one plate throughout, derived from a representative populated floor at
+a chosen gross area per occupant — roughly 16 m² for an office, 22 for `office-prestige`, 20–25 for
+mixed-use, 30 for a hospital, 35 for residential, 40 for a hotel — then rounded:
 
 | building | plate | basis |
 |---|---|---|
@@ -120,14 +120,15 @@ hospital, 35 for residential, 40 for a hotel — then rounded:
 | `midtown-office` | 1 400 m² | 90 occupants a floor |
 | `harbour-point` | 1 650 m² | 104 occupants a floor, the densest office here |
 | `chancery-house` | 750 m² | 34 occupants a floor at prestige density |
-| `secure-tower` | 700 m² | 26–44 a floor by tenant, taken at the modal 36 |
+| `secure-tower` | 700 m² | 26–44 a floor by tenant, sized on the densest |
 | `crown-hotel` | 1 300 m² | 34 a floor |
 | `st-jude-hospital` | 1 900 m² | 64 a floor at hospital density |
 | `ashgate` | 850 m² | 34 a floor, mixed-use |
 | `mixed-use-high-rise` | 900 m² | 46 office below, 26 residential above |
 
-The four reference towers **taper**, because a supertall does: the plate shrinks as the tower rises,
-which is what leaves the express shafts stacked at the bottom.
+The other **five** — the four reference towers and `vertical-city` — **taper**, because a tall building
+does: the plate shrinks as the tower rises, which is what leaves the express shafts stacked at the
+bottom while the top floors carry only their own local bank.
 
 | tower | plates, bottom to top |
 |---|---|
