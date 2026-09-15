@@ -4,6 +4,7 @@
   "name": "Harbour Point",
   "type": "office",
   "trafficProfile": "office-standard",
+  "grossAreaPerFloorM2": 1650,
   "floors": [
     {
       "id": "G",

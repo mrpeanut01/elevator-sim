@@ -234,6 +234,50 @@ about a whole installation's consumption including the standby term and the car 
 inertia this proxy omits; it is what the rope is worth *to this proxy*, and the interval for each is
 in [§ D583](../DECISIONS.md) § 5.
 
+### Floor area, and what a hoistway takes out of it
+
+`data/elevator-specs.json#shaftFootprint` says what **one hoistway** takes out of **every floor plate
+it passes through**, by the rated load of the car in it. A building declares its plate
+(`grossAreaPerFloorM2`, or `grossAreaM2` on a floor, or `grossAreaPerFloorM2` on a range — floor wins,
+then range, then building), and `config/parse.ts` resolves a gross, core and lettable area per level
+([§ D601](../DECISIONS.md), GitHub issue #429).
+
+| rated load, lb | plan area of one hoistway | provenance |
+|---|---|---|
+| 0–2000 | 5.5 m² | **chosen outright**, deliberately below the source's bracket |
+| 2000–3000 | 6.8 m² | **chosen**, inside the 6.7–13.4 m² the source supports |
+| 3000–4000 | 8.0 m² | **chosen**, inside that bracket |
+| 4000 and above | 9.5 m² | **chosen outright**, deliberately above it |
+
+**One thing is cited and the sizes are not.** Al-Kodmany § 2.2.2 gives *one car = one hoistway*
+outright — 24 single-deck cars becoming 13 double-deckers *"reduc[es] the required core by no less
+than 11 hoistways"*, and 24 − 13 = 11 only works that way. For the *size* of a hoistway the paper
+gives one anchor and it **brackets** rather than fixes: TWIN on a 31-storey building recovers *"more
+than 830 m²"* by cutting the shafts *"by a third"*, which is 26.8 m² of plate per floor for a third
+of an unstated shaft count N — 13.4 m² at N = 6, 8.9 at N = 9, 6.7 at N = 12. All four rows above are
+**an agent's proposal awaiting the product owner's approval**, and so are the fourteen buildings'
+plates, which are a stated assumption and not a citation.
+
+**A shaft is charged over its bank's whole span, not its served set.** An express shuttle takes plan
+area out of every floor it passes and never opens onto — which is the reason sky lobbies exist, and
+why a tall building's core tapers. A **double-deck car is one shaft**, charged once at its per-deck
+load.
+
+**What this measures is the hoistway alone**: no lift lobby, no machine room, no riser. The paper's
+headline that elevators and escalators *"can occupy up to 40% of a building's floor"* is about all of
+that, so these figures come out well below it and the two are different quantities. Measured over the
+shipped set: 1.4 % of gross area at `garden-apartments`, 1.9 % at `midtown-office`, **13.1 % at
+`burj-class-reference`** and 16.6 % at `merdeka-class-reference`, with the worst single floor
+`merdeka-class-reference`'s sky lobby at 26.6 %, where ninety-two hoistways cross one level.
+
+A floor whose hoistways take **strictly more** plan area than it has fails to load with
+`core-exceeds-floor-plate`. It is raised on **no shipped building** and the margin is not close, so
+that ceiling is a correctness guard rather than the trade-off: **what a shaft costs is the lettable
+area it removes on every level it passes, forever** — a fifth car at `midtown-office` is 142.8 m².
+**Area is a published quantity and not a price.** Nothing in `data/price-schedule.json` charges it,
+because a second budget axis and a Career income term are the product owner's ruling rather than an
+engineering judgement ([§ D601](../DECISIONS.md) § 5, which measures what each shape would cost).
+
 **Energy is an axis, never a score.** Measured across the full experiment matrix, `nearest-car` — the
 weakest shipped dispatcher — is on the Pareto front at six of eight cells, because it is best on
 energy and worst on wait. Any aggregate "efficiency" number ranks it first. Report energy beside

@@ -4,15 +4,16 @@
   "name": "Vertical City",
   "type": "mixed-use",
   "trafficProfile": "office-standard",
+  "grossAreaPerFloorM2": 1600,
   "floors": [
     { "id": "G", "index": 0, "heightM": 0.0, "population": 0, "isEntrance": true, "isTransferFloor": true, "label": "Ground lobby lower level (street entrance, lower deck boarding)" },
     { "id": "2", "index": 2, "heightM": 4.5, "population": 0, "isTransferFloor": true, "label": "Ground lobby upper level (upper deck boarding)" },
-    { "id": "26", "index": 26, "heightM": 105.6, "population": 0, "isTransferFloor": true, "label": "Sky lobby A - lower" },
-    { "id": "27", "index": 27, "heightM": 110.1, "population": 0, "isTransferFloor": true, "label": "Sky lobby A - upper" },
-    { "id": "51", "index": 51, "heightM": 211.2, "population": 0, "isTransferFloor": true, "label": "Sky lobby B - lower" },
-    { "id": "52", "index": 52, "heightM": 215.7, "population": 0, "isTransferFloor": true, "label": "Sky lobby B - upper" },
-    { "id": "76", "index": 76, "heightM": 303.0, "population": 0, "isTransferFloor": true, "label": "Sky lobby C - lower" },
-    { "id": "77", "index": 77, "heightM": 307.5, "population": 0, "isTransferFloor": true, "label": "Sky lobby C - upper" }
+    { "id": "26", "index": 26, "grossAreaM2": 1500, "heightM": 105.6, "population": 0, "isTransferFloor": true, "label": "Sky lobby A - lower" },
+    { "id": "27", "index": 27, "grossAreaM2": 1300, "heightM": 110.1, "population": 0, "isTransferFloor": true, "label": "Sky lobby A - upper" },
+    { "id": "51", "index": 51, "grossAreaM2": 1100, "heightM": 211.2, "population": 0, "isTransferFloor": true, "label": "Sky lobby B - lower" },
+    { "id": "52", "index": 52, "grossAreaM2": 1100, "heightM": 215.7, "population": 0, "isTransferFloor": true, "label": "Sky lobby B - upper" },
+    { "id": "76", "index": 76, "grossAreaM2": 800, "heightM": 303.0, "population": 0, "isTransferFloor": true, "label": "Sky lobby C - lower" },
+    { "id": "77", "index": 77, "grossAreaM2": 800, "heightM": 307.5, "population": 0, "isTransferFloor": true, "label": "Sky lobby C - upper" }
   ],
   "floorRanges": [
     {
@@ -26,6 +27,7 @@
     },
     {
       "fromIndex": 15,
+      "grossAreaPerFloorM2": 1500,
       "toIndex": 25,
       "startHeightM": 59.4,
       "floorToFloorM": 4.2,
@@ -35,6 +37,7 @@
     },
     {
       "fromIndex": 28,
+      "grossAreaPerFloorM2": 1300,
       "toIndex": 38,
       "startHeightM": 114.6,
       "floorToFloorM": 4.2,
@@ -44,6 +47,7 @@
     },
     {
       "fromIndex": 39,
+      "grossAreaPerFloorM2": 1300,
       "toIndex": 50,
       "startHeightM": 160.8,
       "floorToFloorM": 4.2,
@@ -53,6 +57,7 @@
     },
     {
       "fromIndex": 53,
+      "grossAreaPerFloorM2": 1100,
       "toIndex": 75,
       "startHeightM": 220.2,
       "floorToFloorM": 3.6,
@@ -63,6 +68,7 @@
     },
     {
       "fromIndex": 78,
+      "grossAreaPerFloorM2": 800,
       "toIndex": 100,
       "startHeightM": 312.0,
       "floorToFloorM": 3.4,

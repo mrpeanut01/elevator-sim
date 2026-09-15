@@ -127,6 +127,31 @@ export const ISSUE_CODES = {
   ropeTravelExceedsClass: 'rope-travel-exceeds-class',
   /** A bank names a `ropeClass` the data directory's `ropeClasses` library does not contain. */
   unknownRopeClass: 'unknown-rope-class',
+  /**
+   * **A floor's hoistways take more plan area than the floor has** — `DECISIONS.md` § D601,
+   * GitHub issue #429.
+   *
+   * The shafts passing through one level consume strictly more than that level's declared
+   * `grossAreaM2`. That is not an envelope a designer may knowingly exceed and it is not a
+   * building that performs badly: it is a floor plate with more hole than floor, so it refuses,
+   * on {@link ropeTravelExceedsClass}'s precedent and for its reason.
+   *
+   * **Strictly greater, never equal.** A level that is *entirely* core is degenerate but buildable
+   * — a plant level a bank passes through and opens onto nowhere else — and refusing it would be
+   * this project choosing an architectural taste rather than stating an impossibility.
+   *
+   * Raised on **no shipped building**, and the margin is not close: the nearest approach in
+   * `data/buildings/` is **26.6 %** of the plate, at `merdeka-class-reference`'s sky lobby, where
+   * ninety-two hoistways cross one level (`config/floorArea.test.ts` measures it over every floor
+   * of every shipped building rather than quoting one). It is proved by a configuration that
+   * breaches it, which is the difference between a ceiling and a sentence about one.
+   *
+   * **So this ceiling is a correctness guard rather than the trade-off GitHub issue #429 is
+   * about**, and § D601 § 5 says so rather than leaving a reader to infer that a shaft which
+   * always fits is a shaft that costs nothing. What a shaft costs is the lettable area it removes
+   * on every floor it passes, which is published and which no configuration can avoid paying.
+   */
+  coreExceedsFloorPlate: 'core-exceeds-floor-plate',
 } as const;
 
 /** Stable codes for non-fatal diagnostics. */
@@ -182,6 +207,27 @@ export const WARNING_CODES = {
    * reason.
    */
   ropeClassBuysNothing: 'rope-class-buys-nothing',
+  /**
+   * A floor declares `grossAreaM2` (or the building declares `grossAreaPerFloorM2`) and this data
+   * directory's `elevator-specs.json` declares no `shaftFootprint` block, so there is no plan area
+   * to charge a hoistway with — `DECISIONS.md` § D601. The building's floors resolve with their
+   * gross area and **no core**, and this says so rather than letting the declaration pass silently:
+   * {@link ropeClassBuysNothing}'s shape, for its reason.
+   */
+  floorAreaBuysNothing: 'floor-area-buys-nothing',
+  /**
+   * Some floors of this building resolve a gross area and some do not — `DECISIONS.md` § D601.
+   *
+   * The per-floor figures still resolve for the floors that have one; the **building-level**
+   * `area` is absent, because a gross area summed over some of a building's floors is a smaller
+   * number than the building has and would be published as if it were the whole. Absent is the
+   * only honest answer and this names why.
+   *
+   * A warning rather than a refusal because a partly-authored building is a legitimate
+   * intermediate state in an editor — `buildingConnectivity.ts`'s own split between the hard
+   * refusal and every softer shape of the same defect.
+   */
+  partialFloorArea: 'partial-floor-area',
   /**
    * The bank has double-deck cars and no `servesFloorPairs`, so **there is no deck geometry to
    * simulate** and the runtime runs the car as a single deck of the combined capacity.
@@ -479,6 +525,73 @@ const ropeClassesSchema = z.strictObject({
   source: z.string().min(1),
 });
 
+/**
+ * `elevator-specs.json`'s `shaftFootprint` block — § D601, GitHub issue #429.
+ *
+ * **What one hoistway takes out of every floor plate it passes through, by the rated load of the
+ * car in it.** It sits beside the classes rather than inside one for `airPressure`'s and
+ * `ropeClasses`' reason: a hoistway's plan area is set by the car's plated load and its running
+ * clearances, not by whether the machine is geared — a 2 500 lb car needs the same hole whether it
+ * is hauled at 1.6 m/s or 10.
+ *
+ * **Bands are contiguous from zero to an open top, which is checked rather than trusted.** The
+ * refinements below require `[0, …]` first, `[…, null]` last, and each band's floor equal to the
+ * previous band's ceiling, so every rated load a car can declare falls in exactly one band and the
+ * lookup in `config/parse.ts` cannot miss. A gap would otherwise be a car with no footprint, which
+ * is a shaft that costs nothing — the thirteen-times-shipped defect wearing a new name.
+ *
+ * **Non-decreasing in load**, too: a bigger car in a smaller hole is a data error rather than a
+ * design choice, and it is the shape that would silently make adding capacity *recover* core.
+ */
+const shaftFootprintSchema = z.strictObject({
+  $comment: comment,
+  bands: z
+    .array(
+      z.strictObject({
+        $comment: comment,
+        ratedLoadLbRange: z
+          .tuple([nonNegative, z.number().positive().nullable()])
+          .refine(([low, high]) => high === null || low < high, {
+            message:
+              'expected [fromLb, toLb] with fromLb < toLb, or null for the open top band',
+          }),
+        plateAreaM2: positive,
+        note: z.string().min(1).optional(),
+      }),
+    )
+    .min(1, 'a shaftFootprint block must declare at least one band')
+    .refine((bands) => bands[0]?.ratedLoadLbRange[0] === 0, {
+      message:
+        'the first shaftFootprint band must start at 0 lb: every car has a rated load and every rated load needs a footprint',
+    })
+    .refine((bands) => bands[bands.length - 1]?.ratedLoadLbRange[1] === null, {
+      message:
+        'the last shaftFootprint band must be open at the top (null), so no car can be rated above every band',
+    })
+    .refine(
+      (bands) =>
+        bands.every(
+          (band, index) =>
+            index === 0 || band.ratedLoadLbRange[0] === bands[index - 1]?.ratedLoadLbRange[1],
+        ),
+      {
+        message:
+          'shaftFootprint bands must be contiguous: each band starts where the previous one ends. A gap is a car with no footprint, which is a shaft that costs nothing',
+      },
+    )
+    .refine(
+      (bands) =>
+        bands.every(
+          (band, index) => index === 0 || band.plateAreaM2 >= (bands[index - 1]?.plateAreaM2 ?? 0),
+        ),
+      {
+        message:
+          'shaftFootprint plateAreaM2 must not fall as rated load rises: a bigger car in a smaller hole would make buying capacity recover core',
+      },
+    ),
+  source: z.string().min(1),
+});
+
 export const elevatorSpecsSchema = z
   .strictObject({
     $comment: comment,
@@ -489,6 +602,7 @@ export const elevatorSpecsSchema = z
     airPressure: airPressureSchema.optional(),
     regenerativeDrive: regenerativeDriveSchema.optional(),
     ropeClasses: ropeClassesSchema.optional(),
+    shaftFootprint: shaftFootprintSchema.optional(),
     codeMinimumSpeedByRise: z.array(
       z.strictObject({
         riseFtRange: z
@@ -1241,6 +1355,50 @@ export const dispatcherProfilesSchema = z
 // data/buildings/*.json
 // ---------------------------------------------------------------------------
 
+/**
+ * **Floor area, declared** — CLAUDE.md invariant 8, `DECISIONS.md` § D601, GitHub issue #429.
+ *
+ * One quantity in three places, because a plate is authored at whichever scale it is constant at:
+ * `BuildingConfig.grossAreaPerFloorM2` is the building's typical plate, `FloorRange.
+ * grossAreaPerFloorM2` a zone's, and `FloorConfig.grossAreaM2` one level's. **Precedence is floor,
+ * then range, then building** — exactly `trafficProfile`'s, which is already authored at all three
+ * scales for the same reason, so no reader has to learn a second rule.
+ *
+ * It is declared here beside the building schema rather than in `dispatch/parameters.ts` for
+ * {@link BANK_ENERGY_TUNABLES}' reason: it is fabric rather than a *dispatch* tunable, and
+ * `tuning/space` — which collects the rows a dispatcher profile can hold — does not collect it.
+ * **No `activeWhen`**: whether a plate may be declared depends on no other field. Whether it
+ * resolves a *core* depends on the data directory carrying a `shaftFootprint` library, and that is
+ * a `floor-area-buys-nothing` warning rather than a conditional parameter.
+ *
+ * **The default is *absent*, and absent means area is not modelled** — not a guessed plate. A
+ * building that declares none resolves exactly the object it resolved to before § D601 and
+ * publishes no area at all, which is what makes the field additive rather than a migration.
+ *
+ * The bounds are an authoring sanity band rather than a reference value and are marked so. A
+ * floor under 1 m² is a typo; the largest single storey ever built is a few tens of thousands of
+ * square metres, and 50 000 is chosen above any of them so that the bound catches a transposed
+ * digit and refuses nothing real.
+ */
+export const FLOOR_AREA_TUNABLES = Object.freeze({
+  grossAreaM2: Object.freeze({
+    type: 'number',
+    unit: 'm² of gross floor area on one level, hoistways included',
+    min: 1,
+    max: 50_000,
+    default: undefined,
+    source:
+      'CHOSEN, not a reference value: a band wide enough to catch a transposed digit and to ' +
+      'refuse no real storey. What a shaft takes out of it is elevator-specs.json#shaftFootprint, ' +
+      'which carries its own source and its own CITED/CHOSEN split.',
+  }),
+});
+
+const grossFloorArea = z
+  .number()
+  .min(FLOOR_AREA_TUNABLES.grossAreaM2.min)
+  .max(FLOOR_AREA_TUNABLES.grossAreaM2.max);
+
 export const floorConfigSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -1252,6 +1410,9 @@ export const floorConfigSchema = z.strictObject({
   trafficProfile: identifier.optional(),
   // GitHub issue #437, § D553: the landing's own call type; absent means the dispatcher's.
   landingCallType: z.enum(CALL_TYPES).optional(),
+  // GitHub issue #429, § D601: this level's own plate. Absent means the range's, then the
+  // building's, then area is not modelled here. See FLOOR_AREA_TUNABLES.
+  grossAreaM2: grossFloorArea.optional(),
   label: z.string().min(1).optional(),
 });
 
@@ -1269,6 +1430,9 @@ export const floorRangeSchema = z
     isTransferFloor: z.boolean().optional(),
     trafficProfile: identifier.optional(),
     landingCallType: z.enum(CALL_TYPES).optional(),
+    // GitHub issue #429, § D601: the zone's plate, applied to every floor in the range unless that
+    // floor declares its own. See FLOOR_AREA_TUNABLES.
+    grossAreaPerFloorM2: grossFloorArea.optional(),
   })
   .refine((range) => range.fromIndex <= range.toIndex, {
     message: 'expected fromIndex <= toIndex',
@@ -1556,6 +1720,9 @@ export const buildingConfigSchema = z
     trafficProfile: identifier,
     floors: z.array(floorConfigSchema).optional(),
     floorRanges: z.array(floorRangeSchema).optional(),
+    // GitHub issue #429, § D601: the building's typical plate, applied to every floor that neither
+    // it nor its range declares one for. Absent on every floor means area is not modelled here.
+    grossAreaPerFloorM2: grossFloorArea.optional(),
     totalPopulation: nonNegative.optional(),
     banks: z.array(bankConfigSchema).min(1, 'a building must have at least one bank'),
     transportModes: z.array(transportModeSchema).optional(),

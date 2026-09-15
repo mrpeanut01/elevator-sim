@@ -4,6 +4,7 @@
   "name": "Chancery House",
   "type": "office",
   "trafficProfile": "office-prestige",
+  "grossAreaPerFloorM2": 750,
   "floors": [
     {
       "id": "G",

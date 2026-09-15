@@ -4,6 +4,7 @@
   "name": "Midtown Office",
   "type": "office",
   "trafficProfile": "office-standard",
+  "grossAreaPerFloorM2": 1400,
   "floors": [
     { "id": "G", "index": 0, "heightM": 0.0, "population": 0, "isEntrance": true, "label": "Lobby" },
     { "id": "P1", "index": -1, "heightM": -3.5, "population": 0, "isEntrance": true, "label": "Garage" },

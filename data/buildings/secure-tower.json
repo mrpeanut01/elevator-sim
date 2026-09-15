@@ -4,6 +4,7 @@
   "name": "Secure Tower",
   "type": "office",
   "trafficProfile": "office-standard",
+  "grossAreaPerFloorM2": 700,
   "floors": [
     { "id": "G", "index": 0, "heightM": 0.0, "population": 0, "isEntrance": true, "isTransferFloor": true, "label": "Lobby (screened)" },
     { "id": "2", "index": 2, "heightM": 5.4, "population": 44 },

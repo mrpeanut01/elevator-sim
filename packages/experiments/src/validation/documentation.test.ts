@@ -1742,7 +1742,20 @@ type DecisionReservation = {
  * because it is tidier, but because the alternative is every lane inventing bookkeeping the
  * integrator then has to throw away.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/**
+ * **Wave AB's reservation, opened by a lane rather than before the lanes started.**
+ *
+ * The floor is the charter row's own figure, **D594**, which wave AA reconciled to when it closed.
+ * The ceiling is the top of *this* lane's block, **D605** — the narrowest figure that is true from
+ * here, which is what § D583 wrote for wave AA and what wave Z's lanes B and C each arrived at
+ * independently. A sibling lane holding a higher number should widen it rather than replace it.
+ *
+ * Set by lane B (GitHub issue #429, § D601), because writing D601 while this was `null` turns the
+ * gate above red on the *charter row* rather than on anything the lane did: with no reservation
+ * open the row must equal `highest + 1`, and reconciling it mid-wave is the one thing that rule
+ * exists to stop. The integrator reconciles the row and sets this back to `null` at close.
+ */
+const OPEN_RESERVATION = { wave: 'AB', from: 594, to: 605 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail

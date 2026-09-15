@@ -338,6 +338,52 @@ export interface RopeClassLibrary extends Commented {
   readonly source: string;
 }
 
+/**
+ * **One band of the hoistway footprint table** — `elevator-specs.json`'s `shaftFootprint.bands`,
+ * `DECISIONS.md` § D601, GitHub issue #429.
+ *
+ * Reference data about the hole rather than about the machine in it, which is why it sits beside
+ * the classes as {@link RopeClassSpec} and {@link AirPressureLimit} do: a 2 500 lb car needs the
+ * same shaft whether it is hauled at 1.6 m/s or at 10.
+ *
+ * Read `shaftFootprint.$comment` before treating any figure as a reference value. The source the
+ * block cites brackets a hoistway rather than measuring one, and all four rows are chosen inside
+ * (or, at the ends, deliberately outside) that bracket.
+ */
+export interface ShaftFootprintBand extends Commented {
+  /**
+   * `[fromLb, toLb]`, the rated load this band covers, **`toLb` exclusive** and `null` on the open
+   * top band. Bands are contiguous from `0`, which `config/schema.ts` checks rather than trusts,
+   * so every rated load falls in exactly one.
+   */
+  readonly ratedLoadLbRange: readonly [number, number | null];
+  /**
+   * Plan area one hoistway of this band takes out of **every floor plate it passes through**, m².
+   *
+   * The hoistway alone: no lift lobby, no machine room, no landing doors' swing. A core share
+   * derived from this is therefore smaller than a published *core* share, and
+   * `shaftFootprint.source` says so rather than leaving a reader to discover it by comparison.
+   */
+  readonly plateAreaM2: number;
+  /** What the band is for, and whether its figure is chosen or cited. */
+  readonly note?: string | undefined;
+}
+
+/**
+ * **The hoistway footprint table** — `elevator-specs.json`'s `shaftFootprint` block, § D601.
+ *
+ * A wrapper around the array so the block can carry its own `$comment` and `source`, exactly as
+ * {@link RopeClassLibrary} does. Optional on {@link ElevatorSpecs} for {@link AirPressureLimit}'s
+ * reason: a data directory that declares none charges no floor for its shafts, which is this
+ * project before § D601, and a building that declares a plate there is told so
+ * (`floor-area-buys-nothing`).
+ */
+export interface ShaftFootprintTable extends Commented {
+  readonly bands: readonly ShaftFootprintBand[];
+  /** Where the figures come from, and which of them are chosen rather than cited. */
+  readonly source: string;
+}
+
 /** The whole of `data/elevator-specs.json`. */
 export interface ElevatorSpecs extends Commented {
   readonly version: number;
@@ -368,6 +414,13 @@ export interface ElevatorSpecs extends Commented {
    * #433, and a bank that names a class there is told so (`rope-class-buys-nothing`).
    */
   readonly ropeClasses?: RopeClassLibrary | undefined;
+  /**
+   * What one hoistway takes out of every floor plate it passes through, by the rated load of the
+   * car in it — § D601. Optional for {@link airPressure}'s reason: a data directory that declares
+   * none charges no floor for its shafts, which is the model this project shipped before GitHub
+   * issue #429, and a building that declares a plate there is told so (`floor-area-buys-nothing`).
+   */
+  readonly shaftFootprint?: ShaftFootprintTable | undefined;
   readonly capacities: readonly CapacityEntry[];
   readonly doors: DoorTimings;
   readonly timing: ElevatorTiming;
@@ -1368,6 +1421,20 @@ export interface FloorConfig extends Commented {
    * makes a run whose landings disagree the `hybrid` passenger model (`metrics/comparability.ts`).
    */
   readonly landingCallType?: CallType | undefined;
+  /**
+   * **Gross floor area of this level, m², hoistways included** — GitHub issue #429,
+   * `DECISIONS.md` § D601.
+   *
+   * Absent means *this floor does not state its own plate*, and the range's then the building's
+   * are consulted in that order (`config/expandFloors.ts`, `config/parse.ts`). Absent everywhere
+   * means **area is not modelled for this building**, which is what every building resolved to
+   * before § D601 and is why the field is additive rather than a migration.
+   *
+   * Gross, not lettable: what a shaft takes out of it is derived from
+   * `elevator-specs.json#shaftFootprint` rather than authored, so a building cannot declare a plate
+   * that disagrees with its own lifts. See {@link FLOOR_AREA_TUNABLES} for the declared schema.
+   */
+  readonly grossAreaM2?: number | undefined;
   /** Optional human name, e.g. `Lobby`. */
   readonly label?: string | undefined;
 }
@@ -1398,6 +1465,11 @@ export interface FloorRange extends Commented {
   readonly trafficProfile?: string | undefined;
   /** Landing call type, applied to every floor in the range. See {@link FloorConfig.landingCallType}. */
   readonly landingCallType?: CallType | undefined;
+  /**
+   * Gross floor area applied to every floor in the range, m². See {@link FloorConfig.grossAreaM2}
+   * — a floor's own declaration wins over this, and this wins over the building's.
+   */
+  readonly grossAreaPerFloorM2?: number | undefined;
 }
 
 /**
@@ -1831,6 +1903,12 @@ export interface BuildingConfig extends Commented {
   readonly trafficProfile: string;
   readonly floors?: readonly FloorConfig[] | undefined;
   readonly floorRanges?: readonly FloorRange[] | undefined;
+  /**
+   * The building's typical plate, m² — applied to every floor that neither it nor its range
+   * declares one for. See {@link FloorConfig.grossAreaM2} for the precedence and what absent
+   * means, and {@link FLOOR_AREA_TUNABLES} for the declared schema.
+   */
+  readonly grossAreaPerFloorM2?: number | undefined;
   /** Declared occupancy. Cross-checked against the sum of floor populations. */
   readonly totalPopulation?: number | undefined;
   readonly banks: readonly BankConfig[];
@@ -2024,6 +2102,52 @@ export interface ResolvedBank {
   readonly cars: readonly ResolvedCar[];
 }
 
+/**
+ * **What one level's plate is, and how much of it is hole** — `DECISIONS.md` § D601, GitHub
+ * issue #429.
+ *
+ * A shaft is not an object in this model (`docs/11` § 0 claim 1: it is a per-car value derived
+ * from the bank), so the core of a level is the sum, over every bank whose **span** contains that
+ * level, of its cars' footprints. **Span rather than served set**, and that is the whole modelling
+ * claim: a high-zone shaft physically passes through the low zone whether or not it opens there,
+ * which is the reason sky lobbies exist at all. A bank serving 43–75 takes plan area out of floor
+ * 12 as well.
+ *
+ * A **double-deck car is one shaft** and is charged as one, at its *per-deck* rated load — which is
+ * exactly the saving Al-Kodmany's double-deck case records (24 single-deck cars become 13
+ * double-deckers, *"reducing the required core by no less than 11 hoistways"*).
+ */
+export interface ResolvedFloorArea {
+  readonly floorId: string;
+  /** As declared: the floor's own plate, else its range's, else the building's. */
+  readonly grossM2: number;
+  /** Hoistway plan area passing through this level. `0` where no bank's span reaches it. */
+  readonly coreM2: number;
+  /** `grossM2 − coreM2`. Never negative: a floor where it would be fails to load. */
+  readonly lettableM2: number;
+}
+
+/**
+ * **The building's plate and core, summed over its levels** — § D601.
+ *
+ * Present only when **every** floor resolves a gross area. A partial sum would publish a gross
+ * area smaller than the building's as though it were the whole, which is a figure that lies; the
+ * loader raises `partial-floor-area` and leaves this absent instead.
+ *
+ * **It is an axis and never a score** ([§ D106](../../../../DECISIONS.md)'s rule applied to a second
+ * quantity): no figure here is folded into a verdict, weighted against a wait, or turned into a
+ * letter. `campaign/judge.ts`'s refusal is untouched by it.
+ */
+export interface ResolvedBuildingArea {
+  readonly grossM2: number;
+  readonly coreM2: number;
+  readonly lettableM2: number;
+  /** `coreM2 / grossM2`, a fraction in `[0, 1]`. Hoistways only — see {@link ShaftFootprintBand.plateAreaM2}. */
+  readonly coreShare: number;
+  /** Per level, in floor order. */
+  readonly byFloor: readonly ResolvedFloorArea[];
+}
+
 /** A building with floors expanded, cars resolved, and cross-references checked. */
 export interface ResolvedBuilding {
   readonly id: string;
@@ -2064,6 +2188,19 @@ export interface ResolvedBuilding {
    * than dropping the schedule quietly. See `sim/simulation.ts`.
    */
   readonly serviceEvents?: readonly ResolvedServiceEvent[] | undefined;
+  /**
+   * **Floor area and what the hoistways take out of it** — § D601, GitHub issue #429.
+   *
+   * Present only when every floor of this building resolves a gross area; absent means area is not
+   * modelled here, which is what every building resolved to before § D601 and what a hand-built
+   * `ResolvedBuilding` — fixtures, the fuzz generator, `experiments/validation/syntheticBuilding.ts`
+   * — still resolves to.
+   *
+   * **It moves no leg.** No dispatcher, no `Car.estimateCost()` and no part of `Simulation` reads
+   * it; `config/floorArea.test.ts` asserts that by running a building with and without its area
+   * declaration and requiring every leg to be identical.
+   */
+  readonly area?: ResolvedBuildingArea | undefined;
   /** Sum of expanded floor populations. Authoritative over the declared value. */
   readonly totalPopulation: number;
   /** Non-fatal diagnostics raised while resolving this building. */
