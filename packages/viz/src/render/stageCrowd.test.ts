@@ -130,23 +130,42 @@ function stageFor(id: string, canvas: { readonly width: number; readonly height:
  * in terms that the drawing is not its to decide, so this building is excused the lane here and
  * the disagreement is #377's evidence rather than this file's failure.
  */
+/*
+ * **Three reference towers joined them on 2026-09-15** — GitHub issues #425, #424 and #430 — and
+ * every one is the Burj-class reference's case rather than Vertical City's. They draw 36, 92 and
+ * 106 shafts over 112, 119 and 129 floors, so there is no lane to be had at either canvas, and
+ * `ctf-class-reference` reproduces the **disagreement across canvases** the Burj-class tower shows:
+ * no lane at the wider desktop size and none at the narrower laptop one either, but a shaft count
+ * that moves between them.
+ *
+ * That is the stage's drawing at supertall scale rather than a crowd-lane defect, and it is
+ * **#377's** evidence: `docs/12` § 4.16 measured 35 legible floors at 1280 × 800 and 40 at
+ * 1440 × 900, against 112, 119 and 129 here. Excusing the lane is the same call #376's building
+ * already carries, for the same recorded reason.
+ */
 const NO_ROOM_FOR_A_LOBBY = new Set([
   'burj-class-reference',
+  'ctf-class-reference',
+  'merdeka-class-reference',
   'mixed-use-high-rise',
+  'shanghai-class-reference',
   'vertical-city',
 ]);
 
 describe('the stage has a crowd on it — issue #115 § 2, issue #103', () => {
-  it('reserves a lane on eight of the eleven shipped buildings, at the viewer’s own canvas', () => {
+  it('reserves a lane on eight of the fourteen shipped buildings, at the viewer’s own canvas', () => {
     const withLane = BUILDING_IDS.filter((id) => stageFor(id, SHIPPED_CANVAS).riderLane !== undefined);
     expect([...withLane].sort()).toStrictEqual(
       BUILDING_IDS.filter((id) => !NO_ROOM_FOR_A_LOBBY.has(id))
         .slice()
         .sort(),
     );
-    // Eight of the eleven; before the change it was one, and that one was the empty building.
+    // Eight of the fourteen; before the change it was one, and that one was the empty building.
     // `harbour-point` (6 shafts over 16 floors) and `ashgate` (5 over 22) both have room, which is
-    // what a mid-rise with a small group looks like from here — GitHub issues #500 and #501.
+    // what a mid-rise with a small group looks like from here — GitHub issues #500 and #501. **The
+    // numerator did not move when three towers landed and the denominator did** (GitHub issues
+    // #425, #424 and #430), which is the honest shape: a supertall has no room for a lane, so
+    // adding supertalls adds excusals rather than lanes.
     expect(withLane).toHaveLength(BUILDING_IDS.length - NO_ROOM_FOR_A_LOBBY.size);
     expect(withLane).toHaveLength(8);
   });
@@ -181,6 +200,15 @@ describe('the stage has a crowd on it — issue #115 § 2, issue #103', () => {
      * to solve: § D527's fifth measurement is the stage's drawing, and a tower that hides 24 of its
      * 57 machines at a desktop canvas is what says a zoned or scrolled stage is needed rather than
      * preferred. `RS-05`'s notice still fires, so nothing is hidden silently.
+     *
+     * **And now by three more, two of which are far worse than the Burj-class tower** — GitHub
+     * issues #425, #424 and #430. `ctf-class-reference` hides **3 and 10** of 36;
+     * `merdeka-class-reference` **59 and 66** of 92; `shanghai-class-reference` **73 and 80** of
+     * 106. The last of those is **69 % of the machines at a desktop canvas**, against the
+     * Burj-class tower's 42 %, and it is a denser group rather than a taller one — which is the
+     * useful part, because it says the stage's limit is shafts before it is floors. #377 owns the
+     * remedy, and these three figures are the strongest evidence in the repository that it is
+     * needed rather than preferred.
      */
     const hidden: Record<string, readonly [number, number]> = {
       'burj-class-reference': [24, 31],
@@ -194,6 +222,9 @@ describe('the stage has a crowd on it — issue #115 § 2, issue #103', () => {
       'secure-tower': [0, 0],
       'st-jude-hospital': [0, 0],
       'vertical-city': [2, 9],
+      'ctf-class-reference': [3, 10],
+      'merdeka-class-reference': [59, 66],
+      'shanghai-class-reference': [73, 80],
     };
     for (const id of BUILDING_IDS) {
       const shipped = stageFor(id, SHIPPED_CANVAS);

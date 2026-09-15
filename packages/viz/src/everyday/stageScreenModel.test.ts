@@ -1706,15 +1706,32 @@ describe('the camera, measured per tower — GitHub issue #324', () => {
      * shipped towers thin their labels at 60 vh of a laptop viewport, which is where a camera buys
      * reaching a floor. The list is asserted so a new tower, or a moved pitch, moves it here.
      *
-     * Measured: two of the eight. `secure-tower`'s thirty floors fit a 432 px box at the 13 px
+     * Measured: two of the eight when it was written. `secure-tower`'s thirty floors fit a 432 px box at the 13 px
      * label pitch with two to spare, which the first draft of this list had wrong — it was written
      * from the floor count before the measurement ran, which is the mistake the issue warned about.
      */
     const cramped = shippedTowers()
       .filter((tower) => !wholeTowerIsLegible(tower.floors, HEIGHTS.laptop))
       .map((tower) => tower.id);
-    /* Three since GitHub issue #376: a 165-floor tower is the clearest case there is. */
-    expect(cramped).toEqual(['burj-class-reference', 'mixed-use-high-rise', 'vertical-city']);
+    /*
+     * Three since GitHub issue #376: a 165-floor tower is the clearest case there is.
+     *
+     * **Six since GitHub issues #425, #424 and #430**, and the shape of the list is worth reading:
+     * every tower in it is over sixty floors and every tower outside it is under thirty-one. The
+     * three that joined are 112, 119 and 129 floors, so the camera is offered on every supertall
+     * and on nothing else. That is the measurement agreeing with the entry's original *claim*
+     * about today's canvas — which is not the same as the claim having been checked, and this list
+     * is still what checks it: a moved pitch on `secure-tower` would put a thirty-floor tower in
+     * here and the sentence above would have to be re-argued.
+     */
+    expect(cramped).toEqual([
+      'burj-class-reference',
+      'ctf-class-reference',
+      'merdeka-class-reference',
+      'mixed-use-high-rise',
+      'shanghai-class-reference',
+      'vertical-city',
+    ]);
     for (const tower of shippedTowers()) {
       const chips = stageCameraChipsOf(tower.floors, HEIGHTS.laptop);
       expect(chips.length === 0, tower.id).toBe(!cramped.includes(tower.id));
