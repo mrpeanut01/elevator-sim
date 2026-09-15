@@ -890,7 +890,7 @@
       "buildingId": "midtown-office",
       "dispatcherProfileId": "collective",
       "durationS": 900,
-      "arrivalRatePctPop5min": 1.5,
+      "arrivalRatePctPop5min": 1.25,
       "tuningSeeds": {
         "name": "tuning-20260730",
         "seed": "20260730",
@@ -908,20 +908,20 @@
           "disposition": "batch",
           "tuning": {
             "n": 50,
-            "passes": 26,
-            "fails": 24,
-            "unmeasured": 0,
-            "rateClass": "variable"
-          },
-          "holdout": {
-            "n": 50,
             "passes": 31,
             "fails": 19,
             "unmeasured": 0,
             "rateClass": "variable"
           },
+          "holdout": {
+            "n": 50,
+            "passes": 26,
+            "fails": 24,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 26 of 50 on the tuning seeds and 31 of 50 on the holdout seeds."
+          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 31 of 50 on the tuning seeds and 26 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",

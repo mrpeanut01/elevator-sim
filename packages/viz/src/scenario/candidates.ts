@@ -236,7 +236,17 @@ export const CANDIDATE_SCENARIOS: readonly GoalScenario[] = [
   stage('stage-4-two-banks', 'Two banks', 'mixed-use-high-rise', 'collective', 1.5),
   stage('stage-5-credentials', 'Credentials', 'secure-tower', 'collective', null),
   stage('stage-6-the-tall-one', 'The tall one', 'vertical-city', 'collective', 0.5),
-  stage('stage-7-prove-it', 'Tune it', 'midtown-office', 'collective', 1.5),
+  /*
+   * **1.25 rather than 1.5, and it is #234's C2 rebalance rather than a tidy-up** — GitHub issue
+   * #234, [§ D611](../../../../DECISIONS.md). At 1.5 this stage met every bar from the dropdown
+   * under `destination-panel` (`campaign/difficultyCurve.test.ts#DROPDOWN_CLEARS`, § D520); at
+   * 1.25, 1.0 and 0.75 it meets under none of the twelve profiles its `editable` list admits.
+   * The demand moved and no bar did, which is DC-R1: the bar a count goal is judged against is
+   * the shipped setting's own measured count *at the stage's demand*, so it is re-measured here
+   * rather than authored. `answer-the-demand` stays `variable` on both seed sets (31/50 and
+   * 26/50), so the stage keeps a failable non-comparative goal and DC-1 is untouched.
+   */
+  stage('stage-7-prove-it', 'Tune it', 'midtown-office', 'collective', 1.25),
   stage('stage-8-the-headline-address', 'The headline address', 'chancery-house', 'collective', 3),
   stage('stage-9-both-ways-at-once', 'Both ways at once', 'crown-hotel', 'collective', 2.5),
   stage('stage-10-the-bed-and-the-visitor', 'The bed and the visitor', 'st-jude-hospital', 'collective', 2),
