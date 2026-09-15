@@ -234,4 +234,65 @@ describe('the two ends agree about what they refuse — § D215 § 3’s read-th
     expect(SITTING).toContain("'viewer.buildingId'");
     expect(SITTING).toContain("'viewer.dispatcherId'");
   });
+
+  it('builds a body out of exactly the keys the server’s gate allows, read as text', () => {
+    /*
+     * **The one seam no single test can drive end to end**, and this is the tree's method for it.
+     * `packages/viz` may not import `packages/server`, so the client cannot feed a body through
+     * `rushSittingIssues`; what it can do is read that gate's own allow-lists out of its source and
+     * check that every key this module can emit is on them. A key added here and not there is
+     * `400 invalid-sitting` at the moment a player posts — the moment with no words for it — and a
+     * key the gate would refuse **by name** is worse, because the refusal reads like an accusation.
+     */
+    const listOf = (name: string): readonly string[] => {
+      const found = new RegExp(`const ${name}: readonly string\\[\\] = Object\\.freeze\\(\\[([^\\]]*)\\]`, 'u').exec(SERVER);
+      expect(found, `packages/server no longer declares ${name} in the form this reads`).not.toBeNull();
+      return [...((found as RegExpExecArray)[1] ?? '').matchAll(/'([^']+)'/gu)].map((match) => match[1] ?? '');
+    };
+
+    const full = rushSittingOf({
+      buildingId: 'midtown-office',
+      rounds: [
+        round({
+          ruleRows: [{ when: 'lobby-queue-passes', whenValue: 12, then: 'hold-at-lobby' }],
+          wireInterventions: [
+            { atS: 60, change: { kind: 'park-cars-lobby' } },
+            { atS: 120, change: { kind: 'spread-cars' } },
+            {
+              atS: 300,
+              change: {
+                kind: 'switch-dispatcher',
+                toProfileId: 'eta',
+                ruleRows: [{ when: 'car-fuller-than', whenValue: 8, then: 'no-new-pickups' }],
+              },
+            },
+          ],
+        }),
+      ],
+      modifiers: [{ sinkId: 'rush-purse-top-up', steps: 2 }],
+    });
+    expect(full.ok).toBe(true);
+    if (!full.ok) return;
+
+    const body = full.body as unknown as Record<string, unknown>;
+    expect(Object.keys(body).every((key) => listOf('SITTING_KEYS').includes(key))).toBe(true);
+    const roundBody = (body['rounds'] as readonly Record<string, unknown>[])[0] ?? {};
+    expect(Object.keys(roundBody).every((key) => listOf('ROUND_KEYS').includes(key))).toBe(true);
+    for (const row of roundBody['ruleRows'] as readonly Record<string, unknown>[]) {
+      expect(Object.keys(row).every((key) => listOf('RULE_ROW_KEYS').includes(key))).toBe(true);
+    }
+    for (const entry of roundBody['interventions'] as readonly Record<string, unknown>[]) {
+      expect(Object.keys(entry).every((key) => listOf('INTERVENTION_KEYS').includes(key))).toBe(true);
+      const change = entry['change'] as Record<string, unknown>;
+      const allowed = change['kind'] === 'switch-dispatcher' ? listOf('SWITCH_KEYS') : listOf('BARE_CHANGE_KEYS');
+      expect(Object.keys(change).every((key) => allowed.includes(key))).toBe(true);
+    }
+    for (const claim of body['modifiers'] as readonly Record<string, unknown>[]) {
+      expect(Object.keys(claim).every((key) => listOf('MODIFIER_KEYS').includes(key))).toBe(true);
+    }
+    /* Non-vacuity: the lists were found and are not empty, or every check above passes on nothing. */
+    for (const name of ['SITTING_KEYS', 'ROUND_KEYS', 'RULE_ROW_KEYS', 'INTERVENTION_KEYS', 'SWITCH_KEYS', 'MODIFIER_KEYS']) {
+      expect(listOf(name).length, `${name} read as empty, so the case above asserts nothing`).toBeGreaterThan(0);
+    }
+  });
 });
