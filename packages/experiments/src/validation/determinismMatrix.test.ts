@@ -117,7 +117,7 @@ const SEED = 20260810;
 
 /** See the operating-point note above. Both halves are load-bearing and both were measured. */
 /**
- * **The five buildings whose cells are too dear for the always-on tier, and the measurement that
+ * **The eight buildings whose cells are too dear for the always-on tier, and the measurement that
  * put them there.**
  *
  * This suite's hook ran the whole cross-product three times a cell. At eight buildings that fitted
@@ -149,20 +149,47 @@ const SEED = 20260810;
  * measured exclusion, not the hand-written domain the header argues against, and a fifteenth
  * building is in scope on the day it is authored.
  *
- * **What the always-on tier gives up, named rather than counted.** Four of these five appear in no
+ * **Three more towers were authored into `data/buildings/` the same day, and all three joined this
+ * set on a measurement taken the way the first one should be read.** One WTC, Empire State and
+ * Willis (GitHub issues #428, #427, #426) were measured at this file's own operating point against
+ * four of the incumbents **on one quiet box in one sitting**, which is the only comparison that
+ * means anything here:
+ *
+ * | new tower | one cell | | incumbent, same box | one cell |
+ * |---|---|---|---|---|
+ * | `willis-class-reference` | **1 842 ms** | | `merdeka-class-reference` | 1 802 ms |
+ * | `empire-state-class-reference` | **1 111 ms** | | `shanghai-class-reference` | 1 522 ms |
+ * | `one-wtc-class-reference` | **668 ms** | | `burj-class-reference` | 820 ms |
+ * | | | | `ctf-class-reference` | 704 ms |
+ * | | | | `vertical-city` | 450 ms |
+ *
+ * **The absolute figures in the two tables are not comparable and must not be spliced**: the table
+ * above was taken on a loaded host and this one on an idle one, and `vertical-city` reads 1 739 ms
+ * there against 450 ms here. What transfers is the **ordering within one sitting**, and it is
+ * unambiguous — every one of the three exceeds `vertical-city`, the lightest building already in
+ * this set, and Willis is the heaviest cell in the tree. So all three join, the always-on tier
+ * stays at **nine** buildings, and its 48 s stands unchanged because the set it runs over did not
+ * move.
+ *
+ * **What the always-on tier gives up, named rather than counted.** Seven of these eight appear in no
  * other determinism or replay assertion anywhere in this repository, so per-commit they are now
  * covered by nothing and weekly by this suite's deep half: `burj-class-reference`,
- * `ctf-class-reference`, `merdeka-class-reference` and `shanghai-class-reference`. The fifth,
- * `vertical-city`, is reached by `core/src/sim/determinism.test.ts` under `collective-enroute`.
- * That is a real loss and it is the cheaper of the two on offer: the alternative was a hook that
- * finishes for nobody, which is coverage of zero rather than coverage once a week.
+ * `ctf-class-reference`, `merdeka-class-reference`, `shanghai-class-reference`,
+ * `one-wtc-class-reference`, `empire-state-class-reference` and `willis-class-reference`. The
+ * eighth, `vertical-city`, is reached by `core/src/sim/determinism.test.ts` under
+ * `collective-enroute`. That is a real loss and it is the cheaper of the two on offer: the
+ * alternative was a hook that finishes for nobody, which is coverage of zero rather than coverage
+ * once a week.
  */
 const HEAVY_BUILDING_IDS: ReadonlySet<string> = new Set([
   'burj-class-reference',
   'ctf-class-reference',
+  'empire-state-class-reference',
   'merdeka-class-reference',
+  'one-wtc-class-reference',
   'shanghai-class-reference',
   'vertical-city',
+  'willis-class-reference',
 ]);
 
 const DURATION_S = 210;
