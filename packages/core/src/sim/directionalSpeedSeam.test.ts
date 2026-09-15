@@ -399,5 +399,16 @@ describe('Merdeka-class: the one-leg low rise is a routing decision and it binds
         result.record.passengers.length / journeys(result).size;
       expect(legsPer(halved), `seed ${String(seed)}`).toBeGreaterThan(legsPer(shipped));
     }
-  }, 300_000);
+    /*
+     * **Six whole runs of the heaviest building in the set, and the ceiling is measured.** This
+     * case runs `merdeka-class-reference` — 8 455 people over 92 cars — twice on each of three
+     * seeds. Measured on this tree it costs about 80 s alone and **326 s** inside a full
+     * `--project core` run at load average 27, against `vitest.config.ts`'s 300 000 ms; it failed on
+     * the budget and named this case, which says nothing about the routing claim it makes.
+     *
+     * Annotated rather than cut to one seed. Three seeds is what tells a binding restriction from a
+     * lucky trace — `serviceZoneSeam.test.ts` says so in its own words and this file inherits it —
+     * and dropping to one to fit a window is the weakened criterion `vitest.config.ts` warns about.
+     */
+  }, 900_000);
 });

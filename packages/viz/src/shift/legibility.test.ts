@@ -119,5 +119,17 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
     // journey that takes two legs.
     expect(stretches['c9']).toEqual([1026, 1373, 1665, 1255, 1321, 1474, 1462, 1512, 1126, 1133]);
     expect(stretches['c10']).toEqual([121, 73, 68, 104, 57, 67, 95, 76, 276, 61]);
-  }, 300_000);
+  /*
+   * **Thirteen contracts × ten seeds, and three of the thirteen are supertalls** — GitHub issues
+   * #425, #424 and #430. This slice cost well inside 300 000 ms while the ladder was ten mid-rise
+   * towers; measured on this tree it is about 200 s alone and **629 s under a full
+   * `--project viz` run** at load average 27, so it failed on the budget rather than on the slice
+   * and named a case that says nothing about legibility.
+   *
+   * Annotated rather than sampled down. The ten seeds are the published sweep's own first ten, which
+   * is what makes this a *slice* of the fifty-seed table rather than a second measurement; taking
+   * five would leave the constant beside {@link LEGIBILITY_WINDOW_S} pinned by half of what it
+   * claims. `vitest.config.ts`'s rule is that a site that knows it runs a simulation may say so.
+   */
+  }, 900_000);
 });
