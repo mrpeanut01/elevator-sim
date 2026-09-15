@@ -249,6 +249,17 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    */
   { register: 'STAGE_ABSENCES', fragment: 'no works to buy while the day plays', issue: 367 },
   /*
+   * **The rush's register is not empty any more, and the entry that refilled it came in with the
+   * feature that half-closed its issue.** GitHub issue #372 asked for a per-wave purse, recorded
+   * interventions on the round and a postable result. The purse is derived and published, the
+   * interventions travel and the sitting posts; **nothing spends a purse**, because a between-round
+   * rebuild is the fit-out kit and `campaign/fitOut.ts` over `commissioning/` is code
+   * `packages/server` may not import ([§ D606](../../../../DECISIONS.md)). So the owner is #372
+   * itself rather than a new issue: the absence is that issue's own second criterion, still open on
+   * it, and inventing a second number would split one thing across two queues.
+   */
+  { register: 'RUSH_ABSENCES', fragment: 'The between-round purse', issue: 372 },
+  /*
    * **Two rows left together here, and that they were a pair is the whole reason to say so.**
    * `STAGE_ABSENCES`' *no rival lane* and `EVERYDAY_SHELL_ABSENCES`' *Racing a second dispatcher*
    * were one missing mechanism said from two sides — this table's own comment called them *"one

@@ -1742,7 +1742,24 @@ type DecisionReservation = {
  * because it is tidier, but because the alternative is every lane inventing bookkeeping the
  * integrator then has to throw away.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/**
+ * **Wave AB is open, and this reservation was opened by a lane rather than by the integrator —
+ * which the comment above predicts and wave Z measured happening twice.**
+ *
+ * The charter row names **D594** as the block's floor, and wave AA's own closing note says
+ * D594–D600 are free with nothing above them written. This lane (issue #372, the rush sitting) was
+ * dispatched **D606–D610** and spent D606, so the floor and the ceiling of the wave's block are two
+ * different lanes' facts and only one of them is this lane's.
+ *
+ * **`to` is what this lane knows is allocated, not what the wave holds.** Any lane holding higher
+ * numbers widens it on the commit that needs it — that is exactly what wave Z's lanes B and C each
+ * did, independently, and the note above records the finding: a lane writing a number inside its own
+ * block was turning this gate red on the ceiling rather than on anything it had done wrong. The
+ * integrator reconciles the row and closes the reservation at the end of the wave, and decides then
+ * which unspent numbers are free and which are holes — a call `free`-versus-`hole` makes only after
+ * everything has landed, which is the one part of this bookkeeping no lane can do for itself.
+ */
+const OPEN_RESERVATION = { wave: 'AB', from: 594, to: 610 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
