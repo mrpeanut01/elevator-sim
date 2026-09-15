@@ -4,7 +4,7 @@
   "provenance": {
     "kind": "measured",
     "command": "ELEVATOR_SIM_RUSH_HOUSE=deep ELEVATOR_SIM_REGENERATE_RUSH_HOUSE=1 npx vitest run --project viz src/everyday/rushHouseSweep.test.ts",
-    "tree": "b1a8fd7",
+    "tree": "d13e487",
     "measuredAt": "2026-09-15",
     "seed": "90210",
     "streamLengthS": 5400,
@@ -80,7 +80,7 @@
     {"buildingId":"ctf-class-reference","dispatcherId":"zoned-uppeak","brokeAtS":null,"arrived":6120,"carried":6120,"legs":6120,"awtIsValid":true,"saturationVerdict":"stable"},
     {"buildingId":"ctf-class-reference","dispatcherId":"destination-eta","brokeAtS":null,"arrived":6120,"carried":6120,"legs":6120,"awtIsValid":true,"saturationVerdict":"stable"},
     {"buildingId":"ctf-class-reference","dispatcherId":"destination-panel","brokeAtS":4550,"arrived":4450,"carried":4273,"legs":6120,"awtIsValid":false,"saturationVerdict":"diverging-queue"},
-    {"buildingId":"empire-state-class-reference","dispatcherId":"nearest-car","brokeAtS":null,"arrived":4585,"carried":4585,"legs":4585,"awtIsValid":true,"saturationVerdict":"stable"},
+    {"buildingId":"empire-state-class-reference","dispatcherId":"nearest-car","brokeAtS":null,"arrived":4585,"carried":4585,"legs":4585,"awtIsValid":false,"saturationVerdict":"diverging-queue"},
     {"buildingId":"empire-state-class-reference","dispatcherId":"eta","brokeAtS":null,"arrived":4585,"carried":4585,"legs":4585,"awtIsValid":true,"saturationVerdict":"stable"},
     {"buildingId":"empire-state-class-reference","dispatcherId":"collective","brokeAtS":null,"arrived":4585,"carried":4585,"legs":4585,"awtIsValid":true,"saturationVerdict":"stable"},
     {"buildingId":"empire-state-class-reference","dispatcherId":"collective-enroute","brokeAtS":null,"arrived":4585,"carried":4585,"legs":4585,"awtIsValid":true,"saturationVerdict":"stable"},
@@ -223,7 +223,7 @@
     {"buildingId":"vertical-city","dispatcherId":"zoned-uppeak","brokeAtS":null,"arrived":6213,"carried":6174,"legs":6213,"awtIsValid":true,"saturationVerdict":"stable"},
     {"buildingId":"vertical-city","dispatcherId":"destination-eta","brokeAtS":null,"arrived":6213,"carried":6174,"legs":6213,"awtIsValid":true,"saturationVerdict":"stable"},
     {"buildingId":"vertical-city","dispatcherId":"destination-panel","brokeAtS":5432,"arrived":6098,"carried":5861,"legs":6213,"awtIsValid":false,"saturationVerdict":"diverging-queue"},
-    {"buildingId":"willis-class-reference","dispatcherId":"nearest-car","brokeAtS":3802,"arrived":3249,"carried":3068,"legs":6337,"awtIsValid":false,"saturationVerdict":"diverging-queue"},
+    {"buildingId":"willis-class-reference","dispatcherId":"nearest-car","brokeAtS":5368,"arrived":6139,"carried":5797,"legs":6337,"awtIsValid":false,"saturationVerdict":"diverging-queue"},
     {"buildingId":"willis-class-reference","dispatcherId":"eta","brokeAtS":null,"arrived":6337,"carried":6337,"legs":6337,"awtIsValid":true,"saturationVerdict":"stable"},
     {"buildingId":"willis-class-reference","dispatcherId":"collective","brokeAtS":null,"arrived":6337,"carried":6337,"legs":6337,"awtIsValid":true,"saturationVerdict":"stable"},
     {"buildingId":"willis-class-reference","dispatcherId":"collective-enroute","brokeAtS":null,"arrived":6337,"carried":6337,"legs":6337,"awtIsValid":true,"saturationVerdict":"stable"},
@@ -235,6 +235,6 @@
     {"buildingId":"willis-class-reference","dispatcherId":"auction-multi-round","brokeAtS":null,"arrived":6337,"carried":6337,"legs":6337,"awtIsValid":true,"saturationVerdict":"stable"},
     {"buildingId":"willis-class-reference","dispatcherId":"zoned-uppeak","brokeAtS":null,"arrived":6337,"carried":6337,"legs":6337,"awtIsValid":true,"saturationVerdict":"stable"},
     {"buildingId":"willis-class-reference","dispatcherId":"destination-eta","brokeAtS":null,"arrived":6337,"carried":6337,"legs":6337,"awtIsValid":true,"saturationVerdict":"stable"},
-    {"buildingId":"willis-class-reference","dispatcherId":"destination-panel","brokeAtS":null,"arrived":6337,"carried":6337,"legs":6337,"awtIsValid":false,"saturationVerdict":"diverging-queue"}
+    {"buildingId":"willis-class-reference","dispatcherId":"destination-panel","brokeAtS":5168,"arrived":5718,"carried":5459,"legs":6337,"awtIsValid":false,"saturationVerdict":"diverging-queue"}
   ]
 }

@@ -55,8 +55,8 @@ failed: *checkable by looking* is not checkable.
 | [Shanghai-class reference tower](../data/buildings/shanghai-class-reference.json) | 129 | 14-car shuttle at **20.5 m/s**, pressurised; 4 office locals of 20, a hotel bank of 12 | 4 sky lobbies | **106 cars**, and whether the top of the speed catalogue is ever reached on a hop short enough to matter |
 | [Merdeka-class reference tower](../data/buildings/merdeka-class-reference.json) | 119 | 34 low locals at 8 m/s **straight off the street**; 18 shuttles at 10 m/s; 32 high locals; 8 hotel | 1 office sky lobby | **Fewer transfers over a similar rise**, and a second supertall occupancy to compare the first against |
 | [One-WTC-class reference tower](../data/buildings/one-wtc-class-reference.json) | 104 | 8-car shuttle at 10 m/s; 2 low/mid locals of 16; 2 high locals of 14; 5-car observatory express | **two-level** sky lobby at 64/65 | **A second building for destination dispatch**, and an escalator that carries an eighth of the tower's rides |
-| [Empire-State-class reference tower](../data/buildings/empire-state-class-reference.json) | 102 | 6 ground banks of 10 (2.5–6.1 m/s), a 7-car relay to 86, a 6-car relay to 102 | relay lobbies at 80 and 86 | **A relay with no express at all**, and the energy proxy against a published annual car distance |
-| [Willis-class reference tower](../data/buildings/willis-class-reference.json) | 108 | 16 double-deck **locals** at 2.5 m/s over two zones; 2 express banks of 16 at 8.1 m/s; 46 upper locals; 10-car Skydeck express | two two-level sky lobbies | **Double-deck as the local service** at 1970s kinematics, where floor parity decides the deck |
+| [Empire-State-class reference tower](../data/buildings/empire-state-class-reference.json) | 102 | 6 ground banks of 10 (2.5–6.0 m/s), a 7-car relay to 86, a 6-car relay to 102 | relay lobbies at 80 and 86 | **A relay with no express at all**, and the energy proxy against a published annual car distance |
+| [Willis-class reference tower](../data/buildings/willis-class-reference.json) | 108 | 16 double-deck **locals** at 2.5 m/s over two zones; 2 express banks of 16 at 8.0 m/s; 46 upper locals; 10-car Skydeck express | two two-level sky lobbies | **Double-deck as the local service** at 1970s kinematics, where floor parity decides the deck |
 
 ---
 
@@ -788,9 +788,9 @@ miles"* a year. Both numbers, whatever they say:
 
 | | |
 |---|---|
-| **Measured here** | **3.21, 3.22 and 3.33 km per car per hour** at 1 800 s and **3.15, 3.28 and 3.22** at 3 600 s — six runs at the `office-standard` profile's own typical 12 %POP/5 min under `collective`, seeds 20 260 824 / 20 268 743 / 20 276 662, every car in the fleet moving in every one. Mean **3.237 km/car/h**. |
+| **Measured here** | **3.17, 3.26 and 3.20 km per car per hour** at 1 800 s and **3.16, 3.32 and 3.20** at 3 600 s — six runs at the `office-standard` profile's own typical 12 %POP/5 min under `collective`, seeds 20 260 824 / 20 268 743 / 20 276 662, every car in the fleet moving in every one. Mean **3.220 km/car/h**. |
 | **Published** | 180,000 miles a year over 73 cars = 2,466 car-miles = **3 968 km per car per year**. |
-| **The arithmetic** | 3 968 km at 3.237 km/h is **1 226 hours of this traffic a year** — **4.9 hours** on each of 250 working days, or 3.4 hours on each of 365. |
+| **The arithmetic** | 3 968 km at 3.220 km/h is **1 232 hours of this traffic a year** — **4.9 hours** on each of 250 working days, or 3.4 hours on each of 365. |
 
 **That is a comparison and not a validation, and this document does not call it one.** The two agree
 to the order of magnitude: a real office tower plausibly sees something like five hours a day of
@@ -802,8 +802,8 @@ of what the 180,000 miles covers. **Neither number is adjusted towards the other
 is not calibrated here and § D468's 80 kJ bar is untouched.
 
 **The closed form reconciles on every one of its eight banks**, which no shipped building had done:
-raw divergences +27.467 %, +29.048 %, +30.318 %, +28.984 %, +30.747 %, +21.250 %, +25.773 % and
-+33.626 %; corrected residuals **−0.044 %, −0.076 %, −0.126 %, −0.309 %, −0.368 %, +0.047 %,
+raw divergences +27.467 %, +29.048 %, +30.318 %, +28.984 %, +30.143 %, +20.737 %, +25.773 % and
++33.626 %; corrected residuals **−0.044 %, −0.076 %, −0.126 %, −0.309 %, −0.494 %, −0.109 %,
 −0.119 %** and **−0.184 %**, all at 64 replications from seed 810 000 against a 4 % tolerance. The
 reason is the counterweight to the newest refusal ground in `remainingBuildings.test.ts`: that
 ground is *the apparatus cannot drain the crowd it offers a twenty- or thirty-car bank*, and this
@@ -877,7 +877,7 @@ not** — both double-deck banks declare their pairs and the building loads with
 deleting one bank's pairs **does** raise `missing-floor-pairs`, which is what makes the first half
 worth anything.
 
-**The closed form:** `skydeck` **reconciles** at raw **+9.634 %**, residual **−0.052 %**, 64
+**The closed form:** `skydeck` **reconciles** at raw **+9.456 %**, residual **−0.044 %**, 64
 replications from seed 810 000 — the smallest raw divergence any bank in the oracle has produced,
 because it runs G to 103 and stops nowhere else, so the textbook's two omissions have one stop to
 accumulate on instead of twenty. `local-mid` is refused on `departureGapBracket`, the two express
@@ -889,11 +889,16 @@ bank would be a different calculation wearing its name.
 
 **Playable, and handed as built.** Contract `c16` is *Scenario 15*, at the identity rung.
 
-**It breaks in the Endless rush at 5 228 s, and that refutes a recorded mechanism.**
+**It breaks in the Endless rush at 5 320 s, and that refutes a recorded mechanism.**
 [§ D582](../DECISIONS.md) clause 3 said whether a group can be broken is decided by **how many cars
 it has**, because the rush stream is the same number of people on every tower. Measured: this tower
 has **104** cars and breaks; `one-wtc-class-reference` and `empire-state-class-reference` have
 **73** each and hold under every escalation the table can construct. The car count does not decide
-it. What separates them is the speed of the group — Willis's locals are 2.5 m/s — and **no
-replacement mechanism is offered**, because a second plausible sentence in place of a measurement is
-what § D256 refuses. `NEVER_BREAKS` goes from one member to three and is still a list.
+it. **What does separate them is unmeasured and no replacement mechanism is offered**, because a
+second plausible sentence in place of a measurement is what § D256 refuses. Speed is the obvious
+candidate — Willis's locals are 2.5 m/s — and it is *named as a conjecture rather than a finding*,
+because [§ D600](../DECISIONS.md) clause 8 then measured speed against this very table and found its
+effect **not monotone**: dropping Willis's expresses 8.1 → 8.0 m/s made `nearest-car` hold 1 566 s
+longer and made `destination-panel` break where it had held. A quantity that moves two dispatchers
+in opposite directions does not yet explain which towers break. `NEVER_BREAKS` goes from one
+member to three and is still a list.

@@ -23,6 +23,6 @@
     {"buildingId":"merdeka-class-reference","dispatcherProfileId":"nearest-car","interventions":[{"atS":60,"change":{"kind":"park-cars-lobby"}}],"heldS":3436},
     {"buildingId":"one-wtc-class-reference","dispatcherProfileId":"nearest-car","interventions":[{"atS":60,"change":{"kind":"park-cars-lobby"}}],"heldS":null},
     {"buildingId":"empire-state-class-reference","dispatcherProfileId":"nearest-car","interventions":[{"atS":60,"change":{"kind":"park-cars-lobby"}}],"heldS":null},
-    {"buildingId":"willis-class-reference","dispatcherProfileId":"nearest-car","interventions":[{"atS":60,"change":{"kind":"park-cars-lobby"}}],"heldS":5228}
+    {"buildingId":"willis-class-reference","dispatcherProfileId":"nearest-car","interventions":[{"atS":60,"change":{"kind":"park-cars-lobby"}}],"heldS":5320}
   ]
 }

@@ -65,8 +65,8 @@ describe('the eligible set — § D512’s table read by arithmetic', () => {
     /*
      * **`c15` and `c16` joined on 2026-09-15 and `c14` did not** — GitHub issues #427, #426 and
      * #428 — which is the first wave where three towers of one class split across this threshold.
-     * Empire-State-class is legible on 45 of 50 at a median 437 s and Willis-class on 50 of 50 at
-     * 2 314 s, so both clear it; **One-WTC-class is legible on 1 of 50 at a median 13 s** and is the
+     * Empire-State-class is legible on 45 of 50 at a median 472 s and Willis-class on 50 of 50 at
+     * 2 347 s, so both clear it; **One-WTC-class is legible on 1 of 50 at a median 13 s** and is the
      * first supertall this table has found ineligible. The paragraph above reads the three before
      * them as legible *because* they are towers of thousands, and that reading is now refuted as a
      * claim about size: these three span 4 810 to 9 200 occupants and span the whole range the

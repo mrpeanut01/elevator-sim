@@ -796,13 +796,13 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
      * the first shipped building **every** bank of which reduces. `empire-state-class-reference` is
      * a 1931 relay tower of eight banks, six of ten cars and two of seven and six, and
      * `remainingBuildings.test.ts` reconciles **all eight** at this file's own budget and seed base,
-     * residuals between **+0.047 %** and **−0.368 %**. That is the counterweight to the paragraph
-     * above: the ground that refuses a supertall is the *size of the bank*, and a tower whose
-     * largest group has ten cars meets none of it, however tall it is.
+     * residuals between **−0.044 %** and **−0.494 %**, every one of them negative. That is the
+     * counterweight to the paragraph above: the ground that refuses a supertall is the *size of
+     * the bank*, and a tower whose largest group has ten cars meets none of it, however tall it is.
      *
      * `one-wtc-class-reference` reconciles on `observatory` (+24.766 % / **−0.028 %**) and is
-     * refused on its other five; `willis-class-reference` reconciles on `skydeck` (+9.634 % /
-     * **−0.052 %**) and is refused on four. **No residual is published for either of Willis's
+     * refused on its other five; `willis-class-reference` reconciles on `skydeck` (+9.456 % /
+     * **−0.044 %**) and is refused on four. **No residual is published for either of Willis's
      * double-deck banks**, and the reason is a property of the apparatus rather than of the
      * building: `upPeakCase.ts#isolateBank` drops the deck fields with `servesFloorPairs`, so what
      * it would measure is a single-deck bank of the same cars. Calling that a residual for a

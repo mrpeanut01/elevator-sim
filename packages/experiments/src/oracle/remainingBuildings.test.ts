@@ -79,7 +79,10 @@
  *
  * `empire-state-class-reference` is a 1931 relay tower: eight banks, six of ten cars and two of
  * seven and six, 102 floors, no express anywhere in it. **Every one of its eight banks reduces**,
- * residuals between **+0.047 %** and **−0.368 %** at the full budget. Ground 3 above says the
+ * residuals between **−0.044 %** and **−0.494 %** at the full budget — **every one of them
+ * negative**, which is the direction the one-sided rule predicts and which only became true of
+ * all eight when GitHub issue #45's ladder moved two banks from 6.1 m/s to 6.0
+ * ([§ D600](../../../../DECISIONS.md)). Ground 3 above says the
  * apparatus cannot drain what it offers a twenty- or thirty-car bank and that *no mechanism is
  * offered for exactly where the threshold is*; that is still true, because one point is not a
  * sweep. What this building does establish is the **quantity**: it is the size of the group and not
@@ -841,7 +844,7 @@ describe('the three reference towers each reconcile on one bank and are refused 
        * | `merdeka-class-reference/local-hotel` | **+34.485 %** | **−0.466 %** | 1 435 / 2 090 |
        * | `one-wtc-class-reference/observatory` | **+24.766 %** | **−0.028 %** | 862 |
        * | `empire-state-class-reference/bank-a` | **+27.467 %** | **−0.044 %** | 2 106 |
-       * | `willis-class-reference/skydeck` | **+9.634 %** | **−0.052 %** | 1 905 |
+       * | `willis-class-reference/skydeck` | **+9.456 %** | **−0.044 %** | 1 896 |
        *
        * The last row is the smallest raw divergence any bank in this file has produced, and it is
        * the shape the textbook's simplification predicts rather than a better bank: `skydeck` runs
@@ -919,10 +922,18 @@ describe('the three reference towers each reconcile on one bank and are refused 
      * Measured at the full budget on the tree this landed on, for the record and not as an
      * assertion — raw divergence / corrected residual, 64 replications from seed 810 000:
      * `bank-a` +27.467 % / **−0.044 %**, `bank-b` +29.048 % / **−0.076 %**, `bank-c` +30.318 % /
-     * **−0.126 %**, `bank-d` +28.984 % / **−0.309 %**, `bank-e` +30.747 % / **−0.368 %**, `bank-f`
-     * +21.250 % / **+0.047 %**, `bank-g` +25.773 % / **−0.119 %**, `bank-h` +33.626 % /
-     * **−0.184 %**. All eight inside the 4 % tolerance, and the one positive residual is `bank-f`,
-     * the relay feeder.
+     * **−0.126 %**, `bank-d` +28.984 % / **−0.309 %**, `bank-e` +30.143 % / **−0.494 %**, `bank-f`
+     * +20.737 % / **−0.109 %**, `bank-g` +25.773 % / **−0.119 %**, `bank-h` +33.626 % /
+     * **−0.184 %**. All eight inside the 4 % tolerance, and **all eight negative**.
+     *
+     * **Re-measured on this commit, and the six banks that did not move are what make the two that
+     * did worth reading.** `bank-e` and `bank-f` are the two whose cars were authored at 6.1 m/s — a
+     * speed absent from `gearless-traction`'s own ladder, which is GitHub issue #45's defect — and
+     * moving them to 6.0 moved exactly those two rows: `bank-e` −0.368 % → −0.494 % and `bank-f`
+     * **+0.047 % → −0.109 %**. The other six reproduced to the third decimal in both columns. So
+     * the earlier sentence *“the one positive residual is `bank-f`, the relay feeder”* was a fact
+     * about a 6.1 m/s bank rather than about the relay, and it did not survive the speed becoming
+     * one the player's own control can select. Recorded rather than quietly refreshed.
      */
     const building = config.buildingsById.get('empire-state-class-reference');
     expect(building, 'empire-state-class-reference does not ship').toBeDefined();

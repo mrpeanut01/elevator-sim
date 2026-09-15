@@ -1,5 +1,5 @@
 {
-  "$comment": "THE RELAY TOWER, and the only building in the shipped set whose top is reached by changing lifts twice with no express anywhere in it. GitHub issue #427, DECISIONS.md SS D596 and SS D597. WHY IT IS HERE. Two things no shipped building had. A 1931 zone stack -- eight banks each serving a narrow slice, cars slow by any modern standard, and a 372 m rise reached by RELAY rather than by express shuttle; every other tall building in data/buildings/ hangs its upper zones off a dedicated express. And a published DISTANCE, which is the one quantity this project measures and has never had an external anchor for: SS D468 derives the daily energy goal’s 80 kJ bar from 400 simulated runs against nothing outside this repository. NAMED IN THE REPOSITORY’S CONVENTION, burj-class-reference’s: the real Empire State Building is the reference, and the figures in this file are the project’s own. PROVENANCE, per the product owner’s 2026-09-08 standing ruling on governed data/ values: EVERY AUTHORED FIGURE BELOW IS AN AGENT’S PROPOSAL, drafted for the owner to accept, tighten or reject, and NOT YET APPROVED. The line the ruling asks for is drawn field by field. MEASURED (a count rather than a citation): 73 cars. That is the lift count the prompting article supplies and one of only two figures from it this file uses. The article is a trade-association piece with no primary references which contradicts itself about the world’s fastest lift, and #427 says in terms that it is the prompt and not the citation. QUOTED AND NOT TREATED AS A CITATION: \"its elevators cover a combined distance of over 180,000 miles\" annually. That figure is USED -- it is the whole of criterion 1 -- and it is used as a COMPARISON rather than as a validation, because the article states no measurement window, no basis and no source for it. See the energy note below, which publishes both numbers whatever they say. CHOSEN (an agent’s proposals, none of them cited, all awaiting the owner): the floor count (102 above ground); the height ladder that realises it -- a 12.0 m two-storey ground hall and a 3.6 m office storey, putting the top observatory at 372.0 m under a 381 m roof whose 62 m mast this model does not carry; the relay lobbies at 80 and 86; the populations, authored as a TAPER because the tower steps back four times (140 a floor at 3-30, 90 at 31-59, 55 at 60-79, 35 at 81-85, 25 at 87-101, and 30 and 20 on the two observatory levels, 8,230 in all); and the split of the 73 cars into six ground banks of ten and two relay banks of seven and six. THE OCCUPANCY IS THE LIFT-POOREST IN THE SET, AND THAT IS THE BUILDING RATHER THAN AN ERROR. 8,230 over 73 cars is 112.7 people a car, against merdeka-class-reference’s 91.9, one-wtc-class-reference’s 65.9 and burj-class-reference’s 56.1. A 1931 tower carries more people per car than a 2010s one because its cars are smaller and its zones are narrower, and the taper above is the only place that figure comes from; nothing was solved for it. WHAT THE DISTINGUISHING FEATURE BUYS, MEASURED ON THE LEGS RATHER THAN ASSERTED. packages/core/src/sim/empireStateSeam.test.ts gives bank H a terminal at G -- an express to the top, which this tower has not got -- and changes nothing else. Measured at collective, 1 800 s, three seeds: legs a journey fall from 1.2040 / 1.2228 / 1.2214 to 1.1134 / 1.1063 / 1.1172, and the journeys that need THREE legs fall from 167 / 216 / 182 to 13 / 13 / 8. So the relay is what puts a second and a third leg on this tower’s journeys, and it is a property of the zoning rather than of the height. THE ENERGY CHECK, WHICH IS THE POINT OF #427 AND NOT A DECORATION. Both numbers, whatever they say. MEASURED here: the fleet drives 3.21, 3.22 and 3.33 km per car per hour at 1 800 s and 3.15, 3.28 and 3.22 at 3 600 s, at the office-standard profile’s own typical 12 %POP/5 min under collective at seeds 20 260 824 / 20 268 743 / 20 276 662 -- a mean of 3.237 km per car per hour, over six runs, every car in the fleet moving in every one. PUBLISHED: 180,000 miles a year over 73 cars is 2,466 car-miles, 3,968 km per car per year. ARITHMETIC: 3,968 km at 3.237 km/h is 1,226 hours of this traffic a year -- 4.9 hours on each of 250 working days, or 3.4 hours on each of 365. WHAT THAT MEANS, STATED AS A COMPARISON RATHER THAN AS A VALIDATION. The two agree to the order of magnitude: a real office tower plausibly sees something like five hours a day of demand at or near its own peak rate, so the proxy is not wrong about the world by a factor of ten in either direction. It is NOT a validation and this file does not call it one, for the reason #427 states: the published figure names no window and no basis, so the residual between 1,226 hours and whatever the real building’s duty cycle is cannot be attributed. NO MECHANISM IS OFFERED for the difference -- a plausible sentence in place of a measurement is what DECISIONS.md SS D256 refuses -- and what would close it is a sourced statement of what the 180,000 miles covers, which the article does not give. BOTH NUMBERS STAY, and neither is adjusted towards the other: the energy proxy is not calibrated here and SS D468’s 80 kJ bar is untouched. WHAT THE CLOSED FORM SAYS, AND IT IS THE FIRST TIME IT HAS SAID IT ABOUT EVERY BANK OF A BUILDING: all EIGHT banks reconcile. Raw divergences +27.467 %, +29.048 %, +30.318 %, +28.984 %, +30.747 %, +21.250 %, +25.773 % and +33.626 %; corrected residuals -0.044 %, -0.076 %, -0.126 %, -0.309 %, -0.368 %, +0.047 %, -0.119 % and -0.184 %, all at 64 replications from seed 810 000 against a 4 % tolerance. See packages/experiments/src/oracle/remainingBuildings.test.ts. The raw figures are the ~25 % textbook simplification CLAUDE.md warns a reader about, not a broken simulation. WHY EVERY BANK RECONCILES HERE AND ALMOST NONE DOES ON A SUPERTALL: the refusal ground the three 2026-09-15 towers met is that measureUpPeak drives an isolated bank at OVERLOAD_FACTOR x %POP of its own capacity and cannot drain the crowd it offers a twenty-car group inside the deadline. This tower’s largest bank has TEN cars. So a 1931 arrangement -- many small banks rather than few large ones -- is the arrangement the closed form was written for, which is a fact about the apparatus and the era rather than about this file. WHAT THIS BUILDING IS NOT FOR: it is not in data/proof-cases.json. The owner ruled on 2026-09-10 (GitHub issues #500 and #419) that the bench’s forty stay fixed so every rating stays comparable.",
+  "$comment": "THE RELAY TOWER, and the only building in the shipped set whose top is reached by changing lifts twice with no express anywhere in it. GitHub issue #427, DECISIONS.md SS D596 and SS D597. WHY IT IS HERE. Two things no shipped building had. A 1931 zone stack -- eight banks each serving a narrow slice, cars slow by any modern standard, and a 372 m rise reached by RELAY rather than by express shuttle; every other tall building in data/buildings/ hangs its upper zones off a dedicated express. And a published DISTANCE, which is the one quantity this project measures and has never had an external anchor for: SS D468 derives the daily energy goal’s 80 kJ bar from 400 simulated runs against nothing outside this repository. NAMED IN THE REPOSITORY’S CONVENTION, burj-class-reference’s: the real Empire State Building is the reference, and the figures in this file are the project’s own. PROVENANCE, per the product owner’s 2026-09-08 standing ruling on governed data/ values: EVERY AUTHORED FIGURE BELOW IS AN AGENT’S PROPOSAL, drafted for the owner to accept, tighten or reject, and NOT YET APPROVED. The line the ruling asks for is drawn field by field. MEASURED (a count rather than a citation): 73 cars. That is the lift count the prompting article supplies and one of only two figures from it this file uses. The article is a trade-association piece with no primary references which contradicts itself about the world’s fastest lift, and #427 says in terms that it is the prompt and not the citation. QUOTED AND NOT TREATED AS A CITATION: \"its elevators cover a combined distance of over 180,000 miles\" annually. That figure is USED -- it is the whole of criterion 1 -- and it is used as a COMPARISON rather than as a validation, because the article states no measurement window, no basis and no source for it. See the energy note below, which publishes both numbers whatever they say. CHOSEN (an agent’s proposals, none of them cited, all awaiting the owner): the floor count (102 above ground); the height ladder that realises it -- a 12.0 m two-storey ground hall and a 3.6 m office storey, putting the top observatory at 372.0 m under a 381 m roof whose 62 m mast this model does not carry; the relay lobbies at 80 and 86; the populations, authored as a TAPER because the tower steps back four times (140 a floor at 3-30, 90 at 31-59, 55 at 60-79, 35 at 81-85, 25 at 87-101, and 30 and 20 on the two observatory levels, 8,230 in all); the split of the 73 cars into six ground banks of ten and two relay banks of seven and six; and the speeds, 6.0 m/s on the two upper ground banks down to 2.5 m/s on the lowest. EVERY AUTHORED SPEED IS A VALUE THE PLAYER’S OWN CONTROL CAN SELECT, AND THAT IS A CONSTRAINT RATHER THAN A PREFERENCE. commissioning.ts derives each machine class’s speed ladder from its band and SPEED_STEPS_MPS, and GitHub issue #45 is the defect where a select whose value is not among its options silently shows its first option instead. So a speed off the ladder ships a control that misreports the building it is editing. The first draft of this file was off it; the speeds below are ON it, and commissioning.test.ts checks that from disk for every shipped bank rather than from a list. THE OCCUPANCY IS THE LIFT-POOREST IN THE SET, AND THAT IS THE BUILDING RATHER THAN AN ERROR. 8,230 over 73 cars is 112.7 people a car, against merdeka-class-reference’s 91.9, one-wtc-class-reference’s 65.9 and burj-class-reference’s 56.1. A 1931 tower carries more people per car than a 2010s one because its cars are smaller and its zones are narrower, and the taper above is the only place that figure comes from; nothing was solved for it. WHAT THE DISTINGUISHING FEATURE BUYS, MEASURED ON THE LEGS RATHER THAN ASSERTED. packages/core/src/sim/empireStateSeam.test.ts gives bank H a terminal at G -- an express to the top, which this tower has not got -- and changes nothing else. Measured at collective, 1 800 s, three seeds: legs a journey fall from 1.2040 / 1.2228 / 1.2214 to 1.1134 / 1.1063 / 1.1172, and the journeys that need THREE legs fall from 167 / 216 / 182 to 13 / 13 / 8. So the relay is what puts a second and a third leg on this tower’s journeys, and it is a property of the zoning rather than of the height. THE ENERGY CHECK, WHICH IS THE POINT OF #427 AND NOT A DECORATION. Both numbers, whatever they say. MEASURED here: the fleet drives 3.17, 3.26 and 3.20 km per car per hour at 1 800 s and 3.16, 3.32 and 3.20 at 3 600 s, at the office-standard profile’s own typical 12 %POP/5 min under collective at seeds 20 260 824 / 20 268 743 / 20 276 662 -- a mean of 3.220 km per car per hour, over six runs, every car in the fleet moving in every one. Driven distance over the whole run, window [0, endedAt), divided by 73 cars and by the run’s own elapsed hours; the convention is stated because three plausible ones give three different numbers here. PUBLISHED: 180,000 miles a year over 73 cars is 2,466 car-miles, 3,968 km per car per year. ARITHMETIC: 3,968 km at 3.220 km/h is 1,232 hours of this traffic a year -- 4.9 hours on each of 250 working days, or 3.4 hours on each of 365. WHAT THAT MEANS, STATED AS A COMPARISON RATHER THAN AS A VALIDATION. The two agree to the order of magnitude: a real office tower plausibly sees something like five hours a day of demand at or near its own peak rate, so the proxy is not wrong about the world by a factor of ten in either direction. It is NOT a validation and this file does not call it one, for the reason #427 states: the published figure names no window and no basis, so the residual between 1,232 hours and whatever the real building’s duty cycle is cannot be attributed. NO MECHANISM IS OFFERED for the difference -- a plausible sentence in place of a measurement is what DECISIONS.md SS D256 refuses -- and what would close it is a sourced statement of what the 180,000 miles covers, which the article does not give. BOTH NUMBERS STAY, and neither is adjusted towards the other: the energy proxy is not calibrated here and SS D468’s 80 kJ bar is untouched. WHAT THE CLOSED FORM SAYS, AND IT IS THE FIRST TIME IT HAS SAID IT ABOUT EVERY BANK OF A BUILDING: all EIGHT banks reconcile. Raw divergences +27.467 %, +29.048 %, +30.318 %, +28.984 %, +30.143 %, +20.737 %, +25.773 % and +33.626 %; corrected residuals -0.044 %, -0.076 %, -0.126 %, -0.309 %, -0.494 %, -0.109 %, -0.119 % and -0.184 %, all at 64 replications from seed 810 000 against a 4 % tolerance, and ALL EIGHT NEGATIVE. See packages/experiments/src/oracle/remainingBuildings.test.ts. The raw figures are the ~25 % textbook simplification CLAUDE.md warns a reader about, not a broken simulation. WHY EVERY BANK RECONCILES HERE AND ALMOST NONE DOES ON A SUPERTALL: the refusal ground the three 2026-09-15 towers met is that measureUpPeak drives an isolated bank at OVERLOAD_FACTOR x %POP of its own capacity and cannot drain the crowd it offers a twenty-car group inside the deadline. This tower’s largest bank has TEN cars. So a 1931 arrangement -- many small banks rather than few large ones -- is the arrangement the closed form was written for, which is a fact about the apparatus and the era rather than about this file. WHAT THIS BUILDING IS NOT FOR: it is not in data/proof-cases.json. The owner ruled on 2026-09-10 (GitHub issues #500 and #419) that the bench’s forty stay fixed so every rating stays comparable.",
   "id": "empire-state-class-reference",
   "name": "Empire-State-class reference tower",
   "type": "office",
@@ -491,70 +491,70 @@
         {
           "id": "E1",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "E2",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "E3",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "E4",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "E5",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "E6",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "E7",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "E8",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "E9",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "E10",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         }
@@ -579,70 +579,70 @@
         {
           "id": "F1",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "F2",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "F3",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "F4",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "F5",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "F6",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "F7",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "F8",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "F9",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         },
         {
           "id": "F10",
           "spec": "gearless-traction",
-          "ratedSpeedMps": 6.1,
+          "ratedSpeedMps": 6,
           "ratedLoadLb": 3000,
           "doorType": "centerOpening"
         }

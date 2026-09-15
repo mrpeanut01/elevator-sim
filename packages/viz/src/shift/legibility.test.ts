@@ -126,10 +126,15 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
     expect(stretches['c10']).toEqual([121, 73, 68, 104, 57, 67, 95, 76, 276, 61]);
     // One WTC is the first supertall this slice has found below the window on nine seeds of ten —
     // one landing reaches 128 s and the rest never hold anybody a full two minutes. Empire State is
-    // above it on eight, and the two seeds it misses on (115 s and 88 s) are the ones worth pinning:
+    // above it on eight, and the two seeds it misses on (115 s and 99 s) are the ones worth pinning:
     // they are near misses rather than quiet days, so a change to the bands would move them first.
+    //
+    // **`c15` was re-measured on 2026-09-15** when GitHub issue #45's ladder moved two of its banks
+    // from 6.1 m/s to 6.0 (§ D600): eight of its ten stretches moved and the count did not, which is
+    // what a timing change looks like against a threshold nobody crossed. **`c14` is unmoved** —
+    // One WTC's speeds were already on the ladder — and that contrast is why both are pinned here.
     expect(stretches['c14']).toEqual([11, 1, 14, 28, 16, 128, 76, 6, 91, 0]);
-    expect(stretches['c15']).toEqual([518, 417, 208, 597, 115, 738, 629, 88, 207, 712]);
+    expect(stretches['c15']).toEqual([644, 601, 199, 568, 115, 738, 647, 99, 219, 683]);
   /*
    * **Thirteen contracts × ten seeds, and three of the thirteen are supertalls** — GitHub issues
    * #425, #424 and #430. This slice cost well inside 300 000 ms while the ladder was ten mid-rise
@@ -147,11 +152,14 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
    * the tree that added them. Raised on the commit that made the tree exceed it, which is what the
    * ratchet's own message asks for, and the ratchet's sum is re-derived on the same commit.
    *
-   * **The measurement behind the raise is deliberately not quoted as a per-case cost**, because it
-   * was taken on a box at load average 25–31 with three sibling suites running: the honest reading
-   * is that the slice no longer fits 900 s under contention, not that it costs some particular
-   * number of seconds. What is not in doubt is the direction — three more contracts, all of them
-   * heavier than the mid-rise ladder this budget was first written for.
+   * **The raise was made on a contended box and the clean figure was taken afterwards**, which is
+   * the order worth recording rather than hiding. The timeout that forced it happened at load
+   * average 25–31 with three sibling suites running, so no per-case cost could honestly be quoted
+   * from it. **Measured alone on a quiet box afterwards: 324 s** — a **5.6×** margin against
+   * 1 800 000 ms, and only **2.8×** against the 900 000 ms it replaced, where `vitest.config.ts`'s
+   * own table targets roughly 4.5×. So the raise is justified by the margin rather than by the
+   * timeout: the slice is **not** slow in itself, it was slow in company, and 900 s never had the
+   * headroom this suite is supposed to carry.
    */
   }, 1_800_000);
 });

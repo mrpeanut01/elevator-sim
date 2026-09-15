@@ -89,8 +89,8 @@ import { isWaitingAt } from '../frame/overlay.js';
  * | c12 | shanghai-class-reference | **50** | 729 |
  * | c13 | merdeka-class-reference | **50** | 459 |
  * | c14 | one-wtc-class-reference | **1** | 13 |
- * | c15 | empire-state-class-reference | 45 | 437 |
- * | c16 | willis-class-reference | **50** | 2 314 |
+ * | c15 | empire-state-class-reference | 45 | 472 |
+ * | c16 | willis-class-reference | **50** | 2 347 |
  *
  * **The three reference towers are legible on every seed, and the reading is not flattering.** A day
  * is legible when somebody stays past a minute on some landing for two contiguous minutes, and on a
@@ -107,10 +107,18 @@ import { isWaitingAt } from '../frame/overlay.js';
  * Measured, size is not the variable: `c14` (One-WTC-class, 4 810 occupants, 104 floors) is legible
  * on **1 of 50** at a median stretch of **13 s** — the least legible contract in the catalogue after
  * Garden Apartments, and the first supertall this table has found **ineligible** — while `c16`
- * (Willis-class, 9 200 occupants) is legible on **50 of 50** at **2 314 s**, second only to Midtown
+ * (Willis-class, 9 200 occupants) is legible on **50 of 50** at **2 347 s**, second only to Midtown
  * Office, and `c15` (Empire-State-class, 8 230 occupants) sits between them on **45 of 50** at
- * **437 s**, the same count as Vertical City. Three towers of the same class, spanning the whole
+ * **472 s**, the same count as Vertical City. Three towers of the same class, spanning the whole
  * range this instrument can report.
+ *
+ * **`c15` and `c16`'s medians were re-measured on 2026-09-15** at the published budget, when GitHub
+ * issue #45's ladder moved two of Empire State's banks from 6.1 m/s to 6.0 and three of Willis's
+ * expresses from 8.1 to 8.0 ([§ D600](../../../../DECISIONS.md)). **Only those two rows moved, and
+ * only their medians** — 437 → 472 s and 2 314 → 2 347 s — while **all fourteen other rows reproduced
+ * exactly**, counts and medians alike, and **both counts held** at 45 and 50. So the spread this
+ * paragraph is about is unmoved: a timing change shifted how long the held landings last without
+ * changing how many days hold one, which is what a threshold nobody crossed looks like from here.
  *
  * **Why they differ is unmeasured and no mechanism is offered here**, which is
  * [§ D256](../../../../DECISIONS.md)'s rule at the one place it is most tempting to break: a
@@ -185,8 +193,8 @@ export const LEGIBILITY_SWEEP: readonly LegibilitySweepRow[] = Object.freeze([
   { contractId: 'c12', buildingId: 'shanghai-class-reference', legibleOf50: 50, medianStretchS: 729 },
   { contractId: 'c13', buildingId: 'merdeka-class-reference', legibleOf50: 50, medianStretchS: 459 },
   { contractId: 'c14', buildingId: 'one-wtc-class-reference', legibleOf50: 1, medianStretchS: 13 },
-  { contractId: 'c15', buildingId: 'empire-state-class-reference', legibleOf50: 45, medianStretchS: 437 },
-  { contractId: 'c16', buildingId: 'willis-class-reference', legibleOf50: 50, medianStretchS: 2314 },
+  { contractId: 'c15', buildingId: 'empire-state-class-reference', legibleOf50: 45, medianStretchS: 472 },
+  { contractId: 'c16', buildingId: 'willis-class-reference', legibleOf50: 50, medianStretchS: 2347 },
 ]);
 
 /** The third band's floor — `WAIT_BANDS[2].fromS`, read rather than retyped. */

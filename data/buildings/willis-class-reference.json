@@ -1,5 +1,5 @@
 {
-  "$comment": "THE DOUBLE-DECK LOCAL TOWER -- sixteen double-deckers running as the LOCAL service at 1970s speeds, which is the other double-deck arrangement and the older and commoner one. GitHub issue #426, DECISIONS.md SS D598 and SS D599. WHY IT IS HERE. Two shipped buildings declare a double-deck bank -- vertical-city and burj-class-reference -- and both are supertalls whose double-deckers are SHUTTLES running express between transfer levels. So everything the project knows about SS D131’s paired-stop model comes from one arrangement. Here the decks are the locals: they pair EVERY floor in their zone, so a rider’s floor parity decides which deck they board, and bankDecksAllow is consulted on far more journeys. And the cars are slow -- 2.5 m/s, the bottom of gearless-traction’s band -- because the saving a double-decker buys is in STOP time, and stop time is a larger share of a round trip when the car is slow. NAMED IN THE REPOSITORY’S CONVENTION, burj-class-reference’s: the real Willis Tower is the reference, and the figures in this file are the project’s own. PROVENANCE, per the product owner’s 2026-09-08 standing ruling on governed data/ values: EVERY AUTHORED FIGURE BELOW IS AN AGENT’S PROPOSAL, drafted for the owner to accept, tighten or reject, and NOT YET APPROVED. The line the ruling asks for is drawn field by field. MEASURED (counts rather than citations): 104 cars, of which 16 are double-deck. Those are the two figures the prompting article supplies and the only two this file uses. The article is a trade-association piece with no primary references which contradicts itself about the world’s fastest lift, and #426 says in terms that it is the prompt and not the citation. CHOSEN (an agent’s proposals, none of them cited, all awaiting the owner): 108 floors above ground on a UNIFORM 3.9 m storey; the two two-level sky lobbies at 33/34 and 65/66; the Skydeck at 103; the populations, authored as a taper because the tower sets back twice (120 a floor at 3-32, 100 at 35-64, 80 at 67-86, 60 at 87-102, 40 on the Skydeck level, 9,200 in all); the split of the 104 cars over seven banks; the express speed of 8.1 m/s and the local speed of 2.5 m/s; and the escalator pair, whose traversal time is derived rather than quoted. THE UNIFORM PITCH IS FORCED RATHER THAN CHOSEN, AND IT IS THE FIRST THING TO UNDERSTAND ABOUT THIS FILE. config/parse.ts requires every entry of servesFloorPairs to be EXACTLY deckSeparationM apart in heightM. A double-deck LOCAL pairs every floor in its zone, so every floor in that zone must sit exactly one deck separation above the last -- which is why this tower has one storey height and the three supertalls in the set each have three or four. A double-deck local is a constraint on the section, not just on the hoistway. THE OCCUPANCY IS A FOURTH POINT ON A COMPARISON SS D579 OPENED. 9,200 over 104 cars is 88.5 people a car, against merdeka-class-reference’s 91.9, empire-state-class-reference’s 112.7, one-wtc-class-reference’s 65.9 and burj-class-reference’s 56.1. Authored from a floor-plate taper, like Merdeka’s; nothing was solved for it and no other file moves. WHAT THE DISTINGUISHING FEATURE BUYS, MEASURED ON THE LEGS RATHER THAN ASSERTED. packages/core/src/sim/willisSeam.test.ts takes the decks off both local banks -- servesFloorPairs deleted, doubleDeck, deckSeparationM and ratedLoadLbPerDeck deleted, whole-car capacity unchanged -- and changes nothing else. The legs differ on every seed, and so does their count: 6 880 / 6 847 / 6 530 with the decks against 6 764 / 6 757 / 6 446 without, at collective, 1 800 s, seeds 20 260 824 / 20 268 743 / 20 276 662 over identical journeys. The single-deck arm is not merely a different run: it is a different building, because the escalator stops being needed. AND THAT IS THE MOST INSTRUCTIVE THING THIS TOWER FOUND. The G-to-2 escalator carries 720, 725 and 653 hops as shipped and EXACTLY ZERO once the decks come off. A deck-bound leg from the lower lobby can only reach lower-deck floors, so a rider bound for an even floor must board at 2 -- and the escalator is how they get there. Take the decks away and a single-deck car at G serves every floor in the zone, so the mode never shortens a route again. The transport mode is not decoration beside the deck model; it is a CONSEQUENCE of it, which is a thing vertical-city’s four modes could suggest and this building measures. THE DISCLAIMER CLAUDE.MD NAMES IS NOT RAISED HERE, AND THAT IS CHECKED IN BOTH DIRECTIONS. CLAUDE.md records double-deck operation as simulated and says the remaining disclaimer covers only a double-deck bank declaring no servesFloorPairs. This tower declares pairs on both double-deck banks, so it loads with ZERO warnings and raises no missing-floor-pairs; and willisSeam.test.ts deletes one bank’s pairs and requires the warning to appear, so the claim is that the case exists and this building is not in it rather than that the case is gone. #426 asked whether this tower raises it. It does not. WHAT THE CLOSED FORM SAYS: the oracle reconciles on the Skydeck express, is offered the double-deck locals with a caveat, and REFUSES four banks. skydeck raw +9.634 %, residual -0.052 % at 64 replications from seed 810 000 against a 4 % tolerance. local-mid throws departureGapBracket -- a full load’s dwell outlasts a one-floor round trip on a 2.5 m/s car, which is st-jude-hospital’s ground and is what a slow car with a big door does. express-mid and express-high throw on a zero served population, the ground every shuttle to an unpopulated sky lobby meets. local-high and local-top throw because measureUpPeak cannot drain the crowd it offers a twenty-four- and twenty-two-car bank inside the deadline, SS D578 clause 6’s ground. AND NO RESIDUAL IS PUBLISHED FOR A DOUBLE-DECK BANK, WHICH IS THE CLAUSE TO READ. oracle/upPeakCase.ts#isolateBank DROPS the double-deck fields with servesFloorPairs, because the closed form has no deck term and the derivation would not know where to put one. So the -0.050 % local-low returns is a residual for a SINGLE-DECK bank of the same cars, and calling it a residual for this tower’s double-deck locals would be a different calculation wearing its name. It is recorded in remainingBuildings.test.ts under exactly that label. Extending the closed form to decks is not attempted here: it would mean validating the simulator against arithmetic no reference states, which is the circularity analytical/’s import discipline exists to prevent. WHAT THIS BUILDING IS NOT FOR: it is not in data/proof-cases.json. The owner ruled on 2026-09-10 (GitHub issues #500 and #419) that the bench’s forty stay fixed so every rating stays comparable.",
+  "$comment": "THE DOUBLE-DECK LOCAL TOWER -- sixteen double-deckers running as the LOCAL service at 1970s speeds, which is the other double-deck arrangement and the older and commoner one. GitHub issue #426, DECISIONS.md SS D598 and SS D599. WHY IT IS HERE. Two shipped buildings declare a double-deck bank -- vertical-city and burj-class-reference -- and both are supertalls whose double-deckers are SHUTTLES running express between transfer levels. So everything the project knows about SS D131’s paired-stop model comes from one arrangement. Here the decks are the locals: they pair EVERY floor in their zone, so a rider’s floor parity decides which deck they board, and bankDecksAllow is consulted on far more journeys. And the cars are slow -- 2.5 m/s, the bottom of gearless-traction’s band -- because the saving a double-decker buys is in STOP time, and stop time is a larger share of a round trip when the car is slow. NAMED IN THE REPOSITORY’S CONVENTION, burj-class-reference’s: the real Willis Tower is the reference, and the figures in this file are the project’s own. PROVENANCE, per the product owner’s 2026-09-08 standing ruling on governed data/ values: EVERY AUTHORED FIGURE BELOW IS AN AGENT’S PROPOSAL, drafted for the owner to accept, tighten or reject, and NOT YET APPROVED. The line the ruling asks for is drawn field by field. MEASURED (counts rather than citations): 104 cars, of which 16 are double-deck. Those are the two figures the prompting article supplies and the only two this file uses. The article is a trade-association piece with no primary references which contradicts itself about the world’s fastest lift, and #426 says in terms that it is the prompt and not the citation. CHOSEN (an agent’s proposals, none of them cited, all awaiting the owner): 108 floors above ground on a UNIFORM 3.9 m storey; the two two-level sky lobbies at 33/34 and 65/66; the Skydeck at 103; the populations, authored as a taper because the tower sets back twice (120 a floor at 3-32, 100 at 35-64, 80 at 67-86, 60 at 87-102, 40 on the Skydeck level, 9,200 in all); the split of the 104 cars over seven banks; the express speed of 8.0 m/s and the local speed of 2.5 m/s; and the escalator pair, whose traversal time is derived rather than quoted. EVERY AUTHORED SPEED IS A VALUE THE PLAYER’S OWN CONTROL CAN SELECT, AND THAT IS A CONSTRAINT RATHER THAN A PREFERENCE. commissioning.ts derives each machine class’s speed ladder from its band and SPEED_STEPS_MPS, and GitHub issue #45 is the defect where a select whose value is not among its options silently shows its first option instead. So a speed off the ladder ships a control that misreports the building it is editing. The first draft of this file was off it; the speeds below are ON it, and commissioning.test.ts checks that from disk for every shipped bank rather than from a list. THE UNIFORM PITCH IS FORCED RATHER THAN CHOSEN, AND IT IS THE FIRST THING TO UNDERSTAND ABOUT THIS FILE. config/parse.ts requires every entry of servesFloorPairs to be EXACTLY deckSeparationM apart in heightM. A double-deck LOCAL pairs every floor in its zone, so every floor in that zone must sit exactly one deck separation above the last -- which is why this tower has one storey height and the three supertalls in the set each have three or four. A double-deck local is a constraint on the section, not just on the hoistway. THE OCCUPANCY IS A FOURTH POINT ON A COMPARISON SS D579 OPENED. 9,200 over 104 cars is 88.5 people a car, against merdeka-class-reference’s 91.9, empire-state-class-reference’s 112.7, one-wtc-class-reference’s 65.9 and burj-class-reference’s 56.1. Authored from a floor-plate taper, like Merdeka’s; nothing was solved for it and no other file moves. WHAT THE DISTINGUISHING FEATURE BUYS, MEASURED ON THE LEGS RATHER THAN ASSERTED. packages/core/src/sim/willisSeam.test.ts takes the decks off both local banks -- servesFloorPairs deleted, doubleDeck, deckSeparationM and ratedLoadLbPerDeck deleted, whole-car capacity unchanged -- and changes nothing else. The legs differ on every seed, and so does their count: 6 880 / 6 847 / 6 530 with the decks against 6 764 / 6 757 / 6 446 without, at collective, 1 800 s, seeds 20 260 824 / 20 268 743 / 20 276 662 over identical journeys. The single-deck arm is not merely a different run: it is a different building, because the escalator stops being needed. AND THAT IS THE MOST INSTRUCTIVE THING THIS TOWER FOUND. The G-to-2 escalator carries 720, 725 and 653 hops as shipped and EXACTLY ZERO once the decks come off. A deck-bound leg from the lower lobby can only reach lower-deck floors, so a rider bound for an even floor must board at 2 -- and the escalator is how they get there. Take the decks away and a single-deck car at G serves every floor in the zone, so the mode never shortens a route again. The transport mode is not decoration beside the deck model; it is a CONSEQUENCE of it, which is a thing vertical-city’s four modes could suggest and this building measures. THE DISCLAIMER CLAUDE.MD NAMES IS NOT RAISED HERE, AND THAT IS CHECKED IN BOTH DIRECTIONS. CLAUDE.md records double-deck operation as simulated and says the remaining disclaimer covers only a double-deck bank declaring no servesFloorPairs. This tower declares pairs on both double-deck banks, so it loads with ZERO warnings and raises no missing-floor-pairs; and willisSeam.test.ts deletes one bank’s pairs and requires the warning to appear, so the claim is that the case exists and this building is not in it rather than that the case is gone. #426 asked whether this tower raises it. It does not. WHAT THE CLOSED FORM SAYS: the oracle reconciles on the Skydeck express, is offered the double-deck locals with a caveat, and REFUSES four banks. skydeck raw +9.456 %, residual -0.044 % at 64 replications from seed 810 000 against a 4 % tolerance. local-mid throws departureGapBracket -- a full load’s dwell outlasts a one-floor round trip on a 2.5 m/s car, which is st-jude-hospital’s ground and is what a slow car with a big door does. express-mid and express-high throw on a zero served population, the ground every shuttle to an unpopulated sky lobby meets. local-high and local-top throw because measureUpPeak cannot drain the crowd it offers a twenty-four- and twenty-two-car bank inside the deadline, SS D578 clause 6’s ground. AND NO RESIDUAL IS PUBLISHED FOR A DOUBLE-DECK BANK, WHICH IS THE CLAUSE TO READ. oracle/upPeakCase.ts#isolateBank DROPS the double-deck fields with servesFloorPairs, because the closed form has no deck term and the derivation would not know where to put one. So the -0.050 % local-low returns is a residual for a SINGLE-DECK bank of the same cars, and calling it a residual for this tower’s double-deck locals would be a different calculation wearing its name. It is recorded in remainingBuildings.test.ts under exactly that label. Extending the closed form to decks is not attempted here: it would mean validating the simulator against arithmetic no reference states, which is the circularity analytical/’s import discipline exists to prevent. WHAT THIS BUILDING IS NOT FOR: it is not in data/proof-cases.json. The owner ruled on 2026-09-10 (GitHub issues #500 and #419) that the bench’s forty stay fixed so every rating stays comparable.",
   "id": "willis-class-reference",
   "name": "Willis-class reference tower",
   "type": "office",
@@ -323,112 +323,112 @@
         {
           "id": "XM1",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM2",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM3",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM4",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM5",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM6",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM7",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM8",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM9",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM10",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM11",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM12",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM13",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM14",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM15",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XM16",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         }
@@ -634,112 +634,112 @@
         {
           "id": "XH1",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH2",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH3",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH4",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH5",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH6",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH7",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH8",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH9",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH10",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH11",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH12",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH13",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH14",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH15",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "XH16",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         }
@@ -1139,70 +1139,70 @@
         {
           "id": "SD1",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "SD2",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "SD3",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "SD4",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "SD5",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "SD6",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "SD7",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "SD8",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "SD9",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         },
         {
           "id": "SD10",
           "spec": "high-speed-gearless",
-          "ratedSpeedMps": 8.1,
+          "ratedSpeedMps": 8,
           "ratedLoadLb": 4000,
           "doorType": "centerOpening"
         }

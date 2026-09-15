@@ -2361,8 +2361,8 @@ problem somewhere this arm does not look**, and that is the first shipped instan
 #427 and #426), and **all thirteen earlier rows reproduced to the second for the third wave
 running** — every count, every median, and the six per-seed slices `legibility.test.ts` pins.
 The three new rows are `c14` (One-WTC-class) at **1 of 50**, median **13 s**; `c15`
-(Empire-State-class) at **45 of 50**, median **437 s**; and `c16` (Willis-class) at **50 of 50**,
-median **2 314 s**.
+(Empire-State-class) at **45 of 50**, median **472 s**; and `c16` (Willis-class) at **50 of 50**,
+median **2 347 s**.
 
 **They refute the reading § 4.7k's row offered for the three before them, and that is the useful
 half.** That reading was that a supertall is legible *because* it is a tower of thousands — a held

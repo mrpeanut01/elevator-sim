@@ -196,9 +196,9 @@ a **distance**, which is the one quantity the proxy measures and could never che
 
 | | |
 |---|---|
-| **Measured** | **3.21, 3.22 and 3.33 km per car per hour** at 1 800 s and **3.15, 3.28 and 3.22** at 3 600 s — six runs at the `office-standard` profile's own typical 12 %POP/5 min under `collective`, seeds 20 260 824 / 20 268 743 / 20 276 662, every car in the fleet moving in every one. Mean **3.237 km/car/h**. |
+| **Measured** | **3.17, 3.26 and 3.20 km per car per hour** at 1 800 s and **3.16, 3.32 and 3.20** at 3 600 s — six runs at the `office-standard` profile's own typical 12 %POP/5 min under `collective`, seeds 20 260 824 / 20 268 743 / 20 276 662, every car in the fleet moving in every one. Mean **3.220 km/car/h**. |
 | **Published** | *"Its elevators cover a combined distance of over 180,000 miles"* a year, over 73 cars: **3 968 km per car per year**. |
-| **The arithmetic** | 3 968 km at 3.237 km/h is **1 226 hours** of this traffic a year — **4.9 hours** on each of 250 working days, or 3.4 hours on each of 365. |
+| **The arithmetic** | 3 968 km at 3.220 km/h is **1 232 hours** of this traffic a year — **4.9 hours** on each of 250 working days, or 3.4 hours on each of 365. |
 
 **The two agree to the order of magnitude**, which is the strongest thing this check can say: a real
 office tower plausibly sees something like five hours a day of demand at or near its own peak rate,
