@@ -1742,7 +1742,27 @@ type DecisionReservation = {
  * because it is tidier, but because the alternative is every lane inventing bookkeeping the
  * integrator then has to throw away.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/*
+ * **Wave AA is open, and this reservation was written by a lane rather than by the integrator.**
+ *
+ * The floor is not a guess: the charter row already reads **D576**, which is where wave Z's block
+ * stopped and where wave AA's therefore starts, and the row naming the floor while a wave is open is
+ * exactly what the open branch below asserts. So opening the reservation costs no edit to the
+ * charter and does not reconcile it early.
+ *
+ * **The ceiling is the honest part.** This lane (C, GitHub issues #242, #243 and #355) was given
+ * D587–D590 and told it holds no others, so D590 is the highest number this lane can see. It is set
+ * as the ceiling **because a lane can only report what it holds**, and the precedent for that is
+ * recorded three paragraphs up: two of wave Z's lanes each widened a block from inside it, on the
+ * commit that needed it, and the file's own account says both were right to. **Any lane holding a
+ * block above D590 should widen `to` on the commit that needs it** rather than take the number and
+ * leave this constant wrong — a wider claim makes a narrower one redundant, not wrong.
+ *
+ * Without this, a lane that writes a number turns the gate red on the *ceiling* — `highest + 1`
+ * against a charter row no single branch may reconcile — which is the wall wave Z's lanes each hit
+ * alone.
+ */
+const OPEN_RESERVATION = { wave: 'AA', from: 576, to: 590 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail

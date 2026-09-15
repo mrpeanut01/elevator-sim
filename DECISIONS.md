@@ -35866,3 +35866,42 @@ twelfth building meets a red test rather than this paragraph.
 assumption with its reasoning attached, in § D519's manner, and the owner's to accept, tighten or
 reject. Whether `QUIRKS` should be re-sourced. And nothing about the renewal ladder, the shop or the
 calendar, none of which this touches.
+
+---
+
+## D587 — The revert procedure is rehearsed in halves, because it is two operations: the git half runs from any checkout and is now observed, the half that touches the live site is not and is named rather than implied
+
+**Date: 2026-09-15 · GitHub issue #355 AC4 (and #241 AC2, #242 AC4, #243 AC4) · Wave AA lane C · Builds on § D405's record rule and `CLAUDE.md`'s *a stated refusal goes stale* rule, with the polarity reversed.**
+
+**Why an entry.** It adds `scripts/rehearse-revert.mjs` and a guard in `packages/experiments`, moves a claim in `docs/16-static-site-deployment.md` § 9's verified/unverified register, and changes what `docs/40-incident-runbook.md` § 3 and `docs/41-launch-checklist.md` § 6.3 say about a procedure an operator runs in an incident — none of which the script owns ([§ D405](#d405)).
+
+1. **The finding that made this possible is that `docs/16` § 11 is not one operation.** Steps 0 and 2 are `git` on a workstation: name the live build and the target, revert forward onto `main`, and compare the trees. Steps 1, 3 and 4 and the whole of § 11.4 need the Static Web App, its federated identity and the Container App. § 11.5 recorded the procedure as **wholly** unrehearsed, which was true and hid that half of it could be rehearsed by anybody, for free, in about a second.
+
+2. **The git half is now rehearsed, and rehearsing it found two failure modes reading had not.** `scripts/rehearse-revert.mjs` runs steps 0 and 2 in a throwaway clone under the system temp directory; it invokes `git` and no other binary, touches no network, and only reads the repository it is pointed at. Run 2026-09-15 on `fb15704` over `HEAD~4`, `HEAD~20` and `HEAD~50`: every range reverts clean and **the tree comparison § 11.2 step 2 requires really is empty**, which until now was an inference. A fourth run against a ref that is not an ancestor exits 1 with four failed observations, which is what makes the other three mean anything.
+
+   - **A merge commit in the range aborts the revert *part-way*.** `git revert --no-commit A..B` reverts the commits newer than the merge, **leaves them staged**, then exits 128 — and writes no sequencer state, so there is nothing to `--continue` or `--abort` while the next command in the procedure is `git commit`. That is a green deploy of a half-reverted tree, in an incident. Measured on a synthetic merge in a throwaway clone, because this repository's reachable history is linear and could not produce one; recorded as such rather than as a measurement on this tree.
+   - **A shallow checkout cannot revert at all** and says so as *unknown revision*, which reads like a typo. The tree this ran on is shallow — 51 commits — and `actions/checkout` defaults to depth 1, so any CI-side revert is in the same position.
+
+3. **The tree comparison's pathspecs are derived rather than transcribed.** `artifactPathspecsOf` reads `deploy-viz.yml`'s own `on.push.paths`, drops `.github/**` — the workflow triggers a run without being in the artifact — and refuses a short list rather than comparing almost nothing. `docs/16` § 11.2 still prints the five for a reader, and says outright that the harness is the one to believe if the two ever disagree.
+
+4. **The harness is built so that its output cannot be read as more than it is.** `NOT_REHEARSED` names the upload, the branch policy, the propagation time, the API half and the browser save-clearing, and it is printed on a clean run as loudly as on a failing one. `validation/rehearseRevert.test.ts` asserts that § 11.5 still carries the sentence *has not been run against production*, so a later edit cannot quietly promote half a rehearsal into a whole one. **That is this repository's stale-refusal rule with the polarity that matters most in an incident**: a stale refusal tells a reader not to touch a live control, and a stale *promise* tells them they hold a recovery they have not checked.
+
+**What this does not decide, and must not be read as deciding.** That the rollback is rehearsed. **#241 AC2, #242 AC4 and #243 AC4 stay open**, each asking for a rehearsal *on the production deployment*, and the half that was rehearsed is precisely the half that never touches it. The duration — the figure § 11.5 calls the one that makes the procedure unplannable — is still unmeasured, and nothing in a checkout can measure it.
+
+---
+
+## D588 — Error reports stay untransmitted, and the refusal is pinned to the question it waits on rather than left as an omission; one half of that question's register row was stale and is corrected
+
+**Date: 2026-09-15 · GitHub issue #242 AC1 · Wave AA lane C · Pins a refusal the product already implements, and corrects a register row in `docs/26-telemetry-and-privacy.md` that this module does not own.**
+
+**Why an entry.** It moves two rows in `docs/26` — § 16.2's S14 line and § 19's item 18 — which `docs/40-incident-runbook.md` does not own, and it gives a refusal an id so that it can be discharged by a decision rather than forgotten ([§ D405](#d405)).
+
+1. **The refusal, stated as a decision rather than as a gap.** A fault in a player's browser is counted on the page and travels only inside a report the player composes and sends. **Nothing is transmitted automatically**, to this project's API or anywhere else, and `docs/40` § 5 is the argument. This is not a transport problem: the first-party route is permitted by the deployed page's own `connect-src` today, and the third-party case is the only one the CSP refuses.
+
+2. **What it waits on is named, and it is not this repository's to answer.** `docs/26` § 19 **item 6** — the lawful basis for telemetry (S12) and error reports (S14), options A–D in § 14.2, and whether they may differ. § 14.2 lists four and chooses none, marked for professional review. #242's first acceptance criterion is therefore **refused with a reason and a dependency**, which is a different state from unbuilt, and the difference is exactly what a reader six months from now cannot recover from an omission.
+
+3. **And the consent next door is not a way round it**, for a reason that is engineering rather than posture: the telemetry recorder mints its session at shell mount and refuses to send without a consent answer, so on the failure #242 exists for — a page that died before it mounted — the instrument is absent at the moment it is needed. A player who agreed to *measurement* did not agree to *crash reports* either; § 14.2's option C exists because those two are one row only for sharing a transport.
+
+4. **The stale half, corrected.** § 19 item 18 said the error-report horizon could mean nothing *until #242's runbook exists and names a severity model and a first response*. That runbook exists: `docs/40` § 1 is the severity model and § 2 the first response with per-level response times. So the precondition is **discharged** and the row is blank because nobody has filled it, not because nothing could. Both rows now say so. **No number is written into either**, because a horizon is a judgement this module does not get to make, and because until item 6 is answered nothing is transmitted for a horizon to govern.
+
+**What this does not decide.** The lawful basis, the horizon, or whether a second consent surface is needed — all three are the product owner's and all three stay on § 19. Nor does it change any shipped behaviour: no byte moves, and the client's fault counter and the server's fault lines are exactly as they were.
