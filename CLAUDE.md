@@ -88,12 +88,65 @@ verdict:
   integrated tree after wave X** against a base that was re-measured first (the habit § D442 set);
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
-  `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`:
+  `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
+  below are wave Z's, measured 2026-09-15 on the integrated tree**; the paragraph above
+  describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **680 037** | **606** | **62** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **845 966** | **4 710** | **63** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **716 568** | **606** | **62** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **892 214** | **4 710** | **63** | **0** | **green**, and the register is empty |
+
+  **Wave Z's move is exactly 88.00 strings a case in both tiers — and the row it replaced was wrong
+  about its own verdict, which is a worse failure than the stale counts and is the reason to read
+  this entry.** Measured on the integrated tree after wave Z, both tiers in one sitting, with the
+  base at `155bf07` re-measured first in a detached worktree.
+
+  **The base did not reproduce, and one column of the published row was not merely stale but false:**
+
+  | | published for wave Y | measured at `155bf07` | drift |
+  |---|---|---|---|
+  | always-on strings | 680 037 | **712 256** | **+32 219** |
+  | deep strings | 845 966 | **886 934** | **+40 968** |
+  | surfaces | 62 / 63 | **62 / 63** | **0** |
+  | **deep failing cases** | **0** | **5** | **the row asserted a verdict it did not have** |
+
+  The string drift is the ordinary kind — waves landing without the row being re-measured, which
+  this column has now recorded twice running. **The failing-case column is not that.** The row said
+  *"green, and the register is empty"* of the deep tier, and at that commit the deep tier had five
+  failing cases: `honesty-9100014`, `-9100022`, `-9100028`, `-9100038` and `-9100050` (twice), every
+  one `whole-run-figure-early @ everyday/stageScreenModel.ts#stageHeaderOf`. **Those five are GitHub
+  issue #537**, the weekly job's red, on exactly the case ids CI reported. A stale count sends a
+  reader to the wrong number; a stale *verdict* tells them a search found nothing when it found
+  something, which is the one thing this column exists not to do.
+
+  **So #537 is closed by a run rather than by an argument**: the same measurement on the integrated
+  tree reads `failures 0` over all sixty deep cases, and the register is empty beside it.
+
+  | | base `155bf07` | wave Z | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 712 256 | **716 568** | **+4 312** | **88.00** |
+  | deep strings | 886 934 | **892 214** | **+5 280** | **88.00** |
+  | surfaces | 62 / 63 | **62 / 63** | **0** | — |
+  | cases · simulations | 49 / 60 · 606 / 4 710 | **unmoved** | **0** | — |
+  | deep failing cases | **5** | **0** | **−5** | — |
+
+  **88.00 in both tiers to the hundredth**: 4 312 ÷ 49 and 5 280 ÷ 60 are both exactly 88.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers and against both
+  bases: identical, nothing added, nothing removed, on a wave that authored two buildings, built a
+  hybrid fuzz family, moved a pricing seam and changed five Everyday screens. Every one of them went
+  into an adapter that already existed — the two new towers enter by `honesty/surfaces.ts` iterating
+  `CONTRACTS` rather than by anybody listing them, which is what a derived seed buys. **The deep
+  tier's one-surface lead survives and the diff names it**: `campaign/judge.ts#judgeStage` is the
+  only surface in deep and not in always-on, and nothing is in always-on and not in deep.
+
+  **The move is deliberately not decomposed, and one lane's forecast is the reason it cannot be.**
+  Lane C published **+2 a case in both tiers** before the measurement — the `replay` and `watch` arms
+  of the `ENGINEER_DOOR` adapter — and that is the only forecast this wave carries. The other 86 a
+  case belong to four lanes that forecast nothing. Splitting it between them would be a quotient
+  dressed as a measurement, which is what [§ D256](DECISIONS.md) refuses; the surface attribution is
+  exact because a set difference is a measurement and a division is not.
 
   **Wave Y's move is exactly 752 strings a case in both tiers — and the row it replaced was already
   wrong before this wave started, which is the more useful half.** Measured on the integrated tree
