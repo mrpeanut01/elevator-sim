@@ -72,7 +72,9 @@ const config = readFileSync(VITEST_CONFIG, 'utf8');
  *
  * Only the two `viz` projects are gated, and that is scope rather than judgement: this lane measured
  * the `viz` leg. `experiments` carries **168** above-ceiling annotations of which **123** are named
- * constants, `core` 5, `cli` 2 and `server` 1 — counted by the same scanner, published by the
+ * constants, `core` 6 (5 until 2026-09-15, when GitHub issue #428's three towers pushed
+ * `traffic/credentialGapIdentity.test.ts`'s byte-identity case past 300 000 ms), `cli` 2 and
+ * `server` 1 — counted by the same scanner, published by the
  * deriver, and gated by nothing here.
  */
 const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly totalMs: number }> =

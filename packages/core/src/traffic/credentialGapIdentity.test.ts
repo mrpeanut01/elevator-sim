@@ -91,12 +91,18 @@ function runJson(buildingId: string, share: number | undefined, seed: bigint = S
 }
 
 describe('a building with no access zones is byte-identical at every share', () => {
-  it('names the nine buildings from disk rather than from a list', () => {
+  it('names the unzoned buildings from disk rather than from a list', () => {
     // Derived, so a building that declares no zones joins this guard by existing — the
     // hand-written-list defect § D152 closed, applied to a fixture set. **It worked**: `ashgate`
     // and `harbour-point` landed on 2026-09-14 declaring no access zones (GitHub issues #500,
     // #501) and arrived inside the byte-identity claim below without anybody adding them to it.
     // The list here is the *expectation*, not the fixture, which is why it still has to move.
+    //
+    // **It worked a second time on 2026-09-15** — GitHub issues #428, #427 and #426 — and the
+    // case's title had to stop saying *nine*, because the set is twelve. A title that counts is a
+    // published figure like any other: it was correct when written, it aged silently while the
+    // derivation underneath it stayed right, and it is now worded so that it cannot go stale
+    // again. The fixture derives; only the expectation and the prose ever need a hand.
     expect(unzoned).toEqual([
       'ashgate',
       'burj-class-reference',
@@ -130,7 +136,28 @@ describe('a building with no access zones is byte-identical at every share', () 
         expect(runJson(buildingId, share), `${buildingId} at ${String(share)}`).toBe(shipped);
       }
     }
-  }, 300_000);
+    /*
+     * **300 000 → 900 000 on 2026-09-15**, and this is the one budget in this wave that is
+     * attributable rather than merely load-pressed. The unzoned set is derived from disk, so
+     * GitHub issues #428, #427 and #426 put **three more towers** inside it — nine became twelve
+     * — and each one is simulated once per share plus a shipped baseline. The three are also the
+     * heaviest members: at the determinism matrix's own cell they cost roughly 1.8× to 3.5× what
+     * `midtown-office` costs.
+     *
+     * **Measured rather than asserted, and the figure is the reason for the size of the raise.**
+     * Alone on a box at load 18 this file runs in **192 s**, so it still fits 300 000 ms with a
+     * margin of about 1.56× — and it **timed out twice** before that, once in the full `core` run
+     * and once with a single other file for company. That is what a bound with too little headroom
+     * looks like rather than one that is simply too small, and `vitest.config.ts`'s own table
+     * measures its budgets against roughly 4.5× for exactly this reason. 900 000 ms restores
+     * ~4.7×. It is the one budget in this wave that is attributable to the work rather than to the
+     * box: the other four core files that timed out in the full run passed unchanged on re-run.
+     *
+     * Raised rather than narrowed. Dropping the new towers from the loop would make the claim
+     * *byte-identical on the buildings we chose to check* instead of *on every building that
+     * declares no zones*, and the derivation above exists precisely so that nobody gets to choose.
+     */
+  }, 900_000);
 
   it('carries no credential at all on any of them, at any share', () => {
     // The mechanism behind the identity above, stated separately so a failure says *why*: with no
