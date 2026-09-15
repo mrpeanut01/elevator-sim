@@ -1,0 +1,254 @@
+{
+  "$comment": "OFFICES OVER SHOPS, AND A CAR PARK BELOW -- the only shipped tower with floors below the datum that anybody arrives on, and the only one where a SERVICE ZONE decides how many legs a journey takes. GitHub issue #501; docs/37-content-plan.md SS 7.3, which specifies it as '22 floors with negative-index basements and a servesFloors restriction that leaves one of five cars reaching B1-B2'. The shape is the vendored ENGINE_CONTRACT.md SS 12.3's: 22 floors, 5 lifts. Twenty-two floors are two car-park decks, a ground of shops, three more retail floors and sixteen office floors. PROVENANCE, per the product owner's 2026-09-08 standing ruling on governed data/ values: EVERY AUTHORED FIGURE BELOW IS AN AGENT'S PROPOSAL, drafted for the owner to accept, tighten or reject, and NOT YET APPROVED. The line the ruling asks for is drawn field by field. WHAT IS CHOSEN: the floor count (22) and the car count (5), both from SS 12.3; the split of those 22 into B2, B1, G, three retail and sixteen office floors; the 3.6 m basement pitch, the 4.5 m retail pitch and the 3.7 m office pitch; the populations -- 22 a retail floor and 34 an office floor, 610 in all, with nobody housed in the car park or in the ground-floor shop lobby; the four-plus-one split of the five cars between the two banks; the car classes (geared-traction at 2.5 m/s and 2 500 lb for the tower, mrl-gearless-low at 1.6 m/s and 3 500 lb for the car-park car); and office-standard as the traffic profile. WHAT IS MEASURED: that the restriction BINDS, which is the whole reason the building exists and is the thing DECISIONS.md SS D265 says may not be asserted. On seed 20 260 824 at 1 800 s under collective the run draws 244 journeys and 381 legs; 135 of those journeys begin in the car park and every one of them takes exactly 2.000 legs, transferring at G. Give bank 'main' the two basement floors as well -- the repair GAMEPLAY_AND_NAVIGATION.md SS 10.5 case 6 names -- and the SAME 244 journeys take 244 legs, no journey takes more than one, and the mean time to destination falls from 195.3 s to 150.8 s while the mean wait RISES from 38.5 s to 50.2 s, because the four tower cars now answer the car park too. Two further seeds reproduce it: 383 legs against 246 and 353 against 217. The journey counts are identical on both arms, so what moved is the routing and not the demand. THAT COMPARISON IS A CHECKED-IN RUN RATHER THAN A FIGURE IN THIS COMMENT: packages/core/src/sim/serviceZoneSeam.test.ts is the instrument, always on, and it asserts the relation rather than the three integers -- so an edit that leaves the restriction binding does not fail it, and an edit that stops it binding does. WHY TWO BANKS AND NOT ONE RESTRICTED CAR: servesFloors is declared per BANK, so 'one of five cars reaches B1-B2' is only expressible as a bank of one. It is also the physically honest arrangement: a shaft reaching both B2 (-7.2 m) and floor 19 (+72.7 m) is a 79.9 m rise, past geared-traction's 76 m maxRiseM, and resolveBuilding says so -- the counterfactual arm above raises rise-exceeds-class and the shipped building raises no warning at all. A car park lift is a separate, slower machine because one machine cannot do both. WHY G IS A TRANSFER FLOOR: it is the only floor both banks serve, so it is where a journey changes cars, and config/buildingConnectivity.ts requires the flag before it will route one. mixed-use-high-rise declares G the same way for the same reason. THE CAR-PARK SHARE IS A CONSEQUENCE, NOT A FIGURE: SS 10.5 says the car park is what 'a third of the building arrives through'. That share is NOT EXPRESSIBLE IN A BUILDING DOCUMENT -- traffic/generator.ts weights entrances equally unless a run passes entranceWeights, which is a field of SimulationDemandOptions and not of this schema. Three declared entrances therefore means a third of incoming demand each, and measured, 135 of 244 journeys (55 %) begin in the car park. The alternative was to declare one basement an entrance and leave the other a served floor nobody ever calls from or to, which is the dead-seam shape SS D265 refuses. The share is recorded here rather than approximated. PASSENGER TRANSFER TIME: the loader has no mixed-use row and refuses to default (data/buildings/README.md SS Passenger transfer time), so every car states its own. All five state 1.2 s, the office row, and that is a claim rather than a shrug: this building's entire population is people at work -- shop staff and office staff -- so one figure really does describe every car, unlike mixed-use-high-rise, where a residential bank loads at 1.75 s against an office bank's 1.2 s. WHAT THE CLOSED FORM SAYS: bank 'main' reconciles -- raw divergence +31.21 %, residual -0.26 % once the two documented omissions are restored, explained against a 4 % tolerance, at 64 replications from seed 810 000 -- with three declared departures from the model (nonUniformFloorPopulations, nonUniformInterfloorDistance, expressZone), all three of which are the building being mixed-use rather than defects. Bank 'carpark' is REFUSED and the refusal is measured rather than argued: analyzeUpPeak throws because the bank serves no populated floor above its terminal, which is true -- it lifts people from two unpopulated parking decks to a transfer floor, and an up-peak round trip to a zone with no occupants is not a quantity the Barney/CIBSE expression has. WHAT THIS BUILDING IS NOT FOR: it is not in data/proof-cases.json. The owner ruled on 2026-09-10 (GitHub issues #501 and #419) that it stays out of the bench's forty so every rating stays comparable; docs/37 SS 7.3's proposed swap is settled in the refusing direction.",
+  "id": "ashgate",
+  "name": "Ashgate Mixed-Use",
+  "type": "mixed-use",
+  "trafficProfile": "office-standard",
+  "floors": [
+    {
+      "id": "B2",
+      "index": -2,
+      "heightM": -7.2,
+      "population": 0,
+      "isEntrance": true,
+      "label": "Car park, lower deck"
+    },
+    {
+      "id": "B1",
+      "index": -1,
+      "heightM": -3.6,
+      "population": 0,
+      "isEntrance": true,
+      "label": "Car park"
+    },
+    {
+      "id": "G",
+      "index": 0,
+      "heightM": 0.0,
+      "population": 0,
+      "isEntrance": true,
+      "isTransferFloor": true,
+      "label": "Shops and lobby"
+    },
+    {
+      "id": "1",
+      "index": 1,
+      "heightM": 4.5,
+      "population": 22,
+      "label": "Shops"
+    },
+    {
+      "id": "2",
+      "index": 2,
+      "heightM": 9.0,
+      "population": 22,
+      "label": "Shops"
+    },
+    {
+      "id": "3",
+      "index": 3,
+      "heightM": 13.5,
+      "population": 22,
+      "label": "Shops"
+    },
+    {
+      "id": "4",
+      "index": 4,
+      "heightM": 17.2,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "5",
+      "index": 5,
+      "heightM": 20.9,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "6",
+      "index": 6,
+      "heightM": 24.6,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "7",
+      "index": 7,
+      "heightM": 28.3,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "8",
+      "index": 8,
+      "heightM": 32.0,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "9",
+      "index": 9,
+      "heightM": 35.7,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "10",
+      "index": 10,
+      "heightM": 39.4,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "11",
+      "index": 11,
+      "heightM": 43.1,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "12",
+      "index": 12,
+      "heightM": 46.8,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "13",
+      "index": 13,
+      "heightM": 50.5,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "14",
+      "index": 14,
+      "heightM": 54.2,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "15",
+      "index": 15,
+      "heightM": 57.9,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "16",
+      "index": 16,
+      "heightM": 61.6,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "17",
+      "index": 17,
+      "heightM": 65.3,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "18",
+      "index": 18,
+      "heightM": 69.0,
+      "population": 34,
+      "label": "Offices"
+    },
+    {
+      "id": "19",
+      "index": 19,
+      "heightM": 72.7,
+      "population": 34,
+      "label": "Offices"
+    }
+  ],
+  "totalPopulation": 610,
+  "banks": [
+    {
+      "id": "main",
+      "name": "Shops and offices",
+      "servesFloors": [
+        "G",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19"
+      ],
+      "cars": [
+        {
+          "id": "A",
+          "spec": "geared-traction",
+          "ratedSpeedMps": 2.5,
+          "ratedLoadLb": 2500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "B",
+          "spec": "geared-traction",
+          "ratedSpeedMps": 2.5,
+          "ratedLoadLb": 2500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "C",
+          "spec": "geared-traction",
+          "ratedSpeedMps": 2.5,
+          "ratedLoadLb": 2500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "D",
+          "spec": "geared-traction",
+          "ratedSpeedMps": 2.5,
+          "ratedLoadLb": 2500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        }
+      ]
+    },
+    {
+      "id": "carpark",
+      "name": "Car park lift",
+      "servesFloors": [
+        "B2",
+        "B1",
+        "G"
+      ],
+      "cars": [
+        {
+          "id": "P",
+          "spec": "mrl-gearless-low",
+          "ratedSpeedMps": 1.6,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Four cars serve the ground and everything above it; one serves the two car-park decks and the ground. That one car is the building's whole dispatch problem: it is a queue nothing else can relieve, and every journey it carries is half of somebody's trip rather than all of it.",
+    "The retail floors are 4.5 m apart and the office floors 3.7 m, which is what shops over a lobby and offices over shops really look like and is why the closed form reports a non-uniform interfloor distance here. It is the mean that enters the round trip; the spread is declared so a reader knows the mean is one.",
+    "Nobody lives in the car park. B1 and B2 carry no population and exist as entrances, so they originate incoming journeys and receive outgoing ones and never generate an interfloor trip of their own -- which is what a car park is."
+  ]
+}

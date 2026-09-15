@@ -59,8 +59,8 @@ const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
   it('covers every shipped building exactly once', () => {
     // Both directions. A contract for a building that does not ship is the first suite's
     // failure; a shipped building with no contract is a scenario the reader can never take.
-    // `docs/12` § 4.4 said the set is the FIVE, not a subset of them — and three buildings landed
-    // after the handoff was written, so the campaign is eight and the deviation is recorded in
+    // `docs/12` § 4.4 said the set is the FIVE, not a subset of them — and five buildings landed
+    // after the handoff was written, so the campaign is ten and the deviation is recorded in
     // `docs/12` § 4.7. The rule the guard enforces is unchanged: coverage, in both directions.
     //
     // Compared as sets, not as sequences: the handoff's teaching order puts Secure Tower before
@@ -93,14 +93,21 @@ const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
      * is asserted here as a **list** because it is a curriculum and a reader of this test should be
      * able to see it; the property that makes it a curve rather than a list is the sweep's, and the
      * sweep is a compute job rather than a check (`shift/contractCurve.sweep.test.ts`).
+     *
+     * **Harbour Point and Ashgate were inserted rather than appended** (GitHub issues #500, #501),
+     * each at the position its own measured day-1 miss rate puts it: 0.42 of 50 seeds and 0.52,
+     * against St Jude's 0.40, Midtown's 0.46 and Secure Tower's 0.52. `docs/33` § 4.7j carries the
+     * two rows and the run.
      */
     expect(CONTRACTS.map((contract) => contract.buildingId)).toEqual([
       'garden-apartments',
       'chancery-house',
       'st-jude-hospital',
+      'harbour-point',
       'midtown-office',
       'crown-hotel',
       'secure-tower',
+      'ashgate',
       'mixed-use-high-rise',
       'vertical-city',
     ]);
@@ -109,21 +116,31 @@ const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
   it('never asks a reader to run more banks than the scenario before it', () => {
     /*
      * The curriculum reading of the measured order, and the one thing about it a table can check
-     * without running a simulation: 1, 1, 1, 1, 1, 2, 3, 7. Five single-bank buildings of rising
-     * subtlety, then two banks and a credential, then one transfer, then three. If a rebalance ever
-     * moves a three-bank tower above a one-bank one, this fails and the curriculum claim in
-     * `contracts.ts`'s docstring has to be re-argued rather than quietly dropped.
+     * without running a simulation: 1, 1, 1, 1, 1, 1, 2, 2, 3, 7. Six single-bank buildings of
+     * rising subtlety, then two banks and a credential, then two banks and a service zone, then one
+     * transfer, then three. If a rebalance ever moves a three-bank tower above a one-bank one, this
+     * fails and the curriculum claim in `contracts.ts`'s docstring has to be re-argued rather than
+     * quietly dropped.
+     *
+     * **It survived two insertions, and that was not free.** Harbour Point is a one-bank tower and
+     * Ashgate a two-bank one, and each was placed by its measured miss rate rather than by its bank
+     * count — so a one-bank tower landing after a three-bank one was a live possibility this case
+     * was watching for. It did not happen; had it, the honest move would have been to re-argue the
+     * reading here rather than to reorder the ladder against its own measurement.
      */
     const banksOf = (buildingId: string): number =>
       config.buildingsById.get(buildingId)?.banks.length ?? 0;
     const counts = CONTRACTS.map((contract) => banksOf(contract.buildingId));
-    expect(counts).toEqual([1, 1, 1, 1, 1, 2, 3, 7]);
+    expect(counts).toEqual([1, 1, 1, 1, 1, 1, 2, 2, 3, 7]);
   });
 
   it('asks for between one and three clean shifts, rising', () => {
-    // Non-decreasing, and the three appended contracts may not ask for LESS than the arc they
-    // follow — a campaign that gets easier after its finale is a campaign with two finales.
-    expect(CONTRACTS.map((contract) => contract.needClean)).toEqual([1, 2, 2, 2, 3, 3, 3, 3]);
+    // Non-decreasing, and an inserted contract may not ask for LESS than the arc it lands in — a
+    // campaign that gets easier after its finale is a campaign with two finales. The shape is the
+    // eight-contract ladder's at ten: one opener, then four at two, then five at three.
+    expect(CONTRACTS.map((contract) => contract.needClean)).toEqual([
+      1, 2, 2, 2, 2, 3, 3, 3, 3, 3,
+    ]);
     for (let index = 1; index < CONTRACTS.length; index += 1) {
       const previous = CONTRACTS[index - 1]?.needClean ?? 0;
       expect(CONTRACTS[index]?.needClean ?? 0).toBeGreaterThanOrEqual(previous);
@@ -138,7 +155,7 @@ const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
      * is why the two lists below no longer read in step.
      */
     expect(CONTRACTS.map((contract) => contract.id)).toEqual([
-      'c1', 'c6', 'c8', 'c2', 'c7', 'c3', 'c4', 'c5',
+      'c1', 'c6', 'c8', 'c9', 'c2', 'c7', 'c3', 'c10', 'c4', 'c5',
     ]);
     expect(CONTRACTS.map((contract) => contract.label)).toEqual([
       'Scenario 1',
@@ -149,6 +166,8 @@ const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
       'Scenario 6',
       'Scenario 7',
       'Scenario 8',
+      'Scenario 9',
+      'Scenario 10',
     ]);
   });
 

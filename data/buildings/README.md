@@ -32,6 +32,8 @@ Adding the file alone turns the suite red, which is the intended way to find out
 | Crown Hotel | [`crown-hotel.json`](crown-hotel.json) | Complete — two-way demand, unlike cars |
 | St Jude Hospital | [`st-jude-hospital.json`](st-jude-hospital.json) | Complete — `hospital` profile, first shipped stair |
 | Burj-class reference tower | [`burj-class-reference.json`](burj-class-reference.json) | Complete — 165 levels, 57 cars, **reference only**: no Career contract, and the stage cannot draw it |
+| Harbour Point | [`harbour-point.json`](harbour-point.json) | Complete — the group that cannot cope: one bank, six cars, over-subscribed as built |
+| Ashgate Mixed-Use | [`ashgate.json`](ashgate.json) | Complete — negative-index basements, and one of five cars reaching them |
 
 ## Schema
 

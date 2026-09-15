@@ -1129,12 +1129,14 @@ describe('access credentials', () => {
  * -------------------------------------------------------------------------- */
 
 describe('every shipped building generates a well-formed trace', () => {
-  it('covers all nine buildings', () => {
+  it('covers all eleven buildings', () => {
     expect(config.buildings.map((b) => b.id).sort()).toEqual([
+      'ashgate',
       'burj-class-reference',
       'chancery-house',
       'crown-hotel',
       'garden-apartments',
+      'harbour-point',
       'midtown-office',
       'mixed-use-high-rise',
       'secure-tower',

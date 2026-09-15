@@ -1,5 +1,5 @@
 /**
- * **The closed form on the three shipped buildings the five-building table does not reach.**
+ * **The closed form on the five shipped buildings the five-building table does not reach.**
  *
  * GitHub issue #232's third acceptance criterion asks a new building for *"a closed-form
  * round-trip-time check like the existing five"*. This file exists because that criterion had been
@@ -32,8 +32,31 @@
  * | building | what the closed form can say | cost |
  * |---|---|---|
  * | `chancery-house` | **reconciles** — a sixth full measurement, on the same apparatus at the same 64 replications | one bank simulated |
+ * | `harbour-point` | **reconciles**, on the only other shipped bank `analyzeUpPeak` raises no warning about at all | one bank simulated |
+ * | `ashgate` | **reconciles on `main` and is refused on `carpark`** — one building, both verdicts, and the refusal is a throw rather than a sentence | one bank simulated |
  * | `crown-hotel` | the closed form is **offered and refuses**, and the refusal is measured rather than asserted | one bank simulated |
  * | `st-jude-hospital` | refused **twice**, and both refusals are arithmetic — no simulation at all | free |
+ *
+ * ## The two that landed with the content plan
+ *
+ * `harbour-point` and `ashgate` are GitHub issues #500 and #501, the two buildings
+ * `docs/37-content-plan.md` § 7.3 says the plan owes. They arrive here rather than in
+ * `fiveBuildings.test.ts` for that file's own stated reason: *the five* is a cited set, and
+ * renaming a cited set is a larger change than adding a measurement.
+ *
+ * **Harbour Point is the interesting one for this file's purposes.** It is authored to be
+ * over-subscribed — the group cannot clear its own crowd, and 64 of 65 runs across every shipped
+ * dispatcher have their mean suppressed — and **that has nothing to do with whether the closed form
+ * describes it**, because {@link measureUpPeak} isolates the bank and drives it at
+ * `OVERLOAD_FACTOR × %POP` of its own handling capacity rather than at the building's authored
+ * demand. A reader who expects a saturating building to defeat the oracle is confusing the
+ * building's traffic profile with the experiment's, and the residual below says which.
+ *
+ * **Ashgate is the first shipped building to carry both verdicts at once.** Its `main` bank
+ * reconciles with three declared departures from the model; its `carpark` bank — one car, two
+ * unpopulated parking decks and a transfer floor — is refused, because an up-peak round trip to a
+ * zone with no occupants is not a quantity the Barney/CIBSE expression has. That is asserted as a
+ * throw, in the shape `st-jude-hospital`'s refusal already has.
  *
  * ## Chancery House is the one shipped bank the closed form describes with no caveat
  *
@@ -183,6 +206,28 @@ const RECONCILED_IN_THE_FIVE_BUILDING_TABLE: readonly string[] = [
 const RECONCILED_HERE = 'chancery-house';
 
 /**
+ * Also reconciled here, on their principal bank — GitHub issues **#500** and **#501**.
+ *
+ * Separate from {@link RECONCILED_HERE} rather than folded into it, because every case below that
+ * names {@link RECONCILED_HERE} is a claim about *Chancery House's* measured figures and would
+ * silently become a claim about a different building if the constant grew an array. The two are
+ * measured on the same apparatus, at the same {@link REPLICATIONS} from the same {@link FIRST_SEED},
+ * and their cases are their own.
+ */
+const RECONCILED_HERE_ALSO: readonly string[] = ['harbour-point', 'ashgate'];
+
+/**
+ * The bank of a shipped building the closed form is offered and **throws** on, and why.
+ *
+ * `ashgate`'s car-park lift serves `B2`, `B1` and `G`. All three carry zero population — a parking
+ * deck houses nobody and the ground is shops and a lobby — so there is no populated floor above the
+ * terminal and no up-peak round trip to price. The refusal is asserted rather than described, on
+ * `st-jude-hospital`'s precedent below: a refusal recorded only in prose is the stale-refusal defect
+ * `CLAUDE.md` names, and this one can be lifted by authoring a population above the car park.
+ */
+const REFUSED_BANK = Object.freeze({ buildingId: 'ashgate', bankId: 'carpark' });
+
+/**
  * Refused here, with the mechanism, because the Barney/CIBSE derivation assumes one car
  * specification per bank and both of these hold cars that differ in speed and capacity on purpose.
  *
@@ -281,7 +326,7 @@ const reconciliations = new Map<string, RoundTripReconciliation>();
 
 beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
-  for (const buildingId of [RECONCILED_HERE, 'crown-hotel']) {
+  for (const buildingId of [RECONCILED_HERE, 'crown-hotel', ...RECONCILED_HERE_ALSO]) {
     const measurement = measureUpPeak({
       config,
       buildingId,
@@ -344,6 +389,7 @@ describe('every shipped building is accounted for by exactly one closed-form ver
     const claimed = [
       ...RECONCILED_IN_THE_FIVE_BUILDING_TABLE,
       RECONCILED_HERE,
+      ...RECONCILED_HERE_ALSO,
       ...REFUSED_HERE,
       ...OWED_ELSEWHERE,
     ].sort();
@@ -522,6 +568,123 @@ describe('Chancery House, pure up-peak, 6 cars', () => {
       },
     });
     expect(deflated.explained).toBe(false);
+  });
+});
+
+/* ========================================================================== *
+ * 1b. Harbour Point and Ashgate — GitHub issues #500 and #501.
+ * ========================================================================== */
+
+describe('Harbour Point, pure up-peak, 6 cars', () => {
+  const id = 'harbour-point';
+
+  it('is the second shipped bank the closed form describes with no caveat at all', () => {
+    // One entrance, one zone, six identical cars, uniform populations, uniform pitch, no express
+    // run. Chancery House was the only bank in the shipped set with an empty warning list; this is
+    // the second, and it is empty for the same reasons rather than by coincidence.
+    expect(measurementOf(id).analysis.warnings.map((warning) => warning.code)).toEqual([]);
+  });
+
+  it('ran the intended replications and saturated every time', () => {
+    const m = measurementOf(id);
+    expect(m.replications).toBe(REPLICATIONS);
+    expect({ saturated: `${String(m.saturatedReplications)}/${String(m.replications)}` }).toEqual({
+      saturated: `${String(REPLICATIONS)}/${String(REPLICATIONS)}`,
+    });
+    expect(m.tripCountFull).toBeGreaterThan(200);
+  });
+
+  it('is out by exactly the documented simplifications and by nothing else', () => {
+    /*
+     * Measured: raw **+28.63 %**, residual **−0.14 %**, at n = 64 from seed 810 000.
+     *
+     * **The building being over-subscribed does not reach this measurement**, and saying so is the
+     * point. `harbour-point`'s authored demand puts the group past its own handling capacity — that
+     * is what it is for — but `measureUpPeak` isolates the bank and drives it at
+     * `OVERLOAD_FACTOR × %POP` of the capacity the closed form computes, exactly as it does for
+     * every other bank here. The oracle is a statement about the round trip, not about the
+     * building's traffic profile.
+     */
+    const r = reconciliationOf(id);
+    expect(r.warnings).toEqual([]);
+    expect(r.explained).toBe(true);
+    expect(Math.abs(r.residual)).toBeLessThan(DEFAULT_RESIDUAL_TOLERANCE);
+    for (const term of r.terms) {
+      for (const assumptionId of term.assumptionIds) {
+        expect(CLOSED_FORM_ASSUMPTIONS.find((entry) => entry.id === assumptionId)?.bias).toBe(
+          'under',
+        );
+        expect(CLOSED_FORM_COMPARISON_RULE.oneSidedUnderIds).toContain(assumptionId);
+      }
+    }
+  });
+
+  it('is out against the textbook expression, in the one direction the rule predicts', () => {
+    const m = measurementOf(id);
+    const interval = relativeDivergence(m.measured.intervalS.mean, m.analysis.result.intervalS);
+    const capacity = relativeDivergence(
+      m.measured.percentPopulation5Min.mean,
+      m.analysis.result.percentPopulation5Min,
+    );
+    expect(interval).toBeGreaterThan(0);
+    expect(capacity).toBeLessThan(0);
+    expect(m.measured.roundTripS.mean).toBeGreaterThan(m.matched.result.roundTripTimeS);
+  });
+});
+
+describe('Ashgate Mixed-Use — one building, both verdicts', () => {
+  const id = 'ashgate';
+
+  it('reconciles its principal bank, with its departures from the model declared', () => {
+    /*
+     * Measured: raw **+31.21 %**, residual **−0.26 %**, at n = 64 from seed 810 000.
+     *
+     * The three warnings are the building being mixed-use rather than defects: retail floors carry
+     * 22 people and office floors 34 (`nonUniformFloorPopulations`), the retail pitch is 4.5 m
+     * against the offices' 3.7 m (`nonUniformInterfloorDistance`), and the lowest served floor sits
+     * more than one mean pitch above the terminal (`expressZone`). They are asserted as a **set**,
+     * so a fourth arriving — or one of these silently going away — is a red test rather than a
+     * residual nobody can attribute.
+     */
+    const m = measurementOf(id);
+    expect([...m.analysis.warnings.map((warning) => warning.code)].sort()).toEqual([
+      'expressZone',
+      'nonUniformFloorPopulations',
+      'nonUniformInterfloorDistance',
+    ]);
+    const r = reconciliationOf(id);
+    expect(r.warnings).toEqual([]);
+    expect(r.explained).toBe(true);
+    expect(Math.abs(r.residual)).toBeLessThan(DEFAULT_RESIDUAL_TOLERANCE);
+  });
+
+  it('refuses its car-park bank, by a throw rather than by a sentence', () => {
+    /*
+     * `CLAUDE.md` § "A stated refusal goes stale the same way": a control that writes nothing must
+     * say so, and the saying must be pinned by a run. This refusal is liftable — author a
+     * population above `G` on that bank and it stops throwing — which is what makes asserting it
+     * worth anything.
+     */
+    expect(() =>
+      measureUpPeak({
+        config,
+        buildingId: REFUSED_BANK.buildingId,
+        bankId: REFUSED_BANK.bankId,
+        seeds: [FIRST_SEED],
+        peakWindowS: PEAK_WINDOW_S,
+      }),
+      `${REFUSED_BANK.buildingId}/${REFUSED_BANK.bankId} now reduces — the docstring says it cannot`,
+    ).toThrow(/no populated floor above its terminal|no up-peak to analyse/i);
+  });
+
+  it('declares a service restriction that the closed form is allowed to be blind to', () => {
+    // The oracle prices one bank's round trip and has no term for *how many legs a journey takes*.
+    // Ashgate's restriction — one of five cars reaching the basements — is measured on the legs in
+    // `docs/04` § 11 and by nothing here, and the two banks below are what the restriction *is*.
+    const building = config.buildingsById.get(id);
+    expect(building?.banks.map((bank) => bank.cars.length)).toEqual([4, 1]);
+    const carpark = building?.banks.find((bank) => bank.id === REFUSED_BANK.bankId);
+    expect([...(carpark?.servesFloors ?? [])].sort()).toEqual(['B1', 'B2', 'G']);
   });
 });
 

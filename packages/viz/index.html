@@ -2400,19 +2400,23 @@
                      footnote handed a player a repository path. Static markup cannot count, so the
                      numbers are pinned instead: `src/dev/scenarioCopy.test.ts` derives them from
                      `shift/contracts.ts`'s `CONTRACTS` and fails on the day a ninth lands, which is
-                     the check that was missing rather than the number that was wrong. -->
+                     the check that was missing rather than the number that was wrong. It fired on
+                     2026-09-14, when a ninth and a tenth landed together (GitHub issues #500 and
+                     #501): the suite went red naming all three sentences, and *eight* / *seven* /
+                     *eight* became *ten* / *nine* / *ten* here. A pinned count that goes red is the
+                     check working, not the check being in the way. -->
                 <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px">
                   <div>
-                    <div class="eyebrow">Scenarios — eight buildings, any order</div>
+                    <div class="eyebrow">Scenarios — ten buildings, any order</div>
                     <p style="font-size: 13px; color: var(--dim); line-height: 1.5; margin: 6px 0 0; max-width: 640px">
                       Every scenario is open from the start. Bank the clean shifts one asks for, or just run
-                      it and watch what breaks — each building teaches something the other seven cannot.
+                      it and watch what breaks — each building teaches something the other nine cannot.
                     </p>
                   </div>
                 </div>
                 <div style="display: grid; gap: 10px" id="scenario-list"></div>
                 <p style="font-size: 12px; color: var(--dimmer); margin: 16px 0 0; max-width: 660px; line-height: 1.55">
-                  All eight ship with the simulator — same floor heights, same car specs, same
+                  All ten ship with the simulator — same floor heights, same car specs, same
                   populations. Taking an assignment restarts the week on that building.
                 </p>
               </div>

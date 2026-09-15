@@ -55,8 +55,10 @@ import { isWaitingAt } from '../frame/overlay.js';
  *
  * Measured 2026-09-06 on the integrated tree by `legibility.sweep.test.ts`: each contract's day 1
  * under `collective` at its own shift length, ordinary day, seeds `20 260 824 + 7 919 n`,
- * `n = 0…49`, folded through {@link legibilityOf} at the shipped band and window. **Eight contracts
- * × 50 seeds = 400 runs**, `docs/33` § 4.6's cell exactly.
+ * `n = 0…49`, folded through {@link legibilityOf} at the shipped band and window. **Re-measured
+ * 2026-09-14 at ten contracts × 50 seeds = 500 runs** (GitHub issues #500 and #501), `docs/33`
+ * § 4.6's cell exactly, and **all eight original rows reproduced to the second** — the two added
+ * rows are the only movement in the table.
  *
  * | contract | building | legible seeds of 50 | median longest stretch (s) |
  * |---|---|---|---|
@@ -68,6 +70,8 @@ import { isWaitingAt } from '../frame/overlay.js';
  * | c6 | chancery-house | **2** | 28 |
  * | c7 | crown-hotel | 40 | 161 |
  * | c8 | st-jude-hospital | **1** | 38 |
+ * | c9 | harbour-point | **50** | 1 343 |
+ * | c10 | ashgate | 10 | 79 |
  *
  * Two readings, both of them what #208 and § D475 needed measured rather than argued. Garden
  * Apartments never once holds a landing in the third band for two minutes — nobody on it waits
@@ -78,6 +82,17 @@ import { isWaitingAt } from '../frame/overlay.js';
  * legible on every seed with a stretch longer than the shift, which is a building whose problem a
  * player cannot miss. The five that are legible on more than a third of seeds — c2, c4, c5, c7 and
  * c3 at two fifths — are the eligible set this table hands § D475's draw.
+ *
+ * **The two that landed with the content plan say opposite things, and both are the building doing
+ * what it was authored to do.** Harbour Point is legible on **50 of 50** at a median 1 343 s — a
+ * landing holds somebody past a minute for twenty-two minutes of a thirty-minute day — because the
+ * group cannot clear its crowd even let at three fifths ([§ D572](../../../../DECISIONS.md)); only
+ * Midtown Office is more legible, and it is the second contract whose problem a player cannot miss.
+ * Ashgate is legible on **10 of 50** at a median 79 s, **below the eligible threshold**, and that is
+ * consistent rather than disappointing: its problem is that a car-park arrival rides twice, which is
+ * a fact about *time to destination* and not about a landing holding a crowd — the very case
+ * `docs/35` `PM-TT2` exists to distinguish. A tower can present a real problem and present it
+ * somewhere this instrument does not look, and this is the first shipped example.
  *
  * The proportion carries its `n`, the stretch is a median, and there is no interval: no arms are
  * compared (`docs/33` § 6.5). `legibility.test.ts` pins the first ten seeds of every contract so
@@ -109,6 +124,8 @@ export const LEGIBILITY_SWEEP: readonly LegibilitySweepRow[] = Object.freeze([
   { contractId: 'c6', buildingId: 'chancery-house', legibleOf50: 2, medianStretchS: 28 },
   { contractId: 'c7', buildingId: 'crown-hotel', legibleOf50: 40, medianStretchS: 161 },
   { contractId: 'c8', buildingId: 'st-jude-hospital', legibleOf50: 1, medianStretchS: 38 },
+  { contractId: 'c9', buildingId: 'harbour-point', legibleOf50: 50, medianStretchS: 1343 },
+  { contractId: 'c10', buildingId: 'ashgate', legibleOf50: 10, medianStretchS: 79 },
 ]);
 
 /** The third band's floor — `WAIT_BANDS[2].fromS`, read rather than retyped. */

@@ -294,9 +294,14 @@ mistakes them for oversights:
   its own tab rather than as a refusal covering both halves. The list is
   [`data/proof-cases.json`](../data/proof-cases.json), derived into the forty by
   `gauntlet/proofCases.ts`, run through the bench's own worker by `gauntlet/run.ts`, folded by
-  `gauntlet/rating.ts` and drawn by `everyday/boardScreen.ts`. The eight towers are the eight this
-  build **ships**: § 12.3 names Harbour Point and Ashgate Mixed-Use, `data/buildings/` holds
-  neither, and the file's `$comment` records the substitution and what moving a case would cost.
+  `gauntlet/rating.ts` and drawn by `everyday/boardScreen.ts`. The eight towers are eight this
+  build **ships**, and they are still not § 12.3's eight: Harbour Point and Ashgate Mixed-Use now
+  exist in `data/buildings/` ([§ D572](../DECISIONS.md), [§ D573](../DECISIONS.md), GitHub issues
+  #500 and #501) and are deliberately **not** in the forty, because the owner ruled on 2026-09-10
+  (#419) that the cases stay fixed so every rating stays comparable. So the sentence that used to
+  read *`data/buildings/` holds neither* is now *the proof set does not draw on them*, the file's
+  `$comment` records the substitution and what moving a case would cost, and the substitution is
+  permanent rather than pending.
   **The bench's suite is the third reader as of [§ D445](../DECISIONS.md)** (GitHub issue #157). It
   read `MATRIX_CELLS` — measured operating points, a different question — so § 12.3's *one list,
   three readers* had two. `everyday/benchModel.ts#benchTestsOf` now derives the forty and

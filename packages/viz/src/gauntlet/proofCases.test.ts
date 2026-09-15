@@ -169,10 +169,31 @@ describe('a case as a batch request', () => {
 describe('the parse refuses rather than repairs', () => {
   const good = RAW as Record<string, unknown>;
 
+  /**
+   * An id no shipped building has — **derived from disk rather than typed**, and the reason is
+   * this case's own history.
+   *
+   * It named `harbour-point` for as long as that was a tower `docs/37` had specified and the build
+   * did not ship. Harbour Point shipped on 2026-09-14 (GitHub issue #500) and the negative control
+   * quietly became a positive one: the parse accepted the tower, nothing threw, and the case failed
+   * — correctly, because the sentence it asserts had stopped being true of the id it named.
+   *
+   * A sentinel that names a plausible unshipped id carries an expiry date nobody is watching. This
+   * one is derived instead, so a building landing later cannot collide with it, and the assertion
+   * below states the property the derivation is for rather than trusting it.
+   */
+  const UNSHIPPED_TOWER_ID = ((): string => {
+    let candidate = 'no-such-tower';
+    while (BUILDING_IDS.has(candidate)) candidate = `${candidate}-x`;
+    return candidate;
+  })();
+
   it('refuses a tower this build does not ship — a rating over thirty-nine is not a rating', () => {
+    // Non-vacuity: the id has to be absent, or the throw below would be about something else.
+    expect(BUILDING_IDS.has(UNSHIPPED_TOWER_ID)).toBe(false);
     expect(() =>
       parseProofCases(
-        { ...good, towers: [{ id: 'harbour-point', arrivalRatePctPop5min: 2, why: 'x' }] },
+        { ...good, towers: [{ id: UNSHIPPED_TOWER_ID, arrivalRatePctPop5min: 2, why: 'x' }] },
         { buildingIds: BUILDING_IDS },
       ),
     ).toThrow(ProofCaseError);

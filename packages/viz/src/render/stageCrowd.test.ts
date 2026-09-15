@@ -137,15 +137,18 @@ const NO_ROOM_FOR_A_LOBBY = new Set([
 ]);
 
 describe('the stage has a crowd on it — issue #115 § 2, issue #103', () => {
-  it('reserves a lane on six of the nine shipped buildings, at the viewer’s own canvas', () => {
+  it('reserves a lane on eight of the eleven shipped buildings, at the viewer’s own canvas', () => {
     const withLane = BUILDING_IDS.filter((id) => stageFor(id, SHIPPED_CANVAS).riderLane !== undefined);
     expect([...withLane].sort()).toStrictEqual(
       BUILDING_IDS.filter((id) => !NO_ROOM_FOR_A_LOBBY.has(id))
         .slice()
         .sort(),
     );
-    // Six of the nine; before the change it was one, and that one was the empty building.
-    expect(withLane).toHaveLength(6);
+    // Eight of the eleven; before the change it was one, and that one was the empty building.
+    // `harbour-point` (6 shafts over 16 floors) and `ashgate` (5 over 22) both have room, which is
+    // what a mid-rise with a small group looks like from here — GitHub issues #500 and #501.
+    expect(withLane).toHaveLength(BUILDING_IDS.length - NO_ROOM_FOR_A_LOBBY.size);
+    expect(withLane).toHaveLength(8);
   });
 
   it('reserves it at a laptop canvas too, where the stage has least room', () => {
@@ -184,6 +187,8 @@ describe('the stage has a crowd on it — issue #115 § 2, issue #103', () => {
       'chancery-house': [0, 0],
       'crown-hotel': [0, 0],
       'garden-apartments': [0, 0],
+      'harbour-point': [0, 0],
+      'ashgate': [0, 0],
       'midtown-office': [0, 0],
       'mixed-use-high-rise': [0, 0],
       'secure-tower': [0, 0],
