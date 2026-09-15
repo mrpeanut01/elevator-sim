@@ -1742,7 +1742,16 @@ type DecisionReservation = {
  * because it is tidier, but because the alternative is every lane inventing bookkeeping the
  * integrator then has to throw away.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/**
+ * **Wave AB reserves D594–D620, opened before its first lane commits** — the third wave running to
+ * do it in that order, and the reason is in wave AA's entry above: free-versus-hole is not
+ * answerable from inside a lane, and neither is the ceiling. The block: D594–D600 lane A (GitHub
+ * issues #426, #427, #428 — three more reference towers, serial because they share eight
+ * registries), D601–D605 lane B (#429, shafts costing floor area), D606–D610 lane C (#372, the
+ * rush's per-wave purse), D611–D615 lane D (#234, the campaign rebalance) — and **D616–D620 are
+ * the integrator's**.
+ */
+const OPEN_RESERVATION = { wave: 'AB, of 2026-09-15', from: 594, to: 620 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
