@@ -99,8 +99,15 @@ export const RUSH_POST_COPY = Object.freeze({
   stoppedAt: (held: string, wave: number): string => `ended by hand at ${held}, in wave ${String(wave)}`,
   presses: (count: number): string => `${String(count)} ${count === 1 ? 'change' : 'changes'} while it played`,
   noPresses: 'nothing changed while it played',
+  /*
+   * **The unit is named on both figures**, which is § D530's rule about a price said in the
+   * currency's own words applied to the money inside a mode: `data/rush-purse.json` declares
+   * `unit: 'units'`, and a bare integer beside the word *purse* is a figure a player has to guess
+   * the denomination of. Never chimes, which buy a top-up and are not one.
+   */
   earned: (waves: number, paid: number, after: number): string =>
-    `outlasted ${String(waves)} ${waves === 1 ? 'wave' : 'waves'}, which paid ${String(paid)} into a purse of ${String(after)}`,
+    `outlasted ${String(waves)} ${waves === 1 ? 'wave' : 'waves'}, which paid ${String(paid)} ` +
+    `${paid === 1 ? 'unit' : 'units'} into a purse of ${String(after)}`,
   /** The list before a rush has been played at all. Never empty: a list with no words lies. */
   noRounds: 'No round of this sitting has finished yet.',
 } as const);

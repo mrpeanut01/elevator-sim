@@ -175,7 +175,22 @@ function mountReportScreen(
    * and are about different things: `postOutcome` is *this reading of this sheet*, and this is
    * *this sitting*. Sharing them would have a refusal from a day's post drawn over a sitting.
    */
-  let rushPostOutcome: EverydayRushPostOutcome | undefined;
+  let rushPostOutcome:
+    | {
+        /**
+         * How many rounds the sitting held when this answer was given.
+         *
+         * **The answer goes stale the moment a round joins**, and the count is what says so. A
+         * player who posts a one-round sitting and then plays another would otherwise read *"the
+         * server replayed every round of this sitting and they reproduced"* over a sitting one
+         * round longer than the one that was replayed, with the new round carrying no purse beside
+         * two that do — a sentence about a thing that is no longer on screen, which is the
+         * stale-surface class this shell keeps a register for.
+         */
+        readonly forRounds: number;
+        readonly answer: EverydayRushPostOutcome;
+      }
+    | undefined;
   let rushPosting = false;
   let rushPostBlock: HTMLElement | undefined;
 
@@ -323,14 +338,16 @@ function mountReportScreen(
   function drawRushPostBlock(): HTMLElement {
     const session = context.host.rush();
     const account = everydayAccount();
+    const rounds = session?.rounds ?? [];
     const view = rushPostViewOf({
-      rounds: session?.rounds ?? [],
+      rounds,
       // The sitting's own gate, taken from the host so the block and the press cannot disagree.
       check: session?.check ?? { ok: false, reasons: [RUSH_POST_COPY.noRounds] },
       hasServer: context.host.accountActions() !== undefined,
       signedIn: account?.token !== undefined,
       posting: rushPosting,
-      outcome: rushPostOutcome,
+      // The last answer, and only while it is still about the sitting on screen — see `forRounds`.
+      outcome: rushPostOutcome?.forRounds === rounds.length ? rushPostOutcome.answer : undefined,
     });
     const block = el(doc, 'section', 'everyday-rush-post');
     block.style.cssText = `${WELL};margin-top:20px;padding:16px 18px;border-radius:${String(R.card)}px`;
@@ -398,16 +415,20 @@ function mountReportScreen(
       if (!view.pressable || rushPosting) return;
       rushPosting = true;
       repaintRushPostBlock();
+      const forRounds = rounds.length;
       void context.host
         .postRushSitting()
-        .then((outcome) => {
-          rushPostOutcome = outcome;
+        .then((answer) => {
+          rushPostOutcome = { forRounds, answer };
         })
         .catch((error: unknown) => {
           // A rejection is not a state the host promises — `drawPostBlock`'s own arm, and its
           // reason: carrying the message says the request did not complete instead of inventing a
           // reassuring sentence that would be a guess.
-          rushPostOutcome = { kind: 'failed', detail: error instanceof Error ? error.message : String(error) };
+          rushPostOutcome = {
+            forRounds,
+            answer: { kind: 'failed', detail: error instanceof Error ? error.message : String(error) },
+          };
         })
         .finally(() => {
           rushPosting = false;
