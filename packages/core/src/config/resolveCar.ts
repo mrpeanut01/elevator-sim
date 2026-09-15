@@ -163,13 +163,37 @@ export function airPressureDescentCapMps(
  *
  * Returns `undefined` — never `ratedSpeedMps` — when nothing binds, which is what keeps a
  * symmetric car's resolved object identical to the one it resolved to before #444.
+ *
+ * **The rated speed is one of the limits, and it was not until 2026-09-15** —
+ * `DECISIONS.md` § D576, GitHub issue #425's lane. `airPressureDescentCapMps` says in its own
+ * docstring that *"a cap above what the car can do is still the cap, and whether it binds is the
+ * caller's question"*, and this is that caller; it took `min(authored, cap)` and never asked
+ * whether the answer was below the plate. So a 6 m/s car on a shaft above `appliesAboveTravelM`
+ * resolved to `descentSpeedMps: 10` — **quicker down than up, on a machine nobody authored an
+ * asymmetry for**, with no warning, because `descent-above-rated-speed` is raised on
+ * `CarConfig.descentSpeedMps` and there was none. `sCurve` then really flew it at 10 m/s
+ * downwards.
+ *
+ * It reached no shipped building: the only three banks above 300 m of travel all carry 10.0 m/s
+ * cars, which is exactly the cap, and `descentCap.test.ts` asserts the whole shipped set is
+ * byte-identical across this change. It was found by authoring the fourth such bank.
+ *
+ * **Only the cap is clamped, and the authored field deliberately is not.** A car whose own
+ * `descentSpeedMps` is above its rated speed is legal, is warned about
+ * (`descent-above-rated-speed`), and `CLOSED_FORM_ASSUMPTIONS`' `symmetric-speed` entry names it
+ * in terms as the one expressible case that would make the closed form read *high* instead of
+ * low. Clamping that too would have quietly deleted a configuration a published assumption
+ * describes, which is a worse fix than the defect.
  */
 function descentSpeedOf(
   ratedSpeedMps: number,
   authoredDescentMps: number | undefined,
   capMps: number | undefined,
 ): number | undefined {
-  const limits = [authoredDescentMps, capMps].filter(
+  // A cap above what the car can do binds nothing, so it resolves to the plate and then to
+  // `undefined` below — a symmetric car, which is what a non-binding limit means.
+  const boundCapMps = capMps === undefined ? undefined : Math.min(capMps, ratedSpeedMps);
+  const limits = [authoredDescentMps, boundCapMps].filter(
     (limit): limit is number => limit !== undefined,
   );
   if (limits.length === 0) return undefined;
