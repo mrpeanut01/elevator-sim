@@ -1210,10 +1210,13 @@ and `DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE`'s `predictive-balanced`, which is the 
 way through this stage.
 
 **And that last clause is exactly why it is not taken here.** `predictive-balanced` is stage 5's only
-survivor at any rung and the campaign's only measured dropdown clear of any stage, which is what
-`campaign/stageFiveClears.test.ts` pins — *is this campaign winnable at all?* Closing it takes stage
-5 to zero survivors, puts it on the band register as `below` and on `UNWINNABLE_AS_MEASURED`, and
-inverts that assertion. § 6's C2 row anticipates the inversion and says where the clause goes —
+survivor at any rung, and stage 5 is one of only **three** scenarios the survivor table finds any way
+through at all — the others are stage 1 (`zoned-uppeak`) and stage 3 (`fairness-first`). It is also
+the one the suite pins *winnability* on: `campaign/stageFiveClears.test.ts` asserts that at least one
+shipped profile clears this stage, which is the campaign's answer to *is this winnable at all?*.
+Closing it takes stage 5 to zero survivors, puts it on the band register as `below` and on
+`survivors.test.ts#UNWINNABLE_AS_MEASURED` — seven of ten rather than six — and inverts that
+assertion. § 6's C2 row anticipates the inversion and says where the clause goes —
 *"winnability moving to DC-3's witness"* — but a witness vector that clears stage 5 at 15 % is a
 search nobody has run, and inverting the assertion before one exists would trade a measured way
 through for no way through and call it a rebalance. **The lever is measured and ready; what it waits
@@ -1230,14 +1233,12 @@ on is one witness.**
 Downward leaves the breach exactly where it was. Upward destroys it: R12 refuses a goal whose
 classification does not survive the holdout, so at 15 `data/campaign.json` could not declare
 `nobody-abandoned` at all, stage 3 would join stage 1 on the DC-1 register, and the dropdown question
-gets *worse* rather than better because `beat-the-baseline` alone is a lower bar than five goals.
+gets *worse* rather than better because `beat-the-baseline` alone is a lower bar than two goals.
 **Above 12 there is nothing left to measure**: 15 is the profile's declared `max` and DC-R1 forbids
 exceeding it. So stage 3's C2 quarter is closed to demand and open only to fabric on
-`midtown-office` — a building stages 2 and 7 also run, which two published reference runs pin, and
-which `docs/04` describes; that is a wave's blast radius rather than a lane's, and it is named here
-rather than attempted.
-
----
+`midtown-office` — a building stages 2 and 7 also run, and one of the two runs
+`data/reference-runs.json` pins figure-for-figure and `watch/reference.test.ts` re-simulates; that is
+a wave's blast radius rather than a lane's, and it is named here rather than attempted.
 
 ---
 

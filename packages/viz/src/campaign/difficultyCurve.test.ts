@@ -383,8 +383,8 @@ const DC2B_SHORT: ReadonlySet<string> = new Set([
  * § 3.3f reads stage 3 shut in both directions — `office-standard`'s declared `max` of 15 takes
  * `nobody-abandoned` to `not-shippable` and leaves three profiles meeting rather than one — and
  * stage 5 **open at 15 and deliberately not taken**, because closing it there also closes
- * `predictive-balanced`, which is the campaign's only measured dropdown clear and what
- * `stageFiveClears.test.ts` pins.
+ * `predictive-balanced`, stage 5's only survivor at any rung and the clear
+ * `stageFiveClears.test.ts` pins this campaign's winnability on.
  *
  * ## It is not the survivor table's dropdown column read another way
  *
