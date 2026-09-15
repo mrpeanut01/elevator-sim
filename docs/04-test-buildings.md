@@ -422,7 +422,11 @@ the repair `GAMEPLAY_AND_NAVIGATION.md` § 10.5 case 6 names — and the **same 
 legs**, no journey takes more than one, the mean time to destination falls **195.3 s → 150.8 s** and
 the mean wait **rises 38.5 s → 50.2 s**, because the four tower cars now answer the car park too.
 Two further seeds reproduce it (383 against 246, 353 against 217). The journey counts are identical
-on both arms, so what moved is the routing and not the demand.
+on both arms, so what moved is the routing and not the demand — **and that comparison is a run this
+suite keeps, not a figure in a document**:
+`packages/core/src/sim/serviceZoneSeam.test.ts` is the instrument, always on, and it asserts the
+*relation* rather than the three integers, so a traffic-profile edit that leaves the restriction
+binding does not fail it and an edit that stops it binding does.
 
 **Why two banks rather than one restricted car.** `servesFloors` is declared per *bank*, so *one of
 five cars reaches B1–B2* is only expressible as a bank of one. It is also the physically honest

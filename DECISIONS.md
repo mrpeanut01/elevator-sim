@@ -35524,7 +35524,11 @@ binds anybody authoring a multi-entrance building, which is [§ D405](#d405)'s f
    (383 against 246, 353 against 217). **The journey counts are identical on both arms**, so what
    moved is the routing and not the demand — which is what makes this the standing requirement's
    *move the control and require the run to change, compared on the legs* rather than a difference
-   of traffic.
+   of traffic. **The comparison is a checked-in instrument rather than a figure in a `$comment`**:
+   `packages/core/src/sim/serviceZoneSeam.test.ts`, always on, asserting the relation rather than
+   the three integers — so an edit that leaves the restriction binding does not fail it, and one
+   that stops it binding does. A measurement recorded only in prose is the thing this repository
+   has now been wrong about four times.
 3. **One of five cars is expressible only as a bank of one, and that is physical as well as
    schematic.** `servesFloors` is declared per **bank**. It is also the honest arrangement: a shaft
    reaching both `B2` (−7.2 m) and floor 19 (+72.7 m) is a **79.9 m** rise, past
