@@ -380,9 +380,12 @@ specify exactly as it applies to one it did.
 > table has ever carried. The **teaching points** are unchanged. **The progression rule** holds at
 > thirteen: `needClean` reads 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3.
 >
-> **Fourteen buildings and thirteen contracts is not an arithmetic error**: `burj-class-reference` is a
+> **Seventeen buildings and sixteen contracts is not an arithmetic error**: `burj-class-reference` is a
 > *reference* building with no Career contract, named in `contracts.test.ts#REFERENCE_ONLY` and
-> asserted in both directions there.
+> asserted in both directions there. **Six reference towers have landed since that ruling and every
+> one of them has a contract**, on the owner's 2026-09-10 ruling on #232, so the gap of one is the
+> building that predates the ruling and nothing else. **The progression rule holds at sixteen**:
+> `needClean` reads 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.
 
 ### 4.6 Four corrections to the prototype, found by implementing it
 
