@@ -96,6 +96,17 @@ export interface BankEquipmentPatch {
     readonly counterweightBalanceRatio?: number | undefined;
     /** Fit a regenerative drive, priced by `elevator-specs.json`'s `regenerativeDrive` block. */
     readonly regenerativeDrive?: boolean | undefined;
+    /**
+     * Re-rope the shaft — GitHub issue #433, `DECISIONS.md` § D583. A class id from
+     * `elevator-specs.json#ropeClasses.classes`; the loader checks that it exists and that the rope
+     * reaches the bank's travel, where every other bank field's cross-reference is checked.
+     *
+     * Energy-only like the two above, with one addition that is not energy: a rope's
+     * `maxSingleTravelM` is a **hard** ceiling, so on a shaft taller than the rope allows this is
+     * the only setting in this table whose wrong value refuses the building rather than changing a
+     * figure.
+     */
+    readonly ropeClass?: string | undefined;
   };
 }
 

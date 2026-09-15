@@ -1742,7 +1742,23 @@ type DecisionReservation = {
  * because it is tidier, but because the alternative is every lane inventing bookkeeping the
  * integrator then has to throw away.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/*
+ * **Wave AA of 2026-09-15 is open, and this reservation was written by a lane rather than before the
+ * lanes started — which is the thing wave Z's comment above predicted would keep happening.**
+ *
+ * The block's **floor is D576**, because that is what `CHARTER_PROGRAMME.md`'s row names and this
+ * branch requires the row to name the floor. The **ceiling is D586, which is the top of the block
+ * *this lane* was dispatched** (GitHub issue #433, D583–D586) and not necessarily the top of the
+ * wave's. It is written at the narrowest figure that is true from here rather than at a guess:
+ * § D404 says to ask rather than to take, and inventing a wider ceiling would be this file
+ * asserting a reservation nobody made.
+ *
+ * **A lane of this wave holding a number above D586 should widen `to` on the commit that needs it**,
+ * exactly as wave Z's lanes B and C did and for the reason they gave — a lane writing a number
+ * inside its own block was turning this gate red on the ceiling rather than on anything it had done
+ * wrong. A wider claim makes this narrower one redundant, not wrong.
+ */
+const OPEN_RESERVATION = { wave: 'AA', from: 576, to: 586 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail

@@ -608,6 +608,24 @@
       }
     },
     {
+      "id": "rope-upgrade",
+      "tier": "building",
+      "name": "Re-rope a shaft",
+      "priceUnits": 16,
+      "nights": 6,
+      "note": "AGENT'S PROPOSAL — GitHub issue #433, DECISIONS.md § D583. AWAITING THE PRODUCT OWNER'S APPROVAL; neither figure has been approved. A flat building-tier row, which is what the issue's own body asks for (\"Priced at the building tier of docs/38 § 2.1's schedule\"). MEASURED: nothing. No shipped list prices re-roping a shaft, because nothing in the tree modelled a rope before #433, so there is no agreed figure to keep. CHOSEN: 16 units and 6 nights. Re-roping a hoistway is a fabric job on the shaft rather than a fitting on kit the building already has, which is docs/38 § 2.1's own line between the equipment and building tiers, and it is not a new shaft (new-car, 34 u). 6 nights sits between machines-gearless (5) and new-car (8), on the reasoning that the car is out of service while every fall is changed and the shaft is rebalanced. THE 20 IS CONSTRAINED, and the owner should know by what before moving it: this file's own rule is that a tier's typicalUnits is the MEDIAN of that tier's prices, re-derived at load (packages/viz/src/pricing/parse.ts). The building tier held eleven prices and its median is 20; a twelfth above 20 moves it. This row was drafted at 28 first -- between machines-5mps (25 u) and larger-cars-21 (32 u), which is where the size of the job reads -- and the schedule then refused to load, saying the building tier declares a typical of 20 u while its own prices median at 25 u. So 20 is the dearest figure that leaves the building tier's typical where it is, and any higher price for this row is a deliberate move of that typical rather than a price change alone. THE SECOND CONSTRAINT took it from 20 to 16: docs/35 s 10.2 caps a fix-a-building case's budget at 16 u and fixit/engine.ts#toggleRepair refuses a repair a case cannot afford, so at 20 u no fix-a-building case could buy this row at all and the seam came back byte-identical on both arms -- which is what a dead seam looks like. 16 is the dearest figure that clears BOTH constraints. new-car (34 u) and fifth-car (54 u) stay deliberately unaffordable inside a case and are bought through a scenario's own ladder; a rope is priced to be buyable in both places, and the owner may decide it should not be. Both figures are game feel and the ladder's ordering is the product owner's (see this file's own header). ONE ROW AND NOT FOUR, and not a rate times a rise: § D552's magnitude seam could price a rope per metre of travel or per tier, and this row deliberately does neither, because schedule.test.ts forbids two rows covering one field and a per-metre rate would need a declared maximum quantity that nothing measures. Whether the dearer ropes should cost more than the cheaper ones is the owner's, and it is a second row rather than a correction to this one. WHAT IT BUYS, and why it is a decision rather than a dominant buy: energy, and a shaft that can be built at all. A lighter rope takes work out of every move (§ D583 publishes the measured figure rather than quoting the source's 15 %), and a rope's maxSingleTravelM is the only HARD ceiling on a hoistway's travel in this project — above it the configuration is refused, so on a tall enough shaft this row is not an optimisation but the purchase that makes the shaft legal. It moves energyKJ, workPerServedLegKJ and the fifth goal's verdict and never a leg, exactly as regenerative-drive does.",
+      "covers": [
+        "building.bankEquipment[].set.ropeClass"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 60,
+        "default": 16
+      }
+    },
+    {
       "id": "machines-gearless",
       "tier": "building",
       "name": "Gearless machines, 8.0 m/s",

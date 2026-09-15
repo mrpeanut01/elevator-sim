@@ -494,12 +494,23 @@ export interface EnergyConvention {
    * `regenerativeDrive.recoveryFraction`, resolved onto the bank by `config/parse.ts`.
    */
   readonly regenerativeRecoveryFraction: number;
+  /**
+   * **The rope moving with one of this bank's cars, kg** — `DECISIONS.md` § D583, GitHub issue
+   * #433. `0` on a bank that declares no rope class, which is every shipped bank, and then this
+   * convention prices a move exactly as it was priced before § D583.
+   *
+   * Resolved by `config/parse.ts` from the declared class's `massKgPerMOfTravel` and the bank's own
+   * travel, so `Simulation` reads one number rather than re-deriving a shaft. See
+   * {@link ropeInertiaWorkJ} for what it is charged for and what it deliberately is not.
+   */
+  readonly ropeMassKg: number;
 }
 
-/** Balanced at one half, and no regeneration: the convention every shipped bank runs. */
+/** Balanced at one half, no regeneration and no rope modelled: the convention every shipped bank runs. */
 export const DEFAULT_ENERGY_CONVENTION: EnergyConvention = Object.freeze({
   counterweightBalanceRatio: COUNTERWEIGHT_BALANCE_RATIO,
   regenerativeRecoveryFraction: 0,
+  ropeMassKg: 0,
 });
 
 /**
@@ -536,7 +547,16 @@ export interface TravelSample {
   /** The regenerative recovery fraction that priced this move, present only when it is not zero. */
   readonly regenerativeRecoveryFraction?: number | undefined;
   /**
-   * **The energy proxy for this move, in joules of out-of-balance mechanical work.**
+   * The rope mass that priced this move, kg, **present only when it is not zero** (§ D583). Absent
+   * on every shipped run, so a record from a bank with no rope declared serialises byte-identically
+   * with one written before ropes existed.
+   */
+  readonly ropeMassKg?: number | undefined;
+  /**
+   * **The energy proxy for this move, in joules of mechanical work** — the out-of-balance term
+   * ({@link outOfBalanceWorkJ}) plus, on a bank that declares a rope class, the rope's inertia
+   * ({@link ropeInertiaWorkJ}). The second is zero on every shipped bank, so the sum is the first
+   * to the bit.
    *
    * `|loadKg − r · ratedLoadKg| · g · distanceM`, where `r` is the bank's balance ratio
    * ({@link COUNTERWEIGHT_BALANCE_RATIO} unless it declares one) — multiplied by `1 − f` when the
@@ -548,8 +568,10 @@ export interface TravelSample {
    * the conservative choice — a regenerative drive's figure is bounded above by this one, and since
    * § D539 a bank that fits one is priced by it rather than by this bound.
    *
-   * **What it deliberately omits, so nobody reads it as kWh:** acceleration losses (which need
-   * the car and counterweight masses, which no shipped spec carries), drive and gearing
+   * **What it deliberately omits, so nobody reads it as kWh:** the acceleration of the car and the
+   * counterweight (whose masses no shipped spec carries — and § D583 lifted that omission *exactly
+   * as far as the data reaches*, no further: a bank that declares a rope class carries the rope's
+   * mass, so the rope's acceleration is charged and nothing else's is), drive and gearing
    * efficiency, door-motor energy, and standby/idle power — ISO 25745-2's other half, which on
    * a lightly-used lift dominates the running term and is a property of the *machine*, not of
    * the dispatcher. This is a proxy for *the work the dispatch decisions caused*, and that is
@@ -559,12 +581,22 @@ export interface TravelSample {
   readonly workJ: number;
 }
 
-/** The four numbers a {@link TravelSample} needs from a car after a move. */
+/** The numbers a {@link TravelSample} needs from a car after a move. */
 export interface TravelReading {
   readonly distanceM: number;
   readonly direction: Direction;
   readonly loadKg: number;
   readonly ratedLoadKg: number;
+  /**
+   * The highest speed this move actually reached, m/s — `MotionProfile.peakSpeedMps`, **not** the
+   * car's rated speed, because a short hop never gets there (CLAUDE.md's modelling rules).
+   *
+   * Optional, and only {@link ropeInertiaWorkJ} reads it, so a reading without one prices exactly
+   * as it did before § D583. It is **not** silently treated as zero where it would matter:
+   * `MetricsRecorder.sampleTravel` throws when a convention carries rope mass and the reading
+   * carries no peak speed, because a rope charged nothing is a rope that bought nothing.
+   */
+  readonly peakSpeedMps?: number | undefined;
 }
 
 /**
@@ -599,6 +631,55 @@ export function outOfBalanceWorkJ(
   if (recovery === 0) return workJ;
   const motoring = reading.direction === 'up' ? signedKg > 0 : signedKg < 0;
   return motoring ? workJ : (1 - recovery) * workJ;
+}
+
+/**
+ * **What the rope costs to get moving and to stop, in joules** — `DECISIONS.md` § D583,
+ * GitHub issue #433. Pure and total. Zero on every shipped bank.
+ *
+ * ## Why this is a separate term rather than a bigger {@link outOfBalanceWorkJ}
+ *
+ * They are different physics and the names should say so. Out-of-balance work is *static*: a mass
+ * the counterweight does not cancel, lifted through a height. Rope mass is not that — **the
+ * counterweight cancels a hanging rope's weight to the extent the installation compensates it, and
+ * modelling the uncompensated case instead would put a term ten times the load term into every
+ * figure on a tall shaft, which is precisely why real tall lifts fit compensation.** What the rope
+ * unavoidably costs is *inertia*: it moves with the car, so every move accelerates it to the move's
+ * own peak speed and brakes it back to rest. That is the quantity Al-Kodmany § 2.1.5 is talking
+ * about when it says a 90 % rope-mass reduction *"reduces the total moving masses by no less than
+ * 45%"*.
+ *
+ * ## What is charged
+ *
+ * `½·m·v²` to accelerate, which **motors**, charged whole; and `½·m·v²` to brake, which
+ * **overhauls**, charged `1 − f` where `f` is the bank's regenerative recovery. Without
+ * regeneration that is `m·v²`, the same both-directions-cost convention {@link outOfBalanceWorkJ}
+ * already applies, and for its reason: a drive that does not regenerate burns the braking half in a
+ * resistor. `v` is the move's own {@link TravelReading.peakSpeedMps}, so a short hop that never
+ * reached rated speed is charged for the speed it actually reached.
+ *
+ * ## What is deliberately not charged, and it is most of a real installation
+ *
+ * The car's and the counterweight's own inertia, because no shipped spec carries either mass —
+ * this lifts {@link TravelSample.workJ}'s stated omission exactly as far as the data now reaches
+ * and no further. Rope friction over the sheave, traction losses, and the tensile margin the
+ * ceiling is really about. **So this is not the source's "about 15% energy reduction"**, which is a
+ * claim about a whole installation's consumption; what the carbon option is worth *here* is
+ * measured and published in § D583 rather than quoted.
+ *
+ * A reading with no {@link TravelReading.peakSpeedMps} returns `0`. That is not a silent hole:
+ * `MetricsRecorder.sampleTravel` refuses the pair (rope mass, no peak speed) outright.
+ */
+export function ropeInertiaWorkJ(
+  reading: TravelReading,
+  convention: EnergyConvention = DEFAULT_ENERGY_CONVENTION,
+): number {
+  const ropeKg = convention.ropeMassKg;
+  if (ropeKg === 0) return 0;
+  const v = reading.peakSpeedMps;
+  if (v === undefined) return 0;
+  const halfKineticJ = 0.5 * ropeKg * v * v;
+  return halfKineticJ + (1 - convention.regenerativeRecoveryFraction) * halfKineticJ;
 }
 
 /**

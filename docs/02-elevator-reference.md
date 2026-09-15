@@ -149,6 +149,7 @@ taken at **empty, half and full load**: the mid point is the balance point.
 |---|---|---|
 | Counterweight balance ratio | **0.5** of rated load by default; per bank within **0.4–0.5** | Literature range 0.4–0.5, cited in `core/src/config/schema.ts#BANK_ENERGY_TUNABLES`. `COUNTERWEIGHT_BALANCE_RATIO` in `core/src/metrics/types.ts` is the default, and since [§ D539](../DECISIONS.md) a bank may declare `counterweightBalanceRatio` — see below |
 | Standard gravity | 9.80665 m/s² | CODATA / ISO 80000-3 conventional value |
+| Rope class | **Absent by default** — the rope is not modelled; a bank may declare `ropeClass` | Since [§ D583](../DECISIONS.md), `elevator-specs.json#ropeClasses` carries four classes with a mass per metre of travel and a maximum single travel. Steel at 54 kg/m and carbon fibre at 5 kg/m are Al-Kodmany's own pair (27 000 kg and 2 500 kg over 500 m) divided by that travel; aramid and coated belt are chosen outright and await the owner. The declared class is per bank, and it moves energy and never a leg |
 | Regeneration | **Absent by default**; a bank may fit `regenerativeDrive` | Without regeneration the overhauling direction is dissipated in a brake resistor, so both directions cost. A fitted drive returns `elevator-specs.json#regenerativeDrive.recoveryFraction` of each overhauling move — 0.6, an agent's proposal derived from Al-Kodmany's cited 20–40 % band and awaiting the owner |
 
 ### The simulator's energy proxy
@@ -158,6 +159,8 @@ taken at **empty, half and full load**: the mid point is the balance point.
 ```
 workJ = |loadKg − r · ratedLoadKg| · g · distanceM      r = 0.5 unless the bank declares one
 workJ · (1 − f)                                        for an overhauling move, when the bank's drive returns f
+      + ½·m·v² + (1 − f)·½·m·v²                        m = the bank's rope mass, 0 unless it declares a class;
+                                                       v = the speed this move actually reached
 ```
 
 A move **overhauls** when gravity drives it — climbing with the counterweight side heavier, or
@@ -173,8 +176,10 @@ a dispatcher that cut energy by carrying fuller cars and one that cut it by driv
 different findings with the same number — and `workPerServedLegKJ`, because **a configuration that
 spends less by serving fewer people has not saved anything**.
 
-**This is not kWh, and must not be read as kWh.** It deliberately omits acceleration losses (which
-need car and counterweight masses, which no shipped spec carries), drive and gearing efficiency,
+**This is not kWh, and must not be read as kWh.** It deliberately omits the acceleration of the car
+and the counterweight (whose masses no shipped spec carries — and [§ D583](../DECISIONS.md) lifted
+that omission *exactly as far as the data reaches*: a bank that declares a rope class carries the
+rope's mass, so the rope's acceleration is charged and nothing else's is), drive and gearing efficiency,
 door-motor energy, and **standby/idle power** — ISO 25745-2's other half, which on a lightly-used
 lift dominates the running term and is a property of the machine rather than of the dispatcher. What
 it measures is *the work the dispatch decisions caused*, which is the quantity a comparison between
@@ -196,6 +201,38 @@ convention — a travel sample records its convention whenever it is not the def
 still possible. Each run says so in that disclaimer, and the viewer's Day report refuses to pair the
 energy rows of two runs whose banks differ, naming equipment as the reason, while it pairs every
 other row. Background: [`DECISIONS.md` § D106](../DECISIONS.md).
+
+### Rope class, rope mass, and the one hard ceiling on a hoistway
+
+`data/elevator-specs.json#ropeClasses` carries four classes of hoisting rope, each with a **mass per
+metre of travel** and a **maximum single travel**. A bank declares one (`banks[].ropeClass`) or
+declares none, and **none is the default and means the rope is not modelled** — which is what every
+shipped building does, so no shipped figure moves ([§ D583](../DECISIONS.md), GitHub issue #433).
+
+| class | kg per metre of travel | max single travel | provenance |
+|---|---|---|---|
+| steel | 54 | 500 m | Al-Kodmany § 2.1.5's own pair, divided by its own travel: *"about 27,000 kg"* over 500 m, and *"steel caps a single hoistway at roughly 500 m"* |
+| coated belt | 32 | 600 m | **chosen outright** — the source places Otis Gen2 *"in between"* and gives no figure |
+| aramid | 16 | 750 m | **chosen outright** — the source places Schindler's *"in between"* and gives no figure |
+| carbon fibre | 5 | 1000 m | the same pair: *"about 2,500 kg"* over 500 m, and *"carbon fibre doubles it to 1000 m"* |
+
+The travel ceiling is a **refusal**, not an advisory: a bank that declares a class and spans further
+fails to load with `rope-travel-exceeds-class`. That is the only hard ceiling on a hoistway's travel
+in this project — a lift class's own `maxRiseM` remains **advisory** ([§ D583](../DECISIONS.md) § 2),
+because hardening it reds `midtown-office` at 76.9 m against 76 m. It is raised on **no shipped
+building**: the tallest shipped single hoistway is `burj-class-reference/observation` at 452.0 m,
+inside steel's 500 m, so even a universal steel default would refuse nothing.
+
+**What rope mass moves is energy, and never a leg.** It enters the proxy above as the rope's
+**inertia** — the moving mass accelerated and braked once per move — and not as a static
+out-of-balance, because a hanging rope's position-dependent imbalance is what compensation exists to
+cancel and modelling it uncompensated would put a term ten times the load term into every figure on a
+tall shaft. Measured under `collective` at n = 30 paired replications, carbon fibre against steel takes
+**32.7 %** off `workPerServedLegKJ` at `midtown-office`, **52.5 %** at `vertical-city` and **51.3 %**
+at `burj-class-reference`. **That is not the source's "about 15 % energy reduction"**, which is a claim
+about a whole installation's consumption including the standby term and the car and counterweight
+inertia this proxy omits; it is what the rope is worth *to this proxy*, and the interval for each is
+in [§ D583](../DECISIONS.md) § 5.
 
 **Energy is an axis, never a score.** Measured across the full experiment matrix, `nearest-car` — the
 weakest shipped dispatcher — is on the Pareto front at six of eight cells, because it is best on

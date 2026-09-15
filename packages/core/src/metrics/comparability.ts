@@ -411,7 +411,10 @@ function sameEnergyBasis(a: EnergyBasis, b: EnergyBasis): boolean {
     const y = inB.get(id) ?? DEFAULT_ENERGY_CONVENTION;
     if (
       x.counterweightBalanceRatio !== y.counterweightBalanceRatio ||
-      x.regenerativeRecoveryFraction !== y.regenerativeRecoveryFraction
+      x.regenerativeRecoveryFraction !== y.regenerativeRecoveryFraction ||
+      // § D583. A rope is equipment on exactly the footing the other two are, and two runs roped
+      // differently price the same moves on different scales.
+      x.ropeMassKg !== y.ropeMassKg
     ) {
       return false;
     }
@@ -512,12 +515,22 @@ export const ENERGY_CONVENTION_SENSITIVE_METRICS: readonly ModelSensitiveMetric[
  * "is this the default?" with `===` and an explicit default cannot write a disclaimer.
  */
 export function energyConventionOf(
-  bank: Pick<ResolvedBank, 'counterweightBalanceRatio' | 'regenerativeRecoveryFraction'>,
+  bank: Pick<
+    ResolvedBank,
+    'counterweightBalanceRatio' | 'regenerativeRecoveryFraction' | 'ropeMassKg'
+  >,
 ): EnergyConvention {
   const ratio = bank.counterweightBalanceRatio ?? COUNTERWEIGHT_BALANCE_RATIO;
   const recovery = bank.regenerativeRecoveryFraction ?? 0;
-  if (ratio === COUNTERWEIGHT_BALANCE_RATIO && recovery === 0) return DEFAULT_ENERGY_CONVENTION;
-  return Object.freeze({ counterweightBalanceRatio: ratio, regenerativeRecoveryFraction: recovery });
+  const ropeMassKg = bank.ropeMassKg ?? 0;
+  if (ratio === COUNTERWEIGHT_BALANCE_RATIO && recovery === 0 && ropeMassKg === 0) {
+    return DEFAULT_ENERGY_CONVENTION;
+  }
+  return Object.freeze({
+    counterweightBalanceRatio: ratio,
+    regenerativeRecoveryFraction: recovery,
+    ropeMassKg,
+  });
 }
 
 /**
@@ -532,20 +545,27 @@ export function energyConventionOf(
 export function energyConventionDisclaimer(building: {
   readonly banks: readonly Pick<
     ResolvedBank,
-    'id' | 'counterweightBalanceRatio' | 'regenerativeRecoveryFraction'
+    'id' | 'counterweightBalanceRatio' | 'regenerativeRecoveryFraction' | 'ropeMassKg' | 'ropeClassId'
   >[];
 }): string | undefined {
   const fitted = building.banks
     .map((bank) => ({ id: bank.id, convention: energyConventionOf(bank) }))
     .filter(({ convention }) => convention !== DEFAULT_ENERGY_CONVENTION);
   if (fitted.length === 0) return undefined;
+  const byId = new Map(building.banks.map((bank) => [bank.id, bank]));
   const described = fitted
     .map(({ id, convention }) => {
       const drive =
         convention.regenerativeRecoveryFraction === 0
           ? 'no regeneration'
           : `a regenerative drive returning ${String(convention.regenerativeRecoveryFraction)} of each overhauling move`;
-      return `"${id}" (counterweight at ${String(convention.counterweightBalanceRatio)} of rated load, ${drive})`;
+      // § D583. Named by class as well as by mass, because the class is what a player bought and
+      // the mass is what the run was priced with; a reader given only one cannot check the other.
+      const rope =
+        convention.ropeMassKg === 0
+          ? 'no rope modelled'
+          : `${String(Number(convention.ropeMassKg.toFixed(1)))} kg of "${String(byId.get(id)?.ropeClassId)}" rope moving with each car`;
+      return `"${id}" (counterweight at ${String(convention.counterweightBalanceRatio)} of rated load, ${drive}, ${rope})`;
     })
     .join('; ');
   const listed = ENERGY_CONVENTION_SENSITIVE_METRICS.map(
@@ -553,8 +573,8 @@ export function energyConventionDisclaimer(building: {
   ).join('; ');
   return (
     `this run prices its moves under a per-bank energy convention rather than the default of a ` +
-    `counterweight at ${String(COUNTERWEIGHT_BALANCE_RATIO)} of rated load and no regeneration ` +
-    `(DECISIONS.md § D539): bank ${described}. The legs, the distances and the motor starts are ` +
+    `counterweight at ${String(COUNTERWEIGHT_BALANCE_RATIO)} of rated load, no regeneration and no rope modelled ` +
+    `(DECISIONS.md § D539, § D583): bank ${described}. The legs, the distances and the motor starts are ` +
     `exactly what they would be under the default, and ${String(ENERGY_CONVENTION_SENSITIVE_METRICS.length)} ` +
     `figures are not — ${listed}. Do not pair either against a run of another convention without saying so.`
   );

@@ -438,6 +438,9 @@ function describeRun(
       bankId: bank.id,
       counterweightBalanceRatio: convention.counterweightBalanceRatio,
       regenerativeRecoveryFraction: convention.regenerativeRecoveryFraction,
+      // Version 15, § D583. Omitted rather than written as `0` on a bank with no rope, so the entry
+      // of an unroped bank is byte-identical to the one version 14 wrote.
+      ...(convention.ropeMassKg === 0 ? {} : { ropeMassKg: convention.ropeMassKg }),
     });
   }
   if (bankEquipment.length > 0) recording.bankEquipment = bankEquipment;

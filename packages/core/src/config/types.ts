@@ -286,6 +286,58 @@ export interface RegenerativeDriveConvention extends Commented {
   readonly source: string;
 }
 
+/**
+ * **One class of hoisting rope** — `elevator-specs.json`'s `ropeClasses.classes`,
+ * `DECISIONS.md` § D583, GitHub issue #433.
+ *
+ * Reference data about the rope rather than a property of a machine class or of one bank, so it
+ * sits beside the classes exactly as {@link AirPressureLimit} and
+ * {@link RegenerativeDriveConvention} do. A bank *buys* a class ({@link BankConfig.ropeClass});
+ * this says what that class weighs per metre of travel and how far one hoistway may run on it.
+ *
+ * Read `ropeClasses.$comment` before treating either number as a reference value: two of the four
+ * shipped rows are chosen outright, and the per-metre figures are a division the source does not
+ * perform.
+ */
+export interface RopeClassSpec extends Commented {
+  readonly id: string;
+  readonly name: string;
+  /**
+   * Mass of **all** the rope that moves with one car, per metre of the shaft's travel, kg/m.
+   *
+   * Every fall, both sides of the sheave and whatever compensation is fitted, because that is what
+   * the cited 27 000 kg at 500 m is. `config/parse.ts#resolveBuilding` multiplies it by the bank's
+   * own travel to get {@link ResolvedBank.ropeMassKg}.
+   */
+  readonly massKgPerMOfTravel: number;
+  /**
+   * The furthest a **single hoistway** may run on this rope, metres — the point at which the rope
+   * cannot support its own weight.
+   *
+   * A hard refusal rather than an advisory: a bank that declares this class and spans further
+   * fails to load with `rope-travel-exceeds-class`. That is the whole of what GitHub issue #433
+   * asked for, and it is why this number is not beside {@link ElevatorSpec.maxRiseM}, which is
+   * application guidance and stays advisory.
+   */
+  readonly maxSingleTravelM: number;
+  /** What the class is for, and which of its two figures are chosen rather than cited. */
+  readonly application?: string | undefined;
+}
+
+/**
+ * **The rope library** — `elevator-specs.json`'s `ropeClasses` block, § D583.
+ *
+ * A wrapper around the array so the block can carry its own `$comment` and `source`, which a bare
+ * array cannot. Optional on {@link ElevatorSpecs} for {@link AirPressureLimit}'s reason: a data
+ * directory that declares none models no rope at all, which is this project before § D583, and a
+ * bank that names a class there is told so (`rope-class-buys-nothing`).
+ */
+export interface RopeClassLibrary extends Commented {
+  readonly classes: readonly RopeClassSpec[];
+  /** Where the figures come from, and which of them are chosen rather than cited. */
+  readonly source: string;
+}
+
 /** The whole of `data/elevator-specs.json`. */
 export interface ElevatorSpecs extends Commented {
   readonly version: number;
@@ -309,6 +361,13 @@ export interface ElevatorSpecs extends Commented {
    * that fits a drive there is told so (`regenerative-drive-buys-nothing`).
    */
   readonly regenerativeDrive?: RegenerativeDriveConvention | undefined;
+  /**
+   * The classes of hoisting rope a bank may be roped in, and what each costs in mass and caps in
+   * travel — § D583. Optional for {@link airPressure}'s reason: a data directory that declares
+   * none models no rope on any bank, which is the model this project shipped before GitHub issue
+   * #433, and a bank that names a class there is told so (`rope-class-buys-nothing`).
+   */
+  readonly ropeClasses?: RopeClassLibrary | undefined;
   readonly capacities: readonly CapacityEntry[];
   readonly doors: DoorTimings;
   readonly timing: ElevatorTiming;
@@ -1468,6 +1527,27 @@ export interface BankConfig extends Commented {
    * out-of-balance work. Energy only, exactly as {@link counterweightBalanceRatio} is.
    */
   readonly regenerativeDrive?: boolean | undefined;
+  /**
+   * Which class of hoisting rope this shaft is roped in — `DECISIONS.md` § D583, GitHub issue
+   * #433. An id from `elevator-specs.json`'s `ropeClasses.classes`, and **absent means the rope
+   * is not modelled at all**, which is what every shipped bank does and what this project shipped
+   * before § D583.
+   *
+   * Two things follow from declaring one, and no third:
+   *
+   * - **The class's `maxSingleTravelM` becomes a hard refusal.** A bank spanning further than its
+   *   rope allows fails to load with `rope-travel-exceeds-class`. That is a *binding* ceiling, and
+   *   it is deliberately not the lift class's own `maxRiseM`, which stays advisory.
+   * - **The rope joins the moving mass the energy proxy sees**, as
+   *   `metrics/types.ts#ropeInertiaWorkJ`. It moves `energyKJ`, `workPerServedLegKJ` and the 80 kJ
+   *   goal's verdict, and **never a leg** — nothing a dispatcher, a car or `Car.estimateCost()`
+   *   reads is touched, exactly as {@link counterweightBalanceRatio} is not.
+   *
+   * The type, the values and the default are declared in `config/schema.ts#BANK_ROPE_TUNABLES`
+   * (CLAUDE.md invariant 8); what each class weighs and how far it may run is data
+   * (`elevator-specs.json#ropeClasses`), which is invariant 7.
+   */
+  readonly ropeClass?: string | undefined;
   readonly cars: readonly CarConfig[];
 }
 
@@ -1929,6 +2009,18 @@ export interface ResolvedBank {
    * non-regenerative default, so every shipped bank resolves exactly as it did before.
    */
   readonly regenerativeRecoveryFraction?: number | undefined;
+  /** The rope class this bank declared, present only when it declared one (§ D583). */
+  readonly ropeClassId?: string | undefined;
+  /**
+   * The mass of rope moving with one of this bank's cars, kg — the declared class's
+   * `massKgPerMOfTravel` times this bank's own travel, resolved here so `Simulation` reads one
+   * number off the bank rather than re-deriving a shaft's travel from the floors.
+   *
+   * Present only when the bank declares a rope class **and** the data directory declares the
+   * library to resolve it against. Absent prices every move exactly as it was priced before
+   * § D583, so every shipped bank is byte-identical.
+   */
+  readonly ropeMassKg?: number | undefined;
   readonly cars: readonly ResolvedCar[];
 }
 

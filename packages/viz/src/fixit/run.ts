@@ -177,6 +177,18 @@ function applyBuildingPatch(doc: MutableBuildingDocument, patch: NonNullable<Fix
       if (equipment.set.regenerativeDrive !== undefined) {
         bank['regenerativeDrive'] = equipment.set.regenerativeDrive;
       }
+      /*
+       * **The rope** — GitHub issue #433, § D583. Written as declared, exactly as the two above are
+       * and for the same reason a pressurised cabin is written where it buys nothing: the config
+       * must say what the building has. A class the data directory does not carry, or one too short
+       * for this shaft's travel, is refused by `parseBuilding` when the run is planned rather than
+       * twice with two messages — and the second of those refusals is the only hard travel ceiling
+       * in the project, so a patch that re-ropes a supertall down a tier really can make the
+       * building fail to load. That is the constraint, not a defect in this seam.
+       */
+      if (equipment.set.ropeClass !== undefined) {
+        bank['ropeClass'] = equipment.set.ropeClass;
+      }
     }
   }
   for (const added of patch.addCars ?? []) {
