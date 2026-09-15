@@ -103,9 +103,12 @@ what a hand-built config still says. What a shaft *takes* is never authored here
 that disagrees with its own lifts. A double-deck car is one shaft.
 
 A floor whose hoistways take **strictly more** area than it has fails to load with
-`core-exceeds-floor-plate`. No shipped building comes near it; the closest is 26.6 % of one plate.
+`core-exceeds-floor-plate`. No shipped building comes near it; the closest is **26.6 %** of one
+plate, at `merdeka-class-reference` floor 57. **`willis-class-reference` floor 87 is second at
+25.8 %**, which is close enough to say out loud: that tower runs 104 cars, and the margin here is
+a fact about the shipped set rather than a property of the model. A denser tower would cross it.
 
-### Where the fourteen plates come from
+### Where the seventeen plates come from
 
 **Every figure below is an assumption with its reasoning attached, not a citation.** No published
 floor plate was read for any of these buildings — `burj-class-reference.json`'s own header already
@@ -113,7 +116,7 @@ says exactly that about its populations, and this follows it, so that a later ci
 *stated* figure rather than a silent one. All of them are **an agent's proposal awaiting the product
 owner's approval**.
 
-**Nine** of the fourteen carry one plate throughout, derived from a representative populated floor at
+**Nine** of the seventeen carry one plate throughout, derived from a representative populated floor at
 a chosen gross area per occupant — roughly 16 m² for an office, 22 for `office-prestige`, 20–25 for
 mixed-use, 30 for a hospital, 35 for residential, 40 for a hotel — then rounded:
 
@@ -129,7 +132,7 @@ mixed-use, 30 for a hospital, 35 for residential, 40 for a hotel — then rounde
 | `ashgate` | 850 m² | 34 a floor, mixed-use |
 | `mixed-use-high-rise` | 900 m² | 46 office below, 26 residential above |
 
-The other **five** — the four reference towers and `vertical-city` — **taper**, because a tall building
+The other **eight** — the seven reference towers and `vertical-city` — **taper**, because a tall building
 does: the plate shrinks as the tower rises, which is what leaves the express shafts stacked at the
 bottom while the top floors carry only their own local bank.
 
@@ -140,6 +143,27 @@ bottom while the top floors carry only their own local bank.
 | `ctf-class-reference` | 2 200 → 1 800 → 1 400 → 1 100 → 900 m² |
 | `shanghai-class-reference` | 2 600 → 2 300 → 2 000 → 1 700 → 1 000 m² |
 | `merdeka-class-reference` | 3 000 → 2 300 → 1 200 m² |
+| `one-wtc-class-reference` | 3 716 → 3 400 → 2 900 → 2 500 → 1 400 m² |
+| `empire-state-class-reference` | 4 000 → 2 300 → 1 400 → 900 → 500 m² |
+| `willis-class-reference` | 4 719 → 4 195 → 2 622 → 1 049 m² |
+
+**The last three were authored one wave after the other five and their reasoning is a shape rather
+than a density**, which is why they sit apart from the nine above. Each was sized from the tower's
+own published *form* and then checked against its published gross area, rather than from occupants
+per floor:
+
+- **One WTC** — a 61 m square base is **3 716 m²**, and the chamfers take it in as it rises. The
+  authored taper sums to roughly **322 000 m²** over the tower against a published figure near
+  325 000, so the shape is bracketed rather than guessed. The sky lobby is held at 3 000 m² and the
+  three observatory levels at 1 860.
+- **Empire State** — the five-storey base covers the whole lot and the tower steps back hard, so
+  this is the steepest taper in the set: **4 000 → 500 m²**, summing near **219 000 m²** against a
+  published gross near 208 000.
+- **Willis** — the only one whose plate is arithmetic rather than an estimate. Nine bundled tubes,
+  each **22.9 m square = 524.4 m²**: nine of them is 4 719 m², five is 2 622, two is 1 049. **The
+  range boundaries are the building's dispatch zones rather than its structural setbacks** (which
+  fall at 50, 66 and 90), so a range spanning a setback carries the figure representative of its
+  span — 4 195 m² for 35–64, which is nine tubes to 50 and seven above.
 
 What each comes out at as a **core share** — hoistway only, no lobby, no machine room — is pinned in
 `packages/core/src/config/floorArea.test.ts` and listed in

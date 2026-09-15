@@ -4,6 +4,7 @@
   "name": "One-WTC-class reference tower",
   "type": "office",
   "trafficProfile": "office-standard",
+  "grossAreaPerFloorM2": 3716,
   "floors": [
     {
       "id": "G",
@@ -27,7 +28,8 @@
       "heightM": 258.8,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Sky lobby — arrival level, where the shuttle lands"
+      "label": "Sky lobby — arrival level, where the shuttle lands",
+      "grossAreaM2": 3000
     },
     {
       "id": "65",
@@ -35,7 +37,8 @@
       "heightM": 262.7,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Sky lobby — departure level, one escalator above the arrival hall"
+      "label": "Sky lobby — departure level, one escalator above the arrival hall",
+      "grossAreaM2": 3000
     },
     {
       "id": "100",
@@ -43,7 +46,8 @@
       "heightM": 399.2,
       "population": 60,
       "trafficProfile": "hotel",
-      "label": "Observatory — the main viewing floor"
+      "label": "Observatory — the main viewing floor",
+      "grossAreaM2": 1860
     },
     {
       "id": "101",
@@ -51,7 +55,8 @@
       "heightM": 403.1,
       "population": 45,
       "trafficProfile": "hotel",
-      "label": "Observatory — the theatre level"
+      "label": "Observatory — the theatre level",
+      "grossAreaM2": 1860
     },
     {
       "id": "102",
@@ -59,7 +64,8 @@
       "heightM": 407,
       "population": 45,
       "trafficProfile": "hotel",
-      "label": "Observatory — the restaurant"
+      "label": "Observatory — the restaurant",
+      "grossAreaM2": 1860
     }
   ],
   "floorRanges": [
@@ -70,7 +76,8 @@
       "floorToFloorM": 4,
       "populationPerFloor": 0,
       "idPattern": "{index}",
-      "label": "Podium and mechanical (3–19) — unpopulated"
+      "label": "Podium and mechanical (3–19) — unpopulated",
+      "grossAreaPerFloorM2": 3716
     },
     {
       "fromIndex": 20,
@@ -79,7 +86,8 @@
       "floorToFloorM": 3.9,
       "populationPerFloor": 70,
       "idPattern": "{index}",
-      "label": "Low- and mid-rise offices (20–63)"
+      "label": "Low- and mid-rise offices (20–63)",
+      "grossAreaPerFloorM2": 3400
     },
     {
       "fromIndex": 66,
@@ -88,7 +96,8 @@
       "floorToFloorM": 3.9,
       "populationPerFloor": 60,
       "idPattern": "{index}",
-      "label": "High-rise offices (66–90)"
+      "label": "High-rise offices (66–90)",
+      "grossAreaPerFloorM2": 2900
     },
     {
       "fromIndex": 91,
@@ -97,7 +106,8 @@
       "floorToFloorM": 3.9,
       "populationPerFloor": 0,
       "idPattern": "{index}",
-      "label": "Mechanical (91–99) — unpopulated"
+      "label": "Mechanical (91–99) — unpopulated",
+      "grossAreaPerFloorM2": 2500
     },
     {
       "fromIndex": 103,
@@ -106,7 +116,8 @@
       "floorToFloorM": 3.9,
       "populationPerFloor": 0,
       "idPattern": "{index}",
-      "label": "Plant and the base of the spire (103–104) — unpopulated"
+      "label": "Plant and the base of the spire (103–104) — unpopulated",
+      "grossAreaPerFloorM2": 1400
     }
   ],
   "totalPopulation": 4810,

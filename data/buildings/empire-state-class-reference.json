@@ -4,6 +4,7 @@
   "name": "Empire-State-class reference tower",
   "type": "office",
   "trafficProfile": "office-standard",
+  "grossAreaPerFloorM2": 4000,
   "floors": [
     {
       "id": "G",
@@ -27,7 +28,8 @@
       "heightM": 292.8,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Relay lobby (80) — the first change, and there is no express to it"
+      "label": "Relay lobby (80) — the first change, and there is no express to it",
+      "grossAreaM2": 1400
     },
     {
       "id": "86",
@@ -35,14 +37,16 @@
       "heightM": 314.4,
       "population": 30,
       "isTransferFloor": true,
-      "label": "Observatory deck (86) — the second change"
+      "label": "Observatory deck (86) — the second change",
+      "grossAreaM2": 900
     },
     {
       "id": "102",
       "index": 102,
       "heightM": 372,
       "population": 20,
-      "label": "Upper observatory (102) — the top of the relay"
+      "label": "Upper observatory (102) — the top of the relay",
+      "grossAreaM2": 500
     }
   ],
   "floorRanges": [
@@ -53,7 +57,8 @@
       "floorToFloorM": 3.6,
       "populationPerFloor": 140,
       "idPattern": "{index}",
-      "label": "Lower offices (3–30) — the widest plates"
+      "label": "Lower offices (3–30) — the widest plates",
+      "grossAreaPerFloorM2": 4000
     },
     {
       "fromIndex": 31,
@@ -62,7 +67,8 @@
       "floorToFloorM": 3.6,
       "populationPerFloor": 90,
       "idPattern": "{index}",
-      "label": "Middle offices (31–59)"
+      "label": "Middle offices (31–59)",
+      "grossAreaPerFloorM2": 2300
     },
     {
       "fromIndex": 60,
@@ -71,7 +77,8 @@
       "floorToFloorM": 3.6,
       "populationPerFloor": 55,
       "idPattern": "{index}",
-      "label": "Upper offices (60–79)"
+      "label": "Upper offices (60–79)",
+      "grossAreaPerFloorM2": 1400
     },
     {
       "fromIndex": 81,
@@ -80,7 +87,8 @@
       "floorToFloorM": 3.6,
       "populationPerFloor": 35,
       "idPattern": "{index}",
-      "label": "Tower offices (81–85)"
+      "label": "Tower offices (81–85)",
+      "grossAreaPerFloorM2": 900
     },
     {
       "fromIndex": 87,
@@ -89,7 +97,8 @@
       "floorToFloorM": 3.6,
       "populationPerFloor": 25,
       "idPattern": "{index}",
-      "label": "Mast-shaft offices (87–101) — the smallest plates in the tower"
+      "label": "Mast-shaft offices (87–101) — the smallest plates in the tower",
+      "grossAreaPerFloorM2": 500
     }
   ],
   "totalPopulation": 8230,

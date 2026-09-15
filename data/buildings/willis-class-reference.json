@@ -4,6 +4,7 @@
   "name": "Willis-class reference tower",
   "type": "office",
   "trafficProfile": "office-standard",
+  "grossAreaPerFloorM2": 4719,
   "floors": [
     {
       "id": "G",
@@ -28,7 +29,8 @@
       "heightM": 124.8,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Sky lobby 1 — lower level"
+      "label": "Sky lobby 1 — lower level",
+      "grossAreaM2": 4195
     },
     {
       "id": "34",
@@ -36,7 +38,8 @@
       "heightM": 128.7,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Sky lobby 1 — upper level"
+      "label": "Sky lobby 1 — upper level",
+      "grossAreaM2": 4195
     },
     {
       "id": "65",
@@ -44,7 +47,8 @@
       "heightM": 249.6,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Sky lobby 2 — lower level"
+      "label": "Sky lobby 2 — lower level",
+      "grossAreaM2": 2622
     },
     {
       "id": "66",
@@ -52,14 +56,16 @@
       "heightM": 253.5,
       "population": 0,
       "isTransferFloor": true,
-      "label": "Sky lobby 2 — upper level"
+      "label": "Sky lobby 2 — upper level",
+      "grossAreaM2": 2622
     },
     {
       "id": "103",
       "index": 103,
       "heightM": 397.8,
       "population": 40,
-      "label": "Skydeck (103) — its staff and its shop; the visitors are not modelled"
+      "label": "Skydeck (103) — its staff and its shop; the visitors are not modelled",
+      "grossAreaM2": 1049
     }
   ],
   "floorRanges": [
@@ -70,7 +76,8 @@
       "floorToFloorM": 3.9,
       "populationPerFloor": 120,
       "idPattern": "{index}",
-      "label": "Low-rise offices (3–32) — the full nine-tube plate"
+      "label": "Low-rise offices (3–32) — the full nine-tube plate",
+      "grossAreaPerFloorM2": 4719
     },
     {
       "fromIndex": 35,
@@ -79,7 +86,8 @@
       "floorToFloorM": 3.9,
       "populationPerFloor": 100,
       "idPattern": "{index}",
-      "label": "Mid-rise offices (35–64)"
+      "label": "Mid-rise offices (35–64)",
+      "grossAreaPerFloorM2": 4195
     },
     {
       "fromIndex": 67,
@@ -88,7 +96,8 @@
       "floorToFloorM": 3.9,
       "populationPerFloor": 80,
       "idPattern": "{index}",
-      "label": "High-rise offices (67–86) — above the first setback"
+      "label": "High-rise offices (67–86) — above the first setback",
+      "grossAreaPerFloorM2": 2622
     },
     {
       "fromIndex": 87,
@@ -97,7 +106,8 @@
       "floorToFloorM": 3.9,
       "populationPerFloor": 60,
       "idPattern": "{index}",
-      "label": "Tower offices (87–102) — above the second setback"
+      "label": "Tower offices (87–102) — above the second setback",
+      "grossAreaPerFloorM2": 1049
     },
     {
       "fromIndex": 104,
@@ -106,7 +116,8 @@
       "floorToFloorM": 3.9,
       "populationPerFloor": 0,
       "idPattern": "{index}",
-      "label": "Plant and the antenna base (104–108) — unpopulated"
+      "label": "Plant and the antenna base (104–108) — unpopulated",
+      "grossAreaPerFloorM2": 1049
     }
   ],
   "totalPopulation": 9200,
