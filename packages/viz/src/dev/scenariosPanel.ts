@@ -124,6 +124,25 @@ export const SCENARIO_ART: Readonly<Record<string, string>> = Object.freeze({
     'linear-gradient(180deg,color-mix(in srgb, color-mix(in srgb, var(--shaft-5) 50%, var(--shaft-8)) 34%, var(--card)),var(--card) 70%)',
   'ashgate':
     'linear-gradient(180deg,color-mix(in srgb, color-mix(in srgb, var(--shaft-3) 50%, var(--shaft-7)) 34%, var(--card)),var(--card) 70%)',
+  /*
+   * **Three reference towers, three more mixes** — GitHub issues #424, #425 and #430.
+   *
+   * The paragraph above is now doing the work it was written for: the campaign is **thirteen**
+   * buildings against eight declared tints, so every card past the eighth is a mix of two distant
+   * ones and no literal enters the file. Each pair is distinct from the two above and from each
+   * other, which is the property a swatch has to keep — two scenarios that look alike is the one
+   * thing this table exists to prevent.
+   *
+   * The CTF-class tower is the pearl over the steel blue, the Shanghai-class the blue over the
+   * violet-grey, and the Merdeka-class the violet-grey over the gold. None carries a second layer;
+   * Midtown Office's window stripe is still the design's own and is still not imitated.
+   */
+  'ctf-class-reference':
+    'linear-gradient(180deg,color-mix(in srgb, color-mix(in srgb, var(--shaft-2) 50%, var(--shaft-5)) 34%, var(--card)),var(--card) 70%)',
+  'shanghai-class-reference':
+    'linear-gradient(180deg,color-mix(in srgb, color-mix(in srgb, var(--shaft-1) 50%, var(--shaft-6)) 34%, var(--card)),var(--card) 70%)',
+  'merdeka-class-reference':
+    'linear-gradient(180deg,color-mix(in srgb, color-mix(in srgb, var(--shaft-4) 50%, var(--shaft-8)) 34%, var(--card)),var(--card) 70%)',
 });
 
 /**

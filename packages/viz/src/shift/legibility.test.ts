@@ -98,12 +98,18 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
       stretches[contract.id] = longest;
     }
     /*
-     * The slice, measured 2026-09-06 by `legibility.sweep.test.ts` at LEGIBILITY_SEEDS=10, and
-     * extended on 2026-09-14 by the two contracts GitHub issues #500 and #501 added. **The eight
-     * original rows reproduced unchanged** at both budgets, so the two new keys are the whole of
-     * the movement — which is what says the sweep's own extension did not disturb it.
+     * The slice, measured 2026-09-06 by `legibility.sweep.test.ts` at LEGIBILITY_SEEDS=10, extended
+     * on 2026-09-14 by the two contracts GitHub issues #500 and #501 added, and again on 2026-09-15
+     * by the three GitHub issues #424, #425 and #430 added. **Every earlier row reproduced
+     * unchanged** at every budget both times, so the new keys are the whole of the movement on each
+     * wave — which is what says the sweep's own extension did not disturb it. The three towers are
+     * ten of ten for the reason `firstSession.test.ts` spells out: on a building of thousands a held
+     * landing is the fabric rather than a problem a session can solve.
      */
-    expect(counts).toEqual({ c1: 0, c2: 10, c3: 2, c4: 6, c5: 8, c6: 0, c7: 8, c8: 0, c9: 10, c10: 2 });
+    expect(counts).toEqual({
+      c1: 0, c2: 10, c3: 2, c4: 6, c5: 8, c6: 0, c7: 8, c8: 0, c9: 10, c10: 2,
+      c11: 10, c12: 10, c13: 10,
+    });
     expect(stretches['c1']).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     expect(stretches['c3']).toEqual([163, 72, 143, 65, 77, 90, 103, 106, 97, 51]);
     expect(stretches['c6']).toEqual([0, 0, 60, 0, 28, 69, 10, 3, 70, 19]);

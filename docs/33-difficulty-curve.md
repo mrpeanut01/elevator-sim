@@ -1574,6 +1574,13 @@ each is a finding with its probes attached rather than a reason to widen the ban
 > the order at positions 4 and 8 rather than appended, so the ladder is ten long and DC-4 is green
 > on **seven of ten**. Everything in §§ 4.7a–4.7i describes the eight-contract ladder it was
 > measured on and is not rewritten; § 4.7j says what moved.
+>
+> **Three more have landed since that, and § 4.7k is their row — and it is the first one where the
+> measurement could not place them.** `c11`, `c12` and `c13` (the CTF-, Shanghai- and
+> Merdeka-class reference towers, GitHub issues #425, #424 and #430) each read **1.00**, as `c4` and
+> `c5` do when re-measured beside them, so the ladder is thirteen long and DC-4 is green on **seven
+> of thirteen**. The five tied rows are ordered by **bank count**, which is § 4.7d's curriculum
+> reading doing the work the miss rate cannot.
 
 #### 4.7a The instrument, and the first thing it found
 
@@ -1928,6 +1935,77 @@ eight-contract ladder. A Burj rung still goes after `vertical-city`; it is posit
 
 ## 5. Fix a building — the case ordering
 
+
+#### 4.7k The eleventh, twelfth and thirteenth — where the measurement stopped ordering
+
+**Landed 2026-09-15, GitHub issues [#425](https://github.com/mrpeanut01/elevator-sim/issues/425),
+[#424](https://github.com/mrpeanut01/elevator-sim/issues/424) and
+[#430](https://github.com/mrpeanut01/elevator-sim/issues/430)** — three reference towers, each with
+the Career contract the owner's 2026-09-10 ruling on #232 says every building owes.
+
+**Run.** § 4.7d's, unchanged, one contract at a time: `CONTRACT_CURVE_SWEEP=1
+CONTRACT_CURVE_SEEDS=50 CONTRACT_CURVE_ONLY=<id> CONTRACT_CURVE_OUT=<path> npx vitest run
+--project viz packages/viz/src/shift/contractCurve.sweep.test.ts`, day 1, dispatcher `collective`,
+seeds `20 260 824 + 7 919 n`, the shipped five-goal set.
+
+| position | contract | building | what moves it | missed | of | rate | in band | goals that missed |
+|---|---|---|---|---|---|---|---|---|
+| 10 | c13 | `merdeka-class-reference` | **nothing reaches the band** | 50 | 50 | 1.00 | **no** | queue 50, energy 50, worst-wait 21 |
+| 11 | c11 | `ctf-class-reference` | **nothing reaches the band** | 50 | 50 | 1.00 | **no** | queue 50, worst-wait 50, energy 50, minute 14 |
+| 12 | c12 | `shanghai-class-reference` | **nothing reaches the band** | 50 | 50 | 1.00 | **no** | queue 50, energy 50, worst-wait 13 |
+
+**The two rows already at the ceiling were re-measured beside them rather than quoted**, at ten
+seeds on the same tree: `c4` **10 of 10** and `c5` **10 of 10**, agreeing with § 4.7d's and § 4.7e's
+50-seed 1.00. So **five contracts are tied at 1.00**, and a tie of five is a measurement that has
+stopped ordering.
+
+**Why nothing reaches the band, measured rather than argued.** Two of the five shipped goals are
+missed on every seed of all three, and both are quantities no rung in `data/contract-ladder.json`
+can move:
+
+| tower | work per delivered ride | the bar |
+|---|---|---|
+| `harbour-point` | 19.2 kJ | 80 |
+| `midtown-office` | 9.2 kJ | 80 |
+| `vertical-city` | 86.8 kJ | 80 |
+| **`ctf-class-reference`** | **105.9 kJ** | 80 |
+| **`shanghai-class-reference`** | **109.4 kJ** | 80 |
+| `mixed-use-high-rise` | 137.0 kJ | 80 |
+| **`merdeka-class-reference`** | **176.4 kJ** | 80 |
+| `burj-class-reference` | 242.6 kJ | 80 |
+
+*(One run each, `collective`, seed 20 260 824, 1 800 s — a reading of the fabric rather than an
+interval, and no two arms are compared, so none is required.)* The energy goal is a **per-leg**
+quantity and both admissible substrates — occupancy and arrival rate — are **divisors of the crowd**:
+fewer riders means fewer legs and the same kilojoules on each. [§ D468](../DECISIONS.md) found this
+and said so — *the bar is dominated by building fabric rather than by play* — and left it as § 7 O2
+and GitHub issue #234. This is the same finding at three more towers, and the remedy is a goal-set
+decision with an owner rather than a ladder edit. The lobby-queue goal (25 people) is the same shape:
+a tower of four to eight thousand people puts more than twenty-five in a lobby whatever a dispatcher
+does.
+
+**So all three are handed as built**, with the identity rung `{ occupancy: 1, banks: [] }` and no
+rate override — `c1`'s shape rather than `c9`'s, and for the mirror-image reason. `c1` cannot be
+made to **fail**; these three cannot be made to **pass**.
+
+**The tie is broken by bank count, and that is a design choice stated as one.** Ordered that way the
+five read 3, 4, 5, 6, 7 — `mixed-use-high-rise`, Merdeka-class, CTF-class, Shanghai-class,
+`vertical-city` — and the whole ladder's bank sequence becomes
+**1, 1, 1, 1, 1, 1, 2, 2, 3, 4, 5, 6, 7**, which is the first time § 4.7d's curriculum reading has
+run with no step larger than one. It used to end `…, 3, 7`. The alternative was to append the three
+in the order they were authored, which is ordering by arrival *inside a tie* — the defect #382 was
+filed about, one level down. `contracts.test.ts` asserts the sequence and its non-decrease, so a
+later rebalance meets a red test rather than a quiet change.
+
+**What moved and what did not.** `c5`'s position moves from tenth to thirteenth and its label with
+it; `c4` does not move at all; the eight contracts before position 9 are each still where their own
+measured miss rate put them, untouched. **The ids do not move**, for § 4.7j's reason: `c1`–`c13` are
+names.
+
+**DC-4 is green on seven of thirteen**, against seven of ten — the numerator is unchanged and the
+denominator is not, which is what adding three towers nothing can bring into the band looks like.
+**DC-6 is green**: the array's measured rates read 0.02, 0.36, 0.40, 0.42, 0.46, 0.50, 0.52, 0.52,
+1.00, 1.00, 1.00, 1.00, 1.00, which is non-decreasing.
 ### 5.1 What a fix case's difficulty is made of
 
 A case is a building, a dispatcher, a seed, a horizon and a demand level, plus an authored `asBuilt`
