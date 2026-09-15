@@ -1700,7 +1700,16 @@ type DecisionReservation = {
  * reconciles to D507 on this same commit.
  */
 /**
- * **The D533–D556 block is closed, and wave Z's block D557–D580 is open in its place.**
+ * **The D533–D556 block is closed, and so, now, is wave Z's D557–D580 that replaced it.**
+ *
+ * **Wave Z closed 2026-09-15 with fourteen of twenty-four spent and the split stated rather than
+ * lumped.** Spent: D557 (lane A), D560 (lane B), D563–D567 (lane C), D568–D571 (lane D),
+ * D572–D575 (lane E). **D558, D559, D561 and D562 are holes**, registered below — each sits under
+ * a higher number its own lane went on to write, which is the test this file applies. **D576–D580
+ * are free rather than holes**, because nothing above them was ever written: the integrator's tail
+ * went unspent, so the charter row reconciles to D576 on this same commit rather than pointing
+ * past a gap. That distinction is § D430's and it is the one thing about this bookkeeping that is
+ * easy to get backwards.
  *
  * The wave of 2026-09-10 (widened 2026-09-11) wrote fifteen of its twenty-four numbers. The nine it
  * never reached — D534, D536, D540, D541, D544, D546, D550, D551 and D554 — are registered below as
@@ -1733,7 +1742,7 @@ type DecisionReservation = {
  * because it is tidier, but because the alternative is every lane inventing bookkeeping the
  * integrator then has to throw away.
  */
-const OPEN_RESERVATION = { wave: 'Z, of 2026-09-14', from: 557, to: 580 } as DecisionReservation | null;
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
@@ -1828,6 +1837,30 @@ const OPEN_RESERVATION = { wave: 'Z, of 2026-09-14', from: 557, to: 580 } as Dec
  */
 
 const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
+  [
+    558,
+    "wave Z's lane held it and wrote a higher number instead, so it is a hole rathe" +
+      "r than free. Registered under § D404 and § D430: ids here are names, and reissui" +
+      "ng it would make it denote two things across time.",
+  ],
+  [
+    559,
+    "wave Z's lane held it and wrote a higher number instead, so it is a hole rathe" +
+      "r than free. Registered under § D404 and § D430: ids here are names, and reissui" +
+      "ng it would make it denote two things across time.",
+  ],
+  [
+    561,
+    "wave Z's lane held it and wrote a higher number instead, so it is a hole rathe" +
+      "r than free. Registered under § D404 and § D430: ids here are names, and reissui" +
+      "ng it would make it denote two things across time.",
+  ],
+  [
+    562,
+    "wave Z's lane held it and wrote a higher number instead, so it is a hole rathe" +
+      "r than free. Registered under § D404 and § D430: ids here are names, and reissui" +
+      "ng it would make it denote two things across time.",
+  ],
   [
     534,
     'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
