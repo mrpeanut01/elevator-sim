@@ -298,7 +298,7 @@ point, same `needClean`. Where a handoff stat line disagrees with the file (Gard
 6 floors in both; Midtown Office is 21 floors in both; Vertical City is 101 in both), the file wins
 and the line is generated from it.
 
-### 4.7 The campaign is ten scenarios, and the handoff specifies five
+### 4.7 The campaign is thirteen scenarios, and the handoff specifies five
 
 § 4.4 fixes the campaign at the five buildings shipped when the design was written. Three more
 buildings landed afterwards — `chancery-house`, `crown-hotel` and `st-jude-hospital`
@@ -380,7 +380,7 @@ specify exactly as it applies to one it did.
 > table has ever carried. The **teaching points** are unchanged. **The progression rule** holds at
 > thirteen: `needClean` reads 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3.
 >
-> **Eleven buildings and ten contracts is not an arithmetic error**: `burj-class-reference` is a
+> **Fourteen buildings and thirteen contracts is not an arithmetic error**: `burj-class-reference` is a
 > *reference* building with no Career contract, named in `contracts.test.ts#REFERENCE_ONLY` and
 > asserted in both directions there.
 

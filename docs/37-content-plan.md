@@ -54,7 +54,7 @@ with no contract is a scenario the reader can never take* — and `shift/contrac
 so the tree has been consistent about this since the three contracts landed; only the issue was
 stale.
 
-**Eleven buildings and ten contracts is not an arithmetic error.** `burj-class-reference` is a
+**Fourteen buildings and thirteen contracts is not an arithmetic error.** `burj-class-reference` is a
 *reference* building and has none, by GitHub issue #376's own ruling;
 `packages/viz/src/shift/contracts.test.ts#REFERENCE_ONLY` names it and asserts, in both directions,
 that it ships and has no contract, so the exception cannot quietly widen.

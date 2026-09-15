@@ -2279,7 +2279,7 @@ code**: `shift/legibility.ts#LEGIBILITY_SWEEP` carries this table as data, `shif
 derives the eligible set from it, and a first session draws one of them on a named stream
 ([§ D514](../DECISIONS.md)).
 
-**Re-measured 2026-09-14 at ten contracts × 50 seeds = 500 days** (GitHub issues #500 and #501,
+**Re-measured 2026-09-15 at thirteen contracts × 50 seeds = 650 days** (GitHub issues #425, #424 and #430; the 2026-09-14 re-measurement was ten contracts × 50 = 500 days, #500 and #501,
 § 4.7j). **All eight original rows reproduced to the second**, so the two new rows are the whole of
 the movement: `c9` (`harbour-point`) is legible on **50 of 50** at a median **1 343 s** and joins
 the eligible set, and `c10` (`ashgate`) on **10 of 50** at a median **79 s** and does not. The pair
