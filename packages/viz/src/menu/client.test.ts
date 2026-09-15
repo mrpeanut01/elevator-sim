@@ -1141,3 +1141,82 @@ describe('the earn verb carries the turn it finished, and never an amount — is
     ]);
   });
 });
+
+describe('a rush sitting posts whole — GitHub issue #372, § D542', () => {
+  const SITTING = {
+    buildingId: 'midtown-office',
+    rounds: [
+      { dispatcherProfileId: 'eta', claimedHeldS: 900 },
+      {
+        dispatcherProfileId: 'collective',
+        interventions: [{ atS: 300, change: { kind: 'switch-dispatcher' as const, toProfileId: 'eta' } }],
+        claimedHeldS: 1640,
+      },
+    ],
+  };
+
+  it('sends the sitting to its own route and reads the server’s rounds off the answer', async () => {
+    const { transport, seen } = scripted({
+      status: 201,
+      body: {
+        boardKey: 'rush:midtown-office:2026-09-15',
+        entry: {
+          heldS: 1640,
+          furthestWave: 10,
+          rounds: [
+            { heldS: 900, wavesOutlasted: 5, purseBeforeUnits: 0, paidUnits: 10, purseAfterUnits: 10 },
+            { heldS: 1640, wavesOutlasted: 9, purseBeforeUnits: 10, paidUnits: 18, purseAfterUnits: 28 },
+          ],
+        },
+      },
+    });
+    const client = createClient('https://x', transport);
+    const result = await client.postRushSitting('t', SITTING);
+    expect(seen.map((request) => [request.method, request.url, request.token])).toEqual([
+      ['POST', 'https://x/api/rush-sittings', 't'],
+    ]);
+    /* The body is the sitting exactly: this client adds nothing and normalises nothing. */
+    expect(seen[0]?.body).toEqual(SITTING);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.rounds).toHaveLength(2);
+    expect(result.value.rounds[1]?.purseAfterUnits).toBe(28);
+  });
+
+  it('refuses a 201 with no rounds on it rather than drawing undefined where a figure goes', async () => {
+    const { transport } = scripted({ status: 201, body: { boardKey: 'rush:midtown-office:2026-09-15' } });
+    const result = await createClient('https://x', transport).postRushSitting('t', SITTING);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('unexpected-response');
+  });
+
+  it('carries the server’s own refusal, and the 503 is not dressed up as the caller’s fault', async () => {
+    /*
+     * `503 replay-busy` is a fact about the server — every replay slot is taken — and this API's
+     * `429` is *this account posted too soon*. A client that reworded either would be deciding what
+     * a rejection means, which is the one thing `CLIENT_FAILURES.refused` exists not to do.
+     */
+    const detail = 'Every rush this server can replay at once is being replayed.';
+    const { transport } = scripted({ status: 503, body: { error: 'replay-busy', detail, retryAfterS: 7 } });
+    const result = await createClient('https://x', transport).postRushSitting('t', SITTING);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('replay-busy');
+    expect(result.detail).toBe(detail);
+    /* The whole body travels, so a screen that wants `retryAfterS` can read it without a new field. */
+    expect((result.body as { retryAfterS: number }).retryAfterS).toBe(7);
+  });
+
+  it('carries the round a 422 is about, so a client can say which one did not replay', async () => {
+    const { transport } = scripted({
+      status: 422,
+      body: { error: 'held-does-not-reproduce', detail: 'Replaying round 2 did not reproduce.', round: 2 },
+    });
+    const result = await createClient('https://x', transport).postRushSitting('t', SITTING);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('held-does-not-reproduce');
+    expect((result.body as { round: number }).round).toBe(2);
+  });
+});

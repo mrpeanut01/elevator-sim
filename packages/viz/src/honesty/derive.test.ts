@@ -65,6 +65,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A rush round’s record, which composes no sentence of its own — GitHub issue #372, § D606. ' +
+        '`rushRoundRecordOf` is derived only because the two-adjacent-words scanner reaches the ' +
+        'refusals it **collects**, and every one of those belongs to the module that decided it: the ' +
+        'two device-only ids are `scope/runIdentity.ts#runIdentityIssues`’, a handover the wire ' +
+        'cannot express is `scope/switchWire.ts#switchUnpostableReasonOf`’s, and a press of a kind ' +
+        'that does not travel is `core`’s own `interventionKindRefusal`. That is the point of the ' +
+        'function rather than an accident of it — a sentence about why a round cannot be posted has ' +
+        'one owner, and a second wording here would be `honesty/agreement.ts`’s `surfaces-disagree` ' +
+        'built on purpose. What a player reads off a sitting is `everyday/rushPost.ts#rushPostViewOf` ' +
+        'and the four sentences `everyday/rushSitting.ts#RUSH_SITTING_COPY` owns, and the ' +
+        'EVERYDAY_RUSH adapter drives every state of both.',
+      ids: ['everyday/rushSitting.ts#rushRoundRecordOf'],
+    },
+    {
+      reason:
         'Telemetry’s machinery, which renders nothing — GitHub issue #340. Each of these is derived ' +
         'only because the two-adjacent-words scanner reaches a hyphenated key through it: the four ' +
         'consent writers and the reader all touch `CONSENT_KEY`, which is `elevator-sim.telemetry`, ' +

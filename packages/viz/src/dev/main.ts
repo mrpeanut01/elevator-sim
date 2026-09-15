@@ -4080,6 +4080,33 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     postRun: client === undefined ? undefined : () => postCurrentRun(),
     /*
+     * #372's write half, and it is deliberately **thinner** than `postRun` above.
+     *
+     * Every refusal a sitting can meet is the host's: whether a round may travel is decided when
+     * the round ends (`everyday/rushSitting.ts`), and the host has already turned the sitting into
+     * a body by the time this is called. What is left here is what only this closure holds — the
+     * client and the account — which is the split `everyday/host.ts#EverydayHostBindings` states.
+     *
+     * `undefined` with no API origin, on `postRun`'s rule: the absence is a property of the page,
+     * and a binding that exists and always refuses is the shape this repository keeps paying for.
+     */
+    postRushSitting:
+      client === undefined
+        ? undefined
+        : async (body) => {
+            const token = accountState.token;
+            if (token === undefined) {
+              return { kind: 'signed-out', detail: postingRefusal(accountState) ?? NO_SERVER_SIGN_IN };
+            }
+            // The same escalation the day's post takes, and for the same measurement: the server
+            // this posts to was measured at 28.7 s cold (§ D243), and a sitting is up to twelve
+            // replays on top of that.
+            const done = startWaiting('Posting this sitting…');
+            const result = await client.postRushSitting(token, body);
+            done();
+            return result.ok ? { kind: 'posted', rounds: result.value.rounds } : { kind: 'failed', detail: result.detail };
+          },
+    /*
      * The chime ledger's one read — GitHub issue #368, § D526 clause 5.
      *
      * `accountState` is read **at call time** rather than captured, on this literal's own rule: a
