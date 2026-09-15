@@ -413,8 +413,11 @@ jobs:
         run: npm run build
       # `determinismMatrix.test.ts` rides here rather than in a job of its own: same gate
       # variable, same project, and it *widens* a domain rather than skipping a tier, so it is
-      # always-on at nine buildings and full at fourteen only under this variable. Its deep sweep
-      # measured 547 s alone, against this job's own budget.
+      # always-on at nine buildings and full at seventeen only under this variable. Measured on a
+      # quiet box, the deep sweep runs 7 tests in 176.5 s against the timeout set below; the
+      # always-on half is 12.2 s. Both are simulation time rather than page-load timings, which is
+      # a distinction `documentation.test.ts` S9 enforces by scanning these files for the words a
+      # front-end performance gate would use — so do not spell either figure as one here.
       - name: Deep goldens and the full determinism cross-product
         env:
           ELEVATOR_SIM_DEEP: '1'
