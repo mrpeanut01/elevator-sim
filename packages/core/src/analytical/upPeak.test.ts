@@ -853,13 +853,22 @@ describe('every shipped building is either analysable or explicit about why not'
     }
 
     // The sweep must not pass vacuously by refusing everything. As of the shipped data,
-    // 20 of the 23 banks are analysable. Three are not, and all three are double-deck shuttles
-    // between unpopulated sky lobbies: Vertical City's, and — since GitHub issue #376 — the
-    // Burj-class reference tower's, whose six banks otherwise all analyse. That the same shape
+    // 22 of the 26 banks are analysable. Four are not, and the first three are double-deck
+    // shuttles between unpopulated sky lobbies: Vertical City's, and — since GitHub issue #376 —
+    // the Burj-class reference tower's, whose six banks otherwise all analyse. That the same shape
     // is refused on a 165-floor building as on a 100-floor one is the useful part: the refusal
     // is about the geometry rather than about the size.
-    expect(analysed).toBe(20);
-    expect(refused).toBe(3);
+    //
+    // **The fourth is `ashgate/carpark`** (GitHub issue #501), and it is the same refusal reached
+    // from the opposite end of the size range: one single-deck car serving two car-park decks and
+    // the ground, where the decks house nobody and the ground is shops and a lobby. There is no
+    // populated floor above the terminal, so there is no up-peak round trip to price — which is
+    // not a defect in the building and not a gap in the closed form, but the expression being
+    // asked a question it has no term for. `ashgate/main` and `harbour-point/main` both analyse,
+    // and both reconcile against a simulated run in
+    // `packages/experiments/src/oracle/remainingBuildings.test.ts`.
+    expect(analysed).toBe(22);
+    expect(refused).toBe(4);
     // Two banks exceed the sanity bound on the default population, and both for one reason: a
     // shuttle's U is the sky lobby's own population rather than the crowd it lifts. Mixed-Use
     // High-Rise's is 260 against the 1 014 it carries; the Burj-class reference tower's is its

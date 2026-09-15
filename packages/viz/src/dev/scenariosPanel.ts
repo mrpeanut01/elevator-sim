@@ -56,7 +56,7 @@ import { shiftLengthForContract } from './state.js';
  * -------------------------------------------------------------------------- */
 
 /**
- * The eight swatches, keyed by building id — the design's `PRESETS[*].art`, in tokens.
+ * The ten swatches, keyed by building id — the design's `PRESETS[*].art`, in tokens.
  *
  * Keyed on an id, which `dev/dom.ts` forbids its *helpers* from doing — and this is not one of
  * those. The rule there is that no shared component may key on a metric or a goal kind, because a
@@ -104,6 +104,26 @@ export const SCENARIO_ART: Readonly<Record<string, string>> = Object.freeze({
     'linear-gradient(180deg,color-mix(in srgb, var(--shaft-3) 34%, var(--card)),var(--card) 70%)',
   'st-jude-hospital':
     'linear-gradient(180deg,color-mix(in srgb, var(--shaft-6) 34%, var(--card)),var(--card) 70%)',
+  /*
+   * **The palette ran out, and these two are mixes rather than a ninth and tenth token** — GitHub
+   * issues #500 and #501.
+   *
+   * There are exactly **eight** shaft tints (`--shaft-1…8`, declared in `index.html` in both
+   * themes) and the campaign is now **ten** buildings, so the *one hue per building* the eight
+   * entries above run on cannot continue. Declaring two more tokens would widen the elevation's
+   * own decoration palette to pay for a card, which is a change to a shared surface for a local
+   * reason; picking one of the eight twice would draw two scenarios alike, which is the one thing
+   * a swatch is for. So each of these mixes **two distant declared tints** — no literal enters the
+   * file, `paletteLiterals.test.ts`'s rule is untouched, and both still follow the theme.
+   *
+   * Harbour Point is the cold blue over the olive: a harbour-side slab. Ashgate is the red over
+   * the warm grey: brick, for shops with offices above them. Neither carries a second layer —
+   * Midtown Office's window stripe is the design's own and is still not imitated.
+   */
+  'harbour-point':
+    'linear-gradient(180deg,color-mix(in srgb, color-mix(in srgb, var(--shaft-5) 50%, var(--shaft-8)) 34%, var(--card)),var(--card) 70%)',
+  'ashgate':
+    'linear-gradient(180deg,color-mix(in srgb, color-mix(in srgb, var(--shaft-3) 50%, var(--shaft-7)) 34%, var(--card)),var(--card) 70%)',
 });
 
 /**

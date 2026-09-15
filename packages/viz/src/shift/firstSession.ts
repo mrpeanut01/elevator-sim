@@ -4,13 +4,15 @@
  *
  * § D475 ruled that *every eligible building can carry the first session, drawn at random*, and that
  * *eligible* is a measurement. § D512 made the measurement: a day is legible when a landing holds
- * somebody in the stage's third wait band for two contiguous minutes, and eight contracts × fifty
+ * somebody in the stage's third wait band for two contiguous minutes, and every contract × fifty
  * seeds says which buildings ever are. This module is the ruling's other two consequences:
  *
  * 1. **The set is derived from the table, not typed.** {@link ELIGIBLE_FIRST_CONTRACT_IDS} is every
- *    contract legible on more than a third of the sweep's fifty seeds — c2, c3, c4, c5 and c7 on the
- *    table `shift/legibility.ts` carries as data. Garden Apartments (0 of 50), Chancery House (2)
- *    and St Jude's (1) are not in it, which is #208's own finding arrived at by instrument.
+ *    contract legible on more than a third of the sweep's fifty seeds, read off the table
+ *    `shift/legibility.ts` carries as data. Garden Apartments (0 of 50), Chancery House (2) and
+ *    St Jude's (1) are not in it, which is #208's own finding arrived at by instrument; the members
+ *    are deliberately not listed here, because a list in prose beside a derived constant is the
+ *    second copy that goes stale (`legibility.ts` carries the table and the reading).
  * 2. **The draw is a named stream.** {@link firstSessionContractFor} derives a `first-session` stream
  *    from the session's own seed, `campaign/incidents.ts`'s shape: a sibling of the run's `StreamSet`
  *    rather than one of its streams, because a draw taken from `policyNoise` before the run would
@@ -59,7 +61,7 @@ export function firstSessionContractFor(seed: number | bigint): string {
  * Whether the week is a first day nobody has played on one of the legible towers — the derived
  * condition under which the door says why this tower (§ D476's shape: derived from the player's own
  * progress on every load, stored nowhere). It is true of a drawn first session and equally true of a
- * player who moved to one of the five before playing a day, and {@link FIRST_SESSION_LINE} is worded
+ * player who moved to one of them before playing a day, and {@link FIRST_SESSION_LINE} is worded
  * so that it is true in both cases.
  */
 export function isFirstDayOnALegibleTower(week: WeekState): boolean {
@@ -71,8 +73,34 @@ export function isFirstDayOnALegibleTower(week: WeekState): boolean {
   );
 }
 
-/** The door's line under the seed on such a day. Player-facing; swept by the corpus. */
+/** English number words for the one count this line publishes. */
+const NUMBER_WORDS: readonly string[] = Object.freeze([
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+]);
+
+/**
+ * The door's line under the seed on such a day. Player-facing; swept by the corpus.
+ *
+ * **Both figures are derived from the table rather than authored beside it**, which is
+ * `docs/37-content-plan.md` § 6's one rule for every content type: *a count published on any
+ * player-facing surface is derived from the list, never authored beside it*. They were literals —
+ * *"one of the **five** towers … measured over **400** days"* — and they were correct for an
+ * eight-contract sweep of five eligible towers. The sweep is ten contracts now (GitHub issues #500
+ * and #501), so both numbers moved, and a literal would have had to be remembered. The count is the
+ * eligible set's own length and the days are `rows × n`, so a contract entering or leaving the
+ * legible set moves the sentence on the same commit that moves the table.
+ */
 export const FIRST_SESSION_LINE =
-  'A first day opens on one of the five towers whose day 1 puts somebody past a minute on a landing ' +
-  'for two minutes together, measured over 400 days. The crowd number above is the draw, so the ' +
+  `A first day opens on one of the ${NUMBER_WORDS[ELIGIBLE_FIRST_CONTRACT_IDS.length] ?? String(ELIGIBLE_FIRST_CONTRACT_IDS.length)} towers whose day 1 puts somebody past a minute on a landing ` +
+  `for two minutes together, measured over ${String(LEGIBILITY_SWEEP.length * LEGIBILITY_SWEEP_N)} days. The crowd number above is the draw, so the ` +
   'same number opens the same tower.';

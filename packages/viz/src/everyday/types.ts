@@ -289,6 +289,35 @@ export const ENGINEER_SWAP_RUSH_NOTE =
   'ends the rush first, because a rush runs as shipped and the full panel can change that — and this visit only: reloading opens Everyday Mode again';
 
 /**
+ * **The swap's note while a replay stands** — GitHub issue #533 item 1, [§ D563](../../../../DECISIONS.md).
+ *
+ * The replay's whole promise is that the day is handed back *as it was*: `everyday/replay.ts` leaves
+ * the seed, the building, the dispatcher, the levers and the length exactly where the day left them,
+ * *"because they are what the day was"*. The full panel writes every one of them, and
+ * `dev/main.ts#interveneAt` re-runs over whatever it finds, so a replay that survived the trip would
+ * be a replay of a day that never happened — and a run started over there while it stood landed on
+ * the week the replay put back (GitHub issue #531 item 3). So `shell.ts#enterEngineer` leaves the
+ * replay before it hands the page over, exactly as it leaves a rush, and the row says so before it
+ * is pressed. Beside its siblings for {@link ENGINEER_SWAP_NOTE}'s reason: a word in this module
+ * cannot be caught in an import cycle.
+ */
+export const ENGINEER_SWAP_REPLAY_NOTE =
+  'ends the replay first, because a replay is the day exactly as it was and the full panel can change it — and this visit only: reloading opens Everyday Mode again';
+
+/**
+ * **The swap's note while somebody else's run is on the stage** — GitHub issue #533 item 1.
+ *
+ * Nothing stops here and the swap is not what this note had to be corrected for. What was false in
+ * a watch is the *first* half of {@link ENGINEER_SWAP_NOTE}: it promises *the same day* on the
+ * panel, and the run a spectator is looking at is not their day. The watch itself is untouched by
+ * the trip — `shell.ts#enterEngineer` writes no context, `dev/main.ts` holds the snapshot, and the
+ * stage is still showing the same record on the way back — so this says that instead of implying a
+ * day the player does not have on screen.
+ */
+export const ENGINEER_SWAP_WATCH_NOTE =
+  'the run you are watching, on the full instrument panel — nothing stops and the watch is still standing when you come back, and this visit only: reloading opens Everyday Mode again';
+
+/**
  * The Engineer header's way back, as a label — `dev/main.ts#wireHeaderAndFooter` writes it onto
  * `#back-to-everyday`.
  *

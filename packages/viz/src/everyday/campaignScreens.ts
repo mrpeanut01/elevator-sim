@@ -58,6 +58,8 @@ import { worksHeldCarRefsOf } from '../campaign/works.js';
 import { drawElevation } from './elevation.js';
 import type { DifficultyId, ShopCategoryId } from '../campaign/economy.js';
 import { observationsAt } from '../live/observations.js';
+import type { WaitBandBasis } from '../live/types.js';
+import { shiftIsOver } from '../dev/leftRail.js';
 import type { GoalObservations } from '../shift/types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -215,8 +217,25 @@ export function campaignInputOf(host: EverydayHost): CampaignInput {
       }),
     ),
     observations: run.hasRun ? observationsOfHost(host) : undefined,
+    /*
+     * **The playhead the fold above was taken at, classified** — [§ D557](../../../../DECISIONS.md).
+     *
+     * This desk is a mid-run surface: `observationsOfHost` folds at `runState().playheadS`, so
+     * before the day ends the abandoned cohort's fate is not decided and
+     * `shift/goals.ts#gaveUpBesideOf` may not state it. `shiftIsOver` is the one home for the
+     * comparison — `dev/leftRail.ts` exports it so a second surface cannot compute `t >= endedAt`
+     * its own way — and with no recording there is no shift to be over.
+     */
+    observationsBasis: observationsBasisOf(host),
     history: host.week().history,
   };
+}
+
+/** {@link campaignInputOf}'s basis, through the rail's own `shiftIsOver` rather than a second `>=`. */
+function observationsBasisOf(host: EverydayHost): WaitBandBasis {
+  const recording = host.recording();
+  if (recording === undefined) return 'now';
+  return shiftIsOver(recording, host.runState().playheadS) ? 'whole-run' : 'now';
 }
 
 /**
@@ -270,7 +289,11 @@ function observationsOfHost(host: EverydayHost): CampaignInput['observations'] {
  * publishes `abandoned` to publish both beside it.
  *
  * The playhead is the host's own, the instant `goalsToday()` was folded at, so the rows on a desk
- * stay four facts about one moment.
+ * stay four facts about one moment. **And that is why this desk needs a basis** —
+ * [§ D557](../../../../DECISIONS.md), GitHub issue #537: `abandonedCarried` folded at a playhead
+ * counts only the riders a car has reached so far, so before the day ends `gaveUpBesideOf`
+ * withholds the caption rather than stating a fate nothing has decided. `CampaignInput`'s
+ * `observationsBasis` carries the answer.
  */
 function gaveUpOfHost(
   host: EverydayHost,

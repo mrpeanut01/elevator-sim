@@ -1460,6 +1460,11 @@ export interface EverydayHost {
    * § 3.4's *Leave it* on a day — GitHub issue #526 item 1. The strip has just told the player *today's
    * run will not be scored*, so the run in flight is stopped and the run standing is refused at filing,
    * rather than either being left for another surface to file.
+   *
+   * **A day means either context that draws that strip** — the daily loop's and § 8's campaign day
+   * (GitHub issue #531 item 1). `actionBar.ts#confirmStripFor` gives both the same words, both
+   * press their run through {@link startRun}, and `dev/main.ts#closeShift` cannot tell them apart;
+   * `everyday/shell.ts#leaveUnfinished` is the one caller and carries the argument.
    */
   leaveDayUnfinished(): void;
 
@@ -1520,6 +1525,12 @@ export interface EverydayHostBindings {
    * {@link EverydayHost.leaveDayUnfinished} and a campaign `take-offer` call it (GitHub issue #526 items 1
    * and 2). A cancel alone was measured and is not enough: with the pressed run stopped, the run behind
    * it files instead. **Optional** on {@link cancelRun}'s ground.
+   *
+   * **The refusal is a claim, so it is not made about a day that has already filed** — GitHub issue
+   * #531 item 4, [§ D565](../../../../DECISIONS.md). `take-offer` calls {@link cancelRun} instead
+   * when {@link dayClosed} is true: the cancel is right whatever the day has done, and the mark
+   * would say *left unfinished* about a day that was finished. The other caller cannot arrive with
+   * a closed day — § 3.4's strip is drawn only while `runState().open` is true.
    */
   abandonDay?(): void;
   /**
@@ -2220,6 +2231,8 @@ export function createEverydayHost(
           tower,
           observations,
           state.week.history,
+          /* Folded at `recording.endedAt` two lines up — [§ D557](../../../../DECISIONS.md). */
+          'whole-run',
         ),
       );
       if (verdict === 'ungraded') return;
@@ -2348,10 +2361,32 @@ export function createEverydayHost(
            * **The day being left goes with the week being parked** — GitHub issue #526 item 2. A run in
            * flight here was asked for the old week and landed on the new one, where the Engineer surface's
            * filing presses filed it; a landed, unclosed run was filed there the same way. So the run in
-           * flight is stopped and the run standing is refused, first. Starting the new contract's run
+           * flight is stopped and the run standing is refused, first — *unclosed* being the word the
+           * block below adds, because a day that has already filed is neither of those things.
+           * Starting the new contract's run
            * instead would put a run nobody pressed on the new week, which those same presses would file.
            */
-          b.abandonDay?.();
+          /*
+           * **And a day already filed is stopped rather than refused** — GitHub issue #531 item 4,
+           * [§ D565](../../../../DECISIONS.md). `abandonDay` does two things: it cancels whatever is
+           * in flight, and it marks the recording that stands as one this shell may not file
+           * (`shift/banking.ts#LEFT_UNFINISHED_CANNOT_BANK`). The first is right whatever the day
+           * has done — a run in flight was asked for the week being parked. The second is a claim,
+           * and on a day that has already closed it is a **false** one: the posting gate asks
+           * `bankingRefusalFor` before it asks about identity, so a filed day posted after an offer
+           * was refused with *“belongs to a day that was left unfinished”* about a day that was
+           * finished and filed. It would have been refused anyway, on the selection the offer had
+           * just moved, and a true refusal for the wrong reason is still the product accusing a
+           * player of something they did not do — which is the one accusation `scope/runIdentity.ts`
+           * spends a docstring on not spending.
+           *
+           * So the mark is gated on {@link EverydayHostBindings.dayClosed} and the cancel is not.
+           * {@link EverydayHost.leaveDayUnfinished} needs no such gate and deliberately does not get
+           * one: § 3.4's strip is only drawn while `runState().open` is true, and that is false for
+           * a closed day, so the other caller cannot arrive here with one.
+           */
+          if (b.dayClosed()) b.cancelRun?.();
+          else b.abandonDay?.();
           const state = b.state();
           const moved = switchWeek(state.week, state.parkedWeeks, contract.id, 'restart');
           b.applyPatch({

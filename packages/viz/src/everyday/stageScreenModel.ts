@@ -614,6 +614,13 @@ export interface StageGoalRow {
    * than an oversight in {@link unjudged}. It is a *reading* and not a verdict — § D371's own
    * distinction — so it belongs on the same side of that line as {@link value}, which also
    * survives.
+   *
+   * **One clause of it was not a reading, and that is [§ D557](../../../../DECISIONS.md).** The
+   * sentence used to end *…, none of them carried*, and whether a car ever came for those riders is
+   * an **outcome** rather than a fold: at 1 471 s of a 2 941 s day the stage read *none of them
+   * carried* about a cohort that ended the day with 42 carried. `gaveUpBesideOf` now takes the
+   * strip's own `judged` as a basis and withholds that clause until the day ends; the count, the
+   * population and the denominator clause are readings and are unmoved.
    */
   readonly beside: string;
   /** `✓`, `×` or `·`. Always `·` while the run is unfinished — see {@link stageGoalsOf}. */
@@ -732,15 +739,22 @@ function unjudged(reading: GoalReading): GoalReading {
  *
  * ## Why this cannot publish a whole-run figure early
  *
- * Three gates, none of them added here, which is the point. Every reading arrives from
+ * Three gates, none of them added here, which was the point. Every reading arrives from
  * `readGoals` over `shiftObservationsOf(observationsAt(recording, t))` — counts of what had
  * happened by `t`, never a field of `summary`. The energy bar's own observation refuses outright
  * before the end (`live/observations.ts#energyPerServedLegAt` returns `undefined` at any `t` short
  * of `recording.endedAt`, and `readGoal`'s third gate reads that as `pending`), so the one goal
  * whose quantity *is* whole-run draws the em dash for the whole day rather than a preview of it.
- * And {@link unjudged} stands the verdict down at every playhead short of the end. The corpus's
- * `whole-run-figure-early` property is satisfied by construction rather than by care, which is
- * § D371's stated reason for choosing a reading over `docs/10` R6's provisional verdict.
+ * And {@link unjudged} stands the verdict down at every playhead short of the end.
+ *
+ * **That claim was true of the figures and false of one sentence beside them, and the correction is
+ * the fourth gate** ([§ D557](../../../../DECISIONS.md), GitHub issue **#537**). {@link
+ * StageGoalRow.beside} is not a field of `summary` and is not a verdict, so all three gates passed
+ * it — and it ended *…, none of them carried*, which is an **outcome** about the riders in front of
+ * the give-up horizon rather than a count of what had happened by `t`. The deep honesty corpus
+ * found it: `whole-run-figure-early` on `stage(@Ns).goals.minute.beside`, five cases. The basis is
+ * passed to `gaveUpBesideOf` now, so *satisfied by construction* is once again what this paragraph
+ * says — with one gate more than it used to name.
  *
  * ## What is deliberately **not** built
  *
@@ -755,7 +769,19 @@ export function stageGoalsOf(input: StageGoalsInput): StageGoalsView {
     heading: STAGE_GOALS_COPY.heading,
     note: judged ? STAGE_GOALS_COPY.graded : STAGE_GOALS_COPY.reading,
     judged,
-    rows: goalRowsOf(readings, input.history, input.day, input.observations).map((row, index) => ({
+    rows: goalRowsOf(
+      readings,
+      input.history,
+      input.day,
+      input.observations,
+      /*
+       * The strip's own `judged`, handed to the one row-field that is an **outcome** rather than a
+       * reading — [§ D557](../../../../DECISIONS.md). {@link unjudged} stands the verdict down and
+       * this stands the abandoned cohort's fate down, for the same R6 reason and at the same
+       * instant, so the strip has one answer to *has the day ended* rather than two.
+       */
+      judged ? 'whole-run' : 'now',
+    ).map((row, index) => ({
       /* The reading's own goal, never the row's label — an id is not a sentence. */
       id: readings[index]?.goal.id ?? '',
       label: row.label,

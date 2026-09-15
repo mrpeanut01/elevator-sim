@@ -38,6 +38,7 @@ import {
   ConfigError,
   isServiceModeEvent,
   isServiceRangeEvent,
+  type CallType,
   type ServiceEventConfig,
 } from '@elevator-sim/core';
 
@@ -71,7 +72,24 @@ interface DraftBuilding {
   name: string;
   type: string;
   trafficProfile: string;
-  floors: { id: string; index: number; heightM: number; population: number; isEntrance?: boolean; isTransferFloor?: boolean }[];
+  /**
+   * `landingCallType` is carried for `serviceEvents`' reason, one field over — GitHub issue #534.
+   *
+   * A shrinker that dropped it would report a "minimal" counterexample that is no longer the
+   * **hybrid** run the original was about, and the reduction step that did it would look exactly
+   * like a legitimate one because the candidate still fails, for a different reason. Floors are
+   * dropped whole by their own reducer, which is how *"the panel was not needed"* stays a measured
+   * reduction rather than an accident of the draft shape.
+   */
+  floors: {
+    id: string;
+    index: number;
+    heightM: number;
+    population: number;
+    isEntrance?: boolean;
+    isTransferFloor?: boolean;
+    landingCallType?: CallType;
+  }[];
   totalPopulation?: number;
   banks: { id: string; servesFloors: string[]; cars: Record<string, unknown>[] }[];
   accessZones: { id: string; floors: string[]; credentialGroups: string[] }[];
@@ -103,6 +121,7 @@ function draftOf(fuzzCase: FuzzCase): DraftBuilding {
       population: floor.population,
       ...(floor.isEntrance === true ? { isEntrance: true } : {}),
       ...(floor.isTransferFloor === true ? { isTransferFloor: true } : {}),
+      ...(floor.landingCallType === undefined ? {} : { landingCallType: floor.landingCallType }),
     })),
     banks: building.banks.map((bank) => ({
       id: bank.id,

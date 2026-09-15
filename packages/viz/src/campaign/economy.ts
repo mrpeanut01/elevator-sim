@@ -992,10 +992,16 @@ export function contractIsLost(tower: TowerEconomy): boolean {
  * § 8.5's complexity, 1–5, keyed by **shipped building id**.
  *
  * The contract names seven buildings by short name (`garden`, `ashgate`, `chancery`, `crown`,
- * `midtown`, `stjude`, `vertical`); six of them are buildings this repository ships and are keyed
- * here by their file's id. **`ashgate` is not one of ours and is not invented into one** — no
- * shipped building answers to it, and mapping it onto `mixed-use-high-rise` would be a complexity
- * authored by this file rather than by the contract.
+ * `midtown`, `stjude`, `vertical`), and **all seven are now buildings this repository ships**, keyed
+ * here by their file's id.
+ *
+ * **`ashgate` was the one that was not, and it is now — so its figure comes from the contract rather
+ * than from this file** (GitHub issue #501, [§ D575](../../../../DECISIONS.md)). This paragraph read
+ * *"`ashgate` is not one of ours and is not invented into one — no shipped building answers to it,
+ * and mapping it onto `mixed-use-high-rise` would be a complexity authored by this file rather than
+ * by the contract."* The refusal was right and it has been discharged the way it asked to be: the
+ * building was authored, so the contract's own **2** is used verbatim. Nothing is mapped and nothing
+ * is invented; what changed is that the id now names a file.
  *
  * ## The two the contract does not name — GitHub issue #169 item 4, § D519
  *
@@ -1026,10 +1032,31 @@ export function contractIsLost(tower: TowerEconomy): boolean {
  * contract gave it. Both are an assumption with its reasoning attached rather than a citation —
  * `data/traffic-profiles.json`'s badge-share footing — and `economy.test.ts` pins the neighbours
  * they were placed between so a change to either table has to re-argue the placement.
+ *
+ * ## The two the content plan added — GitHub issues #500 and #501, [§ D575](../../../../DECISIONS.md)
+ *
+ * `ashgate` is **2, cited**: `ENGINE_CONTRACT.md` § 8.5 publishes the number for the id, and the id
+ * now names a shipped file. No measurement was taken and none was needed.
+ *
+ * `harbour-point` is **2, authored**, on § D519's own rule and with the awkwardness said out loud.
+ * Its fabric is the simplest in the set after Garden Apartments — one bank, six identical cars, one
+ * entrance, no zone, no credential, no transfer — which is Chancery House's fabric at three fewer
+ * floors, and Chancery House is the contract's own 2. **It is also the hardest shipped tower to
+ * run**: as built, 64 of 65 runs across every shipped dispatcher × five seeds diverge and have the
+ * mean suppressed ([§ D572](../../../../DECISIONS.md)). Those two facts point opposite ways, and
+ * § 8.5's rule decides which one this column is about: *complexity is the designer's judgement of
+ * the fabric a player has to understand rather than a clear rate*, which the paragraph above
+ * established by measuring Midtown at 0 of 50 on a 3 and Vertical City at 30 of 30 goals on a 5. A
+ * 4 or a 5 here would be a difficulty rating wearing the complexity column's name, which is the
+ * fitted number that paragraph refuses. **So the table says 2 and this sentence says why the player
+ * will find it hard anyway** — the tower is easy to read and impossible to clear, and those are
+ * different claims.
  */
 export const COMPLEXITY: Readonly<Record<string, number>> = Object.freeze({
   'garden-apartments': 1,
+  'ashgate': 2,
   'chancery-house': 2,
+  'harbour-point': 2,
   'crown-hotel': 3,
   'midtown-office': 3,
   'secure-tower': 3,
@@ -1059,13 +1086,24 @@ export const COMPLEXITY_MAX = 5;
  * sentence), and a flat two over complexity keeps Garden Apartments' 3 u where `openingCareer`
  * has always put it. `secure-tower` and `mixed-use-high-rise` joined on the same rule when § D519
  * gave them a complexity (GitHub issue #169 item 4), so every shipped contract is now offerable.
+ *
+ * **`ashgate` is a fourth fixture rather than a fourth derivation** (GitHub issue #501,
+ * [§ D575](../../../../DECISIONS.md)): the design file gives it **6 u a day** outright, beside the
+ * three it already gave, so the rule is not applied to it — the same reason Crown Hotel's 3 u sits
+ * below its own complexity plus two. `harbour-point` takes the rule at **4 u**, which is complexity
+ * 2 plus two and is exactly what Chancery House, the building whose fabric it shares, is given.
+ * **It is a bad bargain and that is the scenario**: the tower cannot be cleared as built, so a
+ * career that takes it at 4 u a day is paying for days it will miss — the fee prices the fabric,
+ * and § 8.9's renewal is what prices the record.
  */
 export const OFFER_FEES: Readonly<Record<string, number>> = Object.freeze({
   'garden-apartments': 3,
+  'harbour-point': 4,
   'chancery-house': 4,
   'crown-hotel': 3,
   'midtown-office': 5,
   'secure-tower': 5,
+  'ashgate': 6,
   'mixed-use-high-rise': 6,
   'st-jude-hospital': 6,
   'vertical-city': 7,

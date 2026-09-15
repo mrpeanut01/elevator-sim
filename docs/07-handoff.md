@@ -661,24 +661,29 @@ Six further banks are measurable and covered by `oracle/deepCampaign.test.ts` (`
 Pushing the simplifications *into* the simulator via per-car config (huge acceleration, zero dwell)
 collapses its round trip onto the textbook figure at −0.4 %.
 
-#### The three shipped buildings the table above does not reach
+#### The five shipped buildings the table above does not reach
 
 The table is five buildings because it was written when five shipped. The set went to eight
-([§ D213](../DECISIONS.md)) and to nine with the Burj-class reference tower, and the table was never
-extended — which is what GitHub issue #232's third acceptance criterion, *"a closed-form
+([§ D213](../DECISIONS.md)), to nine with the Burj-class reference tower, and to **eleven** with
+`harbour-point` and `ashgate` ([§ D572](../DECISIONS.md), [§ D573](../DECISIONS.md)), and the table
+was never extended — which is what GitHub issue #232's third acceptance criterion, *"a closed-form
 round-trip-time check like the existing five"*, is really asking about.
-`oracle/remainingBuildings.test.ts` closes three of the four, and they are three different kinds of
-answer rather than three more rows:
+`oracle/remainingBuildings.test.ts` closes five of the six, and they are four different kinds of
+answer rather than five more rows:
 
 | building | verdict | measured |
 |---|---|---|
 | `chancery-house` | **RECONCILED** — a sixth, on this table's own apparatus, seeds and n = 64 | raw +49.297 %, residual **+0.074 %**, and `analyzeUpPeak` raises **no warning at all** on it, which is true of three shipped banks — this one and `burj-class-reference`'s `local-zone1` and `local-zone2` |
+| `harbour-point` | **RECONCILED** — a seventh, same apparatus, and the **second** bank with no warning at all | raw **+28.63 %**, residual **−0.14 %**, `explained`. Its building is authored to be over-subscribed and that does not reach this measurement: `measureUpPeak` isolates the bank and drives it at `OVERLOAD_FACTOR × %POP` of its own computed capacity |
+| `ashgate` | **BOTH AT ONCE** — `main` reconciled, `carpark` refused | `main`: raw **+31.21 %**, residual **−0.26 %**, `explained`, with `nonUniformFloorPopulations`, `nonUniformInterfloorDistance` and `expressZone` declared as a set. `carpark`: **throws** — two unpopulated parking decks and a transfer floor, so there is no populated floor above the terminal and no up-peak to price |
 | `crown-hotel` | **REFUSED, by a run** | the apparatus is carried to the end rather than declined: raw +36.513 %, residual **+7.592 %** against the 4 % band, `explained: false` |
 | `st-jude-hospital` | **REFUSED TWICE, for free** | `heterogeneousGroup`, and a longest door reopen of 53.20 s against a shortest round trip of 29.56 s — no simulation runs |
 
 **Chancery House being the cleanest case in the shipped set and the one with no check is the finding
 rather than a detail.** Nineteen floors, six identical cars, one bank, uniform populations, uniform
-pitch. Every other bank that reduces at all raises at least one warning.
+pitch. Every other bank that reduces at all raises at least one warning — **except Harbour Point's**,
+which was authored to that shape on purpose so that the thing being measured about it is the
+arithmetic between its crowd and its group rather than its structure ([§ D572](../DECISIONS.md)).
 
 **The two refusals are pinned to runs rather than to sentences**, which is the rule
 [`CLAUDE.md`](../CLAUDE.md) § *"A stated refusal goes stale the same way"* exists for. The

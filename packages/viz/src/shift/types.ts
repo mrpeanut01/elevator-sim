@@ -416,6 +416,14 @@ export interface GoalObservations {
    * `goals.ts#gaveUpBesideOf` came to need it. It is a **gate-shaped field, not a gradeable one**:
    * it is deliberately not in {@link GOAL_OBSERVATION_IDS}, exactly as {@link arrived} and
    * {@link worstWaitIsCensored} are not, so no goal can be written against it.
+   *
+   * **Read *every surface that publishes `abandoned`* as *every surface publishing a finished day*
+   * — [§ D557](../../../../DECISIONS.md), GitHub issue #537.** This field is folded at `t` like the
+   * rest, and at a playhead short of `endedAt` it counts only the riders a car has reached **so
+   * far**: measured, one deep-corpus day read *none of them carried* at 1 471 s and *42 of them
+   * carried* at 2 206 s about the same cohort. So `gaveUpBesideOf` withholds the caption on a
+   * `'now'` basis and says it is withholding it, which is R6 / § D223 rather than a weakening of
+   * § D417 — the count is still never published bare.
    */
   readonly abandonedCarried: number;
   /**

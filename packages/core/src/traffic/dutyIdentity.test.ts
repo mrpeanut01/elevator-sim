@@ -37,10 +37,12 @@ const SEED = 20_260_911n;
 
 /** Every building on disk, named so the report can say which were checked. */
 const SHIPPED = [
+  'ashgate',
   'burj-class-reference',
   'chancery-house',
   'crown-hotel',
   'garden-apartments',
+  'harbour-point',
   'midtown-office',
   'mixed-use-high-rise',
   'secure-tower',
@@ -90,7 +92,7 @@ const dutyColumn = (trace: PassengerTrace): readonly (Duty | undefined)[] =>
   trace.passengers.map((passenger) => passenger.duty);
 
 describe('a building that declares no duty is byte-identical', () => {
-  it('names the nine buildings from disk, and none of them declares a duty', () => {
+  it('names the eleven buildings from disk, and none of them declares a duty', () => {
     expect([...config.buildingsById.keys()].sort()).toEqual([...SHIPPED]);
     for (const id of SHIPPED) {
       for (const bank of buildingOf(id).banks) {

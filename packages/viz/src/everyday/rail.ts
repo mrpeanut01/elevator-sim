@@ -47,7 +47,12 @@ import { EM_DASH, percentFigure } from './figures.js';
 import { avatarInitialOf, DEFAULT_EVERYDAY_PROFILE, effectiveNameOf } from './profile.js';
 import { isScreenBuilt, UNBUILT_REASONS } from './screens.js';
 import { REPLAY_COPY } from './replay.js';
-import { ENGINEER_SWAP_NOTE, ENGINEER_SWAP_RUSH_NOTE } from './types.js';
+import {
+  ENGINEER_SWAP_NOTE,
+  ENGINEER_SWAP_REPLAY_NOTE,
+  ENGINEER_SWAP_RUSH_NOTE,
+  ENGINEER_SWAP_WATCH_NOTE,
+} from './types.js';
 import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 
 /**
@@ -437,6 +442,34 @@ function careerLineOf(
 }
 
 /**
+ * **What the swap row says it does, in the flow it is drawn in** — GitHub issue #533 item 1,
+ * [§ D563](../../../../DECISIONS.md).
+ *
+ * One note per context rather than one note, because the row does a different thing in three of the
+ * five and the sentence is read *before* the press. `daily` and `campaign` share the plain note:
+ * the panel picks up the same day and nothing about it stops. The other three are each corrected
+ * for a different reason, and each is § D227's rule rather than a preference — a control that does
+ * something may not claim it does nothing:
+ *
+ * - `rush` — the swap ends the rush first (GitHub issue #523, § D548 clause 7), so *nothing stops*
+ *   would be false on exactly the row that stops something;
+ * - `replay` — the swap ends the replay first, for the same reason one field over (issue #531
+ *   item 3), which is what {@link ENGINEER_SWAP_REPLAY_NOTE} argues;
+ * - `watch` — nothing stops, and *the same day* is the half that is false: the run on the panel is
+ *   somebody else's.
+ *
+ * The table is exhaustive over {@link RunContext} by construction — the fallthrough is the plain
+ * note — and `rail.test.ts` drives every value of `RUN_CONTEXTS` against it, so a sixth context
+ * arrives here as a decision rather than as a silent default.
+ */
+function swapNoteFor(ctx: RunContext): string {
+  if (ctx === 'rush') return ENGINEER_SWAP_RUSH_NOTE;
+  if (ctx === 'replay') return ENGINEER_SWAP_REPLAY_NOTE;
+  if (ctx === 'watch') return ENGINEER_SWAP_WATCH_NOTE;
+  return ENGINEER_SWAP_NOTE;
+}
+
+/**
  * § 3.2's footer.
  *
  * The identity is `everyday/profileStore.ts`'s, handed in through {@link RailOptions.profile} —
@@ -472,8 +505,7 @@ export function railFooter(state: EverydayState, options: RailOptions = {}): Rai
     },
     engineerSwap: {
       label: 'Switch to Engineer',
-      // With a rush standing the swap ends it first (GitHub issue #523), so *nothing stops* would be false there.
-      note: state.ctx === 'rush' ? ENGINEER_SWAP_RUSH_NOTE : ENGINEER_SWAP_NOTE,
+      note: swapNoteFor(state.ctx),
     },
   };
 }

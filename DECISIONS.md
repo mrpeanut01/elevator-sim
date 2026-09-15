@@ -35440,3 +35440,429 @@ chooses one is #437's too.
 **What this does not decide.** Whether DC-2 should play the whole census rather than a stage's `editable` list: GitHub issue #233 re-authors the lists, and on that commit the out-of-list rows move into `DROPDOWN_CLEARS`. The rebalance of stages 3, 5 and 7.
 
 ---
+
+## D557 — *did a car ever come for them* is an outcome, not a reading: the overlap clause is withheld at a playhead short of `endedAt`
+
+**Date: 2026-09-14 · GitHub issue #537 · Found by the weekly `honesty-deep` job, run 34747043123 on `155bf07` · Narrows [§ D417](#d417)'s *the overlap, always*.**
+
+**Why an entry.** The decision is taken in `shift/goals.ts` and binds four modules that do not own it — `dev/leftRail.ts#goalRowsOf`, `everyday/stageScreenModel.ts#stageGoalsOf`, `everyday/campaignModel.ts#campaignTestRows` and `shift/report.ts#dayReportOf` each now answer *which question was this fold taken to answer* — and it narrows a clause § D417 recorded as unconditional ([§ D405](#d405)).
+
+1. **What the deep tier found, reproduced before anything was changed.** `whole-run-figure-early` on `everyday/stageScreenModel.ts#stageHeaderOf` at `stage(@Ns).goals.minute.beside`, on five deep cases. Reproduced by driving the named seeds through `evaluateCase` under `DEEP_SPACE`: on `honesty-9100014` the strip drew `42 of 491 waited past the 15-minute give-up horizon, 2 of them carried; this share is over the legs that boarded` at 1 474 s of 1 965 s, and the property reported it because `491` is `GoalObservations.arrived` **at that playhead**, `summary.delivered` for the finished day is also `491`, and the word *carried* — its cue for that quantity — sits in the numeral's own clause. The collision is arithmetic. **The defect it uncovered is not.**
+
+2. **The count is a reading and the overlap is an outcome, and the difference is measured rather than argued.** `abandoned` is a fold at `t`, non-decreasing in it, so it understates and never lies; `arrived` is its population and R13 requires it travelling with the count; the denominator clause is § D106's content. `abandonedCarried` is none of those. Whether a car ever came for a rider whose wait crossed the horizon is decided by the end of the day: on `honesty-9100050` (`midtown-office`, `energy-aware`, demand to 1 440 s, `endedAt` 2 941 s) the same sentence about the same day read *18 of 653 … **none of them carried*** at 1 471 s and *195 of 653 … **42 of them carried*** at 2 206 s. **That is R6 / § D223 exactly** — an outcome evaluated before the playhead reaches `endedAt` is a preview — and it is § D417's own defect with the polarity reversed: the clause written so a reader would not subtract the count from the people was, mid-run, producing that subtraction in its strongest form.
+
+3. **The fix is a basis, passed and never sniffed.** `gaveUpBesideOf(goal, observations, basis)` takes `live/types.ts#WaitBandBasis`. On `'whole-run'` the sentence is byte-identical to what it has always been. On `'now'` it reads `42 of 491 have waited past the 15-minute give-up horizon so far; whether a car eventually came for them is not settled until the day ends; …` — the count, the population, the run's own horizon and the denominator clause all survive, and what is withheld is **said** rather than quietly softened. The parameter is **required** on `gaveUpBesideOf`, on `goalRowsOf` and on `campaignTestRows`, and `CampaignInput.observationsBasis` carries it to the desk: `dev/leftRail.ts#basisAt`'s own rule is that *"`live/` answers whichever question it is asked, and which question a finished shift deserves is a presentation call"*, and the three surfaces that already take a basis (`waitBandsAt`, `moodAt`, `honestyAt`) record against themselves that a default *"keeps the reading a caller had"*. Here the default would have been the defect.
+
+4. **Three surfaces were drawing it early, not one.** The stage strip is where the corpus saw it. The Engineer rail draws `goalRowsOf` at the transport's playhead. And the campaign desk folds at the host's playhead too — `everyday/campaignScreens.ts#observationsOfHost` is *"today's fold at the playhead"* — so two of its four tests carried the same settled claim about an unsettled cohort. The Day report is the one caller that is genuinely retrospective (`dev/main.ts#closeShift` folds at `recording.endedAt`) and passes `'whole-run'` with that argument written at the call.
+
+5. **The second surface in the same job is a different defect and is recorded where it was taken.** `live/bands.ts#moodAt` at `decision(@Ns)[i].why` reported `summary.delivered` `22.0` on `honesty-9100014-s2`: the rail's decision log read `waitTime 22.0 s **carried it**`, the dominant term's raw wait in seconds, on a day that delivered twenty-two people. *Carried* is this product's word for a delivered rider — `LiveObservations.carried`, `Observations.carryPct`, the goals strip's *of them carried*, `shift/observations.ts`'s *"how many people has this building carried"* — and the decision log was using it as the idiom for *won the bid*, inches away on the same rail. It says `won it` now, which is what `terms[0]` of the winning car's bid means and the vocabulary the row already keeps (*clear of the next car*, *next best*, *cheapest bid*). That change binds nothing outside `live/decisions.ts`, so its record is that module's docstring under § D405; `decisions.test.ts` pins it by its reason over every outcome and over a shipped run, not only by the sentence.
+
+6. **What was not done.** Neither finding was entered in `honesty.test.ts`'s `OUTSTANDING`, no bound was widened, and `STANDARD_SPACE`, `DEEP_SPACE`, `maxDurationS` and `stageProbability` are untouched. `honesty/properties.ts` is untouched: the textual half's cross-quantity collision — a live numeral that happens to equal another quantity's finished-day value, beside that quantity's cue — is **still able to fire**, and is left able to, because on both of these surfaces it was pointing at something real.
+
+7. **What it moves.** The mid-run arm is a substitution, so the six cases re-measured after the fix report the same text counts they did before it (`honesty-9100014` 14 032, `-9100022` and `-9100028` 13 866, `-9100038` 13 951, `-9100050` 13 780, `-9100014-s2` 12 991) with zero violations. `shift/goals.ts#OVERLAP_UNSETTLED` is a new derived producer and is claimed by the two adapters that seed it — the stage's and the campaign's, the two that render a fold short of `endedAt`. The corpus row is the integrator's to re-measure ([§ D343](#d343)).
+
+**What this does not decide.** Whether `arrived` should name its own population and window on the face of the sentence. It is unlabelled — *42 of 491* never says 491 *what* — and mid-run it means *so far* on three surfaces and *the whole day* on the fourth, with nothing in the words to tell them apart. That is a § D227 question about a stated window rather than R6's about an early outcome, no run here pins it, and it is left open rather than answered with a plausible sentence.
+
+---
+
+## D560 — The fix-it editor's two steppers are priced through the schedule, the multiplier moves into `pricing/` where the data can change it, and a guard keeps the next one out
+
+**Date: 2026-09-14 · GitHub issue #528 · Closes the exception [§ D552](#d552) recorded against itself.**
+
+**Why an entry.** It moves something already recorded — § D552's *"`pricing/parse.ts#purchaseUnits` is the one place a rate is multiplied by a quantity"*, and the named exception under it, whose three superseded sentences are quoted in clause 7 — and it binds code and a rule the deciding module does not own: `fixit/engine.ts`, and a guard that now runs over **every** non-test file in `packages/viz/src` ([§ D405](#d405)).
+
+1. **The premise was checked before anything was changed, and half of it is false.** The issue says `fixit/engine.ts#editorPricingFrom` *"multiplies flat rows in code"*. Traced on `155bf07`: that function (`fixit/engine.ts:65`) reads **three** flat rows through `priceOf` and `purchaseUnits`, each with no quantity, and multiplies nothing. The multiplier was `spendOf` at `:205-206` — `state.speedSteps * pricing.speedUnitsPerHalfMps + state.capacitySteps * pricing.capacityUnitsPerTwoPlaces`. `stepSpeed` and `stepCapacity` charge one step and multiply nothing; `everyday/fixitScreenModel.ts` and `dev/fixitPanel.ts` multiply `steps` by `0.5 m/s` and by `2 places`, which are magnitudes and not prices. The correction is worth more than the verdict: a fix aimed at the function the issue named would have landed in the one link of the chain with nothing to fix. The **substance** of the issue is unaffected and stands — a magnitude term for a price lived in a screen's arithmetic, where `data/price-schedule.json` could neither see it nor set it, which is `CLAUDE.md` invariant 7 on the file that exists to end second price lists ([§ D525](#d525) clause 2).
+
+2. **What ships.** `pricing/parse.ts#steppedPurchaseUnits(change, steps)` is where a step count now meets a price: a **rated** row is charged through `purchaseUnits` at that quantity, range-checked against its own declared most; a **flat** row is charged `priceUnits × steps`. `spendOf` asks it. `editorPricingFrom` reads the two stepped rows through `smallestPurchaseUnitsOf` — the price of one step is a flat row's price and a rated row's `unitsPer`, which is also the figure the panel prints beside the control — and keeps `purchaseUnits` for the shaft, which is one purchase of a whole change and not a stepper.
+
+   **The flat arm is § D552's refusal kept deliberately, and the choice was not *multiplier or no multiplier*.** Withdrawing the multiplier moves a shipped price, and a shipped price is the product owner's (`data/price-schedule.json`'s own header). So the choice was *visible or invisible*, and this is the visible one: one function, in the module that owns prices, named for what it does, guarded, and pinned. **What it buys is that the data can decide** — give either row a `rate` and the rated arm takes over with no code change at all, which is what invariant 7 asks of a magnitude term and could not be said while the arithmetic lived in `fixit/`. `fixit/engine.test.ts` holds that both ways: at the same per-unit figure a rated row charges the editor exactly what the flat one does, and a rated `new-car` is still refused, because no step count sizes a shaft.
+
+3. **No price moves, and it is pinned rather than argued.** `fixit/editorPricesThroughTheSchedule.test.ts` was written and run **before** the seam moved and re-run after, both readings identical: the editor's three prices (shaft 34 u, speed 10 u a half-step, capacity 8 u for two places) and its two settings (rezone 6 u, parking 0 u); the steppers charged step by step, `0, 10, 20, 30, 40, 50, 60, 70, 80` and `0, 8, 16, 24, 32, 40, 48, 56, 64`; and all **72** shipped repairs, priced the way `fixit/parse.ts` prices them at load, summing to **888 u** over the eighteen cases. Eight steps rather than one, because one step cannot tell a per-step price from a flat one.
+
+4. **A divergence was found on the way, and it is registered rather than fixed.** The issue expects a fix-it price and a scenario price to part company *"the day #437's rate row ships"*. They have parted already, inside the fix-it screen: `faster-machines` is flat at 10 u with *"no rule relating the price to how much"* is bought, so `zoning-starves-the-top/regear-the-upper-car` and `car-park-nobody-serves/regear-the-garage-car` each buy **+1.0 m/s for 10 u**, and `sleeping-sky-lobby/regear-the-shuttles` buys +0.5 m/s on **eight cars** for the same 10 u — while the editor charges **20 u** for the same whole metre per second. Closing it moves a shipped price in one direction or the other, so this decision leaves both figures exactly where they are and holds the disagreement in a case that goes red on the commit that decides it.
+
+5. **The data change is drafted and awaits the owner; it is deliberately not made.** The draft: `faster-machines` and `larger-car-step` become rated rows at `unitsPer` **10** and **8** — **CHOSEN: nothing.** Both figures are the ones the rows carry today, moved rather than drafted, and every editor price stays where it is by construction. What needs a ruling is not a figure but three consequences, and none of them is measured here: a rated `faster-machines` is reached by `repairPriceUnits` through `building.cars[].set.ratedSpeedDeltaMps`, which has no quantity to give, so every repair that buys a speed bump must derive one from its own delta — and then the two whole-metre repairs above go **10 u → 20 u**, which is a shipped price moving; `ceilingUnitsOf` would read `unitsPer × quantity.max` rather than a flat figure, so `scenario/budget.ts#scheduleBoundsOf`'s `dearestChangeUnits` and `totalUnits` move and every opening budget derived against them has to be re-checked; and the quantity's declared most becomes a ceiling the stepper has to refuse at, which it does not have. **MEASURED: the divergence in clause 4 and the 888 u in clause 3.** Nothing else.
+
+6. **The guard.** `pricing/pricesAreMultipliedOnlyHere.test.ts` scans every non-test `.ts` file under `packages/viz/src`, derived from disk rather than listed, and fails on a multiplication either side of which mentions a price — including a price laundered through one local binding, which is how the defect would be written by somebody working around the guard. It cannot see a price renamed to mention no price and multiplied three modules away; nothing short of type-aware analysis would, and saying so is cheaper than implying otherwise. It is proved to bite on the exact expression this decision removed, and proved not to fire on `steps * 2` beside the word *price*. Tests are out of scope: a fixture that builds a budget as ten times a price charges nobody.
+
+   **One file outside `pricing/` is allowed, with its reason, asserted in both directions.** `commissioning/choices.ts` prices a bank in **capital units** — 100 a shaft, 20 per m/s per car, 0.2 per metre of rated rise — a second currency the price schedule does not hold, which `pricing/types.ts` already counts among the six price lists it found. Routing it through the schedule re-prices every commissioning choice, so it is named where the next reader meets it rather than left quietly outside the scan. An identifier that joins or leaves that entry turns the case red.
+
+7. **What [§ D552](#d552) clause 2 says that is history from this commit, quoted, with that entry left exactly as it was written.** A decision record preserves superseded text and is not rewritten after the fact ([§ D404](#d404), [§ D405](#d405), and `docs/39-decisions-in-force.md`'s own preamble), so the supersession is recorded **here** and nothing over there is touched. Three sentences of that clause stop being true on this commit, and they are its last three:
+
+   - *"The exception is the fix-it editor, which multiplies a flat price in code."* There is no longer an exception to state: the multiplication is `pricing/parse.ts#steppedPurchaseUnits`, inside the module the sentence was contrasting the editor with. What survives of the sentence is the **fact** rather than the location — a flat price is still multiplied by a step count, and § D552's own refusal of a quantity on a flat row is still the reason it is worth pointing at.
+   - *"`fixit/engine.ts#editorPricingFrom` reads `faster-machines` and `larger-car-step` through `purchaseUnits` as flat figures."* It reads them through `smallestPurchaseUnitsOf` now — a stepper's figure is the price of one step, which is a flat row's price and a rated row's `unitsPer`.
+   - *"until it lands, turning either row into a rated one makes `editorPricingFrom`, and `spendOf` with it, throw."* **This is the one that has reversed**, and reversing it was the point: a rated row is charged `unitsPer × steps` through the seam, identical at the same per-unit figure to what the flat row charges today, so the switch is a data edit rather than a code change. A rated **`new-car`** still throws, and that half of § D552's refusal is untouched.
+
+   Read the whole clause as dated rather than wrong: it *names GitHub issue #528 as the thing that would close it*, which is this entry, so the record already pointed at its own supersession before it happened. Clauses 1, 3, 4 and 5 of § D552 are untouched and in force; `docs/39` gains no row, because that index is for the rulings that declare the **game's shape** and this decision moves no price, no screen and no rule a player meets.
+
+**What this does not decide.** Which way clause 4's disagreement is settled, or whether clause 5's draft is taken — both are the product owner's. Whether commissioning's capital units belong in the schedule at all. And it gives the steppers no ceiling: under a rated row a player stepping past the declared most makes `steppedPurchaseUnits` throw where the panel has no refusal to draw, which is pinned in `pricing/rate.test.ts` and owed by GitHub issue #437's lane, the first that will ship a rate.
+
+---
+
+## D563 — § 3.2's swap ends a replay before it hands the page over, and the row says what the swap does in each flow
+
+**Date: 2026-09-14 · GitHub issue #531 item 3 and GitHub issue #533 item 1 · Found by the independent review of GitHub PR #529 · Extends [§ D548](#d548) clause 7, which made the swap end a rush.**
+
+**Why an entry.** The decision is taken in `everyday/shell.ts` and binds `everyday/types.ts`, `everyday/rail.ts` and `honesty/surfaces.ts`, and it narrows a sentence already recorded — § D548 clause 7 gave the swap row one corrected note and this gives it three ([§ D405](#d405)).
+
+1. **A replay does not survive the trip.** § 6.1 hands a past day back *as it was*: `everyday/replay.ts` leaves the seed, the building, the dispatcher, the levers and the length exactly where that day left them, *"because they are what the day was"*. The full panel writes every one of them and `dev/main.ts#interveneAt` re-runs over whatever it finds, so a replay that survived the swap would be a replay of a day that never happened. That is § D548 clause 7's argument with `RUSH_FIELD_ROLES` swapped for a record of the past.
+2. **And it closes issue #531 item 3 by construction rather than by widening a flag.** `leaveReplay`'s cancel is scoped to runs the replay pressed ([§ D555](#d555) clause 4), and the Engineer surface's own Run button does not go through `EverydayHost.startRun`; a run started over there inside a replay was therefore still in flight when the player left, and `applyShift` landed it over the week the restore had just put back. The issue offered two fixes — leave the replay, or widen the flag to cover Engineer-started runs. Leaving is the one that also answers clause 1, and it needs no new channel through the door between the shells. **What the other fix would have bought and this does not:** a player can no longer inspect a replay on the full panel. A replay can be re-opened from the front door in two presses, which a rush cannot, so the cost is smaller here than the one § D548 clause 7 already accepted.
+3. **`go('door')` rather than a bare context write.** It is the route the bar's own way out of a replay already takes, its guard is what calls `leaveReplay`, and the way back lands on the front door the replay was opened from rather than on a brief whose week is gone.
+4. **The row says what the swap does *there*, in three flows rather than one.** `rail.ts#swapNoteFor` is one note per `RunContext`: `rush` and `replay` each say the swap ends the flow first, `watch` says nothing stops **and** stops calling the run on the panel the player's day — a spectator is looking at somebody else's record, which is the half of `ENGINEER_SWAP_NOTE` that was false there. `daily` and `campaign` keep the plain note. Each correction is § D227's rule rather than a preference, in both of its directions.
+5. **Measured rather than argued.** `replay.browser.test.ts` drives the swap from a replay's brief on the shipped artifact and reads what comes back: the front door rather than the brief, no `REPLAYING` on the rail, and a run started on the Engineer surface after the swap filing day 2's own score — equal, field for field, to a control arm that opened no replay at all.
+
+**What it moves.** Two seeded strings per honesty case, the `replay` and `watch` arms of the `ENGINEER_DOOR` adapter; the corpus row is the integrator's to re-measure ([§ D343](#d343)).
+
+---
+
+## D564 — A campaign day's leave strip keeps the promise it makes: § 8's day is abandoned exactly as § 6's is
+
+**Date: 2026-09-14 · GitHub issue #531 item 1 · Found by the independent review of GitHub PR #529 · Closes the open item [§ D555](#d555) left standing.**
+
+**Why an entry.** It moves something already recorded: § D555's closing sentence reads *"A campaign day's strip makes the same promise and is not wired: `shell.ts#leaveUnfinished` abandons in the daily context only, and says so."* That is no longer true, and the entry is what says so ([§ D405](#d405)).
+
+1. **The promise was made in two contexts and kept in one.** `actionBar.ts#confirmStripFor` gives `campaign` the **same** day-shaped strip as the daily loop, word for word — *"Today's run will not be scored"* — and `shell.ts#leaveUnfinished` called `EverydayHost.leaveDayUnfinished` only on `daily`. Nothing downstream distinguishes them: `host.ts#runCampaignDay` presses the same `startRun`, and `dev/main.ts#closeShift` never asks which flow a run belongs to.
+2. **The reproduction is the one § D555 could not run.** The issue records the inaction as confirmed by reading and the filing as plausible and unmeasured. It is measured now, on the shipped artifact: `autoFile.browser.test.ts` locks a contract day in, leaves it through the strip while the run is still on the worker, and presses the Engineer surface's `Ctrl`+`Enter`. Before this commit the front door showed a filed score; after it, none.
+3. **`ctx` rather than *does this context draw a strip*.** A rush and a replay draw a strip too, and theirs promises something else about a run that is already theirs to stop — so the test is the two day-shaped contexts by name.
+4. **Both halves of `abandonDay`, for § D555 clause 1's measured reason.** The run in flight is cancelled *and* the run standing behind it is refused at filing; on a campaign day that standing run is this page's own boot run, which the contract press has just made filable by latching § D232's flag.
+
+---
+
+## D565 — A day that has already filed is stopped when an offer is taken, not accused of being unfinished
+
+**Date: 2026-09-14 · GitHub issue #531 item 4 · Found by the independent review of GitHub PR #529.**
+
+**Why an entry.** It narrows when a refusal recorded elsewhere may be claimed: `shift/banking.ts#LEFT_UNFINISHED_CANNOT_BANK` is [§ D555](#d555) clause 1's third ground, and this says which recordings it may be attached to ([§ D405](#d405)).
+
+1. **The defect is a true refusal with a false reason.** `abandonDay` does two things — it cancels whatever is in flight, and it marks the standing recording as one this shell may not file. § D555 clause 2 calls it on a campaign `take-offer`, unconditionally. So a player who filed a day, took an offer and then posted was refused with *"this run belongs to a day that was left unfinished"* about a day that was finished and filed. `dev/main.ts#postCurrentRun` asks `bankingRefusalFor` **before** the identity check, so the true refusal — the selection has moved out from under the run — never got the chance to speak.
+2. **It would have been refused anyway, and that is not a defence.** This product makes exactly one accusation and `scope/runIdentity.ts` spends a docstring on not spending it. A refusal that names the wrong ground sends a player looking for a day they never left.
+3. **The cancel is not gated and the mark is.** `everyday/host.ts`'s `take-offer` arm now calls `cancelRun` when the day has closed and `abandonDay` when it has not. The cancel is right whatever the day has done: a run in flight was asked for the week being parked. `host.test.ts` reads `['cancelRun', 'applyPatch']` with `dayClosed` true and `['abandonDay', 'applyPatch']` without it, and the week moves either way.
+4. **The other caller needs no gate and deliberately does not get one.** § 3.4's strip is drawn only while `runState().open` is true, and that is false for a closed day, so `leaveDayUnfinished` cannot arrive with one. A second gate would be a second answer to a question the bar has already settled.
+
+---
+
+## D566 — A covered Everyday screen re-reads the host on the way back, in place, and the screen that must not says why
+
+**Date: 2026-09-14 · GitHub issue #535 · Found while fixing GitHub PR #530 (closes #523).**
+
+**Why an entry.** The decision is taken in `everyday/shell.ts` and adds a member to `everyday/screens.ts#EverydayScreenHandle`, which every screen in the registry implements, so it binds modules the deciding one does not own ([§ D405](#d405)).
+
+1. **The shape, and why it is a class rather than one screen.** `returnToEveryday` leaves every screen mounted — that is what makes the return land where the player left. A screen that *subscribes* is fine; a screen that read the host when it was drawn comes back showing what stood at the swap. PR #530 found the first (the rush setup screen) and fixed it with one guarded `draw()`. Three more had the shape and none had been probed.
+2. **Two of the three can go stale, and both were watched red.** `boardScreen.ts` draws § 20.10's send gate from `editedDispatcher()`, and the Engineer surface's weight sliders are what make a dispatcher dirty — stale, the board offers a send the product has just refused, on a button that starts forty runs and whose press does not re-ask the gate. `landingScreen.ts` chooses its single call to action with `tutorialIsDue`, which counts the days the week has filed, and the Engineer surface can file one — stale, it offers the walkthrough to a player who has just played a shift, with a label and a destination a visit out of date.
+3. **`designerScreen.ts` cannot, and no fix was invented for it.** It reads the host twice, both at mount: the stable resources, and a seed for a drawing the player then owns. Re-reading would replace a tower being drawn with whatever building the other world is standing on, so the fix would be worse than the defect. Its docstring carries that where a lane would go looking, which is what the issue asks for.
+4. **`reread` rather than `draw()`, and rather than a subscription.** `shell.ts#draw` unmounts, and `boardScreen.ts`'s `unmount` cancels a gauntlet in flight — so redrawing the board on the way back would silently throw away a batch of runs a player had started and walked away from, which is a new defect traded for an old one. A host subscription is worse again, for PR #530's own measured reason: the host's listeners fire at the end of every `renderAll`, so a subscribed screen rebuilds itself behind the cover on every state change the other world makes, and the landing page's rebuild restarts a transport. Once, on the way back, in place, is the whole of what is needed. The rush's line is left exactly as PR #530 wrote it: that screen's mount is a one-shot build with nothing to tear down.
+
+---
+
+## D567 — The *Watch it* press has one home, because the copy that had no test was the board's
+
+**Date: 2026-09-14 · GitHub issue #531 item 2 · Found by the independent review of GitHub PR #529.**
+
+**Why an entry.** It moves code out of two modules into a third and changes what [§ D555](#d555) clause 3's last sentence says about coverage ([§ D405](#d405)).
+
+1. **What was reported.** § D555 clause 3 put a guard in `weekScreen.ts` and `boardScreen.ts` — a watch check that lands after the screen has gone enters nothing, and ends the session the host has by then already entered — and recorded that the board's copy has no browser case, because the browser tier runs no board server and a board row cannot be pressed there. So reverting the board's copy alone failed nothing in the tree.
+2. **The fix is one implementation rather than a second test.** `everyday/watchPress.ts#pressWatchRow` carries the whole press: the one-press-at-a-time guard (GitHub issue #410), the gate call, and the three arms of its answer. Both screens supply ports for the parts that genuinely differ — the board keys its busy row and its refusals by the **server's** row id and keeps the reason, the week screen keys both by the run's id and keeps the whole checked row. Two implementations of a three-hazard decision, each with its own test, is the drift this repository keeps a register of.
+3. **`watchPress.test.ts` drives all of it against a fake host that keeps the settle callback** rather than calling it, so a case can land the gate's answer *after* it has unmounted the screen — which is the hazard, and is not expressible against a synchronous stand-in. Removing the late-landing guard turns two of its eight cases red.
+4. **What this does not buy, said rather than glossed.** Nothing here asserts that the board still *calls* it. The week screen's call is pinned on the page by `watchStage.browser.test.ts`; the board's is pinned by nothing until the tier can stand a board server up. That is a smaller hole than the one it replaces — a guard with no test at all — and it is the honest size of it.
+
+---
+
+## D568 — `sim.assignedWalkS` declares both clauses an `activeWhen` can name, and the third — *some landing of this building assigns* — is executed rather than asserted: a run that sets the walk where no landing names a car says so
+
+**Date: 2026-09-14 · GitHub issue #534 item 4 · Found by the independent review of GitHub PR #532 · Extends [§ D553](#d553) and answers `CLAUDE.md` invariant 8 for one row.**
+
+**Why an entry.** It moves a declared schema in `core/src/sim/types.ts`, adds a warning to `sim/simulation.ts`, and names a module neither owns — `experiments`' `tuning/space/landings.ts` ([§ D571](#d571)) — as where the clause it cannot declare is expressed instead ([§ D405](#d405)).
+
+1. **The declared half is now complete.** The row declared `activeWhen: { 'dispatch.passengerAssignment': ['panel'] }` and nothing else. It now also declares `'dispatch.callType': [...DESTINATION_CALL_TYPES]`. That clause was **transitive rather than new** — `resolveDispatchConfig` refuses `panel` beside a call type that cannot ask for a destination (§ T16-D1) — and it is written down because a gate a reader has to derive from another module's refusal is a gate `tuning/space` cannot evaluate. `sim/assignedWalkGate.test.ts` asserts the conjunction and then asks `core`'s own resolver whether the excluded pair is refused, rather than restating the rule.
+
+2. **The third clause is not declarable, and the reason is structural.** Since § D553 the walk is charged where a *landing* names a car — `Simulation.#assignsAt`, which is `comparabilityOfLandings` read one floor at a time — so the row is live only if some landing of the building registers a destination call. An `activeWhen` names **parameter ids**; a per-floor panel set is keyed by floor id, which § D553 item 8 records as a building's property and not a dispatcher profile's. This repository already has one building-dependent condition and it lives as a *function over the building* rather than in a schema — `tuning/space#buildingFeasibility`, for the two `answer.*` rows only decidable against a car — and this is the same shape.
+
+3. **So it is executed.** A run whose `sim.assignedWalkS` is non-zero while `passengerModel` is `conventional` raises a warning naming the value as inert. Raised **only when the value is non-zero**, so the default (`0`) leaves every existing run byte-identical — the whole reason the default is zero. That is `CLAUDE.md`'s *stated refusal* rule pointed at a knob: a control that writes nothing must say so, and the saying is pinned by a run rather than by a sentence.
+
+4. **The gate is checked in both directions, which is what `sim/searchSpaceLiveness.test.ts` requires of every gate.** Live: on a building with panels at one landing, and on one that declares nothing, moving the walk 0 → 20 s moves the legs. Flat: under the *same* `panel` dispatcher on a building whose landings all declare `up-down-buttons`, and under a conventional dispatcher, moving it 0 → 25/30 s is **byte-identical** — every event, every record, every statistic — apart from the warning, which is filtered out of the comparison in both places the run publishes it (`SimulationResult.warnings` and `RunRecord.warnings`) rather than emptied.
+
+**What this does not claim.** That a search varies this row. Nothing does: `sim.*` is excluded from `collectSearchSpace` by its own membership rule, and `dispatch/deadCode.test.ts` records `SIM_PARAMETERS` as *"invariant 8 schema; no shipped search varies these yet"*. The declaration stands on its own, which is what invariant 8 asks for.
+
+---
+
+## D569 — The cross-platform identity check PR #532's review asked for cannot be built as asked, and the reason is two recorded facts: CI has one leg, and a whole-result hash pinned in this repository is the defect § D196 removed
+
+**Date: 2026-09-14 · GitHub issue #534 item 3 · Found by the independent review of GitHub PR #532 · Refuses an acceptance item with reasoning, and builds the portable form instead.**
+
+**Why an entry.** It refuses something already recorded — an acceptance item on a GitHub issue — and it rests on [§ D196](#d196), [§ D201](#d201) and [§ D462](#d462), which it must not be read as reversing ([§ D405](#d405)).
+
+1. **The premise is stale.** The review wrote *"CI runs both platforms, but no test hashes whole results across them."* It has not run both since § D462, the product owner's call of 2026-09-02: `.github/workflows/ci.yml` dropped the `macos-latest` leg and all five of its jobs are `ubuntu-latest`. There is no second platform for a cross-platform check to disagree with. The workflow's own header says what that cost — *"portability stops being a MEASURED property … the pins are still pinned; nothing checks that they travel"* — and nothing here reverses it.
+
+2. **A whole-result hash pinned here would be worse than no check.** `traffic/*Identity.test.ts` used to pin `SHA-256(JSON.stringify(result))` and compare with `toBe`. § D196 re-pinned 26 values that failed in one environment; § D201 found the same 26 failing in the other, each environment reproducing its own pin set exactly. On a one-leg matrix such a pin is green on the machine that wrote it and red on a developer's, which reports float noise as a regression in the place this project is most careful not to.
+
+3. **What is portable by construction is pinned instead, for the hybrid configuration.** `structuralDigestOfResult` hashes every decision — every key, string, boolean and **integer** — and elides the magnitudes, which are compared within `identity.test-helper.ts`'s 1e-9 relative band. `sim/landingPanelIdentity.test.ts` pins four hybrid cells that way. A platform whose *decisions* diverge on a hybrid run — a different car answering, a different landing assigning, a different batch key — goes red on that platform and names the cell, which is exactly the outcome the review wanted and the strongest honest form of it while the matrix is one leg.
+
+4. **And stage 1's own identity claim is re-measured by the suite rather than inherited.** § D553 clause 7 hashed seventy whole results on two trees, on macOS. The same claim is now a case: **every shipped building × seven dispatcher arms × two demand shapes — 70 configurations, 140 runs — declaring the dispatcher's own resolved call type on every landing, compared to the shipped building with the whole-result `fingerprint`, byte for byte.** It is a *within-platform* A/B, so it re-measures the claim on whatever machine runs it; CI's Linux leg is therefore the Linux measurement the review asked for, taken on every commit. Measured green on Linux on this tree, in 15 s.
+
+**What this does not claim.** That two platforms have been compared. Nobody has run it on a second one and nothing in CI will. Re-adding a leg is one `include:` entry, and the workflow says so.
+
+---
+
+## D570 — The property fuzzer draws landing call types: a third pinned family whose landings disagree, in its own space, so the two corpora that carry regression records keep their runs exactly
+
+**Date: 2026-09-14 · GitHub issue #534 item 1 · Found by the independent review of GitHub PR #532 · Extends [§ D553](#d553).**
+
+**Why an entry.** It adds an axis to `experiments`' fuzz generator, a tier to the shipped `elevator-sim fuzz` command in `packages/cli`, and a field to `FuzzSpace` that the two existing corpora depend on being zero ([§ D405](#d405)).
+
+1. **The hole.** § D553 gave a floor `landingCallType` and the generator drew none, so **no fuzz case could build a hybrid**. Everything that configuration reaches was unfuzzed: `costRequestFor` and `batchKeyOf` asked per call rather than per run, `Simulation.#assignsAt` as anything but the run-wide gate, the bare kiosk's refusal at one landing and not the next, conservation claim 5 counted over a proper subset of the landings, and the `hybrid` comparability object itself.
+
+2. **A third space, not a probability on the first two.** `FuzzSpace.landingPanelProbability` is `0` on `STANDARD_SPACE` and `DEEP_SPACE`, where the `fuzz.landings` stream is never touched and no floor gains a key; `HYBRID_SPACE` and `DEEP_HYBRID_SPACE` are those two with that one axis on. The reason is not tidiness: the deep tier's two pinned reproductions (`fuzz-1001074`, `fuzz-1000384`) are **regression records of specific runs**, and a recorded case that quietly became a hybrid would reproduce a different run at the same seed — the defect `CORPUS_DISPATCHER_PROFILE_IDS` exists for, one axis over. `hybrid.test.ts` asserts the always-on corpus declares no landing fixture anywhere, rather than trusting the constant.
+
+3. **The set is drawn from the declared dimension** ([§ D571](#d571)), not by a rule the generator invents: one float decides whether a case carries a set at all, then `sampleCandidate` draws the set from `landingPanelSpaceFor`'s space. A family that sampled a panel set its own way would be exercising a space no search could sample, which is `patternSwitching`'s defect wearing a generator.
+
+4. **`HYBRID_CORPUS` is 48 pinned seeds and the last sixteen are chosen rather than consecutive** — the shape `STANDARD_CORPUS`'s two-floor seeds have. A hybrid needs a dispatcher that *names a car*, and `data/` ships one such profile of thirteen; measured over seeds 2 000 001–2 000 400, **18 produce a hybrid**, about one case in twenty-two, so a consecutive block alone would have carried two. Measured on this tree: **48 cases, 0 failures, 0 skipped, 6 037 passengers, 10.91 simulated hours, 3.7 s** — 44 cases declaring fixtures, 44 with at least one panel, **18 hybrid**, 47 `completed` and 1 `timed-out`. The census is asserted, so a fourteenth profile or a narrowed draw fails there rather than leaving a family of uniform runs with a hybrid name. The deep arm (`ELEVATOR_SIM_FUZZ=deep`) ran **250 cases, 0 failures, 0 skipped, 160 293 passengers, 147.83 simulated hours, 186 s, 18 hybrid**.
+
+5. **One combination is deliberately not drawn, and it is named rather than absent.** A destination call carrying **no credential** beside access zones is `C35` — 32 failures in 2 000 deep cases, [§ D128](#d128), and **open in `core`**. `panelCallTypeFor` declares a reader there instead. A family that drew it would report a known `core` defect as its own finding, which is what the `unroutable` skip exists to keep out of the campaign; a `destination-entry` landing beside a *panel* dispatcher is drawn freely, because `#callValue` stamps `panelAuthorized` at every assigning landing.
+
+6. **A shipped caller, and the shrinker carries the field.** `elevator-sim fuzz --tier hybrid` is the path a user can type — C24's answer applied to the new family — and `shrink.ts`'s draft now copies `landingCallType`, for the reason it already copies `serviceEvents`: a shrinker that dropped it would report a "minimal" counterexample that is no longer the hybrid run the original was about.
+
+**What this does not claim.** That the **honesty properties** have been driven over a hybrid. They cannot be: they are predicates over rendered player-facing strings, no fuzz building is ever rendered, and § D553 clause 9 makes the viewer refuse `landingCallType` outright until stage 2. What is asserted instead is the same question one layer down — every hybrid case raises the § D553 disclaimer and marks the nine model-sensitive metrics not comparable, so no case in the family offers an AWT a reader could pair against a conventional run's.
+
+---
+
+## D571 — A per-floor panel set is a boolean per landing in a **per-building** space, its default read off the dispatcher so the default point is the building as it ships, and the fixture axis waits on stage 2's price rather than the set
+
+**Date: 2026-09-14 · GitHub issue #534 item 5 · Found by the independent review of GitHub PR #532 · Builds what [§ D553](#d553) item 8 noted and did not wire.**
+
+**Why an entry.** It adds a module to `experiments`' `tuning/space`, is consumed by `fuzz/generate.ts`, and is named by a schema row in `core` ([§ D568](#d568)) — three modules, none of which owns the decision ([§ D405](#d405)).
+
+1. **Per-building, not per-profile, and mechanically so.** `landings.<floorId>.destinationPanel` is keyed by a floor id, and `collectSearchSpace`'s membership rule is *"a dispatcher profile can hold this id"*, decided by writing the value into a profile and parsing it. `landings.test.ts` asserts the exclusion in both directions, because an id that leaked into the dispatcher space would be searched and then written into a profile that cannot hold it.
+
+2. **A boolean per floor rather than a categorical per floor, and the reason is stage 2's pricing.** § D553 item 8 offers both. `docs/38` § 2.1 prices panels **per landing**, through PR #527's rate × quantity seam, and the quantity is *how many landings have one* — which a boolean set answers exactly (`panelCountOf`). A categorical over three call types does not: it would make the quantity a question about which fixtures are the same *fitting*, and nothing in the schedule says whether a kiosk, a reader and a button are priced alike. **So what waits on stage 2 is the fixture axis and the price row; the set itself does not wait**, because the fuzzer, the survivor sweep ([§ D528](#d528)) and the pricing all need it first. A categorical is a **widening** of these ids rather than a replacement.
+
+3. **`landingCallType` is tri-state and a boolean has two states, so the default is read off the resolved stage.** Under a dispatcher whose call type carries a destination every landing defaults to `true`; under a conventional one, to `false`. So `defaultCandidate` of this space decodes to the building exactly as it ships — § D553 clause 1's identity — and `true` decodes to the dispatcher's *own* call type wherever that carries a destination, so a `true` landing is byte-identical to an undeclared one rather than merely equivalent. Held by a run: the default point reproduces the undeclared building's legs, and flipping one landing moves them and makes the run `hybrid`.
+
+4. **The declared box is the feasible set, and saying so is a claim.** `validate` always answers `undefined`, written as a function rather than omitted. Any subset of a building's landings may carry a panel; the two refusals `core` makes are properties of the *fixture* — a `destination-entry` landing under a deferring dispatcher, and a panel under a call type that cannot ask for a destination — and both are decided by `panelCallTypeFor` before a candidate exists.
+
+5. **It is sampled by something, which is the whole point.** `fuzz/generate.ts` draws every hybrid family case's set through `sampleCandidate` over this space ([§ D570](#d570)). A dimension a search cannot draw from is `patternSwitching`'s defect wearing a schema, and a test that only asserted the shape would not have told the two apart.
+
+**What this does not decide.** The price of a panel, the fixture axis, or whether a hybrid is worth buying — all stage 2's. Nor whether a *building* space should collect this dimension beside others: there is no per-building space yet, and this module is one dimension family rather than a second `collectSearchSpace`.
+
+---
+
+---
+
+## D572 — Harbour Point: the figures, drafted for approval, and the over-subscription measured on both sides rather than declared
+
+**Date: 2026-09-14 · GitHub issue [#500](https://github.com/mrpeanut01/elevator-sim/issues/500) · Rules on: [`docs/37`](docs/37-content-plan.md) § 7.3 clause 3, the product owner's 2026-09-08 standing ruling on governed `data/` values, and the owner's 2026-09-10 ruling on #232 (*the building target is 22, every building is playable and owes one contract*).**
+
+**Why an entry.** Two of [§ D405](#d405)'s three grounds. The authored figures need the owner's
+approval and are drafted for it here, which is what the standing `data/` ruling asks of a file with
+no schema of its own to hang a `provenance` block on. And it discharges a clause already recorded:
+`docs/37` § 7.3 says *author both buildings*, and this is half of that, with the half the owner
+overruled on 2026-09-10 (#419) — the proof-set swap — recorded as refused rather than deferred.
+
+**The shape is the vendored `ENGINE_CONTRACT.md` § 12.3's**: 16 floors, 6 lifts, *more demand than
+the group can clear, whatever you do*. `data/buildings/harbour-point.json` is one bank, six
+identical cars, one entrance, uniform floors, a uniform pitch and nothing else — deliberately the
+simplest building in `data/buildings/`, so that the finding is the arithmetic between the crowd and
+the group and cannot be attributed to a zone, a credential or a transfer.
+
+1. **What is CHOSEN, and awaits approval.** The floor count (16) and the car count (6), both § 12.3's;
+   the 3.7 m floor-to-floor; **104 people a floor over fifteen occupied floors, 1 560 in all**; the
+   car class (`geared-traction` at its 2.5 m/s typical and 2 500 lb, the *Office standard* row of
+   `data/elevator-specs.json` `capacities`); the side-opening doors; and `office-standard` as the
+   traffic profile. The building's `$comment` marks each of them and says so.
+2. **What is MEASURED, and is not a judgement.** The closed form gives the bank a handling capacity
+   of **155.0 persons / 5 min**, **9.94 %** of the population it serves, against the profile's
+   typical 12 % of which 0.85 is incoming — **10.2 % offered against 9.94 % carried**, before a
+   dispatcher decides anything. And the run: over the **thirteen shipped dispatcher profiles × five
+   seeds** (`20 260 824 + 7 919 n`) at 1 800 s, **64 of 65 runs report a diverging queue and have
+   the mean suppressed**.
+3. **The sixty-fifth is reported rather than rounded away.** `zoned-uppeak` at seed 20 276 662 comes
+   back `awtIsValid: true` and publishes a quotable **278.8 s** mean with **88 %** of arrivals over
+   the long-wait threshold and a queue rising at 12.3 persons a minute. That is the trend test's own
+   scatter ratio failing to clear, not a run that coped, and it is the shape `CLAUDE.md`
+   § Statistical discipline names: *neither gate sees a queue that grew enormously and drained just
+   in time*. **No AWT is published for this building**, and none may be.
+4. **The population departs from the design's own figure, and the departure is a measurement.**
+   `GAMEPLAY_AND_NAVIGATION.md` § 10.5 reads *"One start time for eleven hundred"*. Run over the
+   identical grid at 1 095 people, only **27 of 65** saturate — **38 of 65 publish a quotable
+   mean** — so eleven hundred does not hold § 12.3's *why* line on more than half the grid.
+   [`docs/12`](docs/12-design-handoff.md) § 4.4's *the file wins* is applied to a population, and
+   § 4.7's rule that a deviation is recorded rather than absorbed is why this clause exists. The
+   fix case is GitHub issue #233's and carries its own figure.
+5. **The oracle reaches it with no caveat.** `analyzeUpPeak` raises **no warning at all** on this
+   bank, which was true of exactly one shipped bank before it (`chancery-house/main`). Reconciled in
+   `packages/experiments/src/oracle/remainingBuildings.test.ts` at that file's own 64 replications
+   from seed 810 000: raw **+28.63 %**, residual **−0.14 %**, `explained` against a 4 % tolerance.
+   **A saturating building does not defeat the oracle**, and the reason is structural rather than
+   lucky: `measureUpPeak` isolates the bank and drives it at `OVERLOAD_FACTOR × %POP` of its own
+   computed capacity, so the experiment's demand is not the building's.
+6. **Playable, and let at three fifths to be so.** Contract `c9` hands the player the tower at
+   `occupancy: 0.60`; the rung, its bracket and its measured 0.42 of 50 are
+   `data/contract-ladder.json` and `docs/33` § 4.7j. **The building as built is what § D572 is
+   about; the scenario is a let of it**, and the two are deliberately different claims.
+
+**What this does not decide.** Whether the figures are right — they are game and modelling feel
+where they are not forced, and the owner's to accept, tighten or reject. And the proof set: the
+owner ruled on 2026-09-10 (#500, #419) that the forty stay fixed, so this tower does **not** enter
+`data/proof-cases.json` and that file's recorded substitution stands permanently.
+
+---
+
+## D573 — Ashgate Mixed-Use: the figures, drafted for approval, and a `servesFloors` restriction proved on the legs rather than asserted
+
+**Date: 2026-09-14 · GitHub issue [#501](https://github.com/mrpeanut01/elevator-sim/issues/501) · Rules on: [`docs/37`](docs/37-content-plan.md) § 7.3 clause 3, [§ D265](#d265)'s rule that a restriction no rider needs is a dead seam, and the product owner's 2026-09-08 standing ruling on governed `data/` values.**
+
+**Why an entry.** The same two grounds as [§ D572](#d572): authored figures drafted for the owner's
+approval, and a recorded clause discharged. It also records a **limit of the building schema** that
+binds anybody authoring a multi-entrance building, which is [§ D405](#d405)'s first ground.
+
+1. **What is CHOSEN, and awaits approval.** The floor count (22) and the car count (5), both
+   `ENGINE_CONTRACT.md` § 12.3's; the split of the 22 into `B2`, `B1`, `G`, three retail floors and
+   sixteen office floors; the 3.6 m basement pitch, the 4.5 m retail pitch and the 3.7 m office
+   pitch; 22 people a retail floor and 34 an office floor, **610** in all, with nobody housed in the
+   car park or the ground-floor shop lobby; the four-plus-one split of the five cars; the car classes
+   (`geared-traction` 2.5 m/s / 2 500 lb for the tower, `mrl-gearless-low` 1.6 m/s / 3 500 lb for
+   the car-park car); and `office-standard` as the traffic profile.
+2. **The restriction binds, and it is measured on the legs.** § D265's defect is a restriction no
+   generated rider ever needs, and it is not asserted away here. On seed 20 260 824 at 1 800 s under
+   `collective` the run draws **244 journeys and 381 legs**; 135 of those journeys begin in the car
+   park and **every one takes exactly 2.000 legs**, transferring at `G`. Give bank `main` the two
+   basement floors — the repair `GAMEPLAY_AND_NAVIGATION.md` § 10.5 case 6 names — and the **same
+   244 journeys take 244 legs**, no journey takes more than one, mean time to destination falls
+   **195.3 s → 150.8 s** and mean wait **rises 38.5 s → 50.2 s**. Two further seeds reproduce it
+   (383 against 246, 353 against 217). **The journey counts are identical on both arms**, so what
+   moved is the routing and not the demand — which is what makes this the standing requirement's
+   *move the control and require the run to change, compared on the legs* rather than a difference
+   of traffic. **The comparison is a checked-in instrument rather than a figure in a `$comment`**:
+   `packages/core/src/sim/serviceZoneSeam.test.ts`, always on, asserting the relation rather than
+   the three integers — so an edit that leaves the restriction binding does not fail it, and one
+   that stops it binding does. A measurement recorded only in prose is the thing this repository
+   has now been wrong about four times.
+3. **One of five cars is expressible only as a bank of one, and that is physical as well as
+   schematic.** `servesFloors` is declared per **bank**. It is also the honest arrangement: a shaft
+   reaching both `B2` (−7.2 m) and floor 19 (+72.7 m) is a **79.9 m** rise, past
+   `geared-traction`'s 76 m `maxRiseM` — the counterfactual arm in clause 2 raises
+   `rise-exceeds-class` and the shipped building raises no loader warning at all.
+4. **The car-park share is a consequence and is recorded as one, because the schema cannot carry
+   it.** § 10.5 says the car park is what *a third of the building arrives through*.
+   `traffic/generator.ts` weights entrances **equally** unless a run passes `entranceWeights`, which
+   is a field of `SimulationDemandOptions` and not of the building schema, so three declared
+   entrances means a third of incoming demand each and, measured, **135 of 244 journeys (55 %)**
+   begin in the car park. The alternative — one basement an entrance and the other a served floor
+   nobody ever calls from or to — is § D265's shape exactly, so the share is **published rather than
+   approximated**. Anybody who wants the design's third sets `entranceWeights` on the run.
+5. **Every car states `passengerTransferS`, and every car states 1.2 s.** `data/buildings/README.md`
+   § Passenger transfer time refuses to default on a `mixed-use` building. Declaring the office row
+   five times is a claim rather than a shrug: this tower's whole population is people at work, so one
+   figure does describe every car — unlike `mixed-use-high-rise`, where a residential bank loads at
+   1.75 s against an office bank's 1.2 s. **No new reference value is authored.**
+6. **The closed form reaches one bank and refuses the other, and both are measured.** `main`
+   reconciles — raw **+31.21 %**, residual **−0.26 %**, `explained` against a 4 % tolerance at 64
+   replications from seed 810 000 — with three declared departures from the model
+   (`nonUniformFloorPopulations`, `nonUniformInterfloorDistance`, `expressZone`), asserted as a set
+   so a fourth arriving is red. `carpark` is **refused by a throw**: it serves no populated floor
+   above its terminal, because a parking deck houses nobody, and an up-peak round trip to a zone with
+   no occupants is not a quantity the Barney/CIBSE expression has. The refusal is liftable — author
+   a population above `G` on that bank — which is what makes asserting it worth anything
+   (`CLAUDE.md` § *A stated refusal goes stale the same way*).
+
+**What this does not decide.** Whether the figures are right. Whether `entranceWeights` should
+become a building field — that is a schema question with a run-comparability cost
+([`docs/37`](docs/37-content-plan.md) § 5.2's shape) and nothing here needs it. And the proof set:
+the owner ruled on 2026-09-10 (#501, #419) that the forty stay fixed.
+
+---
+
+## D574 — A new contract is placed in the ladder by its own measured miss rate, and `docs/33` § 4.7h's position 9 is superseded as arithmetic
+
+**Date: 2026-09-14 · GitHub issues [#500](https://github.com/mrpeanut01/elevator-sim/issues/500) and [#501](https://github.com/mrpeanut01/elevator-sim/issues/501) · Rules on: [`docs/33`](docs/33-difficulty-curve.md) § 4.7d's measured order and § 4.7h's *where the ninth contract goes*, and the owner's 2026-09-10 ruling on #232 that every building owes one contract.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: it moves something already recorded. § 4.7h says
+the ninth contract *goes at position 9, after `vertical-city`*, and two contracts have landed that
+do not. It also binds `packages/viz/src/shift/contracts.test.ts`, which pins the order, the labels
+and the bank-count sequence, and `data/contract-ladder.json`, neither of which the deciding lane
+owns outright.
+
+1. **The rule, stated once.** A contract is placed by **its own day-1 miss rate measured on the
+   shipped path**, at `docs/33` § 4.7d's budget and seeds, and inserted where that rate puts it.
+   Appending is what § 4.2 measured and #382 refused: it is ordering by arrival.
+2. **Measured.** `CONTRACT_CURVE_SWEEP=1 CONTRACT_CURVE_SEEDS=50 CONTRACT_CURVE_ONLY=c9,c10`, day 1,
+   `collective`, seeds `20 260 824 + 7 919 n`, the shipped five-goal set: `c9` (`harbour-point`, let
+   at 0.60) **21 of 50 = 0.42**, `c10` (`ashgate`, crowd at 13.5 %) **26 of 50 = 0.52**. They go at
+   positions **4** and **8**. DC-4 is green on **seven of ten**; DC-6 is green, the targets reading
+   0.36, 0.36, 0.40, 0.42, 0.46, 0.50, 0.52, 0.52, 0.65, 0.65.
+3. **Appending was available and is wrong on the measurement, not on taste.** `harbour-point` **as
+   built** reads 1.00 — § D572 clause 2 — and `ashgate` as built reads 0.13 at 30 seeds, under
+   DC-4's floor. Either at the end of the array would have been the ladder #382 replaced.
+4. **Each rung is bracketed on both sides.** `c9` by occupancy at 30 seeds (0.45 → 0.03 … 0.85 →
+   1.00) and `c10` by rate (11 % → 0.00 … 15 % → 0.83, and at 50 seeds 13 % → 0.44 and 14 % →
+   **0.66**, outside the band at the top). Neither figure is the first value that cleared.
+5. **Which substrate moves is decided per building.** `c9` moves the **let** and not the crowd,
+   because `office-standard`'s declared floor is 11 % and the building is short of its own handling
+   capacity at 12 — no admissible rate makes a fully let Harbour Point passable. `c10` moves the
+   **crowd** and leaves the fabric alone, because Ashgate's dispatch problem *is* its fabric.
+6. **The curriculum reading survived and was checked rather than hoped for.** Bank counts go
+   1, 1, 1, 1, 1, 2, 3, 7 → **1, 1, 1, 1, 1, 1, 2, 2, 3, 7**. Harbour Point is a one-bank tower whose
+   difficulty is entirely its crowd, so a miss rate placing it after Secure Tower would have put one
+   bank after two and falsified the reading; `contracts.test.ts` asserts the sequence, so that would
+   have been a red test rather than a quiet change to what the campaign teaches. **Had it fired, the
+   honest move is to re-argue the reading — not to reorder the ladder against its own measurement.**
+7. **§ 4.7h is superseded as arithmetic and intact as reasoning.** It was written about
+   `burj-class-reference`, which still has no contract
+   (`contracts.test.ts#REFERENCE_ONLY`), and the position it names was derived from an
+   eight-contract ladder. A Burj rung still goes after `vertical-city`; it is position **11**.
+8. **The ids do not move and the labels do.** `c1`–`c10` are names; `c2` is now *Scenario 5* and
+   `c4` *Scenario 9*, because a label is a position. `needClean` keeps the eight-contract shape at
+   ten — 1, 2, 2, 2, 2, 3, 3, 3, 3, 3 — so the stake still rises once and lands at the end.
+
+**What this does not decide.** The three contracts still outside DC-4's band (§ 4.7e, § 4.7f) or the
+playtest § 4.7i schedules. And it takes no position on the eleven buildings the target of 22 still
+owes: the rule above is what each of them meets, not a claim about when.
+
+---
+## D575 — The campaign prices the two new towers: Ashgate's complexity is the contract's own, Harbour Point's is placed on fabric and not on difficulty
+
+**Date: 2026-09-14 · GitHub issues [#500](https://github.com/mrpeanut01/elevator-sim/issues/500) and [#501](https://github.com/mrpeanut01/elevator-sim/issues/501) · Rules on: [§ D519](#d519)'s placement rule for a complexity the contract does not publish, [§ D510](#d510)'s offer fee, and `campaign/economy.ts#COMPLEXITY`'s own recorded refusal to invent an `ashgate`.**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. It **discharges a refusal already recorded** —
+`COMPLEXITY`'s docstring said in terms that *"`ashgate` is not one of ours and is not invented into
+one"*, and the honest way out was always to author the building, which #501 did. And one of the two
+figures is authored and needs the owner's approval.
+
+**Why it is owed at all, which is the part worth reading.** `everyday/campaignModel.ts#offersView`
+**skips** a contract whose building has no complexity or no fee. So a shipped, playable building
+that landed without a row in these two tables would be offerable in the daily loop and **invisible
+on the campaign screen** — an absence rather than a refusal, which is [§ D265](#d265)'s shape one
+layer up. `economy.test.ts` now derives the check from `CONTRACTS` in both directions, so the
+twelfth building meets a red test rather than this paragraph.
+
+1. **`ashgate` is 2 and 6 u, both cited.** `ENGINE_CONTRACT.md` § 8.5 publishes
+   *garden 1 · ashgate 2 · chancery 2 · crown 3 · midtown 3 · stjude 4 · vertical 5*, and the design
+   file's offer fixture gives Ashgate **6 u a day** beside the three fees it already gave. Nothing
+   is mapped and nothing is measured: what changed is that the id now names a file. The fee does
+   **not** follow § D510's *complexity plus two* rule, exactly as Crown Hotel's 3 u does not — a
+   fixture outranks a derivation, and the test asserts the inequality so the rule is not applied to
+   it by a later tidy-up.
+2. **`harbour-point` is 2, authored, and it is placed on fabric rather than on difficulty.** Its
+   fabric is one bank, six identical cars, one entrance, no zone, no credential and no transfer —
+   Chancery House's fabric at three fewer floors, and Chancery House is the contract's own 2. **It
+   is simultaneously the hardest shipped tower to run**: as built, 64 of 65 runs across every
+   shipped dispatcher × five seeds diverge and have the mean suppressed ([§ D572](#d572)). Those two
+   facts point opposite ways and § 8.5's rule decides between them: *complexity is the designer's
+   judgement of the fabric a player has to understand rather than a clear rate*, which § D519
+   established by measuring Midtown at 0 of 50 on a 3 and Vertical City at 30 of 30 goals on a 5. A
+   4 or a 5 here would be a difficulty rating wearing the complexity column's name.
+3. **`harbour-point`'s fee is 4 u, by § D510's rule, and it is a bad bargain on purpose.** Complexity
+   2 plus two, which lands exactly on Chancery House's fixture. A career that takes this tower at
+   4 u a day is paying for days it will miss, and that is the scenario rather than a mispricing: the
+   fee prices the **fabric** and § 8.9's renewal prices the **record**.
+4. **Neither gets a quirk, and that is the existing pattern rather than an omission.**
+   `career.ts#QUIRKS` names six buildings; `secure-tower` and `mixed-use-high-rise` are already
+   absent and fall back to the contract's `teaches`, and these two do the same. **One observation
+   recorded rather than acted on**: the design file's own line for `ashgate` is *"Two crowds that
+   never overlap: office people at eight, shoppers from eleven"*, and `QUIRKS` already carries the
+   shortened *"Two crowds that never overlap."* against **`midtown-office`**. Moving it would be a
+   product change on a building this lane was not asked to touch, so it is named here and left.
+
+**What this does not decide.** Whether 2 and 4 u are right for Harbour Point — the complexity is an
+assumption with its reasoning attached, in § D519's manner, and the owner's to accept, tighten or
+reject. Whether `QUIRKS` should be re-sourced. And nothing about the renewal ladder, the shop or the
+calendar, none of which this touches.

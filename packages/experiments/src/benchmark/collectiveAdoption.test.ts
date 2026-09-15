@@ -96,10 +96,20 @@ describe('§ D209 § 2 — the ladders', () => {
     // to be able to see that it is a decision. Widening § D209 to include them retroactively would
     // change what § D210 and § D212 were decided against, which is the one thing a pre-registration
     // is for.
+    //
+    // `harbour-point` and `ashgate` joined this list on 2026-09-14 (GitHub issues #500 and #501),
+    // and the reason they are here rather than in `D209_BUILDINGS` is worth one line: Harbour Point
+    // is over-subscribed as built and suppresses its mean on 64 of 65 measured runs, so a ladder
+    // that descends through arrival rates would be comparing refusals for most of its length; and
+    // Ashgate's journeys are two legs where they begin in the car park, which is a second thing
+    // varying down a ladder that exists to vary one. Neither is a verdict on the mechanism — a
+    // criterion that wants either pre-registers it and says what it is measuring.
     expect(later).toEqual([
+      'ashgate',
       'burj-class-reference',
       'chancery-house',
       'crown-hotel',
+      'harbour-point',
       'st-jude-hospital',
     ]);
   });

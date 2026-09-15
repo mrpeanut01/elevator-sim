@@ -1079,6 +1079,28 @@ export class Simulation {
     );
     if (disclaimer !== undefined) this.#disclaimers.push(disclaimer);
 
+    /*
+     * **A walk nobody walks, said out loud** — GitHub issue #534 item 4, `DECISIONS.md` § D568.
+     *
+     * `sim.assignedWalkS` declares `activeWhen: { dispatch.passengerAssignment: 'panel',
+     * dispatch.callType: <destination> }`, which is every clause of its gate an `activeWhen` can
+     * name. The third clause — *some landing of this building registers a destination call* — is a
+     * property of the building, and since § D553 it is decided landing by landing. A run that
+     * satisfies the declared two and fails the third charges the walk to nobody, silently: the
+     * value is read, admitted by `nonNegative`, and then `#walkDone` returns `true` at every
+     * landing because `#assignsAt` is false everywhere.
+     *
+     * That is `CLAUDE.md`'s *stated refusal* rule pointed at a knob rather than at a control: a
+     * control that writes nothing must say so, and the saying must be pinned by the run rather
+     * than by a sentence in a schema. Raised only when the value is non-zero, so the default
+     * (`0`) leaves every existing run byte-identical — the whole reason the default is zero.
+     */
+    if (this.#options.assignedWalkS > 0 && this.#passengerModel === 'conventional') {
+      this.#warnings.push(
+        `sim.assignedWalkS is ${this.#options.assignedWalkS} s and no landing in this run names a car, so no passenger walks and the value is inert. A walk is charged at the landings that register a destination call — dispatch.passengerAssignment "panel" under a destination call type, per landing where a floor declares landingCallType (DECISIONS.md § D553). This run's passenger model is "conventional".`,
+      );
+    }
+
     this.#factory = new PassengerFactory({
       streams: this.#streams,
       /*

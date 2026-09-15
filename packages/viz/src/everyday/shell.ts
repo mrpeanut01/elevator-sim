@@ -1040,6 +1040,31 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
      * (`types.ts#ENGINEER_SWAP_RUSH_NOTE`).
      */
     if (state.ctx === 'rush') go('rush');
+    /*
+     * **And a replay ends before the page is handed over, for the same reason one field over** —
+     * GitHub issue #531 item 3, [§ D563](../../../../DECISIONS.md).
+     *
+     * Two halves, and the second is the defect the issue reports. § 6.1's replay hands a past day
+     * back *as it was*: `everyday/replay.ts` leaves the seed, the building, the dispatcher, the
+     * levers and the length exactly where that day left them, *“because they are what the day
+     * was”*. The full panel writes every one of them, so a replay that survived the trip would be a
+     * replay of a day that never happened — the rush's argument with `RUSH_FIELD_ROLES` swapped for
+     * a week that is a record of the past.
+     *
+     * And `leaveReplay`'s cancel is scoped to runs the replay pressed (`EverydayHost.startRun` sets
+     * that flag, GitHub issue #526 item 4), which the Engineer surface's own Run button does
+     * not go through: a run started over there inside a replay was still in flight when the player
+     * left, and `dev/main.ts#applyShift` landed it over the week this restore had just put back.
+     * Leaving here closes that by construction rather than by widening the flag — there is no
+     * replay standing for such a run to be inside of — and it is the half of the choice the issue
+     * offered that also fixes the first paragraph.
+     *
+     * `go('door')` is the route the bar's own way out of a replay already takes (see `drawBar`'s
+     * `wayOut`): its guard calls {@link leaveReplay}, and the way back lands on the front door the
+     * replay was opened from rather than on a brief whose week is gone. The row's note says so
+     * before it is pressed (`types.ts#ENGINEER_SWAP_REPLAY_NOTE`).
+     */
+    if (state.ctx === 'replay') go('door');
     world = 'engineer';
     setCoveredInert(false);
     setEverydayCovered(true);
@@ -1067,12 +1092,34 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * subscribed screen would rebuild behind the cover on each of them, and it would need unmount
    * plumbing on a mount that has none. Every other screen is left mounted — the stage above all, whose canvas keeps its box
    * across the trip (`shell.browser.test.ts`).
+   *
+   * **“And only that one” stopped being the whole story with GitHub issue #535**, which asked the
+   * same question of the three other screens that read the host once. Two of them can go stale —
+   * `boardScreen.ts` names the dispatcher a send would carry, and `landingScreen.ts` draws the way
+   * in that a visitor who has now filed a day should no longer be offered — and both re-read **in
+   * place** through `screens.ts#EverydayScreenHandle.reread` rather than being
+   * drawn again, because a remount would cancel a gauntlet the board had running. The third,
+   * `designerScreen.ts`, cannot: the one host value it reads is a seed it consumed at mount, and
+   * everything drawn after that is the player's own document, which re-reading would discard. Its
+   * docstring says so where a lane reading this would go looking.
    */
   function returnToEveryday(): void {
     if (world === 'everyday') return;
     world = 'everyday';
     setEverydayCovered(false);
     coverEngineer();
+    /*
+     * **And every other screen that reads the host once says so for itself** — GitHub issue #535,
+     * [§ D566](../../../../DECISIONS.md). `EverydayScreenHandle.reread` is the in-place form of the
+     * line below, for a screen a remount would damage: the board's `unmount` cancels a gauntlet in
+     * flight, so drawing it again here would throw away a batch of runs to refresh a caption. Its
+     * own docstring carries which of the two a screen should take, and why a host subscription is
+     * neither.
+     *
+     * Ordered before the redraw and not guarded on the screen key: a screen that offers `reread` is
+     * not drawn again, because `draw()` would unmount the thing that just re-read.
+     */
+    mounted?.reread?.();
     if (state.screen === 'rush') draw();
   }
 
@@ -1398,10 +1445,22 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * A day-shaped strip says *today's run will not be scored*, so on a day the host is told first
    * (`EverydayHost.leaveDayUnfinished`, GitHub issue #526 item 1). Every other leave stays
    * {@link doLeave}: a rail row walks off a stage without a question, and the day is still the player's.
-   * A rush and a replay stop their own runs inside `doLeave`, and a campaign day is not decided here.
+   * A rush and a replay stop their own runs inside `doLeave`.
+   *
+   * **A campaign day is decided here too, and the clause that said it was not was the defect** —
+   * GitHub issue #531 item 1, [§ D564](../../../../DECISIONS.md). `actionBar.ts#confirmStripFor`
+   * gives `campaign` the **same** day-shaped strip, word for word — *“Today's run will not be
+   * scored”* — and nothing on the way out made that true: a campaign day's run is pressed through
+   * the same `EverydayHost.startRun` (`host.ts#runCampaignDay`), `dev/main.ts#closeShift` does not
+   * ask which flow a run belongs to, and the Engineer surface's `Ctrl`+`Enter`, its Day report tab
+   * and its export press all reach it. So the promise was kept on one of the two contexts that make
+   * it. The strip is the thing that decides, and both contexts that draw it now tell the host.
+   *
+   * It is `ctx` rather than `confirmStripFor(state.ctx) !== undefined`: a rush and a replay draw a
+   * strip too, and theirs promises something else about a run that is already theirs to stop.
    */
   function leaveUnfinished(): void {
-    if (state.ctx === 'daily') dataHost?.leaveDayUnfinished();
+    if (state.ctx === 'daily' || state.ctx === 'campaign') dataHost?.leaveDayUnfinished();
     doLeave();
   }
 

@@ -319,7 +319,8 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
   /*
    * -- The legibility instrument (GitHub issue #354, § D512), the same shape one step along:
    * legibility.sweep.test.ts under LEGIBILITY_SWEEP=1 is the driver that produced docs/33 § 6.4b's
-   * table over the 400 days of § 4.6, and legibility.test.ts's pinned ten-seed slice is the guard
+   * table over the 500 days of § 4.6 — 400 until GitHub issues #500 and #501 took the sweep from
+   * eight rows to ten — and legibility.test.ts's pinned ten-seed slice is the guard
    * that re-derives a tenth of it on every run. What reads the verdict in the product is #208's
    * build, which this scanner will see when it lands.
    */

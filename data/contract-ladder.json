@@ -128,6 +128,36 @@
         "substrate": "demand",
         "note": "The contract that tied the opening one for the easiest day in the game: 0 of 30 at four goals. The whole move is the crowd, from the hospital profile's typical of 8 % to 8.5 %, inside its declared 6-11 % band — a hospital half a point busier. The response is steep and NOT MONOTONE, which is why the figure is half a point rather than a round one: swept at the shipped fabric the miss rate reads 1.00 at 6 %, 0.77 at 7 and at 8, 0.43 at 9, 0.13 at 10 and 0.10 at 11. The energy bar binds hardest when the building is quiet, because fewer riders share the same car travel, and it falls away as the wards fill. Fabric untouched: `main` mixes bed lifts with passenger cars and may not be commissioned, for c7's reason. The published figure is 0.40 of 50, docs/33 § 4.7."
       }
+    },
+    {
+      "contractId": "c9",
+      "buildingId": "harbour-point",
+      "demand": {},
+      "fabric": {
+        "occupancy": 0.6,
+        "banks": []
+      },
+      "intent": {
+        "missRateTarget": 0.42,
+        "substrate": "fabric",
+        "note": "IN THE BAND, AND THE LEVER IS THE LET RATHER THAN THE CROWD — c2's shape on a building authored for the opposite reason. data/buildings/harbour-point.json is authored to be over-subscribed as built: measured, thirteen shipped dispatcher profiles × five seeds at 1 800 s give 64 of 65 runs a diverging queue and a suppressed mean. That is the building's role in docs/37 § 7.2 and it is not a scenario, because a day nobody can pass teaches nothing and DC-4 asks for a third to two thirds. So the contract hands the player the same tower LET AT 0.60 — 930 desks rather than 1 560 (the stat line the card draws, per-floor rounding included) — with the arrival rate untouched at the standard-office profile's own typical. Measured on the shipped path: 21 of 50 seeds miss, 0.42, with the landing queue doing the discriminating on 21 and the carried share on 3. The occupancy was bracketed on both sides rather than picked: 0.45 reads 0.03, 0.55 reads 0.20, 0.58 reads 0.37, 0.62 reads 0.43, 0.65 reads 0.63, 0.75 reads 0.93 and 0.85 reads 1.00, all at 30 seeds, so 0.60 is the middle of the band's own interval rather than the first value that cleared. THE CROWD IS NOT THE LEVER HERE AND THAT IS THE POINT: the standard-office profile's declared floor is 11 % and the building is short of its own handling capacity at the typical 12, so no admissible rate makes a fully let Harbour Point passable. The population is fabric (docs/33 DC-R1), as it is on c2."
+      }
+    },
+    {
+      "contractId": "c10",
+      "buildingId": "ashgate",
+      "demand": {
+        "arrivalRatePctPop5min": 13.5
+      },
+      "fabric": {
+        "occupancy": 1,
+        "banks": []
+      },
+      "intent": {
+        "missRateTarget": 0.52,
+        "substrate": "demand",
+        "note": "IN THE BAND ON THE CROWD ALONE, WITH THE TOWER AS BUILT. Ashgate as authored is easy — 4 of 30 seeds at the standard-office profile's typical 12 %, 0.13, well under DC-4's floor — because its dispatch problem is a service zone rather than a volume. The rung moves the crowd to 13.5 %, inside the profile's declared 11–15 band, and leaves the fabric alone: the car park is served by one of five cars, and taking a car away or adding one would delete or dissolve the thing this scenario is about. Measured on the shipped path at 50 seeds: 26 miss, 0.52, the landing queue on 23 and the worst wait on 12. The rate was bracketed rather than picked — at 30 seeds 11 % reads 0.00, 12 % 0.13, 13 % 0.40, 14 % 0.57 and 15 % 0.83, and at 50 seeds 13 % reads 0.44 and 14 % reads 0.66, which is outside the band at the top. 13.5 sits between the two figures that were each measured at 50. Fabric untouched: the four-plus-one split IS the scenario."
+      }
     }
   ]
 }

@@ -1,7 +1,7 @@
 /**
  * The first session's draw, through the shipped boot — GitHub issue #208, § D475, § D514.
  *
- * Three loads, three claims. A bare load with a seed and no session draws one of the five legible
+ * Three loads, three claims. A bare load with a seed and no session draws one of the legible
  * towers, and the door says why under the seed line. The same seed draws the same tower, which is
  * what a named stream buys. An address naming a building is the player's choice and wins, and the
  * door then says nothing about a draw. The tier reaches the door by the player's own route.
@@ -54,7 +54,7 @@ async function doorOf(page: Page): Promise<{ title: string; seed: string; line: 
 const SEED = 20_260_906;
 
 describe.skipIf(!HAS_BROWSER)('the first session’s tower — GitHub issue #208', () => {
-  it('draws one of the five legible towers on a bare first load, and the door says why', async () => {
+  it('draws one of the legible towers on a bare first load, and the door says why', async () => {
     const page = await coldLoad(`?seed=${String(SEED)}`);
     try {
       const door = await doorOf(page);
@@ -63,7 +63,22 @@ describe.skipIf(!HAS_BROWSER)('the first session’s tower — GitHub issue #208
       expect(ELIGIBLE_FIRST_CONTRACT_IDS).toContain(drawn?.id);
       expect(door.seed).toContain(`tower ${drawn?.buildingId ?? ''}`);
       expect(door.seed).toContain(`crowd ${String(SEED)}`);
-      expect(door.line).toContain('five towers');
+      /*
+       * **Checked against the table rather than against a literal** — GitHub issues #500 and #501.
+       * This read `toContain('five towers')`, which was true of an eight-contract sweep; the sweep
+       * is ten now and the count moved, so the shipped line says six and this pinned five. A test
+       * that asserts the same literal the module authors cannot tell a correct sentence from a
+       * stale one, so it asserts the *derivation*: the count is the eligible set's own length.
+       * `docs/37` § 6's rule, applied to the check as well as to the string, and the same fix
+       * `shift/firstSession.test.ts` already carries — this file was missed because the browser
+       * tier was not run on the branch that moved the figure.
+       */
+      const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+      expect(door.line).toContain(`${words[ELIGIBLE_FIRST_CONTRACT_IDS.length] ?? ''} towers`);
+      // Non-vacuity: the set is neither empty nor past the word list, so the line above is not
+      // asserting the presence of a bare ` towers`.
+      expect(ELIGIBLE_FIRST_CONTRACT_IDS.length).toBeGreaterThan(1);
+      expect(ELIGIBLE_FIRST_CONTRACT_IDS.length).toBeLessThan(words.length);
       /* Not the campaign's opener, which the instrument found never legible. */
       expect(door.seed).not.toContain('tower garden-apartments');
     } finally {

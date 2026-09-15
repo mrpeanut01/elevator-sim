@@ -1,13 +1,16 @@
 # Test Buildings
 
-Nine reference buildings, each chosen to stress a different aspect of the dispatcher.
+Eleven reference buildings, each chosen to stress a different aspect of the dispatcher.
 Machine-readable configs in [`data/buildings/`](../data/buildings/).
 
 The first five are the original set. The next three were added later and each closes a gap the
 first five could not pose: a traffic profile with no building, a demand with no dominant direction,
 and a bank whose cars are not alike. The ninth is a different kind of thing again — a **reference**
 rather than a scenario, added to give the engine, the closed form and the stage something at the top
-of the size range to be measured against.
+of the size range to be measured against. The tenth and eleventh are the two buildings
+[`docs/37` § 7.3](37-content-plan.md) says the content plan owes, and they close two more gaps: a
+group that **cannot cope with its own crowd**, which no shipped tower was authored to be, and a
+tower with floors **below the datum** that only one of its cars reaches.
 
 **A new building owes a row in this table, a numbered section below, and a row in
 [`data/buildings/README.md`](../data/buildings/README.md) — and that is now a test rather than a
@@ -28,6 +31,8 @@ failed: *checkable by looking* is not checkable.
 | [Crown Hotel](../data/buildings/crown-hotel.json) | 24 | 4 × gearless 3 m/s + 1 × geared 1.75 m/s service | back of house | Two-way demand, unlike cars, a single-floor crowd |
 | [St Jude Hospital](../data/buildings/st-jude-hospital.json) | 13 | 3 × gearless 2.5 m/s + 2 × geared 1.75 m/s bed | clinical + diagnostics | Never off-peak, bed cars, the first shipped stair |
 | [Burj-class reference tower](../data/buildings/burj-class-reference.json) | 165 | 16-car single-deck shuttle @ 10 m/s, 4 locals (10/10/11/8), 2 double-deck observation | none | Scale: 57 cars, 3 sky lobbies, what the engine and the stage cost at the top of the range |
+| [Harbour Point](../data/buildings/harbour-point.json) | 16 | 6 × geared, 2.5 m/s, 2,500 lb, side-opening | none | Demand above the group's handling capacity: the mean is suppressed rather than quoted |
+| [Ashgate Mixed-Use](../data/buildings/ashgate.json) | 22 | 4 × geared 2.5 m/s (G–19); 1 × MRL 1.6 m/s, 3,500 lb (B2–G) | service zone, car park | Negative-index floors, and a service restriction that makes most journeys two legs |
 
 ---
 
@@ -335,3 +340,136 @@ this size, so anything replicated here wants fan-out rather than a loop.
 answers are about apparatus — whether a replication budget is affordable, whether a screen can show
 the result, and whether the closed form can check it — and it is the one place in this table where
 *we cannot measure that here* is the finding rather than an omission.
+
+## 10. Harbour Point
+
+**Config:** [`harbour-point.json`](../data/buildings/harbour-point.json)
+
+Sixteen floors, 1,560 people and one bank of six identical cars — **the simplest building in
+[`data/buildings/`](../data/buildings/), and the only one that cannot serve its own occupants.**
+GitHub issue #500; [`docs/37` § 7.2](37-content-plan.md) authors it because no tower in the shipped
+forty holds that role, and the vendored `ENGINE_CONTRACT.md` § 12.3 gives the shape: *16 floors ·
+6 lifts · more demand than the group can clear, whatever you do.*
+
+**Everything else about it is deliberately uninteresting.** One entrance, one zone, no credential,
+no transfer, no car unlike its neighbours, a uniform 104 people a floor and a uniform 3.7 m pitch.
+That is the point: on every other building here the dispatcher's problem is structural, and the
+finding could always be attributed to the structure. Here there is nothing to attribute it to
+except the arithmetic between the crowd and the group.
+
+**The over-subscription is measured on both sides.** The closed form gives the bank a handling
+capacity of **155.0 persons / 5 min**, which is **9.94 %** of the population it serves, against the
+`office-standard` profile's typical 12 % per 5 min of which 0.85 is incoming — **10.2 % offered
+against 9.94 % carried**, before a dispatcher makes a decision. Run rather than reasoned: over the
+**thirteen shipped dispatcher profiles × five seeds** (20 260 824 + 7 919 n) at 1 800 s, **64 of 65
+runs report a diverging queue and have the mean wait suppressed**.
+
+**The sixty-fifth is worth more than the sixty-four.** `zoned-uppeak` at seed 20 276 662 comes back
+`awtIsValid: true` and publishes a quotable **278.8 s** mean with **88 %** of arrivals over the
+long-wait threshold and a queue rising at 12.3 persons a minute. That is the trend test's own
+scatter ratio failing to clear rather than a run that coped, and it is exactly the shape
+[`CLAUDE.md` § Statistical discipline](../CLAUDE.md) warns about: *neither gate sees a queue that
+grew enormously and drained just in time.* **No AWT is published for this building**, and none may
+be.
+
+**The population is 1,560 and not eleven hundred, and that is a measurement rather than a
+preference.** `GAMEPLAY_AND_NAVIGATION.md` § 10.5's fix case reads *"One start time for eleven
+hundred"*. Measured, eleven hundred does not hold the § 12.3 why line. The same building scaled to
+0.7 — 1,095 people — was run over the identical grid of thirteen profiles × five seeds, and only
+**27 of 65** runs saturate: **38 of 65 publish a quotable mean**, against 1 of 65 at the shipped
+population. A tower authored to the fix case's figure would ship with a *why* line its own runs
+refute on more than half of them. [`docs/12` § 4.4](12-design-handoff.md)'s rule that **the file
+wins** is applied to a population here, and the departure is recorded rather than absorbed — the
+fix case is GitHub issue #233's and carries its own figure.
+
+**The closed-form oracle reaches it with no caveat at all.** `analyzeUpPeak` raises no warning on
+this bank — one entrance, one zone, six identical cars, uniform populations, uniform pitch, no
+express run — so it is the **second** shipped bank the Barney/CIBSE round trip describes without
+one, beside Chancery House's. Reconciled in
+`packages/experiments/src/oracle/remainingBuildings.test.ts` at 64 replications from seed 810 000:
+raw divergence **+28.63 %**, residual **−0.14 %** once the two documented omissions are restored,
+`explained` against a 4 % tolerance.
+
+**Playable, and let at three fifths to be so.** The Career contract `c9` hands the player the tower
+at `occupancy: 0.60` — **930 desks**, which is the stat line `ladderTowersOf` draws once each floor is rounded — because a day nobody can pass teaches nothing;
+[`data/contract-ladder.json`](../data/contract-ladder.json) carries the rung and its bracket, and
+the measured day-1 miss rate there is **0.42 of 50 seeds**, inside `docs/33` DC-4's band. **The
+building as built is what this section is about; the scenario is a let of it.**
+
+**Not in the proof set.** The owner ruled on 2026-09-10 (GitHub issues #500 and #419) that it stays
+out of the bench's forty so every rating stays comparable, so [`docs/37` § 7.3](37-content-plan.md)'s
+proposed swap is settled in the refusing direction.
+
+**Watch for:** which dispatcher loses more slowly, and whether the screen ever quotes a mean it
+should be withholding. This is the building where the *refusal* is the output.
+
+## 11. Ashgate Mixed-Use
+
+**Config:** [`ashgate.json`](../data/buildings/ashgate.json)
+
+Twenty-two floors — two car-park decks at **index −2 and −1**, a ground of shops, three more retail
+floors and sixteen floors of offices — with **five cars in two banks, and only one of them reaching
+the car park.** GitHub issue #501; [`docs/37` § 7.3](37-content-plan.md) specifies it and the
+vendored `ENGINE_CONTRACT.md` § 12.3 gives the shape: *22 floors · 5 lifts · offices over shops, and
+a car park below.*
+
+**It is the only shipped building whose `servesFloors` restriction changes how many legs a journey
+takes**, and that is measured rather than asserted — [§ D265](../DECISIONS.md)'s rule that a
+restriction no rider ever needs is a dead seam. On seed 20 260 824 at 1 800 s under `collective` the
+run draws **244 journeys and 381 legs**; 135 of those journeys begin in the car park and **every one
+takes exactly 2.000 legs**, transferring at G. Give bank `main` the two basement floors as well —
+the repair `GAMEPLAY_AND_NAVIGATION.md` § 10.5 case 6 names — and the **same 244 journeys take 244
+legs**, no journey takes more than one, the mean time to destination falls **195.3 s → 150.8 s** and
+the mean wait **rises 38.5 s → 50.2 s**, because the four tower cars now answer the car park too.
+Two further seeds reproduce it (383 against 246, 353 against 217). The journey counts are identical
+on both arms, so what moved is the routing and not the demand — **and that comparison is a run this
+suite keeps, not a figure in a document**:
+`packages/core/src/sim/serviceZoneSeam.test.ts` is the instrument, always on, and it asserts the
+*relation* rather than the three integers, so a traffic-profile edit that leaves the restriction
+binding does not fail it and an edit that stops it binding does.
+
+**Why two banks rather than one restricted car.** `servesFloors` is declared per *bank*, so *one of
+five cars reaches B1–B2* is only expressible as a bank of one. It is also the physically honest
+arrangement: a shaft reaching both B2 (−7.2 m) and floor 19 (+72.7 m) is a **79.9 m** rise, past
+`geared-traction`'s 76 m `maxRiseM` — the counterfactual arm above raises `rise-exceeds-class` and
+the shipped building raises no loader warning at all. A car-park lift is a separate, slower machine
+because one machine cannot do both.
+
+**G is a transfer floor** because it is the only floor both banks serve, and
+`config/buildingConnectivity.ts` requires the flag before it will route a journey across them —
+`mixed-use-high-rise` declares its ground the same way for the same reason.
+
+**The car-park share is a consequence, not an authored figure.** § 10.5 says the car park is what *a
+third of the building arrives through*. **That share is not expressible in a building document**:
+`traffic/generator.ts` weights entrances equally unless a run passes `entranceWeights`, which is a
+field of `SimulationDemandOptions`. Three declared entrances therefore means a third of incoming
+demand each, and measured, **135 of 244 journeys (55 %)** begin in the car park. The alternative —
+declaring one basement an entrance and leaving the other a served floor nobody ever calls from or
+to — is the dead-seam shape § D265 refuses, so the share is recorded rather than approximated.
+
+**Every car states its own `passengerTransferS`, and states the same one.** The loader has no
+`mixed-use` row and refuses to default
+([`data/buildings/README.md`](../data/buildings/README.md) § Passenger transfer time), so all five
+cars declare **1.2 s**, the office row. That is a claim rather than a shrug: this building's whole
+population is people at work — shop staff and office staff — so one figure really does describe
+every car, unlike `mixed-use-high-rise`, where a residential bank loads at 1.75 s against an office
+bank's 1.2 s.
+
+**The closed form reaches one bank and refuses the other, and both verdicts are measured.** `main`
+reconciles — raw **+31.21 %**, residual **−0.26 %**, `explained` against a 4 % tolerance at 64
+replications from seed 810 000 — with three declared departures from the model
+(`nonUniformFloorPopulations`, `nonUniformInterfloorDistance`, `expressZone`), all three of which are
+the building being mixed-use rather than defects. `carpark` is **refused**: `analyzeUpPeak` throws
+because the bank serves no populated floor above its terminal, which is true — it lifts people from
+two unpopulated parking decks to a transfer floor, and an up-peak round trip to a zone with no
+occupants is not a quantity the Barney/CIBSE expression has.
+
+**Playable as built.** The Career contract `c10` moves only the crowd — 13.5 % of population per
+5 minutes, inside `office-standard`'s declared 11–15 band — and leaves the fabric alone, because
+taking a car away or adding one would delete or dissolve the thing the scenario is about. Measured
+day-1 miss rate **0.52 of 50 seeds**, inside `docs/33` DC-4's band.
+
+**Not in the proof set**, on the same 2026-09-10 ruling as Harbour Point (GitHub issues #501, #419).
+
+**Watch for:** whether a dispatcher notices that the car-park car is a queue nothing else can
+relieve, and whether the report tells a rider who waited twice that they waited twice.

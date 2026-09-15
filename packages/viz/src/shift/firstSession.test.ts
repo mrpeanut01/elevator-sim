@@ -26,6 +26,7 @@ import {
   ELIGIBLE_FIRST_CONTRACT_IDS,
   FIRST_SESSION_LINE,
   FIRST_SESSION_STREAM,
+  LEGIBILITY_SWEEP_N,
   firstSessionContractFor,
   isFirstDayOnALegibleTower,
 } from './firstSession.js';
@@ -43,13 +44,20 @@ function allBuildings(): BrowserResources {
 
 describe('the eligible set — § D512’s table read by arithmetic', () => {
   it('is every contract legible on more than a third of fifty seeds, in contract order', () => {
-    expect(ELIGIBLE_FIRST_CONTRACT_IDS).toEqual(['c2', 'c3', 'c4', 'c5', 'c7']);
+    /*
+     * **`c9` joined on 2026-09-14** — GitHub issue #500. Harbour Point is legible on 50 of 50 at a
+     * median 1 343 s, the second-most legible tower in the catalogue, because the group cannot
+     * clear its crowd. `c10` (Ashgate) did **not** join: 10 of 50, below the threshold, because its
+     * problem is a second leg rather than a held landing. Both are the table's reading rather than
+     * a choice, and this list is derived from it.
+     */
+    expect(ELIGIBLE_FIRST_CONTRACT_IDS).toEqual(['c2', 'c3', 'c4', 'c5', 'c7', 'c9']);
     for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) {
       const row = LEGIBILITY_SWEEP.find((entry) => entry.contractId === id);
       expect(row?.legibleOf50 ?? 0).toBeGreaterThan(50 / 3);
     }
-    /* The three the instrument found never or rarely legible are out, the campaign's opener first. */
-    for (const id of ['c1', 'c6', 'c8']) expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(id);
+    /* The four the instrument found never or rarely legible are out, the campaign's opener first. */
+    for (const id of ['c1', 'c6', 'c8', 'c10']) expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(id);
     expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(FIRST_CONTRACT_ID);
   });
 
@@ -72,8 +80,14 @@ describe('the draw — a named stream off the session’s seed', () => {
       seen.set(drawn, (seen.get(drawn) ?? 0) + 1);
     }
     expect([...seen.keys()].sort()).toEqual([...ELIGIBLE_FIRST_CONTRACT_IDS].sort());
-    /* No member is starved: at 2 000 draws over five, each lands at least a fifth of its share. */
-    for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) expect(seen.get(id) ?? 0).toBeGreaterThan(2_000 / 25);
+    /*
+     * No member is starved: each lands at least a fifth of its share. The bound is **derived from
+     * the set's own size** rather than written as `2 000 / 25`, which was five squared and read as a
+     * constant — the set is six now (GitHub issue #500) and a hard-coded denominator would have
+     * gone from *a fifth of a share* to *a quarter* without anybody choosing that.
+     */
+    const share = 2_000 / ELIGIBLE_FIRST_CONTRACT_IDS.length;
+    for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) expect(seen.get(id) ?? 0).toBeGreaterThan(share / 5);
   });
 
   it('opens a fresh week on the drawn contract, and the building follows the week', () => {
@@ -96,8 +110,25 @@ describe('the door’s line — derived from the week, never stored', () => {
     expect(isFirstDayOnALegibleTower({ ...openWeek('c2'), day: 2 })).toBe(false);
     expect(isFirstDayOnALegibleTower({ ...openWeek('c2'), attempt: 1 })).toBe(false);
     /* Worded to be true however the player arrived: it names the set, not the draw. */
-    expect(FIRST_SESSION_LINE).toContain('five towers');
-    expect(FIRST_SESSION_LINE).toContain('400 days');
+    /*
+     * **Both figures are checked against the table rather than against a literal** — GitHub issues
+     * #500 and #501. This read `toContain('five towers')` and `toContain('400 days')`, which pinned
+     * a sentence that was true of an eight-contract sweep; the sweep is ten now and both numbers
+     * moved. A test that asserts the same literal the module authors cannot tell a correct sentence
+     * from a stale one, so it asserts the *derivation*: the count is the eligible set's length and
+     * the days are `rows × n`. `docs/37` § 6's rule, applied to the check as well as to the string.
+     */
+    const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+    expect(FIRST_SESSION_LINE).toContain(
+      `${words[ELIGIBLE_FIRST_CONTRACT_IDS.length] ?? ''} towers`,
+    );
+    expect(FIRST_SESSION_LINE).toContain(
+      `${String(LEGIBILITY_SWEEP.length * LEGIBILITY_SWEEP_N)} days`,
+    );
+    // Non-vacuity: the set is neither empty nor past the word list, so neither `toContain` above
+    // is asserting the presence of a bare ` towers`.
+    expect(ELIGIBLE_FIRST_CONTRACT_IDS.length).toBeGreaterThan(1);
+    expect(ELIGIBLE_FIRST_CONTRACT_IDS.length).toBeLessThan(words.length);
     expect(FIRST_SESSION_LINE).not.toMatch(/\b(you|your|yours)\b/iu);
   });
 });
@@ -126,13 +157,19 @@ describe('AC1 and AC2, asked of every member of the set on the pinned seeds', ()
       }
       legibleAt[id] = moments;
     }
-    /* The slice `legibility.test.ts` pins, read for the set: c3 is the two-fifths member. */
+    /*
+     * The slice `legibility.test.ts` pins, read for the set: c3 is the two-fifths member, and `c9`
+     * joined it on 2026-09-14 at ten of ten (GitHub issue #500). Harbour Point's day 1 holds a
+     * landing past the band on every seed, which is what a group short of its own handling capacity
+     * looks like from this instrument even let at three fifths.
+     */
     expect(Object.fromEntries(Object.entries(legibleAt).map(([id, list]) => [id, list.length]))).toEqual({
       c2: 10,
       c3: 2,
       c4: 6,
       c5: 8,
       c7: 8,
+      c9: 10,
     });
     /* AC1's clock: on every legible day the moment is inside the day, and never before the window. */
     for (const [id, list] of Object.entries(legibleAt)) {

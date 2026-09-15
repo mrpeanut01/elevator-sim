@@ -582,15 +582,22 @@ describe("the editor's zoning and parking are priced by the rows a repair alread
 });
 
 /**
- * **§ D552 clause 2's known exception, held by a run rather than a sentence.** The editor reads
- * `faster-machines` and `larger-car-step` as flat figures and {@link spendOf} multiplies each by a
- * step count the player chose: a flat price times a quantity, in code rather than through
- * `pricing/parse.ts#purchaseUnits`. GitHub issue #528 tracks moving it onto that seam. Until then two
- * things are true and both are held here: each step costs exactly what the seam would charge a rated
- * row at the same price, and turning either row into a rated one throws rather than charging a
- * quantity nobody chose. The commit that closes #528 replaces this block.
+ * **The block that replaces § D552 clause 2's known exception** — GitHub issue **#528**,
+ * [§ D560](../../../../DECISIONS.md).
+ *
+ * What it said: the editor reads `faster-machines` and `larger-car-step` as flat figures and
+ * {@link spendOf} multiplies each by a step count, in code rather than through `pricing/`, so turning
+ * either row into a rated one made both throw. Two things are true now instead, and the second is the
+ * one worth having — **the data decides, with no code change at all**: give either row a `rate` in
+ * `data/price-schedule.json` and the editor charges `unitsPer × steps` through
+ * `pricing/parse.ts#steppedPurchaseUnits`. At the same per-unit figure that is the arithmetic the
+ * editor already did, so the switch is free of price movement, which is what makes it a data decision
+ * rather than a re-pricing.
+ *
+ * The prices themselves are pinned in `editorPricesThroughTheSchedule.test.ts`, before the seam moved
+ * and after.
  */
-describe('the editor multiplies two flat rows in code — § D552 clause 2, GitHub issue #528', () => {
+describe('a rated row reaches the editor through the schedule — GitHub issue #528, § D560', () => {
   const STEPS = 6;
   const withRated = (schedule: PriceSchedule, id: string): PriceSchedule => ({
     ...schedule,
@@ -607,7 +614,7 @@ describe('the editor multiplies two flat rows in code — § D552 clause 2, GitH
     }),
   });
 
-  it('charges each step exactly what the seam would charge a rated row at the same price', () => {
+  it('charges each step exactly what the seam charges a rated row at the same price', () => {
     const schedule = shippedPriceSchedule();
     const speedTwin = priceOf(withRated(schedule, 'faster-machines'), 'faster-machines');
     const placeTwin = priceOf(withRated(schedule, 'larger-car-step'), 'larger-car-step');
@@ -620,11 +627,37 @@ describe('the editor multiplies two flat rows in code — § D552 clause 2, GitH
     }
   });
 
-  it('throws once either row carries a rate, rather than charging a quantity nobody chose', () => {
+  it('charges the same units once either row carries a rate at the same figure', () => {
     for (const id of ['faster-machines', 'larger-car-step']) {
-      const schedule = withRated(shippedPriceSchedule(), id);
-      expect(() => editorPricingFrom(schedule), id).toThrow(/without a quantity/);
-      expect(() => spendOf(CASE, emptyFixitState(), schedule), id).toThrow(/without a quantity/);
+      const flat = shippedPriceSchedule();
+      const rated = withRated(flat, id);
+      expect(editorPricingFrom(rated), id).toEqual(editorPricingFrom(flat));
+      for (let steps = 0; steps <= STEPS; steps += 1) {
+        const state = { ...emptyFixitState(), speedSteps: steps, capacitySteps: steps };
+        expect(spendOf(CASE, state, rated).editorUnits, `${id} × ${String(steps)}`).toBe(
+          spendOf(CASE, state, flat).editorUnits,
+        );
+      }
     }
+  });
+
+  /**
+   * **The shaft is not a stepper, and it still refuses.** A `new-car` given a rate would have to be
+   * bought with a quantity {@link editorPricingFrom} does not hold, and one unit is a quantity chosen
+   * for the player — § D552's refusal, unweakened by § D560, which moved the *steppers* and nothing
+   * else.
+   *
+   * **One refusal did move, and it was incidental rather than load-bearing.** {@link spendOf} used to
+   * throw on a rated `new-car` too, because it called {@link editorPricingFrom} for all three figures
+   * and used two. It reads the two rows it charges now, so a rated shaft is refused where the shaft
+   * price is actually read — by the panel drawing it — and not by an arithmetic that never spends it.
+   * A selected new shaft is charged from its own repair's units, which the case below holds.
+   */
+  it('still refuses a rated shaft, which no step count sizes', () => {
+    const schedule = withRated(shippedPriceSchedule(), 'new-car');
+    expect(() => editorPricingFrom(schedule)).toThrow(/without a quantity/);
+    expect(spendOf(CASE, { ...emptyFixitState(), selectedRepairIds: ['shaft'] }, schedule)).toEqual(
+      spendOf(CASE, { ...emptyFixitState(), selectedRepairIds: ['shaft'] }, shippedPriceSchedule()),
+    );
   });
 });

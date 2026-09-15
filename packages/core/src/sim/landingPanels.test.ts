@@ -26,12 +26,8 @@
  * paired interval over common random numbers (CLAUDE.md § Statistical discipline).
  */
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { parseBuilding, resolveBuilding } from '../config/parse.js';
 import type {
   CallType,
   DispatcherProfile,
@@ -41,7 +37,7 @@ import type {
 import { MODEL_SENSITIVE_METRIC_IDS } from '../metrics/comparability.js';
 import { parseRunRecord } from '../metrics/serialization.js';
 
-import { DATA_DIR, fingerprint, load } from './fixtures.test-helper.js';
+import { fingerprint, load, reauthoredWithLandings } from './fixtures.test-helper.js';
 import { runSimulation } from './simulation.js';
 import { SimulationError, type SimulationConfig, type SimulationResult } from './types.js';
 
@@ -90,30 +86,17 @@ function shipped(buildingId: string): ResolvedBuilding {
 }
 
 /**
- * A shipped building re-authored with `declared` landing call types, through `parseBuilding` and
- * `resolveBuilding` exactly as `loadConfig` calls them — the same file path, so even
- * `ResolvedBuilding.source` is the shipped one.
+ * A shipped building re-authored with `declared` landing call types.
+ *
+ * One line over `fixtures.test-helper.ts#reauthoredWithLandings`, which is where this helper lives
+ * now that four suites need it (GitHub issue #534). The binding is kept so every case below reads
+ * as it did when it was written.
  */
 function reauthored(
   buildingId: string,
   declared: Readonly<Record<string, CallType>> = {},
 ): ResolvedBuilding {
-  const file = join(DATA_DIR, 'buildings', `${buildingId}.json`);
-  const raw = JSON.parse(readFileSync(file, 'utf8')) as { floors?: Record<string, unknown>[] };
-  const seen = new Set<string>();
-  const floors = (raw.floors ?? []).map((floor) => {
-    const id = String(floor['id']);
-    const landingCallType = declared[id];
-    if (landingCallType === undefined) return floor;
-    seen.add(id);
-    return { ...floor, landingCallType };
-  });
-  const missing = Object.keys(declared).filter((id) => !seen.has(id));
-  if (missing.length > 0) throw new Error(`${buildingId} authors no explicit floor ${missing.join(', ')}`);
-  return resolveBuilding(parseBuilding({ ...raw, floors }, file), config.elevatorSpecs, {
-    file,
-    trafficProfileIds: new Set(config.trafficProfiles.profiles.map((profile) => profile.id)),
-  });
+  return reauthoredWithLandings(config, buildingId, declared);
 }
 
 /** Every landing of a building declaring one call type. */

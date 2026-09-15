@@ -79,6 +79,7 @@ import {
   WATCH_ROWS_LOADING,
 } from './watchStage.js';
 import type { WatchableRun } from '../watch/types.js';
+import { pressWatchRow } from './watchPress.js';
 import { REFERENCE_RUN_LINE } from '../watch/view.js';
 
 /**
@@ -371,36 +372,24 @@ function mountWeek(
    */
   function press(run: WatchableRun): void {
     /*
-     * Dropped rather than queued — GitHub issue #410, and it is the guard the move makes necessary
-     * rather than a courtesy. While the gate was synchronous a second press could not be delivered:
-     * the first one had the thread. Now it can, and two presses would put two runs in flight over
-     * one `EverydayHost`, with the second's answer arriving over a spectator state the first had
-     * already entered. One press at a time, and `checking` is what a row draws instead of its
-     * button.
+     * **The three hazards of this press are `watchPress.ts`'s, not this screen's** — GitHub issue
+     * #531 item 2, § D567. The one-press-at-a-time guard (#410) and the check that lands after the
+     * player has left (#526 item 3) were written here and copied to `boardScreen.ts`, where nothing
+     * drove the copy; they have one home now and this supplies the ports. What is this screen's is
+     * below: `checking` is keyed by the run's id, a refusal keeps the whole checked row because the
+     * row draws its reason, and `render` is the redraw.
      */
-    if (checking !== undefined) return;
-    checking = run.id;
-    render();
-    context.host.watchRun(run, (checked) => {
-      checking = undefined;
-      /*
-       * **A check that lands after the player has left this screen enters nothing** — GitHub issue
-       * #526 item 3. The gate is a worker round trip, and a player can press *Watch* and walk away
-       * before it answers; the shell's `enterWatch` would then pull them off wherever they went and onto
-       * somebody else's run. The host has already entered the spectator state by the time `settled`
-       * runs, so that session is ended too — and only if it is the one this press entered, by identity,
-       * because a watch the player has since opened elsewhere is not this press's to end.
-       */
-      if (!alive) {
-        if (checked.blocked === null && context.host.watching()?.run === checked) context.host.stopWatching();
-        return;
-      }
-      if (checked.blocked !== null) {
+    pressWatchRow(context.host, run.id, run, {
+      alive: () => alive,
+      checking: () => checking,
+      setChecking: (rowId) => {
+        checking = rowId;
+      },
+      redraw: render,
+      refuse: (checked) => {
         refused.set(run.id, checked);
-        render();
-        return;
-      }
-      context.enterWatch();
+      },
+      enter: context.enterWatch,
     });
   }
 

@@ -441,6 +441,25 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       stop.current = undefined;
       if (live?.redraw === render) live = undefined;
     },
+    /**
+     * **Read the host again on the way back from the Engineer surface** — GitHub issue #535,
+     * § D566.
+     *
+     * One host read reaches this page and it decides the only control on it:
+     * {@link firstSessionFor} asks the week how many days have been filed, and a visitor who has
+     * filed none is offered the walkthrough while everybody else is offered a scenario. The
+     * Engineer surface can file a day — its Run button and its `Ctrl`+`Enter` are
+     * `dev/main.ts#closeShift`, live the moment that surface has the page — so a visitor who
+     * crossed over, played a shift and came back was still being told *show me how it plays*, and
+     * the button's label and its destination were both a visit out of date.
+     *
+     * {@link render} rather than a remount: it is the same call {@link live} already makes when a
+     * run lands, it puts the morning back on the canvas through {@link playInto}, and it leaves the
+     * module-scope recording cache alone, so the trip costs no second simulation.
+     */
+    reread: () => {
+      render();
+    },
   };
 }
 

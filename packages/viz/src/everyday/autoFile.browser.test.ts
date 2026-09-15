@@ -78,6 +78,7 @@ import {
   HAS_BROWSER,
   enterEngineerStage,
   enterEverydayStage,
+  leaveTutorialIfOffered,
   openEverydayDoor,
   openPage,
   returnToEverydayMode,
@@ -561,6 +562,68 @@ describe.skipIf(!HAS_BROWSER)('a day left unfinished — GitHub issue #526 item 
       await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
       const scores = await scoresAfterEngineerClose(page);
       expect(figuresIn(scores).length).toBeGreaterThan(0);
+    } finally {
+      await page.close();
+    }
+  });
+
+  /**
+   * **§ 8's campaign day makes the same promise and, until GitHub issue #531 item 1, kept none of
+   * it** — § D564.
+   *
+   * `actionBar.ts#confirmStripFor` hands `campaign` the **same** strip as the daily loop, word for
+   * word, and `everyday/shell.ts#leaveUnfinished` told the host only on `daily`. Nothing downstream
+   * distinguishes the two: `runCampaignDay` presses the same `EverydayHost.startRun`, and
+   * `dev/main.ts#closeShift` never asks which flow a run belongs to.
+   *
+   * Driven in the state the daily pair's first case uses — the run still on the worker — because a
+   * cancel alone is not enough there either: with the pressed run stopped, the run standing behind
+   * it (this page's own boot run, which the contract press has just made filable by latching
+   * § D232's flag) is what the Engineer surface's `Ctrl`+`Enter` files. So this case measures both
+   * halves of `abandonDay` at once.
+   *
+   * The instrument is the pair above's, and its positive control is the third case in this block:
+   * a day walked away from with no strip **does** file through exactly this press, so a build where
+   * the press filed nothing at all fails there rather than passing here.
+   */
+  it('a campaign day left unfinished files nothing onto the week either — item 1 of GitHub issue #531', async () => {
+    const page = await coldLoad();
+    try {
+      await leaveTutorialIfOffered(page);
+      /* § 8's own route: the Campaign tile, the triage row's building, the desk's contract sheet. */
+      await page.locator('.everyday-mode[data-screen="towers"]').first().click();
+      await page.waitForSelector('.everyday-towers', { timeout: 15_000 });
+      await page.click('.everyday-towers-open');
+      await page.waitForSelector('.everyday-building', { timeout: 15_000 });
+      await page.click('.everyday-building-to-contract');
+      await page.waitForSelector('.everyday-contract', { timeout: 15_000 });
+      await page.waitForFunction((label) => document.getElementById('run')?.textContent === label, RUN_IDLE, {
+        timeout: 60_000,
+      });
+      expect(await page.textContent('.everyday-bar-primary')).toContain('Lock it in and run day');
+      /*
+       * Lock the day in and leave it inside one task — `rush.browser.test.ts`'s #518 shape. The
+       * worker answers with a message, which is a task of its own, so the run cannot land between
+       * the press and the leave and this case cannot pass by the run being quick.
+       */
+      const seen = await page.evaluate(() => {
+        const label = (): string => document.getElementById('run')?.textContent ?? '';
+        document.querySelector<HTMLButtonElement>('.everyday-bar-primary')?.click(); // Lock it in and run day N
+        const pressed = label();
+        document.querySelector<HTMLButtonElement>('.everyday-bar-leave')?.click();
+        const asked = document.querySelector('.everyday-bar-question')?.textContent ?? '';
+        document.querySelector<HTMLButtonElement>('.everyday-bar-confirm-leave')?.click();
+        return { pressed, asked };
+      });
+      /* The press started the contract's run, and the strip that stopped the player is the day-shaped one. */
+      expect(seen.pressed).toBe('Cancel this run');
+      expect(seen.asked).toBe(LEAVE_UNFINISHED);
+      await page.waitForFunction((label) => document.getElementById('run')?.textContent === label, RUN_IDLE, {
+        timeout: 60_000,
+      });
+      const scores = await scoresAfterEngineerClose(page);
+      expect(scores.length).toBeGreaterThan(0);
+      expect(figuresIn(scores)).toEqual([]);
     } finally {
       await page.close();
     }

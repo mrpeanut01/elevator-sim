@@ -91,13 +91,18 @@ function runJson(buildingId: string, share: number | undefined, seed: bigint = S
 }
 
 describe('a building with no access zones is byte-identical at every share', () => {
-  it('names the four buildings from disk rather than from a list', () => {
-    // Derived, so a ninth building that declares no zones joins this guard by existing — the
-    // hand-written-list defect § D152 closed, applied to a fixture set.
+  it('names the six buildings from disk rather than from a list', () => {
+    // Derived, so a building that declares no zones joins this guard by existing — the
+    // hand-written-list defect § D152 closed, applied to a fixture set. **It worked**: `ashgate`
+    // and `harbour-point` landed on 2026-09-14 declaring no access zones (GitHub issues #500,
+    // #501) and arrived inside the byte-identity claim below without anybody adding them to it.
+    // The list here is the *expectation*, not the fixture, which is why it still has to move.
     expect(unzoned).toEqual([
+      'ashgate',
       'burj-class-reference',
       'chancery-house',
       'garden-apartments',
+      'harbour-point',
       'midtown-office',
     ]);
     expect(zoned.length).toBe(5);

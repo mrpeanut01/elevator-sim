@@ -41,11 +41,15 @@
  */
 
 export {
+  DEEP_HYBRID_SPACE,
   DEEP_SPACE,
+  HYBRID_CORPUS,
+  HYBRID_SPACE,
   STANDARD_CORPUS,
   STANDARD_SPACE,
   deepCampaignRequested,
   deepCampaignSize,
+  deepHybridSeeds,
   deepSeeds,
   formatStats,
   runCampaign,
@@ -64,8 +68,15 @@ export {
 } from './faults.js';
 export type { RefusalPredicate } from './faults.js';
 
-export { MIN_DURATION_BY_TEMPLATE, caseFromSeed, minDurationFor, reparse, resolveCase } from './generate.js';
-export type { FuzzSpace, GenerateOptions } from './generate.js';
+export {
+  MIN_DURATION_BY_TEMPLATE,
+  caseFromSeed,
+  drawLandingCallTypes,
+  minDurationFor,
+  reparse,
+  resolveCase,
+} from './generate.js';
+export type { FuzzSpace, GenerateOptions, LandingDraw } from './generate.js';
 
 export {
   PROPERTY_CHECKS,

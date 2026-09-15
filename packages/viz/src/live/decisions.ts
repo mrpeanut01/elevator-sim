@@ -252,6 +252,27 @@ function headOf(
  * with its **raw** value in its own unit, then how far clear of the next car it was. Raw rather
  * than the contribution, because *`waitTime` 12.4 s* is a fact about the building a reader can
  * check against the picture, whereas *`waitTime` 0.31* is a fact about the normaliser.
+ *
+ * ## *won it*, and why it is not *carried it* — GitHub issue **#537**
+ *
+ * This row read `waitTime 22.0 s carried it` until the deep honesty corpus reported it under
+ * `whole-run-figure-early` on `honesty-9100014-s2` at four playheads of a 1 140 s day: the run
+ * delivered **22** people, the dominant term's raw wait was **22.0 s**, and the property's cue for
+ * `summary.delivered` is the word *carried*.
+ *
+ * The collision is arithmetic and the search was right to report it, because **the word really is
+ * this product's word for a delivered rider** and it really was on screen next to a number that was
+ * not one. `LiveObservations.carried` is *legs that had alighted by `t`*, `Observations.carryPct`
+ * is the share of them, the goals strip says *none of them carried*, and `shift/observations.ts`
+ * poses the whole question as *"how many people has this building carried"*. Inches away, on the
+ * same rail, this row used *carried it* as the idiom for *won the bid* — one word, two meanings,
+ * on one screen. That is the defect `everyday/stageScreenModel.ts#STAGE_GOALS_COPY` refuses in the
+ * other direction (*"a stage that invented a synonym would give one thing three names"*).
+ *
+ * *won it* is what the sentence means — `terms[0]` is the dominant term of the **winning** car's
+ * bid — and it is the vocabulary the row already keeps beside it (*clear of the next car*, *next
+ * best*, *cheapest bid*). The record is this docstring, under [§ D405](../../../../DECISIONS.md):
+ * the change binds nothing outside this module, and `decisions.test.ts` holds it.
  */
 function whyOf(decision: VizDecision): string {
   if (decision.outcome === 'unassigned') return unassignedWhy(decision);
@@ -263,7 +284,7 @@ function whyOf(decision: VizDecision): string {
       // `topTerms` drops terms that contributed exactly zero, so an empty array means every
       // weighted term priced this car the same as every other. The design's own fallback.
       ? "cheapest bid on the group's own cost"
-      : `${top.termId} ${formatRaw(top)} carried it`,
+      : `${top.termId} ${formatRaw(top)} won it`,
   );
 
   const margin = marginOf(decision);

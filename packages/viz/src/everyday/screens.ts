@@ -97,6 +97,36 @@ export interface EverydayScreenContext {
 /** What `mount` may hand back. `unmount` runs when the player navigates away. */
 export interface EverydayScreenHandle {
   unmount?(): void;
+  /**
+   * **Read the host again and draw what changed, without being remounted** — GitHub issue #535,
+   * [§ D566](../../../../DECISIONS.md).
+   *
+   * Called by `shell.ts#returnToEveryday` on a screen that was covered while the Engineer surface
+   * had the page. Everything this shell holds survives that trip — the screen stays mounted, its
+   * state and its listeners are untouched — and that is precisely the problem for a screen that
+   * read the host **once**, when it was drawn: a dispatcher picked or a day filed over there comes
+   * back as whatever stood at the swap.
+   *
+   * ## Why a screen implements this rather than the shell drawing it again
+   *
+   * `draw()` is the shell's other answer and it is the right one for a screen whose mount is a
+   * one-shot build with nothing to tear down — the rush setup screen, which is what PR #530's
+   * review fixed. It is the wrong one for a screen holding work a remount would destroy:
+   * `boardScreen.ts`'s `unmount` cancels a gauntlet in flight, so drawing the board again on the
+   * way back would silently throw away a batch of runs a player had started and walked away from.
+   *
+   * ## Why not a host subscription
+   *
+   * The host's listeners fire at the end of every `dev/main.ts#renderAll`, which is every state
+   * change the *other* world makes — a slider drag over there is tens of them. A subscribed screen
+   * would rebuild itself behind the cover on each, for a page nobody is looking at, and the landing
+   * page's rebuild restarts a transport. Once, on the way back, is the whole of what is needed.
+   *
+   * It must be cheap and idempotent: it is called on every return, including the ones where nothing
+   * moved. A screen that reads nothing the Engineer surface can write should not implement it, and
+   * should say in its docstring why it does not — `designerScreen.ts` is the worked example.
+   */
+  reread?(): void;
 }
 
 /** One built screen, as the registry holds it. */

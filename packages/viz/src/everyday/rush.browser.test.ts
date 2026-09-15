@@ -202,6 +202,91 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
     }
   });
 
+  /**
+   * **Swapping to Engineer from the rush *result* sheet** — GitHub issue #533 item 2.
+   *
+   * The case above swaps from the stage, where the rush is still running. This one swaps from the
+   * screen after it, and the question the issue asks is what that costs, because the answer was
+   * established by reading and never driven.
+   *
+   * ## The decision, which this case exists to pin
+   *
+   * **Discarding the sheet is acceptable**, and the three reasons are worth having written down
+   * where the next reader meets the behaviour:
+   *
+   * 1. **Nothing is lost that was banked.** `EverydayHost.endRush` posts `rush-wave-survived`
+   *    *before* it hands the player to the result screen, so everything the climb earned is earned
+   *    by the time this sheet is drawn. What reaches the ledger is `chimeTurns.browser.test.ts`'s
+   *    subject, on the wire, and is deliberately not re-asserted here.
+   * 2. **Nothing new can be banked from it.** The sheet is a report; its own primary runs the rush
+   *    again rather than posting anything.
+   * 3. **Standing it back up would mean not putting the week back.** The swap leaves the rush
+   *    (`shell.ts#enterEngineer`, issue #523), and leaving a rush is what restores the parked week
+   *    and the run it interrupted. A way back to the sheet would be a screen describing a rush the
+   *    state no longer holds — which is the stale-surface class, not a convenience.
+   *
+   * So what is pinned is the shape rather than a wish: the row **warns before the press** in a
+   * rush, the sheet is gone afterwards with no route back to it, the setup screen stands in its
+   * place, and the week the rush parked is back.
+   */
+  it('switched to Engineer from the rush result, discards the sheet and puts the week back — GitHub issue #533 item 2', async () => {
+    const page = await coldLoad();
+    try {
+      await leaveTutorialIfOffered(page);
+      await page.locator('.everyday-mode[data-screen="rush"]').click();
+      await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      await page.locator('.everyday-bar-primary').click(); // Start the rush
+      await page.waitForFunction(
+        () => /^WAVE \d+$/u.test(document.querySelector('.everyday-stage-phase')?.textContent ?? ''),
+        undefined,
+        { timeout: 60_000 },
+      );
+      await page.locator('.everyday-bar-primary').click(); // End the rush
+      await page.waitForSelector('.everyday-rush-result', { timeout: 15_000 });
+
+      /*
+       * The warning, read off the row the player is about to press. `rail.test.ts` holds which
+       * sentence this is; what this asserts is that the rush's note — rather than the plain
+       * *nothing stops* one — is the one drawn on the **result** screen too.
+       */
+      const note = await page.textContent('.everyday-engineer-swap');
+      expect(note).toContain('ends the rush first');
+      expect(note).not.toContain('nothing stops');
+
+      await page.locator('.everyday-engineer-swap').click();
+      await page.waitForFunction(
+        () =>
+          document.querySelector<HTMLElement>('.shell')?.inert === false &&
+          document.querySelector<HTMLElement>('.everyday')?.style.visibility === 'hidden',
+        undefined,
+        { timeout: 15_000 },
+      );
+      await page.locator('#back-to-everyday').click();
+
+      /* The sheet is gone and the setup screen is what the swap left standing. */
+      const back = await page.evaluate(() => ({
+        result: document.querySelectorAll('.everyday-rush-result').length,
+        setup: document.querySelector('.everyday-rush-setup') !== null,
+        /* The row is back to the plain note, which is the swap having nothing left to end. */
+        swapNote: document.querySelector('.everyday-engineer-swap')?.textContent ?? '',
+      }));
+      expect(back.result).toBe(0);
+      expect(back.setup).toBe(true);
+      expect(back.swapNote).toContain('nothing stops');
+
+      /* And the week the rush parked is back: the door names the address's tower and crowd. */
+      await page.locator('.everyday-bar-leave').click();
+      await leaveTutorialIfOffered(page);
+      await page.waitForSelector('.everyday-mode[data-screen="scenario"]', { timeout: 15_000 });
+      await openEverydayDoor(page);
+      const seedLine = await page.textContent('.everyday-door-seed');
+      expect(seedLine).toContain('tower garden-apartments');
+      expect(seedLine).toContain('crowd 424242');
+    } finally {
+      await page.close();
+    }
+  });
+
   it('comes back from Engineer naming what the panel wrote there, not what stood at the swap — GitHub PR #530', async () => {
     const page = await coldLoad();
     try {

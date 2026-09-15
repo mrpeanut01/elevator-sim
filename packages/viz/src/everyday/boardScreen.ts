@@ -78,6 +78,7 @@ import { everydayProgressWith } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
 import { WATCH_CHECKING_LABEL, WATCH_IT_LABEL } from './watchStage.js';
 import type { EverydayScreenHandle, EverydayScreenModule } from './screens.js';
+import { pressWatchRow } from './watchPress.js';
 import type { EverydayScreenShellContext } from './shell.js';
 import {
   EVERYDAY_COLORS as C,
@@ -819,31 +820,28 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
           button.addEventListener('click', () => {
             if (source === undefined) return;
             /*
-             * Dropped rather than queued — GitHub issue #410. The gate's run is off the thread that
-             * paints now, so a second press can be delivered where a synchronous one could not, and
-             * two runs in flight over one `EverydayHost` would land the second's answer over a
-             * spectator state the first had already entered. `everyday/weekScreen.ts` holds the
-             * same field for the same press on the same host.
+             * **The press is `watchPress.ts`'s** — GitHub issue #531 item 2, § D567. The three lines
+             * that used to be here were a copy of `everyday/weekScreen.ts#press`: the
+             * one-press-at-a-time guard (#410) and the check that lands after this screen has gone
+             * (#526 item 3). The week screen's copy is driven on the page and this one was driven by
+             * nothing — the browser tier runs no board server, so a board row cannot be pressed
+             * there — so reverting it alone failed nothing in the tree. One home, ported.
+             *
+             * What stays here is what is this screen's: the row is the **server's**, so the busy
+             * state and the refusal are keyed by its id rather than by the run's, and a refusal
+             * keeps the reason because that is what the row draws.
              */
-            if (watchChecking !== undefined) return;
-            watchChecking = entry.id;
-            redraw();
-            context.host.watchRun(context.host.postedRun(source, place), (checked) => {
-              watchChecking = undefined;
-              /*
-               * A check that lands after the board has gone enters nothing — GitHub issue #526 item 3,
-               * and `everyday/weekScreen.ts#press` carries the argument for the same three lines.
-               */
-              if (disposed) {
-                if (checked.blocked === null && context.host.watching()?.run === checked) context.host.stopWatching();
-                return;
-              }
-              if (checked.blocked !== null) {
-                watchRefused.set(entry.id, checked.blocked.reason);
-                redraw();
-                return;
-              }
-              context.enterWatch();
+            pressWatchRow(context.host, entry.id, context.host.postedRun(source, place), {
+              alive: () => !disposed,
+              checking: () => watchChecking,
+              setChecking: (rowId) => {
+                watchChecking = rowId;
+              },
+              redraw,
+              refuse: (checked) => {
+                if (checked.blocked !== null) watchRefused.set(entry.id, checked.blocked.reason);
+              },
+              enter: context.enterWatch,
             });
           });
         }
@@ -1051,6 +1049,25 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
       disposed = true;
       running?.cancel();
       running = undefined;
+    },
+    /**
+     * **Read the host again on the way back from the Engineer surface** — GitHub issue #535,
+     * § D566.
+     *
+     * This screen reads the host when it draws and takes no subscription, and the § 20.10 send
+     * block is drawn from three host reads that the other world writes: `editedDispatcher()` names
+     * the dispatcher a gauntlet would carry and says whether it is dirty, `dispatcherById` decides
+     * whether it is saved at all, and `savedDispatchers()` is the shelf the send resolves it
+     * against. Pick a different dispatcher on the full panel, or edit one there, and the block came
+     * back naming the one that stood at the swap — on the button that sends forty runs.
+     *
+     * {@link redraw} rather than a remount, and that is the reason this hook exists at all: this
+     * screen's `unmount` cancels a gauntlet in flight, so `shell.ts#draw` on the way back would
+     * throw away a batch a player had started and walked away from. `redraw` rebuilds the tabs and
+     * the body from the state that stands and touches neither `running` nor `disposed`.
+     */
+    reread: () => {
+      redraw();
     },
   };
 }

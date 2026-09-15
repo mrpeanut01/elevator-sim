@@ -1,6 +1,6 @@
 /**
- * **The legibility arm of `docs/33` § 6, over the same four hundred days the energy bar was measured
- * on** — GitHub issue #354. Gated on `LEGIBILITY_SWEEP=1`, because eight contracts × fifty seeds is
+ * **The legibility arm of `docs/33` § 6, over the same days the energy bar was measured
+ * on** — GitHub issue #354. Gated on `LEGIBILITY_SWEEP=1`, because ten contracts × fifty seeds is
  * a compute job rather than a check; the table it prints is what `shift/legibility.ts`'s docstring
  * publishes, and `legibility.test.ts` pins a ten-seed slice of it on every run.
  */
@@ -26,11 +26,17 @@ import { LEGIBILITY_SWEEP, legibilityOf } from './legibility.js';
 const SEEDS = Number(process.env['LEGIBILITY_SEEDS'] ?? '50');
 
 /**
- * Every shipped building, not `probes.test-helper.ts`'s two: the sweep is over all eight contracts,
- * so the resources carry all eight resolved buildings, parsed through the same loader.
+ * Every building the contracts name, not `probes.test-helper.ts`'s two, and **derived rather than
+ * transcribed**.
+ *
+ * This was a hand-written list of eight ids. It was correct when it was typed and it is the shape
+ * `DECISIONS.md` § D213 spent a commit on: a guard that can no longer see what it is guarding. The
+ * loop below iterates `CONTRACTS`, so a contract that moves to a new building or a new contract that
+ * lands brings its building with it — which is what `legibility.test.ts#allBuildings` already did
+ * one file away, and the two are now the same derivation.
  */
 function allBuildings(): BrowserResources {
-  const entries = ['chancery-house', 'crown-hotel', 'garden-apartments', 'midtown-office', 'mixed-use-high-rise', 'secure-tower', 'st-jude-hospital', 'vertical-city'].map((id) => {
+  const entries = [...new Set(CONTRACTS.map((contract) => contract.buildingId))].sort().map((id) => {
     const config = parseBuilding(JSON.parse(readFileSync(join(DATA_DIR, 'buildings', `${id}.json`), 'utf8')));
     return { file: `${id}.json`, config, resolved: resolveBuilding(config, RESOURCES.elevatorSpecs) };
   });

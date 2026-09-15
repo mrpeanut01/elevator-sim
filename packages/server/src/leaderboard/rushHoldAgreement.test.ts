@@ -29,6 +29,12 @@
  * The cheapest cells rather than a sweep: every shipped dispatcher on every building is 117 runs and
  * over two minutes a side, and the always-on tier pays for none of that.
  *
+ * Harbour Point and Ashgate joined on 2026-09-14 (GitHub issues #500 and #501), one cell each under
+ * collective, and both break — 2 480 s and 1 710 s. Neither needed a second dispatcher, which is
+ * worth one line rather than none: Harbour Point is the tower whose bank cannot cope, so a cell that
+ * *held* to the horizon there would have been the surprising result and is the thing this table
+ * would have caught.
+ *
  * ## One cell is a fixture, and it is the one no shipped cell could be — GitHub issue #523, item 2
  *
  * This replay resolves a round's dispatcher id against the server's own `data/` and runs that

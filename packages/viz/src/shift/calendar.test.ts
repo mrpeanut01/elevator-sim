@@ -1081,7 +1081,7 @@ describe('what a period asks of the run, and what reaches it — issue #140', ()
     expect(asks).not.toContain('note');
   });
 
-  it('every authored bank has a spare car, asserted from disk', () => {
+  it('every authored building leaves a car to reserve, and exactly one bank cannot spare one', () => {
     /*
      * **This assertion is unchanged and its old title was wrong — GitHub issue #264.** It used to
      * be called *"the goods-car residual is unreachable on shipped data"*, on the argument that
@@ -1095,19 +1095,44 @@ describe('what a period asks of the run, and what reaches it — issue #140', ()
      * `shiftRunConfigOf` commissions the building before the calendar sees it. The residual was
      * live on a fabric one select away, and `scope/runIdentity.test.ts` now measures it end to end.
      *
-     * What the assertion actually says is worth keeping and is what it is renamed to: **the
-     * authored fabric always leaves a car to reserve**, which is why the shipped periods work
-     * as designed on a building nobody has edited.
+     * **And `data/buildings/` has now declared one — GitHub issue #501.** `ashgate`'s `carpark`
+     * bank is a single car, deliberately: *one of five cars reaches B1–B2* is the whole scenario,
+     * and `servesFloors` is declared per bank, so a bank of one is the only way to say it
+     * (§ D573). The thing this case used to assert of every bank — *there is a spare* — is
+     * therefore **false of the shipped catalogue**, and it is renamed rather than relaxed. What is
+     * asserted instead is the property the calendar actually needs and the exception that now
+     * exists, in both directions:
+     *
+     * 1. **Every building leaves at least one car reservable.** `carsToDerate` never empties a
+     *    bank, so a building's reservable pool is `cars − banks`; a building with none would make
+     *    every shipped period's `goodsCars` ask a shortfall on day one.
+     * 2. **Exactly one authored bank cannot spare a car**, and it is named. A second arriving is a
+     *    change to what the calendar can promise on a shipped building, and it should be a red test
+     *    rather than a quiet one — which is the direction this list is meant to move in, the shape
+     *    `contracts.test.ts#REFERENCE_ONLY` already uses for its own exception.
+     *
+     * The consequence for Ashgate, stated so nobody has to derive it: a Moving Week there reserves
+     * its movers' cars from `main` and never from `carpark`, so the car-park lift is in passenger
+     * service on every shipped period. That is correct — a bank of one with its car reserved is a
+     * set of floors nobody can reach — and it is what `carsToDerate`'s own rule already says.
      */
     const dir = fileURLToPath(new URL('../../../../data/buildings/', import.meta.url));
     const files = readdirSync(dir).filter((name) => name.endsWith('.json'));
     expect(files.length).toBeGreaterThan(4);
+
+    const soleCarBanks: string[] = [];
     for (const file of files) {
       const config = parseBuilding(JSON.parse(readFileSync(join(dir, file), 'utf8')) as unknown);
       for (const bank of config.banks) {
-        expect(bank.cars.length, `${file} · ${bank.id}`).toBeGreaterThanOrEqual(2);
+        if (bank.cars.length < 2) soleCarBanks.push(`${file} · ${bank.id}`);
       }
+      // Clause 1, per building: at least one car is reservable once every bank keeps one.
+      const cars = config.banks.reduce((total, bank) => total + bank.cars.length, 0);
+      expect(cars - config.banks.length, `${file}: nothing to reserve`).toBeGreaterThanOrEqual(1);
     }
+
+    // Clause 2, in both directions: the exception is exactly this one, named.
+    expect(soleCarBanks).toEqual(['ashgate.json · carpark']);
   });
 
   it('no shipped event holds a car for the whole shift, which is one half of the spoken-for set', () => {

@@ -16,7 +16,10 @@
  * wins** does not stop at the stat line. `c4` said *"Forty floors … a transfer level at 20"* over a
  * building that expands to 60 floors with its sky lobby at 31; `c3` said *"Thirty-one"* over 30 and
  * `c5` *"A hundred and one"* over 100; and `c1` counted *"the next four"* on a list that is now
- * eight (issue #37). Each correction is annotated where it sits, with the file's own figure.
+ * **ten** (issue #37, and re-counted again when `c9` and `c10` landed — the count is a fact about
+ * the array and goes stale every time it grows, which is why it is annotated rather than derived:
+ * a brief is authored prose and `statLineOf`'s rule does not reach inside a sentence). Each
+ * correction is annotated where it sits, with the file's own figure.
  *
  * `contracts.test.ts` asserts the prose against the vendored copy is not attempted — the vendored
  * file is a record, not a fixture — so these strings are pinned here and reviewed against it.
@@ -27,17 +30,30 @@
  * measured what that added up to: day-1 miss rates of 0.00, 1.00, 0.23, 0.80, 1.00, 0.03, 0.30 and
  * 0.00, which is trivial → unpassable → trivial, and **DC-6 red**. The order is now
  * **non-decreasing in measured day-1 miss rate** — `docs/33` § 4.7 carries the table and the run —
- * and it happens to be non-decreasing in bank count too (1, 1, 1, 1, 1, 2, 3, 7), which is the
- * curriculum reading the same ramp gives: five single-bank buildings of rising subtlety, then two
- * banks and a credential, then one transfer, then three.
+ * and it happens to be non-decreasing in bank count too (1, 1, 1, 1, 1, 1, 2, 2, 3, 7), which is
+ * the curriculum reading the same ramp gives: six single-bank buildings of rising subtlety, then
+ * two banks and a credential, then two banks and a service zone, then one transfer, then three.
  *
- * **The ids do not move with the order and never will.** `c1`–`c8` are names, and a saved week, a
+ * **Two contracts were added to that ramp rather than appended to it** — `c9` (Harbour Point) and
+ * `c10` (Ashgate Mixed-Use), GitHub issues #500 and #501. Each was measured on the shipped path
+ * before it was placed, at `docs/33` § 4.7d's own budget and seeds: 21 of 50 and 26 of 50, so
+ * **0.42** and **0.52**, which puts one between St Jude and Midtown and the other beside Secure
+ * Tower. Appending them would have been the defect #382 was filed about — Harbour Point's own
+ * building file is over-subscribed by construction and would have read 1.00 at the end of the
+ * ladder, and Ashgate as built reads 0.13, which is under DC-4's floor. The bank-count reading
+ * above survived the insertion, and that was **checked rather than hoped for**: a one-bank tower
+ * placed by its miss rate could easily have landed after a three-bank one, and `contracts.test.ts`
+ * asserts the sequence so that it would have been a red test rather than a quiet change to what
+ * the campaign teaches.
+ *
+ * **The ids do not move with the order and never will.** `c1`–`c10` are names, and a saved week, a
  * career tower, a `data/` row and this repository's own prose all hold them; renumbering would make
  * an id mean two things. What moves is the array's order, each contract's `label` (which is its
- * *position*, so `c6` is now *Scenario 2*) and `needClean` (the same 1, 2, 2, 2, 3, 3, 3, 3 ladder,
- * re-attached to the new positions, because a stake that fell in the middle of the campaign would
- * be a campaign with two finales). The deviation from the handoff's own order is recorded in
- * `docs/12` § 4.7, which is where § 4.4 says a disagreement it does not cover belongs.
+ * *position*, so `c6` is now *Scenario 2* and `c2` is now *Scenario 5*) and `needClean` (the same
+ * ladder shape at ten — 1, 2, 2, 2, 2, 3, 3, 3, 3, 3 — re-attached to the new positions, because a
+ * stake that fell in the middle of the campaign would be a campaign with two finales). The
+ * deviation from the handoff's own order is recorded in `docs/12` § 4.7, which is where § 4.4 says
+ * a disagreement it does not cover belongs.
  *
  * ## What a contract hands the player is `data/contract-ladder.json`, not this file
  *
@@ -75,7 +91,7 @@ import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 import type { ContractStatus, ScenarioContract, WeekState } from './types.js';
 
 /**
- * The handoff's five, and three more, in **measured difficulty order** rather than the handoff's —
+ * The handoff's five, and five more, in **measured difficulty order** rather than the handoff's —
  * see the module docstring and `docs/33` § 4.7.
  *
  * Frozen, and every member frozen: this is shared, read-only reference data of exactly the kind
@@ -86,12 +102,17 @@ import type { ContractStatus, ScenarioContract, WeekState } from './types.js';
  * schema, a parser and a loader to protect nothing.
  */
 /**
- * **Eight contracts, and the handoff specifies five.** `docs/12` § 4.4 fixes the campaign at the
- * five buildings shipped when the design was written; three more buildings landed afterwards, and a
+ * **Ten contracts, and the handoff specifies five.** `docs/12` § 4.4 fixes the campaign at the five
+ * buildings shipped when the design was written; five more buildings have landed since, and a
  * shipped building with no contract is a scenario the reader can never take. The deviation is
  * recorded in `docs/12` § 4.7 rather than absorbed, which is the rule the handoff itself sets: it
  * wins every disagreement about what the screen looks like, and a disagreement it does not cover is
  * a decision to be written down.
+ *
+ * **Ten rather than eleven, and the exception is a list rather than a silence.**
+ * `burj-class-reference` is a *reference* building and has no contract;
+ * `contracts.test.ts#REFERENCE_ONLY` names it, asserts it ships, and asserts it has none, so the
+ * exception cannot quietly widen into the rule.
  */
 export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
   Object.freeze({
@@ -101,7 +122,7 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     title: 'Learn the ropes',
     teaches: 'a call, a car, a wait',
     brief:
-      'Six floors, two hydraulic cars at 0.63 m/s, and a gentle trickle of residents. Nothing here is hard — it exists so the seven that follow have something to be different from.',
+      'Six floors, two hydraulic cars at 0.63 m/s, and a gentle trickle of residents. Nothing here is hard — it exists so the nine that follow have something to be different from.',
     needClean: 1,
     reward: 'Minimum estimated wait · Energy aware · one spare shaft',
     /*
@@ -143,9 +164,30 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     reward: 'Destination dispatch · Fairness first · endless mode',
   }),
   Object.freeze({
+    id: 'c9',
+    buildingId: 'harbour-point',
+    label: 'Scenario 4',
+    title: 'The building at its limit',
+    teaches: 'where a lift group runs out, on the one tower with no other problem',
+    /*
+     * **Three fifths let, and the brief says so** — `data/contract-ladder.json`'s `c9` rung.
+     *
+     * Harbour Point as authored is over-subscribed on purpose: thirteen shipped dispatcher
+     * profiles × five seeds give 64 of 65 runs a diverging queue and a suppressed mean, which is
+     * the role `docs/37` § 7.2 authors it for and is **not** a scenario, because a day nobody can
+     * pass teaches nothing. The rung lets it at 0.60 — 930 desks rather than 1 560 — exactly as
+     * `c2` lets Midtown Office at 0.395, and the stat line beside this card is drawn from
+     * `ladderTowersOf`, so the card and the run cannot disagree about which tower this is.
+     */
+    brief:
+      'Sixteen floors and six cars on a building let at three fifths. One bank, no zoning, no credential and nothing clever to find: the only questions are where the cars wait and which call each one takes. Let the other two fifths and no dispatcher in the list clears the morning at all — this is the tower where the answer is a shaft rather than a strategy.',
+    needClean: 2,
+    reward: 'Capacity aware · Fairness first · one spare shaft',
+  }),
+  Object.freeze({
     id: 'c2',
     buildingId: 'midtown-office',
-    label: 'Scenario 4',
+    label: 'Scenario 5',
     title: 'The morning rush',
     teaches: 'up-peak, and the gap between demand offered and carried',
     brief:
@@ -156,7 +198,7 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
   Object.freeze({
     id: 'c7',
     buildingId: 'crown-hotel',
-    label: 'Scenario 5',
+    label: 'Scenario 6',
     title: 'Both ways at once',
     teaches: 'demand with no dominant direction, and a car unlike its neighbours',
     brief:
@@ -167,7 +209,7 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
   Object.freeze({
     id: 'c3',
     buildingId: 'secure-tower',
-    label: 'Scenario 6',
+    label: 'Scenario 7',
     title: 'Two banks, one lobby',
     teaches: 'zoning, and calls nobody may legally answer',
     brief:
@@ -176,9 +218,20 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     reward: 'Destination disclosure · Fairness first · one spare shaft',
   }),
   Object.freeze({
+    id: 'c10',
+    buildingId: 'ashgate',
+    label: 'Scenario 8',
+    title: 'The car park nobody serves',
+    teaches: 'that a service zone is a decision, and a transfer costs a second wait',
+    brief:
+      'Twenty-two floors: two car-park decks below the datum, a ground of shops, and sixteen floors of offices over them. One of the five cars reaches the car park, so most of the people arriving ride twice and wait twice. Nothing here is out of service and nothing is broken.',
+    needClean: 3,
+    reward: 'Operational zoning · Destination disclosure · one spare shaft',
+  }),
+  Object.freeze({
     id: 'c4',
     buildingId: 'mixed-use-high-rise',
-    label: 'Scenario 7',
+    label: 'Scenario 9',
     title: 'The sky lobby',
     teaches: 'transfers, and why a two-leg journey waits twice',
     brief:
@@ -204,7 +257,7 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
   Object.freeze({
     id: 'c5',
     buildingId: 'vertical-city',
-    label: 'Scenario 8',
+    label: 'Scenario 10',
     title: 'Vertical City',
     teaches: 'supertall traffic, and knowing when to stop',
     brief:
@@ -212,6 +265,7 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     needClean: 3,
     reward: 'Multi-round auction · Landing-panel destination dispatch · endless mode',
   }),
+
 ]);
 
 /** The first contract, which is where a fresh week opens. */
