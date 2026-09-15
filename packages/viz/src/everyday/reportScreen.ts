@@ -80,7 +80,8 @@ import {
 import { openTowerOf } from '../campaign/career.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { postRunViewOf } from './postRun.js';
-import type { EverydayPostOutcome } from './host.js';
+import { RUSH_POST_COPY, rushPostViewOf } from './rushPost.js';
+import type { EverydayPostOutcome, EverydayRushPostOutcome } from './host.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import type { EverydayScreenModule } from './screens.js';
 /* GitHub issue #340: beat 5's event and the refusal counter. A no-op without consent. */
@@ -167,6 +168,31 @@ function mountReportScreen(
    * document no longer holds, which is a silent no-op and the worst shape of failure here.
    */
   let postBlock: HTMLElement | undefined;
+  /**
+   * The rush sitting's own three, kept apart from the day's — GitHub issue #372.
+   *
+   * Separate state rather than a shared flag, because the two blocks are never on the page at once
+   * and are about different things: `postOutcome` is *this reading of this sheet*, and this is
+   * *this sitting*. Sharing them would have a refusal from a day's post drawn over a sitting.
+   */
+  let rushPostOutcome:
+    | {
+        /**
+         * How many rounds the sitting held when this answer was given.
+         *
+         * **The answer goes stale the moment a round joins**, and the count is what says so. A
+         * player who posts a one-round sitting and then plays another would otherwise read *"the
+         * server replayed every round of this sitting and they reproduced"* over a sitting one
+         * round longer than the one that was replayed, with the new round carrying no purse beside
+         * two that do — a sentence about a thing that is no longer on screen, which is the
+         * stale-surface class this shell keeps a register for.
+         */
+        readonly forRounds: number;
+        readonly answer: EverydayRushPostOutcome;
+      }
+    | undefined;
+  let rushPosting = false;
+  let rushPostBlock: HTMLElement | undefined;
 
   const root = el(doc, 'div', 'everyday-report');
   root.style.cssText = 'max-width:900px';
@@ -201,6 +227,14 @@ function mountReportScreen(
      * and `repaintPostBlock` is then a no-op rather than a write nobody sees.
      */
     postBlock = undefined;
+    /*
+     * And the rush's, for exactly the same reason one screen over — GitHub issue #372.
+     * `drawRushResult` assigns a fresh one on the path that draws it; every other path leaves it
+     * `undefined`, so a repaint on a screen that is not the rush's result is a no-op rather than a
+     * `replaceWith` on a node the document has dropped, which is the silent failure this pair is
+     * cleared here to avoid.
+     */
+    rushPostBlock = undefined;
     /* § 9.3: the rush's result is its own screen and never falls through to the day's sheet. */
     if (context.ctx === 'rush') {
       root.replaceChildren();
@@ -281,6 +315,148 @@ function mountReportScreen(
     footer.style.cssText = `font-size:12px;color:${C.label};margin:18px 0 0`;
     block.append(footer);
     root.append(block);
+    /*
+     * § 2.3's postable result — GitHub issue #372. Under the sheet rather than inside it, on the
+     * day report's own arrangement: the result is what the run was, and the sitting is what a
+     * player may do about it.
+     */
+    rushPostBlock = drawRushPostBlock();
+    root.append(rushPostBlock);
+  }
+
+  /**
+   * The sitting's round list and its post block — GitHub issue #372's fourth criterion.
+   *
+   * **This is `EverydayHost.postRushSitting`'s non-test caller**, and `drawPostBlock`'s twin in
+   * every respect that matters: every sentence and every enabled/disabled decision is
+   * `everyday/rushPost.ts`'s, this function owns the press, the in-flight flag and the redraw, and
+   * the account is read through `everyday/accountPort.ts` rather than through the host for the
+   * reason that port exists — the host's `onChange` is drained by `renderAll()` and no account path
+   * calls it, so a block that learned about signing in through the host would draw *sign in to
+   * post* at a player who just did.
+   */
+  function drawRushPostBlock(): HTMLElement {
+    const session = context.host.rush();
+    const account = everydayAccount();
+    const rounds = session?.rounds ?? [];
+    const view = rushPostViewOf({
+      rounds,
+      // The sitting's own gate, taken from the host so the block and the press cannot disagree.
+      check: session?.check ?? { ok: false, reasons: [RUSH_POST_COPY.noRounds] },
+      hasServer: context.host.accountActions() !== undefined,
+      signedIn: account?.token !== undefined,
+      posting: rushPosting,
+      // The last answer, and only while it is still about the sitting on screen — see `forRounds`.
+      outcome: rushPostOutcome?.forRounds === rounds.length ? rushPostOutcome.answer : undefined,
+    });
+    const block = el(doc, 'section', 'everyday-rush-post');
+    block.style.cssText = `${WELL};margin-top:20px;padding:16px 18px;border-radius:${String(R.card)}px`;
+    const eyebrow = el(doc, 'p', 'everyday-post-eyebrow', view.eyebrow);
+    eyebrow.style.cssText = `${EYEBROW};margin:0`;
+    const roundsHeading = el(doc, 'p', 'everyday-rush-post-rounds-heading', view.roundsHeading);
+    roundsHeading.style.cssText = `${EYEBROW};margin:14px 0 0`;
+    block.append(eyebrow, roundsHeading);
+    if (view.roundsEmpty !== undefined) {
+      const empty = el(doc, 'p', 'everyday-rush-post-rounds-empty', view.roundsEmpty);
+      empty.style.cssText = `${QUIET};margin:8px 0 0`;
+      block.append(empty);
+    }
+    const list = el(doc, 'ol', 'everyday-rush-post-rounds');
+    list.style.cssText = 'margin:8px 0 0;padding-left:22px;max-width:74ch';
+    for (const round of view.rounds) {
+      const item = el(doc, 'li', 'everyday-rush-post-round');
+      item.style.cssText = `${BODY};margin:6px 0`;
+      const label = el(doc, 'span', 'everyday-rush-post-round-label', round.label);
+      label.style.cssText = 'font-weight:600';
+      /*
+       * One line per round, and the separators are drawn rather than spliced into a string: a
+       * screen that joined these would hand the honesty sweep one seed where there are four claims,
+       * and a violation could not say which of them was the one at fault.
+       */
+      item.append(label, el(doc, 'span', 'everyday-rush-post-round-driver', ` · ${round.driver}`));
+      item.append(el(doc, 'span', 'everyday-rush-post-round-held', ` · ${round.held}`));
+      item.append(el(doc, 'span', 'everyday-rush-post-round-presses', ` · ${round.presses}`));
+      if (round.earned !== undefined) {
+        const earned = el(doc, 'span', 'everyday-rush-post-round-earned', ` · ${round.earned}`);
+        earned.style.cssText = `color:${C.label}`;
+        item.append(earned);
+      }
+      if (round.refusal !== undefined) {
+        const refusal = el(doc, 'p', 'everyday-rush-post-round-refusal', round.refusal);
+        refusal.style.cssText = `${QUIET};margin:4px 0 0;color:${C.terracotta}`;
+        item.append(refusal);
+      }
+      list.append(item);
+    }
+    block.append(list);
+    if (view.purseNote !== undefined) {
+      const purse = el(doc, 'p', 'everyday-rush-post-purse-note', view.purseNote);
+      purse.style.cssText = `${QUIET};margin:10px 0 0;max-width:74ch`;
+      block.append(purse);
+    }
+    const button = el(doc, 'button', 'everyday-rush-post-go', view.label);
+    button.type = 'button';
+    button.disabled = !view.pressable;
+    button.style.cssText = [
+      view.pressable ? 'cursor:pointer' : 'cursor:default',
+      'border:0',
+      `border-radius:${String(R.pill)}px`,
+      `background:${view.pressable ? C.sun : C.rule}`,
+      `color:${C.ink}`,
+      'padding:11px 20px',
+      'font-size:14px',
+      'font-weight:600',
+      'margin:14px 0 0',
+      view.pressable ? 'opacity:1' : 'opacity:0.55',
+    ].join(';');
+    button.addEventListener('click', () => {
+      // Guarded as well as disabled, on `drawPostBlock`'s ground: a keyboard route into a handler
+      // is what issue #21 found behind the Engineer surface's own posting row.
+      if (!view.pressable || rushPosting) return;
+      rushPosting = true;
+      repaintRushPostBlock();
+      const forRounds = rounds.length;
+      void context.host
+        .postRushSitting()
+        .then((answer) => {
+          rushPostOutcome = { forRounds, answer };
+        })
+        .catch((error: unknown) => {
+          // A rejection is not a state the host promises — `drawPostBlock`'s own arm, and its
+          // reason: carrying the message says the request did not complete instead of inventing a
+          // reassuring sentence that would be a guess.
+          rushPostOutcome = {
+            forRounds,
+            answer: { kind: 'failed', detail: error instanceof Error ? error.message : String(error) },
+          };
+        })
+        .finally(() => {
+          rushPosting = false;
+          repaintRushPostBlock();
+        });
+    });
+    block.append(button);
+    /* `docs/36` AX-1/AX-16, § D593 — the day's post block's own treatment, for its own reason. */
+    let reasonId: string | undefined;
+    for (const [index, prose] of view.lines.entries()) {
+      const node = el(doc, 'p', prose.className, prose.text);
+      node.style.cssText = `${prose.role === 'reason' ? BODY : QUIET};margin:10px 0 0;max-width:74ch`;
+      if (prose.role === 'reason' && reasonId === undefined) {
+        reasonId = `everyday-rush-post-reason-${String(index)}`;
+        node.id = reasonId;
+      }
+      block.append(node);
+    }
+    if (!view.pressable && reasonId !== undefined) button.setAttribute('aria-describedby', reasonId);
+    return block;
+  }
+
+  /** {@link repaintPostBlock} for the rush's block. A no-op on every screen that has not drawn one. */
+  function repaintRushPostBlock(): void {
+    if (!alive || rushPostBlock === undefined) return;
+    const next = drawRushPostBlock();
+    rushPostBlock.replaceWith(next);
+    rushPostBlock = next;
   }
 
   function drawSheet(view: EverydayReportView): void {
@@ -828,7 +1004,16 @@ function mountReportScreen(
    * drained by `renderAll()` and no account path calls it, so signing in on the settings screen and
    * walking back here would otherwise leave the post block still saying *sign in to post*.
    */
-  const stopAccount = onEverydayAccount(repaintPostBlock);
+  const stopAccount = onEverydayAccount(() => {
+    /*
+     * Both blocks, and each is a no-op when its own node is not on the page — the day's sheet and
+     * the rush's result are never drawn at once. Naming both here rather than picking one is what
+     * keeps the rush's *sign in to post* from surviving a sign-in, which is the whole reason this
+     * subscription exists.
+     */
+    repaintPostBlock();
+    repaintRushPostBlock();
+  });
 
   return {
     unmount: () => {

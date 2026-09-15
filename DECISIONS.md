@@ -35156,6 +35156,8 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 
 ## D542 — A rush round is a sitting, posted whole: the server replays every round, derives every purse, and the refusal of `endless-rush` is lifted after its replay cost was measured
 
+> **Status 2026-09-15: one of the two things this entry records as unbuilt is built, by [§ D606](#d606).** *The viewer does not post a sitting* stopped being true on that commit — the rush's result screen keeps the round list and sends the sitting whole, and the honesty corpus moved with it. **The other is unchanged and is the open half of GitHub issue #372**: no between-round rebuild travels, so nothing spends a purse. § D606 names the boundary that blocks it and the three questions nobody has ruled on. This entry is left exactly as it was written.
+
 **Date: 2026-09-11 · Owner: product owner (the ruling, 2026-09-10, and the approval of the figures and readings under it as drafted, 2026-09-11); the lane that built GitHub issue #372 (the readings under it) · Rules on: [§ D515](#d515), [§ D525](#d525) clause 6, [§ D526](#d526) clauses 2 and 3, [§ D486](#d486), `packages/server/src/leaderboard/verify.ts`, `data/rush-purse.json`, [`docs/38`](docs/38-what-the-game-is.md) § 2.3, GitHub issue #372.**
 
 **Why an entry.** The ruling binds code no one module owns: the rush's arithmetic moved into `core`, a new file in `data/`, the server's verifier, its store and two routes. It also lifts a refusal already recorded — `verify.ts` refused `endless-rush` since GitHub issue #220 — and the ruling asked for the argument to be written down with the change.
@@ -36598,3 +36600,59 @@ No area figure is folded into a verdict, weighted against a wait, or turned into
 Whether the four footprint figures are right — all four are chosen and all four await the owner. Whether the fourteen plates are right — they are a stated assumption and a later citation replaces a stated figure rather than a silent one. Whether area should cost anything at all, which is § 5 and the owner's. Whether lettable area should bound a floor's **population**, which would make a shaft move a leg and would move every published interval in the project; it is not built and `floorArea.ts` says so in its own header rather than leaving it to be discovered. And whether `new-car` charging the same 34 u for a 24 m² shaft and an 1 178 m² one is right, which is the finding § 5 hands over rather than a defect this lane may fix.
 
 **Bookkeeping.** This lane was reserved D601–D605 and spent **D601**; D602, D603, D604 and D605 are returned **unspent**, and whether each is free or a hole is the integrator's call at close, because that depends on what lands above them (§ D430). The lane also **widened wave AB's reservation** in `documentation.test.ts#OPEN_RESERVATION` to `D594–D605` — the floor is the charter row's own figure and the ceiling is the top of *this lane's* block, written at the narrowest figure that is true from here, exactly as § D583 did for wave AA.
+
+---
+
+## D606 — A rush sitting posts from the viewer, and the purse stays unspendable: the boundary that blocks it is named rather than moved, and the citation for it was the wrong way round
+
+**Date: 2026-09-15 · GitHub issue [#372](https://github.com/mrpeanut01/elevator-sim/issues/372) · Builds the client half of [§ D542](#d542) and [§ D543](#d543) · Corrects a citation carried in `data/rush-purse.json`.**
+
+**Why an entry.** Two of [§ D405](#d405)'s three grounds. It binds `everyday/host.ts`, `everyday/reportScreen.ts`, `menu/client.ts`, `dev/main.ts`, `honesty/surfaces.ts` and `everyday/rushScreenModel.ts#RUSH_ABSENCES` — six modules `everyday/rushSitting.ts` does not own — and it **refuses to move a boundary already recorded**, which is the kind of answer that has to be findable by the next person who asks the same question.
+
+### 1. What is built, and it is the half the issue's own triage called missing
+
+§ D542 built the sitting protocol on the server and closed with two halves unbuilt: *"no between-round rebuild travels, so the purse is derived and nothing spends it, and the viewer does not yet post a sitting."* The second is built here.
+
+A rush session keeps a **round list**. A round joins it in `EverydayHost.endRush`, which is the one moment the state that produced it, its recording and the second it ended at are all in hand at once; *Run the rush again* opens the next round of the same sitting rather than replacing it, and leaving the rush ends the sitting, because *consecutive runs from an as-shipped start* is what a sitting is. `everyday/rushSitting.ts#rushSittingOf` decides whether the rounds may travel and builds the body; `everyday/rushPost.ts` draws the list, the button and every state of both; `menu/client.ts#postRushSitting` is the one request, to the route § D542 opened.
+
+**Three things are deliberate and each is a rule this tree already holds.**
+
+- **A round claims its recording's own hold moment, not where it ended.** `RushOutcome.heldS` is the hold line *or the player's hand, whichever came first*, and the server replays the whole ninety minutes and reads the hold moment off its own legs. A round ended by hand at 8:20 whose recording holds at 13:40 has to claim 13:40, or an honest player is answered `held-does-not-reproduce`. Whether a hand-stopped run may post at all is § D515's separate question, and it is answered on the **last** round, which is what a sitting ranks on.
+- **Every refusal is owned by the module that decided it.** The two device-only ids are `scope/runIdentity.ts`'s sentences, a handover the wire cannot express is `scope/switchWire.ts`'s, a press of a kind that does not travel is `core`'s own `interventionKindRefusal`, and *there is no server* and *nobody is signed in* are `everyday/postRun.ts`'s, borrowed rather than reworded. The four sentences this lane authors are all facts about a *sitting* — hand-stopped, never broke, too long, nothing played — which no other module has an opinion about. A second wording for any of them would be `honesty/agreement.ts#surfaces-disagree` built on purpose.
+- **No purse is computed in `packages/viz`, and the one a player reads is the server's reply to their own post.** `packages/server`'s `rushSitting.ts#NEVER_ON_THE_WIRE` refuses a client-named purse *by name*; this end has no field that could carry one and no arithmetic that could produce one. § D543 clause 5 permits a purse in the poster's own answer and nowhere else, so the figures appear on the round list only after a 201 and never on a board row.
+
+### 2. The purse is still unspendable, and the reason is a package boundary plus a ruling nobody has taken
+
+Criterion 2 of the issue — *a round rebuilt with a larger purse produces a different run from the same seed* — is **not met, and was not attempted**. Closing it needs two different things, and only one of them is an engineering choice:
+
+**The boundary.** A rebuild is the fit-out kit (§ D427). The code that turns a kit into a building is `packages/viz/src/campaign/fitOut.ts` over `packages/viz/src/commissioning/`, priced by `packages/viz/src/pricing/parse.ts` against `data/price-schedule.json`, with the tiers in `packages/viz/src/campaign/economy.ts#SHOP`. `packages/server` can import none of it. Three shapes were weighed and none was taken:
+
+1. **Move the derivation into `core`.** There is precedent and it is the precedent § D542 itself used — `core/src/config/rushPurse.ts` sits beside `chimeLedger.ts` for exactly this reason, *"`packages/server` has to derive a posted sitting's purses and may not import the viewer, so the rule has to live in the package both of them already depend on."* What that precedent covers is a **data reader**. `SHOP` is a shop: its tiers carry player-facing names, subtitles and effect sentences, and moving them into `core` puts product copy inside the simulator and outside the honesty corpus's reach, which is a different decision from moving a parser.
+2. **Put the rebuild on the wire as a cause.** A sitting already carries causes and the server already derives effects, so this is the shape § D486 licenses — but the server still has to turn the cause into a building, so it reduces to (1) with an extra field.
+3. **Admit the two bought intervention kinds on a rush sitting.** `core/src/sim/interventionWire.ts` refuses `equipment-change` and `building-change` because *no submission carries a budget, so a replay would hold the change and not the entitlement to it* — **and that reason is not true of a rush sitting**, which is the one submission in this product whose budget the server derives for itself. That is a real observation and it is recorded rather than acted on, because the server still cannot price the change: `data/price-schedule.json` is parsed only in `packages/viz` (`core/src/config/chimeLedger.ts` says so in terms).
+
+**The ruling.** Even with the boundary moved, three questions have no answer in `docs/38` § 2.3 or anywhere else, and each changes what gets built:
+
+- **Does a rush rebuild book nights?** The career's economy books works over nights in a month grid. A sitting has no calendar, so either a rush purchase is instantaneous — a departure from the shop's own rule — or a sitting acquires a clock.
+- **Does a tier still require the tier below it inside one sitting?** That is § 8.2's first buying rule, and a sitting that starts as-shipped every time makes it a very different ladder.
+- **What does *fitted* mean?** `data/chime-ledger.json` sells `rush-prefit`, *Start with the building fitted*, for 15 chimes. Which kit that is, is authored nowhere, and `rushSitting.ts#rushSittingIssues` refuses the modifier by name today for the same reason it refuses a rebuild.
+
+So the answer here is to **name what has to be decided and build the half that does not need it**, on the issue's own standing: half of it landed honestly is worth more than all of it landed on an invented boundary.
+
+### 3. Criterion 3's client half is blocked by criterion 2 rather than merely unbuilt, which is the useful finding
+
+The triage this lane started from read criteria 2 and 3 as separate gaps — *the spend term* and *the viewer cannot exercise the top-up*. They are one gap. `POST /api/chimes/spend` exists, `data/chime-ledger.json` authors `rush-purse-top-up` at 8 chimes for 5 units, the server checks a claimed modifier against the account's spends, and **nothing in this build spends a chime** (`everyday/chimesPanel.ts#CHIMES_PANEL_COPY.spendRefusal` says so on the screen that lists the prices).
+
+Building that spend now would ship **a purchase that changes no run**: a wider purse buys nothing, because nothing spends a purse. That is `CLAUDE.md`'s standing requirement in its plainest form — *move the control and require the run to change* — and shipping it would be the twelfth instance rather than a feature. So `rushSittingOf` takes a `modifiers` parameter that is always empty, with the reason on it, and the day a spend surface exists it passes its claims through that parameter rather than teaching the module a second way in.
+
+`RUSH_ABSENCES` carries the absence in the register's own shape, `buildNotes.test.ts#ABSENCE_TRIAGE` owns it to **#372 itself** rather than to a new issue — the absence is that issue's own second criterion — and `everyday/rushPost.ts#RUSH_POST_COPY.purseNote` says it beside the figure, because a player who reads *paid 18 into a purse of 18* and goes looking for the shop has met the same defect from the other side.
+
+### 4. The citation was the wrong way round, and it had been copied
+
+`data/rush-purse.json`'s `$comment`, and the dispatch brief that quoted it, both cited **§ D215 § 3** for *the server may not import `viz`*. § D215 § 3 states the prohibition in the **other** direction — *"`viz` may not depend on `server`"* — which is the direction every other site in the tree cites it for, and `packages/server/src/leaderboard/verify.ts:342` already says so in as many words. The clause about what `packages/server` depends on is § D215 § 1, and it has itself drifted: it says *"one dependency, `@elevator-sim/core`"*, and `packages/server/package.json` today also names `@elevator-sim/experiments`, `pg` and two Azure packages.
+
+**What is actually true** is narrower than either clause and is not a decision at all: `packages/server/package.json` does not depend on `packages/viz`, and `packages/viz` is a browser bundle. The `$comment` is corrected to say that, to name § D215 § 1 as the clause it meant, and to say that § 3 runs the other way — a correction rather than a deletion, on this repository's usual rule. § D215 § 1's own drift is **recorded and not fixed**: it is a dated record of what shipped in 2026-08, and rewriting a decision entry after the fact is what this project does not do.
+
+### 5. What this lane measured about the corpus, as a forecast rather than as the row
+
+§ D343 puts the corpus measurement on the integrator, once, after integration. What a lane may honestly publish is a prediction, and this one is decomposed to the string: **+80 strings a case in both tiers**, no surface added and none removed, cases, simulations and failing cases unmoved. The eighty is twelve states of the post block × (eyebrow + heading + button) = 36, plus fifteen prose lines across those states, plus the empty-list line, plus the purse note, plus three states × two rounds × four round-line strings = 24, plus two `earned` lines and one round refusal. The register is a **substitution**: `RUSH_ABSENCES` gains an entry and the section's `empty` line goes, so `buildNotes` contributes zero. Every term is unconditional given a case, so the deep tier's figure is the same eighty.

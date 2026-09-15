@@ -289,7 +289,30 @@ export function rushGeneratedRangeLine(): string {
  * went on the same commit. The register is empty and `buildNotes.ts` draws its empty line; the array
  * stays, because an empty register is a state that must keep being checked.
  */
-export const RUSH_ABSENCES: readonly string[] = Object.freeze([]);
+/**
+ * The rush's register of absences, drawn by `buildNotes.ts` on the Settings screen's build notes.
+ *
+ * ## One entry back, and it is the half of GitHub issue #372 this build does not have
+ *
+ * The sitting posts (`everyday/rushSitting.ts`), the server derives a purse for every round and
+ * answers with it, and **nothing spends one**: a between-round rebuild is the fit-out kit, the code
+ * that turns a kit into a building is `campaign/fitOut.ts` over `commissioning/`, and
+ * `packages/server` may not import either ([§ D606](../../../../DECISIONS.md)). So a player reads
+ * *outlasted 9 waves, which paid 18 into a purse of 18* and there is nowhere to take it, which is
+ * the register's own case — an absence a player can meet, said where the build says what it does
+ * not have. It leaves on the commit that makes it false, as every entry here has.
+ *
+ * The two chime sinks are named in the same breath because they are the same absence from the other
+ * end: `data/chime-ledger.json` sells a wider purse and a fitted start, and neither can be bought,
+ * because a purse that buys nothing is a purchase that changes no run.
+ * `everyday/chimesPanel.ts#CHIMES_PANEL_COPY.spendRefusal` says that on the screen that lists them.
+ */
+export const RUSH_ABSENCES: readonly string[] = Object.freeze([
+  'The between-round purse — the server works out what each round earned and sends it back, and ' +
+    'there is nothing to spend it on: rebuilding the tower between rounds is not built, so a purse ' +
+    'is a record of how far you got rather than a budget. The two rush purchases in the chime list ' +
+    'are the same gap from the other side, and neither can be bought yet.',
+]);
 
 /* -------------------------------------------------------------------------- *
  * The bands — § 9.1, computed off the ramp

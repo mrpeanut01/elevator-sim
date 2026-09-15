@@ -216,8 +216,15 @@ describe('what the screen refuses, and where the refusal sits', () => {
      * #220 built the stream, the held-time stage and the result (§ D515), and the three entries that
      * named them left on that commit. #418 measured the standings (§ D547), and the last entry left
      * on that one. An empty register is a state that keeps being checked, so the case stays.
+     *
+     * **It stopped being empty on GitHub issue #372's commit, and the length is checked rather than
+     * the emptiness**, which is the same case one step along: the entry that refilled it is the
+     * between-round purse, whose units nothing spends (§ D606). What the four `not.toMatch` clauses
+     * still hold is that no entry has *re-acquired* one of the four claims that were deleted — a
+     * register can go back to naming something built only by somebody writing it there, and this
+     * case is what that would fail.
      */
-    expect(RUSH_ABSENCES).toHaveLength(0);
+    expect(RUSH_ABSENCES).toHaveLength(1);
     for (const absence of RUSH_ABSENCES) {
       expect(absence).not.toMatch(/climbing stream|stage of its own|result screen|standings/);
     }

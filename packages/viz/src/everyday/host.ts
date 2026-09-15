@@ -223,6 +223,14 @@ import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import type { DemandBand } from '../fixit/parse.js';
 import { rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
+import {
+  rushRoundRecordOf,
+  rushSittingOf,
+  type RushPostedRound,
+  type RushRoundRecord,
+  type RushSittingBody,
+  type RushSittingCheck,
+} from './rushSitting.js';
 import { REPLAY_COPY, replayBeforeOf, replayPatchOf, replayRestorePatchOf, replayableDay, type ReplayBefore } from './replay.js';
 
 import { campaignDayVerdict, campaignTestRows } from './campaignModel.js';
@@ -424,6 +432,50 @@ export const POST_RUN_NO_SERVER =
   'screen and still in the report — nothing about it is lost.';
 
 /**
+ * **What posting a rush sitting came back with** — GitHub issue #372's fourth criterion, in
+ * {@link EverydayPostOutcome}'s shape and for its reasons.
+ *
+ * The same five states, and the same pair that must never share a sentence: `refused` is this
+ * shell's own judgement made before a request leaves — a sitting whose last round was ended by
+ * hand, a round handed to a dispatcher the board does not ship — and `failed` is the server's or
+ * the transport's, carried as its own words. The difference is whether anything was sent.
+ *
+ * **`posted` carries the server's replay of every round, and it is carried because it is drawn.**
+ * `EverydayPostOutcome` deleted its `boardKey` and `entry` for having no non-test reader, and the
+ * standing requirement that deletion was made under is *name the non-test caller*: this one's is
+ * `everyday/rushPost.ts#rushPostViewOf`, which puts each round's waves and purse on the round list.
+ * The purse figures are the server's derivation of this player's own post
+ * ([§ D543](../../../../DECISIONS.md) clause 5) and nothing in `packages/viz` computes one.
+ *
+ * **What is deliberately not carried is the board key.** The rush route answers
+ * `rush:<building>:<date>` and no placement token, and a key is a string for a switch rather than
+ * for a player — drawing one is the *"The server put it here: personal"* defect GitHub issue #221
+ * records. `rushPost.ts` says the consequence instead, and nothing parses a key.
+ */
+export type EverydayRushPostOutcome =
+  /** No API origin on the page at all. */
+  | { readonly kind: 'no-server'; readonly detail: string }
+  /** There is a server and nobody is signed in. `detail` is `menu/account.ts`'s own sentence. */
+  | { readonly kind: 'signed-out'; readonly detail: string }
+  /** This shell will not post this sitting, and `detail` says which of its own gates refused it. */
+  | { readonly kind: 'refused'; readonly detail: string }
+  /** The request was made and did not succeed. `detail` is the server's sentence, or the client's. */
+  | { readonly kind: 'failed'; readonly detail: string }
+  /** Accepted and replayed, with the server's own figures for every round, in order. */
+  | { readonly kind: 'posted'; readonly rounds: readonly RushPostedRound[] };
+
+/**
+ * Why a press outside a rush is refused — the state a keyboard route can reach and a screen cannot
+ * draw, since the block is only on the rush's own result.
+ *
+ * It is `refused` rather than `no-server` because the fact is about the screen: answering with the
+ * deployment's sentence would send a player looking for a server that is there.
+ */
+export const RUSH_NOT_STANDING =
+  'There is no rush sitting to post. Open Endless rush and play a round out — a sitting is every ' +
+  'round you have played since the building was as shipped.';
+
+/**
  * What a read of today's challenge came back with — GitHub issue #221's third acceptance criterion,
  * *"the daily challenge is reachable without entering the Engineer surface"*.
  *
@@ -588,6 +640,18 @@ export interface EverydayRushSession {
   readonly holdAtS: number | undefined;
   /** Where the player pressed *End the rush*, or where the stage stopped at the line; `undefined` while it plays. */
   readonly endedAtS: number | undefined;
+  /**
+   * **Every round of this sitting that has finished, in order** — GitHub issue #372, and the owner's
+   * ruling of 2026-09-10 that *a round is a sitting, posted whole*.
+   *
+   * A round joins this list when {@link EverydayHost.endRush} fires for the first time on its run,
+   * which is the one moment the state that produced it, its recording and its end are all in hand;
+   * *Run the rush again* opens the next round rather than replacing this one, and leaving the rush
+   * ends the sitting, because *consecutive runs from an as-shipped start* is what a sitting is.
+   */
+  readonly rounds: readonly RushRoundRecord[];
+  /** Whether the rounds so far may be posted — `everyday/rushSitting.ts#rushSittingOf`'s answer. */
+  readonly check: RushSittingCheck;
 }
 
 /** § 6.1's replay in progress — which day of the parked week is being played again (GitHub issue #177 item 1). */
@@ -1331,6 +1395,19 @@ export interface EverydayHost {
    * that gate's own sentence rather than being posted as the player's own work.
    */
   postRun(): Promise<EverydayPostOutcome>;
+  /**
+   * Post the whole rush sitting, and say what happened — GitHub issue #372's fourth criterion.
+   *
+   * {@link postRun}'s contract with a sitting in place of a run, and the one difference is what is
+   * posted: **every round since the rush was entered**, not the one on the stage. The refusals are
+   * made here as well as drawn, on {@link postRun}'s own rule, and the sitting's gate is
+   * `everyday/rushSitting.ts#rushSittingOf` — the same answer {@link EverydayRushSession.check}
+   * carries, so the block and the press cannot come to different conclusions.
+   *
+   * Outside a rush it is `refused`: there is no sitting, and answering `no-server` would blame the
+   * deployment for the screen.
+   */
+  postRushSitting(): Promise<EverydayRushPostOutcome>;
 
   /**
    * Today's challenge and its board — GitHub issue #221's third criterion, *reachable without
@@ -1630,6 +1707,16 @@ export interface EverydayHostBindings {
    */
   readonly postRun?: (() => Promise<EverydayPostOutcome>) | undefined;
   /**
+   * Post a rush sitting — GitHub issue #372's fourth criterion. `undefined` when there is no API
+   * origin, and optional on {@link postRun}'s rule and for its reason.
+   *
+   * It takes the **body** rather than the session, which is the split this seam exists for: this
+   * host decides whether a sitting may travel and what goes on the wire
+   * (`everyday/rushSitting.ts`), and `dev/main.ts` holds the client, the token and the account —
+   * the three things `boundaries.test.ts` will not let a screen or this file hold.
+   */
+  readonly postRushSitting?: ((body: RushSittingBody) => Promise<EverydayRushPostOutcome>) | undefined;
+  /**
    * Today's challenge and its board — GitHub issue #221's third criterion. `undefined` with no API
    * origin, on {@link dailyBoard}'s rule, and optional on {@link postRun}'s.
    */
@@ -1861,6 +1948,10 @@ export function createEverydayHost(
         readonly disclosure: string | undefined;
         readonly hold: { readonly recording: VizRecording; readonly atS: number | undefined } | undefined;
         readonly endedAtS: number | undefined;
+        /** The tower every round of this sitting ran on — read once, at the first press. */
+        readonly buildingId: string;
+        /** The finished rounds — see {@link EverydayRushSession.rounds}. */
+        readonly rounds: readonly RushRoundRecord[];
       }
     | undefined;
   /** The building's profile band, for § D478's line — `fixit/parse.ts#fixitContextOf`'s own lookup. */
@@ -2571,6 +2662,23 @@ export function createEverydayHost(
       const post = b.postRun;
       return post === undefined ? { kind: 'no-server', detail: POST_RUN_NO_SERVER } : post();
     },
+    /*
+     * The sitting's write half — GitHub issue #372. The order of the two gates is deliberate and is
+     * `dev/main.ts#postCurrentRun`'s: the thing that is true of the **page** first, then the thing
+     * that is true of the **sitting**, so a build with no server is told that rather than told its
+     * last round was ended by hand. A sitting that cannot travel is refused here as well as drawn
+     * disabled, which is `postRun`'s own rule about a refusal that exists only in a control.
+     */
+    postRushSitting: async () => {
+      const post = b.postRushSitting;
+      if (post === undefined) return { kind: 'no-server', detail: POST_RUN_NO_SERVER };
+      if (rushSession === undefined) return { kind: 'refused', detail: RUSH_NOT_STANDING };
+      const check = rushSittingOf({ buildingId: rushSession.buildingId, rounds: rushSession.rounds });
+      // All of them, joined: `rushSittingOf` reports every reason on purpose, and a press that
+      // answered with one of four would undo that at the last step (`postCurrentRun`'s own join).
+      if (!check.ok) return { kind: 'refused', detail: check.reasons.join(' ') };
+      return post(check.body);
+    },
     /* Read-only, and the same split. See {@link EverydayHost.challengeToday}. */
     challengeToday: async () => {
       const read = b.challengeToday;
@@ -2675,8 +2783,17 @@ export function createEverydayHost(
           disclosure: rushDisclosureOf(building, bandOf(building)),
           hold: undefined,
           endedAtS: undefined,
+          buildingId: building.id,
+          rounds: [],
         };
       } else {
+        /*
+         * **The rounds survive the press, which is what makes this a sitting** — GitHub issue #372.
+         * *Run the rush again* opens the next round of the same sitting rather than starting a new
+         * one: the rounds already played are what the post carries, and clearing them here would
+         * make every sitting one round long. What is cleared is this round's own end and hold, so
+         * the next `endRush` is a new round's (see `endRush`'s first-end guard).
+         */
         rushSession = { ...rushSession, hold: undefined, endedAtS: undefined };
       }
       /*
@@ -2706,6 +2823,14 @@ export function createEverydayHost(
         disclosure: rushSession.disclosure,
         holdAtS: rushSession.hold?.atS,
         endedAtS: rushSession.endedAtS,
+        rounds: rushSession.rounds,
+        /*
+         * Computed on the read rather than stored, on `drivingProfile`'s opposite ground: this is a
+         * pure fold over a list that changes only when a round ends, and a stored copy would be a
+         * second answer to *may this be posted* that a lane could forget to refresh. No modifiers
+         * are claimed — `rushSitting.ts#rushSittingOf` says why the parameter exists and is empty.
+         */
+        check: rushSittingOf({ buildingId: rushSession.buildingId, rounds: rushSession.rounds }),
       };
     },
     endRush: (atS) => {
@@ -2722,8 +2847,37 @@ export function createEverydayHost(
        * beyond the account's best. Nothing is awaited and nothing is drawn, on `closeDay`'s ground.
        */
       if (!firstEnd) return;
-      const recording = b.state().recording;
+      const state = b.state();
+      const recording = state.recording;
       if (recording === undefined) return;
+      /*
+       * **The round joins the sitting here, and here is the only place it can** — GitHub issue #372.
+       * A round's record needs the state it ran under, the recording it produced and the second it
+       * ended at, and this is the one moment all three are in hand: `startRush` writes a fresh
+       * standing over the state for the next round, so a record taken later would describe the round
+       * after this one. Under the same first-end guard the ledger already uses, for the same reason —
+       * a second end of one run is not a second round.
+       */
+      rushSession = {
+        ...rushSession,
+        rounds: Object.freeze([
+          ...rushSession.rounds,
+          rushRoundRecordOf({
+            state,
+            resources: b.resources,
+            recording,
+            endedAtS: atS,
+            /*
+             * The shelf the stage's own header reads — a saved dispatcher has a name too, and the
+             * round list has to say what the player drove even when that round is the reason the
+             * sitting cannot be posted. The id is the fallback, which is `stageScreen.ts`'s own.
+             */
+            dispatcherName:
+              allDispatchers(b.resources, state.savedDispatchers).find((profile) => profile.id === state.dispatcherId)
+                ?.name ?? state.dispatcherId,
+          }),
+        ]),
+      };
       const waves = rushWavesOutlastedOf(rushOutcomeOf(recording, atS));
       if (waves !== undefined) b.bankCompletion?.({ completion: 'rush-wave-survived', waves });
     },

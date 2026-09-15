@@ -341,4 +341,71 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       await page.close();
     }
   });
+
+  /**
+   * § 2.3's postable result — GitHub issue **#372**, [§ D606](../../../../DECISIONS.md).
+   *
+   * Three things this can only be asked of the drawn document. The **round list** is on the result
+   * screen and names what drove the round — no model test can see that the block reached the page at
+   * all. The **press is refused here for a reason a player can read**: the shipped site is served
+   * with no `<meta name="elevator-sim-api">`, so there is nowhere to post, and § D593's rule is that
+   * a disabled control carries that sentence into the accessibility tree by pointing at the node
+   * already drawn. And the sitting **survives the second round**, which is the whole of what makes it
+   * a sitting rather than a run: *Run the rush again* adds a round rather than replacing one.
+   */
+  it('draws the sitting under the result, lists each round, and refuses the press with a reason — GitHub issue #372', async () => {
+    const page = await coldLoad();
+    try {
+      await leaveTutorialIfOffered(page);
+      await page.locator('.everyday-mode[data-screen="rush"]').click();
+      await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      await page.locator('.everyday-bar-primary').click(); // Start the rush
+      await page.waitForFunction(
+        () => /^WAVE \d+$/u.test(document.querySelector('.everyday-stage-phase')?.textContent ?? ''),
+        undefined,
+        { timeout: 60_000 },
+      );
+      await page.locator('.everyday-bar-primary').click(); // End the rush
+      await page.waitForSelector('.everyday-rush-post', { timeout: 15_000 });
+
+      const first = await page.evaluate(() => {
+        const button = document.querySelector<HTMLButtonElement>('.everyday-rush-post-go');
+        const describedBy = button?.getAttribute('aria-describedby') ?? '';
+        return {
+          rounds: document.querySelectorAll('.everyday-rush-post-round').length,
+          driver: document.querySelector('.everyday-rush-post-round-driver')?.textContent ?? '',
+          name: button?.textContent ?? '',
+          disabled: button?.disabled ?? null,
+          /* The reason the player reads and the description a reader hears are one node. */
+          reason: describedBy === '' ? null : document.getElementById(describedBy)?.textContent ?? null,
+          /* No purse before the server has answered — § D543 clause 5, and nothing here computes one. */
+          purse: document.querySelector('.everyday-rush-post-purse-note'),
+        };
+      });
+      expect(first.rounds).toBe(1);
+      expect(first.driver).toContain('driven by');
+      expect(first.name.length).toBeGreaterThan(0);
+      expect(first.disabled).toBe(true);
+      expect(first.reason, 'a disabled control with no description is § D593’s defect').toContain(
+        'no leaderboard server',
+      );
+      expect(first.purse).toBeNull();
+
+      /* *Run the rush again* opens the next round of the same sitting rather than a new one. */
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForFunction(
+        () => /^WAVE \d+$/u.test(document.querySelector('.everyday-stage-phase')?.textContent ?? ''),
+        undefined,
+        { timeout: 60_000 },
+      );
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-rush-post', { timeout: 15_000 });
+      const second = await page.evaluate(() =>
+        [...document.querySelectorAll('.everyday-rush-post-round-label')].map((node) => node.textContent ?? ''),
+      );
+      expect(second).toEqual(['Round 1', 'Round 2']);
+    } finally {
+      await page.close();
+    }
+  });
 });
