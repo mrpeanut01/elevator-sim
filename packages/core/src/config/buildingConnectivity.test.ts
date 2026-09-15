@@ -581,9 +581,17 @@ describe('the loader refuses to accept an unroutable building in silence', () =>
     expect(tower.warnings.map((warning) => warning.code)).toEqual([]);
   });
 
-  it('leaves all nine shipped buildings loading clean', async () => {
+  it('leaves all eleven shipped buildings loading clean', async () => {
+    /*
+     * **`ashgate` is the one that had to earn this** — GitHub issue #501. It is the first shipped
+     * building whose two banks meet on exactly one floor, so every journey between a car-park deck
+     * and an office is a transfer at `G`, and this model refuses to route one across banks unless
+     * that floor is flagged `isTransferFloor`. A building authored with the restriction and without
+     * the flag strands a third of its own demand quietly, at run time, which is precisely what this
+     * file exists to catch before the loader accepts it.
+     */
     const config = await loadConfig(REAL_DATA_DIR);
-    expect(config.buildings).toHaveLength(9);
+    expect(config.buildings).toHaveLength(11);
     const connectivityCodes: readonly string[] = [
       WARNING_CODES.unreachableFromEntrance,
       WARNING_CODES.unroutableInterfloor,

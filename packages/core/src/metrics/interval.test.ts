@@ -553,8 +553,9 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       .filter((value): value is number => value !== undefined);
 
     // The survey is the whole shipped set, not a subset that happens to prove the point.
-    // 23 since GitHub issue #376 added the Burj-class reference tower's six banks.
-    expect(rows.length, detail).toBe(23);
+    // 23 since GitHub issue #376 added the Burj-class reference tower's six banks, and **26 since
+    // GitHub issues #500 and #501** added `harbour-point/main` and `ashgate`'s two.
+    expect(rows.length, detail).toBe(26);
 
     // 56.5 s — a 26-person hospital car at 2.5 s — against a 29.0 s floor on Midtown Office.
     expect(Math.max(...rows.map((row) => row.maxReopenS)), detail).toBeCloseTo(56.5, 6);
@@ -563,8 +564,16 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       Math.min(...ceilings),
     );
 
-    // Thirteen of the twenty-three sit at or above the fallback, so on those it would split one
+    // Thirteen of the twenty-six sit at or above the fallback, so on those it would split one
     // loading into two departures — the original defect, in the banks the fallback does not cover.
+    //
+    // **The three that landed with the content plan are all safe, and one of them by 0.1 s.**
+    // `ashgate/carpark` reopens at **26.4 s** against a 26.5 s fallback: a 23-person car at the
+    // office 1.2 s, boarding and alighting, lands a tenth of a second under the constant. It is not
+    // tuned to — nothing about that building was chosen against this number — and it is named here
+    // because a margin that thin is the clearest possible statement of this file's own claim. A
+    // transfer time of 1.21 s on that car, or one more person in it, would move it into the list
+    // below; the answer then is `CarTimings` for the building, never a nudged constant.
     // Six of the thirteen arrived together with the Burj-class reference tower (GitHub issue #376),
     // which is every one of its banks: at a 1.75 s transfer and 3 500–4 000 lb cars, a full load's
     // dwell outlasts a one-floor round trip on all six, and on a 165-floor building that is the
