@@ -211,6 +211,41 @@ describe('the cap bites above the declared travel and not below it', () => {
     expect(warningCodes(atCap)).not.toContain(WARNING_CODES.descentCappedByAirPressure);
   });
 
+  it('leaves a car BELOW the cap symmetric, which it did not until § D576', async () => {
+    /*
+     * **The third negative control, and the only one of the three that has ever failed.** GitHub
+     * issue #425's lane, `DECISIONS.md` § D576.
+     *
+     * `airPressureDescentCapMps` says in its own docstring that *"a cap above what the car can do
+     * is still the cap, and whether it binds is the caller's question"* — and the caller,
+     * `descentSpeedOf`, took `min(authored, cap)` and never asked. So a **6 m/s** car on a shaft
+     * above the threshold resolved to `descentSpeedMps: 10`: quicker down than up, on a machine
+     * nobody authored an asymmetry for, and silently — `descent-above-rated-speed` is raised on
+     * `CarConfig.descentSpeedMps` and there was none to raise it on. `sCurve` then really flew it
+     * at 10 m/s downwards, because it reads `descentSpeedMps ?? ratedSpeedMps` by the sign of the
+     * move.
+     *
+     * The two controls above could not see it: one runs a car *above* the cap and one runs a car
+     * *at* it, and the defect lives strictly below. It reached no shipped building — the only three
+     * banks above 300 m of travel all carry 10.0 m/s cars — and was found by authoring a fourth.
+     */
+    const cfg = await load();
+    const slow = { id: 'A', spec: 'gearless-traction', ratedSpeedMps: 6 };
+    // 480 m of travel, well above the threshold, on a car the cap cannot reach down to.
+    expect(
+      resolveCar(slow, cfg.elevatorSpecs, { buildingType: 'office', travelM: 480 })
+        .descentSpeedMps,
+      'a 6 m/s car resolved a 10 m/s descent — it would descend faster than it climbs',
+    ).toBeUndefined();
+    // And the warning stays silent too, because nothing is being capped.
+    const fast = { id: 'B', spec: 'ultra-high-speed', ratedSpeedMps: 14 };
+    expect(
+      resolveCar(fast, cfg.elevatorSpecs, { buildingType: 'office', travelM: 480 })
+        .descentSpeedMps,
+      'the positive control stopped working, so the negative one above means nothing',
+    ).toBe(10);
+  });
+
   it('applies strictly ABOVE the threshold, checked at the boundary itself', () => {
     /*
      * `>` against `>=` is the mistake this shape makes, and a case at 380 m against a threshold
@@ -291,20 +326,60 @@ describe('pressurisation lifts the cap, and its absence does not', () => {
  * The shipped set — byte-identity
  * -------------------------------------------------------------------------- */
 
-describe('every shipped building is symmetric, so no pin moves', () => {
+/**
+ * The shipped banks that are **not** symmetric, and why the exception is a list rather than a
+ * silence — `shift/contracts.test.ts#REFERENCE_ONLY`'s shape, for its reason.
+ *
+ * This describe block read *"every shipped building is symmetric, so no pin moves"* and was true
+ * of every building until 2026-09-15, when GitHub issue #425 landed `ctf-class-reference` — a
+ * tower whose shuttle is authored 20 m/s up and 10 m/s down, which is the whole of what that
+ * building is for (`DECISIONS.md` § D577). So the claim is narrowed rather than deleted: every
+ * shipped car outside this list is still symmetric, every member of this list is asserted to be
+ * asymmetric, and the set is asserted non-empty so the filter cannot quietly become a no-op.
+ */
+const ASYMMETRIC_SHIPPED: ReadonlyMap<string, readonly string[]> = new Map([
+  ['ctf-class-reference', ['shuttle']],
+]);
+
+/**
+ * The shipped banks whose cabins hold pressure, which is a **wider** set than the asymmetric one
+ * and is why the two are separate maps rather than one.
+ *
+ * `shanghai-class-reference`'s shuttle is pressurised and **symmetric**: it is rated 20.5 m/s on a
+ * 418.5 m shaft, so without the equipment the shaft would cap its descent at 10.0 m/s and the
+ * fastest machine in the catalogue would come down at the speed of the slowest supertall shuttle in
+ * the set. Pressurised, it is 20.5 m/s both ways — the purchase buying exactly what
+ * `pressurisedDescentCapMps: null` says it buys. `ctf-class-reference`'s shuttle is pressurised
+ * *and* asymmetric, and its own `$comment` argues why the two go together there.
+ */
+const PRESSURISED_SHIPPED: ReadonlyMap<string, readonly string[]> = new Map([
+  ['ctf-class-reference', ['shuttle']],
+  ['shanghai-class-reference', ['shuttle']],
+]);
+
+describe('every shipped building is symmetric but the one authored not to be', () => {
   it('resolves no descent speed and raises none of the three advisories', async () => {
     const cfg = await load();
     const banks = shippedBanks(cfg);
     expect(banks.length).toBeGreaterThan(10);
 
     for (const [buildingId, building] of cfg.buildingsById) {
+      const asymmetric = ASYMMETRIC_SHIPPED.get(buildingId) ?? [];
+      const pressurised = PRESSURISED_SHIPPED.get(buildingId) ?? [];
       for (const bank of building.banks) {
         for (const car of bank.cars) {
-          expect(
-            car.descentSpeedMps,
-            `${buildingId}/${bank.id}/${car.id} resolved a descent speed; every pinned run in this repository assumes none`,
-          ).toBeUndefined();
-          expect(car.cabinPressurised).toBeUndefined();
+          if (!asymmetric.includes(bank.id)) {
+            expect(
+              car.descentSpeedMps,
+              `${buildingId}/${bank.id}/${car.id} resolved a descent speed; every pinned run in this repository assumes none`,
+            ).toBeUndefined();
+          }
+          if (!pressurised.includes(bank.id)) {
+            expect(
+              car.cabinPressurised,
+              `${buildingId}/${bank.id}/${car.id} fits a pressurised cabin and is not in PRESSURISED_SHIPPED`,
+            ).toBeUndefined();
+          }
         }
       }
       for (const code of [
@@ -317,24 +392,88 @@ describe('every shipped building is symmetric, so no pin moves', () => {
     }
   });
 
-  it('is symmetric because the fastest shipped car is AT the cap, not because nothing is tall', async () => {
+  it('names the exception, and asserts every member of it really is asymmetric', async () => {
     /*
-     * The reason matters, and it is the sentence a future data change will falsify first. Two
-     * shipped banks *are* above the 300 m threshold — `vertical-city`'s shuttle at 307.5 m and
-     * `burj-class-reference`'s at 448.3 m (496 m until GitHub issue #438) — so the cap is reaching them. It does not bite because
-     * every shipped car is rated at or below 10.0 m/s, which is exactly the figure Al-Kodmany
-     * records as the state of the art. Author an 11 m/s shuttle and the row above goes red,
-     * which is correct: the pins really would move.
+     * The exception is asserted rather than merely applied: an empty map, or a member that had
+     * quietly become symmetric, would make the filter above a no-op and the coverage claim would
+     * be back to passing because nothing was checked rather than because everything was.
+     */
+    const cfg = await load();
+    expect(ASYMMETRIC_SHIPPED.size).toBeGreaterThan(0);
+    expect(PRESSURISED_SHIPPED.size).toBeGreaterThan(0);
+    // Every asymmetric bank is pressurised, and the reverse does not hold — which is the whole
+    // difference between the two maps and is asserted rather than left to the docstrings.
+    for (const [buildingId, bankIds] of ASYMMETRIC_SHIPPED) {
+      for (const bankId of bankIds) {
+        expect(PRESSURISED_SHIPPED.get(buildingId) ?? []).toContain(bankId);
+      }
+    }
+    expect(
+      [...PRESSURISED_SHIPPED].flatMap(([id, banks]) => banks.map((bank) => `${id}/${bank}`))
+        .length,
+    ).toBeGreaterThan(
+      [...ASYMMETRIC_SHIPPED].flatMap(([id, banks]) => banks.map((bank) => `${id}/${bank}`)).length,
+    );
+    for (const [buildingId, bankIds] of PRESSURISED_SHIPPED) {
+      const building = cfg.buildingsById.get(buildingId);
+      expect(building, `${buildingId} is excused and does not ship`).toBeDefined();
+      for (const bankId of bankIds) {
+        const bank = building?.banks.find((candidate) => candidate.id === bankId);
+        for (const car of bank?.cars ?? []) {
+          expect(car.cabinPressurised, `${buildingId}/${bankId}/${car.id}`).toBe(true);
+        }
+      }
+    }
+    for (const [buildingId, bankIds] of ASYMMETRIC_SHIPPED) {
+      const building = cfg.buildingsById.get(buildingId);
+      expect(building, `${buildingId} is excused symmetry and does not ship`).toBeDefined();
+      expect(bankIds.length).toBeGreaterThan(0);
+      for (const bankId of bankIds) {
+        const bank = building?.banks.find((candidate) => candidate.id === bankId);
+        expect(bank, `${buildingId}/${bankId}`).toBeDefined();
+        for (const car of bank?.cars ?? []) {
+          expect(car.descentSpeedMps, `${buildingId}/${bankId}/${car.id}`).toBeLessThan(
+            car.ratedSpeedMps,
+          );
+        }
+      }
+    }
+  });
+
+  it('caps no shipped car, because every car above the cap is in a pressurised cabin', async () => {
+    /*
+     * The reason matters, and it is the sentence a data change falsifies first. Five shipped banks
+     * are above the 300 m threshold, so the cap is reaching them. It bites on none, and the reason
+     * changed on 2026-09-15: it used to be that **every shipped car was rated at or below 10.0 m/s**
+     * — Al-Kodmany's own figure for the state of the art — and three towers now go faster
+     * (`ctf-class-reference` at 20.0, `shanghai-class-reference` at 20.5). Every one of those cars
+     * is in a pressurised cabin, which is what `pressurisedDescentCapMps: null` means: no cap at all.
+     *
+     * So the property is stated per bank rather than as one maximum: a tall bank is either slow
+     * enough that the cap cannot reach it, or pressurised. Author an 11 m/s **unpressurised**
+     * shuttle and the first case above goes red, which is correct — the pins really would move.
      */
     const cfg = await load();
     const banks = shippedBanks(cfg);
-    const tall = banks.filter(
-      (bank) => bank.travelM > (cfg.elevatorSpecs.airPressure?.appliesAboveTravelM ?? Infinity),
-    );
+    const threshold = cfg.elevatorSpecs.airPressure?.appliesAboveTravelM ?? Infinity;
+    const capMps = cfg.elevatorSpecs.airPressure?.descentCapMps ?? 0;
+    const tall = banks.filter((bank) => bank.travelM > threshold);
     expect(tall.length).toBeGreaterThan(0);
-    expect(Math.max(...banks.map((bank) => bank.fastestMps))).toBeLessThanOrEqual(
-      cfg.elevatorSpecs.airPressure?.descentCapMps ?? 0,
-    );
+
+    for (const entry of tall) {
+      const cars =
+        cfg.buildingsById
+          .get(entry.buildingId)
+          ?.banks.find((bank) => bank.id === entry.bankId)?.cars ?? [];
+      for (const car of cars) {
+        const held =
+          car.ratedSpeedMps <= capMps || car.cabinPressurised === true;
+        expect(
+          held,
+          `${entry.buildingId}/${entry.bankId}/${car.id} is rated ${String(car.ratedSpeedMps)} m/s on a ${String(Number(entry.travelM.toFixed(1)))} m shaft and is not pressurised`,
+        ).toBe(true);
+      }
+    }
   });
 
   it('runs byte-identically with the airPressure block and without it', async () => {

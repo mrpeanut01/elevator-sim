@@ -34,8 +34,38 @@
  * | `chancery-house` | **reconciles** — a sixth full measurement, on the same apparatus at the same 64 replications | one bank simulated |
  * | `harbour-point` | **reconciles**, on the only other shipped bank `analyzeUpPeak` raises no warning about at all | one bank simulated |
  * | `ashgate` | **reconciles on `main` and is refused on `carpark`** — one building, both verdicts, and the refusal is a throw rather than a sentence | one bank simulated |
+ * | `ctf-class-reference` | **reconciles on `local-low`**, and is refused on two of its other four | one bank simulated |
+ * | `shanghai-class-reference` | **reconciles on `local-hotel`**, and is refused on the other five | one bank simulated |
+ * | `merdeka-class-reference` | **reconciles on `local-hotel`**, and is refused on the other three | one bank simulated |
  * | `crown-hotel` | the closed form is **offered and refuses**, and the refusal is measured rather than asserted | one bank simulated |
  * | `st-jude-hospital` | refused **twice**, and both refusals are arithmetic — no simulation at all | free |
+ *
+ * ## The three reference towers, and the refusal ground this file had never seen
+ *
+ * `ctf-class-reference`, `shanghai-class-reference` and `merdeka-class-reference` are GitHub issues
+ * #425, #424 and #430. Each reconciles on one bank and is refused on its others, and the refusals
+ * fall into three grounds rather than one — which is worth stating because **one of the three is
+ * new to this file**:
+ *
+ * 1. **Zero served population**, the ground `ashgate/carpark` and every supertall shuttle already
+ *    meet: `shanghai-class-reference/shuttle` and `merdeka-class-reference/shuttle` serve a terminal
+ *    and sky lobbies that house nobody.
+ * 2. **`departureGapBracket`**, the ground `st-jude-hospital` meets:
+ *    `ctf-class-reference/local-apartments` is 20-person cars at the residential 1.75 s, so a full
+ *    load's dwell (32.80 s) outlasts a one-floor round trip (29.05 s).
+ * 3. **The run does not deliver everybody inside the drain deadline** — new here, and it is a limit
+ *    of the *apparatus* rather than of the closed form. `measureUpPeak` drives an isolated bank at
+ *    `OVERLOAD_FACTOR × %POP` of its own computed capacity, so a bank with twenty or thirty cars is
+ *    offered a crowd in proportion: `merdeka-class-reference/local-low` is handed **5 695 journeys**
+ *    in 5 400 s and leaves 1 351 of them in the system. Measured, not argued: `ctf-class-reference`'s
+ *    eight-car banks complete and `shanghai-class-reference`'s and `merdeka-class-reference`'s
+ *    twenty-to-thirty-four-car banks do not. **No mechanism is offered for exactly where the
+ *    threshold is** — that would need a sweep over bank sizes, and a plausible sentence in place of a
+ *    measurement is what [§ D256](../../../../DECISIONS.md) refuses.
+ *
+ * So the largest lift group in `data/buildings/` is measurable by this apparatus on its *smallest*
+ * bank and on none of its others, which is a fact about the reconstruction rather than about the
+ * towers.
  *
  * ## The two that landed with the content plan
  *
@@ -217,6 +247,46 @@ const RECONCILED_HERE = 'chancery-house';
 const RECONCILED_HERE_ALSO: readonly string[] = ['harbour-point', 'ashgate'];
 
 /**
+ * The three reference towers of GitHub issues **#425**, **#424** and **#430**, each with the bank
+ * this file reconciles it on.
+ *
+ * A third constant rather than a third entry in {@link RECONCILED_HERE_ALSO}, and the reason is
+ * mechanical: that list is measured on a bank literally called `main`, and none of these towers has
+ * one — a supertall is banks all the way down. Naming the bank per building is also the honest
+ * shape here, because on each of them the bank that reconciles is **not** the one a reader would
+ * pick first: it is the smallest, for the apparatus reason in this file's header.
+ */
+const REFERENCE_TOWERS: readonly { readonly buildingId: string; readonly bankId: string }[] = [
+  { buildingId: 'ctf-class-reference', bankId: 'local-low' },
+  { buildingId: 'shanghai-class-reference', bankId: 'local-hotel' },
+  { buildingId: 'merdeka-class-reference', bankId: 'local-hotel' },
+];
+
+/**
+ * The banks of those three the closed form is offered and **throws** on, with the ground each meets.
+ *
+ * Asserted rather than described, on `st-jude-hospital`'s precedent at the bottom of this file and
+ * on `CLAUDE.md` § *A stated refusal goes stale the same way*: every one of these is liftable — by a
+ * population above a shuttle's terminal, by a door timing, or by an apparatus that does not have to
+ * drain the run — which is what makes asserting them worth anything.
+ */
+const REFUSED_BANKS: readonly {
+  readonly buildingId: string;
+  readonly bankId: string;
+  readonly ground: RegExp;
+}[] = [
+  // Zero served population — the ground `ashgate/carpark` meets.
+  { buildingId: 'shanghai-class-reference', bankId: 'shuttle', ground: /no populated floor above its terminal|no up-peak to analyse|finite, positive number/i },
+  { buildingId: 'merdeka-class-reference', bankId: 'shuttle', ground: /no populated floor above its terminal|no up-peak to analyse|finite, positive number/i },
+  // `departureGapBracket` — the ground `st-jude-hospital` meets.
+  { buildingId: 'ctf-class-reference', bankId: 'local-apartments', ground: /not shorter than/i },
+  // The apparatus cannot drain the crowd it offers a bank this large — new to this file.
+  { buildingId: 'shanghai-class-reference', bankId: 'local-1', ground: /did not deliver everybody/i },
+  { buildingId: 'merdeka-class-reference', bankId: 'local-low', ground: /did not deliver everybody/i },
+  { buildingId: 'merdeka-class-reference', bankId: 'local-high', ground: /did not deliver everybody/i },
+];
+
+/**
  * The bank of a shipped building the closed form is offered and **throws** on, and why.
  *
  * `ashgate`'s car-park lift serves `B2`, `B1` and `G`. All three carry zero population — a parking
@@ -326,17 +396,25 @@ const reconciliations = new Map<string, RoundTripReconciliation>();
 
 beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
-  for (const buildingId of [RECONCILED_HERE, 'crown-hotel', ...RECONCILED_HERE_ALSO]) {
-    const measurement = measureUpPeak({
-      config,
+  const cells: readonly { readonly key: string; readonly buildingId: string; readonly bankId: string }[] = [
+    ...[RECONCILED_HERE, 'crown-hotel', ...RECONCILED_HERE_ALSO].map((buildingId) => ({
+      key: buildingId,
       buildingId,
       bankId: 'main',
+    })),
+    ...REFERENCE_TOWERS.map((entry) => ({ key: entry.buildingId, ...entry })),
+  ];
+  for (const cell of cells) {
+    const measurement = measureUpPeak({
+      config,
+      buildingId: cell.buildingId,
+      bankId: cell.bankId,
       seeds: SEEDS,
       peakWindowS: PEAK_WINDOW_S,
     });
-    measurements.set(buildingId, measurement);
+    measurements.set(cell.key, measurement);
     reconciliations.set(
-      buildingId,
+      cell.key,
       reconcileRoundTrip({
         // `CLOSED_FORM_COMPARISON_RULE.precondition`: the closed form re-evaluated at the load the
         // simulator actually carried, never at 0.8 × capacity.
@@ -365,7 +443,21 @@ beforeAll(async () => {
       measured: uniform.measured,
     }),
   );
-}, 900_000);
+  /*
+   * **The hook's budget, raised from 900 000 ms on 2026-09-15 and not by guesswork.** This
+   * `beforeAll` measured four cells plus the Crown Hotel counterfactual; GitHub issues #425, #424
+   * and #430 took it to eight, each 64 replications of a 5 400 s window. Measured on this tree it
+   * costs **449 s** running alone and **978 s** inside a full `--project experiments` run, where the
+   * old ceiling cut it off and reported all 34 cases as skipped — a hook timeout that reads as a
+   * file-level failure and says nothing about any assertion.
+   *
+   * Raised rather than reduced, which is `deepCampaign.test.ts`'s rule and this file's own: the
+   * replication budget is `fiveBuildings.test.ts`'s and a budget quietly cut to fit a window is a
+   * weakened criterion that still gets published. 3 000 000 ms is about three times the loaded
+   * measurement, which is the headroom `vitest.config.ts` says this suite actually needs — it runs
+   * on a machine hosting several parallel worktrees by design.
+   */
+}, 3_000_000);
 
 function measurementOf(buildingId: string): UpPeakMeasurement {
   const measurement = measurements.get(buildingId);
@@ -390,6 +482,7 @@ describe('every shipped building is accounted for by exactly one closed-form ver
       ...RECONCILED_IN_THE_FIVE_BUILDING_TABLE,
       RECONCILED_HERE,
       ...RECONCILED_HERE_ALSO,
+      ...REFERENCE_TOWERS.map((entry) => entry.buildingId),
       ...REFUSED_HERE,
       ...OWED_ELSEWHERE,
     ].sort();
@@ -685,6 +778,103 @@ describe('Ashgate Mixed-Use — one building, both verdicts', () => {
     expect(building?.banks.map((bank) => bank.cars.length)).toEqual([4, 1]);
     const carpark = building?.banks.find((bank) => bank.id === REFUSED_BANK.bankId);
     expect([...(carpark?.servesFloors ?? [])].sort()).toEqual(['B1', 'B2', 'G']);
+  });
+});
+
+/* ========================================================================== *
+ * 1c. The three reference towers — one verdict each way, on every one of them.
+ * ========================================================================== */
+
+describe('the three reference towers each reconcile on one bank and are refused on their others', () => {
+  it.each(REFERENCE_TOWERS.map((entry) => [entry.buildingId, entry] as const))(
+    '%s reconciles, and the residual is what no documented simplification explains',
+    (buildingId, entry) => {
+      /*
+       * Measured at n = 64 from seed 810 000, the apparatus the five-building table runs:
+       *
+       * | bank | raw | residual | trips (full / all) |
+       * |---|---|---|---|
+       * | `ctf-class-reference/local-low` | **+48.935 %** | **−0.031 %** | 845 / 1 681 |
+       * | `shanghai-class-reference/local-hotel` | **+34.983 %** | **−0.209 %** | 2 003 / 2 908 |
+       * | `merdeka-class-reference/local-hotel` | **+34.485 %** | **−0.466 %** | 1 435 / 2 090 |
+       *
+       * All three inside a 4 % tolerance, and all three of the same sign as every other reconciled
+       * bank — the closed form reads *fast*, which is what `CLOSED_FORM_COMPARISON_RULE` predicts
+       * because everything it omits only ever adds seconds.
+       */
+      const m = measurementOf(buildingId);
+      expect(m.replications).toBe(REPLICATIONS);
+      expect(m.allSaturated, `${buildingId}/${entry.bankId} did not saturate`).toBe(true);
+      expect(m.tripCountFull).toBeGreaterThan(200);
+
+      const r = reconciliationOf(buildingId);
+      expect(r.warnings).toEqual([]);
+      expect(r.explained).toBe(true);
+      expect(Math.abs(r.residual)).toBeLessThan(DEFAULT_RESIDUAL_TOLERANCE);
+
+      // One-sided, and checked rather than assumed: a correction that could remove seconds would
+      // let two errors cancel, and then the accounting would be a fit.
+      for (const term of r.terms) {
+        for (const id of term.assumptionIds) {
+          expect(CLOSED_FORM_ASSUMPTIONS.find((item) => item.id === id)?.bias).toBe('under');
+        }
+      }
+      // And the simulator is slower than the textbook, which is the direction the rule predicts.
+      expect(m.measured.roundTripS.mean).toBeGreaterThan(m.matched.result.roundTripTimeS);
+    },
+  );
+
+  it.each(
+    REFUSED_BANKS.map((entry) => [`${entry.buildingId}/${entry.bankId}`, entry] as const),
+  )('%s is refused by a throw rather than by a sentence', (label, entry) => {
+    /*
+     * Three grounds, and the header says which is which. Every one of them is liftable, which is
+     * what makes asserting it worth anything (`CLAUDE.md` § *A stated refusal goes stale the same
+     * way*): author a population above a shuttle's terminal, change a door timing, or reconstruct
+     * departures from car motion rather than from boarding times.
+     *
+     * One seed rather than sixty-four: a refusal that is decided from the configuration does not
+     * need a budget, and a refusal that is decided mid-run fires on the first replication that
+     * meets it.
+     */
+    expect(() =>
+      measureUpPeak({
+        config,
+        buildingId: entry.buildingId,
+        bankId: entry.bankId,
+        seeds: [FIRST_SEED],
+        peakWindowS: PEAK_WINDOW_S,
+      }),
+      `${label} now reduces — this file says it cannot`,
+    ).toThrow(entry.ground);
+  });
+
+  it('is the only shipped building whose cars are not one speed, and the oracle says so', () => {
+    /*
+     * **GitHub issue #425's own question, answered against this apparatus rather than against a
+     * document.** `analyzeUpPeak` raises `directionalSpeedAsymmetry` on `ctf-class-reference`'s
+     * shuttle and on no other shipped bank, and `CLOSED_FORM_ASSUMPTIONS`' `symmetric-speed` entry
+     * is the divergence it points at. That entry is `bias: 'under'` — the expression charges one
+     * `tv` twice, so a slower descent can only add seconds to the return half.
+     *
+     * The bank itself is **refused** by the apparatus above, on the drain ground, so this file
+     * publishes no residual for it. That is the honest outcome and it is stated rather than worked
+     * around: the warning is what a reader gets, and a reader who wants the number needs a
+     * different apparatus.
+     */
+    const ctf = config.buildingsById.get('ctf-class-reference');
+    expect(ctf).toBeDefined();
+    const asymmetric = (ctf?.banks ?? []).filter((bank) =>
+      bank.cars.some((car) => car.descentSpeedMps !== undefined),
+    );
+    expect(asymmetric.map((bank) => bank.id)).toEqual(['shuttle']);
+    for (const car of asymmetric[0]?.cars ?? []) {
+      expect(car.ratedSpeedMps).toBe(20);
+      expect(car.descentSpeedMps).toBe(10);
+    }
+    const entry = CLOSED_FORM_ASSUMPTIONS.find((item) => item.id === 'symmetric-speed');
+    expect(entry?.bias).toBe('under');
+    expect(CLOSED_FORM_COMPARISON_RULE.oneSidedUnderIds).toContain('symmetric-speed');
   });
 });
 

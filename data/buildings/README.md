@@ -34,6 +34,9 @@ Adding the file alone turns the suite red, which is the intended way to find out
 | Burj-class reference tower | [`burj-class-reference.json`](burj-class-reference.json) | Complete — 165 levels, 57 cars, **reference only**: no Career contract, and the stage cannot draw it |
 | Harbour Point | [`harbour-point.json`](harbour-point.json) | Complete — the group that cannot cope: one bank, six cars, over-subscribed as built |
 | Ashgate Mixed-Use | [`ashgate.json`](ashgate.json) | Complete — negative-index basements, and one of five cars reaching them |
+| CTF-class reference tower | [`ctf-class-reference.json`](ctf-class-reference.json) | Complete — 20 m/s up and **10 m/s down**, the only shipped building with an asymmetric car |
+| Shanghai-class reference tower | [`shanghai-class-reference.json`](shanghai-class-reference.json) | Complete — 20.5 m/s, the top of the speed catalogue, and 106 cars over six banks |
+| Merdeka-class reference tower | [`merdeka-class-reference.json`](merdeka-class-reference.json) | Complete — one sky lobby over a 562 m rise: fifty-six office floors are one leg from the street |
 
 ## Schema
 
@@ -295,9 +298,17 @@ therefore why no single departure-clustering constant can serve every building.
 
 ## Descent speed and cabin pressurisation
 
-Two optional car fields, GitHub issue #444. Omit both — and every shipped building does — for a car
-that descends exactly as fast as it climbs, which is the model this project ran on until they
-existed and is what every pinned run still runs.
+Two optional car fields, GitHub issue #444. Omit both for a car that descends exactly as fast as it
+climbs, which is the model this project ran on until they existed and is what every pinned run still
+runs.
+
+**Every shipped building omitted both until 2026-09-15**, and two no longer do
+([§ D576](../../DECISIONS.md)–[§ D578](../../DECISIONS.md)):
+`ctf-class-reference`'s shuttle declares `descentSpeedMps: 10.0` against a rated 20.0 and
+`shanghai-class-reference`'s declares `cabinPressurised` against a rated 20.5, and both are named in
+`config/descentCap.test.ts`'s `ASYMMETRIC_SHIPPED` and `PRESSURISED_SHIPPED` so the exception is a
+list rather than a silence. Every other car in `data/buildings/` is still symmetric and
+unpressurised, and that file asserts it in both directions.
 
 ```json
 { "id": "S1", "spec": "ultra-high-speed", "ratedSpeedMps": 14.0, "cabinPressurised": true }
@@ -317,6 +328,30 @@ Three advisory warnings come out of it, and each names a state that is legal and
 the author meant: `descent-capped-by-air-pressure` (the cap is biting on this car),
 `descent-above-rated-speed` (a car quicker down than up — legal, and no reference asymmetry is of
 that sign) and `pressurisation-buys-nothing` (a cabin fitted where nothing was capping it).
+
+## The rope, and the only travel ceiling that refuses
+
+```json
+{ "id": "observation", "servesFloors": ["G", "154"], "ropeClass": "carbon-fibre", "cars": [] }
+```
+
+| Field | On | Meaning |
+|---|---|---|
+| `ropeClass` | bank | Which class of hoisting rope the shaft is roped in, an id from `elevator-specs.json#ropeClasses.classes`. **Absent means the rope is not modelled**, which is what every shipped building does. |
+
+Declaring one does two things and no third ([`DECISIONS.md` § D583](../../DECISIONS.md), GitHub
+issue #433). The class's `maxSingleTravelM` becomes a **hard refusal** — a bank that spans further
+fails to load with `rope-travel-exceeds-class`, because Al-Kodmany § 2.1.5's limit is a rope that
+cannot support its own weight rather than an envelope a designer may knowingly exceed. And the
+rope's mass, `massKgPerMOfTravel × the bank's own travel`, joins the moving mass the energy proxy
+sees, which moves `energyKJ` and `workPerServedLegKJ` and **never a leg**: nothing a dispatcher, a
+car or `Car.estimateCost()` reads is touched.
+
+This is the **only** hard ceiling on a hoistway's travel in this repository. A lift class's own
+`maxRiseM` stays advisory (`rise-exceeds-class`) — hardening it would refuse `midtown-office` at
+76.9 m against 76 m, and the product owner re-asked and reversed that on 2026-09-10. One warning
+comes out of the rope: `rope-class-buys-nothing`, a class declared where the data directory carries
+no `ropeClasses` block at all.
 
 ## Double-deck cars
 

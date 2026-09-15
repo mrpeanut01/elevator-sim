@@ -91,7 +91,7 @@ function runJson(buildingId: string, share: number | undefined, seed: bigint = S
 }
 
 describe('a building with no access zones is byte-identical at every share', () => {
-  it('names the six buildings from disk rather than from a list', () => {
+  it('names the nine buildings from disk rather than from a list', () => {
     // Derived, so a building that declares no zones joins this guard by existing — the
     // hand-written-list defect § D152 closed, applied to a fixture set. **It worked**: `ashgate`
     // and `harbour-point` landed on 2026-09-14 declaring no access zones (GitHub issues #500,
@@ -101,9 +101,12 @@ describe('a building with no access zones is byte-identical at every share', () 
       'ashgate',
       'burj-class-reference',
       'chancery-house',
+      'ctf-class-reference',
       'garden-apartments',
       'harbour-point',
+      'merdeka-class-reference',
       'midtown-office',
+      'shanghai-class-reference',
     ]);
     expect(zoned.length).toBe(5);
   });

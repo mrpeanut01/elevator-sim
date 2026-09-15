@@ -664,12 +664,13 @@ collapses its round trip onto the textbook figure at −0.4 %.
 #### The five shipped buildings the table above does not reach
 
 The table is five buildings because it was written when five shipped. The set went to eight
-([§ D213](../DECISIONS.md)), to nine with the Burj-class reference tower, and to **eleven** with
-`harbour-point` and `ashgate` ([§ D572](../DECISIONS.md), [§ D573](../DECISIONS.md)), and the table
-was never extended — which is what GitHub issue #232's third acceptance criterion, *"a closed-form
-round-trip-time check like the existing five"*, is really asking about.
-`oracle/remainingBuildings.test.ts` closes five of the six, and they are four different kinds of
-answer rather than five more rows:
+([§ D213](../DECISIONS.md)), to nine with the Burj-class reference tower, to **eleven** with
+`harbour-point` and `ashgate` ([§ D572](../DECISIONS.md), [§ D573](../DECISIONS.md)), and to
+**fourteen** with the three reference towers of GitHub issues #425, #424 and #430
+([§ D577](../DECISIONS.md)–[§ D579](../DECISIONS.md)), and the table was never extended — which is
+what GitHub issue #232's third acceptance criterion, *"a closed-form round-trip-time check like the
+existing five"*, is really asking about. `oracle/remainingBuildings.test.ts` closes eight of the
+nine, and they are five different kinds of answer rather than eight more rows:
 
 | building | verdict | measured |
 |---|---|---|
@@ -678,6 +679,18 @@ answer rather than five more rows:
 | `ashgate` | **BOTH AT ONCE** — `main` reconciled, `carpark` refused | `main`: raw **+31.21 %**, residual **−0.26 %**, `explained`, with `nonUniformFloorPopulations`, `nonUniformInterfloorDistance` and `expressZone` declared as a set. `carpark`: **throws** — two unpopulated parking decks and a transfer floor, so there is no populated floor above the terminal and no up-peak to price |
 | `crown-hotel` | **REFUSED, by a run** | the apparatus is carried to the end rather than declined: raw +36.513 %, residual **+7.592 %** against the 4 % band, `explained: false` |
 | `st-jude-hospital` | **REFUSED TWICE, for free** | `heterogeneousGroup`, and a longest door reopen of 53.20 s against a shortest round trip of 29.56 s — no simulation runs |
+| `ctf-class-reference` | **THREE RECONCILED, TWO REFUSED**, and the asymmetric bank is one of the two | `local-low` raw +48.935 % / residual **−0.031 %**; `local-mid` +54.025 % / **−0.309 %**; `local-hotel` +35.066 % / **−0.066 %**. `local-apartments` throws on `departureGapBracket`; the **shuttle** throws on the drain ground below. So the one shipped bank whose cars are not one speed publishes no residual, and what a reader gets instead is `directionalSpeedAsymmetry` |
+| `shanghai-class-reference` | **ONE RECONCILED, FIVE REFUSED** | `local-hotel` raw +34.983 % / residual **−0.209 %**. The shuttle throws on a zero served population; `local-1`–`local-4` throw on the drain ground |
+| `merdeka-class-reference` | **ONE RECONCILED, THREE REFUSED** | `local-hotel` raw +34.485 % / residual **−0.466 %**, with `expressZone`, `nonUniformFloorPopulations` and `nonUniformInterfloorDistance` declared. The shuttle throws on a zero served population; `local-low` and `local-high` on the drain ground |
+
+**The drain ground is new, and it is the apparatus rather than the closed form.** `measureUpPeak`
+drives an isolated bank at `OVERLOAD_FACTOR × %POP` of its own computed capacity, so a bank with
+twenty or thirty cars is offered a crowd in proportion — `merdeka-class-reference/local-low` is
+handed **5 695 journeys** in 5 400 s and leaves 1 351 of them in the system when the run stops. So
+the largest lift group in `data/buildings/` is measurable on its **smallest** bank and on none of its
+others. **Where the threshold lies is unmeasured** and no mechanism is offered for it: that needs a
+sweep over bank sizes, and a plausible sentence in place of a measurement is what
+[§ D256](../DECISIONS.md) refuses.
 
 **Chancery House being the cleanest case in the shipped set and the one with no check is the finding
 rather than a detail.** Nineteen floors, six identical cars, one bank, uniform populations, uniform

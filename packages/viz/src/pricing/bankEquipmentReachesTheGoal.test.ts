@@ -318,3 +318,93 @@ describe('a scenario repair reaches the run through fixit/run.ts (§ D219)', () 
     );
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * The rope — GitHub issue #433, DECISIONS.md § D583
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **A third per-bank equipment setting, and it is the one whose wrong value refuses the building.**
+ *
+ * The rope is priced, reaches the run through the same `bankEquipment` patch, moves `energyKJ` and
+ * `workPerServedLegKJ`, and moves no leg — § D539's shape, and the blocks below are that file's
+ * blocks pointed at `ropeClass`. What is new is the last one: a rope's `maxSingleTravelM` is the only
+ * **hard** ceiling on a hoistway's travel in this project, so a patch that ropes a supertall in
+ * something too short does not produce a worse run, it produces no run at all. That is the
+ * constraint GitHub issue #433 exists to add, asserted from the player's own seam rather than from
+ * the loader's.
+ *
+ * **The price had to fit through the seam, and finding that out is what fixed it.** Drafted at 20 u
+ * — the dearest building-tier figure that leaves that tier's derived typical at 20 — both blocks
+ * below came back with the two arms *byte-identical*, which reads exactly like a rope that binds
+ * nothing. It was not: `toggleRepair` refuses a repair the case cannot afford, and `docs/35` § 10.2
+ * caps a fix-a-building case's budget at 16 u. So the row ships at **16**, the dearest figure that
+ * clears both constraints, and this paragraph is here because the failure mode it produced is
+ * indistinguishable from a dead seam at a glance. `new-car` (34 u) and `fifth-car` (54 u) stay
+ * deliberately unaffordable here, which is `repairPrice.ts`'s own sentence and not this row's
+ * problem.
+ */
+const ROPED_STEEL = { building: { bankEquipment: [{ bankIds: ['*'], set: { ropeClass: 'steel' } }] } };
+const ROPED_CARBON = {
+  building: { bankEquipment: [{ bankIds: ['*'], set: { ropeClass: 'carbon-fibre' } }] },
+};
+
+describe('the rope is priced by the schedule at the building tier', () => {
+  it('finds one row by the path its patch produces, and prices it above nothing', () => {
+    expect(pathsIn(ROPED_STEEL)).toEqual(['building.bankEquipment[].set.ropeClass']);
+    const rope = changesBought(shippedPriceSchedule(), ROPED_STEEL);
+    expect(rope.map((change) => change.id)).toEqual(['rope-upgrade']);
+    expect(rope[0]?.tier).toBe('building');
+    expect(rope[0]?.priceUnits).toBeGreaterThan(0);
+    // One row for every class, deliberately (§ D583): a dearer rope is not a dearer row here, and a
+    // second row covering this path would fail `schedule.test.ts` rather than this line.
+    expect(changesBought(shippedPriceSchedule(), ROPED_CARBON).map((c) => c.id)).toEqual([
+      'rope-upgrade',
+    ]);
+  });
+});
+
+describe('a rope reaches the run through fixit/run.ts, and the ceiling refuses one that cannot', () => {
+  it('writes the rope onto every bank, moves the energy, and moves no leg', () => {
+    const both = arms(caseWith(ROPED_STEEL));
+    expect(legsOf(both.with)).toBe(legsOf(both.without));
+    const before = both.without.recording.summary.energy.workKJ ?? Number.NaN;
+    const after = both.with.recording.summary.energy.workKJ ?? Number.NaN;
+    // Heavier than no rope at all, because a rope that is there has to be got moving and stopped.
+    expect(after).toBeGreaterThan(before);
+  });
+
+  it('charges less for a carbon rope than for a steel one, on the same legs', () => {
+    const steel = arms(caseWith(ROPED_STEEL));
+    const carbon = arms(caseWith(ROPED_CARBON));
+    expect(legsOf(carbon.with)).toBe(legsOf(steel.with));
+    expect(carbon.with.recording.summary.energy.workKJ ?? Number.NaN).toBeLessThan(
+      steel.with.recording.summary.energy.workKJ ?? Number.NaN,
+    );
+  });
+
+  it('refuses the building outright when the rope cannot reach the shaft', () => {
+    // `burj-class-reference`'s observation hoistway runs 452.0 m. Every shipped rope reaches it —
+    // that is the measurement `core`'s `config/rope.test.ts` publishes — so the refusal is produced
+    // by a rope the data directory would have to shorten, and the case is made against a shaft that
+    // genuinely cannot be roped in it. Asserted through `resolveBuilding`, which is what
+    // `fixitRunPlanOf` calls: the patch writes the field and the loader decides.
+    const specs = structuredClone(resources.elevatorSpecs) as unknown as {
+      ropeClasses?: { classes: { id: string; maxSingleTravelM: number }[] };
+    };
+    const steel = specs.ropeClasses?.classes.find((entry) => entry.id === 'steel');
+    if (steel === undefined) throw new Error('the shipped specs carry no steel rope');
+    steel.maxSingleTravelM = 200;
+    const entry = resources.entries.find((candidate) => candidate.config.id === 'burj-class-reference');
+    if (entry === undefined) throw new Error('no burj-class-reference');
+    const document = structuredClone(entry.config) as BuildingConfig;
+    const banks = document.banks.map((bank) => ({ ...bank, ropeClass: 'steel' }));
+    expect(() =>
+      resolveBuilding(
+        parseBuilding({ ...document, banks }, 'burj-class-reference.json'),
+        specs as never,
+        { file: 'burj-class-reference.json', trafficProfileIds: resources.trafficProfileIds },
+      ),
+    ).toThrow(/cannot hang further than 200 m/);
+  });
+});

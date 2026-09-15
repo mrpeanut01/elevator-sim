@@ -130,8 +130,9 @@ reverting is still in the history and the run is still in the log.
 ## 3. Rollback
 
 > **The rollback is [`docs/16-static-site-deployment.md`](16-static-site-deployment.md) § 11 and is
-> not repeated here.** That section is the procedure; this one exists to say three things about it
-> that an operator needs before they open it.
+> not repeated here.** That section is the procedure; this one exists to say four things about it
+> that an operator needs before they open it, and to point at the one-second rehearsal that checks
+> the half of it a checkout can check.
 
 **One — the disarm command is not the rollback, and reaching for it makes an incident permanent.**
 `gh variable delete AZURE_SWA_NAME` stops every *future* deploy. The page a player is loading is
@@ -149,11 +150,30 @@ has their saved week cleared, and reverting forward again does not bring it back
 command that checks for this. That is a decision for a human, and it is why the procedure does not
 end in a single command.
 
-**And the thing an operator should know before they rely on any of it: no step of § 11 has ever been
-run.** § 11.5 says so in terms — it is derived from the workflows and the scripts and from nothing
-observed, including the time it takes. An incident procedure whose duration is unknown is a procedure
-nobody can plan around. Rehearsing it is #241 AC2, #242 AC4 and #243 AC4, and it needs the live
-resources; **this document does not close that, and says so rather than reading as though it had.**
+**Four — the range form of the revert can abort part-way, and leave a partial revert staged.**
+`git revert --no-commit $target..main` refuses a merge commit. **Measured**: it reverts the commits
+*newer* than the merge, leaves them staged, and only then exits — with no sequencer state, so there
+is nothing to `--continue` or `--abort`, and the next command in § 11.2 is `git commit`. In an
+incident that is a green deploy of a half-reverted tree. Before you type any of it, run
+
+```sh
+node scripts/rehearse-revert.mjs "$target"
+```
+
+which does steps 0 and 2 in a throwaway clone — no credential, no network, nothing live — and
+reports the merges in the range, whether the revert applies, whether the tree comparison is empty,
+whether the revert crosses a saved-session bump, and what build line the page will show afterwards.
+It costs about a second and it is the cheapest thing in this document.
+
+**And the thing an operator should know before they rely on the rest of it: the half that touches
+production has never been run.** § 11.5 splits the procedure and says which is which. The git half —
+steps 0 and 2 — was rehearsed on 2026-09-15 over three ranges with a negative control, and found two
+failure modes the reasoning had not named, including the one above. **The upload, the branch policy,
+the propagation time, the API half and the save-clearing in a real browser are still derived from
+the workflows and from nothing observed, including how long any of it takes.** An incident procedure
+whose duration is unknown is a procedure nobody can plan around. That production half is #241 AC2,
+#242 AC4 and #243 AC4; it needs the live resources, and **this document does not close it and says
+so rather than reading as though it had.**
 
 ### The API side
 
@@ -176,7 +196,13 @@ What is needed, and it is one rule:
 - **Condition**: any line containing `elevator-sim-fault`. That literal is the whole contract; it is
   asserted as a literal by `packages/server/src/errors/faults.test.ts` and by a spawned process in
   `packages/server/src/http/boot.test.ts`, precisely so that a rule written against the text cannot
-  be silently broken by a refactor.
+  be silently broken by a refactor. **And the literal *on this page* is pinned to the one in the
+  code**, in both directions, by
+  `packages/experiments/src/validation/runbookMarker.test.ts` — including § 2 step 3's `at`
+  vocabulary, so a fifth kind of fault cannot arrive without this document naming it. A rule is
+  typed out of this document rather than out of the source, and until that guard existed a wave
+  could have moved the marker, updated the server's tests in the same commit, and left this page
+  specifying a rule that matches nothing, with nothing red anywhere.
 - **A second, tighter rule is worth having**: `elevator-sim-fault at=boot`, at any count above zero.
   A boot fault means the revision did not come up.
 - **Destination**: a human. This repository has no opinion about which channel, and no credentials
@@ -191,6 +217,15 @@ section are what they update.
 uses is available in production terms — a revision started with a bad configuration exits 1 and
 writes `elevator-sim-fault at=boot kind=Error` before it goes. That is a real error, triggered on
 purpose, and it is what AC3's *verified alert path* means once there is a path to verify.
+
+**The line above is re-derived rather than quoted from memory**, which matters because an alert rule
+will be written against it character by character. `packages/server/src/http/boot.test.ts` spawns the
+**built** entry point, makes it fail for real, and asserts that exact string on standard error — and
+that it appears **once**, so a rule keyed on the marker counts one incident rather than three. Run
+again on 2026-09-15 against the tree at `fb15704`, green; the record is
+[`docs/42-launch-record.md`](42-launch-record.md). **It is still not a verified alert path**: what
+was verified is that the process emits the line, and AC3 asks whether a line reaches a person.
+Nothing here can answer that, because nothing here can create the rule.
 
 ---
 
@@ -213,6 +248,18 @@ reports and chooses none, marked for professional review; § 16.2's retention ro
 **DRAFTED** and blank; and § 13.4's second obligation requires a horizon *before* the feature ships.
 Sending would mean answering, by writing code, a question this repository has written down as not its
 own to answer.
+
+**The refusal has an id, and a named thing it waits on, so that it can be discharged rather than
+quietly forgotten.** It is [§ D588](../DECISIONS.md), and what it waits on is
+[`docs/26`](26-telemetry-and-privacy.md) **§ 19 item 6** — *the lawful basis for telemetry (S12) and
+for error reports (S14), options A–D, and whether they may differ from each other* — which that
+document's own register already carries as the product owner's, not this module's. #242's first
+acceptance criterion is **refused on that basis and not omitted**: an omission would read, to the
+next person who looks, as work nobody got to. One half of the same register has moved, and § D588
+records it: § 19 **item 18** said the error-report horizon could mean nothing until #242's runbook
+existed and named a severity model and a first response. This document is that runbook, so the
+precondition is discharged and the row is now blank because nobody has filled it rather than because
+nothing could.
 
 **And the consent next door is not a way round it.** The telemetry recorder has a transport, a
 batcher and a consent slot. Routing error reports through them would be quiet in the worst way: a
@@ -264,8 +311,9 @@ classification — and it is the price of the destination.
 Named rather than left to be discovered.
 
 1. **The alert rule** (§ 4). Not armed, needs a subscription.
-2. **A rehearsal of the rollback** (§ 3). No step of `docs/16` § 11 has been run, including its
-   duration.
+2. **A rehearsal of the rollback against production** (§ 3). The git half of `docs/16` § 11 —
+   steps 0 and 2 — was rehearsed on 2026-09-15 by `scripts/rehearse-revert.mjs`. The half that
+   touches the live site has still been run by nothing, including its duration.
 3. **Client faults reaching a server** (§ 5). Needs a ruling, not a commit.
 4. **A page for the API's own health** beyond the fault lines. No uptime check, no synthetic request,
    no dashboard. `GET /api/wake` exists and nothing calls it on a schedule except a player's browser.

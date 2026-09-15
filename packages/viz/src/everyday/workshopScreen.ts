@@ -187,6 +187,17 @@ function toggle(doc: Document, on: boolean, label: string, onPress: () => void):
  */
 const WORKSHOP_RAIL_PX = 300;
 
+/**
+ * The `id` § 11.4's inert sentence is written under, so the eleven controls it is about can point at
+ * it — see {@link drawSwitching}'s block for the argument, GitHub issue #406.
+ *
+ * A constant rather than a literal in two places: the write and the two references are eighty lines
+ * apart, and an `aria-describedby` whose target does not exist is a description a reader never
+ * hears and nothing in the page complains about. axe's `aria-valid-attr-value` would catch a
+ * dangling one, which is the other half of why this is safe to do at all.
+ */
+const INERT_NOTE_ID = 'everyday-workshop-switching-inert-note';
+
 function mountWorkshop(
   host: HTMLElement,
   context: EverydayScreenShellContext,
@@ -592,10 +603,30 @@ function mountWorkshop(
     policy.style.cssText = `${NOTE};margin:0 0 10px`;
     wrap.append(policy);
 
+    /**
+     * **The reason the block below is dead, wired to the controls it is about** — `docs/36`
+     * `AX-1`/`AX-16`, GitHub issue #406, [§ D593](../../../../DECISIONS.md).
+     *
+     * The sentence was already drawn and already right; what it was not was **attached**. A
+     * keyboard reader tabbing into this block met *"Dispatcher for up-peak traffic, combo box,
+     * dimmed"* eleven times over and was told nothing about why — the explanation sat a paragraph
+     * above as loose prose, which a sighted player reads in passing and a non-visual one only finds
+     * by leaving the control and going looking. The accessibility-tree walkthrough counted eleven
+     * such controls here, the largest group in the product.
+     *
+     * `aria-describedby` rather than a second copy of the words: the description a screen reader
+     * announces after the control's name is **this same node**, so the two cannot drift and no
+     * player-facing string is added. {@link INERT_NOTE_ID} is a constant because the write and the
+     * reference are eighty lines apart and an `id` that agrees by hand is an `id` that stops
+     * agreeing.
+     */
+    let describedBy: string | undefined;
     if (view.inertNote !== undefined) {
       const inert = el(doc, 'p', 'everyday-workshop-switching-inert', view.inertNote);
+      inert.id = INERT_NOTE_ID;
       inert.style.cssText = `${NOTE};color:${C.alarm};margin:0 0 10px`;
       wrap.append(inert);
+      describedBy = INERT_NOTE_ID;
     }
 
     const block = el(doc, 'div', 'everyday-workshop-detector');
@@ -620,6 +651,7 @@ function mountWorkshop(
       input.step = 'any';
       input.dataset['field'] = control.field;
       input.setAttribute('aria-label', control.label);
+      if (describedBy !== undefined) input.setAttribute('aria-describedby', describedBy);
       input.style.cssText = `width:100px;flex:none;border:1.5px solid ${C.rule};border-radius:${String(R.control)}px;background:${C.paper};padding:6px 8px;font:500 12.5px ${TYPE.mono}`;
       input.addEventListener('change', () => {
         setSelector({ [control.field]: Number(input.value) } as Partial<SelectorSpec>);
@@ -651,6 +683,8 @@ function mountWorkshop(
        * from it rather than from prose that may not be there.
        */
       select.setAttribute('aria-label', `Dispatcher for ${card.patternId} traffic`);
+      /* And why it is dead, when it is — see {@link INERT_NOTE_ID}'s block above. */
+      if (describedBy !== undefined) select.setAttribute('aria-describedby', describedBy);
       select.style.cssText = `margin-top:8px;border:1.5px solid ${C.rule};border-radius:${String(R.control)}px;background:${C.paper};padding:6px 8px;font-size:12.5px`;
       for (const profile of ctx.profiles) {
         const option = new (doc.defaultView?.Option ?? Option)(profile.name, profile.id);

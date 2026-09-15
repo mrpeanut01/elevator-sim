@@ -681,6 +681,50 @@ coverage, which is the more dangerous half of the class [§ D227](../DECISIONS.m
 failing, plus the automated sweep criterion handed over in § 6.5 and the screen-reader walkthrough in
 § 6.7. This document writes no acceptance criteria for it.
 
+> **The walkthrough half is half discharged, and which half matters more than the count.** GitHub
+> issue **#406**, split from #239, on 2026-09-15:
+> `packages/viz/src/everyday/screenReaderWalkthrough.browser.test.ts` walks **Chromium's own
+> accessibility tree** (`Accessibility.getFullAXTree` over CDP, not the DOM and not a rule set's
+> model of it) on each of the twenty-one screens the registry builds, by the player's own route.
+> **No screen reader was run**, and that lane says so in its own first paragraph rather than in a
+> footnote: § 6.7's second promise is still a **tier-3 claim** and this document's commitment to it
+> is unchanged. What is discharged is the first promise, driven, on the shell a player meets first.
+>
+> **Nine findings: six remediated** ([§ D591](../DECISIONS.md)–[§ D593](../DECISIONS.md)) **and
+> three registered**, each with a ghost check holding it in both directions. Two results that are
+> not findings are worth as much: **no control a player operates reaches the tree without a name**
+> on any of the twenty-one screens, and **the covered world is silent on every one of them** — the
+> Engineer half of the document is `ignored`, which is `inert` doing the job `coverShell` gives it.
+>
+> Three rows of § 7's table move, and one of the three is a correction to a clause rather than to
+> the product:
+>
+> - **`AX-15`'s Everyday half** was tier 3. Twenty-one screens exposed twenty-one **unnamed** `main`
+>   landmarks, and the **stage exposed no heading at all** — the screen the game is played on. Both
+>   are fixed from `screens.ts#SCREEN_NAMES`, so no player-facing string was added, and both are
+>   checked on every screen.
+> - **`AX-3`** was recorded as failing and is closed, **and the clause as written was not enough on
+>   its own.** *Written when its sentence changes* is a necessary condition, not a sufficient one:
+>   `stageAlarmOf` returns a sentence carrying a live count, so it really does change on most frames.
+>   The alarm needed § 3.2's other answer — a cadence — as well, which is why the strip and its
+>   announcement are now two elements. § D592 records that correction; the clause is not weakened.
+> - **`AX-11`'s obscuring half** is **measured** for the first time, as § 1.2 priced it. It finds one
+>   instance: three Workshop controls take focus below the fold and behind the pinned bar, because
+>   `aside.everyday-workshop-panel` is `position: sticky` and **1 525 px tall in a 675 px
+>   scrollport**, so no focus scroll can uncover them. Registered rather than fixed — every remedy is
+>   a design change, and `AX-0` rules out the cheap one.
+>
+> **`AX-16` gains a rule nothing had**, which is the fourth clause this touches and is not a tier
+> move: *a disabled control carries the reason it is disabled*. No general rule set has an opinion
+> about it — a disabled control with no **name** is a violation everywhere, and one with a perfect
+> name and no **reason** is a violation nowhere and a dead end for the player. Three screens failed
+> it; two are fixed by pointing at the sentence already drawn, and the works shop's two groups are
+> the registered pair. § D593.
+>
+> Two things the walkthrough could not do, kept here because they are the shape of the residual:
+> nothing drawn on the canvas, and one viewport. That file's § 7 carries the full list of what a real
+> screen-reader session would still have to confirm.
+
 > **The sweep half is discharged**, by #239's own split issue **#407**, on 2026-09-09 — see § 6.2's
 > note. What that sweep found is one line worth carrying here, because two of its four findings are
 > this document's own clauses arriving with a mechanical instrument for the first time: `select-name`

@@ -35,6 +35,30 @@
  * *held* to the horizon there would have been the surprising result and is the thing this table
  * would have caught.
  *
+ * ## One building cannot break, and that is measured rather than tolerated
+ *
+ * Three reference towers joined on 2026-09-15 (GitHub issues #425, #424 and #430), and the rule
+ * above — *every building has a cell that breaks* — **could not be met for one of them**. The rush
+ * stream is deliberately the same number of **people** on every tower (`sim/rush.ts`'s
+ * `rushTopRatePctPop5min` scales the rate so that `rushTopArrivalsPerMinute` is invariant), so
+ * whether a group can be broken by it is decided by how many cars the group has. Measured, in this
+ * order:
+ *
+ * | tower | cars | cell | held |
+ * |---|---|---|---|
+ * | `ctf-class-reference` | 36 | `collective` | **never** |
+ * | `ctf-class-reference` | 36 | `nearest-car` | **2 754 s** |
+ * | `merdeka-class-reference` | 92 | `nearest-car` | never |
+ * | `merdeka-class-reference` | 92 | `nearest-car`, cars parked at the lobby from 60 s | **3 436 s** |
+ * | `shanghai-class-reference` | 106 | `nearest-car`, cars parked at the lobby from 60 s | **never** |
+ *
+ * So `shanghai-class-reference` holds to the horizon under the **weakest shipped dispatcher with its
+ * whole group parked at the lobby**, which is the hardest single cell this table can construct, and
+ * it is named in {@link NEVER_BREAKS} rather than papered over with a cell that agrees at `null` and
+ * pretends to be a pin. The exception is asserted in three ways below — non-empty, ships, and every
+ * one of its cells really is `null` — so the day a hundred and six cars stop being enough, this goes
+ * red and the list has to shrink.
+ *
  * ## One cell is a fixture, and it is the one no shipped cell could be — GitHub issue #523, item 2
  *
  * This replay resolves a round's dispatcher id against the server's own `data/` and runs that
@@ -77,6 +101,15 @@ interface AgreementTable {
 }
 
 const table = JSON.parse(readFileSync(TABLE_URL, 'utf8')) as AgreementTable;
+
+/**
+ * The shipped buildings no cell in this table can break, and why — see the docstring's table.
+ *
+ * One member, `shanghai-class-reference`: a hundred and six cars against a rush stream that is the
+ * same number of people on every tower. It is pinned under `nearest-car` with the whole group parked
+ * at the lobby, which is the hardest cell this table can build, and it still reaches the horizon.
+ */
+const NEVER_BREAKS: ReadonlySet<string> = new Set(['shanghai-class-reference']);
 
 function labelOf(cell: AgreementCell): string {
   const log = (cell.interventions ?? []).map((entry) =>
@@ -132,7 +165,24 @@ describe('the rush hold agreement table — the server’s replay half (PR #513,
     expect([...covered].sort()).toEqual([...shippedBuildingIds].sort());
     if (REGENERATE) return;
     const breaking = new Set(table.cells.filter((cell) => cell.heldS !== null).map((cell) => cell.buildingId));
-    expect([...breaking].sort()).toEqual([...shippedBuildingIds].sort());
+    expect([...breaking].sort()).toEqual(
+      [...shippedBuildingIds].filter((id) => !NEVER_BREAKS.has(id)).sort(),
+    );
+
+    /*
+     * The exception is asserted rather than merely applied — an empty set would make the filter a
+     * no-op and the rule above would pass because nothing was excluded rather than because
+     * everything breaks. See the docstring for what was tried before it was accepted.
+     */
+    expect(NEVER_BREAKS.size).toBeGreaterThan(0);
+    for (const id of NEVER_BREAKS) {
+      expect(shippedBuildingIds, `${id} is excused a breaking cell and does not ship`).toContain(id);
+      const cells = table.cells.filter((cell) => cell.buildingId === id);
+      expect(cells.length, `${id} is excused a breaking cell and has no cell at all`).toBeGreaterThan(0);
+      for (const cell of cells) {
+        expect(cell.heldS, `${labelOf(cell)} breaks after all — take it out of NEVER_BREAKS`).toBeNull();
+      }
+    }
   });
 
   it.each(table.cells.map((cell) => [labelOf(cell), cell] as const))('%s', (label, cell) => {

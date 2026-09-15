@@ -81,6 +81,7 @@ import type {
  * | 13 | {@link VizSummary.saturation} added — `core`'s own trend test over the report window, carried as {@link VizSaturation} (GitHub issue #220, § D515). The rush's result screen names where the queue stopped draining and `docs/35` `PM-RU3` forbids a second definition of *when it broke* computed in the viewer, so the diagnosis travels rather than being re-derived from `saturated`. Optional, because a version-12 recording carries only the boolean; a reader that quotes the slope says the record predates the field rather than inventing one. |
  * | 12 | {@link VizLeg.structuralRefusal} added — the structural reason every car refused a waiting rider's call, joined to the leg by `core` at reconcile time (GitHub issue #178 item 9, § D511). Optional and absent on every leg that boarded, so a version-11 recording reads as a version-12 one with no rider refused structurally; the bump is because a reader that draws the reason must know a recording without the field is *older* rather than *clean*. |
  * | 14 | {@link VizRecording.bankEquipment} added — what each bank was fitted with when it is not the default, read off the resolved building the run was simulated on through `core`'s `energyConventionOf` (`DECISIONS.md` § D539, and GitHub PR #515's review finding L1). The Day report's before/after block reads it as `shift/report.ts#ReportBasis.equipment`, so the energy rows of two runs priced on different scales are refused rather than paired. Absent on every shipped building, so a shipped run's recording differs from version 13's in this number and nothing else. |
+ * | 15 | {@link VizBankEquipment.ropeMassKg} added — the rope moving with each of a bank's cars, when the bank declares a rope class (`DECISIONS.md` § D583, GitHub issue #433). Optional, and absent on every shipped building, so a version-14 recording reads as a version-15 one with no rope modelled. The bump is because the equipment axis is a **pairing key**: without this field two runs of one building roped differently carry identical `bankEquipment` entries, and the Day report's before/after block would pair their energy rows although the two were priced on different scales — which is exactly the defect GitHub PR #515's review found and version 14 was added to close. |
  *
  * ## What version 4 fixed, measured rather than predicted
  *
@@ -113,7 +114,7 @@ import type {
  * a recording arrives from somewhere other than this build and the versions genuinely can
  * disagree (`UX.md` `PB-07`/`PB-15`).
  */
-export const VIZ_SCHEMA_VERSION = 14;
+export const VIZ_SCHEMA_VERSION = 15;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -951,9 +952,10 @@ export interface VizRecording {
    * What each bank that is **not** at the default was fitted with — version 14, `DECISIONS.md` § D539.
    *
    * One entry per such bank, in the building's bank order. The field is absent when every bank is at
-   * the default, a counterweight at one half of rated load and no regeneration, and it is written as
-   * absent rather than `[]` or an explicit `undefined`, so a shipped run's recording carries nothing
-   * it did not carry at version 13.
+   * the default — a counterweight at one half of rated load, no regeneration and, since
+   * `DECISIONS.md` § D583, no rope modelled — and it is written as absent rather than `[]` or an
+   * explicit `undefined`, so a shipped run's recording carries nothing it did not carry at
+   * version 13.
    *
    * Written from the resolved building the run was simulated on, through `core`'s own
    * `energyConventionOf`, so it cannot disagree with the joules in {@link VizSummary.energy}. Its
@@ -980,6 +982,12 @@ export interface VizBankEquipment {
   readonly counterweightBalanceRatio: number;
   /** The share of an overhauling move's out-of-balance work the drive returns; `0` without regeneration. */
   readonly regenerativeRecoveryFraction: number;
+  /**
+   * The rope moving with each of this bank's cars, kg — `core`'s `EnergyConvention.ropeMassKg`
+   * (§ D583). Absent, never `0`, when the bank declares no rope class, so a recording written before
+   * version 15 and one written by an unroped bank say the same thing.
+   */
+  readonly ropeMassKg?: number | undefined;
 }
 
 /* -------------------------------------------------------------------------- *

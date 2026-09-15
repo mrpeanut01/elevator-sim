@@ -403,8 +403,15 @@ export const UP_PEAK_WARNING_CODES = {
    * the divergence is enumerated in {@link CLOSED_FORM_ASSUMPTIONS} as `symmetric-speed` with
    * `bias: 'under'`, and this warning is what stops a residual being read as a defect.
    *
-   * Raised on no shipped building — every car in `data/buildings/` is symmetric — which is the
-   * same distinction `missingFloorPairs` draws in `config/schema.ts`.
+   * **Raised on exactly one shipped bank since 2026-09-15**, and it was raised on none before —
+   * GitHub issue #425, `DECISIONS.md` § D577. `ctf-class-reference/shuttle` climbs at 20 m/s and
+   * descends at 10, which is the design Hitachi publishes for that tower and the whole of what
+   * the building is for. Every other car in `data/buildings/` is still symmetric, and
+   * `analytical/upPeak.test.ts` asserts that in **both** directions — this bank and no other —
+   * because half the claim is that the detector is not simply on. Until that building landed this
+   * paragraph read *"raised on no shipped building"*, which was the same distinction
+   * `missingFloorPairs` draws in `config/schema.ts`: a disclaimer about nothing is not a defect,
+   * and a disclaimer about something is not one either.
    */
   directionalSpeedAsymmetry: 'directionalSpeedAsymmetry',
   /** The bank runs express below its served zone; `tx` is non-zero. */
@@ -633,7 +640,7 @@ export const CLOSED_FORM_ASSUMPTIONS: readonly ClosedFormAssumption[] = [
     assumption:
       'One rated speed serves both directions: the 2·(H·tv + tx) term charges the climb and the descent at the same tv = df/v.',
     divergence:
-      "A car whose descent is limited below its rated speed — by design, as TWIN is (about 7 m/s up, 4 m/s down), or by the air-pressure cap data/elevator-specs.json's airPressure block carries above 300 m of travel — spends longer coming down than the expression charges. Only the return half is affected: the shortfall is H·df·(1/v_down − 1/v_up) per trip, which is positive whenever the descent is the slower half. Every asymmetry the reference literature records is of that sign, and every one this repository can produce from data is too — the air-pressure cap is a cap, and it is the only asymmetry a shipped path writes. The bias is therefore 'under' for the cases that occur rather than for every case expressible: a car authored with descentSpeedMps ABOVE its rated speed is legal (config/parse.ts warns descent-above-rated-speed rather than refusing it) and would make the closed form read high instead. That configuration is not shipped, is flagged where it is authored, and is named here rather than being quietly excluded by the word 'one-sided'. The published expression has one tv and no term to hang a second on; it is left as CIBSE publishes it and analyzeUpPeak raises directionalSpeedAsymmetry instead. See GitHub issue #444.",
+      "A car whose descent is limited below its rated speed — by design, as TWIN is (about 7 m/s up, 4 m/s down), or by the air-pressure cap data/elevator-specs.json's airPressure block carries above 300 m of travel — spends longer coming down than the expression charges. Only the return half is affected: the shortfall is H·df·(1/v_down − 1/v_up) per trip, which is positive whenever the descent is the slower half. Every asymmetry the reference literature records is of that sign, and every one this repository can produce from data is too — the air-pressure cap is a cap, and until 2026-09-15 it was the only asymmetry a shipped path wrote. It is not any more, and the second one is of the same sign: data/buildings/ctf-class-reference.json authors descentSpeedMps 10.0 against a rated 20.0 on its shuttle (GitHub issue #425), so this entry now describes a bank that ships rather than only a bank that could. The bias is therefore 'under' for the cases that occur rather than for every case expressible: a car authored with descentSpeedMps ABOVE its rated speed is legal (config/parse.ts warns descent-above-rated-speed rather than refusing it) and would make the closed form read high instead. That configuration is still not shipped — the one asymmetric shipped bank is slower downwards — is flagged where it is authored, and is named here rather than being quietly excluded by the word 'one-sided'. The published expression has one tv and no term to hang a second on; it is left as CIBSE publishes it and analyzeUpPeak raises directionalSpeedAsymmetry instead. See GitHub issue #444.",
     bias: 'under',
   },
   {

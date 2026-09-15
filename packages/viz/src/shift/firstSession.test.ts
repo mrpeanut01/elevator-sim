@@ -50,8 +50,21 @@ describe('the eligible set — § D512’s table read by arithmetic', () => {
      * clear its crowd. `c10` (Ashgate) did **not** join: 10 of 50, below the threshold, because its
      * problem is a second leg rather than a held landing. Both are the table's reading rather than
      * a choice, and this list is derived from it.
+     *
+     * **`c11`, `c12` and `c13` joined on 2026-09-15** — GitHub issues #425, #424 and #430 — all
+     * three at 50 of 50, which takes the set from six to nine and moves
+     * {@link FIRST_SESSION_LINE}'s own word with it. **That is not a compliment to those towers.**
+     * Legible means *somebody stood past a minute on a landing for two contiguous minutes*, and on a
+     * tower of four to eight thousand people that is the building rather than a problem a first
+     * session can see and solve: their median stretches are 1 221 s, 729 s and 459 s, and the two
+     * towers already at 50 of 50 are the two this table records as legible all day **because the
+     * group cannot cope**. The threshold is § D512's reading of its own table and is not moved here;
+     * whether a first session should open on a supertall at all is a design question this file
+     * cannot answer and does not pretend to.
      */
-    expect(ELIGIBLE_FIRST_CONTRACT_IDS).toEqual(['c2', 'c3', 'c4', 'c5', 'c7', 'c9']);
+    expect(ELIGIBLE_FIRST_CONTRACT_IDS).toEqual([
+      'c2', 'c3', 'c4', 'c5', 'c7', 'c9', 'c11', 'c12', 'c13',
+    ]);
     for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) {
       const row = LEGIBILITY_SWEEP.find((entry) => entry.contractId === id);
       expect(row?.legibleOf50 ?? 0).toBeGreaterThan(50 / 3);
@@ -170,6 +183,9 @@ describe('AC1 and AC2, asked of every member of the set on the pinned seeds', ()
       c5: 8,
       c7: 8,
       c9: 10,
+      c11: 10,
+      c12: 10,
+      c13: 10,
     });
     /* AC1's clock: on every legible day the moment is inside the day, and never before the window. */
     for (const [id, list] of Object.entries(legibleAt)) {
@@ -178,5 +194,17 @@ describe('AC1 and AC2, asked of every member of the set on the pinned seeds', ()
         expect(at).toBeLessThanOrEqual(shiftLengthForContract(id));
       }
     }
-  }, 300_000);
+  /*
+   * **Thirteen contracts × ten seeds, and three of the thirteen are supertalls** — GitHub issues
+   * #425, #424 and #430. This slice cost well inside 300 000 ms while the ladder was ten mid-rise
+   * towers; measured on this tree it is about 190 s alone and **393 s under a full
+   * `--project viz` run** at load average 27, so it failed on the budget rather than on the slice
+   * and named a case that says nothing about legibility.
+   *
+   * Annotated rather than sampled down. The set this walks is derived from the sweep's own table, so
+   * dropping seeds or members would make AC1 and AC2 claims about a subset of the eligible set
+   * rather than about it. `vitest.config.ts`'s rule is that a site that knows it runs a simulation
+   * may say so.
+   */
+  }, 900_000);
 });

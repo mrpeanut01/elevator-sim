@@ -319,11 +319,13 @@ export const GOAL_BARS = Object.freeze({
  * have been the second kind arriving by accident.
  *
  * **`'period'` is the default and that is a decision rather than a convenience.** Three of the
- * **eleven** shipped buildings have no authored day and never will until one is written for their
+ * **fourteen** shipped buildings have no authored day and never will until one is written for their
  * crowd, so a slice is the majority case, and every published figure in this repository was graded
- * as one. *(The numerator has not moved and the denominator has twice: this read **eight** while
- * nine shipped, and `harbour-point` and `ashgate` — both on `office-standard`, which `office-day`
- * matches — took it to eleven without adding to the three. `RISKS.md` R38 on a count in prose.)*
+ * as one. *(The numerator has not moved and the denominator has three times: this read **eight**
+ * while nine shipped, `harbour-point` and `ashgate` took it to eleven, and the three reference
+ * towers of GitHub issues #424, #425 and #430 took it to fourteen. All five declare
+ * `office-standard`, which `office-day` matches, so none of them added to the three.
+ * `RISKS.md` R38 on a count in prose.)*
  *
  * **The named gap the default was covering is closed, and what it cost is worth recording.** This
  * paragraph used to end by saying `dev/leftRail.ts` and `dev/main.ts` were *"not yet horizon-aware,

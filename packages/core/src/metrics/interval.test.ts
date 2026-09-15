@@ -553,9 +553,11 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       .filter((value): value is number => value !== undefined);
 
     // The survey is the whole shipped set, not a subset that happens to prove the point.
-    // 23 since GitHub issue #376 added the Burj-class reference tower's six banks, and **26 since
-    // GitHub issues #500 and #501** added `harbour-point/main` and `ashgate`'s two.
-    expect(rows.length, detail).toBe(26);
+    // 23 since GitHub issue #376 added the Burj-class reference tower's six banks, 26 since
+    // GitHub issues #500 and #501 added `harbour-point/main` and `ashgate`'s two, and **41 since
+    // GitHub issues #424, #425 and #430** added three more reference towers — fifteen banks in one
+    // wave, which is the largest single move this survey has taken.
+    expect(rows.length, detail).toBe(41);
 
     // 56.5 s — a 26-person hospital car at 2.5 s — against a 29.0 s floor on Midtown Office.
     expect(Math.max(...rows.map((row) => row.maxReopenS)), detail).toBeCloseTo(56.5, 6);
@@ -564,27 +566,36 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       Math.min(...ceilings),
     );
 
-    // Thirteen of the twenty-six sit at or above the fallback, so on those it would split one
+    // Twenty-two of the forty-one sit at or above the fallback, so on those it would split one
     // loading into two departures — the original defect, in the banks the fallback does not cover.
     //
-    // **The three that landed with the content plan are all safe, and one of them by 0.1 s.**
-    // `ashgate/carpark` reopens at **26.4 s** against a 26.5 s fallback: a 23-person car at the
-    // office 1.2 s, boarding and alighting, lands a tenth of a second under the constant. It is not
-    // tuned to — nothing about that building was chosen against this number — and it is named here
-    // because a margin that thin is the clearest possible statement of this file's own claim. A
-    // transfer time of 1.21 s on that car, or one more person in it, would move it into the list
-    // below; the answer then is `CarTimings` for the building, never a nudged constant.
-    // Six of the thirteen arrived together with the Burj-class reference tower (GitHub issue #376),
-    // which is every one of its banks: at a 1.75 s transfer and 3 500–4 000 lb cars, a full load's
-    // dwell outlasts a one-floor round trip on all six, and on a 165-floor building that is the
-    // ordinary case rather than the exception. That is the clearest evidence yet for the sentence
-    // this test exists to hold: no constant is safe on all of them.
+    // **The 0.1 s margin is no longer one bank's curiosity, and that is the useful move.** It used
+    // to be `ashgate/carpark` alone at **26.4 s** against a 26.5 s fallback. Eleven banks now sit
+    // on that same figure — `ashgate/carpark`, `ctf-class-reference`'s two office locals,
+    // `shanghai-class-reference`'s four and `vertical-city`'s four — because it is not a
+    // coincidence at all: it is what a **23-person car at the office 1.2 s** costs to fill and
+    // empty, and four of the towers here author exactly that car. None of them was chosen against
+    // this constant. A transfer time of 1.21 s on any of those cars, or one more person in it,
+    // moves eleven banks into the list below at once, and the answer then is `CarTimings` for the
+    // building, never a nudged constant.
+    //
+    // Six of the twenty-two arrived with the Burj-class reference tower (GitHub issue #376), which
+    // is every one of its banks: at a 1.75 s transfer and 3 500–4 000 lb cars, a full load's dwell
+    // outlasts a one-floor round trip on all six, and on a 165-floor building that is the ordinary
+    // case rather than the exception. **Nine more arrived with GitHub issues #424, #425 and #430**,
+    // and they say the same thing at three more points on the size range: every supertall shuttle
+    // in the set is unsafe for this constant (39.8 s, 40.8 s and 40.8 s), and so is every bank that
+    // carries a hotel population at 1.5 s. That is the clearest evidence yet for the sentence this
+    // test exists to hold: no constant is safe on all of them.
     const unsafe = rows.filter((row) => FALLBACK_DEPARTURE_GAP_S <= row.maxReopenS);
     expect(unsafe.map((row) => row.id).sort(), detail).toEqual([
       ...['burj-class-reference/local-lower', 'burj-class-reference/local-zone1', 'burj-class-reference/local-zone2', 'burj-class-reference/local-zone3', 'burj-class-reference/observation', 'burj-class-reference/shuttle'],
       'crown-hotel/main',
+      ...['ctf-class-reference/local-apartments', 'ctf-class-reference/local-hotel', 'ctf-class-reference/shuttle'],
+      ...['merdeka-class-reference/local-high', 'merdeka-class-reference/local-hotel', 'merdeka-class-reference/local-low', 'merdeka-class-reference/shuttle'],
       'mixed-use-high-rise/residential-local',
       'mixed-use-high-rise/shuttle',
+      ...['shanghai-class-reference/local-hotel', 'shanghai-class-reference/shuttle'],
       'st-jude-hospital/main',
       'vertical-city/shuttle',
       'vertical-city/zone-5-local',
@@ -606,6 +617,12 @@ describe('FALLBACK_DEPARTURE_GAP_S lies inside every shipped building’s bracke
       // (70.0 s against a 39.8 s reopen, measured on that commit) and a threshold exists for it.
       ...['burj-class-reference/local-lower', 'burj-class-reference/local-zone1', 'burj-class-reference/local-zone2', 'burj-class-reference/local-zone3', 'burj-class-reference/observation'],
       'crown-hotel/main',
+      // One of the fifteen banks GitHub issues #424, #425 and #430 added, and only one: the
+      // CTF-class tower's serviced-apartment locals are 20-person cars at the residential 1.75 s,
+      // so a full load's dwell (32.8 s) outlasts a one-floor round trip (29.05 s). Its four
+      // siblings all have a threshold, which is what makes this a property of that bank's
+      // population rather than of the building's size.
+      'ctf-class-reference/local-apartments',
       'mixed-use-high-rise/residential-local',
       'st-jude-hospital/main',
       'vertical-city/shuttle',

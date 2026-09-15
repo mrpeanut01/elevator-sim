@@ -873,6 +873,10 @@ export class Car implements CarLike {
       // (§ D523) is a setting on the controller. `spec.ratedLoadKg` is what `resolveLoadSensor`
       // read the plate from, so the two agree on every car that has not been derated.
       ratedLoadKg: this.spec.ratedLoadKg,
+      // **The speed this move actually reached, not the plate's** — § D583. A short hop never gets
+      // to rated speed, and the rope's inertia is charged against what the car did rather than what
+      // it could have done. Read off the solved profile, which is the one authority on it.
+      peakSpeedMps: motion.profile.peakSpeedMps,
     });
   }
 
@@ -1882,4 +1886,12 @@ export interface CarTravel {
    */
   readonly loadKg: number;
   readonly ratedLoadKg: number;
+  /**
+   * The highest speed this move actually reached, m/s — the solved profile's `peakSpeedMps`,
+   * strictly below the car's rated speed on any hop short enough not to get there.
+   *
+   * Raw, like every other field here: the recorder decides what a moving rope costs
+   * (`metrics/types.ts#ropeInertiaWorkJ`), and a car reports what it did.
+   */
+  readonly peakSpeedMps: number;
 }

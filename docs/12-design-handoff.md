@@ -298,7 +298,7 @@ point, same `needClean`. Where a handoff stat line disagrees with the file (Gard
 6 floors in both; Midtown Office is 21 floors in both; Vertical City is 101 in both), the file wins
 and the line is generated from it.
 
-### 4.7 The campaign is ten scenarios, and the handoff specifies five
+### 4.7 The campaign is thirteen scenarios, and the handoff specifies five
 
 § 4.4 fixes the campaign at the five buildings shipped when the design was written. Three more
 buildings landed afterwards — `chancery-house`, `crown-hotel` and `st-jude-hospital`
@@ -358,8 +358,29 @@ specify exactly as it applies to one it did.
 > measured above 0.65 would have displaced it, and neither did. The **progression rule** holds at ten:
 > `needClean` reads 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, the eight-contract shape with one more at each
 > stake. What moved again is each contract's `label`, so `c2` is now *Scenario 5*.
+
+> **Amended again 2026-09-15 — the campaign is thirteen scenarios, and one clause above is now
+> false** ([GitHub issues #425](https://github.com/mrpeanut01/elevator-sim/issues/425),
+> [#424](https://github.com/mrpeanut01/elevator-sim/issues/424) and
+> [#430](https://github.com/mrpeanut01/elevator-sim/issues/430),
+> [`DECISIONS.md` § D581](../DECISIONS.md)). The three reference towers landed with contracts `c11`,
+> `c12` and `c13`.
 >
-> **Eleven buildings and ten contracts is not an arithmetic error**: `burj-class-reference` is a
+> **`c5` is no longer last**, and the paragraph above is kept exactly as written because it predicted
+> the condition that would displace it and then met a different one. It said *a new contract that had
+> measured above 0.65 would have displaced it*. None did: all three measured **1.00**, and so does
+> `c5` when re-measured beside them. **The measurement did not displace `c5` — it stopped
+> discriminating.** Five contracts tie at the ceiling because the energy bar asks 80 kJ a ride of
+> towers whose rides cost 86.8 to 242.6 kJ, and the tie is broken by **bank count**, which puts `c5`
+> at thirteen because it has the most banks. The finale's *reward* is unmoved: `c5` still grants
+> endless mode, and it is still the last scenario a player meets.
+>
+> The other clauses hold. The **ids** are unchanged — `c1`–`c13` are names, and `c13` is now
+> *Scenario 10* while `c5` is *Scenario 13*, which is the clearest illustration of that rule this
+> table has ever carried. The **teaching points** are unchanged. **The progression rule** holds at
+> thirteen: `needClean` reads 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3.
+>
+> **Fourteen buildings and thirteen contracts is not an arithmetic error**: `burj-class-reference` is a
 > *reference* building with no Career contract, named in `contracts.test.ts#REFERENCE_ONLY` and
 > asserted in both directions there.
 

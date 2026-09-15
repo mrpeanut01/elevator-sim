@@ -35866,3 +35866,648 @@ twelfth building meets a red test rather than this paragraph.
 assumption with its reasoning attached, in § D519's manner, and the owner's to accept, tighten or
 reject. Whether `QUIRKS` should be re-sourced. And nothing about the renewal ladder, the shop or the
 calendar, none of which this touches.
+
+
+---
+
+## D576 — The air-pressure cap could resolve a descent speed *above* a car's rated speed, and no warning said so
+
+**Date: 2026-09-15 · GitHub issue [#425](https://github.com/mrpeanut01/elevator-sim/issues/425)'s lane · Rules on: [§ D265](#d265)'s class one layer down, and `config/resolveCar.ts#descentSpeedOf`'s own stated contract.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: it binds `packages/core/src/config/resolveCar.ts`,
+which is `core`'s and not this lane's, and it corrects a claim two shipped docstrings make.
+
+1. **The defect, as measured.** A car rated **6 m/s** on a shaft above
+   `elevator-specs.json`'s `airPressure.appliesAboveTravelM` (300 m) resolved to
+   `descentSpeedMps: 10` — **quicker down than up, on a machine nobody authored an asymmetry for**,
+   and silently: `descent-above-rated-speed` is raised on `CarConfig.descentSpeedMps` and there was
+   none to raise it on. `physics/motion/sCurve.ts` reads `descentSpeedMps ?? ratedSpeedMps` by the
+   sign of the move, so the car really did fly downwards at a speed its plate does not have.
+2. **It is a bug against its own contract rather than a judgement call.**
+   `airPressureDescentCapMps`'s docstring says *"a cap above what the car can do is still the cap,
+   and whether it **binds** is the caller's question"*; `descentSpeedOf`'s says it returns
+   `undefined` *"when nothing binds"*. The caller took `min(authored, cap)` and never asked whether
+   the answer was below the plate. The fix is to bound the **cap** by the rated speed before the
+   minimum, which is two lines.
+3. **The authored field is deliberately *not* clamped**, and that is the half worth recording. A car
+   whose own `descentSpeedMps` exceeds its rated speed is legal, is warned about, and
+   `CLOSED_FORM_ASSUMPTIONS`' `symmetric-speed` entry **names it in terms** as the one expressible
+   case that makes the closed form read *high* rather than low. Clamping it too would have quietly
+   deleted a configuration a published assumption describes, which is a worse fix than the defect.
+4. **It reached no shipped building, and that is measured rather than argued.** Only three shipped
+   banks are above the threshold — `vertical-city/shuttle` at 307.5 m and `burj-class-reference`'s
+   shuttle and observation cars at 448.3 m and 452.0 m — and every car in all three is rated exactly
+   **10.0 m/s**, which is exactly the cap. `config/descentCap.test.ts` asserts the whole shipped set
+   is unmoved across this change.
+5. **Two of its three negative controls could not see it, and the third is new.** That file ran a
+   car *above* the cap and a car *at* it; the defect lives strictly **below**. The new case is
+   written against the value the defect really produced, on a class the cap cannot reach down to.
+6. **How it was found.** By authoring the fourth bank above 300 m of travel — the local zones of the
+   three reference towers below — and checking the resolved cars before running anything. Nothing in
+   the suite would have caught it: the run would simply have been faster downwards than the building
+   said.
+
+**What this does not decide.** Whether `descent-above-rated-speed` should also fire when the *cap*
+produces the inversion — it cannot now, because the inversion cannot now happen — or anything about
+the air-pressure figures themselves, which are GitHub issue #444's and are unmoved.
+
+---
+
+## D577 — The CTF-class reference tower: the figures, and the first shipped bank whose cars are not one speed
+
+**Date: 2026-09-15 · GitHub issue [#425](https://github.com/mrpeanut01/elevator-sim/issues/425) · Rules on: the product owner's 2026-09-08 standing ruling on governed `data/` values, the owner's 2026-09-10 ruling on #232 (*the target is 22 buildings, every one playable and owing one contract*), and [§ D265](#d265).**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. The authored figures need the owner's approval
+and are drafted for it here. And it **moves something already recorded**: `CLAUDE.md` § Correctness
+oracle, `analytical/types.ts` and `config/schema.ts` all said the directional-speed machinery was
+*"raised on no shipped building"*, and one of those is no longer true.
+
+1. **The issue's premise was stale, and that was checked before anything was designed.** #425's
+   title says *the car schema cannot express that*. Since GitHub issue #444, `carConfigSchema`
+   carries `descentSpeedMps` and `cabinPressurised` and `sCurve` picks the top speed by the sign of
+   the move — so #425's **exit 1** was already taken by somebody else and what was missing was a
+   building. The issue is closed by authoring one, not by widening a schema.
+2. **What is CHOSEN, and awaits approval.** 111 floors above ground; a 4.5 m office storey, a 3.5 m
+   apartment storey and a 3.6 m hotel storey, putting the top occupied floor at 446.7 m under a
+   530 m roof this model does not carry; three sky lobbies at 31, 67 and 91 and a sky deck at 109;
+   the populations (52 an office floor, 24 an apartment floor, 30 a hotel floor, 30 on the deck —
+   **4 472** in all); the car count (**36** over five banks) and every car's class, rating and door;
+   and `cabinPressurised` on the shuttle. The building's `$comment` marks each of them.
+3. **What is MEASURED (cited).** The pair **20.0 / 10.0 m/s** — 1 200 m/min ascending and 600 m/min
+   descending, the design Hitachi publishes for this tower's record lifts, with the descent limited
+   for ear comfort rather than by the machine. Nothing is taken from the trade-association article
+   that prompted #425, which the issue itself says is the prompt and not the citation.
+4. **Why the cabin is pressurised, which is the clause to read.** The shuttle's travel is 451.2 m,
+   above `appliesAboveTravelM` (300), so an **unpressurised** cabin is capped at `descentCapMps` —
+   **10.0 m/s, the same figure Hitachi publishes**. `resolveCar` takes the lower of the two limits,
+   so on that arrangement deleting `descentSpeedMps` would change nothing at all: the authored field
+   would be a value with no consequence, which is § D265's defect exactly. Pressurising removes the
+   shaft's cap (`pressurisedDescentCapMps` is `null`), so the machine's own published limit is the
+   only thing holding the descent. **Both halves are asserted by a run**:
+   `packages/core/src/sim/directionalSpeedSeam.test.ts` shows the unpressurised arms are
+   byte-identical on the legs and the shipped arms are not.
+5. **The asymmetry binds, on the legs.** Three seeds at 1 800 s under `collective`: identical
+   journeys on both arms — same origins, same destinations, same arrival instants — carried in
+   **different legs**. The leg *count* does not move, because a speed is not a zone, which is why a
+   leg-count comparison would have missed it entirely.
+6. **It is the first shipped bank to raise `directionalSpeedAsymmetry`.** Asserted in **both**
+   directions in `analytical/upPeak.test.ts` — this bank and no other — because half the claim is
+   that the detector is not simply on. The three sites that said *"raised on no shipped building"*
+   are corrected rather than deleted, and each says what it used to say.
+7. **The oracle publishes three residuals and two refusals, and the asymmetric bank is refused.**
+   `local-low` raw +48.935 % / residual **−0.031 %**, `local-mid` +54.025 % / **−0.309 %**,
+   `local-hotel` +35.066 % / **−0.066 %**, all at 64 replications from seed 810 000 against a 4 %
+   tolerance. `local-apartments` throws on `departureGapBracket` and the **shuttle** throws because
+   `measureUpPeak` cannot drain the crowd it offers it. So this file publishes **no residual for the
+   asymmetric bank**, and that is stated rather than worked around: what a reader gets is the
+   warning, and a reader who wants the number needs a different apparatus.
+8. **Playable, and handed as built** — contract `c11`, [§ D581](#d581).
+
+**What this does not decide.** Whether the figures are right; they are the owner's to accept, tighten
+or reject. Whether the real tower's ~95 lifts should be modelled rather than 36 — the car count is
+CHOSEN and the file says so. And the proof set, which the 2026-09-10 ruling keeps fixed.
+
+---
+
+## D578 — The Shanghai-class reference tower: the top of the speed catalogue, reached on exactly one hop
+
+**Date: 2026-09-15 · GitHub issue [#424](https://github.com/mrpeanut01/elevator-sim/issues/424) · Rules on: the product owner's 2026-09-08 standing ruling on governed `data/` values and the owner's 2026-09-10 ruling on #232.**
+
+**Why an entry.** [§ D405](#d405)'s first ground, twice: authored figures drafted for approval, and a
+building that makes `config/schema.ts`'s air-pressure advisory mean something different from what it
+said.
+
+1. **What is MEASURED (cited, and both citations were already in this repository).** The shuttle's
+   **20.5 m/s**, which is `data/elevator-specs.json#realWorldAnchors`' row for this machine and the
+   maximum of its `ultra-high-speed` class. And `cabinPressurised`, from the `airPressure` block's
+   cited Al-Kodmany (Buildings 2015, 5(3), 1070–1104, § 3.1.4) note that **this tower** answers the
+   air-pressure problem with a pneumatic system. The lift count, **106**, is the one figure the
+   prompting article supplies and it is used as a *count* rather than as a citation.
+2. **What is CHOSEN, and awaits approval.** 128 floors above ground on a 4.5 m office storey and a
+   4.2 m hotel storey, putting the observation deck at 527.7 m and the crown's plant at 568.2 m
+   under a 632 m architectural top this model does not carry; four sky lobbies at 21, 45, 69 and 93;
+   the populations (88 an office floor, 30 a hotel floor, 30 on the deck — **8 612** in all, roughly
+   half what the real tower is reported to carry); and the split of the 106 cars (14 shuttles, four
+   local banks of 20, a hotel bank of 12).
+3. **It is the first shipped building to reach the top of the catalogue, and the framing is #424's
+   own correction.** Every car in `data/buildings/` stopped at 10.0 m/s, so the upper half of the
+   class's declared range had a **UI caller** — `authoring/machineSpec.ts`'s ceiling, which a player
+   can already dial — and no content caller. That is *no authored example*, not a dead seam, and the
+   distinction is the issue's rather than this entry's.
+4. **The rating binds, and it was a live question rather than a formality.** `CLAUDE.md`'s *short
+   hops never reach rated speed*: at 1.2 m/s² and 1.2 m/s³ an s-curve needs about **185.4 m** to
+   reach 20.5 m/s and the same again to stop, so a leg under about **370.7 m** is
+   acceleration-limited. This shuttle makes **exactly one hop that is long enough** — G to sky lobby
+   4, 418.5 m — and three that are not (94.5 m, 202.5 m, 310.5 m). `directionalSpeedSeam.test.ts`
+   re-rates it at 10.0 m/s, the fastest any shipped car was before this file, and requires the legs
+   to differ; they do, on all three seeds.
+5. **The observation deck's visitors are not modelled, and that is a refusal rather than a gap.**
+   Floor 119 carries thirty people — its staff and its restaurant — so it is a real origin and a
+   real destination served by a real bank. The **visitor** crowd an observation deck draws has no
+   demand template in this repository (GitHub issue #436), and authoring a separate observation
+   express would have been a bank almost nobody rides: § D265's defect rather than fidelity.
+6. **The oracle reconciles one bank and refuses five, and one of those refusals is new.**
+   `local-hotel` raw +34.983 % / residual **−0.209 %** at 64 replications from seed 810 000. The
+   shuttle throws on a zero served population — the ground every supertall shuttle meets — and
+   `local-1` … `local-4` throw because `measureUpPeak` drives an isolated bank at
+   `OVERLOAD_FACTOR × %POP` of its own capacity, so a twenty-car bank is handed a crowd it cannot
+   drain inside the deadline. **That third ground had never appeared in this repository.** It is a
+   limit of the departure reconstruction rather than of the closed form, and **no mechanism is
+   offered for where the threshold lies** — that needs a sweep over bank sizes, and a plausible
+   sentence in place of a measurement is what [§ D256](#d256) refuses.
+7. **The stage cannot draw it**, on `docs/12` § 4.16's measured 35 legible floors at 1280 × 800 and
+   40 at 1440 × 900 against 129. Same position as `burj-class-reference`; GitHub issue #377 owns it.
+8. **The rush cannot break it, and that is measured.** [§ D582](#d582).
+
+**What this does not decide.** Whether 8 612 is the right occupancy, or whether the 106 should split
+differently. Both are CHOSEN and the file says so.
+
+---
+
+## D579 — The Merdeka-class reference tower: fewer transfers over a similar rise, and a second supertall occupancy that disagrees with the first
+
+**Date: 2026-09-15 · GitHub issue [#430](https://github.com/mrpeanut01/elevator-sim/issues/430) · Rules on: the 2026-09-08 standing `data/` ruling, the 2026-09-10 ruling on #232, and `burj-class-reference.json`'s own recorded limit.**
+
+**Why an entry.** [§ D405](#d405)'s first ground, and it **answers a question another file asked in
+its own words** — `burj-class-reference`'s `$comment` says its population is an assumption and that
+*"one supertall cannot expose that. Two can."*
+
+1. **What is MEASURED (a count rather than a citation).** **92 cars**, the lift count the prompting
+   article supplies, and the only figure from it this file uses.
+2. **What is CHOSEN, and awaits approval.** 118 floors above ground on a 4.8 m office storey, a
+   4.2 m hotel storey and a 5.0 m observation storey, top occupied floor at 537.0 m under a 678.9 m
+   architectural top; **one** office sky lobby at 57 and a hotel lobby at 93; the populations —
+   90 an office floor low-rise and 80 high-rise (a taper, because the plate narrows with height),
+   30 a hotel floor, 25 an observation floor, **8 455** in all; and the split of the 92 cars.
+3. **Fewer transfers over a similar rise, measured on the legs.** Fifty-six populated office floors
+   are one leg from the street. Seed 20 260 824, 1 800 s, `collective`: **3 529 journeys, 5 041 legs
+   — 1.428 legs a journey**, against `burj-class-reference`'s **1.940** on the same seed and horizon.
+   `directionalSpeedSeam.test.ts` hands floors 29–56 to the high locals, halving the one-leg zone,
+   and requires the same journeys to need strictly more legs.
+4. **The two occupancies disagree by about 64 %, and that is the result.** This tower is 8 455 over
+   92 = **91.9 people a car**; `burj-class-reference` is 3 198 over 57 = **56.1**. The populations
+   were authored by **different methods on purpose** — this one from a stated floor-plate
+   assumption, the other by measuring what a 57-lift arrangement serves with a valid AWT — and
+   neither figure was chosen with the other in view. #430 asks what follows from a disagreement and
+   answers itself: *the assumption is where to look*. **Neither file moves**, because averaging two
+   assumptions produces a third assumption and no measurement. What the comparison establishes is a
+   **direction**: on the same profile the Burj-class tower is the lift-rich one of the pair, which is
+   consistent with a population that was solved for rather than surveyed.
+5. **The shuttle is at the air-pressure cap rather than past it.** Rated 10.0 m/s on a 446.4 m bank,
+   above the 300 m threshold — so the cap reaches it and binds nothing, because the cap *is* 10.0.
+   That is where every supertall shuttle in the shipped set has sat since the block landed, and
+   buying speed is what would make it bite.
+6. **The oracle reconciles one bank and refuses three.** `local-hotel` raw +34.485 % / residual
+   **−0.466 %** with three declared departures from the model; the shuttle on zero served
+   population, and `local-low` and `local-high` on § D578 clause 6's new ground —
+   `local-low` is handed **5 695 journeys** in 5 400 s and leaves 1 351 in the system.
+7. **Playable, and handed as built** — contract `c13`, [§ D581](#d581).
+
+**What this does not decide.** Which of the two occupancies is right. Whether either should move —
+neither does here.
+
+---
+
+## D580 — The campaign prices the three reference towers, and the 1–5 complexity scale is short at the top
+
+**Date: 2026-09-15 · GitHub issues [#425](https://github.com/mrpeanut01/elevator-sim/issues/425), [#424](https://github.com/mrpeanut01/elevator-sim/issues/424), [#430](https://github.com/mrpeanut01/elevator-sim/issues/430) · Rules on: [§ D519](#d519)'s placement rule, [§ D510](#d510)'s offer fee, and [§ D575](#d575)'s fabric-not-difficulty reading.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: one authored figure per building needs the owner's
+approval, and the entry records a limit of a published scale that this lane found and did not act on.
+
+1. **Why it is owed at all.** `everyday/campaignModel.ts#offersView` **skips** a contract whose
+   building has no complexity or no fee, so a shipped playable building without rows here would be
+   offerable in the daily loop and invisible on the campaign screen — § D265's shape one layer up.
+   `economy.test.ts` derives the check from `CONTRACTS` in both directions.
+2. **All three are placed on fabric, and here that distinction is forced rather than preferred.**
+   Every one of them reads a day-1 miss rate of **1.00** ([§ D581](#d581)), so difficulty is the
+   constant function on this end of the set and cannot order anything. Fabric can:
+   `merdeka-class-reference` **4** — four banks, *one* office sky lobby, and its whole design is
+   fewer transfers, so a reader holds one fewer zone boundary than Mixed-Use High-Rise's reader
+   holds on a building a quarter the height; `ctf-class-reference` **5** — five banks, three sky
+   lobbies and the only asymmetric car in the set; `shanghai-class-reference` **5** — six banks,
+   four sky lobbies, 106 cars.
+3. **The fees follow § D510's rule unamended**: 6 u, 7 u and 7 u, each complexity plus two. No
+   fixture names any of the three, because the design file was drawn against eight buildings, so
+   there is nothing for a fixture to outrank. Harbour Point's warning applies with more force: none
+   of the three clears a day at day 1, so each fee is paid for days the career will miss — the fee
+   prices the **fabric** and § 8.9's renewal prices the **record**.
+4. **The scale is short at the top, recorded and not acted on.** Three buildings now sit on
+   `COMPLEXITY_MAX`, and the set holds four supertalls. Widening 1–5 would move every published
+   *complexity n of 5* string in the product, which is an owner's call rather than a lane's. Two
+   buildings already share a 3 in § 8.5's own six, so a shared ceiling is not a ranking collapsing —
+   but it is the clearest sign yet that the column has run out of room.
+5. **Neither gets a quirk**, which is § D575 clause 4's existing pattern: `career.ts#QUIRKS` names
+   six buildings and everything else falls back to the contract's `teaches`.
+
+**What this does not decide.** Whether 4, 5 and 5 are right. Whether the scale should widen.
+
+---
+
+## D581 — Five contracts tie at 1.00, the measurement stops ordering, and the tie is broken by bank count
+
+**Date: 2026-09-15 · GitHub issues [#425](https://github.com/mrpeanut01/elevator-sim/issues/425), [#424](https://github.com/mrpeanut01/elevator-sim/issues/424), [#430](https://github.com/mrpeanut01/elevator-sim/issues/430) · Rules on: [§ D574](#d574)'s placement rule, [`docs/33`](docs/33-difficulty-curve.md) § 4.7d's curriculum reading, and [§ D468](#d468)'s energy-bar finding.**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. It **moves something already recorded** —
+§ D574's rule is *place a contract by its own measured day-1 miss rate*, and this is the first time
+that rule has been unable to place one — and it binds `shift/contracts.ts`,
+`shift/contracts.test.ts` and `data/contract-ladder.json`, none of which this lane owns outright.
+
+1. **Measured, at § 4.7d's budget and seeds.** `CONTRACT_CURVE_SWEEP=1 CONTRACT_CURVE_SEEDS=50`,
+   day 1, `collective`, seeds `20 260 824 + 7 919 n`, the shipped five-goal set, one contract at a
+   time: `c11` **50 of 50**, `c12` **50 of 50**, `c13` **50 of 50**. And the two rows already at the
+   ceiling were **re-measured beside them rather than quoted** — `c4` 10 of 10 and `c5` 10 of 10,
+   agreeing with their published 50-seed 1.00.
+2. **Why nothing reaches DC-4's band, measured rather than argued.** Two goals are missed on every
+   seed of all three, and both are quantities no rung in `data/contract-ladder.json` can move. The
+   **energy bar** asks 80 kJ per delivered ride; measured under `collective` at 1 800 s a ride costs
+   **105.9 kJ** (CTF-class), **109.4** (Shanghai-class) and **176.4** (Merdeka-class), against
+   86.8 for `vertical-city`, 137.0 for `mixed-use-high-rise` and 242.6 for `burj-class-reference`.
+   The bar is a **per-leg** quantity and both admissible substrates — occupancy and arrival rate —
+   are **divisors of the crowd**: fewer riders means fewer legs and the same kilojoules on each.
+   § D468 found exactly this and left it as `docs/33` O2 and GitHub issue #234; this is the same
+   finding at three more towers. The **lobby-queue** goal (25 people) is the same shape.
+3. **So all three are handed as built**, with the identity rung and no rate override — `c1`'s shape
+   rather than `c9`'s, and for the mirror-image reason: `c1` cannot be made to **fail** and these
+   three cannot be made to **pass**.
+4. **The tie is broken by bank count, and that is a design choice stated as one.** Five contracts
+   read 1.00, so the measurement does not order them. Ordered by bank count they read 3, 4, 5, 6, 7
+   — `mixed-use-high-rise`, Merdeka-class, CTF-class, Shanghai-class, `vertical-city` — and the whole
+   ladder's bank sequence becomes **1, 1, 1, 1, 1, 1, 2, 2, 3, 4, 5, 6, 7**, which is the first time
+   § 4.7d's curriculum reading has run with **no step larger than one**. It used to end `…, 3, 7`.
+5. **The alternative was available and is wrong on the same grounds § D574 refused appending.**
+   Putting the three at the end in the order they were authored is ordering by **arrival inside a
+   tie**, which is the defect GitHub issue #382 was filed about one level down. `contracts.test.ts`
+   asserts the sequence *and* its non-decrease, so a later rebalance meets a red test.
+6. **What moves and what does not.** `c5`'s position goes from tenth to thirteenth and its label with
+   it; `c4` does not move; the eight contracts before position 9 are each still where their own
+   measured rate put them. **The ids do not move** — `c1`–`c13` are names, and `c13` is now
+   *Scenario 10* while `c5` is *Scenario 13*, which is where a reader can see the difference.
+7. **DC-4 is green on seven of thirteen**, against seven of ten: the numerator is unchanged and the
+   denominator is not. **DC-6 is green** — 0.02, 0.36, 0.40, 0.42, 0.46, 0.50, 0.52, 0.52, and five
+   1.00s, which is non-decreasing.
+
+**What this does not decide.** Whether the energy bar or the lobby-queue cap should be
+building-relative — that is § D468's, `docs/33` O2's and #234's, and a lane that moved a goal to make
+three contracts pass would be buying difficulty by moving the mark, which `docs/33` § 4.3 and
+`CLAUDE.md` both forbid. And nothing about days 2–20, which are unmeasured here as they were there.
+
+---
+
+## D582 — One shipped building cannot be broken by the Endless rush, and the agreement table names it rather than pinning a cell on nothing
+
+**Date: 2026-09-15 · GitHub issue [#424](https://github.com/mrpeanut01/elevator-sim/issues/424) · Rules on: [§ D547](#d547)'s rush-hold agreement and the rule its own table states — *one cell per shipped building, and it has to break*.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: it moves a rule already recorded, in the file that
+records it, and the exception it opens is one a later wave must be able to close.
+
+1. **The rule, and why it exists.** `rushHoldAgreement.json` carries one cell per shipped building
+   and each must **break** — a cell where both halves hold to the horizon agrees at `null` whatever
+   crowd either half ran, so it is a pin on nothing.
+2. **It could not be met for `shanghai-class-reference`, and the attempts are recorded in order.**
+   `collective` held; `nearest-car` — the weakest shipped dispatcher — held; `nearest-car` with the
+   whole group parked at the lobby from 60 s held. That is the hardest single cell this table can
+   construct and the run still reaches the horizon.
+3. **The reason is structural and measured.** `sim/rush.ts` scales the rate so that
+   `rushTopArrivalsPerMinute` is **invariant across towers** — the stream is the same number of
+   *people* on every building, which is what makes the rush a leaderboard. So whether a group can be
+   broken is decided by how many cars it has, and 106 is enough that it cannot. The two siblings
+   authored in the same wave do break: `ctf-class-reference` (36 cars) at **2 754 s** under
+   `nearest-car`, and `merdeka-class-reference` (92 cars) at **3 436 s** under `nearest-car` with the
+   group parked.
+4. **The exception is a list rather than a silence**, on `contracts.test.ts#REFERENCE_ONLY`'s shape:
+   `NEVER_BREAKS` is asserted non-empty, every member is asserted to ship, and **every cell of every
+   member is asserted to be `null`** — so the day 106 cars stop being enough, the test goes red and
+   the list has to shrink rather than quietly widen.
+5. **What was refused.** Adding a cell that holds and calling it coverage, which is the thing the
+   rule forbids; and inventing a harsher intervention for this one building, which would have been
+   a per-building crowd and is what § 9.2 says a rush may not have.
+
+6. **The house table says the same thing from the other side, and it was regenerated whole.**
+   `data/rush-house-runs.json` now carries every shipped dispatcher on all fourteen buildings — 182
+   runs in 1 104 s — and **the 143 existing rows reproduced exactly**, the diff moving nothing but
+   the provenance's commit and date beside the thirty-nine new ones. Of those thirty-nine, only
+   **three** break at all: `ctf-class-reference` under `nearest-car` (2 754 s) and under
+   `destination-panel` (4 550 s), and `shanghai-class-reference` under `destination-panel`
+   (4 778 s). Every other run on the three towers carries the whole stream to the horizon.
+
+**What this does not decide.** Whether the rush should scale with the tower — it may not, and § 9.2
+is why. Whether a `NEVER_BREAKS` of one is the right shape if a fifth or sixth supertall lands: at
+some point the exception is the rule and the table needs a different claim, and this entry does not
+pretend to know where that is.
+
+---
+
+---
+
+## D583 — Rope class and rope mass are per-bank data, the rope's travel ceiling is the first hard refusal on a hoistway, and the rope reaches the energy proxy as inertia rather than as out-of-balance work
+
+**Date: 2026-09-15 · GitHub issue [#433](https://github.com/mrpeanut01/elevator-sim/issues/433) · Stage 1 of the product owner's staged ruling of 2026-09-11, under the revised ruling of 2026-09-10 · Rules on: `core/src/metrics/types.ts`'s recorded omission of acceleration losses, `core/src/config/schema.ts`'s `WARNING_CODES.riseExceedsClass`, `packages/viz/src/contract/types.ts#VIZ_SCHEMA_VERSION`, `data/price-schedule.json`, `data/campaign.json` and `data/engineering-briefs.json`'s derived ceilings, and [`docs/02`](docs/02-elevator-reference.md) § Energy.**
+
+**Why an entry.** [§ D405](#d405)'s two grounds, both. It **moves something already recorded**:
+`metrics/types.ts#TravelSample.workJ` said the proxy *"deliberately omits acceleration losses (which
+need the car and counterweight masses, which no shipped spec carries)"*, and a bank that declares a
+rope class now carries one of those masses, so part of that omission is lifted. And it **binds code
+and data the module does not own**: a viz schema version, a price row, thirty-six derived ceilings,
+and a reference document.
+
+### 1. What is built, and the one sentence that decides its shape
+
+Two optional per-bank fields' worth of behaviour behind **one** authored field, `BankConfig.ropeClass`
+(`config/schema.ts#BANK_ROPE_TUNABLES`, CLAUDE.md invariant 8). What each class weighs and how far it
+may run is **data** — `data/elevator-specs.json#ropeClasses`, four classes, beside the machine classes
+for exactly `airPressure`'s reason (invariant 7). `config/parse.ts#resolveBuilding` resolves
+`ropeMassKg = massKgPerMOfTravel × the bank's own travel`, and `Simulation` reads it once through
+`metrics/comparability.ts#energyConventionOf`, which is § D539's seam with a third field on it.
+
+**The default is *absent*, and absent means the rope is not modelled** — not `"steel"`. That is the
+owner's staged ruling: stage 1 is *"rope class data, schema and the binding ceiling, where no shipped
+figure moves"*, and every bank in `data/buildings/` is at that default, so every published figure is
+byte-identical. `config/rope.test.ts` asserts it on the run rather than on the arithmetic.
+
+### 2. The ceiling refuses, and *refuse* is a reading of the ruling rather than a transcription of it
+
+The owner's amendment of 2026-09-11 says *"a test building whose run exceeds its rope's ceiling is
+**refused**, with a named **warning code**"*. In this repository those two words name opposite things —
+`WARNING_CODES` is advisory and `ISSUE_CODES` is fatal — so one of them had to give. **It is built as a
+refusal**, `ISSUE_CODES.ropeTravelExceedsClass`, and *named code* is what the second half is read as:
+
+- the revised ruling's own word is **binding**, and the whole reason the class rise envelope was left
+  alone is that an advisory ceiling binds nothing;
+- Al-Kodmany § 2.1.5's constraint is *"when the rope gets too long it cannot support its own weight"*,
+  which is a shaft that cannot be built rather than an envelope a designer may knowingly exceed;
+- the issue's own text asks for *"the style `config/schema.ts` already uses for `serviceEvents` and
+  `accessZones`"*, and those codes are in `ISSUE_CODES`.
+
+**`WARNING_CODES.riseExceedsClass` is untouched and still advisory.** The owner re-asked and reversed
+the proposal to harden it on 2026-09-10, because it immediately reds `midtown-office` at 76.9 m against
+76 m; `rope.test.ts` asserts that building still loads with that warning, so a later lane that hardened
+it would go red here rather than in seventeen benchmark studies.
+
+A third code, `WARNING_CODES.ropeClassBuysNothing`, covers a data directory with no library —
+`regenerative-drive-buys-nothing`'s shape, for its reason.
+
+### 3. No shipped building is refused, and that is measured rather than asserted
+
+The ceiling is proved by a configuration that breaches it: a two-floor tower whose hoistway runs
+620 m under steel fails to load, and the same shaft loads on carbon fibre and fails again 1 m above
+carbon's own ceiling (`config/rope.test.ts`). It is deliberately a test building, which is the owner's
+amendment.
+
+What the amendment does not settle is whether the ceiling would bite under stage 2's *"every bank
+carries a rope class, steel by default"*, and that is a fact about the shipped geometry rather than
+about this feature. **It would not.** Every one of the twenty-six shipped banks is inside steel's
+500 m, and the tallest single hoistway in `data/buildings/` is `burj-class-reference/observation` at
+**452.0 m**, then its shuttle at 448.3 m and `vertical-city/shuttle` at 307.5 m. The test measures the
+whole set rather than quoting the maximum.
+
+**A stale figure found beside it, recorded and not fixed.** `elevator-specs.json#airPressure`'s
+`$comment` says *"burj-class-reference's shuttle and observation cars at 496.0 m"*. Measured on this
+tree they are 448.3 m and 452.0 m. The sentence the figure supports — that exactly two shipped banks
+sit above the 300 m threshold — is still true, and that block is an owner-approved provenance note
+this lane does not own, so it is named here and left.
+
+### 4. The rope reaches the proxy as **inertia**, and the alternative was measured before it was refused
+
+`metrics/types.ts#ropeInertiaWorkJ`, charged per move beside `outOfBalanceWorkJ` and never inside it:
+`½·m·v²` to get the rope moving, which motors and is charged whole, and `½·m·v²` to stop it, which
+overhauls and is charged `1 − f` under a regenerative drive. `v` is the move's own peak speed
+(`MotionProfile.peakSpeedMps`, carried out on `CarTravel`), so a short hop that never reached rated
+speed is charged for the speed it actually reached.
+
+**The obvious model is the wrong one and the arithmetic says why.** A hanging rope's *static*
+out-of-balance is position-dependent, `μ·(H − 2h)`, and it is the textbook reason compensation exists.
+Modelled uncompensated, a 500 m steel shaft carries ±13 500 kg of unbalanced rope against a 1 350 kg
+rated load — ten times the load term — so `workPerServedLegKJ` would stop being a statement about
+dispatch and become a statement about where the cars happened to be. Real tall installations compensate,
+which takes that term to roughly zero. What a compensated rope unavoidably costs is inertia, and
+inertia is also the mechanism the source names: a 90 % rope-mass reduction *"reduces the total moving
+masses by no less than 45%"*.
+
+**What is not charged, said plainly.** The car's and the counterweight's own inertia, because no
+shipped spec carries either mass. So the omission `TravelSample.workJ` records is lifted **exactly as
+far as the data reaches and no further**, which is the honest form of the change rather than a
+half-measure.
+
+### 5. What the rope is worth, measured and pinned rather than quoted
+
+`collective`, n = 30 paired replications under common random numbers, seeds `20 260 824 + 7 919 n`
+(§ D468's formula), the shipped run, every arm the same building with only `ropeClass` moved.
+`workPerServedLegKJ`:
+
+| building | single travel | steel | carbon fibre | Δ carbon − steel | share |
+|---|---|---|---|---|---|
+| `midtown-office` | 76.9 m | 17.142 | 11.543 | **−5.599 [−5.851, −5.348]** | −32.7 % |
+| `vertical-city` | 307.5 m | 200.192 | 95.075 | **−105.117 [−107.877, −102.357]** | −52.5 % |
+| `burj-class-reference` | 452.0 m | 626.796 | 305.074 | **−321.722 [−332.610, −310.833]** | −51.3 % |
+
+The two intermediate classes sit where their masses put them: coated belt −14.7 / −23.6 / −23.0 % and
+aramid −25.3 / −40.7 / −39.8 % against steel. Unroped against steel is −36.0 / −57.9 / −56.6 %.
+
+**This is not the source's "about 15 % energy reduction" and must not be read as it.** That figure is
+a claim about a whole installation's consumption, which includes the standby term and the car and
+counterweight inertia this proxy omits; here the rope is the *only* inertial term, so its share of
+what is measured is necessarily larger. The number above is what the rope class is worth **to this
+proxy**, which is the only thing a run of this simulator can say.
+
+### 6. The finding stage 2 needs, and it is the reason stage 1 stopped here
+
+**Steel rope dominates the proxy on a supertall.** `burj-class-reference` reads 272.2 kJ per ride
+unroped and **626.8 roped in steel**; `vertical-city` reads 84.3 and **200.2**. The fifth goal's bar
+is 80 kJ per ride delivered (§ D468), so under stage 2's *"steel by default"* every tall contract
+would fail that goal by a factor of three to eight, every published energy pin would move by a
+similar factor, and the Pareto energy axis would be measuring rope mass rather than dispatch on any
+building over about 100 m. That is a product decision with a measurement attached, and it is the
+owner's rather than this lane's. **Stage 1 is therefore built so that stage 2 is a data change** — a
+default in one declaration — rather than a rebuild.
+
+### 7. Priced, and the price was decided by two derived constraints rather than by taste
+
+One flat row, `rope-upgrade`, **building tier**, **16 u / 6 nights**, `covers`
+`building.bankEquipment[].set.ropeClass`. Both figures are an **agent's proposal awaiting the owner's
+approval** and are marked so in `data/price-schedule.json`; nothing here is approved.
+
+The 16 is bracketed rather than chosen freely, and the brackets are worth reading because they were
+found by the schedule refusing to load:
+
+- **Above**: `pricing/parse.ts` derives a tier's `typicalUnits` as the **median of that tier's own
+  prices**. The building tier held eleven prices with a median of 20, so a twelfth above 20 moves the
+  tier's typical. Drafted at 28 — where the size of the job reads, between `machines-5mps` and
+  `larger-cars-21` — the schedule refused with *"tier building declares a typical of 20 u and its own
+  prices median at 25 u"*.
+- **Below**: `docs/35` § 10.2 caps a fix-a-building case's budget at 16 u and
+  `fixit/engine.ts#toggleRepair` refuses a repair a case cannot afford. At 20 u **both arms of the
+  seam test came back byte-identical**, which is indistinguishable from a rope that binds nothing.
+  That is recorded in `pricing/bankEquipmentReachesTheGoal.test.ts`'s own header, because the next
+  reader who prices a building-tier row into a fix-a-building case will meet it.
+
+16 is the dearest figure clearing both. **Per-class and per-rise pricing are deliberately not taken**:
+§ D552's magnitude seam could express either, `schedule.test.ts` forbids two rows covering one field,
+and a per-metre rate needs a declared maximum quantity that nothing measures. A dearer carbon rope is
+a second row and the owner's, not a correction to this one.
+
+**The schedule's whole cost moves 396 u → 412 u**, and every ceiling derived from it is re-derived on
+the same commit: 30 in `data/campaign.json` and 6 in `data/engineering-briefs.json`, which
+`scenario/budget.ts` requires to equal the total exactly. That figure is a **consequence** of the
+ladder rather than a choice, which is what `campaign.json`'s own header says about it.
+
+### 8. The non-test caller, named
+
+- **Reader**: `sim/simulation.ts`'s constructor, through `metrics/comparability.ts#energyConventionOf`,
+  and the arrival handler that hands the convention to `MetricsRecorder.sampleTravel`. It is the same
+  seam § D539 named, with a third field on it — which is why no dispatcher, no car and no
+  `Car.estimateCost()` sees a rope, and why no leg can move.
+- **Writer**: `packages/viz/src/fixit/run.ts#applyBuildingPatch`'s `bankEquipment` patch, decoded by
+  `fixit/parse.ts`, priced by `pricing/repairPrice.ts#pathsIn` against the row above.
+  `pricing/bankEquipmentReachesTheGoal.test.ts` drives a repair through it and requires the energy to
+  move and every leg to be identical.
+- **Refused loudly rather than defaulted quietly**: `MetricsRecorder.sampleTravel` throws when a
+  convention carries rope mass and the reading carries no peak speed, because a rope charged nothing
+  is the thirteen-times-shipped defect wearing a new name.
+
+### 9. Two arms on different scales, kept from being silent
+
+§ D539 answered that objection in three places and all three are extended:
+
+- the travel sample records `ropeMassKg` whenever it is not zero, so a reader can redo the sum;
+- `energyConventionDisclaimer` names the class **and** the mass on every roped bank, because a reader
+  given one cannot check the other;
+- **`VIZ_SCHEMA_VERSION` goes 14 → 15.** `VizBankEquipment` gains `ropeMassKg`, and the bump is not
+  bookkeeping: that record is the Day report's **pairing key** (`shift/report.ts#ReportBasis.equipment`),
+  so without the field two runs of one building roped differently carry identical entries and their
+  energy rows would be paired although they were priced on different scales — exactly the defect
+  GitHub PR #515's review found and version 14 exists to close. Absent, never `0`, so a version-14
+  recording and a version-15 recording of an unroped bank compose the same line.
+
+### 10. What this does not decide
+
+Whether the four classes' figures are right — two of them are chosen outright and all four await the
+owner. Whether stage 2 should happen at all, given § 6. Whether a rope should move a **leg**: the
+issue's third owner ruling asks for rope mass *in motion*, which needs a torque model this project
+does not have and would move every published interval, the survivor and rush-house tables and Phase 6's
+accepted verdicts; none of it is built here and `rope.test.ts` says so in its own header rather than
+leaving it to be discovered. Whether `new-car` and `fifth-car` being unaffordable inside a
+fix-a-building case is right — that is `repairPrice.ts`'s existing sentence and this row was priced to
+sit on the other side of it, which the owner may reverse.
+
+**Bookkeeping.** This lane was reserved D583–D586 and spent **D583**; D584, D585 and D586 are returned
+**unspent and free rather than holes**, because nothing above them was written (§ D430). The lane also
+**opened wave AA's reservation** in `documentation.test.ts#OPEN_RESERVATION` at `D576–D586` — the floor
+is the charter row's own figure and the ceiling is the top of *this lane's* block, written at the
+narrowest figure that is true from here; a lane of this wave holding a higher number should widen it,
+as wave Z's lanes B and C did.
+
+---
+
+## D587 — The revert procedure is rehearsed in halves, because it is two operations: the git half runs from any checkout and is now observed, the half that touches the live site is not and is named rather than implied
+
+**Date: 2026-09-15 · GitHub issue #355 AC4 (and #241 AC2, #242 AC4, #243 AC4) · Wave AA lane C · Builds on § D405's record rule and `CLAUDE.md`'s *a stated refusal goes stale* rule, with the polarity reversed.**
+
+**Why an entry.** It adds `scripts/rehearse-revert.mjs` and a guard in `packages/experiments`, moves a claim in `docs/16-static-site-deployment.md` § 9's verified/unverified register, and changes what `docs/40-incident-runbook.md` § 3 and `docs/41-launch-checklist.md` § 6.3 say about a procedure an operator runs in an incident — none of which the script owns ([§ D405](#d405)).
+
+1. **The finding that made this possible is that `docs/16` § 11 is not one operation.** Steps 0 and 2 are `git` on a workstation: name the live build and the target, revert forward onto `main`, and compare the trees. Steps 1, 3 and 4 and the whole of § 11.4 need the Static Web App, its federated identity and the Container App. § 11.5 recorded the procedure as **wholly** unrehearsed, which was true and hid that half of it could be rehearsed by anybody, for free, in about a second.
+
+2. **The git half is now rehearsed, and rehearsing it found two failure modes reading had not.** `scripts/rehearse-revert.mjs` runs steps 0 and 2 in a throwaway clone under the system temp directory; it invokes `git` and no other binary, touches no network, and only reads the repository it is pointed at. Run 2026-09-15 on `fb15704` over `HEAD~4`, `HEAD~20` and `HEAD~50`: every range reverts clean and **the tree comparison § 11.2 step 2 requires really is empty**, which until now was an inference. A fourth run against a ref that is not an ancestor exits 1 with four failed observations, which is what makes the other three mean anything.
+
+   - **A merge commit in the range aborts the revert *part-way*.** `git revert --no-commit A..B` reverts the commits newer than the merge, **leaves them staged**, then exits 128 — and writes no sequencer state, so there is nothing to `--continue` or `--abort` while the next command in the procedure is `git commit`. That is a green deploy of a half-reverted tree, in an incident. Measured on a synthetic merge in a throwaway clone, because this repository's reachable history is linear and could not produce one; recorded as such rather than as a measurement on this tree.
+   - **A shallow checkout cannot revert at all** and says so as *unknown revision*, which reads like a typo. The tree this ran on is shallow — 51 commits — and `actions/checkout` defaults to depth 1, so any CI-side revert is in the same position.
+
+3. **The tree comparison's pathspecs are derived rather than transcribed.** `artifactPathspecsOf` reads `deploy-viz.yml`'s own `on.push.paths`, drops `.github/**` — the workflow triggers a run without being in the artifact — and refuses a short list rather than comparing almost nothing. `docs/16` § 11.2 still prints the five for a reader, and says outright that the harness is the one to believe if the two ever disagree.
+
+4. **The harness is built so that its output cannot be read as more than it is.** `NOT_REHEARSED` names the upload, the branch policy, the propagation time, the API half and the browser save-clearing, and it is printed on a clean run as loudly as on a failing one. `validation/rehearseRevert.test.ts` asserts that § 11.5 still carries the sentence *has not been run against production*, so a later edit cannot quietly promote half a rehearsal into a whole one. **That is this repository's stale-refusal rule with the polarity that matters most in an incident**: a stale refusal tells a reader not to touch a live control, and a stale *promise* tells them they hold a recovery they have not checked.
+
+**What this does not decide, and must not be read as deciding.** That the rollback is rehearsed. **#241 AC2, #242 AC4 and #243 AC4 stay open**, each asking for a rehearsal *on the production deployment*, and the half that was rehearsed is precisely the half that never touches it. The duration — the figure § 11.5 calls the one that makes the procedure unplannable — is still unmeasured, and nothing in a checkout can measure it.
+
+---
+
+## D588 — Error reports stay untransmitted, and the refusal is pinned to the question it waits on rather than left as an omission; one half of that question's register row was stale and is corrected
+
+**Date: 2026-09-15 · GitHub issue #242 AC1 · Wave AA lane C · Pins a refusal the product already implements, and corrects a register row in `docs/26-telemetry-and-privacy.md` that this module does not own.**
+
+**Why an entry.** It moves two rows in `docs/26` — § 16.2's S14 line and § 19's item 18 — which `docs/40-incident-runbook.md` does not own, and it gives a refusal an id so that it can be discharged by a decision rather than forgotten ([§ D405](#d405)).
+
+1. **The refusal, stated as a decision rather than as a gap.** A fault in a player's browser is counted on the page and travels only inside a report the player composes and sends. **Nothing is transmitted automatically**, to this project's API or anywhere else, and `docs/40` § 5 is the argument. This is not a transport problem: the first-party route is permitted by the deployed page's own `connect-src` today, and the third-party case is the only one the CSP refuses.
+
+2. **What it waits on is named, and it is not this repository's to answer.** `docs/26` § 19 **item 6** — the lawful basis for telemetry (S12) and error reports (S14), options A–D in § 14.2, and whether they may differ. § 14.2 lists four and chooses none, marked for professional review. #242's first acceptance criterion is therefore **refused with a reason and a dependency**, which is a different state from unbuilt, and the difference is exactly what a reader six months from now cannot recover from an omission.
+
+3. **And the consent next door is not a way round it**, for a reason that is engineering rather than posture: the telemetry recorder mints its session at shell mount and refuses to send without a consent answer, so on the failure #242 exists for — a page that died before it mounted — the instrument is absent at the moment it is needed. A player who agreed to *measurement* did not agree to *crash reports* either; § 14.2's option C exists because those two are one row only for sharing a transport.
+
+4. **The stale half, corrected.** § 19 item 18 said the error-report horizon could mean nothing *until #242's runbook exists and names a severity model and a first response*. That runbook exists: `docs/40` § 1 is the severity model and § 2 the first response with per-level response times. So the precondition is **discharged** and the row is blank because nobody has filled it, not because nothing could. Both rows now say so. **No number is written into either**, because a horizon is a judgement this module does not get to make, and because until item 6 is answered nothing is transmitted for a horizon to govern.
+
+**What this does not decide.** The lawful basis, the horizon, or whether a second consent surface is needed — all three are the product owner's and all three stay on § 19. Nor does it change any shipped behaviour: no byte moves, and the client's fault counter and the server's fault lines are exactly as they were.
+
+---
+
+## D591 — Every Everyday screen names its main landmark, and the stage acquires the heading it never had; both from `SCREEN_NAMES` rather than from new copy
+
+**Date: 2026-09-15 · GitHub issue [#406](https://github.com/mrpeanut01/elevator-sim/issues/406), split from #239 · Rules on: [`docs/36`](docs/36-accessibility-standard.md) `AX-15`, which until now had an instrument on the Engineer shell only.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: it binds `everyday/shell.ts`, `everyday/stageScreen.ts` and `everyday/screens.ts#SCREEN_NAMES` together, and it moves a row `docs/36` § 7 records — `AX-15`'s Everyday half was tier 3, *"best effort; nothing checks it"*, and it is checked now on all twenty-one screens.
+
+**What was measured, and it is the reason this is not a nicety.** Chromium's own accessibility tree — `Accessibility.getFullAXTree` over CDP, not the DOM and not a rule set's model of it — read on each of the twenty-one screens `everyday/screens.ts` builds, reached by the player's own route:
+
+1. **Twenty-one screens, twenty-one `main` landmarks, and not one of them named.** Landmark navigation is one of the two ways a non-visual reader answers *where am I*, and a list in which every entry reads the same word is a list that has stopped being navigation.
+2. **The stage exposes no heading at all.** Twenty of the twenty-one carry exactly one level-1 heading; the screen the game is actually played on carried none. Heading navigation is the other of the two ways, and on the stage the answer was silence.
+
+**The decision.** `shell.ts#draw` writes `aria-label` on the screen region from `screens.ts#SCREEN_NAMES[state.screen]` on every navigation, and `stageScreen.ts` draws a visually hidden `h1` reading `SCREEN_NAMES.stage`.
+
+Three things follow from *that constant* rather than a sentence of either module's own, and they are the whole of why this is one decision and not two:
+
+- **No player-facing string is added.** `SCREEN_NAMES`' own docstring already says it is *"what a screen is called when a heading needs it"*, and `honesty/surfaces.ts` already seeds every one of its values into the corpus, under the adapter id `everyday/screens.ts#SCREEN_NAMES`. So the honesty corpus does not move, which is a forecast this entry makes rather than a claim it asserts.
+- **A screen cannot come to be called two things.** The shell's refusal screens already draw the same constant as their `h1`.
+- **A renamed screen is renamed in the landmark list on the same commit.**
+
+**Why the stage's heading is hidden and the others are not.** § 7.1's header is a strip of live values — a clock, a phase pill, a driver, three figures — rather than a title, and every fact on that screen is already drawn for a sighted player. Printing a title above it would be a layout change the design handoff did not ask for, and the clause asks for a heading rather than for a bigger header. `AX-0` is satisfied in the other direction too: nothing is removed.
+
+**Why the landmark name is written in the shell and not in each screen.** A per-screen write is a per-screen omission, and the one screen that forgot would be the one nobody noticed. `everyday/screenReaderWalkthrough.browser.test.ts` asserts both halves on all twenty-one, and both go red without the change — measured, not assumed: reverting the label fails twenty-one cases and reverting the heading fails one.
+
+**What this does not decide.** Whether the `main` landmark's name should be the screen's name or the *building's* — the door, the brief and the building desk all title themselves with a building, and a landmark that did so would be a second source for a name the `h1` already carries. And nothing about the Engineer shell's landmarks, which are outside this issue and have their own skip link.
+
+## D592 — A live region is written when its sentence changes, and the stage's alarm needs a cadence as well, because its sentence carries a live count
+
+**Date: 2026-09-15 · GitHub issue [#406](https://github.com/mrpeanut01/elevator-sim/issues/406) · Rules on: [`docs/36`](docs/36-accessibility-standard.md) `AX-3`, recorded there as **failing**, and [`docs/28`](docs/28-art-direction.md) § 7.3 AD-A3, which named the same defect first.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: it closes a defect two documents already record, and it corrects `AX-3`'s own policy where that policy is not sufficient — which is a claim about the standard rather than about this module.
+
+**What the defect was.** `everyday/stageScreen.ts` drew two `role="status"` regions inside its per-frame `draw()`:
+
+- the alarm strip, `alarm.replaceChildren(…)` on **every frame it was up** — `docs/36` § 3.2 calls it *"the clearest example in the product of why this standard exists"*;
+- the intervention stamp, `interventionStamp.textContent = …` on every frame — the same defect one element over, and easier to miss, because assigning the *same* string still replaces the text node and still fires the mutation a reader re-reads.
+
+Measured on the shipped bundle at `vertical-city`, seed 424242, over 300 frames with the day playing: **91 stamp writes, every one of them the same sentence**, and 28 alarm writes over the 28 frames the strip was up.
+
+**The decision, and it is two guards rather than one.**
+
+1. **Equality, for both.** A region is written only when its sentence differs from what it last said. That is `AX-3` read literally and it is the whole answer for the stamp, whose sentence is fixed the moment an intervention is pressed.
+2. **A cadence, for the alarm.** `stageScreenModel.ts#stageAlarmOf` returns *"41 people waiting, deepest at floor 7"* — the count moves — so its sentence **genuinely changes on most frames** and a region obeying the letter of the clause is still a reader talking over the player continuously. It gets `STAGE_ANNOUNCE_MS`, the same two seconds `describeFrame`'s region already uses, rather than a second number.
+
+**That second half is a correction to `AX-3` and is the part worth reading.** The clause as written — *"written when its sentence changes, and at no other time"* — is a necessary condition and not a sufficient one, and this is the first measurement in the tree that separates the two. The clause is not weakened here; a second requirement is added beside it for the regions whose sentence is a live figure.
+
+**The strip and the announcement are now two elements**, and the split is what keeps the fix honest. The visible strip keeps its per-frame count, because a player watching a building go wrong wants the number live, and a rate-limited strip would have been a change to the picture. It carries no `role`. A visually hidden sibling carries the announcement at the cadence, from **the same `alarmLine` string**, so the two cannot drift — `honesty/agreement.ts`'s `surfaces-disagree` avoided structurally rather than asserted. `AX-0` is satisfied: nothing stops being said, and nothing stops being drawn.
+
+**The check, and the vacuous first draft that is the reason this entry names its fixture.** `everyday/screenReaderWalkthrough.browser.test.ts` observes the three announcement regions with a `MutationObserver` and asserts two properties — no two consecutive writes saying the same thing, and no two writes closer than the cadence. Written first against `midtown-office` at the default speed it **passed with the defect in place**: that building never raises the alarm, the stamp was the empty string, and Chromium queues no mutation for `textContent = ''` on an element with no children. So the fixture is three deliberate choices — a building whose morning goes wrong, the fastest speed rung so the playhead crosses it, and one intervention pressed — and the case asserts that both regions were written at least once, so it cannot go quietly vacuous again.
+
+**What this does not decide.** Whether two seconds is the right cadence for an alarm as against a frame description — it is `describeFrame`'s figure kept rather than re-chosen, and re-choosing it is a question for whoever runs the screen-reader session § 6.7 still asks for. And nothing about the Engineer surface's own live region, which has had the cadence since `KB-13`.
+
+## D593 — A disabled control carries the reason it is disabled into the accessibility tree, by pointing at the sentence already drawn
+
+**Date: 2026-09-15 · GitHub issue [#406](https://github.com/mrpeanut01/elevator-sim/issues/406) · Rules on: [`docs/36`](docs/36-accessibility-standard.md) `AX-1` and `AX-16`, and [§ D227](#d227)'s rule that a control which writes nothing must say so.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: it binds `everyday/workshopScreen.ts` and `everyday/reportScreen.ts` to one rule neither module owns, and that rule is now a gate in the browser tier over every screen the registry builds.
+
+**What was measured.** Over the twenty-one screens' accessibility trees, every node the tree marks `disabled`, against whether it carries an accessible **description**. Seven screens already do it — the menu's own home row, the door's *day after this one*, the stage's switch, the campaign's *Not yet*, the fix-it rows, the bench's *Run the suite*, Settings' report button — through `title` or `aria-describedby`. Three did not:
+
+- **the Workshop, eleven controls.** § 11.4's five pattern selects and six detector fields go inert under `policy: 'off'`, and the reason is drawn one paragraph above them as loose prose. A reader tabbing through met *"Dispatcher for up-peak traffic, combo box, dimmed"* eleven times and was told nothing.
+- **the report, one control.** *Post this run*, the loudest disabled control in the product. `postRun.ts` already guarantees the sentence exists — its own docstring says *"`false` is always accompanied by a `reason` line"* — and the sentence was a sibling paragraph, which names nothing.
+- **the works shop, thirty-two controls**, which are **not** fixed and are registered instead; see below.
+
+**The decision.** Where a disabled control's reason is already drawn, the control points at that node with `aria-describedby`. Never a second copy of the words: the description a screen reader announces after the name is the same node a sighted player reads, so no player-facing string is added and the two cannot drift.
+
+**The two that are recorded rather than fixed, with the reason.** `screenReaderWalkthrough.browser.test.ts`'s `OUTSTANDING` carries both, held in both directions by a ghost check:
+
+1. **The contract's nineteen future calendar days.** `campaignModel.ts#cellFor` gives the `works`, `missed` and `cleared` states a suffix on their tip and gives `ahead` none, because there is nothing to say about a day that has not happened. The remedy needs a new player-facing sentence, and the cheap alternative — `aria-hidden` on a future day, or drawing it as text rather than a button — is `AX-0` exactly. Whether a future day is a control at all belongs with whoever owns § 8.4 of the campaign.
+2. **The works shop's thirteen unaffordable tiers, which *do* say why** — in the last phrase of a hundred-character button name, *"… needs level 1 first"*. So the reason reaches a reader, after ninety-odd characters of cost and effect. Moving it into a description would change what a sighted player sees, and a rule that accepted *the reason is somewhere in the name* would accept every long button in the product. It is a real finding and not a real defect, which is the argument for reading that register rather than counting it.
+
+**One exclusion in the rule itself, measured rather than assumed.** Chromium propagates `disabled` from a `<select>` to every `<option>` and does **not** propagate `aria-describedby`, so the Workshop's five inert selects arrived as sixty-five findings about controls no reader ever lands on. `option` is excluded. The cost is stated where the exclusion is: an option disabled *inside an enabled* combobox would go unasked, nothing else asks either, and no such option exists in the tree today.
+
+**What this does not decide.** Whether `title` is a good enough carrier for the seven screens that already pass — it maps to the accessible description in every engine this product supports, and whether each reader announces it is one of the things § 6.7's session still has to confirm.

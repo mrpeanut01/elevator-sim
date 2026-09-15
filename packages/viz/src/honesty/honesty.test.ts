@@ -90,14 +90,28 @@ let elapsedMs = 0;
 
 const environment: Readonly<Record<string, string | undefined>> = process.env;
 
-// A generous timeout: the corpus runs one recording plus a small batch per case over the real
-// buildings, and Vertical City is 196 ms a replication (**M6**).
+/*
+ * A generous timeout: the corpus runs one recording plus a small batch per case over the real
+ * buildings, and Vertical City is 196 ms a replication (**M6**).
+ *
+ * **Raised from 900 000 ms on 2026-09-15, and this lane owns the reason** — GitHub issues #425,
+ * #424 and #430. Three reference towers landed with contracts, and `honesty/surfaces.ts` iterates
+ * `CONTRACTS`, so every case now seeds three more scenario cards and the campaign screen's offers
+ * grew with them. Measured on this tree the hook costs **184 s alone** and **927 s inside a full
+ * `--project viz` run** at load average 27 — over the old ceiling, which reported all thirty cases
+ * as *skipped*: a hook timeout that reads as a file-level failure and says nothing about any
+ * property.
+ *
+ * Raised rather than reduced, which is `STANDARD_CORPUS`'s own rule: the corpus size is the claim,
+ * and a corpus quietly trimmed to fit a window is a weakened search that still publishes a verdict.
+ * 1 800 000 ms is about twice the loaded measurement.
+ */
 beforeAll(async () => {
   ({ resources } = await loadHonestyResources());
   const started = Date.now();
   standard = runHonestyCampaign({ resources, seeds: STANDARD_CORPUS, shrinkBudget: 40 });
   elapsedMs = Date.now() - started;
-}, 900_000);
+}, 1_800_000);
 
 describe('the honesty search runs, and says what it cost', () => {
   it('reports its budget rather than hiding it', () => {

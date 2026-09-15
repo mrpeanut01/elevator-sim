@@ -31,6 +31,7 @@ import {
   resolveCar,
 } from './resolveCar.js';
 import {
+  BANK_ROPE_TUNABLES,
   ConfigError,
   ISSUE_CODES,
   WARNING_CODES,
@@ -576,11 +577,53 @@ export function resolveBuilding(
       );
     }
 
+    /*
+     * **The rope, and the one ceiling in this function that refuses** — `DECISIONS.md` § D583,
+     * GitHub issue #433.
+     *
+     * Three outcomes, and the order matters. A bank that declares no class resolves to the object it
+     * always did, which is every shipped bank. A bank that declares one where the data directory has
+     * no library is **warned** and priced with no rope, because the declaration is legal and the
+     * building is simulated exactly as authored — `regenerative-drive-buys-nothing`'s shape. A bank
+     * that declares one and runs further than that rope can hang is **refused**, because Al-Kodmany
+     * § 2.1.5's limit is the rope failing to support its own weight rather than an envelope a
+     * designer may knowingly exceed. That is the only hard ceiling on travel this project has; the
+     * class's own `maxRiseM`, checked above, stays advisory by the owner's ruling of 2026-09-10.
+     */
+    let ropeMassKg: number | undefined;
+    if (bank.ropeClass !== undefined) {
+      const library = specs.ropeClasses;
+      const ropeClass = library?.classes.find((entry) => entry.id === bank.ropeClass);
+      if (library === undefined) {
+        addWarning(
+          `${at}.ropeClass`,
+          `bank "${bank.id}" is roped in "${bank.ropeClass}", but this data directory's elevator-specs.json declares no ropeClasses block, so there is no rope mass to price it with and no travel ceiling to check it against. The bank's moves are priced with no rope: the rope is declared and buys nothing here.`,
+          WARNING_CODES.ropeClassBuysNothing,
+        );
+      } else if (ropeClass === undefined) {
+        addIssue(
+          `${at}.ropeClass`,
+          `bank "${bank.id}" is roped in "${bank.ropeClass}", which elevator-specs.json does not declare. Known rope classes: ${library.classes.map((entry) => `"${entry.id}"`).join(', ')} (${BANK_ROPE_TUNABLES.ropeClass.valuesFrom}).`,
+          ISSUE_CODES.unknownRopeClass,
+        );
+      } else if (riseM > ropeClass.maxSingleTravelM) {
+        addIssue(
+          `${at}.ropeClass`,
+          `bank "${bank.id}" spans a single travel of ${Number(riseM.toFixed(3))} m and is roped in "${ropeClass.id}", which cannot hang further than ${ropeClass.maxSingleTravelM} m before it stops supporting its own weight. Rope the shaft in a class that reaches, or split the travel with a sky lobby.`,
+          ISSUE_CODES.ropeTravelExceedsClass,
+        );
+      } else {
+        ropeMassKg = ropeClass.massKgPerMOfTravel * riseM;
+      }
+    }
+
     banks.push({
       id: bank.id,
       ...(bank.name === undefined ? {} : { name: bank.name }),
       servesFloors: bank.servesFloors,
       ...(bank.servesFloorPairs === undefined ? {} : { servesFloorPairs: bank.servesFloorPairs }),
+      ...(bank.ropeClass === undefined ? {} : { ropeClassId: bank.ropeClass }),
+      ...(ropeMassKg === undefined ? {} : { ropeMassKg }),
       ...(bank.counterweightBalanceRatio === undefined
         ? {}
         : { counterweightBalanceRatio: bank.counterweightBalanceRatio }),

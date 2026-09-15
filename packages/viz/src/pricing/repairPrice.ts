@@ -81,6 +81,8 @@ export function pathsIn(patch: RepairPatchShape): readonly string[] {
         out.push('building.bankEquipment[].set.counterweightBalanceRatio');
       }
       if ('regenerativeDrive' in set) out.push('building.bankEquipment[].set.regenerativeDrive');
+      // GitHub issue #433: re-roping a shaft, its own building-tier row.
+      if ('ropeClass' in set) out.push('building.bankEquipment[].set.ropeClass');
     }
   }
   for (const [group, fields] of Object.entries(objectOf(patch.dispatcher) ?? {})) {

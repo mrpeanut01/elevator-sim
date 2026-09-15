@@ -48,17 +48,20 @@ const EXPECTED = [
   { id: 'burj-class-reference', type: 'mixed-use', floors: 165, banks: 6, cars: 57, entrances: ['G'], transfers: ['G', '1', '43', '44', '76', '77', '123', '124'], zones: 0, population: 3198 },
   { id: 'chancery-house', type: 'office', floors: 19, banks: 1, cars: 6, entrances: ['G'], transfers: [], zones: 0, population: 612 },
   { id: 'crown-hotel', type: 'hotel', floors: 24, banks: 1, cars: 5, entrances: ['G'], transfers: [], zones: 1, population: 866 },
+  { id: 'ctf-class-reference', type: 'mixed-use', floors: 112, banks: 5, cars: 36, entrances: ['G'], transfers: ['G', '31', '67', '91'], zones: 0, population: 4472 },
   { id: 'garden-apartments', type: 'residential', floors: 6, banks: 1, cars: 2, entrances: ['G'], transfers: [], zones: 0, population: 120 },
   { id: 'harbour-point', type: 'office', floors: 16, banks: 1, cars: 6, entrances: ['G'], transfers: [], zones: 0, population: 1560 },
+  { id: 'merdeka-class-reference', type: 'mixed-use', floors: 119, banks: 4, cars: 92, entrances: ['G'], transfers: ['G', '57', '93'], zones: 0, population: 8455 },
   { id: 'midtown-office', type: 'office', floors: 21, banks: 1, cars: 4, entrances: ['P1', 'G'], transfers: [], zones: 0, population: 1710 },
   { id: 'mixed-use-high-rise', type: 'mixed-use', floors: 60, banks: 3, cars: 16, entrances: ['G'], transfers: ['G', '31'], zones: 2, population: 2276 },
   { id: 'secure-tower', type: 'office', floors: 30, banks: 2, cars: 6, entrances: ['G'], transfers: ['G'], zones: 5, population: 992 },
+  { id: 'shanghai-class-reference', type: 'mixed-use', floors: 129, banks: 6, cars: 106, entrances: ['G'], transfers: ['G', '21', '45', '69', '93'], zones: 0, population: 8612 },
   { id: 'st-jude-hospital', type: 'hospital', floors: 13, banks: 1, cars: 5, entrances: ['G'], transfers: [], zones: 2, population: 922 },
   { id: 'vertical-city', type: 'mixed-use', floors: 100, banks: 7, cars: 35, entrances: ['G'], transfers: ['G', '2', '26', '27', '51', '52', '76', '77'], zones: 2, population: 4887 },
 ] as const;
 
 describe('createBuilding over the shipped buildings', () => {
-  it('builds all eleven', () => {
+  it('builds all fourteen', () => {
     expect(config.buildings.map((b) => b.id)).toEqual(EXPECTED.map((e) => e.id));
   });
 
@@ -444,8 +447,15 @@ describe('boarding a floor that more than one bank serves', () => {
       // 44 and 77 left this list with GitHub issue #438: the single-deck shuttle stops at each sky
       // lobby's lower level only, so each upper level is served by its local bank alone.
       'burj-class-reference': ['G', '1', '43', '76', '123', '124'],
+      // The three reference towers of GitHub issues #424, #425 and #430 share exactly their
+      // declared transfer floors and nothing else — the shuttle meets each local bank at the sky
+      // lobby that bank hangs from, and a sky deck or a plant floor that only one bank reaches is
+      // absent from this list by construction.
+      'ctf-class-reference': ['G', '31', '67', '91'],
+      'merdeka-class-reference': ['G', '57', '93'],
       'mixed-use-high-rise': ['G', '31'],
       'secure-tower': ['G'],
+      'shanghai-class-reference': ['G', '21', '45', '69', '93'],
       'vertical-city': ['G', '2', '26', '27', '51', '52', '76', '77'],
     });
   });

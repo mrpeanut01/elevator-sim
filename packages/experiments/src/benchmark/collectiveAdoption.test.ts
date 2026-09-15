@@ -104,12 +104,22 @@ describe('§ D209 § 2 — the ladders', () => {
     // Ashgate's journeys are two legs where they begin in the car park, which is a second thing
     // varying down a ladder that exists to vary one. Neither is a verdict on the mechanism — a
     // criterion that wants either pre-registers it and says what it is measuring.
+    //
+    // The three reference towers joined on 2026-09-15 (GitHub issues #425, #424 and #430), and the
+    // reason is the same shape one size up: this ladder descends through arrival rates on a single
+    // bank's worth of demand, and each of these towers routes most of its journeys through a sky
+    // lobby, so a rate is not the only thing varying down the ladder. `ctf-class-reference` adds a
+    // second: its shuttle is the only shipped bank whose cars are not one speed, so a descent and a
+    // climb of the same distance are not the same cost. Neither is a verdict on the mechanism.
     expect(later).toEqual([
       'ashgate',
       'burj-class-reference',
       'chancery-house',
       'crown-hotel',
+      'ctf-class-reference',
       'harbour-point',
+      'merdeka-class-reference',
+      'shanghai-class-reference',
       'st-jude-hospital',
     ]);
   });

@@ -89,13 +89,52 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave Z's, measured 2026-09-15 on the integrated tree**; the paragraph above
+  below are wave AA's, measured 2026-09-15 on the integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **716 568** | **606** | **62** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **892 214** | **4 710** | **63** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **722 903** | **606** | **62** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **899 963** | **4 710** | **63** | **0** | **green**, and the register is empty |
+
+  **Wave AA's move is 129 strings a case in both tiers, and the base reproduced exactly — which is
+  the streak restarting one wave after it broke.** Measured on the integrated tree after wave AA,
+  both tiers in one sitting, with the base at `fb15704` re-measured first in a detached worktree.
+
+  **The base reproduced to the string in both tiers**: always-on 716 568 / 62 surfaces / 0 failing,
+  deep 892 214 / 63 / 0, identical to wave Z's published row. Wave Z is the only wave in this
+  column's history where the base did *not* reproduce, and the row it published had to be stated
+  against a measured base rather than the published one. This wave needs no such caveat, and that is
+  worth one sentence rather than none: the habit is not that the base *will* reproduce, it is that
+  you find out — and finding out is the only thing that tells a correction apart from a move.
+
+  | | base `fb15704` | wave AA | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 716 568 | **722 903** | **+6 335** | **129.29** |
+  | deep strings | 892 214 | **899 963** | **+7 749** | **129.15** |
+  | surfaces | 62 / 63 | **62 / 63** | **0** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **Neither quotient is an integer, and the two differ**, which is what a state-dependent renderer
+  looks like from here: the three new towers are drawn through adapters whose string count depends
+  on the run, and the deep tier draws a different mix of buildings and days. No arithmetic makes
+  them one, and claiming a per-case constant would be manufacturing precision this measurement does
+  not have.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: identical,
+  nothing added, nothing removed — on a wave that authored **three reference towers**, added a
+  rope-class equipment tunable with the first hard travel ceiling, rehearsed the revert procedure,
+  and built a 1 046-line accessibility walkthrough over 21 screens. Every one of those went into an
+  adapter that already existed; the towers enter by `honesty/surfaces.ts` iterating `CONTRACTS`
+  rather than by anybody listing them. **The deep tier's one-surface lead survives and the diff
+  names it**: `campaign/judge.ts#judgeStage` is the only surface in deep and not in always-on, and
+  nothing is in always-on and not in deep.
+
+  **One lane forecast zero and was right, which is the only forecast this wave carries.** Lane D's
+  six accessibility fixes each reuse a constant or node the product already draws — `SCREEN_NAMES`
+  is already seeded — so it predicted **0** corpus movement from a commit that changed five player
+  surfaces. The rest of the move belongs to three lanes that forecast nothing, and it is not split
+  between them: a quotient is not a measurement, which is what [§ D256](DECISIONS.md) refuses.
 
   **Wave Z's move is exactly 88.00 strings a case in both tiers — and the row it replaced was wrong
   about its own verdict, which is a worse failure than the stale counts and is the reason to read
@@ -1369,10 +1408,15 @@ states, which is the circularity `analytical/`'s import discipline exists to pre
 expression is left exactly as CIBSE publishes it, `CLOSED_FORM_ASSUMPTIONS` carries the divergence
 as `symmetric-speed` (`bias: 'under'`), and `analyzeUpPeak` raises
 `UP_PEAK_WARNING_CODES.directionalSpeedAsymmetry` on any bank whose cars have one — so a residual
-measured there arrives with the reason attached rather than as a defect. **It is raised on no
-shipped building**, because every shipped car is symmetric, which is the difference between a
-disclaimer and a defect. Under a symmetric configuration the oracle agrees exactly as it did:
-`analytical/validation.test.ts` runs unchanged at its pinned tolerances.
+measured there arrives with the reason attached rather than as a defect. **It stopped being raised
+on no shipped building on 2026-09-15**, and that is a result rather than a regression: this
+paragraph read *"raised on no shipped building, because every shipped car is symmetric"* for as long
+as the exemption was a disclaimer about nothing, and `ctf-class-reference/shuttle` — 20 m/s up,
+10 m/s down, the design Hitachi publishes for that tower — is now the one bank in
+`data/buildings/` that raises it ([§ D577](DECISIONS.md), GitHub issue #425).
+`analytical/upPeak.test.ts` asserts that in **both** directions, this bank and no other, because
+half the claim is that the detector is not simply on. Under a symmetric configuration the oracle
+agrees exactly as it did: `analytical/validation.test.ts` runs unchanged at its pinned tolerances.
 
 ## Modeling rules that are easy to get wrong
 

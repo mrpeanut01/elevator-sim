@@ -18,6 +18,7 @@ import type { ElevatorSpecs, LoadedConfig, ResolvedBuilding } from '../config/ty
 import { analyzeUpPeak, deriveUpPeakTerms, passengerTransferSecondsFor } from './upPeak.js';
 import {
   AnalyticalError,
+  CLOSED_FORM_ASSUMPTIONS,
   CLOSED_FORM_COMPARISON_RULE,
   IMPLAUSIBLE_PERCENT_POPULATION_5MIN,
   UP_PEAK_WARNING_CODES,
@@ -853,11 +854,11 @@ describe('every shipped building is either analysable or explicit about why not'
     }
 
     // The sweep must not pass vacuously by refusing everything. As of the shipped data,
-    // 22 of the 26 banks are analysable. Four are not, and the first three are double-deck
-    // shuttles between unpopulated sky lobbies: Vertical City's, and — since GitHub issue #376 —
-    // the Burj-class reference tower's, whose six banks otherwise all analyse. That the same shape
-    // is refused on a 165-floor building as on a 100-floor one is the useful part: the refusal
-    // is about the geometry rather than about the size.
+    // **35 of the 41 banks are analysable**. Six are not, and the first three are shuttles between
+    // unpopulated sky lobbies: Vertical City's, and — since GitHub issue #376 — the Burj-class
+    // reference tower's, whose six banks otherwise all analyse. That the same shape is refused on a
+    // 165-floor building as on a 100-floor one is the useful part: the refusal is about the
+    // geometry rather than about the size.
     //
     // **The fourth is `ashgate/carpark`** (GitHub issue #501), and it is the same refusal reached
     // from the opposite end of the size range: one single-deck car serving two car-park decks and
@@ -867,13 +868,79 @@ describe('every shipped building is either analysable or explicit about why not'
     // asked a question it has no term for. `ashgate/main` and `harbour-point/main` both analyse,
     // and both reconcile against a simulated run in
     // `packages/experiments/src/oracle/remainingBuildings.test.ts`.
-    expect(analysed).toBe(22);
-    expect(refused).toBe(4);
-    // Two banks exceed the sanity bound on the default population, and both for one reason: a
-    // shuttle's U is the sky lobby's own population rather than the crowd it lifts. Mixed-Use
+    //
+    // **Two more arrived with GitHub issues #424 and #430**, and they are the same refusal a third
+    // and fourth time: `shanghai-class-reference/shuttle` and `merdeka-class-reference/shuttle`
+    // each serve a terminal and two or three sky lobbies, every one of which houses nobody. Four
+    // shuttles on four different towers, refused for one reason, is what makes the refusal a
+    // property of the *arrangement* rather than a quirk of any building — and
+    // `ctf-class-reference/shuttle` is the control that says so, because it is the same shape with
+    // one populated floor bolted on (a sky deck at 109) and it analyses.
+    expect(analysed).toBe(35);
+    expect(refused).toBe(6);
+    // Three banks exceed the sanity bound on the default population, and all three for one reason:
+    // a shuttle's U is the sky lobby's own population rather than the crowd it lifts. Mixed-Use
     // High-Rise's is 260 against the 1 014 it carries; the Burj-class reference tower's is its
     // three sky lobbies' zero (they are transfer floors and hold nobody) against the 3 198 above
-    // them. Every other bank's default U is the population it actually serves.
-    expect(implausible).toBe(2);
+    // them; and `ctf-class-reference/shuttle`'s is the **thirty** people on the sky deck at 109
+    // against the 4 442 in the three zones the same shuttle feeds. Every other bank's default U is
+    // the population it actually serves.
+    expect(implausible).toBe(3);
+  });
+
+  it('raises directionalSpeedAsymmetry on the one shipped bank whose cars are not one speed', () => {
+    /*
+     * **GitHub issue #425, and the first time this warning has fired on shipped data.**
+     *
+     * `CLOSED_FORM_ASSUMPTIONS`' `symmetric-speed` entry and `CLAUDE.md` § Correctness oracle both
+     * said the code *"is raised on no shipped building"* — true from GitHub issue #444 until
+     * `ctf-class-reference` landed, and the difference between a disclaimer and a defect while it
+     * lasted. It is a disclaimer about something now: that tower's shuttle climbs at 20 m/s and
+     * descends at 10, so the published expression's single `tv` is charged twice against a car
+     * that only reaches it in one direction.
+     *
+     * Asserted in **both** directions, because half of this claim is that the detector is not
+     * simply on: it fires on that bank and on no other shipped bank, and the negative half is what
+     * says a symmetric fleet stays silent.
+     */
+    const transferOverride: Record<string, number> = { 'mixed-use': 1.2 };
+    const raising: string[] = [];
+    for (const resolved of config.buildings) {
+      for (const bank of resolved.banks) {
+        const options = {
+          bankId: bank.id,
+          ...(transferOverride[resolved.type] === undefined
+            ? {}
+            : { passengerTransferS: transferOverride[resolved.type] }),
+        };
+        let analysis;
+        try {
+          analysis = analyzeUpPeak(resolved, specs, options);
+        } catch {
+          continue;
+        }
+        if (warningCodes(analysis.warnings).includes(UP_PEAK_WARNING_CODES.directionalSpeedAsymmetry)) {
+          raising.push(`${resolved.id}/${bank.id}`);
+        }
+      }
+    }
+    expect(raising).toEqual(['ctf-class-reference/shuttle']);
+
+    // And the bank really is asymmetric, checked against the configuration rather than trusted —
+    // a detector that had started firing on everything would pass the line above and mean nothing.
+    const bank = config.buildingsById
+      .get('ctf-class-reference')
+      ?.banks.find((candidate) => candidate.id === 'shuttle');
+    expect(bank?.cars.length).toBeGreaterThan(0);
+    for (const car of bank?.cars ?? []) {
+      expect(car.ratedSpeedMps).toBe(20);
+      expect(car.descentSpeedMps).toBe(10);
+    }
+
+    // The divergence the warning points at is enumerated rather than described, and it is
+    // one-sided: a slower descent can only add seconds to the return half.
+    const entry = CLOSED_FORM_ASSUMPTIONS.find((item) => item.id === 'symmetric-speed');
+    expect(entry).toBeDefined();
+    expect(entry?.bias).toBe('under');
   });
 });

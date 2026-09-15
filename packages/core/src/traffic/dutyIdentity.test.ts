@@ -41,11 +41,14 @@ const SHIPPED = [
   'burj-class-reference',
   'chancery-house',
   'crown-hotel',
+  'ctf-class-reference',
   'garden-apartments',
   'harbour-point',
+  'merdeka-class-reference',
   'midtown-office',
   'mixed-use-high-rise',
   'secure-tower',
+  'shanghai-class-reference',
   'st-jude-hospital',
   'vertical-city',
 ] as const;
@@ -92,7 +95,7 @@ const dutyColumn = (trace: PassengerTrace): readonly (Duty | undefined)[] =>
   trace.passengers.map((passenger) => passenger.duty);
 
 describe('a building that declares no duty is byte-identical', () => {
-  it('names the eleven buildings from disk, and none of them declares a duty', () => {
+  it('names the fourteen buildings from disk, and none of them declares a duty', () => {
     expect([...config.buildingsById.keys()].sort()).toEqual([...SHIPPED]);
     for (const id of SHIPPED) {
       for (const bank of buildingOf(id).banks) {
@@ -151,6 +154,25 @@ describe('a building that declares no duty is byte-identical', () => {
       expect(run(weighted, undefined)).toBe(baseline);
       expect(run(weighted, EVERYBODY)).toBe(baseline);
     },
+    /*
+     * **Three whole-duration runs of the heaviest building in the set, and the ceiling is named
+     * here rather than inherited** — GitHub issue #430, `DECISIONS.md` § D579.
+     *
+     * `vitest.config.ts` gives this project 300 000 ms, chosen against a population where the
+     * slowest case was well under it. `merdeka-class-reference` is 8 455 people over 92 cars and
+     * this case runs it **three times** at its full authored duration: measured on this tree it
+     * costs **306 s** inside a full `--project core` run and around 300 s alone, which is the
+     * ceiling to within noise — so it fails on the budget rather than on an assertion, and the
+     * failure names an `it.each` opener and says nothing about identity.
+     *
+     * Annotated rather than shortened. Cutting the window would weaken a byte-identity claim on the
+     * one building most likely to break it: the duty draw is one uniform per passenger in final
+     * trace order, so the longer the trace the more chances the identity has to fail, and a shorter
+     * run is a weaker test that still gets published. `vitest.config.ts`'s own rule is that a site
+     * that knows it runs a simulation is allowed to say so; 900 000 ms is three times the loaded
+     * measurement, which is the headroom this suite needs on a box hosting parallel worktrees.
+     */
+    900_000,
   );
 });
 

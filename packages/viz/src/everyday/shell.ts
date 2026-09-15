@@ -2490,6 +2490,25 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     unmountCurrent();
     drawRail();
     const route = routeFor(state.screen);
+    /**
+     * **The main landmark says which screen it is** — `docs/36` `AX-15`, GitHub issue #406,
+     * [§ D591](../../../../DECISIONS.md).
+     *
+     * A screen reader's landmark list is one of the two ways a non-visual reader navigates a page,
+     * and until this line every one of the twenty-one screens announced the same word: *main*. The
+     * accessibility-tree walkthrough measured it that way — twenty-one screens, twenty-one unnamed
+     * `main` landmarks — and a list in which every entry reads the same is a list that has stopped
+     * being navigation.
+     *
+     * `SCREEN_NAMES` rather than a second table, which is what that constant's own docstring asks
+     * for: *"what a screen is called when a heading needs it"*. So this adds **no** player-facing
+     * string, and a screen that is renamed is renamed here too.
+     *
+     * Written here rather than in each screen because the region is the shell's element, and
+     * because a per-screen write is a per-screen omission: the one screen that forgot would be the
+     * one nobody noticed. `screenReaderWalkthrough.browser.test.ts` asserts it on all of them.
+     */
+    screenRegion.setAttribute('aria-label', SCREEN_NAMES[state.screen]);
     coverEngineer();
     drawBar();
     if (route === 'menu') {

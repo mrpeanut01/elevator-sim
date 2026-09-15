@@ -689,11 +689,33 @@ function mountReportScreen(
         });
     });
     block.append(eyebrow, button);
-    for (const prose of view.lines) {
+    /**
+     * **A refused press says why to a reader who cannot see the paragraph under it** — `docs/36`
+     * `AX-1`/`AX-16`, GitHub issue #406, [§ D593](../../../../DECISIONS.md).
+     *
+     * `postRun.ts` already guarantees the sentence exists — *"`false` is always accompanied by a
+     * `reason` line"* — and the accessibility-tree walkthrough found the other half missing: the
+     * button announced as *"Post this run, button, dimmed"* with no description at all, because the
+     * reason is a sibling paragraph and a sibling names nothing. This is the same defect the
+     * Workshop's eleven inert controls carry, on the loudest disabled control in the product.
+     *
+     * `aria-describedby` at the node already drawn, never a second copy of the words: no
+     * player-facing string is added, and the description a reader hears is by construction the
+     * sentence a sighted player reads. Attached only where there **is** a refusal — a pressable
+     * button describing itself with a note would be noise, and `postRun.ts`'s `role` field is
+     * already the distinction between *this is why you cannot* and *this is what will happen*.
+     */
+    let reasonId: string | undefined;
+    for (const [index, prose] of view.lines.entries()) {
       const node = el(doc, 'p', prose.className, prose.text);
       node.style.cssText = `${prose.role === 'reason' ? BODY : QUIET};margin:10px 0 0;max-width:74ch`;
+      if (prose.role === 'reason' && reasonId === undefined) {
+        reasonId = `everyday-post-reason-${String(index)}`;
+        node.id = reasonId;
+      }
       block.append(node);
     }
+    if (!view.pressable && reasonId !== undefined) button.setAttribute('aria-describedby', reasonId);
     return block;
   }
 

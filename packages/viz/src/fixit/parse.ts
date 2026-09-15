@@ -723,7 +723,7 @@ function decodeBuildingPatch(raw: Record_, at: string, violations: string[]): Bu
         continue;
       }
       const set = entry['set'];
-      const allowed = ['counterweightBalanceRatio', 'regenerativeDrive'];
+      const allowed = ['counterweightBalanceRatio', 'regenerativeDrive', 'ropeClass'];
       for (const key of Object.keys(set)) {
         if (!allowed.includes(key)) violations.push(`${at}: a bank equipment patch may not set "${key}".`);
       }
@@ -732,6 +732,7 @@ function decodeBuildingPatch(raw: Record_, at: string, violations: string[]): Bu
         set: {
           ...(num(set['counterweightBalanceRatio']) === undefined ? {} : { counterweightBalanceRatio: num(set['counterweightBalanceRatio']) }),
           ...(typeof set['regenerativeDrive'] === 'boolean' ? { regenerativeDrive: set['regenerativeDrive'] } : {}),
+          ...(str(set['ropeClass']) === undefined ? {} : { ropeClass: str(set['ropeClass']) }),
         },
       });
     }

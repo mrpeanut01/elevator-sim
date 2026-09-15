@@ -581,7 +581,7 @@ describe('the loader refuses to accept an unroutable building in silence', () =>
     expect(tower.warnings.map((warning) => warning.code)).toEqual([]);
   });
 
-  it('leaves all eleven shipped buildings loading clean', async () => {
+  it('leaves all fourteen shipped buildings loading clean', async () => {
     /*
      * **`ashgate` is the one that had to earn this** — GitHub issue #501. It is the first shipped
      * building whose two banks meet on exactly one floor, so every journey between a car-park deck
@@ -591,7 +591,7 @@ describe('the loader refuses to accept an unroutable building in silence', () =>
      * file exists to catch before the loader accepts it.
      */
     const config = await loadConfig(REAL_DATA_DIR);
-    expect(config.buildings).toHaveLength(11);
+    expect(config.buildings).toHaveLength(14);
     const connectivityCodes: readonly string[] = [
       WARNING_CODES.unreachableFromEntrance,
       WARNING_CODES.unroutableInterfloor,
