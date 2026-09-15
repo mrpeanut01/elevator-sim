@@ -61,6 +61,8 @@
 import type { Browser, BrowserContextOptions, Page } from 'playwright-core';
 import { afterAll, afterEach, expect } from 'vitest';
 
+import type { EverydayScreen } from '../everyday/types.js';
+
 /**
  * The gate and the artifact, from the one module that can be read outside a test — § D425.
  *
@@ -561,6 +563,23 @@ export async function openEverydayDoor(page: Page): Promise<void> {
 }
 
 /**
+ * § 6.1's front door, then § 3.3's primary onto the brief — menu tile → door → brief.
+ *
+ * Split out of {@link enterEverydayStage} rather than inlined twice, because two callers want to
+ * **stop here**: the tuner's only shipped door is a card on the brief (§ 3.2 gives it no rail row
+ * and no tile), and a sweep of the brief itself has to arrive by the player's own route. Before it
+ * was split, `accessibilitySweep.browser.test.ts` carried a private copy of this route and of the
+ * stage's four-fact latch under it, with a docstring saying the copy was kept identical — which is
+ * the shape this file's own header was written about.
+ */
+export async function openEverydayBrief(page: Page): Promise<void> {
+  await openEverydayDoor(page);
+  /* § 3.3's door row, step 1 of the daily timeline: `Set up today`. */
+  await page.locator('.everyday-bar-primary').click();
+  await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+}
+
+/**
  * Walk § 6's daily loop from the main menu to a stage with the player's own day paused on it —
  * menu tile → front door → brief → stage, on § 3.3's primary at each step.
  *
@@ -603,10 +622,7 @@ export async function openEverydayDoor(page: Page): Promise<void> {
  * brief's primary returns long before there is anything to draw.
  */
 export async function enterEverydayStage(page: Page): Promise<void> {
-  await openEverydayDoor(page);
-  /* § 3.3's door row, step 1 of the daily timeline: `Set up today`. */
-  await page.locator('.everyday-bar-primary').click();
-  await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+  await openEverydayBrief(page);
   /* § 3.3's brief row, step 2: `Start the day` — `host.startRun()`, then `go('stage')`. */
   await page.locator('.everyday-bar-primary').click();
   await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
@@ -626,6 +642,175 @@ export async function enterEverydayStage(page: Page): Promise<void> {
     { timeout: 120_000 },
   );
 }
+
+/* -------------------------------------------------------------------------- *
+ * One route per screen the registry builds — GitHub issues #407 and #406
+ * -------------------------------------------------------------------------- */
+
+/** A rail row, by its § 3.2 label — the rows carry no class of their own. */
+async function railRow(page: Page, label: string): Promise<void> {
+  await openEverydayRail(page);
+  await page.locator('nav.everyday-rail button', { hasText: label }).first().click();
+}
+
+/** The Career tile, then the building the campaign opens with. */
+async function openCampaignBuilding(page: Page): Promise<void> {
+  await leaveTutorialIfOffered(page);
+  await page.locator('.everyday-mode[data-screen="towers"]').click();
+  await page.waitForSelector('.everyday-towers', { timeout: 15_000 });
+  await page.locator('.everyday-towers-open').first().click();
+  await page.waitForSelector('.everyday-building', { timeout: 15_000 });
+}
+
+/**
+ * **One route per screen `everyday/screens.ts` builds — the player's own path in every case.**
+ *
+ * Typed as a total `Record` over `EverydayScreen`, so a new key in `everyday/types.ts`'s inventory
+ * fails to compile. *Built* is a filter that type cannot see, so both files that drive this table
+ * assert it against `EVERYDAY_SCREENS_BUILT` at run time, in **both** directions.
+ *
+ * ## Why it is here and not in the file that first needed it
+ *
+ * It was written inside `everyday/accessibilitySweep.browser.test.ts` and moved here whole on the
+ * commit that added `everyday/screenReaderWalkthrough.browser.test.ts` (GitHub issue #406). Two
+ * instruments that visit *every screen* need the same twenty-one routes, and two copies kept
+ * identical by a sentence is the exact shape this file's header was written about — six private
+ * copies of one constant, every docstring claiming they were kept identical, and they were, by
+ * nobody. A route that goes stale now goes stale for both instruments at once, loudly.
+ *
+ * It sits beside {@link enterEverydayStage} and {@link openEverydayDoor} rather than in a new
+ * module because those are its parts, and because `dev/browserTier.test.ts` requires every file
+ * importing this tier's gate to be a file the tier collects: a third `*.test-helper.ts` reaching for
+ * {@link leaveTutorialIfOffered}'s neighbours would be a stray by that guard's own derivation.
+ *
+ * **Its non-test caller is nothing**, like every export in this file — it is the tier's own
+ * vocabulary.
+ */
+export const EVERYDAY_SCREEN_ROUTES: Readonly<
+  Record<EverydayScreen, (page: Page) => Promise<void>>
+> = Object.freeze({
+  /*
+   * The shell's own front door. `leaveTutorialIfOffered` first because every page this tier opens is
+   * a fresh context and therefore a first visit, which `shell.ts#offerTutorial` bounces to the
+   * landing page.
+   */
+  menu: async (page) => {
+    await leaveTutorialIfOffered(page);
+    await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
+  },
+  /*
+   * GitHub issue #244's landing page. Reached by **not leaving it**: it is what a fresh context
+   * meets, which is the whole of what the page is for, so the route waits for it rather than
+   * navigating to it. That also makes this the one route here that reaches a screen in the state a
+   * stranger actually arrives in.
+   */
+  landing: async (page) => {
+    await page.waitForSelector('.everyday-landing', { timeout: 30_000 });
+  },
+  /*
+   * § D529's walkthrough is reached by no tile and no rail row: the shell's only `go` to it is the
+   * landing page's own call to action. Pressed here rather than waited for, because waiting for a
+   * screen nothing opens is how a route quietly stops testing anything.
+   */
+  tutorial: async (page) => {
+    await page.waitForSelector('.everyday-landing-cta', { timeout: 30_000 });
+    await page.locator('.everyday-landing-cta').click();
+    await page.waitForSelector('.everyday-tutorial', { timeout: 30_000 });
+  },
+  /*
+   * The walkthrough's own primary, *Show me a building losing*. Deliberately not the skip button and
+   * not the collapse screen's primary: both call `tutorialScreens.ts#leave`, which files a real day
+   * (§ D476), so pressing either would run a shift these instruments have no use for and hand the
+   * rest of the page a week that is not the fixture.
+   */
+  collapse: async (page) => {
+    await page.waitForSelector('.everyday-landing-cta', { timeout: 30_000 });
+    await page.locator('.everyday-landing-cta').click();
+    await page.waitForSelector('.everyday-tutorial', { timeout: 30_000 });
+    await page.locator('.everyday-bar-primary').click();
+    await page.waitForSelector('.everyday-collapse', { timeout: 20_000 });
+  },
+  scenario: async (page) => {
+    await leaveTutorialIfOffered(page);
+    await page.locator('.everyday-mode[data-screen="scenario"]').click();
+    await page.waitForSelector('.everyday-scenario', { timeout: 15_000 });
+  },
+  door: openEverydayDoor,
+  brief: openEverydayBrief,
+  stage: enterEverydayStage,
+  /*
+   * The only route in this table that needs a run, and it needs a *closed* one:
+   * `shell.ts#nextStopIsLive` lights the report's stop only once the day is closed and a report
+   * exists. Reached by the two presses a player makes rather than by `page.evaluate` into the host,
+   * because that route needs a dev server and these files may not have one.
+   */
+  report: async (page) => {
+    await enterEverydayStage(page);
+    await page.locator('.everyday-bar-primary').click();
+    await page.waitForSelector('.everyday-report', { timeout: 60_000 });
+  },
+  towers: async (page) => {
+    await leaveTutorialIfOffered(page);
+    await page.locator('.everyday-mode[data-screen="towers"]').click();
+    await page.waitForSelector('.everyday-towers', { timeout: 15_000 });
+  },
+  building: openCampaignBuilding,
+  contract: async (page) => {
+    await openCampaignBuilding(page);
+    await page.locator('.everyday-building-to-contract').click();
+    await page.waitForSelector('.everyday-contract', { timeout: 15_000 });
+  },
+  rush: async (page) => {
+    await leaveTutorialIfOffered(page);
+    await page.locator('.everyday-mode[data-screen="rush"]').click();
+    await page.waitForSelector('.everyday-rush', { timeout: 15_000 });
+  },
+  fixit: async (page) => {
+    await openScenarioEntry(page, 'fix-a-building');
+    await page.waitForSelector('.everyday-fixit', { timeout: 30_000 });
+    /*
+     * The case rail arrives with the screen; the figures arrive from a worker. Waiting for a case
+     * button rather than for a figure is deliberate — these instruments read what is drawn, and a
+     * screen still filling in is a state a player meets too.
+     */
+    await page.waitForSelector('.everyday-fixit-case', { timeout: 60_000 });
+  },
+  workshop: async (page) => {
+    await railRow(page, 'Dispatcher workshop');
+    await page.waitForSelector('.everyday-workshop', { timeout: 20_000 });
+  },
+  bench: async (page) => {
+    await railRow(page, 'Test bench');
+    await page.waitForSelector('.everyday-bench-test', { timeout: 30_000 });
+  },
+  designer: async (page) => {
+    await railRow(page, 'Design a building');
+    await page.waitForSelector('.everyday-designer', { timeout: 20_000 });
+  },
+  /*
+   * § 3.2 forbids the tuner a rail row and a tile — *it is a thing you do to a day, not a place you
+   * live* — and `standaloneScreens.browser.test.ts` asserts that absence in both directions. Its one
+   * shipped door is the brief's locked-for-score card, so that is the route.
+   */
+  tuner: async (page) => {
+    await openEverydayBrief(page);
+    await page.locator('.everyday-brief-locked-go').click();
+    await page.waitForSelector('.everyday-tuner', { timeout: 15_000 });
+  },
+  week: async (page) => {
+    await railRow(page, 'Your week');
+    await page.waitForSelector('.everyday-week', { timeout: 20_000 });
+  },
+  board: async (page) => {
+    await railRow(page, 'Boards & ladder');
+    await page.waitForSelector('.everyday-board-tab-ladder', { timeout: 30_000 });
+  },
+  settings: async (page) => {
+    await openEverydayRail(page);
+    await page.locator('.everyday-rail-settings').click();
+    await page.waitForSelector('.everyday-settings', { timeout: 20_000 });
+  },
+});
 
 /* -------------------------------------------------------------------------- *
  * The artifact the tier drives — GitHub issue #281

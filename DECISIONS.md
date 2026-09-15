@@ -35866,3 +35866,77 @@ twelfth building meets a red test rather than this paragraph.
 assumption with its reasoning attached, in § D519's manner, and the owner's to accept, tighten or
 reject. Whether `QUIRKS` should be re-sourced. And nothing about the renewal ladder, the shop or the
 calendar, none of which this touches.
+
+## D591 — Every Everyday screen names its main landmark, and the stage acquires the heading it never had; both from `SCREEN_NAMES` rather than from new copy
+
+**Date: 2026-09-15 · GitHub issue [#406](https://github.com/mrpeanut01/elevator-sim/issues/406), split from #239 · Rules on: [`docs/36`](docs/36-accessibility-standard.md) `AX-15`, which until now had an instrument on the Engineer shell only.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: it binds `everyday/shell.ts`, `everyday/stageScreen.ts` and `everyday/screens.ts#SCREEN_NAMES` together, and it moves a row `docs/36` § 7 records — `AX-15`'s Everyday half was tier 3, *"best effort; nothing checks it"*, and it is checked now on all twenty-one screens.
+
+**What was measured, and it is the reason this is not a nicety.** Chromium's own accessibility tree — `Accessibility.getFullAXTree` over CDP, not the DOM and not a rule set's model of it — read on each of the twenty-one screens `everyday/screens.ts` builds, reached by the player's own route:
+
+1. **Twenty-one screens, twenty-one `main` landmarks, and not one of them named.** Landmark navigation is one of the two ways a non-visual reader answers *where am I*, and a list in which every entry reads the same word is a list that has stopped being navigation.
+2. **The stage exposes no heading at all.** Twenty of the twenty-one carry exactly one level-1 heading; the screen the game is actually played on carried none. Heading navigation is the other of the two ways, and on the stage the answer was silence.
+
+**The decision.** `shell.ts#draw` writes `aria-label` on the screen region from `screens.ts#SCREEN_NAMES[state.screen]` on every navigation, and `stageScreen.ts` draws a visually hidden `h1` reading `SCREEN_NAMES.stage`.
+
+Three things follow from *that constant* rather than a sentence of either module's own, and they are the whole of why this is one decision and not two:
+
+- **No player-facing string is added.** `SCREEN_NAMES`' own docstring already says it is *"what a screen is called when a heading needs it"*, and `honesty/surfaces.ts` already seeds every one of its values into the corpus, under the adapter id `everyday/screens.ts#SCREEN_NAMES`. So the honesty corpus does not move, which is a forecast this entry makes rather than a claim it asserts.
+- **A screen cannot come to be called two things.** The shell's refusal screens already draw the same constant as their `h1`.
+- **A renamed screen is renamed in the landmark list on the same commit.**
+
+**Why the stage's heading is hidden and the others are not.** § 7.1's header is a strip of live values — a clock, a phase pill, a driver, three figures — rather than a title, and every fact on that screen is already drawn for a sighted player. Printing a title above it would be a layout change the design handoff did not ask for, and the clause asks for a heading rather than for a bigger header. `AX-0` is satisfied in the other direction too: nothing is removed.
+
+**Why the landmark name is written in the shell and not in each screen.** A per-screen write is a per-screen omission, and the one screen that forgot would be the one nobody noticed. `everyday/screenReaderWalkthrough.browser.test.ts` asserts both halves on all twenty-one, and both go red without the change — measured, not assumed: reverting the label fails twenty-one cases and reverting the heading fails one.
+
+**What this does not decide.** Whether the `main` landmark's name should be the screen's name or the *building's* — the door, the brief and the building desk all title themselves with a building, and a landmark that did so would be a second source for a name the `h1` already carries. And nothing about the Engineer shell's landmarks, which are outside this issue and have their own skip link.
+
+## D592 — A live region is written when its sentence changes, and the stage's alarm needs a cadence as well, because its sentence carries a live count
+
+**Date: 2026-09-15 · GitHub issue [#406](https://github.com/mrpeanut01/elevator-sim/issues/406) · Rules on: [`docs/36`](docs/36-accessibility-standard.md) `AX-3`, recorded there as **failing**, and [`docs/28`](docs/28-art-direction.md) § 7.3 AD-A3, which named the same defect first.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: it closes a defect two documents already record, and it corrects `AX-3`'s own policy where that policy is not sufficient — which is a claim about the standard rather than about this module.
+
+**What the defect was.** `everyday/stageScreen.ts` drew two `role="status"` regions inside its per-frame `draw()`:
+
+- the alarm strip, `alarm.replaceChildren(…)` on **every frame it was up** — `docs/36` § 3.2 calls it *"the clearest example in the product of why this standard exists"*;
+- the intervention stamp, `interventionStamp.textContent = …` on every frame — the same defect one element over, and easier to miss, because assigning the *same* string still replaces the text node and still fires the mutation a reader re-reads.
+
+Measured on the shipped bundle at `vertical-city`, seed 424242, over 300 frames with the day playing: **91 stamp writes, every one of them the same sentence**, and 28 alarm writes over the 28 frames the strip was up.
+
+**The decision, and it is two guards rather than one.**
+
+1. **Equality, for both.** A region is written only when its sentence differs from what it last said. That is `AX-3` read literally and it is the whole answer for the stamp, whose sentence is fixed the moment an intervention is pressed.
+2. **A cadence, for the alarm.** `stageScreenModel.ts#stageAlarmOf` returns *"41 people waiting, deepest at floor 7"* — the count moves — so its sentence **genuinely changes on most frames** and a region obeying the letter of the clause is still a reader talking over the player continuously. It gets `STAGE_ANNOUNCE_MS`, the same two seconds `describeFrame`'s region already uses, rather than a second number.
+
+**That second half is a correction to `AX-3` and is the part worth reading.** The clause as written — *"written when its sentence changes, and at no other time"* — is a necessary condition and not a sufficient one, and this is the first measurement in the tree that separates the two. The clause is not weakened here; a second requirement is added beside it for the regions whose sentence is a live figure.
+
+**The strip and the announcement are now two elements**, and the split is what keeps the fix honest. The visible strip keeps its per-frame count, because a player watching a building go wrong wants the number live, and a rate-limited strip would have been a change to the picture. It carries no `role`. A visually hidden sibling carries the announcement at the cadence, from **the same `alarmLine` string**, so the two cannot drift — `honesty/agreement.ts`'s `surfaces-disagree` avoided structurally rather than asserted. `AX-0` is satisfied: nothing stops being said, and nothing stops being drawn.
+
+**The check, and the vacuous first draft that is the reason this entry names its fixture.** `everyday/screenReaderWalkthrough.browser.test.ts` observes the three announcement regions with a `MutationObserver` and asserts two properties — no two consecutive writes saying the same thing, and no two writes closer than the cadence. Written first against `midtown-office` at the default speed it **passed with the defect in place**: that building never raises the alarm, the stamp was the empty string, and Chromium queues no mutation for `textContent = ''` on an element with no children. So the fixture is three deliberate choices — a building whose morning goes wrong, the fastest speed rung so the playhead crosses it, and one intervention pressed — and the case asserts that both regions were written at least once, so it cannot go quietly vacuous again.
+
+**What this does not decide.** Whether two seconds is the right cadence for an alarm as against a frame description — it is `describeFrame`'s figure kept rather than re-chosen, and re-choosing it is a question for whoever runs the screen-reader session § 6.7 still asks for. And nothing about the Engineer surface's own live region, which has had the cadence since `KB-13`.
+
+## D593 — A disabled control carries the reason it is disabled into the accessibility tree, by pointing at the sentence already drawn
+
+**Date: 2026-09-15 · GitHub issue [#406](https://github.com/mrpeanut01/elevator-sim/issues/406) · Rules on: [`docs/36`](docs/36-accessibility-standard.md) `AX-1` and `AX-16`, and [§ D227](#d227)'s rule that a control which writes nothing must say so.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: it binds `everyday/workshopScreen.ts` and `everyday/reportScreen.ts` to one rule neither module owns, and that rule is now a gate in the browser tier over every screen the registry builds.
+
+**What was measured.** Over the twenty-one screens' accessibility trees, every node the tree marks `disabled`, against whether it carries an accessible **description**. Seven screens already do it — the menu's own home row, the door's *day after this one*, the stage's switch, the campaign's *Not yet*, the fix-it rows, the bench's *Run the suite*, Settings' report button — through `title` or `aria-describedby`. Three did not:
+
+- **the Workshop, eleven controls.** § 11.4's five pattern selects and six detector fields go inert under `policy: 'off'`, and the reason is drawn one paragraph above them as loose prose. A reader tabbing through met *"Dispatcher for up-peak traffic, combo box, dimmed"* eleven times and was told nothing.
+- **the report, one control.** *Post this run*, the loudest disabled control in the product. `postRun.ts` already guarantees the sentence exists — its own docstring says *"`false` is always accompanied by a `reason` line"* — and the sentence was a sibling paragraph, which names nothing.
+- **the works shop, thirty-two controls**, which are **not** fixed and are registered instead; see below.
+
+**The decision.** Where a disabled control's reason is already drawn, the control points at that node with `aria-describedby`. Never a second copy of the words: the description a screen reader announces after the name is the same node a sighted player reads, so no player-facing string is added and the two cannot drift.
+
+**The two that are recorded rather than fixed, with the reason.** `screenReaderWalkthrough.browser.test.ts`'s `OUTSTANDING` carries both, held in both directions by a ghost check:
+
+1. **The contract's nineteen future calendar days.** `campaignModel.ts#cellFor` gives the `works`, `missed` and `cleared` states a suffix on their tip and gives `ahead` none, because there is nothing to say about a day that has not happened. The remedy needs a new player-facing sentence, and the cheap alternative — `aria-hidden` on a future day, or drawing it as text rather than a button — is `AX-0` exactly. Whether a future day is a control at all belongs with whoever owns § 8.4 of the campaign.
+2. **The works shop's thirteen unaffordable tiers, which *do* say why** — in the last phrase of a hundred-character button name, *"… needs level 1 first"*. So the reason reaches a reader, after ninety-odd characters of cost and effect. Moving it into a description would change what a sighted player sees, and a rule that accepted *the reason is somewhere in the name* would accept every long button in the product. It is a real finding and not a real defect, which is the argument for reading that register rather than counting it.
+
+**One exclusion in the rule itself, measured rather than assumed.** Chromium propagates `disabled` from a `<select>` to every `<option>` and does **not** propagate `aria-describedby`, so the Workshop's five inert selects arrived as sixty-five findings about controls no reader ever lands on. `option` is excluded. The cost is stated where the exclusion is: an option disabled *inside an enabled* combobox would go unasked, nothing else asks either, and no such option exists in the tree today.
+
+**What this does not decide.** Whether `title` is a good enough carrier for the seven screens that already pass — it maps to the accessible description in every engine this product supports, and whether each reader announces it is one of the things § 6.7's session still has to confirm.

@@ -82,7 +82,7 @@ import type { GoalState } from '../shift/types.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import { RUSH_NOT_LANDED, rushStageHeaderOf } from './rush.js';
 import type { EverydayHost } from './host.js';
-import type { EverydayScreenModule } from './screens.js';
+import { SCREEN_NAMES, type EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
   DEFAULT_STAGE_SPEED_INDEX,
@@ -360,6 +360,36 @@ function mountStage(
   let recomputingOver: VizRecording | undefined;
   /** What § 14.1's band was last drawn for — see {@link drawWatching}. `''` while it is down. */
   let watchKey = '';
+  /**
+   * **What the two other announcement regions last said, and when** — `docs/36` `AX-3`, GitHub
+   * issue #406, [§ D592](../../../../DECISIONS.md).
+   *
+   * `AX-3`'s policy is *"a live region is written when its sentence changes, and at no other
+   * time"*, and `docs/36` § 3.2 names the alarm strip as **the clearest example in the product of
+   * why that standard exists**: `alarm.replaceChildren(…)` ran on every frame the alarm was up,
+   * which is up to sixty rewrites a second of a `role="status"` region. `interventionStamp` was the
+   * same defect one element over, through `textContent =` — and assigning the *same* string still
+   * replaces the text node, so the mutation fires and the reader re-reads. Measured on
+   * `vertical-city` over 300 frames: **91 stamp writes, every one of them the same sentence**, and
+   * 28 alarm writes over the 28 frames the strip was up.
+   *
+   * **The two need different guards, and finding that out is what the measurement bought.** The
+   * stamp's sentence is fixed once an intervention is pressed, so equality is the whole answer. The
+   * alarm's is not: `stageScreenModel.ts#stageAlarmOf` carries a live count, so its sentence really
+   * does change on most frames and an equality guard alone leaves the region talking. It gets
+   * {@link description}'s answer as well — the same {@link STAGE_ANNOUNCE_MS} rather than a second
+   * number — on a hidden sibling, so the strip a sighted player reads keeps its live count. See
+   * {@link alarm}.
+   *
+   * `alarmDrawnLine` is the strip's own last paint and is **not** an accessibility guard; it is here
+   * because a repaint that paints the same thing is work nobody asked for.
+   *
+   * The check is `everyday/screenReaderWalkthrough.browser.test.ts`, and it goes red without these.
+   */
+  let alarmSaid: string | undefined;
+  let alarmSaidMs = Number.NEGATIVE_INFINITY;
+  let alarmDrawnLine: string | undefined;
+  let stampSaid: string | undefined;
 
   /* ---------------------------------------------------------------- chrome */
 
@@ -554,8 +584,24 @@ function mountStage(
   goalNote.style.cssText = `font-size:11px;line-height:1.4;color:${C.label}`;
   goals.append(goalHeading, goalRows, goalNote);
 
+  /**
+   * **The alarm strip is a picture again, and its announcement moved to {@link alarmSay}** —
+   * `docs/36` `AX-3`, GitHub issue #406, [§ D592](../../../../DECISIONS.md).
+   *
+   * It carried `role="status"` and was rewritten on every frame it was up, which `docs/28` AD-A3 and
+   * `docs/36` § 3.2 both name as the clearest announcement defect in the product. The first fix
+   * tried was an equality guard — write only when the sentence changes — and measuring it showed
+   * why that is not enough on its own: `stageScreenModel.ts#stageAlarmOf` returns *"41 people
+   * waiting, deepest at floor 7"*, and the **count moves**, so the sentence genuinely changes on
+   * most frames and a reader is still talked over continuously.
+   *
+   * So the strip keeps the live count a sighted player wants and stops being a live region, and a
+   * visually hidden sibling carries the announcement at {@link STAGE_ANNOUNCE_MS}. That is the split
+   * {@link description} already makes one element over, for the same reason, with the same constant
+   * rather than a second number — and `AX-0` is satisfied: nothing stops being said, and nothing
+   * stops being drawn.
+   */
   const alarm = el(doc, 'div', 'everyday-stage-alarm');
-  alarm.setAttribute('role', 'status');
   alarm.style.cssText = [
     'display:none',
     'align-items:center',
@@ -566,6 +612,29 @@ function mountStage(
     'padding:6px 11px',
     'font-size:12.5px',
     'font-weight:600',
+  ].join(';');
+
+  /**
+   * The alarm's announcement — the strip's own sentence, said once and then at most every
+   * {@link STAGE_ANNOUNCE_MS}. See {@link alarm} for why the two are separate elements.
+   *
+   * It is the **same string** rather than a second wording, so the two cannot drift; that is
+   * `honesty/agreement.ts`'s `surfaces-disagree` avoided structurally rather than asserted.
+   */
+  const alarmSay = el(doc, 'p', 'everyday-stage-alarm-say');
+  alarmSay.setAttribute('role', 'status');
+  alarmSay.setAttribute('aria-live', 'polite');
+  alarmSay.style.cssText = [
+    'position:absolute',
+    'width:1px',
+    'height:1px',
+    'margin:-1px',
+    'padding:0',
+    'overflow:hidden',
+    'clip:rect(0 0 0 0)',
+    'clip-path:inset(50%)',
+    'white-space:nowrap',
+    'border:0',
   ].join(';');
 
   /* --- § 14.1's identity band. Up exactly while a record is on the stage. --- */
@@ -993,7 +1062,52 @@ function mountStage(
   ].join(';');
   dock.setAttribute('aria-label', 'campaign dock');
   stageRow.append(stageWrap);
-  root.append(header, goals, watchBand, alarm, stageRow, legend, interventions, race);
+
+  /**
+   * **The one screen in the product that exposed no heading at all** — `docs/36` `AX-15`, GitHub
+   * issue #406, [§ D591](../../../../DECISIONS.md).
+   *
+   * Measured on Chromium's own accessibility tree, screen by screen: twenty of the twenty-one
+   * screens `everyday/screens.ts` builds expose exactly one level-1 heading, and this one — the
+   * screen the game is actually played on — exposed none. Heading navigation is how a screen-reader
+   * user answers *where am I*, and on the stage the answer was silence.
+   *
+   * **Visually hidden, for the reason {@link description} is**: every fact on this screen is already
+   * drawn for a sighted player — the clock, the phase, the driver, the figures — and § 7.1's header
+   * is a strip of live values rather than a title. Printing a title above it would be a layout
+   * change the design handoff did not ask for, and the clause asks for a heading rather than for a
+   * bigger header. `AX-0` is satisfied in the other direction too: nothing is removed here.
+   *
+   * `SCREEN_NAMES.stage` rather than a sentence of its own, so this adds **no** player-facing string
+   * and the stage cannot come to be called two things. The shell draws the same constant as the
+   * region's landmark name and on its own refusal screens.
+   */
+  const title = el(doc, 'h1', 'everyday-stage-title', SCREEN_NAMES.stage);
+  title.style.cssText = [
+    'position:absolute',
+    'width:1px',
+    'height:1px',
+    'margin:-1px',
+    'padding:0',
+    'overflow:hidden',
+    'clip:rect(0 0 0 0)',
+    'clip-path:inset(50%)',
+    'white-space:nowrap',
+    'border:0',
+  ].join(';');
+
+  root.append(
+    title,
+    header,
+    goals,
+    watchBand,
+    alarm,
+    alarmSay,
+    stageRow,
+    legend,
+    interventions,
+    race,
+  );
   region.append(root);
 
   /* ------------------------------------------------------------- behaviour */
@@ -1695,7 +1809,29 @@ function mountStage(
 
     const alarmLine = stageAlarmOf(observations, labelOf);
     alarm.style.display = alarmLine === undefined ? 'none' : 'flex';
-    if (alarmLine !== undefined) alarm.replaceChildren(breathingDot(doc), el(doc, 'span', undefined, alarmLine));
+    /* The strip: drawn only when the sentence changes, because a repaint that paints the same
+       thing is work nobody asked for. It is no longer a live region — see {@link alarmSay}. */
+    if (alarmLine !== undefined && alarmLine !== alarmDrawnLine) {
+      alarm.replaceChildren(breathingDot(doc), el(doc, 'span', undefined, alarmLine));
+      alarmDrawnLine = alarmLine;
+    }
+    /*
+     * The announcement: when the sentence changes **and** not oftener than
+     * {@link STAGE_ANNOUNCE_MS} — `AX-3`, and {@link alarm}'s docstring for why both halves are
+     * needed. Cleared once when the trouble ends, so a reader is not left with a sentence about a
+     * queue that has gone; the guard on that write is what stops the clearing itself repeating.
+     */
+    const nowMs = systemClock().now();
+    if (alarmLine === undefined) {
+      if (alarmSaid !== undefined) {
+        alarmSay.textContent = '';
+        alarmSaid = undefined;
+      }
+    } else if (alarmLine !== alarmSaid && nowMs - alarmSaidMs >= STAGE_ANNOUNCE_MS) {
+      alarmSay.textContent = alarmLine;
+      alarmSaid = alarmLine;
+      alarmSaidMs = nowMs;
+    }
     /*
      * § 7.2 E3 — `trouble_visible`, and it is `charter S1` exactly: *a first-time player reaches a
      * building in visible trouble within 90 s of first load.*
@@ -1802,7 +1938,11 @@ function mountStage(
       recomputing: recomputingOver !== undefined,
       ...(target === undefined ? {} : { switchTo: target }),
     });
-    interventionStamp.textContent = intervention.stamp;
+    /* Written only when the stamp changes — {@link stampSaid}, `AX-3`. */
+    if (intervention.stamp !== stampSaid) {
+      interventionStamp.textContent = intervention.stamp;
+      stampSaid = intervention.stamp;
+    }
     /*
      * § 14.1: *"§ 7.6's intervention machinery is **disabled** while watching. A spectator who could
      * intervene would be playing, not watching."* The refusal is composed here rather than added as

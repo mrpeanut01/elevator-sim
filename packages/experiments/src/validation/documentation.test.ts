@@ -1742,7 +1742,30 @@ type DecisionReservation = {
  * because it is tidier, but because the alternative is every lane inventing bookkeeping the
  * integrator then has to throw away.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'AA', from: 576, to: 594 } as DecisionReservation | null;
+/*
+ * **Wave AA reserved D576–D594, and this line was opened by a lane rather than by the integrator —
+ * which is the slip this block's own paragraphs keep recording, arriving again.**
+ *
+ * The wave was dispatched with per-lane blocks inside D576–D594 and nobody set this constant, so
+ * the first lane to write a decision entry met the closed-wave branch: *the charter row must equal
+ * `highest + 1`*. That branch is correct for an integrated tree and wrong for an open wave, which is
+ * exactly what the paragraph above this one says — and the two ways out of it are not equal. A lane
+ * that reconciled `CHARTER_PROGRAMME.md`'s row to its own highest number would be writing the row
+ * `CLAUDE.md` tells every other lane not to read, in the middle of a wave, from a branch that cannot
+ * see the other lanes' numbers. Opening the reservation instead leaves that row at the block's floor
+ * where it belongs, and tolerates every lane whose numbers sit inside the block.
+ *
+ * **`to` is 594 because that is the ceiling this lane was given** — *never take a number above
+ * D594* — and it is therefore a claim about one dispatch brief rather than about the wave. If
+ * another lane holds numbers above it, this is the line to widen, and the red it produces
+ * (*"a lane may not take a number its block does not hold"*) is the correct one to meet: § D404's
+ * rule is to ask rather than to take.
+ *
+ * Spent by lane D (GitHub issue #406, the accessibility-tree walkthrough): **D591, D592, D593**.
+ * D594 is unspent and is **free rather than a hole**, because nothing above it was written — only a
+ * number written below a higher one is a hole (§ D430).
+ */
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
