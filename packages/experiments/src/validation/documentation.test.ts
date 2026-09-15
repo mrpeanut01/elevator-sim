@@ -1742,7 +1742,7 @@ type DecisionReservation = {
  * because it is tidier, but because the alternative is every lane inventing bookkeeping the
  * integrator then has to throw away.
  */
-const OPEN_RESERVATION = { wave: 'AA, of 2026-09-15', from: 576, to: 600 } as DecisionReservation | null;
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
@@ -1837,6 +1837,36 @@ const OPEN_RESERVATION = { wave: 'AA, of 2026-09-15', from: 576, to: 600 } as De
  */
 
 const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
+  [
+    584,
+    "wave AA's lane returned it unspent, and a sibling lane then wrote a higher num" +
+      "ber, which makes it a hole rather than free. Registered under D404 and D430: ids" +
+      " here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
+    585,
+    "wave AA's lane returned it unspent, and a sibling lane then wrote a higher num" +
+      "ber, which makes it a hole rather than free. Registered under D404 and D430: ids" +
+      " here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
+    586,
+    "wave AA's lane returned it unspent, and a sibling lane then wrote a higher num" +
+      "ber, which makes it a hole rather than free. Registered under D404 and D430: ids" +
+      " here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
+    589,
+    "wave AA's lane returned it unspent, and a sibling lane then wrote a higher num" +
+      "ber, which makes it a hole rather than free. Registered under D404 and D430: ids" +
+      " here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
+    590,
+    "wave AA's lane returned it unspent, and a sibling lane then wrote a higher num" +
+      "ber, which makes it a hole rather than free. Registered under D404 and D430: ids" +
+      " here are names, so reissuing it would make it denote two things across time.",
+  ],
   [
     558,
     "wave Z's lane held it and wrote a higher number instead, so it is a hole rathe" +
