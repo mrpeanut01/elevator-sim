@@ -1702,37 +1702,6 @@ type DecisionReservation = {
 /**
  * **The D533–D556 block is closed, and wave Z's block D557–D580 is open in its place.**
  *
- * The wave of 2026-09-10 (widened 2026-09-11) wrote fifteen of its twenty-four numbers. The nine it
- * never reached — D534, D536, D540, D541, D544, D546, D550, D551 and D554 — are registered below as
- * holes rather than backfilled, on § D430's rule that ids here are names: a number handed to a lane
- * and reported unspent denotes *what that lane took*, and giving it to somebody else later would
- * make it mean two things across time.
- *
- * **Wave Z reserves D557–D580, opened before its first lane commits rather than after.** That is
- * the one procedural thing waves Q and the § D418 note above keep having to relearn, so it is done
- * first here and not at integration. The block: D557–D559 lane A (GitHub issue #537, the deep
- * corpus's whole-run figures), D560–D562 lane B (#528, the fix-it editor's pricing seam),
- * D563–D567 lane C (#531, #533 and #535, the Everyday shell's leave, swap and staleness paths),
- * D568–D571 lane D (#534, the hybrid landing panels' follow-ups), D572–D576 lane E (#500 and #501,
- * Harbour Point and Ashgate) — and **D577–D580 are the integrator's**, which is the sizing lesson
- * § D418's note asked the next wave to apply rather than repeat.
- *
- * **Two lanes widened the old block instead, independently, and both were right to.** Lanes B and
- * C each branched before this commit existed, so the only reservation either could see was
- * D533–D556. Holding D560–D562 and D563–D567 they widened that block to D562 and to D567, each on
- * the commit that needed it, and each gave the same reason: a lane writing a number inside its own
- * block was turning this gate red on the ceiling rather than on anything it had done wrong. That
- * reasoning is correct, and both conflicts were resolved in favour of the block above only because
- * D557–D580 already contains both ranges — a wider claim that makes the narrower ones redundant,
- * not wrong.
- *
- * **That it happened twice is the finding rather than the nuisance.** This comment was written
- * predicting that lanes would each meet the wall alone and solve it differently; two of five did,
- * before anybody looked, and wrote two different ceilings and two different justifying paragraphs.
- * So the rule earns its place by measurement: **the block is opened before the lanes start**, not
- * because it is tidier, but because the alternative is every lane inventing bookkeeping the
- * integrator then has to throw away.
- */
 const OPEN_RESERVATION = { wave: 'Z, of 2026-09-14', from: 557, to: 580 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the

@@ -719,6 +719,14 @@ export function goalRowsOf(
   history: readonly DayOutcome[],
   day: number,
   observations: GoalObservations,
+  /**
+   * Which question the fold above is being asked — {@link basisAt}'s own answer, passed in.
+   *
+   * Required, and it reaches exactly one string: `shift/goals.ts#gaveUpBesideOf` withholds the
+   * overlap at a playhead short of `endedAt` ([§ D557](../../../../DECISIONS.md)). Nothing else on
+   * a row moves with it, because nothing else on a row is an outcome.
+   */
+  basis: WaitBandBasis,
 ): readonly GoalRow[] {
   return readings.map((reading) => {
     const met = reading.state === 'met';
@@ -735,7 +743,7 @@ export function goalRowsOf(
        * field derived from observations a restored outcome does not carry could never be checked
        * against anything. Every caller of this function already holds the fold it graded with.
        */
-      beside: gaveUpBesideOf(reading.goal, observations),
+      beside: gaveUpBesideOf(reading.goal, observations, basis),
       state: reading.state,
       barPct: reading.progressPct,
       color: pending ? FAINT : met ? GOOD : CAUTION,
@@ -1296,6 +1304,13 @@ function drawShift(
     week.history,
     week.day,
     observations,
+    /*
+     * The same question the mood card and the honesty card are asked at this playhead — {@link
+     * basisAt}, one home for the decision. Before the first run there is no shift to be over, and
+     * the fold above is `goalObservationsOf`'s zeroed one, on which `gaveUpBesideOf` returns the
+     * empty string at `abandoned: 0` before it reads the basis at all.
+     */
+    recording === undefined ? 'now' : basisAt(recording, view.simTimeS),
   );
   surfaces.goals(
     goals

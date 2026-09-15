@@ -60,7 +60,7 @@ import {
 } from '../live/synthetic.test-helper.js';
 import type { VizLeg, VizRecording } from '../contract/types.js';
 
-import { gaveUpBesideOf, goalsForDay, readGoals } from './goals.js';
+import { gaveUpBesideOf, goalsForDay, OVERLAP_UNSETTLED, readGoals } from './goals.js';
 import { shiftObservationsOf } from './observations.js';
 import { GOAL_OBSERVATION_IDS, type GoalObservations, type Observations, type ShiftGoal } from './types.js';
 
@@ -178,8 +178,8 @@ const EXPECTED_BESIDE =
 
 describe('the derivation itself', () => {
   it('says nothing on the day that moved its people, and names the twenty on the day that did not', () => {
-    expect(gaveUpBesideOf(minuteGoal(), MOVED)).toBe('');
-    expect(gaveUpBesideOf(minuteGoal(), LEFT)).toBe(EXPECTED_BESIDE);
+    expect(gaveUpBesideOf(minuteGoal(), MOVED, 'whole-run')).toBe('');
+    expect(gaveUpBesideOf(minuteGoal(), LEFT, 'whole-run')).toBe(EXPECTED_BESIDE);
   });
 
   it('says nothing beside a bar the count cannot flatter, on either day', () => {
@@ -192,7 +192,7 @@ describe('the derivation itself', () => {
      */
     for (const goal of goalsForDay(1)) {
       if (goal.reads === 'minutePct') continue;
-      expect(gaveUpBesideOf(goal, LEFT), `${goal.id} should carry no count`).toBe('');
+      expect(gaveUpBesideOf(goal, LEFT, 'whole-run'), `${goal.id} should carry no count`).toBe('');
     }
   });
 
@@ -214,7 +214,7 @@ describe('the derivation itself', () => {
         compare: 'at-most',
         reads,
       };
-      sentences.set(reads, gaveUpBesideOf(goal, LEFT));
+      sentences.set(reads, gaveUpBesideOf(goal, LEFT, 'whole-run'));
     }
     // Exactly the two the module classifies as flattered, named here so a third arriving silently
     // fails rather than passing as *more coverage*.
@@ -234,27 +234,180 @@ describe('the derivation itself', () => {
   it('carries the overlap and the run’s own horizon — § D417', () => {
     // Every one of the three overlap arms, because a surface that published the bare count would
     // invite a reader to subtract it from the people.
-    const some = gaveUpBesideOf(minuteGoal(), { ...LEFT, abandonedCarried: 7 });
+    const some = gaveUpBesideOf(minuteGoal(), { ...LEFT, abandonedCarried: 7 }, 'whole-run');
     expect(some).toContain('7 of them carried');
-    const all = gaveUpBesideOf(minuteGoal(), { ...LEFT, abandonedCarried: LEFT.abandoned });
+    const all = gaveUpBesideOf(minuteGoal(), { ...LEFT, abandonedCarried: LEFT.abandoned }, 'whole-run');
     expect(all).toContain('every one of them carried');
-    expect(gaveUpBesideOf(minuteGoal(), LEFT)).toContain('none of them carried');
+    expect(gaveUpBesideOf(minuteGoal(), LEFT, 'whole-run')).toContain('none of them carried');
     // The run's own line, never a hard-coded fifteen minutes.
-    expect(gaveUpBesideOf(minuteGoal(), { ...LEFT, horizonS: 600 })).toContain('10-minute');
-    expect(gaveUpBesideOf(minuteGoal(), { ...LEFT, horizonS: 750 })).toContain('750 s');
+    expect(gaveUpBesideOf(minuteGoal(), { ...LEFT, horizonS: 600 }, 'whole-run')).toContain('10-minute');
+    expect(gaveUpBesideOf(minuteGoal(), { ...LEFT, horizonS: 750 }, 'whole-run')).toContain('750 s');
   });
 
   it('does not claim they left, because on a no-patience run nobody did — docs/19 defect 3', () => {
-    const said = gaveUpBesideOf(minuteGoal(), LEFT);
+    const said = gaveUpBesideOf(minuteGoal(), LEFT, 'whole-run');
     expect(said).toContain('waited past');
     expect(said).not.toContain('gave up and');
     expect(said).not.toContain('took the stairs');
   });
 });
 
+/* -------------------------------------------------------------------------- *
+ * The overlap is an outcome — § D557, GitHub issue #537
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A day on which every rider's wait crosses the horizon **and a car comes anyway**, late.
+ *
+ * The fixtures above cannot show what this block is about: on {@link leftThemStanding} nobody who
+ * crossed the line is ever carried, so `abandonedCarried` is `0` at every playhead and the overlap
+ * clause reads *none of them carried* honestly from 00:00 to the end. That is the arm the defect
+ * hides behind.
+ *
+ * Here all forty board at `arrivedAt + 1 000` — a thousand seconds is past `fixtureSummary`'s own
+ * 900 s horizon, so every one of them is counted `abandoned`, and every one of them alights. So the
+ * overlap **moves inside one run**, which is the whole claim: it is not a fold of what has happened
+ * by `t`, it is an outcome the end of the day decides.
+ */
+const LATE_BOARD_S = 1_000;
+
+function carriedThemLate(): VizRecording {
+  const legs: VizLeg[] = [];
+  for (let index = 0; index < ARRIVALS; index += 1) {
+    const at = arrivalAt(index);
+    legs.push(servedLeg(`rider-${String(index)}`, at, at + LATE_BOARD_S, at + LATE_BOARD_S + 25));
+  }
+  return syntheticRecording({ startedAt: 0, endedAt: ENDED_AT, legs });
+}
+
+/** The same run, folded at a playhead short of its end. */
+function foldAt(recording: VizRecording, at: number): Observations {
+  return shiftObservationsOf(observationsAt(recording, at));
+}
+
+describe('the overlap moves inside one run, so it is an outcome rather than a reading', () => {
+  const LATE = carriedThemLate();
+  /* Every rider has arrived and the first ten have crossed the horizon; none has alighted yet. */
+  const MIDWAY = foldAt(LATE, LATE_BOARD_S);
+  const FINISHED = foldAt(LATE, ENDED_AT);
+
+  it('reads “none carried” at the playhead and “every one” at the end, about one cohort', () => {
+    /*
+     * The measurement this whole block rests on. The mid-run fold is not wrong — it is a count of
+     * what had happened by then — and that is exactly why the **sentence** may not state it as a
+     * settled fate: at 1 000 s the truthful fold says nobody who crossed the line has been carried,
+     * and by the end of the same day every single one of them has.
+     */
+    expect(MIDWAY.abandoned).toBeGreaterThan(0);
+    expect(MIDWAY.abandonedCarried).toBe(0);
+    expect(FINISHED.abandoned).toBe(ARRIVALS);
+    expect(FINISHED.abandonedCarried).toBe(ARRIVALS);
+  });
+
+  it('withholds the overlap at a playhead short of the end, and says it is withholding it', () => {
+    const live = gaveUpBesideOf(minuteGoal(), MIDWAY, 'now');
+    /*
+     * **The three clauses that are readings survive.** The count is a fold at `t`, non-decreasing
+     * in it; `arrived` is its population, which R13 requires travelling with it; the denominator
+     * clause is § D106's content. None of the three is an outcome, so none is withheld.
+     */
+    expect(live).toContain(`${String(MIDWAY.abandoned)} of ${String(MIDWAY.arrived)}`);
+    expect(live).toContain('15-minute give-up horizon');
+    expect(live).toContain('this share is over the legs that boarded');
+    expect(live).toContain('so far');
+    // And the withholding is *said*, which is § D223's remedy rather than a quieter figure.
+    expect(live).toContain(OVERLAP_UNSETTLED);
+    /*
+     * **The verb is gone, and that is the assertion a revert fails.** `carried` is
+     * `honesty/properties.ts#WHOLE_RUN_COUNTS`'s cue for `summary.delivered`, and the reason the
+     * deep corpus reported this sentence at `stage(@1474s).goals.minute.beside` is that the cue sat
+     * in one clause with a live count that happened to equal the finished day's delivered total.
+     * The cue is not what is being avoided — the *claim* is: *none of them carried* is a statement
+     * about the end of a day that has not ended.
+     */
+    for (const cue of ['carried', 'delivered', 'got where', 'arrived where', 'reached their']) {
+      expect(live, `the mid-run sentence still says "${cue}"`).not.toContain(cue);
+    }
+  });
+
+  it('states the overlap once the day has ended — § D417 is narrowed, not withdrawn', () => {
+    const settled = gaveUpBesideOf(minuteGoal(), FINISHED, 'whole-run');
+    expect(settled).toContain('every one of them carried');
+    expect(settled).not.toContain(OVERLAP_UNSETTLED);
+    expect(settled).not.toContain('so far');
+  });
+
+  it('draws the withheld arm on the stage strip at a playhead short of the end', () => {
+    /*
+     * The surface the deep corpus actually failed on. Driven through `stageGoalsOf` rather than
+     * through `gaveUpBesideOf`, so a strip that stopped passing its own `judged` down fails here
+     * even though the derivation is correct.
+     */
+    const strip = stageGoalsOf({
+      readings: readGoals(goalsForDay(1), MIDWAY),
+      observations: MIDWAY,
+      simTimeS: LATE_BOARD_S,
+      endedAt: ENDED_AT,
+      history: [],
+      day: 1,
+    });
+    expect(strip.judged).toBe(false);
+    const row = strip.rows.find((entry) => entry.id === 'minute');
+    expect(row?.beside).toContain(OVERLAP_UNSETTLED);
+    expect(row?.beside).not.toContain('carried');
+
+    // And the same strip at `endedAt` states it, so the fix is a gate rather than a deletion.
+    const graded = stageGoalsOf({
+      readings: readGoals(goalsForDay(1), FINISHED),
+      observations: FINISHED,
+      simTimeS: ENDED_AT,
+      endedAt: ENDED_AT,
+      history: [],
+      day: 1,
+    });
+    expect(graded.judged).toBe(true);
+    expect(graded.rows.find((entry) => entry.id === 'minute')?.beside).toContain('of them carried');
+  });
+
+  it('draws the withheld arm on the Engineer rail’s own rows at the same playhead', () => {
+    const rows = goalRowsOf(readGoals(goalsForDay(1), MIDWAY), [], 1, MIDWAY, 'now');
+    const row = rows.find((entry) => entry.label.includes('inside a minute'));
+    expect(row?.beside).toContain(OVERLAP_UNSETTLED);
+    expect(row?.beside).not.toContain('carried');
+  });
+
+  it('draws the withheld arm on the campaign desk, which folds at the playhead too', () => {
+    /*
+     * `campaignScreens.ts#observationsOfHost` is *"today's fold at the playhead"*, so this desk is
+     * a mid-run surface as much as the stage is, and the basis reaches it through
+     * `CampaignInput.observationsBasis`.
+     */
+    const tower = openingCareer('eta').towers[0];
+    if (tower === undefined) throw new Error('no opening tower');
+    const rows = campaignTestRows(DIFFICULTIES.standard, tower, MIDWAY, [], 'now');
+    const away = rows.find((entry) => entry.id === 'away');
+    expect(away?.beside).toContain(OVERLAP_UNSETTLED);
+    expect(away?.beside).not.toContain('carried');
+  });
+
+  it('leaves the verdict, the figure and the bar exactly where they were', () => {
+    /*
+     * § D106 rule 1 again, on the new gate: what the basis moves is one clause of one sentence and
+     * nothing else. A basis that reached a glyph or a percentage would be grading a day early,
+     * which is the defect this closes rather than a second version of it.
+     */
+    const live = goalRowsOf(readGoals(goalsForDay(1), MIDWAY), [], 1, MIDWAY, 'now');
+    const settled = goalRowsOf(readGoals(goalsForDay(1), MIDWAY), [], 1, MIDWAY, 'whole-run');
+    expect(live.map((row) => ({ ...row, beside: '' }))).toEqual(
+      settled.map((row) => ({ ...row, beside: '' })),
+    );
+    expect(live.map((row) => row.beside)).not.toEqual(settled.map((row) => row.beside));
+  });
+});
+
 describe('the two screens differ, on every surface that grades the bar', () => {
   function railRow(observations: Observations): string {
-    const rows = goalRowsOf(readGoals(goalsForDay(1), observations), [], 1, observations);
+    const rows = goalRowsOf(readGoals(goalsForDay(1), observations), [], 1, observations, 'whole-run');
     const row = rows.find((entry) => entry.label.includes('inside a minute'));
     if (row === undefined) throw new Error('no minute row on the rail');
     return `${row.glyph} ${row.label} ${row.value} ${row.beside}`;
@@ -280,7 +433,7 @@ describe('the two screens differ, on every surface that grades the bar', () => {
     const view = goalRowViewOf({
       reading,
       was: '—',
-      beside: gaveUpBesideOf(reading.goal, observations),
+      beside: gaveUpBesideOf(reading.goal, observations, 'whole-run'),
     });
     return `${view.glyph} ${view.label} ${view.display} ${view.beside}`;
   }
@@ -288,7 +441,7 @@ describe('the two screens differ, on every surface that grades the bar', () => {
   function campaignRow(observations: GoalObservations): string {
     const tower = openingCareer('eta').towers[0];
     if (tower === undefined) throw new Error('no opening tower');
-    const rows = campaignTestRows(DIFFICULTIES.standard, tower, observations, []);
+    const rows = campaignTestRows(DIFFICULTIES.standard, tower, observations, [], 'whole-run');
     const row = rows.find((entry) => entry.id === 'away');
     if (row === undefined) throw new Error('no away row on the campaign desk');
     return `${row.reading?.glyph ?? '·'} ${row.label} ${row.reading?.display ?? '—'} ${row.beside}`;
@@ -326,8 +479,8 @@ describe('the two screens differ, on every surface that grades the bar', () => {
      * that clears the bar clears it, and the sheet says how it was cleared. So the two days' rows
      * differ in exactly one field.
      */
-    const moved = goalRowsOf(readGoals(goalsForDay(1), MOVED), [], 1, MOVED);
-    const left = goalRowsOf(readGoals(goalsForDay(1), LEFT), [], 1, LEFT);
+    const moved = goalRowsOf(readGoals(goalsForDay(1), MOVED), [], 1, MOVED, 'whole-run');
+    const left = goalRowsOf(readGoals(goalsForDay(1), LEFT), [], 1, LEFT, 'whole-run');
     const minuteMoved = moved.find((row) => row.label.includes('inside a minute'));
     const minuteLeft = left.find((row) => row.label.includes('inside a minute'));
     expect({ ...minuteMoved, beside: '' }).toEqual({ ...minuteLeft, beside: '' });

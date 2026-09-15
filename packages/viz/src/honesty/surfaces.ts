@@ -4183,6 +4183,12 @@ const RAIL_VIEW: SurfaceAdapter = {
         entry.week.history,
         entry.day,
         bundle.observations,
+        /*
+         * `'whole-run'` — `shiftBundleOf` folds at `recording.endedAt`, and this is the day the
+         * report sheet grades. § D557: the basis reaches `gaveUpBesideOf`'s overlap clause and
+         * nothing else on a row, and a mid-run arm of this sentence is the stage adapter's.
+         */
+        'whole-run',
       )) {
         /* GitHub issue #456 — seeded by name, `REPORT_SHEET`'s own reason two adapters up. */
         if (row.beside !== '') {
@@ -4215,6 +4221,7 @@ const RAIL_VIEW: SurfaceAdapter = {
         morningAfter.history,
         morningAfter.day,
         bundle.observations,
+        'whole-run',
       )) {
         seeds.push({
           field: `${at}.goalRowsOf(nextDay, ${row.label}).was`,
@@ -9139,6 +9146,12 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
      * being counted as covered (CLAUDE.md, wave T: *being in `covers` is not being swept*).
      */
     'shift/goals.ts#gaveUpBesideOf',
+    /*
+     * The clause the mid-run sentence carries instead of the overlap — § D557, GitHub issue
+     * #537. Claimed here because this adapter seeds it: this surface folds at a playhead short
+     * of `endedAt`, which is the one basis on which `gaveUpBesideOf` draws it.
+     */
+    'shift/goals.ts#OVERLAP_UNSETTLED',
     'shift/goals.ts#horizonLabelOf',
     'everyday/campaignModel.ts#campaignTestGoals',
     'everyday/campaignModel.ts#testsHeldLine',
@@ -9254,20 +9267,38 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
       seeds.push({ field: `campaign.careerNotice.${ground}`, text: notice, role: 'reason' });
     }
 
-    const cases: readonly (readonly [string, CampaignCareer, GoalObservations | undefined])[] = [
-      ['first-day', first, undefined],
-      ['second-month', { ...second, openTowerId: 'c6' }, observations],
-      ['booked', booked, observations],
-      ['picking-a-night', pending, undefined],
+    /*
+     * **Both bases, and the split between the two run-carrying arms is the point** — § D557.
+     *
+     * `campaignScreens.ts#observationsOfHost` folds *at the host's playhead*, so this desk is drawn
+     * mid-day as well as on a filed one, and `gaveUpBesideOf` says a different thing on each: the
+     * overlap clause is a settled outcome on `'whole-run'` and is withheld on `'now'`. A fixture
+     * that swept one basis would leave the other arm of that sentence unswept, which is the same
+     * argument `abandoned: 34` above makes about the overlap's three branches.
+     *
+     * The two arms that grade no run take `'whole-run'` and reach no string either way: with no
+     * observations `campaignTestRows` draws `''` before a basis is consulted.
+     */
+    const cases: readonly (readonly [
+      string,
+      CampaignCareer,
+      GoalObservations | undefined,
+      WaitBandBasis,
+    ])[] = [
+      ['first-day', first, undefined, 'whole-run'],
+      ['second-month', { ...second, openTowerId: 'c6' }, observations, 'whole-run'],
+      ['booked', booked, observations, 'now'],
+      ['picking-a-night', pending, undefined, 'whole-run'],
     ];
 
-    for (const [label, career, observed] of cases) {
+    for (const [label, career, observed, observationsBasis] of cases) {
       const input = {
         career,
         schedule: shippedPriceSchedule(),
         buildings,
         dispatchers,
         observations: observed,
+        observationsBasis,
         history: [],
       } as const;
 
@@ -9847,6 +9878,12 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      * being counted as covered (CLAUDE.md, wave T: *being in `covers` is not being swept*).
      */
     'shift/goals.ts#gaveUpBesideOf',
+    /*
+     * The clause the mid-run sentence carries instead of the overlap — § D557, GitHub issue
+     * #537. Claimed here because this adapter seeds it: this surface folds at a playhead short
+     * of `endedAt`, which is the one basis on which `gaveUpBesideOf` draws it.
+     */
+    'shift/goals.ts#OVERLAP_UNSETTLED',
     'shift/goals.ts#horizonLabelOf',
     'everyday/stageScreenModel.ts#STAGE_GOALS_COPY',
     /*

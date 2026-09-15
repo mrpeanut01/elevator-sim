@@ -1634,7 +1634,7 @@ describe('the § 7 goal strip', () => {
      */
     const atEnd = shiftObservationsOf(observationsAt(recording, recording.endedAt));
     const readings = readGoals(goalsForDay(DAY), atEnd);
-    const rail = goalRowsOf(readings, [], DAY, atEnd);
+    const rail = goalRowsOf(readings, [], DAY, atEnd, 'whole-run');
     expect(
       strip.rows.map((row) => [row.glyph, row.value, row.was, row.barPct, row.beside]),
     ).toEqual(rail.map((row) => [row.glyph, row.value, row.was, row.barPct, row.beside]));

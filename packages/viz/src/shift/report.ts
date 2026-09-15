@@ -892,7 +892,13 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
        * what § D106's *beside, never folded in* asks for and what `docs/14` § 5 criterion 4 says
        * must be **shown** rather than derivable from elsewhere on the same page.
        */
-      beside: gaveUpBesideOf(reading.goal, observations),
+      /*
+       * `'whole-run'` and not a playhead — [§ D557](../../../../DECISIONS.md). This sheet is the
+       * **filed** day: `dev/main.ts#closeShift` folds at `recording.endedAt` and there is no
+       * earlier state of it, so the overlap clause is a retrospective fact here rather than a
+       * preview of one. A sheet that ever acquires a mid-run arm owes this argument again.
+       */
+      beside: gaveUpBesideOf(reading.goal, observations, 'whole-run'),
     })),
     diagnosis: diagnosisFor(recording, observations, dayStartS, judgement.verdict),
     levers: leversFor(recording, observations, summary, readings),
