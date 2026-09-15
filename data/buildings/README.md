@@ -157,7 +157,13 @@ is not for the trip, so a car whose duty differs is still sent when it is the on
    of the profile's other weights is near-exclusive use. **No shipped profile weights it yet**: while
    no shipped building declares a duty a weight would be decoration, and `traffic/dutyIdentity.test.ts`
    refuses one; § D549 drafts `capacity-aware` at 0.35 for when one does. The shares — 0.02 goods,
-   0.01 bed and 0.02 service — are applied, and are **proposals awaiting the owner's approval**.
+   0.01 bed and 0.02 service — are applied, and the **product owner approved them as drafted on
+   2026-09-11** ([§ D549](../../DECISIONS.md) clause 7), along with the 0.35 weight; no figure moved.
+   **Approving the weight did not apply it**: it stays out of `data/dispatcher-profiles.json` under
+   the shipped-weight guard until a shipped building declares a duty. This sentence read *proposals
+   awaiting the owner's approval* until 2026-09-15 — a stale refusal of exactly the kind `CLAUDE.md`
+   calls worse than a dead seam, since it tells a reader a decision is still open when it has been
+   taken, and nothing in the suite reads this file's prose to catch it.
 3. **The control.** Not built: the picker the two screens want, on § D219's test.
 
 **The precedent that set that order is `accessZones`, this defect with its polarity reversed**
