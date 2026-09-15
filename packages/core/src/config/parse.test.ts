@@ -124,6 +124,11 @@ describe('parse.ts is fs-free so the browser build can use it', () => {
       'buildingConnectivity.ts',
       'demandPhases.ts',
       'expandFloors.ts',
+      // GitHub issue #429, § D601: floor area and what the hoistways take out of it. Arithmetic
+      // over the resolved floors and banks plus the two code tables from `schema.ts`, so it adds
+      // nothing to `external` and nothing to the `node:` set — the same clean bill
+      // `buildingConnectivity.ts` above got, and for the same reason.
+      'floorArea.ts',
       'parse.ts',
       'resolveCar.ts',
       'schema.ts',
