@@ -113,13 +113,66 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave AA's, measured 2026-09-15 on the integrated tree**; the paragraph above
+  below are wave AB's, measured 2026-09-15 on the integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **722 903** | **606** | **62** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **899 963** | **4 710** | **63** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **733 546** | **606** | **62** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **912 990** | **4 710** | **63** | **0** | **green**, and the register is empty |
+
+  **Wave AB's move is 217 strings a case in both tiers, and the small change is the whole of the
+  interest: the remainder is 10 strings across 49 cases and 7 across 60.** Measured on the
+  integrated tree after wave AB, both tiers in one sitting, with the base at `e53f28b` re-measured
+  first in a detached worktree.
+
+  **The base reproduced to the string in both tiers** — always-on 722 903 / 62 surfaces / 0 failing,
+  deep 899 963 / 63 / 0, identical to wave AA's published row. That is the second consecutive wave
+  the base has held since wave Z broke the streak, and the habit is worth restating in the form that
+  survives: not that the base *will* reproduce, but that you find out, because only a re-measurement
+  tells a correction apart from a move.
+
+  | | base `e53f28b` | wave AB | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 722 903 | **733 546** | **+10 643** | **217.20** |
+  | deep strings | 899 963 | **912 990** | **+13 027** | **217.12** |
+  | surfaces | 62 / 63 | **62 / 63** | **0** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **Neither quotient is an integer and both sit a hair above 217, which is a different shape from
+  every non-integer this column has recorded.** 49 × 217 = 10 633 against 10 643 measured, and
+  60 × 217 = 13 020 against 13 027 — so the move is a per-case constant of **exactly 217** plus a
+  conditional remainder of **10 strings in one tier and 7 in the other**, about a fifth of a string
+  a case. Previous non-integers here were state-dependent renderers emitting a genuinely variable
+  count; this one is a constant with a rounding error's worth of condition attached, and saying
+  which it is costs one division.
+
+  **The forecasts are scored and they do not sum, which is recorded rather than explained away.**
+  Three lanes published exact per-case figures — lane B **+8**, lane C **+80**, lane D **0**, summing
+  to **88** — and lane A published a **floor** of +18 (13 → 16 contracts × 5 seeds, plus three
+  `nextContract` strings) with an unquantified conditional above it. Floor total **106**; measured
+  **217**. **The 111-a-case remainder is not attributed to lane A**, tempting as the arithmetic is:
+  that inference holds only if the other three forecasts were exact, and [§ D454](DECISIONS.md)
+  recorded four forecasts that each checked out against their own branch and still came up one
+  string a case short in the integrated tree. A quotient is not a measurement, which is what
+  [§ D256](DECISIONS.md) refuses. What can be said exactly is that lane A was the only lane to
+  publish a floor rather than a figure, and it was right to.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: identical,
+  nothing added, nothing removed — on a wave that authored **three more reference towers** (One WTC,
+  Empire State, Willis), gave every floor a plate and every shaft a footprint that comes out of it,
+  built a rush sitting that posts from the viewer with a twelve-state post block, and rebalanced a
+  campaign stage. Every one of them went into an adapter that already existed; the three towers
+  enter by `honesty/surfaces.ts` iterating `CONTRACTS` rather than by anybody listing them, and none
+  of them appears in either tier's building histogram, which is unmoved. **The deep tier's
+  one-surface lead survives and the diff names it**: `campaign/judge.ts#judgeStage` is the only
+  surface in deep and not in always-on, and nothing is in always-on and not in deep.
+
+  **Both tiers exited 0 this time, which the previous pair did not.** The base deep run wrote
+  complete figures at 76 minutes while vitest called it failed at its 3 600 000 ms test timeout
+  under a load average of 30; the integrated run was given `--testTimeout=10800000` and finished in
+  **1 847 751 ms** on a quiet box with the verdict matching the figures. A measurement whose verdict
+  disagrees with its own output is a measurement somebody will later mistake for a failure.
 
   **Wave AA's move is 129 strings a case in both tiers, and the base reproduced exactly — which is
   the streak restarting one wave after it broke.** Measured on the integrated tree after wave AA,
