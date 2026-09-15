@@ -1,0 +1,1172 @@
+{
+  "$comment": "THE FIRST SHIPPED BUILDING THAT REACHES THE TOP OF THE SPEED CATALOGUE, and the densest group in the set: 106 cars over six banks against burj-class-reference's 57 over six. GitHub issue #424. NAMED IN THE REPOSITORY'S CONVENTION, burj-class-reference's: the real Shanghai Tower is the reference and the figures in this file are the project's own. PROVENANCE, per the product owner's 2026-09-08 standing ruling on governed data/ values: EVERY AUTHORED FIGURE BELOW IS AN AGENT'S PROPOSAL, drafted for the owner to accept, tighten or reject, and NOT YET APPROVED. The line the ruling asks for is drawn field by field. MEASURED (cited, and both citations are already in this repository): the shuttle's 20.5 m/s, which is elevator-specs.json's own realWorldAnchors row for this machine and the maximum of its ultra-high-speed class; and cabinPressurised, from the airPressure block's cited Al-Kodmany (Buildings 2015, 5(3), 1070-1104, s 3.1.4) note that this tower fits a pneumatic system against the air-pressure problem. The lift count, 106, is the one figure the prompting article states that this file uses, and it is used as a COUNT rather than as a citation -- how the 106 split between shuttles, locals and service is nowhere published and is chosen below. CHOSEN (an agent's proposals, none of them cited, all awaiting the owner): 128 floors above ground on a 4.5 m office storey and a 4.2 m hotel storey, putting the observation deck at 527.7 m and the crown's plant at 568.2 m under a 632 m architectural top this model does not carry; four sky lobbies at 21, 45, 69 and 93 and a hotel above the fourth; the populations (88 an office floor, 30 a hotel floor, 30 on the observation deck, 8,612 in all, which is roughly half what the real tower is reported to carry and is a floor-plate assumption rather than a citation); the split of the 106 cars (14 shuttles, four local banks of 20, a hotel bank of 12); and every car's class, rating and door. NOTHING HERE IS TAKEN FROM THE PROMPTING ARTICLE'S SPEED FIGURE: it says 5 m/s in the same paragraph as 'the 119th floor in under 55 seconds', which is self-refuting, and GitHub issue #424 says in terms that the article is the prompt and not the citation. WHAT THE DISTINGUISHING FEATURE BUYS, MEASURED ON THE LEGS RATHER THAN ASSERTED: packages/core/src/sim/directionalSpeedSeam.test.ts runs this tower as shipped and again with the shuttle rated at 10.0 m/s -- the fastest any shipped car was before this file -- and requires the legs to differ. A rating no run can spend is the shape of the eleven dead seams CLAUDE.md opens with, and CLAUDE.md's own 'short hops never reach rated speed' rule makes that a live risk at the top of the catalogue rather than a formality: at this class's 1.2 m/s2 and 1.2 m/s3 an s-curve needs about 185.4 m to reach 20.5 m/s and the same again to stop, so a leg shorter than about 370.7 m never touches the plate figure. THIS SHUTTLE MAKES EXACTLY ONE HOP THAT DOES -- G to sky lobby 4, 418.5 m -- and the other three (94.5 m, 202.5 m, 310.5 m) are acceleration-limited. That is the measurement #424 asks for, and it is in the seam test rather than in this sentence. WHAT THE CLOSED FORM SAYS: see packages/experiments/src/oracle/remainingBuildings.test.ts, which records this tower's verdict as a run rather than as a claim.",
+  "id": "shanghai-class-reference",
+  "name": "Shanghai-class reference tower",
+  "type": "mixed-use",
+  "trafficProfile": "office-standard",
+  "floors": [
+    {
+      "id": "G",
+      "index": 0,
+      "heightM": 0.0,
+      "population": 0,
+      "isEntrance": true,
+      "isTransferFloor": true,
+      "label": "Ground lobby \u2014 street entrance and the shuttle terminal"
+    },
+    {
+      "id": "21",
+      "index": 21,
+      "heightM": 94.5,
+      "population": 0,
+      "isTransferFloor": true,
+      "label": "Sky lobby 1 \u2014 zone 2 transfer"
+    },
+    {
+      "id": "45",
+      "index": 45,
+      "heightM": 202.5,
+      "population": 0,
+      "isTransferFloor": true,
+      "label": "Sky lobby 2 \u2014 zone 3 transfer"
+    },
+    {
+      "id": "69",
+      "index": 69,
+      "heightM": 310.5,
+      "population": 0,
+      "isTransferFloor": true,
+      "label": "Sky lobby 3 \u2014 zone 4 transfer"
+    },
+    {
+      "id": "93",
+      "index": 93,
+      "heightM": 418.5,
+      "population": 0,
+      "isTransferFloor": true,
+      "label": "Sky lobby 4 \u2014 the hotel lobby"
+    },
+    {
+      "id": "119",
+      "index": 119,
+      "heightM": 527.7,
+      "population": 30,
+      "label": "Observation deck and its restaurant (119)"
+    }
+  ],
+  "floorRanges": [
+    {
+      "fromIndex": 1,
+      "toIndex": 20,
+      "startHeightM": 4.5,
+      "floorToFloorM": 4.5,
+      "populationPerFloor": 88,
+      "idPattern": "{index}",
+      "label": "Zone 1 offices (1\u201320)"
+    },
+    {
+      "fromIndex": 22,
+      "toIndex": 44,
+      "startHeightM": 99.0,
+      "floorToFloorM": 4.5,
+      "populationPerFloor": 88,
+      "idPattern": "{index}",
+      "label": "Zone 2 offices (22\u201344)"
+    },
+    {
+      "fromIndex": 46,
+      "toIndex": 68,
+      "startHeightM": 207.0,
+      "floorToFloorM": 4.5,
+      "populationPerFloor": 88,
+      "idPattern": "{index}",
+      "label": "Zone 3 offices (46\u201368)"
+    },
+    {
+      "fromIndex": 70,
+      "toIndex": 92,
+      "startHeightM": 315.0,
+      "floorToFloorM": 4.5,
+      "populationPerFloor": 88,
+      "idPattern": "{index}",
+      "label": "Zone 4 offices (70\u201392)"
+    },
+    {
+      "fromIndex": 94,
+      "toIndex": 118,
+      "startHeightM": 422.7,
+      "floorToFloorM": 4.2,
+      "populationPerFloor": 30,
+      "idPattern": "{index}",
+      "label": "Hotel guest floors (94\u2013118)",
+      "trafficProfile": "hotel"
+    },
+    {
+      "fromIndex": 120,
+      "toIndex": 128,
+      "startHeightM": 532.2,
+      "floorToFloorM": 4.5,
+      "populationPerFloor": 0,
+      "idPattern": "{index}",
+      "label": "Plant and crown (120\u2013128) \u2014 unpopulated"
+    }
+  ],
+  "totalPopulation": 8612,
+  "banks": [
+    {
+      "$comment": "THE TOP OF THE SPEED CATALOGUE, REACHED BY A SHIPPED BUILDING FOR THE FIRST TIME. elevator-specs.json's ultra-high-speed class is {min 10.0, max 20.5, typical 10.0} and its 20.5 is taken from this very machine (realWorldAnchors: 'Shanghai Tower 20.5 World's fastest (Mitsubishi)'), and until this bank no building in data/buildings/ went faster than 10.0 -- so the top half of the class's own range had a UI caller (authoring/machineSpec.ts's ceiling, which a player can already dial) and no content caller. GitHub issue #424, and its own correcting comment, which is why this is stated as 'no authored example' rather than as a dead seam. cabinPressurised is CHOSEN and is the one field here with a source behind it: elevator-specs.json's airPressure $comment records Al-Kodmany (Buildings 2015) noting that THIS TOWER answers the air-pressure problem with a pneumatic system. Without it a 418.5 m bank would cap this car's descent at 10.0 m/s and the fastest lift in the catalogue would come down at the speed of the slowest supertall shuttle in the set; with it the machine is symmetric at 20.5 m/s both ways, which is what makes this tower the SYMMETRIC arm beside ctf-class-reference's asymmetric one.",
+      "id": "shuttle",
+      "name": "Sky lobby shuttle",
+      "servesFloors": [
+        "G",
+        "21",
+        "45",
+        "69",
+        "93"
+      ],
+      "cars": [
+        {
+          "id": "S1",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S2",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S3",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S4",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S5",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S6",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S7",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S8",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S9",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S10",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S11",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S12",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S13",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S14",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 20.5,
+          "cabinPressurised": true,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        }
+      ]
+    },
+    {
+      "id": "local-1",
+      "name": "Zone 1 locals, off the ground lobby",
+      "servesFloors": [
+        "G",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21"
+      ],
+      "cars": [
+        {
+          "id": "L1-1",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-2",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-3",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-4",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-5",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-6",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-7",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-8",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-9",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-10",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-11",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-12",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-13",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-14",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-15",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-16",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-17",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-18",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-19",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L1-20",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 5.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        }
+      ]
+    },
+    {
+      "id": "local-2",
+      "name": "Zone 2 locals, off sky lobby 1",
+      "servesFloors": [
+        "21",
+        "22",
+        "23",
+        "24",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "32",
+        "33",
+        "34",
+        "35",
+        "36",
+        "37",
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44",
+        "45"
+      ],
+      "cars": [
+        {
+          "id": "L2-1",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-2",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-3",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-4",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-5",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-6",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-7",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-8",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-9",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-10",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-11",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-12",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-13",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-14",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-15",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-16",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-17",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-18",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-19",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2-20",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        }
+      ]
+    },
+    {
+      "id": "local-3",
+      "name": "Zone 3 locals, off sky lobby 2",
+      "servesFloors": [
+        "45",
+        "46",
+        "47",
+        "48",
+        "49",
+        "50",
+        "51",
+        "52",
+        "53",
+        "54",
+        "55",
+        "56",
+        "57",
+        "58",
+        "59",
+        "60",
+        "61",
+        "62",
+        "63",
+        "64",
+        "65",
+        "66",
+        "67",
+        "68",
+        "69"
+      ],
+      "cars": [
+        {
+          "id": "L3-1",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-2",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-3",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-4",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-5",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-6",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-7",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-8",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-9",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-10",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-11",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-12",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-13",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-14",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-15",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-16",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-17",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-18",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-19",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3-20",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        }
+      ]
+    },
+    {
+      "id": "local-4",
+      "name": "Zone 4 locals, off sky lobby 3",
+      "servesFloors": [
+        "69",
+        "70",
+        "71",
+        "72",
+        "73",
+        "74",
+        "75",
+        "76",
+        "77",
+        "78",
+        "79",
+        "80",
+        "81",
+        "82",
+        "83",
+        "84",
+        "85",
+        "86",
+        "87",
+        "88",
+        "89",
+        "90",
+        "91",
+        "92",
+        "93"
+      ],
+      "cars": [
+        {
+          "id": "L4-1",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-2",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-3",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-4",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-5",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-6",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-7",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-8",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-9",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-10",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-11",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-12",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-13",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-14",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-15",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-16",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-17",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-18",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-19",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4-20",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 6.0,
+          "ratedLoadLb": 3500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        }
+      ]
+    },
+    {
+      "id": "local-hotel",
+      "name": "Hotel and observation locals, off sky lobby 4",
+      "servesFloors": [
+        "93",
+        "94",
+        "95",
+        "96",
+        "97",
+        "98",
+        "99",
+        "100",
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "110",
+        "111",
+        "112",
+        "113",
+        "114",
+        "115",
+        "116",
+        "117",
+        "118",
+        "119",
+        "120",
+        "121",
+        "122",
+        "123",
+        "124",
+        "125",
+        "126",
+        "127",
+        "128"
+      ],
+      "cars": [
+        {
+          "id": "H1",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "H2",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "H3",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "H4",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "H5",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "H6",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "H7",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "H8",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "H9",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "H10",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "H11",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "H12",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Six banks and 106 cars over a 568 m rise, against burj-class-reference's six banks and 57 cars over 596 m. That contrast is the point of the building and it is a contrast in DENSITY rather than in height: four local banks of twenty cars each, where the Burj-class tower's locals run eight to eleven. GitHub issue #424 asks for 'a denser bank arrangement over a shorter rise, which is a different point in the design space and not a bigger version of it'.",
+    "The observation deck is a populated floor and its visitors are not modelled, which is stated rather than left to be discovered. Floor 119 carries 30 people -- the deck's own staff and its restaurant -- so it is a real origin and a real destination on the office-standard profile and the hotel bank really serves it. What this repository has no template for is the VISITOR crowd an observation deck draws, which is GitHub issue #436's subject; authoring a separate observation express here would have been a bank almost nobody rides, which is DECISIONS.md SS D265's defect rather than fidelity.",
+    "Every car states passengerTransferS, because data/buildings/README.md refuses to default one on a mixed-use building. The shuttle takes the hotel's 1.5 s rather than the offices' 1.2 s on the README's own rule -- where a bank carries more than one population the slower value is chosen -- because it is the only route to the hotel and a guest with luggage is aboard it every trip. No new reference value is authored.",
+    "The stage cannot draw this tower legibly and that is recorded rather than implied. docs/12 SS 4.16 measured the SS 7 stage on the shipped bundle at 35 legible floors at 1280x800 and 40 at 1440x900; this building has 129. It is in exactly the position burj-class-reference is in, for the same reason, and GitHub issue #377 owns the remedy."
+  ]
+}

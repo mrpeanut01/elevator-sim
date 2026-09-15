@@ -58,7 +58,13 @@ import { isWaitingAt } from '../frame/overlay.js';
  * `n = 0…49`, folded through {@link legibilityOf} at the shipped band and window. **Re-measured
  * 2026-09-14 at ten contracts × 50 seeds = 500 runs** (GitHub issues #500 and #501), `docs/33`
  * § 4.6's cell exactly, and **all eight original rows reproduced to the second** — the two added
- * rows are the only movement in the table.
+ * rows were the only movement in the table.
+ *
+ * **Re-measured again 2026-09-15 at thirteen contracts × 50 seeds = 650 runs** (GitHub issues #424,
+ * #425 and #430), and **all ten rows reproduced to the second for the second wave running**. The
+ * three added rows are the only movement, and that is worth one line rather than none: this table's
+ * value is that a change to the crowd, the bands or the union shows up as a row that moves, and two
+ * consecutive waves of reproduction is what makes a row that *does* move mean something.
  *
  * | contract | building | legible seeds of 50 | median longest stretch (s) |
  * |---|---|---|---|
@@ -72,6 +78,18 @@ import { isWaitingAt } from '../frame/overlay.js';
  * | c8 | st-jude-hospital | **1** | 38 |
  * | c9 | harbour-point | **50** | 1 343 |
  * | c10 | ashgate | 10 | 79 |
+ * | c11 | ctf-class-reference | **50** | 1 221 |
+ * | c12 | shanghai-class-reference | **50** | 729 |
+ * | c13 | merdeka-class-reference | **50** | 459 |
+ *
+ * **The three reference towers are legible on every seed, and the reading is not flattering.** A day
+ * is legible when somebody stays past a minute on some landing for two contiguous minutes, and on a
+ * tower of four to eight thousand people that is not a problem a player can see and solve — it is
+ * the building. `c11`'s median stretch is **1 221 s**, which is two thirds of the whole shift, and
+ * it sits between Harbour Point's 1 343 and Midtown's 2 504 — the two towers this table already
+ * records as *legible for the whole day because the group cannot cope*. So legibility at 50 of 50 on
+ * these three means the same thing it means there, and `docs/33` § 6's arm should be read beside
+ * § 4.7k's miss rates rather than on its own.
  *
  * Two readings, both of them what #208 and § D475 needed measured rather than argued. Garden
  * Apartments never once holds a landing in the third band for two minutes — nobody on it waits
@@ -126,6 +144,9 @@ export const LEGIBILITY_SWEEP: readonly LegibilitySweepRow[] = Object.freeze([
   { contractId: 'c8', buildingId: 'st-jude-hospital', legibleOf50: 1, medianStretchS: 38 },
   { contractId: 'c9', buildingId: 'harbour-point', legibleOf50: 50, medianStretchS: 1343 },
   { contractId: 'c10', buildingId: 'ashgate', legibleOf50: 10, medianStretchS: 79 },
+  { contractId: 'c11', buildingId: 'ctf-class-reference', legibleOf50: 50, medianStretchS: 1221 },
+  { contractId: 'c12', buildingId: 'shanghai-class-reference', legibleOf50: 50, medianStretchS: 729 },
+  { contractId: 'c13', buildingId: 'merdeka-class-reference', legibleOf50: 50, medianStretchS: 459 },
 ]);
 
 /** The third band's floor — `WAIT_BANDS[2].fromS`, read rather than retyped. */

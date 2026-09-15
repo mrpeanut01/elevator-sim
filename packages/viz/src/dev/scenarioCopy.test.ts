@@ -73,6 +73,21 @@ async function scenariosPanel(): Promise<string> {
  * A lookup rather than a spelling algorithm, and it throws past its end on purpose: a campaign of
  * thirteen scenarios is a different design conversation, and a test that silently started
  * comparing digits would pass over a sentence nobody had reread.
+ *
+ * **It fired on 2026-09-15, at exactly the number it names** — GitHub issues #425, #424 and #430
+ * took the campaign to thirteen — and the paragraph above is left standing because it predicted
+ * this. The three sentences were reread before the word was added, which is the whole of what the
+ * throw is for. They still work at thirteen: *Scenarios — thirteen buildings, any order*, *each
+ * building teaches something the other twelve cannot*, and *All thirteen ship with the simulator*
+ * are each a count and nothing else, and none of them promises a shape a longer list would break.
+ * What a reader should notice is that this is the **second** wave in two to move all three, and
+ * `packages/viz/index.html`'s own comment now says so: § D253 considered deriving the numbers at
+ * runtime and recorded it as the better fix outside that lane. It is outside this one too, and the
+ * argument for it is stronger every time this fires.
+ *
+ * **Extended by one word rather than to the target of 22.** The forcing function is worth keeping
+ * one step ahead of the campaign: filling the list to twenty-two would buy nine waves of silence
+ * on sentences nobody had reread, which is exactly what the throw exists to prevent.
  */
 const NUMBER_WORDS = [
   'zero',
@@ -88,6 +103,7 @@ const NUMBER_WORDS = [
   'ten',
   'eleven',
   'twelve',
+  'thirteen',
 ] as const;
 
 function inWords(count: number): string {

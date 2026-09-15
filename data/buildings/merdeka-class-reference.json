@@ -1,0 +1,984 @@
+{
+  "$comment": "THE SECOND SUPERTALL, AND IT EXISTS TO GIVE THE FIRST ONE'S POPULATION ASSUMPTION SOMETHING TO BE COMPARED WITH. GitHub issue #430. burj-class-reference's own $comment says its 3,198 people is an assumption arrived at by measuring what a 57-lift arrangement serves with a valid AWT, and that 'one supertall cannot expose that; two can'. So the population here is authored by a DIFFERENT method on purpose -- per-floor occupancy from a stated plate assumption, never fitted to a lift count -- and the people-per-lift figures are then compared rather than reconciled. Measured: this tower is 8,455 people over 92 cars = 91.9 people a car; burj-class-reference is 3,198 over 57 = 56.1. THE TWO DISAGREE BY ABOUT 64 %, AND THAT IS THE RESULT RATHER THAN A FAILURE: #430 asks what follows if two independently authored supertalls imply wildly different people-per-lift, and its own answer is that THE ASSUMPTION IS WHERE TO LOOK. Neither figure was chosen with the other in view -- this one is a floor-plate occupancy and the Burj-class one is what a 57-lift arrangement was measured to serve with a valid AWT -- and the comparison is published in docs/04-test-buildings.md rather than folded back into either file, because averaging two assumptions produces a third assumption and no measurement. What it establishes is a direction: on the same profile the Burj-class tower is the LIFT-RICH one of the pair, which is consistent with a population that was solved for rather than surveyed. NAMED IN THE REPOSITORY'S CONVENTION, burj-class-reference's: the real Merdeka 118 is the reference and the figures here are the project's own. PROVENANCE, per the product owner's 2026-09-08 standing ruling on governed data/ values: EVERY AUTHORED FIGURE BELOW IS AN AGENT'S PROPOSAL, drafted for the owner to accept, tighten or reject, and NOT YET APPROVED. The line the ruling asks for is drawn field by field. MEASURED (a count rather than a citation): 92 cars, which is the lift count the prompting article states and the only figure from it this file uses. How they split between banks is nowhere published and is chosen below. CHOSEN (an agent's proposals, none of them cited, all awaiting the owner): 118 floors above ground on a 4.8 m office storey, a 4.2 m hotel storey and a 5.0 m observation storey, putting the top occupied floor at 537.0 m under a 678.9 m architectural top whose spire this model does not carry; ONE office sky lobby at 57 and a hotel lobby at 93; the populations -- 90 an office floor low-rise and 80 high-rise, a taper rather than a constant because the plate narrows with height, 30 a hotel floor and 25 an observation floor, 8,455 in all; the split of the 92 cars (34 low locals, 18 shuttles, 32 high locals, 8 hotel); and every car's class, rating and door. NOTHING ELSE COMES FROM THE PROMPTING ARTICLE, which GitHub issue #430 says in terms is the prompt and not the citation. WHAT THE DISTINGUISHING FEATURE BUYS, MEASURED ON THE LEGS RATHER THAN ASSERTED: the feature is the ONE-LEG low-rise, and packages/core/src/sim/directionalSpeedSeam.test.ts's third arm takes bank local-low's fifty-six office floors away from it -- leaving them to the shuttle and the high locals, which is burj-class-reference's arrangement -- and requires the same journeys to take more legs. A service zone that changes no route is DECISIONS.md SS D265's defect, and the arm is the standing requirement's 'move the control and require the run to change, compared on the legs'. WHAT THE CLOSED FORM SAYS: see packages/experiments/src/oracle/remainingBuildings.test.ts, which records this tower's verdict as a run rather than as a claim.",
+  "id": "merdeka-class-reference",
+  "name": "Merdeka-class reference tower",
+  "type": "mixed-use",
+  "trafficProfile": "office-standard",
+  "floors": [
+    {
+      "id": "G",
+      "index": 0,
+      "heightM": 0.0,
+      "population": 0,
+      "isEntrance": true,
+      "isTransferFloor": true,
+      "label": "Ground lobby \u2014 street entrance, the low-rise locals and the shuttle"
+    },
+    {
+      "id": "57",
+      "index": 57,
+      "heightM": 273.6,
+      "population": 0,
+      "isTransferFloor": true,
+      "label": "The single sky lobby \u2014 the tower's only office transfer"
+    },
+    {
+      "id": "93",
+      "index": 93,
+      "heightM": 446.4,
+      "population": 0,
+      "isTransferFloor": true,
+      "label": "Hotel lobby (93)"
+    }
+  ],
+  "floorRanges": [
+    {
+      "fromIndex": 1,
+      "toIndex": 56,
+      "startHeightM": 4.8,
+      "floorToFloorM": 4.8,
+      "populationPerFloor": 90,
+      "idPattern": "{index}",
+      "label": "Low-rise offices (1\u201356) \u2014 reached from the ground in one leg"
+    },
+    {
+      "fromIndex": 58,
+      "toIndex": 92,
+      "startHeightM": 278.4,
+      "floorToFloorM": 4.8,
+      "populationPerFloor": 80,
+      "idPattern": "{index}",
+      "label": "High-rise offices (58\u201392)"
+    },
+    {
+      "fromIndex": 94,
+      "toIndex": 111,
+      "startHeightM": 450.6,
+      "floorToFloorM": 4.2,
+      "populationPerFloor": 30,
+      "idPattern": "{index}",
+      "label": "Hotel guest floors (94\u2013111)",
+      "trafficProfile": "hotel"
+    },
+    {
+      "fromIndex": 112,
+      "toIndex": 114,
+      "startHeightM": 527.0,
+      "floorToFloorM": 5.0,
+      "populationPerFloor": 25,
+      "idPattern": "{index}",
+      "label": "Observation decks and their restaurant (112\u2013114)"
+    },
+    {
+      "fromIndex": 115,
+      "toIndex": 118,
+      "startHeightM": 542.0,
+      "floorToFloorM": 5.0,
+      "populationPerFloor": 0,
+      "idPattern": "{index}",
+      "label": "Plant and spire base (115\u2013118) \u2014 unpopulated"
+    }
+  ],
+  "totalPopulation": 8455,
+  "banks": [
+    {
+      "$comment": "THE BANK THAT IS THE POINT OF THE BUILDING. Fifty-six populated office floors reached from the street in ONE leg, over a 268.8 m rise -- where burj-class-reference's local-lower reaches 42 floors over 160.4 m and everything above its floor 42 costs a transfer. GitHub issue #430's second stress is 'a tower with FEWER TRANSFERS over a similar rise', which it attributes to the rope technology a 2024 installation has and a 2010 one did not. The rise here is 268.8 m, below elevator-specs.json airPressure.appliesAboveTravelM (300), so the shaft imposes no descent cap and these cars are symmetric -- which is the honest reading rather than a convenience: a bank that does not go above 300 m does not meet the problem.",
+      "id": "local-low",
+      "name": "Low-rise locals, straight off the street",
+      "servesFloors": [
+        "G",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22",
+        "23",
+        "24",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "32",
+        "33",
+        "34",
+        "35",
+        "36",
+        "37",
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44",
+        "45",
+        "46",
+        "47",
+        "48",
+        "49",
+        "50",
+        "51",
+        "52",
+        "53",
+        "54",
+        "55",
+        "56",
+        "57"
+      ],
+      "cars": [
+        {
+          "id": "L1",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L2",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L3",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L4",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L5",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L6",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L7",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L8",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L9",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L10",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L11",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L12",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L13",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L14",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L15",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L16",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L17",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L18",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L19",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L20",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L21",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L22",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L23",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L24",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L25",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L26",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L27",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L28",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L29",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L30",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L31",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L32",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L33",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "L34",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        }
+      ]
+    },
+    {
+      "id": "shuttle",
+      "name": "Sky lobby shuttle",
+      "servesFloors": [
+        "G",
+        "57",
+        "93"
+      ],
+      "cars": [
+        {
+          "id": "S1",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S2",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S3",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S4",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S5",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S6",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S7",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S8",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S9",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S10",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S11",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S12",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S13",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S14",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S15",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S16",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S17",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "S18",
+          "spec": "ultra-high-speed",
+          "ratedSpeedMps": 10.0,
+          "ratedLoadLb": 4500,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        }
+      ]
+    },
+    {
+      "id": "local-high",
+      "name": "High-rise locals, off the sky lobby",
+      "servesFloors": [
+        "57",
+        "58",
+        "59",
+        "60",
+        "61",
+        "62",
+        "63",
+        "64",
+        "65",
+        "66",
+        "67",
+        "68",
+        "69",
+        "70",
+        "71",
+        "72",
+        "73",
+        "74",
+        "75",
+        "76",
+        "77",
+        "78",
+        "79",
+        "80",
+        "81",
+        "82",
+        "83",
+        "84",
+        "85",
+        "86",
+        "87",
+        "88",
+        "89",
+        "90",
+        "91",
+        "92",
+        "93"
+      ],
+      "cars": [
+        {
+          "id": "HR1",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR2",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR3",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR4",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR5",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR6",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR7",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR8",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR9",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR10",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR11",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR12",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR13",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR14",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR15",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR16",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR17",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR18",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR19",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR20",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR21",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR22",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR23",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR24",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR25",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR26",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR27",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR28",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR29",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR30",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR31",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        },
+        {
+          "id": "HR32",
+          "spec": "high-speed-gearless",
+          "ratedSpeedMps": 8.0,
+          "ratedLoadLb": 4000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.2
+        }
+      ]
+    },
+    {
+      "id": "local-hotel",
+      "name": "Hotel and observation locals, off the hotel lobby",
+      "servesFloors": [
+        "93",
+        "94",
+        "95",
+        "96",
+        "97",
+        "98",
+        "99",
+        "100",
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "110",
+        "111",
+        "112",
+        "113",
+        "114",
+        "115",
+        "116",
+        "117",
+        "118"
+      ],
+      "cars": [
+        {
+          "id": "HT1",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "HT2",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "HT3",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "HT4",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "HT5",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "HT6",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "HT7",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        },
+        {
+          "id": "HT8",
+          "spec": "gearless-traction",
+          "ratedSpeedMps": 4.0,
+          "ratedLoadLb": 3000,
+          "doorType": "centerOpening",
+          "passengerTransferS": 1.5
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Four banks and one office sky lobby, against burj-class-reference's six banks and three. That is the whole shape of the building: fifty-six of its ninety-one populated office floors are one leg from the street, and the transfer accounting -- where a hop is charged to ttdMeanS and lights no landing button -- is exercised over a much smaller share of journeys than the Burj-class tower exercises it over. GitHub issue #430 asks for exactly that contrast.",
+    "The shuttle's cars are rated 10.0 m/s and the bank's travel is 446.4 m, which is above elevator-specs.json airPressure.appliesAboveTravelM (300). The cap and the rating are the same number, so nothing binds and no warning is raised -- this bank is at the cap rather than past it, which is the position every supertall shuttle in the shipped set has been in since the airPressure block landed. Buying speed on this bank is what would make the cap bite, and that is a purchase a player can make rather than a figure authored here.",
+    "Every car states passengerTransferS, because data/buildings/README.md refuses to default one on a mixed-use building. The shuttle takes the hotel's 1.5 s rather than the offices' 1.2 s on the README's own rule -- where a bank carries more than one population the slower value is chosen. No new reference value is authored.",
+    "The stage cannot draw this tower legibly, on docs/12 SS 4.16's measured 35 legible floors at 1280x800 and 40 at 1440x900 against this building's 119. It is in the same position as burj-class-reference and shanghai-class-reference, and GitHub issue #377 owns the remedy."
+  ]
+}

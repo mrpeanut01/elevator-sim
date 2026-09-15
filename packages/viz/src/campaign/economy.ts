@@ -1051,6 +1051,31 @@ export function contractIsLost(tower: TowerEconomy): boolean {
  * fitted number that paragraph refuses. **So the table says 2 and this sentence says why the player
  * will find it hard anyway** — the tower is easy to read and impossible to clear, and those are
  * different claims.
+ *
+ * ## The three reference towers — GitHub issues #424, #425 and #430, [§ D580](../../../../DECISIONS.md)
+ *
+ * All three are **placed on the fabric rule above**, not on how hard they are to clear, and the
+ * distinction matters more here than anywhere else in this table: every one of them reads a day-1
+ * miss rate of **1.00** on the shipped path, so difficulty cannot order them at all — it is the
+ * constant function on this end of the set. Fabric can:
+ *
+ * | building | fabric | complexity |
+ * |---|---|---|
+ * | `mixed-use-high-rise` (4) | three banks, one sky lobby, sixteen cars | — |
+ * | **`merdeka-class-reference`** | four banks, **one** office sky lobby and a hotel lobby, ninety-two cars over a 557 m rise | **4** |
+ * | **`ctf-class-reference`** | five banks, three sky lobbies, and the only asymmetric car in the set | **5** |
+ * | **`shanghai-class-reference`** | six banks, four sky lobbies, a hundred and six cars | **5** |
+ * | `vertical-city` (5) | seven banks, double-deck shuttles, four escalators | — |
+ *
+ * `merdeka-class-reference` is a **4** because its whole design is *fewer transfers* — fifty-six
+ * office floors are one leg from the street — so a player reading it has one fewer zone boundary to
+ * hold than Mixed-Use High-Rise's reader has, on a building four times as tall. The other two are
+ * **5**s beside Vertical City: three and four sky lobbies against its three, no double deck, and a
+ * directional speed asymmetry on one of them that nothing else in the set has. Three buildings at
+ * the ceiling is not a ranking collapsing — {@link COMPLEXITY_MAX} is a **scale**, and § 8.5's own
+ * six put two buildings on 3 — but it is the clearest sign yet that the 1–5 scale is short at the
+ * top for a set that now holds four supertalls. That is an owner's call and is recorded rather than
+ * acted on: widening it would move every published *complexity n of 5* string in the product.
  */
 export const COMPLEXITY: Readonly<Record<string, number>> = Object.freeze({
   'garden-apartments': 1,
@@ -1060,8 +1085,11 @@ export const COMPLEXITY: Readonly<Record<string, number>> = Object.freeze({
   'crown-hotel': 3,
   'midtown-office': 3,
   'secure-tower': 3,
+  'merdeka-class-reference': 4,
   'mixed-use-high-rise': 4,
   'st-jude-hospital': 4,
+  'ctf-class-reference': 5,
+  'shanghai-class-reference': 5,
   'vertical-city': 5,
 });
 
@@ -1095,6 +1123,14 @@ export const COMPLEXITY_MAX = 5;
  * **It is a bad bargain and that is the scenario**: the tower cannot be cleared as built, so a
  * career that takes it at 4 u a day is paying for days it will miss — the fee prices the fabric,
  * and § 8.9's renewal is what prices the record.
+ *
+ * **The three reference towers take the same rule** (GitHub issues #424, #425 and #430,
+ * [§ D580](../../../../DECISIONS.md)): 6 u for `merdeka-class-reference` and 7 u for the other two,
+ * which is each one's complexity plus two. No fixture names any of them — the design file was drawn
+ * against eight buildings — so the rule applies unamended, and Harbour Point's warning applies to
+ * all three with more force: none of them clears a day at day 1, so every one is a fee paid for days
+ * the career will miss. That is the fee pricing the **fabric**, which is what § 8.9's renewal then
+ * corrects against the record.
  */
 export const OFFER_FEES: Readonly<Record<string, number>> = Object.freeze({
   'garden-apartments': 3,
@@ -1104,8 +1140,11 @@ export const OFFER_FEES: Readonly<Record<string, number>> = Object.freeze({
   'midtown-office': 5,
   'secure-tower': 5,
   'ashgate': 6,
+  'merdeka-class-reference': 6,
   'mixed-use-high-rise': 6,
   'st-jude-hospital': 6,
+  'ctf-class-reference': 7,
+  'shanghai-class-reference': 7,
   'vertical-city': 7,
 });
 

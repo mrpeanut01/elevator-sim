@@ -46,6 +46,27 @@
  * asserts the sequence so that it would have been a red test rather than a quiet change to what
  * the campaign teaches.
  *
+ * ## Three more, and this time the measurement could not order them — `DECISIONS.md` § D581
+ *
+ * `c11` (CTF-class), `c12` (Shanghai-class) and `c13` (Merdeka-class) are GitHub issues #425, #424
+ * and #430. Measured on the shipped path at § 4.7d's budget and seeds, **every one reads 1.00** —
+ * and so do `c4` and `c5`, re-measured beside them. Five contracts tied at the ceiling is a
+ * measurement that has stopped discriminating, and the reason is one this repository already
+ * recorded: `shift/goals.ts`'s energy bar asks for 80 kJ per delivered ride, and a leg in a
+ * supertall costs **86.8 to 242.6 kJ** measured across the five. § D468 found that the bar is
+ * dominated by building fabric rather than by play and left it as `docs/33` O2 and GitHub issue
+ * #234; this is the same finding at three more towers, and no rung in `data/contract-ladder.json`
+ * can move it, which is why all three are handed **as built**.
+ *
+ * **So the tie is broken by the curriculum reading, and that is a design choice stated as one.**
+ * Ordered by bank count, the five read 3, 4, 5, 6, 7 — `mixed-use-high-rise`, Merdeka-class,
+ * CTF-class, Shanghai-class, `vertical-city` — and the whole ladder becomes
+ * **1, 1, 1, 1, 1, 1, 2, 2, 3, 4, 5, 6, 7**, which is the first time this sequence has run without a
+ * jump. It moves `c5` from the end of the array to the end of a longer array and `c4` not at all;
+ * every contract before position 9 is where its own measured rate put it and is untouched. The
+ * alternative was to append the three in the order they were authored, which is ordering by arrival
+ * inside a tie — the defect #382 was filed about, one level down.
+ *
  * **The ids do not move with the order and never will.** `c1`–`c10` are names, and a saved week, a
  * career tower, a `data/` row and this repository's own prose all hold them; renumbering would make
  * an id mean two things. What moves is the array's order, each contract's `label` (which is its
@@ -91,7 +112,7 @@ import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 import type { ContractStatus, ScenarioContract, WeekState } from './types.js';
 
 /**
- * The handoff's five, and five more, in **measured difficulty order** rather than the handoff's —
+ * The handoff's five, and eight more, in **measured difficulty order** rather than the handoff's —
  * see the module docstring and `docs/33` § 4.7.
  *
  * Frozen, and every member frozen: this is shared, read-only reference data of exactly the kind
@@ -102,17 +123,20 @@ import type { ContractStatus, ScenarioContract, WeekState } from './types.js';
  * schema, a parser and a loader to protect nothing.
  */
 /**
- * **Ten contracts, and the handoff specifies five.** `docs/12` § 4.4 fixes the campaign at the five
+ * **Thirteen contracts, and the handoff specifies five.** `docs/12` § 4.4 fixes the campaign at the five
  * buildings shipped when the design was written; five more buildings have landed since, and a
  * shipped building with no contract is a scenario the reader can never take. The deviation is
  * recorded in `docs/12` § 4.7 rather than absorbed, which is the rule the handoff itself sets: it
  * wins every disagreement about what the screen looks like, and a disagreement it does not cover is
  * a decision to be written down.
  *
- * **Ten rather than eleven, and the exception is a list rather than a silence.**
+ * **Thirteen rather than fourteen, and the exception is a list rather than a silence.**
  * `burj-class-reference` is a *reference* building and has no contract;
  * `contracts.test.ts#REFERENCE_ONLY` names it, asserts it ships, and asserts it has none, so the
- * exception cannot quietly widen into the rule.
+ * exception cannot quietly widen into the rule. **Three more reference towers landed on 2026-09-15
+ * and every one of them has a contract**, on the owner's 2026-09-10 ruling on #232 that the target
+ * is 22 buildings and 22 contracts and that every building is playable — so the list did not widen,
+ * and the one member it still holds is the building that predates that ruling.
  */
 export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
   Object.freeze({
@@ -255,9 +279,42 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     reward: 'Predictive balanced · Contract-net auction · two more shafts',
   }),
   Object.freeze({
+    id: 'c13',
+    buildingId: 'merdeka-class-reference',
+    label: 'Scenario 10',
+    title: 'One change, not three',
+    teaches: 'what a transfer costs, by taking most of them away',
+    brief:
+      'Fifty-six office floors reached from the street in a single ride, over a rise that would be three sky lobbies in an older tower. Most of this building never transfers at all — so when a rider does wait twice, there is nowhere for the second wait to hide.',
+    needClean: 3,
+    reward: 'Predictive balanced · Fairness first · endless mode',
+  }),
+  Object.freeze({
+    id: 'c11',
+    buildingId: 'ctf-class-reference',
+    label: 'Scenario 11',
+    title: 'Twenty up, ten down',
+    teaches: 'that a car is not one speed, and that the way back costs more than the way out',
+    brief:
+      'A hundred and eleven floors on three sky lobbies, and a shuttle that climbs at 20 m/s and comes down at 10 — the descent is held for the ears of the people inside, not by the machine. Every figure you read about that bank was measured on a round trip the textbook charges at one speed and it makes at two.',
+    needClean: 3,
+    reward: 'Destination dispatch · Energy aware · two more shafts',
+  }),
+  Object.freeze({
+    id: 'c12',
+    buildingId: 'shanghai-class-reference',
+    label: 'Scenario 12',
+    title: 'A hundred and six cars',
+    teaches: 'that the fastest lift in the catalogue is not fast on a short hop',
+    brief:
+      'A hundred and twenty-eight floors, four sky lobbies and a hundred and six cars, fourteen of them the quickest machines this simulator can express. Three of the shuttle’s four hops are too short for it to ever reach its rated speed. Finding the one that is not is the whole of this building.',
+    needClean: 3,
+    reward: 'Multi-round auction · Pre-positioning · two more shafts',
+  }),
+  Object.freeze({
     id: 'c5',
     buildingId: 'vertical-city',
-    label: 'Scenario 10',
+    label: 'Scenario 13',
     title: 'Vertical City',
     teaches: 'supertall traffic, and knowing when to stop',
     brief:

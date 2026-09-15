@@ -1369,10 +1369,15 @@ states, which is the circularity `analytical/`'s import discipline exists to pre
 expression is left exactly as CIBSE publishes it, `CLOSED_FORM_ASSUMPTIONS` carries the divergence
 as `symmetric-speed` (`bias: 'under'`), and `analyzeUpPeak` raises
 `UP_PEAK_WARNING_CODES.directionalSpeedAsymmetry` on any bank whose cars have one — so a residual
-measured there arrives with the reason attached rather than as a defect. **It is raised on no
-shipped building**, because every shipped car is symmetric, which is the difference between a
-disclaimer and a defect. Under a symmetric configuration the oracle agrees exactly as it did:
-`analytical/validation.test.ts` runs unchanged at its pinned tolerances.
+measured there arrives with the reason attached rather than as a defect. **It stopped being raised
+on no shipped building on 2026-09-15**, and that is a result rather than a regression: this
+paragraph read *"raised on no shipped building, because every shipped car is symmetric"* for as long
+as the exemption was a disclaimer about nothing, and `ctf-class-reference/shuttle` — 20 m/s up,
+10 m/s down, the design Hitachi publishes for that tower — is now the one bank in
+`data/buildings/` that raises it ([§ D577](DECISIONS.md), GitHub issue #425).
+`analytical/upPeak.test.ts` asserts that in **both** directions, this bank and no other, because
+half the claim is that the detector is not simply on. Under a symmetric configuration the oracle
+agrees exactly as it did: `analytical/validation.test.ts` runs unchanged at its pinned tolerances.
 
 ## Modeling rules that are easy to get wrong
 

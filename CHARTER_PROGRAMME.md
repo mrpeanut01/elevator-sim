@@ -48,7 +48,6 @@ Measured on this tree at `c8fd6fa`, before any charter work:
 | Browser tier | **ran** — 25 of the 440 files; `ELEVATOR_SIM_CHROMIUM` pointed at the container's Chromium |
 | Wall clock | 3 771 s (62 m 52 s) — **contended, not comparable**; see the caveat below |
 | Next free decision number | **D576** — the floor of the **D576–D600** block reserved for **wave AA of 2026-09-15**, which is still open (`documentation.test.ts#OPEN_RESERVATION`). The row names the floor until the wave closes. Dispatched per lane: D576–D582 lane A (GitHub issues #425, #424, #430), D583–D586 lane B (#433), D587–D590 lane C (#242, #243, #355), D591–D594 lane D (#406), and **D595–D600 the integrator’s**. Wave Z before it reserved D557–D580 and closed spending fourteen; D558, D559, D561 and D562 are registered holes, and D576–D580 were free rather than holes, which is why this block reuses D576 as its floor rather than starting past a gap. |
-
 **The skip count is 11, and it is the number this programme was told to watch.** All eleven are
 deep-tier opt-ins behind `describe.skipIf(!DEEP)` / `!deepRequested()` in `packages/experiments`
 (`matrixCensus`, `collectiveAdoption`, `fuzz/deep`, `perfScaling`, `perfSweep`, `goldenRuns`,

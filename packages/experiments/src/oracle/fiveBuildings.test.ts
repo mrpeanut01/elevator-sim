@@ -708,7 +708,10 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
       'burj-class-reference',
       'chancery-house',
       'crown-hotel',
+      'ctf-class-reference',
       'harbour-point',
+      'merdeka-class-reference',
+      'shanghai-class-reference',
       'st-jude-hospital',
     ]);
 
@@ -769,7 +772,31 @@ describe('the banks that cannot be reconciled, and the mechanism for each', () =
      * internally uniform. That is **not** the same as reduces — the remark under
      * `burj-class-reference` says why, and it is the wrong step this guard exists to keep visible.
      */
-    const coverable = ['ashgate', 'burj-class-reference', 'chancery-house', 'harbour-point'];
+    /*
+     * **Three reference towers landed on 2026-09-15** — GitHub issues #425, #424 and #430 — and all
+     * three are `coverable` in the strict per-bank sense this loop checks: every bank of each holds
+     * identical cars. Each **reconciles on one bank** in `remainingBuildings.test.ts` at this file's
+     * own budget and seed base — `ctf-class-reference/local-low` at raw +48.935 % / residual
+     * −0.031 %, `shanghai-class-reference/local-hotel` at +34.983 % / −0.209 %, and
+     * `merdeka-class-reference/local-hotel` at +34.485 % / −0.466 % — and each is **refused on its
+     * others**, on three separate grounds that file enumerates.
+     *
+     * One of those grounds is worth knowing here, because it is the first time it has appeared in
+     * either file: `measureUpPeak` drives an isolated bank at `OVERLOAD_FACTOR × %POP` of its own
+     * capacity, and a bank with twenty or thirty cars is therefore offered a crowd it cannot drain
+     * inside the deadline. So *uniform* still does not imply *reduces*, and now it does not imply
+     * *measurable* either — the same wrong step this guard exists to keep visible, reached from a
+     * third direction.
+     */
+    const coverable = [
+      'ashgate',
+      'burj-class-reference',
+      'chancery-house',
+      'ctf-class-reference',
+      'harbour-point',
+      'merdeka-class-reference',
+      'shanghai-class-reference',
+    ];
     const notCoverable = ['crown-hotel', 'st-jude-hospital'];
     expect([...coverable, ...notCoverable].sort()).toEqual(absent);
     for (const id of notCoverable) {

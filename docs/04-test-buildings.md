@@ -1,6 +1,6 @@
 # Test Buildings
 
-Eleven reference buildings, each chosen to stress a different aspect of the dispatcher.
+Fourteen reference buildings, each chosen to stress a different aspect of the dispatcher.
 Machine-readable configs in [`data/buildings/`](../data/buildings/).
 
 The first five are the original set. The next three were added later and each closes a gap the
@@ -11,6 +11,14 @@ of the size range to be measured against. The tenth and eleventh are the two bui
 [`docs/37` § 7.3](37-content-plan.md) says the content plan owes, and they close two more gaps: a
 group that **cannot cope with its own crowd**, which no shipped tower was authored to be, and a
 tower with floors **below the datum** that only one of its cars reaches.
+
+**The twelfth, thirteenth and fourteenth are three more *reference* towers**, GitHub issues #425,
+#424 and #430, and each carries one thing the shipped set had never held: a car that is **not one
+speed** (20 m/s up, 10 m/s down), a car at the **top of the speed catalogue** (20.5 m/s, where
+everything before it stopped at 10), and a supertall with **one sky lobby instead of three**, so the
+Burj-class tower's population assumption finally has something to be compared against. All three are
+named in this repository's convention — `<name>-class-reference`, `burj-class-reference`'s — because
+the real building is the reference and the figures in the file are the project's own.
 
 **A new building owes a row in this table, a numbered section below, and a row in
 [`data/buildings/README.md`](../data/buildings/README.md) — and that is now a test rather than a
@@ -33,6 +41,9 @@ failed: *checkable by looking* is not checkable.
 | [Burj-class reference tower](../data/buildings/burj-class-reference.json) | 165 | 16-car single-deck shuttle @ 10 m/s, 4 locals (10/10/11/8), 2 double-deck observation | none | Scale: 57 cars, 3 sky lobbies, what the engine and the stage cost at the top of the range |
 | [Harbour Point](../data/buildings/harbour-point.json) | 16 | 6 × geared, 2.5 m/s, 2,500 lb, side-opening | none | Demand above the group's handling capacity: the mean is suppressed rather than quoted |
 | [Ashgate Mixed-Use](../data/buildings/ashgate.json) | 22 | 4 × geared 2.5 m/s (G–19); 1 × MRL 1.6 m/s, 3,500 lb (B2–G) | service zone, car park | Negative-index floors, and a service restriction that makes most journeys two legs |
+| [CTF-class reference tower](../data/buildings/ctf-class-reference.json) | 112 | 8-car shuttle at **20 m/s up / 10 m/s down**, pressurised; 4 locals (8/8/6/6) | 3 sky lobbies | **Directional speed asymmetry** — the only shipped bank the closed form must refuse on `symmetric-speed` |
+| [Shanghai-class reference tower](../data/buildings/shanghai-class-reference.json) | 129 | 14-car shuttle at **20.5 m/s**, pressurised; 4 office locals of 20, a hotel bank of 12 | 4 sky lobbies | **106 cars**, and whether the top of the speed catalogue is ever reached on a hop short enough to matter |
+| [Merdeka-class reference tower](../data/buildings/merdeka-class-reference.json) | 119 | 34 low locals at 8 m/s **straight off the street**; 18 shuttles at 10 m/s; 32 high locals; 8 hotel | 1 office sky lobby | **Fewer transfers over a similar rise**, and a second supertall occupancy to compare the first against |
 
 ---
 
@@ -473,3 +484,191 @@ day-1 miss rate **0.52 of 50 seeds**, inside `docs/33` DC-4's band.
 
 **Watch for:** whether a dispatcher notices that the car-park car is a queue nothing else can
 relieve, and whether the report tells a rider who waited twice that they waited twice.
+
+
+---
+
+## 12. CTF-class Reference Tower
+
+**Config:** [`ctf-class-reference.json`](../data/buildings/ctf-class-reference.json)
+
+A hundred and eleven floors on three sky lobbies, and **the only shipped building whose cars are not
+one speed**: its eight shuttles climb at 20 m/s and descend at 10. GitHub issue #425. Everything
+else about the tower is ordinary — four symmetric local banks, one entrance, no credential, no
+double deck — because a building in which every car were asymmetric could not tell a reader which
+figures moved because of it.
+
+**The issue's premise was stale, and that was checked rather than assumed.** #425's title says *the
+car schema cannot express that*, and it could not when the issue was filed. GitHub issue #444 landed
+`descentSpeedMps` and `cabinPressurised` on `CarConfig`, `sCurve` picks the top speed by the sign of
+the move, and `CLOSED_FORM_ASSUMPTIONS` gained `symmetric-speed`. So #425's *exit 1 — widen the
+schema* was already taken by somebody else; what was missing was a building that uses it.
+
+**It is the first shipped bank to raise `directionalSpeedAsymmetry`, and that warning had never
+fired on shipped data.** `CLAUDE.md` § Correctness oracle and `analytical/types.ts` both said *"it is
+raised on no shipped building"* — the difference between a disclaimer and a defect while it lasted.
+`analytical/upPeak.test.ts` now asserts it in **both** directions: this bank and no other, because
+half the claim is that the detector is not simply on.
+
+**The shuttle is pressurised, and that is a modelling decision with a measured reason rather than a
+claim about the real machine.** The bank's travel is 451.2 m, above `elevator-specs.json`'s
+`airPressure.appliesAboveTravelM` of 300, so an **unpressurised** cabin would be capped at
+`descentCapMps` — 10.0 m/s, *the same figure Hitachi publishes*. `resolveCar` takes the lower of the
+two limits, so on that arrangement deleting `descentSpeedMps` would change nothing at all and the
+authored field would be a value with no consequence: [§ D265](../DECISIONS.md)'s defect exactly.
+Pressurising removes the shaft's cap (`pressurisedDescentCapMps` is `null` — no cap), so the only
+thing holding the descent to 10 m/s is the machine's own published limit.
+`packages/core/src/sim/directionalSpeedSeam.test.ts` asserts **both halves**: on the unpressurised
+arm the two configurations produce byte-identical legs, and on the shipped one they do not.
+
+**The asymmetry binds, measured on the legs.** On three seeds at 1 800 s under `collective`, the
+shipped tower and the same tower with `descentSpeedMps` deleted are handed **identical journeys** —
+same origins, same destinations, same arrival instants — and carry them in **different legs**:
+different cars, different boarding times. The leg *count* does not move, because a speed is not a
+zone, which is why a leg-count comparison would have missed this entirely.
+
+**The 20 m/s rating is reached on one hop and on no other.** `CLAUDE.md`'s *short hops never reach
+rated speed*, at the top of the catalogue: at `ultra-high-speed`'s 1.2 m/s² and 1.2 m/s³ an s-curve
+needs about 176.7 m to reach 20 m/s and the same again to stop, so a run under about 353 m is
+acceleration-limited. G to the sky deck is 451.2 m and G to sky lobby 3 is 385.5 m and both reach
+it; G to sky lobby 2 is 301.5 m and G to sky lobby 1 is 139.5 m and neither does. Downwards the car
+is held at 10 m/s on all four.
+
+**The closed form reaches four of the five banks and the verdicts are runs rather than sentences.**
+`local-low` **reconciles** at raw **+48.935 %**, residual **−0.031 %** against a 4 % tolerance, 64 replications from seed 810 000 — and `analyzeUpPeak` raises **no warning at all** on the case that measurement drives, which is what makes the residual mean what it says. `local-mid` reconciles too (**+54.025 %** raw, **−0.309 %** residual) and so does `local-hotel` (**+35.066 %**, **−0.066 %**). Two are refused, by a throw rather than by a sentence: `local-apartments` on `departureGapBracket` — 20-person cars at the residential 1.75 s, so a full load's dwell (32.80 s) outlasts a one-floor round trip (29.05 s) — and the **shuttle** because the apparatus cannot drain the crowd it offers it. `packages/experiments/src/oracle/remainingBuildings.test.ts` asserts every one of those verdicts.
+
+**So the asymmetric bank is the one bank this file publishes no residual for**, and that is stated rather than worked around. What a reader gets instead is `directionalSpeedAsymmetry`, which says the published expression charges one `tv` twice and therefore understates the return half of every round trip on it — `bias: 'under'`, one-sided, enumerated in `CLOSED_FORM_ASSUMPTIONS` as `symmetric-speed`. A reader who wants the number needs a different apparatus, not a looser tolerance.
+
+**Playable, and handed as built.** Contract `c11` is *Scenario 11*, and its ladder rung is the
+identity: `{ occupancy: 1, banks: [] }`, no rate override. That is **not** the shape Harbour Point
+and Ashgate take, and the reason is measured: day 1 reads **50 of 50 seeds**, and no
+admissible rung moves it, because the goal doing the missing is the energy bar. A ride in this tower
+costs **105.9 kJ** against a bar of 80 — `docs/33` § 4.7k.
+
+**Not in the proof set**, on the 2026-09-10 ruling that keeps the bench's forty fixed.
+
+**Watch for:** whether a dispatcher's cost estimate notices that a down call and an up call of equal
+distance are no longer equal cost, and whether any figure the product publishes about that bank
+reads as though the round trip were symmetric.
+
+---
+
+## 13. Shanghai-class Reference Tower
+
+**Config:** [`shanghai-class-reference.json`](../data/buildings/shanghai-class-reference.json)
+
+A hundred and twenty-eight floors, four sky lobbies and **a hundred and six cars** — the densest
+group in the set, against `burj-class-reference`'s fifty-seven over a similar rise. GitHub issue
+#424. Its fourteen shuttles are rated **20.5 m/s**, which is the maximum of `ultra-high-speed` and
+the figure `data/elevator-specs.json#realWorldAnchors` takes from this very machine.
+
+**It is the first shipped building to reach the top of the speed catalogue.** Every car in
+`data/buildings/` stopped at 10.0 m/s before it, so the upper half of that class's declared range
+had a UI caller — `authoring/machineSpec.ts`'s ceiling, which a player can already dial — and no
+content caller. #424's own correcting comment is why this is stated as *no authored example* rather
+than as a dead seam: the range was never uncalled, it was uninhabited.
+
+**Whether a 20.5 m/s car ever reaches its rated speed is the question, and the answer is once.** At
+1.2 m/s² and 1.2 m/s³ an s-curve needs about 185.4 m to reach 20.5 m/s and the same again to stop,
+so a leg shorter than about **370.7 m** never touches the plate figure. This shuttle makes exactly
+one hop that does — G to sky lobby 4, **418.5 m** — and three that do not: 94.5 m, 202.5 m and
+310.5 m. `directionalSpeedSeam.test.ts` moves the rating to 10.0 m/s, the fastest any shipped car
+was before this file, and requires the legs to differ; they do, on all three seeds.
+
+**The cabin is pressurised, and that citation was already in the repository.**
+`elevator-specs.json`'s `airPressure` block quotes Al-Kodmany (Buildings 2015, § 3.1.4) recording
+that *this tower* answers the air-pressure problem with a pneumatic system. Without it a 418.5 m
+bank would cap the fastest machine in the catalogue at the speed of the slowest supertall shuttle in
+the set. With it the car is symmetric at 20.5 m/s both ways — which is what makes this tower the
+**symmetric** arm beside the CTF-class tower's asymmetric one.
+
+**The observation deck is a populated floor and its visitors are not modelled**, which is stated
+rather than left to be found. Floor 119 carries thirty people — the deck's staff and its restaurant
+— so it is a real origin and a real destination and the hotel bank really serves it. What this
+repository has no template for is the **visitor** crowd an observation deck draws, which is GitHub
+issue #436's subject; authoring a separate observation express would have been a bank almost nobody
+rides, which is § D265's defect rather than fidelity.
+
+**The closed form:**
+`local-hotel` **reconciles** at raw **+34.983 %**, residual **−0.209 %** against a 4 % tolerance, 64 replications from seed 810 000. The other five are refused by a throw: the **shuttle** because its terminal and its four sky lobbies house nobody, so there is no up-peak round trip to price — the ground `vertical-city`'s and `burj-class-reference`'s shuttles already meet — and **`local-1` through `local-4`** because `measureUpPeak` drives an isolated bank at `OVERLOAD_FACTOR × %POP` of its own capacity, and a twenty-car bank is therefore handed a crowd it cannot drain inside the deadline. That third ground is **new to this repository**: it is a limit of the departure reconstruction rather than of the closed form, and it means the largest lift group in `data/buildings/` is measurable on its smallest bank and on none of its others.
+
+**Playable, and handed as built.** Contract `c12` is *Scenario 12* at the identity rung. Day 1 reads
+**50 of 50 seeds** and the energy bar is again what does the missing: **109.4 kJ** a ride
+against 80.
+
+**The stage cannot draw it**, on `docs/12` § 4.16's measured 35 legible floors at 1280×800 and 40 at
+1440×900 against this building's 129. It is in the same position as `burj-class-reference`, for the
+same reason, and GitHub issue #377 owns the remedy.
+
+**Not in the proof set.**
+
+**Watch for:** whether raising a rated speed the shaft is too short to spend shows up anywhere as an
+improvement, which is `docs/04` § 1's negative-control finding at the far end of the scale.
+
+---
+
+## 14. Merdeka-class Reference Tower
+
+**Config:** [`merdeka-class-reference.json`](../data/buildings/merdeka-class-reference.json)
+
+A hundred and eighteen floors over a 557 m rise with **one office sky lobby**, where the Burj-class
+tower has three. Ninety-two cars. GitHub issue #430, and the building exists for two comparisons
+rather than for a mechanic.
+
+**Fewer transfers over a similar rise, measured.** Fifty-six populated office floors are reached
+from the street in **one leg**. On seed 20 260 824 at 1 800 s under `collective` the tower draws
+**3 529 journeys and 5 041 legs — 1.428 legs a journey**, against
+`burj-class-reference`'s **1.940** on the same seed and horizon. `directionalSpeedSeam.test.ts` hands
+floors 29–56 to the high locals, halving the one-leg zone, and requires the same journeys to need
+strictly more legs; they do, on all three seeds.
+
+**A second supertall occupancy, and the two disagree.** `burj-class-reference`'s own `$comment` says
+its 3 198 people *"is an assumption"*, arrived at by measuring what a 57-lift arrangement serves with
+a valid AWT, and that *"one supertall cannot expose that. Two can."* This tower's population is
+authored by a **different method on purpose** — per-floor occupancy from a stated plate assumption,
+never fitted to a lift count:
+
+| tower | people | cars | people a car |
+|---|---|---|---|
+| `burj-class-reference` | 3 198 | 57 | **56.1** |
+| `merdeka-class-reference` | 8 455 | 92 | **91.9** |
+
+**They disagree by about 64 %, and that is the result rather than a failure.** #430 asks what
+follows if two independently authored supertalls imply wildly different people-per-lift, and its own
+answer is that *the assumption is where to look*. Neither figure was chosen with the other in view.
+What the comparison establishes is a direction — on the same profile the Burj-class tower is the
+**lift-rich** one of the pair, which is consistent with a population that was solved for rather than
+surveyed — and it establishes nothing about which occupancy is right. Averaging two assumptions
+would produce a third assumption and no measurement, so neither file moves.
+
+**The shuttle is at the air-pressure cap rather than past it.** Its cars are rated 10.0 m/s and the
+bank's travel is 446.4 m, above the 300 m threshold — so the cap reaches it and binds nothing,
+because the cap *is* 10.0. That is the position every supertall shuttle in the shipped set has been
+in since the `airPressure` block landed; buying speed on this bank is what would make it bite, and
+that is a purchase a player makes rather than a figure authored here.
+
+**The closed form:**
+`local-hotel` **reconciles** at raw **+34.485 %**, residual **−0.466 %** against a 4 % tolerance, 64 replications from seed 810 000 — with three declared departures from the model (`expressZone`, `nonUniformFloorPopulations`, `nonUniformInterfloorDistance`), all three of which are the building being mixed-use rather than defects. The other three are refused by a throw: the **shuttle** on a zero served population, and **`local-low`** and **`local-high`** because the apparatus cannot drain what it offers a thirty-car bank — `local-low` is handed **5 695 journeys** in 5 400 s and leaves 1 351 of them in the system.
+
+**Playable, and handed as built.** Contract `c13` is *Scenario 10* — the ids are names and the
+labels are positions — at the identity rung. Day 1 reads **50 of 50 seeds**, and this is
+the tower where the energy bar is furthest out of reach: **176.4 kJ** a ride against 80.
+
+**The house has run all three in Endless rush, and the 143 existing rows reproduced exactly.**
+`data/rush-house-runs.json` was regenerated over every shipped dispatcher × every shipped building —
+182 runs in 1 104 s — and the only lines the diff moves besides the thirty-nine new rows are the
+provenance's commit and date. That is the second wave running in which this table has been
+re-measured whole and agreed with itself, which is what makes a row that *does* move mean something.
+
+**What the three towers say in that table is worth one line**: under the rush's fixed crowd, only
+two of the thirty-nine runs ever break — `ctf-class-reference` under `nearest-car` at 2 754 s and
+under `destination-panel` at 4 550 s, and `shanghai-class-reference` under `destination-panel` at
+4 778 s. Everything else carries the whole stream. That is the same finding [§ D582](../DECISIONS.md)
+records from the other side: the rush is the same number of people on every tower, so a group of
+ninety-two or a hundred and six cars is simply not the thing it was built to break.
+
+**Not in the proof set.**
+
+**Watch for:** whether the transfer accounting — a hop charged to `ttdMeanS` that lights no landing
+button — reads sensibly when only a third of journeys have one, which is what #430 filed this
+building to ask.
