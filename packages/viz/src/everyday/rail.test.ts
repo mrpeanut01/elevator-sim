@@ -20,7 +20,9 @@ import { railFooter, railGroups, railModel, sublineFor } from './rail.js';
 import { EVERYDAY_SCREENS_BUILT, UNBUILT_REASONS } from './screens.js';
 import {
   ENGINEER_SWAP_NOTE,
+  ENGINEER_SWAP_REPLAY_NOTE,
   ENGINEER_SWAP_RUSH_NOTE,
+  ENGINEER_SWAP_WATCH_NOTE,
   EVERYDAY_SCREENS,
   RUN_CONTEXTS,
   type EverydayScreen,
@@ -251,8 +253,79 @@ describe('the footer', () => {
       expect(note).toContain('this visit only');
     }
     for (const ctx of RUN_CONTEXTS.filter((context) => context !== 'rush')) {
+      expect(railFooter({ screen: 'stage', ctx }).engineerSwap.note, ctx).not.toBe(
+        ENGINEER_SWAP_RUSH_NOTE,
+      );
+    }
+  });
+
+  /*
+   * GitHub issue #533 item 1. The rush's note was the first correction of this row and it left the
+   * other two flows saying *nothing stops* about a swap that does not do the same thing there. Each
+   * of the three cases below is the sentence for one flow, and the fourth is the totality guard: a
+   * context with no row of its own falls through to the plain note, and the loop is over
+   * `RUN_CONTEXTS` so a sixth value arrives here rather than silently taking the default.
+   */
+  it('says in a replay that the swap ends the replay first, and only in a replay', () => {
+    for (const screen of ['brief', 'stage', 'report'] as const) {
+      const note = railFooter({ screen, ctx: 'replay' }).engineerSwap.note;
+      expect(note).toBe(ENGINEER_SWAP_REPLAY_NOTE);
+      /*
+       * The two facts the sentence exists to carry, asserted apart from the constant so that
+       * rewording it cannot quietly drop one: the swap ends the replay, and it does so because the
+       * panel can change the day being replayed (`shell.ts#enterEngineer`, issue #531 item 3).
+       */
+      expect(note).toContain('ends the replay first');
+      expect(note).not.toContain('nothing stops');
+      expect(note).toContain('this visit only');
+    }
+    for (const ctx of RUN_CONTEXTS.filter((context) => context !== 'replay')) {
+      expect(railFooter({ screen: 'stage', ctx }).engineerSwap.note, ctx).not.toBe(
+        ENGINEER_SWAP_REPLAY_NOTE,
+      );
+    }
+  });
+
+  it('says in a watch that nothing stops, without calling the run on the panel the player’s day', () => {
+    const note = railFooter({ screen: 'stage', ctx: 'watch' }).engineerSwap.note;
+    expect(note).toBe(ENGINEER_SWAP_WATCH_NOTE);
+    /*
+     * A watch is the one flow where *nothing stops* is still true and *the same day* is not: the
+     * record on the stage is somebody else's. So the corrected half is the subject rather than the
+     * promise, and both are asserted, because dropping either would make this note one of the other
+     * two by accident.
+     */
+    expect(note).toContain('nothing stops');
+    expect(note).toContain('watching');
+    expect(note).not.toContain('the same day');
+    expect(note).toContain('this visit only');
+    for (const ctx of RUN_CONTEXTS.filter((context) => context !== 'watch')) {
+      expect(railFooter({ screen: 'stage', ctx }).engineerSwap.note, ctx).not.toBe(
+        ENGINEER_SWAP_WATCH_NOTE,
+      );
+    }
+  });
+
+  it('keeps the plain note for the two flows the swap really does not interrupt', () => {
+    /*
+     * The daily loop and § 8's campaign day: the panel picks up the same day, and the row says so.
+     * Written as the complement of the three above rather than as a second list, so a context that
+     * gains a note of its own cannot be left in both places.
+     */
+    const plain = RUN_CONTEXTS.filter(
+      (ctx) => ctx !== 'rush' && ctx !== 'replay' && ctx !== 'watch',
+    );
+    expect(plain).toEqual(['daily', 'campaign']);
+    for (const ctx of plain) {
       expect(railFooter({ screen: 'stage', ctx }).engineerSwap.note, ctx).toBe(ENGINEER_SWAP_NOTE);
     }
+  });
+
+  it('draws a note on every context, and no two flows share one by accident', () => {
+    const notes = RUN_CONTEXTS.map((ctx) => railFooter({ screen: 'stage', ctx }).engineerSwap.note);
+    for (const note of notes) expect(note.length).toBeGreaterThan(0);
+    /* Four distinct sentences over five contexts — daily and campaign share, deliberately. */
+    expect(new Set(notes).size).toBe(4);
   });
 });
 

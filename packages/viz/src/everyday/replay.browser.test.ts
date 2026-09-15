@@ -229,4 +229,87 @@ describe.skipIf(!HAS_BROWSER)('the replay — GitHub issue #177 item 1', () => {
       await page.close();
     }
   });
+
+  /**
+   * **§ 3.2's swap ends the replay before it hands the page over** — GitHub issue #531 item 3,
+   * § D563, and the rush's #523 one field over.
+   *
+   * Two things were wrong with a replay that survived the trip, and the second is what the issue
+   * reports. A replay is *the day as it was* — `everyday/replay.ts` leaves the seed, the building,
+   * the dispatcher, the levers and the length where the day left them — and the full panel writes
+   * every one of them. And `leaveReplay`'s cancel is scoped to runs the **replay** pressed (#526
+   * item 4), which the Engineer surface's own Run button does not go through, so a run started over
+   * there inside a replay was still in flight when the player left and landed over the week the
+   * restore had just put back.
+   *
+   * What is asserted is the whole of the fix and nothing derived from it: the screen the swap leaves
+   * behind is the front door rather than the replay's brief, the week under it is the player's own,
+   * and a run started on the Engineer surface after the swap files **day 2's own score** rather than
+   * a replay-configured run's. The control arm is the same page with no replay opened, so the two
+   * arms differ in exactly the detour.
+   */
+  it('ends the replay on the way to the Engineer surface, so a run started there is the week’s own — GitHub issue #531 item 3', async () => {
+    /* The control: to day 2's door, out to the menu, then Engineer runs and files. No replay anywhere. */
+    const control = await coldLoad();
+    let expected: DoorWeek;
+    try {
+      await toTomorrowsDoor(control);
+      await control.locator('.everyday-bar-leave').click();
+      await control.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
+      await enterEngineerStage(control);
+      await control.click('#run');
+      await control.waitForFunction((label) => document.getElementById('run')?.textContent === label, RUN_IDLE, {
+        timeout: 120_000,
+      });
+      await control.evaluate(() => {
+        (document.activeElement as HTMLElement | null)?.blur();
+      });
+      await control.keyboard.press('Control+Enter');
+      await returnToEverydayMode(control);
+      await openEverydayDoor(control);
+      expected = await doorWeek(control);
+      /* Non-vacuity: the press really filed something, so the comparison below is not two blanks. */
+      expect(expected.scores.filter((score) => /\d/u.test(score)).length).toBeGreaterThan(0);
+    } finally {
+      await control.close();
+    }
+
+    const page = await coldLoad();
+    try {
+      await toTomorrowsDoor(page);
+      await page.locator('.everyday-door-chip').nth(5).click();
+      await page.locator('.everyday-bar-primary').click(); // Set up the replay
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+
+      await enterEngineerStage(page);
+      await page.click('#run');
+      await page.waitForFunction((label) => document.getElementById('run')?.textContent === label, RUN_IDLE, {
+        timeout: 120_000,
+      });
+      await page.evaluate(() => {
+        (document.activeElement as HTMLElement | null)?.blur();
+      });
+      await page.keyboard.press('Control+Enter');
+      await returnToEverydayMode(page);
+
+      /*
+       * The swap's own half, read the moment the page comes back: the replay is gone, and the screen
+       * behind it is the front door the replay was opened from rather than the brief of a week that
+       * is no longer standing. On a build where the swap leaves the replay alone this is the brief.
+       */
+      const back = await page.evaluate(() => ({
+        door: document.querySelector('.everyday-door') !== null,
+        brief: document.querySelector('.everyday-brief') !== null,
+        subline: document.querySelector('.everyday-rail-subline')?.textContent ?? '',
+      }));
+      expect(back.brief).toBe(false);
+      expect(back.door).toBe(true);
+      expect(back.subline).not.toContain('REPLAYING');
+
+      /* And what the Engineer surface ran and filed is the player's own day rather than a replay's. */
+      expect(await doorWeek(page)).toEqual(expected);
+    } finally {
+      await page.close();
+    }
+  });
 });

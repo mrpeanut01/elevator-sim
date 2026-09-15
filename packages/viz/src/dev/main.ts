@@ -830,6 +830,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * `shift/banking.ts#bankingRefusalFor` refuses on. Written by the Everyday host's `abandonDay` binding
    * alone, on § 3.4's *Leave it* and on a campaign `take-offer`, and compared by identity, so the next run
    * pressed files as it always did. Like {@link simulatedRecording}, not saved or restored by a watch.
+   *
+   * **Never a recording that has already filed** — GitHub issue #531 item 4, § D565. The host asks
+   * `dayClosed` first and cancels without marking when it is true, because *left unfinished* is a
+   * claim and this is the one the posting gate reads before it reads anything about identity.
    */
   let abandonedRecording: VizRecording | undefined;
   /**

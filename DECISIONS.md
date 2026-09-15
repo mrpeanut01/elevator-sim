@@ -35440,3 +35440,71 @@ chooses one is #437's too.
 **What this does not decide.** Whether DC-2 should play the whole census rather than a stage's `editable` list: GitHub issue #233 re-authors the lists, and on that commit the out-of-list rows move into `DROPDOWN_CLEARS`. The rebalance of stages 3, 5 and 7.
 
 ---
+
+## D563 — § 3.2's swap ends a replay before it hands the page over, and the row says what the swap does in each flow
+
+**Date: 2026-09-14 · GitHub issue #531 item 3 and GitHub issue #533 item 1 · Found by the independent review of GitHub PR #529 · Extends [§ D548](#d548) clause 7, which made the swap end a rush.**
+
+**Why an entry.** The decision is taken in `everyday/shell.ts` and binds `everyday/types.ts`, `everyday/rail.ts` and `honesty/surfaces.ts`, and it narrows a sentence already recorded — § D548 clause 7 gave the swap row one corrected note and this gives it three ([§ D405](#d405)).
+
+1. **A replay does not survive the trip.** § 6.1 hands a past day back *as it was*: `everyday/replay.ts` leaves the seed, the building, the dispatcher, the levers and the length exactly where that day left them, *"because they are what the day was"*. The full panel writes every one of them and `dev/main.ts#interveneAt` re-runs over whatever it finds, so a replay that survived the swap would be a replay of a day that never happened. That is § D548 clause 7's argument with `RUSH_FIELD_ROLES` swapped for a record of the past.
+2. **And it closes issue #531 item 3 by construction rather than by widening a flag.** `leaveReplay`'s cancel is scoped to runs the replay pressed ([§ D555](#d555) clause 4), and the Engineer surface's own Run button does not go through `EverydayHost.startRun`; a run started over there inside a replay was therefore still in flight when the player left, and `applyShift` landed it over the week the restore had just put back. The issue offered two fixes — leave the replay, or widen the flag to cover Engineer-started runs. Leaving is the one that also answers clause 1, and it needs no new channel through the door between the shells. **What the other fix would have bought and this does not:** a player can no longer inspect a replay on the full panel. A replay can be re-opened from the front door in two presses, which a rush cannot, so the cost is smaller here than the one § D548 clause 7 already accepted.
+3. **`go('door')` rather than a bare context write.** It is the route the bar's own way out of a replay already takes, its guard is what calls `leaveReplay`, and the way back lands on the front door the replay was opened from rather than on a brief whose week is gone.
+4. **The row says what the swap does *there*, in three flows rather than one.** `rail.ts#swapNoteFor` is one note per `RunContext`: `rush` and `replay` each say the swap ends the flow first, `watch` says nothing stops **and** stops calling the run on the panel the player's day — a spectator is looking at somebody else's record, which is the half of `ENGINEER_SWAP_NOTE` that was false there. `daily` and `campaign` keep the plain note. Each correction is § D227's rule rather than a preference, in both of its directions.
+5. **Measured rather than argued.** `replay.browser.test.ts` drives the swap from a replay's brief on the shipped artifact and reads what comes back: the front door rather than the brief, no `REPLAYING` on the rail, and a run started on the Engineer surface after the swap filing day 2's own score — equal, field for field, to a control arm that opened no replay at all.
+
+**What it moves.** Two seeded strings per honesty case, the `replay` and `watch` arms of the `ENGINEER_DOOR` adapter; the corpus row is the integrator's to re-measure ([§ D343](#d343)).
+
+---
+
+## D564 — A campaign day's leave strip keeps the promise it makes: § 8's day is abandoned exactly as § 6's is
+
+**Date: 2026-09-14 · GitHub issue #531 item 1 · Found by the independent review of GitHub PR #529 · Closes the open item [§ D555](#d555) left standing.**
+
+**Why an entry.** It moves something already recorded: § D555's closing sentence reads *"A campaign day's strip makes the same promise and is not wired: `shell.ts#leaveUnfinished` abandons in the daily context only, and says so."* That is no longer true, and the entry is what says so ([§ D405](#d405)).
+
+1. **The promise was made in two contexts and kept in one.** `actionBar.ts#confirmStripFor` gives `campaign` the **same** day-shaped strip as the daily loop, word for word — *"Today's run will not be scored"* — and `shell.ts#leaveUnfinished` called `EverydayHost.leaveDayUnfinished` only on `daily`. Nothing downstream distinguishes them: `host.ts#runCampaignDay` presses the same `startRun`, and `dev/main.ts#closeShift` never asks which flow a run belongs to.
+2. **The reproduction is the one § D555 could not run.** The issue records the inaction as confirmed by reading and the filing as plausible and unmeasured. It is measured now, on the shipped artifact: `autoFile.browser.test.ts` locks a contract day in, leaves it through the strip while the run is still on the worker, and presses the Engineer surface's `Ctrl`+`Enter`. Before this commit the front door showed a filed score; after it, none.
+3. **`ctx` rather than *does this context draw a strip*.** A rush and a replay draw a strip too, and theirs promises something else about a run that is already theirs to stop — so the test is the two day-shaped contexts by name.
+4. **Both halves of `abandonDay`, for § D555 clause 1's measured reason.** The run in flight is cancelled *and* the run standing behind it is refused at filing; on a campaign day that standing run is this page's own boot run, which the contract press has just made filable by latching § D232's flag.
+
+---
+
+## D565 — A day that has already filed is stopped when an offer is taken, not accused of being unfinished
+
+**Date: 2026-09-14 · GitHub issue #531 item 4 · Found by the independent review of GitHub PR #529.**
+
+**Why an entry.** It narrows when a refusal recorded elsewhere may be claimed: `shift/banking.ts#LEFT_UNFINISHED_CANNOT_BANK` is [§ D555](#d555) clause 1's third ground, and this says which recordings it may be attached to ([§ D405](#d405)).
+
+1. **The defect is a true refusal with a false reason.** `abandonDay` does two things — it cancels whatever is in flight, and it marks the standing recording as one this shell may not file. § D555 clause 2 calls it on a campaign `take-offer`, unconditionally. So a player who filed a day, took an offer and then posted was refused with *"this run belongs to a day that was left unfinished"* about a day that was finished and filed. `dev/main.ts#postCurrentRun` asks `bankingRefusalFor` **before** the identity check, so the true refusal — the selection has moved out from under the run — never got the chance to speak.
+2. **It would have been refused anyway, and that is not a defence.** This product makes exactly one accusation and `scope/runIdentity.ts` spends a docstring on not spending it. A refusal that names the wrong ground sends a player looking for a day they never left.
+3. **The cancel is not gated and the mark is.** `everyday/host.ts`'s `take-offer` arm now calls `cancelRun` when the day has closed and `abandonDay` when it has not. The cancel is right whatever the day has done: a run in flight was asked for the week being parked. `host.test.ts` reads `['cancelRun', 'applyPatch']` with `dayClosed` true and `['abandonDay', 'applyPatch']` without it, and the week moves either way.
+4. **The other caller needs no gate and deliberately does not get one.** § 3.4's strip is drawn only while `runState().open` is true, and that is false for a closed day, so `leaveDayUnfinished` cannot arrive with one. A second gate would be a second answer to a question the bar has already settled.
+
+---
+
+## D566 — A covered Everyday screen re-reads the host on the way back, in place, and the screen that must not says why
+
+**Date: 2026-09-14 · GitHub issue #535 · Found while fixing GitHub PR #530 (closes #523).**
+
+**Why an entry.** The decision is taken in `everyday/shell.ts` and adds a member to `everyday/screens.ts#EverydayScreenHandle`, which every screen in the registry implements, so it binds modules the deciding one does not own ([§ D405](#d405)).
+
+1. **The shape, and why it is a class rather than one screen.** `returnToEveryday` leaves every screen mounted — that is what makes the return land where the player left. A screen that *subscribes* is fine; a screen that read the host when it was drawn comes back showing what stood at the swap. PR #530 found the first (the rush setup screen) and fixed it with one guarded `draw()`. Three more had the shape and none had been probed.
+2. **Two of the three can go stale, and both were watched red.** `boardScreen.ts` draws § 20.10's send gate from `editedDispatcher()`, and the Engineer surface's weight sliders are what make a dispatcher dirty — stale, the board offers a send the product has just refused, on a button that starts forty runs and whose press does not re-ask the gate. `landingScreen.ts` chooses its single call to action with `tutorialIsDue`, which counts the days the week has filed, and the Engineer surface can file one — stale, it offers the walkthrough to a player who has just played a shift, with a label and a destination a visit out of date.
+3. **`designerScreen.ts` cannot, and no fix was invented for it.** It reads the host twice, both at mount: the stable resources, and a seed for a drawing the player then owns. Re-reading would replace a tower being drawn with whatever building the other world is standing on, so the fix would be worse than the defect. Its docstring carries that where a lane would go looking, which is what the issue asks for.
+4. **`reread` rather than `draw()`, and rather than a subscription.** `shell.ts#draw` unmounts, and `boardScreen.ts`'s `unmount` cancels a gauntlet in flight — so redrawing the board on the way back would silently throw away a batch of runs a player had started and walked away from, which is a new defect traded for an old one. A host subscription is worse again, for PR #530's own measured reason: the host's listeners fire at the end of every `renderAll`, so a subscribed screen rebuilds itself behind the cover on every state change the other world makes, and the landing page's rebuild restarts a transport. Once, on the way back, in place, is the whole of what is needed. The rush's line is left exactly as PR #530 wrote it: that screen's mount is a one-shot build with nothing to tear down.
+
+---
+
+## D567 — The *Watch it* press has one home, because the copy that had no test was the board's
+
+**Date: 2026-09-14 · GitHub issue #531 item 2 · Found by the independent review of GitHub PR #529.**
+
+**Why an entry.** It moves code out of two modules into a third and changes what [§ D555](#d555) clause 3's last sentence says about coverage ([§ D405](#d405)).
+
+1. **What was reported.** § D555 clause 3 put a guard in `weekScreen.ts` and `boardScreen.ts` — a watch check that lands after the screen has gone enters nothing, and ends the session the host has by then already entered — and recorded that the board's copy has no browser case, because the browser tier runs no board server and a board row cannot be pressed there. So reverting the board's copy alone failed nothing in the tree.
+2. **The fix is one implementation rather than a second test.** `everyday/watchPress.ts#pressWatchRow` carries the whole press: the one-press-at-a-time guard (GitHub issue #410), the gate call, and the three arms of its answer. Both screens supply ports for the parts that genuinely differ — the board keys its busy row and its refusals by the **server's** row id and keeps the reason, the week screen keys both by the run's id and keeps the whole checked row. Two implementations of a three-hazard decision, each with its own test, is the drift this repository keeps a register of.
+3. **`watchPress.test.ts` drives all of it against a fake host that keeps the settle callback** rather than calling it, so a case can land the gate's answer *after* it has unmounted the screen — which is the hazard, and is not expressible against a synchronous stand-in. Removing the late-landing guard turns two of its eight cases red.
+4. **What this does not buy, said rather than glossed.** Nothing here asserts that the board still *calls* it. The week screen's call is pinned on the page by `watchStage.browser.test.ts`; the board's is pinned by nothing until the tier can stand a board server up. That is a smaller hole than the one it replaces — a guard with no test at all — and it is the honest size of it.
+
+---

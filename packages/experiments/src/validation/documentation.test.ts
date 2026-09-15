@@ -1716,6 +1716,16 @@ type DecisionReservation = {
  * D568–D571 lane D (#534, the hybrid landing panels' follow-ups), D572–D576 lane E (#500 and #501,
  * Harbour Point and Ashgate) — and **D577–D580 are the integrator's**, which is the sizing lesson
  * § D418's note asked the next wave to apply rather than repeat.
+ *
+ * **One lane widened the old block instead, and it was right to, which is worth recording rather
+ * than silently overwriting.** Lane C branched before this commit existed, so the only reservation
+ * it could see was D533–D556; holding D563–D567 it widened that block to D567 on the commit that
+ * needed it, reasoning that the alternative is a branch red in `experiments` for bookkeeping that
+ * has nothing to do with what it changed. That reasoning is correct and the conflict was resolved
+ * in favour of the block above only because D557–D580 already contains D563–D567 — a wider claim
+ * that makes the lane's narrower one redundant, not wrong. The real lesson is the one this comment
+ * already states: **the block has to be open before the lanes start**, or every lane meets this
+ * same wall on its own and solves it five different ways.
  */
 const OPEN_RESERVATION = { wave: 'Z, of 2026-09-14', from: 557, to: 580 } as DecisionReservation | null;
 /*
