@@ -289,7 +289,14 @@ describe('a refusal that outlived the thing it refused — GitHub issue #423', (
      * entry on that commit (§ D547). The count is still asserted rather than described, which is the
      * point of this case.
      */
-    expect(RUSH_ABSENCES.length).toBe(0);
+    /*
+     * None, then one again: GitHub issue #372 built the sitting's posting path and deliberately did
+     * **not** build the spend that would make the purse mean anything, so the register regained an
+     * entry for that absence (§ D606). Four values in this one figure's life — three, one, none,
+     * one — which is the argument for asserting it here rather than writing it into a sentence, and
+     * is exactly what this case was opened to say.
+     */
+    expect(RUSH_ABSENCES.length).toBe(1);
     onlyInRetraction(
       sourceOf('./rushScreenModel.ts'),
       'three entries about the missing engine',
