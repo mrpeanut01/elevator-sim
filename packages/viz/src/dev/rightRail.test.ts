@@ -480,6 +480,40 @@ describe('buildingPlateOf', () => {
     );
   });
 
+  /**
+   * **The core row is the non-test reader of `ResolvedBuilding.area`** — GitHub issue #429,
+   * `DECISIONS.md` § D601, and the whole reason that field is not a twelfth dead seam.
+   *
+   * Derived from the building rather than pinned, in the direction that can go wrong: the row's
+   * figures are recomputed from `building.area` here, so a plate that drew a *different* building's
+   * core, or rounded one and not the other, fails.
+   */
+  it('draws what the shafts take out of the building, from the resolved area', () => {
+    const building = requireBuilding(config, 'midtown-office');
+    const area = building.area;
+    expect(area, 'midtown-office resolves no area').toBeDefined();
+    const row = valueOf(buildingPlateOf(building, undefined), 'core');
+    expect(row).toContain(`${String(Math.round(area?.coreM2 ?? 0))} m²`);
+    expect(row).toContain(`${(((area?.coreShare ?? 0) * 100)).toFixed(1)}%`);
+    // The help says what the figure is *not*, because a reader who compares it with a published
+    // core share for a real tower is comparing different quantities.
+    const help = buildingPlateOf(building, undefined).find((entry) => entry.k === 'core')?.help;
+    expect(help).toContain('no lift lobby');
+    expect(help).toContain('double-deck');
+  });
+
+  /**
+   * **A building that declares no plate gets no row rather than a zero**, which is the difference
+   * between *not modelled* and *nothing there*. Absent is the default for every config outside
+   * `data/buildings/`, including hand-built ones.
+   */
+  it('omits the core row entirely when the building declares no floor area', () => {
+    const building = requireBuilding(config, 'midtown-office');
+    const unauthored = { ...building, area: undefined };
+    expect(buildingPlateOf(unauthored, undefined).map((row) => row.k)).not.toContain('core');
+    expect(buildingPlateOf(building, undefined).map((row) => row.k)).toContain('core');
+  });
+
   it('draws no closed form at all when no machine library is handed over', () => {
     // The narrower plate, never the wrong one: a caller with no `ElevatorSpecs` gets the two
     // halves it always got rather than a block computed from a library it did not supply.
