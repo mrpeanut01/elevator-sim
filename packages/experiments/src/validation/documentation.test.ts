@@ -1717,15 +1717,21 @@ type DecisionReservation = {
  * Harbour Point and Ashgate) — and **D577–D580 are the integrator's**, which is the sizing lesson
  * § D418's note asked the next wave to apply rather than repeat.
  *
- * **One lane widened the old block instead, and it was right to, which is worth recording rather
- * than silently overwriting.** Lane C branched before this commit existed, so the only reservation
- * it could see was D533–D556; holding D563–D567 it widened that block to D567 on the commit that
- * needed it, reasoning that the alternative is a branch red in `experiments` for bookkeeping that
- * has nothing to do with what it changed. That reasoning is correct and the conflict was resolved
- * in favour of the block above only because D557–D580 already contains D563–D567 — a wider claim
- * that makes the lane's narrower one redundant, not wrong. The real lesson is the one this comment
- * already states: **the block has to be open before the lanes start**, or every lane meets this
- * same wall on its own and solves it five different ways.
+ * **Two lanes widened the old block instead, independently, and both were right to.** Lanes B and
+ * C each branched before this commit existed, so the only reservation either could see was
+ * D533–D556. Holding D560–D562 and D563–D567 they widened that block to D562 and to D567, each on
+ * the commit that needed it, and each gave the same reason: a lane writing a number inside its own
+ * block was turning this gate red on the ceiling rather than on anything it had done wrong. That
+ * reasoning is correct, and both conflicts were resolved in favour of the block above only because
+ * D557–D580 already contains both ranges — a wider claim that makes the narrower ones redundant,
+ * not wrong.
+ *
+ * **That it happened twice is the finding rather than the nuisance.** This comment was written
+ * predicting that lanes would each meet the wall alone and solve it differently; two of five did,
+ * before anybody looked, and wrote two different ceilings and two different justifying paragraphs.
+ * So the rule earns its place by measurement: **the block is opened before the lanes start**, not
+ * because it is tidier, but because the alternative is every lane inventing bookkeeping the
+ * integrator then has to throw away.
  */
 const OPEN_RESERVATION = { wave: 'Z, of 2026-09-14', from: 557, to: 580 } as DecisionReservation | null;
 /*

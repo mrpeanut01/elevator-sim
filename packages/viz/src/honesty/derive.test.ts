@@ -131,6 +131,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'pricing/parse.ts#violationsIn',
         'pricing/parse.ts#priceOf',
         'pricing/parse.ts#purchaseUnits',
+        /*
+         * GitHub issue #528, § D560. The same argument one function along: it returns a number, and
+         * its one literal is a refusal addressed to whoever asked a stepper for half a step or a
+         * negative one. What a player reads about a step is `fixitScreenModel.ts#fixitMachineryRows`’
+         * *"10 u per half a metre per second"*, which the FIXIT adapter drives and which this
+         * function does not write.
+         */
+        'pricing/parse.ts#steppedPurchaseUnits',
         'pricing/repairPrice.ts#pathsIn',
         'pricing/repairPrice.ts#changesBought',
         'pricing/repairPrice.ts#unpricedPathsIn',

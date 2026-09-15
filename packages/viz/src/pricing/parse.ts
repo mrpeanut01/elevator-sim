@@ -479,18 +479,21 @@ export function changeCovering(
 
 /**
  * **What buying a change costs — the one place a rate is multiplied by a quantity.** GitHub issue
- * **#478**, [§ D552](../../../../DECISIONS.md).
+ * **#478**, [§ D552](../../../../DECISIONS.md). That sentence is still exact after § D560, and the
+ * word carrying it is **rate**: {@link steppedPurchaseUnits} multiplies a *flat* price by a step
+ * count and hands a rated row straight back here, so there is one rate multiplier and one flat one,
+ * both in this file, each saying which it is.
  *
  * A flat row costs its price and takes no quantity. A rated row costs `unitsPer × quantity`, linear
  * and nothing else, for a whole-number quantity inside its declared range.
  *
- * **It is not the only place a price is multiplied, and the exception is known.** The fix-it editor
- * reads `faster-machines` and `larger-car-step` through here as flat figures
- * (`fixit/engine.ts#editorPricingFrom`), and `fixit/engine.ts#spendOf` multiplies each by the step
- * count the player chose: a flat price times a quantity, in code. The figures are identical today to
- * what this function would charge a rated row at the same price for the same count, and GitHub issue
- * #528 tracks moving them onto this seam. Until it does, turning either row into a rated one makes
- * `editorPricingFrom` throw here, and `spendOf` with it; `fixit/engine.test.ts` holds both halves.
+ * **The exception this docstring used to name is closed** — GitHub issue **#528**,
+ * [§ D560](../../../../DECISIONS.md). It read: the fix-it editor takes `faster-machines` and
+ * `larger-car-step` as flat figures and `fixit/engine.ts#spendOf` multiplies each by the step count
+ * the player chose, a flat price times a quantity, in code. That multiplication is now
+ * {@link steppedPurchaseUnits}, three declarations below — still a multiplication, still on a flat
+ * row, and no longer outside this module, where nothing could see it and nothing did.
+ * `pricing/pricesAreMultipliedOnlyHere.test.ts` is the guard that keeps it here.
  *
  * **Both refusals are the point.** Every other path that priced a change before #478 summed a flat
  * figure and has no quantity to give, so a rated row reached through one of them throws here rather than
@@ -524,6 +527,55 @@ export function purchaseUnits(change: PricedChange, quantity?: number): number {
     );
   }
   return unitsPer * quantity;
+}
+
+/**
+ * **What a stepped control charges for `steps` of a change** — GitHub issue **#528**,
+ * [§ D560](../../../../DECISIONS.md).
+ *
+ * A control that sells a change *by the step* — the fix-it editor's `+0.5 m/s` and `+2 places`, and
+ * nothing else in the tree today — asks this rather than reaching for a figure and a `*`. Its
+ * non-test caller is `fixit/engine.ts#spendOf`, which charges both steppers through it.
+ *
+ * | the row | what it is charged |
+ * |---|---|
+ * | rated | {@link purchaseUnits} at that quantity: `unitsPer × steps`, range-checked against the row's own declared most |
+ * | flat | `priceUnits × steps` — **the multiplier the schedule does not declare** |
+ *
+ * ## The flat arm is § D552's refusal, kept on purpose, in the open
+ *
+ * {@link purchaseUnits} refuses a quantity on a flat row, and the argument is exactly right: a
+ * magnitude on a row that declares no rate is *"a multiplier nobody authored"*. The fix-it editor has
+ * charged one anyway since before this schedule existed — 10 u a half-metre per second, 8 u for two
+ * places — and it is not withdrawn here, because withdrawing it moves a shipped price and a shipped
+ * price is the product owner's (`data/price-schedule.json`'s own header). So the choice is not
+ * *multiplier or no multiplier*; it is *visible or invisible*. This is the visible one: one function,
+ * in the module that owns prices, named after the thing it does, guarded by
+ * `pricesAreMultipliedOnlyHere.test.ts` so a second one cannot appear quietly, and pinned to the
+ * digit by `fixit/editorPricesThroughTheSchedule.test.ts`.
+ *
+ * **What it buys is that the data can decide.** Give either row a `rate` in
+ * `data/price-schedule.json` and the arm above takes over with **no code change at all** — which is
+ * what invariant 7 asks of a magnitude term, and what could not be said while the multiplier lived in
+ * `fixit/`. § D560 drafts that data change and does not take it: on the two rows the editor steps, it
+ * would re-price the shipped repairs that buy them.
+ *
+ * **The gap it leaves, said rather than discovered later.** A rated row declares a most, and a player
+ * who steps past it makes this throw where the panel has no ceiling to refuse at — the steppers cap on
+ * the budget alone. Nothing reaches that today, because no shipped row is rated; the row that changes
+ * that is GitHub issue #437's per-landing panels, and its lane owes the stepper a ceiling. The throw
+ * is pinned in `rate.test.ts` rather than left to be found.
+ */
+export function steppedPurchaseUnits(change: PricedChange, steps: number): number {
+  if (!Number.isInteger(steps) || steps < 0) {
+    throw new PriceScheduleError(
+      `"${change.id}" was bought ${String(steps)} steps at a time. A step count is a whole number of ` +
+        'steps, none of them negative — a fractional step is a price nobody declared and a negative ' +
+        'one pays the player to buy (GitHub issue #528, § D560).',
+    );
+  }
+  if (change.rate !== undefined) return purchaseUnits(change, steps);
+  return change.priceUnits * steps;
 }
 
 /**
