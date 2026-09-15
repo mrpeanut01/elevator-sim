@@ -132,9 +132,11 @@ describe('a free play run', () => {
       { ...openWeek('c2'), day: 4, streak: 4 },
       openWeek(FREE_PLAY_CONTRACT_ID),
     );
-    // `c2` is *Scenario 4* since issue #382 re-ordered the ladder by measured day-1 difficulty; a
-    // label is a position and the ids did not move.
-    expect(line).toContain('Scenario 4 is kept on day 4');
+    // **Derived rather than pinned.** This read `Scenario 4`, true after issue #382 re-ordered the
+    // ladder by measured day-1 difficulty and false again when GitHub issue #500 inserted `c9`
+    // above `c2`. A label is a *position*, so a literal is a claim about how many contracts sit in
+    // front of this one; what this case is about is that the line names the week being kept.
+    expect(line).toContain(`${contractById('c2')?.label ?? ''} is kept on day 4`);
     expect(line).toContain('pick that building again and it carries on from there');
     expect(line).toContain('Your free-play run is one run and banks nothing.');
     expect(line).not.toContain('starts a new week');

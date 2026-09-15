@@ -785,13 +785,22 @@ describe('§ 8.8’s offers, and the gate on ambition', () => {
     const opening = openingCareer('collective');
     const view = towersView(inputOf(opening));
     const ids = view.offers.rows.map((row) => row.contractId);
-    /* Garden Apartments is held; every other shipped building is priced since § D519 (GitHub issue
-       #169 item 4), so all seven are on the table. */
+    /* Garden Apartments is held; every other shipped building is priced — since § D519 (GitHub
+       issue #169 item 4) and, for `harbour-point` and `ashgate`, since § D575 (issues #500, #501) —
+       so every one of them is on the table. */
     expect(ids).not.toContain('c1');
     // In `CONTRACTS`' own order, which is `docs/33` § 4.7's measured ramp since issue #382 — read
     // from the list rather than transcribed, so a later rebalance moves this with it.
-    expect(ids).toEqual(CONTRACTS.map((contract) => contract.id).filter((id) => id !== 'c1'));
-    expect(view.offers.caption).toBe('7 offers');
+    const offerable = CONTRACTS.map((contract) => contract.id).filter((id) => id !== 'c1');
+    expect(ids).toEqual(offerable);
+    /*
+     * **The caption is derived, not pinned.** It read `'7 offers'`, which was a count of the
+     * contract list with one held — true at eight contracts and false at ten. The caption's own
+     * claim is *this many rows are drawn*, and that is what is asserted; the non-vacuity beside it
+     * is what stops the pair passing over an empty table.
+     */
+    expect(view.offers.caption).toBe(`${String(offerable.length)} offers`);
+    expect(offerable.length).toBeGreaterThan(5);
     expect(view.offers.empty).toBeUndefined();
     for (const row of view.offers.rows) {
       expect(row.terms).toMatch(/^complexity \d of 5 · \d+ u a day$/u);

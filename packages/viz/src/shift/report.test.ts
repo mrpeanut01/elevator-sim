@@ -1087,8 +1087,15 @@ describe('the rest of the sheet', () => {
 
   it('says what is banked, and what is left to bank', () => {
     const report = reportOf(clean);
-    // `c2` is *Scenario 4* since issue #382 re-ordered the ladder by measured day-1 difficulty.
-    expect(report.contractLine).toContain('Scenario 4 — The morning rush');
+    /*
+     * **The position is derived, not pinned.** This read `Scenario 4` — true after issue #382
+     * re-ordered the ladder by measured day-1 difficulty, and false again when GitHub issue #500
+     * inserted `c9` above `c2`. A `label` is a *position*, so a literal here is a fact about the
+     * length of the array in front of this contract, and the line under test is the one the sheet
+     * draws from the contract itself. Asserting the derivation keeps the claim — *the sheet names
+     * the scenario you are on* — and drops the part of it that was never the point.
+     */
+    expect(report.contractLine).toContain(`${contractById('c2')?.label ?? ''} — The morning rush`);
     expect(report.contractLine).toContain('clean shifts banked');
     expect(report.taught).toContain('Bank 1 more clean shift');
   });
@@ -1637,8 +1644,15 @@ describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
     const report = weekDay(sheetOf({ kind: 'week-day' }));
     expect(report.of).toBe('week-day');
     expect(report.title).toBe('Thursday — day 4');
-    // `c2` is *Scenario 4* since issue #382 re-ordered the ladder by measured day-1 difficulty.
-    expect(report.contractLine).toContain('Scenario 4 — The morning rush');
+    /*
+     * **The position is derived, not pinned.** This read `Scenario 4` — true after issue #382
+     * re-ordered the ladder by measured day-1 difficulty, and false again when GitHub issue #500
+     * inserted `c9` above `c2`. A `label` is a *position*, so a literal here is a fact about the
+     * length of the array in front of this contract, and the line under test is the one the sheet
+     * draws from the contract itself. Asserting the derivation keeps the claim — *the sheet names
+     * the scenario you are on* — and drops the part of it that was never the point.
+     */
+    expect(report.contractLine).toContain(`${contractById('c2')?.label ?? ''} — The morning rush`);
     expect(report.contractLine).toContain('clean shifts banked');
     expect(report.streakLine).toContain('clean days in a row');
     expect(report.forecast.demand).toContain('more tenants than today');
