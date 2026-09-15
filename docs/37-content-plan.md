@@ -35,9 +35,9 @@ fix cases and forty proof cases*. **Four are right and one is wrong.**
 
 | content type | key | ships today | derived from |
 |---|---|---|---|
-| Buildings | `buildings` | **11** | `.json` files in [`data/buildings/`](../data/buildings/), and pinned both ways by `packages/viz/src/fixtures.test-helper.ts#BUILDING_IDS` against `readdirSync` |
+| Buildings | `buildings` | **14** | `.json` files in [`data/buildings/`](../data/buildings/), and pinned both ways by `packages/viz/src/fixtures.test-helper.ts#BUILDING_IDS` against `readdirSync` |
 | Campaign stages | `campaign-stages` | **10** | `stages` in [`data/campaign.json`](../data/campaign.json) |
-| Contracts (the daily loop's scenarios) | `contracts` | **10** | `CONTRACTS` in `packages/viz/src/shift/contracts.ts` — `c1`–`c10` |
+| Contracts (the daily loop's scenarios) | `contracts` | **13** | `CONTRACTS` in `packages/viz/src/shift/contracts.ts` — `c1`–`c13` |
 | Fix-a-building cases | `fix-cases` | **18** | `cases` in [`data/fixit-cases.json`](../data/fixit-cases.json) |
 | Proof cases | `proof-cases` | **40** | `towers` × `crowds` in [`data/proof-cases.json`](../data/proof-cases.json) — 8 × 5 |
 | Dispatcher profiles | `dispatchers` | **13** | `profiles` in [`data/dispatcher-profiles.json`](../data/dispatcher-profiles.json) |
@@ -116,27 +116,29 @@ day. So the multiplier is **at least 5×**, and 5 is what this document uses.
 
 | mode | simulated seconds shipped | derivation | watched? | real watch minutes at 30× |
 |---|---|---|---|---|
-| Daily loop | **45 000** | 24 clean days is the floor — `needClean` over `c1`–`c10` is 1+2+2+2+2+3+3+3+3+3 — at 1 800 s each, except `c1`'s authored 3 600 s: 3 600 + 23 × 1 800 | yes | **25.0** |
+| Daily loop | **61 200** | 33 clean days is the floor — `needClean` over `c1`–`c13` is 1+2+2+2+2+3+3+3+3+3+3+3+3 — at 1 800 s each, except `c1`'s authored 3 600 s: 3 600 + 32 × 1 800 | yes | **34.0** |
 | Campaign | **9 000** | 10 stages × `durationS` 900 | yes | **5.0** |
 | Fix a building | 33 900 | 18 cases, `run.durationS` 1 500–2 700 | no | 0 |
 | The gauntlet | 38 400 | 8 towers × (900 + 900 + 1 200 + 1 200 + 600) crowd horizons | no | 0 |
-| **watched total** | **54 000** | | | **30.0** |
+| **watched total** | **70 200** | | | **39.0** |
 
-**Thirty minutes.** That is the whole of what this game asks a player to watch, and it is worth
-stating in one line because it is the figure the issue's *"a few hours of content"* is hiding: the
-hours are real, and almost none of them are the simulator running. *(It read **twenty-five** until
-§ 7.3's two buildings shipped their contracts; five clean days at 1 800 s is five watch-minutes, and
-the row is re-derived here rather than left to drift — `RISKS.md` R38.)*
+**Thirty-nine minutes.** That is the whole of what this game asks a player to watch, and it is
+worth stating in one line because it is the figure the issue's *"a few hours of content"* is hiding:
+the hours are real, and almost none of them are the simulator running. *(It read **twenty-five**
+until § 7.3's two buildings shipped their contracts and **thirty** until the first three reference
+towers shipped theirs — GitHub issues #424, #425 and #430. Nine clean days at 1 800 s is nine
+watch-minutes, and the row is re-derived here on each wave rather than left to drift —
+`RISKS.md` R38.)*
 
 **The finite play-hours, then:**
 
 | mode | arithmetic | play-hours |
 |---|---|---|
-| Daily loop + campaign | 30.0 watch-minutes × 5 (§ 2) = 150 min | **2.50** |
+| Daily loop + campaign | 39.0 watch-minutes × 5 (§ 2) = 195 min | **3.25** |
 | Fix a building | 18 cases × 7.67 min (below) = 138 min | **2.30** |
 | The gauntlet | one press per dispatcher a player wants rated | ~0 |
 | Endless rush | unbounded by construction | excluded |
-| **total** | | **≈ 4.8** |
+| **total** | | **≈ 5.6** |
 
 **Where 7.67 minutes a case comes from.** A clean solve is: understand the fault (the charter's own
 first-session standard is *understood why within three minutes*), choose among four repairs against a
@@ -177,8 +179,8 @@ independently**.
 
 | content type | key | today | **target** | how the target is derived | play-hours it adds |
 |---|---|---|---|---|---|
-| Buildings | `buildings` | 11 | **22** | owner ruling, 2026-09-10 (#232): every open reference tower plus Harbour Point and Ashgate, each playable. § 4.3's rotation arithmetic set the earlier floor of 12 | 0 directly; multiplies every other row |
-| Contracts | `contracts` | 10 | **22** | one per shipped building — `docs/12` § 4.7's own rule, *a shipped building with no contract is a scenario the reader can never take* | 12 × 3 clean days × 1 800 s = 64 800 s = 36 watch-min × 5 = **+3.00** |
+| Buildings | `buildings` | 14 | **22** | owner ruling, 2026-09-10 (#232): every open reference tower plus Harbour Point and Ashgate, each playable. § 4.3's rotation arithmetic set the earlier floor of 12 | 0 directly; multiplies every other row |
+| Contracts | `contracts` | 13 | **22** | one per shipped building — `docs/12` § 4.7's own rule, *a shipped building with no contract is a scenario the reader can never take* | 12 × 3 clean days × 1 800 s = 64 800 s = 36 watch-min × 5 = **+3.00** |
 | Campaign stages | `campaign-stages` | 10 | **24** | one per building, plus the two stages that teach a mechanic rather than a tower (stage 3 *Overwhelmed* and stage 7 *Tune it*, both on `midtown-office`). Today that rule gives exactly the shipped 10, and at 22 buildings it gives 24 | 14 × 900 s = 12 600 s = 7 watch-min × 5 = **+0.58** |
 | Fix cases | `fix-cases` | 18 | **44** | § 10.6 of the gameplay guide names **26** further cases by name, with authoring rules; 18 + 26. **16 of the 26 are authorable today** — § 5.2 | 26 × 7.67 min = **+3.32** |
 | Proof cases | `proof-cases` | 40 | **40** | **unchanged, by rule.** A rating is only comparable if the cases never move; growing the building set must not touch this list. § 7 is the one permitted move | 0 |

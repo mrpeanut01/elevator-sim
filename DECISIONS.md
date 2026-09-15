@@ -35866,3 +35866,324 @@ twelfth building meets a red test rather than this paragraph.
 assumption with its reasoning attached, in § D519's manner, and the owner's to accept, tighten or
 reject. Whether `QUIRKS` should be re-sourced. And nothing about the renewal ladder, the shop or the
 calendar, none of which this touches.
+
+
+---
+
+## D576 — The air-pressure cap could resolve a descent speed *above* a car's rated speed, and no warning said so
+
+**Date: 2026-09-15 · GitHub issue [#425](https://github.com/mrpeanut01/elevator-sim/issues/425)'s lane · Rules on: [§ D265](#d265)'s class one layer down, and `config/resolveCar.ts#descentSpeedOf`'s own stated contract.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: it binds `packages/core/src/config/resolveCar.ts`,
+which is `core`'s and not this lane's, and it corrects a claim two shipped docstrings make.
+
+1. **The defect, as measured.** A car rated **6 m/s** on a shaft above
+   `elevator-specs.json`'s `airPressure.appliesAboveTravelM` (300 m) resolved to
+   `descentSpeedMps: 10` — **quicker down than up, on a machine nobody authored an asymmetry for**,
+   and silently: `descent-above-rated-speed` is raised on `CarConfig.descentSpeedMps` and there was
+   none to raise it on. `physics/motion/sCurve.ts` reads `descentSpeedMps ?? ratedSpeedMps` by the
+   sign of the move, so the car really did fly downwards at a speed its plate does not have.
+2. **It is a bug against its own contract rather than a judgement call.**
+   `airPressureDescentCapMps`'s docstring says *"a cap above what the car can do is still the cap,
+   and whether it **binds** is the caller's question"*; `descentSpeedOf`'s says it returns
+   `undefined` *"when nothing binds"*. The caller took `min(authored, cap)` and never asked whether
+   the answer was below the plate. The fix is to bound the **cap** by the rated speed before the
+   minimum, which is two lines.
+3. **The authored field is deliberately *not* clamped**, and that is the half worth recording. A car
+   whose own `descentSpeedMps` exceeds its rated speed is legal, is warned about, and
+   `CLOSED_FORM_ASSUMPTIONS`' `symmetric-speed` entry **names it in terms** as the one expressible
+   case that makes the closed form read *high* rather than low. Clamping it too would have quietly
+   deleted a configuration a published assumption describes, which is a worse fix than the defect.
+4. **It reached no shipped building, and that is measured rather than argued.** Only three shipped
+   banks are above the threshold — `vertical-city/shuttle` at 307.5 m and `burj-class-reference`'s
+   shuttle and observation cars at 448.3 m and 452.0 m — and every car in all three is rated exactly
+   **10.0 m/s**, which is exactly the cap. `config/descentCap.test.ts` asserts the whole shipped set
+   is unmoved across this change.
+5. **Two of its three negative controls could not see it, and the third is new.** That file ran a
+   car *above* the cap and a car *at* it; the defect lives strictly **below**. The new case is
+   written against the value the defect really produced, on a class the cap cannot reach down to.
+6. **How it was found.** By authoring the fourth bank above 300 m of travel — the local zones of the
+   three reference towers below — and checking the resolved cars before running anything. Nothing in
+   the suite would have caught it: the run would simply have been faster downwards than the building
+   said.
+
+**What this does not decide.** Whether `descent-above-rated-speed` should also fire when the *cap*
+produces the inversion — it cannot now, because the inversion cannot now happen — or anything about
+the air-pressure figures themselves, which are GitHub issue #444's and are unmoved.
+
+---
+
+## D577 — The CTF-class reference tower: the figures, and the first shipped bank whose cars are not one speed
+
+**Date: 2026-09-15 · GitHub issue [#425](https://github.com/mrpeanut01/elevator-sim/issues/425) · Rules on: the product owner's 2026-09-08 standing ruling on governed `data/` values, the owner's 2026-09-10 ruling on #232 (*the target is 22 buildings, every one playable and owing one contract*), and [§ D265](#d265).**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. The authored figures need the owner's approval
+and are drafted for it here. And it **moves something already recorded**: `CLAUDE.md` § Correctness
+oracle, `analytical/types.ts` and `config/schema.ts` all said the directional-speed machinery was
+*"raised on no shipped building"*, and one of those is no longer true.
+
+1. **The issue's premise was stale, and that was checked before anything was designed.** #425's
+   title says *the car schema cannot express that*. Since GitHub issue #444, `carConfigSchema`
+   carries `descentSpeedMps` and `cabinPressurised` and `sCurve` picks the top speed by the sign of
+   the move — so #425's **exit 1** was already taken by somebody else and what was missing was a
+   building. The issue is closed by authoring one, not by widening a schema.
+2. **What is CHOSEN, and awaits approval.** 111 floors above ground; a 4.5 m office storey, a 3.5 m
+   apartment storey and a 3.6 m hotel storey, putting the top occupied floor at 446.7 m under a
+   530 m roof this model does not carry; three sky lobbies at 31, 67 and 91 and a sky deck at 109;
+   the populations (52 an office floor, 24 an apartment floor, 30 a hotel floor, 30 on the deck —
+   **4 472** in all); the car count (**36** over five banks) and every car's class, rating and door;
+   and `cabinPressurised` on the shuttle. The building's `$comment` marks each of them.
+3. **What is MEASURED (cited).** The pair **20.0 / 10.0 m/s** — 1 200 m/min ascending and 600 m/min
+   descending, the design Hitachi publishes for this tower's record lifts, with the descent limited
+   for ear comfort rather than by the machine. Nothing is taken from the trade-association article
+   that prompted #425, which the issue itself says is the prompt and not the citation.
+4. **Why the cabin is pressurised, which is the clause to read.** The shuttle's travel is 451.2 m,
+   above `appliesAboveTravelM` (300), so an **unpressurised** cabin is capped at `descentCapMps` —
+   **10.0 m/s, the same figure Hitachi publishes**. `resolveCar` takes the lower of the two limits,
+   so on that arrangement deleting `descentSpeedMps` would change nothing at all: the authored field
+   would be a value with no consequence, which is § D265's defect exactly. Pressurising removes the
+   shaft's cap (`pressurisedDescentCapMps` is `null`), so the machine's own published limit is the
+   only thing holding the descent. **Both halves are asserted by a run**:
+   `packages/core/src/sim/directionalSpeedSeam.test.ts` shows the unpressurised arms are
+   byte-identical on the legs and the shipped arms are not.
+5. **The asymmetry binds, on the legs.** Three seeds at 1 800 s under `collective`: identical
+   journeys on both arms — same origins, same destinations, same arrival instants — carried in
+   **different legs**. The leg *count* does not move, because a speed is not a zone, which is why a
+   leg-count comparison would have missed it entirely.
+6. **It is the first shipped bank to raise `directionalSpeedAsymmetry`.** Asserted in **both**
+   directions in `analytical/upPeak.test.ts` — this bank and no other — because half the claim is
+   that the detector is not simply on. The three sites that said *"raised on no shipped building"*
+   are corrected rather than deleted, and each says what it used to say.
+7. **The oracle publishes three residuals and two refusals, and the asymmetric bank is refused.**
+   `local-low` raw +48.935 % / residual **−0.031 %**, `local-mid` +54.025 % / **−0.309 %**,
+   `local-hotel` +35.066 % / **−0.066 %**, all at 64 replications from seed 810 000 against a 4 %
+   tolerance. `local-apartments` throws on `departureGapBracket` and the **shuttle** throws because
+   `measureUpPeak` cannot drain the crowd it offers it. So this file publishes **no residual for the
+   asymmetric bank**, and that is stated rather than worked around: what a reader gets is the
+   warning, and a reader who wants the number needs a different apparatus.
+8. **Playable, and handed as built** — contract `c11`, [§ D581](#d581).
+
+**What this does not decide.** Whether the figures are right; they are the owner's to accept, tighten
+or reject. Whether the real tower's ~95 lifts should be modelled rather than 36 — the car count is
+CHOSEN and the file says so. And the proof set, which the 2026-09-10 ruling keeps fixed.
+
+---
+
+## D578 — The Shanghai-class reference tower: the top of the speed catalogue, reached on exactly one hop
+
+**Date: 2026-09-15 · GitHub issue [#424](https://github.com/mrpeanut01/elevator-sim/issues/424) · Rules on: the product owner's 2026-09-08 standing ruling on governed `data/` values and the owner's 2026-09-10 ruling on #232.**
+
+**Why an entry.** [§ D405](#d405)'s first ground, twice: authored figures drafted for approval, and a
+building that makes `config/schema.ts`'s air-pressure advisory mean something different from what it
+said.
+
+1. **What is MEASURED (cited, and both citations were already in this repository).** The shuttle's
+   **20.5 m/s**, which is `data/elevator-specs.json#realWorldAnchors`' row for this machine and the
+   maximum of its `ultra-high-speed` class. And `cabinPressurised`, from the `airPressure` block's
+   cited Al-Kodmany (Buildings 2015, 5(3), 1070–1104, § 3.1.4) note that **this tower** answers the
+   air-pressure problem with a pneumatic system. The lift count, **106**, is the one figure the
+   prompting article supplies and it is used as a *count* rather than as a citation.
+2. **What is CHOSEN, and awaits approval.** 128 floors above ground on a 4.5 m office storey and a
+   4.2 m hotel storey, putting the observation deck at 527.7 m and the crown's plant at 568.2 m
+   under a 632 m architectural top this model does not carry; four sky lobbies at 21, 45, 69 and 93;
+   the populations (88 an office floor, 30 a hotel floor, 30 on the deck — **8 612** in all, roughly
+   half what the real tower is reported to carry); and the split of the 106 cars (14 shuttles, four
+   local banks of 20, a hotel bank of 12).
+3. **It is the first shipped building to reach the top of the catalogue, and the framing is #424's
+   own correction.** Every car in `data/buildings/` stopped at 10.0 m/s, so the upper half of the
+   class's declared range had a **UI caller** — `authoring/machineSpec.ts`'s ceiling, which a player
+   can already dial — and no content caller. That is *no authored example*, not a dead seam, and the
+   distinction is the issue's rather than this entry's.
+4. **The rating binds, and it was a live question rather than a formality.** `CLAUDE.md`'s *short
+   hops never reach rated speed*: at 1.2 m/s² and 1.2 m/s³ an s-curve needs about **185.4 m** to
+   reach 20.5 m/s and the same again to stop, so a leg under about **370.7 m** is
+   acceleration-limited. This shuttle makes **exactly one hop that is long enough** — G to sky lobby
+   4, 418.5 m — and three that are not (94.5 m, 202.5 m, 310.5 m). `directionalSpeedSeam.test.ts`
+   re-rates it at 10.0 m/s, the fastest any shipped car was before this file, and requires the legs
+   to differ; they do, on all three seeds.
+5. **The observation deck's visitors are not modelled, and that is a refusal rather than a gap.**
+   Floor 119 carries thirty people — its staff and its restaurant — so it is a real origin and a
+   real destination served by a real bank. The **visitor** crowd an observation deck draws has no
+   demand template in this repository (GitHub issue #436), and authoring a separate observation
+   express would have been a bank almost nobody rides: § D265's defect rather than fidelity.
+6. **The oracle reconciles one bank and refuses five, and one of those refusals is new.**
+   `local-hotel` raw +34.983 % / residual **−0.209 %** at 64 replications from seed 810 000. The
+   shuttle throws on a zero served population — the ground every supertall shuttle meets — and
+   `local-1` … `local-4` throw because `measureUpPeak` drives an isolated bank at
+   `OVERLOAD_FACTOR × %POP` of its own capacity, so a twenty-car bank is handed a crowd it cannot
+   drain inside the deadline. **That third ground had never appeared in this repository.** It is a
+   limit of the departure reconstruction rather than of the closed form, and **no mechanism is
+   offered for where the threshold lies** — that needs a sweep over bank sizes, and a plausible
+   sentence in place of a measurement is what [§ D256](#d256) refuses.
+7. **The stage cannot draw it**, on `docs/12` § 4.16's measured 35 legible floors at 1280 × 800 and
+   40 at 1440 × 900 against 129. Same position as `burj-class-reference`; GitHub issue #377 owns it.
+8. **The rush cannot break it, and that is measured.** [§ D582](#d582).
+
+**What this does not decide.** Whether 8 612 is the right occupancy, or whether the 106 should split
+differently. Both are CHOSEN and the file says so.
+
+---
+
+## D579 — The Merdeka-class reference tower: fewer transfers over a similar rise, and a second supertall occupancy that disagrees with the first
+
+**Date: 2026-09-15 · GitHub issue [#430](https://github.com/mrpeanut01/elevator-sim/issues/430) · Rules on: the 2026-09-08 standing `data/` ruling, the 2026-09-10 ruling on #232, and `burj-class-reference.json`'s own recorded limit.**
+
+**Why an entry.** [§ D405](#d405)'s first ground, and it **answers a question another file asked in
+its own words** — `burj-class-reference`'s `$comment` says its population is an assumption and that
+*"one supertall cannot expose that. Two can."*
+
+1. **What is MEASURED (a count rather than a citation).** **92 cars**, the lift count the prompting
+   article supplies, and the only figure from it this file uses.
+2. **What is CHOSEN, and awaits approval.** 118 floors above ground on a 4.8 m office storey, a
+   4.2 m hotel storey and a 5.0 m observation storey, top occupied floor at 537.0 m under a 678.9 m
+   architectural top; **one** office sky lobby at 57 and a hotel lobby at 93; the populations —
+   90 an office floor low-rise and 80 high-rise (a taper, because the plate narrows with height),
+   30 a hotel floor, 25 an observation floor, **8 455** in all; and the split of the 92 cars.
+3. **Fewer transfers over a similar rise, measured on the legs.** Fifty-six populated office floors
+   are one leg from the street. Seed 20 260 824, 1 800 s, `collective`: **3 529 journeys, 5 041 legs
+   — 1.428 legs a journey**, against `burj-class-reference`'s **1.940** on the same seed and horizon.
+   `directionalSpeedSeam.test.ts` hands floors 29–56 to the high locals, halving the one-leg zone,
+   and requires the same journeys to need strictly more legs.
+4. **The two occupancies disagree by about 64 %, and that is the result.** This tower is 8 455 over
+   92 = **91.9 people a car**; `burj-class-reference` is 3 198 over 57 = **56.1**. The populations
+   were authored by **different methods on purpose** — this one from a stated floor-plate
+   assumption, the other by measuring what a 57-lift arrangement serves with a valid AWT — and
+   neither figure was chosen with the other in view. #430 asks what follows from a disagreement and
+   answers itself: *the assumption is where to look*. **Neither file moves**, because averaging two
+   assumptions produces a third assumption and no measurement. What the comparison establishes is a
+   **direction**: on the same profile the Burj-class tower is the lift-rich one of the pair, which is
+   consistent with a population that was solved for rather than surveyed.
+5. **The shuttle is at the air-pressure cap rather than past it.** Rated 10.0 m/s on a 446.4 m bank,
+   above the 300 m threshold — so the cap reaches it and binds nothing, because the cap *is* 10.0.
+   That is where every supertall shuttle in the shipped set has sat since the block landed, and
+   buying speed is what would make it bite.
+6. **The oracle reconciles one bank and refuses three.** `local-hotel` raw +34.485 % / residual
+   **−0.466 %** with three declared departures from the model; the shuttle on zero served
+   population, and `local-low` and `local-high` on § D578 clause 6's new ground —
+   `local-low` is handed **5 695 journeys** in 5 400 s and leaves 1 351 in the system.
+7. **Playable, and handed as built** — contract `c13`, [§ D581](#d581).
+
+**What this does not decide.** Which of the two occupancies is right. Whether either should move —
+neither does here.
+
+---
+
+## D580 — The campaign prices the three reference towers, and the 1–5 complexity scale is short at the top
+
+**Date: 2026-09-15 · GitHub issues [#425](https://github.com/mrpeanut01/elevator-sim/issues/425), [#424](https://github.com/mrpeanut01/elevator-sim/issues/424), [#430](https://github.com/mrpeanut01/elevator-sim/issues/430) · Rules on: [§ D519](#d519)'s placement rule, [§ D510](#d510)'s offer fee, and [§ D575](#d575)'s fabric-not-difficulty reading.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: one authored figure per building needs the owner's
+approval, and the entry records a limit of a published scale that this lane found and did not act on.
+
+1. **Why it is owed at all.** `everyday/campaignModel.ts#offersView` **skips** a contract whose
+   building has no complexity or no fee, so a shipped playable building without rows here would be
+   offerable in the daily loop and invisible on the campaign screen — § D265's shape one layer up.
+   `economy.test.ts` derives the check from `CONTRACTS` in both directions.
+2. **All three are placed on fabric, and here that distinction is forced rather than preferred.**
+   Every one of them reads a day-1 miss rate of **1.00** ([§ D581](#d581)), so difficulty is the
+   constant function on this end of the set and cannot order anything. Fabric can:
+   `merdeka-class-reference` **4** — four banks, *one* office sky lobby, and its whole design is
+   fewer transfers, so a reader holds one fewer zone boundary than Mixed-Use High-Rise's reader
+   holds on a building a quarter the height; `ctf-class-reference` **5** — five banks, three sky
+   lobbies and the only asymmetric car in the set; `shanghai-class-reference` **5** — six banks,
+   four sky lobbies, 106 cars.
+3. **The fees follow § D510's rule unamended**: 6 u, 7 u and 7 u, each complexity plus two. No
+   fixture names any of the three, because the design file was drawn against eight buildings, so
+   there is nothing for a fixture to outrank. Harbour Point's warning applies with more force: none
+   of the three clears a day at day 1, so each fee is paid for days the career will miss — the fee
+   prices the **fabric** and § 8.9's renewal prices the **record**.
+4. **The scale is short at the top, recorded and not acted on.** Three buildings now sit on
+   `COMPLEXITY_MAX`, and the set holds four supertalls. Widening 1–5 would move every published
+   *complexity n of 5* string in the product, which is an owner's call rather than a lane's. Two
+   buildings already share a 3 in § 8.5's own six, so a shared ceiling is not a ranking collapsing —
+   but it is the clearest sign yet that the column has run out of room.
+5. **Neither gets a quirk**, which is § D575 clause 4's existing pattern: `career.ts#QUIRKS` names
+   six buildings and everything else falls back to the contract's `teaches`.
+
+**What this does not decide.** Whether 4, 5 and 5 are right. Whether the scale should widen.
+
+---
+
+## D581 — Five contracts tie at 1.00, the measurement stops ordering, and the tie is broken by bank count
+
+**Date: 2026-09-15 · GitHub issues [#425](https://github.com/mrpeanut01/elevator-sim/issues/425), [#424](https://github.com/mrpeanut01/elevator-sim/issues/424), [#430](https://github.com/mrpeanut01/elevator-sim/issues/430) · Rules on: [§ D574](#d574)'s placement rule, [`docs/33`](docs/33-difficulty-curve.md) § 4.7d's curriculum reading, and [§ D468](#d468)'s energy-bar finding.**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. It **moves something already recorded** —
+§ D574's rule is *place a contract by its own measured day-1 miss rate*, and this is the first time
+that rule has been unable to place one — and it binds `shift/contracts.ts`,
+`shift/contracts.test.ts` and `data/contract-ladder.json`, none of which this lane owns outright.
+
+1. **Measured, at § 4.7d's budget and seeds.** `CONTRACT_CURVE_SWEEP=1 CONTRACT_CURVE_SEEDS=50`,
+   day 1, `collective`, seeds `20 260 824 + 7 919 n`, the shipped five-goal set, one contract at a
+   time: `c11` **50 of 50**, `c12` **50 of 50**, `c13` **50 of 50**. And the two rows already at the
+   ceiling were **re-measured beside them rather than quoted** — `c4` 10 of 10 and `c5` 10 of 10,
+   agreeing with their published 50-seed 1.00.
+2. **Why nothing reaches DC-4's band, measured rather than argued.** Two goals are missed on every
+   seed of all three, and both are quantities no rung in `data/contract-ladder.json` can move. The
+   **energy bar** asks 80 kJ per delivered ride; measured under `collective` at 1 800 s a ride costs
+   **105.9 kJ** (CTF-class), **109.4** (Shanghai-class) and **176.4** (Merdeka-class), against
+   86.8 for `vertical-city`, 137.0 for `mixed-use-high-rise` and 242.6 for `burj-class-reference`.
+   The bar is a **per-leg** quantity and both admissible substrates — occupancy and arrival rate —
+   are **divisors of the crowd**: fewer riders means fewer legs and the same kilojoules on each.
+   § D468 found exactly this and left it as `docs/33` O2 and GitHub issue #234; this is the same
+   finding at three more towers. The **lobby-queue** goal (25 people) is the same shape.
+3. **So all three are handed as built**, with the identity rung and no rate override — `c1`'s shape
+   rather than `c9`'s, and for the mirror-image reason: `c1` cannot be made to **fail** and these
+   three cannot be made to **pass**.
+4. **The tie is broken by bank count, and that is a design choice stated as one.** Five contracts
+   read 1.00, so the measurement does not order them. Ordered by bank count they read 3, 4, 5, 6, 7
+   — `mixed-use-high-rise`, Merdeka-class, CTF-class, Shanghai-class, `vertical-city` — and the whole
+   ladder's bank sequence becomes **1, 1, 1, 1, 1, 1, 2, 2, 3, 4, 5, 6, 7**, which is the first time
+   § 4.7d's curriculum reading has run with **no step larger than one**. It used to end `…, 3, 7`.
+5. **The alternative was available and is wrong on the same grounds § D574 refused appending.**
+   Putting the three at the end in the order they were authored is ordering by **arrival inside a
+   tie**, which is the defect GitHub issue #382 was filed about one level down. `contracts.test.ts`
+   asserts the sequence *and* its non-decrease, so a later rebalance meets a red test.
+6. **What moves and what does not.** `c5`'s position goes from tenth to thirteenth and its label with
+   it; `c4` does not move; the eight contracts before position 9 are each still where their own
+   measured rate put them. **The ids do not move** — `c1`–`c13` are names, and `c13` is now
+   *Scenario 10* while `c5` is *Scenario 13*, which is where a reader can see the difference.
+7. **DC-4 is green on seven of thirteen**, against seven of ten: the numerator is unchanged and the
+   denominator is not. **DC-6 is green** — 0.02, 0.36, 0.40, 0.42, 0.46, 0.50, 0.52, 0.52, and five
+   1.00s, which is non-decreasing.
+
+**What this does not decide.** Whether the energy bar or the lobby-queue cap should be
+building-relative — that is § D468's, `docs/33` O2's and #234's, and a lane that moved a goal to make
+three contracts pass would be buying difficulty by moving the mark, which `docs/33` § 4.3 and
+`CLAUDE.md` both forbid. And nothing about days 2–20, which are unmeasured here as they were there.
+
+---
+
+## D582 — One shipped building cannot be broken by the Endless rush, and the agreement table names it rather than pinning a cell on nothing
+
+**Date: 2026-09-15 · GitHub issue [#424](https://github.com/mrpeanut01/elevator-sim/issues/424) · Rules on: [§ D547](#d547)'s rush-hold agreement and the rule its own table states — *one cell per shipped building, and it has to break*.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: it moves a rule already recorded, in the file that
+records it, and the exception it opens is one a later wave must be able to close.
+
+1. **The rule, and why it exists.** `rushHoldAgreement.json` carries one cell per shipped building
+   and each must **break** — a cell where both halves hold to the horizon agrees at `null` whatever
+   crowd either half ran, so it is a pin on nothing.
+2. **It could not be met for `shanghai-class-reference`, and the attempts are recorded in order.**
+   `collective` held; `nearest-car` — the weakest shipped dispatcher — held; `nearest-car` with the
+   whole group parked at the lobby from 60 s held. That is the hardest single cell this table can
+   construct and the run still reaches the horizon.
+3. **The reason is structural and measured.** `sim/rush.ts` scales the rate so that
+   `rushTopArrivalsPerMinute` is **invariant across towers** — the stream is the same number of
+   *people* on every building, which is what makes the rush a leaderboard. So whether a group can be
+   broken is decided by how many cars it has, and 106 is enough that it cannot. The two siblings
+   authored in the same wave do break: `ctf-class-reference` (36 cars) at **2 754 s** under
+   `nearest-car`, and `merdeka-class-reference` (92 cars) at **3 436 s** under `nearest-car` with the
+   group parked.
+4. **The exception is a list rather than a silence**, on `contracts.test.ts#REFERENCE_ONLY`'s shape:
+   `NEVER_BREAKS` is asserted non-empty, every member is asserted to ship, and **every cell of every
+   member is asserted to be `null`** — so the day 106 cars stop being enough, the test goes red and
+   the list has to shrink rather than quietly widen.
+5. **What was refused.** Adding a cell that holds and calling it coverage, which is the thing the
+   rule forbids; and inventing a harsher intervention for this one building, which would have been
+   a per-building crowd and is what § 9.2 says a rush may not have.
+
+**What this does not decide.** Whether the rush should scale with the tower — it may not, and § 9.2
+is why. Whether `data/rush-house-runs.json` should gain rows for the three towers: it has none, the
+product draws its `unrun` refusal for all three, and regenerating that table is a deep-tier job left
+for whoever next runs that tier.
