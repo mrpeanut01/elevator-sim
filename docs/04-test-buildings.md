@@ -654,11 +654,18 @@ that is a purchase a player makes rather than a figure authored here.
 labels are positions — at the identity rung. Day 1 reads **50 of 50 seeds**, and this is
 the tower where the energy bar is furthest out of reach: **176.4 kJ** a ride against 80.
 
-**The house has not run it in Endless rush**, and the product says so rather than drawing a blank
-table: `everyday/rushHouse.ts` returns its `unrun` refusal for any building
-`data/rush-house-runs.json` has no rows for, and none of the three towers in § 12–§ 14 has any. That
-table is a deep-tier regeneration (`ELEVATOR_SIM_RUSH_HOUSE=deep`) over every shipped dispatcher ×
-every shipped building, and it is left for whoever next runs that tier rather than half-filled here.
+**The house has run all three in Endless rush, and the 143 existing rows reproduced exactly.**
+`data/rush-house-runs.json` was regenerated over every shipped dispatcher × every shipped building —
+182 runs in 1 104 s — and the only lines the diff moves besides the thirty-nine new rows are the
+provenance's commit and date. That is the second wave running in which this table has been
+re-measured whole and agreed with itself, which is what makes a row that *does* move mean something.
+
+**What the three towers say in that table is worth one line**: under the rush's fixed crowd, only
+two of the thirty-nine runs ever break — `ctf-class-reference` under `nearest-car` at 2 754 s and
+under `destination-panel` at 4 550 s, and `shanghai-class-reference` under `destination-panel` at
+4 778 s. Everything else carries the whole stream. That is the same finding [§ D582](../DECISIONS.md)
+records from the other side: the rush is the same number of people on every tower, so a group of
+ninety-two or a hundred and six cars is simply not the thing it was built to break.
 
 **Not in the proof set.**
 

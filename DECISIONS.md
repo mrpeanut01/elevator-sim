@@ -36183,7 +36183,15 @@ records it, and the exception it opens is one a later wave must be able to close
    rule forbids; and inventing a harsher intervention for this one building, which would have been
    a per-building crowd and is what § 9.2 says a rush may not have.
 
+6. **The house table says the same thing from the other side, and it was regenerated whole.**
+   `data/rush-house-runs.json` now carries every shipped dispatcher on all fourteen buildings — 182
+   runs in 1 104 s — and **the 143 existing rows reproduced exactly**, the diff moving nothing but
+   the provenance's commit and date beside the thirty-nine new ones. Of those thirty-nine, only
+   **three** break at all: `ctf-class-reference` under `nearest-car` (2 754 s) and under
+   `destination-panel` (4 550 s), and `shanghai-class-reference` under `destination-panel`
+   (4 778 s). Every other run on the three towers carries the whole stream to the horizon.
+
 **What this does not decide.** Whether the rush should scale with the tower — it may not, and § 9.2
-is why. Whether `data/rush-house-runs.json` should gain rows for the three towers: it has none, the
-product draws its `unrun` refusal for all three, and regenerating that table is a deep-tier job left
-for whoever next runs that tier.
+is why. Whether a `NEVER_BREAKS` of one is the right shape if a fifth or sixth supertall lands: at
+some point the exception is the rule and the table needs a different claim, and this entry does not
+pretend to know where that is.
