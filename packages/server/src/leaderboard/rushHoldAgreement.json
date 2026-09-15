@@ -17,6 +17,9 @@
     {"buildingId":"st-jude-hospital","dispatcherProfileId":"collective","heldS":3012},
     {"buildingId":"burj-class-reference","dispatcherProfileId":"nearest-car","heldS":5170},
     {"buildingId":"harbour-point","dispatcherProfileId":"collective","heldS":2480},
-    {"buildingId":"ashgate","dispatcherProfileId":"collective","heldS":1710}
+    {"buildingId":"ashgate","dispatcherProfileId":"collective","heldS":1710},
+    {"buildingId":"ctf-class-reference","dispatcherProfileId":"nearest-car","heldS":2754},
+    {"buildingId":"shanghai-class-reference","dispatcherProfileId":"nearest-car","interventions":[{"atS":60,"change":{"kind":"park-cars-lobby"}}],"heldS":null},
+    {"buildingId":"merdeka-class-reference","dispatcherProfileId":"nearest-car","interventions":[{"atS":60,"change":{"kind":"park-cars-lobby"}}],"heldS":3436}
   ]
 }
