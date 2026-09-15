@@ -4,6 +4,7 @@
   "name": "Crown Hotel",
   "type": "hotel",
   "trafficProfile": "hotel",
+  "grossAreaPerFloorM2": 1300,
   "floors": [
     {
       "id": "B1",

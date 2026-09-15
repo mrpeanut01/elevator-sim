@@ -103,7 +103,10 @@ describe('Phase 0 is usable through the barrel alone', () => {
 
   it('loads the shipped data directory', async () => {
     const config = await barrel.loadConfig(REAL_DATA_DIR);
-    expect(config.buildings).toHaveLength(14);
+    /* 14 → 17 on 2026-09-15: GitHub issues #428, #427 and #426 (One-WTC-, Empire-State- and
+       Willis-class). The literal is the point — it fails when a building lands, which is how the
+       barrel's own claim about the shipped set stays true rather than merely plausible. */
+    expect(config.buildings).toHaveLength(17);
     expect(config.buildingsById.get('midtown-office')).toBeDefined();
   });
 

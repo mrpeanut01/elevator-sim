@@ -1717,20 +1717,32 @@ describe('the camera, measured per tower — GitHub issue #324', () => {
      * Three since GitHub issue #376: a 165-floor tower is the clearest case there is.
      *
      * **Six since GitHub issues #425, #424 and #430**, and the shape of the list is worth reading:
-     * every tower in it is over sixty floors and every tower outside it is under thirty-one. The
+     * every tower in it is sixty floors or more and every tower outside it is thirty or fewer. The
      * three that joined are 112, 119 and 129 floors, so the camera is offered on every supertall
      * and on nothing else. That is the measurement agreeing with the entry's original *claim*
      * about today's canvas — which is not the same as the claim having been checked, and this list
      * is still what checks it: a moved pitch on `secure-tower` would put a thirty-floor tower in
      * here and the sentence above would have to be re-argued.
+     *
+     * **Nine since GitHub issues #428, #427 and #426**, and the three that joined did so by being
+     * on disk. `shippedTowers()` reads `data/buildings/` rather than a list, so
+     * `one-wtc-class-reference` (104 floors), `willis-class-reference` (108) and
+     * `empire-state-class-reference` (102) arrived inside this measurement without anybody adding
+     * them to it; only the expectation needed a hand. **They do not test the boundary** — the gap
+     * this list straddles is 30 floors to 60, and all three sit well above it — so the sentence
+     * above is unmoved rather than re-argued, which is the honest thing to say about three towers
+     * that confirmed a rule instead of probing it.
      */
     expect(cramped).toEqual([
       'burj-class-reference',
       'ctf-class-reference',
+      'empire-state-class-reference',
       'merdeka-class-reference',
       'mixed-use-high-rise',
+      'one-wtc-class-reference',
       'shanghai-class-reference',
       'vertical-city',
+      'willis-class-reference',
     ]);
     for (const tower of shippedTowers()) {
       const chips = stageCameraChipsOf(tower.floors, HEIGHTS.laptop);

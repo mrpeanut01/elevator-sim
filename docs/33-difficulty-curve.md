@@ -62,6 +62,13 @@ over all ten stages and all thirteen shipped profiles at the stages' own seeds: 
 stage 3, stage 5 and stage 7. The measurement, the instrument and the three other claims it moved are
 § 3.1. Everything below is written against **three**.
 
+**And three became two on 2026-09-15**, which is the first time this figure has moved because somebody
+rebalanced rather than because somebody re-measured. Stage 7's demand moved from 1.5 to 1.25 %pop/5 min
+and none of the twelve profiles it admits meets every bar there ([§ D611](../DECISIONS.md), § 3.3f).
+The paragraph above is left as the dated record it is; the live list is
+`campaign/difficultyCurve.test.ts#DROPDOWN_CLEARS`, which is checked in both directions, and the live
+figure is **two of ten** — stage 3 and stage 5.
+
 ---
 
 ## 1. The two substrates, and the test that separates them
@@ -446,7 +453,7 @@ through the shipped `campaign/stageRun.ts#batchRequestForStage` — two arms, th
 seeds, 50 replications, common random numbers — and judged by the shipped
 `campaign/judge.ts#judgeStage`. 130 stage-profile cells, 77 of them admitted and run.
 
-**Result: three of ten stages clear from the dispatcher dropdown alone.**
+**Result: three of ten stages clear from the dispatcher dropdown alone.** *(Dated. Stage 7 stopped on 2026-09-15 — § 3.3f and [§ D611](../DECISIONS.md) — so the live figure is two of ten and the live list is `campaign/difficultyCurve.test.ts#DROPDOWN_CLEARS`. The measurement below is kept as the record of what was true when it was taken.)*
 
 | stage | building | admitted | of which the control | clears from the dropdown |
 |---|---|---|---|---|
@@ -560,7 +567,7 @@ it, so it satisfies DC-2 while teaching nothing, which is why DC-2 needed DC-2b 
 | 4 | *service zoning, and a journey with two waits* | 1.5 %/5 min · two banks and a sky lobby | the transfer leg doubles the wait and no single dial reaches both halves | **holds, and is the front.** Nothing clears; `zoned-uppeak` is 2 ahead and 1 behind, which is what makes *"and nothing resolved against it"* falsifiable |
 | 5 | *access zoning, and the one problem no dial reaches* | the building's own profile · 30 floors, credentialed above 21 | landings that **no car may legally answer**, which look nothing like slow ones | **DC-2 breach.** `eta` clears it from the dropdown |
 | 6 | *that at a hundred floors the geometry decides more than the weights do* | 0.5 %/5 min · 100 floors, sky lobbies, double-deck shuttles | every weight vector the dropdown offers is behind on something; the geometry is the binding constraint | **holds, and is the strongest cell in the campaign.** 12 profiles admitted, 0 clear, and somebody is ahead on something in several — so the refusal is `beat-the-baseline` asking for a dominating move rather than a dead comparison |
-| 7 | *that an improvement you cannot measure is not one* | 1.5 %/5 min · the same building as 2 | an improvement that does not survive the holdout set | **DC-2 breach.** `destination-panel` clears it, and this stage admits **all thirteen** profiles |
+| 7 | *that an improvement you cannot measure is not one* | **1.25** %/5 min · the same building as 2 | an improvement that does not survive the holdout set | **DC-2 breach CLOSED, 2026-09-15.** It read *"`destination-panel` clears it"* at 1.5 %/5 min; the demand moved to 1.25 and none of the twelve profiles it admits meets every bar ([§ D611](../DECISIONS.md), § 3.3f). **Still below its survivor band at 0 of 24**, which this row did not and does not measure |
 | 8 | *that spare cars are not the same as a short interval* | 3 %/5 min · 6 fast cars, prestige bank | **none is reachable from the dropdown** — the control meets every count goal | **DC-1 and DC-2b both breached, and by one cause.** Admits **only the control**: there is no dropdown move to make, so nothing can go wrong |
 | 9 | *demand with no dominant direction, and a car unlike its neighbours* | 2.5 %/5 min · a hotel with one odd car | **none is reachable from the dropdown** — both admitted profiles meet `answer-the-demand` | **DC-1 and DC-2b both breached.** Admits the control and `eta`: one real move, and it fails nothing |
 | 10 | *that two cars in one bank can be the wrong car* | 2 %/5 min · bed cars and passenger cars in one bank | **none is reachable from the dropdown** — the control meets `deliver-everyone` and `answer-the-demand` | **DC-1 and DC-2b both breached, and by one cause.** Admits **only the control** |
@@ -573,7 +580,7 @@ expressible as demand or fabric or as a stage's `editable` list**, and none is a
 | | obligation | why | permitted by |
 |---|---|---|---|
 | **C1** | Stages **1**, 8, 9 and 10 must fail a non-comparative goal under some admitted profile | DC-1. Today every admitted profile meets every count goal on all four, so the only thing a player can miss is `beat-the-baseline`, and standing still misses that everywhere. **Stage 1 joined this list with GitHub issue #255** and not by anybody changing it: its only count goal was `answer-the-demand` read over a five-minute band, which measured where the band fell rather than how the building was dispatched, and over the honest window all five of its per-run kinds are `50/50, 50/50`. See § 3.1a | DC-R1: demand or fabric on `garden-apartments`, `chancery-house`, `crown-hotel` and `st-jude-hospital`. Note that `chancery-house` is measured elsewhere in the tree as the building whose *six 5 m/s cars never produce a wait over a minute* at any plausible rate, so its pressure has to come from fabric or from zoning rather than from demand; and `garden-apartments` has a **hard rate ceiling** — the residential profile's `max` is `7`, which DC-R1 forbids exceeding — so its pressure has to come from fabric too. **That last clause has now been measured rather than inferred, and it holds with room to spare: § 3.3a.** Stage 1's quarter of C1 is closed to demand and to the dispatcher menu, and open to fabric |
-| **C2** | Stages 3, 5 and 7 must stop clearing from the dropdown | DC-2 | DC-R1 — the demand or the fabric moves, never the goal |
+| **C2** | Stages 3, 5 and 7 must stop clearing from the dropdown. **Stage 7 is done** — its demand moved from 1.5 to 1.25 %pop/5 min on 2026-09-15 and its rows left `DROPDOWN_CLEARS` and `DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT` ([§ D611](../DECISIONS.md)). **Stages 3 and 5 remain**, and § 3.3f measures the demand axis on both rather than leaving the lever column a hedge: stage 3 is shut in both directions, stage 5 is open at 15 %pop/5 min and is not taken until a DC-3 witness exists there ([§ D612](../DECISIONS.md)) | DC-2 | DC-R1 — the demand or the fabric moves, never the goal. **Direction is not part of the rule and § 3.3f measures why that matters**: on stage 7 the lower demand is the harder stage |
 | **C3** | The same three stages must admit at least two non-control profiles | DC-2b, and it is C1's other half rather than a second job: both breaches have one cause | a scope change to each stage's `editable` list; not a difficulty change, so DC-R1 does not bind it |
 | **C4** | Every stage names a witness vector that clears it | DC-3 | W6, already built |
 | **C5** | The published clear count must be re-derived by a test, not by a document | it has now gone stale **three** times — seven→ten in the denominator, four→three in the numerator, and twice in which stages | the sweep, § 6 |
@@ -1129,6 +1136,124 @@ has three axes measured shut** — demand (§ 3.3a), parking-from-`data/` (§ 3.
 vector (here) — and one axis measured open and refused for its consequences (fabric, § 3.3a Result 7
 and #270).
 
+### 3.3f C2's demand axis, measured on all three stages — one closed, one open and not taken, one shut
+
+C2 is *stages 3, 5 and 7 must stop clearing from the dropdown*, and its lever column has always read
+*"DC-R1 — the demand or the fabric moves, never the goal"* without anybody measuring what the demand
+half can reach. This section is that measurement, taken 2026-09-15 for GitHub issue **#234**
+([§ D611](../DECISIONS.md), [§ D612](../DECISIONS.md)).
+
+**Instrument.** The shipped `scenario/measure.ts#measureScenario` at the stage's own horizon and seed
+sets, to re-derive the published bars at each candidate demand; then the shipped
+`campaign/stageSequence.ts#runStageToVerdict` over every profile `campaign/dimensions.ts#admitProfile`
+admits, 50 tuning and 50 holdout replications each, exactly as `difficultyCurve.test.ts`'s deep tier
+plays them. Nothing is a second copy of anything: a candidate demand is evaluated by the same two
+functions the file on disk is generated by and the register is measured by. **The control was run
+first**: the deep tier itself, over all 45 admitted cells at the shipped demands, reproduced
+`DROPDOWN_CLEARS` and `DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT` row for row in 317 s before any candidate
+was tried, and the probe was then checked against it on stage 7's shipped 1.5 %, where it returned
+`destination-panel` and nothing else. A candidate measured on an apparatus that had not reproduced
+the answer everybody already had would be measuring the apparatus.
+
+**Why demand is a lever and not a bar, which is the objection this section has to answer first.** A
+count goal's bar is *the shipped setting's own measured count on these seeds* (`judge.ts`), and that
+count is a function of the stage's demand. So moving the demand moves the bar — and it is still not
+a bar change, because nothing here authors a number. The goal kinds are untouched, the one authored
+threshold (`long-waits-under`'s 10 %) is untouched, and the new bar is **re-derived** into
+`data/scenario-goals.json` by the regeneration path rather than chosen. What DC-R1 forbids is a
+difficulty knob that makes a day harder without making the building harder; this makes the building
+easier or harder and lets the bar follow, which is the shape the rule is written to permit.
+
+#### Stage 7 — closed, and the direction is the counter-intuitive one
+
+| `arrivalRatePctPop5min` | `answer-the-demand`, tuning / holdout | meets every bar on the tuning seeds, of 12 admitted |
+|---|---|---|
+| 0.75 | variable | **none** |
+| 1.0 | 36/50, 38/50 variable | **none** |
+| **1.25 — shipped from this commit** | **31/50, 26/50 variable** | **none** |
+| 1.5 — shipped until this commit | 26/50, 31/50 variable | `destination-panel` |
+| 2.5 | variable | `predictive-balanced`, `auction`, `auction-multi-round`, `destination-panel` |
+| 3.5 | variable | `fairness-first`, **which also holds on the holdout** |
+| 5 | variable | six, **four of which hold on the holdout** |
+
+**Raising the demand makes this stage *easier* to clear from the dropdown, and lowering it makes it
+harder.** That is not a paradox once the bar is read: the bar is `collective`'s own count, and
+`collective` degrades faster under load than the profiles the player can pick, so a heavier morning
+widens the gap the candidate is scored on. The lever therefore runs the other way from the intuition
+the C2 row was written with, and a lane that had assumed *harder building, harder stage* would have
+moved this stage to 2.5 and quadrupled the breach.
+
+**1.25 is CHOSEN and the rest is MEASURED.** Three consecutive rates below 1.5 read zero, so the
+closure is a window rather than a knife-edge; 1.25 is the smallest move inside it, which is the only
+property that distinguishes it from 1.0 and 0.75. `answer-the-demand` stays `variable` on both seed
+sets, so DC-1 is untouched and the stage keeps the one non-comparative goal it had.
+
+**What it does not fix, and this half was measured rather than assumed.** Stage 7 was already
+`below` its survivor band with 0 of 24 through at every rung, and a stage made harder does not come
+back inside a band it was under. `data/scenario-survivors.json` was regenerated on the changed tree
+— 4 860 s over the whole ladder — and **nine of the ten scenarios came back byte-identical**. Stage 7
+moved in exactly one field: `suppressed` fell by one at each rung, 2 → 1, 3 → 2 and 1 → 0, which is
+what a lighter morning does. Its survivor counts, survivor names, `examined`, `unjudged` and
+`unbuildable` are all unmoved, so `survivors.test.ts#UNWINNABLE_AS_MEASURED`,
+`survivorBands.test.ts#OUTSIDE_THEIR_BAND` and `DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE` all keep exactly
+the membership they had. What leaves is the stage's row in `DROPDOWN_CLEARS` and in
+`DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT`, and nothing else.
+
+**The same regeneration corrected two provenance fields that were stale before this lane started**,
+and they are not this rebalance's ([§ D614](../DECISIONS.md)). The table's `scope` sentence read
+*"10 of 33 priced changes can reach a scenario run"* and now reads **34**, and `rope-upgrade` joined
+`unreachableChangeIds` — GitHub issue #433's building-tier row, priced in the wave before this one
+and never swept into this census. Nothing about the counts was wrong; what was stale is the table's
+own account of the space it counted over, which is the half a reader uses to decide whether a count
+means anything.
+
+#### Stage 5 — open, measured, and deliberately **not taken** in this lane
+
+| `arrivalRatePctPop5min` | goals still shippable | meets every bar on the tuning seeds, of 4 admitted |
+|---|---|---|
+| 9 | four — `no-divergence` falls out | `eta`, **and it holds on the holdout** |
+| 11 | four — `no-divergence` falls out | `eta`, `destination-eta` |
+| null (the building's own 12) — shipped | all five | `eta`, holdout refuses |
+| **15** — `office-standard`'s declared `max` | **all five** | **none** |
+
+At 15 the stage's own `editable` list admits nothing that meets every bar, and swept over **all
+thirteen** shipped profiles rather than the four admitted, four meet on the tuning seeds
+(`fairness-first`, `capacity-aware`, `predictive-balanced`, `auction`) and **none clears**. So 15
+would empty **two** of this issue's five named ways through in one move: `DROPDOWN_CLEARS`'s `eta`,
+and `DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE`'s `predictive-balanced`, which is the survivor table's one
+way through this stage.
+
+**And that last clause is exactly why it is not taken here.** `predictive-balanced` is stage 5's only
+survivor at any rung, and stage 5 is one of only **three** scenarios the survivor table finds any way
+through at all — the others are stage 1 (`zoned-uppeak`) and stage 3 (`fairness-first`). It is also
+the one the suite pins *winnability* on: `campaign/stageFiveClears.test.ts` asserts that at least one
+shipped profile clears this stage, which is the campaign's answer to *is this winnable at all?*.
+Closing it takes stage 5 to zero survivors, puts it on the band register as `below` and on
+`survivors.test.ts#UNWINNABLE_AS_MEASURED` — seven of ten rather than six — and inverts that
+assertion. § 6's C2 row anticipates the inversion and says where the clause goes —
+*"winnability moving to DC-3's witness"* — but a witness vector that clears stage 5 at 15 % is a
+search nobody has run, and inverting the assertion before one exists would trade a measured way
+through for no way through and call it a rebalance. **The lever is measured and ready; what it waits
+on is one witness.**
+
+#### Stage 3 — shut in both directions, and the upward direction is shut twice over
+
+| `arrivalRatePctPop5min` | `nobody-abandoned`, tuning / holdout | verdict |
+|---|---|---|
+| 11 | variable | `fairness-first` still meets every bar — **no change** |
+| null (the building's own 12) — shipped | 28/50, 29/50 variable | `fairness-first`, the registered breach |
+| 15 — `office-standard`'s declared `max` | **1/50 variable, 0/50 constant-fail → `not-shippable`** | the stage loses its only count goal, and with only `beat-the-baseline` left **three** profiles meet and **two** clear |
+
+Downward leaves the breach exactly where it was. Upward destroys it: R12 refuses a goal whose
+classification does not survive the holdout, so at 15 `data/campaign.json` could not declare
+`nobody-abandoned` at all, stage 3 would join stage 1 on the DC-1 register, and the dropdown question
+gets *worse* rather than better because `beat-the-baseline` alone is a lower bar than two goals.
+**Above 12 there is nothing left to measure**: 15 is the profile's declared `max` and DC-R1 forbids
+exceeding it. So stage 3's C2 quarter is closed to demand and open only to fabric on
+`midtown-office` — a building stages 2 and 7 also run, and one of the two runs
+`data/reference-runs.json` pins figure-for-figure and `watch/reference.test.ts` re-simulates; that is
+a wave's blast radius rather than a lane's, and it is named here rather than attempted.
+
 ---
 
 ## 4. The week — Today's tower and the daily loop
@@ -1575,6 +1700,10 @@ each is a finding with its probes attached rather than a reason to widen the ban
 > on **seven of ten**. Everything in §§ 4.7a–4.7i describes the eight-contract ladder it was
 > measured on and is not rewritten; § 4.7j says what moved.
 >
+> **And three more again, on the same day: § 4.7l is their row, and it is where bank count stops
+> being a total order.** `c14` (One-WTC-class), `c15` (Empire-State-class) and `c16` (Willis-class)
+> are GitHub issues #428, #427 and #426.
+>
 > **Three more have landed since that, and § 4.7k is their row — and it is the first one where the
 > measurement could not place them.** `c11`, `c12` and `c13` (the CTF-, Shanghai- and
 > Merdeka-class reference towers, GitHub issues #425, #424 and #430) each read **1.00**, as `c4` and
@@ -2006,6 +2135,70 @@ names.
 denominator is not, which is what adding three towers nothing can bring into the band looks like.
 **DC-6 is green**: the array's measured rates read 0.02, 0.36, 0.40, 0.42, 0.46, 0.50, 0.52, 0.52,
 1.00, 1.00, 1.00, 1.00, 1.00, which is non-decreasing.
+
+#### 4.7l The fourteenth, fifteenth and sixteenth — where the tie needed a second key
+
+**Landed 2026-09-15, GitHub issues [#428](https://github.com/mrpeanut01/elevator-sim/issues/428),
+[#427](https://github.com/mrpeanut01/elevator-sim/issues/427) and
+[#426](https://github.com/mrpeanut01/elevator-sim/issues/426)** — three more reference towers, each
+with the Career contract the owner's 2026-09-10 ruling on #232 says every building owes.
+
+**Run.** § 4.7d's, unchanged: `CONTRACT_CURVE_SWEEP=1 CONTRACT_CURVE_SEEDS=50
+CONTRACT_CURVE_ONLY=c14,c15,c16 CONTRACT_CURVE_OUT=<path> npx vitest run --project viz
+src/shift/contractCurve.sweep.test.ts`, day 1, dispatcher `collective`, seeds `20 260 824 + 7 919 n`,
+the shipped five-goal set.
+
+| position | contract | building | what moves it | missed | of | rate | in band | goals that missed |
+|---|---|---|---|---|---|---|---|---|
+| 12 | c14 | `one-wtc-class-reference` | **nothing reaches the band** | 50 | 50 | 1.00 | **no** | queue 50, energy 50 |
+| 15 | c16 | `willis-class-reference` | **nothing reaches the band** | 50 | 50 | 1.00 | **no** | queue 50, worst-wait 50, minute 43, energy 40 |
+| 16 | c15 | `empire-state-class-reference` | **nothing reaches the band** | 50 | 50 | 1.00 | **no** | queue 50, energy 50, worst-wait 4 |
+
+**So the tie at the ceiling is eight contracts**, and § 4.7k's tie-break — bank count — is no longer
+a total order: `one-wtc-class-reference` and `shanghai-class-reference` both have six banks, and
+`vertical-city` and `willis-class-reference` both have seven.
+
+**The second key is the car count, smaller group first**, which is § D581's own reading (*what a
+reader has to hold at once*) applied to the other quantity of the arrangement a reader meets on the
+screen: 73 cars before 106, and 35 before 104. The whole sequence reads
+**1, 1, 1, 1, 1, 1, 2, 2, 3, 4, 5, 6, 6, 7, 7, 8** — still non-decreasing, still no step larger than
+one, now with two repeats instead of a jump. `shift/contracts.test.ts` asserts the list, the
+non-decrease, **and the second key inside the tie alone** — the first eight positions are each a
+measured rate, and a bank-count repeat there (`chancery-house` then `st-jude-hospital`) is the
+measurement doing the ordering. Requiring the car count to rise across that would be a test
+overruling the sweep.
+
+**What a ride costs on each, for the table § 4.7k publishes:**
+
+| tower | work per delivered ride | the bar |
+|---|---|---|
+| **`willis-class-reference`** | **125.9 kJ** | 80 |
+| **`empire-state-class-reference`** | **151.9 kJ** | 80 |
+| **`one-wtc-class-reference`** | **263.1 kJ** | 80 |
+
+*(One run each, `collective`, seed 20 260 824, 1 800 s — a reading of the fabric rather than an
+interval, and no two arms are compared, so none is required.)* **`one-wtc-class-reference` is the
+most expensive ride in the shipped set**, above `burj-class-reference`'s 242.6: it is 73 cars over
+104 floors carrying 2 873 legs in half an hour, where the Willis-class tower's 104 cars carry 6 880.
+The bar is a per-leg quantity and the denominator is what moves.
+
+**`c16`'s energy goal misses on 40 of 50 rather than on all fifty, which is the only row in this
+family that does not.** It is still not in the band — the landing queue and the worst wait both miss
+on every seed — but it is the first tower at this end of the ladder where the energy bar is close
+enough to the fabric to vary, and that is a fact about a fleet of 104 slow cars rather than about the
+rung. Recorded rather than acted on: the remedy is still § 7's O2 and GitHub issue #234.
+
+**What moves and what does not.** `c12`'s label goes from *Scenario 12* to *Scenario 13* and `c5`'s
+from *Scenario 13* to *Scenario 14*; `c4`, `c13` and `c11` do not move at all; the eight contracts
+before position 9 are each still where their own measured rate put them. **The ids do not move**,
+for § 4.7j's reason — `c1`–`c16` are names — which is why `c15` is the *sixteenth* scenario and
+`c16` the fifteenth.
+
+**DC-4 is green on seven of sixteen**, against seven of thirteen: the numerator is unchanged for the
+third wave running and the denominator is not, which is what adding towers nothing can bring into
+the band looks like. **DC-6 is green**: 0.02, 0.36, 0.40, 0.42, 0.46, 0.50, 0.52, 0.52 and then
+eight 1.00s, which is non-decreasing.
+
 ### 5.1 What a fix case's difficulty is made of
 
 A case is a building, a dispatcher, a seed, a horizon and a demand level, plus an authored `asBuilt`
@@ -2288,6 +2481,25 @@ what this instrument looks at; Ashgate's is a journey that takes two legs, which
 time to destination and which a *held landing* measure cannot see. **A tower can present a real
 problem somewhere this arm does not look**, and that is the first shipped instance of the limit
 `docs/35` `PM-TT2` names.
+
+**Re-measured again the same day at sixteen contracts × 50 seeds = 800 days** (GitHub issues #428,
+#427 and #426), and **all thirteen earlier rows reproduced to the second for the third wave
+running** — every count, every median, and the six per-seed slices `legibility.test.ts` pins.
+The three new rows are `c14` (One-WTC-class) at **1 of 50**, median **13 s**; `c15`
+(Empire-State-class) at **45 of 50**, median **472 s**; and `c16` (Willis-class) at **50 of 50**,
+median **2 347 s**.
+
+**They refute the reading § 4.7k's row offered for the three before them, and that is the useful
+half.** That reading was that a supertall is legible *because* it is a tower of thousands — a held
+landing being the building rather than a problem a session can see and solve. These three span
+4 810 to 9 200 occupants and span the **whole range this instrument reports**: One WTC is the least
+legible contract shipped after Garden Apartments and the first supertall the table has found
+**ineligible** for a first session, while Willis is second only to Midtown Office. **Population does
+not predict legibility.** What does is unmeasured, and no mechanism is offered in its place — a
+sentence about the fabric here would be a plausible story standing where a run belongs
+([§ D256](../DECISIONS.md)). The eligible set § D475 draws from goes from nine members to **eleven**,
+`c15` and `c16` joining and `c14` staying out, and it is still derived from this table rather than
+chosen.
 
 ### 6.5 Two things the sweep is not allowed to do
 

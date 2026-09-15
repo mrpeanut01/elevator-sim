@@ -1703,6 +1703,11 @@ U7.
 > **Measured 2026-08-24 over ten stages and thirteen profiles** — 77 admitted cells, two arms ×
 > 50 replications under common random numbers: **three of ten stages clear from the dispatcher
 > dropdown alone** — stage 3 by `fairness-first`, stage 5 by `eta`, stage 7 by `destination-panel`.
+> **Stage 7 stopped on 2026-09-15 and the live figure is two of ten** — GitHub issue #234's C2
+> rebalance moved that stage's demand from 1.5 to 1.25 %pop/5 min and none of the twelve profiles it
+> admits meets every bar there ([§ D611](../DECISIONS.md), `docs/33` § 3.3f). The paragraph is left
+> as the dated record it is; the live list is `campaign/difficultyCurve.test.ts#DROPDOWN_CLEARS`,
+> which is checked in both directions.
 > Stage 5's clearer also moved: `destination-eta` no longer clears it. The apparatus and the full
 > table are docs/33's § 6, and `ISSUE_VERIFICATION_FINDINGS.md` § AC records what this replaced. **§ 5.4's *"winnable trivially"* is false
 > of stage 1 under this bar**, and is corrected in place below. Clearing those four needs an
@@ -2142,7 +2147,7 @@ this paragraph named only the empty route for as long as the totals above it wer
 | **4 two banks** | `mixed-use-high-rise`, 1.5 % | **36/50, 34/50** | 50/50, 50/50 | 50/50, 50/50 | **19/50, 20/50** | 50/50, 50/50 |
 | **5 credentials** | `secure-tower`, shipped | **5/50, 11/50** | **45/50, 46/50** | 50/50, 50/50 | **5/50, 9/50** | **14/50, 12/50** |
 | **6 the tall one** | `vertical-city`, 0.5 % | **40/50, 46/50** | 50/50, 50/50 | 50/50, 50/50 | **31/50, 25/50** | 50/50, 50/50 |
-| **7 prove it** | `midtown-office`, 1.5 % | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **26/50, 31/50** | 50/50, 50/50 |
+| **7 prove it** | `midtown-office`, 1.25 % ¶ | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **31/50, 26/50** | 50/50, 50/50 |
 | **8 the headline address** | `chancery-house`, 3 % | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **32/50, 30/50** | 50/50, 50/50 |
 | **9 both ways at once** | `crown-hotel`, 2.5 % | 47/50, 50/50 ‡ | 50/50, 50/50 | 50/50, 50/50 | **40/50, 42/50** | 50/50, 49/50 ‡ |
 | **10 the bed and the visitor** | `st-jude-hospital`, 2 % | **41/50, 41/50** | 50/50, 50/50 | 50/50, 50/50 | **32/50, 30/50** | 50/50, 50/50 |
@@ -2155,6 +2160,15 @@ not survive a disjoint seed set is not one to ship a level on — the hotel's tw
 exactly on that boundary, and so, independently, does row 11's long-wait cell on a different
 building under a different dispatcher. `everyone-can-get-there` and `beat-the-baseline` are withheld
 on every row, the first blocked on W7 and the second because it compares two arms.
+
+**¶ is stage 7's demand, and it is a rebalance rather than a measurement that drifted** — GitHub
+issue **#234**, [`DECISIONS.md`](../DECISIONS.md) § D611. The stage ran at 1.5 % until 2026-09-15 and
+its `answer-the-demand` cell read **26/50, 31/50**; at 1.25 % it reads **31/50, 26/50**. Nothing about
+the old cell was wrong and nothing here moves a bar: the bar *is* the shipped setting's own count at
+the stage's own demand, so a demand change re-derives it. What the move buys is `docs/33` § 6's C2 —
+at 1.5 % this stage met every bar from the dropdown under `destination-panel` and at 1.25 % it meets
+under none of the twelve profiles it admits. The curve either side of it, and why raising the demand
+made the stage *easier*, are `docs/33` § 3.3f.
 
 **§ is stage 1's whole row, and it is a correction rather than a measurement that drifted** — GitHub
 issue **#255**. Three of its five cells read `49/50, 48/50 †` and `**38/50, 48/50**` until the

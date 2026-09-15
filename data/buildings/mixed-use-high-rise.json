@@ -4,6 +4,7 @@
   "name": "Mixed-Use High-Rise",
   "type": "mixed-use",
   "trafficProfile": "office-standard",
+  "grossAreaPerFloorM2": 900,
   "floors": [
     { "id": "G", "index": 0, "heightM": 0.0, "population": 0, "isEntrance": true, "isTransferFloor": true, "label": "Ground lobby / retail level 1" },
     { "id": "31", "index": 31, "heightM": 126.0, "population": 260, "isTransferFloor": true, "label": "Sky lobby (amenity, conference, restaurant)" }

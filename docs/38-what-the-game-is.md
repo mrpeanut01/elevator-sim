@@ -267,8 +267,16 @@ reads its hold moment with the stage's own reader, and derives each round's purs
 outlasted. The seed, the stream and every purse are derived and never posted. The replay was
 measured before `leaderboard/verify.ts`'s refusal of `endless-rush` was lifted — one simulation a
 round — and a sitting lands on a board keyed by the tower, the day and the modifier set
-([§ D543](../DECISIONS.md)). **Two halves are not built**: no between-round rebuild travels, so the
-purse is derived and nothing spends it, and the viewer does not yet post a sitting.
+([§ D543](../DECISIONS.md)). **The viewer posts one now** ([§ D606](../DECISIONS.md)): the rush's
+result screen keeps the round list, names what drove each round and how far it got, and sends the
+sitting whole — and the purse figures a player reads are the server's reply to their own post and
+are computed nowhere in `packages/viz`. **One half is still not built**: no between-round rebuild
+travels, so the purse is derived and nothing spends it. That is a package boundary and a ruling
+rather than a missing feature — § D606 names the three shapes the boundary could move in and the
+three questions this section does not answer (whether a rush rebuild books nights, whether a tier
+still requires the tier below inside one sitting, and what `rush-prefit`'s *fitted* means) — and
+the same blockage is why nothing sells the rush's two chime sinks: a wider purse would buy
+nothing, so selling it would be a control that changes no run.
 
 **A run carries its modifiers onto the board.** The standard board is the standard purse and the
 building as shipped, the same for everyone; a run with a bought purse or a pre-fitted building ranks

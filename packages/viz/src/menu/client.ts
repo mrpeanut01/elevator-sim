@@ -173,6 +173,55 @@ export interface SubmittedRuleRow {
  */
 export type SubmittedIntervention = CoreWireIntervention<SubmittedRuleRow>;
 
+/* -------------------------------------------------------------------------- *
+ * The rush sitting — GitHub issue #372, § D542
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One round of a rush sitting on the wire — `packages/server`'s `SubmittedRushRound`.
+ *
+ * Four fields, and the absences are the protocol: no seed, no template, no rate, no length and no
+ * window, because the server derives all five from the building; and no purse, no paid figure and
+ * no wave count, because `rushSitting.ts#NEVER_ON_THE_WIRE` refuses each of them by name. There is
+ * nowhere in this type to put one, which is the mechanical form of that rule on this end.
+ */
+export interface RushSittingRoundWire {
+  readonly dispatcherProfileId: string;
+  readonly ruleRows?: readonly SubmittedRuleRow[] | undefined;
+  readonly interventions?: readonly SubmittedIntervention[] | undefined;
+  /**
+   * Where this device's own recording of the round holds the line, seconds from its start, or
+   * `null` when the stream ran out first. **A claim compared, never a figure stored**: the server
+   * replays the round and answers `held-does-not-reproduce` if the two disagree, which is how a
+   * client on an older build is told that rather than shown a number it never produced.
+   */
+  readonly claimedHeldS: number | null;
+}
+
+/** A sitting on the wire — `packages/server`'s `SubmittedRushSitting`. */
+export interface RushSittingWire {
+  readonly buildingId: string;
+  readonly rounds: readonly RushSittingRoundWire[];
+  /** What the account bought for this sitting — the modifier, never the spend (§ D526 clause 3). */
+  readonly modifiers?: readonly { readonly sinkId: string; readonly steps: number }[] | undefined;
+}
+
+/**
+ * One round as the server replayed it, off the 201.
+ *
+ * Every figure is the server's, including the three purse fields — which are the **only** purse
+ * figures this client ever holds, because nothing in `packages/viz` may compute one
+ * ([§ D543](../../../../DECISIONS.md) clause 5 permits a purse in the poster's own answer and
+ * nowhere else).
+ */
+export interface RushSittingRoundAccepted {
+  readonly heldS: number | null;
+  readonly wavesOutlasted: number;
+  readonly purseBeforeUnits: number;
+  readonly paidUnits: number;
+  readonly purseAfterUnits: number;
+}
+
 export interface ClaimedMetrics {
   readonly awtS: number;
   readonly wt95S: number;
@@ -612,6 +661,30 @@ export interface LeaderboardClient {
    * The refusal to word carefully is the 409: `challenge-not-open` carries the window, the state
    * and the challenge that *is* open, reachable through `challengeNotOpenOf`.
    */
+  /**
+   * Post a rush sitting, whole — `POST /api/rush-sittings`, GitHub issue **#372**,
+   * [§ D542](../../../../DECISIONS.md).
+   *
+   * The body is `everyday/rushSitting.ts#rushSittingOf`'s, and building it there rather than here is
+   * {@link submitChallenge}'s own arrangement: the gate that refuses a sitting a player cannot post
+   * runs before the round trip and before the server spends up to twelve replays on it.
+   *
+   * **Nothing about the run is named and there is nowhere to name it.** The seed, the stream, the
+   * ninety minutes and the rate are the server's derivation from the building
+   * (`verify.ts#rushRoundConfigFor`), and a purse, a paid figure or a wave count is refused **by
+   * name** before a simulation starts — so this signature carries none of them, and the answer's
+   * purse figures are the server's own.
+   *
+   * Two refusals worth handling by name: **422** with the server's own code, whose body carries the
+   * `round` a refusal is about so a screen can say which one did not replay, and **503**
+   * `replay-busy` with `Retry-After` — a fact about the server rather than about the caller, which
+   * is why it is not the 429 this API uses for *you posted too soon*. Both arrive as a
+   * {@link Failure} carrying the server's own sentence, which this client does not rewrite.
+   */
+  postRushSitting(
+    token: string,
+    sitting: RushSittingWire,
+  ): Promise<Result<{ rounds: readonly RushSittingRoundAccepted[] }>>;
   submitChallenge(token: string, submission: ChallengeSubmission): Promise<Result<ChallengeEntryAccepted>>;
   challengeBoard(challengeId: string, metric: string): Promise<Result<ChallengeBoardPage>>;
   /**
@@ -887,6 +960,21 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
         return typeof record?.['currentId'] === 'string' && Array.isArray(record['recent'])
           ? (record as unknown as ChallengeIndex)
           : undefined;
+      }),
+    postRushSitting: (token, sitting) =>
+      call({ method: 'POST', url: `${base}/api/rush-sittings`, token, body: sitting }, (body) => {
+        const record = body as Record<string, unknown> | null;
+        const entry = record?.['entry'] as Record<string, unknown> | undefined;
+        const rounds = entry?.['rounds'];
+        /*
+         * `rounds` decides whether the answer is readable, on `boards`' own rule: it is the half a
+         * caller draws — the waves and the purse per round — and a 201 without it is a server this
+         * build does not understand, which `call` turns into `unexpected-response` rather than
+         * drawing `undefined` where a figure should be. `boardKey` comes back on the same body and
+         * is deliberately **not** carried: a rush key is `rush:<building>:<date>`, a string for a
+         * switch, and `everyday/rushPost.ts` says the consequence instead of printing a key.
+         */
+        return Array.isArray(rounds) ? { rounds: rounds as readonly RushSittingRoundAccepted[] } : undefined;
       }),
     submitChallenge: (token, submission) =>
       call({ method: 'POST', url: `${base}/api/challenge-scores`, token, body: submission }, (body) => {

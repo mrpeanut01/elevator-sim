@@ -67,10 +67,12 @@ import {
   challengeTodayOf,
   CHALLENGE_BOARD_METRIC,
   POST_RUN_NO_SERVER,
+  RUSH_NOT_STANDING,
   EVERYDAY_HOST,
   type EverydayGhostRace,
   type EverydayHost,
   type EverydayHostBindings,
+  type EverydayRushPostOutcome,
 } from './host.js';
 
 const DATA = new URL('../../../../data/', import.meta.url);
@@ -1865,6 +1867,141 @@ describe('the rush — GitHub issue #220, § D515', () => {
     /* Outside a rush, leaving cancels nothing: a day's own run is not the rush's to stop. */
     host.leaveRush();
     expect(h.calls).toEqual(['applyPatch', 'startRun', 'cancelRun', 'applyPatch']);
+  });
+});
+
+/**
+ * The sitting a rush posts — GitHub issue **#372**, [§ D542](../../../../DECISIONS.md), and the
+ * owner's ruling of 2026-09-10 that *a round is a sitting, posted whole*.
+ *
+ * This is where `everyday/rushSitting.ts#rushRoundRecordOf` is driven: a round's record is taken
+ * from the state that produced it, the recording it produced and the second it ended at, and those
+ * three are in hand together only inside `endRush`.
+ */
+describe('a rush sitting — GitHub issue #372', () => {
+  /** The rush on Garden Apartments, which crosses the hold line (`rush.test.ts` measures it). */
+  let rush: VizRecording;
+  beforeAll(() => {
+    const state = base();
+    const patch = rushPatchOf(resources, state);
+    if (patch === undefined) throw new Error(state.buildingId);
+    rush = recordRun(shiftRunConfigOf(resources, { ...state, ...patch } as ViewerState).config, {
+      recordDecisions: false,
+    }).recording;
+  });
+
+  /** Play one round out to its line, on a host already inside a rush. */
+  function playRound(h: Harness, host: EverydayHost): number {
+    host.startRush();
+    h.state = { ...h.state, recording: rush };
+    const holdAtS = host.rush()?.holdAtS;
+    expect(holdAtS, 'the rush never crossed its line, so this case tests nothing').toBeDefined();
+    host.endRush(holdAtS ?? 0);
+    return holdAtS ?? 0;
+  }
+
+  it('keeps every round of the sitting, in order, and *Run the rush again* opens the next one', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    expect(host.rush()).toBeUndefined();
+    const holdAtS = playRound(h, host);
+    expect(host.rush()?.rounds).toHaveLength(1);
+    /*
+     * The round claims the recording's **hold moment**, which is the quantity the server reads off
+     * its own replay — not `RushOutcome.heldS`, which is where the round *ended*. On a round played
+     * to the line the two agree, and `rushSitting.test.ts` drives the case where they do not.
+     */
+    expect(host.rush()?.rounds[0]?.holdS).toBeCloseTo(holdAtS - rush.startedAt, 6);
+    expect(host.rush()?.rounds[0]?.dispatcherProfileId).toBe(base().dispatcherId);
+    expect(host.rush()?.rounds[0]?.outcome.kind).toBe('broke');
+
+    /* A second end of the same run is not a second round — `endRush`'s own first-end guard. */
+    host.endRush(holdAtS);
+    expect(host.rush()?.rounds).toHaveLength(1);
+
+    playRound(h, host);
+    expect(host.rush()?.rounds).toHaveLength(2);
+  });
+
+  it('ends the sitting when the rush is left, because a sitting is runs from an as-shipped start', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    playRound(h, host);
+    expect(host.rush()?.rounds).toHaveLength(1);
+    host.leaveRush();
+    expect(host.rush()).toBeUndefined();
+    host.startRush();
+    expect(host.rush()?.rounds).toEqual([]);
+  });
+
+  it('carries the check the block draws, so the press and the affordance cannot disagree', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    host.startRush();
+    /* Nothing played yet: the sitting has no round, and the check says so rather than being absent. */
+    expect(host.rush()?.check.ok).toBe(false);
+    playRound(h, host);
+    expect(host.rush()?.check.ok).toBe(true);
+  });
+
+  it('refuses a sitting whose last round was ended by hand, and sends nothing — § D515', async () => {
+    const posted: unknown[] = [];
+    const h = harnessOf(base());
+    const host = createEverydayHost({
+      ...h.bindings,
+      postRushSitting: async (body): Promise<EverydayRushPostOutcome> => {
+        posted.push(body);
+        return { kind: 'posted', rounds: [] };
+      },
+    });
+    host.startRush();
+    h.state = { ...h.state, recording: rush };
+    const holdAtS = host.rush()?.holdAtS ?? 0;
+    host.endRush(holdAtS - 60);
+    const outcome = await host.postRushSitting();
+    expect(outcome.kind).toBe('refused');
+    expect(posted, 'a refusal this shell makes must send nothing').toEqual([]);
+  });
+
+  it('posts the body the sitting gate built, and hands the server’s own rounds back', async () => {
+    const posted: unknown[] = [];
+    const h = harnessOf(base());
+    const host = createEverydayHost({
+      ...h.bindings,
+      postRushSitting: async (body): Promise<EverydayRushPostOutcome> => {
+        posted.push(body);
+        return {
+          kind: 'posted',
+          rounds: [{ heldS: 1178, wavesOutlasted: 6, purseBeforeUnits: 0, paidUnits: 12, purseAfterUnits: 12 }],
+        };
+      },
+    });
+    playRound(h, host);
+    const outcome = await host.postRushSitting();
+    expect(outcome.kind).toBe('posted');
+    if (outcome.kind !== 'posted') return;
+    expect(outcome.rounds[0]?.purseAfterUnits).toBe(12);
+    expect(posted).toHaveLength(1);
+    const body = posted[0] as { buildingId: string; rounds: readonly unknown[] };
+    expect(body.buildingId).toBe(base().buildingId);
+    expect(body.rounds).toHaveLength(1);
+    /* The seed, the stream and every purse are the server's — nothing this device sends names one. */
+    expect(JSON.stringify(body)).not.toMatch(/purse|seed|demandTemplateId/u);
+  });
+
+  it('answers no-server with no binding and refuses a press outside a rush', async () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    expect((await host.postRushSitting()).kind).toBe('no-server');
+
+    const withServer = harnessOf(base());
+    const other = createEverydayHost({
+      ...withServer.bindings,
+      postRushSitting: async (): Promise<EverydayRushPostOutcome> => ({ kind: 'posted', rounds: [] }),
+    });
+    const outcome = await other.postRushSitting();
+    expect(outcome.kind).toBe('refused');
+    expect(outcome.kind === 'refused' && outcome.detail).toBe(RUSH_NOT_STANDING);
   });
 });
 

@@ -4,6 +4,7 @@
   "name": "Merdeka-class reference tower",
   "type": "mixed-use",
   "trafficProfile": "office-standard",
+  "grossAreaPerFloorM2": 3000,
   "floors": [
     {
       "id": "G",
@@ -25,6 +26,7 @@
     {
       "id": "93",
       "index": 93,
+      "grossAreaM2": 2300,
       "heightM": 446.4,
       "population": 0,
       "isTransferFloor": true,
@@ -43,6 +45,7 @@
     },
     {
       "fromIndex": 58,
+      "grossAreaPerFloorM2": 2300,
       "toIndex": 92,
       "startHeightM": 278.4,
       "floorToFloorM": 4.8,
@@ -52,6 +55,7 @@
     },
     {
       "fromIndex": 94,
+      "grossAreaPerFloorM2": 1200,
       "toIndex": 111,
       "startHeightM": 450.6,
       "floorToFloorM": 4.2,
@@ -62,6 +66,7 @@
     },
     {
       "fromIndex": 112,
+      "grossAreaPerFloorM2": 1200,
       "toIndex": 114,
       "startHeightM": 527.0,
       "floorToFloorM": 5.0,
@@ -71,6 +76,7 @@
     },
     {
       "fromIndex": 115,
+      "grossAreaPerFloorM2": 1200,
       "toIndex": 118,
       "startHeightM": 542.0,
       "floorToFloorM": 5.0,

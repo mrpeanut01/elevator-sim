@@ -26,24 +26,25 @@
  * acceptance-gate directory, and a documentation gate is what this is.
  */
 
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, readdirSync } from "node:fs";
+import { join, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 
-import * as experiments from '../index.js';
+import * as experiments from "../index.js";
 
-const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
-const DOCS = join(ROOT, 'docs');
+const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
+const DOCS = join(ROOT, "docs");
 
-const read = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), 'utf8');
+const read = (...parts: string[]): string =>
+  readFileSync(join(ROOT, ...parts), "utf8");
 
 /* -------------------------------------------------------------------------- *
  * Phase sets
  * -------------------------------------------------------------------------- */
 
-type Status = 'landed' | 'partial' | 'not-started';
+type Status = "landed" | "partial" | "not-started";
 
 /**
  * Expand a prose phase list — `0–3, 5 and 7` — into its members.
@@ -59,11 +60,13 @@ function expandPhases(source: string): readonly number[] {
     if (token.length === 0) continue;
     const range = /^(\d+)\s*[–-]\s*(\d+)$/.exec(token);
     if (range !== null) {
-      for (let n = Number(range[1]); n <= Number(range[2]); n += 1) found.push(n);
+      for (let n = Number(range[1]); n <= Number(range[2]); n += 1)
+        found.push(n);
       continue;
     }
     const single = /^(\d+)$/.exec(token);
-    if (single === null) throw new Error(`cannot read "${token}" as a phase or a phase range`);
+    if (single === null)
+      throw new Error(`cannot read "${token}" as a phase or a phase range`);
     found.push(Number(single[1]));
   }
   return found.sort((a, b) => a - b);
@@ -74,7 +77,7 @@ function expandPhases(source: string): readonly number[] {
  * a `**` in the middle of a sentence nor the line wrap that happens to fall inside it.
  */
 const plain = (source: string): string =>
-  source.replaceAll('*', '').replaceAll('_', '').replace(/\s+/g, ' ');
+  source.replaceAll("*", "").replaceAll("_", "").replace(/\s+/g, " ");
 
 /**
  * Read a phase→status map out of a prose status sentence.
@@ -82,13 +85,22 @@ const plain = (source: string): string =>
  * The three clauses are matched independently and each is optional only in the sense that a
  * document with no phases in a state need not name it; a document that names none at all fails.
  */
-function statusFromProse(source: string, where: string): ReadonlyMap<number, Status> {
+function statusFromProse(
+  source: string,
+  where: string,
+): ReadonlyMap<number, Status> {
   const text = plain(source);
   const map = new Map<number, Status>();
 
   const clauses: readonly (readonly [RegExp, Status])[] = [
-    [/Phases? ([\d\s,–\-]+?(?:and[\d\s,–\-]+)?) (?:are|is) landed and accepted/, 'landed'],
-    [/Phases? ([\d\s,–\-]+?(?:and[\d\s,–\-]+)?) (?:are|is) a foundation only/, 'partial'],
+    [
+      /Phases? ([\d\s,–\-]+?(?:and[\d\s,–\-]+)?) (?:are|is) landed and accepted/,
+      "landed",
+    ],
+    [
+      /Phases? ([\d\s,–\-]+?(?:and[\d\s,–\-]+)?) (?:are|is) a foundation only/,
+      "partial",
+    ],
     // The fourth term (T23-R2 / handback H2). `⚠️` covers two different situations — a phase that
     // has barely begun and a phase that is mostly done with a named piece outstanding — and until
     // this line the only prose the guard recognised for either was *"a foundation only"*. That is
@@ -97,17 +109,27 @@ function statusFromProse(source: string, where: string): ReadonlyMap<number, Sta
     // to write the guard's phrase and then spend a paragraph explaining that it is the guard's and
     // not the author's — in the first line of the resume brief, which is the exact position review
     // finding #18 was about. A vocabulary term is cheaper than a paragraph of apology.
-    [/Phases? ([\d\s,–\-]+?(?:and[\d\s,–\-]+)?) (?:are|is) partially complete/, 'partial'],
-    [/Phases? ([\d\s,–\-]+?(?:and[\d\s,–\-]+)?) (?:are|is) not started/, 'not-started'],
+    [
+      /Phases? ([\d\s,–\-]+?(?:and[\d\s,–\-]+)?) (?:are|is) partially complete/,
+      "partial",
+    ],
+    [
+      /Phases? ([\d\s,–\-]+?(?:and[\d\s,–\-]+)?) (?:are|is) not started/,
+      "not-started",
+    ],
   ];
 
   for (const [pattern, status] of clauses) {
     const match = pattern.exec(text);
     if (match === null) continue;
-    for (const phase of expandPhases(match[1] as string)) map.set(phase, status);
+    for (const phase of expandPhases(match[1] as string))
+      map.set(phase, status);
   }
 
-  expect(map.size, `${where}: no phase status sentence recognised`).toBeGreaterThan(0);
+  expect(
+    map.size,
+    `${where}: no phase status sentence recognised`,
+  ).toBeGreaterThan(0);
   return map;
 }
 
@@ -117,61 +139,78 @@ function statusFromProse(source: string, where: string): ReadonlyMap<number, Sta
  * Rows that do not begin with a phase number — `| CLI | ✅ … |` — are skipped: the CLI is not a
  * phase, and inventing one would make the three documents disagree for a reason that is not drift.
  */
-function statusFromTable(source: string, where: string): ReadonlyMap<number, Status> {
+function statusFromTable(
+  source: string,
+  where: string,
+): ReadonlyMap<number, Status> {
   const map = new Map<number, Status>();
-  for (const line of source.split('\n')) {
+  for (const line of source.split("\n")) {
     const row = /^\|\s*\*{0,2}(\d+)\s*[—–-]/.exec(line);
     if (row === null) continue;
     const phase = Number(row[1]);
-    const status: Status | undefined = line.includes('✅')
-      ? 'landed'
-      : line.includes('⚠️')
-        ? 'partial'
-        : line.includes('⬜')
-          ? 'not-started'
+    const status: Status | undefined = line.includes("✅")
+      ? "landed"
+      : line.includes("⚠️")
+        ? "partial"
+        : line.includes("⬜")
+          ? "not-started"
           : undefined;
-    expect(status, `${where}: phase ${String(phase)} row carries no ✅ / ⚠️ / ⬜`).toBeDefined();
+    expect(
+      status,
+      `${where}: phase ${String(phase)} row carries no ✅ / ⚠️ / ⬜`,
+    ).toBeDefined();
     map.set(phase, status as Status);
   }
   expect(map.size, `${where}: no phase rows found`).toBeGreaterThan(0);
   return map;
 }
 
-const sorted = (map: ReadonlyMap<number, Status>): readonly (readonly [number, Status])[] =>
+const sorted = (
+  map: ReadonlyMap<number, Status>,
+): readonly (readonly [number, Status])[] =>
   [...map.entries()].sort((a, b) => a[0] - b[0]);
 
-describe('the phase set, stated in three documents', () => {
-  it('agrees between CLAUDE.md, README.md and docs/07-handoff.md (review findings #2, #18)', () => {
-    const claude = statusFromProse(read('CLAUDE.md'), 'CLAUDE.md');
-    const readme = statusFromTable(read('README.md'), 'README.md § Status');
-    const handoff = statusFromTable(read('docs', '07-handoff.md'), 'docs/07 § Where things stand');
+describe("the phase set, stated in three documents", () => {
+  it("agrees between CLAUDE.md, README.md and docs/07-handoff.md (review findings #2, #18)", () => {
+    const claude = statusFromProse(read("CLAUDE.md"), "CLAUDE.md");
+    const readme = statusFromTable(read("README.md"), "README.md § Status");
+    const handoff = statusFromTable(
+      read("docs", "07-handoff.md"),
+      "docs/07 § Where things stand",
+    );
 
     expect(
       sorted(readme),
-      'README.md § Status disagrees with docs/07-handoff.md § 1. A reader who starts at the front ' +
-        'door and one who starts at the resume brief would plan different work.',
+      "README.md § Status disagrees with docs/07-handoff.md § 1. A reader who starts at the front " +
+        "door and one who starts at the resume brief would plan different work.",
     ).toEqual(sorted(handoff));
 
     expect(
       sorted(claude),
       "CLAUDE.md's status line disagrees with README.md § Status. CLAUDE.md is what an agent reads " +
-        'first, so a phase wrong here is a phase skipped or redone.',
+        "first, so a phase wrong here is a phase skipped or redone.",
     ).toEqual(sorted(readme));
   });
 
-  it('does not contradict itself inside docs/07-handoff.md (review finding #18)', () => {
-    const handoff = read('docs', '07-handoff.md');
-    const opening = statusFromProse(handoff, 'docs/07-handoff.md, opening sentence');
-    const table = statusFromTable(handoff, 'docs/07-handoff.md § Where things stand');
+  it("does not contradict itself inside docs/07-handoff.md (review finding #18)", () => {
+    const handoff = read("docs", "07-handoff.md");
+    const opening = statusFromProse(
+      handoff,
+      "docs/07-handoff.md, opening sentence",
+    );
+    const table = statusFromTable(
+      handoff,
+      "docs/07-handoff.md § Where things stand",
+    );
 
     // The exact defect: one phase asserted both complete and outstanding in a single sentence.
     const both = [...opening.entries()].filter(
-      ([phase, status]) => status === 'landed' && table.get(phase) !== 'landed',
+      ([phase, status]) => status === "landed" && table.get(phase) !== "landed",
     );
     expect(
       both.map(([phase]) => phase),
       "docs/07-handoff.md's opening sentence calls a phase complete that its own status table does " +
-        'not. The opening sentence is the line a cold resume actually reads.',
+        "not. The opening sentence is the line a cold resume actually reads.",
     ).toEqual([]);
 
     expect(
@@ -181,7 +220,7 @@ describe('the phase set, stated in three documents', () => {
   });
 });
 
-describe('the phase-status vocabulary', () => {
+describe("the phase-status vocabulary", () => {
   /**
    * The fourth term is live, and the three that were there still are.
    *
@@ -192,41 +231,55 @@ describe('the phase-status vocabulary', () => {
    * lets the two land in either order.
    */
   it('reads "partially complete" and "a foundation only" as the same status', () => {
-    const foundation = statusFromProse('Phases 6 and 8 are a foundation only.', 'synthetic');
-    const partial = statusFromProse('Phases 6 and 8 are partially complete.', 'synthetic');
-    expect([...partial.entries()].sort()).toEqual([...foundation.entries()].sort());
-    expect(partial.get(6)).toBe('partial');
-    expect(partial.get(8)).toBe('partial');
+    const foundation = statusFromProse(
+      "Phases 6 and 8 are a foundation only.",
+      "synthetic",
+    );
+    const partial = statusFromProse(
+      "Phases 6 and 8 are partially complete.",
+      "synthetic",
+    );
+    expect([...partial.entries()].sort()).toEqual(
+      [...foundation.entries()].sort(),
+    );
+    expect(partial.get(6)).toBe("partial");
+    expect(partial.get(8)).toBe("partial");
   });
 
-  it('still reads the other three terms, and mixes them in one sentence', () => {
+  it("still reads the other three terms, and mixes them in one sentence", () => {
     const map = statusFromProse(
-      'Phases 0–3, 5 and 7 are landed and accepted. Phases 6 and 8 are partially complete. Phase 9 is not started.',
-      'synthetic',
+      "Phases 0–3, 5 and 7 are landed and accepted. Phases 6 and 8 are partially complete. Phase 9 is not started.",
+      "synthetic",
     );
     expect(sorted(map)).toEqual([
-      [0, 'landed'],
-      [1, 'landed'],
-      [2, 'landed'],
-      [3, 'landed'],
-      [5, 'landed'],
-      [6, 'partial'],
-      [7, 'landed'],
-      [8, 'partial'],
-      [9, 'not-started'],
+      [0, "landed"],
+      [1, "landed"],
+      [2, "landed"],
+      [3, "landed"],
+      [5, "landed"],
+      [6, "partial"],
+      [7, "landed"],
+      [8, "partial"],
+      [9, "not-started"],
     ]);
   });
 
-  it('maps ⚠️ to the same status the prose terms produce, so a document may use either', () => {
+  it("maps ⚠️ to the same status the prose terms produce, so a document may use either", () => {
     const table = statusFromTable(
-      ['| 5 — Benchmarks | ✅ |', '| 6 — Destination | ⚠️ |', '| 9 — Later | ⬜ |'].join('\n'),
-      'synthetic',
+      [
+        "| 5 — Benchmarks | ✅ |",
+        "| 6 — Destination | ⚠️ |",
+        "| 9 — Later | ⬜ |",
+      ].join("\n"),
+      "synthetic",
     );
-    expect(table.get(6)).toBe(statusFromProse('Phase 6 is partially complete.', 'synthetic').get(6));
+    expect(table.get(6)).toBe(
+      statusFromProse("Phase 6 is partially complete.", "synthetic").get(6),
+    );
     expect(sorted(table)).toEqual([
-      [5, 'landed'],
-      [6, 'partial'],
-      [9, 'not-started'],
+      [5, "landed"],
+      [6, "partial"],
+      [9, "not-started"],
     ]);
   });
 });
@@ -282,32 +335,33 @@ describe('the phase-status vocabulary', () => {
  * asserted in only one direction is an exclusion that goes stale silently.
  */
 const REFUTED_MECHANISM_SITES: readonly string[] = Object.freeze([
-  'docs/01-architecture.md',
-  'docs/05-roadmap.md',
-  'docs/07-handoff.md',
-  'packages/core/src/dispatch/lifecycle.ts',
-  'packages/core/src/model/types.ts',
-  'packages/core/src/model/car/types.ts',
-  'packages/core/src/sim/simulation.ts',
+  "docs/01-architecture.md",
+  "docs/05-roadmap.md",
+  "docs/07-handoff.md",
+  "packages/core/src/dispatch/lifecycle.ts",
+  "packages/core/src/model/types.ts",
+  "packages/core/src/model/car/types.ts",
+  "packages/core/src/sim/simulation.ts",
 ]);
 
 /** § D60's excluded site: descriptive, and true. Asserted in both directions below. */
-const DESCRIPTIVE_SITE = 'packages/core/src/model/car/estimateCost.ts';
+const DESCRIPTIVE_SITE = "packages/core/src/model/car/estimateCost.ts";
 
 /** The **performance** claim, in every wording the seven used. Not the descriptive mechanism. */
 const CLAIM_PATTERNS = new RegExp(
   [
-    'better under access control',
-    'cheaper under access control',
-    'access control cheaper',
-    'authorization and optimization happen in the same step',
-    'authorisation and optimisation happen in the same step',
-  ].join('|'),
-  'gi',
+    "better under access control",
+    "cheaper under access control",
+    "access control cheaper",
+    "authorization and optimization happen in the same step",
+    "authorisation and optimisation happen in the same step",
+  ].join("|"),
+  "gi",
 );
 
 /** The descriptive sentence that is true, and that `estimateCost.ts` is excluded for carrying. */
-const DESCRIPTIVE_PATTERN = /authoriz\w+ and optimiz\w+ in (?:one|the same) step/i;
+const DESCRIPTIVE_PATTERN =
+  /authoriz\w+ and optimiz\w+ in (?:one|the same) step/i;
 
 /**
  * A sentence that marks the claim as refuted rather than asserted.
@@ -336,10 +390,11 @@ const MARKER_WINDOW = 400;
  * stripped by {@link plain}, which is why the patterns carry no `*`.
  */
 const WITHDRAWN_DESTINATION_PATTERNS = new RegExp(
-  ['sav(?:ing|ings)[^.]{0,70}in the credential', 'sav(?:ing|ings)[^.]{0,70}claim about authoriz'].join(
-    '|',
-  ),
-  'gi',
+  [
+    "sav(?:ing|ings)[^.]{0,70}in the credential",
+    "sav(?:ing|ings)[^.]{0,70}claim about authoriz",
+  ].join("|"),
+  "gi",
 );
 
 /**
@@ -362,9 +417,9 @@ const WITHDRAWAL_MARKERS = /withdraw\w*|unmeasured/gi;
  */
 const proseFiles = (): readonly string[] =>
   Object.freeze([
-    'CLAUDE.md',
+    "CLAUDE.md",
     ...readdirSync(DOCS)
-      .filter((name) => name.endsWith('.md'))
+      .filter((name) => name.endsWith(".md"))
       .sort()
       .map((name) => `docs/${name}`),
   ]);
@@ -378,20 +433,25 @@ const proseFiles = (): readonly string[] =>
  * § D284 and are not this lane's to edit.
  */
 const WITHDRAWN_DESTINATION_SITES: readonly string[] = Object.freeze([
-  'CLAUDE.md',
-  'docs/01-architecture.md',
-  'docs/05-roadmap.md',
-  'docs/07-handoff.md',
-  'docs/08-review-findings.md',
-  'docs/09-destination-dispatch-contract.md',
+  "CLAUDE.md",
+  "docs/01-architecture.md",
+  "docs/05-roadmap.md",
+  "docs/07-handoff.md",
+  "docs/08-review-findings.md",
+  "docs/09-destination-dispatch-contract.md",
 ]);
 
-describe('the refuted access-control mechanism stays refuted (DECISIONS.md § D60)', () => {
+describe("the refuted access-control mechanism stays refuted (DECISIONS.md § D60)", () => {
   /** Emphasis stripped and whitespace collapsed, so a line wrap cannot hide a match. */
-  const sourceOf = (file: string): string => plain(read(...file.split('/')));
+  const sourceOf = (file: string): string => plain(read(...file.split("/")));
 
   /** Distance from an occurrence to the nearest match of `markers`, or `Infinity`. */
-  function nearest(text: string, markers: RegExp, start: number, end: number): number {
+  function nearest(
+    text: string,
+    markers: RegExp,
+    start: number,
+    end: number,
+  ): number {
     let best = Number.POSITIVE_INFINITY;
     for (const marker of text.matchAll(markers)) {
       const from = marker.index;
@@ -406,7 +466,7 @@ describe('the refuted access-control mechanism stays refuted (DECISIONS.md § D6
   const nearestMarker = (text: string, start: number, end: number): number =>
     nearest(text, REFUTATION_MARKERS, start, end);
 
-  it('never states the performance claim without a refutation beside it', () => {
+  it("never states the performance claim without a refutation beside it", () => {
     const unmarked: string[] = [];
     for (const file of REFUTED_MECHANISM_SITES) {
       const text = sourceOf(file);
@@ -416,58 +476,65 @@ describe('the refuted access-control mechanism stays refuted (DECISIONS.md § D6
         if (distance > MARKER_WINDOW) {
           unmarked.push(
             `${file}: "${claim[0]}" with no refutation within ${String(MARKER_WINDOW)} characters ` +
-              `(nearest ${Number.isFinite(distance) ? String(distance) : 'none in the file'}). ` +
-              'Measured, that claim is false: Δ_secure − Δ_midtown = +1.020 s [+0.625, +1.414], ' +
-              'excluding zero on the positive side (DECISIONS.md § D60, re-pinned by § D280).',
+              `(nearest ${Number.isFinite(distance) ? String(distance) : "none in the file"}). ` +
+              "Measured, that claim is false: Δ_secure − Δ_midtown = +1.020 s [+0.625, +1.414], " +
+              "excluding zero on the positive side (DECISIONS.md § D60, re-pinned by § D280).",
           );
         }
       }
     }
-    expect(unmarked.join('\n'), unmarked.join('\n')).toBe('');
+    expect(unmarked.join("\n"), unmarked.join("\n")).toBe("");
   });
 
-  it('still carries the correction in every one of the seven — it cannot be silently deleted', () => {
+  it("still carries the correction in every one of the seven — it cannot be silently deleted", () => {
     // The other direction. Without this, deleting the whole paragraph passes the check above by
     // having nothing left to match, and the repository quietly forgets that it measured this.
     const missing: string[] = [];
     for (const file of REFUTED_MECHANISM_SITES) {
       const text = sourceOf(file);
       const marked = [...text.matchAll(CLAIM_PATTERNS)].some((claim) =>
-        Number.isFinite(nearestMarker(text, claim.index, claim.index + claim[0].length)),
+        Number.isFinite(
+          nearestMarker(text, claim.index, claim.index + claim[0].length),
+        ),
       );
       if (!marked) missing.push(file);
     }
     expect(
       missing,
-      'named by DECISIONS.md § D60 as having asserted the refuted mechanism, and no longer ' +
-        'carrying the correction. Seven places said it and no test pinned any of them; this is ' +
-        'that test.',
+      "named by DECISIONS.md § D60 as having asserted the refuted mechanism, and no longer " +
+        "carrying the correction. Seven places said it and no test pinned any of them; this is " +
+        "that test.",
     ).toEqual([]);
   });
 
-  it('never states the withdrawn destination for the saving without a withdrawal beside it', () => {
+  it("never states the withdrawn destination for the saving without a withdrawal beside it", () => {
     const unmarked: string[] = [];
     for (const file of proseFiles()) {
       const text = sourceOf(file);
       for (const stated of text.matchAll(WITHDRAWN_DESTINATION_PATTERNS)) {
         const start = stated.index;
-        const distance = nearest(text, WITHDRAWAL_MARKERS, start, start + stated[0].length);
+        const distance = nearest(
+          text,
+          WITHDRAWAL_MARKERS,
+          start,
+          start + stated[0].length,
+        );
         if (distance > MARKER_WINDOW) {
           unmarked.push(
             `${file}: "${stated[0]}" with no withdrawal within ${String(MARKER_WINDOW)} characters ` +
-              `(nearest ${Number.isFinite(distance) ? String(distance) : 'none in the file'}). ` +
-              'H-ACCESS-1 is REFUTED (DECISIONS.md § D256, § D279): eta and ' +
-              'destination-eta-unpriced are bit-identical on 150 of 150 secure-tower replications, ' +
-              'so the credential buys nothing and the saving is not in it. Where it comes from is ' +
-              'UNMEASURED — say that, and do not substitute another mechanism (§ D280).',
+              `(nearest ${Number.isFinite(distance) ? String(distance) : "none in the file"}). ` +
+              "H-ACCESS-1 is REFUTED (DECISIONS.md § D256, § D279): eta and " +
+              "destination-eta-unpriced are bit-identical on 150 of 150 secure-tower replications, " +
+              "so the credential buys nothing and the saving is not in it. Where it comes from is " +
+              "UNMEASURED — say that, and do not substitute another mechanism (§ D280).",
           );
         }
       }
     }
-    expect(unmarked.join('\n'), unmarked.join('\n')).toBe('');
+    expect(unmarked.join("\n"), unmarked.join("\n")).toBe("");
   });
 
-  it('mechanises the count — the carrier set is derived from disk, not transcribed', () => {
+  it("mechanises the count — the carrier set is derived from disk, not transcribed", () => {
     // The other direction, and the one nobody had. § D280 named eight places quoting the figure and
     // six quoting the destination, both by hand; DECISIONS.md § D60 named seven for the mechanism.
     // Three hand counts, none of them executable. This derives the set instead, so a NEW site fails
@@ -476,31 +543,32 @@ describe('the refuted access-control mechanism stays refuted (DECISIONS.md § D6
     // `matchAll` rather than `test`, because `test` on a /g/ regex advances `lastIndex` and would
     // make this filter depend on the order the files were read in.
     const carriers = proseFiles().filter(
-      (file) => [...sourceOf(file).matchAll(WITHDRAWN_DESTINATION_PATTERNS)].length > 0,
+      (file) =>
+        [...sourceOf(file).matchAll(WITHDRAWN_DESTINATION_PATTERNS)].length > 0,
     );
     expect(
       carriers,
-      'the set of documents stating the withdrawn destination for the saving has changed. A file ' +
+      "the set of documents stating the withdrawn destination for the saving has changed. A file " +
         'that appeared here states, or quotes, "the saving is in the credential" / "a claim about ' +
         'authorization" and must carry a withdrawal beside it. A file that disappeared deleted the ' +
-        'record of a refuted answer instead of marking it, which is what DECISIONS.md § D281 ' +
-        'refuses: a withdrawn figure is preserved under its marker, never dropped.',
+        "record of a refuted answer instead of marking it, which is what DECISIONS.md § D281 " +
+        "refuses: a withdrawn figure is preserved under its marker, never dropped.",
     ).toEqual(WITHDRAWN_DESTINATION_SITES);
   });
 
-  it('excludes estimateCost.ts, and the exclusion is asserted in both directions', () => {
+  it("excludes estimateCost.ts, and the exclusion is asserted in both directions", () => {
     const text = sourceOf(DESCRIPTIVE_SITE);
     expect(
       DESCRIPTIVE_PATTERN.test(text),
       `${DESCRIPTIVE_SITE} no longer carries the descriptive "authorize and optimize in one step". ` +
-        'The exclusion in § D60 exists because that sentence is there and is TRUE; if it has gone, ' +
-        'the exclusion is stale and should be deleted rather than left standing.',
+        "The exclusion in § D60 exists because that sentence is there and is TRUE; if it has gone, " +
+        "the exclusion is stale and should be deleted rather than left standing.",
     ).toBe(true);
     expect(
       [...text.matchAll(CLAIM_PATTERNS)].map((claim) => claim[0]),
       `${DESCRIPTIVE_SITE} is excluded from the guard because it describes the code rather than ` +
-        'claiming a performance result. It now carries a performance claim, so either the claim ' +
-        'goes or the file joins REFUTED_MECHANISM_SITES.',
+        "claiming a performance result. It now carries a performance claim, so either the claim " +
+        "goes or the file joins REFUTED_MECHANISM_SITES.",
     ).toEqual([]);
   });
 });
@@ -534,7 +602,7 @@ describe('the refuted access-control mechanism stays refuted (DECISIONS.md § D6
  * See {@link UNGUARDED_COUPLING_SITES}. Both are outside this lane's ownership, both are asserted
  * to *still* carry the claim, and that assertion is what stops the exemption from going quiet.
  */
-const COUPLING_DOC = 'docs/14-building-behaviour-contract.md';
+const COUPLING_DOC = "docs/14-building-behaviour-contract.md";
 
 /**
  * The **strong** form of the coupling: a change to the group-size *curve* costing a different
@@ -546,11 +614,11 @@ const COUPLING_DOC = 'docs/14-building-behaviour-contract.md';
  */
 const COUPLING_CLAIM_PATTERNS = new RegExp(
   [
-    'change to the group-size curve',
-    'change to the group size curve',
-    'group-size curve[^.]{0,80}different number of draws',
-  ].join('|'),
-  'gi',
+    "change to the group-size curve",
+    "change to the group size curve",
+    "group-size curve[^.]{0,80}different number of draws",
+  ].join("|"),
+  "gi",
 );
 
 /**
@@ -577,21 +645,25 @@ const COUPLING_REFUTATION_MARKERS =
  * scanned set rather than sitting in a register nobody re-reads.
  */
 const UNGUARDED_COUPLING_SITES: readonly string[] = Object.freeze([
-  'packages/core/src/traffic/types.ts',
-  'WAVE13_RESUME.md',
+  "packages/core/src/traffic/types.ts",
+  "WAVE13_RESUME.md",
 ]);
 
 /** § D203's descriptive-and-true site, excluded for `estimateCost.ts`'s reason. Both directions. */
-const COUPLING_DESCRIPTIVE_SITE = 'packages/core/src/traffic/poissonBatch.ts';
+const COUPLING_DESCRIPTIVE_SITE = "packages/core/src/traffic/poissonBatch.ts";
 
 /** The property the whole correction rests on, as `poissonBatch.ts` states it. */
 const ONE_DRAW_PATTERN = /exactly one[^.]{0,40}draw is consumed per call/i;
 
-describe('the overstated group-size coupling stays corrected (DECISIONS.md § D203)', () => {
-  const sourceOf = (file: string): string => plain(read(...file.split('/')));
+describe("the overstated group-size coupling stays corrected (DECISIONS.md § D203)", () => {
+  const sourceOf = (file: string): string => plain(read(...file.split("/")));
 
   /** Distance from a claim occurrence to the nearest marker, or `Infinity`. Mirrors § D60's. */
-  function nearestCouplingMarker(text: string, start: number, end: number): number {
+  function nearestCouplingMarker(
+    text: string,
+    start: number,
+    end: number,
+  ): number {
     let best = Number.POSITIVE_INFINITY;
     for (const marker of text.matchAll(COUPLING_REFUTATION_MARKERS)) {
       const from = marker.index;
@@ -602,30 +674,36 @@ describe('the overstated group-size coupling stays corrected (DECISIONS.md § D2
     return best;
   }
 
-  it('never states the strong coupling in docs/ without the correction beside it', () => {
+  it("never states the strong coupling in docs/ without the correction beside it", () => {
     // Every doc, not only docs/14: the claim was copied from the wave brief into the contract
     // once already, and a third copy would arrive the same way.
     const unmarked: string[] = [];
-    for (const name of readdirSync(DOCS).filter((entry) => entry.endsWith('.md'))) {
-      const text = plain(read('docs', name));
+    for (const name of readdirSync(DOCS).filter((entry) =>
+      entry.endsWith(".md"),
+    )) {
+      const text = plain(read("docs", name));
       for (const claim of text.matchAll(COUPLING_CLAIM_PATTERNS)) {
         const start = claim.index;
-        const distance = nearestCouplingMarker(text, start, start + claim[0].length);
+        const distance = nearestCouplingMarker(
+          text,
+          start,
+          start + claim[0].length,
+        );
         if (distance > MARKER_WINDOW) {
           unmarked.push(
             `docs/${name}: "${claim[0]}" with no correction within ${String(MARKER_WINDOW)} ` +
-              `characters (nearest ${Number.isFinite(distance) ? String(distance) : 'none in the file'}). ` +
-              'Measured, the strong form is false of the shipped model: batchesPerSecond = ' +
-              'passengerRate / meanBatchSize, and drawGeometricBatchSize consumes exactly one ' +
-              'draw per call for every mean (DECISIONS.md § D203).',
+              `characters (nearest ${Number.isFinite(distance) ? String(distance) : "none in the file"}). ` +
+              "Measured, the strong form is false of the shipped model: batchesPerSecond = " +
+              "passengerRate / meanBatchSize, and drawGeometricBatchSize consumes exactly one " +
+              "draw per call for every mean (DECISIONS.md § D203).",
           );
         }
       }
     }
-    expect(unmarked.join('\n'), unmarked.join('\n')).toBe('');
+    expect(unmarked.join("\n"), unmarked.join("\n")).toBe("");
   });
 
-  it('still carries the correction in docs/14 — it cannot be silently deleted', () => {
+  it("still carries the correction in docs/14 — it cannot be silently deleted", () => {
     // The other direction, and the one that matters most for an *additive* correction: deleting
     // the rebuttal block AND the overstated paragraph together passes the check above by leaving
     // nothing to match, and the repository quietly forgets that it measured this.
@@ -634,34 +712,37 @@ describe('the overstated group-size coupling stays corrected (DECISIONS.md § D2
     expect(
       claims.length,
       `${COUPLING_DOC} no longer states the coupling at all. § D203 records the overstated ` +
-        'paragraph as left standing under a rebuttal, which is how this repository files ' +
-        'corrections; if the whole passage has gone, § D203 is describing a document that does ' +
-        'not exist.',
+        "paragraph as left standing under a rebuttal, which is how this repository files " +
+        "corrections; if the whole passage has gone, § D203 is describing a document that does " +
+        "not exist.",
     ).toBeGreaterThan(0);
 
     const marked = claims.some((claim) =>
-      Number.isFinite(nearestCouplingMarker(text, claim.index, claim.index + claim[0].length)),
+      Number.isFinite(
+        nearestCouplingMarker(text, claim.index, claim.index + claim[0].length),
+      ),
     );
     expect(
       marked,
       `${COUPLING_DOC} states the group-size coupling and no longer marks it as overstated. ` +
-        'The correction was filed additively (§ D203); this is the test that stops it being ' +
-        'edited back to the version a run refused.',
+        "The correction was filed additively (§ D203); this is the test that stops it being " +
+        "edited back to the version a run refused.",
     ).toBe(true);
 
     // Non-vacuity: the corrected form, not merely the word "overstated" somewhere in the file.
     for (const required of [
-      'batchesPerSecond',
-      'drawGeometricBatchSize',
-      'across demand sources',
+      "batchesPerSecond",
+      "drawGeometricBatchSize",
+      "across demand sources",
     ]) {
-      expect(text, `${COUPLING_DOC} no longer names ${required} in the correction`).toContain(
-        required,
-      );
+      expect(
+        text,
+        `${COUPLING_DOC} no longer names ${required} in the correction`,
+      ).toContain(required);
     }
   });
 
-  it('excludes poissonBatch.ts, and the exclusion is asserted in both directions', () => {
+  it("excludes poissonBatch.ts, and the exclusion is asserted in both directions", () => {
     // § D60's third check, transplanted. `drawGeometricBatchSize`'s docstring is the *evidence*
     // the correction rests on — the claim was refutable from the repository as it stood on the
     // day it was written, and this is the sentence that made it so.
@@ -669,30 +750,31 @@ describe('the overstated group-size coupling stays corrected (DECISIONS.md § D2
     expect(
       ONE_DRAW_PATTERN.test(text),
       `${COUPLING_DESCRIPTIVE_SITE} no longer states that exactly one draw is consumed per call. ` +
-        'That sentence is § D203’s second ground and it predates the claim it refutes; if it ' +
-        'has gone, the correction is standing on evidence that is no longer in the tree. ' +
-        '(The behaviour itself is measured in core/src/traffic/poissonBatch.test.ts — ' +
-        '“every group-size family costs exactly one draw”.)',
+        "That sentence is § D203’s second ground and it predates the claim it refutes; if it " +
+        "has gone, the correction is standing on evidence that is no longer in the tree. " +
+        "(The behaviour itself is measured in core/src/traffic/poissonBatch.test.ts — " +
+        "“every group-size family costs exactly one draw”.)",
     ).toBe(true);
     expect(
       [...text.matchAll(COUPLING_CLAIM_PATTERNS)].map((claim) => claim[0]),
       `${COUPLING_DESCRIPTIVE_SITE} is excluded because what it says about draw counts is ` +
-        'descriptive and true. It now carries the refuted group-size claim, so either the claim ' +
-        'goes or the file joins the scanned set.',
+        "descriptive and true. It now carries the refuted group-size claim, so either the claim " +
+        "goes or the file joins the scanned set.",
     ).toEqual([]);
   });
 
-  it('keeps the two unguarded sites honest: each still carries the claim it was exempted for', () => {
+  it("keeps the two unguarded sites honest: each still carries the claim it was exempted for", () => {
     const corrected: string[] = [];
     for (const file of UNGUARDED_COUPLING_SITES) {
-      if ([...sourceOf(file).matchAll(COUPLING_CLAIM_PATTERNS)].length === 0) corrected.push(file);
+      if ([...sourceOf(file).matchAll(COUPLING_CLAIM_PATTERNS)].length === 0)
+        corrected.push(file);
     }
     expect(
       corrected,
-      'exempted from the § D203 guard on the grounds that it still asserts the refuted coupling ' +
-        'and was outside the correcting lane’s ownership. It no longer asserts it, so the ' +
-        'exemption is stale: delete the entry, or move the file into the scanned set if the claim ' +
-        'has merely been reworded.',
+      "exempted from the § D203 guard on the grounds that it still asserts the refuted coupling " +
+        "and was outside the correcting lane’s ownership. It no longer asserts it, so the " +
+        "exemption is stale: delete the entry, or move the file into the scanned set if the claim " +
+        "has merely been reworded.",
     ).toEqual([]);
   });
 
@@ -713,14 +795,17 @@ describe('the overstated group-size coupling stays corrected (DECISIONS.md § D2
    * published form from the code and assert the document against it*) rather than transcribing a
    * figure and hoping.
    */
-  it('re-derives the one-agreeing / nineteen-displaced counts the rebuttal quotes', async () => {
+  it("re-derives the one-agreeing / nineteen-displaced counts the rebuttal quotes", async () => {
     const [{ loadResources }, core] = await Promise.all([
-      import('./harness.js'),
-      import('@elevator-sim/core'),
+      import("./harness.js"),
+      import("@elevator-sim/core"),
     ]);
     const config = await loadResources();
-    const building = config.buildingsById.get('midtown-office');
-    expect(building, 'midtown-office is no longer a shipped building').toBeDefined();
+    const building = config.buildingsById.get("midtown-office");
+    expect(
+      building,
+      "midtown-office is no longer a shipped building",
+    ).toBeDefined();
 
     const plan = core.planDemand({
       building: building as NonNullable<typeof building>,
@@ -730,20 +815,23 @@ describe('the overstated group-size coupling stays corrected (DECISIONS.md § D2
     // One source's arrival times are drawn before any group-size draw exists, so exactly one can
     // agree between the models; every other is displaced.
     const displaced = plan.sources.length - 1;
-    expect(plan.sources.length, 'midtown-office no longer has twenty demand sources').toBe(20);
+    expect(
+      plan.sources.length,
+      "midtown-office no longer has twenty demand sources",
+    ).toBe(20);
 
     const asWords: Readonly<Record<number, string>> = {
-      17: 'seventeen',
-      18: 'eighteen',
-      19: 'nineteen',
-      20: 'twenty',
-      21: 'twenty-one',
+      17: "seventeen",
+      18: "eighteen",
+      19: "nineteen",
+      20: "twenty",
+      21: "twenty-one",
     };
     const word = asWords[displaced];
     expect(
       word,
       `midtown-office now plans ${String(plan.sources.length)} demand sources, and this guard has ` +
-        'no English word for the displaced count. Widen the table and re-read the document.',
+        "no English word for the displaced count. Widen the table and re-read the document.",
     ).toBeDefined();
 
     const text = sourceOf(COUPLING_DOC);
@@ -752,7 +840,7 @@ describe('the overstated group-size coupling stays corrected (DECISIONS.md § D2
       `${COUPLING_DOC} quotes a displaced-source count that midtown-office's demand plan no ` +
         `longer produces. planDemand gives ${String(plan.sources.length)} sources, so the ` +
         `rebuttal should read "all ${word as string}" — re-run core/src/sim/trafficModelSeam.test.ts ` +
-        'and re-word § 1.3, or the document is quoting a building it no longer describes.',
+        "and re-word § 1.3, or the document is quoting a building it no longer describes.",
     ).toContain(`all ${word as string}`);
 
     // …and the agreeing one, named. `trafficModelSeam.test.ts` pins the identity `['entrance']`;
@@ -765,28 +853,34 @@ describe('the overstated group-size coupling stays corrected (DECISIONS.md § D2
  * README's documentation table
  * -------------------------------------------------------------------------- */
 
-describe('README.md § Documentation', () => {
-  it('lists every docs/*.md on disk (review finding #2)', () => {
-    const readme = read('README.md');
+describe("README.md § Documentation", () => {
+  it("lists every docs/*.md on disk (review finding #2)", () => {
+    const readme = read("README.md");
     // The **table**, not the file. A doc mentioned in passing further down is not listed: the
     // omission this finding reports was of docs/07-handoff.md from the table, while the closing
     // paragraph linked it. A reader scanning the table is the one being served here.
-    const heading = readme.indexOf('## Documentation');
-    expect(heading, 'README.md has no ## Documentation section').toBeGreaterThan(0);
-    const table = readme.slice(heading, readme.indexOf('\n## ', heading + 1));
+    const heading = readme.indexOf("## Documentation");
+    expect(
+      heading,
+      "README.md has no ## Documentation section",
+    ).toBeGreaterThan(0);
+    const table = readme.slice(heading, readme.indexOf("\n## ", heading + 1));
 
     const onDisk = readdirSync(DOCS)
-      .filter((name) => name.endsWith('.md'))
+      .filter((name) => name.endsWith(".md"))
       .sort();
 
-    expect(onDisk.length, 'no docs found — the walk is broken, not the README').toBeGreaterThan(5);
+    expect(
+      onDisk.length,
+      "no docs found — the walk is broken, not the README",
+    ).toBeGreaterThan(5);
 
     const missing = onDisk.filter((name) => !table.includes(`docs/${name}`));
     expect(
       missing,
-      'on disk in docs/ and not linked from README.md’s documentation table. docs/07-handoff.md ' +
-        'was the omission that mattered: it is the current-state brief, and the front door did ' +
-        'not point at it.',
+      "on disk in docs/ and not linked from README.md’s documentation table. docs/07-handoff.md " +
+        "was the omission that mattered: it is the current-state brief, and the front door did " +
+        "not point at it.",
     ).toEqual([]);
   });
 });
@@ -830,41 +924,47 @@ describe('README.md § Documentation', () => {
  * in a regex is a distinction the next author cannot see; kept this way, a figure that is still in
  * a shape is still being asserted.
  */
-describe('README.md § Status publishes no suite figure of its own (GitHub issue #230)', () => {
+describe("README.md § Status publishes no suite figure of its own (GitHub issue #230)", () => {
   const SUITE_FIGURE_SHAPES: readonly RegExp[] = Object.freeze([
     /(\d[\d,   ]*)\s+test\s+files/giu,
     /(\d[\d,   ]*)\s+files,\s*(\d[\d,   ]*)\s+tests/giu,
   ]);
 
-  it('carries neither of the two shapes it used to carry', () => {
-    const readme = read('README.md');
+  it("carries neither of the two shapes it used to carry", () => {
+    const readme = read("README.md");
     const found: string[] = [];
     for (const shape of SUITE_FIGURE_SHAPES) {
       for (const hit of readme.matchAll(shape)) found.push(hit[0].trim());
     }
     expect(
       found,
-      'README.md publishes a suite count again. It is the one document whose reader has no ' +
-        'context to judge one by, and it carried two contradictory counts in a single section ' +
-        'for six waves. A suite figure is a claim about a machine, a commit and a tier: put it ' +
-        'in AGENT_STATUS.md beside the run that produced it, or in GAPS.md’s header beside its ' +
-        'caveat, and point at it from here.',
+      "README.md publishes a suite count again. It is the one document whose reader has no " +
+        "context to judge one by, and it carried two contradictory counts in a single section " +
+        "for six waves. A suite figure is a claim about a machine, a commit and a tier: put it " +
+        "in AGENT_STATUS.md beside the run that produced it, or in GAPS.md’s header beside its " +
+        "caveat, and point at it from here.",
     ).toEqual([]);
   });
 
-  it('points at the documents that do carry one', () => {
-    const readme = read('README.md');
-    const status = readme.slice(readme.indexOf('## Status'), readme.indexOf('\n## ', readme.indexOf('## Status') + 1));
-    expect(status.length, 'README.md has no ## Status section to check').toBeGreaterThan(0);
+  it("points at the documents that do carry one", () => {
+    const readme = read("README.md");
+    const status = readme.slice(
+      readme.indexOf("## Status"),
+      readme.indexOf("\n## ", readme.indexOf("## Status") + 1),
+    );
+    expect(
+      status.length,
+      "README.md has no ## Status section to check",
+    ).toBeGreaterThan(0);
     // Both, because they answer different questions — AGENT_STATUS.md has the tier split and the
     // host, GAPS.md's header has the caveat that makes a whole-suite number readable at all. A
     // pointer to one of them would send half the readers to the wrong place.
-    for (const document of ['AGENT_STATUS.md', 'GAPS.md']) {
+    for (const document of ["AGENT_STATUS.md", "GAPS.md"]) {
       expect(
         status,
         `README.md § Status no longer points at ${document}. Removing the count without leaving ` +
-          'the pointer turns a wrong answer into no answer, which is not the improvement this ' +
-          'criterion asked for.',
+          "the pointer turns a wrong answer into no answer, which is not the improvement this " +
+          "criterion asked for.",
       ).toContain(document);
     }
   });
@@ -874,58 +974,73 @@ describe('README.md § Status publishes no suite figure of its own (GitHub issue
  * The roadmap's reproduction instructions
  * -------------------------------------------------------------------------- */
 
-describe('docs/05-roadmap.md § Phase 5 — which entry point regenerates which number', () => {
+describe("docs/05-roadmap.md § Phase 5 — which entry point regenerates which number", () => {
   /**
    * Every function name the entry-point mapping table names, taken from the backticked spans in its
    * rows. `formatBenchmark(await runBenchmark())` contributes two; `await` is not a function.
    */
   function namedEntryPoints(): readonly string[] {
-    const roadmap = read('docs', '05-roadmap.md');
-    const heading = roadmap.indexOf('Which entry point regenerates which number');
-    expect(heading, 'docs/05 § Phase 5 no longer carries the entry-point mapping').toBeGreaterThan(0);
+    const roadmap = read("docs", "05-roadmap.md");
+    const heading = roadmap.indexOf(
+      "Which entry point regenerates which number",
+    );
+    expect(
+      heading,
+      "docs/05 § Phase 5 no longer carries the entry-point mapping",
+    ).toBeGreaterThan(0);
     // The table only. The prose above it names `runBenchmark` and `results.map(formatCase)` while
     // explaining what the old claim got wrong, and neither is a reproduction instruction.
-    const start = roadmap.indexOf('| numbers |', heading);
-    expect(start, 'the entry-point mapping is no longer a table').toBeGreaterThan(0);
-    const block = roadmap.slice(start, roadmap.indexOf('\n\n', start));
+    const start = roadmap.indexOf("| numbers |", heading);
+    expect(
+      start,
+      "the entry-point mapping is no longer a table",
+    ).toBeGreaterThan(0);
+    const block = roadmap.slice(start, roadmap.indexOf("\n\n", start));
 
     const names = new Set<string>();
     for (const span of block.matchAll(/`([^`]+)`/g)) {
-      for (const call of (span[1] as string).matchAll(/\b([A-Za-z][A-Za-z0-9]*)\s*\(/g)) {
+      for (const call of (span[1] as string).matchAll(
+        /\b([A-Za-z][A-Za-z0-9]*)\s*\(/g,
+      )) {
         const name = call[1] as string;
-        if (name !== 'await') names.add(name);
+        if (name !== "await") names.add(name);
       }
     }
     return [...names].sort();
   }
 
-  it('names only functions @elevator-sim/experiments actually exports (review finding #17)', () => {
+  it("names only functions @elevator-sim/experiments actually exports (review finding #17)", () => {
     const named = namedEntryPoints();
-    expect(named.length, 'no entry points parsed out of the table — its shape changed').toBeGreaterThan(5);
+    expect(
+      named.length,
+      "no entry points parsed out of the table — its shape changed",
+    ).toBeGreaterThan(5);
 
     const surface = experiments as unknown as Record<string, unknown>;
-    const absent = named.filter((name) => typeof surface[name] !== 'function');
+    const absent = named.filter((name) => typeof surface[name] !== "function");
     expect(
       absent,
-      'named in the roadmap as the way to regenerate a published number, and not exported by ' +
-        '@elevator-sim/experiments. A reproduction instruction that names a function nobody can ' +
-        'call is the defect this table replaced.',
+      "named in the roadmap as the way to regenerate a published number, and not exported by " +
+        "@elevator-sim/experiments. A reproduction instruction that names a function nobody can " +
+        "call is the defect this table replaced.",
     ).toEqual([]);
   });
 
-  it('still names the studies whose numbers the section publishes', () => {
+  it("still names the studies whose numbers the section publishes", () => {
     // Non-vacuity: the table must not decay into naming only `runBenchmark`, which was the wrong
     // claim in the first place.
     const named = namedEntryPoints();
     for (const required of [
-      'runPrepositioningStudy',
-      'runTailStudy',
-      'runCapacityReassignmentStudy',
-      'measurePredictorLag',
-      'auditForecastCausalityInRun',
-      'measureAuctionAggregation',
+      "runPrepositioningStudy",
+      "runTailStudy",
+      "runCapacityReassignmentStudy",
+      "measurePredictorLag",
+      "auditForecastCausalityInRun",
+      "measureAuctionAggregation",
     ]) {
-      expect(named, `the mapping no longer names ${required}`).toContain(required);
+      expect(named, `the mapping no longer names ${required}`).toContain(
+        required,
+      );
     }
   });
 });
@@ -975,66 +1090,73 @@ describe('docs/05-roadmap.md § Phase 5 — which entry point regenerates which 
  * silent un-withdrawal (the marker), and on a re-pin that did not take (the disjointness). What it
  * no longer does is demand that a struck-through historical table track a live run.
  */
-describe('docs/05-roadmap.md § H-ACCESS-1 — the withdrawn coverage table is the withdrawn pins', () => {
+describe("docs/05-roadmap.md § H-ACCESS-1 — the withdrawn coverage table is the withdrawn pins", () => {
   /** `| **0 of 30** | 18.2 | 33.5 % |` → `0 of 30 | 18.2 | 33.5 %`. */
   const normalizeRow = (row: string): string =>
     row
-      .replaceAll('**', '')
-      .split('|')
+      .replaceAll("**", "")
+      .split("|")
       .map((cell) => cell.trim())
-      .filter((cell) => cell !== '')
+      .filter((cell) => cell !== "")
       .slice(1) // drop the arm label; the numbers are what is pinned
-      .join(' | ');
+      .join(" | ");
 
-  it('renders every published coverage row from the study’s own withdrawn record', async () => {
-    const { derivedCoverageForms, withdrawnCoverageForms } = await import(
-      '../benchmark/accessControl.js'
-    );
+  it("renders every published coverage row from the study’s own withdrawn record", async () => {
+    const { derivedCoverageForms, withdrawnCoverageForms } =
+      await import("../benchmark/accessControl.js");
     const live = derivedCoverageForms();
     const withdrawn = withdrawnCoverageForms();
 
-    expect(live.size, 'the live coverage vocabulary is empty — the pins are gone').toBeGreaterThan(
-      3,
-    );
+    expect(
+      live.size,
+      "the live coverage vocabulary is empty — the pins are gone",
+    ).toBeGreaterThan(3);
     expect(
       withdrawn.size,
-      'WITHDRAWN_COVERAGE is empty, so this guard would accept anything the live pins happen to ' +
-        'render and nothing else — see DECISIONS.md § D256, which withdrew these rows rather than ' +
-        'deleting them',
+      "WITHDRAWN_COVERAGE is empty, so this guard would accept anything the live pins happen to " +
+        "render and nothing else — see DECISIONS.md § D256, which withdrew these rows rather than " +
+        "deleting them",
     ).toBeGreaterThan(3);
 
-    const roadmap = read('docs', '05-roadmap.md');
-    const heading = roadmap.indexOf('**H-ACCESS-1 — coverage.');
-    expect(heading, 'docs/05-roadmap.md no longer states H-ACCESS-1').toBeGreaterThan(0);
+    const roadmap = read("docs", "05-roadmap.md");
+    const heading = roadmap.indexOf("**H-ACCESS-1 — coverage.");
+    expect(
+      heading,
+      "docs/05-roadmap.md no longer states H-ACCESS-1",
+    ).toBeGreaterThan(0);
 
-    const table = roadmap.slice(heading, roadmap.indexOf('\n\n', roadmap.indexOf('|', heading)));
+    const table = roadmap.slice(
+      heading,
+      roadmap.indexOf("\n\n", roadmap.indexOf("|", heading)),
+    );
 
     // The marker, asserted before the numbers: these rows are legal *because* the table is
     // withdrawn, so a table that stopped saying so would be quoting a defect as a measurement.
     expect(
-      table.slice(0, table.indexOf('\n')),
-      'docs/05-roadmap.md § H-ACCESS-1 no longer marks its coverage table as withdrawn, but the ' +
-        'rows under it are the ones DECISIONS.md § D256 withdrew. Either the table was refreshed ' +
-        'from a current run — in which case check it against derivedCoverageForms() instead — or ' +
-        'the withdrawal was dropped and the document now asserts a defect as a measurement.',
+      table.slice(0, table.indexOf("\n")),
+      "docs/05-roadmap.md § H-ACCESS-1 no longer marks its coverage table as withdrawn, but the " +
+        "rows under it are the ones DECISIONS.md § D256 withdrew. Either the table was refreshed " +
+        "from a current run — in which case check it against derivedCoverageForms() instead — or " +
+        "the withdrawal was dropped and the document now asserts a defect as a measurement.",
     ).toMatch(/WITHDRAWN/u);
 
     const rows = table
-      .split('\n')
-      .filter((line) => line.startsWith('| `'))
+      .split("\n")
+      .filter((line) => line.startsWith("| `"))
       .map(normalizeRow);
 
-    expect(rows.length, 'no arm rows parsed — the table moved and this guard stopped looking').toBe(
-      3,
-    );
+    expect(
+      rows.length,
+      "no arm rows parsed — the table moved and this guard stopped looking",
+    ).toBe(3);
 
     const undeclared = rows.filter((row) => !withdrawn.has(row));
     expect(
       undeclared,
-      'a coverage row in docs/05-roadmap.md that benchmark/accessControl.ts’s WITHDRAWN_COVERAGE ' +
-        'cannot render. The table is a historical record of what H-ACCESS-1 reported before ' +
-        'DECISIONS.md § D254; a row that is in neither vocabulary is a transcription nobody can ' +
-        'reproduce — which is exactly how 51.7 % survived the C35 fix.',
+      "a coverage row in docs/05-roadmap.md that benchmark/accessControl.ts’s WITHDRAWN_COVERAGE " +
+        "cannot render. The table is a historical record of what H-ACCESS-1 reported before " +
+        "DECISIONS.md § D254; a row that is in neither vocabulary is a transcription nobody can " +
+        "reproduce — which is exactly how 51.7 % survived the C35 fix.",
     ).toEqual([]);
 
     /*
@@ -1044,10 +1166,11 @@ describe('docs/05-roadmap.md § H-ACCESS-1 — the withdrawn coverage table is t
      * withdrawn figure from a current one. (The credential row withdrew as all-zeros, which is
      * still how Midtown's live row renders, so it is deliberately not required to be disjoint.)
      */
-    const moved = rows.filter((row) => row.startsWith('0 of 30'));
-    expect(moved.length, 'neither withdrawn row parsed, so the check below is checking nothing').toBe(
-      2,
-    );
+    const moved = rows.filter((row) => row.startsWith("0 of 30"));
+    expect(
+      moved.length,
+      "neither withdrawn row parsed, so the check below is checking nothing",
+    ).toBe(2);
     for (const row of moved) {
       expect(
         live.has(row),
@@ -1114,15 +1237,18 @@ describe('docs/05-roadmap.md § H-ACCESS-1 — the withdrawn coverage table is t
  * fails on the measurement. One direction alone lets the other drift silently — which is how the
  * table got here.
  */
-describe('docs/22-charter.md § 4 — the instrument table is derived, not remembered', () => {
-  const charter = (): string => read('docs', '22-charter.md');
+describe("docs/22-charter.md § 4 — the instrument table is derived, not remembered", () => {
+  const charter = (): string => read("docs", "22-charter.md");
 
   /** The § 4 table only, so a phrase elsewhere in the charter cannot satisfy a cell. */
   const instrumentTable = (): string => {
     const source = charter();
-    const start = source.indexOf('### Which of these can be evaluated today');
-    expect(start, 'the § 4 instrument table has been renamed or removed').toBeGreaterThan(0);
-    const end = source.indexOf('\n### ', start + 1);
+    const start = source.indexOf("### Which of these can be evaluated today");
+    expect(
+      start,
+      "the § 4 instrument table has been renamed or removed",
+    ).toBeGreaterThan(0);
+    const end = source.indexOf("\n### ", start + 1);
     return source.slice(start, end === -1 ? undefined : end);
   };
 
@@ -1136,11 +1262,11 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
    */
   const code = (source: string): string =>
     source
-      .replace(/\/\*[\s\S]*?\*\//gu, ' ')
-      .replace(/\/\/[^\n]*/gu, ' ')
+      .replace(/\/\*[\s\S]*?\*\//gu, " ")
+      .replace(/\/\/[^\n]*/gu, " ")
       .replace(/'(?:\\.|[^'\\])*'/gu, "''")
       .replace(/"(?:\\.|[^"\\])*"/gu, '""')
-      .replace(/`(?:\\.|[^`\\])*`/gu, '``');
+      .replace(/`(?:\\.|[^`\\])*`/gu, "``");
 
   const sourceFilesUnder = (dir: string): readonly string[] => {
     const found: string[] = [];
@@ -1148,15 +1274,16 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
       for (const entry of readdirSync(at, { withFileTypes: true })) {
         const path = join(at, entry.name);
         if (entry.isDirectory()) {
-          if (entry.name !== 'node_modules' && entry.name !== 'dist') walk(path);
-        } else if (entry.name.endsWith('.ts')) found.push(path);
+          if (entry.name !== "node_modules" && entry.name !== "dist")
+            walk(path);
+        } else if (entry.name.endsWith(".ts")) found.push(path);
       }
     };
     walk(dir);
     return found;
   };
 
-  it('S1–S4 — the instrument exists in code rather than in prose, and the cell says so', () => {
+  it("S1–S4 — the instrument exists in code rather than in prose, and the cell says so", () => {
     /*
      * **Non-test code only, and this exclusion is S1's own lesson arriving one level up.**
      *
@@ -1169,11 +1296,14 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
      * that says *there is no telemetry here* must not read as telemetry — and it matters more in
      * this direction, not less: prose about a subsystem is the cheapest possible way to fake one.
      */
-    const naming = sourceFilesUnder(join(ROOT, 'packages'))
+    const naming = sourceFilesUnder(join(ROOT, "packages"))
       .filter((path) => path.includes(`${sep}src${sep}`))
-      .filter((path) => !path.endsWith('.test.ts') && !path.endsWith('.test-helper.ts'))
-      .filter((path) => /telemetry/iu.test(code(readFileSync(path, 'utf8'))))
-      .map((path) => path.slice(ROOT.length).split(sep).join('/'));
+      .filter(
+        (path) =>
+          !path.endsWith(".test.ts") && !path.endsWith(".test-helper.ts"),
+      )
+      .filter((path) => /telemetry/iu.test(code(readFileSync(path, "utf8"))))
+      .map((path) => path.slice(ROOT.length).split(sep).join("/"));
 
     /*
      * **The four parts of an instrument**, each named by the file that has to hold it. A funnel
@@ -1188,17 +1318,29 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
      * expectation, so this file already builds every `viz` path the same way (see the campaign
      * directory in S5's case). Joining here keeps that check able to see a real import.
      */
-    const path = (...segments: readonly string[]): string => segments.join('/');
+    const path = (...segments: readonly string[]): string => segments.join("/");
     for (const [half, file] of [
-      ['the client that composes the events', path('packages', 'viz', 'src', 'telemetry', 'schema.ts')],
-      ['the client that emits them from the player’s screens', path('packages', 'viz', 'src', 'everyday', 'shell.ts')],
-      ['the schema the route gates on', path('packages', 'server', 'src', 'telemetry', 'schema.ts')],
-      ['the store that holds them', path('packages', 'server', 'src', 'store', 'store.ts')],
+      [
+        "the client that composes the events",
+        path("packages", "viz", "src", "telemetry", "schema.ts"),
+      ],
+      [
+        "the client that emits them from the player’s screens",
+        path("packages", "viz", "src", "everyday", "shell.ts"),
+      ],
+      [
+        "the schema the route gates on",
+        path("packages", "server", "src", "telemetry", "schema.ts"),
+      ],
+      [
+        "the store that holds them",
+        path("packages", "server", "src", "store", "store.ts"),
+      ],
     ] as const) {
       expect(
         naming,
         `S1–S4 claim an instrument and ${half} does not name one in code. Either it moved, or the ` +
-          'charter cell has to move back.',
+          "charter cell has to move back.",
       ).toContain(file);
     }
 
@@ -1212,21 +1354,27 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
      * erase the subject of this one. Comments still go, so a docstring describing a route this
      * server does not serve cannot satisfy it.
      */
-    const api = readFileSync(join(ROOT, 'packages', 'server', 'src', 'http', 'api.ts'), 'utf8').replace(
-      /\/\*[\s\S]*?\*\//gu,
-      ' ',
-    );
+    const api = readFileSync(
+      join(ROOT, "packages", "server", "src", "http", "api.ts"),
+      "utf8",
+    ).replace(/\/\*[\s\S]*?\*\//gu, " ");
     /*
      * Quoted whole, both of them. `/POST \/api\/telemetry/` alone is satisfied by the *forget*
      * route, so a tree that had lost ingest and kept deletion would pass — which this case caught
      * when its own positive control removed the ingest route and nothing went red.
      */
-    expect(api, 'no ingest route').toMatch(/'POST \/api\/telemetry'/u);
-    expect(api, 'no deletion route beside it — `docs/26` § 3.3’s second request').toMatch(
-      /'POST \/api\/telemetry\/forget'/u,
+    expect(api, "no ingest route").toMatch(/'POST \/api\/telemetry'/u);
+    expect(
+      api,
+      "no deletion route beside it — `docs/26` § 3.3’s second request",
+    ).toMatch(/'POST \/api\/telemetry\/forget'/u);
+    const store = readFileSync(
+      join(ROOT, "packages", "server", "src", "store", "store.ts"),
+      "utf8",
     );
-    const store = readFileSync(join(ROOT, 'packages', 'server', 'src', 'store', 'store.ts'), 'utf8');
-    expect(store, 'no table to hold an event').toMatch(/CREATE TABLE IF NOT EXISTS telemetry_events/u);
+    expect(store, "no table to hold an event").toMatch(
+      /CREATE TABLE IF NOT EXISTS telemetry_events/u,
+    );
 
     // The other direction: the cell must be making the claim this case pins, and must not have
     // quietly kept the retired one beside it.
@@ -1248,8 +1396,10 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
      * Fixed by matching the **retired sentence's own words**, anchored on the S1 row rather than on
      * the string, so the assertion is about the cell that would carry it.
      */
-    const s1Row = /^\|\s*S1\s*\|[^\n]*$/mu.exec(table)?.[0] ?? '';
-    expect(s1Row, 'the S1 row is no longer in the table this reads').not.toBe('');
+    const s1Row = /^\|\s*S1\s*\|[^\n]*$/mu.exec(table)?.[0] ?? "";
+    expect(s1Row, "the S1 row is no longer in the table this reads").not.toBe(
+      "",
+    );
 
     /*
      * **Asserted-not-quoted, which is the third time this tree has needed that distinction today.**
@@ -1259,15 +1409,15 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
      * words refuses it. So the words are stripped of every retraction quotation first, and what is
      * left is the cell speaking in its own voice.
      */
-    const asserted = s1Row.replace(/\*"[^"]*"\*/gu, '');
+    const asserted = s1Row.replace(/\*"[^"]*"\*/gu, "");
     expect(
       asserted,
-      'the charter still asserts the sentence this instrument retired, outside a quotation. A cell ' +
-        'that claims both is the stale refusal `CLAUDE.md` calls the more dangerous half.',
+      "the charter still asserts the sentence this instrument retired, outside a quotation. A cell " +
+        "that claims both is the stale refusal `CLAUDE.md` calls the more dangerous half.",
     ).not.toMatch(/there is no funnel/iu);
   });
 
-  it('S1–S4 — telemetry is this product\u2019s own, and no third-party analytics module exists', () => {
+  it("S1–S4 — telemetry is this product\u2019s own, and no third-party analytics module exists", () => {
     /*
      * **A property the tree lost when this guard changed subject, restored deliberately.**
      *
@@ -1290,35 +1440,44 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
      * shape a vendor module actually takes — sailed through it. A guard against a naming decision
      * has to match the names that decision produces.
      */
-    const named = sourceFilesUnder(join(ROOT, 'packages'))
+    const named = sourceFilesUnder(join(ROOT, "packages"))
       .filter((path) => path.includes(`${sep}src${sep}`))
-      .filter((path) => !path.endsWith('.test.ts') && !path.endsWith('.test-helper.ts'))
-      .filter((path) => /analytics/iu.test(code(readFileSync(path, 'utf8'))))
-      .map((path) => path.slice(ROOT.length).split(sep).join('/'));
+      .filter(
+        (path) =>
+          !path.endsWith(".test.ts") && !path.endsWith(".test-helper.ts"),
+      )
+      .filter((path) => /analytics/iu.test(code(readFileSync(path, "utf8"))))
+      .map((path) => path.slice(ROOT.length).split(sep).join("/"));
 
     /* Non-vacuity: the enumeration must actually reach files, or this asserts nothing. */
-    expect(sourceFilesUnder(join(ROOT, 'packages')).length).toBeGreaterThan(100);
+    expect(sourceFilesUnder(join(ROOT, "packages")).length).toBeGreaterThan(
+      100,
+    );
 
     expect(
       named,
-      'a source file names `analytics` in code rather than in prose. Telemetry here is this ' +
-        'product\u2019s own, posted to its own API under `docs/26` \u00a7 8\u2019s two routes; a ' +
-        'vendor module would be a decision nobody has recorded.',
+      "a source file names `analytics` in code rather than in prose. Telemetry here is this " +
+        "product\u2019s own, posted to its own API under `docs/26` \u00a7 8\u2019s two routes; a " +
+        "vendor module would be a decision nobody has recorded.",
     ).toEqual([]);
   });
 
-  it('S1–S4 — positive control: the scan reads code and not prose', () => {
+  it("S1–S4 — positive control: the scan reads code and not prose", () => {
     /*
      * Both strippers, driven. Without this the case above passes on a scan that matches anything:
      * a comment naming telemetry would satisfy it, and *a comment naming telemetry* is precisely
      * what the two `api.ts` hits were before #340 — the word used to deny the thing.
      */
-    expect(code('/* telemetry lives here one day */\nexport const x = 1;\n')).not.toMatch(/telemetry/u);
-    expect(code("export const note = 'telemetry';\n")).not.toMatch(/telemetry/u);
-    expect(code('export const telemetryPort = 1;\n')).toMatch(/telemetry/u);
+    expect(
+      code("/* telemetry lives here one day */\nexport const x = 1;\n"),
+    ).not.toMatch(/telemetry/u);
+    expect(code("export const note = 'telemetry';\n")).not.toMatch(
+      /telemetry/u,
+    );
+    expect(code("export const telemetryPort = 1;\n")).toMatch(/telemetry/u);
   });
 
-  it('S1–S4 — an instrument is not a measurement, and the cell may not say it is', () => {
+  it("S1–S4 — an instrument is not a measurement, and the cell may not say it is", () => {
     /*
      * The one upgrade this table is most likely to make by accident. § 4's rule runs one way —
      * *no criterion may be reported as met before its instrument exists* — and the converse is the
@@ -1326,12 +1485,18 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
      * measured. S8 is the only row entitled to say *met*, and it says why in its own cell.
      */
     const table = instrumentTable();
-    for (const criterion of ['S1', 'S2', 'S3', 'S4'] as const) {
-      const row = new RegExp(`^\\| ${criterion} \\|([^\n]*)$`, 'mu').exec(table)?.[1] ?? '';
-      expect(row, `${criterion} has no row in the form this case reads`).not.toBe('');
-      expect(row, `${criterion} reports itself met; it is instrumented and unevaluated`).not.toMatch(
-        /currently met|and met\b/u,
-      );
+    for (const criterion of ["S1", "S2", "S3", "S4"] as const) {
+      const row =
+        new RegExp(`^\\| ${criterion} \\|([^\n]*)$`, "mu").exec(table)?.[1] ??
+        "";
+      expect(
+        row,
+        `${criterion} has no row in the form this case reads`,
+      ).not.toBe("");
+      expect(
+        row,
+        `${criterion} reports itself met; it is instrumented and unevaluated`,
+      ).not.toMatch(/currently met|and met\b/u);
       /*
        * **`unevaluated` or something weaker, and the weaker case is why this reads an alternation.**
        *
@@ -1348,19 +1513,25 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
       expect(
         row,
         `${criterion} states no standing — a cell must say unevaluated, or say plainly what less ` +
-          'than that it is claiming',
+          "than that it is claiming",
       ).toMatch(/unevaluated|partly|not instrumented|cannot close/iu);
     }
   });
 
-  it('S5 — the stage count the cell publishes is the stage count the campaign ships', () => {
-    const campaign = JSON.parse(read('data', 'campaign.json')) as { stages: readonly unknown[] };
+  it("S5 — the stage count the cell publishes is the stage count the campaign ships", () => {
+    const campaign = JSON.parse(read("data", "campaign.json")) as {
+      stages: readonly unknown[];
+    };
     const table = instrumentTable();
     const claimed = /`data\/campaign\.json` ships \*\*(\d+)\*\*/u.exec(table);
-    expect(claimed, 'S5 no longer publishes a stage count in the form this case reads').not.toBeNull();
-    expect(Number(claimed?.[1]), 'S5 publishes a stage count the campaign does not ship').toBe(
-      campaign.stages.length,
-    );
+    expect(
+      claimed,
+      "S5 no longer publishes a stage count in the form this case reads",
+    ).not.toBeNull();
+    expect(
+      Number(claimed?.[1]),
+      "S5 publishes a stage count the campaign does not ship",
+    ).toBe(campaign.stages.length);
 
     /*
      * And the stages the paired sweep actually plays, by name. The cell used to say "4, 5 and 6
@@ -1376,32 +1547,39 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
      * `stageFiveClears.test.ts`, the second holding the sweep on its own for cost) and both carry
      * the title.
      */
-    const campaignDir = join(ROOT, 'packages', 'viz', 'src', 'campaign');
+    const campaignDir = join(ROOT, "packages", "viz", "src", "campaign");
     const played = [
       ...new Set(
         readdirSync(campaignDir)
-          .filter((file) => file.endsWith('.test.ts'))
+          .filter((file) => file.endsWith(".test.ts"))
           .flatMap((file) =>
             [
-              ...read('packages', 'viz', 'src', 'campaign', file).matchAll(
+              ...read("packages", "viz", "src", "campaign", file).matchAll(
                 /describe\('stage (\d+), played/gu,
               ),
             ].map((match) => Number(match[1])),
           ),
       ),
     ];
-    expect(played.length, 'no played-stage suites parsed, so this case is checking nothing')
-      .toBeGreaterThan(0);
+    expect(
+      played.length,
+      "no played-stage suites parsed, so this case is checking nothing",
+    ).toBeGreaterThan(0);
     const listed = /plays stages \*\*([\d, and]+)\*\* by name/u.exec(table);
-    expect(listed, 'S5 no longer lists the stages it plays in the form this case reads').not.toBeNull();
-    const inCell = (listed?.[1] ?? '').match(/\d+/gu)?.map(Number) ?? [];
-    expect([...inCell].sort((a, b) => a - b)).toEqual([...played].sort((a, b) => a - b));
+    expect(
+      listed,
+      "S5 no longer lists the stages it plays in the form this case reads",
+    ).not.toBeNull();
+    const inCell = (listed?.[1] ?? "").match(/\d+/gu)?.map(Number) ?? [];
+    expect([...inCell].sort((a, b) => a - b)).toEqual(
+      [...played].sort((a, b) => a - b),
+    );
   });
 
-  it('S6 — the playtest programme exists, and the cell says only that', () => {
+  it("S6 — the playtest programme exists, and the cell says only that", () => {
     expect(
-      readdirSync(DOCS).includes('30-playtest-programme.md'),
-      'S6 claims the playtest programme exists',
+      readdirSync(DOCS).includes("30-playtest-programme.md"),
+      "S6 claims the playtest programme exists",
     ).toBe(true);
     const table = instrumentTable();
     expect(table).toMatch(/30-playtest-programme\.md.*\*\*exists\*\*/u);
@@ -1409,21 +1587,26 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
     expect(table).toMatch(/the recruited cohort does not/u);
   });
 
-  it('S9 — the workflows the cell names are the workflows on disk, and none is a load budget', () => {
-    const workflows = readdirSync(join(ROOT, '.github', 'workflows')).sort();
+  it("S9 — the workflows the cell names are the workflows on disk, and none is a load budget", () => {
+    const workflows = readdirSync(join(ROOT, ".github", "workflows")).sort();
     const table = instrumentTable();
     for (const file of workflows) {
-      expect(table, `.github/workflows/${file} exists and S9 does not name it`).toContain(file);
+      expect(
+        table,
+        `.github/workflows/${file} exists and S9 does not name it`,
+      ).toContain(file);
     }
     const budgets = workflows.filter((file) =>
-      /budget|lighthouse|cold.?load/iu.test(readFileSync(join(ROOT, '.github', 'workflows', file), 'utf8')),
+      /budget|lighthouse|cold.?load/iu.test(
+        readFileSync(join(ROOT, ".github", "workflows", file), "utf8"),
+      ),
     );
-    expect(budgets, 'S9 says there is no load budget in CI').toEqual([]);
+    expect(budgets, "S9 says there is no load budget in CI").toEqual([]);
   });
 
-  it('S10 — the journey-row tally is the tally TEST_MATRIX.md holds', () => {
-    const matrix = read('TEST_MATRIX.md');
-    const rows = matrix.split('\n').filter((line) => /^\| T\d+ \|/u.test(line));
+  it("S10 — the journey-row tally is the tally TEST_MATRIX.md holds", () => {
+    const matrix = read("TEST_MATRIX.md");
+    const rows = matrix.split("\n").filter((line) => /^\| T\d+ \|/u.test(line));
     const tally = (status: string): number =>
       rows.filter((row) => row.includes(`**${status}**`)).length;
 
@@ -1433,32 +1616,54 @@ describe('docs/22-charter.md § 4 — the instrument table is derived, not remem
      * the issue reporting all this made in its own first measurement.
      */
     const table = instrumentTable();
-    const published = /\*\*(\d+)\*\* journey rows[\s\S]*?\*\*(\d+)\*\* `passing`[\s\S]*?\*\*(\d+)\*\* `owned`[\s\S]*?\*\*(\d+)\*\* `planned`/u.exec(
-      table,
-    );
-    expect(published, 'S10 no longer publishes its tally in the form this case reads').not.toBeNull();
+    const published =
+      /\*\*(\d+)\*\* journey rows[\s\S]*?\*\*(\d+)\*\* `passing`[\s\S]*?\*\*(\d+)\*\* `owned`[\s\S]*?\*\*(\d+)\*\* `planned`/u.exec(
+        table,
+      );
+    expect(
+      published,
+      "S10 no longer publishes its tally in the form this case reads",
+    ).not.toBeNull();
     const [, total, passing, owned, planned] = (published ?? []).map(Number);
 
-    expect(rows.length, 'S10 publishes a journey-row count TEST_MATRIX.md does not hold').toBe(total);
-    expect(tally('passing'), 'S10 publishes a passing count TEST_MATRIX.md does not hold').toBe(passing);
-    expect(tally('owned'), 'S10 publishes an owned count TEST_MATRIX.md does not hold').toBe(owned);
-    expect(tally('planned'), 'S10 publishes a planned count TEST_MATRIX.md does not hold').toBe(planned);
+    expect(
+      rows.length,
+      "S10 publishes a journey-row count TEST_MATRIX.md does not hold",
+    ).toBe(total);
+    expect(
+      tally("passing"),
+      "S10 publishes a passing count TEST_MATRIX.md does not hold",
+    ).toBe(passing);
+    expect(
+      tally("owned"),
+      "S10 publishes an owned count TEST_MATRIX.md does not hold",
+    ).toBe(owned);
+    expect(
+      tally("planned"),
+      "S10 publishes a planned count TEST_MATRIX.md does not hold",
+    ).toBe(planned);
   });
 
-  it('gives every cell its own date, because one stamp for ten measurements is what failed', () => {
+  it("gives every cell its own date, because one stamp for ten measurements is what failed", () => {
     const table = instrumentTable();
-    const dated = [...table.matchAll(/^\| S\d+ \| [^|]+\| (\d{4}-\d{2}-\d{2}) \|/gmu)];
-    expect(dated.length, 'the § 4 table has stopped carrying a date per cell').toBe(10);
+    const dated = [
+      ...table.matchAll(/^\| S\d+ \| [^|]+\| (\d{4}-\d{2}-\d{2}) \|/gmu),
+    ];
+    expect(
+      dated.length,
+      "the § 4 table has stopped carrying a date per cell",
+    ).toBe(10);
     /*
      * Quoted occurrences do not count. The paragraph above the table *quotes* the retired stamp to
      * explain why it is retired, and a check that could not tell a quotation from a claim would
      * make that explanation unwritable — which is the same defect as a register that cannot record
      * its own deletions.
      */
-    const unquoted = table.replace(/\*"[^"]*"\*/gu, ' ');
-    expect(unquoted, 'the table has gone back to one stamp for all ten cells').not.toMatch(
-      /Verified on this tree,\s*\d{4}-\d{2}-\d{2}/u,
-    );
+    const unquoted = table.replace(/\*"[^"]*"\*/gu, " ");
+    expect(
+      unquoted,
+      "the table has gone back to one stamp for all ten cells",
+    ).not.toMatch(/Verified on this tree,\s*\d{4}-\d{2}-\d{2}/u);
   });
 });
 
@@ -1501,17 +1706,23 @@ const DECISION_HEADING = /^## D(\d+) —/gmu;
  * `dist-web/` is excluded by name as well as by `dist` — it is Vite's output directory and carries
  * a copy of the bundled sources, which would double every count taken through here.
  */
-const SKIP_DIRS = new Set(['node_modules', 'dist', 'dist-web', '.git', 'coverage']);
+const SKIP_DIRS = new Set([
+  "node_modules",
+  "dist",
+  "dist-web",
+  ".git",
+  "coverage",
+]);
 
 const filesUnder = (dir: string): readonly string[] => {
   const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name.startsWith('.') && entry.name !== '.github') continue;
+    if (entry.name.startsWith(".") && entry.name !== ".github") continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
       out.push(...filesUnder(full));
-    } else if (entry.name.endsWith('.ts') || entry.name.endsWith('.md')) {
+    } else if (entry.name.endsWith(".ts") || entry.name.endsWith(".md")) {
       out.push(full);
     }
   }
@@ -1520,7 +1731,9 @@ const filesUnder = (dir: string): readonly string[] => {
 
 /** Every number that heads a decision, in file order, including any repeat. */
 const decisionNumbers = (): readonly number[] =>
-  [...read('DECISIONS.md').matchAll(DECISION_HEADING)].map((match) => Number(match[1]));
+  [...read("DECISIONS.md").matchAll(DECISION_HEADING)].map((match) =>
+    Number(match[1]),
+  );
 
 /**
  * Empty, and it is kept empty rather than deleted.
@@ -1742,7 +1955,54 @@ type DecisionReservation = {
  * because it is tidier, but because the alternative is every lane inventing bookkeeping the
  * integrator then has to throw away.
  */
+/**
+ * **Wave AB reserved D594–D620 and closed 2026-09-15 with thirteen of twenty-seven spent.** The
+ * block, as dispatched: D594–D600 lane A (GitHub issues #426, #427, #428 — three more reference
+ * towers, serial because they share eight registries), D601–D605 lane B (#429, shafts costing
+ * floor area), D606–D610 lane C (#372, the rush's per-wave purse), D611–D615 lane D (#234, the
+ * campaign rebalance), and D616–D620 the integrator's.
+ *
+ * **Spent:** D594–D600 (lane A, all seven — D594–D599 on the towers and D600 on two authored
+ * speeds moved onto their machine class's ladder, a defect the towers' own commissioning check
+ * found afterwards), D601 (lane B), D606 (lane C), D611–D614 (lane D).
+ *
+ * **D602–D605 and D607–D610 are holes**, registered above: each sits under a higher number a
+ * sibling lane went on to write, which is the test this file applies. **D615–D620 are free rather
+ * than holes**, because nothing above them was ever written — lane D returned its last number and
+ * the integrator's tail went unspent — so the charter row reconciles to D615 on this same commit
+ * rather than pointing past a gap.
+ *
+ * **Every one of the four lanes opened this reservation itself before the integrator's block
+ * reached it, and all four were right to.** Each branched from `e53f28b`, where this constant was
+ * `null`, so the first number any lane wrote turned the charter-row gate red on the ceiling rather
+ * than on anything the lane had done. Lane B opened it at D605, lane C at D610, lane D at D615 and
+ * lane A closed it outright on spending its last number — four different ceilings, each correct
+ * from where it stood and none correct here. That is wave Z's finding arriving for the second
+ * time, now with a full house rather than two of five, and it is the argument for the block being
+ * opened before the lanes start rather than a preference for tidiness.
+ */
 const OPEN_RESERVATION = null as DecisionReservation | null;
+/*
+ * **Wave AB opened this as `{ wave: 'AB', from: 594, to: 600 }` and lane A closed it, having spent
+ * every number in it.** The dispatch brief allocated lane A **D594–D600** and no others; wave AA's
+ * charter row says that range was the whole of what wave AA left free, so the block was the lane's
+ * and the wave's at once and there is nothing to widen it to.
+ *
+ * **Why it is `null` rather than left open, and the caveat the integrator needs.** The guard below
+ * refuses a reservation with no unfinished numbers in it, and it names the remedy in terms: set
+ * this to `null` and reconcile the charter row on the same commit. Lane A spent D594–D599 on the
+ * three towers and then **D600** on a defect the towers' own commissioning check found after the
+ * fact — two authored speeds off their machine class's ladder — which is [§ D405](../../../../DECISIONS.md)'s
+ * second ground and could not be left to a docstring, because it moves figures in three decisions
+ * this same wave had already recorded.
+ *
+ * **Lane D was still open when this landed, and that is deliberately not papered over.** A sibling
+ * lane holds D601 upward. Nulling this does not claim otherwise: with no reservation the guard
+ * asserts `row === highest + 1` on *every* commit, so the first number lane D writes turns it red
+ * until lane D moves the row with it. That is the guard working rather than a collision — the
+ * alternative was inventing a ceiling for a block this lane was never told, which is exactly the
+ * bookkeeping the comment above concludes lanes should stop inventing.
+ */
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
@@ -1838,6 +2098,54 @@ const OPEN_RESERVATION = null as DecisionReservation | null;
 
 const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [
+    602,
+    "wave AB's lane B returned it unspent, and lanes C and D then wrote a higher" +
+      " number, which makes it a hole rather than free. Registered under D404 and D430:" +
+      " ids here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
+    603,
+    "wave AB's lane B returned it unspent, and lanes C and D then wrote a higher" +
+      " number, which makes it a hole rather than free. Registered under D404 and D430:" +
+      " ids here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
+    604,
+    "wave AB's lane B returned it unspent, and lanes C and D then wrote a higher" +
+      " number, which makes it a hole rather than free. Registered under D404 and D430:" +
+      " ids here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
+    605,
+    "wave AB's lane B returned it unspent, and lanes C and D then wrote a higher" +
+      " number, which makes it a hole rather than free. Registered under D404 and D430:" +
+      " ids here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
+    607,
+    "wave AB's lane C returned it unspent, and lane D then wrote a higher" +
+      " number, which makes it a hole rather than free. Registered under D404 and D430:" +
+      " ids here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
+    608,
+    "wave AB's lane C returned it unspent, and lane D then wrote a higher" +
+      " number, which makes it a hole rather than free. Registered under D404 and D430:" +
+      " ids here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
+    609,
+    "wave AB's lane C returned it unspent, and lane D then wrote a higher" +
+      " number, which makes it a hole rather than free. Registered under D404 and D430:" +
+      " ids here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
+    610,
+    "wave AB's lane C returned it unspent, and lane D then wrote a higher" +
+      " number, which makes it a hole rather than free. Registered under D404 and D430:" +
+      " ids here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
     584,
     "wave AA's lane returned it unspent, and a sibling lane then wrote a higher num" +
       "ber, which makes it a hole rather than free. Registered under D404 and D430: ids" +
@@ -1893,131 +2201,155 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   ],
   [
     534,
-    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
-      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
-      's what that lane took, and reissuing it would make it denote two things across time.',
+    "the wave of 2026-09-10 held it and never wrote it. Registered rather than b" +
+      "ackfilled under § D404 and § D430: ids here are names, so the number denote" +
+      "s what that lane took, and reissuing it would make it denote two things across time.",
   ],
   [
     536,
-    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
-      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
-      's what that lane took, and reissuing it would make it denote two things across time.',
+    "the wave of 2026-09-10 held it and never wrote it. Registered rather than b" +
+      "ackfilled under § D404 and § D430: ids here are names, so the number denote" +
+      "s what that lane took, and reissuing it would make it denote two things across time.",
   ],
   [
     540,
-    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
-      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
-      's what that lane took, and reissuing it would make it denote two things across time.',
+    "the wave of 2026-09-10 held it and never wrote it. Registered rather than b" +
+      "ackfilled under § D404 and § D430: ids here are names, so the number denote" +
+      "s what that lane took, and reissuing it would make it denote two things across time.",
   ],
   [
     541,
-    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
-      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
-      's what that lane took, and reissuing it would make it denote two things across time.',
+    "the wave of 2026-09-10 held it and never wrote it. Registered rather than b" +
+      "ackfilled under § D404 and § D430: ids here are names, so the number denote" +
+      "s what that lane took, and reissuing it would make it denote two things across time.",
   ],
   [
     544,
-    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
-      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
-      's what that lane took, and reissuing it would make it denote two things across time.',
+    "the wave of 2026-09-10 held it and never wrote it. Registered rather than b" +
+      "ackfilled under § D404 and § D430: ids here are names, so the number denote" +
+      "s what that lane took, and reissuing it would make it denote two things across time.",
   ],
   [
     546,
-    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
-      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
-      's what that lane took, and reissuing it would make it denote two things across time.',
+    "the wave of 2026-09-10 held it and never wrote it. Registered rather than b" +
+      "ackfilled under § D404 and § D430: ids here are names, so the number denote" +
+      "s what that lane took, and reissuing it would make it denote two things across time.",
   ],
   [
     550,
-    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
-      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
-      's what that lane took, and reissuing it would make it denote two things across time.',
+    "the wave of 2026-09-10 held it and never wrote it. Registered rather than b" +
+      "ackfilled under § D404 and § D430: ids here are names, so the number denote" +
+      "s what that lane took, and reissuing it would make it denote two things across time.",
   ],
   [
     551,
-    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
-      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
-      's what that lane took, and reissuing it would make it denote two things across time.',
+    "the wave of 2026-09-10 held it and never wrote it. Registered rather than b" +
+      "ackfilled under § D404 and § D430: ids here are names, so the number denote" +
+      "s what that lane took, and reissuing it would make it denote two things across time.",
   ],
   [
     554,
-    'the wave of 2026-09-10 held it and never wrote it. Registered rather than b' +
-      'ackfilled under § D404 and § D430: ids here are names, so the number denote' +
-      's what that lane took, and reissuing it would make it denote two things across time.',
+    "the wave of 2026-09-10 held it and never wrote it. Registered rather than b" +
+      "ackfilled under § D404 and § D430: ids here are names, so the number denote" +
+      "s what that lane took, and reissuing it would make it denote two things across time.",
   ],
-  [44, 'used by a per-lane record folded in without remapping — DECISIONS.md’s preamble'],
-  [55, 'used by a per-lane record folded in without remapping — DECISIONS.md’s preamble'],
-  [78, 'the T20-era per-lane records’ own numbering, never remapped on the fold'],
-  [79, 'the T20-era per-lane records’ own numbering, never remapped on the fold'],
-  [80, 'the T20-era per-lane records’ own numbering, never remapped on the fold'],
-  [81, 'the T20-era per-lane records’ own numbering, never remapped on the fold'],
-  [82, 'the T20-era per-lane records’ own numbering, never remapped on the fold'],
+  [
+    44,
+    "used by a per-lane record folded in without remapping — DECISIONS.md’s preamble",
+  ],
+  [
+    55,
+    "used by a per-lane record folded in without remapping — DECISIONS.md’s preamble",
+  ],
+  [
+    78,
+    "the T20-era per-lane records’ own numbering, never remapped on the fold",
+  ],
+  [
+    79,
+    "the T20-era per-lane records’ own numbering, never remapped on the fold",
+  ],
+  [
+    80,
+    "the T20-era per-lane records’ own numbering, never remapped on the fold",
+  ],
+  [
+    81,
+    "the T20-era per-lane records’ own numbering, never remapped on the fold",
+  ],
+  [
+    82,
+    "the T20-era per-lane records’ own numbering, never remapped on the fold",
+  ],
   [
     83,
-    'the T20-era per-lane records’ own numbering; two core/src/metrics docstrings cited it as a ' +
-      'section of this file until 2026-08-29, and are retargeted at § T21-D1 and § T21-D2',
+    "the T20-era per-lane records’ own numbering; two core/src/metrics docstrings cited it as a " +
+      "section of this file until 2026-08-29, and are retargeted at § T21-D1 and § T21-D2",
   ],
-  [84, 'the T20-era per-lane records’ own numbering, never remapped on the fold'],
+  [
+    84,
+    "the T20-era per-lane records’ own numbering, never remapped on the fold",
+  ],
   [
     387,
-    'allocated to wave F in the block D386–D392 and never written. Left unused permanently under ' +
-      '§ D404: ids are names here, so backfilling it would make it denote two things across time ' +
-      'and would falsify the charter’s record of what wave F took.',
+    "allocated to wave F in the block D386–D392 and never written. Left unused permanently under " +
+      "§ D404: ids are names here, so backfilling it would make it denote two things across time " +
+      "and would falsify the charter’s record of what wave F took.",
   ],
   [
     428,
-    'wave I allocated it to lane E, which folded its second subject into § D427 as paragraphs rather than ' +
-      'splitting it, and reported the number unspent. Registered rather than backfilled because ids here are ' +
-      'names (§ D430). It sits inside wave I’s block and not at its top: § D429 and § D430 close the block, ' +
-      'so the charter row names D431 and points at no hole.',
+    "wave I allocated it to lane E, which folded its second subject into § D427 as paragraphs rather than " +
+      "splitting it, and reported the number unspent. Registered rather than backfilled because ids here are " +
+      "names (§ D430). It sits inside wave I’s block and not at its top: § D429 and § D430 close the block, " +
+      "so the charter row names D431 and points at no hole.",
   ],
   [
     438,
-    'wave J allocated it to lane D, which folded its second subject — the sixteen-tier fit-out survey, ' +
-      'the two cells not drivable at this corpus’s seams, and the deep-tier inert cells — into § D437 as ' +
-      'paragraphs rather than splitting it, and reported the number unspent. Registered rather than ' +
-      'backfilled because ids here are names (§ D430), and this is the second consecutive wave in which a ' +
-      'lane’s second number went unspent for the same reason: a survey is one decision however many cells ' +
-      'it measures. It sits inside wave J’s block and not at its top — § D441 and § D442 close the block, ' +
-      'so the charter row names D443 and points at no hole.',
+    "wave J allocated it to lane D, which folded its second subject — the sixteen-tier fit-out survey, " +
+      "the two cells not drivable at this corpus’s seams, and the deep-tier inert cells — into § D437 as " +
+      "paragraphs rather than splitting it, and reported the number unspent. Registered rather than " +
+      "backfilled because ids here are names (§ D430), and this is the second consecutive wave in which a " +
+      "lane’s second number went unspent for the same reason: a survey is one decision however many cells " +
+      "it measures. It sits inside wave J’s block and not at its top — § D441 and § D442 close the block, " +
+      "so the charter row names D443 and points at no hole.",
   ],
   [
     450,
-    'wave K allocated it to lane D, which spent § D449 on GitHub issue #165 whole — the three surfaces ' +
-      'moved off the painting thread, the measurement that corrected their stated costs, and the two ' +
-      'consequences that reach past them (`runFixitPair` deleted, `checkedRun` split) — and reported the ' +
-      'number unspent. Registered rather than backfilled because ids here are names (§ D430). This is the ' +
-      'third consecutive wave a lane has returned its second number, and the reason is the same each time: ' +
-      'one issue closed end to end is one decision however many modules it touches. It sits inside wave ' +
-      'K’s block and not at its top, which § D430’s other half requires.',
+    "wave K allocated it to lane D, which spent § D449 on GitHub issue #165 whole — the three surfaces " +
+      "moved off the painting thread, the measurement that corrected their stated costs, and the two " +
+      "consequences that reach past them (`runFixitPair` deleted, `checkedRun` split) — and reported the " +
+      "number unspent. Registered rather than backfilled because ids here are names (§ D430). This is the " +
+      "third consecutive wave a lane has returned its second number, and the reason is the same each time: " +
+      "one issue closed end to end is one decision however many modules it touches. It sits inside wave " +
+      "K’s block and not at its top, which § D430’s other half requires.",
   ],
   [
     444,
-    'wave K allocated it to lane A, which spent § D443 on GitHub issues #167 and #228 together — the ' +
-      'batch library seam, the five surfaces it reaches, and the cell the leg-level proof is measured ' +
-      'at — and reported the number unspent. Two issues closed through one seam is still one decision.',
+    "wave K allocated it to lane A, which spent § D443 on GitHub issues #167 and #228 together — the " +
+      "batch library seam, the five surfaces it reaches, and the cell the leg-level proof is measured " +
+      "at — and reported the number unspent. Two issues closed through one seam is still one decision.",
   ],
   [
     452,
-    'wave K allocated it to lane E, which spent § D451 on the absence it deleted and re-took, and ' +
-      'recorded the shared-predicate extraction and the `drivingProfile` façade method in their own ' +
-      'docstrings under § D405 rather than taking a second number for them. A decision that reaches no ' +
-      'further than the module taking it does not need an entry here, which is what makes this a hole ' +
-      'rather than an omission.',
+    "wave K allocated it to lane E, which spent § D451 on the absence it deleted and re-took, and " +
+      "recorded the shared-predicate extraction and the `drivingProfile` façade method in their own " +
+      "docstrings under § D405 rather than taking a second number for them. A decision that reaches no " +
+      "further than the module taking it does not need an entry here, which is what makes this a hole " +
+      "rather than an omission.",
   ],
   [
     465,
-    'wave P reserved D464 to D467 for lane A, which spent § D464 on GitHub issue #333 whole: the ' +
-      'versioned register, the runner, and the ruling that a row predating `entries.legs` keeps its rank '  +
-      'and loses its count. It reported three numbers unspent. One issue closed end to end is one '  +
-      'decision, which is the fourth consecutive wave to return a lane’s spare numbers for that reason. '  +
-      'These sit inside wave P’s block and not at its top, because § D468 is written above them, so the '  +
-      'charter row names D469 and points at no hole. Lane C’s D469 to D471 were reserved and never '  +
-      'reached; nothing is written past them, so they are free rather than holed. The integrator '  +
-      'registered all six as holes and named D472, and the case below is what drew the distinction.',
+    "wave P reserved D464 to D467 for lane A, which spent § D464 on GitHub issue #333 whole: the " +
+      "versioned register, the runner, and the ruling that a row predating `entries.legs` keeps its rank " +
+      "and loses its count. It reported three numbers unspent. One issue closed end to end is one " +
+      "decision, which is the fourth consecutive wave to return a lane’s spare numbers for that reason. " +
+      "These sit inside wave P’s block and not at its top, because § D468 is written above them, so the " +
+      "charter row names D469 and points at no hole. Lane C’s D469 to D471 were reserved and never " +
+      "reached; nothing is written past them, so they are free rather than holed. The integrator " +
+      "registered all six as holes and named D472, and the case below is what drew the distinction.",
   ],
-  [466, 'wave P, lane A’s block; unspent for § 465’s reason.'],
-  [467, 'wave P, lane A’s block; unspent for § 465’s reason.'],
+  [466, "wave P, lane A’s block; unspent for § 465’s reason."],
+  [467, "wave P, lane A’s block; unspent for § 465’s reason."],
 ]);
 
 /**
@@ -2064,21 +2396,24 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
  */
 const DECISION_DEBT_CEILING = 4;
 
-describe('the decision-number bookkeeping (GitHub issue #173)', () => {
-  it('keeps the charter’s next-free number correct by derivation, not by transcription', () => {
+describe("the decision-number bookkeeping (GitHub issue #173)", () => {
+  it("keeps the charter’s next-free number correct by derivation, not by transcription", () => {
     const numbers = decisionNumbers();
     // Non-vacuity first: a pattern that stops matching would make every case below pass on an
     // empty set, which is the trap `deadCode.test.ts` and `week.test.ts` both guard against.
-    expect(numbers.length, 'no decision headings were found, so these cases assert nothing').
-      toBeGreaterThan(300);
+    expect(
+      numbers.length,
+      "no decision headings were found, so these cases assert nothing",
+    ).toBeGreaterThan(300);
 
     const highest = Math.max(...numbers);
-    const charter = read('CHARTER_PROGRAMME.md');
-    const declared = /\|\s*Next free decision number\s*\|\s*\*\*D(\d+)\*\*/u.exec(charter);
+    const charter = read("CHARTER_PROGRAMME.md");
+    const declared =
+      /\|\s*Next free decision number\s*\|\s*\*\*D(\d+)\*\*/u.exec(charter);
     expect(
       declared,
-      'CHARTER_PROGRAMME.md no longer states a next free decision number. That row is the one ' +
-        'place a lane can reserve one; without it GitHub issue #173 has no answer at all.',
+      "CHARTER_PROGRAMME.md no longer states a next free decision number. That row is the one " +
+        "place a lane can reserve one; without it GitHub issue #173 has no answer at all.",
     ).not.toBeNull();
 
     const row = Number((declared as RegExpExecArray)[1]);
@@ -2088,7 +2423,7 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
         row,
         `DECISIONS.md's highest decision is D${String(highest)}, so the next free number is ` +
           `D${String(highest + 1)}. The charter says otherwise, and a lane that trusts it will ` +
-          'reuse a number that is taken.',
+          "reuse a number that is taken.",
       ).toBe(highest + 1);
       return;
     }
@@ -2100,14 +2435,14 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
       `wave ${OPEN_RESERVATION.wave} reserved D${String(OPEN_RESERVATION.from)}–` +
         `D${String(OPEN_RESERVATION.to)}, so the charter row should still name the block's floor, ` +
         `D${String(OPEN_RESERVATION.from)}. It names D${String(row)}. Either the row was ` +
-        'reconciled while the wave is still open, or the reservation above is wrong.',
+        "reconciled while the wave is still open, or the reservation above is wrong.",
     ).toBe(OPEN_RESERVATION.from);
 
     expect(
       highest,
       `D${String(highest)} is above wave ${OPEN_RESERVATION.wave}'s reservation, which ends at ` +
         `D${String(OPEN_RESERVATION.to)}. A lane may not take a number its block does not hold — ` +
-        'the next lane holds it, and § D404 says to ask rather than to take.',
+        "the next lane holds it, and § D404 says to ask rather than to take.",
     ).toBeLessThanOrEqual(OPEN_RESERVATION.to);
 
     const numbering = new Set(numbers);
@@ -2118,13 +2453,13 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
     expect(
       unfinished.length,
       `every number in wave ${OPEN_RESERVATION.wave}'s block now heads a decision or is a ` +
-        'registered hole, so the wave’s numbering is finished. Set OPEN_RESERVATION to null and ' +
+        "registered hole, so the wave’s numbering is finished. Set OPEN_RESERVATION to null and " +
         `reconcile the charter row to D${String(highest + 1)} on the same commit — that ` +
-        'reconciliation is what D387 shows nobody remembers when nothing asks for it.',
+        "reconciliation is what D387 shows nobody remembers when nothing asks for it.",
     ).toBeGreaterThan(0);
   });
 
-  it('lets no second decision number head two decisions', () => {
+  it("lets no second decision number head two decisions", () => {
     const numbers = decisionNumbers();
     const seen = new Set<number>();
     const duplicated = new Set<number>();
@@ -2132,16 +2467,18 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
       if (seen.has(n)) duplicated.add(n);
       seen.add(n);
     }
-    const unregistered = [...duplicated].filter((n) => !KNOWN_DUPLICATE_DECISIONS.includes(n));
+    const unregistered = [...duplicated].filter(
+      (n) => !KNOWN_DUPLICATE_DECISIONS.includes(n),
+    );
     expect(
       unregistered,
-      'a decision number heads two decisions, so a `§ Dnnn` citation to it is ambiguous. ' +
-        '`citations.test.ts` asserts such a citation resolves and never that it resolves to one ' +
-        'thing. Do not renumber — ids are names here. Ask first whether one of the two is a ' +
-        'decision at all: D63 was cleared in 2026-09-04 by finding that its first block was a ' +
-        'hand-back note wearing a heading it never earned, and demoting it broke no citation. ' +
-        'Retitling alone does not help, because the number still heads two blocks. Otherwise ' +
-        'register it in KNOWN_DUPLICATE_DECISIONS with the reason.',
+      "a decision number heads two decisions, so a `§ Dnnn` citation to it is ambiguous. " +
+        "`citations.test.ts` asserts such a citation resolves and never that it resolves to one " +
+        "thing. Do not renumber — ids are names here. Ask first whether one of the two is a " +
+        "decision at all: D63 was cleared in 2026-09-04 by finding that its first block was a " +
+        "hand-back note wearing a heading it never earned, and demoting it broke no citation. " +
+        "Retitling alone does not help, because the number still heads two blocks. Otherwise " +
+        "register it in KNOWN_DUPLICATE_DECISIONS with the reason.",
     ).toEqual([]);
 
     // The other direction: a registered duplicate that stopped reproducing must leave the register,
@@ -2150,12 +2487,12 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
       expect(
         duplicated.has(known),
         `D${String(known)} is registered as a duplicate and no longer is one. Delete it from ` +
-          'KNOWN_DUPLICATE_DECISIONS on the commit that fixed it.',
+          "KNOWN_DUPLICATE_DECISIONS on the commit that fixed it.",
       ).toBe(true);
     }
   });
 
-  it('heads a decision with every number up to the highest, or registers why it does not', () => {
+  it("heads a decision with every number up to the highest, or registers why it does not", () => {
     const numbers = decisionNumbers();
     const seen = new Set(numbers);
 
@@ -2174,7 +2511,10 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
      * rather than about the file — and the case above holds the wave accountable for it, by
      * refusing to let the reservation be closed while any of its numbers is unaccounted for.
      */
-    const boundary = OPEN_RESERVATION === null ? Math.max(...numbers) + 1 : OPEN_RESERVATION.from;
+    const boundary =
+      OPEN_RESERVATION === null
+        ? Math.max(...numbers) + 1
+        : OPEN_RESERVATION.from;
 
     const holes: number[] = [];
     for (let n = 1; n < boundary; n += 1) if (!seen.has(n)) holes.push(n);
@@ -2182,13 +2522,13 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
     const unregistered = holes.filter((n) => !KNOWN_DECISION_HOLES.has(n));
     expect(
       unregistered,
-      'a number below the highest heads no decision and is not registered above. Two causes, and ' +
-        'they need opposite responses: a heading that a merge or an edit stopped being a heading ' +
-        '(§ D394 — restore it, and note that every § Dnnn citation to it was dangling meanwhile), ' +
-        'or a number allocated to a lane that never wrote it (D387, written here without a ' +
-        'section sigil because it is a hole — leave it unused and add it ' +
-        'to KNOWN_DECISION_HOLES with that reason, per § D404). Guessing which is which is the ' +
-        'whole job; a bare number in the register hides an eaten heading.',
+      "a number below the highest heads no decision and is not registered above. Two causes, and " +
+        "they need opposite responses: a heading that a merge or an edit stopped being a heading " +
+        "(§ D394 — restore it, and note that every § Dnnn citation to it was dangling meanwhile), " +
+        "or a number allocated to a lane that never wrote it (D387, written here without a " +
+        "section sigil because it is a hole — leave it unused and add it " +
+        "to KNOWN_DECISION_HOLES with that reason, per § D404). Guessing which is which is the " +
+        "whole job; a bare number in the register hides an eaten heading.",
     ).toEqual([]);
 
     // The other direction, on `honesty.test.ts`'s OUTSTANDING rule and the duplicate register's:
@@ -2196,9 +2536,9 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
     const filled = [...KNOWN_DECISION_HOLES.keys()].filter((n) => seen.has(n));
     expect(
       filled,
-      'a number registered above as a hole now heads a decision. Delete it from ' +
-        'KNOWN_DECISION_HOLES on the commit that filled it — but read § D404 first, because ' +
-        'filling one of these deliberately is exactly what that decision forbids.',
+      "a number registered above as a hole now heads a decision. Delete it from " +
+        "KNOWN_DECISION_HOLES on the commit that filled it — but read § D404 first, because " +
+        "filling one of these deliberately is exactly what that decision forbids.",
     ).toEqual([]);
   });
 
@@ -2214,10 +2554,10 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
      */
     const marker = /decision number is owed/gu;
     const scanned = filesUnder(ROOT).filter(
-      (path) => !path.endsWith(join('validation', 'documentation.test.ts')),
+      (path) => !path.endsWith(join("validation", "documentation.test.ts")),
     );
     const owed = scanned
-      .map((path) => (readFileSync(path, 'utf8').match(marker) ?? []).length)
+      .map((path) => (readFileSync(path, "utf8").match(marker) ?? []).length)
       .reduce((total, n) => total + n, 0);
 
     /*
@@ -2239,21 +2579,24 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
      *
      * With both in place, **`owed === 0` is a legitimate green** and means what it says.
      */
-    expect(scanned.length, 'the walk found no files, so this ratchet is scanning nothing')
-      .toBeGreaterThan(500);
-    const control = 'A decision number is owed for the omission pair; the argument lives elsewhere.';
+    expect(
+      scanned.length,
+      "the walk found no files, so this ratchet is scanning nothing",
+    ).toBeGreaterThan(500);
+    const control =
+      "A decision number is owed for the omission pair; the argument lives elsewhere.";
     expect(
       control.match(marker)?.length ?? 0,
-      'the marker pattern no longer matches a real site’s wording, so a tree full of them would ' +
-        'read as zero. This control is one of the sentences that was actually in the tree.',
+      "the marker pattern no longer matches a real site’s wording, so a tree full of them would " +
+        "read as zero. This control is one of the sentences that was actually in the tree.",
     ).toBe(1);
 
     expect(
       owed,
       `${String(owed)} sites carry the owed-decision marker, against a ceiling of ` +
         `${String(DECISION_DEBT_CEILING)}. This is a ratchet: settle one and lower the ceiling on ` +
-        'the same commit. It rose 38 → 64 during a single wave whose merge said every known issue ' +
-        'had burned down, which is why it is a gate rather than a note (GitHub issue #173).',
+        "the same commit. It rose 38 → 64 during a single wave whose merge said every known issue " +
+        "had burned down, which is why it is a gate rather than a note (GitHub issue #173).",
     ).toBeLessThanOrEqual(DECISION_DEBT_CEILING);
   });
 });
@@ -2262,7 +2605,7 @@ describe('the decision-number bookkeeping (GitHub issue #173)', () => {
  * § D526 clause 6 — no purchase anywhere (GitHub issue #368)
  * -------------------------------------------------------------------------- */
 
-describe('DECISIONS.md D526 clause 6 — no purchase, price, store or conversion event ships', () => {
+describe("DECISIONS.md D526 clause 6 — no purchase, price, store or conversion event ships", () => {
   /**
    * TypeScript with comments and string literals removed — the S1 scrubber, and its reason applies
    * here more sharply than it did there.
@@ -2275,11 +2618,11 @@ describe('DECISIONS.md D526 clause 6 — no purchase, price, store or conversion
    */
   const code = (source: string): string =>
     source
-      .replace(/\/\*[\s\S]*?\*\//gu, ' ')
-      .replace(/\/\/[^\n]*/gu, ' ')
+      .replace(/\/\*[\s\S]*?\*\//gu, " ")
+      .replace(/\/\/[^\n]*/gu, " ")
       .replace(/'(?:\\.|[^'\\])*'/gu, "''")
       .replace(/"(?:\\.|[^"\\])*"/gu, '""')
-      .replace(/`(?:\\.|[^`\\])*`/gu, '``');
+      .replace(/`(?:\\.|[^`\\])*`/gu, "``");
 
   const sourceFilesUnder = (dir: string): readonly string[] => {
     const found: string[] = [];
@@ -2287,8 +2630,9 @@ describe('DECISIONS.md D526 clause 6 — no purchase, price, store or conversion
       for (const entry of readdirSync(at, { withFileTypes: true })) {
         const path = join(at, entry.name);
         if (entry.isDirectory()) {
-          if (entry.name !== 'node_modules' && entry.name !== 'dist') walk(path);
-        } else if (entry.name.endsWith('.ts')) found.push(path);
+          if (entry.name !== "node_modules" && entry.name !== "dist")
+            walk(path);
+        } else if (entry.name.endsWith(".ts")) found.push(path);
       }
     };
     walk(dir);
@@ -2340,7 +2684,7 @@ describe('DECISIONS.md D526 clause 6 — no purchase, price, store or conversion
   const PURCHASE_VENDORS =
     /revenuecat|lemonsqueezy|chargebee|recurly|gumroad|fastspring|xsolla|\bpaddle\b|square-?up|\bwallet\b|subscription|purchases?|applepay|googlepay|shopify|snipcart|\bcoinbase\b|\bplaid\b/iu;
 
-  it('names none of a purchase’s machinery in code, anywhere under packages/', () => {
+  it("names none of a purchase’s machinery in code, anywhere under packages/", () => {
     /*
      * `documentation.test.ts:1136`'s shape, and its four moves kept: ask the code rather than the
      * word, exclude tests because an instrument is non-test code by this repository's own standing
@@ -2348,39 +2692,51 @@ describe('DECISIONS.md D526 clause 6 — no purchase, price, store or conversion
      * directions so that a reworded document fails on the reword and a moved tree fails on the
      * measurement.
      */
-    const naming = sourceFilesUnder(join(ROOT, 'packages'))
+    const naming = sourceFilesUnder(join(ROOT, "packages"))
       .filter((path) => path.includes(`${sep}src${sep}`))
-      .filter((path) => !path.endsWith('.test.ts') && !path.endsWith('.test-helper.ts'))
-      .filter((path) => PURCHASE_MACHINERY.test(code(readFileSync(path, 'utf8'))))
+      .filter(
+        (path) =>
+          !path.endsWith(".test.ts") && !path.endsWith(".test-helper.ts"),
+      )
+      .filter((path) =>
+        PURCHASE_MACHINERY.test(code(readFileSync(path, "utf8"))),
+      )
       .map((path) => path.slice(ROOT.length));
 
     expect(
       naming,
-      'DECISIONS.md D526 clause 6: no purchase, price, store, conversion event or supporting ' +
-        'telemetry ships anywhere, and such a source is added only by a decision citing a measured ' +
-        'charter S4. These files name one in code rather than in prose. Either that decision has ' +
-        'been taken and this check moves with it, or they do.',
+      "DECISIONS.md D526 clause 6: no purchase, price, store, conversion event or supporting " +
+        "telemetry ships anywhere, and such a source is added only by a decision citing a measured " +
+        "charter S4. These files name one in code rather than in prose. Either that decision has " +
+        "been taken and this check moves with it, or they do.",
     ).toEqual([]);
 
     // The other direction: the document must still be making the claim this case pins.
-    const nonGoals = read('docs', '26-telemetry-and-privacy.md');
-    expect(nonGoals).toMatch(/No purchase, price, store, conversion event or supporting telemetry/u);
+    const nonGoals = read("docs", "26-telemetry-and-privacy.md");
+    expect(nonGoals).toMatch(
+      /No purchase, price, store, conversion event or supporting telemetry/u,
+    );
   });
 
-  it('declares no payment or store dependency in any package', () => {
+  it("declares no payment or store dependency in any package", () => {
     /*
      * The other half, and the cheaper one to get wrong: a purchase does not have to be written to
      * arrive, it can be installed. Read off every `package.json` under `packages/` rather than a
      * list, so a new package joins this rule on the commit that creates it.
      */
-    const manifests = readdirSync(join(ROOT, 'packages'), { withFileTypes: true })
+    const manifests = readdirSync(join(ROOT, "packages"), {
+      withFileTypes: true,
+    })
       .filter((entry) => entry.isDirectory())
-      .map((entry) => join(ROOT, 'packages', entry.name, 'package.json'));
-    expect(manifests.length, 'the packages directory produced no manifests').toBeGreaterThan(3);
+      .map((entry) => join(ROOT, "packages", entry.name, "package.json"));
+    expect(
+      manifests.length,
+      "the packages directory produced no manifests",
+    ).toBeGreaterThan(3);
 
     const offenders: string[] = [];
     for (const path of manifests) {
-      const manifest = JSON.parse(readFileSync(path, 'utf8')) as {
+      const manifest = JSON.parse(readFileSync(path, "utf8")) as {
         dependencies?: Record<string, string>;
         devDependencies?: Record<string, string>;
       };
@@ -2396,23 +2752,25 @@ describe('DECISIONS.md D526 clause 6 — no purchase, price, store or conversion
     }
     expect(
       offenders,
-      'a package declares a payment or store dependency. See DECISIONS.md D526 clause 6 — the ' +
-        'ledger is built so an add from outside would be one more source on it, and that source ' +
-        'needs a decision rather than an install.',
+      "a package declares a payment or store dependency. See DECISIONS.md D526 clause 6 — the " +
+        "ledger is built so an add from outside would be one more source on it, and that source " +
+        "needs a decision rather than an install.",
     ).toEqual([]);
   });
 
-  it('positive control: the detector really would catch one', () => {
+  it("positive control: the detector really would catch one", () => {
     /*
      * This suite's own habit. A vocabulary that quietly stopped matching would pass forever, and a
      * scrubber that over-removed would make every file silent. Both are asserted: the machinery is
      * caught in code, and the same words inside a comment or a string are not — which is the
      * distinction that lets this repository write about refusing a purchase at length.
      */
-    const implemented = 'const session = await stripe.checkout.sessions.create({ amount: 499 });';
+    const implemented =
+      "const session = await stripe.checkout.sessions.create({ amount: 499 });";
     expect(PURCHASE_MACHINERY.test(code(implemented))).toBe(true);
 
-    const denied = '/* No purchase, no price, no store, no checkout, no stripe. */ const a = 1;';
+    const denied =
+      "/* No purchase, no price, no store, no checkout, no stripe. */ const a = 1;";
     expect(PURCHASE_MACHINERY.test(code(denied))).toBe(false);
 
     const quoted = "const note = 'there is no checkout in this product';";
@@ -2426,26 +2784,32 @@ describe('DECISIONS.md D526 clause 6 — no purchase, price, store or conversion
     const installs = (name: string): boolean =>
       PURCHASE_MACHINERY.test(name) || PURCHASE_VENDORS.test(name);
     for (const vendor of [
-      '@stripe/stripe-js',
-      'react-native-purchases',
-      'revenuecat',
-      '@paddle/paddle-js',
-      'lemonsqueezy.ts',
-      '@solana/wallet-adapter',
-      'some-subscriptions-sdk',
+      "@stripe/stripe-js",
+      "react-native-purchases",
+      "revenuecat",
+      "@paddle/paddle-js",
+      "lemonsqueezy.ts",
+      "@solana/wallet-adapter",
+      "some-subscriptions-sdk",
     ]) {
       expect(installs(vendor), vendor).toBe(true);
     }
     /* And the names this workspace really declares are not caught by either. */
-    for (const real of ['vitest', 'typescript', '@elevator-sim/core', 'playwright', 'esbuild']) {
+    for (const real of [
+      "vitest",
+      "typescript",
+      "@elevator-sim/core",
+      "playwright",
+      "esbuild",
+    ]) {
       expect(installs(real), real).toBe(false);
     }
 
     /* And the words this product legitimately uses are not in the vocabulary. */
     for (const allowed of [
-      'const priceUnits = sink.priceChimes;',
-      'const cost = repair.costUnits;',
-      'const bought = changesBought(schedule, patch);',
+      "const priceUnits = sink.priceChimes;",
+      "const cost = repair.costUnits;",
+      "const bought = changesBought(schedule, patch);",
     ]) {
       expect(PURCHASE_MACHINERY.test(code(allowed)), allowed).toBe(false);
     }

@@ -187,6 +187,28 @@ dispatchers is asking about. On a bank without regeneration — every shipped ba
 installation's true consumption is bounded **above** by this figure; a bank that fits a drive is priced
 by the drive instead.
 
+**The first external anchor this proxy has ever had, and it is a comparison rather than a
+validation** — GitHub issue [#427](https://github.com/mrpeanut01/elevator-sim/issues/427),
+[§ D597](../DECISIONS.md). Every figure the energy axis carries is self-consistent: § D468 derived
+the daily goal's 80 kJ bar from 400 simulated runs against nothing outside this repository.
+`empire-state-class-reference` is the first shipped building modelled on a real tower that publishes
+a **distance**, which is the one quantity the proxy measures and could never check.
+
+| | |
+|---|---|
+| **Measured** | **3.17, 3.26 and 3.20 km per car per hour** at 1 800 s and **3.16, 3.32 and 3.20** at 3 600 s — six runs at the `office-standard` profile's own typical 12 %POP/5 min under `collective`, seeds 20 260 824 / 20 268 743 / 20 276 662, every car in the fleet moving in every one. Mean **3.220 km/car/h**. |
+| **Published** | *"Its elevators cover a combined distance of over 180,000 miles"* a year, over 73 cars: **3 968 km per car per year**. |
+| **The arithmetic** | 3 968 km at 3.220 km/h is **1 232 hours** of this traffic a year — **4.9 hours** on each of 250 working days, or 3.4 hours on each of 365. |
+
+**The two agree to the order of magnitude**, which is the strongest thing this check can say: a real
+office tower plausibly sees something like five hours a day of demand at or near its own peak rate,
+so the proxy is not wrong about the world by a factor of ten in either direction. It is **not** a
+validation, because the published figure names no measurement window and no basis — a working day or
+a calendar one, passenger service or all motion — so the residual cannot be attributed, and **no
+mechanism is offered** for it ([§ D256](../DECISIONS.md)). **Neither number was adjusted towards the
+other**: nothing above is calibrated here and § D468's bar is untouched. What would close it is a
+sourced statement of what the 180,000 miles covers.
+
 **Why 0.5 is the default, and why a per-bank ratio is not a silent change of scale.** 0.5 is the
 value at which the proxy is symmetric — an empty car and a full car of equal travel cost the same — so
 at the default the number describes how far cars drove out of balance rather than one installation's
@@ -233,6 +255,50 @@ at `burj-class-reference`. **That is not the source's "about 15 % energy reducti
 about a whole installation's consumption including the standby term and the car and counterweight
 inertia this proxy omits; it is what the rope is worth *to this proxy*, and the interval for each is
 in [§ D583](../DECISIONS.md) § 5.
+
+### Floor area, and what a hoistway takes out of it
+
+`data/elevator-specs.json#shaftFootprint` says what **one hoistway** takes out of **every floor plate
+it passes through**, by the rated load of the car in it. A building declares its plate
+(`grossAreaPerFloorM2`, or `grossAreaM2` on a floor, or `grossAreaPerFloorM2` on a range — floor wins,
+then range, then building), and `config/parse.ts` resolves a gross, core and lettable area per level
+([§ D601](../DECISIONS.md), GitHub issue #429).
+
+| rated load, lb | plan area of one hoistway | provenance |
+|---|---|---|
+| 0–2000 | 5.5 m² | **chosen outright**, deliberately below the source's bracket |
+| 2000–3000 | 6.8 m² | **chosen**, inside the 6.7–13.4 m² the source supports |
+| 3000–4000 | 8.0 m² | **chosen**, inside that bracket |
+| 4000 and above | 9.5 m² | **chosen outright**, deliberately above it |
+
+**One thing is cited and the sizes are not.** Al-Kodmany § 2.2.2 gives *one car = one hoistway*
+outright — 24 single-deck cars becoming 13 double-deckers *"reduc[es] the required core by no less
+than 11 hoistways"*, and 24 − 13 = 11 only works that way. For the *size* of a hoistway the paper
+gives one anchor and it **brackets** rather than fixes: TWIN on a 31-storey building recovers *"more
+than 830 m²"* by cutting the shafts *"by a third"*, which is 26.8 m² of plate per floor for a third
+of an unstated shaft count N — 13.4 m² at N = 6, 8.9 at N = 9, 6.7 at N = 12. All four rows above are
+**an agent's proposal awaiting the product owner's approval**, and so are the fourteen buildings'
+plates, which are a stated assumption and not a citation.
+
+**A shaft is charged over its bank's whole span, not its served set.** An express shuttle takes plan
+area out of every floor it passes and never opens onto — which is the reason sky lobbies exist, and
+why a tall building's core tapers. A **double-deck car is one shaft**, charged once at its per-deck
+load.
+
+**What this measures is the hoistway alone**: no lift lobby, no machine room, no riser. The paper's
+headline that elevators and escalators *"can occupy up to 40% of a building's floor"* is about all of
+that, so these figures come out well below it and the two are different quantities. Measured over the
+shipped set: 1.4 % of gross area at `garden-apartments`, 1.9 % at `midtown-office`, **13.1 % at
+`burj-class-reference`** and 16.6 % at `merdeka-class-reference`, with the worst single floor
+`merdeka-class-reference`'s sky lobby at 26.6 %, where ninety-two hoistways cross one level.
+
+A floor whose hoistways take **strictly more** plan area than it has fails to load with
+`core-exceeds-floor-plate`. It is raised on **no shipped building** and the margin is not close, so
+that ceiling is a correctness guard rather than the trade-off: **what a shaft costs is the lettable
+area it removes on every level it passes, forever** — a fifth car at `midtown-office` is 142.8 m².
+**Area is a published quantity and not a price.** Nothing in `data/price-schedule.json` charges it,
+because a second budget axis and a Career income term are the product owner's ruling rather than an
+engineering judgement ([§ D601](../DECISIONS.md) § 5, which measures what each shape would cost).
 
 **Energy is an axis, never a score.** Measured across the full experiment matrix, `nearest-car` — the
 weakest shipped dispatcher — is on the Pareto front at six of eight cells, because it is best on

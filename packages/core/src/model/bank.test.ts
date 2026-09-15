@@ -189,6 +189,18 @@ describe('double-deck pairing', () => {
     );
     // GitHub issue #438 moved the Burj-class reference's decks from its sky-lobby shuttle to its
     // observation run, which is where every source read puts the real tower's two double-deck cars.
-    expect(doubleDeckBanks).toEqual(['burj-class-reference/observation', 'vertical-city/shuttle']);
+    //
+    // **Two entries became four on 2026-09-15** — GitHub issue #426's Willis-class reference, and
+    // the case's own name is what the addition is about. Every double-deck bank this repository
+    // had shipped was a *shuttle* or an *observation run*: a handful of cars serving a handful of
+    // levels. Willis runs its sixteen double-deckers as the **locals**, so two whole zones are
+    // paired rather than four transfer floors, and this list is where that shows up. A building
+    // that made the list longer without changing its shape would have been a fourth shuttle.
+    expect(doubleDeckBanks).toEqual([
+      'burj-class-reference/observation',
+      'vertical-city/shuttle',
+      'willis-class-reference/local-low',
+      'willis-class-reference/local-mid',
+    ]);
   });
 });

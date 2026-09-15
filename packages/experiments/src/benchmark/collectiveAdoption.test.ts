@@ -117,10 +117,13 @@ describe('§ D209 § 2 — the ladders', () => {
       'chancery-house',
       'crown-hotel',
       'ctf-class-reference',
+      'empire-state-class-reference',
       'harbour-point',
       'merdeka-class-reference',
+      'one-wtc-class-reference',
       'shanghai-class-reference',
       'st-jude-hospital',
+      'willis-class-reference',
     ]);
   });
 

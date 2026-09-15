@@ -35156,6 +35156,8 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 
 ## D542 — A rush round is a sitting, posted whole: the server replays every round, derives every purse, and the refusal of `endless-rush` is lifted after its replay cost was measured
 
+> **Status 2026-09-15: one of the two things this entry records as unbuilt is built, by [§ D606](#d606).** *The viewer does not post a sitting* stopped being true on that commit — the rush's result screen keeps the round list and sends the sitting whole, and the honesty corpus moved with it. **The other is unchanged and is the open half of GitHub issue #372**: no between-round rebuild travels, so nothing spends a purse. § D606 names the boundary that blocks it and the three questions nobody has ruled on. This entry is left exactly as it was written.
+
 **Date: 2026-09-11 · Owner: product owner (the ruling, 2026-09-10, and the approval of the figures and readings under it as drafted, 2026-09-11); the lane that built GitHub issue #372 (the readings under it) · Rules on: [§ D515](#d515), [§ D525](#d525) clause 6, [§ D526](#d526) clauses 2 and 3, [§ D486](#d486), `packages/server/src/leaderboard/verify.ts`, `data/rush-purse.json`, [`docs/38`](docs/38-what-the-game-is.md) § 2.3, GitHub issue #372.**
 
 **Why an entry.** The ruling binds code no one module owns: the rush's arithmetic moved into `core`, a new file in `data/`, the server's verifier, its store and two routes. It also lifts a refusal already recorded — `verify.ts` refused `endless-rush` since GitHub issue #220 — and the ruling asked for the argument to be written down with the change.
@@ -36511,3 +36513,388 @@ Measured on the shipped bundle at `vertical-city`, seed 424242, over 300 frames 
 **One exclusion in the rule itself, measured rather than assumed.** Chromium propagates `disabled` from a `<select>` to every `<option>` and does **not** propagate `aria-describedby`, so the Workshop's five inert selects arrived as sixty-five findings about controls no reader ever lands on. `option` is excluded. The cost is stated where the exclusion is: an option disabled *inside an enabled* combobox would go unasked, nothing else asks either, and no such option exists in the tree today.
 
 **What this does not decide.** Whether `title` is a good enough carrier for the seven screens that already pass — it maps to the accessible description in every engine this product supports, and whether each reader announces it is one of the things § 6.7's session still has to confirm.
+
+## D594 — The One-WTC-class reference tower: the figures, the escalator that earns its place, and the landing fixture it refuses to declare
+
+**Date: 2026-09-15 · GitHub issue [#428](https://github.com/mrpeanut01/elevator-sim/issues/428) · Rules on: the product owner's 2026-09-08 standing ruling on governed `data/` values, the owner's 2026-09-10 ruling on #232, [§ D265](#d265) and [§ D553](#d553).**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. The authored figures need the owner's approval and are drafted for it here. And it **refuses something already recorded**: § D553 built a per-landing `landingCallType` and this is the first building that would obviously carry one; it does not, and the refusal binds `sim/simulation.ts`'s behaviour rather than this file's.
+
+1. **What is MEASURED (a count rather than a citation).** **73 cars**, the lift count the prompting article supplies and the only figure from it this file uses. A listicle can be right about a count and is demonstrably wrong about a speed — the same article puts the world's fastest lift at 5 m/s — so the count is used and nothing else is.
+2. **What is MEASURED (cited, and the citation was already in this repository).** `data/elevator-specs.json`'s `airPressure` block quotes Al-Kodmany (Buildings 2015, 5(3), 1070–1104, § 3.1.4) recording **this tower** answering the air-pressure problem by pressurising its cars. See clause 5 for why that fact does *not* become a `cabinPressurised` field.
+3. **What is CHOSEN, and awaits approval.** 104 floors above ground; a 6.0 m lobby mezzanine, a 4.0 m podium storey and a 3.9 m office storey, putting the top occupied floor at 407.0 m and the highest plant floor at 414.8 m under a 417 m roof whose 541.3 m spire this model does not carry; the unpopulated podium at 3–19; the **two-level** sky lobby at 64 and 65; the populations (4 810 in all); and the split of the 73 cars over six banks.
+4. **The escalator is not a garnish, and #428's second criterion is answered with a number.** That criterion says an undirected, uncapacitated escalator pair that takes zero hops is a dead field, and that a building whose escalators genuinely carry traffic is the case that would justify giving `transportModes` a capacity or a direction. Measured at `collective`, 1 800 s, seeds 20 260 824 / 20 268 743 / 20 276 662: **391, 375 and 359 hops** against 2 873, 2 995 and 2 841 lift legs, and deleting the block adds back **exactly one lift leg per hop**. About an eighth of this tower's rides. Whether that justifies a capacity or a direction is the owner's, and this entry does not take it.
+   **The arrangement that makes it live is stated because it is not obvious.** `traffic/route.ts` expands transport edges before bank edges, so a mode wins where it reaches a floor at the same breadth-first depth a lift does. The shuttle lands at 64; `local-high-a` serves both 64 and 65; `local-high-b` departs from 65 alone. So 65 is reached from 64 by the escalator and the B-side zone hangs off it — while the **lift-only** model still routes the street to floor 90 in three legs, which `config/buildingConnectivity.test.ts` requires, because an escalator may never be what rescues a zoning mistake.
+5. **The cabin is deliberately not pressurised, and that is § D577 clause 4 read from the other side.** The observatory bank's travel is 414.8 m, above `appliesAboveTravelM` (300), so an unpressurised cabin is capped at `descentCapMps` — **10.0 m/s, which is exactly these cars' rated speed**. Pressurising would remove a cap that is not biting and change no leg: a declared value with no consequence, which is § D265's defect. The CTF-class shuttle *is* pressurised precisely because there the machine's published limit sits below the shaft's.
+6. **It declares no `landingCallType`, and the refusal is pinned by two runs rather than by a sentence** (`CLAUDE.md` § *A stated refusal goes stale the same way*). The real tower runs destination entry at its lobby. Declaring it here would be one of two things and both are measured in `packages/core/src/sim/oneWtcSeam.test.ts`: `mobile-credential` on every landing leaves the legs **byte-identical** under the shipped default, because `collective` weights `waitTime` alone and `lifecycle.ts#batchKeyOf` splits a landing per destination only under `passengerAssignment: 'panel'`; and `destination-entry` makes the tower **throw** under `predictive-balanced`, a shipped profile and a contract reward, because a kiosk cannot defer. **A building that crashes on a dispatcher the game offers is a product defect rather than fidelity.** What would make the field live is a dispatcher that reads a destination it did not ask for, which is a dispatcher change rather than a building one.
+7. **The oracle reconciles one bank and refuses five.** `observatory` raw **+24.766 %** / residual **−0.028 %** at 64 replications from seed 810 000 against a 4 % tolerance. The shuttle throws on a zero served population and the four local banks on § D578 clause 6's drain-deadline ground.
+8. **The occupancy is a third point on § D579's comparison.** 4 810 over 73 is **65.9** people a car, against Merdeka-class's 91.9 and Burj-class's 56.1, authored by Merdeka's method. It lands between them and **neither of the other two files moves**, for § D579 clause 4's reason unchanged.
+9. **Playable, and handed as built** — contract `c14`, [§ D599](#d599).
+
+**What this does not decide.** Whether the figures are right; they are the owner's to accept, tighten or reject. Whether the real tower's escalators should carry a capacity or a direction. And whether a dispatcher should be built that reads an undisclosed destination, which is what would make clause 6's refusal stop being true.
+
+---
+
+## D595 — Phase 6a/6b measured on a second building: the disclosure arm does not reproduce and the panel does
+
+**Date: 2026-09-15 · GitHub issue [#428](https://github.com/mrpeanut01/elevator-sim/issues/428) · Rules on: [§ D100](#d100)'s raised criterion, [§ D151](#d151)'s resolution protocol, and `CLAUDE.md`'s Phase 6 status row.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: it **moves something already recorded**. `CLAUDE.md` states 6a/6b's accepted result as a property of the shipped destination profiles; this measurement says the Level-0 half of it is a property of one cell.
+
+1. **The apparatus is § D100's, deliberately unchanged**: baseline `eta`, candidates `destination-eta` and `destination-panel`, **n = 200** under common random numbers at seed 20 260 726, gate **TTD**, AWT and WT95 reported beside it as costs. A different apparatus would make a disagreement unreadable — it could be the building or it could be the instrument.
+2. **What is *not* copied is the rate, and that is the apparatus rather than a deviation from it.** § D100's cell is 4 % because 4 % is the highest rate at which Midtown Office returns a valid AWT on every arm. The property is *the highest quotable rate*; the number is Midtown's. On this tower it is **2 %**, censused at the budget the measurement spends: at n = 200, 2 % is clean on all four arms, 3 % saturates `eta` on 1 of 200 and `destination-panel` on 4, and 4 % saturates `destination-eta` on 18. **A census at n = 10 would have published 4 %** — every rate up to it looks clean there — and then reported three arms of four as `UNQUOTABLE`.
+3. **The result, and it splits the two arms.** Candidate − baseline, TTD, with the baseline's own TTD at 110.701 s:
+
+   | arm | ΔTTD (s) | verdict | `requiredReplications` |
+   |---|---|---|---|
+   | `destination-eta` | **−0.092 [−0.804, +0.619]** | **INDISTINGUISHABLE** | **11 704** |
+   | `destination-panel` | **−1.293 [−2.069, −0.517]** | **BETTER** | **1** |
+
+4. **So −1.598 s is not a property of `destination-eta`.** The arm that carries § D100's accepted result on Midtown Office is indistinguishable here, and § D151's protocol answers in the refusing direction: the effect would need **fifty-eight times the budget** to resolve at this cell's own measured spread. The Level-1 panel is the arm that works here — which is the **reverse** of the shape `CLAUDE.md` records for Midtown, where the panel carried the over-subscription defect and the disclosure did the work.
+5. **Stated as a fact about two cells rather than as a reversal.** Midtown's interval is still Midtown's and this one is still this one. What the pair establishes is that **the effect is building-dependent**, which is exactly what #428 says a second building is for and what a second seed could never have shown. § D100's verdict is that criterion's to move and is not moved here.
+6. **The costs are the same shape on both arms**: AWT +1.730 [+1.572, +1.888] and WT95 +1.512 for `destination-eta`, +1.624 and +1.443 for `destination-panel`, all four **WORSE**. § D27's rule — a cost hidden is a cost claimed — and the same trade § D100 reports.
+7. **The control is `collective`, and what it measured is worth recording.** It carries `eta`'s weight vector exactly and at this cell the two are **bit-identical**, zero difference and zero spread over 200 replications on all three metrics. At 4 %, where both saturate, they are **not**: ΔTTD reads −0.0054 s. Two profiles that share a weight vector agree until the run stops draining. **No mechanism is offered** for the rest of it ([§ D256](#d256)).
+
+**What this does not decide.** Why the two arms split here and not on Midtown Office — the towers differ in banks, transfers, population and height at once, and a plausible sentence in place of a measurement is § D256's refusal. Whether § D100's criterion should be re-stated per building; that is the criterion's own.
+
+---
+
+## D596 — The Empire-State-class reference tower: a relay with no express, and the first shipped building the closed form reconciles on every bank
+
+**Date: 2026-09-15 · GitHub issue [#427](https://github.com/mrpeanut01/elevator-sim/issues/427) · Rules on: the 2026-09-08 standing `data/` ruling, the 2026-09-10 ruling on #232, and [§ D578](#d578) clause 6's refusal ground.**
+
+**Why an entry.** [§ D405](#d405)'s first ground — authored figures drafted for approval — and its second, because it puts a bound on a ground § D578 left explicitly unlocated.
+
+1. **What is MEASURED (a count rather than a citation).** **73 cars**, the article's lift count, used as a count.
+2. **What is QUOTED and deliberately not treated as a citation.** *"Its elevators cover a combined distance of over 180,000 miles"* annually. It is used — it is the whole of #427's first criterion — and it is used as a **comparison** rather than as a validation, because the article states no measurement window, no basis and no source. See [§ D597](#d597).
+3. **What is CHOSEN, and awaits approval.** 102 floors above ground; a 12.0 m two-storey ground hall and a 3.6 m office storey, putting the top observatory at 372.0 m under a 381 m roof whose 62 m mast this model does not carry; the relay lobbies at 80 and 86; the populations, authored as a **taper** over four setbacks (8 230 in all); and the split of the 73 cars into six ground banks of ten and two relay banks of seven and six.
+4. **The relay is the building, and it is authored as an absence.** No bank reaches both the entrance and the top zone. The street to floor 102 is three legs and two changes, which is the maximum `config/buildingConnectivity.test.ts` allows from an entrance to a populated floor — this tower sits exactly on that limit, deliberately. `packages/core/src/sim/empireStateSeam.test.ts` gives bank H a terminal at the street and changes nothing else: over identical journeys at `collective`, 1 800 s, three seeds, legs a journey fall from **1.2040 / 1.2228 / 1.2214** to **1.1134 / 1.1063 / 1.1172** and the journeys needing three legs fall from **167 / 216 / 182** to **13 / 13 / 8**.
+5. **All eight banks reconcile, which no shipped building had done**, and it bounds § D578's ground rather than merely adding rows. Raw divergences +27.467 % to +33.626 %; corrected residuals **−0.044, −0.076, −0.126, −0.309, −0.494, −0.109, −0.119** and **−0.184 %**, 64 replications from seed 810 000 against a 4 % tolerance, **every one of them negative** ([§ D600](#d600) clauses 4 and 5 — two of these eight moved on this same wave when `bank-e` and `bank-f` came off 6.1 m/s, and the other six reproduced to the third decimal). § D578 clause 6 says the apparatus cannot drain what it offers a twenty- or thirty-car bank and that **no mechanism is offered for where the threshold lies**. This tower's largest bank has **ten** cars and every one of them reduces. That does not locate the threshold — it is one point, not a sweep — but it establishes the quantity is the **size of the group** rather than the height of the shaft, on a 102-floor building. The residual is published for `bank-a` at the full budget and the *no bank is refused* claim is asserted at one seed over all eight, which is the cheaper claim that carries it.
+6. **The occupancy is the lift-poorest in the set**: 8 230 over 73 is **112.7** people a car, against Merdeka-class's 91.9, One-WTC-class's 65.9 and Burj-class's 56.1. A 1931 tower carries more people per car because its cars are smaller and its zones narrower; nothing was solved for.
+7. **It is the sharpest statement the set has made about the stage.** It hides **40 of 73 shafts at a desktop canvas and 47 at a laptop one** on a building that is not a supertall by any other measure, which says GitHub issue **#377**'s remedy is about the group rather than the height.
+8. **Playable, and handed as built** — contract `c15`, [§ D599](#d599).
+
+**What this does not decide.** Whether 8 230 is the right occupancy or whether the 73 should split differently. Both are CHOSEN and the file says so.
+
+---
+
+## D597 — The energy proxy against a published annual car distance: both numbers, and what cannot be settled
+
+**Date: 2026-09-15 · GitHub issue [#427](https://github.com/mrpeanut01/elevator-sim/issues/427) · Rules on: [§ D106](#d106)'s energy-as-an-axis rule, [§ D468](#d468)'s derivation of the 80 kJ bar, and [§ D256](#d256).**
+
+**Why an entry.** [§ D405](#d405)'s second ground. § D468 derived the daily goal's bar from 400 simulated runs **against no external anchor at all**, and this is the first external anchor the project has had for the quantity underneath it. Whatever the comparison said, it had to be recorded where § D468 can be read beside it.
+
+1. **What was measured.** The fleet's driven distance at the `office-standard` profile's own typical 12 %POP/5 min under `collective`, over the whole run rather than the report window — window `[0, endedAt)`, divided by 73 cars and by the run's *own elapsed* hours, a denominator [§ D600](#d600) clause 7 had to recover because three plausible conventions differ by 11 % here: **3.17, 3.26 and 3.20 km per car per hour** at 1 800 s and **3.16, 3.32 and 3.20** at 3 600 s, seeds 20 260 824 / 20 268 743 / 20 276 662, every car in the fleet moving in every run. Mean **3.220 km per car per hour**.
+2. **What is published.** 180,000 miles a year over 73 cars is 2,466 car-miles, **3 968 km per car per year**.
+3. **The arithmetic, which is the whole of the comparison.** 3 968 km at 3.220 km/h is **1 232 hours of this traffic a year** — **4.9 hours** on each of 250 working days, or 3.4 hours on each of 365.
+4. **The verdict is *the same order of magnitude*, and it is a comparison rather than a validation.** A real office tower plausibly sees something like five hours a day of demand at or near its own peak rate, so the energy proxy is not wrong about the world by a factor of ten in either direction. That is the strongest thing this check can say and it is stated as such: #427 says in terms that the published figure names no window and no basis, so the residual between 1 232 hours and whatever the real building's duty cycle is **cannot be attributed**.
+5. **No mechanism is offered for the difference**, which is § D256's rule applied to the one place it is most tempting to break. What would close it is a sourced statement of what the 180,000 miles covers — a working day or a calendar one, passenger service or all motion, one modernisation or the building's life — and the article gives none.
+6. **Neither number is adjusted towards the other.** The energy proxy is not calibrated here; § D468's 80 kJ bar is untouched; `EnergyStatistics` is unchanged. A check that moved a figure to agree with an uncited one would have converted an anchor into a fit, which is what § D106's *energy is an axis, never a score* exists to prevent one level up.
+
+**What this does not decide.** Whether the proxy is *right*, which one point cannot settle. Whether a second published figure should be sought — it should, and this entry is the argument for it rather than the answer.
+
+---
+
+## D598 — The Willis-class reference tower: double-deck as the local service, and the surviving disclaimer's case checked in both directions
+
+**Date: 2026-09-15 · GitHub issue [#426](https://github.com/mrpeanut01/elevator-sim/issues/426) · Rules on: [§ D131](#d131)'s paired-stop model, `CLAUDE.md`'s double-deck disclaimer, and the 2026-09-08 standing `data/` ruling.**
+
+**Why an entry.** [§ D405](#d405)'s first ground, and its second: `CLAUDE.md` states the surviving double-deck disclaimer as covering a case *"which no shipped building raises"*, and #426 asks whether this tower raises it. The answer is measured here rather than asserted.
+
+1. **What is MEASURED (counts rather than citations).** **104 cars, of which 16 are double-deck** — the two figures the article supplies, used as counts.
+2. **What is CHOSEN, and awaits approval.** 108 floors above ground on a **uniform 3.9 m storey**; two two-level sky lobbies at 33/34 and 65/66; the Skydeck at 103; the populations, a taper over two setbacks (9 200 in all); the split of the 104 cars over seven banks; 8.0 m/s for the expresses ([§ D600](#d600) — 8.1 as first authored, moved onto `high-speed-gearless`'s own ladder) and **2.5 m/s** for the double-deck locals.
+3. **The uniform storey height is forced rather than preferred, and it is the first fact about the file.** `config/parse.ts` requires every `servesFloorPairs` entry to be exactly `deckSeparationM` apart in `heightM`. A double-deck **local** pairs every floor in its zone, so every floor in that zone must sit exactly one deck separation above the last — which is why this tower has one storey height where the three supertalls of § D577–§ D579 each have three or four. **A double-deck local is a constraint on the section, not just on the hoistway**, and that is a thing the shipped set could not have shown, because both of its double-deck banks were shuttles pairing four transfer levels.
+4. **The decks bind, measured on the legs.** `packages/core/src/sim/willisSeam.test.ts` takes the decks off both local banks — pairs deleted, `doubleDeck`, `deckSeparationM` and `ratedLoadLbPerDeck` deleted, whole-car capacity unchanged — and changes nothing else. The legs differ on every seed and so does their count: **6 880 / 6 847 / 6 530** against **6 764 / 6 757 / 6 446**.
+5. **And the escalator turns out to be a consequence of the decks, which is the finding.** The `G ↔ 2` pair carries **720, 725 and 653** hops as shipped and **exactly zero** once the decks come off. A deck-bound leg from the lower lobby reaches lower-deck floors only, so a rider bound for an even floor must board at 2 and the escalator is how they get there; a single-deck car at G serves the whole zone and the mode never shortens a route again. `vertical-city`'s four modes could *suggest* that relationship — two of them carry zero hops — and this building measures it.
+6. **The pairing is a bounded exception rather than an identity, and that is itself a measurement.** Both arms offer the same number of journeys and **every journey starts at the same instant**, asserted with no tolerance. **31 of 3 949** destinations differ, every one of them ending at the upper lobby level `2` on the decked arm and at `G` on the single-deck one, because `traffic/generator.ts` rejects a journey with no lift leg and which journeys those are is decided by the routing the control changes. The case asserts the fraction and both destination sets, so a control that began perturbing the demand generally would fail rather than pass quietly.
+7. **The disclaimer's case is not raised here, and it is checked in both directions.** Both double-deck banks declare their pairs, the building loads with **zero** warnings, and deleting one bank's pairs **does** raise `missing-floor-pairs`. Half the claim is that the case still exists and can still be entered; a guard that passed because the warning had been deleted would look identical to one that passed because the building is correct.
+8. **The oracle reconciles `skydeck` at raw +9.456 % / residual −0.044 %** ([§ D600](#d600) clause 4 — re-measured when this bank came off 8.1 m/s; `local-low`'s −0.050 % is unmoved) — the smallest raw divergence any bank in `remainingBuildings.test.ts` has produced, because it runs G to 103 and stops nowhere else, so the textbook's two omissions have one stop to accumulate on rather than twenty. `local-mid` is refused on `departureGapBracket`, the two expresses on a zero served population, and the two big locals on the drain deadline.
+9. **No residual is published for a double-deck bank, and the reason is the apparatus.** `oracle/upPeakCase.ts#isolateBank` drops the deck fields with `servesFloorPairs`, so what it measures on `local-low` is a **single-deck bank of the same cars**. Publishing that as this tower's double-deck residual would be *a different calculation wearing its name*, which is the limit `fiveBuildings.test.ts` already words that way. Extending the closed form to decks is not attempted: it would mean validating the simulator against arithmetic no reference states, which is the circularity `analytical/`'s import discipline exists to prevent.
+10. **Playable, and handed as built** — contract `c16`, [§ D599](#d599).
+
+**What this does not decide.** Whether § D131's paired-stop model is *right* at 1970s kinematics — that this entry says the decks **bind** is a different and smaller claim than that the saving is the one the literature predicts, which would need a paired-t interval over 50–200 replications and is not taken here. Whether `isolateBank` should learn about decks.
+
+---
+
+## D599 — What the three towers cost the shipped registries: a second key for the tie, three prices at the ceiling, and a refuted mechanism in the rush table
+
+**Date: 2026-09-15 · GitHub issues [#428](https://github.com/mrpeanut01/elevator-sim/issues/428), [#427](https://github.com/mrpeanut01/elevator-sim/issues/427), [#426](https://github.com/mrpeanut01/elevator-sim/issues/426) · Rules on: [§ D574](#d574)'s placement rule, [§ D581](#d581)'s tie-break, [§ D510](#d510)'s offer fee, [§ D580](#d580) clause 4, and [§ D582](#d582) clause 3.**
+
+**Why an entry.** [§ D405](#d405)'s second ground, three times over. It binds `shift/contracts.ts`, `data/contract-ladder.json`, `campaign/economy.ts` and `packages/server/src/leaderboard/rushHoldAgreement.test.ts`, none of which this lane owns; and it **refutes a mechanism § D582 stated as fact**.
+
+1. **All three measure 1.00, and the tie at the ceiling is now eight contracts.** Measured on the shipped path at `docs/33` § 4.7d's budget and seeds — `CONTRACT_CURVE_SWEEP=1 CONTRACT_CURVE_SEEDS=50`, day 1, `collective`, seeds `20 260 824 + 7 919 n`. The goal doing the missing is the **energy bar**, for § D581 clause 2's reason unchanged: 80 kJ per delivered ride against rides that cost more, and both admissible substrates are divisors of the crowd while the bar is a per-leg quantity. No rung in `data/contract-ladder.json` can move it, so all three are handed **as built**.
+2. **Bank count stopped being a total order, so the tie needs a second key.** `one-wtc-class-reference` and `shanghai-class-reference` both have six banks; `vertical-city` and `willis-class-reference` both have seven. **The second key is the car count, smaller group first** — 73 before 106, and 35 before 104 — which is § D581's own reading (*what a reader has to hold at once*) applied to the only other quantity of the arrangement a reader meets on the screen. The sequence becomes **1, 1, 1, 1, 1, 1, 2, 2, 3, 4, 5, 6, 6, 7, 7, 8**, still non-decreasing and still with no step larger than one.
+3. **The second key is asserted only where it is the key**, and that distinction is the part to read. `contracts.test.ts` applies it to the eight tied contracts alone. The first eight positions are each a *measured* miss rate, and a bank-count repeat there — `chancery-house` then `st-jude-hospital`, both one bank — is the measurement doing the ordering. Requiring the car count to rise across it would be a test overruling the sweep, which is the inverse of the mistake § D574 refused.
+4. **The prices take § D510's rule unamended: complexity 5 and a fee of 7 u each.** And § D580 clause 4's finding is recorded a second time rather than acted on: **six** buildings now sit on `COMPLEXITY_MAX`, and the column cannot tell an eight-bank relay from a four-bank supertall. Widening 1–5 would move every published *complexity n of 5* string in the product, which is an owner's call and not a lane's.
+5. **`NEVER_BREAKS` goes from one member to three, and § D582 clause 3's mechanism is REFUTED.** That clause said whether a group can be broken by the Endless rush is decided by **how many cars it has**, because `sim/rush.ts` holds the stream invariant across towers. Measured: `willis-class-reference` has **104** cars and breaks at **5 320 s**; `one-wtc-class-reference` and `empire-state-class-reference` have **73** each and hold. Both were escalated in § D582's own order and held at every step — `nearest-car`, `nearest-car` with the group parked at the lobby from 60 s, and `destination-panel` parked, which is the arm that breaks two towers in `data/rush-house-runs.json` that `nearest-car` does not.
+6. **No replacement mechanism is offered.** The car count does not decide it; what separates the three is visible in the fabric (Willis's locals are 2.5 m/s) and a plausible sentence in place of a measurement is what § D256 refuses. What stays measured is the **negative**.
+7. **The exception is still a list.** Three of seventeen, every member asserted to ship and every cell of every member asserted `null`, so the day 73 cars stop being enough the test goes red and the list has to shrink. § D582's own closing question — *whether a `NEVER_BREAKS` of one is the right shape if a fifth or sixth supertall lands* — is now a question about three, and this entry does not pretend to know where the line is either.
+
+8. **The legibility table gained three rows, they disagree with each other, and a reading recorded one wave earlier is refuted.** Re-measured at the published budget — `LEGIBILITY_SWEEP=1 LEGIBILITY_SEEDS=50`, sixteen contracts × 50 seeds = 800 days, day 1, `collective`, the same seeds — **all thirteen earlier rows reproduced to the second**, counts and medians alike, plus the six per-seed slices `legibility.test.ts` pins; the third consecutive wave of reproduction over a table that has grown from eight rows to sixteen. The new rows are `c14` **1 of 50** (median 13 s), `c15` **45 of 50** (**472 s**) and `c16` **50 of 50** (**2 347 s**). **The two medians were re-measured at the published budget by [§ D600](#d600)** after two authored speeds moved onto their machine class's ladder; they first read 437 s and 2 314 s, which is what the speeds then authored produce. **Only those two rows moved and only their medians** — all fourteen others reproduced exactly, and **both counts held**, so nothing this clause concludes is disturbed. `shift/legibility.ts`'s docstring and `firstSession.test.ts`'s eligible-set case both read the three supertalls added one wave earlier as legible *because* they are towers of thousands. **These three span 4 810 to 9 200 occupants and span the whole range the instrument reports**, so that reading is refuted as a claim about size: population does not predict legibility. One-WTC-class is the first supertall the table has found **ineligible** for a first session, which takes § D475's derived eligible set from nine members to eleven — `c15` and `c16` in, `c14` out — and moves `FIRST_SESSION_LINE`'s own number word with it, so `shift/firstSession.ts#NUMBER_WORDS` is extended past `ten`: the fallback is `String(n)` and a bare numeral in a player-facing sentence is a figure with no licence.
+9. **Why the three differ is unmeasured and no mechanism is offered**, which is § D256 at the place it is most tempting to break. What stays measured is the **negative**, and it is worth more than the story it replaces: the earlier reading would have had the next reader assume every supertall added from here lands at 50 of 50 and stop looking.
+10. **`data/rush-house-runs.json` was regenerated through the command the table carries rather than hand-edited**, and the three new buildings' 39 cells are measured. One-WTC-class and Empire-State-class hold the line under all thirteen dispatchers; **Willis-class breaks under two of them** — `nearest-car` at **5 368 s** and `destination-panel` at **5 168 s** — which is a **second, independent instrument agreeing with clause 5** on a different stream, seed and horizon from `rushHoldAgreement.json`'s 5 320 s, and the same verdict about which of the three breaks. **These three cells were re-measured by [§ D600](#d600) clause 8** after two authored speeds moved onto their machine class's ladder; the figures this clause first published (3 802 s, and `destination-panel` holding) were correct for the speeds then authored and reproduce exactly at them.
+
+**What this does not decide.** Whether the energy bar or the lobby-queue cap should be building-relative; that is § D468's, `docs/33` O2's and #234's, and a lane that moved a goal to make three contracts pass would be buying difficulty by moving the mark. Whether the complexity scale should widen. Why the legibility spread is what it is. And nothing about days 2–20.
+
+---
+
+## D600 — Two authored speeds moved onto the machine class's own ladder, and what re-measuring cost: three residuals, six energy figures, and a sentence that was a fact about 6.1 m/s
+
+**Date: 2026-09-15 · GitHub issues [#427](https://github.com/mrpeanut01/elevator-sim/issues/427), [#426](https://github.com/mrpeanut01/elevator-sim/issues/426), [#45](https://github.com/mrpeanut01/elevator-sim/issues/45) · Moves: [§ D596](#d596) clause 5, [§ D597](#d597) clauses 1 and 3, [§ D598](#d598) clause 8.**
+
+**Why an entry.** [§ D405](#d405)'s second and third grounds together. It **moves figures three decisions in this same wave had already recorded**, and it binds `docs/02-elevator-reference.md`, `docs/04-test-buildings.md`, `packages/experiments/src/oracle/remainingBuildings.test.ts` and `fiveBuildings.test.ts` — none of which this lane owns.
+
+1. **What was wrong.** `empire-state-class-reference`'s `bank-e` and `bank-f` were authored at **6.1 m/s** and `willis-class-reference`'s `express-mid`, `express-high` and `skydeck` at **8.1 m/s**. Neither value is on its machine class's speed ladder — `commissioning.ts` derives each class's choices from its band and `SPEED_STEPS_MPS`, giving `gearless-traction` 2.5…7.0 and `high-speed-gearless` 7.0…10.0, both in 0.5 steps. **GitHub issue #45 is what that costs**: a select whose value is not among its options shows its *first* option, so the commissioning control would have reported 2.5 m/s and 7.0 m/s for banks running at 6.1 and 8.1. `commissioning.test.ts` derives the check from disk and caught all five banks.
+2. **Moved the data rather than the guard, on this repository's own precedent.** Three banks have been repaired this way before — `secure-tower` to 4, `chancery-house` to 5, `crown-hotel` to 3. It costs no citation here because **both speeds are CHOSEN rather than measured**: `willis-class-reference`'s provenance block says *"the express speed of 8.1 m/s"* in the CHOSEN list in terms. A figure an agent proposed may be moved to a value the product can actually represent; a cited one could not be, and would have had to move the ladder instead.
+3. **And then everything the change touched was re-measured, which is the clause that matters.** A speed is not a zone — it moves the *timing* of a run and not its routing — so the prediction was that structural figures hold and timed ones move. **Measured, and it is exactly that**, which is worth more than the prediction: § D596 clause 4's leg figures (**1.2040 / 1.2228 / 1.2214 → 1.1134 / 1.1063 / 1.1172**, three-leg journeys **167 / 216 / 182 → 13 / 13 / 8**) and § D598's leg counts (**6 880 / 6 847 / 6 530** against **6 764 / 6 757 / 6 446**) and escalator hops (**720 / 725 / 653**, and zero without the decks) **all reproduce to the digit**. Nothing in them moved.
+4. **The oracle residuals moved on exactly the three banks whose speed moved, and on no other.** Re-measured at the published apparatus — 64 replications from seed 810 000, 900 s window. The **six** Empire-State banks that were not touched reproduce to the third decimal in **both** columns (`bank-a` +27.467 % / −0.044 %, `bank-b` +29.048 % / −0.076 %, `bank-c` +30.318 % / −0.126 %, `bank-d` +28.984 % / −0.309 %, `bank-g` +25.773 % / −0.119 %, `bank-h` +33.626 % / −0.184 %), and Willis's `local-low` reproduces at **−0.050 %**. The three that moved:
+
+   | bank | published | re-measured |
+   |---|---|---|
+   | `empire-state-class-reference/bank-e` | +30.747 % / **−0.368 %** | +30.143 % / **−0.494 %** |
+   | `empire-state-class-reference/bank-f` | +21.250 % / **+0.047 %** | +20.737 % / **−0.109 %** |
+   | `willis-class-reference/skydeck` | +9.634 % / **−0.052 %** | +9.456 % / **−0.044 %** |
+
+   **Seven unchanged cells reproducing while exactly three move is the control**, and it is why these figures are published as a re-measurement rather than as a fresh set: a change that had perturbed the apparatus rather than the two towers would have moved all ten.
+5. **One sentence was not stale but false, and it is the useful half.** § D596 clause 5 and `remainingBuildings.test.ts` both said *"the one positive residual is `bank-f`, the relay feeder"*. All eight are now **negative**. That was never a fact about the relay: it was a fact about a bank running 6.1 m/s, and it did not survive the speed becoming one the player's own control can select. The range in three docstrings moves from *"+0.047 % to −0.368 %"* to *"−0.044 % to −0.494 %"*, and the one-sided rule the reconciliation asserts is now satisfied by every bank of the building rather than seven of eight.
+6. **The energy comparison moved, and its conclusion did not.** § D597's six runs re-measured: **3.17, 3.26 and 3.20 km per car per hour** at 1 800 s and **3.16, 3.32 and 3.20** at 3 600 s, mean **3.220** against the published 3.237. So 3 968 km a car a year is **1 232 hours** of this traffic rather than 1 226 — **4.9 hours** on each of 250 working days and **3.4** on each of 365, both unchanged to the figure they are quoted at. The verdict § D597 reaches is untouched: same order of magnitude, a comparison and not a validation, and **no mechanism offered** for the residual.
+7. **The measurement convention is now stated where the figure is, because three plausible ones disagree here.** The published figures are driven distance over the window `[0, endedAt)` — the whole run including its drain tail — divided by 73 cars and by the run's *own elapsed* hours. Capping the window at `durationS` while dividing by `durationS` gives **3.50** instead of 3.17 at the same seed, an 11 % difference from nothing but the convention. § D597 recorded *"over the whole run rather than the report window"* and that was true but not sufficient; the denominator was the half nobody had written down. Recovered by re-deriving the published figures at the old speed and requiring them to reproduce **exactly** before any new figure was taken, which is the only thing that could have told a convention error apart from a real move.
+8. **Two generated tables moved with it, both were regenerated through their own command rather than hand-edited, and the third arm is a counterfactual that settles the attribution.** `rushHoldAgreement.json` moved in **exactly one cell** — `willis-class-reference`/`nearest-car`/`park-cars-lobby@60`, **5 228 s → 5 320 s** — with every other cell, all sixteen other buildings included, reproducing unchanged. `data/rush-house-runs.json` moved in **three**, and those three were **not** taken on trust: the previous table had been generated on a loaded box where Willis timed out, so *bad prior measurement* and *real effect* were both live explanations and a plausible sentence choosing between them is what [§ D256](#d256) refuses. So both speeds were run on the same quiet box, from a throwaway copy of `data/`, and the old arm **reproduced the previous table to the digit**:
+
+   | cell | at 6.1 / 8.1 | at 6.0 / 8.0 |
+   |---|---|---|
+   | `willis`/`nearest-car` | broke **3 802 s**, arrived 3 249 | broke **5 368 s**, arrived **6 139** |
+   | `willis`/`destination-panel` | **never broke**, arrived 6 337 | broke **5 168 s**, arrived 5 718 |
+   | `empire-state`/`nearest-car` | `awtIsValid` **true**, `stable` | `awtIsValid` **false**, `diverging-queue` |
+
+   So the prior table was right and the speed moved it. **The direction is the part to read, and it is not the intuitive one.** A 1.2 % *reduction* in express speed lets `nearest-car` hold **1 566 s longer** and serve nearly twice as many people, and makes `destination-panel` break where it had held. **Opposite signs on one building from one change**, which is exactly the shape `CLAUDE.md`'s statistical discipline warns about — *increasing lift speed appearing to increase average waiting time*. **No dispatcher ranking is claimed from it**: these are single runs, this table is a reproduction fixture rather than a comparison, and a ranking would need a paired-t interval over 50–200 replications that nothing here has run. **No mechanism is offered** for why the sign differs by dispatcher.
+
+   **And the Empire-State row is a saturation finding rather than a throughput one.** `arrived`, `carried` and `legs` are **4 585 on both arms** — the same people, served — while the verdict goes `stable` → `diverging-queue` and the mean stops being quotable. The slower cars do not serve fewer riders; they leave the queue trending upward at the horizon, which is the first of the five `awtIsValid` grounds. **A mean may no longer be quoted for that cell**, and that is the rule working on a figure this wave authored rather than on an old one.
+
+9. **What this does not decide.** Whether 6.0 and 8.0 are the right speeds for these towers — they are still **CHOSEN and awaiting the owner**, and the ladder constrains which values are *representable*, not which are right. Whether the ladder's 0.5 m/s step is fine enough. And nothing about the other fourteen shipped buildings, every one of which `commissioning.test.ts` already checks from disk.
+
+---
+
+---
+
+---
+
+## D601 — A floor has a plate, a shaft takes plan area out of every level it passes, and a floor with more hole than floor is refused; area is a published quantity and not a price, because the price is the owner's ruling
+
+**Date: 2026-09-15 · GitHub issue [#429](https://github.com/mrpeanut01/elevator-sim/issues/429) · Under the product owner's own comment on that issue of 2026-09-10 · Rules on: `core/src/config/schema.ts`'s `ISSUE_CODES` and `WARNING_CODES`, `data/elevator-specs.json`, all fourteen configs in `data/buildings/`, [`docs/02`](docs/02-elevator-reference.md) and [`data/buildings/README.md`](data/buildings/README.md).**
+
+**Why an entry.** [§ D405](#d405)'s second ground, twice. It binds code and data no single module owns — a field on `FloorConfig`, `FloorRange` and `BuildingConfig` in `config/`, a block in `elevator-specs.json`, a plate on every shipped building, and a row on the Engineer building plate in `packages/viz` — and it **refuses** part of what the issue asks for, which is a thing a docstring may not decide on its own.
+
+### 1. The premise, verified rather than quoted
+
+The issue's claim is that the model has no concept of area at all. It was true on the tree this lane branched from: `areaM2`, `floorArea`, `rentable` and `coreArea` returned zero hits across `packages/core/src`, `packages/viz/src` and `data/`, and a floor carried `id, index, heightM, population, isEntrance, isTransferFloor, trafficProfile, landingCallType, label` and nothing else. So **adding a car really was a pure win**: the schedule charges 34 u for `new-car` once and nothing charged it again.
+
+### 2. What is built
+
+**A floor's plate is data** (invariant 7), declared with type, range, unit and default (invariant 8) as `config/schema.ts#FLOOR_AREA_TUNABLES`, and authored at whichever scale it is constant at — `BuildingConfig.grossAreaPerFloorM2`, `FloorRange.grossAreaPerFloorM2`, `FloorConfig.grossAreaM2`. **Precedence is floor, then range, then building**, which is `trafficProfile`'s exactly, so no reader learns a second rule. **The default is *absent*, and absent means area is not modelled** — § D583's shape, for its reason: a building that declares none resolves to the object it resolved to before this entry.
+
+**What a hoistway takes is also data**: `elevator-specs.json#shaftFootprint`, four bands of rated load, beside the machine classes for `airPressure`'s and `ropeClasses`' reason — a hoistway's plan area is set by the car's plated load and its clearances, not by whether the machine is geared.
+
+`config/floorArea.ts#resolveFloorArea` is called once, by `resolveBuilding`, and puts `ResolvedBuilding.area` on the result: gross, core, lettable and `coreShare`, per floor and for the building.
+
+### 3. The one modelling claim, and it is the load-bearing one
+
+**A shaft is charged over its bank's whole *span*, not over its served set.** A bank serving 43–75 takes plan area out of floor 12, because the hoistway physically passes through it. That is not a convenience — it is the reason sky lobbies exist, it is what makes a tall building's core taper, and a model that charged only the served floors would make an express shuttle free everywhere it does not open, which is the opposite of the fact the issue is about. Measured on `burj-class-reference`, the core runs 245.6 m² through the low residences and 64.0 m² at the top; `config/floorArea.test.ts` asserts the shuttle is charged to floor 50, which it passes and never opens onto.
+
+**A double-deck car is one shaft**, charged once at its *per-deck* load. The source's own arithmetic requires it: 24 single-deck cars becoming 13 double-deckers *"reduc[es] the required core by no less than 11 hoistways"*, and 24 − 13 = 11 only works if a double-deck car occupies one hole.
+
+### 4. Where the figures come from, and which of them are chosen
+
+**One thing is cited and everything else is chosen**, and the split is in `shaftFootprint.$comment` field by field. Al-Kodmany (Buildings 2015, 5(3), 1070–1104) gives **one car = one hoistway** outright, in the double-deck arithmetic above. For the *size* of a hoistway it gives one anchor and that anchor **brackets** rather than fixes: TWIN on a 31-storey building recovers *"more than 830 m², equivalent to an area of 20 hotel rooms"* by cutting the shafts *"by a third"*. 830 ÷ 31 is 26.8 m² of plate per floor and that is a third of the shafts, so one hoistway is 26.8 ÷ (N/3) m² for an unstated original count N — **13.4 m² at N = 6, 8.9 at N = 9, 6.7 at N = 12**. A 31-storey office plausibly runs 8–12 shafts, so the source supports roughly **6.7–13.4 m²**.
+
+The four bands — 5.5, 6.8, 8.0 and 9.5 m² — are **chosen**. The middle two sit inside that bracket and the ends sit outside it deliberately, because a 10-person residential car needs less hole than that building's and a 26-person service car needs more. **All four are an agent's proposal awaiting the owner's approval and `elevator-specs.json` says so**; nothing here is approved.
+
+**The floor plates are chosen too, and are an assumption rather than a citation** — `burj-class-reference`'s own header already says exactly that about its populations, and this follows it. No published floor plate was read for any of the fourteen. The four reference towers taper and the ten others carry one plate; what each is, and the density reasoning behind it, is in `data/buildings/README.md`.
+
+**What the block measures, said where a reader will meet it: the hoistway alone.** No lift lobby, no machine room, no landing-door swing, no riser. The paper's headline that elevators and escalators *"can occupy up to 40% of a building's floor"* is about all of that, so a core share derived here is **expected to come out well under 40 %** and a reader comparing the two is comparing different quantities.
+
+### 5. What is **not** built, and why that is a decision rather than an omission
+
+**#429's third acceptance criterion — *"the price schedule charges area, and the Career income model reads it"* — is deliberately not built.** `data/price-schedule.json` is untouched and nothing here costs a unit. The reason is the product owner's own, on the issue, on 2026-09-10:
+
+> *"The ruling this needs is not should shafts cost area — it is that **making area a cost introduces a second budget axis and a Career income term**, and neither is in `docs/38`. That reshapes the economy rather than adding a price, which is why it should not be built on an engineering judgement."*
+
+That objection was about `pricing/` having no magnitude term at all, and **half of it has since been answered**: [§ D552](#d552) landed rate × quantity and [§ D560](#d560) moved the last private multiplier onto it, so *per m²* is now expressible with no new mechanism. The half that remains is the half the owner reserved, and it is untouched here.
+
+**So the ruling arrives with arithmetic attached rather than without.** Both shapes were worked out and neither was taken:
+
+- **Charging a shaft in units per m²** means making `new-car` a rated row. That **moves a shipped price**, which `data/price-schedule.json`'s own header puts with the product owner, and § D552 clause 4 re-derives every scenario ceiling from `unitsPer × quantity.max` — thirty in `data/campaign.json` and six in `data/engineering-briefs.json`. Measured over the shipped set, **a shaft's area cost spans 49×**: 24.0 m² for a car in `ashgate`'s three-level car park against **1 178.0 m² for one more Burj shuttle**, which at the rate that keeps `midtown-office` at today's 34 u (0.238 u/m²) would price that shuttle at **280 u against a whole schedule of 412**. That is not a tuning question; it is a different game, and it is the owner's.
+- **Charging a shaft in area as a second currency** — the issue's own words, *"priced in units **and** in the area it permanently removes"* — is the second budget axis by name, and needs the Career income term beside it or the area is spent from nothing.
+
+**A third thing the measurement settles, and it is the reason not to guess.** The plate ceiling in § 6 **does not bind on anything that ships**: the nearest approach across all fourteen buildings is 26.6 % of one plate, and no purchase the game sells comes near it. So a reader must not take the refusal for the trade-off. **What a shaft costs today is the lettable area it removes on every floor it passes, forever, published and unavoidable** — a fifth car at `midtown-office` is 142.8 m², measured on the run in `config/floorArea.test.ts` — and turning that quantity into a *price* is the ruling this entry declines to take.
+
+### 6. The ceiling refuses, and it is proved by a configuration that breaches it
+
+`ISSUE_CODES.coreExceedsFloorPlate`: a floor whose hoistways take **strictly more** plan area than it has fails to load. Strictly, never equal — a level that is entirely core is degenerate but buildable, and refusing it would be this project choosing an architectural taste over an impossibility.
+
+It is proved on a hand-built two-level tower where the ninth car fits on a 65 m² plate and the tenth does not, which is *more shafts is not monotonically better* as a refusal. It is deliberately a test building, on § D583's precedent, because no shipped configuration can reach it.
+
+Two warnings sit under it, both `regenerative-drive-buys-nothing`'s shape: `floor-area-buys-nothing` for a data directory with no footprint table, and `partial-floor-area` for a building where only some floors resolve a plate — in which case the building's totals are **absent rather than partial**, because a gross area summed over some of a building's floors reads as a figure for all of them.
+
+### 7. What the shipped buildings measure, pinned rather than bounded
+
+`coreShare`, hoistway only: `garden-apartments` 1.4 %, `midtown-office` 1.9 %, `st-jude-hospital` 2.3 %, `harbour-point` 2.5 %, `ashgate` 3.0 %, `crown-hotel` 3.2 %, `secure-tower` 5.1 %, `chancery-house` 6.4 %, `vertical-city` 7.3 %, `mixed-use-high-rise` 7.5 %, `ctf-class-reference` 7.9 %, **`burj-class-reference` 13.1 %**, `shanghai-class-reference` 13.3 %, `merdeka-class-reference` 16.6 %. The worst single floor in the project is `merdeka-class-reference`'s sky lobby at **26.6 %**, where ninety-two hoistways cross one level.
+
+**Low-rise single figures and supertall mid-teens is Al-Kodmany's qualitative claim arriving as a measurement of this model** — *"in high-rises elevators occupy more space than any other services"* — rather than as a quotation. It is not the paper's 40 %, and § 4 says why it must not be read as it.
+
+### 8. The non-test caller, named
+
+- **Reader**: `packages/viz/src/dev/rightRail.ts#buildingPlateOf`, which draws a `core` row above the line beside floors, metres and people. It is the **only** reader, and that is the whole of why no leg can move.
+- **Writer**: the fourteen configs in `data/buildings/`, through `config/parse.ts#resolveBuilding`.
+- **Refused loudly rather than defaulted quietly**: a building that declares a plate where the data directory has no footprint table publishes **no area**, warned, rather than a core of zero — a shaft that costs nothing is the thirteen-times-shipped defect wearing a new name.
+
+### 9. Move the control and require the run to change, in the only form available
+
+**Changing a building's area declaration alone changes no leg** — #429's fourth criterion, first half — and three arms prove it on a run rather than on the import graph: as shipped, at double the plate, and with the declaration removed, all three fingerprint identically.
+
+**The second half is measured on the quantity the control moves rather than on a leg**, § D583's shape: a fifth car in `midtown-office`'s only bank is 6.8 m² on each of twenty-one floors, so `lettableM2` falls by exactly **142.8 m²** while `grossM2` does not move — a shaft does not make a building bigger. The legs of *that* comparison do move, deliberately, and the point is the other way round: the area is charged whether the fifth car helps or not.
+
+### 10. Not a score, and mechanically so
+
+No area figure is folded into a verdict, weighted against a wait, or turned into a letter. `campaign/judge.ts`'s refusal is untouched, `shift/goals.ts` gains nothing, and the plate row publishes a figure beside the others exactly as `workPerServedLegKJ` sits beside raw energy ([§ D106](#d106)). Charter non-goal 6 holds.
+
+### 11. What this does not decide
+
+Whether the four footprint figures are right — all four are chosen and all four await the owner. Whether the fourteen plates are right — they are a stated assumption and a later citation replaces a stated figure rather than a silent one. Whether area should cost anything at all, which is § 5 and the owner's. Whether lettable area should bound a floor's **population**, which would make a shaft move a leg and would move every published interval in the project; it is not built and `floorArea.ts` says so in its own header rather than leaving it to be discovered. And whether `new-car` charging the same 34 u for a 24 m² shaft and an 1 178 m² one is right, which is the finding § 5 hands over rather than a defect this lane may fix.
+
+**Bookkeeping.** This lane was reserved D601–D605 and spent **D601**; D602, D603, D604 and D605 are returned **unspent**, and whether each is free or a hole is the integrator's call at close, because that depends on what lands above them (§ D430). The lane also **widened wave AB's reservation** in `documentation.test.ts#OPEN_RESERVATION` to `D594–D605` — the floor is the charter row's own figure and the ceiling is the top of *this lane's* block, written at the narrowest figure that is true from here, exactly as § D583 did for wave AA.
+
+---
+
+## D606 — A rush sitting posts from the viewer, and the purse stays unspendable: the boundary that blocks it is named rather than moved, and the citation for it was the wrong way round
+
+**Date: 2026-09-15 · GitHub issue [#372](https://github.com/mrpeanut01/elevator-sim/issues/372) · Builds the client half of [§ D542](#d542) and [§ D543](#d543) · Corrects a citation carried in `data/rush-purse.json`.**
+
+**Why an entry.** Two of [§ D405](#d405)'s three grounds. It binds `everyday/host.ts`, `everyday/reportScreen.ts`, `menu/client.ts`, `dev/main.ts`, `honesty/surfaces.ts` and `everyday/rushScreenModel.ts#RUSH_ABSENCES` — six modules `everyday/rushSitting.ts` does not own — and it **refuses to move a boundary already recorded**, which is the kind of answer that has to be findable by the next person who asks the same question.
+
+### 1. What is built, and it is the half the issue's own triage called missing
+
+§ D542 built the sitting protocol on the server and closed with two halves unbuilt: *"no between-round rebuild travels, so the purse is derived and nothing spends it, and the viewer does not yet post a sitting."* The second is built here.
+
+A rush session keeps a **round list**. A round joins it in `EverydayHost.endRush`, which is the one moment the state that produced it, its recording and the second it ended at are all in hand at once; *Run the rush again* opens the next round of the same sitting rather than replacing it, and leaving the rush ends the sitting, because *consecutive runs from an as-shipped start* is what a sitting is. `everyday/rushSitting.ts#rushSittingOf` decides whether the rounds may travel and builds the body; `everyday/rushPost.ts` draws the list, the button and every state of both; `menu/client.ts#postRushSitting` is the one request, to the route § D542 opened.
+
+**Three things are deliberate and each is a rule this tree already holds.**
+
+- **A round claims its recording's own hold moment, not where it ended.** `RushOutcome.heldS` is the hold line *or the player's hand, whichever came first*, and the server replays the whole ninety minutes and reads the hold moment off its own legs. A round ended by hand at 8:20 whose recording holds at 13:40 has to claim 13:40, or an honest player is answered `held-does-not-reproduce`. Whether a hand-stopped run may post at all is § D515's separate question, and it is answered on the **last** round, which is what a sitting ranks on.
+- **Every refusal is owned by the module that decided it.** The two device-only ids are `scope/runIdentity.ts`'s sentences, a handover the wire cannot express is `scope/switchWire.ts`'s, a press of a kind that does not travel is `core`'s own `interventionKindRefusal`, and *there is no server* and *nobody is signed in* are `everyday/postRun.ts`'s, borrowed rather than reworded. The four sentences this lane authors are all facts about a *sitting* — hand-stopped, never broke, too long, nothing played — which no other module has an opinion about. A second wording for any of them would be `honesty/agreement.ts#surfaces-disagree` built on purpose.
+- **No purse is computed in `packages/viz`, and the one a player reads is the server's reply to their own post.** `packages/server`'s `rushSitting.ts#NEVER_ON_THE_WIRE` refuses a client-named purse *by name*; this end has no field that could carry one and no arithmetic that could produce one. § D543 clause 5 permits a purse in the poster's own answer and nowhere else, so the figures appear on the round list only after a 201 and never on a board row.
+
+### 2. The purse is still unspendable, and the reason is a package boundary plus a ruling nobody has taken
+
+Criterion 2 of the issue — *a round rebuilt with a larger purse produces a different run from the same seed* — is **not met, and was not attempted**. Closing it needs two different things, and only one of them is an engineering choice:
+
+**The boundary.** A rebuild is the fit-out kit (§ D427). The code that turns a kit into a building is `packages/viz/src/campaign/fitOut.ts` over `packages/viz/src/commissioning/`, priced by `packages/viz/src/pricing/parse.ts` against `data/price-schedule.json`, with the tiers in `packages/viz/src/campaign/economy.ts#SHOP`. `packages/server` can import none of it. Three shapes were weighed and none was taken:
+
+1. **Move the derivation into `core`.** There is precedent and it is the precedent § D542 itself used — `core/src/config/rushPurse.ts` sits beside `chimeLedger.ts` for exactly this reason, *"`packages/server` has to derive a posted sitting's purses and may not import the viewer, so the rule has to live in the package both of them already depend on."* What that precedent covers is a **data reader**. `SHOP` is a shop: its tiers carry player-facing names, subtitles and effect sentences, and moving them into `core` puts product copy inside the simulator and outside the honesty corpus's reach, which is a different decision from moving a parser.
+2. **Put the rebuild on the wire as a cause.** A sitting already carries causes and the server already derives effects, so this is the shape § D486 licenses — but the server still has to turn the cause into a building, so it reduces to (1) with an extra field.
+3. **Admit the two bought intervention kinds on a rush sitting.** `core/src/sim/interventionWire.ts` refuses `equipment-change` and `building-change` because *no submission carries a budget, so a replay would hold the change and not the entitlement to it* — **and that reason is not true of a rush sitting**, which is the one submission in this product whose budget the server derives for itself. That is a real observation and it is recorded rather than acted on, because the server still cannot price the change: `data/price-schedule.json` is parsed only in `packages/viz` (`core/src/config/chimeLedger.ts` says so in terms).
+
+**The ruling.** Even with the boundary moved, three questions have no answer in `docs/38` § 2.3 or anywhere else, and each changes what gets built:
+
+- **Does a rush rebuild book nights?** The career's economy books works over nights in a month grid. A sitting has no calendar, so either a rush purchase is instantaneous — a departure from the shop's own rule — or a sitting acquires a clock.
+- **Does a tier still require the tier below it inside one sitting?** That is § 8.2's first buying rule, and a sitting that starts as-shipped every time makes it a very different ladder.
+- **What does *fitted* mean?** `data/chime-ledger.json` sells `rush-prefit`, *Start with the building fitted*, for 15 chimes. Which kit that is, is authored nowhere, and `rushSitting.ts#rushSittingIssues` refuses the modifier by name today for the same reason it refuses a rebuild.
+
+So the answer here is to **name what has to be decided and build the half that does not need it**, on the issue's own standing: half of it landed honestly is worth more than all of it landed on an invented boundary.
+
+### 3. Criterion 3's client half is blocked by criterion 2 rather than merely unbuilt, which is the useful finding
+
+The triage this lane started from read criteria 2 and 3 as separate gaps — *the spend term* and *the viewer cannot exercise the top-up*. They are one gap. `POST /api/chimes/spend` exists, `data/chime-ledger.json` authors `rush-purse-top-up` at 8 chimes for 5 units, the server checks a claimed modifier against the account's spends, and **nothing in this build spends a chime** (`everyday/chimesPanel.ts#CHIMES_PANEL_COPY.spendRefusal` says so on the screen that lists the prices).
+
+Building that spend now would ship **a purchase that changes no run**: a wider purse buys nothing, because nothing spends a purse. That is `CLAUDE.md`'s standing requirement in its plainest form — *move the control and require the run to change* — and shipping it would be the twelfth instance rather than a feature. So `rushSittingOf` takes a `modifiers` parameter that is always empty, with the reason on it, and the day a spend surface exists it passes its claims through that parameter rather than teaching the module a second way in.
+
+`RUSH_ABSENCES` carries the absence in the register's own shape, `buildNotes.test.ts#ABSENCE_TRIAGE` owns it to **#372 itself** rather than to a new issue — the absence is that issue's own second criterion — and `everyday/rushPost.ts#RUSH_POST_COPY.purseNote` says it beside the figure, because a player who reads *paid 18 into a purse of 18* and goes looking for the shop has met the same defect from the other side.
+
+### 4. The citation was the wrong way round, and it had been copied
+
+`data/rush-purse.json`'s `$comment`, and the dispatch brief that quoted it, both cited **§ D215 § 3** for *the server may not import `viz`*. § D215 § 3 states the prohibition in the **other** direction — *"`viz` may not depend on `server`"* — which is the direction every other site in the tree cites it for, and `packages/server/src/leaderboard/verify.ts:342` already says so in as many words. The clause about what `packages/server` depends on is § D215 § 1, and it has itself drifted: it says *"one dependency, `@elevator-sim/core`"*, and `packages/server/package.json` today also names `@elevator-sim/experiments`, `pg` and two Azure packages.
+
+**What is actually true** is narrower than either clause and is not a decision at all: `packages/server/package.json` does not depend on `packages/viz`, and `packages/viz` is a browser bundle. The `$comment` is corrected to say that, to name § D215 § 1 as the clause it meant, and to say that § 3 runs the other way — a correction rather than a deletion, on this repository's usual rule. § D215 § 1's own drift is **recorded and not fixed**: it is a dated record of what shipped in 2026-08, and rewriting a decision entry after the fact is what this project does not do.
+
+### 5. What this lane measured about the corpus, as a forecast rather than as the row
+
+§ D343 puts the corpus measurement on the integrator, once, after integration. What a lane may honestly publish is a prediction, and this one is decomposed to the string: **+80 strings a case in both tiers**, no surface added and none removed, cases, simulations and failing cases unmoved. The eighty is twelve states of the post block × (eyebrow + heading + button) = 36, plus fifteen prose lines across those states, plus the empty-list line, plus the purse note, plus three states × two rounds × four round-line strings = 24, plus two `earned` lines and one round refusal. The register is a **substitution**: `RUSH_ABSENCES` gains an entry and the section's `empty` line goes, so `buildNotes` contributes zero. Every term is unconditional given a case, so the deep tier's figure is the same eighty.
+
+---
+
+## D611 — Stage 7 stops clearing from the dropdown, by moving its demand down; the bar follows the demand rather than being moved
+
+**Date: 2026-09-15 · GitHub issue [#234](https://github.com/mrpeanut01/elevator-sim/issues/234) · Rules on: [`data/campaign.json`](data/campaign.json), `packages/viz/src/scenario/candidates.ts`, [`data/scenario-goals.json`](data/scenario-goals.json), `campaign/difficultyCurve.test.ts#DROPDOWN_CLEARS`, [`docs/33`](docs/33-difficulty-curve.md) § 3.3f and § 6 C2, [`docs/10`](docs/10-experience-layer-contract.md) M30.**
+
+**Why an entry.** [§ D405](#d405)'s second and third grounds: it moves something already recorded — [§ D520](#d520)'s pinned three-row register and `docs/10` M30's published cell — and it binds a `data/` file, a `.ts` constant and two documents that no one module owns.
+
+**The decision.** `stage-7-prove-it` runs at **1.25 %pop/5 min** rather than 1.5. `DROPDOWN_CLEARS` and `DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT` lose their stage-7 rows on this commit, which is the only way a row in either is allowed to leave. Nothing else about the stage moves: the same building, the same horizon, the same seed sets, the same two goal kinds, the same `every-declared-dimension` editable set, the same budget.
+
+**What was measured, and with what.** The shipped `scenario/measure.ts#measureScenario` to re-derive the stage's published bars at each candidate demand, then the shipped `campaign/stageSequence.ts#runStageToVerdict` over all twelve profiles `admitProfile` admits, 50 tuning and 50 holdout replications each — the same two functions the file on disk is generated by and the register is measured by, rather than a second copy of either. The probe was checked against the shipped 1.5 % first, where it returned `destination-panel` and nothing else.
+
+| `arrivalRatePctPop5min` | meets every bar on the tuning seeds, of 12 admitted |
+|---|---|
+| 0.75 | none |
+| 1.0 | none |
+| **1.25** | **none** |
+| 1.5 (shipped until this commit) | `destination-panel` |
+| 2.5 | `predictive-balanced`, `auction`, `auction-multi-round`, `destination-panel` |
+| 3.5 | `fairness-first`, which also holds on the holdout |
+| 5 | six, four of which hold on the holdout |
+
+Then on the tree this lane is on: the deep tier itself, over all 45 admitted cells, twice — **before**
+the change, where it reproduced § D520's three rows and two holdout refusals exactly in 316.8 s, and
+**after**, where stage 7 reads `admitted 12, met on tuning seeds none, refused on the holdout none`
+in 360.8 s and the register matches in both directions. A candidate measured on an apparatus that had
+not first reproduced the answer everybody already had would be measuring the apparatus.
+
+**The finding, which is the half worth carrying.** **Raising this stage's demand makes it easier to clear from the dropdown.** The bar a count goal is judged against is `collective`'s own count on the same seeds, and `collective` degrades faster under load than the profiles a player can pick, so a heavier morning *widens* the gap the candidate is scored on. C2's lever column says *"the demand or the fabric moves"* and says nothing about direction; a lane reading it as *harder building, harder stage* would have moved this stage to 2.5 % and taken the register from one clearer to four.
+
+**Why this is not a bar move, which is the objection DC-R1 exists to raise.** Nothing here authors a number. The goal kinds are untouched, the one authored threshold in the campaign (`long-waits-under`'s 10 %) is not on this stage, and the new bar is **re-derived** into `data/scenario-goals.json` by `scenario/regenerate.test-helper.ts` — the same path `goalRates.test.ts` re-derives it against. Exactly one cell in that file moved: `answer-the-demand` from `26/50, 31/50` to `31/50, 26/50`, still `variable` on both seed sets, so the stage keeps its failable non-comparative goal and DC-1 is untouched.
+
+**Provenance, per the owner's 2026-09-08 standing ruling on governed `data/` values.** `1.25` is **CHOSEN** — an author's setting, drafted for the owner to accept, tighten or reject, and **not approved by the agent that moved it**. What is **MEASURED** is the table above and the regenerated cell. The choice among 1.25, 1.0 and 0.75, all three of which read zero, is that 1.25 is the smallest move inside the window; the window itself is the measurement, and three consecutive rates reading zero is why this is not a knife-edge.
+
+**What this does not fix, said in the same breath.** Stage 7 was already **below** its survivor band at 0 of 24 through at every rung and already on `survivors.test.ts#UNWINNABLE_AS_MEASURED`; a stage made harder does not come back inside a band it was under. Both registrations stand and neither moves. So this closes one of the five named ways through criterion 1 and closes none of the band breaches, and calling it a rebalance of the stage rather than of the clear would be over-reading it.
+
+## D612 — C2's demand axis measured on stages 3 and 5: one shut in both directions, one open at the profile's declared max and deliberately not taken
+
+**Date: 2026-09-15 · GitHub issue [#234](https://github.com/mrpeanut01/elevator-sim/issues/234) · Rules on: [`docs/33`](docs/33-difficulty-curve.md) § 3.3f and § 6 C2, `campaign/difficultyCurve.test.ts`'s registers.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: it pins what C2's lever column can and cannot reach on two stages it names, which until now was an unmeasured hedge, and it records a refusal that a later lane would otherwise spend a day re-deriving.
+
+**Stage 3 is shut, and upward is shut twice over.** At 11 %pop/5 min `fairness-first` still meets every bar, so downward changes nothing. At 15 — `office-standard`'s declared `max`, and DC-R1 forbids exceeding it — `nobody-abandoned` measures **1/50 `variable` on the tuning seeds and 0/50 `constant-fail` on the holdout**, so R12 refuses it and `data/campaign.json` could not declare it at all. The stage would be left with `beat-the-baseline` alone, join stage 1 on the DC-1 register, and get **worse** on the dropdown question rather than better: measured with that goal set, three admitted profiles meet and two clear. So stage 3's quarter of C2 is closed to demand and open only to fabric on `midtown-office` — a building stages 2 and 7 also run and which `data/reference-runs.json` pins a run of, which is a wave's blast radius rather than a lane's.
+
+**Stage 5 is open at 15 and is not taken here.** All five of its goals stay shippable at 15, none of the four profiles its `editable` list admits meets every bar, and swept over all thirteen shipped profiles rather than the four, four meet on the tuning seeds and **none clears**. That would empty **two** of this issue's five named ways through in one move — `DROPDOWN_CLEARS`'s `eta` and `DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE`'s `predictive-balanced`.
+
+**And the second of those is why it is refused rather than landed.** `predictive-balanced` is stage 5's only survivor at any rung, and stage 5 is one of only **three** scenarios `data/scenario-survivors.json` finds any way through at all — the others being stage 1 (`zoned-uppeak`) and stage 3 (`fairness-first`). It is also the stage the suite pins *winnability* on: `campaign/stageFiveClears.test.ts` asserts that at least one shipped profile clears it, which is this campaign's answer to *is it winnable at all?*. Closing it takes stage 5 to zero survivors, puts it on the band register as `below` and on `UNWINNABLE_AS_MEASURED` — seven of ten rather than six — and inverts that assertion. `docs/33` § 6's C2 row anticipates the inversion and names where the clause goes — *"winnability moving to DC-3's witness"* — but **no witness vector that clears stage 5 at 15 % has been searched for**, and inverting the assertion before one exists would trade a measured way through for no way through and call it a rebalance. The lever is measured and ready; what it waits on is one witness.
+
+**What this does not decide.** Whether the fabric axis can close stage 3 or stage 5 — nothing here measures it, and a plausible sentence in place of a measurement is what [§ D256](#d256) refuses.
+
+## D613 — Stage 1's one-car fabric lever reproduces exactly, and is not taken in this lane; the reason is blast radius rather than doubt
+
+**Date: 2026-09-15 · GitHub issue [#234](https://github.com/mrpeanut01/elevator-sim/issues/234) · Rules on: [`docs/33`](docs/33-difficulty-curve.md) § 3.3a's Result 7, `campaign/difficultyCurve.test.ts#DC1_UNFAILABLE`.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: `difficultyCurve.test.ts`'s register says the lever *"belongs to the campaign rebalance (#234), not here"*, and this is that lane arriving, confirming the figure and declining the edit. A register entry that names a lane and is then silently left alone by it is worse than one that was never assigned.
+
+**Reproduced exactly.** `garden-apartments` rebuilt through `parseBuilding`/`resolveBuilding` with **one** car in its `main` bank instead of two, at the building's own declared demand and stage 1's own 900 s and seed sets: `long-waits-under (≤ 10 %)` measures **31/50 on the tuning seeds and 32/50 on the holdout**, both `variable` — inside `docs/33` DC-4's `[1/3, 2/3]` band on both sets, exactly the pair § 3.3a Result 7 published. Every other per-run kind stays `50/50, 50/50`. So the stage would gain the failable non-comparative goal DC-1 asks for and `DC1_UNFAILABLE` would empty.
+
+**Not taken, and the reason is a count.** `garden-apartments` is named by **282** `.ts` files in this tree; it is the CLI's default building, one of the two runs `data/reference-runs.json` pins figure-for-figure and re-simulates in `watch/reference.test.ts`, a matrix cell, a leaderboard board key and a fixture in four packages. Halving its fleet moves every one of those, and none of it is in this issue. Landing a one-line `data/` edit whose consequences are a wave's worth of re-pinned figures, inside a lane whose remaining budget is one suite run, would produce exactly the thing `CLAUDE.md` names first: a published number that no longer reproduces from the code that produced it.
+
+**So the register keeps its entry and gains this measurement**, which is a different state from *nobody tried*: the axis is measured **open**, the figure is confirmed on this tree rather than inherited, and what it needs is a wave that owns `garden-apartments`' pinned figures rather than a stage.
+
+## D614 — The survivor table's census sentence had gone stale one wave before anybody regenerated it, and the regeneration is what said so
+
+**Date: 2026-09-15 · GitHub issue [#234](https://github.com/mrpeanut01/elevator-sim/issues/234) · Rules on: [`data/scenario-survivors.json`](data/scenario-survivors.json)'s `provenance`.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: it corrects a published `data/` table's own account of itself, which [§ D535](#d535) and [§ D583](#d583) both have a claim on, and it is not the change the regeneration was run for.
+
+**What happened.** Stage 7's demand move ([§ D611](#d611)) obliged a regeneration of `data/scenario-survivors.json`, because a published number that no longer reproduces from the code that produced it is this repository's named defect. That run — 4 860 s over the whole ladder on this tree — came back with **nine of the ten scenarios byte-identical** and stage 7 moved in one field. It also rewrote two `provenance` fields that have nothing to do with #234:
+
+- `scope` read *"10 of **33** priced changes can reach a scenario run at all"* and now reads **34**.
+- `unreachableChangeIds` gained **`rope-upgrade`**.
+
+**Both are wave AA's rope row arriving in a census nobody re-derived.** GitHub issue #433 added the 16 u `rope-upgrade` row at the building tier ([§ D583](#d583)); `data/campaign.json`'s own budget comment records the ladder ceiling moving for it. The survivor table's census is derived from `data/price-schedule.json` at regeneration time, so the row entered the denominator the moment it landed — and the table on disk went on describing a 33-change schedule until something re-ran the sweep.
+
+**No count moved, and that is the point rather than a mitigation.** `rope-upgrade` is *unreachable*: `campaign/stageRun.ts` cannot apply a building-tier change to a scenario run, so it is in the denominator of *what the schedule prices* and in neither the numerator nor any survivor count. The figures were right the whole time. What was stale is the table's account of the space it counted over, which is the half a reader uses to decide whether a count means anything — and it is exactly the class `CLAUDE.md` records under *a published number goes stale the same way*, one level up from a number.
+
+**What this does not decide.** Whether the census sentence should be re-derived by a guard rather than by a regeneration. It is written by `regenerateSurvivors.test-helper.ts` from the shipped schedule, so it is derived rather than transcribed — the gap is that nothing re-derives it *between* regenerations, and the survivor sweep is a weekly deep tier by design. Naming a cheap always-on check for it here without measuring what it would cost would be inventing one.

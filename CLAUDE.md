@@ -34,7 +34,19 @@ verdict:
   arms** — and say the shape, not just the verdict: the two light points stay INDISTINGUISHABLE,
   which is what an over-subscription defect predicts, since an unbounded promise cannot bite until
   a car fills. The cost is unchanged and still reported beside it (AWT and WT95 **WORSE** against
-  `eta` at that point). 6c (learned control) is **no longer deferred — it is implemented, measured, and NOT
+  `eta` at that point).
+  **That verdict now has a second building rather than a second seed, and half of it did not
+  reproduce** ([§ D595](DECISIONS.md), GitHub issue #428). Measured on `one-wtc-class-reference` at
+  the same apparatus — `eta` baseline, n = 200 under common random numbers, TTD the gate — at *that
+  tower's* highest quotable rate, which is 2 % rather than Midtown's 4 % and is censused at the
+  budget the run spends: **`destination-eta` is INDISTINGUISHABLE**, ΔTTD `−0.092 [−0.804, +0.619]`
+  with `requiredReplications` of **11 704** against a budget of 200, while **`destination-panel` is
+  BETTER**, `−1.293 [−2.069, −0.517]`, resolvable at n = 1. So the Level-0 arm that carries § D100's
+  accepted result does nothing on the second tower and the Level-1 panel does — **the reverse of the
+  shape above** — and what the pair establishes is that the effect is **building-dependent**. The
+  verdict is not moved: Midtown's interval is still Midtown's, this one is still this one, and
+  § D100's criterion is the criterion's own to restate. The costs are the same shape on both arms
+  (AWT and WT95 **WORSE**), and **no mechanism is offered** for the split. 6c (learned control) is **no longer deferred — it is implemented, measured, and NOT
   ACCEPTED**: ΔTTD `−0.213 [−0.440, +0.014]` against `collective` at n = 200 on a disjoint seed, an
   interval containing zero, unchanged at 24 and 64 search candidates ([§ D139](DECISIONS.md) is the
   criterion, dated before the code; [§ D145](DECISIONS.md) is the verdict). **That refusal is now
@@ -59,7 +71,19 @@ verdict:
   Double-deck operation is
   **simulated** — paired stops, per-deck design load, deck-bound legs ([§ D131](DECISIONS.md)) — and
   the disclaimer survives only in the narrower case of a double-deck bank declaring no
-  `servesFloorPairs`, which no shipped building raises.
+  `servesFloorPairs`, which no shipped building raises. **That last clause is now checked by a
+  building that could have raised it rather than by a set that happened not to**
+  ([§ D598](DECISIONS.md), GitHub issue #426): `willis-class-reference` runs its sixteen
+  double-deckers as the **locals**, pairing every floor in their zone rather than four transfer
+  levels, and it loads with zero warnings — while deleting one bank's pairs **does** raise
+  `missing-floor-pairs`, which is what makes the first half worth anything. Two things that tower
+  measured and the shuttle-only set could not: a double-deck **local** forces one uniform storey
+  height over its whole zone, because every pair must be exactly `deckSeparationM` apart; and its
+  lobby escalator carries 720 hops with the decks and **exactly zero** without them, so a transport
+  mode can be *produced by* the deck model rather than sit beside it. **No residual is published for
+  a double-deck bank**, and that is the apparatus rather than the building —
+  `oracle/upPeakCase.ts#isolateBank` drops the deck fields, so what it measures is a single-deck
+  bank of the same cars.
 - **Phase 8** — **both blocking property violations are closed**, and neither was closed by moving a
   bound: `fuzz-1001074` by a fourth `awtIsValid` ground, `fuzz-1000384` by revoking a promise a
   withdrawn car cannot keep. The deep tier is green at 2 000 cases. **All eight tracks have landed**;
@@ -89,13 +113,66 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave AA's, measured 2026-09-15 on the integrated tree**; the paragraph above
+  below are wave AB's, measured 2026-09-15 on the integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **722 903** | **606** | **62** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **899 963** | **4 710** | **63** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **733 546** | **606** | **62** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **912 990** | **4 710** | **63** | **0** | **green**, and the register is empty |
+
+  **Wave AB's move is 217 strings a case in both tiers, and the small change is the whole of the
+  interest: the remainder is 10 strings across 49 cases and 7 across 60.** Measured on the
+  integrated tree after wave AB, both tiers in one sitting, with the base at `e53f28b` re-measured
+  first in a detached worktree.
+
+  **The base reproduced to the string in both tiers** — always-on 722 903 / 62 surfaces / 0 failing,
+  deep 899 963 / 63 / 0, identical to wave AA's published row. That is the second consecutive wave
+  the base has held since wave Z broke the streak, and the habit is worth restating in the form that
+  survives: not that the base *will* reproduce, but that you find out, because only a re-measurement
+  tells a correction apart from a move.
+
+  | | base `e53f28b` | wave AB | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 722 903 | **733 546** | **+10 643** | **217.20** |
+  | deep strings | 899 963 | **912 990** | **+13 027** | **217.12** |
+  | surfaces | 62 / 63 | **62 / 63** | **0** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **Neither quotient is an integer and both sit a hair above 217, which is a different shape from
+  every non-integer this column has recorded.** 49 × 217 = 10 633 against 10 643 measured, and
+  60 × 217 = 13 020 against 13 027 — so the move is a per-case constant of **exactly 217** plus a
+  conditional remainder of **10 strings in one tier and 7 in the other**, about a fifth of a string
+  a case. Previous non-integers here were state-dependent renderers emitting a genuinely variable
+  count; this one is a constant with a rounding error's worth of condition attached, and saying
+  which it is costs one division.
+
+  **The forecasts are scored and they do not sum, which is recorded rather than explained away.**
+  Three lanes published exact per-case figures — lane B **+8**, lane C **+80**, lane D **0**, summing
+  to **88** — and lane A published a **floor** of +18 (13 → 16 contracts × 5 seeds, plus three
+  `nextContract` strings) with an unquantified conditional above it. Floor total **106**; measured
+  **217**. **The 111-a-case remainder is not attributed to lane A**, tempting as the arithmetic is:
+  that inference holds only if the other three forecasts were exact, and [§ D454](DECISIONS.md)
+  recorded four forecasts that each checked out against their own branch and still came up one
+  string a case short in the integrated tree. A quotient is not a measurement, which is what
+  [§ D256](DECISIONS.md) refuses. What can be said exactly is that lane A was the only lane to
+  publish a floor rather than a figure, and it was right to.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: identical,
+  nothing added, nothing removed — on a wave that authored **three more reference towers** (One WTC,
+  Empire State, Willis), gave every floor a plate and every shaft a footprint that comes out of it,
+  built a rush sitting that posts from the viewer with a twelve-state post block, and rebalanced a
+  campaign stage. Every one of them went into an adapter that already existed; the three towers
+  enter by `honesty/surfaces.ts` iterating `CONTRACTS` rather than by anybody listing them, and none
+  of them appears in either tier's building histogram, which is unmoved. **The deep tier's
+  one-surface lead survives and the diff names it**: `campaign/judge.ts#judgeStage` is the only
+  surface in deep and not in always-on, and nothing is in always-on and not in deep.
+
+  **Both tiers exited 0 this time, which the previous pair did not.** The base deep run wrote
+  complete figures at 76 minutes while vitest called it failed at its 3 600 000 ms test timeout
+  under a load average of 30; the integrated run was given `--testTimeout=10800000` and finished in
+  **1 847 751 ms** on a quiet box with the verdict matching the figures. A measurement whose verdict
+  disagrees with its own output is a measurement somebody will later mistake for a failure.
 
   **Wave AA's move is 129 strings a case in both tiers, and the base reproduced exactly — which is
   the streak restarting one wave after it broke.** Measured on the integrated tree after wave AA,

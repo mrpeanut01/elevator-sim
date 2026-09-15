@@ -37,6 +37,9 @@ Adding the file alone turns the suite red, which is the intended way to find out
 | CTF-class reference tower | [`ctf-class-reference.json`](ctf-class-reference.json) | Complete — 20 m/s up and **10 m/s down**, the only shipped building with an asymmetric car |
 | Shanghai-class reference tower | [`shanghai-class-reference.json`](shanghai-class-reference.json) | Complete — 20.5 m/s, the top of the speed catalogue, and 106 cars over six banks |
 | Merdeka-class reference tower | [`merdeka-class-reference.json`](merdeka-class-reference.json) | Complete — one sky lobby over a 562 m rise: fifty-six office floors are one leg from the street |
+| One-WTC-class reference tower | [`one-wtc-class-reference.json`](one-wtc-class-reference.json) | Complete — the **second** building Phase 6a/6b has been measured on, and a **two-level** sky lobby whose escalator carries an eighth of the tower's rides |
+| Empire-State-class reference tower | [`empire-state-class-reference.json`](empire-state-class-reference.json) | Complete — a 1931 **relay**: eight banks, no express anywhere, and the only building the closed form reconciles on **every** bank |
+| Willis-class reference tower | [`willis-class-reference.json`](willis-class-reference.json) | Complete — sixteen double-deck **locals** pairing every floor in their zone, at 2.5 m/s |
 
 ## Schema
 
@@ -58,6 +61,7 @@ Used by the two existing configs. One object per floor. Preferred for buildings 
 | `heightM` | Height above datum, metres. Drives travel time. |
 | `population` | Occupants; drives arrival rate as % pop / 5 min |
 | `isEntrance` | Ground-level source of incoming traffic |
+| `grossAreaM2` | This level's gross floor area, m², hoistways included. Optional — see **Floor area** below |
 | `label` | Optional human name |
 
 ### Range form
@@ -79,6 +83,91 @@ explicit form at load time.
 ```
 
 A config may use `floors`, `floorRanges`, or both (explicit entries win on index collision).
+
+## Floor area
+
+A floor may carry a **gross floor area**, and a hoistway takes plan area out of every level it passes
+through ([`DECISIONS.md` § D601](../../DECISIONS.md), GitHub issue #429). Declared at whichever scale
+it is constant at, with the same precedence `trafficProfile` already uses — **floor, then range, then
+building**:
+
+```json
+"grossAreaPerFloorM2": 1400,          // on the building: its typical plate
+"floorRanges": [{ "fromIndex": 15, "grossAreaPerFloorM2": 1500, … }],
+"floors":      [{ "id": "26", "grossAreaM2": 1500, … }]
+```
+
+**Absent everywhere means area is not modelled**, which is what every building said before § D601 and
+what a hand-built config still says. What a shaft *takes* is never authored here — it is derived from
+`../elevator-specs.json#shaftFootprint` by the car's rated load, so a building cannot declare a core
+that disagrees with its own lifts. A double-deck car is one shaft.
+
+A floor whose hoistways take **strictly more** area than it has fails to load with
+`core-exceeds-floor-plate`. No shipped building comes near it; the closest is **26.6 %** of one
+plate, at `merdeka-class-reference` floor 57. **`willis-class-reference` floor 87 is second at
+25.8 %**, which is close enough to say out loud: that tower runs 104 cars, and the margin here is
+a fact about the shipped set rather than a property of the model. A denser tower would cross it.
+
+### Where the seventeen plates come from
+
+**Every figure below is an assumption with its reasoning attached, not a citation.** No published
+floor plate was read for any of these buildings — `burj-class-reference.json`'s own header already
+says exactly that about its populations, and this follows it, so that a later citation replaces a
+*stated* figure rather than a silent one. All of them are **an agent's proposal awaiting the product
+owner's approval**.
+
+**Nine** of the seventeen carry one plate throughout, derived from a representative populated floor at
+a chosen gross area per occupant — roughly 16 m² for an office, 22 for `office-prestige`, 20–25 for
+mixed-use, 30 for a hospital, 35 for residential, 40 for a hotel — then rounded:
+
+| building | plate | basis |
+|---|---|---|
+| `garden-apartments` | 800 m² | 24 residents a floor |
+| `midtown-office` | 1 400 m² | 90 occupants a floor |
+| `harbour-point` | 1 650 m² | 104 occupants a floor, the densest office here |
+| `chancery-house` | 750 m² | 34 occupants a floor at prestige density |
+| `secure-tower` | 700 m² | 26–44 a floor by tenant, sized on the densest |
+| `crown-hotel` | 1 300 m² | 34 a floor |
+| `st-jude-hospital` | 1 900 m² | 64 a floor at hospital density |
+| `ashgate` | 850 m² | 34 a floor, mixed-use |
+| `mixed-use-high-rise` | 900 m² | 46 office below, 26 residential above |
+
+The other **eight** — the seven reference towers and `vertical-city` — **taper**, because a tall building
+does: the plate shrinks as the tower rises, which is what leaves the express shafts stacked at the
+bottom while the top floors carry only their own local bank.
+
+| tower | plates, bottom to top |
+|---|---|
+| `vertical-city` | 1 600 → 1 500 → 1 300 → 1 100 → 800 m² |
+| `burj-class-reference` | 2 800 → 2 200 → 1 800 → 1 400 → 1 100 → 800 m² |
+| `ctf-class-reference` | 2 200 → 1 800 → 1 400 → 1 100 → 900 m² |
+| `shanghai-class-reference` | 2 600 → 2 300 → 2 000 → 1 700 → 1 000 m² |
+| `merdeka-class-reference` | 3 000 → 2 300 → 1 200 m² |
+| `one-wtc-class-reference` | 3 716 → 3 400 → 2 900 → 2 500 → 1 400 m² |
+| `empire-state-class-reference` | 4 000 → 2 300 → 1 400 → 900 → 500 m² |
+| `willis-class-reference` | 4 719 → 4 195 → 2 622 → 1 049 m² |
+
+**The last three were authored one wave after the other five and their reasoning is a shape rather
+than a density**, which is why they sit apart from the nine above. Each was sized from the tower's
+own published *form* and then checked against its published gross area, rather than from occupants
+per floor:
+
+- **One WTC** — a 61 m square base is **3 716 m²**, and the chamfers take it in as it rises. The
+  authored taper sums to roughly **322 000 m²** over the tower against a published figure near
+  325 000, so the shape is bracketed rather than guessed. The sky lobby is held at 3 000 m² and the
+  three observatory levels at 1 860.
+- **Empire State** — the five-storey base covers the whole lot and the tower steps back hard, so
+  this is the steepest taper in the set: **4 000 → 500 m²**, summing near **219 000 m²** against a
+  published gross near 208 000.
+- **Willis** — the only one whose plate is arithmetic rather than an estimate. Nine bundled tubes,
+  each **22.9 m square = 524.4 m²**: nine of them is 4 719 m², five is 2 622, two is 1 049. **The
+  range boundaries are the building's dispatch zones rather than its structural setbacks** (which
+  fall at 50, 66 and 90), so a range spanning a setback carries the figure representative of its
+  span — 4 195 m² for 35–64, which is nine tubes to 50 and seven above.
+
+What each comes out at as a **core share** — hoistway only, no lobby, no machine room — is pinned in
+`packages/core/src/config/floorArea.test.ts` and listed in
+[`docs/02`](../../docs/02-elevator-reference.md) § Floor area.
 
 ## Bank and car fields
 
@@ -214,7 +303,17 @@ the next leg starts waiting or as seconds added after the last alighting.
 
 The `traversalTimeS` is reference data and must be cited in the mode's `$comment`; see
 [docs/02 § Non-lift transport](../../docs/02-elevator-reference.md). Declared by
-[`vertical-city.json`](vertical-city.json) and by no other shipped building, which declares **four**
+[`vertical-city.json`](vertical-city.json), and since 2026-09-15 by
+[`one-wtc-class-reference.json`](one-wtc-class-reference.json) and
+[`willis-class-reference.json`](willis-class-reference.json), which declare **one each** — GitHub
+issues #428 and #426. Both are worth reading before you declare a fourth, because between them they
+answer the question this section leaves open. One WTC's `sky-lobby-escalator` (64 ↔ 65) carries
+**391, 375 and 359 hops** at three seeds under `collective` at 1 800 s, and deleting it adds back
+**exactly one lift leg per hop**; Willis's `lobby-escalator` (G ↔ 2) carries **720, 725 and 653**,
+and drops to **zero** the moment its double-deck locals are made single-deck, because a deck-bound
+leg from the lower lobby is the only thing that makes the upper one worth reaching. So a mode is
+live when a *different* edge of the graph forces it, and dead when the lifts already reach — which
+is what `vertical-city`'s own two zero-hop pairs say from the other side. Vertical City declares **four**
 — one per two-level lobby, `G ↔ 2` and the three sky lobbies `26 ↔ 27`, `51 ↔ 52`, `76 ↔ 77`, all at
 21.2 s because every lobby pair rises exactly the 4.5 m deck separation. Before any of them existed,
 **292 of that building's 3,549 lift legs at the standard seed were the `G ↔ 2` lobby hop**, which

@@ -66,6 +66,13 @@ import { isWaitingAt } from '../frame/overlay.js';
  * value is that a change to the crowd, the bands or the union shows up as a row that moves, and two
  * consecutive waves of reproduction is what makes a row that *does* move mean something.
  *
+ * **Re-measured again the same day at sixteen contracts × 50 seeds = 800 days** (GitHub issues #428,
+ * #427 and #426), and **all thirteen earlier rows reproduced to the second for the third wave
+ * running** — every count and every median, and the six per-seed slices `legibility.test.ts` pins as
+ * well. Three consecutive waves of reproduction over a table that has grown from eight rows to
+ * sixteen is the strongest thing this instrument can say about itself: every row that has ever moved
+ * in it is a row somebody added.
+ *
  * | contract | building | legible seeds of 50 | median longest stretch (s) |
  * |---|---|---|---|
  * | c1 | garden-apartments | **0** | 0 |
@@ -81,6 +88,9 @@ import { isWaitingAt } from '../frame/overlay.js';
  * | c11 | ctf-class-reference | **50** | 1 221 |
  * | c12 | shanghai-class-reference | **50** | 729 |
  * | c13 | merdeka-class-reference | **50** | 459 |
+ * | c14 | one-wtc-class-reference | **1** | 13 |
+ * | c15 | empire-state-class-reference | 45 | 472 |
+ * | c16 | willis-class-reference | **50** | 2 347 |
  *
  * **The three reference towers are legible on every seed, and the reading is not flattering.** A day
  * is legible when somebody stays past a minute on some landing for two contiguous minutes, and on a
@@ -91,6 +101,32 @@ import { isWaitingAt } from '../frame/overlay.js';
  * these three means the same thing it means there, and `docs/33` § 6's arm should be read beside
  * § 4.7k's miss rates rather than on its own.
  *
+ * **That paragraph's reading is kept, and the generalisation inside it is refuted by the next three
+ * towers measured after it.** It says a held landing *"on a tower of four to eight thousand people"*
+ * is the building rather than a problem a session can solve, which reads as a claim about **size**.
+ * Measured, size is not the variable: `c14` (One-WTC-class, 4 810 occupants, 104 floors) is legible
+ * on **1 of 50** at a median stretch of **13 s** — the least legible contract in the catalogue after
+ * Garden Apartments, and the first supertall this table has found **ineligible** — while `c16`
+ * (Willis-class, 9 200 occupants) is legible on **50 of 50** at **2 347 s**, second only to Midtown
+ * Office, and `c15` (Empire-State-class, 8 230 occupants) sits between them on **45 of 50** at
+ * **472 s**, the same count as Vertical City. Three towers of the same class, spanning the whole
+ * range this instrument can report.
+ *
+ * **`c15` and `c16`'s medians were re-measured on 2026-09-15** at the published budget, when GitHub
+ * issue #45's ladder moved two of Empire State's banks from 6.1 m/s to 6.0 and three of Willis's
+ * expresses from 8.1 to 8.0 ([§ D600](../../../../DECISIONS.md)). **Only those two rows moved, and
+ * only their medians** — 437 → 472 s and 2 314 → 2 347 s — while **all fourteen other rows reproduced
+ * exactly**, counts and medians alike, and **both counts held** at 45 and 50. So the spread this
+ * paragraph is about is unmoved: a timing change shifted how long the held landings last without
+ * changing how many days hold one, which is what a threshold nobody crossed looks like from here.
+ *
+ * **Why they differ is unmeasured and no mechanism is offered here**, which is
+ * [§ D256](../../../../DECISIONS.md)'s rule at the one place it is most tempting to break: a
+ * sentence about the fabric would be a plausible story standing in for a run. What the pair does
+ * establish is the negative — **population does not predict legibility** — and that is worth more
+ * than the story it replaces, because the earlier reading would have had a reader assume every
+ * supertall added from here lands at 50 of 50 and stop looking.
+ *
  * Two readings, both of them what #208 and § D475 needed measured rather than argued. Garden
  * Apartments never once holds a landing in the third band for two minutes — nobody on it waits
  * sixty seconds, so *"the first session presents no problem to solve"* is the instrument's own
@@ -98,8 +134,17 @@ import { isWaitingAt } from '../frame/overlay.js';
  * something about its day changes. Chancery House and St Jude's are legible on 2 and 1 seeds, which
  * is *rarely* rather than *never* and is the same verdict for a first session. Midtown Office is
  * legible on every seed with a stretch longer than the shift, which is a building whose problem a
- * player cannot miss. The five that are legible on more than a third of seeds — c2, c4, c5, c7 and
- * c3 at two fifths — are the eligible set this table hands § D475's draw.
+ * player cannot miss. The five that were legible on more than a third of seeds when this paragraph
+ * was written — c2, c4, c5, c7 and c3 at two fifths — were the eligible set this table handed
+ * § D475's draw.
+ *
+ * **That sentence is in the past tense now and was not when it needed to be**, which is worth one
+ * line rather than a silent edit. It named five members and read as a present-tense fact about a
+ * **derived** set; the table has since grown to sixteen rows and the set to **eleven**, so it was
+ * wrong by six before anybody noticed. Nothing reads this prose — `firstSession.ts` derives
+ * {@link LEGIBILITY_SWEEP} with the threshold and never the list — so the code was right the whole
+ * time and only the sentence went stale. Re-tensed rather than refreshed with today's members,
+ * because a list of eleven typed here would go stale on exactly the same schedule.
  *
  * **The two that landed with the content plan say opposite things, and both are the building doing
  * what it was authored to do.** Harbour Point is legible on **50 of 50** at a median 1 343 s — a
@@ -147,6 +192,9 @@ export const LEGIBILITY_SWEEP: readonly LegibilitySweepRow[] = Object.freeze([
   { contractId: 'c11', buildingId: 'ctf-class-reference', legibleOf50: 50, medianStretchS: 1221 },
   { contractId: 'c12', buildingId: 'shanghai-class-reference', legibleOf50: 50, medianStretchS: 729 },
   { contractId: 'c13', buildingId: 'merdeka-class-reference', legibleOf50: 50, medianStretchS: 459 },
+  { contractId: 'c14', buildingId: 'one-wtc-class-reference', legibleOf50: 1, medianStretchS: 13 },
+  { contractId: 'c15', buildingId: 'empire-state-class-reference', legibleOf50: 45, medianStretchS: 472 },
+  { contractId: 'c16', buildingId: 'willis-class-reference', legibleOf50: 50, medianStretchS: 2347 },
 ]);
 
 /** The third band's floor — `WAIT_BANDS[2].fromS`, read rather than retyped. */

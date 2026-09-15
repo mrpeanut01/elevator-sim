@@ -121,6 +121,16 @@ import { DATA_DIR } from '../fixtures.test-helper.js';
  * at all, puts `collective`'s `long-waits-under (≤ 10 %)` at **31 of 50 and 32 of 50** — inside
  * DC-4's `[1/3, 2/3]` band on both seed sets. That edit is in `data/buildings/garden-apartments.json`
  * and belongs to the campaign rebalance (#234), not here.
+ *
+ * **#234's lane arrived on 2026-09-15, re-measured that pair on this tree, and declined the edit**
+ * ([§ D613](../../../../DECISIONS.md)). Rebuilt through `parseBuilding`/`resolveBuilding` with one
+ * car in `main`, `long-waits-under (≤ 10 %)` reads **31/50 and 32/50** — the figure above,
+ * reproduced rather than inherited — with every other per-run kind still `50/50, 50/50`. What it
+ * declined is the blast radius: `garden-apartments` is named by 282 `.ts` files, is the CLI's
+ * default building, and is one of the two runs `data/reference-runs.json` pins figure-for-figure
+ * and `watch/reference.test.ts` re-simulates. So this entry stays, and what it now says is *the
+ * axis is measured open and needs a wave that owns those pins*, which is a different state from
+ * nobody having tried.
  */
 const DC1_UNFAILABLE: ReadonlyMap<string, string> = new Map([
   [
@@ -349,10 +359,32 @@ const DC2B_SHORT: ReadonlySet<string> = new Set([
  * DC-2's measured breaches — the shipped profiles that meet every bar on the tuning seeds, per stage,
  * measured 2026-09-06 on the integrated tree by the deep tier below (`ELEVATOR_SIM_DEEP=1`): 45
  * admitted cells over the ten stages, 217 s on one worker of a four-core box. A stage absent here had
- * none. The three are `docs/33` § 3.1's three, and each is one profile: `fairness-first` on stage 3,
- * `eta` on stage 5, `destination-panel` on stage 7. Emptying this table is C2's rebalance, by demand
+ * none. It held **three** rows when § D520 pinned it — `fairness-first` on stage 3, `eta` on stage 5
+ * and `destination-panel` on stage 7, `docs/33` § 3.1's three, one profile each. Emptying this table
+ * is C2's rebalance, by demand
  * or fabric and never by a bar (DC-R1); a row leaves on the commit that makes it stop reproducing.
  * See § D520 for the run. Re-run 2026-09-11 on `f691a97a`: the same three, over the same 45 cells.
+ *
+ * ## It held three rows until 2026-09-15 and now holds two — **the stage-7 row is gone by a run**
+ *
+ * GitHub issue **#234**'s C2 rebalance, [§ D611](../../../../DECISIONS.md). `docs/33` § 3.1 and
+ * § D520 measured one clearer per stage: `fairness-first` on stage 3, `eta` on stage 5,
+ * `destination-panel` on stage 7. Stage 7's demand moved from **1.5 to 1.25 %pop/5 min** in
+ * `data/campaign.json` and `scenario/candidates.ts`, its published bar was re-derived at that demand
+ * rather than authored, and the deep tier below then read **none** of its twelve admitted profiles
+ * meeting every bar. The row and its holdout row were deleted on that commit, which is the only way
+ * a row is allowed to leave. `docs/33` § 3.3f carries the curve either side of it — and the finding
+ * worth carrying here is that it runs the **other way** from the intuition: at 2.5 % four profiles
+ * meet and at 5 % six do, because the bar is `collective`'s own count and `collective` degrades
+ * faster under load than the profiles a player can pick. A lane that assumed *harder building,
+ * harder stage* would have quadrupled this register.
+ *
+ * Stages 3 and 5 are **not** closed and the demand axis on each is measured rather than left open:
+ * § 3.3f reads stage 3 shut in both directions — `office-standard`'s declared `max` of 15 takes
+ * `nobody-abandoned` to `not-shippable` and leaves three profiles meeting rather than one — and
+ * stage 5 **open at 15 and deliberately not taken**, because closing it there also closes
+ * `predictive-balanced`, stage 5's only survivor at any rung and the clear
+ * `stageFiveClears.test.ts` pins this campaign's winnability on.
  *
  * ## It is not the survivor table's dropdown column read another way
  *
@@ -366,8 +398,9 @@ const DC2B_SHORT: ReadonlySet<string> = new Set([
  * verdict both ways ([§ D556](../../../../DECISIONS.md)):
  *
  * 1. **The reading.** This register is `metOnTuningSeeds`, for `docs/33` § 2.3's reason; the table
- *    counts `cleared`, which needs the holdout batch as well. `eta` on stage 5 and
- *    `destination-panel` on stage 7 are here and not there — {@link DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT}.
+ *    counts `cleared`, which needs the holdout batch as well. `eta` on stage 5 is here and not
+ *    there — {@link DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT}. `destination-panel` on stage 7 was the
+ *    second such row until § D611 emptied stage 7 outright.
  * 2. **The population.** This register plays only what the stage's own `editable` list admits
  *    (`admitProfile`); the table plays every shipped profile that runs a different system and that
  *    the rung affords (`survivorSpace.ts#dropdownConfigurationsOf`, which does not apply the list, on
@@ -379,7 +412,6 @@ const DC2B_SHORT: ReadonlySet<string> = new Set([
 const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   'stage-3-overwhelmed': ['fairness-first'],
   'stage-5-credentials': ['eta'],
-  'stage-7-prove-it': ['destination-panel'],
 });
 
 /**
@@ -392,8 +424,10 @@ const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.free
  * - `eta` on stage 5 meets all five goals on `tuning-20260730` and misses `deliver-everyone`,
  *   `no-divergence` and `answer-the-demand` on `holdout-20260731` — `stageFiveClears.test.ts`'s
  *   finding, reached here by a different route.
- * - `destination-panel` on stage 7 meets both goals on the tuning seeds and misses
- *   `beat-the-baseline` on the holdout.
+ * - `destination-panel` on stage 7 met both goals on the tuning seeds and missed
+ *   `beat-the-baseline` on the holdout, **until 2026-09-15**: § D611 moved that stage's demand to
+ *   1.25 %pop/5 min and nothing meets there, so the row left {@link DROPDOWN_CLEARS} and this
+ *   register together on the commit that made both stop reproducing.
  *
  * **A holdout refusal is still a DC-2 breach**, and this register takes neither row out of
  * {@link DROPDOWN_CLEARS}: DC-2 asks whether the dropdown can meet a stage's bars at all (`docs/33`
@@ -403,7 +437,6 @@ const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.free
  */
 const DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT: Readonly<Record<string, readonly string[]>> = Object.freeze({
   'stage-5-credentials': ['eta'],
-  'stage-7-prove-it': ['destination-panel'],
 });
 
 /**

@@ -109,7 +109,27 @@ const table = JSON.parse(readFileSync(TABLE_URL, 'utf8')) as AgreementTable;
  * same number of people on every tower. It is pinned under `nearest-car` with the whole group parked
  * at the lobby, which is the hardest cell this table can build, and it still reaches the horizon.
  */
-const NEVER_BREAKS: ReadonlySet<string> = new Set(['shanghai-class-reference']);
+const NEVER_BREAKS: ReadonlySet<string> = new Set([
+  'shanghai-class-reference',
+  // Two more on 2026-09-15, GitHub issues #428 and #427 — and they **refute** the mechanism
+  // § D582 clause 3 offered for the first one. That entry said whether a group can be broken is
+  // decided by *how many cars it has*, because the rush stream is the same number of people on
+  // every tower. Measured here, it is not: `willis-class-reference` has **104** cars and breaks at
+  // 5 320 s, while `one-wtc-class-reference` and `empire-state-class-reference` have **73** each
+  // and hold. What *does* separate them is unmeasured and no replacement mechanism is offered here,
+  // because a second plausible sentence is what § D256 refuses. Speed is the obvious candidate —
+  // Willis's locals are 2.5 m/s double-deckers — and it is named as a **conjecture rather than a
+  // finding**, because § D600 clause 8 measured speed against this very table and found its effect
+  // **not monotone**: dropping Willis's expresses 8.1 → 8.0 m/s moved `nearest-car` from 3 802 s to
+  // 5 368 s in `rush-house-runs.json` and made `destination-panel` break where it had held. A
+  // quantity that moves two dispatchers in opposite directions does not explain which towers break.
+  // Both were escalated in § D582's own order and both
+  // held at every step: `nearest-car`, then `nearest-car` with the whole group parked at the lobby
+  // from 60 s, and then `destination-panel` parked, which is the arm that breaks two towers in
+  // `data/rush-house-runs.json` that `nearest-car` does not.
+  'one-wtc-class-reference',
+  'empire-state-class-reference',
+]);
 
 function labelOf(cell: AgreementCell): string {
   const log = (cell.interventions ?? []).map((entry) =>

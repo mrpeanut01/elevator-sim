@@ -4,6 +4,7 @@
   "name": "Ashgate Mixed-Use",
   "type": "mixed-use",
   "trafficProfile": "office-standard",
+  "grossAreaPerFloorM2": 850,
   "floors": [
     {
       "id": "B2",

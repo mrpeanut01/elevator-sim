@@ -203,6 +203,9 @@ import {
 } from '../everyday/stageScreenModel.js';
 import { todayOf } from '../everyday/today.js';
 import { RUSH_NOT_LANDED, RUSH_RESULT_EMPTY_LEDE, rushDisclosureOf, rushOutcomeOf, rushResultViewOf, rushStageHeaderOf, type RushOutcome } from '../everyday/rush.js';
+import { rushPostViewOf } from '../everyday/rushPost.js';
+import { RUSH_SITTING_COPY, rushSittingOf, type RushRoundRecord } from '../everyday/rushSitting.js';
+import { RUSH_NOT_STANDING } from '../everyday/host.js';
 import {
   ENGINEER_RETURN_LABEL,
   ENGINEER_RETURN_TITLE,
@@ -9746,6 +9749,78 @@ const FAMILY_CONTROLS: SurfaceAdapter = {
  * is built from the same recording's facts with the line placed at the playhead, so the wording
  * every rush that breaks reads is in the corpus whether or not this case's day breaks.
  */
+/**
+ * The states § 2.3's post block can be in, as inputs to its own view function — GitHub issue #372.
+ *
+ * `postRunStates`' arrangement and its argument: a function rather than a constant, so the type is
+ * checked against `rushPostViewOf`'s parameter and a state that stops existing goes red here rather
+ * than silently dropping out of the sweep.
+ *
+ * **Two kinds of fabrication, and each is the kind that adapter already licences.** A `check` is
+ * built from `RUSH_SITTING_COPY`'s own producers rather than by playing thirteen rounds, which is
+ * the same trade the `posted` placement arm makes: the string is the shipped one and only the state
+ * that reaches it is arranged. And the `posted` arm carries purse figures written here, because no
+ * case in this corpus has posted anything and a figure a player can meet is a figure this search
+ * has to read.
+ */
+function rushPostStates(rounds: readonly RushRoundRecord[]): readonly {
+  readonly label: string;
+  readonly input: Parameters<typeof rushPostViewOf>[0];
+}[] {
+  const ok = rushSittingOf({ buildingId: 'midtown-office', rounds });
+  const ready = { rounds, check: ok, hasServer: true, signedIn: true, posting: false, outcome: undefined } as const;
+  const refuse = (reason: string): Parameters<typeof rushPostViewOf>[0] => ({
+    ...ready,
+    check: { ok: false, reasons: [reason] },
+  });
+  return [
+    { label: 'ready', input: ready },
+    { label: 'posting', input: { ...ready, posting: true } },
+    { label: 'noServer', input: { ...ready, hasServer: false } },
+    { label: 'signedOut', input: { ...ready, signedIn: false } },
+    { label: 'noRounds', input: { ...ready, rounds: [], check: rushSittingOf({ buildingId: 'midtown-office', rounds: [] }) } },
+    { label: 'handStopped', input: refuse(RUSH_SITTING_COPY.handStopped) },
+    { label: 'neverBroke', input: refuse(RUSH_SITTING_COPY.neverBroke) },
+    { label: 'tooLong', input: refuse(RUSH_SITTING_COPY.tooLong(13)) },
+    /*
+     * A round that cannot travel, drawn on the round's own line **and** under the button. The
+     * refusal is `scope/switchWire.ts`'s own sentence about a hand-tuned handover — the commonest
+     * way a round becomes unpostable — carried here as it would be carried there, because this
+     * corpus has no saved dispatcher to produce one from.
+     */
+    {
+      label: 'roundRefused',
+      input: (() => {
+        const refusal =
+          'A day handed to Your own mix cannot be posted to a board: it is a hand-tuned dispatcher, ' +
+          'and a posted run can only hand over to one the board ships, or to one of those with your ' +
+          'rules on it. The day still runs; it just stays on this device.';
+        const marked = rounds.map((round, index) => (index === 1 ? { ...round, unpostable: [refusal] } : round));
+        return { ...ready, rounds: marked, check: rushSittingOf({ buildingId: 'midtown-office', rounds: marked }) };
+      })(),
+    },
+    /* The host's own arm, reachable by a keyboard route into the press and by no drawn control. */
+    { label: 'notStanding', input: { ...ready, outcome: { kind: 'refused', detail: RUSH_NOT_STANDING } } },
+    { label: 'failed', input: { ...ready, outcome: { kind: 'failed', detail: 'The board service did not answer.' } } },
+    {
+      label: 'posted',
+      input: {
+        ...ready,
+        outcome: {
+          kind: 'posted',
+          rounds: rounds.map((round, index) => ({
+            heldS: round.holdS,
+            wavesOutlasted: 4 + index,
+            purseBeforeUnits: index * 8,
+            paidUnits: 8 + index * 2,
+            purseAfterUnits: index * 8 + 8 + index * 2,
+          })),
+        },
+      },
+    },
+  ];
+}
+
 const EVERYDAY_RUSH: SurfaceAdapter = {
   id: 'everyday/rush.ts#rushResultViewOf',
   covers: [
@@ -9755,6 +9830,20 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
     'everyday/rush.ts#RUSH_STAGE_COPY',
     'everyday/rush.ts#RUSH_NOT_LANDED',
     'everyday/rush.ts#RUSH_RESULT_EMPTY_LEDE',
+    /*
+     * GitHub issue #372's round list and post block, under the result. Every state is driven below
+     * rather than the copy table alone, on `EVERYDAY_DAILY_LOOP`'s argument for the day's block:
+     * the state most likely to say something a sitting cannot support is the one a developer never
+     * sees. `RUSH_SITTING_COPY` is named because `rushSittingOf` composes its four sentences and
+     * the states above drive all of them; `RUSH_NOT_STANDING` because the host's own refusal is
+     * reachable by a keyboard route and by no drawn control, which is exactly the kind of string
+     * this search exists to read.
+     */
+    'everyday/rushPost.ts#rushPostViewOf',
+    'everyday/rushPost.ts#RUSH_POST_COPY',
+    'everyday/rushSitting.ts#rushSittingOf',
+    'everyday/rushSitting.ts#RUSH_SITTING_COPY',
+    'everyday/host.ts#RUSH_NOT_STANDING',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -9807,6 +9896,68 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
     }
     seeds.push({ field: 'rush.bar.notLanded', text: RUSH_NOT_LANDED, role: 'reason' });
     seeds.push({ field: 'rush.result.empty', text: RUSH_RESULT_EMPTY_LEDE, role: 'reason' });
+
+    /*
+     * § 2.3's sitting — GitHub issue #372. Two rounds, because one is the case a list cannot get
+     * wrong: the ordinals, the per-round refusal and the purse are all claims *about a round's
+     * position*, and a one-round sitting drives none of them. The first round is the one the player
+     * ended by hand, the second is the one that broke — which is the only order a postable sitting
+     * can have, since the last round is what posts.
+     */
+    const sittingRounds: readonly RushRoundRecord[] = [
+      {
+        dispatcherProfileId: recording.dispatcherProfileId,
+        dispatcherName: dispatcherNameOf(context),
+        ruleRows: [],
+        wireInterventions: [],
+        interventionCount: 0,
+        holdS: null,
+        outcome: stopped,
+        unpostable: [],
+      },
+      {
+        dispatcherProfileId: recording.dispatcherProfileId,
+        dispatcherName: dispatcherNameOf(context),
+        ruleRows: [],
+        wireInterventions: [],
+        interventionCount: 2,
+        holdS: broke.heldS,
+        outcome: broke,
+        unpostable: [],
+      },
+    ];
+    for (const state of rushPostStates(sittingRounds)) {
+      const view = rushPostViewOf(state.input);
+      const tag = `rush.post(${state.label})`;
+      seeds.push({ field: `${tag}.eyebrow`, text: view.eyebrow, role: 'label' });
+      seeds.push({ field: `${tag}.roundsHeading`, text: view.roundsHeading, role: 'label' });
+      seeds.push({ field: `${tag}.button`, text: view.label, role: 'label' });
+      if (view.roundsEmpty !== undefined) seeds.push({ field: `${tag}.roundsEmpty`, text: view.roundsEmpty, role: 'reason' });
+      if (view.purseNote !== undefined) seeds.push({ field: `${tag}.purseNote`, text: view.purseNote, role: 'prose' });
+      for (const [index, line] of view.lines.entries()) {
+        seeds.push({
+          field: `${tag}.line${String(index)}`,
+          text: line.text,
+          role: line.role === 'reason' ? 'reason' : 'prose',
+        });
+      }
+      /*
+       * The round list in the three shapes its **content** takes — before an answer, with one, and
+       * with a round refused — rather than under every state above, which would seed the same eight
+       * strings a dozen times over. `postRunStates`' own economy: the block's chrome varies by
+       * state and the list varies by what is on it.
+       */
+      if (state.label !== 'ready' && state.label !== 'posted' && state.label !== 'roundRefused') continue;
+      for (const [index, round] of view.rounds.entries()) {
+        const at = `${tag}.round${String(index)}`;
+        seeds.push({ field: `${at}.label`, text: round.label, role: 'label' });
+        seeds.push({ field: `${at}.driver`, text: round.driver, role: 'label' });
+        seeds.push({ field: `${at}.held`, text: round.held, role: 'observation' });
+        seeds.push({ field: `${at}.presses`, text: round.presses, role: 'observation' });
+        if (round.earned !== undefined) seeds.push({ field: `${at}.earned`, text: round.earned, role: 'observation' });
+        if (round.refusal !== undefined) seeds.push({ field: `${at}.refusal`, text: round.refusal, role: 'reason' });
+      }
+    }
     return singleRun(this.id, seeds);
   },
 };
@@ -12868,10 +13019,14 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_ABSENCES',
     /*
      * `everyday/rushScreenModel.ts#RUSH_ABSENCES` stood here until GitHub issue #418 emptied it — the
-     * standings entry left when the rows became the house's measured runs (§ D547). An empty array
-     * produces no prose, so a `covers` entry for it would claim coverage of nothing; the register is
-     * still drawn below, with the rest, and its empty line is seeded with the others.
+     * standings entry left when the rows became the house's measured runs (§ D547) — and it is
+     * **back**, because GitHub issue #372 put a sentence in it: the between-round purse the server
+     * derives and nothing spends ([§ D606](../../../../DECISIONS.md)). `STAGE_ABSENCES`' case
+     * exactly, one register over — the register was drawn either way, as the section's `empty` line
+     * while it was empty and as a seeded entry now, so what moved is the coverage claim rather than
+     * the rendering.
      */
+    'everyday/rushScreenModel.ts#RUSH_ABSENCES',
     /*
      * `everyday/designerModel.ts#DESIGNER_ABSENCES` stood here until GitHub issue #420 emptied it —
      * the machine-per-shaft pickers made its last row false, so the row and its triage entry went

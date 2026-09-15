@@ -1,6 +1,6 @@
 # Test Buildings
 
-Fourteen reference buildings, each chosen to stress a different aspect of the dispatcher.
+Seventeen reference buildings, each chosen to stress a different aspect of the dispatcher.
 Machine-readable configs in [`data/buildings/`](../data/buildings/).
 
 The first five are the original set. The next three were added later and each closes a gap the
@@ -19,6 +19,16 @@ everything before it stopped at 10), and a supertall with **one sky lobby instea
 Burj-class tower's population assumption finally has something to be compared against. All three are
 named in this repository's convention — `<name>-class-reference`, `burj-class-reference`'s — because
 the real building is the reference and the figures in the file are the project's own.
+
+**The fifteenth, sixteenth and seventeenth are three more, and they are the first that are not all
+supertalls** — GitHub issues #428, #427 and #426. One-WTC-class is the **second building Phase 6a/6b
+has ever been measured on**, which is what turns § D100's accepted result into a finding rather than
+a cell. Empire-State-class is a **1931 relay**: eight banks, no express anywhere in it, and a top
+reached by changing lifts twice — and it is the only building in the set that carries a **published
+external distance figure** for the energy proxy to be compared against. Willis-class is the other
+double-deck arrangement, the older and commoner one: sixteen double-deckers running as the
+**locals**, pairing every floor in their zone at 1970s speeds, where the two shipped double-deck
+banks before it were both supertall shuttles.
 
 **A new building owes a row in this table, a numbered section below, and a row in
 [`data/buildings/README.md`](../data/buildings/README.md) — and that is now a test rather than a
@@ -44,6 +54,9 @@ failed: *checkable by looking* is not checkable.
 | [CTF-class reference tower](../data/buildings/ctf-class-reference.json) | 112 | 8-car shuttle at **20 m/s up / 10 m/s down**, pressurised; 4 locals (8/8/6/6) | 3 sky lobbies | **Directional speed asymmetry** — the only shipped bank the closed form must refuse on `symmetric-speed` |
 | [Shanghai-class reference tower](../data/buildings/shanghai-class-reference.json) | 129 | 14-car shuttle at **20.5 m/s**, pressurised; 4 office locals of 20, a hotel bank of 12 | 4 sky lobbies | **106 cars**, and whether the top of the speed catalogue is ever reached on a hop short enough to matter |
 | [Merdeka-class reference tower](../data/buildings/merdeka-class-reference.json) | 119 | 34 low locals at 8 m/s **straight off the street**; 18 shuttles at 10 m/s; 32 high locals; 8 hotel | 1 office sky lobby | **Fewer transfers over a similar rise**, and a second supertall occupancy to compare the first against |
+| [One-WTC-class reference tower](../data/buildings/one-wtc-class-reference.json) | 104 | 8-car shuttle at 10 m/s; 2 low/mid locals of 16; 2 high locals of 14; 5-car observatory express | **two-level** sky lobby at 64/65 | **A second building for destination dispatch**, and an escalator that carries an eighth of the tower's rides |
+| [Empire-State-class reference tower](../data/buildings/empire-state-class-reference.json) | 102 | 6 ground banks of 10 (2.5–6.0 m/s), a 7-car relay to 86, a 6-car relay to 102 | relay lobbies at 80 and 86 | **A relay with no express at all**, and the energy proxy against a published annual car distance |
+| [Willis-class reference tower](../data/buildings/willis-class-reference.json) | 108 | 16 double-deck **locals** at 2.5 m/s over two zones; 2 express banks of 16 at 8.0 m/s; 46 upper locals; 10-car Skydeck express | two two-level sky lobbies | **Double-deck as the local service** at 1970s kinematics, where floor parity decides the deck |
 
 ---
 
@@ -672,3 +685,220 @@ ninety-two or a hundred and six cars is simply not the thing it was built to bre
 **Watch for:** whether the transfer accounting — a hop charged to `ttdMeanS` that lights no landing
 button — reads sensibly when only a third of journeys have one, which is what #430 filed this
 building to ask.
+
+---
+
+## 15. One-WTC-class Reference Tower
+
+**Config:** [`one-wtc-class-reference.json`](../data/buildings/one-wtc-class-reference.json)
+
+A hundred and four floors, 73 cars over six banks, one transfer on the way up, and **4 810** people.
+GitHub issue #428. The building exists for a measurement rather than for a mechanic, and the
+measurement is the one Phase 6a/6b had never had.
+
+**A second building for destination dispatch, and it splits the two arms.** `CLAUDE.md` records 6a
+and 6b as accepted against § D100 **on one building at one operating point**. #428's first sentence
+is the honest limit of that. Measured here at n = 200 under common random numbers against `eta`, at
+this tower's own highest quotable rate:
+
+| arm | ΔTTD (s) | verdict | `requiredReplications` |
+|---|---|---|---|
+| `destination-eta` | **−0.092 [−0.804, +0.619]** | **INDISTINGUISHABLE** | **11 704** |
+| `destination-panel` | **−1.293 [−2.069, −0.517]** | **BETTER** | **1** |
+
+The Level-0 arm, which carries § D100's accepted result, does **nothing** here: its interval
+straddles zero and the effect would need fifty-eight times the budget to resolve at this cell's own
+spread. The Level-1 panel is the arm that works, which is the reverse of the shape Midtown Office
+shows. Both pay at the landing — AWT and WT95 **WORSE** on both arms, § D27's rule that a cost
+hidden is a cost claimed. `packages/experiments/src/benchmark/destinationSecondBuilding.test.ts`
+carries the run and the census behind the rate.
+
+**The rate is 2 %POP/5 min and that is measured rather than copied.** § D100's cell is 4 % because
+4 % is the highest rate at which Midtown returns a valid AWT on every arm; the *property* is the
+highest quotable rate and the *number* is Midtown's. At n = 200 on this tower, 2 % is clean on all
+four arms, 3 % saturates `eta` on 1 of 200 and `destination-panel` on 4, and 4 % saturates
+`destination-eta` on 18. A census at n = 10 would have published 4 % — every rate up to it looks
+clean there — and then reported three arms of four as `UNQUOTABLE`.
+
+**The escalator is part of the lift system rather than a garnish, and that is #428's second
+criterion answered with a number.** The sky lobby is **two levels**: the shuttle lands at 64 and the
+B-side high locals depart from 65. Measured under `collective` at 1 800 s on three seeds the pair
+carries **391, 375 and 359 hops** against 2 873, 2 995 and 2 841 lift legs, and deleting the
+`transportModes` block adds back **exactly one lift leg per hop**. About an eighth of this tower's
+rides use it. Whether that justifies giving `transportModes` a capacity or a direction is the
+owner's call and this building does not make it; what it supplies is the count that question needed.
+
+**It declares no `landingCallType`, and the refusal is pinned by two runs rather than by a
+sentence.** The real tower runs destination entry at its lobby, and § D553 built the per-landing
+fixture for exactly that. It is not declared because on this arrangement it would be either inert or
+a crash: under the shipped default dispatcher, `mobile-credential` on every landing leaves the legs
+**byte-identical** — `collective` weights `waitTime` alone and `batchKeyOf` splits a landing per
+destination only under a panel — and `destination-entry` makes the tower **throw** under
+`predictive-balanced`, a shipped profile and a contract reward, because a kiosk cannot defer. A
+building that crashes on a dispatcher the game offers is a product defect rather than fidelity.
+`packages/core/src/sim/oneWtcSeam.test.ts` asserts both.
+
+**The cabin is not pressurised, and that is the same kind of decision.** The observatory express
+spans 414.8 m, above the 300 m air-pressure threshold, so the shaft caps an unpressurised cabin at
+**10.0 m/s** — which is exactly these cars' rated speed. The field would remove a cap that is not
+biting and change no leg, which is § D265's defect; § D577 clause 4 is the precedent from the other
+side, where the CTF-class shuttle *is* pressurised because there the machine's limit is below the
+shaft's.
+
+**The closed form:** `observatory` **reconciles** at raw **+24.766 %**, residual **−0.028 %**
+against a 4 % tolerance, 64 replications from seed 810 000. The other five are refused by a throw —
+the shuttle on a zero served population, and the four local banks because `measureUpPeak` cannot
+drain the crowd it offers a fourteen- or sixteen-car group inside the deadline.
+
+**The occupancy is a third point on a comparison two other files started.** 4 810 over 73 cars is
+**65.9** people a car, against `merdeka-class-reference`'s 91.9 and `burj-class-reference`'s 56.1
+(§ D579 clause 4). Authored from a floor-plate assumption, like Merdeka's; it lands between them and
+moves neither.
+
+**Playable, and handed as built.** Contract `c14` is *Scenario 12* — the ids are names and the
+labels are positions — at the identity rung.
+
+**The Endless rush cannot break it**, at `nearest-car` with the whole group parked at the lobby from
+60 s and again at `destination-panel` parked. It joins `shanghai-class-reference` in
+`rushHoldAgreement.test.ts#NEVER_BREAKS`, and what that pair refutes is in § 17 below.
+
+---
+
+## 16. Empire-State-class Reference Tower
+
+**Config:** [`empire-state-class-reference.json`](../data/buildings/empire-state-class-reference.json)
+
+A hundred and two floors, 73 cars over **eight** banks, **8 230** people, and no express anywhere in
+the tower. GitHub issue #427.
+
+**The relay, and it is authored as an absence.** The top is reached by riding a *local* to 80,
+changing, riding to 86, and changing again — three legs and two waits, which is the maximum
+`config/buildingConnectivity.test.ts` allows from an entrance to a populated floor. This tower sits
+exactly on that limit. Every other tall building in `data/buildings/` hangs its upper zones off a
+dedicated shuttle; the property that makes this one a relay is negative — **no bank reaches both the
+entrance and the top zone** — and a negative property is the kind that survives an edit nobody
+notices, so `packages/core/src/sim/empireStateSeam.test.ts` asserts it and then moves it. Given bank
+H a terminal at the street, over identical journeys at `collective`, 1 800 s, three seeds: legs a
+journey fall from **1.2040 / 1.2228 / 1.2214** to **1.1134 / 1.1063 / 1.1172**, and the journeys
+needing **three** legs fall from **167 / 216 / 182** to **13 / 13 / 8**.
+
+**The energy proxy against a published figure, which is the point of #427 and not a decoration.**
+The article that prompted the issue states *"its elevators cover a combined distance of over 180,000
+miles"* a year. Both numbers, whatever they say:
+
+| | |
+|---|---|
+| **Measured here** | **3.17, 3.26 and 3.20 km per car per hour** at 1 800 s and **3.16, 3.32 and 3.20** at 3 600 s — six runs at the `office-standard` profile's own typical 12 %POP/5 min under `collective`, seeds 20 260 824 / 20 268 743 / 20 276 662, every car in the fleet moving in every one. Mean **3.220 km/car/h**. |
+| **Published** | 180,000 miles a year over 73 cars = 2,466 car-miles = **3 968 km per car per year**. |
+| **The arithmetic** | 3 968 km at 3.220 km/h is **1 232 hours of this traffic a year** — **4.9 hours** on each of 250 working days, or 3.4 hours on each of 365. |
+
+**That is a comparison and not a validation, and this document does not call it one.** The two agree
+to the order of magnitude: a real office tower plausibly sees something like five hours a day of
+demand at or near its own peak rate, so the proxy is not wrong about the world by a factor of ten in
+either direction. What cannot be settled is the residual, because the published figure names **no
+measurement window and no basis** — #427 says so itself — and **no mechanism is offered** for the
+difference, which is [§ D256](../DECISIONS.md)'s rule. What would close it is a sourced statement
+of what the 180,000 miles covers. **Neither number is adjusted towards the other**: the energy proxy
+is not calibrated here and § D468's 80 kJ bar is untouched.
+
+**The closed form reconciles on every one of its eight banks**, which no shipped building had done:
+raw divergences +27.467 %, +29.048 %, +30.318 %, +28.984 %, +30.143 %, +20.737 %, +25.773 % and
++33.626 %; corrected residuals **−0.044 %, −0.076 %, −0.126 %, −0.309 %, −0.494 %, −0.109 %,
+−0.119 %** and **−0.184 %**, all at 64 replications from seed 810 000 against a 4 % tolerance. The
+reason is the counterweight to the newest refusal ground in `remainingBuildings.test.ts`: that
+ground is *the apparatus cannot drain the crowd it offers a twenty- or thirty-car bank*, and this
+tower's largest bank has **ten** cars. So the limit is the size of the group rather than the height
+of the shaft, and a 1931 arrangement — many small banks rather than few large ones — is the
+arrangement the closed form was written for.
+
+**The occupancy is the lift-poorest in the set and that is the building rather than an error.**
+8 230 over 73 cars is **112.7** people a car, against Merdeka-class's 91.9, One-WTC-class's 65.9 and
+Burj-class's 56.1. A 1931 tower carries more people per car because its cars are smaller and its
+zones are narrower; the population is a stated taper over four setbacks and nothing was solved for
+it.
+
+**It is also the sharpest thing this set has said about the stage.** It hides **40 of its 73 shafts
+at a desktop canvas and 47 at a laptop one** — more than half — on a building that is not a
+supertall by any other measure. `render/stageCrowd.test.ts` pins it, and GitHub issue **#377** owns
+the remedy.
+
+**Playable, and handed as built.** Contract `c15` is *Scenario 16*, the last position on the ladder,
+at the identity rung.
+
+**The Endless rush cannot break it either**, on the same escalation One-WTC-class survived.
+
+---
+
+## 17. Willis-class Reference Tower
+
+**Config:** [`willis-class-reference.json`](../data/buildings/willis-class-reference.json)
+
+A hundred and eight floors, **104** cars over seven banks — roughly one car per floor, which no
+other shipped building comes near — **9 200** people, and **sixteen double-deckers running as the
+local service**. GitHub issue #426.
+
+**The other double-deck arrangement, and it is the older and commoner one.** `vertical-city` and
+`burj-class-reference` both declare a double-deck bank and both are supertalls whose double-deckers
+are **shuttles** running express between transfer levels. Here the decks are the **locals**: they
+pair every floor in their zone — sixteen pairs each, `[G,2]`, `[3,4]` … `[31,32]` and `[33,34]`,
+`[35,36]` … `[63,64]` — so a rider's floor parity decides which deck they board, and `bankDecksAllow`
+is consulted on far more journeys. The cars are **2.5 m/s**, the bottom of `gearless-traction`'s
+band, because the saving a double-decker buys is in *stop* time and stop time is a larger share of a
+slow car's round trip.
+
+**The uniform storey height is forced rather than chosen, and it is the first thing to understand
+about the file.** `config/parse.ts` requires every entry of `servesFloorPairs` to be exactly
+`deckSeparationM` apart in `heightM`. A double-deck **local** pairs every floor in its zone, so every
+floor in that zone must sit exactly one deck separation above the last — which is why this tower has
+**one** storey height where the three supertalls each have three or four. A double-deck local is a
+constraint on the section, not just on the hoistway.
+
+**The decks bind, and the escalator turns out to be a consequence of them.** `willisSeam.test.ts`
+takes the decks off both local banks — pairs deleted, `doubleDeck`, `deckSeparationM` and
+`ratedLoadLbPerDeck` deleted, whole-car capacity unchanged — and changes nothing else. The legs
+differ on every seed and so does their count: **6 880 / 6 847 / 6 530** with the decks against
+**6 764 / 6 757 / 6 446** without. And the `G ↔ 2` escalator carries **720, 725 and 653** hops as
+shipped and **exactly zero** once the decks come off, because a deck-bound leg from the lower lobby
+can only reach lower-deck floors and the escalator is how a rider bound for an even floor gets to
+the upper one. Take the decks away and a single-deck car at G serves the whole zone. The mode is not
+decoration beside the deck model; it is produced by it.
+
+**The pairing is a bounded exception rather than an identity, and that is itself the measurement.**
+The two arms offer the same number of journeys and **every journey starts at the same instant** —
+asserted with no tolerance. What differs is **31 of 3 949** destinations, every one of them a journey
+ending at the upper lobby level `2` on the decked arm and at `G` on the single-deck one:
+`traffic/generator.ts` rejects a journey with no lift leg, and which journeys those are is decided
+by the routing the control changes.
+
+**The disclaimer `CLAUDE.md` names is not raised here, and that is checked in both directions.**
+That file records double-deck operation as simulated and says the surviving disclaimer covers only a
+double-deck bank declaring no `servesFloorPairs`. #426 asks whether this tower raises it. **It does
+not** — both double-deck banks declare their pairs and the building loads with zero warnings — and
+deleting one bank's pairs **does** raise `missing-floor-pairs`, which is what makes the first half
+worth anything.
+
+**The closed form:** `skydeck` **reconciles** at raw **+9.456 %**, residual **−0.044 %**, 64
+replications from seed 810 000 — the smallest raw divergence any bank in the oracle has produced,
+because it runs G to 103 and stops nowhere else, so the textbook's two omissions have one stop to
+accumulate on instead of twenty. `local-mid` is refused on `departureGapBracket`, the two express
+banks on a zero served population, and `local-high` and `local-top` on the drain deadline. **No
+residual is published for a double-deck bank**, and the reason is the apparatus rather than the
+building: `oracle/upPeakCase.ts#isolateBank` drops the deck fields with `servesFloorPairs`, so what
+it would measure is a single-deck bank of the same cars. Calling that a residual for a double-deck
+bank would be a different calculation wearing its name.
+
+**Playable, and handed as built.** Contract `c16` is *Scenario 15*, at the identity rung.
+
+**It breaks in the Endless rush at 5 320 s, and that refutes a recorded mechanism.**
+[§ D582](../DECISIONS.md) clause 3 said whether a group can be broken is decided by **how many cars
+it has**, because the rush stream is the same number of people on every tower. Measured: this tower
+has **104** cars and breaks; `one-wtc-class-reference` and `empire-state-class-reference` have
+**73** each and hold under every escalation the table can construct. The car count does not decide
+it. **What does separate them is unmeasured and no replacement mechanism is offered**, because a
+second plausible sentence in place of a measurement is what § D256 refuses. Speed is the obvious
+candidate — Willis's locals are 2.5 m/s — and it is *named as a conjecture rather than a finding*,
+because [§ D600](../DECISIONS.md) clause 8 then measured speed against this very table and found its
+effect **not monotone**: dropping Willis's expresses 8.1 → 8.0 m/s made `nearest-car` hold 1 566 s
+longer and made `destination-panel` break where it had held. A quantity that moves two dispatchers
+in opposite directions does not yet explain which towers break. `NEVER_BREAKS` goes from one
+member to three and is still a list.

@@ -127,7 +127,7 @@ export const SCENARIO_ART: Readonly<Record<string, string>> = Object.freeze({
   /*
    * **Three reference towers, three more mixes** — GitHub issues #424, #425 and #430.
    *
-   * The paragraph above is now doing the work it was written for: the campaign is **thirteen**
+   * The paragraph above is now doing the work it was written for: the campaign is **sixteen**
    * buildings against eight declared tints, so every card past the eighth is a mix of two distant
    * ones and no literal enters the file. Each pair is distinct from the two above and from each
    * other, which is the property a swatch has to keep — two scenarios that look alike is the one
@@ -143,6 +143,21 @@ export const SCENARIO_ART: Readonly<Record<string, string>> = Object.freeze({
     'linear-gradient(180deg,color-mix(in srgb, color-mix(in srgb, var(--shaft-1) 50%, var(--shaft-6)) 34%, var(--card)),var(--card) 70%)',
   'merdeka-class-reference':
     'linear-gradient(180deg,color-mix(in srgb, color-mix(in srgb, var(--shaft-4) 50%, var(--shaft-8)) 34%, var(--card)),var(--card) 70%)',
+  /*
+   * **Three more, three more mixes** — GitHub issues #428, #427 and #426. Sixteen buildings against
+   * eight declared tints now, and the constraint the paragraph above sets is the one that is
+   * actually binding: every pair must be distinct from every other pair already in this table.
+   * Taken so far past the eighth card: (3,7), (2,5), (1,6), (4,8). These are (1,4), (2,8) and
+   * (3,5) — the One-WTC-class tower the pearl over the sea-green, the Empire-State-class the steel
+   * blue over the gold, and the Willis-class the slate over the violet-grey. Still no literal, and
+   * still no second layer.
+   */
+  'one-wtc-class-reference':
+    'linear-gradient(180deg,color-mix(in srgb, color-mix(in srgb, var(--shaft-1) 50%, var(--shaft-4)) 34%, var(--card)),var(--card) 70%)',
+  'empire-state-class-reference':
+    'linear-gradient(180deg,color-mix(in srgb, color-mix(in srgb, var(--shaft-2) 50%, var(--shaft-8)) 34%, var(--card)),var(--card) 70%)',
+  'willis-class-reference':
+    'linear-gradient(180deg,color-mix(in srgb, color-mix(in srgb, var(--shaft-3) 50%, var(--shaft-5)) 34%, var(--card)),var(--card) 70%)',
 });
 
 /**

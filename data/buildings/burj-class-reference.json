@@ -4,6 +4,7 @@
   "name": "Burj-class reference tower",
   "type": "mixed-use",
   "trafficProfile": "office-standard",
+  "grossAreaPerFloorM2": 2800,
   "floors": [
     {
       "id": "B2",
@@ -41,6 +42,7 @@
     {
       "id": "43",
       "index": 43,
+      "grossAreaM2": 1800,
       "heightM": 156.735,
       "population": 0,
       "isTransferFloor": true,
@@ -49,6 +51,7 @@
     {
       "id": "44",
       "index": 44,
+      "grossAreaM2": 1800,
       "heightM": 160.38,
       "population": 0,
       "isTransferFloor": true,
@@ -57,6 +60,7 @@
     {
       "id": "76",
       "index": 76,
+      "grossAreaM2": 1400,
       "heightM": 277.02,
       "population": 0,
       "isTransferFloor": true,
@@ -65,6 +69,7 @@
     {
       "id": "77",
       "index": 77,
+      "grossAreaM2": 1400,
       "heightM": 280.665,
       "population": 0,
       "isTransferFloor": true,
@@ -73,6 +78,7 @@
     {
       "id": "123",
       "index": 123,
+      "grossAreaM2": 1100,
       "heightM": 448.335,
       "population": 0,
       "isTransferFloor": true,
@@ -81,6 +87,7 @@
     {
       "id": "124",
       "index": 124,
+      "grossAreaM2": 1100,
       "heightM": 451.98,
       "population": 0,
       "isTransferFloor": true,
@@ -90,6 +97,7 @@
   "floorRanges": [
     {
       "fromIndex": 2,
+      "grossAreaPerFloorM2": 2200,
       "toIndex": 8,
       "startHeightM": 7.29,
       "floorToFloorM": 3.645,
@@ -100,6 +108,7 @@
     },
     {
       "fromIndex": 9,
+      "grossAreaPerFloorM2": 2200,
       "toIndex": 16,
       "startHeightM": 32.805,
       "floorToFloorM": 3.645,
@@ -110,6 +119,7 @@
     },
     {
       "fromIndex": 17,
+      "grossAreaPerFloorM2": 2200,
       "toIndex": 18,
       "startHeightM": 61.965,
       "floorToFloorM": 3.645,
@@ -119,6 +129,7 @@
     },
     {
       "fromIndex": 19,
+      "grossAreaPerFloorM2": 2200,
       "toIndex": 37,
       "startHeightM": 69.255,
       "floorToFloorM": 3.645,
@@ -129,6 +140,7 @@
     },
     {
       "fromIndex": 38,
+      "grossAreaPerFloorM2": 2200,
       "toIndex": 39,
       "startHeightM": 138.51,
       "floorToFloorM": 3.645,
@@ -139,6 +151,7 @@
     },
     {
       "fromIndex": 40,
+      "grossAreaPerFloorM2": 2200,
       "toIndex": 42,
       "startHeightM": 145.8,
       "floorToFloorM": 3.645,
@@ -148,6 +161,7 @@
     },
     {
       "fromIndex": 45,
+      "grossAreaPerFloorM2": 1800,
       "toIndex": 72,
       "startHeightM": 164.025,
       "floorToFloorM": 3.645,
@@ -158,6 +172,7 @@
     },
     {
       "fromIndex": 73,
+      "grossAreaPerFloorM2": 1800,
       "toIndex": 75,
       "startHeightM": 266.085,
       "floorToFloorM": 3.645,
@@ -167,6 +182,7 @@
     },
     {
       "fromIndex": 78,
+      "grossAreaPerFloorM2": 1400,
       "toIndex": 108,
       "startHeightM": 284.31,
       "floorToFloorM": 3.645,
@@ -177,6 +193,7 @@
     },
     {
       "fromIndex": 109,
+      "grossAreaPerFloorM2": 1400,
       "toIndex": 111,
       "startHeightM": 397.305,
       "floorToFloorM": 3.645,
@@ -186,6 +203,7 @@
     },
     {
       "fromIndex": 112,
+      "grossAreaPerFloorM2": 1100,
       "toIndex": 121,
       "startHeightM": 408.24,
       "floorToFloorM": 3.645,
@@ -195,6 +213,7 @@
     },
     {
       "fromIndex": 122,
+      "grossAreaPerFloorM2": 1100,
       "toIndex": 122,
       "startHeightM": 444.69,
       "floorToFloorM": 3.645,
@@ -204,6 +223,7 @@
     },
     {
       "fromIndex": 125,
+      "grossAreaPerFloorM2": 800,
       "toIndex": 154,
       "startHeightM": 455.625,
       "floorToFloorM": 3.645,
@@ -213,6 +233,7 @@
     },
     {
       "fromIndex": 155,
+      "grossAreaPerFloorM2": 800,
       "toIndex": 162,
       "startHeightM": 564.975,
       "floorToFloorM": 3.645,

@@ -1,11 +1,16 @@
 /**
- * **Invariant 5 over the whole cross-product: 8 buildings × 13 dispatchers, replayed and re-seeded.**
+ * **Invariant 5 over the whole cross-product: every shipped building × every dispatcher, replayed
+ * and re-seeded.** The counts are derived below rather than written here, because this header has
+ * already been wrong once: it said *"8 buildings × 13 dispatchers"* and *"104 pairs"* while the
+ * tree held **14 × 13 = 182**, three towers having landed in `e53f28b` without anything
+ * re-measuring the claim. That is the published-number-goes-stale class `CLAUDE.md` catalogues,
+ * sitting in the header of the suite that exists to catch a hand-written domain.
  *
  * *"Every persisted run record carries its seed, so any run replays exactly."* Replay is what the
  * leaderboard verifies submissions with, what `reports/replay.ts` reconstructs a stored run from,
  * and what makes common random numbers worth 5–20× in required run count. The UI readiness audit of
- * 2026-08-10 measured it and cleared it: **104 building × dispatcher pairs replay bit-identically
- * from their seed, and the seed is live in every one.**
+ * 2026-08-10 measured it and cleared it at the size the tree was then — **104 building ×
+ * dispatcher pairs** — and the suite now derives that figure instead of quoting it.
  *
  * ## Why this is not redundant with `core/src/sim/determinism.test.ts`
  *
@@ -16,7 +21,7 @@
  * `vertical-city`/`collective-enroute` (`:123`), `mixed-use-high-rise`/`eta` (`:146`) and
  * `garden-apartments`/`nearest-car` (`:156`, `:169`). `validation/goldenRuns.test.ts` adds five
  * more, over `eta` and `collective` only. Eighteen distinct pairs are touched by *some* assertion;
- * **ten of the 104 are asserted to replay**, and three shipped buildings — `chancery-house`,
+ * **ten of them are asserted to replay**, and three shipped buildings — `chancery-house`,
  * `crown-hotel`, `st-jude-hospital` — appear in no determinism or replay assertion anywhere in this
  * repository.
  *
@@ -32,7 +37,7 @@
  * re-seed.
  *
  * So this suite adds the two things the sample cannot give: **the cross-product, derived from disk
- * on both axes**, and **seed liveness on all 104 cells rather than one**. It does not duplicate the
+ * on both axes**, and **seed liveness on every cell it sweeps rather than one**. It does not duplicate the
  * deep single-cell work — 20-replication soak tests, process-history independence, diverting cars,
  * door obstructions, cross-process replay through NDJSON — all of which stay where they are and are
  * better there.
@@ -47,7 +52,8 @@
  *
  * ## The operating point, and why it is small
  *
- * 104 cells × 3 runs is 312 simulations, so the run has to be cheap or the suite gets skipped. A
+ * Three runs a cell, so the run has to be cheap or the suite gets skipped — and at fourteen
+ * buildings it stopped being cheap enough, which is what the split below is for. A
  * 210 s window at 10 % of population per 5 minutes is the smallest of the points measured at which
  * every cell is still substantial: the thinnest is `garden-apartments` — a small building, six floors
  * and two cars — at **10 legs**, and every other building's thinnest cell is **23 or more**, up to
@@ -65,6 +71,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { loadConfig, runSimulation } from '@elevator-sim/core';
 import type { SimulationConfig, SimulationResult } from '@elevator-sim/core';
 
+import { deepRequested } from './golden.js';
 import { DATA_DIR } from './harness.js';
 
 /**
@@ -89,12 +96,115 @@ import { DATA_DIR } from './harness.js';
  * still a flake waiting for a busy machine, and the 113 `viz` sites that annotated themselves
  * before the default existed were still right to.
  */
-const TIMEOUT_MS = 300_000;
+/** Every shipped building under `ELEVATOR_SIM_DEEP=1`; the nine affordable ones otherwise. */
+const DEEP = deepRequested();
+
+/**
+ * **One literal for both halves, and the reason is a guard rather than a preference.** This was
+ * first written as `DEEP ? 3_600_000 : 900_000`, sized against each half's own sweep — and
+ * `packages/viz/src/testCost.test.ts` rejected it. That file censuses every timeout annotation in
+ * the repository and prices it, and it refuses an argument it cannot resolve to a number: a
+ * conditional has two values, so an annotation written as one is an annotation nobody can cost.
+ * It reported all six sites here as `unresolved constant` and went red, which is the guard doing
+ * exactly its job.
+ *
+ * So the value is a literal, and it is sized on the half that needs it. Measured on a quiet box:
+ * the deep seventeen run **7 tests in 176.5 s**, the always-on nine in **12.2 s**. 1 800 000 ms is
+ * ~10× the deep figure and matches `deep-tiers.yml`'s own `--testTimeout`, so the annotation and
+ * the workflow agree rather than one silently overriding the other — a per-test argument beats the
+ * CLI flag, which is the trap that shape invites.
+ *
+ * **The always-on half is therefore annotated far above what it needs**, and that is the accepted
+ * cost of being priceable. It is stated rather than hidden because the opposite error is the one
+ * this repository keeps finding: an annotation shorter than the job it holds fails for a reason
+ * that is not the code.
+ *
+ * The old single 300 000 ms was right for eight buildings and is what failed at fourteen. Raised
+ * because the work grew, not to cover a case that got slow — the distinction `testCost.test.ts`'s
+ * ratchet exists to police, and it is worth saying here too since this file annotates itself.
+ */
+const TIMEOUT_MS = 1_800_000;
 
 /** The audit's seed, so a cell that goes red here reproduces through `scripts/opcheck/`. */
 const SEED = 20260810;
 
 /** See the operating-point note above. Both halves are load-bearing and both were measured. */
+/**
+ * **The eight buildings whose cells are too dear for the always-on tier, and the measurement that
+ * put them there.**
+ *
+ * This suite's hook ran the whole cross-product three times a cell. At eight buildings that fitted
+ * its 300 s budget; at fourteen it does not, and it did not fail gradually — the hook simply cannot
+ * finish on any host. Measured on a quiet box, one cell per building at this file's own operating
+ * point:
+ *
+ * | building | one cell | | building | one cell |
+ * |---|---|---|---|---|
+ * | `merdeka-class-reference` | **3 104 ms** | | `mixed-use-high-rise` | 409 ms |
+ * | `shanghai-class-reference` | **2 922 ms** | | `ashgate` | 307 ms |
+ * | `ctf-class-reference` | **2 385 ms** | | `harbour-point` | 243 ms |
+ * | `burj-class-reference` | **2 118 ms** | | `midtown-office` / `crown-hotel` | 149 ms |
+ * | `vertical-city` | **1 739 ms** | | `st-jude-hospital` / `secure-tower` | 149 / 144 ms |
+ * | | | | `chancery-house` | 140 ms |
+ * | | | | `garden-apartments` | 71 ms |
+ *
+ * **Five of fourteen buildings carry 87 % of the cost.** Those per-cell figures projected the full
+ * sweep at 547 s against a 300 s hook; **run whole it is 446 s**, and the projection is left beside
+ * it because the gap is the point — a sum of single cells is not a measurement of a sweep, and this
+ * file's own subject is figures that were derived once and then quoted. The same sweep was
+ * separately reported as burning 58 minutes without finishing: that is this repository's measured
+ * ~4.5× contention factor applied to 446 s, so both reports are right and were taken on different
+ * boxes.
+ *
+ * So the domain splits on a **measured** threshold rather than a chosen one: the nine buildings
+ * under a second a cell stay always-on — **48 s measured whole** — and these five join the deep
+ * tier, where the full fourteen run in **446 s**. Both axes are still taken from `loadConfig` — this is a named,
+ * measured exclusion, not the hand-written domain the header argues against, and a fifteenth
+ * building is in scope on the day it is authored.
+ *
+ * **Three more towers were authored into `data/buildings/` the same day, and all three joined this
+ * set on a measurement taken the way the first one should be read.** One WTC, Empire State and
+ * Willis (GitHub issues #428, #427, #426) were measured at this file's own operating point against
+ * four of the incumbents **on one quiet box in one sitting**, which is the only comparison that
+ * means anything here:
+ *
+ * | new tower | one cell | | incumbent, same box | one cell |
+ * |---|---|---|---|---|
+ * | `willis-class-reference` | **1 842 ms** | | `merdeka-class-reference` | 1 802 ms |
+ * | `empire-state-class-reference` | **1 111 ms** | | `shanghai-class-reference` | 1 522 ms |
+ * | `one-wtc-class-reference` | **668 ms** | | `burj-class-reference` | 820 ms |
+ * | | | | `ctf-class-reference` | 704 ms |
+ * | | | | `vertical-city` | 450 ms |
+ *
+ * **The absolute figures in the two tables are not comparable and must not be spliced**: the table
+ * above was taken on a loaded host and this one on an idle one, and `vertical-city` reads 1 739 ms
+ * there against 450 ms here. What transfers is the **ordering within one sitting**, and it is
+ * unambiguous — every one of the three exceeds `vertical-city`, the lightest building already in
+ * this set, and Willis is the heaviest cell in the tree. So all three join, the always-on tier
+ * stays at **nine** buildings, and its 48 s stands unchanged because the set it runs over did not
+ * move.
+ *
+ * **What the always-on tier gives up, named rather than counted.** Seven of these eight appear in no
+ * other determinism or replay assertion anywhere in this repository, so per-commit they are now
+ * covered by nothing and weekly by this suite's deep half: `burj-class-reference`,
+ * `ctf-class-reference`, `merdeka-class-reference`, `shanghai-class-reference`,
+ * `one-wtc-class-reference`, `empire-state-class-reference` and `willis-class-reference`. The
+ * eighth, `vertical-city`, is reached by `core/src/sim/determinism.test.ts` under
+ * `collective-enroute`. That is a real loss and it is the cheaper of the two on offer: the
+ * alternative was a hook that finishes for nobody, which is coverage of zero rather than coverage
+ * once a week.
+ */
+const HEAVY_BUILDING_IDS: ReadonlySet<string> = new Set([
+  'burj-class-reference',
+  'ctf-class-reference',
+  'empire-state-class-reference',
+  'merdeka-class-reference',
+  'one-wtc-class-reference',
+  'shanghai-class-reference',
+  'vertical-city',
+  'willis-class-reference',
+]);
+
 const DURATION_S = 210;
 const DEMAND = { peakWindowS: 60, arrivalRatePctPop5min: 10 } as const;
 
@@ -145,7 +255,9 @@ let DISPATCHER_COUNT = 0;
 beforeAll(async () => {
   const config = await loadConfig(DATA_DIR);
   /* Both axes off disk. Sorted so a failure list reads in a stable order. */
-  const buildingIds = [...config.buildingsById.keys()].sort();
+  const buildingIds = [...config.buildingsById.keys()]
+    .sort()
+    .filter((id) => DEEP || !HEAVY_BUILDING_IDS.has(id));
   const profiles = config.dispatcherProfiles.profiles;
   BUILDING_COUNT = buildingIds.length;
   DISPATCHER_COUNT = profiles.length;
