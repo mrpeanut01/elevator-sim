@@ -952,9 +952,10 @@ export interface VizRecording {
    * What each bank that is **not** at the default was fitted with — version 14, `DECISIONS.md` § D539.
    *
    * One entry per such bank, in the building's bank order. The field is absent when every bank is at
-   * the default, a counterweight at one half of rated load and no regeneration, and it is written as
-   * absent rather than `[]` or an explicit `undefined`, so a shipped run's recording carries nothing
-   * it did not carry at version 13.
+   * the default — a counterweight at one half of rated load, no regeneration and, since
+   * `DECISIONS.md` § D583, no rope modelled — and it is written as absent rather than `[]` or an
+   * explicit `undefined`, so a shipped run's recording carries nothing it did not carry at
+   * version 13.
    *
    * Written from the resolved building the run was simulated on, through `core`'s own
    * `energyConventionOf`, so it cannot disagree with the joules in {@link VizSummary.energy}. Its

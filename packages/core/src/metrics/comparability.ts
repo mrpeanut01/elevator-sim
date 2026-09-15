@@ -561,10 +561,15 @@ export function energyConventionDisclaimer(building: {
           : `a regenerative drive returning ${String(convention.regenerativeRecoveryFraction)} of each overhauling move`;
       // § D583. Named by class as well as by mass, because the class is what a player bought and
       // the mass is what the run was priced with; a reader given only one cannot check the other.
+      const ropeClassId = byId.get(id)?.ropeClassId;
       const rope =
         convention.ropeMassKg === 0
           ? 'no rope modelled'
-          : `${String(Number(convention.ropeMassKg.toFixed(1)))} kg of "${String(byId.get(id)?.ropeClassId)}" rope moving with each car`;
+          : `${String(Number(convention.ropeMassKg.toFixed(1)))} kg of ${
+              // A resolved bank carries both or neither, so the fallback is for a hand-built one —
+              // and it says *unnamed* rather than printing `undefined` at a reader of the run.
+              ropeClassId === undefined ? 'unnamed' : `"${ropeClassId}"`
+            } rope moving with each car`;
       return `"${id}" (counterweight at ${String(convention.counterweightBalanceRatio)} of rated load, ${drive}, ${rope})`;
     })
     .join('; ');
