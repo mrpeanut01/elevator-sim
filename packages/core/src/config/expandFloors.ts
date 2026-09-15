@@ -126,6 +126,13 @@ export function expandFloors(source: FloorSource, options: ExpandFloorsOptions =
         ...(range.isTransferFloor === true ? { isTransferFloor: true } : {}),
         ...(range.trafficProfile === undefined ? {} : { trafficProfile: range.trafficProfile }),
         ...(range.landingCallType === undefined ? {} : { landingCallType: range.landingCallType }),
+        // GitHub issue #429, § D601. Copied onto the expanded floor exactly as `landingCallType`
+        // is, so a range-form building and a floor-by-floor one resolve the same object. The
+        // building-level default is applied later, in `resolveBuilding`, because it must not
+        // overwrite a range that stated its own.
+        ...(range.grossAreaPerFloorM2 === undefined
+          ? {}
+          : { grossAreaM2: range.grossAreaPerFloorM2 }),
         ...(label === undefined ? {} : { label }),
       });
       rangeOfIndex.set(index, rangeIndex);

@@ -4,6 +4,7 @@
   "name": "Garden Apartments",
   "type": "residential",
   "trafficProfile": "residential",
+  "grossAreaPerFloorM2": 800,
   "floors": [
     { "id": "G", "index": 0, "heightM": 0.0, "population": 0, "isEntrance": true, "label": "Lobby" },
     { "id": "2", "index": 2, "heightM": 3.0, "population": 24 },

@@ -1163,6 +1163,32 @@ export function buildingPlateOf(
     },
   ];
 
+  /*
+   * **What the shafts take out of the building** — GitHub issue #429, `DECISIONS.md` § D601. This
+   * is the **non-test reader** of `ResolvedBuilding.area`, and it is the only one.
+   *
+   * Drawn only where the building declares a plate; absent means area is not modelled and the row
+   * is not there, rather than reading `0 m²` or `unknown` about a building that never claimed one.
+   * It sits above the line with floors, metres and people, so it takes no Casual lead: *floor
+   * area* and *core* are not lift-engineering vocabulary the way *handling capacity* is.
+   *
+   * **It is a figure and never a grade.** No verdict reads it, nothing weighs it against a wait,
+   * and `campaign/judge.ts`'s refusal is untouched — § D106's rule for energy, applied to the
+   * second axis it was always going to have to cover.
+   */
+  const area = building.area;
+  if (area !== undefined) {
+    rows.push({
+      k: 'core',
+      v: `${grouped(area.coreM2)} m² of ${grouped(area.grossM2)} m² (${(area.coreShare * 100).toFixed(1)}%)`,
+      help:
+        'Hoistway plan area, summed over every floor each shaft passes through — a high-zone ' +
+        'shaft takes space out of the low floors it never opens onto, which is why sky lobbies ' +
+        'exist. Hoistways only: no lift lobby, no machine room, no riser, so this reads lower ' +
+        'than a published core share for the same building. A double-deck car is one shaft.',
+    });
+  }
+
   if (recording === undefined) {
     rows.push({
       k: 'measured',

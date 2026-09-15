@@ -24,6 +24,7 @@ import type { ZodError } from 'zod';
 import { bankRangeIsFixed, isServiceDerateEvent, isServiceRangeEvent } from './serviceEvent.js';
 import { connectivityDiagnostics } from './buildingConnectivity.js';
 import { expandFloors } from './expandFloors.js';
+import { resolveFloorArea } from './floorArea.js';
 import {
   airPressureDescentCapMps,
   findElevatorSpec,
@@ -166,6 +167,24 @@ export function resolveBuilding(
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     issues.push(...error.issues);
+  }
+
+  /*
+   * **The building's plate, applied last** — GitHub issue #429, `DECISIONS.md` § D601.
+   *
+   * Precedence is floor, then range, then building, and this is where the third rung is applied:
+   * `expandFloors` has already copied a range's figure onto its floors, so anything still without
+   * one is a floor that stated nothing and sits under no range that did. `trafficProfile`'s
+   * precedence exactly, which is why no reader has to learn a second rule.
+   *
+   * A building that declares none leaves every floor as it was, and the whole area block below
+   * resolves to `undefined` — the state every building was in before § D601.
+   */
+  const buildingPlateM2 = building.grossAreaPerFloorM2;
+  if (buildingPlateM2 !== undefined) {
+    floors = floors.map((floor) =>
+      floor.grossAreaM2 === undefined ? { ...floor, grossAreaM2: buildingPlateM2 } : floor,
+    );
   }
 
   // A building carries two orderings of the same shaft: `index` is what the dispatcher
@@ -817,6 +836,19 @@ export function resolveBuilding(
     warnings.push(...connectivity.warnings);
   }
 
+  /*
+   * **The plate and its core** — GitHub issue #429, `DECISIONS.md` § D601. Resolved here, where the
+   * floors and the resolved banks are both in view, so a reader gets one number per floor rather
+   * than re-deriving a bank's span from the floors. A building whose floors declare no area gets
+   * `undefined` and is byte-identical to what it resolved to before § D601.
+   *
+   * Placed **before** the throw below so that `core-exceeds-floor-plate` travels with every other
+   * issue in one `ConfigError` rather than in a second one nobody sees.
+   */
+  const floorArea = resolveFloorArea(floors, banks, specs);
+  for (const issue of floorArea.issues) addIssue(issue.path, issue.message, issue.code);
+  for (const warning of floorArea.warnings) addWarning(warning.path, warning.message, warning.code);
+
   if (issues.length > 0) {
     throw new ConfigError(issues, {
       summary: `Invalid building "${building.id}": ${issues.length} problem${issues.length === 1 ? '' : 's'}`,
@@ -840,6 +872,7 @@ export function resolveBuilding(
     transportModes: building.transportModes ?? [],
     accessZones: building.accessZones ?? [],
     serviceEvents,
+    ...(floorArea.area === undefined ? {} : { area: floorArea.area }),
     totalPopulation,
     warnings,
   };

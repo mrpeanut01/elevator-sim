@@ -4,6 +4,7 @@
   "name": "St Jude Hospital",
   "type": "hospital",
   "trafficProfile": "hospital",
+  "grossAreaPerFloorM2": 1900,
   "floors": [
     {
       "id": "LG",

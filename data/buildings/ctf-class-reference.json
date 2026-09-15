@@ -4,6 +4,7 @@
   "name": "CTF-class reference tower",
   "type": "mixed-use",
   "trafficProfile": "office-standard",
+  "grossAreaPerFloorM2": 2200,
   "floors": [
     {
       "id": "G",
@@ -25,6 +26,7 @@
     {
       "id": "67",
       "index": 67,
+      "grossAreaM2": 1800,
       "heightM": 301.5,
       "population": 0,
       "isTransferFloor": true,
@@ -33,6 +35,7 @@
     {
       "id": "91",
       "index": 91,
+      "grossAreaM2": 1400,
       "heightM": 385.5,
       "population": 0,
       "isTransferFloor": true,
@@ -41,6 +44,7 @@
     {
       "id": "109",
       "index": 109,
+      "grossAreaM2": 1100,
       "heightM": 451.2,
       "population": 30,
       "label": "Sky deck \u2014 the observation level, its bar and its restaurant"
@@ -58,6 +62,7 @@
     },
     {
       "fromIndex": 32,
+      "grossAreaPerFloorM2": 1800,
       "toIndex": 66,
       "startHeightM": 144.0,
       "floorToFloorM": 4.5,
@@ -67,6 +72,7 @@
     },
     {
       "fromIndex": 68,
+      "grossAreaPerFloorM2": 1400,
       "toIndex": 90,
       "startHeightM": 305.0,
       "floorToFloorM": 3.5,
@@ -77,6 +83,7 @@
     },
     {
       "fromIndex": 92,
+      "grossAreaPerFloorM2": 1100,
       "toIndex": 108,
       "startHeightM": 389.1,
       "floorToFloorM": 3.6,
@@ -87,6 +94,7 @@
     },
     {
       "fromIndex": 110,
+      "grossAreaPerFloorM2": 900,
       "toIndex": 111,
       "startHeightM": 455.7,
       "floorToFloorM": 4.5,

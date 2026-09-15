@@ -36511,3 +36511,90 @@ Measured on the shipped bundle at `vertical-city`, seed 424242, over 300 frames 
 **One exclusion in the rule itself, measured rather than assumed.** Chromium propagates `disabled` from a `<select>` to every `<option>` and does **not** propagate `aria-describedby`, so the Workshop's five inert selects arrived as sixty-five findings about controls no reader ever lands on. `option` is excluded. The cost is stated where the exclusion is: an option disabled *inside an enabled* combobox would go unasked, nothing else asks either, and no such option exists in the tree today.
 
 **What this does not decide.** Whether `title` is a good enough carrier for the seven screens that already pass — it maps to the accessible description in every engine this product supports, and whether each reader announces it is one of the things § 6.7's session still has to confirm.
+
+---
+
+## D601 — A floor has a plate, a shaft takes plan area out of every level it passes, and a floor with more hole than floor is refused; area is a published quantity and not a price, because the price is the owner's ruling
+
+**Date: 2026-09-15 · GitHub issue [#429](https://github.com/mrpeanut01/elevator-sim/issues/429) · Under the product owner's own comment on that issue of 2026-09-10 · Rules on: `core/src/config/schema.ts`'s `ISSUE_CODES` and `WARNING_CODES`, `data/elevator-specs.json`, all fourteen configs in `data/buildings/`, [`docs/02`](docs/02-elevator-reference.md) and [`data/buildings/README.md`](data/buildings/README.md).**
+
+**Why an entry.** [§ D405](#d405)'s second ground, twice. It binds code and data no single module owns — a field on `FloorConfig`, `FloorRange` and `BuildingConfig` in `config/`, a block in `elevator-specs.json`, a plate on every shipped building, and a row on the Engineer building plate in `packages/viz` — and it **refuses** part of what the issue asks for, which is a thing a docstring may not decide on its own.
+
+### 1. The premise, verified rather than quoted
+
+The issue's claim is that the model has no concept of area at all. It was true on the tree this lane branched from: `areaM2`, `floorArea`, `rentable` and `coreArea` returned zero hits across `packages/core/src`, `packages/viz/src` and `data/`, and a floor carried `id, index, heightM, population, isEntrance, isTransferFloor, trafficProfile, landingCallType, label` and nothing else. So **adding a car really was a pure win**: the schedule charges 34 u for `new-car` once and nothing charged it again.
+
+### 2. What is built
+
+**A floor's plate is data** (invariant 7), declared with type, range, unit and default (invariant 8) as `config/schema.ts#FLOOR_AREA_TUNABLES`, and authored at whichever scale it is constant at — `BuildingConfig.grossAreaPerFloorM2`, `FloorRange.grossAreaPerFloorM2`, `FloorConfig.grossAreaM2`. **Precedence is floor, then range, then building**, which is `trafficProfile`'s exactly, so no reader learns a second rule. **The default is *absent*, and absent means area is not modelled** — § D583's shape, for its reason: a building that declares none resolves to the object it resolved to before this entry.
+
+**What a hoistway takes is also data**: `elevator-specs.json#shaftFootprint`, four bands of rated load, beside the machine classes for `airPressure`'s and `ropeClasses`' reason — a hoistway's plan area is set by the car's plated load and its clearances, not by whether the machine is geared.
+
+`config/floorArea.ts#resolveFloorArea` is called once, by `resolveBuilding`, and puts `ResolvedBuilding.area` on the result: gross, core, lettable and `coreShare`, per floor and for the building.
+
+### 3. The one modelling claim, and it is the load-bearing one
+
+**A shaft is charged over its bank's whole *span*, not over its served set.** A bank serving 43–75 takes plan area out of floor 12, because the hoistway physically passes through it. That is not a convenience — it is the reason sky lobbies exist, it is what makes a tall building's core taper, and a model that charged only the served floors would make an express shuttle free everywhere it does not open, which is the opposite of the fact the issue is about. Measured on `burj-class-reference`, the core runs 245.6 m² through the low residences and 64.0 m² at the top; `config/floorArea.test.ts` asserts the shuttle is charged to floor 50, which it passes and never opens onto.
+
+**A double-deck car is one shaft**, charged once at its *per-deck* load. The source's own arithmetic requires it: 24 single-deck cars becoming 13 double-deckers *"reduc[es] the required core by no less than 11 hoistways"*, and 24 − 13 = 11 only works if a double-deck car occupies one hole.
+
+### 4. Where the figures come from, and which of them are chosen
+
+**One thing is cited and everything else is chosen**, and the split is in `shaftFootprint.$comment` field by field. Al-Kodmany (Buildings 2015, 5(3), 1070–1104) gives **one car = one hoistway** outright, in the double-deck arithmetic above. For the *size* of a hoistway it gives one anchor and that anchor **brackets** rather than fixes: TWIN on a 31-storey building recovers *"more than 830 m², equivalent to an area of 20 hotel rooms"* by cutting the shafts *"by a third"*. 830 ÷ 31 is 26.8 m² of plate per floor and that is a third of the shafts, so one hoistway is 26.8 ÷ (N/3) m² for an unstated original count N — **13.4 m² at N = 6, 8.9 at N = 9, 6.7 at N = 12**. A 31-storey office plausibly runs 8–12 shafts, so the source supports roughly **6.7–13.4 m²**.
+
+The four bands — 5.5, 6.8, 8.0 and 9.5 m² — are **chosen**. The middle two sit inside that bracket and the ends sit outside it deliberately, because a 10-person residential car needs less hole than that building's and a 26-person service car needs more. **All four are an agent's proposal awaiting the owner's approval and `elevator-specs.json` says so**; nothing here is approved.
+
+**The floor plates are chosen too, and are an assumption rather than a citation** — `burj-class-reference`'s own header already says exactly that about its populations, and this follows it. No published floor plate was read for any of the fourteen. The four reference towers taper and the ten others carry one plate; what each is, and the density reasoning behind it, is in `data/buildings/README.md`.
+
+**What the block measures, said where a reader will meet it: the hoistway alone.** No lift lobby, no machine room, no landing-door swing, no riser. The paper's headline that elevators and escalators *"can occupy up to 40% of a building's floor"* is about all of that, so a core share derived here is **expected to come out well under 40 %** and a reader comparing the two is comparing different quantities.
+
+### 5. What is **not** built, and why that is a decision rather than an omission
+
+**#429's third acceptance criterion — *"the price schedule charges area, and the Career income model reads it"* — is deliberately not built.** `data/price-schedule.json` is untouched and nothing here costs a unit. The reason is the product owner's own, on the issue, on 2026-09-10:
+
+> *"The ruling this needs is not should shafts cost area — it is that **making area a cost introduces a second budget axis and a Career income term**, and neither is in `docs/38`. That reshapes the economy rather than adding a price, which is why it should not be built on an engineering judgement."*
+
+That objection was about `pricing/` having no magnitude term at all, and **half of it has since been answered**: [§ D552](#d552) landed rate × quantity and [§ D560](#d560) moved the last private multiplier onto it, so *per m²* is now expressible with no new mechanism. The half that remains is the half the owner reserved, and it is untouched here.
+
+**So the ruling arrives with arithmetic attached rather than without.** Both shapes were worked out and neither was taken:
+
+- **Charging a shaft in units per m²** means making `new-car` a rated row. That **moves a shipped price**, which `data/price-schedule.json`'s own header puts with the product owner, and § D552 clause 4 re-derives every scenario ceiling from `unitsPer × quantity.max` — thirty in `data/campaign.json` and six in `data/engineering-briefs.json`. Measured over the shipped set, **a shaft's area cost spans 49×**: 24.0 m² for a car in `ashgate`'s three-level car park against **1 178.0 m² for one more Burj shuttle**, which at the rate that keeps `midtown-office` at today's 34 u (0.238 u/m²) would price that shuttle at **280 u against a whole schedule of 412**. That is not a tuning question; it is a different game, and it is the owner's.
+- **Charging a shaft in area as a second currency** — the issue's own words, *"priced in units **and** in the area it permanently removes"* — is the second budget axis by name, and needs the Career income term beside it or the area is spent from nothing.
+
+**A third thing the measurement settles, and it is the reason not to guess.** The plate ceiling in § 6 **does not bind on anything that ships**: the nearest approach across all fourteen buildings is 26.6 % of one plate, and no purchase the game sells comes near it. So a reader must not take the refusal for the trade-off. **What a shaft costs today is the lettable area it removes on every floor it passes, forever, published and unavoidable** — a fifth car at `midtown-office` is 142.8 m², measured on the run in `config/floorArea.test.ts` — and turning that quantity into a *price* is the ruling this entry declines to take.
+
+### 6. The ceiling refuses, and it is proved by a configuration that breaches it
+
+`ISSUE_CODES.coreExceedsFloorPlate`: a floor whose hoistways take **strictly more** plan area than it has fails to load. Strictly, never equal — a level that is entirely core is degenerate but buildable, and refusing it would be this project choosing an architectural taste over an impossibility.
+
+It is proved on a hand-built two-level tower where the ninth car fits on a 65 m² plate and the tenth does not, which is *more shafts is not monotonically better* as a refusal. It is deliberately a test building, on § D583's precedent, because no shipped configuration can reach it.
+
+Two warnings sit under it, both `regenerative-drive-buys-nothing`'s shape: `floor-area-buys-nothing` for a data directory with no footprint table, and `partial-floor-area` for a building where only some floors resolve a plate — in which case the building's totals are **absent rather than partial**, because a gross area summed over some of a building's floors reads as a figure for all of them.
+
+### 7. What the shipped buildings measure, pinned rather than bounded
+
+`coreShare`, hoistway only: `garden-apartments` 1.4 %, `midtown-office` 1.9 %, `st-jude-hospital` 2.3 %, `harbour-point` 2.5 %, `ashgate` 3.0 %, `crown-hotel` 3.2 %, `secure-tower` 5.1 %, `chancery-house` 6.4 %, `vertical-city` 7.3 %, `mixed-use-high-rise` 7.5 %, `ctf-class-reference` 7.9 %, **`burj-class-reference` 13.1 %**, `shanghai-class-reference` 13.3 %, `merdeka-class-reference` 16.6 %. The worst single floor in the project is `merdeka-class-reference`'s sky lobby at **26.6 %**, where ninety-two hoistways cross one level.
+
+**Low-rise single figures and supertall mid-teens is Al-Kodmany's qualitative claim arriving as a measurement of this model** — *"in high-rises elevators occupy more space than any other services"* — rather than as a quotation. It is not the paper's 40 %, and § 4 says why it must not be read as it.
+
+### 8. The non-test caller, named
+
+- **Reader**: `packages/viz/src/dev/rightRail.ts#buildingPlateOf`, which draws a `core` row above the line beside floors, metres and people. It is the **only** reader, and that is the whole of why no leg can move.
+- **Writer**: the fourteen configs in `data/buildings/`, through `config/parse.ts#resolveBuilding`.
+- **Refused loudly rather than defaulted quietly**: a building that declares a plate where the data directory has no footprint table publishes **no area**, warned, rather than a core of zero — a shaft that costs nothing is the thirteen-times-shipped defect wearing a new name.
+
+### 9. Move the control and require the run to change, in the only form available
+
+**Changing a building's area declaration alone changes no leg** — #429's fourth criterion, first half — and three arms prove it on a run rather than on the import graph: as shipped, at double the plate, and with the declaration removed, all three fingerprint identically.
+
+**The second half is measured on the quantity the control moves rather than on a leg**, § D583's shape: a fifth car in `midtown-office`'s only bank is 6.8 m² on each of twenty-one floors, so `lettableM2` falls by exactly **142.8 m²** while `grossM2` does not move — a shaft does not make a building bigger. The legs of *that* comparison do move, deliberately, and the point is the other way round: the area is charged whether the fifth car helps or not.
+
+### 10. Not a score, and mechanically so
+
+No area figure is folded into a verdict, weighted against a wait, or turned into a letter. `campaign/judge.ts`'s refusal is untouched, `shift/goals.ts` gains nothing, and the plate row publishes a figure beside the others exactly as `workPerServedLegKJ` sits beside raw energy ([§ D106](#d106)). Charter non-goal 6 holds.
+
+### 11. What this does not decide
+
+Whether the four footprint figures are right — all four are chosen and all four await the owner. Whether the fourteen plates are right — they are a stated assumption and a later citation replaces a stated figure rather than a silent one. Whether area should cost anything at all, which is § 5 and the owner's. Whether lettable area should bound a floor's **population**, which would make a shaft move a leg and would move every published interval in the project; it is not built and `floorArea.ts` says so in its own header rather than leaving it to be discovered. And whether `new-car` charging the same 34 u for a 24 m² shaft and an 1 178 m² one is right, which is the finding § 5 hands over rather than a defect this lane may fix.
+
+**Bookkeeping.** This lane was reserved D601–D605 and spent **D601**; D602, D603, D604 and D605 are returned **unspent**, and whether each is free or a hole is the integrator's call at close, because that depends on what lands above them (§ D430). The lane also **widened wave AB's reservation** in `documentation.test.ts#OPEN_RESERVATION` to `D594–D605` — the floor is the charter row's own figure and the ceiling is the top of *this lane's* block, written at the narrowest figure that is true from here, exactly as § D583 did for wave AA.
