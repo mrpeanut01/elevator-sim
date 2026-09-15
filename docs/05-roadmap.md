@@ -1601,7 +1601,7 @@ load-bearing is the shape [§ D99](../DECISIONS.md) had to own.
 
 | track | state | evidence |
 |---|---|---|
-| Property-based fuzzing | ✅ built | `experiments/src/fuzz/` — generator, shrinker, six properties, a 64-case always-on corpus and a 2 000-case deep tier |
+| Property-based fuzzing | ✅ built | `experiments/src/fuzz/` — generator, shrinker, six properties, a 64-case always-on corpus and a 2 000-case deep tier, plus a **48-case hybrid family** whose buildings carry per-landing hall fixtures so some landings name a car and some do not ([§ D570](../DECISIONS.md), GitHub issue #534; `elevator-sim fuzz --tier hybrid`) |
 | Analytical cross-validation, all five buildings | ✅ built | `experiments/src/oracle/fiveBuildings.test.ts`, `bankCensus.test.ts`, `reconcile.ts` — and `remainingBuildings.test.ts`, which takes the shipped set from five reconciled buildings to six and records why two of the other three cannot be reconciled at all (GitHub issue #232) |
 | Physics verification | ✅ built | `experiments/src/validation/physics.test.ts` |
 | Statistical self-validation | ✅ built | `validation/{crnVarianceReduction,nullComparison,sequentialStopping,operatingPoint}.test.ts` |

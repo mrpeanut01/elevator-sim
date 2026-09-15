@@ -35440,3 +35440,81 @@ chooses one is #437's too.
 **What this does not decide.** Whether DC-2 should play the whole census rather than a stage's `editable` list: GitHub issue #233 re-authors the lists, and on that commit the out-of-list rows move into `DROPDOWN_CLEARS`. The rebalance of stages 3, 5 and 7.
 
 ---
+
+## D568 — `sim.assignedWalkS` declares both clauses an `activeWhen` can name, and the third — *some landing of this building assigns* — is executed rather than asserted: a run that sets the walk where no landing names a car says so
+
+**Date: 2026-09-14 · GitHub issue #534 item 4 · Found by the independent review of GitHub PR #532 · Extends [§ D553](#d553) and answers `CLAUDE.md` invariant 8 for one row.**
+
+**Why an entry.** It moves a declared schema in `core/src/sim/types.ts`, adds a warning to `sim/simulation.ts`, and names a module neither owns — `experiments`' `tuning/space/landings.ts` ([§ D571](#d571)) — as where the clause it cannot declare is expressed instead ([§ D405](#d405)).
+
+1. **The declared half is now complete.** The row declared `activeWhen: { 'dispatch.passengerAssignment': ['panel'] }` and nothing else. It now also declares `'dispatch.callType': [...DESTINATION_CALL_TYPES]`. That clause was **transitive rather than new** — `resolveDispatchConfig` refuses `panel` beside a call type that cannot ask for a destination (§ T16-D1) — and it is written down because a gate a reader has to derive from another module's refusal is a gate `tuning/space` cannot evaluate. `sim/assignedWalkGate.test.ts` asserts the conjunction and then asks `core`'s own resolver whether the excluded pair is refused, rather than restating the rule.
+
+2. **The third clause is not declarable, and the reason is structural.** Since § D553 the walk is charged where a *landing* names a car — `Simulation.#assignsAt`, which is `comparabilityOfLandings` read one floor at a time — so the row is live only if some landing of the building registers a destination call. An `activeWhen` names **parameter ids**; a per-floor panel set is keyed by floor id, which § D553 item 8 records as a building's property and not a dispatcher profile's. This repository already has one building-dependent condition and it lives as a *function over the building* rather than in a schema — `tuning/space#buildingFeasibility`, for the two `answer.*` rows only decidable against a car — and this is the same shape.
+
+3. **So it is executed.** A run whose `sim.assignedWalkS` is non-zero while `passengerModel` is `conventional` raises a warning naming the value as inert. Raised **only when the value is non-zero**, so the default (`0`) leaves every existing run byte-identical — the whole reason the default is zero. That is `CLAUDE.md`'s *stated refusal* rule pointed at a knob: a control that writes nothing must say so, and the saying is pinned by a run rather than by a sentence.
+
+4. **The gate is checked in both directions, which is what `sim/searchSpaceLiveness.test.ts` requires of every gate.** Live: on a building with panels at one landing, and on one that declares nothing, moving the walk 0 → 20 s moves the legs. Flat: under the *same* `panel` dispatcher on a building whose landings all declare `up-down-buttons`, and under a conventional dispatcher, moving it 0 → 25/30 s is **byte-identical** — every event, every record, every statistic — apart from the warning, which is filtered out of the comparison in both places the run publishes it (`SimulationResult.warnings` and `RunRecord.warnings`) rather than emptied.
+
+**What this does not claim.** That a search varies this row. Nothing does: `sim.*` is excluded from `collectSearchSpace` by its own membership rule, and `dispatch/deadCode.test.ts` records `SIM_PARAMETERS` as *"invariant 8 schema; no shipped search varies these yet"*. The declaration stands on its own, which is what invariant 8 asks for.
+
+---
+
+## D569 — The cross-platform identity check PR #532's review asked for cannot be built as asked, and the reason is two recorded facts: CI has one leg, and a whole-result hash pinned in this repository is the defect § D196 removed
+
+**Date: 2026-09-14 · GitHub issue #534 item 3 · Found by the independent review of GitHub PR #532 · Refuses an acceptance item with reasoning, and builds the portable form instead.**
+
+**Why an entry.** It refuses something already recorded — an acceptance item on a GitHub issue — and it rests on [§ D196](#d196), [§ D201](#d201) and [§ D462](#d462), which it must not be read as reversing ([§ D405](#d405)).
+
+1. **The premise is stale.** The review wrote *"CI runs both platforms, but no test hashes whole results across them."* It has not run both since § D462, the product owner's call of 2026-09-02: `.github/workflows/ci.yml` dropped the `macos-latest` leg and all five of its jobs are `ubuntu-latest`. There is no second platform for a cross-platform check to disagree with. The workflow's own header says what that cost — *"portability stops being a MEASURED property … the pins are still pinned; nothing checks that they travel"* — and nothing here reverses it.
+
+2. **A whole-result hash pinned here would be worse than no check.** `traffic/*Identity.test.ts` used to pin `SHA-256(JSON.stringify(result))` and compare with `toBe`. § D196 re-pinned 26 values that failed in one environment; § D201 found the same 26 failing in the other, each environment reproducing its own pin set exactly. On a one-leg matrix such a pin is green on the machine that wrote it and red on a developer's, which reports float noise as a regression in the place this project is most careful not to.
+
+3. **What is portable by construction is pinned instead, for the hybrid configuration.** `structuralDigestOfResult` hashes every decision — every key, string, boolean and **integer** — and elides the magnitudes, which are compared within `identity.test-helper.ts`'s 1e-9 relative band. `sim/landingPanelIdentity.test.ts` pins four hybrid cells that way. A platform whose *decisions* diverge on a hybrid run — a different car answering, a different landing assigning, a different batch key — goes red on that platform and names the cell, which is exactly the outcome the review wanted and the strongest honest form of it while the matrix is one leg.
+
+4. **And stage 1's own identity claim is re-measured by the suite rather than inherited.** § D553 clause 7 hashed seventy whole results on two trees, on macOS. The same claim is now a case: **every shipped building × seven dispatcher arms × two demand shapes — 70 configurations, 140 runs — declaring the dispatcher's own resolved call type on every landing, compared to the shipped building with the whole-result `fingerprint`, byte for byte.** It is a *within-platform* A/B, so it re-measures the claim on whatever machine runs it; CI's Linux leg is therefore the Linux measurement the review asked for, taken on every commit. Measured green on Linux on this tree, in 15 s.
+
+**What this does not claim.** That two platforms have been compared. Nobody has run it on a second one and nothing in CI will. Re-adding a leg is one `include:` entry, and the workflow says so.
+
+---
+
+## D570 — The property fuzzer draws landing call types: a third pinned family whose landings disagree, in its own space, so the two corpora that carry regression records keep their runs exactly
+
+**Date: 2026-09-14 · GitHub issue #534 item 1 · Found by the independent review of GitHub PR #532 · Extends [§ D553](#d553).**
+
+**Why an entry.** It adds an axis to `experiments`' fuzz generator, a tier to the shipped `elevator-sim fuzz` command in `packages/cli`, and a field to `FuzzSpace` that the two existing corpora depend on being zero ([§ D405](#d405)).
+
+1. **The hole.** § D553 gave a floor `landingCallType` and the generator drew none, so **no fuzz case could build a hybrid**. Everything that configuration reaches was unfuzzed: `costRequestFor` and `batchKeyOf` asked per call rather than per run, `Simulation.#assignsAt` as anything but the run-wide gate, the bare kiosk's refusal at one landing and not the next, conservation claim 5 counted over a proper subset of the landings, and the `hybrid` comparability object itself.
+
+2. **A third space, not a probability on the first two.** `FuzzSpace.landingPanelProbability` is `0` on `STANDARD_SPACE` and `DEEP_SPACE`, where the `fuzz.landings` stream is never touched and no floor gains a key; `HYBRID_SPACE` and `DEEP_HYBRID_SPACE` are those two with that one axis on. The reason is not tidiness: the deep tier's two pinned reproductions (`fuzz-1001074`, `fuzz-1000384`) are **regression records of specific runs**, and a recorded case that quietly became a hybrid would reproduce a different run at the same seed — the defect `CORPUS_DISPATCHER_PROFILE_IDS` exists for, one axis over. `hybrid.test.ts` asserts the always-on corpus declares no landing fixture anywhere, rather than trusting the constant.
+
+3. **The set is drawn from the declared dimension** ([§ D571](#d571)), not by a rule the generator invents: one float decides whether a case carries a set at all, then `sampleCandidate` draws the set from `landingPanelSpaceFor`'s space. A family that sampled a panel set its own way would be exercising a space no search could sample, which is `patternSwitching`'s defect wearing a generator.
+
+4. **`HYBRID_CORPUS` is 48 pinned seeds and the last sixteen are chosen rather than consecutive** — the shape `STANDARD_CORPUS`'s two-floor seeds have. A hybrid needs a dispatcher that *names a car*, and `data/` ships one such profile of thirteen; measured over seeds 2 000 001–2 000 400, **18 produce a hybrid**, about one case in twenty-two, so a consecutive block alone would have carried two. Measured on this tree: **48 cases, 0 failures, 0 skipped, 6 037 passengers, 10.91 simulated hours, 3.7 s** — 44 cases declaring fixtures, 44 with at least one panel, **18 hybrid**, 47 `completed` and 1 `timed-out`. The census is asserted, so a fourteenth profile or a narrowed draw fails there rather than leaving a family of uniform runs with a hybrid name. The deep arm (`ELEVATOR_SIM_FUZZ=deep`) ran **250 cases, 0 failures, 0 skipped, 160 293 passengers, 147.83 simulated hours, 186 s, 18 hybrid**.
+
+5. **One combination is deliberately not drawn, and it is named rather than absent.** A destination call carrying **no credential** beside access zones is `C35` — 32 failures in 2 000 deep cases, [§ D128](#d128), and **open in `core`**. `panelCallTypeFor` declares a reader there instead. A family that drew it would report a known `core` defect as its own finding, which is what the `unroutable` skip exists to keep out of the campaign; a `destination-entry` landing beside a *panel* dispatcher is drawn freely, because `#callValue` stamps `panelAuthorized` at every assigning landing.
+
+6. **A shipped caller, and the shrinker carries the field.** `elevator-sim fuzz --tier hybrid` is the path a user can type — C24's answer applied to the new family — and `shrink.ts`'s draft now copies `landingCallType`, for the reason it already copies `serviceEvents`: a shrinker that dropped it would report a "minimal" counterexample that is no longer the hybrid run the original was about.
+
+**What this does not claim.** That the **honesty properties** have been driven over a hybrid. They cannot be: they are predicates over rendered player-facing strings, no fuzz building is ever rendered, and § D553 clause 9 makes the viewer refuse `landingCallType` outright until stage 2. What is asserted instead is the same question one layer down — every hybrid case raises the § D553 disclaimer and marks the nine model-sensitive metrics not comparable, so no case in the family offers an AWT a reader could pair against a conventional run's.
+
+---
+
+## D571 — A per-floor panel set is a boolean per landing in a **per-building** space, its default read off the dispatcher so the default point is the building as it ships, and the fixture axis waits on stage 2's price rather than the set
+
+**Date: 2026-09-14 · GitHub issue #534 item 5 · Found by the independent review of GitHub PR #532 · Builds what [§ D553](#d553) item 8 noted and did not wire.**
+
+**Why an entry.** It adds a module to `experiments`' `tuning/space`, is consumed by `fuzz/generate.ts`, and is named by a schema row in `core` ([§ D568](#d568)) — three modules, none of which owns the decision ([§ D405](#d405)).
+
+1. **Per-building, not per-profile, and mechanically so.** `landings.<floorId>.destinationPanel` is keyed by a floor id, and `collectSearchSpace`'s membership rule is *"a dispatcher profile can hold this id"*, decided by writing the value into a profile and parsing it. `landings.test.ts` asserts the exclusion in both directions, because an id that leaked into the dispatcher space would be searched and then written into a profile that cannot hold it.
+
+2. **A boolean per floor rather than a categorical per floor, and the reason is stage 2's pricing.** § D553 item 8 offers both. `docs/38` § 2.1 prices panels **per landing**, through PR #527's rate × quantity seam, and the quantity is *how many landings have one* — which a boolean set answers exactly (`panelCountOf`). A categorical over three call types does not: it would make the quantity a question about which fixtures are the same *fitting*, and nothing in the schedule says whether a kiosk, a reader and a button are priced alike. **So what waits on stage 2 is the fixture axis and the price row; the set itself does not wait**, because the fuzzer, the survivor sweep ([§ D528](#d528)) and the pricing all need it first. A categorical is a **widening** of these ids rather than a replacement.
+
+3. **`landingCallType` is tri-state and a boolean has two states, so the default is read off the resolved stage.** Under a dispatcher whose call type carries a destination every landing defaults to `true`; under a conventional one, to `false`. So `defaultCandidate` of this space decodes to the building exactly as it ships — § D553 clause 1's identity — and `true` decodes to the dispatcher's *own* call type wherever that carries a destination, so a `true` landing is byte-identical to an undeclared one rather than merely equivalent. Held by a run: the default point reproduces the undeclared building's legs, and flipping one landing moves them and makes the run `hybrid`.
+
+4. **The declared box is the feasible set, and saying so is a claim.** `validate` always answers `undefined`, written as a function rather than omitted. Any subset of a building's landings may carry a panel; the two refusals `core` makes are properties of the *fixture* — a `destination-entry` landing under a deferring dispatcher, and a panel under a call type that cannot ask for a destination — and both are decided by `panelCallTypeFor` before a candidate exists.
+
+5. **It is sampled by something, which is the whole point.** `fuzz/generate.ts` draws every hybrid family case's set through `sampleCandidate` over this space ([§ D570](#d570)). A dimension a search cannot draw from is `patternSwitching`'s defect wearing a schema, and a test that only asserted the shape would not have told the two apart.
+
+**What this does not decide.** The price of a panel, the fixture axis, or whether a hybrid is worth buying — all stage 2's. Nor whether a *building* space should collect this dimension beside others: there is no per-building space yet, and this module is one dimension family rather than a second `collectSearchSpace`.
+
+---

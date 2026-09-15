@@ -1717,7 +1717,20 @@ type DecisionReservation = {
  * for #478 and #437, and D555–D556 are the integrator's. D534 and D536 are still unwritten, and are
  * registered as holes when the block closes, not before.
  */
-const OPEN_RESERVATION = { wave: 'of 2026-09-10, widened 2026-09-11', from: 533, to: 556 } as DecisionReservation | null;
+/**
+ * **Widened again on 2026-09-14, for the wave that follows PR #532's review.**
+ *
+ * The ceiling stood at D556 and the new wave's dispatch briefs allocate blocks above it, so the
+ * constant was stale for the whole wave: the ceiling assertion below is red on **every** lane
+ * branch the moment a lane writes its first entry, which is the failure mode this mechanism's own
+ * docstring names — a gate red on every branch is one people route around.
+ *
+ * This lane holds **D568–D571** (GitHub issue #534) and raises the ceiling to its own block's top.
+ * A sibling lane holding numbers above D571 raises it again on the same line; that is a one-line
+ * conflict for the integrator to resolve, which is the cheap direction. The floor stays at D533,
+ * so `CHARTER_PROGRAMME.md`'s row is unmoved and this is not the reconciliation D387 is about.
+ */
+const OPEN_RESERVATION = { wave: 'of 2026-09-10, widened 2026-09-11 and 2026-09-14', from: 533, to: 571 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail
