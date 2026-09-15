@@ -123,9 +123,14 @@ export const WARNING_CODES = {
    *
    * A **warning and never an error**, because the configuration is legal and the building is
    * simulated exactly as declared — the run just does not go as fast down as the plate says.
-   * It is raised on no shipped building (`data/buildings/`'s fastest car is 10.0 m/s, which is
-   * the cap), which is the difference between a disclaimer and a defect, and the same
-   * distinction `missing-floor-pairs` above draws.
+   * It is raised on no shipped building, which is the difference between a disclaimer and a
+   * defect, and the same distinction `missing-floor-pairs` above draws — **and the reason changed
+   * on 2026-09-15** (`DECISIONS.md` § D577, § D578). It used to be that `data/buildings/`'s
+   * fastest car was 10.0 m/s, which is exactly the cap. Two towers now go faster
+   * (`ctf-class-reference` at 20.0, `shanghai-class-reference` at 20.5) and both of those banks
+   * are above 300 m of travel, so the cap reaches them; it bites on neither because both fit
+   * `cabinPressurised`. `config/descentCap.test.ts` states the property per bank rather than as
+   * one maximum, so an unpressurised fast shuttle turns it red.
    */
   descentCappedByAirPressure: 'descent-capped-by-air-pressure',
   /**

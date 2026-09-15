@@ -41,11 +41,14 @@ const SHIPPED = [
   'burj-class-reference',
   'chancery-house',
   'crown-hotel',
+  'ctf-class-reference',
   'garden-apartments',
   'harbour-point',
+  'merdeka-class-reference',
   'midtown-office',
   'mixed-use-high-rise',
   'secure-tower',
+  'shanghai-class-reference',
   'st-jude-hospital',
   'vertical-city',
 ] as const;
@@ -92,7 +95,7 @@ const dutyColumn = (trace: PassengerTrace): readonly (Duty | undefined)[] =>
   trace.passengers.map((passenger) => passenger.duty);
 
 describe('a building that declares no duty is byte-identical', () => {
-  it('names the eleven buildings from disk, and none of them declares a duty', () => {
+  it('names the fourteen buildings from disk, and none of them declares a duty', () => {
     expect([...config.buildingsById.keys()].sort()).toEqual([...SHIPPED]);
     for (const id of SHIPPED) {
       for (const bank of buildingOf(id).banks) {
