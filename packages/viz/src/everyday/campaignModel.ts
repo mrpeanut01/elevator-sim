@@ -58,6 +58,7 @@
 
 import { gaveUpBesideOf, readGoal, wasDisplayOf, PENDING_DISPLAY } from '../shift/goals.js';
 import type { PriceSchedule } from '../pricing/types.js';
+import type { WaitBandBasis } from '../live/types.js';
 import { shopTierPrice } from '../campaign/economy.js';
 import type { DayOutcome, GoalObservations, GoalReading, ShiftGoal } from '../shift/types.js';
 import { wasGraded } from '../shift/week.js';
@@ -168,6 +169,15 @@ export interface CampaignInput {
   readonly dispatchers: readonly DispatcherChoice[];
   /** Today's readings at the playhead, for the four tests. Empty before any run. */
   readonly observations: GoalObservations | undefined;
+  /**
+   * Whether that playhead has reached the run's end — [§ D557](../../../../DECISIONS.md).
+   *
+   * **Required, and written out on every caller**, for {@link observations}' own reason one line
+   * up: the fold is taken *at the playhead*, so a desk drawn mid-run and a desk drawn on a filed
+   * day are two different claims about one cohort, and the field above cannot tell them apart. A
+   * default here would have been the defect — see `shift/goals.ts#gaveUpBesideOf`.
+   */
+  readonly observationsBasis: WaitBandBasis;
   /** The week's closed days, for § 7's *was* column. */
   readonly history: readonly DayOutcome[];
   /**
@@ -328,6 +338,15 @@ export function campaignTestRows(
   tower: CampaignTower,
   observations: GoalObservations | undefined,
   history: readonly DayOutcome[],
+  /**
+   * Which question {@link observations} was folded to answer — [§ D557](../../../../DECISIONS.md).
+   *
+   * Required, and it reaches exactly one string. This desk is drawn **at the host's playhead**
+   * (`campaignScreens.ts#observationsOfHost`, *"today's fold at the playhead"*), so it is a mid-run
+   * surface as much as the stage strip is, and `shift/goals.ts#gaveUpBesideOf` withholds the
+   * overlap clause on `'now'`.
+   */
+  basis: WaitBandBasis,
 ): readonly CampaignTestRow[] {
   return campaignTestGoals(difficulty).map((goal): CampaignTestRow => {
     const suffix = goal.unit === '%' ? '%' : goal.unit;
@@ -342,7 +361,7 @@ export function campaignTestRows(
        * nobody has run is the fabricated-zero this file already refuses one field over (see
        * {@link campaignTestGoals}'s fourth row).
        */
-      beside: observations === undefined ? '' : gaveUpBesideOf(goal, observations),
+      beside: observations === undefined ? '' : gaveUpBesideOf(goal, observations, basis),
       tension: TEST_TENSIONS[goal.id] ?? '',
       reading: observations === undefined ? undefined : readGoal(goal, observations),
     };
@@ -1126,7 +1145,13 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
   const difficulty = DIFFICULTIES[tower.difficultyId];
   const need = needOf(tower);
   const offer = renewalOffer(tower);
-  const rows = campaignTestRows(difficulty, tower, input.observations, input.history);
+  const rows = campaignTestRows(
+    difficulty,
+    tower,
+    input.observations,
+    input.history,
+    input.observationsBasis,
+  );
 
   return {
     name: facts.name,
@@ -1480,7 +1505,13 @@ export function contractView(input: CampaignInput): ContractView | undefined {
   const occupied = occupiedDayIndices(tower);
   const lastCleared = tower.day - 1 - tower.missed;
   const worksDays = [...occupied].filter((index) => index >= dayIdx);
-  const rows = campaignTestRows(difficulty, tower, input.observations, input.history);
+  const rows = campaignTestRows(
+    difficulty,
+    tower,
+    input.observations,
+    input.history,
+    input.observationsBasis,
+  );
 
   const cellFor = (index: number): MonthCellView => {
     const bookable = starts.includes(index);

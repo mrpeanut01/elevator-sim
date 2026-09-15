@@ -58,6 +58,8 @@
  * a clean day, which is `campaign/judge.ts`'s rule (*unjudged is not passed*) at a smaller scale.
  */
 
+import type { WaitBandBasis } from '../live/types.js';
+
 import {
   WAKE_UP_ARRIVALS,
   type DayOutcome,
@@ -662,6 +664,20 @@ const DENOMINATOR_CLAUSE: Readonly<Record<GoalObservationId, string>> = Object.f
 });
 
 /**
+ * The clause the mid-run sentence carries **instead of** the overlap — [§ D557](../../../../DECISIONS.md).
+ *
+ * It does the same job § D417 gave the overlap and does it without a count: it tells the reader the
+ * riders in front of the horizon are not a fourth disjoint outcome and may still be carried, so the
+ * count above may not be subtracted from the people. What it refuses to do is say **how many** of
+ * them a car reached, because at a playhead short of `endedAt` that is not a thing that has
+ * happened yet.
+ *
+ * Exported so `goalsBeside.test.ts` pins the withholding against the shipped sentence rather than
+ * against a copy of it.
+ */
+export const OVERLAP_UNSETTLED = 'whether a car eventually came for them is not settled until the day ends';
+
+/**
  * The count of riders who waited past the give-up horizon, phrased to sit **beside** one goal —
  * the empty string on a goal the count cannot flatter, and on a run where nobody did.
  *
@@ -672,15 +688,44 @@ const DENOMINATOR_CLAUSE: Readonly<Record<GoalObservationId, string>> = Object.f
  *
  * - **The count with its own denominator.** R13's rule — a figure never travels without the
  *   population it was taken over — and {@link GoalObservations.arrived} is that population.
- * - **The overlap, always** ([§ D417](../../../../DECISIONS.md)). `abandoned` counts *waits that
- *   crossed the horizon*, whether or not a car eventually came; it is an attribute, not a fourth
- *   disjoint outcome. On a no-patience saturated run every one of those legs can still board, so a
- *   surface publishing the bare count invites a reader to subtract it from the people. The three
- *   branches are the three shapes the overlap takes.
+ * - **The overlap, once the day has ended** ([§ D417](../../../../DECISIONS.md),
+ *   [§ D557](../../../../DECISIONS.md)). `abandoned` counts *waits that crossed the horizon*,
+ *   whether or not a car eventually came; it is an attribute, not a fourth disjoint outcome. On a
+ *   no-patience saturated run every one of those legs can still board, so a surface publishing the
+ *   bare count invites a reader to subtract it from the people. The three branches are the three
+ *   shapes the overlap takes — and they are drawn on `'whole-run'` only. See below.
  * - **The run's own horizon**, from {@link GoalObservations.horizonS}, for the same decision.
  * - **The denominator clause**, which is the § D106 content rather than the § D417 content: it
  *   names *why the count is standing here*. A reader meeting `100 %` beside `20 of 340 waited past
  *   the horizon` can see that the hundred per cent is over the ones who boarded.
+ *
+ * ## Why `basis`, and why § D417's *always* is narrowed rather than kept
+ *
+ * R6 / § D223: *an outcome evaluated before the playhead reaches `endedAt` is a preview.* The count
+ * and the horizon are **readings** — {@link GoalObservations.abandoned} is a fold at `t` and is
+ * non-decreasing in it, so it understates and never lies. The **overlap is an outcome**: *did a car
+ * ever come for them* is decided by the end of the day and by nothing earlier, and
+ * {@link GoalObservations.abandonedCarried} at a mid-run playhead counts only the ones a car has
+ * reached **so far**.
+ *
+ * Measured rather than argued, on `honesty-9100050` (deep corpus, `midtown-office`, `energy-aware`,
+ * 1 440 s of demand ending at 2 941 s): at 1 471 s this sentence read *18 of 653 waited past the
+ * 15-minute give-up horizon, **none of them carried***, and at 2 206 s the same sentence about the
+ * same day read *195 of 653 … **42 of them carried***. *None of them carried* at half past the day
+ * is the strongest possible misreading — it tells a player every one of those riders was lost — and
+ * it is § D417's own defect with the polarity reversed: the clause written to stop a reader
+ * subtracting the count from the people was, mid-run, producing that subtraction.
+ *
+ * So on `'now'` the overlap is **withheld and the withholding is said** ({@link OVERLAP_UNSETTLED}),
+ * which is § D223's remedy rather than a softer figure. The count, the population and the
+ * denominator clause all survive, because none of them is an outcome.
+ *
+ * **The basis is passed and never sniffed**, which is `dev/leftRail.ts#basisAt`'s recorded rule:
+ * *"`live/` answers whichever question it is asked, and which question a finished shift deserves is
+ * a presentation call."* `waitBandsAt`, `moodAt` and `honestyAt` all take it for that reason. It is
+ * **required** rather than defaulted for the reason those three record against themselves: a
+ * default that keeps the reading a caller had is how a whole class of string goes unexamined, and
+ * here the wrong default would be the defect this parameter closes.
  *
  * ## What it deliberately does not say
  *
@@ -690,13 +735,24 @@ const DENOMINATOR_CLAUSE: Readonly<Record<GoalObservationId, string>> = Object.f
  * them is that the wait crossed the line. It also carries no verdict, no tone and no arithmetic
  * against the bar: {@link GoalReading.state} is the verdict and this is an observation beside it.
  *
- * Pure in its two arguments, so the rail, the stage strip, the report sheet and the campaign desk
+ * Pure in its three arguments, so the rail, the stage strip, the report sheet and the campaign desk
  * cannot draw four sentences about one run.
  */
-export function gaveUpBesideOf(goal: ShiftGoal, observations: GoalObservations): string {
+export function gaveUpBesideOf(
+  goal: ShiftGoal,
+  observations: GoalObservations,
+  basis: WaitBandBasis,
+): string {
   if (!ABANDONMENT_FLATTERS[goal.reads]) return '';
   const { abandoned, abandonedCarried, arrived, horizonS } = observations;
   if (abandoned <= 0) return '';
+  const clause = DENOMINATOR_CLAUSE[goal.reads];
+  if (basis === 'now') {
+    return (
+      `${String(abandoned)} of ${String(arrived)} have waited past the ${horizonLabelOf(horizonS)} ` +
+      `give-up horizon so far; ${OVERLAP_UNSETTLED}; ${clause}`
+    );
+  }
   const overlap =
     abandonedCarried === 0
       ? 'none of them carried'
@@ -705,7 +761,7 @@ export function gaveUpBesideOf(goal: ShiftGoal, observations: GoalObservations):
         : `${String(abandonedCarried)} of them carried`;
   return (
     `${String(abandoned)} of ${String(arrived)} waited past the ${horizonLabelOf(horizonS)} ` +
-    `give-up horizon, ${overlap}; ${DENOMINATOR_CLAUSE[goal.reads]}`
+    `give-up horizon, ${overlap}; ${clause}`
   );
 }
 

@@ -2220,6 +2220,8 @@ export function createEverydayHost(
           tower,
           observations,
           state.week.history,
+          /* Folded at `recording.endedAt` two lines up — [§ D557](../../../../DECISIONS.md). */
+          'whole-run',
         ),
       );
       if (verdict === 'ungraded') return;

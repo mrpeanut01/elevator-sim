@@ -177,7 +177,7 @@ describe('the three outcomes each say something honest', () => {
   it('assigns with the dominant term’s raw value and a dimensionless margin', () => {
     const row = decisionRowsAt(syntheticRecording({ decisions: [decision()] }), 300)[0];
     expect(row?.head).toBe('A → Level 2');
-    expect(row?.why).toBe('waitTime 12.4 s carried it · 0.42 clear of the next car');
+    expect(row?.why).toBe('waitTime 12.4 s won it · 0.42 clear of the next car');
     expect(row?.t).toBe('06:02');
     expect(row?.color).toBe('var(--band-0)');
   });
@@ -250,7 +250,7 @@ describe('the three outcomes each say something honest', () => {
       }),
       300,
     )[0];
-    expect(row?.why).toBe('waitTime 12.4 s carried it · the only car that could take it');
+    expect(row?.why).toBe('waitTime 12.4 s won it · the only car that could take it');
   });
 
   it('falls back to the design’s sentence when every term priced the same', () => {
@@ -323,5 +323,62 @@ describe('one clock per run: the feed, the ticks and the bands agree with the he
     expect(decisionRowsAt(empty, 300, 6, DAY)[0]?.t).toBe(clockAt(300, DAY));
     // …and, where a run declares none, the same shared fallback as the header — never two axes.
     expect(decisionRowsAt(empty, 300)[0]?.t).toBe(clockAt(300));
+  });
+});
+
+/**
+ * **The word *carried* belongs to a delivered rider, and this row is about a bid** — GitHub issue
+ * **#537**, argued in `decisions.ts#whyOf` and recorded there under § D405.
+ *
+ * The deep honesty corpus reported this row under `whole-run-figure-early`: on `honesty-9100014-s2`
+ * the dominant term's raw wait was `22.0 s`, the finished day delivered `22` people, and the
+ * property's cue for `summary.delivered` is the word *carried* — so `waitTime 22.0 s carried it`
+ * read, to anything matching on words, as the day's delivered count published at 285 s of a 1 140 s
+ * run.
+ *
+ * It is pinned here **by its own reason** rather than by the sentence, because the sentence is
+ * already asserted above and a revert would have to lie to pass both: no row this module draws may
+ * use the product's word for a delivered rider, because `LiveObservations.carried`,
+ * `Observations.carryPct` and the goals strip's *of them carried* all mean something else and are
+ * drawn inches away on the same rail.
+ *
+ * Driven over every outcome the module can produce and over a shipped run, so a fifth phrasing
+ * arriving later is caught rather than only the three that exist today.
+ */
+describe('no decision row borrows the product’s word for a delivered rider — issue #537', () => {
+  /** `carried`, and the rest of `honesty/properties.ts#WHOLE_RUN_COUNTS`' cue for `summary.delivered`. */
+  const DELIVERED_CUES = ['carried', 'delivered', 'got where', 'arrived where', 'reached their'];
+
+  it('says nothing of the kind on any synthetic outcome', () => {
+    for (const outcome of ['assigned', 'reassigned', 'unassigned'] as const) {
+      const rows = decisionRowsAt(syntheticRecording({ decisions: [decision({ outcome })] }), 300);
+      expect(rows.length, outcome).toBeGreaterThan(0);
+      for (const row of rows) {
+        for (const cue of DELIVERED_CUES) {
+          expect(row.why, `${outcome}: "${cue}"`).not.toContain(cue);
+          expect(row.title, `${outcome} title: "${cue}"`).not.toContain(cue);
+          expect(row.head, `${outcome} head: "${cue}"`).not.toContain(cue);
+        }
+      }
+    }
+  });
+
+  it('says nothing of the kind on a shipped run, at every playhead the rail draws', () => {
+    /*
+     * Non-vacuous by construction: the rows are counted, so a recording that stopped carrying
+     * decisions would fail here rather than pass by having nothing to check — the shape
+     * `deadCode.test.ts` and `week.test.ts` both guard against.
+     */
+    let seen = 0;
+    for (const t of sampleTimes(recording)) {
+      for (const row of decisionRowsAt(recording, t)) {
+        seen += 1;
+        for (const cue of DELIVERED_CUES) {
+          expect(row.why, `@${t.toFixed(0)}s: "${cue}"`).not.toContain(cue);
+          expect(row.title, `@${t.toFixed(0)}s title: "${cue}"`).not.toContain(cue);
+        }
+      }
+    }
+    expect(seen).toBeGreaterThan(6);
   });
 });

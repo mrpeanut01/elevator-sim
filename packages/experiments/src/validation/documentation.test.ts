@@ -1716,8 +1716,16 @@ type DecisionReservation = {
  * (#372), D545–D546 (#438), D547–D548 (#418), D549–D550 (#481) and D551 (#379); D552–D554 are held
  * for #478 and #437, and D555–D556 are the integrator's. D534 and D536 are still unwritten, and are
  * registered as holes when the block closes, not before.
+ *
+ * **Widened to D559 on 2026-09-14 by the wave-Z lane holding D557–D559** (GitHub issue #537, the
+ * weekly `honesty-deep` job). Its dispatch brief allocates that block and says a sibling lane holds
+ * the numbers above it, so the ceiling here is a **floor on the true one** rather than the wave's
+ * whole allocation — this is the step the paragraph above puts on the integrator, taken from a lane
+ * because writing § D557 against a ceiling of D556 is red on this branch and on no other. § D557 is
+ * the only one of the three spent; D558 and D559 are unwritten and are registered as holes when the
+ * block closes, not before.
  */
-const OPEN_RESERVATION = { wave: 'of 2026-09-10, widened 2026-09-11', from: 533, to: 556 } as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'of 2026-09-10, widened 2026-09-11 and 2026-09-14', from: 533, to: 559 } as DecisionReservation | null;
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail

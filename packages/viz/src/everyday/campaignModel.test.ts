@@ -73,6 +73,8 @@ function inputOf(career: CampaignCareer, patch: Partial<CampaignInput> = {}): Ca
     buildings: BUILDINGS,
     dispatchers: DISPATCHERS,
     observations: undefined,
+    /* § D557 — the desk's fold is at a playhead; these fixtures grade a finished day. */
+    observationsBasis: 'whole-run',
     history: [],
     ...patch,
   };
@@ -333,7 +335,7 @@ describe('the four daily tests (§ 7, § 8.6)', () => {
   const tower = (): CampaignTower => openingCareer('eta').towers[0]!;
 
   it('sets four bars from the difficulty and grades them from the run', () => {
-    const rows = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, []);
+    const rows = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, [], 'whole-run');
     expect(rows).toHaveLength(4);
     expect(rows.map((row) => row.target)).toEqual(['75%', '180 s', '25', '520']);
     expect(rows.map((row) => row.reading?.state)).toEqual(['met', 'met', 'met', 'met']);
@@ -343,10 +345,10 @@ describe('the four daily tests (§ 7, § 8.6)', () => {
      * misses a hard one's 82.
      */
     const marginal = { ...GOOD, minutePct: 80 };
-    expect(campaignTestRows(DIFFICULTIES.standard, tower(), marginal, [])[0]?.reading?.state).toBe(
+    expect(campaignTestRows(DIFFICULTIES.standard, tower(), marginal, [], 'whole-run')[0]?.reading?.state).toBe(
       'met',
     );
-    const hard = campaignTestRows(DIFFICULTIES.hard, tower(), marginal, []);
+    const hard = campaignTestRows(DIFFICULTIES.hard, tower(), marginal, [], 'whole-run');
     expect(hard.map((row) => row.target)).toEqual(['82%', '150 s', '18', '470']);
     expect(hard[0]?.reading?.state).toBe('missed');
   });
@@ -359,16 +361,16 @@ describe('the four daily tests (§ 7, § 8.6)', () => {
    * — a trip budget is an `at-most` bar, so a fabricated zero would read `met`.
    */
   it('grades the trip budget from the run, and refuses it when the run carried no count', () => {
-    const rows = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, []);
+    const rows = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, [], 'whole-run');
     const trips = rows.at(-1)!;
     expect(trips.id).toBe('trips');
     expect(trips.reading?.state).toBe('met');
     expect(trips.reading?.display).toBe('300');
 
-    const over = campaignTestRows(DIFFICULTIES.standard, tower(), { ...GOOD, loadedDepartures: 521 }, []);
+    const over = campaignTestRows(DIFFICULTIES.standard, tower(), { ...GOOD, loadedDepartures: 521 }, [], 'whole-run');
     expect(over.at(-1)?.reading?.state).toBe('missed');
 
-    const unmeasured = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD_UNMEASURED_TRIPS, []);
+    const unmeasured = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD_UNMEASURED_TRIPS, [], 'whole-run');
     expect(unmeasured.at(-1)?.reading?.state).toBe('pending');
     expect(unmeasured.at(-1)?.reading?.display).toBe(UNFINISHED);
     expect(unmeasured.at(-1)?.reading?.observed).toBeNull();
@@ -390,17 +392,17 @@ describe('the four daily tests (§ 7, § 8.6)', () => {
       recordRefusal: 'no record kept in this fixture',
     });
     const onDayTwo = { ...tower(), day: 2 };
-    const rows = campaignTestRows(DIFFICULTIES.standard, onDayTwo, GOOD, [yesterday]);
+    const rows = campaignTestRows(DIFFICULTIES.standard, onDayTwo, GOOD, [yesterday], 'whole-run');
     expect(rows[0]?.was).toBe('88%');
     expect(rows[1]?.was).toBe('141 s');
     expect(rows[2]?.was).toBe('19');
     // With no previous day at all, every one of them is `—`.
-    const noHistory = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, []);
+    const noHistory = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, [], 'whole-run');
     expect(noHistory.map((row) => row.was)).toEqual([UNFINISHED, UNFINISHED, UNFINISHED, UNFINISHED]);
   });
 
   it('counts what is holding out of what it can grade, both halves derived', () => {
-    expect(testsHeldLine(campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, []))).toBe(
+    expect(testsHeldLine(campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, [], 'whole-run'))).toBe(
       '4 of 4 holding',
     );
     /*
@@ -412,15 +414,15 @@ describe('the four daily tests (§ 7, § 8.6)', () => {
      * day, measured or not.
      */
     expect(
-      testsHeldLine(campaignTestRows(DIFFICULTIES.standard, tower(), GOOD_UNMEASURED_TRIPS, [])),
+      testsHeldLine(campaignTestRows(DIFFICULTIES.standard, tower(), GOOD_UNMEASURED_TRIPS, [], 'whole-run')),
     ).toBe('3 of 4 holding');
     // The same shape, from the gate that predates this lane.
     expect(
       testsHeldLine(
-        campaignTestRows(DIFFICULTIES.standard, tower(), { ...GOOD, worstWaitIsCensored: true }, []),
+        campaignTestRows(DIFFICULTIES.standard, tower(), { ...GOOD, worstWaitIsCensored: true }, [], 'whole-run'),
       ),
     ).toBe('3 of 4 holding');
-    expect(testsHeldLine(campaignTestRows(DIFFICULTIES.standard, tower(), undefined, []))).toBe(
+    expect(testsHeldLine(campaignTestRows(DIFFICULTIES.standard, tower(), undefined, [], 'whole-run'))).toBe(
       'nothing run yet today',
     );
   });
@@ -692,7 +694,7 @@ describe('a works day takes one car out of service (issue #353, after #264)', ()
 describe('what marks a campaign day', () => {
   const tower = (): CampaignTower => openingCareer('eta').towers[0]!;
   const verdictAt = (difficulty: Difficulty, observed: GoalObservations | undefined) =>
-    campaignDayVerdict(campaignTestRows(difficulty, tower(), observed, []));
+    campaignDayVerdict(campaignTestRows(difficulty, tower(), observed, [], 'whole-run'));
 
   it('clears a day on which every test it can read held', () => {
     expect(verdictAt(DIFFICULTIES.standard, GOOD)).toBe('cleared');
@@ -701,7 +703,7 @@ describe('what marks a campaign day', () => {
   it('misses a day on one failed test, and names the one that decided it', () => {
     const longWait = { ...GOOD, worstWaitS: DIFFICULTIES.standard.tests.worstS + 1 };
     expect(verdictAt(DIFFICULTIES.standard, longWait)).toBe('missed');
-    const rows = campaignTestRows(DIFFICULTIES.standard, tower(), longWait, []);
+    const rows = campaignTestRows(DIFFICULTIES.standard, tower(), longWait, [], 'whole-run');
     expect(rows.filter((row) => row.reading?.state === 'missed').map((row) => row.id)).toEqual([
       'worst',
     ]);
@@ -724,20 +726,21 @@ describe('what marks a campaign day', () => {
      * day like the other three now: the same run, over the budget, is a missed day rather than a
      * cleared one — which is the whole of what *ungraded* was costing the mode.
      */
-    const rows = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, []);
+    const rows = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD, [], 'whole-run');
     expect(campaignDayVerdict(rows)).toBe('cleared');
     const over = campaignTestRows(
       DIFFICULTIES.standard,
       tower(),
       { ...GOOD, loadedDepartures: 900 },
       [],
+      'whole-run',
     );
     expect(campaignDayVerdict(over)).toBe('missed');
     /*
      * And a day whose trip count could not be read is `ungraded` rather than cleared by three tests
      * out of four — § D234's *unjudged is not passed*, reaching the one row that can still refuse.
      */
-    const unmeasured = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD_UNMEASURED_TRIPS, []);
+    const unmeasured = campaignTestRows(DIFFICULTIES.standard, tower(), GOOD_UNMEASURED_TRIPS, [], 'whole-run');
     expect(campaignDayVerdict(unmeasured)).toBe('ungraded');
   });
 
@@ -765,7 +768,7 @@ describe('what marks a campaign day', () => {
      */
     expect(BUILDING_COPY.testsNote).not.toContain('four');
     const gradedOf = (observations: GoalObservations): number =>
-      campaignTestRows(DIFFICULTIES.standard, tower(), observations, []).filter(
+      campaignTestRows(DIFFICULTIES.standard, tower(), observations, [], 'whole-run').filter(
         (row) => row.reading?.state !== 'pending' && row.reading !== undefined,
       ).length;
     expect(gradedOf(GOOD)).toBe(4);
