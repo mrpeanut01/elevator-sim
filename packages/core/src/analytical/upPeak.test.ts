@@ -876,8 +876,16 @@ describe('every shipped building is either analysable or explicit about why not'
     // property of the *arrangement* rather than a quirk of any building — and
     // `ctf-class-reference/shuttle` is the control that says so, because it is the same shape with
     // one populated floor bolted on (a sky deck at 109) and it analyses.
-    expect(analysed).toBe(35);
-    expect(refused).toBe(6);
+    //
+    // **Three more towers landed on 2026-09-15** — GitHub issues #428, #427 and #426 — and they
+    // move this count by eighteen, from 35 to 53. Two of the three add a shuttle to the refusal
+    // above for the fifth and sixth time (`one-wtc-class-reference/shuttle`,
+    // `willis-class-reference/express-mid` and `express-high`, all serving terminals and sky
+    // lobbies that house nobody), and `empire-state-class-reference` adds **eight banks and no
+    // refusal at all**: a 1931 relay has no unpopulated transfer level to shuttle between, so
+    // every one of its banks has a populated floor above its terminal and every one analyses.
+    expect(analysed).toBe(53);
+    expect(refused).toBe(9);
     // Three banks exceed the sanity bound on the default population, and all three for one reason:
     // a shuttle's U is the sky lobby's own population rather than the crowd it lifts. Mixed-Use
     // High-Rise's is 260 against the 1 014 it carries; the Burj-class reference tower's is its
@@ -885,7 +893,16 @@ describe('every shipped building is either analysable or explicit about why not'
     // them; and `ctf-class-reference/shuttle`'s is the **thirty** people on the sky deck at 109
     // against the 4 442 in the three zones the same shuttle feeds. Every other bank's default U is
     // the population it actually serves.
-    expect(implausible).toBe(3);
+    //
+    // **Eight more arrived on 2026-09-15** — GitHub issues #428, #427 and #426 — and they say the
+    // same thing at two more shapes. `one-wtc-class-reference`'s observatory express and
+    // `willis-class-reference`'s Skydeck express both lift a whole tower's visitors to floors whose
+    // own population is their staff, and `empire-state-class-reference`'s relay banks are the
+    // interesting ones: `bank-f` feeds a relay lobby of **zero**, and `bank-g` and `bank-h` each
+    // serve an observatory level whose population is a fraction of what changes there. So the
+    // warning is about a **terminal that is not where the crowd is**, and a relay meets it as
+    // squarely as a sky lobby does — which is a thing the shuttle-only set could not have shown.
+    expect(implausible).toBe(11);
   });
 
   it('raises directionalSpeedAsymmetry on the one shipped bank whose cars are not one speed', () => {

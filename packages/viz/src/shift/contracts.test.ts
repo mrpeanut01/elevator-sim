@@ -56,6 +56,27 @@ describe('the scenarios are the shipped buildings, one contract each', () => {
  */
 const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
 
+/**
+ * The contracts whose day-1 miss rate measures **1.00**, in the order the curriculum reading puts
+ * them — `DECISIONS.md` § D581 and § D599, `docs/33` § 4.7k.
+ *
+ * Eight of the sixteen, and they are the tail of the ladder by construction: a contract the
+ * measurement cannot order goes after every contract it can. Bank count orders six of them and ties
+ * twice; the car count breaks both ties. Named here rather than derived because the rates are a
+ * sweep's output and this file runs no sweep — what it can check is that the tail is still the tail
+ * and that the two keys still hold inside it.
+ */
+const TIED_AT_THE_CEILING: readonly string[] = Object.freeze([
+  'c4',
+  'c13',
+  'c11',
+  'c14',
+  'c12',
+  'c5',
+  'c16',
+  'c15',
+]);
+
   it('covers every shipped building exactly once', () => {
     // Both directions. A contract for a building that does not ship is the first suite's
     // failure; a shipped building with no contract is a scenario the reader can never take.
@@ -106,6 +127,14 @@ const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
      * at the ceiling is a measurement that has stopped ordering, so the five are ordered by **bank
      * count** instead, which is the curriculum reading doing the work the measurement cannot. The
      * eight positions before them are untouched and are still each contract's own measured rate.
+     *
+     * **Three more joined the tie on 2026-09-15, and bank count stopped being a total order**
+     * (GitHub issues #428, #427, #426; `DECISIONS.md` § D599). `c14`, `c15` and `c16` all measure
+     * 1.00 too, so the tie is eight contracts — and `one-wtc-class-reference` and
+     * `shanghai-class-reference` both have six banks while `vertical-city` and
+     * `willis-class-reference` both have seven. The second key is the **car count**, smaller group
+     * first: 73 before 106, and 35 before 104. Same reading as § D581's, applied to the only other
+     * quantity of the arrangement a reader meets on the screen.
      */
     expect(CONTRACTS.map((contract) => contract.buildingId)).toEqual([
       'garden-apartments',
@@ -119,8 +148,11 @@ const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
       'mixed-use-high-rise',
       'merdeka-class-reference',
       'ctf-class-reference',
+      'one-wtc-class-reference',
       'shanghai-class-reference',
       'vertical-city',
+      'willis-class-reference',
+      'empire-state-class-reference',
     ]);
   });
 
@@ -147,11 +179,38 @@ const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
      * **1, 1, 1, 1, 1, 1, 2, 2, 3, 4, 5, 6, 7** with no step larger than one. If a rebalance ever
      * moves a tower against this, the honest move is still the one above: re-argue the reading,
      * never reorder the ladder against its own measurement.
+     *
+     * **And three more again, where the reading needed a second key** (GitHub issues #428, #427 and
+     * #426; § D599). The sequence is now **1, 1, 1, 1, 1, 1, 2, 2, 3, 4, 5, 6, 6, 7, 7, 8**: two
+     * repeats rather than a jump, because bank count ties twice and the car count breaks it. The
+     * non-decreasing property below is what carries the claim through a repeat — a list alone
+     * cannot say whether `6, 6` is a curriculum or an accident, and the loop can.
      */
     const banksOf = (buildingId: string): number =>
       config.buildingsById.get(buildingId)?.banks.length ?? 0;
+    const carsOf = (buildingId: string): number =>
+      config.buildingsById.get(buildingId)?.banks.reduce((n, bank) => n + bank.cars.length, 0) ?? 0;
     const counts = CONTRACTS.map((contract) => banksOf(contract.buildingId));
-    expect(counts).toEqual([1, 1, 1, 1, 1, 1, 2, 2, 3, 4, 5, 6, 7]);
+    expect(counts).toEqual([1, 1, 1, 1, 1, 1, 2, 2, 3, 4, 5, 6, 6, 7, 7, 8]);
+    /*
+     * The second key, asserted **only where it is the key** — inside the eight contracts that all
+     * measure 1.00 and are therefore placed by the curriculum reading rather than by their own
+     * rate. The first eight positions are each a measured miss rate, and a bank-count repeat there
+     * (`chancery-house` then `st-jude-hospital`, both one bank) is the measurement doing the
+     * ordering; requiring the car count to rise across it would be this test overruling the sweep.
+     * That is the distinction § D581 draws and this case has to draw with it.
+     */
+    const firstTied = CONTRACTS.findIndex((contract) => contract.id === TIED_AT_THE_CEILING[0]);
+    expect(
+      CONTRACTS.slice(firstTied).map((contract) => contract.id),
+      'the tie at the ceiling is no longer the tail of the ladder',
+    ).toEqual([...TIED_AT_THE_CEILING]);
+    for (let index = firstTied + 1; index < counts.length; index += 1) {
+      if (counts[index] !== counts[index - 1]) continue;
+      const here = CONTRACTS[index]?.buildingId ?? '';
+      const before = CONTRACTS[index - 1]?.buildingId ?? '';
+      expect(carsOf(here), `${before} then ${here}`).toBeGreaterThanOrEqual(carsOf(before));
+    }
     // Non-decreasing, stated as the property rather than left to be read off the list — which is
     // what the list above is for and what a reader of a rebalance needs the test to hold.
     for (let index = 1; index < counts.length; index += 1) {
@@ -164,9 +223,9 @@ const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
   it('asks for between one and three clean shifts, rising', () => {
     // Non-decreasing, and an inserted contract may not ask for LESS than the arc it lands in — a
     // campaign that gets easier after its finale is a campaign with two finales. The shape is the
-    // eight-contract ladder's at ten: one opener, then four at two, then five at three.
+    // eight-contract ladder's at sixteen: one opener, then four at two, then eleven at three.
     expect(CONTRACTS.map((contract) => contract.needClean)).toEqual([
-      1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
+      1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
     ]);
     for (let index = 1; index < CONTRACTS.length; index += 1) {
       const previous = CONTRACTS[index - 1]?.needClean ?? 0;
@@ -182,7 +241,7 @@ const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
      * is why the two lists below no longer read in step.
      */
     expect(CONTRACTS.map((contract) => contract.id)).toEqual([
-      'c1', 'c6', 'c8', 'c9', 'c2', 'c7', 'c3', 'c10', 'c4', 'c13', 'c11', 'c12', 'c5',
+      'c1', 'c6', 'c8', 'c9', 'c2', 'c7', 'c3', 'c10', 'c4', 'c13', 'c11', 'c14', 'c12', 'c5', 'c16', 'c15',
     ]);
     expect(CONTRACTS.map((contract) => contract.label)).toEqual([
       'Scenario 1',
@@ -198,13 +257,19 @@ const REFERENCE_ONLY: ReadonlySet<string> = new Set(['burj-class-reference']);
       'Scenario 11',
       'Scenario 12',
       'Scenario 13',
+      'Scenario 14',
+      'Scenario 15',
+      'Scenario 16',
     ]);
     // The ids are names and the labels are positions, which is only visible where the two
-    // disagree: `c5` is the thirteenth scenario and `c13` is the tenth.
+    // disagree: `c5` is the fourteenth scenario, `c13` is the tenth, and `c15` — the last id
+    // allocated — is the sixteenth while `c16` is the fifteenth.
     expect(CONTRACTS[9]?.id).toBe('c13');
     expect(CONTRACTS[9]?.label).toBe('Scenario 10');
-    expect(CONTRACTS[12]?.id).toBe('c5');
-    expect(CONTRACTS[12]?.label).toBe('Scenario 13');
+    expect(CONTRACTS[13]?.id).toBe('c5');
+    expect(CONTRACTS[13]?.label).toBe('Scenario 14');
+    expect(CONTRACTS[14]?.id).toBe('c16');
+    expect(CONTRACTS[15]?.id).toBe('c15');
   });
 
   it('carries a brief and a teaching point on every one', () => {

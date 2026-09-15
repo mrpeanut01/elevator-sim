@@ -1742,7 +1742,22 @@ type DecisionReservation = {
  * because it is tidier, but because the alternative is every lane inventing bookkeeping the
  * integrator then has to throw away.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'AB', from: 594, to: 600 } as DecisionReservation | null;
+/*
+ * **Wave AB, opened by lane A because it was null when the lane started.** The dispatch brief
+ * allocated this lane **D594–D600** and no others, which is the block named here. That is lane A's
+ * block rather than the wave's: the integrator pre-allocates a contiguous block per lane before any
+ * lane starts, so a sibling lane holds numbers above D600 and this ceiling is narrower than the
+ * wave's own. The comment above records two lanes of wave S widening a block they found too tight
+ * and concludes that the block should be opened before the lanes start; this is the same wall met
+ * from the other side — the row was reconciled to D594 at wave AA's close and nothing had reopened
+ * it — and the honest move is the same one those lanes made: name the block you were given, on the
+ * commit that needs it, and let the integrator widen it to the wave's at integration.
+ *
+ * Lane A spent **D594–D599** and left **D600** unspent. Whether that is a free number or a
+ * permanent hole is the integrator's call at close and not this lane's, for the reason wave AA's
+ * charter row states in terms: free-versus-hole depends on what lands after you.
+ */
 /*
  * **Wave V reserved D507–D520, opened before the first commit.** One worker, serial, on the
  * dispatch brief's own sizing rule: one number per issue that reaches past its module, and a tail

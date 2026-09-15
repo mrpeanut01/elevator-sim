@@ -146,21 +146,24 @@ function stageFor(id: string, canvas: { readonly width: number; readonly height:
 const NO_ROOM_FOR_A_LOBBY = new Set([
   'burj-class-reference',
   'ctf-class-reference',
+  'empire-state-class-reference',
   'merdeka-class-reference',
   'mixed-use-high-rise',
+  'one-wtc-class-reference',
   'shanghai-class-reference',
   'vertical-city',
+  'willis-class-reference',
 ]);
 
 describe('the stage has a crowd on it — issue #115 § 2, issue #103', () => {
-  it('reserves a lane on eight of the fourteen shipped buildings, at the viewer’s own canvas', () => {
+  it('reserves a lane on eight of the seventeen shipped buildings, at the viewer’s own canvas', () => {
     const withLane = BUILDING_IDS.filter((id) => stageFor(id, SHIPPED_CANVAS).riderLane !== undefined);
     expect([...withLane].sort()).toStrictEqual(
       BUILDING_IDS.filter((id) => !NO_ROOM_FOR_A_LOBBY.has(id))
         .slice()
         .sort(),
     );
-    // Eight of the fourteen; before the change it was one, and that one was the empty building.
+    // Eight of the seventeen; before the change it was one, and that one was the empty building.
     // `harbour-point` (6 shafts over 16 floors) and `ashgate` (5 over 22) both have room, which is
     // what a mid-rise with a small group looks like from here — GitHub issues #500 and #501. **The
     // numerator did not move when three towers landed and the denominator did** (GitHub issues
@@ -209,6 +212,15 @@ describe('the stage has a crowd on it — issue #115 § 2, issue #103', () => {
      * useful part, because it says the stage's limit is shafts before it is floors. #377 owns the
      * remedy, and these three figures are the strongest evidence in the repository that it is
      * needed rather than preferred.
+     *
+     * **And three more on 2026-09-15** — GitHub issues #428, #427 and #426 — one of which settles
+     * the shafts-before-floors reading rather than merely repeating it.
+     * `empire-state-class-reference` hides **40 and 47** of 73 over **102** floors;
+     * `one-wtc-class-reference` **0 and 0** of 73 over 104; `willis-class-reference` **0 and 0** of 104 over
+     * 108. The Empire-State-class tower is the useful one: 1931 kinematics, no sky-lobby shuttle
+     * and a hundred and two floors, and it hides more than half its machines at a desktop canvas.
+     * Nothing about it is supertall except the number of shafts, which is what says #377's remedy
+     * is about the group and not about the height.
      */
     const hidden: Record<string, readonly [number, number]> = {
       'burj-class-reference': [24, 31],
@@ -225,6 +237,9 @@ describe('the stage has a crowd on it — issue #115 § 2, issue #103', () => {
       'ctf-class-reference': [3, 10],
       'merdeka-class-reference': [59, 66],
       'shanghai-class-reference': [73, 80],
+      'empire-state-class-reference': [40, 47],
+      'one-wtc-class-reference': [40, 47],
+      'willis-class-reference': [71, 78],
     };
     for (const id of BUILDING_IDS) {
       const shipped = stageFor(id, SHIPPED_CANVAS);

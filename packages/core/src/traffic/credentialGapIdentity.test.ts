@@ -102,11 +102,14 @@ describe('a building with no access zones is byte-identical at every share', () 
       'burj-class-reference',
       'chancery-house',
       'ctf-class-reference',
+      'empire-state-class-reference',
       'garden-apartments',
       'harbour-point',
       'merdeka-class-reference',
       'midtown-office',
+      'one-wtc-class-reference',
       'shanghai-class-reference',
+      'willis-class-reference',
     ]);
     expect(zoned.length).toBe(5);
   });

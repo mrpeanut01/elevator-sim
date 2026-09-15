@@ -187,6 +187,28 @@ dispatchers is asking about. On a bank without regeneration — every shipped ba
 installation's true consumption is bounded **above** by this figure; a bank that fits a drive is priced
 by the drive instead.
 
+**The first external anchor this proxy has ever had, and it is a comparison rather than a
+validation** — GitHub issue [#427](https://github.com/mrpeanut01/elevator-sim/issues/427),
+[§ D597](../DECISIONS.md). Every figure the energy axis carries is self-consistent: § D468 derived
+the daily goal's 80 kJ bar from 400 simulated runs against nothing outside this repository.
+`empire-state-class-reference` is the first shipped building modelled on a real tower that publishes
+a **distance**, which is the one quantity the proxy measures and could never check.
+
+| | |
+|---|---|
+| **Measured** | **3.21, 3.22 and 3.33 km per car per hour** at 1 800 s and **3.15, 3.28 and 3.22** at 3 600 s — six runs at the `office-standard` profile's own typical 12 %POP/5 min under `collective`, seeds 20 260 824 / 20 268 743 / 20 276 662, every car in the fleet moving in every one. Mean **3.237 km/car/h**. |
+| **Published** | *"Its elevators cover a combined distance of over 180,000 miles"* a year, over 73 cars: **3 968 km per car per year**. |
+| **The arithmetic** | 3 968 km at 3.237 km/h is **1 226 hours** of this traffic a year — **4.9 hours** on each of 250 working days, or 3.4 hours on each of 365. |
+
+**The two agree to the order of magnitude**, which is the strongest thing this check can say: a real
+office tower plausibly sees something like five hours a day of demand at or near its own peak rate,
+so the proxy is not wrong about the world by a factor of ten in either direction. It is **not** a
+validation, because the published figure names no measurement window and no basis — a working day or
+a calendar one, passenger service or all motion — so the residual cannot be attributed, and **no
+mechanism is offered** for it ([§ D256](../DECISIONS.md)). **Neither number was adjusted towards the
+other**: nothing above is calibrated here and § D468's bar is untouched. What would close it is a
+sourced statement of what the 180,000 miles covers.
+
 **Why 0.5 is the default, and why a per-bank ratio is not a silent change of scale.** 0.5 is the
 value at which the proxy is symmetric — an empty car and a full car of equal travel cost the same — so
 at the default the number describes how far cars drove out of balance rather than one installation's

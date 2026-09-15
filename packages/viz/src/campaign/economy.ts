@@ -1065,6 +1065,9 @@ export function contractIsLost(tower: TowerEconomy): boolean {
  * | **`merdeka-class-reference`** | four banks, **one** office sky lobby and a hotel lobby, ninety-two cars over a 557 m rise | **4** |
  * | **`ctf-class-reference`** | five banks, three sky lobbies, and the only asymmetric car in the set | **5** |
  * | **`shanghai-class-reference`** | six banks, four sky lobbies, a hundred and six cars | **5** |
+ * | **`one-wtc-class-reference`** | six banks, a **two-level** sky lobby, and the only escalator in the set that carries an eighth of a tower's rides | **5** |
+ * | **`willis-class-reference`** | seven banks, two two-level sky lobbies, and sixteen double-deck **locals** that pair every floor in their zone | **5** |
+ * | **`empire-state-class-reference`** | eight banks, **no express at all**, and a top reached by changing twice | **5** |
  * | `vertical-city` (5) | seven banks, double-deck shuttles, four escalators | — |
  *
  * `merdeka-class-reference` is a **4** because its whole design is *fewer transfers* — fifty-six
@@ -1076,6 +1079,14 @@ export function contractIsLost(tower: TowerEconomy): boolean {
  * six put two buildings on 3 — but it is the clearest sign yet that the 1–5 scale is short at the
  * top for a set that now holds four supertalls. That is an owner's call and is recorded rather than
  * acted on: widening it would move every published *complexity n of 5* string in the product.
+ *
+ * **Three more landed on 2026-09-15 and every one of them is a 5** (GitHub issues #428, #427 and
+ * #426; [§ D599](../../../../DECISIONS.md)). That takes the ceiling from three buildings to six, and
+ * it is now the clearest thing in this table: `empire-state-class-reference` has **eight** banks and
+ * `merdeka-class-reference` has four, and the column cannot tell them apart. The scale has run out
+ * of room and this lane did not widen it, for § D580 clause 4's reason unchanged — it is an owner's
+ * call, not a lane's. Recorded a second time rather than acted on, which is what a ratchet that may
+ * only fall looks like when the honest move is to leave it alone.
  */
 export const COMPLEXITY: Readonly<Record<string, number>> = Object.freeze({
   'garden-apartments': 1,
@@ -1086,6 +1097,9 @@ export const COMPLEXITY: Readonly<Record<string, number>> = Object.freeze({
   'midtown-office': 3,
   'secure-tower': 3,
   'merdeka-class-reference': 4,
+  'empire-state-class-reference': 5,
+  'one-wtc-class-reference': 5,
+  'willis-class-reference': 5,
   'mixed-use-high-rise': 4,
   'st-jude-hospital': 4,
   'ctf-class-reference': 5,
@@ -1126,7 +1140,8 @@ export const COMPLEXITY_MAX = 5;
  *
  * **The three reference towers take the same rule** (GitHub issues #424, #425 and #430,
  * [§ D580](../../../../DECISIONS.md)): 6 u for `merdeka-class-reference` and 7 u for the other two,
- * which is each one's complexity plus two. No fixture names any of them — the design file was drawn
+ * which is each one's complexity plus two. **The three of 2026-09-15 take the rule unamended too**
+ * — 7 u each, complexity 5 plus two (GitHub issues #428, #427 and #426). No fixture names any of them — the design file was drawn
  * against eight buildings — so the rule applies unamended, and Harbour Point's warning applies to
  * all three with more force: none of them clears a day at day 1, so every one is a fee paid for days
  * the career will miss. That is the fee pricing the **fabric**, which is what § 8.9's renewal then
@@ -1141,6 +1156,9 @@ export const OFFER_FEES: Readonly<Record<string, number>> = Object.freeze({
   'secure-tower': 5,
   'ashgate': 6,
   'merdeka-class-reference': 6,
+  'empire-state-class-reference': 7,
+  'one-wtc-class-reference': 7,
+  'willis-class-reference': 7,
   'mixed-use-high-rise': 6,
   'st-jude-hospital': 6,
   'ctf-class-reference': 7,

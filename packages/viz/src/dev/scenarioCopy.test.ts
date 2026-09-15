@@ -88,6 +88,13 @@ async function scenariosPanel(): Promise<string> {
  * **Extended by one word rather than to the target of 22.** The forcing function is worth keeping
  * one step ahead of the campaign: filling the list to twenty-two would buy nine waves of silence
  * on sentences nobody had reread, which is exactly what the throw exists to prevent.
+ *
+ * **It fired again on the same day, at thirteen, and this time three words were added rather than
+ * one** — GitHub issues #428, #427 and #426 took the campaign to sixteen. Three rather than one
+ * because three contracts landed in one lane, so the list is still exactly the campaign's size and
+ * still one short of anything unread; adding *seventeen* would have bought the silence the
+ * paragraph above refuses. The three sentences were reread before the words went in and they still
+ * work at sixteen, for the reason they worked at thirteen: each is a count and nothing else.
  */
 const NUMBER_WORDS = [
   'zero',
@@ -104,6 +111,9 @@ const NUMBER_WORDS = [
   'eleven',
   'twelve',
   'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
 ] as const;
 
 function inWords(count: number): string {

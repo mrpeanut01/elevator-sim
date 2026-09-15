@@ -35,9 +35,9 @@ fix cases and forty proof cases*. **Four are right and one is wrong.**
 
 | content type | key | ships today | derived from |
 |---|---|---|---|
-| Buildings | `buildings` | **14** | `.json` files in [`data/buildings/`](../data/buildings/), and pinned both ways by `packages/viz/src/fixtures.test-helper.ts#BUILDING_IDS` against `readdirSync` |
+| Buildings | `buildings` | **17** | `.json` files in [`data/buildings/`](../data/buildings/), and pinned both ways by `packages/viz/src/fixtures.test-helper.ts#BUILDING_IDS` against `readdirSync` |
 | Campaign stages | `campaign-stages` | **10** | `stages` in [`data/campaign.json`](../data/campaign.json) |
-| Contracts (the daily loop's scenarios) | `contracts` | **13** | `CONTRACTS` in `packages/viz/src/shift/contracts.ts` — `c1`–`c13` |
+| Contracts (the daily loop's scenarios) | `contracts` | **16** | `CONTRACTS` in `packages/viz/src/shift/contracts.ts` — `c1`–`c16` |
 | Fix-a-building cases | `fix-cases` | **18** | `cases` in [`data/fixit-cases.json`](../data/fixit-cases.json) |
 | Proof cases | `proof-cases` | **40** | `towers` × `crowds` in [`data/proof-cases.json`](../data/proof-cases.json) — 8 × 5 |
 | Dispatcher profiles | `dispatchers` | **13** | `profiles` in [`data/dispatcher-profiles.json`](../data/dispatcher-profiles.json) |
@@ -54,10 +54,15 @@ with no contract is a scenario the reader can never take* — and `shift/contrac
 so the tree has been consistent about this since the three contracts landed; only the issue was
 stale.
 
-**Fourteen buildings and thirteen contracts is not an arithmetic error.** `burj-class-reference` is a
+**Seventeen buildings and sixteen contracts is not an arithmetic error.** `burj-class-reference` is a
 *reference* building and has none, by GitHub issue #376's own ruling;
 `packages/viz/src/shift/contracts.test.ts#REFERENCE_ONLY` names it and asserts, in both directions,
-that it ships and has no contract, so the exception cannot quietly widen.
+that it ships and has no contract, so the exception cannot quietly widen. **Six more reference towers
+have landed since that ruling and every one of them has a contract** — three on GitHub issues #425,
+#424 and #430 and three on #428, #427 and #426 — because the owner's 2026-09-10 ruling on #232 says
+the target is 22 buildings, 22 contracts, and every building playable. So the gap of one is the
+building that predates the ruling and nothing else, and it stays a list rather than becoming a
+category.
 
 **Three stale docstrings found beside it, named rather than fixed here.** The same *five* survives in
 prose in `packages/viz/src/shift/contracts.ts` (*"The five scenarios"*, and *"`contracts.test.ts`
