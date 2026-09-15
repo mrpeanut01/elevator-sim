@@ -131,6 +131,19 @@ import {
 // what "live" means for a schema it does not own.
 import { activeWhenSatisfied } from '../tuning/space/types.js';
 
+// The per-building landing-panel dimension, and the sampler that draws from it. Imported rather
+// than reimplemented for the reason the whole `tuning/space` module exists: a fuzz family that drew
+// a panel set by a rule of its own would be sampling a space no search could sample, which is the
+// `patternSwitching` defect (`CLAUDE.md` § *the standing requirement*) wearing a generator. This
+// import is also what makes `tuning/space/landings.ts`'s non-test caller real.
+import {
+  landingCallTypesFrom,
+  landingPanelSpaceFor,
+  panelCountOf,
+  wouldBeHybrid,
+} from '../tuning/space/landings.js';
+import { sampleCandidate } from '../tuning/space/sample.js';
+
 import type { FuzzCase, FuzzTopology } from './types.js';
 
 /**
@@ -185,6 +198,24 @@ export interface FuzzSpace {
   readonly initialServiceModeProbability: number;
   /** Probability that a case carries a mid-run {@link ServiceEventConfig} schedule at all. */
   readonly serviceScheduleProbability: number;
+  /**
+   * Probability that a case draws a **per-landing panel set** at all — GitHub issue #534 item 1.
+   *
+   * Per case, exactly as {@link serviceScheduleProbability} is, and for the same reason: it is the
+   * switch that says whether this axis is in play, not a second knob over *how many* landings get a
+   * panel. When it fires the set itself is drawn from the declared search space
+   * (`tuning/space/landings.ts`) by `sampleCandidate`, which is a fair coin per landing — the
+   * space's own geometry rather than a rule this file invents.
+   *
+   * **`0` on {@link STANDARD_SPACE} and {@link DEEP_SPACE}, and that is load-bearing.** At zero the
+   * `fuzz.landings` stream is never touched and no floor gains a key, so every case those two
+   * corpora have ever generated is **byte-identical** to what it was before this axis existed —
+   * which the deep tier's two pinned reproductions (`fuzz-1001074`, `fuzz-1000384`) require, since a
+   * recorded case that quietly became a hybrid would be reproducing a different run at the same
+   * seed (`run.ts` § {@link CORPUS_DISPATCHER_PROFILE_IDS}). {@link HYBRID_SPACE} is where the axis
+   * is on.
+   */
+  readonly landingPanelProbability: number;
 }
 
 /** The always-on corpus space. Deliberately small; the cost is stated, never silently capped. */
@@ -199,6 +230,7 @@ export const STANDARD_SPACE: FuzzSpace = Object.freeze({
   drainGraceS: 900,
   initialServiceModeProbability: 0.2,
   serviceScheduleProbability: 0.25,
+  landingPanelProbability: 0,
 });
 
 /** The opt-in campaign space: taller buildings, longer horizons, demand well past capacity. */
@@ -215,6 +247,40 @@ export const DEEP_SPACE: FuzzSpace = Object.freeze({
   // the whole deep space follows: a deep finding must shrink into the standard space when it can.
   initialServiceModeProbability: 0.3,
   serviceScheduleProbability: 0.4,
+  landingPanelProbability: 0,
+});
+
+/**
+ * **The hybrid family's space** — GitHub issue #534 item 1, `DECISIONS.md` § D553, § D570.
+ *
+ * {@link STANDARD_SPACE} with one axis switched on, and deliberately nothing else: a finding here
+ * must shrink into the always-on space, which is the rule the whole deep space follows. § D553 gave
+ * a landing its own hall fixture and the generator drew none, so **no fuzz case could build a
+ * hybrid** and the whole configuration — per-landing `costRequestFor`, per-landing `batchKeyOf`,
+ * `#assignsAt`, the bare kiosk's per-landing refusal, conservation claim 5 counted over the
+ * landings that assign, and the `hybrid` comparability object — was unreached by the six
+ * properties. This is the space that reaches it.
+ *
+ * **Why it is a third space rather than a probability on the first two.** Turning the axis on in
+ * `STANDARD_SPACE` would not move a single generated *building* — the draw comes from its own
+ * `fuzz.landings` stream, so no other scalar shifts — but it would change what the pinned corpora
+ * *run*, and two of the deep tier's cases are regression records of specific runs. A record that
+ * silently starts describing a different run is the defect `CORPUS_DISPATCHER_PROFILE_IDS` exists
+ * for, one axis over. So the existing corpora keep their runs exactly, and the new axis gets its
+ * own pinned corpus beside them.
+ *
+ * `0.8` rather than `1.0` so the family still generates the control — a case whose landings all
+ * follow the dispatcher, which is every building this project ships.
+ */
+export const HYBRID_SPACE: FuzzSpace = Object.freeze({
+  ...STANDARD_SPACE,
+  landingPanelProbability: 0.8,
+});
+
+/** The hybrid family at the deep space's size. Same axis, wider buildings and longer horizons. */
+export const DEEP_HYBRID_SPACE: FuzzSpace = Object.freeze({
+  ...DEEP_SPACE,
+  landingPanelProbability: 0.8,
 });
 
 /** Everything the generator needs from the loaded reference data. Ids are data, never literals. */
@@ -753,6 +819,76 @@ function generateService(
 }
 
 /* -------------------------------------------------------------------------- *
+ * Landing fixtures
+ * -------------------------------------------------------------------------- */
+
+/** What one case's landing draw produced. `declared` is empty when the axis did not fire. */
+export interface LandingDraw {
+  /** `landingCallType` per floor id, or empty. Every floor is named when the axis fires. */
+  readonly declared: Readonly<Record<string, CallType>>;
+  /** How many landings carry a destination panel — the quantity stage 2's pricing multiplies. */
+  readonly panels: number;
+  /** Whether this configuration makes the run `hybrid` rather than uniform. */
+  readonly hybrid: boolean;
+}
+
+const NO_LANDINGS: LandingDraw = Object.freeze({
+  declared: Object.freeze({}),
+  panels: 0,
+  hybrid: false,
+});
+
+/**
+ * Draw one case's per-landing hall fixtures — GitHub issue #534 item 1, `DECISIONS.md` § D553.
+ *
+ * Two draws from the `fuzz.landings` stream and nothing else: one float to decide whether this case
+ * carries a panel set at all, then `sampleCandidate` over the **declared** per-landing dimension
+ * (`tuning/space/landings.ts`), which is a fair coin per landing. Nothing here decides what a panel
+ * *is* — {@link landingPanelSpaceFor} does, off the resolved stage — so this function cannot come to
+ * disagree with the space a search would draw the same set from.
+ *
+ * **Its own stream, for {@link generateService}'s reason.** Every case the corpora generated before
+ * this axis existed is bit-identical apart from the keys the axis adds, so the pinned coverage
+ * assertions in `generate.test.ts` did not have to move; and at `landingPanelProbability: 0` the
+ * stream is not touched at all.
+ *
+ * The stage is resolved through the **real** `resolveDispatchConfig` — the same function
+ * `Simulation` asks — rather than read off the authored profile, because `passengerAssignment` is
+ * what decides whether a destination landing *names a car*, and a profile that authors none resolves
+ * to one.
+ */
+export function drawLandingCallTypes(
+  rng: Rng,
+  space: FuzzSpace,
+  floorIds: readonly string[],
+  profile: DispatcherProfile,
+  callType: CallType,
+  hasAccessZones: boolean,
+): LandingDraw {
+  if (space.landingPanelProbability <= 0) return NO_LANDINGS;
+  if (rng.nextFloat() >= space.landingPanelProbability) return NO_LANDINGS;
+
+  const candidateProfile: DispatcherProfile = {
+    ...profile,
+    dispatch: { ...profile.dispatch, callType },
+  };
+  const stage = resolveDispatchConfig(candidateProfile).dispatch;
+  const panels = landingPanelSpaceFor({
+    floorIds,
+    stage: { callType, callCarriesCredential: callCarriesCredential(profile, callType) },
+    hasAccessZones,
+  });
+  // `validate: false` because this space refuses nothing and says so: the declared box is the
+  // feasible set, and a feasibility probe here would build a policy per case for no answer.
+  const candidate = sampleCandidate(panels.space, rng, { validate: false });
+  return Object.freeze({
+    declared: landingCallTypesFrom(panels, candidate),
+    panels: panelCountOf(panels, candidate),
+    hybrid: wouldBeHybrid(panels, candidate, stage.passengerAssignment === 'panel'),
+  });
+}
+
+/* -------------------------------------------------------------------------- *
  * The case
  * -------------------------------------------------------------------------- */
 
@@ -784,6 +920,9 @@ export function caseFromSeed(fuzzSeed: number | bigint, options: GenerateOptions
   const accessRng = streams.derive('fuzz.access');
   const runRng = streams.derive('fuzz.run');
   const serviceRng = streams.derive('fuzz.service');
+  // Last, and its own, for `fuzz.service`'s reason: a stream per generation concern so an axis
+  // added here moves nothing that was drawn before it (GitHub issue #534).
+  const landingRng = streams.derive('fuzz.landings');
 
   const buildingType = pick(shape, ['office', 'residential', 'hotel', 'mixed-use'] as const);
   const trafficProfile = pick(shape, options.trafficProfileIds);
@@ -889,6 +1028,14 @@ export function caseFromSeed(fuzzSeed: number | bigint, options: GenerateOptions
     runRng.nextFloat() < 0.25 ? uniform(runRng, 0.05, 0.5, 2) : 0;
 
   const service = generateService(serviceRng, space, banks, durationS);
+  const landings = drawLandingCallTypes(
+    landingRng,
+    space,
+    floors.map((floor) => floor.id),
+    dispatcherProfile,
+    callType,
+    accessZones.length > 0,
+  );
 
   const authored = {
     id: `fuzz-${String(fuzzSeed)}`,
@@ -902,6 +1049,12 @@ export function caseFromSeed(fuzzSeed: number | bigint, options: GenerateOptions
       population: floor.population,
       ...(floor.isEntrance === true ? { isEntrance: true } : {}),
       ...(floor.isTransferFloor === true ? { isTransferFloor: true } : {}),
+      // Absent, not the dispatcher's own value: `FloorConfig.landingCallType` is optional and its
+      // absence means the dispatcher's, so a case the axis did not fire on authors exactly the JSON
+      // it authored before this axis existed.
+      ...(landings.declared[floor.id] === undefined
+        ? {}
+        : { landingCallType: landings.declared[floor.id] }),
     })),
     totalPopulation: floors.reduce((sum, floor) => sum + floor.population, 0),
     banks: banks.map((bank) => ({
@@ -929,6 +1082,12 @@ export function caseFromSeed(fuzzSeed: number | bigint, options: GenerateOptions
   if (service.modes.size > 0) tags.push('initial-service-mode');
   if (service.events.length > 0) tags.push('service-schedule');
   if (service.returns) tags.push('service-return');
+  // Three tags rather than one, because they are three different configurations and only the third
+  // is the one § D553 calls `hybrid`: a case may declare fixtures and still run uniformly, which is
+  // the control the family needs as much as the mixture.
+  if (Object.keys(landings.declared).length > 0) tags.push('landing-fixtures');
+  if (landings.panels > 0) tags.push('landing-panels');
+  if (landings.hybrid) tags.push('hybrid-landings');
 
   return Object.freeze({
     caseId: `fuzz-${String(fuzzSeed)}`,

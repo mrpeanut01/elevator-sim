@@ -618,8 +618,11 @@ export type {
 
 export {
   AWT_OBJECTIVE_ID,
+  BUTTON_CALL_TYPE,
   DOC_RUNGS,
   ENERGY_OBJECTIVE_ID,
+  LANDING_PANEL_KEY,
+  LANDING_SECTION,
   NOT_COMPARABLE_LABEL,
   PARAMETER_SCHEMA_SUFFIX,
   PROFILE_OBJECT_SECTIONS,
@@ -683,6 +686,9 @@ export {
   isFlat,
   isIndistinguishable,
   isProfileAuthorable,
+  landingCallTypesFrom,
+  landingPanelParameterId,
+  landingPanelSpaceFor,
   materializer,
   normalizeSearchSeed,
   objectiveMetricSpec,
@@ -691,6 +697,8 @@ export {
   objectiveVerdict,
   outcomeKey,
   outcomeOf,
+  panelCallTypeFor,
+  panelCountOf,
   parameterOf,
   paretoFrontOfPoints,
   parseProfile,
@@ -730,6 +738,7 @@ export {
   validateValues,
   vectorDimensions,
   vectorSpace,
+  wouldBeHybrid,
 } from './tuning/index.js';
 
 export type {
@@ -760,6 +769,9 @@ export type {
   HoldoutVerdict,
   IndistinguishablePair,
   IntegerParameter,
+  LandingPanelSpace,
+  LandingPanelSpaceOptions,
+  LandingStage,
   NumericParameter,
   Objective,
   ObjectiveArm,
@@ -892,10 +904,13 @@ export type {
  * -------------------------------------------------------------------------- */
 
 export {
+  DEEP_HYBRID_SPACE,
   DEEP_SPACE,
   FUZZ_PROPERTIES,
   FUZZ_SKIP_REASONS,
   FUZZ_TOPOLOGIES,
+  HYBRID_CORPUS,
+  HYBRID_SPACE,
   PROPERTY_BOUNDS,
   PROPERTY_CHECKS,
   CORPUS_DISPATCHER_PROFILE_IDS,
@@ -912,7 +927,9 @@ export {
   checkTermination,
   deepCampaignRequested,
   deepCampaignSize,
+  deepHybridSeeds,
   deepSeeds,
+  drawLandingCallTypes,
   MIN_DURATION_BY_TEMPLATE,
   evaluateCase,
   formatFuzzCase,
@@ -948,6 +965,7 @@ export type {
   FuzzSpace,
   FuzzTopology,
   GenerateOptions,
+  LandingDraw,
   PropertyBounds,
   PropertyContext,
   RefusalPredicate,

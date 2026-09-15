@@ -171,6 +171,10 @@ const BROWSER_GRAPH = [
   'tuning/space/collect.ts',
   'tuning/space/encode.ts',
   'tuning/space/index.ts',
+  // The per-building landing-panel dimension (GitHub issue #534, `DECISIONS.md` § D571). It imports
+  // `@elevator-sim/core` and this module's own types and nothing else, so it is environment-free by
+  // the same argument the rest of `tuning/space` is.
+  'tuning/space/landings.ts',
   'tuning/space/sample.ts',
   'tuning/space/types.ts',
 ];
