@@ -10,11 +10,13 @@
  * would prove that a fixture building runs.
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadConfig } from '../config/loader.js';
 import { parseBuilding, resolveBuilding } from '../config/parse.js';
-import type { DispatcherProfile, LoadedConfig, ResolvedBuilding } from '../config/types.js';
+import type { CallType, DispatcherProfile, LoadedConfig, ResolvedBuilding } from '../config/types.js';
 
 import type { SimulationResult } from './types.js';
 
@@ -86,6 +88,85 @@ export function tinyBuilding(config: LoadedConfig, ratedLoadLb = 1000): Resolved
   };
   return resolveBuilding(parseBuilding(authored, 'one-car-walkup.json'), config.elevatorSpecs, {
     file: 'one-car-walkup.json',
+    trafficProfileIds: new Set(config.trafficProfiles.profiles.map((profile) => profile.id)),
+  });
+}
+
+/**
+ * A shipped building re-authored with `landingCallType` declared on the named floors — GitHub
+ * issue #437 stage 1, `DECISIONS.md` § D553.
+ *
+ * Re-authored through `parseBuilding` and `resolveBuilding` exactly as `loadConfig` calls them,
+ * with the shipped file path, so even `ResolvedBuilding.source` is the shipped one and a building
+ * that declares nothing comes back byte-identical to the shipped one
+ * (`sim/landingPanels.test.ts` AC1 holds that). The alternative — mutating a `ResolvedBuilding` —
+ * would build a configuration no loader would accept and prove nothing about the shipped path.
+ *
+ * Moved here from `sim/landingPanels.test.ts`, where it was a file-local helper, when a second,
+ * third and fourth suite needed it (GitHub issue #534). Kept as one copy on the rule
+ * `fuzz/generate.ts` states for the generator: a helper restated per file is a helper that drifts
+ * per file.
+ *
+ * @throws Error if `declared` names a floor the building's file does not author explicitly.
+ */
+export function reauthoredWithLandings(
+  config: LoadedConfig,
+  buildingId: string,
+  declared: Readonly<Record<string, CallType>> = {},
+): ResolvedBuilding {
+  const file = join(DATA_DIR, 'buildings', `${buildingId}.json`);
+  const raw = JSON.parse(readFileSync(file, 'utf8')) as { floors?: Record<string, unknown>[] };
+  const seen = new Set<string>();
+  const floors = (raw.floors ?? []).map((floor) => {
+    const id = String(floor['id']);
+    const landingCallType = declared[id];
+    if (landingCallType === undefined) return floor;
+    seen.add(id);
+    return { ...floor, landingCallType };
+  });
+  const missing = Object.keys(declared).filter((id) => !seen.has(id));
+  if (missing.length > 0) {
+    throw new Error(`${buildingId} authors no explicit floor ${missing.join(', ')}`);
+  }
+  return resolveBuilding(parseBuilding({ ...raw, floors }, file), config.elevatorSpecs, {
+    file,
+    trafficProfileIds: new Set(config.trafficProfiles.profiles.map((profile) => profile.id)),
+  });
+}
+
+/**
+ * A shipped building re-authored with one `landingCallType` on **every** landing it authors.
+ *
+ * Both halves of the authored geometry are stamped, and that is the whole reason this is a second
+ * function rather than an argument to {@link reauthoredWithLandings}: four of the nine shipped
+ * buildings author some of their floors as a `floorRanges` entry, and `expandFloors` copies a
+ * range's `landingCallType` to every floor it expands to (`DECISIONS.md` § D553 clause 1). A helper
+ * that stamped only `floors[]` would silently leave twenty-five landings undeclared on
+ * `mixed-use-high-rise` and call the result *"every landing"*.
+ *
+ * Used to measure § D553 clause 7's identity claim — declaring the dispatcher's own call type on
+ * every landing changes nothing, byte for byte — over whole buildings rather than one.
+ */
+export function reauthoredWithLandingCallTypeEverywhere(
+  config: LoadedConfig,
+  buildingId: string,
+  landingCallType: CallType,
+): ResolvedBuilding {
+  const file = join(DATA_DIR, 'buildings', `${buildingId}.json`);
+  const raw = JSON.parse(readFileSync(file, 'utf8')) as {
+    floors?: Record<string, unknown>[];
+    floorRanges?: Record<string, unknown>[];
+  };
+  const stamp = (entries: Record<string, unknown>[] | undefined): Record<string, unknown>[] | undefined =>
+    entries?.map((entry) => ({ ...entry, landingCallType }));
+  const floorRanges = stamp(raw.floorRanges);
+  const authored = {
+    ...raw,
+    floors: stamp(raw.floors) ?? [],
+    ...(floorRanges === undefined ? {} : { floorRanges }),
+  };
+  return resolveBuilding(parseBuilding(authored, file), config.elevatorSpecs, {
+    file,
     trafficProfileIds: new Set(config.trafficProfiles.profiles.map((profile) => profile.id)),
   });
 }

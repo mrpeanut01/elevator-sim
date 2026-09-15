@@ -35,6 +35,7 @@
  * is no `if (building.id === ...)` anywhere in this module.
  */
 
+import { DESTINATION_CALL_TYPES } from '../config/types.js';
 import type {
   DirectionalSplit,
   DispatcherProfile,
@@ -243,6 +244,46 @@ export const SIM_PARAMETERS: readonly SimParameterSpec[] = Object.freeze([
       'Hard timeout: simulated seconds past the end of demand in which the system may finish delivering. Exceeding it is reported as a failed run, never trimmed away.',
   },
   {
+    /**
+     * **The gate is a conjunction of two dispatcher rows and one fact about the building, and
+     * only the first two can be declared here** — GitHub issue #534 item 4, `DECISIONS.md`
+     * § D553, § D568.
+     *
+     * A walk from a panel to a named car is charged where a landing *names* a car, and since
+     * § D553 that is decided landing by landing: `Simulation.#assignsAt(floorId)`, which is
+     * `comparabilityOfLandings(stage, floors)` read one floor at a time. So the row is live
+     * exactly when
+     *
+     * 1. the dispatcher names cars at all — `dispatch.passengerAssignment: 'panel'`;
+     * 2. its call type can carry a destination, because a panel that cannot ask for one is an
+     *    up/down button (`dispatch/policy.ts` refuses the pair outright); **and**
+     * 3. at least one landing of *this building* registers a destination call.
+     *
+     * The first two are declared below, as `activeWhen` conditions over declared parameter ids —
+     * that is the whole vocabulary an `activeWhen` has. Clause 2 was transitive before this
+     * commit (clause 1 is refused without it) and is now written down, because a gate a reader
+     * has to derive from another module's refusal is a gate `tuning/space` cannot evaluate.
+     *
+     * **Clause 3 is not declarable here, and the reason is structural rather than an omission.**
+     * Its subject is a per-floor set keyed by floor id, which is a *building's* property; an
+     * `activeWhen` names parameter ids, and `DECISIONS.md` § D553 item 8 records that a per-floor
+     * panel set therefore belongs to a per-building space rather than to a dispatcher profile's.
+     * This repository already has one building-dependent feasibility condition and it lives as a
+     * *function over the building* rather than in a schema —
+     * `experiments`' `tuning/space#buildingFeasibility`, for the two `answer.*` rows that are
+     * only decidable against a car — and clause 3 is the same shape. So it is stated where it can
+     * be executed instead of asserted:
+     *
+     * - `experiments`' `tuning/space/landings.ts#landingPanelSpaceFor` is the per-building
+     *   dimension the set is searched over (§ D571), and `wouldBeHybrid` and `panelCountOf` read
+     *   clause 3 off a point in it — which is as close to declaring it as a per-floor set gets;
+     * - **the run says so out loud.** A run whose `sim.assignedWalkS` is non-zero while no
+     *   landing in it assigns a car raises a warning naming the value as inert
+     *   (`sim/simulation.ts`). A control that writes nothing must say so — `CLAUDE.md`
+     *   § *the standing requirement* — and a gate is a claim, so
+     *   `sim/assignedWalkGate.test.ts` proves it in both directions with runs: the walk moves the
+     *   legs where a landing assigns and moves nothing where none does.
+     */
     id: 'sim.assignedWalkS',
     type: 'continuous',
     range: [0, 30],
@@ -250,8 +291,11 @@ export const SIM_PARAMETERS: readonly SimParameterSpec[] = Object.freeze([
     default: SIM_DEFAULTS.assignedWalkS,
     unit: 's',
     description:
-      'Walk from a destination-entry panel to the car it named, under dispatch.passengerAssignment "panel". Counted inside waiting time and inside time to destination, never by moving the arrival instant. Deliberately a property of the lobby and NOT authorable in a dispatcher profile: a dispatcher that could tune its own walk distance could tune away its own cost, and the Pareto front would be a lie.',
-    activeWhen: { 'dispatch.passengerAssignment': ['panel'] },
+      'Walk from a destination-entry panel to the car it named, under dispatch.passengerAssignment "panel" and a call type that carries a destination. Live only at the landings that register a destination call: a building whose floors declare landingCallType "up-down-buttons" everywhere charges no walk even under a panel dispatcher (DECISIONS.md § D553), and a run that sets it where no landing assigns says so in its warnings. Counted inside waiting time and inside time to destination, never by moving the arrival instant. Deliberately a property of the lobby and NOT authorable in a dispatcher profile: a dispatcher that could tune its own walk distance could tune away its own cost, and the Pareto front would be a lie.',
+    activeWhen: {
+      'dispatch.passengerAssignment': ['panel'],
+      'dispatch.callType': [...DESTINATION_CALL_TYPES],
+    },
   },
   {
     id: 'sim.queueSampleCount',

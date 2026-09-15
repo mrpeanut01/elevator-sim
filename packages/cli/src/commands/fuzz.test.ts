@@ -22,6 +22,7 @@ import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import {
   CORPUS_DISPATCHER_PROFILE_IDS,
   CORPUS_TRAFFIC_PROFILE_IDS,
+  HYBRID_CORPUS,
   STANDARD_CORPUS,
   STANDARD_SPACE,
   caseFromSeed,
@@ -43,6 +44,7 @@ import { createBufferedOutput, type BufferedOutput } from '../output.js';
 
 import {
   chunkSize,
+  extendedSpaceOf,
   mergeStats,
   reportCampaign,
   seedsFor,
@@ -328,6 +330,38 @@ describe('the pieces that decide what runs', () => {
     /* The overnight pass, from the command line rather than from an environment variable. */
     expect(seedsFor('deep', 2000, 1_000_001)).toHaveLength(2000);
     expect(spaceOf('deep').maxFloors).toBeGreaterThan(spaceOf('standard').maxFloors);
+  });
+
+  it('gives the hybrid family its pinned corpus, and a campaign past it', () => {
+    /*
+     * GitHub issue #534 item 1. The landing-fixture family is both a regression suite and the only
+     * path a user has to the axis, so `--cases` past the pinned 48 has to mean something rather than
+     * refusing: it continues into a **disjoint** seed block in the wider space, which is a campaign.
+     */
+    expect(seedsFor('hybrid', undefined, 1)).toBe(HYBRID_CORPUS);
+    expect(seedsFor('hybrid', HYBRID_CORPUS.length, 1)).toBe(HYBRID_CORPUS);
+    expect(seedsFor('hybrid', 4, 1)).toEqual(HYBRID_CORPUS.slice(0, 4));
+
+    const campaign = seedsFor('hybrid', HYBRID_CORPUS.length + 2, 1);
+    expect(campaign).toHaveLength(HYBRID_CORPUS.length + 2);
+    // Disjoint from the pinned family, so a campaign case is never a pinned case wearing a
+    // different space — the defect `CORPUS_DISPATCHER_PROFILE_IDS` records, one axis over.
+    expect(campaign.filter((seed) => HYBRID_CORPUS.includes(seed))).toEqual([]);
+
+    // The axis is on in this tier and off in the other two, which is the whole difference.
+    expect(spaceOf('hybrid').landingPanelProbability).toBeGreaterThan(0);
+    expect(spaceOf('standard').landingPanelProbability).toBe(0);
+    expect(spaceOf('deep').landingPanelProbability).toBe(0);
+
+    // The space reported has to be the space the seeds were decoded against.
+    expect(extendedSpaceOf('hybrid', 4)).toBe(spaceOf('hybrid'));
+    expect(extendedSpaceOf('hybrid', HYBRID_CORPUS.length + 2).maxFloors).toBeGreaterThan(
+      spaceOf('hybrid').maxFloors,
+    );
+    expect(extendedSpaceOf('hybrid', HYBRID_CORPUS.length + 2).landingPanelProbability).toBe(
+      spaceOf('hybrid').landingPanelProbability,
+    );
+    expect(extendedSpaceOf('standard', 4)).toBe(spaceOf('standard'));
   });
 
   it('chunks for progress without ever producing a zero-length chunk', () => {

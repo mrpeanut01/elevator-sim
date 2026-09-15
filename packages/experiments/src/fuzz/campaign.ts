@@ -24,7 +24,14 @@
  * passengers generated and the simulated seconds, and the always-on suite prints them.
  */
 
-import { caseFromSeed, DEEP_SPACE, STANDARD_SPACE, type FuzzSpace } from './generate.js';
+import {
+  caseFromSeed,
+  DEEP_HYBRID_SPACE,
+  DEEP_SPACE,
+  HYBRID_SPACE,
+  STANDARD_SPACE,
+  type FuzzSpace,
+} from './generate.js';
 import { evaluateCase, generateOptionsFrom, isFailure, type RunOptions } from './run.js';
 import { shrinkCase, type ShrinkResult } from './shrink.js';
 import type { CampaignStats, FuzzOutcome } from './types.js';
@@ -160,6 +167,51 @@ export const STANDARD_CORPUS: readonly number[] = Object.freeze([
   161, 168, 181, 193,
 ]);
 
+/**
+ * **The hybrid family: 48 pinned generator seeds in {@link HYBRID_SPACE}** — GitHub issue #534
+ * item 1, `DECISIONS.md` § D553, § D570.
+ *
+ * The axis § D553 opened and no fuzz case reached. A landing may carry its own hall fixture, and
+ * until this corpus existed the generator drew none — so `costRequestFor` and `batchKeyOf` were
+ * never asked per call, `Simulation.#assignsAt` was never anything but the run-wide gate, the bare
+ * kiosk's refusal was never asked at one landing and not another, conservation claim 5 was never
+ * counted over a proper subset of the landings, and no case ever produced the `hybrid` comparability
+ * object at all. All six properties are checked on every case here, exactly as on
+ * {@link STANDARD_CORPUS}.
+ *
+ * **Pinned, and the last sixteen are chosen rather than consecutive** — the same shape
+ * {@link STANDARD_CORPUS}'s two-floor seeds have, for the same reason. A hybrid run needs a
+ * dispatcher that *names a car* (`metrics/comparability.ts#landingPassengerModelOf`: a landing is
+ * conventional under anything but `passengerAssignment: 'panel'`, whatever its fixture discloses),
+ * and `data/dispatcher-profiles.json` ships one such profile of thirteen. Measured over seeds
+ * 2 000 001–2 000 400: **18 produce a hybrid**, about one case in twenty-two. A consecutive block
+ * alone would therefore have carried two, so the sixteen hybrid seeds outside the block are named
+ * here and the family carries **18 hybrid cases of 48**.
+ *
+ * What the whole corpus measured when it landed, on this tree: 48 cases, 0 failures, 0 skipped,
+ * 6 037 generated passengers, 10.91 simulated hours, in 3.7 s — 44 cases declaring fixtures,
+ * 44 with at least one panel, 18 of them hybrid, 47 `completed` and 1 `timed-out`.
+ *
+ * **The census is asserted rather than described**: `hybrid.test.ts` requires those counts of these
+ * seeds, so a thirteenth-profile change, a re-ordered draw or a narrowed space fails there instead
+ * of quietly making this a corpus of uniform runs with a hybrid name.
+ */
+export const HYBRID_CORPUS: readonly number[] = Object.freeze([
+  2_000_001, 2_000_002, 2_000_003, 2_000_004, 2_000_005, 2_000_006, 2_000_007, 2_000_008,
+  2_000_009, 2_000_010, 2_000_011, 2_000_012, 2_000_013, 2_000_014, 2_000_015, 2_000_016,
+  2_000_017, 2_000_018, 2_000_019, 2_000_020, 2_000_021, 2_000_022, 2_000_023, 2_000_024,
+  2_000_025, 2_000_026, 2_000_027, 2_000_028, 2_000_029, 2_000_030, 2_000_031, 2_000_032,
+  // …and the seeds that produce a run whose landings disagree, which a consecutive block reaches
+  // about once in twenty-two.
+  2_000_060, 2_000_072, 2_000_108, 2_000_121, 2_000_122, 2_000_171, 2_000_202, 2_000_210,
+  2_000_244, 2_000_280, 2_000_300, 2_000_329, 2_000_343, 2_000_351, 2_000_370, 2_000_379,
+]);
+
+/** Seeds for the opt-in deep hybrid campaign. Disjoint from {@link HYBRID_CORPUS}, by construction. */
+export function deepHybridSeeds(count: number, from = 2_100_001): readonly number[] {
+  return deepSeeds(count, from);
+}
+
 /** Seeds for the opt-in deep campaign. `count` cases starting from `from`. */
 export function deepSeeds(count: number, from = 1_000_001): readonly number[] {
   const seeds: number[] = [];
@@ -182,4 +234,4 @@ export function deepCampaignSize(
   return Number.isInteger(declared) && declared > 0 ? declared : 250;
 }
 
-export { DEEP_SPACE, STANDARD_SPACE };
+export { DEEP_HYBRID_SPACE, DEEP_SPACE, HYBRID_SPACE, STANDARD_SPACE };

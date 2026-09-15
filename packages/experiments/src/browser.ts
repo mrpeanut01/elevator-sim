@@ -148,6 +148,9 @@
  * -------------------------------------------------------------------------- */
 
 export {
+  BUTTON_CALL_TYPE,
+  LANDING_PANEL_KEY,
+  LANDING_SECTION,
   PARAMETER_SCHEMA_SUFFIX,
   PROFILE_OBJECT_SECTIONS,
   PROFILE_SECTIONS,
@@ -170,7 +173,12 @@ export {
   isActive,
   isActiveWhenRange,
   isProfileAuthorable,
+  landingCallTypesFrom,
+  landingPanelParameterId,
+  landingPanelSpaceFor,
   materializer,
+  panelCallTypeFor,
+  panelCountOf,
   parameterOf,
   parseProfile,
   perturbCandidate,
@@ -187,6 +195,7 @@ export {
   validateValues,
   vectorDimensions,
   vectorSpace,
+  wouldBeHybrid,
 } from './tuning/space/index.js';
 
 export type {
@@ -200,6 +209,9 @@ export type {
   ContinuousParameter,
   GateReader,
   IntegerParameter,
+  LandingPanelSpace,
+  LandingPanelSpaceOptions,
+  LandingStage,
   NumericParameter,
   ParameterScale,
   ParameterValue,

@@ -37,12 +37,16 @@
  */
 
 import {
+  DEEP_HYBRID_SPACE,
   DEEP_SPACE,
   FUZZ_PROPERTIES,
+  HYBRID_CORPUS,
+  HYBRID_SPACE,
   PROPERTY_BOUNDS,
   STANDARD_CORPUS,
   STANDARD_SPACE,
   deepCampaignSize,
+  deepHybridSeeds,
   deepSeeds,
   formatOutcome,
   formatStats,
@@ -74,14 +78,34 @@ import { field, heading, padColumn, type Output } from '../output.js';
  * Tiers
  * -------------------------------------------------------------------------- */
 
-/** The two corpora `campaign.ts` documents, named on the command line rather than in an env var. */
-export const FUZZ_TIERS = ['standard', 'deep'] as const;
+/**
+ * The corpora `campaign.ts` documents, named on the command line rather than in an env var.
+ *
+ * `hybrid` is the third and it is the reason this file changed for GitHub issue #534: the family
+ * that draws **per-landing hall fixtures** (`DECISIONS.md` § D553) needs a path a user can type, or
+ * it is a corpus whose only caller is a vitest file — which is exactly the C24 shape this command
+ * exists to close for the other two.
+ */
+export const FUZZ_TIERS = ['standard', 'deep', 'hybrid'] as const;
 
 export type FuzzTier = (typeof FUZZ_TIERS)[number];
 
-/** The generation space each tier draws from. Both are `fuzz/generate.ts`'s, unmodified. */
+/** The generation space each tier draws from. All three are `fuzz/generate.ts`'s, unmodified. */
 export function spaceOf(tier: FuzzTier): FuzzSpace {
-  return tier === 'deep' ? DEEP_SPACE : STANDARD_SPACE;
+  if (tier === 'deep') return DEEP_SPACE;
+  return tier === 'hybrid' ? HYBRID_SPACE : STANDARD_SPACE;
+}
+
+/**
+ * The generation space a tier draws from once `--cases` takes it past its pinned corpus.
+ *
+ * Only `hybrid` has one: its pinned corpus is 48 seeds in {@link HYBRID_SPACE}, and a user asking
+ * for more than that is asking for the campaign rather than the regression suite, which is the
+ * wider {@link DEEP_HYBRID_SPACE}. `standard` refuses instead, for {@link seedsFor}'s reason.
+ */
+export function extendedSpaceOf(tier: FuzzTier, cases: number | undefined): FuzzSpace {
+  if (tier !== 'hybrid' || cases === undefined || cases <= HYBRID_CORPUS.length) return spaceOf(tier);
+  return DEEP_HYBRID_SPACE;
 }
 
 /** The deep tier's default case count, and how many the standard tier has pinned. */
@@ -103,6 +127,16 @@ const DEFAULT_DEEP_CASES = 250;
  */
 export function seedsFor(tier: FuzzTier, cases: number | undefined, from: number): readonly number[] {
   if (tier === 'deep') return deepSeeds(cases ?? DEFAULT_DEEP_CASES, from);
+  if (tier === 'hybrid') {
+    // The pinned family, and a contiguous range beyond it rather than a refusal: the hybrid corpus
+    // is a regression suite *and* the only entry point to the landing axis, so asking for more of it
+    // has to mean something. Past the pinned 48 the seeds continue from a disjoint block in the
+    // wider space, which {@link extendedSpaceOf} selects — so `--cases 48` is the pinned suite and
+    // `--cases 250` is a campaign, and neither is a pinned corpus with strangers appended to it.
+    if (cases === undefined || cases === HYBRID_CORPUS.length) return HYBRID_CORPUS;
+    if (cases < HYBRID_CORPUS.length) return HYBRID_CORPUS.slice(0, cases);
+    return deepHybridSeeds(cases);
+  }
   if (cases === undefined) return STANDARD_CORPUS;
   if (cases > STANDARD_CORPUS.length) {
     throw new UsageError(
@@ -125,7 +159,8 @@ export const FUZZ_FLAGS: readonly FlagSpec[] = [
     name: 'tier',
     kind: 'string',
     placeholder: '<id>',
-    summary: 'standard is the pinned always-on corpus; deep generates a wider space',
+    summary:
+      'standard is the pinned always-on corpus; deep generates a wider space; hybrid draws per-landing hall fixtures',
     choices: [...FUZZ_TIERS],
     defaultValue: 'standard',
   },
@@ -173,7 +208,10 @@ export const FUZZ_FLAGS: readonly FlagSpec[] = [
 
 export const FUZZ_HELP: CommandHelp = {
   name: 'fuzz',
-  usage: `${BINARY} fuzz [--tier standard|deep] [--cases <n>] [--from <n>]`,
+  // Derived from FUZZ_TIERS rather than spelled out: this line was written `standard|deep` and
+  // went stale the moment a third tier landed, which is the shape of staleness a one-line
+  // derivation removes for good (GitHub issue #534).
+  usage: `${BINARY} fuzz [--tier ${FUZZ_TIERS.join('|')}] [--cases <n>] [--from <n>]`,
   summary: 'generate random buildings and check the six run properties on every one',
   description: [
     'Randomized buildings, not just randomized seeds. Every case is generated through the real ' +
@@ -227,7 +265,10 @@ export function runFuzz(out: Output, config: LoadedConfig, parsed: ParsedArgs): 
 
   const cases = tier === 'deep' ? (requested ?? deepCampaignSize()) : requested;
   const seeds = seedsFor(tier, cases, from);
-  const space = spaceOf(tier);
+  // The space a seed is decoded against has to be the one the seeds came from: past the hybrid
+  // family's pinned 48 the seeds are a campaign in the wider space, and reporting the narrow one
+  // would print a plan the run did not follow.
+  const space = extendedSpaceOf(tier, cases);
 
   /* ---- the plan, printed before anything runs ---------------------------- */
 
@@ -530,18 +571,28 @@ export function violationsByProperty(
 }
 
 function tierNote(tier: FuzzTier): string {
-  return tier === 'deep'
-    ? '— the opt-in space: 40 floors, 6 cars a bank, 30-minute horizons, demand past capacity'
-    : '— the pinned always-on corpus, a regression suite rather than a search';
+  if (tier === 'deep') {
+    return '— the opt-in space: 40 floors, 6 cars a bank, 30-minute horizons, demand past capacity';
+  }
+  if (tier === 'hybrid') {
+    return '— the landing-fixture family: buildings whose floors carry their own hall fixtures, so some landings name a car and some do not (DECISIONS.md § D553)';
+  }
+  return '— the pinned always-on corpus, a regression suite rather than a search';
 }
 
 function seedNote(tier: FuzzTier, seeds: readonly number[], from: number): string {
   if (tier === 'deep') {
     return `seeds ${String(from)}…${String(from + seeds.length - 1)}`;
   }
-  return seeds.length === STANDARD_CORPUS.length
+  const pinned = tier === 'hybrid' ? HYBRID_CORPUS : STANDARD_CORPUS;
+  const first = seeds[0];
+  const last = seeds[seeds.length - 1];
+  if (tier === 'hybrid' && seeds.length > pinned.length && first !== undefined && last !== undefined) {
+    return `seeds ${String(first)}…${String(last)}, past the pinned family and in the wider space`;
+  }
+  return seeds.length === pinned.length
     ? 'the whole pinned corpus'
-    : `the first ${String(seeds.length)} of ${String(STANDARD_CORPUS.length)} pinned seeds`;
+    : `the first ${String(seeds.length)} of ${String(pinned.length)} pinned seeds`;
 }
 
 /** A multi-line block, indented so it reads as part of the report rather than as raw output. */
