@@ -1990,7 +1990,34 @@ type DecisionReservation = {
  * holes from the earlier #540 collision. The integrator sets this back to `null` and moves
  * `CHARTER_PROGRAMME.md`'s row to **D622** on this commit.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/*
+ * **The wave of 2026-09-16 reserves D623–D644, and it is opened by a lane rather than at dispatch.**
+ *
+ * The floor is `CHARTER_PROGRAMME.md`'s own row, which wave AC closed at **D623**, so the
+ * reservation is *what that row already said was free* and the row does not move while the wave is
+ * open — which is the state the guard below is written for. The ceiling is the highest number the
+ * wave's dispatch briefs allocated.
+ *
+ * **Two lane blocks inside it, deliberately disjoint, and a gap under both:**
+ *
+ * - **D630–D639** — GitHub issue #429, shaft and area pricing.
+ * - **D640–D644** — GitHub issue #372, the `rush-prefit` chime sink ([§ D640](../../../../DECISIONS.md)).
+ * - **D623–D629** were allocated to nobody. They are *free*, not holes, until something above them
+ *   is written and this reservation closes; § D404 is what decides which they become then, and the
+ *   integrator decides it, because only the merged tree says what was written.
+ *
+ * **Opened by the #372 lane, which held the upper block.** The precedent is wave AB's, where every
+ * one of four lanes opened the reservation itself from its own brief: a lane that writes a number
+ * above the row turns the guard red until one of them does, and the alternative — each lane moving
+ * the row to its own `highest + 1` — is how two lanes come to claim the same next-free number. A
+ * sibling lane opening it identically is a one-line conflict with an obvious resolution; a sibling
+ * lane opening it *differently* is the integrator's signal that the two briefs disagree, which is
+ * worth more than either lane guessing.
+ *
+ * The integrator sets this back to `null` and reconciles the charter row to the merged tree's
+ * `highest + 1` on the same commit, which is the remedy the guard below names in terms.
+ */
+const OPEN_RESERVATION = { wave: '2026-09-16', from: 623, to: 644 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
