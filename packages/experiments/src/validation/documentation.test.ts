@@ -1981,7 +1981,27 @@ type DecisionReservation = {
  * time, now with a full house rather than two of five, and it is the argument for the block being
  * opened before the lanes start rather than a preference for tidiness.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/**
+ * **This wave is open on D619–D620, opened by the TWIN lane (GitHub issue #412) from its branch.**
+ *
+ * Opened here rather than left to the integrator on the precedent the paragraph above records in
+ * terms: *"Every one of the four lanes opened this reservation itself before the integrator's block
+ * reached it, and all four were right to."* This lane branched from `5a52354`, where this constant
+ * was `null` and the charter row read **D619**, so the first number it wrote turned the charter-row
+ * gate red on the ceiling rather than on anything the lane had done — the same position all four of
+ * wave AB's lanes were in.
+ *
+ * **The block is stated as D619–D620 because that is what the charter row supports, not because
+ * this lane knows the wave's shape.** That row names D619 and D620 as free (the previous wave's
+ * block was D594–D620 and its tail went unspent). This lane holds **D620** from its own dispatch
+ * brief and spent exactly it, on § D620. **D619 is therefore not this lane's to register as a hole
+ * and is not registered as one**: it is at or above the floor, so the gap case reads it as *not
+ * merged yet* rather than as *nobody wrote it*, which is the honest reading from a branch that
+ * cannot see its siblings. If no lane in this wave writes D619, closing the reservation is what
+ * forces the integrator to account for it — which is the accountability this mechanism exists for
+ * and is not something a branch can discharge.
+ */
+const OPEN_RESERVATION = { wave: 'AC', from: 619, to: 620 } as DecisionReservation | null;
 /*
  * **Wave AB opened this as `{ wave: 'AB', from: 594, to: 600 }` and lane A closed it, having spent
  * every number in it.** The dispatch brief allocated lane A **D594–D600** and no others; wave AA's

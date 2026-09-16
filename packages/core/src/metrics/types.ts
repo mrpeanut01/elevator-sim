@@ -528,6 +528,58 @@ export const DEFAULT_ENERGY_CONVENTION: EnergyConvention = Object.freeze({
  * a move that straddles the window boundary is charged whole to one side, exactly as a leg is
  * assigned whole to the window its arrival falls in.
  */
+/**
+ * **One completed car move, with enough of it to reconstruct where the car was at any instant**
+ * — `docs/11` § 3.4(a) and § 8 row 9, GitHub issue #412, `DECISIONS.md` § D620.
+ *
+ * ## The gap this closes, and the one it does not
+ *
+ * `docs/11` § 0 row 9 records, as a verified code fact, that **no run record carries a
+ * car-position series** — and § 3.4 turns that from a note into a *dependency*: the honest form
+ * of the TWIN separation property (P7) reconstructs both cars' analytic positions and finds the
+ * minimum of `height(upper,t) − height(lower,t)` over each overlapping interval, which is
+ * tractable precisely because `Car.positionAt` is analytic. The cheap alternative — assert the
+ * movement gate's own counter is zero — *"cannot see a breach that arises from two independently
+ * legal moves, which is the only interesting kind"*.
+ *
+ * This is that series, in the smallest form that supports the reconstruction: the two heights and
+ * the two instants bound the run, and the profile between them is `buildProfile(distance,
+ * constraints)` — deterministic given the car, so it is recomputed rather than stored. There is
+ * no need for a sample per tick and this deliberately is not one.
+ *
+ * **It also unblocks an unrelated oracle gap**: `docs/07` § 5 records a bank as unmeasurable
+ * because *"the fix is a car-position series, which no run record carries"*. Two consumers wanted
+ * it; that is the argument `docs/11` OQ-8 gives for doing it once.
+ *
+ * ## Why it is opt-in, and why that is not timidity
+ *
+ * A position series is a **cost** as much as a capability: it multiplies what every run holds,
+ * and this repository pins hundreds of published intervals against recorded runs. So it is
+ * written only when `SimulationConfig.recordCarMoves` asks for it, the field is **absent**
+ * otherwise, and every shipped run serialises byte-identically to one written before this type
+ * existed. A reader who finds it missing has found a run that did not ask, never a run whose cars
+ * did not move — the distinction `travelSamples` is careful about for the same reason.
+ */
+export interface CarMoveRecord {
+  readonly carId: string;
+  readonly bankId: string;
+  /** The hoistway this car is in — the field that makes a TWIN pair identifiable in a record. */
+  readonly shaftId: string;
+  readonly fromFloorId: string;
+  readonly toFloorId: string;
+  /** Height above datum the move started from, metres. */
+  readonly fromHeightM: number;
+  /** Height above datum the move ended at, metres. */
+  readonly toHeightM: number;
+  /** When the move was commanded. */
+  readonly commandedAt: SimTime;
+  /** `commandedAt + motorStartDelayS`: when the motion profile's `t = 0` is. */
+  readonly startedAt: SimTime;
+  /** `startedAt + profile.duration + levelingSettleS`: when the car is levelled. */
+  readonly arrivesAt: SimTime;
+  readonly direction: Direction;
+}
+
 export interface TravelSample {
   readonly at: SimTime;
   readonly carId: string;
@@ -1024,6 +1076,16 @@ export interface RunRecord {
    * stage 7's repositioning spends energy on — the one stage an energy axis exists to price.
    */
   readonly travelSamples?: readonly TravelSample[] | undefined;
+  /**
+   * **Every completed car move, when the run asked for them** — see {@link CarMoveRecord}, which
+   * carries the whole argument.
+   *
+   * Absent unless `SimulationConfig.recordCarMoves` is set, so every shipped run and every pinned
+   * record is byte-identical to one written before this field existed. Absent means *nobody
+   * asked*, never *the cars did not move* — `travelSamples` above draws the same distinction for
+   * the same reason.
+   */
+  readonly carMoves?: readonly CarMoveRecord[] | undefined;
   /** Free-form provenance: weight vector id, sweep coordinates, anything Phase 3 wants back. */
   readonly metadata?: Readonly<Record<string, string | number | boolean>> | undefined;
 }

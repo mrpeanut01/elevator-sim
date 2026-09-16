@@ -59,6 +59,7 @@ import {
   type QueueSample,
   type ReportWindow,
   type TravelReading,
+  type CarMoveRecord,
   type TravelSample,
   outOfBalanceWorkJ,
   ropeInertiaWorkJ,
@@ -259,6 +260,13 @@ export class MetricsRecorder {
   readonly #loadSamples: LoadSample[] = [];
   readonly #queueSamples: QueueSample[] = [];
   readonly #travelSamples: TravelSample[] = [];
+  /**
+   * Completed car moves, **only when a caller records them** — see {@link CarMoveRecord}.
+   *
+   * Nothing calls {@link recordCarMove} unless `SimulationConfig.recordCarMoves` asked for it, so
+   * this stays empty on every shipped run and the field is omitted from the record entirely.
+   */
+  readonly #carMoves: CarMoveRecord[] = [];
 
   #lastEventAt: SimTime;
   #boardedCount = 0;
@@ -774,6 +782,23 @@ export class MetricsRecorder {
    * the target is the current floor), so one arriving here is a bug worth failing on rather
    * than a free sample that dilutes the mean.
    */
+  /**
+   * **Record one completed car move** — `docs/11` § 3.4(a) and § 8 row 9, GitHub issue #412.
+   *
+   * Called from `sim/simulation.ts`'s arrival handler, beside {@link sampleTravel} and for the
+   * same structural reason: that handler is the only place in the shipped path where a completed
+   * move is observable, because `completeArrival` clears the motion. Called **only** when the run
+   * asked for the series, so a run that did not ask writes nothing and its record omits the field.
+   *
+   * Unvalidated beyond what the type says, unlike {@link sampleTravel} — this is a transcription
+   * of a `CarMotion` the kernel has just completed rather than a derived energy quantity, and
+   * there is no arithmetic here for a guard to protect.
+   */
+  recordCarMove(move: CarMoveRecord): void {
+    this.#assertOpen('recordCarMove');
+    this.#carMoves.push(Object.freeze({ ...move }));
+  }
+
   sampleTravel(
     at: SimTime,
     carId: string,
@@ -979,6 +1004,10 @@ export class MetricsRecorder {
       ...(this.#travelSamples.length === 0
         ? {}
         : { travelSamples: Object.freeze([...this.#travelSamples]) }),
+      // Omitted rather than empty for `travelSamples`' reason, one step stronger: nothing writes
+      // here unless the run asked for the series, so an absent field says *nobody asked* and a
+      // present empty one could only ever say *asked, and no car moved*.
+      ...(this.#carMoves.length === 0 ? {} : { carMoves: Object.freeze([...this.#carMoves]) }),
       ...(this.#metadata === undefined ? {} : { metadata: Object.freeze({ ...this.#metadata }) }),
     });
   }

@@ -170,6 +170,33 @@ export const travelSampleSchema = z.strictObject({
   workJ: z.number().min(0),
 });
 
+/**
+ * One completed car move — `RunRecord.carMoves`, `docs/11` § 3.4(a), GitHub issue #412.
+ *
+ * Optional on the record in both directions, on `travelSamples`' precedent and for a stronger
+ * version of its reason: nothing writes these unless a run asked for them, so a record written by
+ * any shipped path has no such key and parses exactly as it did before this field existed.
+ *
+ * `distanceM` is deliberately **not** a field. The two heights carry it, and a third number that
+ * had to agree with them would be a second authority on how far a car went — which is the shape of
+ * defect this repository keeps recording. The motion profile is likewise recomputed rather than
+ * stored: it is `buildProfile(toHeightM − fromHeightM, constraints)` and therefore a function of
+ * data the record already holds.
+ */
+export const carMoveRecordSchema = z.strictObject({
+  carId: identifier,
+  bankId: identifier,
+  shaftId: identifier,
+  fromFloorId: identifier,
+  toFloorId: identifier,
+  fromHeightM: z.number(),
+  toHeightM: z.number(),
+  commandedAt: simTime,
+  startedAt: simTime,
+  arrivesAt: simTime,
+  direction: z.enum(DIRECTIONS),
+});
+
 export const queueSampleSchema = z.strictObject({
   at: simTime,
   waiting: z.number().min(0),
@@ -209,6 +236,9 @@ export const runRecordSchema = z.strictObject({
   // unchanged, and a record written by a run that sampled travel round-trips it. Absence means
   // *not measured*, which `summarizeRun` reports rather than zeroing.
   travelSamples: z.array(travelSampleSchema).optional(),
+  // Absent unless the run asked for the series (`SimulationConfig.recordCarMoves`), so every
+  // record this project has ever written parses byte-identically. See `carMoveRecordSchema`.
+  carMoves: z.array(carMoveRecordSchema).optional(),
   metadata: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
 });
 

@@ -1620,7 +1620,50 @@ export interface BankConfig extends Commented {
    * (`elevator-specs.json#ropeClasses`), which is invariant 7.
    */
   readonly ropeClass?: string | undefined;
+  /**
+   * **Which cars share a hoistway** — `docs/11` § 1.2, GitHub issue #412, `DECISIONS.md` § D620.
+   *
+   * **Absent means today's meaning exactly: one shaft per car, no separation**, which is every
+   * shipped building and every run this project has ever measured. Declaring the block is how a
+   * building says two of its cars are TWIN — two independently driven cars on one set of guide
+   * rails, which is a different mechanism from a double-deck car (one body, two decks, one
+   * drive, and a coupling that cannot be violated because it is steel).
+   *
+   * When present it must partition the bank's cars: every car in exactly one shaft, no car
+   * named twice, no car left out. `parse.ts` checks that and refuses the building otherwise,
+   * because a car in no shaft is a car with no hoistway and a car in two is a car in two places.
+   */
+  readonly shafts?: readonly ShaftConfig[] | undefined;
   readonly cars: readonly CarConfig[];
+}
+
+/**
+ * One hoistway of a bank: which cars are in it, and — for two — how far apart they must stay.
+ *
+ * `carIds` is **ordered lower-first** and the order is a physical fact rather than an
+ * observation: C-ORDER (`docs/11` § 2.1) forbids two cars in one shaft from swapping, so the
+ * order is declared once and never re-derived from positions. Two entries at most; three cars in
+ * one shaft is a separate system with a collision-avoidance argument nobody has written
+ * (`docs/11` OQ-9 — **out**, and `CarShaft.carIds` being a tuple is what enforces it).
+ *
+ * The three separation figures are **hardware**, not strategy: they describe a brake and a
+ * clearance, so they are declared here and not as dispatcher weights (CLAUDE.md invariant 7
+ * puts *strategy* in `data/dispatcher-profiles.json`). Their type, range and default are
+ * declared in `config/schema.ts#BANK_SHAFT_TUNABLES` (invariant 8).
+ */
+export interface ShaftConfig {
+  readonly id: string;
+  readonly carIds: readonly string[];
+  /** Two cars levelled and standing, floor to floor, metres. Required for a two-car shaft. */
+  readonly standingClearanceM?: number | undefined;
+  /** Padding on the computed braking distance, metres. Defaults to `0`. */
+  readonly bufferM?: number | undefined;
+  /**
+   * The safety gear's deceleration, m/s² — **not** the comfort deceleration, which describes
+   * the ride a passenger gets. Must be at least the harshest comfort deceleration of either car
+   * in the shaft, or the separation check stops being exact and `parse.ts` refuses the building.
+   */
+  readonly emergencyDecelerationMps2?: number | undefined;
 }
 
 /**
@@ -2099,7 +2142,42 @@ export interface ResolvedBank {
    * § D583, so every shipped bank is byte-identical.
    */
   readonly ropeMassKg?: number | undefined;
+  /**
+   * **This bank's hoistways, always populated** — `docs/11` § 1.2, GitHub issue #412.
+   *
+   * A bank whose config declares no `shafts` block resolves to one single-car shaft per car, so
+   * the runtime has **one** representation of a hoistway and the *absence* of the block is
+   * handled by the loader rather than by every consumer. That is the doc's own rule, and it is
+   * why `model/car/types.ts#shaftsForBank` has no "if undefined" branch reaching the geometry:
+   * the only place absence is read is where the default layout is built.
+   *
+   * Never empty. A bank with cars has at least one hoistway to put them in.
+   */
+  readonly shafts: readonly ResolvedShaft[];
   readonly cars: readonly ResolvedCar[];
+}
+
+/**
+ * One resolved hoistway: identity, occupancy, and — on a TWIN shaft — the separation contract
+ * with every default filled in.
+ *
+ * `separation` is **absent on a single-car shaft** and that absence is structural rather than a
+ * flag: there is no second car for a constraint to hold between, so every helper over it
+ * short-circuits and a building with no TWIN shaft runs bit-identically to the same building
+ * before TWIN existed.
+ */
+export interface ResolvedShaft {
+  readonly id: string;
+  /** Lower car first. One or two. */
+  readonly carIds: readonly string[];
+  readonly separation?: ResolvedShaftSeparation | undefined;
+}
+
+/** A TWIN shaft's separation figures, defaults applied. See `model/car/separation.ts`. */
+export interface ResolvedShaftSeparation {
+  readonly standingClearanceM: number;
+  readonly bufferM: number;
+  readonly emergencyDecelerationMps2: number;
 }
 
 /**

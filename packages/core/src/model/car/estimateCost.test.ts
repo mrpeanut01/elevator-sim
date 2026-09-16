@@ -327,6 +327,33 @@ describe('ROADMAP ACCEPTANCE: estimateCost() is pure', () => {
     expect(source).not.toMatch(/Math\.random/);
     expect(source).not.toMatch(/Date\.now|performance\.now|setTimeout/);
   });
+
+  /**
+   * **The guard above reads one file, and `estimateCost.ts` now imports a second** —
+   * `separation.ts`, for the TWIN feasibility filter (`docs/11` § 4.3, GitHub issue #412).
+   *
+   * A source-level guard over one module is only as good as that module's import list, and a
+   * module it imports is a hole in it: an `Rng` reached through `separation.ts` would be an `Rng`
+   * `estimateCost` can reach, and the check above would still be green. `docs/11` § 4.2 asks for
+   * exactly this — *"the three existing `estimateCost` purity guards … apply unchanged and must be
+   * asserted to still apply"* — so the same guard is applied to the module that joined the graph.
+   *
+   * It also asserts `separation.ts` imports nothing but `ModelError`, which is what keeps this
+   * check a statement about a leaf rather than about a graph somebody has to walk.
+   */
+  it('reaches no random number through the separation module either', async () => {
+    const source = await readModuleSource('separation.ts');
+
+    expect(source).not.toMatch(/from '.*random/);
+    expect(source).not.toMatch(/from '\.\/car\.js'/);
+    expect(source).not.toMatch(/Math\.random/);
+    expect(source).not.toMatch(/Date\.now|performance\.now|setTimeout/);
+
+    // A leaf: one import, and it is an error class. Anything else here would make the assertions
+    // above a claim about this file rather than about everything `estimateCost` can reach.
+    const imports = [...source.matchAll(/^import .*? from '(.*?)';$/gmu)].map((m) => m[1]);
+    expect(imports).toEqual(['../types.js']);
+  });
 });
 
 /* -------------------------------------------------------------------------- *
