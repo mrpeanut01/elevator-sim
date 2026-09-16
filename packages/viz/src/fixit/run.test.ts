@@ -42,9 +42,16 @@ import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
 import { recordRun, type RecordedRun } from '../record/recordRun.js';
 
+import type { FloorConfig, ResolvedBank, ResolvedBuilding } from '@elevator-sim/core';
+
 import { emptyFixitState, toggleRepair } from './engine.js';
 import { fixitContextOf, parseFixitCases } from './parse.js';
-import { fixitRunPlanOf, type FixitResources } from './run.js';
+import {
+  fixitRunPlanOf,
+  topFloorRaiseCeilingOf,
+  TOP_FLOOR_RAISE_MAX_M,
+  type FixitResources,
+} from './run.js';
 import type { FixitCase, FixitState } from './types.js';
 
 const TIMEOUT_MS = 300_000;
@@ -156,5 +163,77 @@ describe('a fixit case’s runs survive being posted to a worker', () => {
     expect(structuredClone(asBuilt.building.floorsById).size).toBe(
       asBuilt.building.floorsById.size,
     );
+  });
+});
+
+/**
+ * **The elevation control's ceiling, on the two shapes no shipped building takes** — GitHub issue
+ * #422. Every one of the eighteen fixit-case buildings offers the control (measured: every shipped
+ * building's topmost floor is served by some bank and is not one half of a double-deck pair — see
+ * `cases.test.ts`'s own sweep), so `topFloorRaiseCeilingOf`'s two zero branches have no shipped case
+ * to exercise them. Driven here against minimal synthetic buildings instead, `zoneOverlapCeilingOf`'s
+ * ceiling logic having no such gap because eight of the eighteen shipped cases are single-bank.
+ */
+describe('the elevation control refuses where the topmost floor cannot take it', () => {
+  const floor = (id: string, index: number, heightM: number): FloorConfig =>
+    ({ id, index, heightM, population: 0 }) as FloorConfig;
+
+  /**
+   * `topFloorIdOf` reads `building.config.floors` — the authored document `resolveBuilding` carries
+   * on its own resolution — to tell an explicit floor from one only a `floorRanges` entry declares
+   * (`topFloorIdOf`'s own docstring). These fixtures declare every floor explicitly by default, and
+   * the one test that does not is the point of {@link explicitFloorIds}.
+   */
+  const buildingOf = (
+    floors: readonly FloorConfig[],
+    banks: readonly Partial<ResolvedBank>[],
+    explicitFloorIds: readonly string[] = floors.map((f) => f.id),
+  ): ResolvedBuilding =>
+    ({
+      floors,
+      banks: banks as unknown as readonly ResolvedBank[],
+      config: { floors: floors.filter((f) => explicitFloorIds.includes(f.id)) },
+    }) as unknown as ResolvedBuilding;
+
+  it('is the max metres where the topmost floor is served and unpaired', () => {
+    const building = buildingOf(
+      [floor('G', 0, 0), floor('2', 1, 4), floor('3', 2, 8)],
+      [{ id: 'main', servesFloors: ['G', '2', '3'], cars: [] }],
+    );
+    expect(topFloorRaiseCeilingOf(building)).toBe(TOP_FLOOR_RAISE_MAX_M);
+  });
+
+  it('is 0 where no bank serves the topmost floor', () => {
+    const building = buildingOf(
+      [floor('G', 0, 0), floor('2', 1, 4), floor('3', 2, 8)],
+      [{ id: 'main', servesFloors: ['G', '2'], cars: [] }],
+    );
+    expect(topFloorRaiseCeilingOf(building)).toBe(0);
+  });
+
+  it('is 0 where the topmost floor is one half of a double-deck pair', () => {
+    const building = buildingOf(
+      [floor('G', 0, 0), floor('2', 1, 4), floor('3', 2, 8)],
+      [{ id: 'main', servesFloors: ['G', '2', '3'], servesFloorPairs: [['2', '3']], cars: [] }],
+    );
+    expect(topFloorRaiseCeilingOf(building)).toBe(0);
+  });
+
+  /**
+   * `vertical-city` and `mixed-use-high-rise`'s own shape, measured in `cases.test.ts` — found by
+   * running the control rather than by reasoning about it, before this test existed to pin it.
+   */
+  it('is 0 where the topmost floor is declared only by a floorRanges entry', () => {
+    const building = buildingOf(
+      [floor('G', 0, 0), floor('2', 1, 4), floor('3', 2, 8)],
+      [{ id: 'main', servesFloors: ['G', '2', '3'], cars: [] }],
+      ['G', '2'],
+    );
+    expect(topFloorRaiseCeilingOf(building)).toBe(0);
+  });
+
+  it('is 0 for a building with no floors at all', () => {
+    const building = buildingOf([], []);
+    expect(topFloorRaiseCeilingOf(building)).toBe(0);
   });
 });

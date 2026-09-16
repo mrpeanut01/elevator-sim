@@ -192,6 +192,8 @@ export const CONTROL_KEYS = [
   'fixit-zones',
   /** The idle-parking select — § 10.3's parking, issue #422. */
   'fixit-parking',
+  /** The top-floor-raise stepper — § 10.3's elevation control, issue #422. */
+  'fixit-elevation',
 ] as const;
 export type TelemetryControlKey = (typeof CONTROL_KEYS)[number];
 

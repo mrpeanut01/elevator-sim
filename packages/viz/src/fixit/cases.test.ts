@@ -82,6 +82,7 @@ import {
   emptyFixitState,
   spendOf,
   stepSpeed,
+  stepTopFloorRaise,
   stepZoneOverlap,
   toggleRepair,
   selectionKeepsTheCrowd,
@@ -94,6 +95,8 @@ import {
   measuredOf,
   assertPairMatchesRepairs,
   standingParkingOf,
+  topFloorRaiseCeilingOf,
+  TOP_FLOOR_RAISE_MAX_M,
   zoneOverlapCeilingOf,
   ZONE_OVERLAP_MAX,
   type FixitResources,
@@ -903,6 +906,115 @@ describe('the editor machinery is live where it is priced', () => {
       expect(after.zoneOverlapFloors, 'the reducer took a rezone the budget refuses').toBe(0);
 
       /* And the run that produces is the speed step's alone — no boundary moved behind the refusal. */
+      expect(legsKey(recordRun(fixitRunPlanOf(entry, after, resources).asRepaired, FIXIT_RUN_SWITCHES))).toBe(
+        legsKey(recordRun(fixitRunPlanOf(entry, spent, resources).asRepaired, FIXIT_RUN_SWITCHES)),
+      );
+    },
+    SUITE_TIMEOUT,
+  );
+
+  /**
+   * § 10.3's elevation control — GitHub issue **#422**, the same § D219 bar zoning and parking are
+   * held to. `zoning-starves-the-top` again: raising the topmost floor lengthens every trip that
+   * touches it, on a building where the complaint is already about who reaches the top.
+   *
+   * **Every rung, not just the first** — `zoneOverlapCeilingOf`'s own reason, pointed at
+   * `topFloorRaiseCeilingOf`.
+   */
+  it(
+    'each metre the top floor is raised moves the legs, all the way to the building ceiling',
+    () => {
+      const entry = caseOf('zoning-starves-the-top');
+      const asBuilt = fixitRunPlanOf(entry, emptyFixitState(), resources).asBuilt;
+      const ceiling = topFloorRaiseCeilingOf(asBuilt.building);
+      expect(ceiling, 'this case must offer the control at all').toBeGreaterThan(0);
+
+      const base = legsKey(recordRun(asBuilt, FIXIT_RUN_SWITCHES));
+      const seen = new Set<string>([base]);
+      for (let metres = 1; metres <= ceiling; metres += 1) {
+        const after = legsKey(
+          recordRun(
+            fixitRunPlanOf(entry, { ...emptyFixitState(), topFloorRaiseM: metres }, resources)
+              .asRepaired,
+            FIXIT_RUN_SWITCHES,
+          ),
+        );
+        expect(after, `the elevation stepper moved no leg at +${String(metres)} m`).not.toBe(base);
+        expect(seen.has(after), `+${String(metres)} m redrew the run its predecessor already did`).toBe(
+          false,
+        );
+        seen.add(after);
+      }
+    },
+    SUITE_TIMEOUT,
+  );
+
+  /**
+   * **The ceiling is measured against the fabric, not asserted** — `zoneOverlapCeilingOf`'s own
+   * pair, pointed at the topmost floor. Both halves matter and each is the other's control:
+   *
+   * - where `topFloorRaiseCeilingOf` reports 0, a maximum step must leave the run
+   *   **byte-identical** — which is what says the refusal is for a real reason rather than a
+   *   screen's guess;
+   * - where it reports more than 0, the same step must move the legs.
+   *
+   * **The split is not the one zoning has, and it was found by running this rather than by
+   * reasoning about it.** Fourteen cases fall on one side and four on the other — `vertical-city`
+   * and `mixed-use-high-rise` (`sleeping-sky-lobby`, `every-deck-calls-itself-full`,
+   * `cars-that-always-go-home`, `controller-sends-every-car`) refuse, because both buildings declare
+   * their topmost level as a compact `floorRanges` entry rather than an explicit `FloorConfig`
+   * (`topFloorIdOf`'s docstring). `run.test.ts#the elevation control refuses...` proves the same
+   * ceiling's zero branches on synthetic buildings for the other two grounds — unserved, and a
+   * double-deck pair — since no shipped building reaches either of those.
+   */
+  it(
+    'binds exactly where the ceiling says it can, over every shipped case',
+    () => {
+      let bound = 0;
+      let refused = 0;
+      for (const entry of cases.cases) {
+        const asBuilt = fixitRunPlanOf(entry, emptyFixitState(), resources).asBuilt;
+        const ceiling = topFloorRaiseCeilingOf(asBuilt.building);
+        const stepped = fixitRunPlanOf(
+          entry,
+          { ...emptyFixitState(), topFloorRaiseM: Math.max(ceiling, TOP_FLOOR_RAISE_MAX_M) },
+          resources,
+        ).asRepaired;
+        const same = legsKey(recordRun(stepped, FIXIT_RUN_SWITCHES)) === legsKey(recordRun(asBuilt, FIXIT_RUN_SWITCHES));
+        if (ceiling === 0) {
+          expect(same, `"${entry.id}" reports no elevation ceiling and yet the raise moved its run`).toBe(true);
+          refused += 1;
+        } else {
+          expect(same, `"${entry.id}" reports a ceiling of ${String(ceiling)} m and moved no leg`).toBe(false);
+          bound += 1;
+        }
+      }
+      /* Non-vacuity: this assertion is worthless if every case landed on one side. */
+      expect(bound, 'no shipped case can take an elevation step').toBeGreaterThan(0);
+      expect(refused, 'no shipped case refuses one, so the refusing arm proved nothing').toBeGreaterThan(0);
+    },
+    SUITE_TIMEOUT,
+  );
+
+  /**
+   * The refusing arm, § D219's other half and `pricing/tiersReachTheRun.test.ts`'s shape: a control
+   * the budget cannot afford must leave the run **exactly** as built.
+   */
+  it(
+    'a raise the budget cannot take leaves the run alone',
+    () => {
+      const entry = caseOf('zoning-starves-the-top');
+      const schedule = shippedPriceSchedule();
+      /* 12 u of budget, one 10 u speed step taken: the 10 u raise no longer fits. */
+      const spent = stepSpeed(entry, emptyFixitState(), 1, schedule);
+      expect(spent.speedSteps).toBe(1);
+      const ceiling = topFloorRaiseCeilingOf(
+        fixitRunPlanOf(entry, emptyFixitState(), resources).asBuilt.building,
+      );
+      const after = stepTopFloorRaise(entry, spent, 1, ceiling, schedule);
+      expect(after.topFloorRaiseM, 'the reducer took a raise the budget refuses').toBe(0);
+
+      /* And the run that produces is the speed step's alone — no floor moved behind the refusal. */
       expect(legsKey(recordRun(fixitRunPlanOf(entry, after, resources).asRepaired, FIXIT_RUN_SWITCHES))).toBe(
         legsKey(recordRun(fixitRunPlanOf(entry, spent, resources).asRepaired, FIXIT_RUN_SWITCHES)),
       );

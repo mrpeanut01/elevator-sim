@@ -67,6 +67,8 @@ export function pathsIn(patch: RepairPatchShape): readonly string[] {
     if (arrayOf(building['addCars']) !== undefined) out.push('building.addCars[]');
     if (arrayOf(building['banks']) !== undefined) out.push('building.banks[]');
     if (arrayOf(building['floorPopulations']) !== undefined) out.push('building.floorPopulations[]');
+    // GitHub issue #422: the elevation control — the one field that moves a floor.
+    if (arrayOf(building['floors']) !== undefined) out.push('building.floors[]');
     for (const entry of arrayOf(building['cars']) ?? []) {
       const set = objectOf(objectOf(entry)?.['set']) ?? {};
       if ('dwellHallCallS' in set) out.push('building.cars[].set.dwellHallCallS');

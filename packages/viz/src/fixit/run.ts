@@ -135,6 +135,28 @@ function applyBuildingPatch(doc: MutableBuildingDocument, patch: NonNullable<Fix
      */
     doc.banks = structuredClone(patch.banks) as MutableBank[];
   }
+  /*
+   * **The elevation control — the one field that moves a floor** — GitHub issue #422. Written
+   * directly onto the cloned document's `heightM`, exactly as a car's `dwellCarCallS` is written
+   * above: the config must say what the building has. The strict-increasing-with-`index` rule, a
+   * double-deck pair's exact separation and a rope's hard travel ceiling are not re-checked here —
+   * `parseBuilding` + `resolveBuilding` re-validate the whole document below, the same door a
+   * shipped file enters by, so a move that breaks one of them is refused there rather than reaching
+   * a run.
+   */
+  for (const heightChange of patch.floors ?? []) {
+    for (const floorId of heightChange.floorIds) {
+      const floor = (doc.floors ?? []).find((candidate) => candidate.id === floorId);
+      if (floor === undefined) {
+        throw new Error(`fixit: a patch moves floor "${floorId}", which this building does not declare as a floor.`);
+      }
+      const currentHeightM = floor['heightM'];
+      if (typeof currentHeightM !== 'number') {
+        throw new Error(`fixit: floor "${floorId}" declares no heightM for an elevation delta to add to.`);
+      }
+      floor['heightM'] = currentHeightM + heightChange.heightDeltaM;
+    }
+  }
   for (const carPatch of patch.cars ?? []) {
     for (const car of carsOf(doc, carPatch.carIds)) {
       if (carPatch.set.ratedSpeedDeltaMps !== undefined) {
@@ -224,7 +246,8 @@ function applyDispatcherPatches(
 }
 
 /**
- * What the editor bought, as a patch — § 9's machinery step sizes and § 10.3's parking.
+ * What the editor bought, as a patch — § 9's machinery step sizes, § 10.3's parking, and § 10.3's
+ * elevation control.
  *
  * It is placed **last** in the patch list, so an editor control wins over a repair that set the
  * same field. That is the right way round: a repair is an offer the case authored and the editor is
@@ -232,22 +255,32 @@ function applyDispatcherPatches(
  *
  * Zoning is not here, and cannot be: `building.banks[]` is a *replacement* array, so widening a
  * range needs the banks the repairs left behind and the building's own floor order. It is applied
- * in {@link configOf} against the patched document instead — {@link applyZoneOverlap}.
+ * in {@link configOf} against the patched document instead — {@link applyZoneOverlap}. The
+ * elevation control needs no such thing — it names one floor by id and adds to it — so it travels as
+ * a real `FixitPatch.building.floors` entry, merged with the speed step's `cars` under one
+ * `building` key rather than losing one to the other under a naive spread.
+ *
+ * `topFloorId` is `undefined` for a building `fixitRunPlanOf` could not find (which `configOf`
+ * refuses on its own next line anyway) — the raise is silently dropped rather than thrown here, so
+ * the clearer error is the one `configOf` gives.
  */
-function editorPatchOf(state: FixitState): FixitPatch {
-  const speed =
-    state.speedSteps === 0
+function editorPatchOf(state: FixitState, topFloorId: string | undefined): FixitPatch {
+  const buildingPatch: NonNullable<FixitPatch['building']> = {
+    ...(state.speedSteps === 0
       ? {}
-      : {
-          building: {
-            cars: [{ carIds: ['*'], set: { ratedSpeedDeltaMps: 0.5 * state.speedSteps } }],
-          },
-        };
+      : { cars: [{ carIds: ['*'], set: { ratedSpeedDeltaMps: 0.5 * state.speedSteps } }] }),
+    ...(state.topFloorRaiseM <= 0 || topFloorId === undefined
+      ? {}
+      : { floors: [{ floorIds: [topFloorId], heightDeltaM: state.topFloorRaiseM }] }),
+  };
   const parking =
     state.parkingStrategy === null
       ? {}
       : { dispatcher: { idle: { parkingStrategy: state.parkingStrategy } } };
-  return { ...speed, ...parking };
+  return {
+    ...(Object.keys(buildingPatch).length === 0 ? {} : { building: buildingPatch }),
+    ...parking,
+  };
 }
 
 /* -------------------------------------------------------------------------- *
@@ -356,6 +389,72 @@ export function zoneOverlapCeilingOf(building: ResolvedBuilding): number {
   return ceiling;
 }
 
+/* -------------------------------------------------------------------------- *
+ * Section 10.3's elevation — issue #422
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The most the elevation control will raise the top floor by. Small next to any shipped bank's
+ * travel — every bank below `data/elevator-specs.json#airPressure.appliesAboveTravelM` (300 m)
+ * except `vertical-city`'s shuttle (307.5 m) and `burj-class-reference`'s (496.0 m), and every rope
+ * class's `maxSingleTravelM` in the hundreds — so it is a real, measurable move without being a
+ * quantity that would need its own bracketed derivation the way `rope-upgrade`'s did.
+ */
+export const TOP_FLOOR_RAISE_MAX_M = 5;
+
+/**
+ * The building's topmost floor id that the elevation control may actually name, or `undefined`
+ * where none qualifies.
+ *
+ * **Not simply `building.floors.at(-1)?.id`** — GitHub issue #422, found by a real building rather
+ * than reasoned about. `applyBuildingPatch` looks a floor up in the *authored document's* own
+ * `floors` array, and a tall building's topmost levels are routinely declared as a compact
+ * `floorRanges` entry rather than as explicit `FloorConfig`s (`config/expandFloors.ts` is the
+ * expansion, and it runs after a patch would need to have already found the floor). Two of the
+ * seven buildings `data/fixit-cases.json` runs — `vertical-city` and `mixed-use-high-rise` — declare
+ * their topmost floor exactly that way. So the topmost floor only qualifies when it is **also** one
+ * of `ResolvedBuilding.config`'s own explicit `floors` — the authored config carried on the
+ * resolution, `resolveBuilding`'s own "exactly as authored" copy — which is what
+ * `applyBuildingPatch` will actually find.
+ */
+export function topFloorIdOf(building: ResolvedBuilding): string | undefined {
+  const top = building.floors.at(-1);
+  if (top === undefined) return undefined;
+  const authoredExplicitly = (building.config.floors ?? []).some((floor) => floor.id === top.id);
+  return authoredExplicitly ? top.id : undefined;
+}
+
+/**
+ * **How far the elevation control can actually be stepped on this building, and 0 when it cannot
+ * be** — `zoneOverlapCeilingOf`'s own shape, pointed at the topmost floor.
+ *
+ * Three grounds, all about the *building* rather than about the budget, and all `0`:
+ *
+ * - **the topmost floor is a `floorRanges` level rather than an explicit one.** {@link topFloorIdOf}
+ *   says why; a control offered there would name a floor `applyBuildingPatch` cannot find.
+ * - **no bank serves the topmost floor.** A vanishingly unlikely shape on a shipped tower, but a
+ *   press that writes a field and changes no leg is § D219's defect wherever it could occur.
+ * - **the topmost floor is one half of a double-deck pair.** `BankConfig.servesFloorPairs` requires
+ *   each pair to sit exactly `deckSeparationM` apart; raising one deck's floor alone would move it
+ *   off that separation, which `parseBuilding` would refuse. Better to report `0` than to offer a
+ *   stepper that throws on its own first press.
+ *
+ * Otherwise {@link TOP_FLOOR_RAISE_MAX_M} — flat, unlike the zoning stepper's per-building ceiling,
+ * because every rung the control can reach moves a real riser: there is no "the boundary has already
+ * met its neighbour" case to stop early at.
+ */
+export function topFloorRaiseCeilingOf(building: ResolvedBuilding): number {
+  const topId = topFloorIdOf(building);
+  if (topId === undefined) return 0;
+  const servedByABank = building.banks.some((bank) => bank.servesFloors.includes(topId));
+  if (!servedByABank) return 0;
+  const partOfAPair = building.banks.some((bank) =>
+    (bank.servesFloorPairs ?? []).some((pair) => pair.includes(topId)),
+  );
+  if (partOfAPair) return 0;
+  return TOP_FLOOR_RAISE_MAX_M;
+}
+
 /**
  * **Where this case's idle cars already wait** — what `FixitState.parkingStrategy: null` means, read
  * off the run rather than guessed.
@@ -457,11 +556,20 @@ export function fixitRunPlanOf(
   const repairPatches = entry.repairs
     .filter((repair) => state.selectedRepairIds.includes(repair.id))
     .map((repair) => repair.patch);
+  /*
+   * The elevation control needs the topmost floor's id before `configOf` has built anything — it
+   * travels as a real patch entry, unlike zoning, which is applied against the patched document
+   * `configOf` builds. Looked up here rather than passed down from a caller that already resolved
+   * it, on the same ground `configOf`'s own `authored` lookup rests on: the case names its building
+   * and the resources carry it, or `configOf` refuses below anyway.
+   */
+  const authored = resources.entries.find((candidate) => candidate.resolved.id === entry.buildingId);
+  const topFloorId = authored === undefined ? undefined : topFloorIdOf(authored.resolved);
   return {
     asBuilt: configOf(entry, [entry.asBuilt.patch], NO_EDITOR, resources),
     asRepaired: configOf(
       entry,
-      [entry.asBuilt.patch, ...repairPatches, editorPatchOf(state)],
+      [entry.asBuilt.patch, ...repairPatches, editorPatchOf(state, topFloorId)],
       { capacitySteps: state.capacitySteps, zoneOverlapFloors: state.zoneOverlapFloors },
       resources,
     ),

@@ -51,7 +51,9 @@ import {
   spendOf,
   stepCapacity,
   stepSpeed,
+  stepTopFloorRaise,
   stepZoneOverlap,
+  topFloorRaisePriceUnits,
   zonePriceUnits,
   toggleExtra,
   toggleRepair,
@@ -64,6 +66,7 @@ import {
   fixitRunPlanOf,
   measuredOf,
   standingParkingOf,
+  topFloorRaiseCeilingOf,
   zoneOverlapCeilingOf,
 } from '../fixit/run.js';
 import { EDITOR_PARKING_STRATEGIES } from '../fixit/types.js';
@@ -398,6 +401,7 @@ function scheduleNow(): PriceSchedule {
         stepperRow(entry, session, 'capacity'),
         zoneRow(entry, session),
         parkingRow(entry, session),
+        elevationRow(entry, session),
         el(doc, 'p', {
           text: `${String(spend.totalUnits)} of ${String(entry.budgetUnits)} u committed, ${String(spend.machineryUnits)} u of it machinery — ${budgetNoteOf(entry, spend)}`,
           style: { color: MUTED },
@@ -577,14 +581,20 @@ function scheduleNow(): PriceSchedule {
    * second opinion this file holds about a run. Memoised because building that config parses and
    * resolves the whole tower, and `render()` runs on every press.
    */
-  const fabricByCase = new Map<string, { readonly ceiling: number; readonly standing: string }>();
-  function editorFabricOf(entry: FixitCase): { readonly ceiling: number; readonly standing: string } {
+  const fabricByCase = new Map<
+    string,
+    { readonly ceiling: number; readonly standing: string; readonly elevationCeiling: number }
+  >();
+  function editorFabricOf(
+    entry: FixitCase,
+  ): { readonly ceiling: number; readonly standing: string; readonly elevationCeiling: number } {
     const cached = fabricByCase.get(entry.id);
     if (cached !== undefined) return cached;
     const asBuilt = fixitRunPlanOf(entry, emptyFixitState(), host.resources).asBuilt;
     const fabric = {
       ceiling: zoneOverlapCeilingOf(asBuilt.building),
       standing: standingParkingOf(asBuilt),
+      elevationCeiling: topFloorRaiseCeilingOf(asBuilt.building),
     };
     fabricByCase.set(entry.id, fabric);
     return fabric;
@@ -687,6 +697,50 @@ function scheduleNow(): PriceSchedule {
             price === 0
               ? 'Where idle cars wait · no charge — telling a controller where to send an empty car costs nothing'
               : `Where idle cars wait · ${String(price)} u`,
+          style: { color: MUTED },
+        }),
+      ],
+    });
+  }
+
+  /**
+   * § 10.3's elevation control — GitHub issue **#422**. `zoneRow`'s own shape, pointed at the
+   * building's topmost floor: `null` where `topFloorRaiseCeilingOf` reports `0` (served by no bank,
+   * or one half of a double-deck pair), so a stepper that would write a field and move no leg is
+   * never drawn — a dev surface is not exempt from that either.
+   */
+  function elevationRow(entry: FixitCase, session: CaseSession): HTMLElement | null {
+    const { elevationCeiling: ceiling } = editorFabricOf(entry);
+    if (ceiling <= 0) return null;
+    const metres = session.state.topFloorRaiseM;
+    const price = topFloorRaisePriceUnits(scheduleNow());
+    const canBuy = affordabilityOf(entry, session.state, price, scheduleNow()).selectable;
+    const atCeiling = metres >= ceiling;
+    const atBudget = metres === 0 && !canBuy;
+    const minus = el(doc, 'button', { text: '−', style: buttonStyle(false) });
+    const plus = el(doc, 'button', { text: '+', style: buttonStyle(false) });
+    minus.disabled = metres === 0;
+    plus.disabled = atCeiling || atBudget;
+    if (atCeiling) plus.title = 'this is as far as a repair budget moves a floor';
+    else if (atBudget) plus.title = 'at the budget';
+    minus.addEventListener('click', () => {
+      session.state = stepTopFloorRaise(entry, session.state, -1, ceiling, scheduleNow());
+      render();
+    });
+    plus.addEventListener('click', () => {
+      session.state = stepTopFloorRaise(entry, session.state, 1, ceiling, scheduleNow());
+      render();
+    });
+    const suffix = atCeiling ? ' — as far as a repair budget goes' : atBudget ? ' — at the budget' : '';
+    return el(doc, 'div', {
+      style: { display: 'flex', 'align-items': 'center', gap: '0.5rem', 'margin-bottom': '0.5rem' },
+      children: [
+        minus,
+        plus,
+        el(doc, 'span', {
+          text:
+            `Top floor · ${String(price)} u once, however far it moves · ` +
+            `${metres === 0 ? 'as the building draws it' : `+${String(metres)} ${metres === 1 ? 'metre' : 'metres'}`}${suffix}`,
           style: { color: MUTED },
         }),
       ],

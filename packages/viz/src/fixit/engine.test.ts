@@ -33,7 +33,9 @@ import {
   setParkingStrategy,
   stepCapacity,
   stepSpeed,
+  stepTopFloorRaise,
   stepZoneOverlap,
+  topFloorRaisePriceUnits,
   zonePriceUnits,
   toggleExtra,
   toggleRepair,
@@ -578,6 +580,70 @@ describe("the editor's zoning and parking are priced by the rows a repair alread
       expect(PARKING_STRATEGIES as readonly string[]).toContain(strategy);
     }
     expect(EDITOR_PARKING_STRATEGIES.length).toBeLessThan(PARKING_STRATEGIES.length);
+  });
+});
+
+/**
+ * **The elevation control** — GitHub issue **#422**. The same shape as the zoning block above,
+ * because `stepTopFloorRaise` is `stepZoneOverlap` pointed at one floor rather than at a bank's
+ * served range: a flat price, charged once regardless of how far the metre moves, refused by
+ * either the building's ceiling or the case's budget.
+ */
+describe("the editor's elevation control is priced by the row a repair already pays", () => {
+  it('names its path only once bought, at the schedule figure `raise-a-floor` holds', () => {
+    const schedule = shippedPriceSchedule();
+    expect(editorPathsOf({ ...emptyFixitState(), topFloorRaiseM: 2 })).toEqual(['building.floors[]']);
+    expect(topFloorRaisePriceUnits(schedule)).toBe(10);
+    expect(editorPathsOf(emptyFixitState())).toEqual([]);
+  });
+
+  /** Only the first metre is charged — `raise-a-floor`'s own note, on `rezone-bank`'s precedent. */
+  it('charges the raise once however many metres it moves', () => {
+    const schedule = shippedPriceSchedule();
+    const one = spendOf(CASE, { ...emptyFixitState(), topFloorRaiseM: 1 }, schedule);
+    const five = spendOf(CASE, { ...emptyFixitState(), topFloorRaiseM: 5 }, schedule);
+    expect(one.totalUnits).toBe(10);
+    expect(five.totalUnits).toBe(10);
+  });
+
+  /** A moved floor is a setting rather than steel — `docs/20` defect 8's rule, applied a third time. */
+  it('keeps the elevation control out of the machinery split', () => {
+    const schedule = shippedPriceSchedule();
+    const settings = spendOf(CASE, { ...emptyFixitState(), topFloorRaiseM: 3 }, schedule);
+    expect(settings.editorUnits).toBe(10);
+    expect(settings.machineryUnits).toBe(0);
+  });
+
+  it('steps the raise up to the building ceiling and no further, and back down again', () => {
+    const schedule = shippedPriceSchedule();
+    let state = emptyFixitState();
+    state = stepTopFloorRaise(CASE, state, 1, 2, schedule);
+    expect(state.topFloorRaiseM).toBe(1);
+    state = stepTopFloorRaise(CASE, state, 1, 2, schedule);
+    expect(state.topFloorRaiseM).toBe(2);
+    /* The building's ceiling, not the budget's: 10 of 12 u committed and the press is still refused. */
+    expect(spendOf(CASE, state, schedule).totalUnits).toBe(10);
+    expect(stepTopFloorRaise(CASE, state, 1, 2, schedule)).toBe(state);
+    state = stepTopFloorRaise(CASE, state, -1, 2, schedule);
+    expect(state.topFloorRaiseM).toBe(1);
+    state = stepTopFloorRaise(CASE, state, -1, 2, schedule);
+    expect(state.topFloorRaiseM).toBe(0);
+    expect(stepTopFloorRaise(CASE, state, -1, 2, schedule)).toBe(state);
+    /* A ceiling of zero refuses the first press outright — the unserved/double-deck answer. */
+    const untouched = emptyFixitState();
+    expect(stepTopFloorRaise(CASE, untouched, 1, 0, schedule)).toBe(untouched);
+  });
+
+  it('refuses the first metre of raise when the budget cannot take it', () => {
+    const schedule = shippedPriceSchedule();
+    /* One speed step is 10 of this case's 12 u, so the 10 u raise no longer fits. */
+    const spent = stepSpeed(CASE, emptyFixitState(), 1, schedule);
+    expect(spendOf(CASE, spent, schedule).totalUnits).toBe(10);
+    expect(affordabilityOf(CASE, spent, topFloorRaisePriceUnits(schedule), schedule)).toEqual({
+      selectable: false,
+      shortByUnits: 8,
+    });
+    expect(stepTopFloorRaise(CASE, spent, 1, 5, schedule)).toBe(spent);
   });
 });
 
