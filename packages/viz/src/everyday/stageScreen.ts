@@ -545,6 +545,12 @@ function mountStage(
    * that looked live and did nothing — exactly what § D219/§ D227 refuse in both directions.
    */
   const floorJump = el(doc, 'select', 'everyday-stage-floor-jump');
+  /**
+   * `STAGE_FLOOR_JUMP_PLACEHOLDER` verbatim — the sighted reader's own words, which is what SC
+   * 2.5.3 asks an accessible name to match, and the reason every other `<select>` in this file
+   * sets `aria-label` from the string it also draws rather than a second phrasing of it.
+   */
+  floorJump.setAttribute('aria-label', STAGE_FLOOR_JUMP_PLACEHOLDER);
   floorJump.style.cssText = [
     `background:transparent`,
     `border:1px solid ${C.rule}`,
@@ -553,6 +559,13 @@ function mountStage(
     `font:500 11px ${TYPE.mono}`,
     `color:${C.warmGrey}`,
     'cursor:pointer',
+    /*
+     * `vertical-city`'s hundred floors give the select's widest `<option>` more text than a phone
+     * viewport holds; unbounded, the browser sizes the closed box to that text and pushes it past
+     * the edge of the header's own wrapped row. `max-width:100%` is `campaignScreens.ts#select`'s
+     * same fix for the same shape — smallScreen.browser.test.ts's #549 case.
+     */
+    'max-width:100%',
   ].join(';');
   /** The floor set the select's `<option>`s were last built from — rebuilt only when this changes. */
   let floorJumpBuiltFor: readonly VizFloor[] | undefined;
