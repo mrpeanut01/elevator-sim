@@ -24,6 +24,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { loadConfig } from '@elevator-sim/core';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -299,11 +300,12 @@ describe('the rate and its quantity each declare a schema — CLAUDE.md invarian
 describe('rows without a rate stay flat, so every existing price is unchanged', () => {
   const shipped = (): PriceSchedule => parsePriceSchedule(rawShipped());
 
-  it('prices every shipped row at exactly its flat figure through the one purchase function', () => {
+  it('prices every flat shipped row at exactly its flat figure through the one purchase function', () => {
     const schedule = shipped();
-    expect(schedule.changes.length).toBeGreaterThan(0);
-    for (const change of schedule.changes) {
-      expect(change.rate, change.id).toBeUndefined();
+    const flat = schedule.changes.filter((change) => change.rate === undefined);
+    // Every row but one. The exception is asserted by id below rather than merely subtracted here.
+    expect(flat.length).toBe(schedule.changes.length - 1);
+    for (const change of flat) {
       expect(purchaseUnits(change), change.id).toBe(change.priceUnits);
       expect(smallestPurchaseUnitsOf(change), change.id).toBe(change.priceUnits);
       expect(ceilingUnitsOf(change), change.id).toBe(change.priceUnits);
@@ -311,23 +313,62 @@ describe('rows without a rate stay flat, so every existing price is unchanged', 
   });
 
   /**
-   * **A register with one entry — none — and the next change is the one that empties it.** The
-   * ruling names destination panels per floor as the first case, and that is GitHub issue #437: a
-   * core model change this seam does not make. So no shipped row carries a rate yet, and a rate row
-   * that arrives without #437's quantity would be a price on a control nobody can size. The commit
-   * that adds the first one replaces this case with that row's own *reaches the run* test.
+   * **The register that used to say *none* now names one row, and this is the case that replaced
+   * it** — GitHub issue #437 stage 2, [§ D619](../../../../DECISIONS.md).
+   *
+   * The block this sits in used to assert that *no* shipped row carried a rate, and its docstring
+   * said the commit adding the first one would replace that case with the row's own check. This is
+   * that replacement. It is deliberately **by id**: a count would let a second rate row arrive
+   * unexamined, and § D552's ruling — *"destination panels per floor is the first case"* — is about
+   * a particular row rather than about a quantity of them.
    */
-  it('ships no rate row yet — the first is GitHub issue #437’s', () => {
+  it('ships exactly one rate row, and it is GitHub issue #437’s landing panels', () => {
     const raw = rawShipped();
-    expect(raw.changes.filter((row) => 'rate' in row).map((row) => row['id'])).toEqual([]);
+    expect(raw.changes.filter((row) => 'rate' in row).map((row) => row['id'])).toEqual([
+      'landing-panels',
+    ]);
   });
 
-  it('would see a flat row turned into a rate row, so the case above is not vacuous', () => {
+  it('prices that row per landing, and refuses to price it without a quantity', () => {
+    const schedule = shipped();
+    const panels = priceOf(schedule, 'landing-panels');
+    if (panels.rate === undefined) throw new Error('landing-panels lost its rate');
+    expect(panels.tier).toBe('equipment');
+    expect(panels.rate.quantity.unit).toBe('landing');
+    // The three readings § D552 distinguishes, on the first row that can tell them apart.
+    expect(purchaseUnits(panels, 6)).toBe(panels.rate.unitsPer * 6);
+    expect(smallestPurchaseUnitsOf(panels)).toBe(panels.rate.unitsPer);
+    expect(ceilingUnitsOf(panels)).toBe(panels.rate.unitsPer * panels.rate.quantity.max);
+    // And a quantity is never chosen for the player, which is the whole of the ruling.
+    expect(() => purchaseUnits(panels)).toThrow(PriceScheduleError);
+    expect(() => purchaseUnits(panels, panels.rate.quantity.max + 1)).toThrow(PriceScheduleError);
+  });
+
+  /**
+   * **The ceiling is a ceiling on every building the game ships, derived rather than trusted.**
+   *
+   * `data/price-schedule.json`'s note says 165 is the landing count of the largest shipped
+   * building. A transcribed figure goes stale the first time a taller tower lands, and then a
+   * scenario's derived budget ceiling quietly stops being *above which there is nothing left to
+   * buy*. So the claim is checked against `data/buildings/` through the loader, in the direction
+   * that matters: the declared most is at least what the tallest building could take.
+   */
+  it('sells at least as many landings as the largest shipped building has', async () => {
+    const schedule = shipped();
+    const panels = priceOf(schedule, 'landing-panels');
+    if (panels.rate === undefined) throw new Error('landing-panels lost its rate');
+    const config = await loadConfig(fileURLToPath(new URL('../../../../data', import.meta.url)));
+    const landings = [...config.buildingsById.values()].map((building) => building.floors.length);
+    expect(landings.length).toBeGreaterThan(0);
+    expect(panels.rate.quantity.max).toBeGreaterThanOrEqual(Math.max(...landings));
+  });
+
+  it('would see a second flat row turned into a rate row, so the case above is not vacuous', () => {
     const raw = rawShipped();
     const first = raw.changes[0];
     if (first === undefined) throw new Error('the shipped schedule prices nothing');
     const mutated = [{ ...first, rate: {} }, ...raw.changes.slice(1)];
-    expect(mutated.filter((row) => 'rate' in row)).toHaveLength(1);
+    expect(mutated.filter((row) => 'rate' in row)).toHaveLength(2);
   });
 });
 

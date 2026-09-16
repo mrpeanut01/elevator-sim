@@ -67,8 +67,12 @@ export function pathsIn(patch: RepairPatchShape): readonly string[] {
     if (arrayOf(building['addCars']) !== undefined) out.push('building.addCars[]');
     if (arrayOf(building['banks']) !== undefined) out.push('building.banks[]');
     if (arrayOf(building['floorPopulations']) !== undefined) out.push('building.floorPopulations[]');
-    // GitHub issue #422: the elevation control — the one field that moves a floor.
-    if (arrayOf(building['floors']) !== undefined) out.push('building.floors[]');
+    // GitHub issue #422: the elevation control — the one field that moves a floor. Priced on the
+    // specific field a `FixitPatch` can move (`heightM`, via `heightDeltaM`) rather than the bare
+    // group, because the group form would also claim GitHub issue #437's `landingCallType` — a
+    // config field on the same array that no `FixitPatch` shape can reach, but that a bare-group
+    // `covers` entry would still claim at the schedule-validation level. See DECISIONS.md § D619.
+    if (arrayOf(building['floors']) !== undefined) out.push('building.floors[].heightM');
     for (const entry of arrayOf(building['cars']) ?? []) {
       const set = objectOf(objectOf(entry)?.['set']) ?? {};
       if ('dwellHallCallS' in set) out.push('building.cars[].set.dwellHallCallS');

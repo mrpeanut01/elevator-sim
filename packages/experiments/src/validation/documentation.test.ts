@@ -1983,6 +1983,20 @@ type DecisionReservation = {
  */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
+ * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
+ * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
+ * the sibling lane that had already spent D619 for #422; the integrator found the collision on
+ * merge and renumbered #437's entry to **D620**, correcting both entries' cross-references and the
+ * budget-ceiling arithmetic each had computed alone (the schedule's own re-derived `totalUnits` is
+ * what the merged tree carries, not either lane's isolated delta). With both D619 and D620 now
+ * spent — the block's whole six numbers accounted for, D616/D617 as holes — the reservation closes
+ * and `CHARTER_PROGRAMME.md`'s row moves to **D621** on this commit, per the remedy the guard below
+ * names.
+ *
+ * **If D620 is never written it becomes a hole, not free**, and belongs in `KNOWN_DECISION_HOLES`
+ * under § D404 and § D430: ids here are names.
+ */
+/*
  * **Wave AB opened this as `{ wave: 'AB', from: 594, to: 600 }` and lane A closed it, having spent
  * every number in it.** The dispatch brief allocated lane A **D594–D600** and no others; wave AA's
  * charter row says that range was the whole of what wave AA left free, so the block was the lane's

@@ -592,7 +592,9 @@ describe("the editor's zoning and parking are priced by the rows a repair alread
 describe("the editor's elevation control is priced by the row a repair already pays", () => {
   it('names its path only once bought, at the schedule figure `raise-a-floor` holds', () => {
     const schedule = shippedPriceSchedule();
-    expect(editorPathsOf({ ...emptyFixitState(), topFloorRaiseM: 2 })).toEqual(['building.floors[]']);
+    expect(editorPathsOf({ ...emptyFixitState(), topFloorRaiseM: 2 })).toEqual([
+      'building.floors[].heightM',
+    ]);
     expect(topFloorRaisePriceUnits(schedule)).toBe(10);
     expect(editorPathsOf(emptyFixitState())).toEqual([]);
   });

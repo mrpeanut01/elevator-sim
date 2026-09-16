@@ -296,6 +296,11 @@ export function worksKindOfTier(tierId: string): 'equipment-change' | 'building-
  * is how the same change comes to cost three different things on three screens.
  */
 export function worksLabelOf(change: PricedChange): string {
+  // A rated row carries its rate on its face rather than a total, because this control holds no
+  // quantity to multiply by — § D619, and `admitWorks` refuses such a change for the same reason.
+  if (change.rate !== undefined) {
+    return `${change.name} · ${String(change.rate.unitsPer)} units per ${change.rate.quantity.unit}`;
+  }
   return `${change.name} · ${String(purchaseUnits(change))} units`;
 }
 
@@ -508,6 +513,30 @@ export function admitWorks(input: WorksAdmissionInput): WorksAdmission {
       reason:
         `this build has no price for “${changeId}”, so there is no way to say what it would cost ` +
         'today — and a change nobody can price is one nobody can be billed for honestly',
+    };
+  }
+  /*
+   * **A change priced per unit is refused rather than priced at one** — GitHub issue #437,
+   * [§ D619](../../../../DECISIONS.md), on [§ D552](../../../../DECISIONS.md)'s ruling.
+   *
+   * This control buys *a whole change* and holds no quantity, so `purchaseUnits` would throw here
+   * rather than return a number — and a throw out of an admission function is a crashed stage
+   * screen where the contract above promises a refusal with a reason on it. No shipped offer names
+   * a rated change today (`landing-panels` is the only one, and `StageWorksOffer`s are authored
+   * rather than enumerated from the schedule), so this is reachable only by authoring one; it is
+   * written now because the alternative to a refusal here is not *nothing*, it is a stack trace.
+   */
+  if (priced.rate !== undefined) {
+    return {
+      admitted: false,
+      priceUnits: 0,
+      spentUnits,
+      budgetUnits,
+      reason:
+        `“${priced.name}” is priced at ${String(priced.rate.unitsPer)} units per ` +
+        `${priced.rate.quantity.unit}, and this control buys a whole change rather than a number ` +
+        'of them — so there is no honest figure to bill today, and choosing one would be choosing ' +
+        'how many for you',
     };
   }
   const priceUnits = purchaseUnits(priced);

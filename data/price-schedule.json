@@ -13,8 +13,8 @@
       "id": "equipment",
       "order": 2,
       "name": "Equipment",
-      "typicalUnits": 9,
-      "note": "Settings and fittings on kit the building already has — door timings, sensors, landing panels. Dearer than telling the cars what to do, cheaper than changing the building."
+      "typicalUnits": 6,
+      "note": "Settings and fittings on kit the building already has — door timings, sensors, landing panels. Dearer than telling the cars what to do, cheaper than changing the building. THE TYPICAL IS DERIVED, NEVER CHOSEN (packages/viz/src/pricing/parse.ts#violationsIn): it is this tier's own median of the price on each row's face, a flat row's price and a rated row's per-unit rate. It read 9 until GitHub issue #437 added the 1 u per-landing landing-panels row, which moved the fifteen-value median down to 6. That is arithmetic rather than a re-pricing -- no shipped row's price moved -- and the ladder still ascends: 2 u, 6 u, 20 u."
     },
     {
       "id": "building",
@@ -317,6 +317,27 @@
       }
     },
     {
+      "id": "landing-panels",
+      "tier": "equipment",
+      "name": "Destination panels, per landing",
+      "rate": {
+        "unitsPer": 1,
+        "quantity": { "type": "integer", "unit": "landing", "min": 0, "max": 165, "default": 0 }
+      },
+      "nights": 1,
+      "note": "GitHub issue #437 stage 2, DECISIONS.md section D619. THE FIRST RATED ROW ON THIS SCHEDULE -- issue #478 / section D552 built the rate-times-quantity seam and named this change as the row that would use it. Al-Kodmany (Buildings 2015, 5(3), 1070-1104) section 2.2.1 is the premise: destination panels are installed on all floors (full configuration) or only on the busiest ones (hybrid configuration), so panel count is a quantity a building has rather than a switch it is on one side of. PROVENANCE, per the product owner's 2026-09-08 standing ruling on governed data/ values: THIS FIGURE IS AN AGENT'S PROPOSAL, drafted for the owner to accept, tighten or reject. What is MEASURED: nothing about the price. packages/experiments/src/benchmark/landingPanelDeployment.ts measures what panels are WORTH on midtown-office at n=200 under common random numbers -- entrance-only is bit-identical to a full deployment under a pure up-peak and 1.294 s of time-to-destination short of it under a mixed day -- and a worth is not a cost. What is DERIVED: the bracket. Two shipped rows already price a whole-building destination install, destination-panels at 13 u and full-destination at 24 u, and midtown-office, the building #437 names, has 21 landings; 1 u per landing puts a full deployment there at 21 u, between the two. What is CHOSEN: 1 rather than 2, and a landing rather than a floor group as the unit. THE CEILING IS A CEILING AND NOT A PRICE: 165 is the landing count of the largest shipped building (burj-class-reference), so that the schedule ceiling scenario/budget.ts derives -- every change bought at once, a rated row at its declared most -- stays true of every building the game ships; packages/viz/src/pricing/rate.test.ts derives that number from data/buildings/ through the loader rather than trusting this one. THIS ROW DOES NOT REPLACE destination-panels, and the two do not overlap by path: that row prices switching the DISPATCHER into destination mode (dispatcher.dispatch.callType and .passengerAssignment) and is bought flat by shipped fix-it repairs, which is why it stays flat -- making it rated would make purchaseUnits throw for every caller that holds no quantity and would re-price those repairs. This row prices the hall FIXTURE at a landing, which section D553 made per-floor data (FloorConfig.landingCallType). WHAT READS IT TODAY, stated rather than left to be discovered: packages/viz/src/scenario/budget.ts#scheduleBoundsOf, through campaign/parse.ts, whose ceiling, cheapest positive step and affordable-purchase count all move because this row exists. WHAT DOES NOT: a purchase. The viewer refuses a building declaring landingCallType under the code landing-call-type-not-playable until GitHub issue #534's list is done (section D553 clause 9), so no shipped surface spends this rate yet, and that is the honest boundary of stage 2 rather than a dead seam nobody noticed.",
+      "covers": [
+        "building.floors[].landingCallType"
+      ],
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 0,
+        "max": 10,
+        "default": 1
+      }
+    },
+    {
       "id": "full-destination",
       "tier": "equipment",
       "name": "Full destination dispatch",
@@ -486,7 +507,7 @@
       "nights": 3,
       "note": "AGENT'S PROPOSAL — GitHub issue #422. The elevation control: no row priced this before, because no `FixitPatch` field could move a floor at all until this issue gave it one (`fixit/types.ts#BuildingPatch.floors`). MEASURED: nothing about the figure, exactly as cabin-pressurisation's and rope-upgrade's notes say of themselves — no shipped repair or shipped list has ever priced a floor's own position moving, so there is no agreed figure to keep and no disagreement to record. DERIVED: the ceiling, on rope-upgrade's own precedent. docs/35 s 10.2 caps a fix-a-building case's budget at 16 u, and a row priced above that would be a seam no case could ever buy — the same dead-seam shape rope-upgrade's note measured at 20 u before it was moved to 16. So this row may not exceed 16 u either, and CHOSEN below stays under it with headroom for the case's own diagnosed repair. CHOSEN: 10 u and 3 nights. A floor's slab, the landing it opens onto and everything above it re-set to a new elevation is a fabric job on the shaft rather than a fitting on kit the building already has — docs/38 s 2.1's own line between the equipment and building tiers — so it sits with faster-machines (10 u, 2 nights, a machine swap) rather than with rezone-bank (6 u, a controller and a landing sign). 3 nights because more of the shaft is disturbed than a machine swap touches, and less than move-a-tenant's 4, which is a lease matter rather than a structural one. Both figures are game feel and the ladder's ordering is the product owner's (see this file's own header). WHAT IT BUYS: only the building's topmost floor is offered a control (fixit/run.ts#topFloorRaiseCeilingOf), because raising it is the one move that can never break heightM's strict-increasing-with-index rule — every other floor is untouched. It changes travel time to and from that floor and, on a building already close to elevator-specs.json's airPressure.appliesAboveTravelM, can move a bank across that threshold; on a shaft near a fitted rope's maxSingleTravelM it can refuse the building outright, exactly as ropeClass already can, which is the constraint rather than a defect in this seam.",
       "covers": [
-        "building.floors[]"
+        "building.floors[].heightM"
       ],
       "schema": {
         "type": "integer",

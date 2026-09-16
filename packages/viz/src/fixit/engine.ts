@@ -184,7 +184,7 @@ export function editorPathsOf(state: FixitState): readonly string[] {
   const paths: string[] = [];
   if (state.zoneOverlapFloors > 0) paths.push('building.banks[]');
   if (state.parkingStrategy !== null) paths.push('dispatcher.idle.parkingStrategy');
-  if (state.topFloorRaiseM > 0) paths.push('building.floors[]');
+  if (state.topFloorRaiseM > 0) paths.push('building.floors[].heightM');
   return paths;
 }
 
