@@ -27,6 +27,13 @@ const CONTEXT: FixitContext = {
   profileIds: new Set(['standing-order']),
   bandByBuilding: new Map([['tower', { min: 3, max: 7 }]]),
   engineIds: ['tower', 'standing-order'],
+  /*
+   * **This fixture bands no shaft, and that is the unresolved arm rather than the cheap one** —
+   * GitHub issue #429 stage 2, § D630. `tower` is not a shipped building, so no plan area exists to
+   * resolve; a new-shaft repair here is priced at the base `new-car` figure, which is exactly what
+   * the two cases in `UNBANDED_SHAFT_CASES` get and why the two states must not be conflated.
+   */
+  shaftAreaBandByBank: new Map(),
 };
 
 /** A minimal valid case, cloned per test. */
@@ -147,7 +154,14 @@ describe('parseFixitCases', () => {
         };
       }),
     );
-    expect(cheapShaft.join('\n')).toContain('data/price-schedule.json prices it 34 in every case');
+    /*
+     * **The message names the two halves of the price, and no longer says *in every case***  —
+     * GitHub issue #429 stage 2, § D630. A shaft is the base `new-car` figure plus this building's
+     * own plan-area band, so one figure is no longer true of every case and the refusal says which
+     * band it used. This fixture's building is not a shipped one, so no band resolves and the price
+     * is the base — the unresolved arm, which is deliberately not the same statement as band 0.
+     */
+    expect(cheapShaft.join('\n')).toContain('u for the car and no resolvable area band');
     expect(cheapShaft.join('\n')).toContain('visible and unaffordable');
   });
 

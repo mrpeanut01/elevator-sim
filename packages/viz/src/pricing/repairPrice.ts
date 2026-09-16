@@ -150,9 +150,35 @@ export function unpricedPathsIn(
  *
  * A patch names paths and carries no count, so a row priced per unit is refused here by
  * `pricing/parse.ts#purchaseUnits` rather than charged for one unit — GitHub issue #478, § D552.
+ *
+ * ## The one exception, and it is a quantity the patch cannot carry — GitHub issue #429 stage 2
+ *
+ * `shaftAreaBand` is the `shaft-area` row's quantity ([§ D630](../../../../DECISIONS.md)): which
+ * band the plan area of the hoistway this patch adds falls into. It is **not** in the patch and
+ * could not be, because it is a fact about the *building* the patch is applied to rather than about
+ * the patch — the same car added to `ashgate`'s three-level car park and to a Burj shuttle takes
+ * 24.0 m² and 1 178.0 m² out of their towers respectively, and the patch is identical. The caller
+ * that holds the building resolves it (`fixit/parse.ts#fixitContextOf`) and passes it here.
+ *
+ * **Omitted means unresolved, not band 0**, and the difference is the whole of why this argument is
+ * `undefined`-able rather than defaulted: a caller with no building must charge the base price and
+ * say so, not quietly claim the cheapest band. Two of the eighteen shipped fix-it cases add a car to
+ * a bank their building does not have as built, so their band genuinely cannot be resolved — see
+ * `fixit/parse.ts#UNBANDED_SHAFT_CASES`, which names them rather than letting them pass as small.
  */
-export function repairPriceUnits(schedule: PriceSchedule, patch: RepairPatchShape): number {
-  return changesBought(schedule, patch).reduce((sum, change) => sum + purchaseUnits(change), 0);
+export function repairPriceUnits(
+  schedule: PriceSchedule,
+  patch: RepairPatchShape,
+  shaftAreaBand?: number | undefined,
+): number {
+  const base = changesBought(schedule, patch).reduce(
+    (sum, change) => sum + purchaseUnits(change),
+    0,
+  );
+  if (shaftAreaBand === undefined || shaftAreaBand <= 0) return base;
+  if (!pathsIn(patch).includes('building.addCars[]')) return base;
+  const area = schedule.changes.find((change) => change.id === 'shaft-area');
+  return area === undefined ? base : base + purchaseUnits(area, shaftAreaBand);
 }
 
 /*

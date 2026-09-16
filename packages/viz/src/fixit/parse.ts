@@ -40,8 +40,9 @@
  *   not (§ D227's class, aimed at the one parameter the ruling makes load-bearing).
  */
 
+import { shaftPlanAreaM2, type ShaftFootprintTable } from '@elevator-sim/core/browser';
 import { probabilityWordIn } from '../campaign/words.js';
-import { priceOf, purchaseUnits } from '../pricing/parse.js';
+import { priceOf, purchaseUnits, shaftAreaBandOf } from '../pricing/parse.js';
 import { repairPriceUnits, unpricedPathsIn } from '../pricing/repairPrice.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type {
@@ -104,6 +105,20 @@ export interface FixitContext {
    * this from the same loaded data (building ids, profile ids); this module never lists one.
    */
   readonly engineIds: readonly string[];
+  /**
+   * **Which price band one more hoistway falls into**, keyed `"buildingId/bankId"` — GitHub issue
+   * **#429** stage 2, [§ D630](../../../../DECISIONS.md).
+   *
+   * Derived by the caller from the same loaded `data/` as everything else here: `core`'s
+   * `config/floorArea.ts#shaftPlanAreaM2` gives the plan area one more car in that bank would
+   * permanently take out of every plate its span passes, and `pricing/parse.ts#shaftAreaBandOf`
+   * turns that into the `shaft-area` row's quantity. This module reads the map and bands nothing
+   * itself.
+   *
+   * **A bank absent from the map has no resolvable band**, and the new-shaft repair in that case is
+   * priced at the base rather than at the cheapest band — see {@link UNBANDED_SHAFT_CASES}.
+   */
+  readonly shaftAreaBandByBank: ReadonlyMap<string, number>;
 }
 
 /**
@@ -118,8 +133,20 @@ export function fixitContextOf(input: {
   readonly buildings: readonly {
     readonly id: string;
     readonly trafficProfile: string;
-    readonly floors: readonly { readonly id: string }[];
+    readonly floors: readonly { readonly id: string; readonly index?: number }[];
+    /**
+     * The banks, when the caller holds resolved buildings — GitHub issue #429 stage 2, § D630. The
+     * shipped loader does; a fixture that states none simply bands no shaft, and its cases keep the
+     * base price, which is what {@link FixitContext.shaftAreaBandByBank} means by *absent*.
+     */
+    readonly banks?: readonly {
+      readonly id: string;
+      readonly cars: readonly { readonly ratedLoadLb: number; readonly ratedLoadLbPerDeck?: number | undefined }[];
+      readonly servesFloors: readonly string[];
+    }[];
   }[];
+  /** For the shaft-area band, and only that. Absent bands nothing, exactly as absent banks do. */
+  readonly elevatorSpecs?: { readonly shaftFootprint?: ShaftFootprintTable | undefined } | undefined;
   readonly trafficProfiles: { readonly profiles: readonly { readonly id: string; readonly arrivalRatePctPop5min: DemandBand }[] };
   readonly dispatcherProfiles: { readonly profiles: readonly { readonly id: string }[] };
 }): FixitContext {
@@ -128,6 +155,25 @@ export function fixitContextOf(input: {
   for (const building of input.buildings) {
     const band = bands.get(building.trafficProfile);
     if (band !== undefined) bandByBuilding.set(building.id, band);
+  }
+  /*
+   * The shaft-area bands — GitHub issue #429 stage 2, § D630. One entry per (building, bank) whose
+   * area `core` can actually resolve; a bank that resolves none is left out rather than entered at
+   * zero, because a shaft that costs nothing is the defect the area model exists to close.
+   */
+  const table = input.elevatorSpecs?.shaftFootprint;
+  const shaftAreaBandByBank = new Map<string, number>();
+  if (table !== undefined) {
+    for (const building of input.buildings) {
+      const floors = building.floors.filter(
+        (floor): floor is { id: string; index: number } => typeof floor.index === 'number',
+      );
+      for (const bank of building.banks ?? []) {
+        const areaM2 = shaftPlanAreaM2(bank, floors, table);
+        if (areaM2 === undefined) continue;
+        shaftAreaBandByBank.set(`${building.id}/${bank.id}`, shaftAreaBandOf(input.schedule, areaM2));
+      }
+    }
   }
   return {
     schedule: input.schedule,
@@ -138,8 +184,32 @@ export function fixitContextOf(input: {
       ...input.buildings.map((building) => building.id),
       ...input.dispatcherProfiles.profiles.map((profile) => profile.id),
     ],
+    shaftAreaBandByBank,
   };
 }
+
+/**
+ * **The two shipped cases whose new shaft cannot be banded, named rather than quietly priced small**
+ * — GitHub issue #429 stage 2, [§ D630](../../../../DECISIONS.md).
+ *
+ * Measured over all eighteen new-shaft repairs: **sixteen** add a car to a bank their building has
+ * as built, so `core` resolves the plan area that car's hoistway would take and the repair is priced
+ * at that band. These two add a car to a bank the shipped building **does not have** —
+ * `midtown-office` ships one bank, `main`, and these cases invent `high` and `garage` through their
+ * own zoning — so there is no span to multiply a footprint by and no honest band to charge.
+ *
+ * They are priced at the **base** `new-car` figure and registered here rather than defaulted to
+ * band 0. Charging the cheapest band would be a pricing rule nobody ruled on, dressed as a
+ * measurement, which is exactly what § D601 § 5 refused to do with this whole question; and the two
+ * are `midtown-office` cases whose invented banks would plainly not be the cheapest band if they
+ * existed. **A case that ever stops reproducing here owes its entry back**, on `honesty.test.ts`'s
+ * `OUTSTANDING` precedent — `cases.test.ts` asserts this list in both directions, so a case that
+ * acquires a resolvable bank fails here instead of silently leaving.
+ */
+export const UNBANDED_SHAFT_CASES: readonly string[] = [
+  'zoning-starves-the-top',
+  'car-park-nobody-serves',
+];
 
 const ROLES: readonly RepairRole[] = ['diagnosed', 'costly-fix', 'cheap-fix', 'new-shaft'];
 const MEASURE_KINDS = ['long-waits', 'mean-wait'] as const;
@@ -161,6 +231,30 @@ export const DIAGNOSED_MAX_UNITS = 9;
  */
 export function newShaftUnits(schedule: PriceSchedule): number {
   return purchaseUnits(priceOf(schedule, 'new-car'));
+}
+
+/**
+ * **What the plan area of one more hoistway adds to that price** — GitHub issue #429 stage 2,
+ * [§ D630](../../../../DECISIONS.md).
+ *
+ * The `shaft-area` row bought at `band`. Zero for an **unresolved** band and zero for band 0, and
+ * the two are deliberately the same figure by different routes: the cheapest band costs nothing
+ * because the owner's ruling keeps a small building's shaft at today's agreed price, and an
+ * unresolved band costs nothing because charging a building whose area cannot be measured would be
+ * inventing a quantity. What must not happen is an unresolved band being *called* band 0, which is
+ * why {@link UNBANDED_SHAFT_CASES} names the two cases rather than letting them read as small.
+ */
+export function shaftAreaSurchargeUnits(
+  schedule: PriceSchedule,
+  band: number | undefined,
+): number {
+  if (band === undefined || band <= 0) return 0;
+  return purchaseUnits(priceOf(schedule, 'shaft-area'), band);
+}
+
+/** The bank a new-shaft repair adds its car to, or `''` — § D630. */
+function shaftBankIdOf(repair: FixitRepair): string {
+  return repair.patch.building?.addCars?.[0]?.bankId ?? '';
 }
 
 /**
@@ -253,7 +347,7 @@ export function playerFacingStringsOf(entry: FixitCase): readonly (readonly [str
  */
 export function parseFixitCases(raw: unknown, context: FixitContext): FixitCases {
   const violations: string[] = [];
-  const decoded = decodeFile(raw, violations, context.schedule);
+  const decoded = decodeFile(raw, violations, context.schedule, context.shaftAreaBandByBank);
   if (decoded === undefined) throw new FixitCasesError(violations);
   const seen = new Set<string>();
   const cases: FixitCase[] = [];
@@ -310,11 +404,23 @@ function checkCase(where: string, entry: FixitCase, context: FixitContext): read
   }
   const shaft = entry.repairs.find((repair) => repair.role === 'new-shaft');
   if (shaft !== undefined) {
-    const shaftUnits = newShaftUnits(context.schedule);
+    /*
+     * **The base plus this building's own area band** — GitHub issue #429 stage 2, § D630.
+     *
+     * This read *"prices it N in every case"* until the product owner ruled that a shaft's plan area
+     * is charged. It is no longer one figure in every case and must not be: the same car costs
+     * 24.0 m² of plate in `ashgate`'s car park and 1 178.0 m² in a Burj shuttle, and that is the
+     * whole of what the ruling is about. Sixteen of the eighteen cases resolve a band; the two in
+     * {@link UNBANDED_SHAFT_CASES} resolve none and keep the base, which is checked here rather than
+     * assumed — a case that acquires a resolvable bank stops matching and says so.
+     */
+    const band = context.shaftAreaBandByBank.get(`${entry.buildingId}/${shaftBankIdOf(shaft)}`);
+    const shaftUnits = newShaftUnits(context.schedule) + shaftAreaSurchargeUnits(context.schedule, band);
     if (shaft.costUnits !== shaftUnits) {
       violations.push(
         `${where}: the new shaft costs ${String(shaft.costUnits)} u; data/price-schedule.json ` +
-          `prices it ${String(shaftUnits)} in every case.`,
+          `prices it ${String(shaftUnits)} here — ${String(newShaftUnits(context.schedule))} u for ` +
+          `the car and ${band === undefined ? 'no resolvable area band' : `area band ${String(band)}`}.`,
       );
     }
     if (shaft.costUnits <= entry.budgetUnits) {
@@ -445,7 +551,12 @@ function strings(value: unknown): readonly string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 }
 
-function decodeFile(raw: unknown, violations: string[], schedule: PriceSchedule): FixitCases | undefined {
+function decodeFile(
+  raw: unknown,
+  violations: string[],
+  schedule: PriceSchedule,
+  bandByBank: ReadonlyMap<string, number>,
+): FixitCases | undefined {
   if (!isRecord(raw)) {
     violations.push('the file is not a JSON object.');
     return undefined;
@@ -457,13 +568,19 @@ function decodeFile(raw: unknown, violations: string[], schedule: PriceSchedule)
   }
   const decoded: FixitCase[] = [];
   for (const [index, entry] of cases.entries()) {
-    const one = decodeCase(entry, `cases[${String(index)}]`, violations, schedule);
+    const one = decodeCase(entry, `cases[${String(index)}]`, violations, schedule, bandByBank);
     if (one !== undefined) decoded.push(one);
   }
   return { version: num(raw['version']) ?? 0, cases: decoded, schedule };
 }
 
-function decodeCase(raw: unknown, at: string, violations: string[], schedule: PriceSchedule): FixitCase | undefined {
+function decodeCase(
+  raw: unknown,
+  at: string,
+  violations: string[],
+  schedule: PriceSchedule,
+  bandByBank: ReadonlyMap<string, number>,
+): FixitCase | undefined {
   if (!isRecord(raw)) {
     violations.push(`${at}: is not an object.`);
     return undefined;
@@ -522,7 +639,9 @@ function decodeCase(raw: unknown, at: string, violations: string[], schedule: Pr
     figures: decodeFigures(raw['figures'], where, violations),
     diagnosis: { text: str(diagnosis['text']) ?? '', reasoning: str(diagnosis['reasoning']) ?? '' },
     budgetUnits: num(raw['budgetUnits']) ?? Number.NaN,
-    repairs: decodeRepairs(raw['repairs'], where, violations, schedule),
+    repairs: decodeRepairs(raw['repairs'], where, violations, schedule, (bankId) =>
+      bandByBank.get(`${str(raw['buildingId']) ?? ''}/${bankId}`),
+    ),
     result: { head: str(result['head']) ?? '', body: str(result['body']) ?? '' },
   };
 }
@@ -601,6 +720,8 @@ function decodeRepairs(
   where: string,
   violations: string[],
   schedule: PriceSchedule,
+  /** The `shaft-area` band for a bank of this case's building, or `undefined` — § D630. */
+  bandOf: (bankId: string) => number | undefined,
 ): readonly FixitRepair[] {
   if (!Array.isArray(raw)) {
     violations.push(`${where}: has no "repairs" array.`);
@@ -642,12 +763,27 @@ function decodeRepairs(
       id: str(entry['id']) ?? `repair-${String(index)}`,
       role: role as RepairRole,
       name: str(entry['name']) ?? '',
-      costUnits: repairPriceUnits(schedule, patch),
+      costUnits: repairPriceUnits(schedule, patch, shaftAreaBandOfPatch(patch, bandOf)),
       effect: str(entry['effect']) ?? '',
       patch,
     });
   }
   return repairs;
+}
+
+/**
+ * The band a patch's own added car falls into — GitHub issue #429 stage 2, § D630.
+ *
+ * `undefined` for a patch that adds no car, and for a patch whose bank the shipped building does not
+ * have: {@link UNBANDED_SHAFT_CASES} names the two that do the latter, and `repairPriceUnits` reads
+ * `undefined` as *unresolved* rather than as the cheapest band.
+ */
+function shaftAreaBandOfPatch(
+  patch: FixitPatch,
+  bandOf: (bankId: string) => number | undefined,
+): number | undefined {
+  const bankId = patch.building?.addCars?.[0]?.bankId;
+  return bankId === undefined ? undefined : bandOf(bankId);
 }
 
 function decodePatch(raw: unknown, at: string, violations: string[]): FixitPatch {

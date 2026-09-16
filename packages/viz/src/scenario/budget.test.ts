@@ -47,7 +47,7 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { parseEngineeringBriefs, type EngineeringBriefs } from '../briefs/parse.js';
 import { editableIdsOf, parseCampaign, type CampaignContext } from '../campaign/parse.js';
 import type { Campaign, CampaignStage } from '../campaign/types.js';
-import { purchaseUnits, smallestPurchaseUnitsOf } from '../pricing/parse.js';
+import { ceilingUnitsOf, priceOf, purchaseUnits, smallestPurchaseUnitsOf } from '../pricing/parse.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import type { PriceSchedule, PricedChange } from '../pricing/types.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
@@ -222,7 +222,15 @@ describe('every shipped scenario carries a budget, and it parses', () => {
     );
     expect(bounds.dearestChangeUnits).toBeGreaterThan(dearestFlat);
     const rated = schedule.changes.filter((change) => change.rate !== undefined);
-    expect(rated.map((change) => change.id)).toEqual(['landing-panels']);
+    /*
+     * **Two rated rows now, and the dearest is still `landing-panels`'** — GitHub issue #429
+     * stage 2, § D630. `shaft-area` enters the ceiling at 8 u × 3 bands = 24 u, well under
+     * `fifth-car`'s flat 54, so it does not touch `dearestChangeUnits` and the clause above keeps
+     * meaning what it meant. Named by id rather than counted, `rate.test.ts`'s discipline: a third
+     * rated row must be looked at rather than absorbed.
+     */
+    expect(rated.map((change) => change.id)).toEqual(['landing-panels', 'shaft-area']);
+    expect(ceilingUnitsOf(priceOf(schedule, 'shaft-area'))).toBeLessThan(dearestFlat);
   });
 });
 
@@ -854,6 +862,8 @@ describe('what a ceiling means for a row priced per unit — #478, § D552', () 
       ],
       extras: [],
       withheld: [],
+      /* This fixture prices no shaft, so it bands none — GitHub issue #429 stage 2, § D630. */
+      areaBands: [],
     });
 
     const ladder = (base: number, adds: number): ScenarioBudget => {

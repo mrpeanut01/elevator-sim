@@ -37036,3 +37036,128 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 **MEASURED: 1 121.534 kB current, ≈ 1 108.8 kB pre-wave base, ≈ 13–15 kB this wave's addition.** **CHOSEN: 1 800 kB, by the product owner, deliberately more generous than the measured growth alone would call for.** Offered a tighter figure tracking this wave's measurement precisely (≈ 1 300 kB); the owner chose real headroom instead, on the same reasoning as the 2026-09-11 raise — relitigating this gate in small increments costs more than headroom does, and the deterministic hard-cap-plus-90%-line shape still catches a genuine accidental dependency long before 1 800 kB. The 90 % line is now 1 620 kB.
 
 **A trim was considered and not taken.** `core` is bundled separately into all three JS entry points rather than sharing one chunk, so every byte `core` gains is paid three times. Sharing it (`build.rolldownOptions.output.manualChunks` or equivalent) would very likely buy back real headroom, and is the trim `docs/31` § 3 names as the alternative to raising the number. Not attempted here: it changes how three separate entry points load rather than one number, and is a real engineering change to verify rather than a budget line to edit. Left as a named follow-up — generous headroom is a reason to defer it, not a reason it stops being worth doing.
+
+---
+
+## D630 — A shaft's plan area is priced, in four bands cut from the measured distribution rather than at a rate per square metre, and the two cases that cannot be banded are named rather than charged the cheapest
+
+**Date: 2026-09-16 · GitHub issue [#429](https://github.com/mrpeanut01/elevator-sim/issues/429), stage 2 · Completes [§ D601](#d601), which built the area model and refused the price · Spends [§ D552](#d552)'s rate × quantity seam for the second time, after [§ D620](#d620) · Rules on: `data/price-schedule.json`, `data/campaign.json`, `data/engineering-briefs.json`, `packages/core/src/config/floorArea.ts`, `packages/viz/src/pricing/`, `packages/viz/src/fixit/parse.ts`.**
+
+**Why an entry.** Three of [§ D405](#d405)'s grounds. It adds authored figures to a governed `data/` file that need the product owner's approval and are drafted for it here. It **moves figures already recorded** — the budget ceiling in `data/campaign.json` (30 sites) and `data/engineering-briefs.json` (6), and the price of a new shaft in the shipped fix-it cases, none of which this lane's module owns. And it **settles a question § D601 deliberately left open**, which a docstring may not do on its own.
+
+### 1. What § D601 left, and the ruling that closed it
+
+§ D601 built the quantity in full — a floor has a plate, a shaft takes plan area out of **every level it passes**, `ResolvedBuilding.area` publishes gross, core, lettable and `coreShare` for all fourteen shipped buildings — and refused to price it, quoting the product owner on the issue: *making area a cost introduces a second budget axis and a Career income term, neither of which is in `docs/38`; that reshapes the economy rather than adding a price.* § D601 § 5 then worked out both shapes so the ruling would arrive with arithmetic attached, and measured the fact that makes the obvious shape unusable: **a shaft's plan area spans 49× across the shipped set**, so the flat rate that keeps `midtown-office`'s `new-car` at its agreed 34 u (0.238 u/m²) prices one more Burj shuttle at **280 u against a whole schedule of 587**.
+
+**The product owner has since ruled on that open question**, in this shape, paraphrased rather than quoted because this lane holds no verbatim text:
+
+1. **One currency.** Area is priced in the schedule's existing `units`. The issue's own second shape — *priced in units **and** in the area it permanently removes* — is **declined**: no second budget axis, and no Career income term.
+2. **Bands, not a rate.** A shaft's area cost is charged in a small number of **discrete bands**, each a flat surcharge, keyed to the plan area the shaft actually removes. Not a units-per-m² rate across the whole 49× spread, for the reason § D601 § 5 already measured.
+3. **The boundaries and the prices are an agent's draft**, on § D601's own `shaftFootprint` footing: drafted for the owner to accept, tighten or reject, with the reasoning shown rather than only the numbers, and measured before chosen.
+
+### 2. The distribution, measured before anything was chosen
+
+§ D601 § 4's method, kept. Every bank of all fourteen shipped buildings was resolved **through the real loader**, and the quantity ranked is what one *more* car in that bank would take: `config/floorArea.ts#shaftPlanAreaM2`, one car's `shaftFootprint` times the number of floors its bank's span reaches.
+
+**62 banks.** Minimum **24.0 m²** (`ashgate/carpark`), p25 **176.0**, median **240.0**, p75 **376.0**, maximum **1 178.0** (`burj-class-reference/shuttle`) — a spread of **49.1×**, which reproduces § D601 § 5's figure from the other direction.
+
+**The three widest gaps *by ratio* are the whole of why there are four bands and not five.** Ratio is the right measure over a 49× range; an absolute gap of 210 m² at the top is a smaller discontinuity than one of 48 m² at the bottom.
+
+| gap | ratio | rank |
+|---|---|---|
+| 56.0 → 104.0 | **1.86×** | widest |
+| 640.0 → 850.0 | **1.33×** | second |
+| 376.0 → 464.0 | **1.23×** | third |
+| next-widest anywhere inside the 104–376 bulk | **1.10×** | — |
+
+So the boundaries fall at **80, 400 and 800 m²** — inside those three gaps, at round figures. **A fifth band was drafted and dropped**: splitting the 44-bank bulk means cutting an edge in a 1.10× gap while three real ones sit at 1.23–1.86×, which is inventing a boundary the distribution does not have. **And a boundary at 200 m² is refused outright**, which is the concrete form of the same rule: **seven shipped banks sit at exactly 200.0 m²**, so an edge there would move all seven a whole price band on a 0.1 m² authoring change.
+
+### 3. The bands and the prices, and which half of each is measured
+
+`data/price-schedule.json#areaBands`, and a new `shaft-area` row on the **building** tier.
+
+| band | plan area one shaft takes | surcharge | shipped banks | a new car there costs |
+|---|---|---|---|---|
+| 0 | under 80 m² | **0 u** | **3** | 34 u |
+| 1 | 80–400 m² | **8 u** | **44** | 42 u |
+| 2 | 400–800 m² | **16 u** | **8** | 50 u |
+| 3 | 800 m² and up | **24 u** | **7** | 58 u |
+
+**MEASURED: the distribution above, and nothing about any price.** A price is game feel and no amount of arithmetic makes it a measurement — `data/price-schedule.json`'s own header, kept.
+
+**DERIVED, and both ends are:**
+
+- **The floor is 0**, so the smallest shipped shafts — `ashgate/carpark` 24.0 m², `garden-apartments/main` 33.0 m², `empire-state-class-reference/bank-g` 56.0 m² — keep **exactly** the 34 u that four shipped lists independently agreed on, and a small building's price does not move at all.
+- **The ceiling is 24 u**, set so that the dearest shaft in the game becomes **the dearest single purchase on the schedule and nothing more**: 34 + 24 = **58 u**, just above `fifth-car`'s shipped 54 u, today's dearest row. That is **20.7 %** of the 280 u the rejected linear rate produced, so *well short* is an order-of-magnitude statement rather than a nudge.
+
+**CHOSEN: 8 u a band, and a ladder linear in the band index (0, 8, 16, 24) rather than a curve.** 8 is the step that lands the top of the ladder on the derived 24. The ladder is linear in the **band index** and therefore strongly sublinear in **area**, which is the whole of the compression the ruling asked for: **a shaft 49× the area of the cheapest costs 24 u more, not 271 u more.**
+
+**Also chosen, and named because it is a shipped price moving rather than a side effect:** `midtown-office/main` is 142.8 m² and lands in band 1, so the reference office's new car moves **34 → 42 u**. That is the ruling arriving, not a defect, and the row's note says so where a reader will meet it.
+
+**All four figures are an agent's proposal awaiting the owner's sign-off, and `data/price-schedule.json` says so on its own face** — exactly the status § D601's four `shaftFootprint` figures carry, and for the same reason.
+
+### 4. The shape the schema forced, and it is § D552's ruling rather than a preference
+
+**The bands could not go on the row**, and finding that out decided the design. § D552's ruling is *linear only, no curves*, and `pricing/parse.ts` refuses any key beyond `unitsPer` and `quantity` inside a rate, beyond the five range keys inside its quantity and its schema, and beyond the flat row's own keys beside it — `rate.quantity.bands` is refused **by name** in that parser's own docstring. So the row stays a plain linear rate and **the bend from area to band lives outside it**:
+
+- `shaft-area` is a **rated row**: `rate.unitsPer: 8`, `rate.quantity` in `area band`, `0`–`3`, default `0`. The quantity is which band the shaft falls into, which is `landing-panels`' own precedent — § D620's note calls a panel count *"a quantity a building has rather than a switch it is on one side of"*, and an area band is that exactly.
+- The boundaries live in the schedule's own **`areaBands`** block, parsed and validated beside the ladder.
+
+**The row books `nights: 0`, and that is not it being cheap.** The works are `new-car`'s eight nights; a shaft is sunk once and the area it takes is a consequence of *those* nights rather than a second job on the same hoistway. Booking nights here would double-count the closure a player already paid for, and Career reads `nights` to fill the month grid. The area is charged in units, permanently, and in no calendar days at all.
+
+**And `areaBands` is in the price schedule rather than in `data/elevator-specs.json` beside `shaftFootprint`**, which is the other place it could plausibly sit. Where the line between a cheap shaft and a dear one falls is **game feel, exactly as 34 u is**; `elevator-specs.json` is CIBSE-cited reference data. `shaftFootprint` says what a hoistway *is*, `areaBands` says what one *costs*, and they are not the same kind of claim.
+
+**The table is held to `shaftFootprint`'s own rules**, in `pricing/parse.ts#areaBandViolations`, each with the refusal it prevents: contiguous from 0 with an open top, so no shaft falls through and costs nothing; ascending from band 0, so a larger hole never costs less than a smaller one; no empty or backwards band; and **the dearest band must equal the row's own `quantity.max`**, or a band exists that nothing can be bought at, or a rate reaches past the table.
+
+### 5. The ceiling is a ceiling and it is checked against disk
+
+`landing-panels`' precedent, kept. `quantity.max: 3` is **the dearest band any shipped building reaches**, and `pricing/rate.test.ts` derives it from `data/buildings/` **through the loader**, over every bank of every shipped building, in **both** directions — the ceiling is reached by something that ships, and nothing that ships reaches past it. A transcribed figure goes stale the first time a taller tower lands, and here that would be worse than a stale budget: a shaft in the new tower would be charged for a band the table does not have.
+
+### 6. The budget ceilings, re-derived rather than computed by hand
+
+`scheduleBoundsOf` on the merged schedule reads **`totalUnits: 611`** directly. A rated row enters the ceiling at its declared most, so `shaft-area` adds 8 × 3 = **24 u**.
+
+| | before | after |
+|---|---|---|
+| `data/campaign.json` budget `schema.max` (30 sites) | 587 | **611** |
+| `data/engineering-briefs.json` budget `schema.max` (6 sites) | 587 | **611** |
+| `scheduleBoundsOf.dearestChangeUnits` | 165 | **165, unmoved** |
+| `scheduleBoundsOf.cheapestPositiveUnits` | 1 | **1, unmoved** |
+| building tier `typicalUnits` | 18 | **18, unmoved** |
+
+**Two of those rows are the interesting ones.** `dearestChangeUnits` does not move because `shaft-area`'s whole ceiling, 24 u, is under `fifth-car`'s flat 54 — so § D620 § 5's flagged question about the scenario rung ladder is **not** reopened here, and no rung moves. And the building tier's `typicalUnits` does not move because a fourteenth row at 8 u lands below the existing median and leaves the upper-middle where it was; the ladder still ascends (2 u, 6 u, 18 u). **No shipped row's own price moved** — what moved is what a shaft costs on top of its row.
+
+### 7. Move the control and require the run to change, in the only form a price can take it
+
+`CLAUDE.md`'s standing requirement cannot be met on the legs here, and saying why is better than pretending: **a price moves no passenger.** § D601 § 9 took the same problem and answered it on the quantity the control moves; this answers it on the quantity **and** the price, end to end through the real loader, in `pricing/rate.test.ts`:
+
+- the cheapest and dearest shafts in the shipped set are resolved from `data/buildings/` — real footprint table, real band table, real rate — and the two prices must differ in the direction the ruling names;
+- `ashgate/carpark` comes out at **exactly** the base 34 u, so the cheapest band really does charge nothing;
+- `midtown-office/main` sits **strictly between** the two, so the ladder is a ladder and not a switch;
+- and the whole spread is required to stay under `fifth-car`'s own price, stated as a **bound** rather than as the figure, so moving the ladder need not move the test while the compression claim still binds.
+
+### 8. The non-test caller, named — and the one that does not exist
+
+**Reader (a purchase):** `packages/viz/src/fixit/parse.ts#fixitContextOf` resolves each shipped fix-it case's building and bank to a band through `core`'s `shaftPlanAreaM2`, and `checkCase` prices the case's new-shaft repair at the base **plus that band**. That validator's message used to read *"prices it 34 in every case"*; it no longer says *in every case*, because under this ruling that sentence must stop being true. **The eighteen shipped new-shaft repairs now carry three prices rather than one**: 34 u on four, **42 u on twelve**, **50 u on two**. Every one is still **visible and unaffordable** inside its own 10–16 u budget, which is § 10.2's lesson and the thing a price rise must not break in the other direction; `cases.test.ts` asserts that on the shipped file.
+
+**Reader (a ceiling):** `packages/viz/src/scenario/budget.ts#scheduleBoundsOf`, through `campaign/parse.ts` — the 587 → 611 move above.
+
+**Writer:** `data/price-schedule.json`'s `shaft-area` row and `areaBands` block.
+
+**What does NOT read it, stated here rather than left to be discovered: the campaign shop.** `campaign/economy.ts#shopTierPrice`, `campaign/career.ts` and `everyday/campaignModel.ts` hold a `CampaignCareer` and a `PriceSchedule` and **never a `ResolvedBuilding`** — the string `ResolvedBuilding` does not occur in any of the three. So the Shafts tier still quotes the unbanded 34 u and 54 u, and `fifth-car` (`shop.shafts.2`) carries no surcharge at all, because nothing on that path can say which bank a shaft joins. Threading a resolved building through three modules and six call sites is a refactor this lane did not take. **That is this stage's honest boundary**, and it is § D620's own shape one issue later: a priced row whose ceiling is live and whose purchase path is partial, said in the row's note rather than found later.
+
+### 9. The two cases that cannot be banded, named rather than priced cheap
+
+Measured over all eighteen new-shaft repairs: **sixteen** add a car to a bank their building has as built. **Two do not** — `zoning-starves-the-top` and `car-park-nobody-serves` both add a car to `midtown-office`, which ships **one** bank (`main`), at banks the cases themselves invent (`high`, `garage`). There is no span to multiply a footprint by, so there is no area, so there is no honest band.
+
+**They are priced at the base and registered in `fixit/parse.ts#UNBANDED_SHAFT_CASES`, not defaulted to band 0.** Charging the cheapest band would be a pricing rule nobody ruled on wearing a measurement's clothes — the precise thing § D601 § 5 refused to do with this whole question — and both are `midtown-office` cases whose invented banks would plainly not be the cheapest band if they existed. `repairPriceUnits`' third argument is `undefined`-able for exactly this reason: **omitted means unresolved, never band 0**, and the two states reach the same figure by different routes and must not be conflated. `cases.test.ts` asserts the register in **both** directions, on `honesty.test.ts`'s `OUTSTANDING` precedent, so a case that acquires a resolvable bank fails here rather than leaving quietly.
+
+### 10. Not a score, and mechanically so
+
+`campaign/judge.ts`'s refusal is untouched, `shift/goals.ts` gains nothing, and no area figure is folded into a verdict, weighted against a wait, or turned into a letter. This is a **price**, which is what a player pays before a run, and § D601 § 10 and charter non-goal 6 are both undisturbed: two players who post the same run still read the same verdict whatever they paid.
+
+### 11. What this does not decide
+
+Whether **any** of the four prices or three boundaries is right — all seven are an agent's draft and all seven await the owner, exactly as § D601's footprints do. Whether `fifth-car` should carry the surcharge too, which is the campaign-shop path § 8 says nothing reaches. Whether the campaign shop should quote a banded price at all, which needs a resolved building where there is none. Whether a **fifth** band is worth cutting once a building lands in the 104–376 bulk's own gaps — § 2 says the distribution does not support one **today**, which is a measurement of a shipped set rather than a property of the design. And whether lettable area should bound a floor's **population**, which § D601 § 11 left open and this entry does not touch.
+
+**Bookkeeping.** This lane was reserved **D630–D639** and spent **D630**. **D631–D639 are returned unspent**, and whether each is free or a hole is the integrator's call at close, on § D430's rule.
