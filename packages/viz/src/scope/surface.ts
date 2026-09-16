@@ -184,8 +184,14 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
       'a tier in nights and `bookingIsLive` will not report it fitted until they are past, so the ' +
       'kit changes on a day boundary and never inside one. It is not between-games either — a ' +
       'contract is twenty days and the fabric moves several times inside one, which is the whole ' +
-      'shape of the mode. Written only by everyday/host.ts#runCampaignDay, which presses the run in ' +
-      'the same call, so no screen can move it without running the day it belongs to.',
+      'shape of the mode. It has TWO writers, and the second joined on GitHub issue #372 (§ D640): ' +
+      'everyday/host.ts#runCampaignDay, which presses the run in the same call, so no screen can ' +
+      'move it without running the day it belongs to; and everyday/rush.ts#rushPatchOf, which ' +
+      'writes the rush pre-fit kit onto the standing a rush press builds, in the same press that ' +
+      'starts the round. The scope is unmoved by that, and the second writer is why the sentence ' +
+      'says so: a rush press is a between-games act — it parks the player’s week and opens the ' +
+      'rush’s own — so the kit is still decided before a round exists and never inside one. What a ' +
+      'rush writes is the ONE kit core/src/config/rushPrefit.ts holds, not a tier a screen chose.',
   ),
   'viewer.campaignEventId': control(
     'between-days',
