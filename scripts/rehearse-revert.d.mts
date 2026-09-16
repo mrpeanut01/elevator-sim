@@ -58,6 +58,75 @@ export function crossesSaveSchema(bumps: readonly SchemaBump[]): boolean;
 /** The ten characters the built page shows, matching `vite.config.ts#buildVersion`. */
 export function buildVersionOf(sha: string): string;
 
+/** A commit as `git log --format="%H<sep>%P"` reports it: its sha and its parents' shas. */
+export interface LoggedCommit {
+  readonly sha: string;
+  readonly parents: readonly string[];
+}
+
+/** One `git revert` invocation {@link planRevertSteps} plans for a single commit. */
+export interface RevertStep {
+  readonly sha: string;
+  readonly isMerge: boolean;
+  readonly args: readonly string[];
+}
+
+/** Which of GitHub issue #540's history problems a target has, or none. */
+export interface HistoryProblem {
+  readonly blocked: boolean;
+  readonly reason: 'shallow-history' | 'unknown-revision' | 'not-an-ancestor' | null;
+}
+
+/** The result of {@link safeRevertTo}. */
+export type SafeRevertResult =
+  | {
+      readonly ok: true;
+      readonly revertSha: string;
+      readonly stepCount: number;
+      readonly merges: readonly string[];
+    }
+  | { readonly ok: false; readonly reason: string; readonly detail: string };
+
+/** Whether a logged commit is a merge — see {@link planRevertSteps}. */
+export function isMergeCommit(commit: LoggedCommit): boolean;
+
+/** `git log --format="%H<sep>%P" target..tip` parsed into {@link LoggedCommit}s, newest first. */
+export function parseCommitLog(logText: string, sep?: string): readonly LoggedCommit[];
+
+/**
+ * The ordered, one-commit-at-a-time `git revert` invocations that put the tree back to `target` —
+ * never the ranged form, which is GitHub issue #540's first failure mode.
+ */
+export function planRevertSteps(commitsNewestFirst: readonly LoggedCommit[]): readonly RevertStep[];
+
+/**
+ * Distinguishes GitHub issue #540's second failure mode (a shallow checkout that never fetched
+ * `target`) from a target that does not exist, and from one that is not an ancestor of `tip`.
+ */
+export function classifyHistoryProblem(observed: {
+  readonly isShallow: boolean;
+  readonly objectExistsLocally: boolean;
+  readonly isAncestorOfTip: boolean;
+}): HistoryProblem;
+
+/** The message for a {@link classifyHistoryProblem} result, precise about which of the three it is. */
+export function historyProblemMessage(problem: HistoryProblem, target: string, tip: string): string;
+
+/**
+ * Executes {@link planRevertSteps}'s plan against `cwd` for real: one `git revert --no-commit` per
+ * commit, then a single `git commit` over the whole plan — the ranged form is never issued. On any
+ * step's failure, aborts the sequencer, hard-resets to the commit `cwd` started on, and cleans, so
+ * a partial revert is never committed. `identityArgs` is prepended to the commit invocation.
+ */
+export function safeRevertTo(
+  cwd: string,
+  target: string,
+  tip: string,
+  commitMessage?: string,
+  identityArgs?: readonly string[],
+  revertRunner?: (cwd: string, args: readonly string[]) => { readonly code: number; readonly output: string },
+): SafeRevertResult;
+
 /** Why a rehearsal failed, in the order the observations were taken. Empty means it held. */
 export function issuesOf(observations: readonly Observation[]): readonly string[];
 
