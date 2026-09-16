@@ -854,6 +854,8 @@ describe('what a ceiling means for a row priced per unit — #478, § D552', () 
       ],
       extras: [],
       withheld: [],
+      /* This fixture prices no shaft, so it bands none — GitHub issue #429 stage 2, § D630. */
+      areaBands: [],
     });
 
     const ladder = (base: number, adds: number): ScenarioBudget => {

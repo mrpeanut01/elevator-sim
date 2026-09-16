@@ -27,6 +27,13 @@ const CONTEXT: FixitContext = {
   profileIds: new Set(['standing-order']),
   bandByBuilding: new Map([['tower', { min: 3, max: 7 }]]),
   engineIds: ['tower', 'standing-order'],
+  /*
+   * **This fixture bands no shaft, and that is the unresolved arm rather than the cheap one** —
+   * GitHub issue #429 stage 2, § D630. `tower` is not a shipped building, so no plan area exists to
+   * resolve; a new-shaft repair here is priced at the base `new-car` figure, which is exactly what
+   * the two cases in `UNBANDED_SHAFT_CASES` get and why the two states must not be conflated.
+   */
+  shaftAreaBandByBank: new Map(),
 };
 
 /** A minimal valid case, cloned per test. */
