@@ -395,7 +395,8 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
 
   /**
    * **A change priced per unit is refused with a reason, never priced at one and never a throw** —
-   * GitHub issue #437, § D619.
+   * GitHub issue #437, § D619. `shaft-area` (GitHub issue #429 stage 2, § D630) joined `landing-panels`
+   * as the schedule's second rated row and is refused for the identical reason, asserted below.
    *
    * `landing-panels` is the schedule's first rated row. This control buys a whole change and holds
    * no quantity, so the honest answer is a refusal; before § D619 the answer was a
@@ -405,7 +406,7 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
    */
   it('refuses a change priced per unit, because this control holds no quantity', () => {
     const rated = schedule.changes.filter((change) => change.rate !== undefined);
-    expect(rated.map((change) => change.id)).toEqual(['landing-panels']);
+    expect(rated.map((change) => change.id)).toEqual(['landing-panels', 'shaft-area']);
     const panels = rated[0] as PricedChange;
 
     const admission = admitWorks({

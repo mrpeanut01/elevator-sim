@@ -327,6 +327,16 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
   'shift/legibilityOf':
     'the instrument behind docs/33 § 6.4b; its driver is the gated sweep and its guard the pinned slice',
   /*
+   * -- GitHub issue #429 stage 2, § D630. `UNBANDED_SHAFT_CASES` names the two shipped cases whose
+   * new-shaft repair cannot be priced by band — the coverage register `cases.test.ts` asserts
+   * against the shipped file in both directions, on `coveredDeclarations`' ground: the guard is its
+   * consumer by design. A shipped caller reappearing here would mean a repair's price silently
+   * branching on this list rather than on the band `fixitContextOf` actually resolved, which is
+   * exactly the defect § D601 § 5 refused to let a docstring decide.
+   */
+  'fixit/UNBANDED_SHAFT_CASES':
+    'the register cases.test.ts asserts against the shipped file in both directions',
+  /*
    * -- The campaign dock's string walk. Its consumer is campaignDock.test.ts's first-person sweep
    * over every dock state; the corpus reaches the same strings through stageScreenModel.ts's
    * stage header, which is why nothing in honesty/ calls this one.
