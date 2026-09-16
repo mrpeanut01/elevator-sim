@@ -769,10 +769,11 @@ note and the presses, so the label agrees with itself across four surfaces by co
 switch beside that strip would be a second, disagreeing source for the same fact — the argument is
 at `tunerModel.ts` where the narrower guard (*the building moved*) was rejected for the same reason.
 
-**Not decided, and named so the next reader finds it named.** Whether Free play should be scored:
-a free-play week *is* posted — `week.ts` gates only on the sandbox id — while the handoff's Sandbox
-is explicitly unscored. That is a product judgement about what Free play is for, and § D496 leaves
-it open rather than settling a second question inside the first.
+**Status 2026-09-16: RULED by [§ D630](../DECISIONS.md).** Free play should **keep** posting to the
+week — the status quo is confirmed rather than changed. § D496 raised the question and left it open;
+§ D630 settles it by reading `week.ts`'s own reasoning at `FREE_PLAY_CONTRACT_ID`'s declaration,
+which already distinguishes Free Play (*chosen*, from its own tile) from Sandbox (*arrived at*, the
+only one of the two whose screen promises nothing counts). No gate change is owed.
 
 ---
 
@@ -885,9 +886,13 @@ this box — the honest-control shape `docs/28` § 5.5a describes. All three chi
 A floor that is neither near the lobby nor currently under a full car **cannot be looked at legibly
 at all**. Measured through the shipped derivation: the reachable band is **40 of 165**.
 
-**What is deliberately not decided here.** Whether the answer is a scrollbar, a drag, a floor-number
-jump, or a zone picker keyed to the tower's own sky lobbies is design work with an owner this
-document does not have, and `docs/38` § 2.5 is the reason it is wanted. What is settled is that the
+**Status 2026-09-16: RULED by [§ D625](../DECISIONS.md).** Of the four candidates — a scrollbar, a
+drag, a floor-number jump, or a zone picker keyed to the tower's own sky lobbies — the floor-number
+jump ships first, as the smallest control that composes with the three existing bands; the zone
+picker `docs/38` § 2.5 wants remains the fuller answer and follows as a v2 rather than a blocker.
+Confirmed directly (GitHub issue #549) that none of the four exists today: wheel and drag over the
+stage canvas do nothing, and clicking a floor row in `Whole tower` view does not aim the camera
+there either. Neither candidate is built by this ruling. What is settled is that the
 handoff's single-cutaway assumption does not survive this building, and that the camera is a
 starting point rather than the answer — three fixed positions is a zoning mechanism with no way to
 aim it.
