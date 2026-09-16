@@ -1671,6 +1671,7 @@ import {
   legibleFloorCount,
   stageCameraChipsOf,
   stageCameraWindowOf,
+  stageFloorJumpOptionsOf,
   wholeTowerIsLegible,
 } from './stageScreenModel.js';
 
@@ -1800,5 +1801,47 @@ describe('the camera, measured per tower — GitHub issue #324', () => {
       cars: [{ heightM: 3.2 * 25, occupants: 7 }],
     });
     expect(moved).not.toEqual(high);
+  });
+
+  describe('the fourth position — a jump to a chosen floor, GitHub issue #549, § D625', () => {
+    const tall = Array.from({ length: 60 }, (_unused, index) => ({
+      ...syntheticFloor(`L${String(index)}`, index),
+      heightM: index * 3.2,
+      isEntrance: index === 0,
+    }));
+    const height = Math.round(720 * 0.6);
+
+    it('offers one option per floor, top-down, exactly where the fixed chips are offered', () => {
+      expect(stageFloorJumpOptionsOf(tall, height)).toHaveLength(tall.length);
+      expect(stageFloorJumpOptionsOf(tall, height).map((option) => option.floorId)).toEqual(
+        [...tall].sort((a, b) => b.heightM - a.heightM).map((floor) => floor.id),
+      );
+      const short = tall.slice(0, 3);
+      expect(wholeTowerIsLegible(short, height)).toBe(true);
+      expect(stageFloorJumpOptionsOf(short, height)).toEqual([]);
+    });
+
+    it('centres the band on the chosen floor, unlike lobby or follow', () => {
+      const lobby = stageCameraWindowOf({ camera: 'lobby', floors: tall, height });
+      const jumped = stageCameraWindowOf({ camera: 'floor', floors: tall, height, targetFloorId: 'L45' });
+      expect(jumped).toBeDefined();
+      expect(jumped!.fromIndex).toBeLessThanOrEqual(45);
+      expect(jumped!.toIndex).toBeGreaterThanOrEqual(45);
+      expect(jumped).not.toEqual(lobby);
+    });
+
+    it('moves the picture, and moving the control does — the standing requirement, applied here', () => {
+      const at10 = stageCameraWindowOf({ camera: 'floor', floors: tall, height, targetFloorId: 'L10' });
+      const at50 = stageCameraWindowOf({ camera: 'floor', floors: tall, height, targetFloorId: 'L50' });
+      expect(at10).not.toEqual(at50);
+    });
+
+    it('falls back to the lobby band with no target, or a stale one off a since-loaded building', () => {
+      const lobby = stageCameraWindowOf({ camera: 'lobby', floors: tall, height });
+      expect(stageCameraWindowOf({ camera: 'floor', floors: tall, height })).toEqual(lobby);
+      expect(stageCameraWindowOf({ camera: 'floor', floors: tall, height, targetFloorId: 'not-a-real-floor' })).toEqual(
+        lobby,
+      );
+    });
   });
 });

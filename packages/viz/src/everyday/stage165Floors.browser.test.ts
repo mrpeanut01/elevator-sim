@@ -35,6 +35,11 @@
  * not fit. A stage that could not draw the tower and did not offer the camera would be the real
  * defect; a stage that cannot draw it and does offer it is a zoned stage that already partly exists,
  * which is the finding this file exists to produce.
+ *
+ * **Since GitHub issue #549, § D625, the camera is a zoned stage plus one free control.** The three
+ * original positions still cannot reach a floor that is neither the entrance nor under the fullest
+ * car — measured below, unchanged — but a fourth, `floor`, now reaches any of them directly. Both
+ * halves are measured in the cases below rather than one silently going stale beside the other.
  */
 
 import { chromium, type Browser, type Page } from 'playwright-core';
@@ -51,6 +56,7 @@ import {
 import {
   legibleFloorCount,
   stageCameraWindowOf,
+  stageFloorJumpOptionsOf,
   wholeTowerIsLegible,
 } from './stageScreenModel.js';
 
@@ -159,11 +165,17 @@ describe.skipIf(!HAS_BROWSER)('the stage at 165 floors — GitHub issue #377', (
     });
   }
 
-  it('leaves most of the tower unreachable, because no camera is a free control', () => {
+  it('leaves most of the tower unreachable through the three fixed positions alone', () => {
     /*
-     * **The sharper half of the finding, and the reason a camera is not yet a zoned stage.**
+     * **The sharper half of the finding, corrected on the commit that changed it — GitHub issue
+     * #549, § D625.**
      *
-     * `STAGE_CAMERAS` offers three positions and none of them is a scroll:
+     * This case used to read *"no camera is a free control"* and end there, ***inviting*** its own
+     * correction in its last line: *"a camera that gains a free control moves this case."* It has.
+     * A fourth position, `floor`, now exists ({@link stageFloorJumpOptionsOf}), and unlike the three
+     * below it is keyed to a player's own choice rather than to anything the run produces — see the
+     * next case. **What has not changed is the three fixed positions' own reach**, which this case
+     * still measures precisely:
      *
      * - `whole` draws all 165 floors in the box — the illegible case by construction, about 3 px a
      *   floor at `60vh`, under `render/canvas.ts#MIN_GLYPH_PITCH_PX`'s 12, so every row degrades.
@@ -171,13 +183,10 @@ describe.skipIf(!HAS_BROWSER)('the stage at 165 floors — GitHub issue #377', (
      * - `follow` is a band **centred on the fullest car**, so it goes where the simulation goes and
      *   nowhere the player chooses.
      *
-     * So a floor that is neither near the lobby nor currently under a full car **cannot be looked
-     * at legibly at all**. That is the gap § D527's fourth measurement anticipated, stated as a
-     * quantity rather than as an impression, and it is why #377 ends in a recorded deviation rather
-     * than in a measurement that closes it.
-     *
-     * Measured through the shipped derivation rather than by arithmetic on this docstring, so a
-     * camera that gains a free control moves this case.
+     * So a floor that is neither near the lobby nor currently under a full car still cannot be
+     * reached by picking `whole`, `lobby` or `follow` — that half of § D527's fourth measurement
+     * stands. It no longer means the floor is unreachable *at all*, which is why the title above
+     * lost its old, now-false, absolute claim and gained the word "through."
      */
     const floors = Array.from({ length: REFERENCE_FLOORS }, (_unused, index) => ({
       index,
@@ -208,10 +217,86 @@ describe.skipIf(!HAS_BROWSER)('the stage at 165 floors — GitHub issue #377', (
 
     /*
      * Recorded as a share rather than pinned at a number: what matters is that most of the tower is
-     * out of reach, and an exact count would make an unrelated band change look like a regression.
-     * At the measured 540 px box this is 40 of 165.
+     * out of reach through these three, and an exact count would make an unrelated band change look
+     * like a regression. At the measured 540 px box this is 40 of 165.
      */
     expect(reach / REFERENCE_FLOORS).toBeLessThan(0.5);
+  });
+
+  it('reaches every floor through the fourth position, which the three fixed ones cannot — § D625', () => {
+    /*
+     * The half that corrects the old absolute claim, measured rather than asserted: every floor the
+     * three fixed positions could not reach is offered directly in {@link stageFloorJumpOptionsOf},
+     * and jumping to one centres the band on it exactly as `follow` centres on a car — see
+     * `stageScreenModel.test.ts`'s own camera describe block for the unit-level proof. This case
+     * checks the one thing that block cannot: that the shipped derivation, on the shipped reference
+     * tower, at the shipped legibility box, actually offers all 165 rather than some cramped subset.
+     */
+    const floors = Array.from({ length: REFERENCE_FLOORS }, (_unused, index) => ({
+      id: `floor-${String(index)}`,
+      index,
+      heightM: index * 4,
+      isEntrance: index === 0,
+      isTransferFloor: false,
+      population: 0,
+    }));
+
+    const options = stageFloorJumpOptionsOf(floors as never, 540);
+    expect(options).toHaveLength(REFERENCE_FLOORS);
+
+    /* A floor the three fixed positions leave stranded — the middle of the tower, near neither
+       the lobby nor (with no cars given) the fullest car. */
+    const strandedIndex = 90;
+    const lobby = stageCameraWindowOf({ camera: 'lobby', floors: floors as never, height: 540 });
+    expect(
+      strandedIndex,
+      'the chosen floor is inside the lobby band, so it does not test what this case exists to test',
+    ).toBeGreaterThan(lobby?.toIndex ?? 0);
+
+    const jumped = stageCameraWindowOf({
+      camera: 'floor',
+      floors: floors as never,
+      height: 540,
+      targetFloorId: `floor-${String(strandedIndex)}`,
+    });
+    expect(jumped).toBeDefined();
+    expect(jumped!.fromIndex).toBeLessThanOrEqual(strandedIndex);
+    expect(jumped!.toIndex).toBeGreaterThanOrEqual(strandedIndex);
+  });
+
+  it('actually moves the control on the shipped page, and un-presses the three fixed chips — § D625', async () => {
+    /*
+     * The two cases above prove the model. This one proves the DOM: the standing requirement this
+     * repository holds every added control to — *move the control and require the run to change* —
+     * checked on the built bundle rather than assumed from the model-level proof above.
+     */
+    const page = await stageAt(1440, 900);
+    try {
+      const select = page.locator('.everyday-stage-floor-jump');
+      expect(await select.count()).toBe(1);
+      const optionCount = await select.locator('option').count();
+      /* One placeholder plus one option per floor. */
+      expect(optionCount).toBe(REFERENCE_FLOORS + 1);
+
+      /* Press `lobby` first, so the case below is a real transition rather than an untouched default. */
+      const lobbyChip = page.locator('.everyday-stage-camera[data-camera="lobby"]');
+      await lobbyChip.click();
+      expect(await lobbyChip.getAttribute('aria-pressed')).toBe('true');
+
+      const values = await select
+        .locator('option')
+        .evaluateAll((opts) => opts.map((opt) => (opt as HTMLOptionElement).value).filter((v) => v !== ''));
+      const midValue = values[Math.floor(values.length / 2)];
+      expect(midValue, 'no non-placeholder option to select').toBeDefined();
+      await select.selectOption(midValue as string);
+
+      /* Selecting a floor un-presses every fixed chip — there is no fourth chip to press instead. */
+      const pressedFixed = await page.locator('.everyday-stage-camera[aria-pressed="true"]').count();
+      expect(pressedFixed).toBe(0);
+      expect(await select.inputValue()).toBe(midValue);
+    } finally {
+      await page.close();
+    }
   });
 
   it('resolves the reference tower to its full height, not to its ten authored anchors', async () => {
