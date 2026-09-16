@@ -93,6 +93,10 @@ import type { TailStudy } from './tailStudy.js';
 import type { SelectionStudy } from './weightSetSelection.js';
 import type { SelectionSweep } from './selectionSweep.js';
 import type { LunchTwoWaySelectionStudy } from './lunchTwoWaySelection.js';
+import {
+  landingPanelPairKey,
+  type LandingPanelDeploymentStudy,
+} from './landingPanelDeployment.js';
 
 /* -------------------------------------------------------------------------- *
  * The domain
@@ -122,6 +126,7 @@ export const PUBLISHED_STUDY_IDS = Object.freeze([
   'weight-set-selection',
   'selection-sweep',
   'lunch-two-way-selection',
+  'landing-panel-deployment',
   'double-deck',
   'deadband-sweep',
   'rate-sweep',
@@ -510,6 +515,30 @@ export function lunchTwoWaySelectionFigures(
           estimateOf(cost.estimate),
         );
       }
+    }
+  }
+  return figures;
+}
+
+/**
+ * The landing-panel deployment study's figures — GitHub issue #437 stage 2, § D619.
+ *
+ * Keyed `cell/candidate-baseline/metric` by {@link landingPanelPairKey}, which the study owns so the
+ * key cannot drift between the pin and the thing pinned.
+ *
+ * **Every metric the study measures is pinned, including the ones `comparabilityBetween` refuses.**
+ * A pin holds a number against drift; it makes no claim that the number may be read as a
+ * comparison, and that claim lives on `LandingPanelPair.verdict`, which reads `NOT-COMPARABLE` for
+ * all nine model-sensitive metrics here. Pinning only the comparable ones would leave the costs
+ * § D27 requires to be shown as the only figures in this study nothing guards.
+ */
+export function landingPanelFigures(
+  study: LandingPanelDeploymentStudy,
+): ReadonlyMap<string, PinnedEstimate> {
+  const figures = new Map<string, PinnedEstimate>();
+  for (const cell of study.cells) {
+    for (const pair of cell.pairs) {
+      figures.set(landingPanelPairKey(cell.cellId, pair), estimateOf(pair.comparison.estimate));
     }
   }
   return figures;
@@ -1198,6 +1227,12 @@ export const STUDY_ENTRY_POINTS: Readonly<Record<string, PublishedStudyId | 'no-
     // cells' arms, so `regeneratePins.ts` is its non-test caller and
     // `lunchTwoWaySelection.test.ts` compares the pins against a fresh run.
     runLunchTwoWaySelectionStudy: 'lunch-two-way-selection',
+    // GitHub issue #437 stage 2's measurement, DECISIONS.md § D619: three per-landing panel
+    // deployments of one building under one dispatcher, at two operating points, n = 200 under
+    // common random numbers. Publishes a paired-t interval per cell per pair per metric, so
+    // `regeneratePins.ts` is its non-test caller and `landingPanelDeployment.test.ts` compares the
+    // pins against a fresh run.
+    runLandingPanelDeploymentStudy: 'landing-panel-deployment',
     // Counts and a trajectory divergence index: how many patterns the detector entered, whether
     // the shipped weight-set map and a permuted one produce different car trajectories, and
     // whether the selector switched off is bit-identical to the profile run without it. There is
@@ -2287,6 +2322,32 @@ export const PINNED_ESTIMATES: Readonly<
     "midtown-lunch-two-way-1.5pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 4.443549783624212, standardError: 0.5830506682747879, lower: 3.293799202689362, upper: 5.593300364559061 },
     "midtown-lunch-two-way-1.5pct/learned/cost/wt95S": { n: 200, mean: 0.8087805158646946, standardError: 0.23605125713104458, lower: 0.3432976945862684, upper: 1.2742633371431207 },
     "midtown-lunch-two-way-1.5pct/learned/gate/ttdMeanS": { n: 200, mean: -0.1701872278619276, standardError: 0.11887551599771772, lower: -0.4046045795849358, upper: 0.0642301238610806 },
+  }),
+  "landing-panel-deployment": Object.freeze({
+    "mixed-1.5pct/entrance-full/awtS": { n: 200, mean: -0.49753790416534727, standardError: 0.08307154404647096, lower: -0.6613513790888867, upper: -0.33372442924180773 },
+    "mixed-1.5pct/entrance-full/energyPerServedLegKJ": { n: 200, mean: -4.003483148411619, standardError: 0.5069381496871915, lower: -5.003143150218172, upper: -3.0038231466050664 },
+    "mixed-1.5pct/entrance-full/ttdMeanS": { n: 200, mean: 1.2940765800005307, standardError: 0.15235092375923212, lower: 0.9936471788707069, upper: 1.5945059811303546 },
+    "mixed-1.5pct/entrance-full/wt95S": { n: 200, mean: -1.0654455813497803, standardError: 0.2992562423609647, lower: -1.6555658868816854, upper: -0.4753252758178752 },
+    "mixed-1.5pct/entrance-none/awtS": { n: 200, mean: -0.03271618543063606, standardError: 0.06168115025990955, lower: -0.15434873334264293, upper: 0.08891636248137079 },
+    "mixed-1.5pct/entrance-none/energyPerServedLegKJ": { n: 200, mean: 0.7860287016304625, standardError: 0.3892743152065617, lower: 0.018396668249747727, upper: 1.553660735011177 },
+    "mixed-1.5pct/entrance-none/ttdMeanS": { n: 200, mean: -0.3179772593057198, standardError: 0.10479377730389977, lower: -0.52462603425701, upper: -0.11132848435442957 },
+    "mixed-1.5pct/entrance-none/wt95S": { n: 200, mean: -0.08615850931650333, standardError: 0.2733279305523002, lower: -0.6251493106959115, upper: 0.4528322920629048 },
+    "mixed-1.5pct/full-none/awtS": { n: 200, mean: 0.4648217187347112, standardError: 0.08159835161455566, lower: 0.3039133152682293, upper: 0.6257301222011931 },
+    "mixed-1.5pct/full-none/energyPerServedLegKJ": { n: 200, mean: 4.789511850042078, standardError: 0.5249856722317819, lower: 3.754262918046188, upper: 5.824760782037967 },
+    "mixed-1.5pct/full-none/ttdMeanS": { n: 200, mean: -1.6120538393062507, standardError: 0.14799319206204395, lower: -1.9038899828977107, upper: -1.3202176957147906 },
+    "mixed-1.5pct/full-none/wt95S": { n: 200, mean: 0.9792870720332775, standardError: 0.31723749330790657, lower: 0.35370852102271655, upper: 1.6048656230438385 },
+    "up-peak-1pct/entrance-full/awtS": { n: 200, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "up-peak-1pct/entrance-full/energyPerServedLegKJ": { n: 200, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "up-peak-1pct/entrance-full/ttdMeanS": { n: 200, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "up-peak-1pct/entrance-full/wt95S": { n: 200, mean: 0, standardError: 0, lower: 0, upper: 0 },
+    "up-peak-1pct/entrance-none/awtS": { n: 200, mean: 0.48992188790032853, standardError: 0.12160272460166999, lower: 0.25012659932321685, upper: 0.7297171764774402 },
+    "up-peak-1pct/entrance-none/energyPerServedLegKJ": { n: 200, mean: 3.1593731676044037, standardError: 0.7734545622516775, lower: 1.634154381890802, upper: 4.684591953318005 },
+    "up-peak-1pct/entrance-none/ttdMeanS": { n: 200, mean: -0.15161267388860775, standardError: 0.20725708155171424, lower: -0.5603146321970383, upper: 0.2570892844198228 },
+    "up-peak-1pct/entrance-none/wt95S": { n: 200, mean: 0.14685739389811597, standardError: 0.12214966975705784, lower: -0.09401644675750961, upper: 0.3877312345537416 },
+    "up-peak-1pct/full-none/awtS": { n: 200, mean: 0.48992188790032853, standardError: 0.12160272460166999, lower: 0.25012659932321685, upper: 0.7297171764774402 },
+    "up-peak-1pct/full-none/energyPerServedLegKJ": { n: 200, mean: 3.1593731676044037, standardError: 0.7734545622516775, lower: 1.634154381890802, upper: 4.684591953318005 },
+    "up-peak-1pct/full-none/ttdMeanS": { n: 200, mean: -0.15161267388860775, standardError: 0.20725708155171424, lower: -0.5603146321970383, upper: 0.2570892844198228 },
+    "up-peak-1pct/full-none/wt95S": { n: 200, mean: 0.14685739389811597, standardError: 0.12214966975705784, lower: -0.09401644675750961, upper: 0.3877312345537416 },
   }),
   "deadband-sweep": Object.freeze({
     "t0/awtS": { n: 300, mean: -0.6230477193303771, standardError: 0.26148216826541404, lower: -1.1376262361914988, upper: -0.10846920246925529 },

@@ -300,9 +300,19 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
     doubleDeck = requireBuilding(config, 'vertical-city');
   }, 120_000);
 
-  /** The cheapest and dearest shipped changes on each of the two tiers, found rather than named. */
+  /**
+   * The cheapest and dearest shipped changes on each of the two tiers, found rather than named.
+   *
+   * **Flat rows only, and that is the population this control can buy from** — GitHub issue #437,
+   * § D619. A rated row is priced per unit, `purchaseUnits` refuses to price one without a quantity
+   * this control does not hold, and `admitWorks` now refuses such a change by name. Sorting the
+   * whole tier would therefore throw, and picking a rated row as *the cheapest equipment change*
+   * would make these cases assert against a purchase the product does not offer.
+   */
   const onTier = (tier: string): readonly PricedChange[] =>
-    schedule.changes.filter((change) => change.tier === tier).sort((a, b) => purchaseUnits(a) - purchaseUnits(b));
+    schedule.changes
+      .filter((change) => change.tier === tier && change.rate === undefined)
+      .sort((a, b) => purchaseUnits(a) - purchaseUnits(b));
 
   const cheapestEquipment = onTier('equipment')[0];
   const dearestBuilding = onTier('building').at(-1);
@@ -381,6 +391,40 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
     expect(cheapestEquipment).toBeDefined();
     const change = cheapestEquipment as PricedChange;
     expect(worksLabelOf(change)).toBe(`${change.name} · ${String(change.priceUnits)} units`);
+  });
+
+  /**
+   * **A change priced per unit is refused with a reason, never priced at one and never a throw** —
+   * GitHub issue #437, § D619.
+   *
+   * `landing-panels` is the schedule's first rated row. This control buys a whole change and holds
+   * no quantity, so the honest answer is a refusal; before § D619 the answer was a
+   * `PriceScheduleError` thrown out of `admitWorks`, which on the stage screen is a crash where the
+   * contract promises a sentence. Driven against the shipped row rather than a fixture, because a
+   * fixture would prove only that a fixture is refused.
+   */
+  it('refuses a change priced per unit, because this control holds no quantity', () => {
+    const rated = schedule.changes.filter((change) => change.rate !== undefined);
+    expect(rated.map((change) => change.id)).toEqual(['landing-panels']);
+    const panels = rated[0] as PricedChange;
+
+    const admission = admitWorks({
+      schedule,
+      // A budget far above any plausible price, so the refusal cannot be the purse's.
+      budgetUnits: 10_000,
+      interventions: [],
+      changeId: panels.id,
+      kind: 'equipment-change',
+      building: singleDeck,
+      serviceEvents: [],
+    });
+    expect(admission.admitted).toBe(false);
+    expect(admission.priceUnits).toBe(0);
+    expect(admission.reason).toContain(panels.name);
+    expect(admission.reason).toContain('per');
+    // And the label prints the rate on the row's face rather than inventing a total.
+    expect(worksLabelOf(panels)).toContain('units per');
+    expect(worksLabelOf(panels)).not.toMatch(/· \d+ units$/);
   });
 
   it('admits a change the rung covers, and refuses one it does not — naming the price and the budget', () => {

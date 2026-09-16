@@ -1981,7 +1981,24 @@ type DecisionReservation = {
  * time, now with a full house rather than two of five, and it is the argument for the block being
  * opened before the lanes start rather than a preference for tidiness.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'AC', from: 619, to: 620 } as DecisionReservation | null;
+/*
+ * **Wave AC is open on the pair wave AB left free, and this lane spent the first of them.**
+ * `CHARTER_PROGRAMME.md`'s row reads **D619** and says in terms that *"D619 and D620 are free rather
+ * than holes"* — so the block is that pair, and it is a block rather than a single number because a
+ * sibling lane may hold D620 while this one holds D619.
+ *
+ * GitHub issue #437 stage 2 wrote **D619**. The charter row is deliberately **not** moved to D620
+ * here: with a reservation open the guard asserts the row still names the block's *floor*, which is
+ * what it does, and reconciling the row mid-wave is the thing D387 records going wrong from the
+ * other direction (written without the section mark, as the docstring above writes it: D387 is a
+ * lane record rather than a `DECISIONS.md` heading, and `citations.test.ts` checks every `§ Dnnn`
+ * against one). The integrator sets this back to `null` and moves the row on one commit once the
+ * wave's numbering is finished — which is the remedy the guard below already names.
+ *
+ * **If D620 is never written it becomes a hole, not free**, and belongs in `KNOWN_DECISION_HOLES`
+ * under § D404 and § D430: ids here are names.
+ */
 /*
  * **Wave AB opened this as `{ wave: 'AB', from: 594, to: 600 }` and lane A closed it, having spent
  * every number in it.** The dispatch brief allocated lane A **D594–D600** and no others; wave AA's

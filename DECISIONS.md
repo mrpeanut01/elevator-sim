@@ -36926,3 +36926,50 @@ not first reproduced the answer everybody already had would be measuring the app
 ---
 
 ## D618 — `charter S9` B1's run-history store lives beside `viz`, and the gate stays advisory until it has real history
+
+---
+
+## D619 — A destination panel is priced **per landing** at the equipment tier, the first rated row this schedule ships, and what a hybrid deployment is worth is measured rather than asserted
+
+**Date: 2026-09-16 · GitHub issue [#437](https://github.com/mrpeanut01/elevator-sim/issues/437), stage 2 · Completes [§ D553](#d553), which built the per-floor data and left the price and the measurement to this stage · Spends [§ D552](#d552)'s rate × quantity seam for the first time.**
+
+**Why an entry.** Three of [§ D405](#d405)'s grounds. It adds an authored figure to a governed `data/` file that needs the product owner's approval and is drafted for it here. It **moves figures already recorded**: `data/price-schedule.json`'s equipment `typicalUnits` (9 → 6, derived) and the budget ceiling in `data/campaign.json` and `data/engineering-briefs.json` (412 → 577, derived), neither of which this lane's own module owns. And it makes a refusal that § D552 recorded as reachable stop being reachable on the shipped ladder, which is a thing a docstring may not quietly absorb.
+
+### What stage 1 left, and what this is
+
+§ D553 clause 1 made panel presence per-floor data (`FloorConfig.landingCallType`), clause 4 decided a mixed run's comparability and clause 6 enforced it, and its closing note said what it deliberately did not claim: *"the per-panel price on the schedule and the pinned measurement of entrance-only against full and against none, on the legs with paired intervals, are stage 2's."* This is stage 2, minus the viewer, which clause 9 holds for GitHub issue #534 and which is untouched here.
+
+### Ruling
+
+1. **`landing-panels` is a rated row at the equipment tier**: `rate.unitsPer: 1`, `rate.quantity` in `landing`, `0`–`165`, default `0`. It is the first row on the schedule priced per unit rather than flat, which § D552 anticipated by name (`rate.test.ts`: *"the first rate row that ships is GitHub issue #437's"*). **The figure is an agent's proposal, drafted for the owner**, per the standing ruling of 2026-09-08 on governed `data/` values; the row's note draws the measured/derived/chosen line field by field. What is derived is the bracket: two shipped rows already price a whole-building destination install at 13 u and 24 u, and `midtown-office` has 21 landings, so 1 u a landing puts a full deployment there between them. Nothing about the figure is measured, and the note says so.
+
+2. **It does not replace `destination-panels`, and the two do not overlap by path.** That row prices switching the *dispatcher* into destination mode (`dispatcher.dispatch.callType`, `.passengerAssignment`) and is bought flat by shipped fix-it repairs; making it rated would make `purchaseUnits` throw for every caller that holds no quantity and would re-price those repairs, which § D560 already drafted and declined. This row prices the hall *fixture* at a landing (`building.floors[].landingCallType`).
+
+3. **The ceiling is a ceiling, not a price, and it is checked against disk.** 165 is the landing count of the largest shipped building, so that the schedule ceiling `scenario/budget.ts#scheduleBoundsOf` derives — every change bought at once, a rated row at its declared most — stays true of every building the game ships. `pricing/rate.test.ts` derives that bound from `data/buildings/` through the loader rather than trusting the number in the file.
+
+4. **Two derived figures move with it, and both are arithmetic rather than re-pricing.** The equipment tier's `typicalUnits` is its own median of the price on each row's face, which `violationsIn` enforces; a fifteenth row at 1 u moves it 9 → 6, and the ladder still ascends (2 u, 6 u, 20 u). The budget `schema.max` in `data/campaign.json` (30 sites) and `data/engineering-briefs.json` (6 sites) must equal `totalUnits` exactly, which `budgetViolations` enforces; a rated row enters it at its declared most, so 412 → 577. **No shipped row's price moved.**
+
+5. **The scenario rung ladder is deliberately *not* raised, and this is flagged rather than settled.** `scheduleBoundsOf.dearestChangeUnits` now reads 165 rather than `fifth-car`'s 54, because a rated row enters it at its most. Shipped stages keep a top rung of 54. Two reasons: a rung is a game-feel figure `data/campaign.json`'s own header puts with the product owner, and **no stage's editable set reaches `building.floors[].landingCallType`** — it is a building's fabric rather than a dispatcher dimension, so `changePricingDimension` never matches it and no scenario can spend a unit on it at any rung. Raising every rung by 111 units for a row no scenario can buy is not a consequence a lane may take. If panels become purchasable in a scenario, this is the figure to revisit.
+
+6. **§ D552's *"the rung below wearing a second price"* refusal is no longer reachable below 165 u, measured rather than discovered later.** `affordablePurchasesAt` counts a rated row's affordable *units* rather than the row — § D552's own choice, so that a rung buying a second panel is not refused as a duplicate. With a 1 u rate on the ladder, every rung below the row's ceiling buys at least one more panel than the rung under it, so no dead rung exists in the range a scenario occupies. The rule is unweakened and still binds above the ceiling; `scenario/budget.test.ts` now drives its positive control against the shipped ladder **minus** that row and asserts the shipped ladder's opposite answer beside it, so the pair says which it is rather than leaving a refusal that silently never fires.
+
+7. **The measurement.** `benchmark/landingPanelDeployment.ts`, pinned in `benchmark/published.ts` under `landing-panel-deployment` with `regeneratePins.ts` as its non-test caller. Three deployments of `midtown-office` under `destination-panel` held fixed — `none` (buttons at every landing, 0 panels, `conventional`), `entrance` (the landings the building itself flags `isEntrance`, 2 panels, `hybrid`), `full` (undeclared, 21 panels, `destination-dispatch`) — at two operating points, **n = 200** under common random numbers, seed 20 260 726, every arm quotable with zero saturated replications and trace digests identical across all three arms.
+
+   | cell | pair | ΔTTD (s) | verdict |
+   |---|---|---|---|
+   | up-peak 1 % | `entrance` − `none` | −0.1516 [−0.5603, +0.2571] | INDISTINGUISHABLE, `requiredReplications` 1 436 |
+   | up-peak 1 % | `full` − `none` | −0.1516 [−0.5603, +0.2571] | INDISTINGUISHABLE, 1 436 |
+   | up-peak 1 % | `entrance` − `full` | 0.0000 [0.0000, 0.0000] | **IDENTICAL**, 200 of 200 replications exactly equal on all four metrics |
+   | mixed 1.5 % | `entrance` − `none` | −0.3180 [−0.5246, −0.1113] | BETTER, resolvable at n = 1 |
+   | mixed 1.5 % | `full` − `none` | −1.6121 [−1.9039, −1.3202] | BETTER, n = 1 |
+   | mixed 1.5 % | `entrance` − `full` | +1.2941 [+0.9936, +1.5945] | WORSE, n = 1 |
+
+   **Under a pure up-peak two panels buy exactly what twenty-one do**, and the reason is counted rather than argued: incoming-only demand weighted entirely to `G` registers every call at `G`, so the other nineteen panels are never pressed. That is Al-Kodmany § 2.2.1's own claim about the hybrid configuration, measured in the direction it is made. Neither deployment is distinguishable from buttons on the gate at that cell. **Under the mixed day they separate and the ordering is monotone in panels**, because the landings a hybrid leaves out are landings that generate calls. The energy cost is reported beside the gate and never folded into it ([§ D106](#d106)): `energyPerServedLegKJ` is WORSE for both deployments at both cells.
+
+   **The rate is 1 % on the up-peak cell, censused at the budget the study spends** — at n = 200 the button arm first loses its AWT at 2 %, and at 3 % and 4 % the panel arms lose sixteen and twenty-nine replications. § D595's lesson kept: a census at n = 20 would have published 2 %.
+
+8. **§ D553 clause 4's pairing rule is enforced on the measurement rather than restated beside it.** No two arms run the same landing models, so `comparabilityBetween` refuses all nine model-sensitive metrics on **every** pair here, and the study carries the refusal as a value: `LandingPanelPair.verdict` reads `NOT-COMPARABLE` on each of them, so no caller can obtain a direction from an AWT taken across two passenger models. `ttdMeanS` is the gate for that reason, and the costs are still measured and published — § D27 — as figures rather than as verdicts.
+
+### What is not established
+
+**No mechanism** for why the mixed-cell effect is the size it is; that would need a measurement of its own, and [§ D256](#d256) refuses a plausible sentence in its place. **Nothing about any other building**: § D595 measured a destination effect that reversed between two towers, and this study is one building at two cells. **No purchase path**: the viewer still refuses a building declaring `landingCallType` under `landing-call-type-not-playable` (§ D553 clause 9, GitHub issue #534), so what reads this row today is `scenario/budget.ts#scheduleBoundsOf` through `campaign/parse.ts` — whose ceiling, cheapest positive step and affordable-purchase count all move because the row exists — and what does not read it is a player spending a unit on a panel. That is stage 2's honest boundary, stated here rather than left for a reader to find.

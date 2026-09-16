@@ -33,9 +33,15 @@
  *   fixture. Stage 2 extends it on the commit the schedule prices the fixtures separately, and not
  *   before.
  *
- * So what waits on stage 2 is the fixture axis and the price row, and what does not wait is the
- * set itself — because the set is what the fuzzer, the survivor sweep (§ D528) and the pricing all
- * need first, and none of them can be written against a dimension that does not exist.
+ * **The price row has landed and the fixture axis has not** — `DECISIONS.md` [§ D619](../../../../../DECISIONS.md),
+ * GitHub issue #437 stage 2. `data/price-schedule.json` now carries `landing-panels`, the first
+ * rated row on the schedule, at 1 u a landing at the equipment tier; the quantity it multiplies is
+ * exactly {@link panelCountOf}. What still waits is the fixture axis, for the reason above — the
+ * schedule prices *a panel*, and says nothing about a kiosk against a reader, so a categorical
+ * would still be guessing. This paragraph read *"what waits on stage 2 is the fixture axis and the
+ * price row"* until that row shipped, and is corrected rather than left: a sentence telling a
+ * reader a price does not exist when it does is the stale-refusal shape `CLAUDE.md` names as worse
+ * than a dead seam.
  *
  * ## `true` means the dispatcher's own panel, and `false` means a button
  *
@@ -271,9 +277,11 @@ export function landingCallTypesFrom(
 /**
  * How many landings this candidate puts a panel on — the **quantity** a per-panel price multiplies.
  *
- * The one number stage 2's pricing needs from this dimension, and the reason the dimension is a
- * boolean per floor rather than a categorical per floor. Counted over the space's own floor ids so
- * a candidate carrying a stray id cannot inflate it.
+ * The one number the schedule's `landing-panels` rate needs from this dimension, and the reason the
+ * dimension is a boolean per floor rather than a categorical per floor. Since § D619 that rate
+ * exists: `pricing/parse.ts#purchaseUnits(change, quantity)` charges `unitsPer × quantity`, and this
+ * is the quantity. Counted over the space's own floor ids so a candidate carrying a stray id cannot
+ * inflate it.
  */
 export function panelCountOf(panels: LandingPanelSpace, candidate: Candidate): number {
   let count = 0;
