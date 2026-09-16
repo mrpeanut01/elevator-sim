@@ -363,8 +363,20 @@ describe('CLAUDE.md invariant 6 — core never depends on viz', () => {
 
 describe('the wall clock has exactly one home', () => {
   it('is read only in playback/clock.ts', async () => {
+    /*
+     * **`dev/recordTti.ts` is a second, narrower exemption, and it is not a renderer.**
+     * `playback/clock.ts`'s own header explains what this check protects: replay determinism and
+     * `ManualClock`-driven tests, for modules that produce a *picture*. `recordTti.ts` produces no
+     * picture — it is an offline CI script (GitHub issue #408, DECISIONS.md § D618) that timestamps
+     * one line of an append-only log, `perf-history/tti-history.jsonl`, and nothing simulated or
+     * rendered ever reads that value back. Naming it here rather than loosening the regex above
+     * keeps the invariant this check exists to state — wall-clock time enters through
+     * `DisplayClock` and nowhere else — true of every module that draws a frame, which is what it
+     * was written to guarantee.
+     */
+    const WALL_CLOCK_EXEMPT = new Set(['playback/clock.ts', 'dev/recordTti.ts']);
     const offenders = (await vizSources())
-      .filter((file) => file.id !== 'playback/clock.ts' && !isTest(file.id))
+      .filter((file) => !WALL_CLOCK_EXEMPT.has(file.id) && !isTest(file.id))
       .filter((file) => /\b(?:Date\.now|performance\.now)\s*\(/.test(file.code))
       .map((file) => file.id);
     expect(offenders).toEqual([]);

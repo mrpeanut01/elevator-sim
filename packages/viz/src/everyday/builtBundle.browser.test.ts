@@ -110,7 +110,7 @@
  * helper has always summed.
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
@@ -128,6 +128,8 @@ import {
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
+import { evaluateTtiGate, ROLLING_WINDOW_N, TTI_BUDGET_MS } from '../dev/ttiGate.js';
+import { parseTtiHistory, recordsOnBranch } from '../dev/ttiHistory.js';
 
 /** The shortest viewport `docs/31-support-matrix.md` § 1 tier 2 supports. */
 const SHORTEST_SUPPORTED = { width: 375, height: 667 } as const;
@@ -567,6 +569,75 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
         1,
       )} of ${String(BUNDLE_BUDGET_KB)} kB). Look at the growth rather than at the number.`,
     ).toBeLessThanOrEqual(BUNDLE_BUDGET_KB * 0.9);
+  });
+
+  /* ------------------------------------------------------------------------ *
+   * `charter S9`'s B1 — GitHub issue #408, DECISIONS.md § D618
+   * ------------------------------------------------------------------------ */
+
+  /**
+   * **B1, reported against the rolling comparison `docs/31` § 3 requires — and gated only once that
+   * comparison has enough history to mean anything.**
+   *
+   * This file's header lists B1 among what could not be a plain assertion here, and quotes why:
+   * *"gates only on a rolling comparison, never on a single run … a single-run wall clock on a
+   * shared VM is a coin flip"*. `../dev/ttiGate.ts` and `../dev/ttiHistory.ts` are that comparison
+   * and its store; this case is where the two meet the tier.
+   *
+   * **What this case does and does not assert.** It always measures and always prints the verdict.
+   * It only **fails the build** when `evaluateTtiGate` returns `'fail'` — never on `'advisory'`,
+   * which is what every evaluation returns today, because `perf-history/tti-history.jsonl` has zero
+   * `main`-branch runs recorded (see that directory's README — it does carry one real measurement
+   * from validating this change, on a worktree branch that is not `main` and so does not count).
+   * That is not a bypass carved out for this case: it is the same arithmetic that will gate the
+   * ${ROLLING_WINDOW_N + 1}th run on `main`
+   * returning `'advisory'` for the first, per `ttiGate.ts`'s own header. `docs/22-charter.md` § 6's
+   * rule against meeting a criterion by weakening it is why this case does not fabricate history to
+   * make the gate "live" sooner — a store seeded with invented numbers would make `charter S9`
+   * *look* instrumented rather than make it so.
+   *
+   * **The measurement is Node-side wall clock**, matching `serveMs` above rather than a
+   * browser-reported metric — `docs/31` § 3 warns against a vendor metric whose own definition can
+   * move underneath the number. `../dev/recordTti.ts` shares this same approximation and its own
+   * header names the one clause of `docs/31`'s definition ("its handler bound") that presence and
+   * an enabled state cannot, by themselves, prove.
+   *
+   * **This case does not write to the store.** Appending on every test run — including a pull
+   * request's — would let untrusted branch measurements into a window `docs/31` § 3 specifies as
+   * `main`'s alone. `../dev/recordTti.ts` is the writer, run separately; see its header for why it
+   * is not (yet) invoked by CI.
+   */
+  it('reports time to interactive against the rolling history — charter S9 B1 (advisory until enough history exists)', async () => {
+    const page = await openPage(browser, { viewport: { width: 1280, height: 800 } });
+    const startedAt = process.hrtime.bigint();
+    await page.goto(site.origin, { waitUntil: 'commit' });
+    await page.waitForSelector('.everyday-screen', { timeout: 30_000 });
+    await leaveTutorialIfOffered(page);
+    await page.waitForSelector('[data-screen="scenario"]:not([disabled])', { timeout: 30_000 });
+    const ttiMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+
+    const historyPath = fileURLToPath(new URL('../../perf-history/tti-history.jsonl', import.meta.url));
+    const historyText = existsSync(historyPath) ? readFileSync(historyPath, 'utf8') : '';
+    const mainHistoryMs = recordsOnBranch(parseTtiHistory(historyText), 'main').map(
+      (record) => record.ttiMs,
+    );
+
+    // This run is on whatever branch checked out this worktree, never `main` from inside a test —
+    // the store's own writer (`recordTti.ts`) is what tags a real `main` run, and this case must
+    // not guess `isMainBranch: true` for itself or it would silently join a window it never joins.
+    const gate = evaluateTtiGate({ mainHistoryMs, currentTtiMs: ttiMs, isMainBranch: false });
+
+    console.log(
+      `charter S9 B1: measured ${ttiMs.toFixed(1)} ms against a ${String(TTI_BUDGET_MS)} ms ` +
+        `budget. ${gate.reason}`,
+    );
+
+    expect(
+      gate.verdict,
+      `charter S9 B1 regressed beyond the rolling comparison: ${gate.reason} ` +
+        `(measured ${ttiMs.toFixed(1)} ms). This is a real gate, not a placeholder — see ` +
+        'ttiGate.ts and DECISIONS.md § D618 before touching the numbers it compares against.',
+    ).not.toBe('fail');
   });
 });
 

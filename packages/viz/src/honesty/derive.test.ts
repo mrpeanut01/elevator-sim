@@ -1917,6 +1917,25 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'campaign/career.ts#offerRefusalOf',
       ],
     },
+    {
+      reason:
+        'The `charter S9` B1 run-history store and its rolling gate — GitHub issue #408, ' +
+        'DECISIONS.md § D618. Every literal here is addressed to whoever reads a CI log or a ' +
+        '`packages/viz/perf-history/tti-history.jsonl` parse failure: a schema violation message ' +
+        '("expected a full 40-character git SHA"), a malformed-line diagnostic naming the line ' +
+        'number, or `evaluateTtiGate`\'s own sentence reporting a rolling median against a budget. ' +
+        'None of them reaches a player — the store and the gate exist entirely inside the CI tier ' +
+        '(`everyday/builtBundle.browser.test.ts`\'s B1 case, `dev/recordTti.ts`) and this package ' +
+        'ships no screen that shows a build-time measurement.',
+      ids: [
+        'dev/ttiGate.ts#evaluateTtiGate',
+        'dev/ttiHistory.ts#appendTtiRecord',
+        'dev/ttiHistory.ts#parseTtiHistory',
+        'dev/ttiHistory.ts#serializeTtiRecord',
+        'dev/ttiHistory.ts#TtiHistoryParseError',
+        'dev/ttiHistory.ts#ttiRecordSchema',
+      ],
+    },
   ]);
 
 const excludedIds = new Set(NOT_PLAYER_FACING.flatMap((group) => group.ids));
