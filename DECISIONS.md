@@ -37058,7 +37058,9 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 
 **Basis.** A follow-up playtest confirmed that even the narrow case — reaching Merdeka, the issue's own worked example, at all — currently requires the Engineer/Free-Play surface, since neither Scenario nor (practically) Career content reaches it. That sharpens rather than changes the ruling: (a) is worth building once the rung it would be priced against is real, regardless of which content path eventually carries Merdeka.
 
-**What this does not decide.** The tracker's shape, whether (a)'s UI lands on the Everyday stage or the Engineer surface first, and how the offer is priced once a rung is readable, are all left to whoever takes the follow-up on. A GitHub issue naming this gap explicitly is the next step, not attempted here — the same shape [§ D628](#d628) and [§ D629](#d629) left their own follow-ups in.
+**What this does not decide.** The tracker's shape, whether (a)'s UI lands on the Everyday stage or the Engineer surface first, and how the offer is priced once a rung is readable, are all left to whoever takes the follow-up on.
+
+**Follow-up filed: [GitHub issue #553](https://github.com/mrpeanut01/elevator-sim/issues/553).**
 
 ---
 
@@ -37134,6 +37136,8 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 
 **What this does not decide.** The seed's source, the event calendar's shape, and what a rolled failure actually does to a running campaign are all unscoped. A follow-up issue naming this work explicitly would be the next step, not attempted here.
 
+**Follow-up filed: [GitHub issue #554](https://github.com/mrpeanut01/elevator-sim/issues/554).**
+
 ---
 
 ## D629 — `docs/32` Q6: the campaign day-goal bar belongs to the contract, not the difficulty tier; the 80 kJ/ride energy bar's fabric-domination (#234) needs per-building scaling, which is measurement work rather than a same-session fix
@@ -37149,6 +37153,8 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 **What this settles for #234.** The 80 kJ/ride energy bar is dominated by building fabric rather than by play, reproduced now on four-plus towers including `merdeka-class-reference` (176.4 kJ/ride under `collective` at 1 800 s, per that contract's own recorded note) — no dispatcher or tier setting can move it. Given the ownership ruling above, the fix is **per-building (or per-contract) scaling of the bar rather than one global constant**, which is what `docs/33` O2 already recommends. **This is not built here** — deriving a sound per-building target is a measurement task (the same shape as the 80 kJ figure's own derivation, § D468), not a ruling this session can make by itself.
 
 **What this does not decide.** The scaling formula, and whether existing contracts' recorded target texts need updating once it exists, are left to whoever takes the measurement on.
+
+**Follow-up filed: [GitHub issue #555](https://github.com/mrpeanut01/elevator-sim/issues/555).**
 
 ---
 
