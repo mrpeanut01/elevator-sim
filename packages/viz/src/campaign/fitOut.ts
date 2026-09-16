@@ -43,6 +43,8 @@
  */
 
 import {
+  MIN_DOOR_S,
+  doorCycleWithSaving,
   parseLoadDivisor,
   type BuildingConfig,
   type DispatchStageConfig,
@@ -296,7 +298,7 @@ function carsFitted(
         const timing = specs.doors[doorType];
         const openS = car.doorOpenS ?? timing?.openS ?? 0;
         const closeS = car.doorCloseS ?? timing?.closeS ?? 0;
-        const cycle = doorCycle(openS, closeS, fit.doorSecondsSaved);
+        const cycle = doorCycleWithSaving(openS, closeS, fit.doorSecondsSaved);
         const hallS = car.dwellHallCallS ?? specs.doors.dwellHallCallS.typical;
         const wantedLb =
           fit.carPersons === undefined || divisor === undefined
@@ -370,35 +372,17 @@ function loadOf(
 }
 
 /**
- * The door cycle with `saved` seconds taken out of it — **close first, then open**.
+ * The door cycle with `saved` seconds taken out of it, and the floor its two halves stop at.
  *
- * The order is the tier ladder read in reverse: `doors` L3 is *doors start opening as the car
- * lands*, which is the open half, and it is the tier that asks for more seconds than the close half
- * can give. Taking the close first therefore keeps L1 and L2 entirely inside the half a faster door
- * operator moves, and only the tier whose own sentence is about opening reaches the open figure.
- *
- * Both halves floor at {@link MIN_DOOR_S}, which is authored here and said so: `data/` publishes no
- * minimum door time, the fastest shipped figure is `centerOpening`'s 1.8 s open, and a door given
- * zero seconds is not a fast door but an absent one.
+ * **Both moved to `@elevator-sim/core`'s `config/rushPrefit.ts` and are re-exported here**, which is
+ * a change of address rather than of behaviour: GitHub issue #372's rush pre-fit needs the same
+ * arithmetic in `packages/server`, which may not import this package, so the one piece of arithmetic
+ * in a door tier now has one implementation instead of two that agree today. The argument for the
+ * close-then-open order, for the floor and for clamping rather than subtracting is on
+ * `doorCycleWithSaving` where the code is. `MIN_DOOR_S` keeps this name because `fitOut.test.ts` and
+ * the designer copy already read it from here.
  */
-function doorCycle(
-  openS: number,
-  closeS: number,
-  saved: number,
-): { readonly openS: number; readonly closeS: number } {
-  /*
-   * Each half is clamped to the floor rather than having a computed saving subtracted from it, so a
-   * tier that asks for more than a door has lands on {@link MIN_DOOR_S} **exactly** rather than on
-   * 0.7999999999999998. A floor that is only approximately the floor is a floor a test cannot state.
-   */
-  const nextClose = Math.max(MIN_DOOR_S, closeS - saved);
-  const takenFromClose = closeS - nextClose;
-  const nextOpen = Math.max(MIN_DOOR_S, openS - (saved - takenFromClose));
-  return { openS: nextOpen, closeS: nextClose };
-}
-
-/** The floor a door cycle's two halves stop at. Authored — see {@link doorCycle}. */
-export const MIN_DOOR_S = 0.8;
+export { MIN_DOOR_S };
 
 /**
  * The per-passenger transfer time a car with none of its own would resolve to.

@@ -103,6 +103,19 @@ export {
   violationsInRushPurse,
 } from './rushPurse.js';
 export type { RushPurseRound, RushPurseSchema, RushPurseTable } from './rushPurse.js';
+
+/** The one fixed rush pre-fit kit and its two appliers — GitHub issue #372, § D640. */
+export {
+  MIN_DOOR_S,
+  RUSH_PREFIT_KIT,
+  RUSH_PREFIT_SINK_ID,
+  claimsRushPrefit,
+  doorCycleWithSaving,
+  prefittedRushBuilding,
+  prefittedRushProfile,
+  violationsInRushPrefit,
+} from './rushPrefit.js';
+export type { RushPrefitClaim, RushPrefitKit, RushPrefitRung } from './rushPrefit.js';
 export type {
   ChimeCompletion,
   ChimeCurrency,

@@ -51,6 +51,10 @@ import { switchTargetFromWire, type WireIntervention } from '../scope/switchWire
 
 import { createEverydayHost, type EverydayHostBindings } from './host.js';
 import { RUSH_SEED, rushHoldAt, rushTopRatePctPop5min } from './rush.js';
+import type { ClaimedRushModifier } from './rushSitting.js';
+
+/** A claim of `data/chime-ledger.json`'s pre-fit, as a sitting's `modifiers` carries it. */
+const PREFIT_CLAIM: readonly ClaimedRushModifier[] = Object.freeze([{ sinkId: 'rush-prefit', steps: 1 }]);
 
 const TABLE_URL = new URL('../../../server/src/leaderboard/rushHoldAgreement.json', import.meta.url);
 
@@ -59,6 +63,14 @@ interface AgreementCell {
   readonly dispatcherProfileId: string;
   readonly interventions?: readonly WireIntervention[];
   readonly declaredSelection?: NonNullable<BrowserResources['dispatcherProfiles']['profiles'][number]['selection']>;
+  /**
+   * Whether the sitting claimed `data/chime-ledger.json`'s `rush-prefit` — GitHub issue #372,
+   * § D640. This half fits the tower by letting the press do it: the claim goes to the host's
+   * `rushModifiers` binding, `startRush` hands it to `everyday/rush.ts#rushPatchOf`, and the patch
+   * writes `RUSH_PREFIT_FIT_OUT` onto `campaignFitOut` — the player's own path, whole, which is the
+   * only thing this half may test.
+   */
+  readonly prefit?: boolean;
   readonly heldS: number | null;
 }
 
@@ -100,11 +112,22 @@ function resourcesFor(cell: AgreementCell): BrowserResources {
 }
 
 /** *Start the rush*, pressed through `EverydayHost` exactly as `rushScreen.ts` presses it. */
-function pressedRush(standing: ViewerState, using: BrowserResources = resources): ViewerState {
+function pressedRush(
+  standing: ViewerState,
+  using: BrowserResources = resources,
+  modifiers: readonly ClaimedRushModifier[] = [],
+): ViewerState {
   let state = standing;
   const bindings = {
     resources: using,
     state: () => state,
+    /*
+     * The seam a spend surface will fill — GitHub issue #372, § D640. No shipped binding supplies
+     * it, so this is the one caller that can drive a claimed `rush-prefit` at all, and it drives it
+     * through the press rather than by writing `campaignFitOut` itself: what has to agree with the
+     * server is the whole of the player's path, not the constant at the end of it.
+     */
+    rushModifiers: () => modifiers,
     applyPatch: (patch: Partial<ViewerState>) => {
       state = { ...state, ...patch };
     },
@@ -165,7 +188,7 @@ describe('the rush hold agreement table — the viewer’s half (PR #513, findin
     table.cells.map(
       (cell) =>
         [
-          `${cell.buildingId} ${cell.dispatcherProfileId}${cell.declaredSelection === undefined ? '' : ` declaring ${JSON.stringify(cell.declaredSelection)}`}${cell.interventions === undefined ? '' : ' logged'}`,
+          `${cell.buildingId} ${cell.dispatcherProfileId}${cell.prefit === true ? ' pre-fitted' : ''}${cell.declaredSelection === undefined ? '' : ` declaring ${JSON.stringify(cell.declaredSelection)}`}${cell.interventions === undefined ? '' : ' logged'}`,
           cell,
         ] as const,
     ),
@@ -173,7 +196,11 @@ describe('the rush hold agreement table — the viewer’s half (PR #513, findin
     '%s',
     (label, cell) => {
       const using = resourcesFor(cell);
-      const pressed = pressedRush(standingOn(cell.buildingId, cell.dispatcherProfileId, using), using);
+      const pressed = pressedRush(
+        standingOn(cell.buildingId, cell.dispatcherProfileId, using),
+        using,
+        cell.prefit === true ? PREFIT_CLAIM : [],
+      );
       const log: RunInterventionConfig[] = (cell.interventions ?? []).map((entry) => {
         if (entry.change.kind !== 'switch-dispatcher') return { atS: entry.atS, change: { kind: entry.change.kind } } as RunInterventionConfig;
         const profile = switchTargetFromWire(entry.change, using.dispatcherProfiles.profiles);

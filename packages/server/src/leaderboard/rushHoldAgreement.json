@@ -3,7 +3,9 @@
   "command": "ELEVATOR_SIM_REGENERATE_RUSH_AGREEMENT=1 npx vitest run --project server src/leaderboard/rushHoldAgreement.test.ts",
   "cells": [
     {"buildingId":"garden-apartments","dispatcherProfileId":"collective","heldS":1178},
+    {"buildingId":"garden-apartments","dispatcherProfileId":"collective","prefit":true,"heldS":1214},
     {"buildingId":"midtown-office","dispatcherProfileId":"collective","heldS":1640},
+    {"buildingId":"midtown-office","dispatcherProfileId":"collective","prefit":true,"heldS":1650},
     {"buildingId":"midtown-office","dispatcherProfileId":"eta","heldS":1542},
     {"buildingId":"midtown-office","dispatcherProfileId":"collective","interventions":[{"atS":60,"change":{"kind":"switch-dispatcher","toProfileId":"nearest-car"}}],"heldS":1510},
     {"buildingId":"midtown-office","dispatcherProfileId":"collective","interventions":[{"atS":60,"change":{"kind":"park-cars-lobby"}}],"heldS":1536},

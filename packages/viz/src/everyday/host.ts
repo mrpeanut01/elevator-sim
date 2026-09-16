@@ -226,6 +226,7 @@ import { rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcome
 import {
   rushRoundRecordOf,
   rushSittingOf,
+  type ClaimedRushModifier,
   type RushPostedRound,
   type RushRoundRecord,
   type RushSittingBody,
@@ -1717,6 +1718,21 @@ export interface EverydayHostBindings {
    */
   readonly postRushSitting?: ((body: RushSittingBody) => Promise<EverydayRushPostOutcome>) | undefined;
   /**
+   * What the account has bought and claims for the next rush sitting — GitHub issue #372,
+   * [§ D640](../../../../DECISIONS.md). Read **once**, at the sitting's first press.
+   *
+   * **`undefined` in every shipped binding, and that is a fact about this build rather than a seam
+   * left loose.** No screen spends a chime — `everyday/chimesPanel.ts#CHIMES_PANEL_COPY.spendRefusal`
+   * says so on its own face, and that is GitHub issues #371 and #372's own second half — so no
+   * account holds a rush modifier to claim and there is nothing to answer. The field exists because
+   * a claim is the one thing that cannot be derived here: the balance and the spends are the
+   * server's, `boundaries.test.ts` forbids this file holding an account, and `dev/main.ts` is where
+   * the three things live. When a spend surface ships it fills this and nothing else changes —
+   * `startRush` already gives the claims to `everyday/rush.ts#rushPatchOf`, which fits the building
+   * for a claimed `rush-prefit`, and `rushSittingOf` already puts them on the wire.
+   */
+  readonly rushModifiers?: (() => readonly ClaimedRushModifier[]) | undefined;
+  /**
    * Today's challenge and its board — GitHub issue #221's third criterion. `undefined` with no API
    * origin, on {@link dailyBoard}'s rule, and optional on {@link postRun}'s.
    */
@@ -1950,6 +1966,16 @@ export function createEverydayHost(
         readonly endedAtS: number | undefined;
         /** The tower every round of this sitting ran on — read once, at the first press. */
         readonly buildingId: string;
+        /**
+         * What the account bought for this sitting — read once, at the **first** press, for the
+         * reason `buildingId` is (GitHub issue #372, [§ D640](../../../../DECISIONS.md)).
+         *
+         * A sitting is one modifier set: every round runs the same start and the board it lands on
+         * is keyed by that set (§ D543). Re-reading the binding on *Run the rush again* would let a
+         * spend made between rounds change the building under a sitting already half played, and the
+         * sitting would then claim a set no round but the last one met.
+         */
+        readonly modifiers: readonly ClaimedRushModifier[];
         /** The finished rounds — see {@link EverydayRushSession.rounds}. */
         readonly rounds: readonly RushRoundRecord[];
       }
@@ -2673,7 +2699,11 @@ export function createEverydayHost(
       const post = b.postRushSitting;
       if (post === undefined) return { kind: 'no-server', detail: POST_RUN_NO_SERVER };
       if (rushSession === undefined) return { kind: 'refused', detail: RUSH_NOT_STANDING };
-      const check = rushSittingOf({ buildingId: rushSession.buildingId, rounds: rushSession.rounds });
+      const check = rushSittingOf({
+        buildingId: rushSession.buildingId,
+        rounds: rushSession.rounds,
+        modifiers: rushSession.modifiers,
+      });
       // All of them, joined: `rushSittingOf` reports every reason on purpose, and a press that
       // answered with one of four would undo that at the last step (`postCurrentRun`'s own join).
       if (!check.ok) return { kind: 'refused', detail: check.reasons.join(' ') };
@@ -2774,7 +2804,6 @@ export function createEverydayHost(
        * rush takes from the player, and `leaveRush` puts the rest back (§ D548 clause 5).
        */
       const building = rushBuildingOf(b.resources, state);
-      const patch = rushPatchOf(b.resources, state);
       if (building === undefined) return 'no building is standing, so there is nothing for the stream to arrive at';
       if (rushSession === undefined) {
         rushSession = {
@@ -2784,6 +2813,14 @@ export function createEverydayHost(
           hold: undefined,
           endedAtS: undefined,
           buildingId: building.id,
+          /*
+           * **Read once, here** — GitHub issue #372, § D640. The binding answers what the account
+           * bought and claims for this sitting, and `[]` when there is nothing to ask: no surface in
+           * this build spends a chime, so that is every sitting today. A sitting is one modifier set
+           * and the board is keyed on it, so this is taken with `before` and `buildingId` and never
+           * re-read on *Run the rush again*.
+           */
+          modifiers: b.rushModifiers?.() ?? [],
           rounds: [],
         };
       } else {
@@ -2805,7 +2842,12 @@ export function createEverydayHost(
        * the patch moves no week, because `shift/week.ts#switchWeek` is the identity on the live
        * contract, so writing it again puts every `fresh` field back at a fresh session's value and
        * restates the rush's identity. `before` is still taken on the first press only.
+       *
+       * **And it is built from the sitting's own modifiers rather than from the binding**, which is
+       * the same argument one line up: the set is the sitting's, read at the first press, so every
+       * round of it starts from the same building whatever the account bought in between.
        */
+      const patch = rushPatchOf(b.resources, state, rushSession.modifiers);
       if (patch !== undefined) b.applyPatch(patch);
       b.startRun();
       notifyCampaign();
@@ -2827,10 +2869,16 @@ export function createEverydayHost(
         /*
          * Computed on the read rather than stored, on `drivingProfile`'s opposite ground: this is a
          * pure fold over a list that changes only when a round ends, and a stored copy would be a
-         * second answer to *may this be posted* that a lane could forget to refresh. No modifiers
-         * are claimed — `rushSitting.ts#rushSittingOf` says why the parameter exists and is empty.
+         * second answer to *may this be posted* that a lane could forget to refresh. The modifiers
+         * are the sitting's own, read at its first press, and in this build they are always empty —
+         * `rushSitting.ts#rushSittingOf` says why the parameter exists and what a `rush-prefit`
+         * claim would now do (§ D640).
          */
-        check: rushSittingOf({ buildingId: rushSession.buildingId, rounds: rushSession.rounds }),
+        check: rushSittingOf({
+          buildingId: rushSession.buildingId,
+          rounds: rushSession.rounds,
+          modifiers: rushSession.modifiers,
+        }),
       };
     },
     endRush: (atS) => {
