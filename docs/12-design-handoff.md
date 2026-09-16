@@ -769,11 +769,11 @@ note and the presses, so the label agrees with itself across four surfaces by co
 switch beside that strip would be a second, disagreeing source for the same fact — the argument is
 at `tunerModel.ts` where the narrower guard (*the building moved*) was rejected for the same reason.
 
-**Status 2026-09-16: RULED by [§ D630](../DECISIONS.md).** Free play should **not** be scored,
-consistent with the Sandbox's own framing and `docs/32 GD9`. § D496 raised the question and left it
-open rather than settling a second question inside the first; § D630 settles it, and names the
-current gate — `week.ts` excludes only the sandbox id, not `FREE_PLAY_CONTRACT_ID` — as a live
-defect against this answer rather than a further open question. The fix is not applied here.
+**Status 2026-09-16: RULED by [§ D630](../DECISIONS.md).** Free play should **keep** posting to the
+week — the status quo is confirmed rather than changed. § D496 raised the question and left it open;
+§ D630 settles it by reading `week.ts`'s own reasoning at `FREE_PLAY_CONTRACT_ID`'s declaration,
+which already distinguishes Free Play (*chosen*, from its own tile) from Sandbox (*arrived at*, the
+only one of the two whose screen promises nothing counts). No gate change is owed.
 
 ---
 
