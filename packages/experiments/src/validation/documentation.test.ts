@@ -2146,6 +2146,20 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
       " ids here are names, so reissuing it would make it denote two things across time.",
   ],
   [
+    616,
+    "this wave's #540 lane was redone from a stale base and returned this number" +
+      " unspent after the redo used D615 instead; a sibling lane then wrote a higher" +
+      " number, which makes it a hole rather than free. Registered under D404 and D430:" +
+      " ids here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
+    617,
+    "this wave's #540 lane was redone from a stale base and returned this number" +
+      " unspent after the redo used D615 instead; a sibling lane then wrote a higher" +
+      " number, which makes it a hole rather than free. Registered under D404 and D430:" +
+      " ids here are names, so reissuing it would make it denote two things across time.",
+  ],
+  [
     584,
     "wave AA's lane returned it unspent, and a sibling lane then wrote a higher num" +
       "ber, which makes it a hole rather than free. Registered under D404 and D430: ids" +

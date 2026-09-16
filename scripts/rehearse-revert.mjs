@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Rehearse the offline half of the revert procedure — GitHub issue **#355**, AC4.
+ * Rehearse the offline half of the revert procedure, and — since GitHub issue **#540** — run it
+ * for real. GitHub issue **#355**, AC4, and #540, items 1 and 2 of *"what this suggests"*.
  *
  * ## What this is for
  *
@@ -14,8 +15,8 @@
  * Container App. Nothing here holds those and nothing here may touch a live deployment. But the
  * procedure is not one operation: its steps 0 and 2 are **git on a workstation**, they decide
  * whether the bytes that reach the upload are the bytes anybody wanted, and they can be run with no
- * credential, no network and no live resource at all. That half is what this script runs, and it
- * runs it **in a throwaway clone** so the operator's own tree is never touched.
+ * credential, no network and no live resource at all. That half is what this script runs, and by
+ * default it runs it **in a throwaway clone** so the operator's own tree is never touched.
  *
  * So the honest claim is a split rather than a tick: the git half is **rehearsed**, by this script,
  * on whatever commits it is pointed at; the upload, the branch policy, the propagation time, the
@@ -24,34 +25,54 @@
  * would be this repository's stale-promise defect with the polarity that matters most — telling a
  * reader in an incident that they hold a recovery they have not checked.
  *
+ * ## What #540 found and what closes it
+ *
+ * Rehearsing the *documented* step 2 — `git revert --no-commit "$target"..main` followed by a bare
+ * `git commit` — is what found #540's two failure modes (§ 11.3, § 11.5): a merge commit in the
+ * range makes the ranged form abort **after** staging every newer commit's revert, leaving no
+ * sequencer state, so the next line in the procedure commits a **partial** revert; and a shallow
+ * checkout reports the target as an *unknown revision*, which reads like a typo rather than a
+ * missing-history problem. Diagnosing both was step one. This file now also fixes the first
+ * structurally and reports the second precisely, rather than only detecting them:
+ *
+ * - {@link planRevertSteps} never emits the ranged form at all. It reverts one commit at a time,
+ *   newest first, `-m 1` on a merge — the alternative § 11.2 already named for a *single* merge,
+ *   generalised to every merge a range holds and run automatically rather than left to an operator
+ *   noticing git's error. {@link safeRevertTo} executes that plan and, on any step's failure, runs
+ *   `git revert --abort`, `git reset --hard` back to the commit it started from, and `git clean
+ *   -fdx` — so a failed or partial revert is never left staged and nothing ever calls `git commit`
+ *   over one. This is what `--apply` below runs for real, and what the rehearsal below runs in its
+ *   throwaway clone.
+ * - {@link classifyHistoryProblem} distinguishes a shallow clone that never fetched the target from
+ *   a target that plain does not exist, from one that exists but is not an ancestor — three
+ *   different mistakes git's own *unknown revision* wording collapses into one message.
+ *
  * ## What it touches, stated because the subject is a deployment
  *
- * **`git`, and nothing else.** No `az`, no `gh`, no network, no `node_modules`, no build. Every
- * mutating command runs inside a temporary clone under the system temp directory; the repository it
- * is pointed at is only ever read. It cannot deploy, cannot write a repository variable, and cannot
- * reach Azure even if it wanted to.
+ * **`git`, and nothing else.** No `az`, no `gh`, no network, no `node_modules`, no build. In
+ * rehearsal (the default), every mutating command runs inside a temporary clone under the system
+ * temp directory and the repository it is pointed at is only ever read. **`--apply` is the one
+ * exception**: it runs the same safe, per-commit revert directly against the repository this
+ * script is invoked from, because that is the whole point of step 2 — and it refuses on a dirty
+ * working tree first, so it never discards uncommitted work.
  *
- * ## The five things it establishes, and why each is in § 11
+ * ## The things it establishes, and why each is in § 11
  *
- * 1. **The range holds no merge commit.** § 11.2 step 2 is `git revert --no-commit $target..main`,
- *    and the range form of `git revert` refuses a merge without `-m`. Measured (see § 11.3): it
- *    refuses **at** the merge, having already staged the reverts of every commit newer than it, and
- *    leaves no sequencer state — so an operator who does not read the error and types the next
- *    command in the procedure commits a **partial** revert. That is a green run putting a
- *    half-reverted page up, which is the worst outcome this procedure has.
- * 2. **The history reaches the target.** A shallow checkout — `actions/checkout`'s default is depth
- *    1 — cannot revert anything, and says so in a git error that looks nothing like the cause.
- * 3. **The revert applies without conflict**, which is a property of the range and not of the
- *    procedure, and is therefore worth measuring on the range actually being reverted.
- * 4. **The reverted tree equals the target over the artifact paths.** This is § 11.2 step 2's own
+ * 1. **The history reaches the target**, checked before anything else touches git. A shallow
+ *    checkout — `actions/checkout`'s default is depth 1 — cannot revert anything, and
+ *    {@link classifyHistoryProblem} names which of the three related mistakes this is.
+ * 2. **The revert applies, commit by commit, with no conflict** — see above. A range holding a
+ *    merge commit is reported rather than hidden, but no longer blocks the attempt: it is handled.
+ * 3. **The reverted tree equals the target over the artifact paths.** This is § 11.2 step 2's own
  *    claim and the reason the operator must compare the *tree* rather than the page's build line.
  *    The pathspecs are **derived from `deploy-viz.yml`'s own `paths:` list** rather than
  *    transcribed, so a path added to the workflow cannot silently fall out of the comparison.
- * 5. **Whether the revert crosses a `SESSION_SCHEMA_VERSION` bump**, which is the one irreversible
+ * 4. **Whether the revert crosses a `SESSION_SCHEMA_VERSION` bump**, which is the one irreversible
  *    step in the procedure: a player who loads the reverted build once has their saved week
  *    cleared, and reverting forward does not bring it back. A crossing **fails** this run unless
- *    `--accept-save-loss` is passed, because § 11.3 says that is a decision for a human and a
- *    harness that blessed it silently would be making it for them.
+ *    `--accept-save-loss` is passed — in rehearsal that turns the run red; under `--apply` it
+ *    refuses to touch the tree at all, because § 11.3 says the crossing is a decision for a human
+ *    and a harness that blessed it silently would be making it for them.
  *
  * It also prints what the page's build line will say — the revert commit, not the target — because
  * § 11.3's first failure mode is an operator reading a correct revert as a failed one.
@@ -59,9 +80,18 @@
  * ## Usage
  *
  *   node scripts/rehearse-revert.mjs <target-commit> [<tip>] [--accept-save-loss] [--keep]
+ *   node scripts/rehearse-revert.mjs <target-commit> --apply [--accept-save-loss]
  *
- * `<tip>` defaults to `HEAD`. `--keep` leaves the temporary clone in place and prints its path, for
- * an operator who wants to look at the reverted tree. Exit 0 means every observation above held.
+ * `<tip>` defaults to `HEAD` and is only meaningful in rehearsal — `--apply` always reverts the
+ * repository's own `HEAD` forward to `<target-commit>`, for real, and commits the result; there is
+ * no `<tip>` argument for it because step 2 is always "bring `main`'s tip back", never an arbitrary
+ * pair. `--keep` (rehearsal only) leaves the temporary clone in place and prints its path. Exit 0
+ * means every observation held, or, under `--apply`, that the revert was made and committed.
+ *
+ * `--repo <path>` is test-only: it points "this checkout" at an arbitrary repository instead of
+ * the one containing this file, which is what lets `validation/rehearseRevert.test.ts` drive
+ * `--apply` and the rehearsal against a real, disposable repository it builds rather than against
+ * this repository. An operator never passes it.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -90,8 +120,15 @@ export const NOT_REHEARSED = [
 /** The workflow whose `paths:` decide what the artifact is built from. */
 const WORKFLOW = '.github/workflows/deploy-viz.yml';
 
-/** Where the session schema version this procedure can destroy is declared. */
-const SESSION_TYPES = 'packages/viz/src/persist/types.ts';
+/**
+ * Where the session schema version this procedure can destroy is declared.
+ *
+ * Exported so a test that needs to describe this same path (rather than a real dependency on it)
+ * names it once rather than repeating the literal — `packages/experiments/src/validation/`
+ * sources may not contain the substring `viz` at all, per CLAUDE.md invariant 6 and
+ * `boundaries.test.ts`'s scan over `packages/experiments/src`.
+ */
+export const SESSION_TYPES = 'packages/viz/src/persist/types.ts';
 
 /**
  * The pathspecs the reverted tree is compared over, derived from the workflow's own `paths:`.
@@ -174,6 +211,172 @@ export function buildVersionOf(sha) {
   return sha.slice(0, 10);
 }
 
+/**
+ * Whether a `{ sha, parents }` commit — {@link parseCommitLog}'s shape — is a merge.
+ *
+ * GitHub issue #540's first failure mode is a property of the *ranged* `git revert`: it refuses a
+ * merge without `-m`, but only after staging every newer commit's revert, and leaves no sequencer
+ * state to `--continue` or `--abort`. {@link planRevertSteps} avoids the ranged form entirely, so
+ * this predicate exists to route a merge to `-m 1` rather than to detect a class of doomed range.
+ */
+export function isMergeCommit(commit) {
+  return commit.parents.length > 1;
+}
+
+/**
+ * `git log --format="%H<sep>%P" target..tip` parsed into `{ sha, parents }`, newest first — the
+ * order `git log` already produces and the order {@link planRevertSteps} needs: a commit must be
+ * reverted before the commits stacked underneath it, because reverting an older commit first would
+ * apply that revert onto a tree state it was never taken against. `sep` defaults to the unit
+ * separator, which cannot appear in a sha or in `%P`'s space-joined parent list.
+ */
+export function parseCommitLog(logText, sep = '') {
+  return logText
+    .split('\n')
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const [sha = '', parentsField = ''] = line.split(sep);
+      const trimmed = parentsField.trim();
+      return { sha, parents: trimmed.length > 0 ? trimmed.split(/\s+/u) : [] };
+    });
+}
+
+/**
+ * The ordered `git revert` invocations that put the tree back to `target`, one commit at a time —
+ * the whole structural fix for GitHub issue #540's first failure mode. § 11.2 already named `-m 1`
+ * as the alternative for undoing *one* merge by hand; this generalises it to every merge a range
+ * holds and runs it automatically, so `git commit` is never reached with a partial revert staged
+ * under it — there is no ranged revert left to abort part-way, because none is ever issued.
+ */
+export function planRevertSteps(commitsNewestFirst) {
+  return commitsNewestFirst.map((commit) => ({
+    sha: commit.sha,
+    isMerge: isMergeCommit(commit),
+    args: isMergeCommit(commit)
+      ? ['revert', '--no-commit', '-m', '1', commit.sha]
+      : ['revert', '--no-commit', commit.sha],
+  }));
+}
+
+/**
+ * Distinguishes GitHub issue #540's second failure mode — a shallow checkout that simply never
+ * fetched `target` — from a target that does not exist at all, and from one that exists but is not
+ * an ancestor of `tip`. Git's own *"unknown revision or path not in the working tree"* wording
+ * collapses the first two into one message, which reads like a typo in the sha rather than a
+ * missing-history problem — the confusion § 11.3's shallow-clone row now names precisely instead of
+ * quoting git's wording verbatim.
+ */
+export function classifyHistoryProblem({ isShallow, objectExistsLocally, isAncestorOfTip }) {
+  if (!objectExistsLocally) {
+    return { blocked: true, reason: isShallow ? 'shallow-history' : 'unknown-revision' };
+  }
+  if (!isAncestorOfTip) {
+    return { blocked: true, reason: 'not-an-ancestor' };
+  }
+  return { blocked: false, reason: null };
+}
+
+/** The message for a {@link classifyHistoryProblem} result, precise about which of the three it is. */
+export function historyProblemMessage(problem, target, tip) {
+  switch (problem.reason) {
+    case 'shallow-history':
+      return (
+        `this checkout cannot name "${target}", and the checkout is shallow. A shallow checkout ` +
+        `holds no commit before its boundary, so a commit outside the window is reported as an ` +
+        `unknown revision rather than as missing history (GitHub issue #540's second failure ` +
+        `mode) — deepen it (\`git fetch --unshallow\` on a workstation, \`fetch-depth: 0\` on a ` +
+        `runner) or name a commit inside the window.`
+      );
+    case 'unknown-revision':
+      return `this checkout cannot name "${target}" and is not shallow — the commit does not exist here. Check the sha.`;
+    case 'not-an-ancestor':
+      return `"${target}" exists but is not an ancestor of "${tip}", so reverting forward to it is not well-formed on this branch. Check the target and the branch.`;
+    default:
+      return 'no problem';
+  }
+}
+
+/**
+ * Runs {@link planRevertSteps}'s plan against `cwd` for real: one `git revert --no-commit` per
+ * commit in `target..tip` (newest first, `-m 1` on a merge), then a single `git commit` over the
+ * whole plan. The ranged form `git revert --no-commit target..tip` is never issued — that is the
+ * form § 11.3 measured aborting part-way on a merge with the newer reverts left staged, which is
+ * GitHub issue #540's first failure mode. Any step's non-zero exit runs `git revert --abort`,
+ * `git reset --hard` back to the commit `cwd` started on, and `git clean -fdx`, so a failed or
+ * partial revert is never left staged and nothing ever calls `git commit` over one.
+ *
+ * The history check runs first, via {@link classifyHistoryProblem}, so a caller learns which of
+ * #540's two shapes it hit — or that the target simply is not an ancestor — rather than reverting
+ * against a tree that might be silently missing the commits it needs.
+ *
+ * `identityArgs` is prepended to the commit invocation — empty for a real `--apply`, which must
+ * use the operator's own configured identity, and `['-c', 'user.email=…', '-c', 'user.name=…']`
+ * for the rehearsal, which runs in a disposable clone that may hold no identity at all.
+ * `revertRunner` defaults to {@link gitStatus} and exists only so
+ * `validation/rehearseRevert.test.ts` can inject a failure on one specific step against a real,
+ * throwaway repository, to assert the abort/reset/clean sequence deterministically — every other
+ * call site, including every other test, uses the real default and mocks nothing.
+ *
+ * Returns `{ ok: true, revertSha, stepCount, merges }` or `{ ok: false, reason, detail }`, and
+ * never throws: every call already goes through {@link gitStatus} or `revertRunner`, which turn a
+ * non-zero exit into a value rather than an exception.
+ */
+export function safeRevertTo(cwd, target, tip, commitMessage, identityArgs = [], revertRunner = gitStatus) {
+  const startSha = git(cwd, ['rev-parse', tip]);
+  const isShallow = git(cwd, ['rev-parse', '--is-shallow-repository']) === 'true';
+  const objectExistsLocally = gitStatus(cwd, ['cat-file', '-e', `${target}^{commit}`]).code === 0;
+  const isAncestorOfTip = objectExistsLocally
+    ? gitStatus(cwd, ['merge-base', '--is-ancestor', target, tip]).code === 0
+    : false;
+  const problem = classifyHistoryProblem({ isShallow, objectExistsLocally, isAncestorOfTip });
+  if (problem.blocked) {
+    return { ok: false, reason: problem.reason, detail: historyProblemMessage(problem, target, tip) };
+  }
+
+  const log = git(cwd, ['log', '--format=%H%P', `${target}..${tip}`]);
+  const commits = parseCommitLog(log);
+  const steps = planRevertSteps(commits);
+  const merges = steps.filter((step) => step.isMerge).map((step) => step.sha);
+
+  for (const step of steps) {
+    const result = revertRunner(cwd, step.args);
+    if (result.code !== 0) {
+      gitStatus(cwd, ['revert', '--abort']);
+      gitStatus(cwd, ['reset', '--hard', startSha]);
+      gitStatus(cwd, ['clean', '-fdx']);
+      return {
+        ok: false,
+        reason: 'revert-step-failed',
+        detail:
+          `reverting ${buildVersionOf(step.sha)}${step.isMerge ? ' (-m 1, a merge)' : ''} failed: ` +
+          `${result.output.split('\n')[0] ?? ''} — reset to ${buildVersionOf(startSha)}, nothing committed`,
+      };
+    }
+  }
+
+  const unmerged = git(cwd, ['diff', '--name-only', '--diff-filter=U']);
+  if (unmerged !== '') {
+    gitStatus(cwd, ['reset', '--hard', startSha]);
+    gitStatus(cwd, ['clean', '-fdx']);
+    return {
+      ok: false,
+      reason: 'unmerged-paths',
+      detail: `unmerged paths remained after every step reported clean: ${unmerged} — reset to ${buildVersionOf(startSha)}, nothing committed`,
+    };
+  }
+
+  const message = commitMessage ?? `revert: back to ${buildVersionOf(target)}`;
+  const commitResult = gitStatus(cwd, [...identityArgs, 'commit', '--quiet', '-m', message]);
+  if (commitResult.code !== 0) {
+    return {
+      ok: false,
+      reason: 'nothing-to-commit',
+      detail: `git commit found nothing staged after ${String(steps.length)} clean revert(s): ${commitResult.output}`,
+    };
+  }
+  return { ok: true, revertSha: git(cwd, ['rev-parse', 'HEAD']), stepCount: steps.length, merges };
+}
+
 /** Why a rehearsal failed, in the order the observations were taken. Empty means it held. */
 export function issuesOf(observations) {
   return observations
@@ -219,39 +422,101 @@ const gitStatus = (cwd, args) => {
 };
 
 function main(argv) {
-  const flags = new Set(argv.filter((a) => a.startsWith('--')));
-  const positional = argv.filter((a) => !a.startsWith('--'));
+  // `--repo <path>` is test-only — see `validation/rehearseRevert.test.ts` — and is stripped
+  // before the flag/positional split below so it never appears as a stray positional argument.
+  // An operator never passes it: with it omitted `root` is this file's own containing repository,
+  // which is what makes `--apply` "this checkout" rather than an arbitrary one.
+  const repoIdx = argv.indexOf('--repo');
+  const repoOverride = repoIdx === -1 ? undefined : argv[repoIdx + 1];
+  const rest = repoIdx === -1 ? argv : [...argv.slice(0, repoIdx), ...argv.slice(repoIdx + 2)];
+
+  const flags = new Set(rest.filter((a) => a.startsWith('--')));
+  const positional = rest.filter((a) => !a.startsWith('--'));
   if (positional.length === 0) {
     process.stderr.write(
-      'usage: node scripts/rehearse-revert.mjs <target-commit> [<tip>] [--accept-save-loss] [--keep]\n',
+      'usage: node scripts/rehearse-revert.mjs <target-commit> [<tip>] [--accept-save-loss] [--keep]\n' +
+        '       node scripts/rehearse-revert.mjs <target-commit> --apply [--accept-save-loss]\n',
     );
     return 2;
   }
   const here = dirname(fileURLToPath(import.meta.url));
-  const root = git(here, ['rev-parse', '--show-toplevel']);
+  const root = repoOverride === undefined ? git(here, ['rev-parse', '--show-toplevel']) : resolve(repoOverride);
   /**
-   * A revision this checkout cannot name is reported rather than thrown.
-   *
-   * The common cause is the one an operator will not guess from git's own wording: a shallow
-   * checkout — `actions/checkout`'s default — holds no commit before its boundary, so
-   * `HEAD~60` is *unknown* rather than *too old*.
+   * A revision this checkout cannot name is reported rather than thrown, via
+   * {@link classifyHistoryProblem} so the message names which of GitHub issue #540's shapes this
+   * is rather than quoting git's *unknown revision* wording verbatim.
    */
-  const resolveCommit = (revision) => {
-    const attempt = gitStatus(root, ['rev-parse', '--verify', `${revision}^{commit}`]);
+  const resolveCommit = (cwd, revision) => {
+    const attempt = gitStatus(cwd, ['rev-parse', '--verify', `${revision}^{commit}`]);
     if (attempt.code !== 0) {
-      process.stderr.write(
-        `this checkout cannot name "${revision}". A shallow checkout holds no commit before its ` +
-          `boundary — \`git rev-parse --is-shallow-repository\` here says ` +
-          `${git(root, ['rev-parse', '--is-shallow-repository'])}, over ` +
-          `${git(root, ['rev-list', '--count', 'HEAD'])} reachable commit(s). Deepen it, or name a ` +
-          'commit inside the window.\n',
-      );
+      const isShallow = git(cwd, ['rev-parse', '--is-shallow-repository']) === 'true';
+      const problem = classifyHistoryProblem({
+        isShallow,
+        objectExistsLocally: false,
+        isAncestorOfTip: false,
+      });
+      process.stderr.write(`${historyProblemMessage(problem, revision, 'HEAD')}\n`);
       return '';
     }
-    return git(root, ['rev-parse', revision]);
+    return git(cwd, ['rev-parse', revision]);
   };
-  const target = resolveCommit(positional[0]);
-  const tip = resolveCommit(positional[1] ?? 'HEAD');
+
+  // --apply: GitHub issue #540, item 1 — run the safe revert for real, directly on this checkout,
+  // which is what docs/16 § 11.2 step 2 now names instead of the raw `git revert --no-commit
+  // "$target"..main` / `git commit` sequence. Nothing here is a rehearsal: it commits.
+  if (flags.has('--apply')) {
+    const target = resolveCommit(root, positional[0]);
+    if (target === '') return 2;
+    const dirty = git(root, ['status', '--porcelain']);
+    if (dirty !== '') {
+      process.stderr.write(
+        'refusing --apply: this checkout has uncommitted changes. A safe revert never discards ' +
+          'work it did not make — commit or stash first, then try again.\n',
+      );
+      return 2;
+    }
+    const pathspecs = artifactPathspecsOf(readFileSync(join(root, WORKFLOW), 'utf8'));
+    const blind = gitStatus(root, ['cat-file', '-e', `HEAD:${SESSION_TYPES}`]).code !== 0;
+    const schemaDiff = blind ? '' : git(root, ['diff', target, 'HEAD', '--', SESSION_TYPES]);
+    const crosses = crossesSaveSchema(schemaBumpsOf(schemaDiff));
+    const accepted = flags.has('--accept-save-loss');
+    if (crosses && !accepted) {
+      process.stderr.write(
+        'refusing --apply: the target writes an older SESSION_SCHEMA_VERSION than HEAD does, so ' +
+          'every affected player loses their saved week (docs/16 § 11.3). That is a decision for a ' +
+          'human, not a default — pass --accept-save-loss to proceed. Nothing has been touched.\n',
+      );
+      return 1;
+    }
+    const startSha = git(root, ['rev-parse', 'HEAD']);
+    const result = safeRevertTo(root, target, 'HEAD', `revert: back to ${buildVersionOf(target)}`, []);
+    if (!result.ok) {
+      process.stderr.write(
+        `--apply failed (${result.reason}): ${result.detail}\nThe checkout is back at ` +
+          `${buildVersionOf(startSha)} with nothing committed.\n`,
+      );
+      return 1;
+    }
+    const treeMatches = gitStatus(root, ['diff', '--quiet', target, 'HEAD', '--', ...pathspecs]).code === 0;
+    process.stdout.write(
+      `${[
+        `Reverted ${buildVersionOf(startSha)} forward to ${buildVersionOf(target)}: ` +
+          `${String(result.stepCount)} commit(s), ${String(result.merges.length)} merge commit(s) among them.`,
+        `Committed as ${buildVersionOf(result.revertSha)}. The page's build line will read that, ` +
+          `not ${buildVersionOf(target)} — § 11.3's first failure mode.`,
+        treeMatches
+          ? `The tree matches the target over the artifact paths (${pathspecs.join(', ')}).`
+          : 'WARNING: the tree does NOT match the target over the artifact paths — inspect before pushing.',
+        'Nothing has been pushed. Run `git push`, then continue with docs/16 § 11.2 step 3.',
+      ].join('\n')}\n`,
+    );
+    return treeMatches ? 0 : 1;
+  }
+
+  // Rehearsal (the default): the same safe, per-commit revert, run inside a throwaway clone so
+  // the operator's own tree is never touched. This is what a caller runs *before* --apply.
+  const target = resolveCommit(root, positional[0]);
+  const tip = resolveCommit(root, positional[1] ?? 'HEAD');
   if (target === '' || tip === '') return 2;
   const pathspecs = artifactPathspecsOf(readFileSync(join(root, WORKFLOW), 'utf8'));
 
@@ -262,13 +527,18 @@ function main(argv) {
     git(clone, ['checkout', '--quiet', '--detach', tip]);
 
     const shallow = git(clone, ['rev-parse', '--is-shallow-repository']) === 'true';
-    const reaches = gitStatus(clone, ['merge-base', '--is-ancestor', target, tip]).code === 0;
+    const objectExistsLocally = gitStatus(clone, ['cat-file', '-e', `${target}^{commit}`]).code === 0;
+    const isAncestorOfTip = objectExistsLocally
+      ? gitStatus(clone, ['merge-base', '--is-ancestor', target, tip]).code === 0
+      : false;
+    const historyProblem = classifyHistoryProblem({ isShallow: shallow, objectExistsLocally, isAncestorOfTip });
+    const reaches = !historyProblem.blocked;
     observations.push({
       id: 'history-reaches-target',
       claim: 'the checkout holds enough history to revert to the target',
       observed: reaches
         ? `${buildVersionOf(target)} is an ancestor of ${buildVersionOf(tip)}${shallow ? ' (the checkout is shallow, so a deeper target would not be)' : ''}`
-        : `${buildVersionOf(target)} is not an ancestor of ${buildVersionOf(tip)}${shallow ? ' — and this checkout is shallow, which is the likeliest reason' : ''}`,
+        : historyProblemMessage(historyProblem, target, tip),
       ok: reaches,
     });
 
@@ -276,14 +546,15 @@ function main(argv) {
       ? git(clone, ['rev-list', '--merges', `${target}..${tip}`]).split('\n').filter((l) => l !== '')
       : [];
     observations.push({
-      id: 'range-is-linear',
-      claim: 'the range holds no merge commit, so the range form of `git revert` does not abort part-way',
+      id: 'merge-commits-handled',
+      claim:
+        'a merge commit in the range does not abort the revert — it is reverted with `-m 1`, one commit at a time, never with the range form',
       observed: !reaches
         ? 'not measured, because the history does not reach the target'
         : merges.length === 0
           ? `${git(clone, ['rev-list', '--count', `${target}..${tip}`])} commit(s) in the range, no merges`
-          : `${String(merges.length)} merge commit(s) in the range, first ${buildVersionOf(merges[0])} — use \`git revert -m 1\` per merge; the range form stages the newer reverts and then aborts`,
-      ok: reaches && merges.length === 0,
+          : `${String(merges.length)} merge commit(s) in the range, first ${buildVersionOf(merges[0])} — each reverted individually with \`-m 1\` below`,
+      ok: true,
     });
 
     const blind = gitStatus(clone, ['cat-file', '-e', `${tip}:${SESSION_TYPES}`]).code !== 0;
@@ -302,37 +573,27 @@ function main(argv) {
       ok: !blind && (!crosses || accepted),
     });
 
-    let reverted = { code: 0, output: '' };
-    if (reaches && merges.length === 0) {
-      reverted = gitStatus(clone, ['revert', '--no-commit', `${target}..${tip}`]);
-      if (reverted.code === 0) {
-        gitStatus(clone, [
+    const result = reaches
+      ? safeRevertTo(clone, target, tip, `rehearsal: revert to ${buildVersionOf(target)}`, [
           '-c',
           'user.email=rehearsal@invalid',
           '-c',
           'user.name=revert rehearsal',
-          'commit',
-          '--quiet',
-          '--allow-empty',
-          '-m',
-          `rehearsal: revert to ${buildVersionOf(target)}`,
-        ]);
-      }
-    }
+        ])
+      : { ok: false, reason: 'not-attempted', detail: '' };
     observations.push({
       id: 'revert-applies',
-      claim: 'the range reverts onto the tip with no conflict',
-      observed:
-        !reaches || merges.length > 0
-          ? 'not attempted, because an earlier observation failed'
-          : reverted.code === 0
-            ? 'applied clean'
-            : `git revert exited ${String(reverted.code)}: ${reverted.output.split('\n')[0] ?? ''}`,
-      ok: reaches && merges.length === 0 && reverted.code === 0,
+      claim: 'the revert applies commit by commit onto the tip with no conflict',
+      observed: !reaches
+        ? 'not attempted, because an earlier observation failed'
+        : result.ok
+          ? `applied clean, ${String(result.stepCount)} commit(s) reverted individually`
+          : `${result.reason}: ${result.detail}`,
+      ok: reaches && result.ok,
     });
 
     const treeMatches =
-      reaches && merges.length === 0 && reverted.code === 0
+      reaches && result.ok
         ? gitStatus(clone, ['diff', '--quiet', target, 'HEAD', '--', ...pathspecs]).code === 0
         : false;
     observations.push({
@@ -363,6 +624,10 @@ function main(argv) {
         touches
           ? 'The revert touches an artifact path, so a push to `main` would start a deploy run on its own.'
           : 'The revert touches no artifact path, so a push starts no run: step 3\'s dispatch is the trigger.',
+      );
+      extra.push(
+        'Rehearsal only — nothing here was committed to this checkout. Run the same logic for real ' +
+          'with `--apply` in place of a target/tip pair to commit it here.',
       );
     }
     process.stdout.write(`${summaryOf(observations, issues)}${extra.join('\n')}\n`);

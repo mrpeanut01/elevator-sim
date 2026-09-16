@@ -150,11 +150,14 @@ has their saved week cleared, and reverting forward again does not bring it back
 command that checks for this. That is a decision for a human, and it is why the procedure does not
 end in a single command.
 
-**Four — the range form of the revert can abort part-way, and leave a partial revert staged.**
-`git revert --no-commit $target..main` refuses a merge commit. **Measured**: it reverts the commits
-*newer* than the merge, leaves them staged, and only then exits — with no sequencer state, so there
-is nothing to `--continue` or `--abort`, and the next command in § 11.2 is `git commit`. In an
-incident that is a green deploy of a half-reverted tree. Before you type any of it, run
+**Four — do not type the raw, ranged revert; § 11.2 no longer asks you to.** The range form,
+`git revert --no-commit $target..main`, refuses a merge commit — **measured**: it reverts the
+commits *newer* than the merge, leaves them staged, and only then exits, with no sequencer state,
+so there is nothing to `--continue` or `--abort`. In an incident, typing `git commit` next is a
+green deploy of a half-reverted tree. § 11.2's step 2 is now `node scripts/rehearse-revert.mjs
+"$target" --apply`, which never issues the ranged form — it reverts one commit at a time (`-m 1` on
+a merge) and aborts, hard-resets and cleans on any failure, so this is closed structurally rather
+than by remembering not to ([§ D615](../DECISIONS.md), GitHub issue #540). Rehearse it first:
 
 ```sh
 node scripts/rehearse-revert.mjs "$target"
