@@ -31,9 +31,10 @@
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
@@ -447,6 +448,37 @@ const TYPES_SOURCE = fileURLToPath(new URL('./types.js', import.meta.url));
 const run = promisify(execFile);
 const tempDirs: string[] = [];
 
+/**
+ * A git worktree checkout has no `node_modules` of its own (§ D405: worktree-safe resolution, no
+ * decision entry owed — this is a self-contained test-file fix, not a change to shared
+ * infrastructure). `REPO_ROOT` above is still correct — it names the worktree's own root, which is
+ * where `tsconfig.base.json` genuinely lives, tracked by git — but a plain `join(REPO_ROOT,
+ * 'node_modules', …)` assumed the dependency install sits at that same root. It doesn't in a
+ * worktree: npm installs once, in the main checkout, and Node's own resolution for a bare
+ * specifier walks up through ancestor `node_modules` directories to find it, which is why every
+ * other import in this suite "just works" from a worktree and only this hand-built path did not
+ * (GitHub issue #539). Mirror that walk here instead of assuming a fixed layout.
+ */
+function findAncestorNodeModules(startDir: string): string {
+  let dir = startDir;
+  for (;;) {
+    const candidate = join(dir, 'node_modules');
+    if (existsSync(join(candidate, '.bin', 'tsc')) && existsSync(join(candidate, '@types'))) {
+      return candidate;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) {
+      throw new Error(
+        `no node_modules/.bin/tsc and node_modules/@types found walking up from ${startDir} — ` +
+          'run npm install at the repository root (or the main checkout, if this is a worktree)',
+      );
+    }
+    dir = parent;
+  }
+}
+
+const NODE_MODULES = findAncestorNodeModules(REPO_ROOT);
+
 afterAll(async () => {
   await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
 });
@@ -543,7 +575,13 @@ describe('criterion 2 — a comparison’s arms cannot be split across shards', 
   });
 
   it('refuses at the type, by trying: the compiler rejects every attempt and accepts the control', async () => {
-    // The spawned compiler resolves `@elevator-sim/core` to its build, as `tsc -b` does.
+    // The spawned compiler resolves `@elevator-sim/core` to its build, as `tsc -b` does — but
+    // pinned to THIS worktree's own build via `paths` below, rather than through node_modules'
+    // ordinary walk-up. A worktree has no `node_modules/@elevator-sim/core` of its own; if the walk
+    // that resolves `tsc` and `@types` above (also GitHub issue #539) lands on an ancestor
+    // checkout's `node_modules`, that ancestor's `@elevator-sim/core` symlink points at *its own*
+    // `packages/core`, not this one's — silently type-checking against code nobody wrote here. The
+    // `paths` mapping keeps that specifier pinned to the build `assertCoreBuilt` just confirmed.
     assertCoreBuilt();
     const dir = await mkdtemp(join(tmpdir(), 'elevator-sim-shard-types-'));
     tempDirs.push(dir);
@@ -572,20 +610,31 @@ describe('criterion 2 — a comparison’s arms cannot be split across shards', 
           sourceMap: false,
           noEmit: true,
           types: ['node'],
-          typeRoots: [join(REPO_ROOT, 'node_modules', '@types')],
+          typeRoots: [join(NODE_MODULES, '@types')],
+          // Pinned to this worktree's own package rather than left to node_modules resolution —
+          // see the comment above.
+          paths: {
+            '@elevator-sim/core': [join(REPO_ROOT, 'packages', 'core', 'dist', 'index.d.ts')],
+          },
         },
         include: [join(dir, 'attempts.mts'), join(dir, 'control.mts')],
       }),
       'utf8',
     );
 
-    const tsc = join(REPO_ROOT, 'node_modules', '.bin', 'tsc');
+    const tsc = join(NODE_MODULES, '.bin', 'tsc');
     let output: string;
     try {
       const result = await run(tsc, ['-p', project, '--pretty', 'false'], { cwd: REPO_ROOT });
       output = `${result.stdout}${result.stderr}`;
     } catch (error) {
-      const failure = error as { stdout?: string; stderr?: string };
+      const failure = error as NodeJS.ErrnoException & { stdout?: string; stderr?: string };
+      // ENOENT means the process never started — ripgrep-ing an empty `output` for diagnostics
+      // below would read that as "the compiler rejected nothing", not "the compiler never ran"
+      // (the second half of GitHub issue #539). Fail immediately and unambiguously instead.
+      if (failure.code === 'ENOENT') {
+        throw new Error(`tsc not found at ${tsc} (resolved node_modules: ${NODE_MODULES})`);
+      }
       output = `${failure.stdout ?? ''}${failure.stderr ?? ''}`;
     }
 
@@ -594,6 +643,18 @@ describe('criterion 2 — a comparison’s arms cannot be split across shards', 
       line: Number(match[2]),
       code: match[3] ?? '',
     }));
+    // A compiler that never touched either file — bailing before it opened them, e.g. on a
+    // typeRoots it couldn't resolve — parses to the same empty `diagnostics` as a compiler that
+    // opened them and rejected nothing, which is the false-positive GitHub issue #539 names: every
+    // attempt below reads as "ACCEPTED by the compiler" either way, and only one of those two
+    // means the negative type test proved anything. Every attempt is expected to raise at least
+    // one diagnostic, so fewer diagnostics than attempts is real execution failing to happen, not
+    // real code passing — assert that before reading the per-line absence of one as a verdict.
+    expect(
+      diagnostics.length,
+      `expected at least ${TYPE_ATTEMPTS.length} diagnostics (one per attempt); the compiler ` +
+        `likely never evaluated the file it was given. Raw output:\n${output}`,
+    ).toBeGreaterThanOrEqual(TYPE_ATTEMPTS.length);
     // The control compiles clean, so every error below is the attempt's and not the harness's.
     expect(
       diagnostics.filter((diagnostic) => !diagnostic.file.endsWith('attempts.mts')),
