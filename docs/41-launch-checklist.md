@@ -451,11 +451,13 @@ section does not restate it.** Four things an operator needs before opening it:
   and reverting forward again does not bring it back. § 11.2 carries the command that checks for it.
   **§ 3 of this document is what makes that check cheap to reason about**, because the matrix says
   exactly which versions the current build can read.
-- **The range form can stop half-way through and look like it worked.** A merge commit inside the
-  range makes `git revert --no-commit` abort **after** it has staged the reverts of everything newer
-  than the merge, with nothing to continue or abort — and the next command in § 11.2 is `git commit`.
-  Rehearse it first (below); the harness reports the merges in the range before an operator types
-  anything.
+- **The range form could stop half-way through and look like it worked — § 11.2 no longer uses it.**
+  A merge commit inside the range makes `git revert --no-commit` abort **after** it has staged the
+  reverts of everything newer than the merge, with nothing to continue or abort. § 11.2's step 2 is
+  now `node scripts/rehearse-revert.mjs <target> --apply`, which reverts one commit at a time
+  (`-m 1` on a merge) and never issues that form, so this is closed structurally
+  ([§ D615](../DECISIONS.md), GitHub issue #540). Rehearse it first (below); the harness reports the
+  merges in the range before an operator types anything.
 
 - **What a pass looks like:** the six observations `docs/16` § 11.5 lists — a non-`main` dispatch
   really being refused at the environment, a revert-forward push really deploying with an empty tree

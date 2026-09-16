@@ -552,6 +552,21 @@ run corrected both of them ([§ D308](../DECISIONS.md)):
    App, its federated identity and the Container App, so nothing that can be done from a checkout
    closes them.
 
+   **The two failure modes that rehearsal found are now fixed or precisely reported, not merely
+   found** ([§ D615](../DECISIONS.md), GitHub issue #540). The merge-commit one is closed
+   structurally: `--apply` and the rehearsal both revert one commit at a time (`-m 1` on a merge)
+   and never issue the ranged form that aborted part-way, so there is no longer a partial-revert
+   state for an operator to commit by not reading an error. The shallow-clone one is not closed —
+   **deepening the checkout is still on the operator**, unchanged — but the error is now precise:
+   `classifyHistoryProblem` in `scripts/rehearse-revert.mjs` names *shallow-history* apart from a
+   target that plain does not exist and one that is not an ancestor, three cases git's own *unknown
+   revision* wording had collapsed into one. **No `.github/workflows/` job performs a revert** —
+   confirmed by re-reading every workflow in this wave rather than assumed — so there is no CI
+   `fetch-depth` to widen for this procedure specifically; § 11.2 already names the workstation
+   remedy (`git fetch --unshallow`), and a workflow that ever did run a revert would need
+   `fetch-depth: 0` on its own checkout step, which is exactly what the harness's error message
+   says.
+
 ---
 
 ## 10. Seeding the boards on a clock — GitHub issues #222 and #328
@@ -662,22 +677,32 @@ sha. Call it `$target`.
 after: the page and the API are two independent deploys and only one of them is in this workflow.
 
 **Step 2 — put the target tree on `main`.** `main` is the only ref the production environment
-accepts, so the revert is a revert *forward*:
+accepts, so the revert is a revert *forward*. **Do not type `git revert --no-commit "$target"..main`
+followed by `git commit`** — that is the raw, ranged form § 11.3 measured aborting *part-way* on a
+merge commit, staging every newer commit's revert and leaving no sequencer state, so the `git
+commit` line that used to follow it would commit a partial revert on a green run
+([§ D615](../DECISIONS.md), GitHub issue #540). Use the safe script instead — it never issues the
+ranged form, reverting one commit at a time (`-m 1` on a merge) and aborting, hard-resetting and
+cleaning on any step's failure, so nothing partial is ever committed:
 
 ```sh
 git switch main && git pull --ff-only
-git revert --no-commit "$target"..main   # every commit after $target
-# or, to undo one merge and nothing else:  git revert -m 1 <merge sha>
-git commit
+node scripts/rehearse-revert.mjs "$target" --apply   # reverts and commits for real; see below
 git push
 ```
+
+`--apply` refuses on a dirty working tree before it touches anything, and refuses a
+`SESSION_SCHEMA_VERSION` crossing (below) unless `--accept-save-loss` is passed. It prints the
+step-count and merge-count it reverted, the commit it made, and whether the tree matches `$target`
+over the artifact paths — the same comparison the manual form below runs, done for you.
 
 Two things about this step that will otherwise be read as failures:
 
 - **The deployed build version will name the revert commit, not `$target`.** The bytes match; the
   name does not, because `github.sha` is the commit being built. An operator comparing the page's
-  build line against `$target` reads a correct revert as a failed one. Compare the **tree** instead,
-  over exactly the paths the artifact is built from — this must print nothing:
+  build line against `$target` reads a correct revert as a failed one. `--apply` already prints
+  this comparison, but it is worth being able to run by hand — the **tree**, over exactly the paths
+  the artifact is built from, must print nothing:
 
   ```sh
   git diff --stat "$target" HEAD -- packages data package.json package-lock.json 'tsconfig*.json'
@@ -689,11 +714,13 @@ Two things about this step that will otherwise be read as failures:
   there cannot quietly fall out of the comparison — and if this list and that one ever disagree,
   the harness is the one to believe.
 
-**Rehearse this step before running it for real.** `node scripts/rehearse-revert.mjs "$target"`
-does steps 0 and 2 in a throwaway clone — no credential, no network, nothing live — and reports
-whether the range holds a merge commit, whether the revert applies, whether the tree comparison
-above really is empty, whether the revert crosses a saved-session bump, and what the page's build
-line will read afterwards. It costs about a second. § 11.5 records what it has been run on.
+**Rehearse this step before running `--apply` for real.** `node scripts/rehearse-revert.mjs
+"$target"` (no `--apply`) runs the same safe, per-commit logic in a throwaway clone — no
+credential, no network, nothing live, and this checkout is never touched — and reports whether the
+history reaches the target, whether the range holds a merge commit (handled rather than blocking),
+whether the revert applies, whether the tree comparison above really is empty, whether the revert
+crosses a saved-session bump, and what the page's build line will read afterwards. It costs about a
+second. § 11.5 records what it has been run on.
 
 - **The push deploys only if the revert touches one of the workflow's `paths:`** — `packages/**`,
   `data/**`, `package.json`, `package-lock.json`, `tsconfig*.json`,
@@ -736,8 +763,8 @@ not need.
 |---|---|---|
 | The run is green in `build` and deployed nothing | The dispatch named a ref that is not `main`. `viz-production`'s branch policy refuses the deployment before the job authenticates, so `jobs.build` still runs and passes and the run is *partly* green | Dispatch on `main`. `provision.sh --deploy-now` refuses this case itself rather than letting GitHub produce it |
 | The push landed and no run appeared | The `paths:` filter (step 2) | `gh workflow run deploy-viz.yml --ref main` |
-| `git revert` stopped with *"commit … is a merge but no -m option was given"* | The range holds a merge commit. **Measured rather than inferred** (§ 11.5): the range form reverts every commit *newer* than the merge, leaves them **staged**, and only then aborts — and it writes no sequencer state, so there is nothing to `--continue` or `--abort`. An operator who does not read the error and types the next command in § 11.2 commits a **partial** revert, and the deploy that follows is green | `git reset --hard` back to the tip, then revert commit by commit with `git revert -m 1 <merge sha>` for each merge. `scripts/rehearse-revert.mjs` reports the merges in the range before you type anything |
-| `git rev-parse` or `git revert` calls the target an unknown revision | The checkout is **shallow**, so the target is not in it at all. `actions/checkout` defaults to depth 1 and **no workflow in `.github/workflows/` deepens it** (only `review.yml` names the setting, and it names 1), so this is not a procedure a runner can carry out; a workstation clone made with `--depth` behaves the same way. Git's wording says *unknown*, which reads like a typo rather than a truncated history | `git fetch --unshallow`, or run the revert from a full clone. The harness says which it is: it prints the shallow flag and the reachable commit count instead of git's message |
+| A range holds a merge commit | **Prevented rather than merely diagnosed since [§ D615](../DECISIONS.md), GitHub issue #540.** The raw, ranged `git revert --no-commit "$target"..main` reverts every commit *newer* than the merge, leaves them **staged**, and only then aborts with *"commit … is a merge but no -m option was given"* — writing no sequencer state, so there is nothing to `--continue` or `--abort`. An operator who does not read the error and types the next `git commit` commits a **partial** revert on a green deploy. `--apply` never issues that ranged form: it reverts one commit at a time (`-m 1` on a merge) and, on any step's failure, aborts, hard-resets to the commit it started from and cleans — so a partial revert is structurally impossible through this path, not merely caught if noticed | Use `node scripts/rehearse-revert.mjs "$target" --apply` (step 2). If you are typing raw `git revert` by hand for some other reason, `scripts/rehearse-revert.mjs "$target"` (no `--apply`) still reports the merges in the range before you type anything |
+| `git rev-parse` or a raw `git revert` calls the target an unknown revision | The checkout is **shallow**, so the target is not in it at all. `actions/checkout` defaults to depth 1 and **no workflow in `.github/workflows/` deepens it** (only `review.yml` names the setting, and it names 1) — see § 9 item 5 below for what that does and does not mean in practice; a workstation clone made with `--depth` behaves the same way. Git's own wording says *unknown*, which reads like a typo rather than a truncated history. **Reported precisely rather than merely detected since [§ D615](../DECISIONS.md):** both `--apply` and the rehearsal name this *shallow-history*, distinct from a target that plain does not exist (*unknown-revision*) and from one that exists but is not an ancestor of `HEAD` (*not-an-ancestor*) — three different mistakes git's own wording collapses into one message | `git fetch --unshallow`, or run the revert from a full clone. The harness's error message says which of the three it is and, for a shallow clone, names both remedies (`git fetch --unshallow` on a workstation, `fetch-depth: 0` on a runner) |
 | The run never started, or a queued one vanished | `deploy-viz.yml`'s production concurrency group is the literal string `deploy-viz-production`, so every production run shares it. `cancel-in-progress` is false for a push, so a running deploy is not cancelled — but GitHub keeps at most one **pending** run per group, so a third arrival evicts the queued one whatever the flag says (`CLAUDE.md`'s working agreements; [`RISKS.md`](../RISKS.md) R46, which measured this on `ci.yml`). **Inferred here from the group name and unobserved on this workflow** | Push nothing else to `main` while the revert deploy is in flight |
 | The page went back and every account surface dead-ends | `ELEVATOR_SIM_API_ORIGIN` is a repository variable read at **build** time, so rebuilding an old commit bakes in *today's* value, not the one that commit shipped against. Reverting the page does not revert the origin | Check `$api` before step 3. This is the failure mode of issues #21, #28, #29, #30, #32 and #34 (§ 4), and the workflow's own assertion catches only a build that disagrees with the variable, not a variable that has moved |
 | Players report their saved week is gone | The page went back past a bump in `packages/viz/src/persist/types.ts#SESSION_SCHEMA_VERSION`. An older build finds a version outside its `SESSION_SCHEMA_VERSIONS_READ`, refuses the session as *newer* (`persist/session.ts`), and `dev/main.ts` then **clears the slot** so it cannot re-fail forever | Nothing. See the warning below — this one is not recoverable |
@@ -844,6 +871,16 @@ rows in § 11.3:
    which reads like a typo. The tree this rehearsal ran on **is** shallow — 51 commits, the oldest
    `479116e` — so the rehearsal is bounded at `HEAD~50` for that reason rather than by choice, and
    `actions/checkout`'s default depth of 1 puts any CI-side revert in the same position.
+
+**Both are now addressed rather than only found**, one closed and one still open
+([§ D615](../DECISIONS.md), GitHub issue #540, filed against this row). Item 1 is closed
+structurally: `--apply` and the rehearsal both plan the revert as one commit per `git revert`
+(`-m 1` on a merge) and never issue the ranged form, so there is no longer a partial-staged state
+for a `git commit` to land on. Item 2 is **not** closed — deepening a shallow checkout is still the
+operator's job — but the message is now precise about which of three related problems it is
+(`scripts/rehearse-revert.mjs#classifyHistoryProblem`), and § 9 item 5 records that no
+`.github/workflows/` job runs a revert today, so there is no CI `fetch-depth` this wave found
+reason to widen.
 
 #### The production half — never run, by anything
 
