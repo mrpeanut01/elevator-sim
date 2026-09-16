@@ -901,8 +901,39 @@ aim it.
 at 165 floors a legible pitch needs about **2 160 px** of canvas — nearly three times a 900 px
 viewport. There is no viewport this fits in, so the fix cannot be geometry.
 
+### 4.17 The stage now carries a bank-kind legend — a glyph and a colour, not text alone
 
-## 5 — Definition of done
+**The deviation, stated first.** The handoff has a per-shaft legend for the building editor (§ 1.3
+M11, `:736–738`): an express toggle and sky-lobby chips, so a reader picks an express or shuttle
+bank out of the editor's own list by more than its name. It has **no row for the play stage**, and
+until [§ D624](../DECISIONS.md) the stage did not need one to be silent — `render/canvas.ts#drawShafts`
+drew every shaft, express or local, with the identical recess/hairline/rect treatment, and the only
+signal telling the two apart was whichever string the bank happened to be named. GitHub issue #544
+found this directly: on `merdeka-class-reference` (four bank shapes) and `one-wtc-class-reference`
+(including its `observatory` express bank), the stage was colour-and-shape-blind to bank kind.
+
+**What the product does now** ([§ D624](../DECISIONS.md)). An express or shuttle bank's shafts and
+its own group heading both draw in `theme.badgeTransfer` — the same colour
+`render/canvas.ts#drawFloors` already uses for a sky-lobby floor row's `⇄` badge, so the vocabulary
+is one the player has already met rather than a second one invented for this row — and each of its
+shafts carries a small triangular mark at the top of its recess, a shape rather than a second use of
+the same colour (`UX.md` KB-15). The heading
+text also carries a `»` glyph, mirroring the floor grid's `⌂`/`⇄` badges (RV-07) rather than
+inventing a fourth convention.
+
+**How kind is known, since `BankConfig` carries none.** § 4.5 already states the handoff's own
+answer for the editor — *"the handoff's shuttle vs local car roles are derived from the bank
+structure rather than assigned"* — and this reaches the same conclusion for the stage by the same
+route: `render/canvas.ts#expressBankIdsOf` reads whether a bank's `servedFloorIds`, placed on the
+building's own floor order, skip at least one floor between the lowest and highest it stops at. A
+local bank's range is contiguous; an express or shuttle bank's is not, because it exists to skip the
+floors between its lobby and a sky lobby or observatory deck. No schema change, no authored field,
+and no `data/buildings/*.json` migration — the fact was already in the geometry every shaft already
+carries.
+
+**What this does not decide.** Escalators and access-zone *structure* (as opposed to a per-call
+refusal outcome) remain outside `VizRecording` entirely, per #544's own findings, and neither is
+touched here. This row closes only the bank-kind half of that issue.
 
 The refactor is done when all of the following are true, and not before.
 
