@@ -72,6 +72,7 @@ import {
   FIXIT_SCREEN_COPY,
   fixitBarModel,
   fixitCaseRailModel,
+  fixitElevationRow,
   fixitMachineryRows,
   fixitParkingRow,
   fixitZoneRow,
@@ -272,6 +273,7 @@ import { summariseReport, validateBuilding, type ValidationReport } from '../edi
 import {
   editorPricingFrom,
   parkingPriceUnits,
+  topFloorRaisePriceUnits,
   zonePriceUnits,
   standingExtrasFrom,
   budgetNoteOf,
@@ -6898,6 +6900,7 @@ const FIXIT_COVERS: readonly string[] = [
   'everyday/fixitScreenModel.ts#fixitMachineryRows',
   'everyday/fixitScreenModel.ts#fixitZoneRow',
   'everyday/fixitScreenModel.ts#fixitParkingRow',
+  'everyday/fixitScreenModel.ts#fixitElevationRow',
   'everyday/fixitScreenModel.ts#fixitSpendSummary',
   'everyday/fixitScreenModel.ts#fixitRepairStateLine',
 ];
@@ -7191,6 +7194,32 @@ const FIXIT: SurfaceAdapter = {
       seeds.push({ field: `zones.${where}.priced`, text: row.priced, role: 'label' });
       if (row.stepUpRefusal !== undefined) {
         seeds.push({ field: `zones.${where}.refusal`, text: row.stepUpRefusal, role: 'reason' });
+      }
+    }
+
+    /*
+     * ---- § 10.3's elevation control, issue #422 ----
+     *
+     * `fixitZoneRow`'s own shape and its own reason: both refusals over a seeded ceiling, because a
+     * refusal nobody renders is a refusal nobody has read. `no-ceiling` is the answer on
+     * `vertical-city` and `mixed-use-high-rise`, whose topmost floor `fixit/run.ts#topFloorRaiseCeilingOf`
+     * refuses; `at-ceiling` is the one arm that must say *the topmost floor stops here* rather than
+     * *the budget does*.
+     */
+    for (const [where, elevationState, ceiling, affordable] of [
+      ['as-drawn', empty, 2, true],
+      ['stepped', { ...empty, topFloorRaiseM: 1 }, 2, true],
+      ['at-ceiling', { ...empty, topFloorRaiseM: 2 }, 2, true],
+      ['at-budget', empty, 2, false],
+      ['no-ceiling', empty, 0, true],
+    ] as const) {
+      const row = fixitElevationRow(elevationState, ceiling, affordable, topFloorRaisePriceUnits(schedule));
+      if (row === null) continue;
+      seeds.push({ field: `elevation.${where}.label`, text: row.label, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `elevation.${where}.readout`, text: row.readout, role: 'observation' });
+      seeds.push({ field: `elevation.${where}.priced`, text: row.priced, role: 'label' });
+      if (row.stepUpRefusal !== undefined) {
+        seeds.push({ field: `elevation.${where}.refusal`, text: row.stepUpRefusal, role: 'reason' });
       }
     }
 

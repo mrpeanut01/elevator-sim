@@ -32,19 +32,33 @@
  * ## The § 10.3 subset drawn, and why it is still a subset — narrowed by GitHub issue #422
  *
  * § 10.1 item 6 asks for the full building editor — elevation grid, zones, shafts, parking,
- * who-drives. **Zones and parking are now drawn**, because the engine now prices them:
+ * who-drives. **Zones and parking are drawn**, because the engine prices them:
  * `FixitState.zoneOverlapFloors` writes `building.banks[]` at the schedule's `rezone-bank`, and
  * `FixitState.parkingStrategy` writes `dispatcher.idle.parkingStrategy` at `idle-parking`. Both are
  * proved on the legs in `fixit/cases.test.ts` — every rung of the stepper and every strategy the
  * select offers — which is the only thing that makes drawing them different from miming them.
  *
+ * **A third is drawn now too, narrower than what it closes is named after.** `FixitState.topFloorRaiseM`
+ * raises the building's topmost floor and writes `building.floors[]` at the schedule's new
+ * `raise-a-floor` (`fixit/types.ts#BuildingPatch.floors`, GitHub issue #422) — the field `FixitPatch`
+ * had none of before, so a repair or the editor can now move a floor at all. It is **not** § 10.1
+ * item 6's elevation grid — a per-shaft, per-floor-band click-to-set control — which stays exactly
+ * as refused as it was; see the next bullet. What is drawn is the one floor move that can never
+ * break `heightM`'s strict-increasing-with-`index` rule, whatever else the building holds:
+ * `fixit/run.ts#topFloorRaiseCeilingOf` reports `0` and the row is not drawn where the topmost floor
+ * is served by no bank or is one half of a double-deck pair, exactly the shape of refusal zoning's
+ * ceiling already uses.
+ *
  * **What is still refused, and why each one is refused for its own reason.** A control that writes
  * no field of the state it claims to edit is this repository's signature defect (§ D219 — *move the
  * control and require the run to change*), and these three would each be one:
  *
- * - **The elevation grid.** No field of `FixitPatch` adds, removes or moves a floor: `BuildingPatch`
- *   carries populations, banks, cars and added cars, and nothing else. A grid drawn over that would
- *   edit a document the run never reads.
+ * - **The elevation grid.** One row per floor band, one column per shaft, click any cell to change
+ *   what it does there (§ 10.3's own words) — a stopping-pattern control distinct from the one metre
+ *   this build now moves. No field of `FixitPatch` expresses *which shaft stops at which band*:
+ *   `BuildingPatch` carries populations, banks (a whole zone boundary, not one cell), cars, bank
+ *   equipment, added cars and now one floor's elevation, and nothing that names a cell of that grid.
+ *   A grid drawn over that would edit a document the run never reads.
  * - **Shafts.** A new shaft is `building.addCars[]` and *is* priced (`new-car`, 34 u) — but it is
  *   already sold as each case's fourth repair, at a price no shipped budget can take. A second
  *   control for the same purchase would be one act at two places, which is what #366 abolished.
@@ -60,11 +74,16 @@
  *   can put it back mid-run. Claiming it here made the refusal wider than the gap, which is § D227
  *   pointed the other way: a refusal may not claim more is missing than is.
  *
- * **And zoning is drawn only where it can bind.** Eight of the eighteen shipped cases run a
- * single-bank building, where every floor a bank could grow into it already serves;
- * `fixit/run.ts#zoneOverlapCeilingOf` reports 0 there and the row is not drawn at all. A refusal
- * that survives what it refuses is the defect class this file states against itself below, so it
- * says the ceiling rather than the control.
+ * **And zoning and elevation are each drawn only where they can bind, on two different splits.**
+ * Eight of the eighteen shipped cases run a single-bank building, where every floor a bank could
+ * grow into it already serves; `fixit/run.ts#zoneOverlapCeilingOf` reports 0 there and the zoning
+ * row is not drawn at all. **Elevation's refusal is a different four, found by running it rather
+ * than by reasoning about it**: `topFloorRaiseCeilingOf` reports 0 on `vertical-city` and
+ * `mixed-use-high-rise` — two of the eighteen cases' six buildings — because both declare their
+ * topmost floor as a compact `floorRanges` entry rather than an explicit one, which is the one shape
+ * `fixit/run.ts#applyBuildingPatch` cannot look a floor up by id in (`topFloorIdOf`'s docstring says
+ * why). A refusal that survives what it refuses is the defect class this file states against itself
+ * below, so both rows say their own ceiling rather than assuming one.
  *
  * ## The runs are on a worker — GitHub issue #165
  *
@@ -130,9 +149,11 @@ import {
   standingExtrasFrom,
   stepCapacity,
   stepSpeed,
+  stepTopFloorRaise,
   stepZoneOverlap,
   toggleExtra,
   toggleRepair,
+  topFloorRaisePriceUnits,
   zonePriceUnits,
   type FixitOutcome,
 } from '../fixit/engine.js';
@@ -143,6 +164,7 @@ import {
   fixitRunPlanOf,
   measuredOf,
   standingParkingOf,
+  topFloorRaiseCeilingOf,
   zoneOverlapCeilingOf,
 } from '../fixit/run.js';
 import type {
@@ -163,11 +185,13 @@ import {
   FIXIT_SCREEN_COPY as COPY,
   fixitBarModel,
   fixitCaseRailModel,
+  fixitElevationRow,
   fixitMachineryRows,
   fixitParkingRow,
   fixitRepairStateLine,
   fixitSpendSummary,
   fixitZoneRow,
+  type FixitElevationRow,
   type FixitSpendSummary,
   type FixitZoneRow,
 } from './fixitScreenModel.js';
@@ -1073,6 +1097,14 @@ function mountFixit(
     );
     if (zone !== null) body.append(zoneLine(entry, session, zone, fabric.ceiling));
     body.append(parkingLine(entry, session, fabric.standing));
+    const elevation = fixitElevationRow(
+      session.state,
+      fabric.elevationCeiling,
+      affordabilityOf(entry, session.state, topFloorRaisePriceUnits(scheduleNow()), scheduleNow())
+        .selectable,
+      topFloorRaisePriceUnits(scheduleNow()),
+    );
+    if (elevation !== null) body.append(elevationLine(entry, session, elevation, fabric.elevationCeiling));
     card.append(body);
 
     const note = el(doc, 'div', 'everyday-fixit-budget-note', budgetNoteOf(entry, spendOf(entry, session.state, scheduleNow())));
@@ -1098,17 +1130,21 @@ function mountFixit(
    * press; keyed by case id, and a case's fabric cannot change inside a session because the as-built
    * patch is authored.
    */
-  const fabricByCase = new Map<string, { readonly ceiling: number; readonly standing: string }>();
+  const fabricByCase = new Map<
+    string,
+    { readonly ceiling: number; readonly standing: string; readonly elevationCeiling: number }
+  >();
   function editorFabricOf(
     loadedFixit: LoadedFixit,
     entry: FixitCase,
-  ): { readonly ceiling: number; readonly standing: string } {
+  ): { readonly ceiling: number; readonly standing: string; readonly elevationCeiling: number } {
     const cached = fabricByCase.get(entry.id);
     if (cached !== undefined) return cached;
     const asBuilt = fixitRunPlanOf(entry, emptyFixitState(), loadedFixit.resources).asBuilt;
     const fabric = {
       ceiling: zoneOverlapCeilingOf(asBuilt.building),
       standing: standingParkingOf(asBuilt),
+      elevationCeiling: topFloorRaiseCeilingOf(asBuilt.building),
     };
     fabricByCase.set(entry.id, fabric);
     return fabric;
@@ -1217,6 +1253,63 @@ function mountFixit(
     const priced = el(doc, 'span', undefined, row.priced);
     priced.style.cssText = `margin-left:auto;${MONO(10, C.label)}`;
     line.append(select, label, priced);
+    return line;
+  }
+
+  /**
+   * § 10.3's elevation stepper — issue **#422**, `zoneLine`'s own shape pointed at
+   * `fixitScreenModel.ts#fixitElevationRow`'s words: the `+` button's `title` is the row's own
+   * refusal, never a restated constant, for `docs/20` defect 8's reason.
+   */
+  function elevationLine(
+    entry: FixitCase,
+    session: CaseSession,
+    row: FixitElevationRow,
+    ceiling: number,
+  ): HTMLElement {
+    const line = el(doc, 'div', 'everyday-fixit-stepper everyday-fixit-stepper-elevation');
+    line.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+    const minus = el(doc, 'button', 'everyday-fixit-step-down', '−');
+    const plus = el(doc, 'button', 'everyday-fixit-step-up', '+');
+    for (const [button, enabled, label, why] of [
+      [minus, row.canStepDown, COPY.stepDown, COPY.nothingToReturn],
+      [plus, row.stepUpRefusal === undefined, COPY.stepUp, row.stepUpRefusal ?? ''],
+    ] as const) {
+      button.type = 'button';
+      button.setAttribute('aria-label', `${row.label} — ${label}`);
+      button.disabled = !enabled;
+      if (!enabled && why !== '') button.title = why;
+      button.style.cssText = [
+        'width:26px',
+        'height:24px',
+        'padding:0',
+        `border:1px solid ${C.rule}`,
+        `border-radius:${String(R.control)}px`,
+        `background:${C.paper}`,
+        `color:${enabled ? C.ink : C.faint}`,
+        `cursor:${enabled ? 'pointer' : 'not-allowed'}`,
+        'font-size:14px',
+        'line-height:1',
+      ].join(';');
+    }
+    for (const [button, delta] of [
+      [minus, -1],
+      [plus, 1],
+    ] as const) {
+      button.addEventListener('click', () => {
+        if (running) return;
+        session.state = stepTopFloorRaise(entry, session.state, delta, ceiling, scheduleNow());
+        everydayTelemetry().record({ name: 'change_made', controlKey: 'fixit-elevation', screenKey: 'fixit' });
+        render();
+      });
+    }
+    const label = el(doc, 'span', undefined, row.label);
+    label.style.cssText = 'font-size:13px;font-weight:600';
+    const readout = el(doc, 'span', 'everyday-fixit-readout', row.readout);
+    readout.style.cssText = MONO(12, C.terracotta);
+    const priced = el(doc, 'span', undefined, row.priced);
+    priced.style.cssText = `margin-left:auto;${MONO(10, C.label)}`;
+    line.append(minus, plus, label, readout, priced);
     return line;
   }
 

@@ -25,6 +25,7 @@ import {
   emptyFixitState,
   parkingPriceUnits,
   spendOf,
+  topFloorRaisePriceUnits,
   zonePriceUnits,
 } from '../fixit/engine.js';
 import { EDITOR_PARKING_STRATEGIES } from '../fixit/types.js';
@@ -35,6 +36,7 @@ import {
   FIXIT_SCREEN_COPY as COPY,
   fixitBarModel,
   fixitCaseRailModel,
+  fixitElevationRow,
   fixitMachineryRows,
   fixitParkingRow,
   fixitRepairStateLine,
@@ -266,6 +268,50 @@ describe('the zoning row', () => {
     /* The price is the schedule's and is stated once, whatever the step. */
     expect(fixitZoneRow(emptyFixitState(), 3, true, price)?.priced).toBe(
       `${String(price)} u ${COPY.zonesPriced}`,
+    );
+  });
+});
+
+describe('the elevation row', () => {
+  const price = topFloorRaisePriceUnits(shippedPriceSchedule());
+
+  /**
+   * **A building whose topmost floor cannot take it gets no row** — `fixitZoneRow`'s own rule,
+   * pointed at `fixit/run.ts#topFloorRaiseCeilingOf`. `fixit/cases.test.ts` proves the ceiling is a
+   * fact about the fabric (unserved, double-deck-paired, or declared only by a `floorRanges`
+   * entry); this proves the model acts on it.
+   */
+  it('is absent entirely where the building has no ceiling', () => {
+    expect(fixitElevationRow(emptyFixitState(), 0, true, price)).toBeNull();
+    expect(fixitElevationRow(emptyFixitState(), 1, true, price)).not.toBeNull();
+  });
+
+  /** The two refusals are two different sentences — `docs/20` defect 8, on this row too. */
+  it('tells the building’s ceiling apart from the budget’s', () => {
+    const atCeiling = fixitElevationRow({ ...emptyFixitState(), topFloorRaiseM: 2 }, 2, true, price);
+    expect(atCeiling?.stepUpRefusal).toBe(COPY.elevationAtCeiling);
+    expect(atCeiling?.priced).not.toContain(COPY.atBudget);
+
+    const atBudget = fixitElevationRow(emptyFixitState(), 2, false, price);
+    expect(atBudget?.stepUpRefusal).toBe(COPY.noBudgetLeft);
+    expect(atBudget?.priced).toContain(COPY.atBudget);
+
+    const live = fixitElevationRow({ ...emptyFixitState(), topFloorRaiseM: 1 }, 2, true, price);
+    expect(live?.stepUpRefusal).toBeUndefined();
+    expect(live?.canStepDown).toBe(true);
+  });
+
+  it('reads back the raise in metres, and says it is as the building draws it at zero', () => {
+    expect(fixitElevationRow(emptyFixitState(), 5, true, price)?.readout).toBe(COPY.elevationNone);
+    expect(fixitElevationRow({ ...emptyFixitState(), topFloorRaiseM: 1 }, 5, true, price)?.readout).toContain(
+      '+1 metre',
+    );
+    expect(fixitElevationRow({ ...emptyFixitState(), topFloorRaiseM: 2 }, 5, true, price)?.readout).toContain(
+      '+2 metres',
+    );
+    /* The price is the schedule's and is stated once, whatever the step. */
+    expect(fixitElevationRow(emptyFixitState(), 5, true, price)?.priced).toBe(
+      `${String(price)} u ${COPY.elevationPriced}`,
     );
   });
 });

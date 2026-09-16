@@ -36926,3 +36926,21 @@ not first reproduced the answer everybody already had would be measuring the app
 ---
 
 ## D618 — `charter S9` B1's run-history store lives beside `viz`, and the gate stays advisory until it has real history
+
+---
+
+## D619 — Fix-a-building's elevation control: `FixitPatch` gets a field that moves a floor, priced by a new row, scoped to the topmost explicitly-authored floor
+
+**Date: 2026-09-16 · Owner: lane (this change) · Rules on: `data/price-schedule.json`, `packages/viz/src/fixit/types.ts#BuildingPatch`, GitHub issue #422.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: this adds a `data/price-schedule.json` row (invariant 7) and moves the `building` tier's `typicalUnits` from 20 to 18, its own re-derived median — both are facts other code (`pricing/parse.ts`'s ladder check, any reader of the schedule) must agree with, not a decision this lane's docstrings alone can hold.
+
+**What happened.** `BuildingPatch.floors` (floor id → metres added to `heightM`) is the first `FixitPatch` field that moves a floor rather than changing what serves or lives on one. Priced by a new building-tier row, `raise-a-floor`, 10 u / 3 nights — capped under the fix-a-building case budget's 16 u ceiling on `rope-upgrade`'s own precedent (§ D583), so it is a seam a case can actually buy rather than a dead one. Applied in `fixit/run.ts#applyBuildingPatch` by writing the cloned document's `heightM` directly and re-validating the whole building through `parseBuilding`/`resolveBuilding`, the same door a shipped file enters by — so a move that breaks the strict `heightM`-increases-with-`index` rule, a double-deck pair's exact separation, or a rope's hard travel ceiling is refused there rather than reaching a run.
+
+**The new row moved the whole schedule's cost, 412 u → 422 u, and that reaches two files rather than one.** `data/campaign.json`'s ten stages and `data/engineering-briefs.json`'s two shipped briefs each declare their opening budget's ceiling as the schedule's total (`scenario/budget.ts#scheduleBoundsOf`), checked at load; both now read 422 in every one of their thirty-six affected fields, found by running the honesty and scenario suites rather than by grepping for the number first — the same rope-upgrade-class ripple `docs/33`'s own history already records twice.
+
+The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's own topmost floor, because that is the one move that cannot break the ordering rule at any magnitude — every other floor is untouched. `fixit/run.ts#topFloorRaiseCeilingOf` reports `0` (control not drawn) where the topmost floor is unserved by any bank, is one half of a double-deck pair, or — found by running the control against the shipped buildings rather than by reasoning about it — is declared only inside a compact `FloorRange` rather than as an explicit `FloorConfig`, which `applyBuildingPatch`'s lookup cannot resolve. Two of the eighteen shipped cases' six buildings (`vertical-city`, `mixed-use-high-rise`) take that third ground; the other five bind. `fixit/cases.test.ts`'s new block proves both arms over all eighteen shipped cases, on the legs, mirroring the zoning control's own two-sided proof.
+
+**Also investigated: "shafts."** `building.addCars[]` is already priced (`new-car`, 34 u) and sold as every case's mandatory fourth repair, unaffordable inside any shipped case's budget by `fixit/parse.ts`'s own validation rule — the same shape § 10.3 asks the shaft control to have. No engine seam or UI control was missing; nothing changed here.
+
+**What this does not decide.** § 10.1 item 6's elevation grid — a per-shaft, per-floor-band click-to-set control — is a different, larger mechanism and stays exactly as refused as it was; this closes only the narrower literal gap (`FixitPatch` had no field that moved a floor at all). Whether a floor other than the topmost should ever be movable by this control is not decided or measured here.
