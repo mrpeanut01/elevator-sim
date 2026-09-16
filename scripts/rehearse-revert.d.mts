@@ -36,6 +36,9 @@ export interface SchemaBump {
  */
 export const NOT_REHEARSED: readonly string[];
 
+/** Where the session schema version this procedure can destroy is declared. */
+export const SESSION_TYPES: string;
+
 /**
  * The pathspecs a reverted tree is compared over, derived from `deploy-viz.yml`'s own `paths:`.
  *

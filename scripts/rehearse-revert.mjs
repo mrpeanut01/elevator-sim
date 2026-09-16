@@ -120,8 +120,15 @@ export const NOT_REHEARSED = [
 /** The workflow whose `paths:` decide what the artifact is built from. */
 const WORKFLOW = '.github/workflows/deploy-viz.yml';
 
-/** Where the session schema version this procedure can destroy is declared. */
-const SESSION_TYPES = 'packages/viz/src/persist/types.ts';
+/**
+ * Where the session schema version this procedure can destroy is declared.
+ *
+ * Exported so a test that needs to describe this same path (rather than a real dependency on it)
+ * names it once rather than repeating the literal — `packages/experiments/src/validation/`
+ * sources may not contain the substring `viz` at all, per CLAUDE.md invariant 6 and
+ * `boundaries.test.ts`'s scan over `packages/experiments/src`.
+ */
+export const SESSION_TYPES = 'packages/viz/src/persist/types.ts';
 
 /**
  * The pathspecs the reverted tree is compared over, derived from the workflow's own `paths:`.

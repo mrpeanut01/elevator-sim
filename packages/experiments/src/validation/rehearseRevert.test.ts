@@ -65,6 +65,7 @@ import {
   parseCommitLog,
   planRevertSteps,
   safeRevertTo,
+  SESSION_TYPES,
   schemaBumpsOf,
   summaryOf,
   type Observation,
@@ -128,7 +129,7 @@ describe('the artifact pathspecs are derived from the workflow (GitHub issue #35
 describe('the save-schema crossing (docs/16 § 11.3)', () => {
   it('reads a real bump out of a diff of `persist/types.ts`', () => {
     const diff = [
-      'diff --git a/packages/viz/src/persist/types.ts b/packages/viz/src/persist/types.ts',
+      `diff --git a/${SESSION_TYPES} b/${SESSION_TYPES}`,
       '@@ -288,7 +288,7 @@',
       '-export const SESSION_SCHEMA_VERSION = 8;',
       '+export const SESSION_SCHEMA_VERSION = 9;',
@@ -139,7 +140,7 @@ describe('the save-schema crossing (docs/16 § 11.3)', () => {
 
   it('finds no crossing in a diff that moves something else in the same file', () => {
     const diff = [
-      'diff --git a/packages/viz/src/persist/types.ts b/packages/viz/src/persist/types.ts',
+      `diff --git a/${SESSION_TYPES} b/${SESSION_TYPES}`,
       '-/** The slot the week is written to. Bumping SESSION_SCHEMA_VERSION is the other half. */',
       '+/** The slot the week is written to, and what a stale one costs. */',
     ].join('\n');
@@ -474,9 +475,8 @@ describe('the CLI end to end — --apply and the rehearsal, over --repo', () => 
     // Also present, so § 11.2's schema check is clean rather than blind on this fixture — a
     // blind reading is its own already-covered case (`schemaBumpsOf`'s empty-diff test above) and
     // is not what these CLI-level tests are about.
-    const persistDir = join(dir, 'packages/viz/src/persist');
-    mkdirSync(persistDir, { recursive: true });
-    writeFileSync(join(persistDir, 'types.ts'), 'export const SESSION_SCHEMA_VERSION = 1;\n');
+    mkdirSync(join(dir, SESSION_TYPES, '..'), { recursive: true });
+    writeFileSync(join(dir, SESSION_TYPES), 'export const SESSION_SCHEMA_VERSION = 1;\n');
     run(dir, ['add', '-A']);
     run(dir, ['commit', '--quiet', '-m', 'workflow and persist-schema fixtures']);
     return dir;
@@ -525,16 +525,16 @@ describe('the CLI end to end — --apply and the rehearsal, over --repo', () => 
 
   it('--apply refuses a SESSION_SCHEMA_VERSION crossing without --accept-save-loss, and proceeds with it', () => {
     const dir = freshRepo();
-    mkdirSync(join(dir, 'packages/viz/src/persist'), { recursive: true });
+    mkdirSync(join(dir, SESSION_TYPES, '..'), { recursive: true });
     writeFileSync(
-      join(dir, 'packages/viz/src/persist/types.ts'),
+      join(dir, SESSION_TYPES),
       'export const SESSION_SCHEMA_VERSION = 8;\n',
     );
     run(dir, ['add', '-A']);
     run(dir, ['commit', '--quiet', '-m', 'v8']);
     const base = run(dir, ['rev-parse', 'HEAD']);
     writeFileSync(
-      join(dir, 'packages/viz/src/persist/types.ts'),
+      join(dir, SESSION_TYPES),
       'export const SESSION_SCHEMA_VERSION = 9;\n',
     );
     run(dir, ['add', '-A']);
