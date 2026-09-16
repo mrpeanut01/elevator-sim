@@ -210,7 +210,7 @@ export interface WithheldChange {
 /** `data/price-schedule.json`, parsed. */
 /**
  * **One band of the plan area a new hoistway removes** — GitHub issue **#429** stage 2,
- * [§ D630](../../../../DECISIONS.md).
+ * [§ D631](../../../../DECISIONS.md).
  *
  * [§ D601](../../../../DECISIONS.md) built the quantity — `config/floorArea.ts#shaftPlanAreaM2`,
  * one car's footprint times the floors its bank's span reaches — and refused to price it, because
@@ -253,7 +253,7 @@ export interface PriceSchedule {
   readonly withheld: readonly WithheldChange[];
   /**
    * How a shaft's plan area becomes the `shaft-area` row's quantity — GitHub issue #429 stage 2,
-   * § D630. Required, for `withheld`'s reason: a file nobody finished and a file that bands nothing
+   * § D631. Required, for `withheld`'s reason: a file nobody finished and a file that bands nothing
    * must not look alike.
    */
   readonly areaBands: readonly AreaBand[];

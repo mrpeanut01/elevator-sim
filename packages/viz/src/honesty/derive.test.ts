@@ -160,7 +160,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'pricing/repairPrice.ts#repairPriceUnits',
         'fixit/parse.ts#newShaftUnits',
         /*
-         * GitHub issue #429 stage 2, § D630 — the same argument one row along. `fixitContextOf`
+         * GitHub issue #429 stage 2, § D631 — the same argument one row along. `fixitContextOf`
          * assembles the derivation context (the forbidden-identifier set, the demand bands, the
          * shaft-area band map) and authors no sentence of its own; its only literal is `'number'`,
          * a `typeof` guard rather than prose. `shaftAreaSurchargeUnits` returns a number off the

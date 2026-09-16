@@ -324,7 +324,7 @@ describe('rows without a rate stay flat, so every existing price is unchanged', 
    * a particular row rather than about a quantity of them.
    *
    * **A second rate row has since arrived, and it arrived through this case rather than past it** —
-   * GitHub issue #429 stage 2, [§ D630](../../../../DECISIONS.md). `shaft-area` charges a new
+   * GitHub issue #429 stage 2, [§ D631](../../../../DECISIONS.md). `shaft-area` charges a new
    * hoistway for the plan area it permanently removes, in bands, and it is named here for the same
    * reason `landing-panels` is: the list is the register of every row that multiplies, and a row
    * that multiplies without appearing here is a price nobody looked at. Which is exactly what the
@@ -382,7 +382,7 @@ describe('rows without a rate stay flat, so every existing price is unchanged', 
 
   /**
    * **The area band is a quantity the building has, and its ceiling is derived from the shipped
-   * set rather than trusted** — GitHub issue #429 stage 2, [§ D630](../../../../DECISIONS.md).
+   * set rather than trusted** — GitHub issue #429 stage 2, [§ D631](../../../../DECISIONS.md).
    *
    * `landing-panels`' own precedent one row up, and for the same reason: `data/price-schedule.json`
    * says `quantity.max` is the dearest band any shipped building reaches, and a transcribed figure
@@ -414,7 +414,7 @@ describe('rows without a rate stay flat, so every existing price is unchanged', 
 
   /**
    * **Move the building and require the price to change** — `CLAUDE.md`'s standing requirement,
-   * in the only form a price can take it, GitHub issue #429 stage 2 and [§ D630](../../../../DECISIONS.md).
+   * in the only form a price can take it, GitHub issue #429 stage 2 and [§ D631](../../../../DECISIONS.md).
    *
    * A price is not a leg, so this cannot be compared on one. What it *can* be compared on is the
    * thing the ruling is about: **the same purchase in two real buildings must not cost the same**,

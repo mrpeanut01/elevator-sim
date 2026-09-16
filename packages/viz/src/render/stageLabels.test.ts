@@ -240,3 +240,88 @@ describe('shaft labels stay distinguishable — issue #115 § 4', () => {
     }
   });
 });
+
+describe('bank kind carries a glyph as well as a colour — GitHub issue #544, § D624', () => {
+  /**
+   * A canvas wide enough that none of Merdeka's 92 cars or One-WTC's 73 falls outside
+   * `stageLayoutFor`'s gutter ladder — the windowing GitHub issue #41 built. This describe block
+   * is about bank *kind*, and a bank the layout dropped for width would test nothing.
+   */
+  const WIDE_CANVAS = { width: 2600, height: 900 } as const;
+
+  /**
+   * `merdeka-class-reference`'s `shuttle` bank serves only G/57/93 — a real gap either side — while
+   * its three locals serve contiguous ranges (`data/buildings/merdeka-class-reference.json`).
+   */
+  it('marks the shuttle heading on Merdeka, and marks no local heading', () => {
+    const layout = stageFor('merdeka-class-reference', WIDE_CANVAS);
+    expect(layout.hiddenShaftCount, 'the canvas is not wide enough for this test').toBe(0);
+    const ctx = paint('merdeka-class-reference', layout);
+    const headings = ctx.drawn.filter((entry) => entry.y === layout.header.bankY);
+    expect(headings.length).toBeGreaterThan(1);
+
+    const byBankId = new Map(layout.columns.map((column) => [column.bankId, column]));
+    expect(byBankId.has('shuttle')).toBe(true);
+    expect(byBankId.has('local-low')).toBe(true);
+
+    const shuttleHeading = headings.find((entry) => entry.text.includes('shuttle'));
+    expect(shuttleHeading, 'no heading names the shuttle bank').toBeDefined();
+    expect(shuttleHeading!.text.startsWith('»')).toBe(true);
+
+    const localHeadings = headings.filter((entry) => entry.text.includes('local-'));
+    expect(localHeadings.length).toBeGreaterThan(0);
+    for (const entry of localHeadings) {
+      expect(entry.text.startsWith('»'), `local heading carries the express glyph: "${entry.text}"`).toBe(false);
+    }
+  });
+
+  /**
+   * `one-wtc-class-reference`'s `observatory` bank (G/100–104) is the most on-the-nose express case
+   * shipped — the issue's own example — and it is not adjacent to `shuttle` in bank order, so this
+   * also checks the glyph is decided per bank rather than smeared across neighbours.
+   */
+  it('marks the observatory heading on One-WTC', () => {
+    const layout = stageFor('one-wtc-class-reference', WIDE_CANVAS);
+    expect(layout.hiddenShaftCount, 'the canvas is not wide enough for this test').toBe(0);
+    const ctx = paint('one-wtc-class-reference', layout);
+    const headings = ctx.drawn.filter((entry) => entry.y === layout.header.bankY);
+    const observatoryHeading = headings.find((entry) => entry.text.includes('observatory'));
+    expect(observatoryHeading, 'no heading names the observatory bank').toBeDefined();
+    expect(observatoryHeading!.text.startsWith('»')).toBe(true);
+  });
+
+  it('draws a distinct hairline colour on an express shaft, not only on its heading', () => {
+    /*
+     * The issue's sharper complaint: *every shaft*, not just the row of text above them, was
+     * colour-and-shape-blind to bank kind. Checked against the mock's own recorded `strokeStyle`
+     * at the moment each shaft's recess was stroked, via a `Faces` subclass that also records fill
+     * and stroke calls — the base `Faces` above tracks only `fillText`.
+     */
+    class TracksStrokes extends Faces {
+      readonly strokes: { readonly style: string }[] = [];
+      override strokeRect(): void {
+        this.strokes.push({ style: this.strokeStyle });
+      }
+    }
+    const layout = stageFor('merdeka-class-reference', WIDE_CANVAS);
+    expect(layout.hiddenShaftCount, 'the canvas is not wide enough for this test').toBe(0);
+    const recording = recordings.get('merdeka-class-reference');
+    if (recording === undefined) throw new Error('no recording for merdeka-class-reference');
+    const ctx = new TracksStrokes();
+    drawScene(ctx, {
+      recording,
+      frame: frameAt(recording, recording.startedAt + 300),
+      layout,
+      theme: DEFAULT_THEME,
+      unservedFloorIds: [],
+      unansweredCallFloorIds: [],
+      lockedOutLandings: [],
+    });
+    const shuttleColumns = layout.columns.filter((column) => column.bankId === 'shuttle').length;
+    const localColumns = layout.columns.filter((column) => column.bankId === 'local-low').length;
+    expect(shuttleColumns).toBeGreaterThan(0);
+    expect(localColumns).toBeGreaterThan(0);
+    const distinctStrokeStyles = new Set(ctx.strokes.map((stroke) => stroke.style));
+    expect(distinctStrokeStyles.size, 'every shaft still strokes the same colour').toBeGreaterThan(1);
+  });
+});

@@ -62,7 +62,7 @@ import type { DispatcherProfile } from '@elevator-sim/core/browser';
 import { drawCutaway, sizeCanvas } from './cutaway.js';
 import { Playback } from '../playback/playback.js';
 import { systemClock } from '../playback/clock.js';
-import type { Frame, VizRecording } from '../contract/types.js';
+import type { Frame, VizFloor, VizRecording } from '../contract/types.js';
 import { describeFrame } from '../render/describeFrame.js';
 import { frameAt } from '../frame/frameAt.js';
 import { queueAt } from '../frame/overlay.js';
@@ -94,12 +94,14 @@ import {
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
   STAGE_SWITCH_PICKER_LABEL,
+  STAGE_FLOOR_JUMP_PLACEHOLDER,
   stageAlarmOf,
   stageBarModelOf,
   stageCameraChipsOf,
   type StageCameraId,
   stageCameraWindowOf,
   type StageFigure,
+  stageFloorJumpOptionsOf,
   stageFilingLandsOn,
   stageGeometryOf,
   stageGoalsOf,
@@ -337,6 +339,8 @@ function mountStage(
   let audioState: AudioDirectorState = NO_AUDIO_YET;
   /** § 7.3's camera — GitHub issue #324. A view over the recording; it writes nothing to the run. */
   let camera: StageCameraId = 'whole';
+  /** The floor a jump-to-floor selection targets — GitHub issue #549, § D625. Read only when `camera === 'floor'`. */
+  let targetFloorId: string | undefined;
   let started = false;
   let pendingFrame: number | undefined;
   /**
@@ -534,6 +538,45 @@ function mountStage(
   });
   /* Empty until a laid-out paint offers the chips — see the paint below for why absent, not hidden. */
 
+  /*
+   * The fourth camera position — a jump to a player-chosen floor, GitHub issue #549, § D625. A
+   * `<select>` rather than a fifth {@link STAGE_CAMERAS} chip: the other three need no input before
+   * they do anything, and this one does, so a chip with nothing to click first would be a control
+   * that looked live and did nothing — exactly what § D219/§ D227 refuse in both directions.
+   */
+  const floorJump = el(doc, 'select', 'everyday-stage-floor-jump');
+  /**
+   * `STAGE_FLOOR_JUMP_PLACEHOLDER` verbatim — the sighted reader's own words, which is what SC
+   * 2.5.3 asks an accessible name to match, and the reason every other `<select>` in this file
+   * sets `aria-label` from the string it also draws rather than a second phrasing of it.
+   */
+  floorJump.setAttribute('aria-label', STAGE_FLOOR_JUMP_PLACEHOLDER);
+  floorJump.style.cssText = [
+    `background:transparent`,
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.control)}px`,
+    'padding:5px 9px',
+    `font:500 11px ${TYPE.mono}`,
+    `color:${C.warmGrey}`,
+    'cursor:pointer',
+    /*
+     * `vertical-city`'s hundred floors give the select's widest `<option>` more text than a phone
+     * viewport holds; unbounded, the browser sizes the closed box to that text and pushes it past
+     * the edge of the header's own wrapped row. `max-width:100%` is `campaignScreens.ts#select`'s
+     * same fix for the same shape — smallScreen.browser.test.ts's #549 case.
+     */
+    'max-width:100%',
+  ].join(';');
+  /** The floor set the select's `<option>`s were last built from — rebuilt only when this changes. */
+  let floorJumpBuiltFor: readonly VizFloor[] | undefined;
+  floorJump.addEventListener('change', () => {
+    if (floorJump.value === '') return;
+    camera = 'floor';
+    targetFloorId = floorJump.value;
+    syncCamera();
+    requestFrame();
+  });
+
   function syncCamera(): void {
     for (const button of cameraButtons) {
       const on = button.dataset['camera'] === camera;
@@ -548,10 +591,12 @@ function mountStage(
         'cursor:pointer',
       ].join(';');
     }
+    /* Picking a fixed chip un-picks the floor jump — there is no `floor` chip to do it instead. */
+    if (camera !== 'floor') floorJump.value = '';
   }
   syncCamera();
 
-  header.append(clock, phase, nextPhase, driving, figures, playButton, speeds, cameras);
+  header.append(clock, phase, nextPhase, driving, figures, playButton, speeds, cameras, floorJump);
 
   /*
    * **Pillar 3's strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
@@ -1911,6 +1956,37 @@ function mountStage(
         const offered = stageCameraChipsOf(recording.floors, rect.height).length > 0;
         if (offered && cameras.childElementCount === 0) cameras.replaceChildren(...cameraButtons);
         if (!offered && cameras.childElementCount > 0) cameras.replaceChildren();
+        /*
+         * The select's options are rebuilt only when the floor set they were built from changes —
+         * a new recording, not a new frame — so a mid-shift repaint never resets the control an
+         * unrelated player interaction is mid-way through. `stageFloorJumpOptionsOf` is offered
+         * under the same gate `stageCameraChipsOf` is, so the two controls appear and disappear
+         * together.
+         */
+        if (recording.floors !== floorJumpBuiltFor) {
+          floorJumpBuiltFor = recording.floors;
+          const options = stageFloorJumpOptionsOf(recording.floors, rect.height);
+          if (options.length > 0) {
+            const placeholder = el(doc, 'option', undefined, STAGE_FLOOR_JUMP_PLACEHOLDER);
+            placeholder.value = '';
+            placeholder.disabled = true;
+            placeholder.selected = true;
+            const entries = options.map((option) => {
+              const entry = el(doc, 'option', undefined, option.label);
+              entry.value = option.floorId;
+              return entry;
+            });
+            floorJump.replaceChildren(placeholder, ...entries);
+          } else {
+            floorJump.replaceChildren();
+          }
+          /* A rebuilt select has forgotten any floor a player had jumped to. */
+          if (camera === 'floor') {
+            camera = 'whole';
+            targetFloorId = undefined;
+            syncCamera();
+          }
+        }
       }
       drawCutaway(ctx, {
         recording,
@@ -1922,7 +1998,13 @@ function mountStage(
           floors: recording.floors,
           shafts: recording.shafts,
           outOfServiceCarIds: recording.outOfServiceCarIds,
-          window: stageCameraWindowOf({ camera, floors: recording.floors, height: rect.height, cars: frame.cars }),
+          window: stageCameraWindowOf({
+            camera,
+            floors: recording.floors,
+            height: rect.height,
+            cars: frame.cars,
+            targetFloorId,
+          }),
         }),
         floorLabelOf: labelOf,
       });

@@ -157,7 +157,7 @@ export {
   type ResolveBuildingOptions,
 } from './parse.js';
 /**
- * The plan area one more hoistway would take — GitHub issue #429 stage 2, § D630. Exported because
+ * The plan area one more hoistway would take — GitHub issue #429 stage 2, § D631. Exported because
  * `packages/viz/src/fixit/parse.ts#fixitContextOf` turns it into the `shaft-area` row's price band,
  * which is the first reader outside `core`. `resolveFloorArea` stays unexported: its result reaches
  * `viz` on `ResolvedBuilding.area` already, and a second door to it would be two ways to ask.

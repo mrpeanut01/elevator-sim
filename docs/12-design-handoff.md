@@ -769,10 +769,11 @@ note and the presses, so the label agrees with itself across four surfaces by co
 switch beside that strip would be a second, disagreeing source for the same fact — the argument is
 at `tunerModel.ts` where the narrower guard (*the building moved*) was rejected for the same reason.
 
-**Not decided, and named so the next reader finds it named.** Whether Free play should be scored:
-a free-play week *is* posted — `week.ts` gates only on the sandbox id — while the handoff's Sandbox
-is explicitly unscored. That is a product judgement about what Free play is for, and § D496 leaves
-it open rather than settling a second question inside the first.
+**Status 2026-09-16: RULED by [§ D630](../DECISIONS.md).** Free play should **keep** posting to the
+week — the status quo is confirmed rather than changed. § D496 raised the question and left it open;
+§ D630 settles it by reading `week.ts`'s own reasoning at `FREE_PLAY_CONTRACT_ID`'s declaration,
+which already distinguishes Free Play (*chosen*, from its own tile) from Sandbox (*arrived at*, the
+only one of the two whose screen promises nothing counts). No gate change is owed.
 
 ---
 
@@ -885,9 +886,13 @@ this box — the honest-control shape `docs/28` § 5.5a describes. All three chi
 A floor that is neither near the lobby nor currently under a full car **cannot be looked at legibly
 at all**. Measured through the shipped derivation: the reachable band is **40 of 165**.
 
-**What is deliberately not decided here.** Whether the answer is a scrollbar, a drag, a floor-number
-jump, or a zone picker keyed to the tower's own sky lobbies is design work with an owner this
-document does not have, and `docs/38` § 2.5 is the reason it is wanted. What is settled is that the
+**Status 2026-09-16: RULED by [§ D625](../DECISIONS.md).** Of the four candidates — a scrollbar, a
+drag, a floor-number jump, or a zone picker keyed to the tower's own sky lobbies — the floor-number
+jump ships first, as the smallest control that composes with the three existing bands; the zone
+picker `docs/38` § 2.5 wants remains the fuller answer and follows as a v2 rather than a blocker.
+Confirmed directly (GitHub issue #549) that none of the four exists today: wheel and drag over the
+stage canvas do nothing, and clicking a floor row in `Whole tower` view does not aim the camera
+there either. Neither candidate is built by this ruling. What is settled is that the
 handoff's single-cutaway assumption does not survive this building, and that the camera is a
 starting point rather than the answer — three fixed positions is a zoning mechanism with no way to
 aim it.
@@ -896,8 +901,39 @@ aim it.
 at 165 floors a legible pitch needs about **2 160 px** of canvas — nearly three times a 900 px
 viewport. There is no viewport this fits in, so the fix cannot be geometry.
 
+### 4.17 The stage now carries a bank-kind legend — a glyph and a colour, not text alone
 
-## 5 — Definition of done
+**The deviation, stated first.** The handoff has a per-shaft legend for the building editor (§ 1.3
+M11, `:736–738`): an express toggle and sky-lobby chips, so a reader picks an express or shuttle
+bank out of the editor's own list by more than its name. It has **no row for the play stage**, and
+until [§ D624](../DECISIONS.md) the stage did not need one to be silent — `render/canvas.ts#drawShafts`
+drew every shaft, express or local, with the identical recess/hairline/rect treatment, and the only
+signal telling the two apart was whichever string the bank happened to be named. GitHub issue #544
+found this directly: on `merdeka-class-reference` (four bank shapes) and `one-wtc-class-reference`
+(including its `observatory` express bank), the stage was colour-and-shape-blind to bank kind.
+
+**What the product does now** ([§ D624](../DECISIONS.md)). An express or shuttle bank's shafts and
+its own group heading both draw in `theme.badgeTransfer` — the same colour
+`render/canvas.ts#drawFloors` already uses for a sky-lobby floor row's `⇄` badge, so the vocabulary
+is one the player has already met rather than a second one invented for this row — and each of its
+shafts carries a small triangular mark at the top of its recess, a shape rather than a second use of
+the same colour (`UX.md` KB-15). The heading
+text also carries a `»` glyph, mirroring the floor grid's `⌂`/`⇄` badges (RV-07) rather than
+inventing a fourth convention.
+
+**How kind is known, since `BankConfig` carries none.** § 4.5 already states the handoff's own
+answer for the editor — *"the handoff's shuttle vs local car roles are derived from the bank
+structure rather than assigned"* — and this reaches the same conclusion for the stage by the same
+route: `render/canvas.ts#expressBankIdsOf` reads whether a bank's `servedFloorIds`, placed on the
+building's own floor order, skip at least one floor between the lowest and highest it stops at. A
+local bank's range is contiguous; an express or shuttle bank's is not, because it exists to skip the
+floors between its lobby and a sky lobby or observatory deck. No schema change, no authored field,
+and no `data/buildings/*.json` migration — the fact was already in the geometry every shaft already
+carries.
+
+**What this does not decide.** Escalators and access-zone *structure* (as opposed to a per-call
+refusal outcome) remain outside `VizRecording` entirely, per #544's own findings, and neither is
+touched here. This row closes only the bank-kind half of that issue.
 
 The refactor is done when all of the following are true, and not before.
 

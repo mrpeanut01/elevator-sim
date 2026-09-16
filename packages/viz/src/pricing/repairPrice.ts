@@ -153,7 +153,7 @@ export function unpricedPathsIn(
  *
  * ## The one exception, and it is a quantity the patch cannot carry — GitHub issue #429 stage 2
  *
- * `shaftAreaBand` is the `shaft-area` row's quantity ([§ D630](../../../../DECISIONS.md)): which
+ * `shaftAreaBand` is the `shaft-area` row's quantity ([§ D631](../../../../DECISIONS.md)): which
  * band the plan area of the hoistway this patch adds falls into. It is **not** in the patch and
  * could not be, because it is a fact about the *building* the patch is applied to rather than about
  * the patch — the same car added to `ashgate`'s three-level car park and to a Burj shuttle takes

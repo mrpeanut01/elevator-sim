@@ -964,8 +964,11 @@ losing condition is real.**
   axis, never a score (R11, § 7.3).
 - **A single-run goal whose across-seed variance has not been measured** (R12).
 - **An estimate displayed without the count it was computed from** (R13).
-- A difficulty setting that changes anything other than declared `TRAFFIC_PARAMETERS` and building
-  fabric. Difficulty is demand and geometry; it is never a fudge factor on a metric.
+- A difficulty setting that moves a measurement. Difficulty may vary declared `TRAFFIC_PARAMETERS`
+  and building fabric; stakes may separately vary the purse, the miss allowance, what a contract
+  ends on, and the bar a day is cleared against — never a figure the run produces
+  ([§ D345](../DECISIONS.md), [§ D627](../DECISIONS.md); `22-charter.md` non-goal 6 is the text of
+  record, kept in sync here per that document's own rule). It is never a fudge factor on a metric.
 
 ---
 

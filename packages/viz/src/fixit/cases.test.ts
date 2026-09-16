@@ -160,7 +160,7 @@ beforeAll(async () => {
       dispatcherProfiles: resources.dispatcherProfiles,
       /*
        * **The shipped loader passes these, so this suite must too** — GitHub issue #429 stage 2,
-       * § D630. Without them no shaft resolves a plan-area band and every new-shaft repair falls
+       * § D631. Without them no shaft resolves a plan-area band and every new-shaft repair falls
        * back to the base price, which would leave the banded prices asserted nowhere while the
        * product charged them. `dev/data.ts#loadFixitCases` is the path this mirrors.
        */
@@ -755,7 +755,7 @@ describe('running a case leaves the authored case file alone', () => {
 
 /**
  * **A shaft costs what its own building's plan area says it costs** — GitHub issue **#429** stage 2,
- * [§ D630](../../../../DECISIONS.md).
+ * [§ D631](../../../../DECISIONS.md).
  *
  * [§ D601](../../../../DECISIONS.md) measured the quantity and refused to price it; the product
  * owner has since ruled that area is charged, in the schedule's one currency and in **discrete

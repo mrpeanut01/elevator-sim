@@ -182,6 +182,7 @@ import {
   STAGE_ABSENCES,
   STAGE_AWAITING_RUN,
   STAGE_CAMERAS,
+  STAGE_FLOOR_JUMP_PLACEHOLDER,
   STAGE_GOALS_COPY,
   STAGE_INTERVENTIONS,
   STAGE_OUT_OF_SERVICE,
@@ -10016,6 +10017,14 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_CAMERAS',
     /* Returns the chips above or none; the words are theirs, seeded below once per case. */
     'everyday/stageScreenModel.ts#stageCameraChipsOf',
+    /*
+     * The fourth camera position's own control — GitHub issue #549, § D625. Only the placeholder
+     * is static copy and is seeded below; `#stageFloorJumpOptionsOf` returns per-building floor
+     * labels, which are building data rather than prose and is not a derived producer at all —
+     * confirmed rather than assumed, listing it here failed `derive.test.ts`'s own over-claim
+     * check.
+     */
+    'everyday/stageScreenModel.ts#STAGE_FLOOR_JUMP_PLACEHOLDER',
     /* § 7.6's handover — the title it carries, and the refusal it draws on itself (issue #171). */
     'everyday/stageScreenModel.ts#STAGE_SWITCH_EXPLAINS',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
@@ -10233,6 +10242,12 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     for (const chip of STAGE_CAMERAS) {
       seeds.push({ field: `stage.camera.${chip.id}`, text: chip.label, role: 'label' });
     }
+    /*
+     * The fourth camera position's own control — GitHub issue #549, § D625. Per-building floor
+     * labels are already building data rather than copy (swept wherever a floor label is drawn
+     * elsewhere on this stage), so only the select's own static placeholder is seeded here.
+     */
+    seeds.push({ field: 'stage.camera.floor.placeholder', text: STAGE_FLOOR_JUMP_PLACEHOLDER, role: 'label' });
     /*
      * **Every arm the control can offer, including the one that is built per call** — GitHub issue
      * **#171**. `STAGE_INTERVENTIONS` holds only the arms whose whole content is their kind, so

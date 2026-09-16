@@ -1623,8 +1623,21 @@ const MIN_LABEL_PITCH_PX = 13;
  * speed chips are the precedent (*they are not interventions*), and this joins them. The legs are
  * identical with the camera anywhere, which is not a claim that needs a test because no path from
  * this module reaches `ViewerState`.
+ *
+ * ## A fourth position — `floor` — GitHub issue #549, [§ D625](../../../../DECISIONS.md)
+ *
+ * The three fixed bands answer *what the run is doing right now* (the whole tower, the entrance, the
+ * fullest car) but not *the one question a player who has been told to watch a specific bank or
+ * floor actually has*: put that floor on screen. `floor` is a fourth window, keyed to a player-chosen
+ * `VizFloor.id` rather than to anything the run produces, so — unlike `lobby` and `follow` — it is
+ * never inferred and always explicit. It is deliberately **not** a fourth {@link StageCameraChip}:
+ * the other three need no input to press, and a floor-jump does, so it is offered as a separate
+ * select ({@link stageFloorJumpOptionsOf}) rather than a fourth button with nothing to click before
+ * it does anything. Selecting a floor is what sets the camera to `floor`; there is no `floor` chip to
+ * un-press it back to `whole` — picking `whole` (or any other chip) does that, exactly as choosing a
+ * different camera always has.
  */
-export type StageCameraId = 'whole' | 'lobby' | 'follow';
+export type StageCameraId = 'whole' | 'lobby' | 'follow' | 'floor';
 
 export interface StageCameraChip {
   readonly id: StageCameraId;
@@ -1665,15 +1678,42 @@ export function stageCameraChipsOf(floors: readonly VizFloor[], height: number):
 }
 
 /**
+ * One option per floor, for the jump-to-floor select — GitHub issue #549, § D625. Offered on exactly
+ * the towers the three fixed chips are, by the same test: a select that could not move the picture
+ * would be the same lie a fourth inert chip would be. Ordered top-down, matching the stage's own
+ * cutaway, so the list reads the way the building does.
+ */
+/** The floor-jump select's own placeholder option — swept by `honesty/surfaces.ts` like the chips. */
+export const STAGE_FLOOR_JUMP_PLACEHOLDER = 'Jump to floor…';
+
+export interface StageFloorJumpOption {
+  readonly floorId: string;
+  readonly label: string;
+}
+
+export function stageFloorJumpOptionsOf(
+  floors: readonly VizFloor[],
+  height: number,
+): readonly StageFloorJumpOption[] {
+  if (wholeTowerIsLegible(floors, height)) return [];
+  return [...floors]
+    .sort((a, b) => b.heightM - a.heightM)
+    .map((floor) => ({ floorId: floor.id, label: floor.label ?? floor.id }));
+}
+
+/**
  * The window a camera position selects, or `undefined` for the whole tower — the value
  * `stageGeometryOf` takes. `follow` reads the frame's cars; with no car aboard anybody it is the
- * lobby band, which is where the fullest car will be found next.
+ * lobby band, which is where the fullest car will be found next. `floor` reads `targetFloorId`;
+ * with none given (or a stale id off a since-loaded building) it is the lobby band for the same
+ * reason — a jump with nothing to jump to is not a jump.
  */
 export function stageCameraWindowOf(input: {
   readonly camera: StageCameraId;
   readonly floors: readonly VizFloor[];
   readonly height: number;
   readonly cars?: readonly { readonly heightM: number; readonly occupants: number }[] | undefined;
+  readonly targetFloorId?: string | undefined;
 }): StageCameraWindow | undefined {
   const { floors, height } = input;
   if (input.camera === 'whole' || wholeTowerIsLegible(floors, height)) return undefined;
@@ -1688,15 +1728,18 @@ export function stageCameraWindowOf(input: {
     const to = ordered[Math.min(ordered.length - 1, start + size - 1)];
     return { fromIndex: from?.index ?? lowest.index, toIndex: to?.index ?? highest.index };
   };
-  if (input.camera === 'lobby') {
+  const lobbyBand = (): StageCameraWindow => {
     const entrance = ordered.findIndex((floor) => floor.isEntrance);
     return bandFrom(entrance < 0 ? 0 : entrance);
+  };
+  if (input.camera === 'lobby') return lobbyBand();
+  if (input.camera === 'floor') {
+    const target = ordered.findIndex((floor) => floor.id === input.targetFloorId);
+    if (target < 0) return lobbyBand();
+    return bandFrom(target - Math.floor(size / 2));
   }
   const fullest = [...(input.cars ?? [])].sort((a, b) => b.occupants - a.occupants)[0];
-  if (fullest === undefined || fullest.occupants === 0) {
-    const entrance = ordered.findIndex((floor) => floor.isEntrance);
-    return bandFrom(entrance < 0 ? 0 : entrance);
-  }
+  if (fullest === undefined || fullest.occupants === 0) return lobbyBand();
   /* The floor the car is at or just above, then the band centred on it. */
   let at = 0;
   for (const [ordinal, floor] of ordered.entries()) {

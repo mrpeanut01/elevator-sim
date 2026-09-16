@@ -37037,9 +37037,144 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 
 **A trim was considered and not taken.** `core` is bundled separately into all three JS entry points rather than sharing one chunk, so every byte `core` gains is paid three times. Sharing it (`build.rolldownOptions.output.manualChunks` or equivalent) would very likely buy back real headroom, and is the trim `docs/31` § 3 names as the alternative to raising the number. Not attempted here: it changes how three separate entry points load rather than one number, and is a real engineering change to verify rather than a budget line to edit. Left as a named follow-up — generous headroom is a reason to defer it, not a reason it stops being worth doing.
 
+
 ---
 
-## D630 — A shaft's plan area is priced, in four bands cut from the measured distribution rather than at a rate per square metre, and the two cases that cannot be banded are named rather than charged the cheapest
+## D623 — Scope ruling on #543's live pause-and-reassign ask, corrected: (a) needs a budget-in-force tracker that does not exist yet, so it is scoped as a follow-up rather than built blind; car-move/express creation stay unscoped; fix-a-building's no-pause design stays as-is
+
+**Date: 2026-09-16 · Owner: this session, on the session principal's explicit delegated authority (recorded here rather than attributed to an unnamed "product owner," per [§ D227](#d227)'s stale-attribution class and the standing rule that an agent lane may not manufacture a human) · Rules on: GitHub issue [#543](https://github.com/mrpeanut01/elevator-sim/issues/543).**
+
+**Why an entry.** The ruling binds a GitHub issue and the module boundary between `core`'s `building-change` intervention and `everyday/stageScreen.ts`'s UI, neither of which is owned by this session's own work.
+
+**What was asked.** #543 named two things tangled together: (a) reassigning floors between banks that already exist mid-run, and (b) moving a car between banks or creating a new express run mid-run, neither of which any layer models today. It also asked whether the eighteen fix-a-building cases, now Scenario content, should ever gain the live pause `asBuiltStage.ts` deliberately withholds from them.
+
+**This entry replaces its own first draft, which was wrong about (a) in the way that matters most on this project.** The draft said the mechanism "already exists end to end" and called wiring it "UI wiring … not new modelling," on the strength of `rezone-bank`/`building-change`/`admitWorks` existing and `stageInterventionsOf` already accepting a `works` field. Starting to build against that reading meant reading `everyday/stageScreenModel.ts#StageWorksInput.budgetUnits`'s own docstring first, and it says the opposite of what the draft assumed: "`scenario/budget.ts` validates a scenario's ladder at load and nothing reads it at play time yet, so no caller can honestly say what rung is in force; a stage that offered a *Re-zone a bank* button against a budget it invented would be the failure `CLAUDE.md` names eleven times, arriving as a control that spends money nobody has." Reading `scenario/budget.ts` confirmed it: `rungsOf` derives what a rung holds from a `ScenarioBudget` and its ordered steps, but nothing anywhere tracks, at play time, which steps a running scenario has bought — there is no live chime-spend ledger for a caller to read the current rung off of. Using the base rung (`budget.startingUnits`) as a stand-in would not be "wiring the existing mechanism"; it would be presenting an invented number as the rung in force, which is exactly the failure the docstring names by pointing at this exact button. The mechanism (a) needs is not end to end — the last link, a play-time reader of which rung is bought, does not exist, and building it is real modelling work (a state to carry through a run and persist with the record), not UI wiring on top of #370.
+
+**Ruling.**
+
+1. **(a)'s direction is right and its scoping was wrong.** Reassigning floors between existing banks mid-run, priced against the ladder, is still worth building — `rezone-bank`, `building-change` and `admitWorks` are real and correctly gated (including the double-deck refusal from #477). What is not ready is the budget side: a live rung tracker has to exist before a screen can honestly offer a priced change. **This is not built here.** Scoping the tracker (what it persists, whether it lives beside `RunInterventionConfig` or beside the stage record, how a filed day reconciles chimes spent) is a follow-up task, not a same-session build.
+2. **(b) stays unscoped**, for the reason the first draft gave: moving a car between banks or spinning up a mid-run express run has no seam at any layer — not in `ServiceEventConfig`, not in the fixit patch shape — and building one is real modelling work with its own pricing and re-simulation-cost questions, closer in shape to #422's "give the engine the seams" than to a UI task. Not ruled out, just not bundled with (a).
+3. **Fix-a-building cases keep their no-pause design.** `asBuiltStage.ts`'s docstring states the reason on purpose: a stage that let a case's opening run be pressed would be a second place to change a building the mode measures twice deliberately. Watch-then-edit and watch-pause-edit-continue stay two different scenario shapes rather than converging into one.
+
+**Basis.** A follow-up playtest confirmed that even the narrow case — reaching Merdeka, the issue's own worked example, at all — currently requires the Engineer/Free-Play surface, since neither Scenario nor (practically) Career content reaches it. That sharpens rather than changes the ruling: (a) is worth building once the rung it would be priced against is real, regardless of which content path eventually carries Merdeka.
+
+**What this does not decide.** The tracker's shape, whether (a)'s UI lands on the Everyday stage or the Engineer surface first, and how the offer is priced once a rung is readable, are all left to whoever takes the follow-up on.
+
+**Follow-up filed: [GitHub issue #553](https://github.com/mrpeanut01/elevator-sim/issues/553).**
+
+---
+
+## D624 — `docs/12`'s design handoff is extended: the stage gets a bank/zone-kind legend, mirroring the editor's existing express-toggle and sky-lobby-chip convention
+
+**Date: 2026-09-16 · Owner: this session, on the session principal's explicit delegated authority · Rules on: `docs/12-design-handoff.md` § 4, GitHub issue [#544](https://github.com/mrpeanut01/elevator-sim/issues/544).**
+
+**Why an entry.** `CLAUDE.md` keeps `docs/12` canonical for the interface; extending it is exactly the kind of departure § 4 exists to record rather than let arrive silently, and it binds a document this session's own work does not own.
+
+**What was asked.** #544 found bank identity is text-label-only on the stage — no colour or shape distinguishes an express/shuttle bank's shafts from a local's — and asked whether `docs/12` needs a new convention for the stage, or whether the editor's existing express-toggle/sky-lobby-chip legend (built for the building editor, § 4 M11) already covers it.
+
+**Ruling: it does not, and the handoff is extended rather than left silent.** Confirmed directly, not just read from the issue's code trace: on `merdeka-class-reference` (four bank shapes) and `one-wtc-class-reference` (including its `observatory` express bank, isolated via the bank filter), every shaft renders with identical grey recess/hairline treatment regardless of kind — the only signal is the text label above the column group, and those labels truncate illegibly at 1280×800 exactly as a cited code comment warns. The editor's convention exists for a different screen and does not reach the stage by itself. `docs/12` § 4 should gain a stage-legend row analogous to M11's, so the same express/shuttle/sky-lobby vocabulary a player learns in the editor is legible while a day plays.
+
+**What this does not decide.** The specific visual treatment (colour, icon, both) is not chosen here — that's a design-handoff drafting task, not a ruling this session is positioned to make. What's settled is that a row is owed, not what the row says.
+
+**Implemented in [PR #552](https://github.com/mrpeanut01/elevator-sim/pull/552)**: `render/canvas.ts#expressBankIdsOf` derives express-vs-local from each bank's served-floor gaps (no schema change), and the stage draws a stroke-colour change plus a triangular roof mark on express shafts — colour and shape together, per KB-15 — reusing `theme.badgeTransfer`. `docs/12-design-handoff.md` § 4.17 records the choice.
+
+---
+
+## D625 — #549's camera-aim gap gets a floor-number jump as the v1 answer; a sky-lobby-keyed zone picker stays a v2, not a blocker
+
+**Date: 2026-09-16 · Owner: this session, on the session principal's explicit delegated authority · Rules on: `docs/12-design-handoff.md` § 4.16, GitHub issues [#377](https://github.com/mrpeanut01/elevator-sim/issues/377) and [#549](https://github.com/mrpeanut01/elevator-sim/issues/549).**
+
+**Why an entry.** § 4.16 names this question and explicitly declines to own it — "design work with an owner this document does not have." This entry supplies that ruling and binds the same document.
+
+**What was asked.** #377 measured and recorded that `Whole tower`/`Lobby`/`Follow the fullest car` are the stage's only camera positions, and that none is player-aimable — 40 of 165 floors reachable on `burj-class-reference`. It named four unchosen candidates: a scrollbar, a drag, a floor-number jump, or a sky-lobby-keyed zone picker.
+
+**Ruling: build the floor-number jump first.** Reasoning: it composes with the three existing bands rather than replacing them, needs no new canvas interaction surface (wheel-pan and drag were confirmed, by direct testing on Burj, to do nothing today — adding either is a bigger, riskier change to the canvas's existing gesture handling than adding one input), and directly answers the concrete complaint (#543, #544) — a player who has been told "watch `local-low`" needs to get to `local-low`'s floors, not necessarily to explore the whole tower freely. **The zone picker `docs/38` § 2.5 gestures at remains the more finished answer and is not ruled out** — it should follow as a v2 once the smaller control ships, keyed to the tower's own sky lobbies as that section already proposes.
+
+**What this does not decide.** Interaction details (a text input vs. a stepper vs. something else) and implementation are both left open; this rules on *which mechanism ships first*, not how it's built.
+
+**Implemented in [PR #551](https://github.com/mrpeanut01/elevator-sim/pull/551)**: a fourth `floor` camera position and a `stageFloorJumpOptionsOf` select, gated by the same `wholeTowerIsLegible` check the three fixed bands use, reaching every floor rather than the 40 of 165 #377 measured.
+
+---
+
+## D626 — Endless Rush is demoted off the front door, closing `docs/32` Q1 and the placement remainder `docs/35` § 13.1 left open on Q3
+
+**Date: 2026-09-16 · Owner: this session, on the session principal's explicit delegated authority · Rules on: `docs/32-game-design.md` § 9 Q1, `docs/35-problem-per-mode.md` § 13.1 Q3, and (per [§ D477](#d477), unchanged by this entry) the mode's continued existence.**
+
+**Why an entry.** Amends a standing table two other documents cite and is exactly the shape of cross-document decision `CLAUDE.md`'s working agreements ask to be recorded rather than left implicit.
+
+**What was asked.** `docs/32` Q1 asked whether Endless Rush is a front-door mode or an instrument beside the bench, and declined to decide because moving a tile is an interface change belonging to the handoff. [§ D477](#d477) separately ruled the mode itself is **kept** — "the fail state is the lobby overfilling; the ramp is traffic and/or breakdowns" — but left its *placement* as the one item `docs/35` § 13.1 recorded as still open, gated on "the moment #220 is scheduled."
+
+**Ruling: demote it off the front door, beside the bench.** `docs/32`'s own stated argument is sound and nothing this session's playtesting contradicts it: Endless Rush serves neither half of the core loop (it produces a limit, not a differential to improve against), and a limit is a later-session instrument rather than a first-tile offering. This settles Q1 in the direction the document itself recommended, and — because it is the same underlying placement question — closes the one remainder `docs/35` § 13.1 left open on Q3.
+
+**What this does not decide.** § D477's substance is untouched: the mode is kept, not cut, and its mechanics (lobby-overfilling fail state, traffic/breakdown ramp) are unaffected. This entry rules on where it sits in the front door, not on what it does.
+
+---
+
+## D627 — `docs/32` Q2: `charter` non-goal 6 amended in place to name *stakes*, including the goal bar, as a category distinct from difficulty; the shipped tiers are unchanged
+
+**Date: 2026-09-16 · Owner: this session, on the session principal's explicit delegated authority · Rules on: `22-charter.md` non-goal 6, `docs/10-experience-layer-contract.md` § 5.5, `docs/32-game-design.md` § 5.1, § 8 and § 9 Q2.**
+
+**Why an entry.** Amends the charter, which `CLAUDE.md`'s working agreements name as owned by its own owner rather than by any lane — recording the ruling here is what lets a future reader cite it rather than infer it.
+
+**What was asked, and what turned out to be stale before the question could even be answered.** `docs/32` § 5.1 quoted non-goal 6 as forbidding *"anything other than declared traffic parameters and building fabric"* and flagged the shipped tiers (which also move the purse, the rate ladder, the miss allowance and four goal bars) as sitting outside that wording. **That quote was already stale.** Non-goal 6 had been amended once before, by [§ D345](#d345), to explicitly permit the purse and the miss allowance as *"what a miss costs you"* — but §D345's own amendment note says it **deliberately did not** extend that permission to the goal bars, leaving exactly the gap `docs/32`'s Q2 was really asking about. `docs/10-experience-layer-contract.md` § 5.5, which non-goal 6 says carries the same sentence, had not been updated when §D345 landed and was still carrying the pre-§D345 wording.
+
+**Ruling: amend non-goal 6 again, to also permit the goal bar as stakes**, adopting `docs/32 GD18`'s three-way distinction (difficulty moves demand/fabric only; stakes may additionally move the purse, miss allowance, contract-ending condition, and now the bar a day is cleared against; neither may touch a measurement — a figure, a suppression ground, a censoring limit, a replication count). The shipped tiers are not changed; this closes the gap between the charter's wording and a mechanic (`campaign/economy.ts`'s four goal bars) that has shipped, been tuned and been playtested (#382) throughout. Applied directly to `22-charter.md` non-goal 6's text, following its own precedent of amending in place with a trailing note rather than leaving the old wording to silently drift. `docs/10` § 5.5's mirrored bullet is brought back in sync with it in the same commit, closing the drift §D345 left open between the two.
+
+**What this does not decide.** Whether the byte-identity M2-gate test `docs/32` § 5.1 proposes (run the same seed at every difficulty setting, require the recording identical) should actually be built is not settled here — it's a good mechanical enforcement of this clause and is left as a suggestion for whoever picks up gate work, not built in this pass.
+
+---
+
+## D628 — `docs/32` Q3: campaign failure odds should roll against something, scoped as a follow-up feature rather than settled as a same-session change
+
+**Date: 2026-09-16 · Owner: this session, on the session principal's explicit delegated authority · Rules on: `packages/viz/src/campaign/career.ts`, `docs/32-game-design.md` § 3.6 and § 9 Q3.**
+
+**Why an entry.** Rules on a question `docs/32` explicitly declined to take on its own authority, and the ruling is the record a future implementer needs rather than a repeated citation of the open question.
+
+**What was asked.** `failureOddsPct` computes a daily hazard that nothing currently rolls against; `career.ts` publishes that refusal in its own words. Should the odds actually be rolled?
+
+**Ruling: yes, in principle** — a wear clock that cannot bite makes every service booking a purely arithmetic decision, which is not what the number's presence on screen implies to a player. **This is not built here.** `docs/32`'s own text names what's missing: a seeded stream for a campaign day and an event calendar behind a contract, neither of which exists yet. This entry settles the *direction*; scoping and building the seeded stream and event calendar is real infrastructure work for a future session or lane, not a same-day ruling.
+
+**What this does not decide.** The seed's source, the event calendar's shape, and what a rolled failure actually does to a running campaign are all unscoped. A follow-up issue naming this work explicitly would be the next step, not attempted here.
+
+**Follow-up filed: [GitHub issue #554](https://github.com/mrpeanut01/elevator-sim/issues/554).**
+
+---
+
+## D629 — `docs/32` Q6: the campaign day-goal bar belongs to the contract, not the difficulty tier; the 80 kJ/ride energy bar's fabric-domination (#234) needs per-building scaling, which is measurement work rather than a same-session fix
+
+**Date: 2026-09-16 · Owner: this session, on the session principal's explicit delegated authority · Rules on: `packages/viz/src/campaign/*`, `data/campaign.json`'s `DIFFICULTIES[].tests`, `docs/32-game-design.md` § 9 Q6, `docs/33-difficulty-curve.md` O2, GitHub issue [#234](https://github.com/mrpeanut01/elevator-sim/issues/234).**
+
+**Why an entry.** Amends a design-doc table and rules on an open GitHub issue; binds documents and a data shape this session does not itself own.
+
+**What was asked (Q6).** Today the day-goal bar is the difficulty tier's (`DIFFICULTIES[].tests`), which is legitimate *stakes* under `docs/32 GD18`. But a bar that moves with a difficulty setting and a bar that moves with the building being played are different games — the second is closer to `docs/10` § 5.4's *progression by mechanism introduced*.
+
+**Ruling: the goal bar belongs to the contract, not the tier.** A bar whose target should reasonably differ by building (as #234 demonstrates for the energy bar specifically) is a fact about the contract being played, not a difficulty knob — conflating the two lets a tier's setting silently reinterpret what a building-specific goal means.
+
+**What this settles for #234.** The 80 kJ/ride energy bar is dominated by building fabric rather than by play, reproduced now on four-plus towers including `merdeka-class-reference` (176.4 kJ/ride under `collective` at 1 800 s, per that contract's own recorded note) — no dispatcher or tier setting can move it. Given the ownership ruling above, the fix is **per-building (or per-contract) scaling of the bar rather than one global constant**, which is what `docs/33` O2 already recommends. **This is not built here** — deriving a sound per-building target is a measurement task (the same shape as the 80 kJ figure's own derivation, § D468), not a ruling this session can make by itself.
+
+**What this does not decide.** The scaling formula, and whether existing contracts' recorded target texts need updating once it exists, are left to whoever takes the measurement on.
+
+**Follow-up filed: [GitHub issue #555](https://github.com/mrpeanut01/elevator-sim/issues/555).**
+
+---
+
+## D630 — `docs/12`'s open question on Free Play scoring, left by [§ D496](#d496): Free Play should keep posting to the week, confirming the status quo rather than changing it
+
+**Date: 2026-09-16 · Owner: this session, on the session principal's explicit delegated authority · Rules on: `docs/12-design-handoff.md` § 4.13, `packages/viz/src/shift/week.ts`.**
+
+**Why an entry.** Settles a question § D496 explicitly left open. **This entry replaces a first draft of D630, written and corrected on the same unmerged branch before it reached `main`** — worth saying plainly, because the correction is the more useful record than silence would be. The first draft ruled the opposite way (Free Play should *not* post) from a `docs/12` citation alone, without first reading the code path it was about to change. Reading `week.ts` reversed it.
+
+**What was asked.** `docs/12` line 772: a free-play week *is* currently posted (`week.ts` gates only on `SANDBOX_CONTRACT_ID`), while the handoff's Sandbox screen is explicitly unscored. Is that a product judgement that Free Play should be scored, or a gap against an answer already implied?
+
+**Ruling: Free Play should keep posting, and the current gate is correct as it stands — no code change is owed.** `week.ts`'s own docstring at `FREE_PLAY_CONTRACT_ID`'s declaration already makes the deliberate argument: Sandbox is *arrived at* (a drawn building with no assignment written for it) while Free Play is *chosen*, from its own front-door tile, and only Sandbox's screen promises — three times, in as many words — that nothing counts. Free Play's own tile copy (`menu/screens.ts`: *"Any building, any dispatcher, any traffic"*) makes no such promise. A player who deliberately selects Free Play from the menu is not the same case § D290's fix protected, which was a screen actively lying to the player about what it was doing.
+
+**What the first draft got wrong, named rather than erased.** It reasoned from `docs/32 GD9` ("no currency measures progress") and the risk of a player inflating a tracked figure through undemanding settings — a real consideration, but one that argues just as strongly against *Endless* mode, which also posts and which nothing in this product treats as a problem. The asymmetry the first draft was reaching for (a mode with no stakes shouldn't move a scored figure) proves too much: Endless *is* stakes-light by construction (§ D515) and posts anyway, by design. The actual line this product draws is narrower and already drawn correctly: *arrived-at* vs. *chosen*, not *hard* vs. *easy*.
+
+**What this does not decide.** Whether a player being able to pick an easy building/dispatcher/traffic combination in Free Play and have it move their best-day or streak figure is itself a *balance* concern (as opposed to the scoring-mechanism question this entry settles) is untouched — that would be a claim about specific figures being too easy to inflate, which needs measurement, not a reading of two docstrings.
+
+---
+
+## D631 — A shaft's plan area is priced, in four bands cut from the measured distribution rather than at a rate per square metre, and the two cases that cannot be banded are named rather than charged the cheapest
 
 **Date: 2026-09-16 · GitHub issue [#429](https://github.com/mrpeanut01/elevator-sim/issues/429), stage 2 · Completes [§ D601](#d601), which built the area model and refused the price · Spends [§ D552](#d552)'s rate × quantity seam for the second time, after [§ D620](#d620) · Rules on: `data/price-schedule.json`, `data/campaign.json`, `data/engineering-briefs.json`, `packages/core/src/config/floorArea.ts`, `packages/viz/src/pricing/`, `packages/viz/src/fixit/parse.ts`.**
 
@@ -37160,7 +37295,7 @@ Measured over all eighteen new-shaft repairs: **sixteen** add a car to a bank th
 
 Whether **any** of the four prices or three boundaries is right — all seven are an agent's draft and all seven await the owner, exactly as § D601's footprints do. Whether `fifth-car` should carry the surcharge too, which is the campaign-shop path § 8 says nothing reaches. Whether the campaign shop should quote a banded price at all, which needs a resolved building where there is none. Whether a **fifth** band is worth cutting once a building lands in the 104–376 bulk's own gaps — § 2 says the distribution does not support one **today**, which is a measurement of a shipped set rather than a property of the design. And whether lettable area should bound a floor's **population**, which § D601 § 11 left open and this entry does not touch.
 
-**Bookkeeping.** This lane was reserved **D630–D639** and spent **D630**. **D631–D639 are returned unspent**, and whether each is free or a hole is the integrator's call at close, on § D430's rule.
+**Bookkeeping.** This lane was reserved **D630–D639** and drafted as **D630**. **Renumbered to D631 on the integrator's merge into `main`**: an independent playtest/ruling session had, in parallel and without either side visible to the other, spent D630 itself for an unrelated ruling (`docs/12`'s Free Play scoring question, below) — the two branches never shared a base after this one's own reservation was cut, so neither could have seen the other's number. This entry is the later of the two to reach `main` and is the one renumbered, on this file's own precedent (§ D620, § D621): the earlier-merged entry keeps its number, ids are names, and the citation is corrected everywhere it was drafted. **D632–D639 remain unspent**, and whether each is free or a hole is the integrator's call at close, on § D430's rule.
 
 ---
 

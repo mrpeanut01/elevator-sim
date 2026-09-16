@@ -1281,6 +1281,43 @@ interface ShaftGroupLabel {
   readonly text: string;
   readonly centreX: number;
   readonly widthPx: number;
+  /** Whether this bank's own heading carries the express glyph — see {@link expressBankIdsOf}. */
+  readonly isExpress: boolean;
+}
+
+/**
+ * Which banks skip at least one floor between the lowest and highest they serve — an express or
+ * shuttle bank's shape, read off the geometry a shaft already carries rather than from an authored
+ * field. GitHub issue #544, [§ D624](../../../../DECISIONS.md): `docs/12` § 4.5 already establishes
+ * that a bank's shuttle-vs-local role is *"derived from the bank structure rather than assigned"* —
+ * there is no `kind` on `BankConfig` to read, and this is that derivation, reaching the render layer
+ * rather than staying a fact only the config layer knows.
+ *
+ * A local bank's `servedFloorIds` are contiguous once mapped onto {@link VizFloor.index} — every
+ * floor between the lowest it stops at and the highest is one it also stops at. A shuttle or express
+ * bank skips floors on the way to a sky lobby or an observatory deck, so its served set has a gap.
+ * One car with the gap is enough to mark the whole bank, matching how a bank is one unit everywhere
+ * else this renderer treats it (RV-06's grouping, `#stageCameraWindowOf`'s bank filter).
+ */
+function expressBankIdsOf(recording: VizRecording): ReadonlySet<string> {
+  const indexById = new Map(recording.floors.map((floor) => [floor.id, floor.index]));
+  const servedIndicesByBank = new Map<string, Set<number>>();
+  for (const shaft of recording.shafts) {
+    const indices = servedIndicesByBank.get(shaft.bankId) ?? new Set<number>();
+    for (const floorId of shaft.servedFloorIds) {
+      const index = indexById.get(floorId);
+      if (index !== undefined) indices.add(index);
+    }
+    servedIndicesByBank.set(shaft.bankId, indices);
+  }
+  const express = new Set<string>();
+  for (const [bankId, indices] of servedIndicesByBank) {
+    if (indices.size < 2) continue;
+    const min = Math.min(...indices);
+    const max = Math.max(...indices);
+    if (max - min + 1 > indices.size) express.add(bankId);
+  }
+  return express;
 }
 
 interface ShaftLabelPlan {
@@ -1323,7 +1360,14 @@ interface ShaftLabelPlan {
  * When there is one bank and nothing was elided, no heading is drawn at all — `RV-06`'s rule that
  * repeating `main` over every column is noise, unchanged.
  */
-function planShaftLabels(layout: Layout, bankCount: number): ShaftLabelPlan {
+/** The express/shuttle glyph — GitHub issue #544, § D624. `⇄`'s and `⌂`'s neighbour, not a rhyme. */
+const EXPRESS_GLYPH = '» ';
+
+function planShaftLabels(
+  layout: Layout,
+  bankCount: number,
+  expressBankIds: ReadonlySet<string>,
+): ShaftLabelPlan {
   const columnTexts: string[] = [];
   const groups: ShaftGroupLabel[] = [];
   let index = 0;
@@ -1363,11 +1407,14 @@ function planShaftLabels(layout: Layout, bankCount: number): ShaftLabelPlan {
           ? `${prefix}* · ${first.bankId}`
           : `${prefix}*`;
     if (heading !== '') {
-      groups.push({
-        text: fitLabel(heading, spanPx),
-        centreX: first.x + spanPx / 2,
-        widthPx: spanPx,
-      });
+      const isExpress = expressBankIds.has(first.bankId);
+      // The glyph is prepended after fitLabel, budgeted for first — the floor-label badge's own
+      // shape (`⌂ `/`⇄ `, ~L1218 above), so a glyph never eats the character it exists to add to.
+      const glyphBudget = isExpress ? spanPx - EXPRESS_GLYPH.length * CHAR_ADVANCE_PX : spanPx;
+      const text = isExpress
+        ? `${EXPRESS_GLYPH}${fitLabel(heading, Math.max(0, glyphBudget))}`
+        : fitLabel(heading, spanPx);
+      groups.push({ text, centreX: first.x + spanPx / 2, widthPx: spanPx, isExpress });
     }
     index = end;
   }
@@ -1401,7 +1448,8 @@ function drawShafts(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { recording, layout } = input;
   const servedById = new Map(recording.shafts.map((shaft) => [shaft.carId, new Set(shaft.servedFloorIds)]));
   const bankCount = new Set(recording.shafts.map((shaft) => shaft.bankId)).size;
-  const plan = planShaftLabels(layout, bankCount);
+  const expressBankIds = expressBankIdsOf(recording);
+  const plan = planShaftLabels(layout, bankCount, expressBankIds);
   for (const [columnIndex, column] of layout.columns.entries()) {
     const served = servedById.get(column.carId);
     // A shaft is drawn only over the floors it physically serves — service zoning made visible,
@@ -1413,11 +1461,28 @@ function drawShafts(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
     // the mass read as a building rather than as a backdrop. Design `:2054–2057`.
     ctx.fillStyle = theme.shaftRecess;
     ctx.fillRect(column.x, top, column.width, Math.max(1, bottom - top));
-    ctx.strokeStyle = theme.shaftHairline;
+    const isExpress = expressBankIds.has(column.bankId);
+    // GitHub issue #544, § D624: bank kind was colour-and-shape-blind at the shaft level — every
+    // column got the identical recess/hairline regardless of what bank it belonged to. An express
+    // or shuttle shaft's hairline now carries the same colour the floor grid already uses for a
+    // sky lobby (`theme.badgeTransfer`, ~L1227 above), and — KB-15, no colour-only signal — a small
+    // roof mark at the shaft's own top, a real shape rather than a second use of the same colour.
+    ctx.strokeStyle = isExpress ? theme.badgeTransfer : theme.shaftHairline;
     ctx.lineWidth = 1;
     // Half-pixel inset so the hairline lands on a pixel rather than across two of them, which is
     // the difference between a 1 px line and a 2 px grey smudge on a real context.
     ctx.strokeRect(column.x + 0.5, top + 0.5, Math.max(1, column.width - 1), Math.max(1, bottom - top - 1));
+    if (isExpress) {
+      const cx = column.x + column.width / 2;
+      const size = Math.min(6, column.width / 3);
+      ctx.fillStyle = theme.badgeTransfer;
+      ctx.beginPath();
+      ctx.moveTo(cx - size, top + size);
+      ctx.lineTo(cx, top);
+      ctx.lineTo(cx + size, top + size);
+      ctx.closePath();
+      ctx.fill();
+    }
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
@@ -1435,9 +1500,11 @@ function drawShafts(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   // {@link HeaderBand}.
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.fillStyle = theme.badge;
   ctx.font = FONT;
   for (const group of plan.groups) {
+    // An express bank's own heading carries the same badge colour its glyph does — one signal,
+    // read twice, rather than a second one invented for the row above the shafts.
+    ctx.fillStyle = group.isExpress ? theme.badgeTransfer : theme.badge;
     ctx.fillText(group.text, group.centreX, layout.header.bankY);
   }
 }

@@ -88,7 +88,7 @@ export function shaftFootprintM2(
 
 /**
  * **The plan area ONE shaft of this bank permanently removes from the building** — the quantity
- * [§ D630](../../../../DECISIONS.md) prices, m².
+ * [§ D631](../../../../DECISIONS.md) prices, m².
  *
  * One car's {@link shaftFootprintM2} multiplied by the number of floors its bank's span reaches —
  * the same footprint × span arithmetic {@link resolveFloorArea} charges each floor with, summed

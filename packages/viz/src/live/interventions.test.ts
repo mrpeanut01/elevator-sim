@@ -395,7 +395,7 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
 
   /**
    * **A change priced per unit is refused with a reason, never priced at one and never a throw** —
-   * GitHub issue #437, § D619. `shaft-area` (GitHub issue #429 stage 2, § D630) joined `landing-panels`
+   * GitHub issue #437, § D619. `shaft-area` (GitHub issue #429 stage 2, § D631) joined `landing-panels`
    * as the schedule's second rated row and is refused for the identical reason, asserted below.
    *
    * `landing-panels` is the schedule's first rated row. This control buys a whole change and holds

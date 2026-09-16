@@ -224,7 +224,7 @@ describe('every shipped scenario carries a budget, and it parses', () => {
     const rated = schedule.changes.filter((change) => change.rate !== undefined);
     /*
      * **Two rated rows now, and the dearest is still `landing-panels`'** — GitHub issue #429
-     * stage 2, § D630. `shaft-area` enters the ceiling at 8 u × 3 bands = 24 u, well under
+     * stage 2, § D631. `shaft-area` enters the ceiling at 8 u × 3 bands = 24 u, well under
      * `fifth-car`'s flat 54, so it does not touch `dearestChangeUnits` and the clause above keeps
      * meaning what it meant. Named by id rather than counted, `rate.test.ts`'s discipline: a third
      * rated row must be looked at rather than absorbed.
@@ -862,7 +862,7 @@ describe('what a ceiling means for a row priced per unit — #478, § D552', () 
       ],
       extras: [],
       withheld: [],
-      /* This fixture prices no shaft, so it bands none — GitHub issue #429 stage 2, § D630. */
+      /* This fixture prices no shaft, so it bands none — GitHub issue #429 stage 2, § D631. */
       areaBands: [],
     });
 

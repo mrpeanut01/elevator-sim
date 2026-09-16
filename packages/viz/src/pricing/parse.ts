@@ -106,7 +106,7 @@ const RATE_KEYS: readonly string[] = ['unitsPer', 'quantity'];
  *
  * Deliberately **no price**: a band that carried its own units would be a second ladder beside the
  * rate it multiplies, and then a reader could not say what a shaft costs without knowing which of
- * the two won. GitHub issue #429 stage 2, [§ D630](../../../../DECISIONS.md).
+ * the two won. GitHub issue #429 stage 2, [§ D631](../../../../DECISIONS.md).
  */
 const AREA_BAND_KEYS: readonly string[] = ['areaM2Range', 'band', 'name'];
 
@@ -302,7 +302,7 @@ export function parsePriceSchedule(raw: unknown): PriceSchedule {
       shape.push(
         `areaBands.bands[${String(index)}] carries "${key}", and a band is a range, a multiplier ` +
           'and a name. A price on a band would be a second ladder beside the rate it multiplies ' +
-          '(GitHub issue #429, § D630).',
+          '(GitHub issue #429, § D631).',
       );
     }
     const range = list(item['areaM2Range'], `${where}.areaM2Range`);
@@ -332,7 +332,7 @@ export function parsePriceSchedule(raw: unknown): PriceSchedule {
 
 /**
  * **Which band a shaft's plan area falls in** — GitHub issue #429 stage 2,
- * [§ D630](../../../../DECISIONS.md).
+ * [§ D631](../../../../DECISIONS.md).
  *
  * The quantity the `shaft-area` row is bought with. Half-open on the left, `[from, to)`, so a shaft
  * sitting exactly on a boundary lands in the **dearer** band: the boundaries are cut in the gaps of
@@ -492,7 +492,7 @@ export function violationsIn(schedule: PriceSchedule): readonly string[] {
 }
 
 /**
- * The band table's own rules — GitHub issue #429 stage 2, [§ D630](../../../../DECISIONS.md).
+ * The band table's own rules — GitHub issue #429 stage 2, [§ D631](../../../../DECISIONS.md).
  *
  * `shaftFootprint`'s rules in `core`, pointed at a price: **contiguous from 0 with an open top**, so
  * every shaft lands in exactly one band and none falls through; **ascending**, because a larger hole

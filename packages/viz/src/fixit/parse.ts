@@ -107,7 +107,7 @@ export interface FixitContext {
   readonly engineIds: readonly string[];
   /**
    * **Which price band one more hoistway falls into**, keyed `"buildingId/bankId"` — GitHub issue
-   * **#429** stage 2, [§ D630](../../../../DECISIONS.md).
+   * **#429** stage 2, [§ D631](../../../../DECISIONS.md).
    *
    * Derived by the caller from the same loaded `data/` as everything else here: `core`'s
    * `config/floorArea.ts#shaftPlanAreaM2` gives the plan area one more car in that bank would
@@ -135,7 +135,7 @@ export function fixitContextOf(input: {
     readonly trafficProfile: string;
     readonly floors: readonly { readonly id: string; readonly index?: number }[];
     /**
-     * The banks, when the caller holds resolved buildings — GitHub issue #429 stage 2, § D630. The
+     * The banks, when the caller holds resolved buildings — GitHub issue #429 stage 2, § D631. The
      * shipped loader does; a fixture that states none simply bands no shaft, and its cases keep the
      * base price, which is what {@link FixitContext.shaftAreaBandByBank} means by *absent*.
      */
@@ -157,7 +157,7 @@ export function fixitContextOf(input: {
     if (band !== undefined) bandByBuilding.set(building.id, band);
   }
   /*
-   * The shaft-area bands — GitHub issue #429 stage 2, § D630. One entry per (building, bank) whose
+   * The shaft-area bands — GitHub issue #429 stage 2, § D631. One entry per (building, bank) whose
    * area `core` can actually resolve; a bank that resolves none is left out rather than entered at
    * zero, because a shaft that costs nothing is the defect the area model exists to close.
    */
@@ -190,7 +190,7 @@ export function fixitContextOf(input: {
 
 /**
  * **The two shipped cases whose new shaft cannot be banded, named rather than quietly priced small**
- * — GitHub issue #429 stage 2, [§ D630](../../../../DECISIONS.md).
+ * — GitHub issue #429 stage 2, [§ D631](../../../../DECISIONS.md).
  *
  * Measured over all eighteen new-shaft repairs: **sixteen** add a car to a bank their building has
  * as built, so `core` resolves the plan area that car's hoistway would take and the repair is priced
@@ -235,7 +235,7 @@ export function newShaftUnits(schedule: PriceSchedule): number {
 
 /**
  * **What the plan area of one more hoistway adds to that price** — GitHub issue #429 stage 2,
- * [§ D630](../../../../DECISIONS.md).
+ * [§ D631](../../../../DECISIONS.md).
  *
  * The `shaft-area` row bought at `band`. Zero for an **unresolved** band and zero for band 0, and
  * the two are deliberately the same figure by different routes: the cheapest band costs nothing
@@ -252,7 +252,7 @@ export function shaftAreaSurchargeUnits(
   return purchaseUnits(priceOf(schedule, 'shaft-area'), band);
 }
 
-/** The bank a new-shaft repair adds its car to, or `''` — § D630. */
+/** The bank a new-shaft repair adds its car to, or `''` — § D631. */
 function shaftBankIdOf(repair: FixitRepair): string {
   return repair.patch.building?.addCars?.[0]?.bankId ?? '';
 }
@@ -405,7 +405,7 @@ function checkCase(where: string, entry: FixitCase, context: FixitContext): read
   const shaft = entry.repairs.find((repair) => repair.role === 'new-shaft');
   if (shaft !== undefined) {
     /*
-     * **The base plus this building's own area band** — GitHub issue #429 stage 2, § D630.
+     * **The base plus this building's own area band** — GitHub issue #429 stage 2, § D631.
      *
      * This read *"prices it N in every case"* until the product owner ruled that a shaft's plan area
      * is charged. It is no longer one figure in every case and must not be: the same car costs
@@ -720,7 +720,7 @@ function decodeRepairs(
   where: string,
   violations: string[],
   schedule: PriceSchedule,
-  /** The `shaft-area` band for a bank of this case's building, or `undefined` — § D630. */
+  /** The `shaft-area` band for a bank of this case's building, or `undefined` — § D631. */
   bandOf: (bankId: string) => number | undefined,
 ): readonly FixitRepair[] {
   if (!Array.isArray(raw)) {
@@ -772,7 +772,7 @@ function decodeRepairs(
 }
 
 /**
- * The band a patch's own added car falls into — GitHub issue #429 stage 2, § D630.
+ * The band a patch's own added car falls into — GitHub issue #429 stage 2, § D631.
  *
  * `undefined` for a patch that adds no car, and for a patch whose bank the shipped building does not
  * have: {@link UNBANDED_SHAFT_CASES} names the two that do the latter, and `repairPriceUnits` reads
