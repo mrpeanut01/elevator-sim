@@ -37040,7 +37040,7 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 
 ---
 
-## D623 — Scope ruling on #543's live pause-and-reassign ask: wire the existing mechanism for floor/bank reassignment, leave car-move and mid-run express creation unscoped, keep fix-a-building's no-pause design as-is
+## D623 — Scope ruling on #543's live pause-and-reassign ask, corrected: (a) needs a budget-in-force tracker that does not exist yet, so it is scoped as a follow-up rather than built blind; car-move/express creation stay unscoped; fix-a-building's no-pause design stays as-is
 
 **Date: 2026-09-16 · Owner: this session, on the session principal's explicit delegated authority (recorded here rather than attributed to an unnamed "product owner," per [§ D227](#d227)'s stale-attribution class and the standing rule that an agent lane may not manufacture a human) · Rules on: GitHub issue [#543](https://github.com/mrpeanut01/elevator-sim/issues/543).**
 
@@ -37048,15 +37048,17 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 
 **What was asked.** #543 named two things tangled together: (a) reassigning floors between banks that already exist mid-run, and (b) moving a car between banks or creating a new express run mid-run, neither of which any layer models today. It also asked whether the eighteen fix-a-building cases, now Scenario content, should ever gain the live pause `asBuiltStage.ts` deliberately withholds from them.
 
+**This entry replaces its own first draft, which was wrong about (a) in the way that matters most on this project.** The draft said the mechanism "already exists end to end" and called wiring it "UI wiring … not new modelling," on the strength of `rezone-bank`/`building-change`/`admitWorks` existing and `stageInterventionsOf` already accepting a `works` field. Starting to build against that reading meant reading `everyday/stageScreenModel.ts#StageWorksInput.budgetUnits`'s own docstring first, and it says the opposite of what the draft assumed: "`scenario/budget.ts` validates a scenario's ladder at load and nothing reads it at play time yet, so no caller can honestly say what rung is in force; a stage that offered a *Re-zone a bank* button against a budget it invented would be the failure `CLAUDE.md` names eleven times, arriving as a control that spends money nobody has." Reading `scenario/budget.ts` confirmed it: `rungsOf` derives what a rung holds from a `ScenarioBudget` and its ordered steps, but nothing anywhere tracks, at play time, which steps a running scenario has bought — there is no live chime-spend ledger for a caller to read the current rung off of. Using the base rung (`budget.startingUnits`) as a stand-in would not be "wiring the existing mechanism"; it would be presenting an invented number as the rung in force, which is exactly the failure the docstring names by pointing at this exact button. The mechanism (a) needs is not end to end — the last link, a play-time reader of which rung is bought, does not exist, and building it is real modelling work (a state to carry through a run and persist with the record), not UI wiring on top of #370.
+
 **Ruling.**
 
-1. **(a) is in scope and should be built next**: the mechanism already exists end to end (`rezone-bank`, `building-change`, `admitWorks`) — the gap is that no screen draws the offer. This is UI wiring on top of #370's work, not new modelling, and is the cheapest real win available on this issue.
-2. **(b) stays unscoped.** Moving a car between banks or spinning up a mid-run express run has no seam at any layer — not in `ServiceEventConfig`, not in the fixit patch shape — and building one is real modelling work with its own pricing and re-simulation-cost questions, closer in shape to #422's "give the engine the seams" than to a UI task. Not ruled out, just not bundled with (a).
+1. **(a)'s direction is right and its scoping was wrong.** Reassigning floors between existing banks mid-run, priced against the ladder, is still worth building — `rezone-bank`, `building-change` and `admitWorks` are real and correctly gated (including the double-deck refusal from #477). What is not ready is the budget side: a live rung tracker has to exist before a screen can honestly offer a priced change. **This is not built here.** Scoping the tracker (what it persists, whether it lives beside `RunInterventionConfig` or beside the stage record, how a filed day reconciles chimes spent) is a follow-up task, not a same-session build.
+2. **(b) stays unscoped**, for the reason the first draft gave: moving a car between banks or spinning up a mid-run express run has no seam at any layer — not in `ServiceEventConfig`, not in the fixit patch shape — and building one is real modelling work with its own pricing and re-simulation-cost questions, closer in shape to #422's "give the engine the seams" than to a UI task. Not ruled out, just not bundled with (a).
 3. **Fix-a-building cases keep their no-pause design.** `asBuiltStage.ts`'s docstring states the reason on purpose: a stage that let a case's opening run be pressed would be a second place to change a building the mode measures twice deliberately. Watch-then-edit and watch-pause-edit-continue stay two different scenario shapes rather than converging into one.
 
-**Basis.** A follow-up playtest confirmed that even the narrow case — reaching Merdeka, the issue's own worked example, at all — currently requires the Engineer/Free-Play surface, since neither Scenario nor (practically) Career content reaches it. That sharpens rather than changes the ruling: (a) is worth building regardless of which content path eventually carries Merdeka.
+**Basis.** A follow-up playtest confirmed that even the narrow case — reaching Merdeka, the issue's own worked example, at all — currently requires the Engineer/Free-Play surface, since neither Scenario nor (practically) Career content reaches it. That sharpens rather than changes the ruling: (a) is worth building once the rung it would be priced against is real, regardless of which content path eventually carries Merdeka.
 
-**What this does not decide.** Implementation is not done here — this is a scope ruling, not code. Whether (a)'s UI lands on the Everyday stage or the Engineer surface first, and how it's priced, is left to whoever picks it up.
+**What this does not decide.** The tracker's shape, whether (a)'s UI lands on the Everyday stage or the Engineer surface first, and how the offer is priced once a rung is readable, are all left to whoever takes the follow-up on. A GitHub issue naming this gap explicitly is the next step, not attempted here — the same shape [§ D628](#d628) and [§ D629](#d629) left their own follow-ups in.
 
 ---
 
@@ -37072,6 +37074,8 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 
 **What this does not decide.** The specific visual treatment (colour, icon, both) is not chosen here — that's a design-handoff drafting task, not a ruling this session is positioned to make. What's settled is that a row is owed, not what the row says.
 
+**Implemented in [PR #552](https://github.com/mrpeanut01/elevator-sim/pull/552)**: `render/canvas.ts#expressBankIdsOf` derives express-vs-local from each bank's served-floor gaps (no schema change), and the stage draws a stroke-colour change plus a triangular roof mark on express shafts — colour and shape together, per KB-15 — reusing `theme.badgeTransfer`. `docs/12-design-handoff.md` § 4.17 records the choice.
+
 ---
 
 ## D625 — #549's camera-aim gap gets a floor-number jump as the v1 answer; a sky-lobby-keyed zone picker stays a v2, not a blocker
@@ -37085,6 +37089,8 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 **Ruling: build the floor-number jump first.** Reasoning: it composes with the three existing bands rather than replacing them, needs no new canvas interaction surface (wheel-pan and drag were confirmed, by direct testing on Burj, to do nothing today — adding either is a bigger, riskier change to the canvas's existing gesture handling than adding one input), and directly answers the concrete complaint (#543, #544) — a player who has been told "watch `local-low`" needs to get to `local-low`'s floors, not necessarily to explore the whole tower freely. **The zone picker `docs/38` § 2.5 gestures at remains the more finished answer and is not ruled out** — it should follow as a v2 once the smaller control ships, keyed to the tower's own sky lobbies as that section already proposes.
 
 **What this does not decide.** Interaction details (a text input vs. a stepper vs. something else) and implementation are both left open; this rules on *which mechanism ships first*, not how it's built.
+
+**Implemented in [PR #551](https://github.com/mrpeanut01/elevator-sim/pull/551)**: a fourth `floor` camera position and a `stageFloorJumpOptionsOf` select, gated by the same `wholeTowerIsLegible` check the three fixed bands use, reaching every floor rather than the 40 of 165 #377 measured.
 
 ---
 
