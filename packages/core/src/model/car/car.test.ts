@@ -20,7 +20,7 @@ import { ModelError, hallCallId, type HallCall } from '../types.js';
 import { CAR_DEFAULTS, CAR_PARAMETERS, Car } from './car.js';
 import {
   createShaft,
-  shaftForBank,
+  shaftsForBank,
   shaftServes,
   type CarClock,
   type CarShaft,
@@ -178,7 +178,7 @@ describe('createShaft', () => {
   });
 });
 
-describe('shaftForBank, against the real building configs', () => {
+describe('shaftsForBank, against the real building configs', () => {
   let config: LoadedConfig;
 
   beforeAll(async () => {
@@ -190,7 +190,7 @@ describe('shaftForBank, against the real building configs', () => {
     expect(tower).toBeDefined();
     if (tower === undefined) return;
 
-    const low = shaftForBank(tower, 'low');
+    const low = shaftsForBank(tower, 'low')[0]!;
     const bank = tower.banks.find((candidate) => candidate.id === 'low');
     expect(bank).toBeDefined();
 
@@ -208,7 +208,7 @@ describe('shaftForBank, against the real building configs', () => {
 
     const restricted = new Set(tower.accessZones.flatMap((zone) => zone.floors));
     for (const bank of tower.banks) {
-      const shaft = shaftForBank(tower, bank.id);
+      const shaft = shaftsForBank(tower, bank.id)[0]!;
       for (const floor of shaft.floors) {
         expect(floor.permittedCredentialGroups === undefined).toBe(!restricted.has(floor.id));
       }
@@ -220,7 +220,7 @@ describe('shaftForBank, against the real building configs', () => {
     const tower = config.buildingsById.get('secure-tower');
     expect(tower).toBeDefined();
     if (tower === undefined) return;
-    expect(() => shaftForBank(tower, 'nope')).toThrow(/declares no bank/);
+    expect(() => shaftsForBank(tower, 'nope')).toThrow(/declares no bank/);
   });
 
   it('builds a whole building of real cars through createBuilding', () => {
@@ -236,7 +236,9 @@ describe('shaftForBank, against the real building configs', () => {
           id: `${context.bankId}-${spec.id}`,
           bankId: context.bankId,
           spec,
-          shaft: shaftForBank(resolved, context.bankId),
+          shaft: shaftsForBank(resolved, context.bankId).find((candidate) =>
+            candidate.carIds.includes(spec.id),
+          )!,
           homeFloorId: entrance,
           clock: kernel,
           loadSensorSpec: config.elevatorSpecs.loadSensor,

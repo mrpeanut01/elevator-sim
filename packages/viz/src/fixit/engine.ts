@@ -159,27 +159,32 @@ export function emptyFixitState(): FixitState {
     capacitySteps: 0,
     zoneOverlapFloors: 0,
     parkingStrategy: null,
+    topFloorRaiseM: 0,
   };
 }
 
 /**
- * **The `covers` paths the editor's own two settings buy** — issue **#422**.
+ * **The `covers` paths the editor's own three settings buy** — issue **#422**.
  *
- * Two strings rather than a patch, because that is genuinely all the state carries: the banks array
- * a zoning step becomes is not built until `fixit/run.ts` plans the run, and manufacturing a
- * patch-shaped object here purely so `pathsIn` could walk it back into these strings would be a
- * second statement of the same fact.
+ * Three strings rather than a patch, because that is genuinely most of what two of the three
+ * settings carry: the banks array a zoning step becomes is not built until `fixit/run.ts` plans the
+ * run, and manufacturing a patch-shaped object here purely so `pathsIn` could walk it back into
+ * these strings would be a second statement of the same fact. (The third, `topFloorRaiseM`, *is*
+ * carried as a real `FixitPatch.building.floors` entry once `fixit/run.ts#editorPatchOf` has a floor
+ * id to name — this function still names its path directly, alongside the other two, so pricing
+ * asks nothing about how a setting becomes a patch.)
  *
- * Neither path is invented for this screen. `building.banks[]` is the path twelve shipped repairs
- * already buy `rezone-bank` with, and `dispatcher.idle.parkingStrategy` is the first of
- * `idle-parking`'s four. That is what makes the editor pay a repair's price rather than a price of
- * its own — `pricing/schedule.test.ts` refuses a second row covering a field already claimed, so
- * reusing these is not merely allowed, it is the only thing the schedule permits.
+ * None of the three paths is invented for this screen. `building.banks[]` is the path twelve
+ * shipped repairs already buy `rezone-bank` with, `dispatcher.idle.parkingStrategy` is the first of
+ * `idle-parking`'s four, and `building.floors[]` is the path `raise-a-floor` prices for the same
+ * reason — `pricing/schedule.test.ts` refuses a second row covering a field already claimed, so
+ * reusing a schedule row is not merely allowed, it is the only thing the schedule permits.
  */
 export function editorPathsOf(state: FixitState): readonly string[] {
   const paths: string[] = [];
   if (state.zoneOverlapFloors > 0) paths.push('building.banks[]');
   if (state.parkingStrategy !== null) paths.push('dispatcher.idle.parkingStrategy');
+  if (state.topFloorRaiseM > 0) paths.push('building.floors[].heightM');
   return paths;
 }
 
@@ -375,6 +380,10 @@ export function zonePriceUnits(schedule: PriceSchedule): number {
 export function parkingPriceUnits(schedule: PriceSchedule): number {
   return purchaseUnits(priceOf(schedule, 'idle-parking'));
 }
+/** What the schedule charges for the editor's elevation step — issue **#422**. */
+export function topFloorRaisePriceUnits(schedule: PriceSchedule): number {
+  return purchaseUnits(priceOf(schedule, 'raise-a-floor'));
+}
 
 /**
  * Widen or narrow the overlap between the banks by one floor — issue **#422**.
@@ -404,6 +413,37 @@ export function stepZoneOverlap(
     if (!affordabilityOf(entry, state, zonePriceUnits(schedule), schedule).selectable) return state;
   }
   return { ...state, zoneOverlapFloors: next };
+}
+
+/**
+ * Raise or lower the building's topmost floor by one metre — issue **#422**.
+ *
+ * The same shape as {@link stepZoneOverlap}, for the same two reasons. **Two ceilings, refused for
+ * two different reasons**: the budget, because the first metre is a purchase and costs
+ * `raise-a-floor`; and `ceiling`, which belongs to the *building* —
+ * `fixit/run.ts#topFloorRaiseCeilingOf` is `0` where the topmost floor is served by no bank or is
+ * one half of a double-deck pair, and a press past it would write a field and change nothing.
+ *
+ * **Only the first metre is charged.** The schedule prices the move flat, on `rezone-bank`'s own
+ * ground: a magnitude rule for "how far" is not something any shipped repair or list has ever
+ * stated for a floor moving, so none is invented here either. Stepping 1 → 2 is free and stepping
+ * 2 → 0 refunds the price.
+ */
+export function stepTopFloorRaise(
+  entry: FixitCase,
+  state: FixitState,
+  delta: 1 | -1,
+  ceiling: number,
+  schedule: PriceSchedule,
+): FixitState {
+  const next = state.topFloorRaiseM + delta;
+  if (next < 0 || next > ceiling) return state;
+  if (state.topFloorRaiseM === 0 && next > 0) {
+    if (!affordabilityOf(entry, state, topFloorRaisePriceUnits(schedule), schedule).selectable) {
+      return state;
+    }
+  }
+  return { ...state, topFloorRaiseM: next };
 }
 
 /**

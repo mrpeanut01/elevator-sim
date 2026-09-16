@@ -125,6 +125,18 @@ export interface BuildingPatch {
   readonly bankEquipment?: readonly BankEquipmentPatch[] | undefined;
   /** New cars cloned from an existing one — how a case adds a shaft, or the as-built adds a car. */
   readonly addCars?: readonly { readonly bankId: string; readonly copyCarId: string; readonly id: string }[] | undefined;
+  /**
+   * **Floor elevation changes — the one `BuildingPatch` field that moves a floor** — GitHub issue
+   * #422. Floor id → the metres added to that floor's authored `heightM`. Every other field here
+   * changes what serves or lives on a floor; this changes where the floor itself sits.
+   *
+   * Applied to the authored document and re-resolved through `parseBuilding`, exactly as `banks`
+   * is (`fixit/run.ts#applyBuildingPatch`) — so a move that breaks `heightM`'s strict-increasing-
+   * with-`index` rule, a double-deck pair's exact `deckSeparationM` separation, or a rope's hard
+   * `maxSingleTravelM` ceiling is refused there rather than allowed to reach a run, the same door a
+   * shipped file enters by.
+   */
+  readonly floors?: readonly { readonly floorIds: readonly string[]; readonly heightDeltaM: number }[] | undefined;
 }
 
 /** Dispatcher overrides, merged section-whole onto the case's named profile. */
@@ -277,4 +289,25 @@ export interface FixitState {
    * strategy to move the legs.
    */
   readonly parkingStrategy: EditorParkingStrategy | null;
+  /**
+   * § 10.3's **elevation** control, narrowed to the one move that is always safe to offer — GitHub
+   * issue #422. Metres added to the building's topmost floor; `0` leaves it as the building draws
+   * it.
+   *
+   * **This is not § 10.1 item 6's elevation grid** — a per-shaft, per-floor-band click-to-set grid —
+   * which stays undrawn; `everyday/fixitScreen.ts`'s docstring says why the grid itself is still out
+   * of scope. What this closes is narrower and more literal: `BuildingPatch` had no field that moved
+   * a floor at all, and now it does.
+   *
+   * Only the topmost floor, because raising it can only *add* to the tallest riser in the building —
+   * every other floor's `heightM` is untouched, so the loader's strict-increasing-with-`index` rule
+   * can never be violated by this control, however far it is pushed. `fixit/run.ts#topFloorRaiseCeilingOf`
+   * reports `0`, and the row is not drawn at all, where the topmost floor is served by no bank (a
+   * press that writes a field and moves no leg), is one half of a double-deck pair (raising it alone
+   * would move `heightM` off the exact separation its pair declares), or — the ground two of the
+   * eighteen shipped cases' buildings actually raise — is declared as part of a compact
+   * `FloorRange` rather than as an explicit floor, which `fixit/run.ts#applyBuildingPatch` cannot
+   * look up by id.
+   */
+  readonly topFloorRaiseM: number;
 }

@@ -47,7 +47,7 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { parseEngineeringBriefs, type EngineeringBriefs } from '../briefs/parse.js';
 import { editableIdsOf, parseCampaign, type CampaignContext } from '../campaign/parse.js';
 import type { Campaign, CampaignStage } from '../campaign/types.js';
-import { purchaseUnits } from '../pricing/parse.js';
+import { purchaseUnits, smallestPurchaseUnitsOf } from '../pricing/parse.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import type { PriceSchedule, PricedChange } from '../pricing/types.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
@@ -169,16 +169,60 @@ describe('every shipped scenario carries a budget, and it parses', () => {
     }
   });
 
+  /**
+   * **The top rung, and the one figure GitHub issue #437 moved out from under it.**
+   *
+   * The substantive clause is the second: at the top rung, *every* change on the ladder is
+   * affordable one at a time, so nothing above it buys a row — only a combination. That still holds
+   * exactly, and it is what the rung means.
+   *
+   * The first clause used to read `bounds.dearestChangeUnits` and now reads the dearest **flat**
+   * change, because #437's `landing-panels` row is priced per landing and a rated row enters
+   * `dearestChangeUnits` at its declared most (§ D552) — 1 u × 165 landings = 165 u, against
+   * `fifth-car`'s 54. **The shipped rungs were deliberately not raised to follow it**, and the
+   * reason is not that 165 is inconvenient:
+   *
+   * - a rung is a game-feel figure the product owner owns (`data/campaign.json`'s own header says
+   *   so), and tripling every scenario's top rung is not a consequence a lane may take; and
+   * - no stage's editable set reaches `building.floors[].landingCallType` — it is a building's
+   *   fabric rather than a dispatcher dimension, so `changePricingDimension` never matches it and a
+   *   scenario cannot spend a unit on it at any rung.
+   *
+   * So raising the rungs would widen every budget by 111 units for a row no scenario can buy.
+   * **This is flagged rather than settled**: if panels ever become purchasable in a scenario, the
+   * rung ladder is the figure to revisit, and § D619 says so.
+   *
+   * The schema **ceiling** is a different question and did move, in `data/campaign.json` and
+   * `data/engineering-briefs.json`: that one is *the whole schedule's cost*, `budgetViolations`
+   * requires it to equal `totalUnits` exactly, and it is derived rather than authored.
+   */
   it('reaches the top of the ladder, and stops where nothing more can be bought one at a time', () => {
-    const bounds = scheduleBoundsOf(schedule);
+    const flatPrices = schedule.changes
+      .filter((change) => change.rate === undefined)
+      .map((change) => change.priceUnits);
+    const dearestFlat = Math.max(...flatPrices);
     for (const stage of campaign.stages) {
       const rungs = rungsOf(stage.budget);
       const top = rungs[rungs.length - 1];
-      expect(top?.units, `${stage.id}`).toBe(bounds.dearestChangeUnits);
+      expect(top?.units, `${stage.id}`).toBe(dearestFlat);
       expect(affordableChanges(schedule, top?.units ?? 0).length, `${stage.id}`).toBe(
         schedule.changes.length,
       );
     }
+  });
+
+  it('is a ladder whose dearest single change is now a rated row, which is why the clause above says flat', () => {
+    // Asserted so the sentence above cannot go stale silently: the day this stops being true is the
+    // day the two clauses coincide again and the distinction can be deleted.
+    const bounds = scheduleBoundsOf(schedule);
+    const dearestFlat = Math.max(
+      ...schedule.changes
+        .filter((change) => change.rate === undefined)
+        .map((change) => change.priceUnits),
+    );
+    expect(bounds.dearestChangeUnits).toBeGreaterThan(dearestFlat);
+    const rated = schedule.changes.filter((change) => change.rate !== undefined);
+    expect(rated.map((change) => change.id)).toEqual(['landing-panels']);
   });
 });
 
@@ -220,11 +264,15 @@ describe('a record missing a budget is refused rather than defaulted — #365 cr
 describe('a step no price schedule can reach fails to load — #365 criterion 2', () => {
   it('refuses a step that adds less than the cheapest change costing anything', () => {
     const bounds = scheduleBoundsOf(schedule);
+    // Derived rather than written down. It read `1` until GitHub issue #437 priced landing panels
+    // at 1 u each, which made 1 the cheapest thing on the ladder that costs anything — so a literal
+    // would have quietly stopped being *below* the bound and tested nothing.
+    const tooSmall = bounds.cheapestPositiveUnits - 1;
     const found = violationsAfter((budget) => ({
       ...budget,
       steps: budget.steps.map((step, index) =>
         index === 0
-          ? { ...step, addsUnits: 1, schema: { ...step.schema, default: 1 } }
+          ? { ...step, addsUnits: tooSmall, schema: { ...step.schema, default: tooSmall } }
           : step,
       ),
     }));
@@ -255,12 +303,27 @@ describe('a step no price schedule can reach fails to load — #365 criterion 2'
    * 10 → 12 units on the shipped ladder: the dearest change at or under 10 units is 10, the next
    * price up is 13, so the two rungs afford exactly the same changes and the step buys nothing. The
    * figures are derived here rather than written down, so a re-priced schedule moves the case.
+   *
+   * **It is driven against a flat-only view of the shipped schedule since GitHub issue #437, and
+   * that is a finding rather than a workaround** (§ D619). `landing-panels` is priced at 1 u a
+   * landing, and `affordablePurchasesAt` counts a rated row's affordable *units* rather than the
+   * row — § D552's own choice, made so that a rung buying a second panel is not refused as a
+   * duplicate. With that row on the ladder **every** rung below its 165 u ceiling buys at least one
+   * more panel than the rung under it, so no dead rung exists there at all and this refusal cannot
+   * be tripped by any budget in the range a scenario occupies. The rule is unweakened and still
+   * binds above the ceiling; what has changed is that the shipped ladder can no longer produce a
+   * witness, so the witness is built from the ladder minus its one rated row. The case below
+   * measures the other half on the shipped schedule, so the pair says which it is.
    */
   it('refuses a rung that affords exactly what the rung below afforded', () => {
-    const prices = [...new Set(schedule.changes.map((change) => purchaseUnits(change)))].sort(
+    const flatOnly: PriceSchedule = {
+      ...schedule,
+      changes: schedule.changes.filter((change) => change.rate === undefined),
+    };
+    const prices = [...new Set(flatOnly.changes.map((change) => smallestPurchaseUnitsOf(change)))].sort(
       (a, b) => a - b,
     );
-    const bounds = scheduleBoundsOf(schedule);
+    const bounds = scheduleBoundsOf(flatOnly);
     const base = prices.find(
       (price, index) =>
         price >= bounds.cheapestTierTypicalUnits &&
@@ -284,9 +347,53 @@ describe('a step no price schedule can reach fails to load — #365 criterion 2'
           },
         ],
       },
-      schedule,
+      flatOnly,
     );
     expect(found.join('\n')).toMatch(/the rung below wearing a second price/);
+  });
+
+  it('does not refuse that same rung on the shipped ladder, because a rated row makes it buy a panel', () => {
+    // The other half of the pair above, on the shipped schedule rather than a flat view of it. The
+    // step is identical; what differs is that one more unit now buys one more landing panel, so the
+    // rung genuinely enlarges what is affordable. § D552 chose that counting deliberately, and this
+    // is the first commit on which the shipped ladder can show it.
+    const prices = [...new Set(schedule.changes.map((change) => smallestPurchaseUnitsOf(change)))].sort(
+      (a, b) => a - b,
+    );
+    const flatOnly: PriceSchedule = {
+      ...schedule,
+      changes: schedule.changes.filter((change) => change.rate === undefined),
+    };
+    const flatBounds = scheduleBoundsOf(flatOnly);
+    const base = prices.find(
+      (price, index) =>
+        price >= flatBounds.cheapestTierTypicalUnits &&
+        (prices[index + 1] ?? Number.POSITIVE_INFINITY) - price > flatBounds.cheapestPositiveUnits,
+    );
+    expect(base).toBeDefined();
+    const bounds = scheduleBoundsOf(schedule);
+    const found = budgetViolations(
+      'a stage',
+      {
+        ...aBudget(),
+        startingUnits: base ?? 0,
+        schema: { ...aBudget().schema, default: base ?? 0 },
+        steps: [
+          {
+            ...firstStepOf(aBudget()),
+            addsUnits: flatBounds.cheapestPositiveUnits,
+            schema: {
+              ...firstStepOf(aBudget()).schema,
+              default: flatBounds.cheapestPositiveUnits,
+            },
+          },
+        ],
+      },
+      schedule,
+    );
+    expect(found.join('\n')).not.toMatch(/the rung below wearing a second price/);
+    // And the cheapest thing that costs anything is now the panel's own rate, which is why.
+    expect(bounds.cheapestPositiveUnits).toBeLessThan(flatBounds.cheapestPositiveUnits);
   });
 });
 

@@ -864,6 +864,20 @@ export interface SimulationConfig {
   readonly interventions?: readonly RunInterventionConfig[] | undefined;
   /** `throw` (default) or `report`. See {@link SimulationError}. */
   readonly onTimeout?: TimeoutPolicy | undefined;
+  /**
+   * **Write every completed car move into the record** — `RunRecord.carMoves`, `docs/11` § 3.4(a)
+   * and OQ-8, GitHub issue #412.
+   *
+   * `false` or absent by default, and absent is what every shipped path passes: a position series
+   * multiplies what a run holds, and this repository pins published intervals against recorded
+   * runs. So it is asked for rather than assumed, and a run that does not ask produces a record
+   * byte-identical to one written before the field existed.
+   *
+   * Ask for it when the question is *where were the cars*, which is what the TWIN separation
+   * property needs and what `docs/07` § 5's unmeasurable bank needs. It changes nothing about the
+   * simulation itself — no draw, no event, no decision — only what is written down.
+   */
+  readonly recordCarMoves?: boolean | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -1155,6 +1169,85 @@ export interface StageActivity {
    * rest of {@link StageActivity} is: `runSimulation` discards the instance.
    */
   readonly diversions: number;
+
+  /* ---- TWIN shafts: docs/11 § 1.2's four counters and § 2.4's bound ---- */
+
+  /*
+   * **All five are present exactly when the building declares a TWIN shaft, and absent
+   * otherwise** — not "absent when zero", and the difference is the whole of why they are
+   * optional at all.
+   *
+   * Absent-when-zero would destroy `docs/11` § 6.2 clause 1, which makes a **zero** on a TWIN
+   * building a *wiring bug rather than a small effect*: a shaft whose constraint never binds has
+   * resolved to two independent cars, and a counter that disappeared at zero could not say so. So
+   * a TWIN run always carries all five, including the zero that is the bug report.
+   *
+   * Absent on a conventional building is what keeps `StageActivity` — which is part of
+   * `SimulationResult` and is therefore inside `traffic/identity.test-helper.ts`'s structural
+   * digest, key by key — **byte-identical** to the object this project has been pinning all
+   * along. Measured rather than assumed: with these five stripped, all 34 pinned digests across
+   * `dayStartIdentity`, `landingPanelIdentity` and `transportIdentity` reproduce exactly, so the
+   * shape is the only thing TWIN moved and the behaviour of every shipped building is unchanged.
+   */
+
+  /**
+   * **Departures the separation constraint refused** — `docs/11` § 2.4, GitHub issue #412.
+   *
+   * A car was told to go somewhere, the move would have breached C-CLEAR against its shaft
+   * mate, and it was *deferred*: it did not move, and it did not lose the stop.
+   *
+   * Zero on every building that declares no TWIN shaft, which is every building in
+   * `data/buildings/`. On one that does, `docs/11` § 6.2 clause 1 makes a zero here a **wiring
+   * bug rather than a small effect**: a TWIN shaft whose constraint never binds has resolved to
+   * two independent cars, which would be this repository's twelfth configurable-tested-and-dead
+   * feature and would look exactly like a pass.
+   */
+  readonly separationDeferrals?: number | undefined;
+  /**
+   * **Compelled moves commanded to get a mate out of the way** — `docs/11` § 5.
+   *
+   * Not a park and not priced like one: a clearing move does not pass through
+   * `idle.repositionThresholdS`, because a tuning deadband that can veto a move the constraint
+   * requires is a deadlock produced by a tuning value (§ 5.2's Q-PP, answered *no* in
+   * `DECISIONS.md` § D620). It is empty-car driving and it reaches the energy proxy through
+   * `#depart` like every other move, which is the obligation § 5.2's *if no* branch names.
+   */
+  readonly clearingMoves?: number | undefined;
+  /** Separation predicates evaluated over the run, across both gates. The denominator. */
+  readonly separationChecks?: number | undefined;
+  /**
+   * **Commanded moves that breached C-CLEAR: zero by construction** — `docs/11` § 3.4's P7 in
+   * its cheap (b) form.
+   *
+   * The movement gate refuses such a move, so a non-zero value here is a defect in the gate
+   * rather than in a dispatcher. `docs/11` § 3.4 says exactly what that is worth: *"a property
+   * that can only see the violations its own gate already prevented is a tautology"*. The
+   * honest check is the post-hoc one over a car-position series, which **no run record carries**
+   * — § 3.4's own named dependency, and still unbuilt.
+   */
+  readonly separationBreaches?: number | undefined;
+  /**
+   * The longest single deferral, simulated seconds — `docs/11` § 2.4 requirement 3.
+   *
+   * A car deferred for longer than a plausible bound is a deadlock in progress, and a deferral
+   * that is never observed is one nobody can distinguish from a wait. Reported in the same way
+   * the simulator already reports a structurally unservable landing rather than papering over
+   * it.
+   */
+  readonly longestSeparationDeferralS?: number | undefined;
+  /**
+   * **Deferrals taken while both cars held a stop across the other** — `docs/11` § 3.2's MERL
+   * deadlock shape, and § 3.6 clause 3's own denominator.
+   *
+   * A crossed pair is the **hazard**, not the failure: it is discharged in sequence by one car
+   * clearing out of the other's way and coming back, which is what the clearing move does. It is
+   * counted because § 3.6 clause 3 says a campaign that never draws the *blocking-prone*
+   * population reports a clean pass that is *"evidence of nothing, and the report must show the
+   * count rather than the pass"*. A run whose separation never met the hard case and one that met
+   * it and survived look identical without this number.
+   */
+  readonly crossedCommitmentDeferrals?: number | undefined;
+
   /** Calls it looked at and left where they were, with a gate that kept them. */
   readonly capacityHeld: number;
   /**

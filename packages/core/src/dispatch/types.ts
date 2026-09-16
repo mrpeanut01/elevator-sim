@@ -259,6 +259,16 @@ export const INELIGIBILITY_REASONS = [
   'destinationAccessDenied',
   'overload',
   'hallCallBypass',
+  /**
+   * **TWIN**: the other car in this car's hoistway makes the floor unreachable — `docs/11` § 4.3,
+   * GitHub issue #412. Mirrors `InfeasibilityReason`, and is the car's own answer rather than the
+   * group controller's: a shaft block is geometry, and no dispatcher weight may override it.
+   *
+   * It is in {@link TRANSIENT_INELIGIBILITY} for the reason `oppositeDirection` is — the answer
+   * changes on its own as the mate moves — and absent from `Simulation`'s
+   * `STRUCTURAL_INELIGIBILITY` for the reason INV-TWIN-3 gives: the passenger is servable.
+   */
+  'shaftBlocked',
   /** `eligibility.maxLoadFactorForAssignment`: the car would be too full on arrival. */
   'loadFactorCeiling',
   /** `eligibility.allowOppositeDirectionPickup` is off and the car would arrive facing the wrong way. */

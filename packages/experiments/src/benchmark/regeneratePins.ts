@@ -33,6 +33,7 @@ import { TAIL_CENSUS_LOADS, runTailStudy } from './tailStudy.js';
 import { runWeightSetSelectionStudy } from './weightSetSelection.js';
 import { runSelectionSweep } from './selectionSweep.js';
 import { runLunchTwoWaySelectionStudy } from './lunchTwoWaySelection.js';
+import { runLandingPanelDeploymentStudy } from './landingPanelDeployment.js';
 import { runBenchmark } from './suite.js';
 import { loadResources, withProfiles } from '../validation/harness.js';
 import {
@@ -55,6 +56,7 @@ import {
   weightSetSelectionFigures,
   selectionSweepFigures,
   lunchTwoWaySelectionFigures,
+  landingPanelFigures,
   type PinnedEstimate,
   type PublishedStudyId,
 } from './published.js';
@@ -80,6 +82,7 @@ export async function measureAllPublishedFigures(): Promise<
     'weight-set-selection': weightSetSelectionFigures(await runWeightSetSelectionStudy({})),
     'selection-sweep': selectionSweepFigures(await runSelectionSweep({})),
     'lunch-two-way-selection': lunchTwoWaySelectionFigures(await runLunchTwoWaySelectionStudy({})),
+    'landing-panel-deployment': landingPanelFigures(await runLandingPanelDeploymentStudy({})),
     'deadband-sweep': deadbandSweepFigures(await runDeadbandSweep({})),
     'rate-sweep': rateSweepFigures(await runRateSweep({})),
     'double-deck': doubleDeckFigures(await runDoubleDeckStudy({ resources })),

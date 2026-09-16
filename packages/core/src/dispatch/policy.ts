@@ -465,11 +465,14 @@ export function weightSetSourceFrom(
 /**
  * Reasons a car is refused *for now* rather than *at all*.
  *
- * Both are geometry: `hardConstraint` here is `noDirectionReversal`, and `oppositeDirection` is the
- * softer filter over the same question. A car refused for either is refused for the direction it
- * happens to be pointing, which changes every time it arrives somewhere. Everything else in
- * `INELIGIBILITY_REASONS` — service mode, service zone, access, overload, bypass, the load ceiling
- * — is a fact about what the car *can* do, and a call held by such a car really is stranded.
+ * All three are geometry: `hardConstraint` here is `noDirectionReversal`, `oppositeDirection` is the
+ * softer filter over the same question, and `shaftBlocked` is a TWIN car refused because its shaft
+ * mate is in the way (`docs/11` § 4.3). A car refused for the first two is refused for the
+ * direction it happens to be pointing, which changes every time it arrives somewhere; a car
+ * refused for the third is refused for where its mate happens to be, which changes every time the
+ * mate arrives somewhere. Everything else in `INELIGIBILITY_REASONS` — service mode, service zone,
+ * access, overload, bypass, the load ceiling — is a fact about what the car *can* do, and a call
+ * held by such a car really is stranded.
  *
  * Deliberately **not** the same set as `Simulation`'s `STRUCTURAL_INELIGIBILITY`, which answers a
  * different question: that one is "will retrying this call ever help?", where access and service
@@ -477,7 +480,11 @@ export function weightSetSourceFrom(
  * change on its own?", where the load ceiling is durable enough to surrender a call over and the
  * direction is not. Two sets, two questions, and collapsing them would be wrong in both places.
  */
-const TRANSIENT_INELIGIBILITY: ReadonlySet<string> = new Set(['hardConstraint', 'oppositeDirection']);
+const TRANSIENT_INELIGIBILITY: ReadonlySet<string> = new Set([
+  'hardConstraint',
+  'oppositeDirection',
+  'shaftBlocked',
+]);
 
 /** Whether the incumbent was refused for a reason that will change as it moves. */
 function isTransientlyIneligible(

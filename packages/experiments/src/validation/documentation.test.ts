@@ -1981,7 +1981,30 @@ type DecisionReservation = {
  * time, now with a full house rather than two of five, and it is the argument for the block being
  * opened before the lanes start rather than a preference for tidiness.
  */
+/**
+ * **Wave AC's reservation is closed.** Three lanes opened it independently from the same
+ * pre-merge base (`5a52354`), each seeing the charter row at its own floor and none seeing its
+ * siblings: #422 wrote D619, #437 wrote D619 too (renumbered to D620 on merge, its own entry and
+ * every cross-reference corrected on the same commit), and #412 wrote D620 (renumbered to D621).
+ * All three numbers the block ever named — D619, D620, D621 — are now spent, and D616/D617 remain
+ * holes from the earlier #540 collision. The integrator sets this back to `null` and moves
+ * `CHARTER_PROGRAMME.md`'s row to **D622** on this commit.
+ */
 const OPEN_RESERVATION = null as DecisionReservation | null;
+/*
+ * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
+ * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
+ * the sibling lane that had already spent D619 for #422; the integrator found the collision on
+ * merge and renumbered #437's entry to **D620**, correcting both entries' cross-references and the
+ * budget-ceiling arithmetic each had computed alone (the schedule's own re-derived `totalUnits` is
+ * what the merged tree carries, not either lane's isolated delta). With both D619 and D620 now
+ * spent — the block's whole six numbers accounted for, D616/D617 as holes — the reservation closes
+ * and `CHARTER_PROGRAMME.md`'s row moves to **D621** on this commit, per the remedy the guard below
+ * names.
+ *
+ * **If D620 is never written it becomes a hole, not free**, and belongs in `KNOWN_DECISION_HOLES`
+ * under § D404 and § D430: ids here are names.
+ */
 /*
  * **Wave AB opened this as `{ wave: 'AB', from: 594, to: 600 }` and lane A closed it, having spent
  * every number in it.** The dispatch brief allocated lane A **D594–D600** and no others; wave AA's

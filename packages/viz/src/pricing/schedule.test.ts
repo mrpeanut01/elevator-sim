@@ -15,7 +15,6 @@ import { describe, expect, it } from 'vitest';
 import {
   parsePriceSchedule,
   priceOf,
-  purchaseUnits,
   smallestPurchaseUnitsOf,
   violationsIn,
   PriceScheduleError,
@@ -78,8 +77,14 @@ describe('data/price-schedule.json — issue #366', () => {
    */
   it('lets a dear change in a cheap tier outprice a cheap one in a dear tier', () => {
     const schedule = shipped();
+    // The price on the row's *face* — a flat row's price, a rated row's per-unit rate — which is
+    // the same reading `violationsIn` takes each tier's typical from. `purchaseUnits` cannot be
+    // used here: since GitHub issue #437 one row is rated, and pricing it needs a quantity this
+    // comparison has no business choosing (§ D552).
     const priceIn = (tierId: string): readonly number[] =>
-      schedule.changes.filter((change) => change.tier === tierId).map((change) => purchaseUnits(change));
+      schedule.changes
+        .filter((change) => change.tier === tierId)
+        .map((change) => smallestPurchaseUnitsOf(change));
     const equipment = priceIn('equipment');
     const building = priceIn('building');
     expect(Math.max(...equipment)).toBeGreaterThan(Math.min(...building));

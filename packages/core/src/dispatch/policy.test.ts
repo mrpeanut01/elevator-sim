@@ -16,7 +16,7 @@ import type {
   ResolvedCar,
 } from '../config/types.js';
 import { Car } from '../model/car/car.js';
-import { createShaft, shaftForBank, type CarShaft, type CarSnapshot } from '../model/car/types.js';
+import { createShaft, shaftsForBank, type CarShaft, type CarSnapshot } from '../model/car/types.js';
 import { Passenger } from '../model/passenger.js';
 import { hallCallId, type Direction, type HallCall } from '../model/types.js';
 
@@ -1004,7 +1004,7 @@ describe('every parking strategy moves a car on data/buildings/midtown-office.js
     const spec = bank?.cars[0];
     if (building === undefined || bank === undefined || spec === undefined) return;
 
-    const shaft = shaftForBank(building, bank.id);
+    const shaft = shaftsForBank(building, bank.id)[0]!;
     const entranceFloorIds = building.entranceFloors.map((floor) => floor.id);
     const snapshots = shaft.floors.map((floor) =>
       new Car({

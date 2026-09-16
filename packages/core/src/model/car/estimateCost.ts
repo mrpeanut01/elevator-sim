@@ -72,6 +72,11 @@ import {
 import { travelTime } from '../../physics/motion/index.js';
 import { acceptsCarCalls, acceptsHallCalls, type Direction } from '../types.js';
 
+// The TWIN feasibility filter's one predicate. Imported rather than restated, because a second
+// reading of "inside the mate's range" in this file is a second authority on the one question
+// gate 1 exists to answer — and the ranges can be *empty*, which is the reading a restatement
+// gets wrong (`separation.ts#withinRange` says why).
+import { withinRange } from './separation.js';
 import {
   deckOfFloor,
   deckSlot,
@@ -174,6 +179,54 @@ export function infeasibilityOf(
     }
     if (!isAccessPermitted(snapshot.shaft, request.credentialGroup, destinationFloorId)) {
       return 'destinationAccessDenied';
+    }
+  }
+
+  /*
+   * 3'. **TWIN: the other car in this hoistway** — `docs/11` § 4.3, GitHub issue #412,
+   *     `DECISIONS.md` § D620. Gate 1 of § 2.3: a *feasibility filter*, not the authority.
+   *     Gate 2 lives in `sim/simulation.ts#depart` and is the one that may not be wrong; if this
+   *     one is wrong the run is merely inefficient.
+   *
+   *     **Placed after the destination checks and before the load cell**, which follows the
+   *     ordering rule this function already documents — the most structural answer wins.
+   *     `shaftBlocked` is less structural than a service zone (the fabric reaches that floor) and
+   *     more structural than a load reading (a load reading can be overridden by the dispatcher's
+   *     starvation guard, `allowBypassIfSoleEligibleCar`, and a shaft block may not be).
+   *
+   *     **Two ranges, two questions, and the second is the deadlock prevention.** The *pickup* is
+   *     asked against `reachableIndexRange`, which is about this instant and moves when the mate
+   *     does. The *destination*, where the call type discloses one, is asked against
+   *     `admissibleIndexRange`, which is a constant of the building — because accepting a call
+   *     whose destination this car may never reach boards a passenger it cannot deliver, and
+   *     `docs/11` § 3.2 places deadlock prevention exactly there: *deadlock is prevented at
+   *     commitment, and only checked at movement*. It is structurally identical to the
+   *     double-deck lane's cross-deck refusal, with a dynamic predicate in place of a static one.
+   *
+   *     **Transient, never structural.** INV-TWIN-3: the passenger refused here is servable and
+   *     the call is retried. `'shaftBlocked'` is absent from `STRUCTURAL_INELIGIBILITY`, which
+   *     `sim/twinShaft.test.ts` asserts in both directions.
+   *
+   *     Costs one `undefined` check on every car of every conventional building, because
+   *     `shaftMate` is absent unless the car is in a two-car hoistway.
+   */
+  const mate = snapshot.shaftMate;
+  if (mate !== undefined) {
+    const pickup = shaftFloor(snapshot.shaft, stopFloorIdOf(snapshot.shaft, request.floorId));
+    if (pickup !== undefined && !withinRange(pickup.index, mate.reachableIndexRange)) {
+      return 'shaftBlocked';
+    }
+    if (destinationFloorId !== undefined) {
+      const destination = shaftFloor(
+        snapshot.shaft,
+        stopFloorIdOf(snapshot.shaft, destinationFloorId),
+      );
+      if (
+        destination !== undefined &&
+        !withinRange(destination.index, mate.admissibleIndexRange)
+      ) {
+        return 'shaftBlocked';
+      }
     }
   }
 

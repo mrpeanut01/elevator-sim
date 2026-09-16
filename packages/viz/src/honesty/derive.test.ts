@@ -1453,12 +1453,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'fixit/engine.ts#stepSpeed',
         'fixit/engine.ts#stepCapacity',
         /*
-         * Issue #422's two reducers, on the two steppers' own ground: a `FixitState` in, a
+         * Issue #422's three reducers, on the two steppers' own ground: a `FixitState` in, a
          * `FixitState` out, reaching prose only through `affordabilityOf`, which this adapter drives
-         * directly. What a player reads about either is the row, not the reducer.
+         * directly. What a player reads about any of the three is the row, not the reducer.
          */
         'fixit/engine.ts#stepZoneOverlap',
         'fixit/engine.ts#setParkingStrategy',
+        'fixit/engine.ts#stepTopFloorRaise',
         'frame/overlay.ts#queueAt',
         'frame/overlay.ts#landingAssignmentsAt',
         'frame/sequence.ts#frameSequence',

@@ -37,8 +37,10 @@ import type { ActionBarModel } from './actionBar.js';
  * `stateSelected`/`stateAffordable` are its repair-row state words (the third state's words —
  * *beyond a repair budget* — arrive inside `fixit/engine.ts#repairRowOf`'s refusal and are not
  * restated here); `asBuiltEyebrow` is § 10.1 item 2's own name for the card, uppercased to the
- * eyebrow register, because the prototype's heading for that region names its elevation editor,
- * which this build deliberately does not draw (see `fixitScreen.ts`).
+ * eyebrow register, because the prototype's heading for that region names its elevation editor —
+ * the per-shaft, per-floor-band click-to-set grid § 10.1 item 6 asks for, which this build still
+ * deliberately does not draw (see `fixitScreen.ts`). What *is* drawn now is narrower: one control
+ * that raises the building's topmost floor, issue #422.
  */
 export const FIXIT_SCREEN_COPY = Object.freeze({
   railHeading: 'BUILDINGS THAT NEED HELP',
@@ -108,6 +110,11 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   parkingZone: 'in the middle of its own zone',
   /** Why *buy one more step* refuses — § 10.3's budget cap, said on the control. */
   noBudgetLeft: 'The repair budget will not stretch to another step on this row.',
+  /* Section 10.3's elevation — issue #422. */
+  elevationLabel: 'The top floor',
+  elevationNone: 'as the building draws it',
+  elevationAtCeiling: 'This is as far as a repair budget moves a floor; a bigger rise is a capital project.',
+  elevationPriced: 'once, however far it moves',
 } as const);
 
 /** One case rail row, worded. `towerLine` comes through {@link buildingLineOf}. */
@@ -239,10 +246,12 @@ export interface FixitMachineryRow {
 }
 
 /**
- * The two machinery rows § 10.3 prices — rated speed and car capacity. Door dwell and the elevation
- * grid are § 10.3 controls this build deliberately does not draw; `fixitScreen.ts`'s docstring
- * carries that scoping and the reason. **Zoning is no longer among them** — it is
- * {@link fixitZoneRow}, issue #422.
+ * The two machinery rows § 10.3 prices — rated speed and car capacity. Door dwell and § 10.1 item
+ * 6's elevation *grid* (the per-shaft, per-floor-band click-to-set control) are § 10.3 controls this
+ * build deliberately does not draw; `fixitScreen.ts`'s docstring carries that scoping and the
+ * reason. **Zoning is no longer among them** — it is {@link fixitZoneRow}, issue #422 — and **nor
+ * is the narrower elevation control** that raises the topmost floor — it is
+ * {@link fixitElevationRow}, the same issue.
  *
  * `canBuySpeed`/`canBuyCapacity` are the engine's affordability answers, passed in rather than
  * recomputed so this module holds no second opinion about what fits in a budget.
@@ -406,6 +415,52 @@ export function fixitParkingRow(
     priced:
       priceUnits === 0 ? FIXIT_SCREEN_COPY.parkingFree : `${String(priceUnits)} u`,
     options,
+  };
+}
+
+/** The elevation stepper, worded. Absent entirely on a building whose top floor cannot take it. */
+export interface FixitElevationRow {
+  readonly key: 'elevation';
+  readonly label: string;
+  /** What the raise buys so far, in metres — or the as-drawn phrase at zero. */
+  readonly readout: string;
+  readonly priced: string;
+  /** Two refusals, never one — `FixitZoneRow.stepUpRefusal`'s own reason applied here. */
+  readonly stepUpRefusal: string | undefined;
+  readonly canStepDown: boolean;
+}
+
+/**
+ * The elevation row, or `null` where the building cannot take one — issue **#422**.
+ *
+ * `null` where `fixit/run.ts#topFloorRaiseCeilingOf` reports `0`: the topmost floor is served by no
+ * bank, or is one half of a double-deck pair. Drawing a stepper there would be a control that writes
+ * a field and moves no leg, exactly {@link fixitZoneRow}'s reason for the same `null`.
+ */
+export function fixitElevationRow(
+  state: FixitState,
+  ceiling: number,
+  canBuy: boolean,
+  priceUnits: number,
+): FixitElevationRow | null {
+  if (ceiling <= 0) return null;
+  const atCeiling = state.topFloorRaiseM >= ceiling;
+  const atBudget = state.topFloorRaiseM === 0 && !canBuy;
+  const price = `${String(priceUnits)} u ${FIXIT_SCREEN_COPY.elevationPriced}`;
+  return {
+    key: 'elevation',
+    label: FIXIT_SCREEN_COPY.elevationLabel,
+    readout:
+      state.topFloorRaiseM === 0
+        ? FIXIT_SCREEN_COPY.elevationNone
+        : `+${String(state.topFloorRaiseM)} ${state.topFloorRaiseM === 1 ? 'metre' : 'metres'}`,
+    priced: atBudget ? `${price} · ${FIXIT_SCREEN_COPY.atBudget}` : price,
+    stepUpRefusal: atCeiling
+      ? FIXIT_SCREEN_COPY.elevationAtCeiling
+      : atBudget
+        ? FIXIT_SCREEN_COPY.noBudgetLeft
+        : undefined,
+    canStepDown: state.topFloorRaiseM > 0,
   };
 }
 

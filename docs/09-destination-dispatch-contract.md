@@ -1022,8 +1022,45 @@ decision. What it changes in this contract, section by section:
   building that declares a destination landing is not an up-peak oracle configuration either, for
   that section's own reason.
 
-What a hybrid is *worth* is not stated here. It is stage 2's pinned measurement: entrance-only
-against full and against none on `midtown-office`, on the legs, with paired intervals.
+### 11.1 What a hybrid is worth — stage 2's measurement
+
+This paragraph used to say the question was stage 2's. It has been run
+([DECISIONS.md § D619](../DECISIONS.md), `packages/experiments/src/benchmark/landingPanelDeployment.ts`,
+pinned in `benchmark/published.ts`). Three deployments of `midtown-office` under `destination-panel`
+held fixed — no panels, panels on the landings the building itself flags `isEntrance` (two), and
+panels everywhere (twenty-one) — at **n = 200** under common random numbers, seed 20 260 726, every
+arm quotable with nothing saturated and identical trace digests across all three arms.
+
+The gate is `ttdMeanS`, because § 1.6's rule bites on every pair here: no two arms run the same
+landing models, so all nine model-sensitive metrics are refused between them, and the study carries
+that refusal as a value rather than as a note.
+
+| cell | pair | ΔTTD (s) | verdict |
+|---|---|---|---|
+| up-peak 1 % | entrance − none | −0.1516 [−0.5603, +0.2571] | indistinguishable (would need 1 436 replications) |
+| up-peak 1 % | full − none | −0.1516 [−0.5603, +0.2571] | indistinguishable |
+| up-peak 1 % | entrance − full | 0.0000 [0.0000, 0.0000] | **identical**, 200 of 200 replications |
+| mixed 1.5 % | entrance − none | −0.3180 [−0.5246, −0.1113] | better, resolvable at n = 1 |
+| mixed 1.5 % | full − none | −1.6121 [−1.9039, −1.3202] | better, n = 1 |
+| mixed 1.5 % | entrance − full | +1.2941 [+0.9936, +1.5945] | worse, n = 1 |
+
+**Under a pure up-peak two panels buy exactly what twenty-one do.** Incoming-only demand weighted
+entirely to the lobby registers every call at the lobby, so the other nineteen panels are never
+pressed — the paper's own claim about the hybrid configuration, measured in the direction it is
+made. Neither deployment is distinguishable from buttons on the gate at that cell.
+
+**Under the mixed 40/30/30 day of § 2.2 they separate, and the ordering is monotone in panels**,
+because the landings a hybrid leaves out are landings that generate calls. Energy per served leg is
+worse for both deployments at both cells, reported beside the gate and never folded into it
+(DECISIONS.md § D106).
+
+Nothing here is a claim about another building: § D595 measured a destination effect that reversed
+between two towers, and this is one building at two operating points. No mechanism is offered for
+the size of the mixed-cell effect.
+
+Panels are priced per landing on `data/price-schedule.json` (`landing-panels`, equipment tier), and
+no shipped surface can buy one yet: the viewer refuses a building declaring `landingCallType` until
+GitHub issue #534's list is done (§ D553 clause 9).
 
 ---
 

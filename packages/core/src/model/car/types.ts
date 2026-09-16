@@ -42,6 +42,11 @@ import {
   type Direction,
   type ServiceMode,
 } from '../types.js';
+import {
+  assertBrakeDominatesComfort,
+  validateSeparation,
+  type ShaftSeparation,
+} from './separation.js';
 
 /* -------------------------------------------------------------------------- *
  * Clock
@@ -102,6 +107,43 @@ export interface ServedFloorInit {
  * dispatcher strategy and appears nowhere in this module.
  */
 export interface CarShaft {
+  /**
+   * Which hoistway this is, unique within its bank — `docs/11` § 1.1, GitHub issue #412.
+   *
+   * **The field that makes a shaft an object.** Before it, a shaft was a per-car value derived
+   * from the bank (`docs/11` § 0 claim 1), so four cars in a bank held four structurally
+   * identical but distinct values and nothing in `core/` could express *these two cars are in
+   * the same physical hole*. `shaftsForBank` now builds one value per declared shaft and hands
+   * the same reference to every car in it, so identity is reference identity.
+   *
+   * Defaults to the bank's own id on a bank that declares no `shafts` block, which is every
+   * shipped building: one shaft per car, all sharing one id, exactly the value this field would
+   * have had if it had always existed.
+   */
+  readonly id: string;
+  /**
+   * The cars in this hoistway, **ordered lower-first**, one or two of them.
+   *
+   * A tuple rather than a set, and the order is a physical fact that C-ORDER (`docs/11` § 2.1)
+   * forbids from changing — so it is expressed in the type rather than recomputed from
+   * positions every time somebody needs it. A `readonly string[]` would let a three-car shaft
+   * typecheck, and three cars in one hoistway is a different system with a different
+   * collision-avoidance argument that nobody here has written (`docs/11` OQ-9: **out**, and the
+   * type is what enforces it).
+   */
+  readonly carIds: readonly [string] | readonly [string, string];
+  /**
+   * How far apart this shaft's two cars must stay. **`undefined` on a single-car shaft**, and
+   * every helper short-circuits on its absence.
+   *
+   * That is the structural trick the deck geometry below uses, applied to TWIN: a building with
+   * no TWIN shaft produces a bit-identical run because of the *shape* of this value, not
+   * because of an assertion in a docstring. `separation === undefined` is not a flag meaning
+   * *no constraint applies*; it is the state in which there is no second car for a constraint
+   * to hold between.
+   */
+  readonly separation?: ShaftSeparation | undefined;
+
   /** Floors served, ascending by {@link ServedFloor.index}. */
   readonly floors: readonly ServedFloor[];
   readonly floorsById: ReadonlyMap<string, ServedFloor>;
@@ -143,6 +185,25 @@ export interface CarShaft {
 /** Declared double-deck pairing for a shaft: `[lowerFloorId, upperFloorId]`, in any order. */
 export interface ShaftOptions {
   readonly floorPairs?: readonly (readonly [string, string])[] | undefined;
+  /**
+   * This hoistway's id. Defaults to `'shaft'` when a caller builds a shaft with no bank to name
+   * it — which is every hand-built shaft in a test, and is why it is optional here and required
+   * on {@link CarShaft}.
+   */
+  readonly id?: string | undefined;
+  /**
+   * The cars in this hoistway, lower-first. Defaults to a single anonymous occupant, which is
+   * the reading every shaft had before TWIN: one car, whoever it turns out to be.
+   */
+  readonly carIds?: readonly [string] | readonly [string, string] | undefined;
+  /**
+   * The separation contract for a two-car hoistway. **`createShaft` throws when this is present
+   * beside a single `carIds`**: a separation between one car and nothing is a declaration
+   * nobody can honour, and a shaft that quietly accepted it would be a TWIN configuration
+   * simulated as a conventional one, which is the failure mode `docs/11` § 1.2 names for
+   * `shaftForBank` and this is the same failure one layer down.
+   */
+  readonly separation?: ShaftSeparation | undefined;
 }
 
 /**
@@ -195,10 +256,32 @@ export function stopFloorsOf(shaft: CarShaft): readonly ServedFloor[] {
  *   direction-dependent cost term. Also if a declared floor pair names a floor the shaft does
  *   not serve, orders its two floors the wrong way round, or reuses a floor in two pairs: a
  *   deck assignment that is not a partition would let one floor be served from two positions.
+ *   Also if a two-car shaft names the same car twice, or if a `separation` is declared over a
+ *   shaft holding one car — a separation between one car and nothing is a TWIN declaration that
+ *   would be simulated as a conventional shaft (`docs/11` § 1.2).
  */
 export function createShaft(floors: readonly ServedFloorInit[], options?: ShaftOptions): CarShaft {
   if (floors.length === 0) {
     throw new ModelError('A car shaft must serve at least one floor.');
+  }
+
+  // Identity and occupancy, before any geometry: a shaft that cannot say which cars are in it
+  // cannot be checked for anything TWIN needs checking for.
+  const shaftId = options?.id ?? 'shaft';
+  const carIds = options?.carIds ?? ([shaftId] as const);
+  if (carIds.length === 2 && carIds[0] === carIds[1]) {
+    throw new ModelError(
+      `Shaft "${shaftId}" declares car "${carIds[0]}" as both of its two occupants. A TWIN shaft holds two distinct cars.`,
+    );
+  }
+  const separation = options?.separation;
+  if (separation !== undefined) {
+    if (carIds.length !== 2) {
+      throw new ModelError(
+        `Shaft "${shaftId}" declares a separation but holds ${carIds.length} car. A separation is a constraint between two cars; declaring one over a single-car shaft is a TWIN configuration that would be simulated as a conventional one.`,
+      );
+    }
+    validateSeparation(separation, shaftId);
   }
 
   const sorted = [...floors].sort((a, b) => a.index - b.index);
@@ -257,6 +340,9 @@ export function createShaft(floors: readonly ServedFloorInit[], options?: ShaftO
   const pairs = options?.floorPairs ?? [];
   if (pairs.length === 0) {
     return Object.freeze({
+      id: shaftId,
+      carIds,
+      ...(separation === undefined ? {} : { separation }),
       floors: Object.freeze(served),
       floorsById: byId,
       floorsByIndex: byIndex,
@@ -313,6 +399,9 @@ export function createShaft(floors: readonly ServedFloorInit[], options?: ShaftO
   }
 
   return Object.freeze({
+    id: shaftId,
+    carIds,
+    ...(separation === undefined ? {} : { separation }),
     floors: Object.freeze(served),
     floorsById: byId,
     floorsByIndex: byIndex,
@@ -335,27 +424,30 @@ const EMPTY_DECK_FLOORS: ReadonlyMap<string, readonly string[]> = new Map<
 const EMPTY_DECKS: ReadonlyMap<string, DeckPosition> = new Map<string, DeckPosition>();
 
 /**
- * Build the shaft for one bank of a resolved building, folding in the building's access
- * zones.
+ * Every hoistway of one bank, one value per declared shaft — `docs/11` § 1.2, GitHub issue #412.
  *
- * This is the form a car factory uses, because it runs *during* `createBuilding` and so has
- * the {@link ResolvedBuilding} but not yet the runtime `Building`:
+ * **This replaces `shaftForBank` at the car factory**, and the replacement is the point.
+ * `shaftForBank` returned one shaft *per call*, so `sim/simulation.ts`'s factory gave four cars
+ * in a bank four structurally identical but distinct values and nothing could express that two
+ * of them share a hole. This returns one value per shaft, and the factory hands the same
+ * reference to every car in it.
  *
- * ```ts
- * const building = createBuilding(resolved, {
- *   createCar: (spec, ctx) =>
- *     new Car({ id: spec.id, bankId: ctx.bankId, spec,
- *               shaft: shaftForBank(resolved, ctx.bankId),
- *               homeFloorId: 'G', clock: kernel }),
- * });
- * ```
+ * **A bank that declares no `shafts` block resolves to one single-car shaft per car**, which is
+ * today's meaning exactly and is every shipped building. The absence is handled here rather
+ * than by every consumer, so the runtime has one representation — `docs/11` § 1.2's
+ * `ResolvedBank.shafts` rule, applied at the layer that builds the runtime value.
  *
- * @throws ModelError if the building declares no such bank, or the bank names a floor the
- *   building does not declare. Both are caught earlier by the config layer; the checks are
- *   here so a hand-built `ResolvedBuilding` in a test fails loudly rather than producing a
- *   shaft with a hole in it.
+ * Order is the bank's own car order, and within a TWIN shaft `carIds` is ordered lower-first as
+ * the bank declared it. Nothing here re-derives that order from positions: C-ORDER forbids it
+ * from changing, so it is a declaration, not an observation.
+ *
+ * @throws ModelError if the building declares no such bank, if the bank names a floor the
+ *   building does not declare, or if a declared shaft names a car the bank does not hold. All
+ *   three are caught earlier by the config layer; the checks are here so a hand-built
+ *   {@link ResolvedBuilding} in a test fails loudly rather than producing a shaft with a hole
+ *   in it.
  */
-export function shaftForBank(building: ResolvedBuilding, bankId: string): CarShaft {
+export function shaftsForBank(building: ResolvedBuilding, bankId: string): readonly CarShaft[] {
   const bank = building.banks.find((candidate) => candidate.id === bankId);
   if (bank === undefined) {
     const known = building.banks.map((candidate) => candidate.id).join(', ');
@@ -364,6 +456,83 @@ export function shaftForBank(building: ResolvedBuilding, bankId: string): CarSha
     );
   }
 
+  const carIdsInBank = new Set(bank.cars.map((car) => car.id));
+  const declared = bank.shafts;
+  // Absent ⇒ one single-car shaft per car, named for the car it holds. That is the value this
+  // field would have had if it had always existed, which is what keeps every shipped building
+  // bit-identical across this change.
+  const layout: readonly { readonly id: string; readonly carIds: readonly string[] }[] =
+    declared === undefined || declared.length === 0
+      ? bank.cars.map((car) => ({ id: `${bankId}-${car.id}`, carIds: [car.id] }))
+      : declared;
+
+  return Object.freeze(
+    layout.map((shaft) => {
+      for (const carId of shaft.carIds) {
+        if (!carIdsInBank.has(carId)) {
+          throw new ModelError(
+            `Shaft "${shaft.id}" of bank "${bankId}" holds car "${carId}", which the bank does not declare. Declared cars: ${[...carIdsInBank].join(', ') || '(none)'}.`,
+          );
+        }
+      }
+      const occupants = shaft.carIds;
+      if (occupants.length !== 1 && occupants.length !== 2) {
+        throw new ModelError(
+          `Shaft "${shaft.id}" of bank "${bankId}" holds ${occupants.length} cars. A hoistway holds one car or two; three in one shaft is a different system with a collision-avoidance argument nobody has written (docs/11 OQ-9).`,
+        );
+      }
+      const carIds =
+        occupants.length === 2
+          ? ([occupants[0], occupants[1]] as readonly [string, string])
+          : ([occupants[0]] as readonly [string]);
+      const separation =
+        declared === undefined
+          ? undefined
+          : declared.find((candidate) => candidate.id === shaft.id)?.separation;
+      if (separation !== undefined) {
+        /*
+         * **The premise `separation.ts`'s exactness rests on, checked where the shaft is built.**
+         *
+         * A safety brake gentler than the service brake makes the protected position non-monotone,
+         * and every claim about checking endpoints rather than sampling stops being true. This
+         * S-curve model decelerates at the rate it accelerates, so the harshest comfort
+         * deceleration in the shaft is the largest `acceleration` among its cars.
+         *
+         * `config/parse.ts` checks the same inequality and reports it as a located `ConfigError`
+         * instead, because a building being edited wants every fault at once. This throw is what
+         * catches a `ResolvedBuilding` assembled by hand in a test, which never passes through the
+         * loader — the same split every other check in this function is on.
+         */
+        assertBrakeDominatesComfort(
+          separation,
+          Math.max(
+            ...carIds.map(
+              (carId) => bank.cars.find((car) => car.id === carId)?.acceleration ?? 0,
+            ),
+          ),
+          shaft.id,
+        );
+      }
+      return shaftGeometryFor(building, bank, bankId, {
+        id: shaft.id,
+        carIds,
+        ...(separation === undefined ? {} : { separation }),
+      });
+    }),
+  );
+}
+
+/** The floors-and-decks half of a shaft, shared by every shaft of one bank. */
+function shaftGeometryFor(
+  building: ResolvedBuilding,
+  bank: ResolvedBuilding['banks'][number],
+  bankId: string,
+  identity: {
+    readonly id: string;
+    readonly carIds: readonly [string] | readonly [string, string];
+    readonly separation?: ShaftSeparation | undefined;
+  },
+): CarShaft {
   const permitted = credentialsByFloorId(building.accessZones);
 
   // **The deck pairing reaches the runtime here, and only here.** The bank declares the pairs
@@ -391,7 +560,12 @@ export function shaftForBank(building: ResolvedBuilding, bankId: string): CarSha
         ...(groups === undefined ? {} : { permittedCredentialGroups: groups }),
       };
     }),
-    floorPairs === undefined ? undefined : { floorPairs },
+    {
+      id: identity.id,
+      carIds: identity.carIds,
+      ...(identity.separation === undefined ? {} : { separation: identity.separation }),
+      ...(floorPairs === undefined ? {} : { floorPairs }),
+    },
   );
 }
 
@@ -691,9 +865,69 @@ export interface CarSnapshot {
   readonly assumedBoardingPassengers: number;
 
   readonly shaft: CarShaft;
+  /**
+   * **The other car in this hoistway, as a frozen value** — `docs/11` § 4.2, GitHub issue #412.
+   * Absent for a car in a single-car shaft, which is every car of every shipped building.
+   *
+   * ## How this preserves purity, which is the whole of § 4
+   *
+   * `estimateCost` must price *reachability given the mate's commitments*, and the obstacle
+   * (`docs/11` § 0 row 6) is that a `CarSnapshot` deliberately has no handle to any other car —
+   * an absence that **is** the purity mechanism. So the mate arrives by exactly the mechanism
+   * this type already relies on: a plain frozen value, built by the `Simulation` (which owns both
+   * cars), with no method, no `Rng`, no scheduler and no reference back to a `Car`. **The
+   * estimator gains a field to read, not a capability**, and CLAUDE.md invariant 1 is untouched.
+   *
+   * ## It is an envelope and not the mate's route, and that is a cost decision
+   *
+   * `Simulation#snapshots` builds one snapshot per car per dispatch pass, and handing each car a
+   * copy of the other's `CommittedStop[]` would double snapshot construction — which this type's
+   * own docstring says is *"what keeps snapshot construction cheap enough to call ten thousand
+   * times"*. The two ranges below are O(1) to read and sufficient for a hard filter, which is the
+   * part that must be fast. Whether an ETA *penalty*, as opposed to a filter, needs the mate's
+   * full route is `docs/11` OQ-4, and nothing here assumes it does.
+   */
+  readonly shaftMate?: ShaftMateSnapshot | undefined;
   readonly load: CarLoadSnapshot;
   /** Committed stops, in floor-index order. Route ordering is applied by `projectRoute`. */
   readonly stops: readonly CommittedStop[];
+}
+
+/**
+ * The other car of a TWIN shaft, frozen at the same instant as the snapshot that carries it —
+ * `docs/11` § 4.2.
+ *
+ * Two ranges rather than one, because they answer two different questions and conflating them
+ * breaks a different invariant each way round:
+ *
+ * - {@link reachableIndexRange} is *where may this car stop **right now***. It moves whenever the
+ *   mate does, so a call refused against it is refused **transiently** — INV-TWIN-3, and why
+ *   `'shaftBlocked'` must never join `STRUCTURAL_INELIGIBILITY`.
+ * - {@link admissibleIndexRange} is *where may this car **ever** stop*. It is a constant of the
+ *   building, and a commitment outside it is discharged by no sequence of legal moves — a
+ *   deadlock created at the instant it is made (INV-TWIN-2). Refusing **destinations** against
+ *   this range is the deadlock prevention of `docs/11` § 3.2, and it is structurally identical to
+ *   the double-deck lane's cross-deck refusal — *letting them alight on the other deck's floor
+ *   would simulate a physically impossible journey* — with a shaft in place of a deck.
+ *
+ * Both are **shaft floor indices**, inclusive at both ends, and either can be empty (`low > high`)
+ * — a car standing immediately below its mate can reach nothing this instant. A reader treats an
+ * empty range as *nothing right now*, never as *nothing ever*.
+ */
+export interface ShaftMateSnapshot {
+  readonly carId: string;
+  /** Whether the mate is the **upper** car of this shaft, i.e. this snapshot's car is the lower. */
+  readonly isAbove: boolean;
+  /** Height above datum at the snapshot's instant, metres — analytic, interpolated when moving. */
+  readonly heightM: number;
+  /** Signed velocity at that instant, m/s. Positive is up. */
+  readonly velocityMps: number;
+  /** Standing clearance plus buffer, metres — the gap two levelled cars must hold. */
+  readonly clearanceM: number;
+  /** This car's legal stop positions **now**, as inclusive shaft floor indices. */
+  readonly reachableIndexRange: readonly [number, number];
+  /** This car's legal stop positions **ever**, as inclusive shaft floor indices. */
+  readonly admissibleIndexRange: readonly [number, number];
 }
 
 /* -------------------------------------------------------------------------- *
@@ -781,6 +1015,21 @@ export const INFEASIBILITY_REASONS = [
   'overload',
   /** Load is at or above `bypassLoadThreshold`: no new hall calls, car calls still served. */
   'hallCallBypass',
+  /**
+   * **TWIN**: the other car in this hoistway makes the requested floor unreachable — `docs/11`
+   * § 4.3, GitHub issue #412.
+   *
+   * **Transient, and that is load-bearing.** A passenger refused for this reason is *servable*:
+   * the fleet reaches them, the credential permits them, and the block is the control system's
+   * own choice about this instant. So it is **absent from `STRUCTURAL_INELIGIBILITY`** in
+   * `sim/simulation.ts`, it follows `serviceMode` rather than `accessDenied`, and the call is
+   * retried. INV-TWIN-3 exists to forbid the edit that would change that, and filing a transient
+   * reason as structural is the `C35` failure with a new label.
+   *
+   * Never produced on a building that declares no TWIN shaft: `CarSnapshot.shaftMate` is absent
+   * there and the check short-circuits before reading anything.
+   */
+  'shaftBlocked',
 ] as const;
 
 export type InfeasibilityReason = (typeof INFEASIBILITY_REASONS)[number];
