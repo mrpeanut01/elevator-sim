@@ -37171,3 +37171,210 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 **What the first draft got wrong, named rather than erased.** It reasoned from `docs/32 GD9` ("no currency measures progress") and the risk of a player inflating a tracked figure through undemanding settings — a real consideration, but one that argues just as strongly against *Endless* mode, which also posts and which nothing in this product treats as a problem. The asymmetry the first draft was reaching for (a mode with no stakes shouldn't move a scored figure) proves too much: Endless *is* stakes-light by construction (§ D515) and posts anyway, by design. The actual line this product draws is narrower and already drawn correctly: *arrived-at* vs. *chosen*, not *hard* vs. *easy*.
 
 **What this does not decide.** Whether a player being able to pick an easy building/dispatcher/traffic combination in Free Play and have it move their best-day or streak figure is itself a *balance* concern (as opposed to the scoring-mechanism question this entry settles) is untouched — that would be a claim about specific figures being too easy to inflate, which needs measurement, not a reading of two docstrings.
+
+---
+
+## D631 — A shaft's plan area is priced, in four bands cut from the measured distribution rather than at a rate per square metre, and the two cases that cannot be banded are named rather than charged the cheapest
+
+**Date: 2026-09-16 · GitHub issue [#429](https://github.com/mrpeanut01/elevator-sim/issues/429), stage 2 · Completes [§ D601](#d601), which built the area model and refused the price · Spends [§ D552](#d552)'s rate × quantity seam for the second time, after [§ D620](#d620) · Rules on: `data/price-schedule.json`, `data/campaign.json`, `data/engineering-briefs.json`, `packages/core/src/config/floorArea.ts`, `packages/viz/src/pricing/`, `packages/viz/src/fixit/parse.ts`.**
+
+**Why an entry.** Three of [§ D405](#d405)'s grounds. It adds authored figures to a governed `data/` file that need the product owner's approval and are drafted for it here. It **moves figures already recorded** — the budget ceiling in `data/campaign.json` (30 sites) and `data/engineering-briefs.json` (6), and the price of a new shaft in the shipped fix-it cases, none of which this lane's module owns. And it **settles a question § D601 deliberately left open**, which a docstring may not do on its own.
+
+### 1. What § D601 left, and the ruling that closed it
+
+§ D601 built the quantity in full — a floor has a plate, a shaft takes plan area out of **every level it passes**, `ResolvedBuilding.area` publishes gross, core, lettable and `coreShare` for all fourteen shipped buildings — and refused to price it, quoting the product owner on the issue: *making area a cost introduces a second budget axis and a Career income term, neither of which is in `docs/38`; that reshapes the economy rather than adding a price.* § D601 § 5 then worked out both shapes so the ruling would arrive with arithmetic attached, and measured the fact that makes the obvious shape unusable: **a shaft's plan area spans 49× across the shipped set**, so the flat rate that keeps `midtown-office`'s `new-car` at its agreed 34 u (0.238 u/m²) prices one more Burj shuttle at **280 u against a whole schedule of 587**.
+
+**The product owner has since ruled on that open question**, in this shape, paraphrased rather than quoted because this lane holds no verbatim text:
+
+1. **One currency.** Area is priced in the schedule's existing `units`. The issue's own second shape — *priced in units **and** in the area it permanently removes* — is **declined**: no second budget axis, and no Career income term.
+2. **Bands, not a rate.** A shaft's area cost is charged in a small number of **discrete bands**, each a flat surcharge, keyed to the plan area the shaft actually removes. Not a units-per-m² rate across the whole 49× spread, for the reason § D601 § 5 already measured.
+3. **The boundaries and the prices are an agent's draft**, on § D601's own `shaftFootprint` footing: drafted for the owner to accept, tighten or reject, with the reasoning shown rather than only the numbers, and measured before chosen.
+
+### 2. The distribution, measured before anything was chosen
+
+§ D601 § 4's method, kept. Every bank of all fourteen shipped buildings was resolved **through the real loader**, and the quantity ranked is what one *more* car in that bank would take: `config/floorArea.ts#shaftPlanAreaM2`, one car's `shaftFootprint` times the number of floors its bank's span reaches.
+
+**62 banks.** Minimum **24.0 m²** (`ashgate/carpark`), p25 **176.0**, median **240.0**, p75 **376.0**, maximum **1 178.0** (`burj-class-reference/shuttle`) — a spread of **49.1×**, which reproduces § D601 § 5's figure from the other direction.
+
+**The three widest gaps *by ratio* are the whole of why there are four bands and not five.** Ratio is the right measure over a 49× range; an absolute gap of 210 m² at the top is a smaller discontinuity than one of 48 m² at the bottom.
+
+| gap | ratio | rank |
+|---|---|---|
+| 56.0 → 104.0 | **1.86×** | widest |
+| 640.0 → 850.0 | **1.33×** | second |
+| 376.0 → 464.0 | **1.23×** | third |
+| next-widest anywhere inside the 104–376 bulk | **1.10×** | — |
+
+So the boundaries fall at **80, 400 and 800 m²** — inside those three gaps, at round figures. **A fifth band was drafted and dropped**: splitting the 44-bank bulk means cutting an edge in a 1.10× gap while three real ones sit at 1.23–1.86×, which is inventing a boundary the distribution does not have. **And a boundary at 200 m² is refused outright**, which is the concrete form of the same rule: **seven shipped banks sit at exactly 200.0 m²**, so an edge there would move all seven a whole price band on a 0.1 m² authoring change.
+
+### 3. The bands and the prices, and which half of each is measured
+
+`data/price-schedule.json#areaBands`, and a new `shaft-area` row on the **building** tier.
+
+| band | plan area one shaft takes | surcharge | shipped banks | a new car there costs |
+|---|---|---|---|---|
+| 0 | under 80 m² | **0 u** | **3** | 34 u |
+| 1 | 80–400 m² | **8 u** | **44** | 42 u |
+| 2 | 400–800 m² | **16 u** | **8** | 50 u |
+| 3 | 800 m² and up | **24 u** | **7** | 58 u |
+
+**MEASURED: the distribution above, and nothing about any price.** A price is game feel and no amount of arithmetic makes it a measurement — `data/price-schedule.json`'s own header, kept.
+
+**DERIVED, and both ends are:**
+
+- **The floor is 0**, so the smallest shipped shafts — `ashgate/carpark` 24.0 m², `garden-apartments/main` 33.0 m², `empire-state-class-reference/bank-g` 56.0 m² — keep **exactly** the 34 u that four shipped lists independently agreed on, and a small building's price does not move at all.
+- **The ceiling is 24 u**, set so that the dearest shaft in the game becomes **the dearest single purchase on the schedule and nothing more**: 34 + 24 = **58 u**, just above `fifth-car`'s shipped 54 u, today's dearest row. That is **20.7 %** of the 280 u the rejected linear rate produced, so *well short* is an order-of-magnitude statement rather than a nudge.
+
+**CHOSEN: 8 u a band, and a ladder linear in the band index (0, 8, 16, 24) rather than a curve.** 8 is the step that lands the top of the ladder on the derived 24. The ladder is linear in the **band index** and therefore strongly sublinear in **area**, which is the whole of the compression the ruling asked for: **a shaft 49× the area of the cheapest costs 24 u more, not 271 u more.**
+
+**Also chosen, and named because it is a shipped price moving rather than a side effect:** `midtown-office/main` is 142.8 m² and lands in band 1, so the reference office's new car moves **34 → 42 u**. That is the ruling arriving, not a defect, and the row's note says so where a reader will meet it.
+
+**All four figures are an agent's proposal awaiting the owner's sign-off, and `data/price-schedule.json` says so on its own face** — exactly the status § D601's four `shaftFootprint` figures carry, and for the same reason.
+
+### 4. The shape the schema forced, and it is § D552's ruling rather than a preference
+
+**The bands could not go on the row**, and finding that out decided the design. § D552's ruling is *linear only, no curves*, and `pricing/parse.ts` refuses any key beyond `unitsPer` and `quantity` inside a rate, beyond the five range keys inside its quantity and its schema, and beyond the flat row's own keys beside it — `rate.quantity.bands` is refused **by name** in that parser's own docstring. So the row stays a plain linear rate and **the bend from area to band lives outside it**:
+
+- `shaft-area` is a **rated row**: `rate.unitsPer: 8`, `rate.quantity` in `area band`, `0`–`3`, default `0`. The quantity is which band the shaft falls into, which is `landing-panels`' own precedent — § D620's note calls a panel count *"a quantity a building has rather than a switch it is on one side of"*, and an area band is that exactly.
+- The boundaries live in the schedule's own **`areaBands`** block, parsed and validated beside the ladder.
+
+**The row books `nights: 0`, and that is not it being cheap.** The works are `new-car`'s eight nights; a shaft is sunk once and the area it takes is a consequence of *those* nights rather than a second job on the same hoistway. Booking nights here would double-count the closure a player already paid for, and Career reads `nights` to fill the month grid. The area is charged in units, permanently, and in no calendar days at all.
+
+**And `areaBands` is in the price schedule rather than in `data/elevator-specs.json` beside `shaftFootprint`**, which is the other place it could plausibly sit. Where the line between a cheap shaft and a dear one falls is **game feel, exactly as 34 u is**; `elevator-specs.json` is CIBSE-cited reference data. `shaftFootprint` says what a hoistway *is*, `areaBands` says what one *costs*, and they are not the same kind of claim.
+
+**The table is held to `shaftFootprint`'s own rules**, in `pricing/parse.ts#areaBandViolations`, each with the refusal it prevents: contiguous from 0 with an open top, so no shaft falls through and costs nothing; ascending from band 0, so a larger hole never costs less than a smaller one; no empty or backwards band; and **the dearest band must equal the row's own `quantity.max`**, or a band exists that nothing can be bought at, or a rate reaches past the table.
+
+### 5. The ceiling is a ceiling and it is checked against disk
+
+`landing-panels`' precedent, kept. `quantity.max: 3` is **the dearest band any shipped building reaches**, and `pricing/rate.test.ts` derives it from `data/buildings/` **through the loader**, over every bank of every shipped building, in **both** directions — the ceiling is reached by something that ships, and nothing that ships reaches past it. A transcribed figure goes stale the first time a taller tower lands, and here that would be worse than a stale budget: a shaft in the new tower would be charged for a band the table does not have.
+
+### 6. The budget ceilings, re-derived rather than computed by hand
+
+`scheduleBoundsOf` on the merged schedule reads **`totalUnits: 611`** directly. A rated row enters the ceiling at its declared most, so `shaft-area` adds 8 × 3 = **24 u**.
+
+| | before | after |
+|---|---|---|
+| `data/campaign.json` budget `schema.max` (30 sites) | 587 | **611** |
+| `data/engineering-briefs.json` budget `schema.max` (6 sites) | 587 | **611** |
+| `scheduleBoundsOf.dearestChangeUnits` | 165 | **165, unmoved** |
+| `scheduleBoundsOf.cheapestPositiveUnits` | 1 | **1, unmoved** |
+| building tier `typicalUnits` | 18 | **18, unmoved** |
+
+**Two of those rows are the interesting ones.** `dearestChangeUnits` does not move because `shaft-area`'s whole ceiling, 24 u, is under `fifth-car`'s flat 54 — so § D620 § 5's flagged question about the scenario rung ladder is **not** reopened here, and no rung moves. And the building tier's `typicalUnits` does not move because a fourteenth row at 8 u lands below the existing median and leaves the upper-middle where it was; the ladder still ascends (2 u, 6 u, 18 u). **No shipped row's own price moved** — what moved is what a shaft costs on top of its row.
+
+### 7. Move the control and require the run to change, in the only form a price can take it
+
+`CLAUDE.md`'s standing requirement cannot be met on the legs here, and saying why is better than pretending: **a price moves no passenger.** § D601 § 9 took the same problem and answered it on the quantity the control moves; this answers it on the quantity **and** the price, end to end through the real loader, in `pricing/rate.test.ts`:
+
+- the cheapest and dearest shafts in the shipped set are resolved from `data/buildings/` — real footprint table, real band table, real rate — and the two prices must differ in the direction the ruling names;
+- `ashgate/carpark` comes out at **exactly** the base 34 u, so the cheapest band really does charge nothing;
+- `midtown-office/main` sits **strictly between** the two, so the ladder is a ladder and not a switch;
+- and the whole spread is required to stay under `fifth-car`'s own price, stated as a **bound** rather than as the figure, so moving the ladder need not move the test while the compression claim still binds.
+
+### 8. The non-test caller, named — and the one that does not exist
+
+**Reader (a purchase):** `packages/viz/src/fixit/parse.ts#fixitContextOf` resolves each shipped fix-it case's building and bank to a band through `core`'s `shaftPlanAreaM2`, and `checkCase` prices the case's new-shaft repair at the base **plus that band**. That validator's message used to read *"prices it 34 in every case"*; it no longer says *in every case*, because under this ruling that sentence must stop being true. **The eighteen shipped new-shaft repairs now carry three prices rather than one**: 34 u on four, **42 u on twelve**, **50 u on two**. Every one is still **visible and unaffordable** inside its own 10–16 u budget, which is § 10.2's lesson and the thing a price rise must not break in the other direction; `cases.test.ts` asserts that on the shipped file.
+
+**Reader (a ceiling):** `packages/viz/src/scenario/budget.ts#scheduleBoundsOf`, through `campaign/parse.ts` — the 587 → 611 move above.
+
+**Writer:** `data/price-schedule.json`'s `shaft-area` row and `areaBands` block.
+
+**What does NOT read it, stated here rather than left to be discovered: the campaign shop.** `campaign/economy.ts#shopTierPrice`, `campaign/career.ts` and `everyday/campaignModel.ts` hold a `CampaignCareer` and a `PriceSchedule` and **never a `ResolvedBuilding`** — the string `ResolvedBuilding` does not occur in any of the three. So the Shafts tier still quotes the unbanded 34 u and 54 u, and `fifth-car` (`shop.shafts.2`) carries no surcharge at all, because nothing on that path can say which bank a shaft joins. Threading a resolved building through three modules and six call sites is a refactor this lane did not take. **That is this stage's honest boundary**, and it is § D620's own shape one issue later: a priced row whose ceiling is live and whose purchase path is partial, said in the row's note rather than found later.
+
+### 9. The two cases that cannot be banded, named rather than priced cheap
+
+Measured over all eighteen new-shaft repairs: **sixteen** add a car to a bank their building has as built. **Two do not** — `zoning-starves-the-top` and `car-park-nobody-serves` both add a car to `midtown-office`, which ships **one** bank (`main`), at banks the cases themselves invent (`high`, `garage`). There is no span to multiply a footprint by, so there is no area, so there is no honest band.
+
+**They are priced at the base and registered in `fixit/parse.ts#UNBANDED_SHAFT_CASES`, not defaulted to band 0.** Charging the cheapest band would be a pricing rule nobody ruled on wearing a measurement's clothes — the precise thing § D601 § 5 refused to do with this whole question — and both are `midtown-office` cases whose invented banks would plainly not be the cheapest band if they existed. `repairPriceUnits`' third argument is `undefined`-able for exactly this reason: **omitted means unresolved, never band 0**, and the two states reach the same figure by different routes and must not be conflated. `cases.test.ts` asserts the register in **both** directions, on `honesty.test.ts`'s `OUTSTANDING` precedent, so a case that acquires a resolvable bank fails here rather than leaving quietly.
+
+### 10. Not a score, and mechanically so
+
+`campaign/judge.ts`'s refusal is untouched, `shift/goals.ts` gains nothing, and no area figure is folded into a verdict, weighted against a wait, or turned into a letter. This is a **price**, which is what a player pays before a run, and § D601 § 10 and charter non-goal 6 are both undisturbed: two players who post the same run still read the same verdict whatever they paid.
+
+### 11. What this does not decide
+
+Whether **any** of the four prices or three boundaries is right — all seven are an agent's draft and all seven await the owner, exactly as § D601's footprints do. Whether `fifth-car` should carry the surcharge too, which is the campaign-shop path § 8 says nothing reaches. Whether the campaign shop should quote a banded price at all, which needs a resolved building where there is none. Whether a **fifth** band is worth cutting once a building lands in the 104–376 bulk's own gaps — § 2 says the distribution does not support one **today**, which is a measurement of a shipped set rather than a property of the design. And whether lettable area should bound a floor's **population**, which § D601 § 11 left open and this entry does not touch.
+
+**Bookkeeping.** This lane was reserved **D630–D639** and drafted as **D630**. **Renumbered to D631 on the integrator's merge into `main`**: an independent playtest/ruling session had, in parallel and without either side visible to the other, spent D630 itself for an unrelated ruling (`docs/12`'s Free Play scoring question, below) — the two branches never shared a base after this one's own reservation was cut, so neither could have seen the other's number. This entry is the later of the two to reach `main` and is the one renumbered, on this file's own precedent (§ D620, § D621): the earlier-merged entry keeps its number, ids are names, and the citation is corrected everywhere it was drafted. **D632–D639 remain unspent**, and whether each is free or a hole is the integrator's call at close, on § D430's rule.
+
+---
+
+## D640 — `rush-prefit` is one fixed kit, authored at last: what *fitted* means, applied by `core` and claimable at both ends, with the general rebuild still refused
+
+**Date: 2026-09-16 · GitHub issue [#372](https://github.com/mrpeanut01/elevator-sim/issues/372) · Answers the third of the three questions [§ D606](#d606) § 2 named and declined · Rules on: [`data/chime-ledger.json`](data/chime-ledger.json)'s `rush-prefit` sink, `packages/core/src/config/rushPrefit.ts`, `packages/server/src/leaderboard/rushSitting.ts`, `packages/server/src/leaderboard/verify.ts`, `packages/viz/src/everyday/rush.ts`, `packages/viz/src/everyday/host.ts`, `packages/viz/src/campaign/fitOut.ts`, `packages/server/src/leaderboard/rushHoldAgreement.json`.**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds. It binds nine modules across three packages that no one of them owns; it **moves something already recorded** — § D606 § 2 declined to answer what *fitted* means, and `verify.ts` carried *"a pre-fitted start (its fitted building is one this server cannot build)"* as a standing refusal; and it records two product-owner rulings that bind work nobody has started.
+
+### 1. What is built
+
+`data/chime-ledger.json` has sold **`rush-prefit`, *Start with the building fitted*, for fifteen chimes** since the ledger shipped, and **what *fitted* meant was authored nowhere**. Both ends refused it by name for that reason, which was correct while it was true. It is authored now, as **one kit and no other**:
+
+**Doors L1 + Control L1 + Tenants L1** — `campaign/economy.ts#SHOP`'s three cheapest first rungs, which are [`data/price-schedule.json`](data/price-schedule.json)'s `faster-doors`, `zone-the-tower` and `queue-marshalling`. Three effects, all of them plain fields `core` already carries: a second off each stop's door cycle, a 1.2 s ceiling on per-passenger transfer time, and *the group is worked as zones*.
+
+`packages/core/src/config/rushPrefit.ts` holds the kit and its two appliers, beside `rushPurse.ts` and `chimeLedger.ts` for the reason those two give in terms: `packages/server` has to replay a posted sitting and may not import the viewer, so a rule both ends need lives in the package both already depend on. `packages/viz` reaches it as a `CampaignFitOut` built **from that constant** (`everyday/rush.ts#RUSH_PREFIT_FIT_OUT`) and folds it through `campaign/fitOut.ts` like any other kit, because a pre-fitted rush *is* a fitted building and a second applier beside that one would be the answer that drifts. `packages/server`, which has no shop and no fold, calls the two functions directly.
+
+**The zoning lever is a `viz` concept, and the entry says what it resolves to**, because the brief asked and because the next reader will. `zonesTheTower` is `campaign/economy.ts`'s field, expressed as `authoring/dispatcherSpec.ts`'s **`express` group lever** — and `GroupLevers` lives in `packages/viz` and reaches `core` through nothing. So `core` holds the lever's *conclusion* rather than the lever: `prefittedRushProfile` writes `dispatch.assignmentMode: 'split-demand'`, `dispatch.splitThresholdPassengers` (the profile's own where it declares one, else 10) and `idle.parkingStrategy: 'zone-center'`, which are exactly the three fields `profileFromSpec` writes for `levers.express`, transcribed rather than reinvented. `packages/viz` still goes through the lever, so nothing there gained a second expression of it; the two are held to the same three fields over every shipped dispatcher by a test, and the parking override is part of the claim because `parkingFor` puts express above the profile's own.
+
+**The claim travels the way [§ D606](#d606) built it to.** `EverydayHost.startRush` reads the sitting's modifiers **once**, at the first press, from a new `rushModifiers` binding, and hands them to `everyday/rush.ts#rushPatchOf`; the same set goes to `rushSittingOf` and onto the wire; `packages/server`'s `rushSittingIssues` now accepts the pre-fit alongside the purse top-ups, and `replayRushSitting` reads the set once for the whole sitting and fits every round with it. A sitting is one modifier set — every round of it starts from the same building, which is what *consecutive runs from an as-shipped start* becomes once the start is bought — and the board is already keyed on that set ([§ D543](#d543)).
+
+### 2. That this is a purchase which changes a run is established by runs, not by this entry
+
+`packages/server/src/leaderboard/rushHoldAgreement.json` gains two `prefit` cells. Each half of that agreement plays its **own whole path** to them — the viewer's through the player's press, the server's through `rushRoundConfigFor` — and each cell is required to differ from the same cell as built:
+
+| cell | as built | pre-fitted |
+|---|---|---|
+| `garden-apartments` · `collective` | 1 178 s | **1 214 s** |
+| `midtown-office` · `collective` | 1 640 s | **1 650 s** |
+
+That is `CLAUDE.md`'s standing requirement pointed at a purchase — *move the control and require the run to change, compared on the legs* — and it is the only check here that can catch a kit which folds perfectly and reaches no decision, which is what `destination-eta` did for a whole release ([§ D112](#d112)). The two appliers are separately held byte-identical on every shipped tower, raw and resolved, each side with a negative control so that two no-ops cannot agree.
+
+**Two measured findings, recorded rather than smoothed.** The kit is **inert on `zoned-uppeak`**, which ships declaring exactly what Control L1 concludes — asserted in both directions, so a shipped profile that stopped being zoned goes red rather than making the exception list quietly shorter. And `queue-marshalling`'s ceiling is already inert on `midtown-office`, which `campaign/fitOut.ts` had measured before this lane, so that tower's ten seconds are doors and zoning alone.
+
+### 3. The kit, and why these three rungs — CHOSEN
+
+Every figure here is **CHOSEN** in the product owner's 2026-09-08 sense: an agent's proposal, drafted for the owner to accept, tighten or reject, and not one of them is measured. The lever is one constant and one `priceChimes`.
+
+**Fifteen units against fifteen chimes, at one chime per unit.** 4 + 6 + 5 = 15 in the price schedule, and the sink has charged fifteen chimes since it shipped. One chime per unit is [`data/campaign.json`](data/campaign.json)'s scenario budget rungs' own rate, cited as precedent in the ledger's own `$comment`; it is deliberately **not** the ≈ 1.6 chimes per unit the two `purse-units` sinks charge, because those sell a scalable grant and this is a flat one-time kit, where the round number is the more legible anchor. The arithmetic is re-derived from the shipped schedule by a test rather than transcribed, so a re-priced row goes red here instead of leaving the reasoning behind.
+
+**Machines, Shafts and Car size are deliberately out.** `SHOP`'s own subtitle calls Shafts *"the real fix, and the real cost"*. A flat currency purchase should give a taste of comfort rather than pre-solve the tower. It also keeps the kit clear of `commissioning/` entirely — no `extraShafts`, no `machineClassId` — which is what makes § 5 below possible.
+
+**Control is capped at tier 1.** `zone-the-tower` sets nothing but `zonesTheTower`. Tiers 2 and 3 rewrite `callType`, `passengerAssignment` and `rideTimeWeightFloor`, and a flat currency purchase may not pre-decide the dispatcher-strategy question the player is there to make live.
+
+### 4. Two rulings settled and parked, recorded so nobody asks again
+
+[§ D606](#d606) § 2 named three questions with no answer anywhere. The third is § 1 above. The other two are **answered by the product owner and are not actionable yet**, because the work they bind — the general between-round rebuild — is not built:
+
+1. **A rush rebuild is instantaneous.** No clock and no nights inside a sitting. This departs from Career's shop, which books works over nights in a month grid, and the departure is the reason: a sitting has no calendar, which is § D606's own framing of this exact question, and giving one a clock would make it a different mode.
+2. **A rush rebuild does not require the tier below it inside the same sitting.** [`docs/38`](docs/38-what-the-game-is.md) § 8.2's first buying rule — a tier requires the tier below — holds in the campaign and does not hold here, because a sitting that starts as-shipped every time is a very different ladder.
+
+Neither reaches code on this commit. `rush-prefit` is a fixed kit, so it has no tier to gate and nothing to book; both rulings bind whoever builds the general rebuild.
+
+### 5. What is **not** built, and § D606's boundary is not moved
+
+**The general between-round purse-spend rebuild is not built** — buying an arbitrary tier of an arbitrary category between rounds, which is issue #372's second acceptance criterion in its own words: *a round rebuilt with a larger purse produces a different run*. It remains blocked exactly where [§ D606](#d606) § 2 left it. The purse is still derived, published and spent by nothing; `rushPurse.ts#rushPurseRounds` still has no spend term; `everyday/rushScreenModel.ts#RUSH_ABSENCES` still carries the absence, owned to #372 itself.
+
+**None of § D606's three shapes is taken, and that is the load-bearing claim of this entry.** Each was declined for a reason that is about an *arbitrary* kit, and none of those reasons is true of a fixed one:
+
+- **Moving the derivation into `core`** was declined because `SHOP` is a shop — *"its tiers carry player-facing names, subtitles and effect sentences, and moving them into `core` puts product copy inside the simulator and outside the honesty corpus's reach."* `RUSH_PREFIT_KIT` carries **three numbers and no words**: no name, no subtitle, no effect sentence, no tier, no price in units, no ladder and no second kit. A test asserts that mechanically — no prose literal may appear on the constant — so the claim is checked rather than promised. `SHOP` has not moved and is not reachable from `core`.
+- **Putting the rebuild on the wire as a cause** reduced to the first with an extra field. Nothing is added to the wire here: `modifiers` is [§ D542](#d542)'s own field, already carried, already checked against the account's spends by `chimes/ledger.ts#unbackedModifiers`, already in the board key.
+- **Admitting the two bought intervention kinds on a rush sitting** is untouched. `core/src/sim/interventionWire.ts` refuses `equipment-change` and `building-change` exactly as it did, and a pre-fit is not an intervention — it is the configuration a round starts from, which is why it needs no pricing at replay time.
+
+**And nothing here can price anything.** [`data/price-schedule.json`](data/price-schedule.json) is still parsed only in `packages/viz`; `core` holds the three rungs' unit figures as a **dated transcription** with the schedule named, not as a read. That is the whole difference between a fixed kit and the general feature, and it is why the general feature still needs a boundary decision this lane does not take.
+
+### 6. Two smaller things this lane moved, both corrections
+
+**`doorCycleWithSaving` and `MIN_DOOR_S` moved from `campaign/fitOut.ts` into `core`**, and `fitOut.ts` re-exports `MIN_DOOR_S` and calls the moved function. A change of address rather than of behaviour: the replay needs the same arithmetic on the other side of a package boundary, and two implementations that agree today is the shape this repository has a rule about.
+
+**`RUSH_ABSENCES`'s second sentence was a stale refusal before this lane closed.** It read *"The two rush purchases in the chime list are the same gap from the other side, and neither can be bought yet"*, and they are no longer the same gap: a wider purse still buys nothing, while starting fitted now reaches the run and waits only on a screen that spends a chime. [§ D227](#d227) rates a refusal drawn over a working control as worse than a missing sentence, so it is rewritten as a **substitution** — one register entry in, one out.
+
+### 7. What no surface does yet, said plainly
+
+**No screen spends a chime, so no account holds a `rush-prefit` to claim and every sitting this build produces still carries an empty `modifiers`.** That is GitHub issues #371 and #372's own remaining half, and `everyday/chimesPanel.ts#CHIMES_PANEL_COPY.spendRefusal` says it on its own face. What changed is what a claim would now *do*: before this commit, buying the pre-fit would have been a purchase that changed no run and was refused at the gate; after it, the sink is real, and the day a spend surface ships it fills `EverydayHostBindings.rushModifiers` and nothing else moves. The two `purse-units` sinks are still in the defect `CLAUDE.md`'s standing requirement names, and selling one before a rebuild travels would still be that defect.
+
+### 8. The corpus, as a forecast rather than as the row
+
+[§ D343](#d343) puts the measurement on the integrator, once, after integration. What a lane may honestly publish is a prediction, and this one is **zero in both tiers: no surface added, none removed, no string moved, cases, simulations and failing cases unmoved.** Every player-facing change on this commit is a substitution — one `RUSH_ABSENCES` entry replaced by one — and nothing else here draws a word: the kit carries no copy, the server's two new sentences are API detail rather than a surface, and `honesty/surfaces.ts` is untouched.
+
+### 9. Numbers spent
+
+This lane held **D640–D644** and spent **D640 only**. **D641, D642, D643 and D644 are unspent** and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them — ids here are names, so backfilling one would make it denote two things across time. The integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES` if that is what happens.

@@ -48,14 +48,23 @@
  *
  * **No between-round rebuild travels, so nothing spends a purse.** `docs/38` § 2.3 rebuilds the
  * building between rounds from the price schedule, with the fit-out kit the career reaches the run
- * through (§ D427). The code that turns a kit into a building is `packages/viz/src/campaign/fitOut.ts`
- * over `packages/viz/src/commissioning/`, which this package may not import, and no module in `core`
- * or `experiments` applies a priced change's `covers` path to a building. A rebuild on this wire would
- * be a change the server could price and could not build — the entitlement without the change, which
- * is `core/src/sim/interventionWire.ts`'s refusal of the two bought kinds turned around. So every
- * round of a sitting runs the building as shipped, the purse is derived and published and bought
- * nothing, and a rebuild enters at {@link replayRushSitting}'s per-round configuration the day the
- * derivation of a fitted building reaches a package this one can read.
+ * through (§ D427). The code that turns *an arbitrary kit* into a building is
+ * `packages/viz/src/campaign/fitOut.ts` over `packages/viz/src/commissioning/`, which this package
+ * may not import, and no module in `core` or `experiments` applies a priced change's `covers` path to
+ * a building. A rebuild on this wire would be a change the server could price and could not build —
+ * the entitlement without the change, which is `core/src/sim/interventionWire.ts`'s refusal of the
+ * two bought kinds turned around. So the purse is still derived and published and still buys nothing,
+ * and a rebuild enters at {@link replayRushSitting}'s per-round configuration the day one of
+ * § D606 § 2's three shapes is taken.
+ *
+ * **What does travel now is one fixed start** — GitHub issue #372,
+ * [§ D640](../../../../DECISIONS.md). `data/chime-ledger.json`'s `rush-prefit` had been refused by
+ * name here for as long as *fitted* meant nothing; it means one kit of three plain fields now —
+ * Doors L1, Control L1 and Tenants L1, held by `core`'s `config/rushPrefit.ts` — and a sitting that
+ * claims it is replayed on the fitted tower from its first round. That needed **none** of § D606's
+ * three shapes and moved no boundary: the kit names no shaft and no machine class, so
+ * `commissioning/` is not wanted, and it carries no name, subtitle or effect sentence, so no product
+ * copy goes into `core`. The general rebuild is a different feature and is the one still blocked.
  *
  * ## What a round costs to replay, measured before the refusal was lifted
  *
@@ -142,6 +151,8 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
+  RUSH_PREFIT_SINK_ID,
+  claimsRushPrefit,
   parseRushPurse,
   playerWaveAt,
   rushHoldAtLegs,
@@ -149,6 +160,7 @@ import {
   rushPurseRounds,
   rushWavesOutlasted,
   runSimulation,
+  violationsInRushPrefit,
   violationsInRushPurse,
   type ChimeLedgerTable,
   type RuleRowConfig,
@@ -173,10 +185,18 @@ const RUSH_PURSE_FILE = 'rush-purse.json';
  * **Throws**, on `chimes/ledger.ts#loadChimeLedger`'s ground: a server whose purse will not parse, or
  * names a top-up the ledger does not sell, would refuse every sitting at the moment a player posted
  * one, and boot is where that is a configuration mistake with an obvious fix.
+ *
+ * **The pre-fit is checked here too, and for the same reason at the other end** — GitHub issue #372,
+ * [§ D640](../../../../DECISIONS.md). `core`'s `claimsRushPrefit` recognises a claim **by sink id**,
+ * because `packages/viz` has to ask the same question and deliberately never holds a parsed ledger;
+ * so what holds the ledger to that id has to run somewhere, and boot is where a renamed or re-kinded
+ * sink is a configuration mistake rather than a sitting quietly replayed on the tower as shipped.
+ * {@link violationsInRushPrefit} also refuses a **second** `prefit` sink, which would be a fitted
+ * building nothing defines — § D606 § 2's hole, re-opened.
  */
 export async function loadRushPurse(dataDir: string, ledger: ChimeLedgerTable): Promise<RushPurseTable> {
   const table = parseRushPurse(JSON.parse(await readFile(join(dataDir, RUSH_PURSE_FILE), 'utf8')) as unknown);
-  const violations = violationsInRushPurse(table, ledger);
+  const violations = [...violationsInRushPurse(table, ledger), ...violationsInRushPrefit(ledger)];
   if (violations.length > 0) throw new Error(`rush purse: ${violations.join(' ')}`);
   return table;
 }
@@ -344,11 +364,21 @@ function idIssue(value: unknown, where: string): string | undefined {
  * a client-supplied purse or amount is refused by name here rather than silently dropped, so a client
  * that thinks it can name one is told it cannot. See {@link NEVER_ON_THE_WIRE}.
  *
- * **A modifier has to top up this purse.** The shape is `chimes/ledger.ts#claimedModifierIssues`'s;
- * what is added is that the sink is one `data/rush-purse.json` lists, because the only modifier a
- * sitting's replay can reach is units in its purse. A pre-fitted building is a modifier whose building
- * this server cannot build (the module docstring says why), and a claim of one would put a sitting on
- * a board that says *pre-fitted* for runs of the building as shipped.
+ * **A modifier has to be one this sitting's replay can reach.** The shape is
+ * `chimes/ledger.ts#claimedModifierIssues`'s; what is added is that the sink is one of two kinds —
+ * a purse top-up `data/rush-purse.json` lists, or the pre-fit `core`'s `config/rushPrefit.ts` holds
+ * the kit for. Anything else is a claim the replay cannot honour, and a sitting carrying one would
+ * land on a board keyed as *bought* for a run of the building as shipped.
+ *
+ * **The pre-fit arm is new** — GitHub issue #372, [§ D640](../../../../DECISIONS.md). This read
+ * *"the only modifier a sitting's replay can reach is units in its purse"*, and named a pre-fitted
+ * building as *"a modifier whose building this server cannot build"*. That was true while *fitted*
+ * meant nothing: `data/chime-ledger.json` sold the sink, § D606 § 2 recorded that the kit was
+ * authored nowhere, and a claim the replay could not build had to be refused rather than guessed at.
+ * It is authored now, as one fixed kit, and {@link replayRushSitting} fits every round with it.
+ * **By id rather than by kind**, and that is `claimsRushPrefit`'s own argument: the id is what both
+ * ends can ask, and {@link loadRushPurse} holds the ledger to it at boot — so a sink renamed out
+ * from under this line is a server that will not start, not a gate that quietly narrows.
  */
 export function rushSittingIssues(body: unknown, purse: RushPurseTable): readonly string[] {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) return ['a sitting must be an object'];
@@ -394,12 +424,12 @@ export function rushSittingIssues(body: unknown, purse: RushPurseTable): readonl
   for (const [index, claim] of objectsIn(modifiers)) issues.push(...keyIssues(claim, MODIFIER_KEYS, `modifiers[${String(index)}]`));
   if (shape.length === 0 && Array.isArray(modifiers)) {
     for (const [index, claim] of (modifiers as readonly ClaimedModifier[]).entries()) {
-      if (!purse.topUpSinkIds.includes(claim.sinkId)) {
+      if (!purse.topUpSinkIds.includes(claim.sinkId) && claim.sinkId !== RUSH_PREFIT_SINK_ID) {
         issues.push(
-          `modifiers[${String(index)}] names "${claim.sinkId}", which does not top up the rush purse ` +
-            `(${purse.topUpSinkIds.join(', ')}): the only modifier a sitting's replay can reach is units in ` +
-            'its purse, and a modifier the replay cannot reach would put the sitting on a board for runs ' +
-            'it does not describe',
+          `modifiers[${String(index)}] names "${claim.sinkId}", which this sitting's replay cannot reach ` +
+            `(${[...purse.topUpSinkIds, RUSH_PREFIT_SINK_ID].join(', ')}): a sitting may open with units in ` +
+            'its purse or with the building fitted, and a modifier the replay cannot reach would put the ' +
+            'sitting on a board for runs it does not describe',
         );
       }
     }
@@ -465,6 +495,10 @@ function refused(
  * Replay a sitting and decide — the chain the owner's ruling names, in the order the refusals should
  * reach a player.
  *
+ * 0. **Read the sitting's modifiers once**, before any round resolves. A pre-fit is a fact about the
+ *    *sitting* — every round of it starts from the same building, which is what *consecutive runs
+ *    from an as-shipped start* becomes once the start is bought — so it is read here rather than per
+ *    round, and a round cannot be fitted while its neighbour is not.
  * 1. **Resolve every round before simulating any**, so an id this server does not ship is refused at
  *    no cost however far into the sitting it sits.
  * 2. **Simulate each round and compare its hold moment**, stopping at the first that does not
@@ -477,9 +511,11 @@ function refused(
  * no figure this returns.
  */
 export function replayRushSitting(sitting: SubmittedRushSitting, from: RushSittingResources): RushSittingVerification {
+  /* Once, for the whole sitting — see the numbered list above, step 0. */
+  const prefit = claimsRushPrefit(sitting.modifiers);
   const configs: SimulationConfig[] = [];
   for (const [index, round] of sitting.rounds.entries()) {
-    const config = rushRoundConfigFor(sitting.buildingId, round, from.resources);
+    const config = rushRoundConfigFor(sitting.buildingId, round, from.resources, prefit);
     if (typeof config === 'string') {
       return refused(
         config,
@@ -487,8 +523,13 @@ export function replayRushSitting(sitting: SubmittedRushSitting, from: RushSitti
           ? `This server does not ship a building "${sitting.buildingId}".`
           : config === 'unknown-dispatcher'
             ? `Round ${String(index + 1)} names a dispatcher this server does not ship.`
-            : 'This server does not ship the rush stream, so no sitting can be replayed on it.',
-        config === 'unknown-building' ? undefined : index + 1,
+            : config === 'cannot-prefit'
+              ? 'This sitting says it started with the building fitted, and this server cannot fit one: it ' +
+                'was given no elevator specification to resolve the kit against. Nothing was ranked, and ' +
+                'replaying the sitting on the building as shipped would compare it against a held time a ' +
+                'different building produced.'
+              : 'This server does not ship the rush stream, so no sitting can be replayed on it.',
+        config === 'unknown-building' || config === 'cannot-prefit' ? undefined : index + 1,
         0,
       );
     }

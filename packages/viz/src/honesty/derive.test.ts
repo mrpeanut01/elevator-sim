@@ -160,6 +160,23 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'pricing/repairPrice.ts#repairPriceUnits',
         'fixit/parse.ts#newShaftUnits',
         /*
+         * GitHub issue #429 stage 2, § D631 — the same argument one row along. `fixitContextOf`
+         * assembles the derivation context (the forbidden-identifier set, the demand bands, the
+         * shaft-area band map) and authors no sentence of its own; its only literal is `'number'`,
+         * a `typeof` guard rather than prose. `shaftAreaSurchargeUnits` returns a number off the
+         * schedule, and the classifier reaches it only through its one literal, `'shaft-area'` —
+         * the row id `priceOf` looks the change up by, on `newShaftUnits`' own `'new-car'` ground
+         * one line up. `UNBANDED_SHAFT_CASES` is a list of `data/fixit-cases.json` ids
+         * (`zoning-starves-the-top`, `car-park-nobody-serves`), reached only because the
+         * two-adjacent-words scanner reads a hyphenated case id as prose — the same shape
+         * `REQUIRED_TEMPLATE_IDS` is excluded for above. None of the three composes a word a
+         * player reads: what a player reads about a priced repair is the change's own `name`,
+         * driven exactly as `newShaftUnits`' neighbours are.
+         */
+        'fixit/parse.ts#fixitContextOf',
+        'fixit/parse.ts#shaftAreaSurchargeUnits',
+        'fixit/parse.ts#UNBANDED_SHAFT_CASES',
+        /*
          * Returns three numbers. `standingExtrasFrom` beside it is deliberately **not** here — it
          * returns the five extras' names and lines, which are player copy and are driven by the
          * FIXIT adapter, exactly as `STANDING_EXTRAS` was before #366 renamed it.

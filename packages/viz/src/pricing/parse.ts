@@ -51,6 +51,7 @@
  */
 
 import {
+  type AreaBand,
   type PriceRate,
   type PriceSchedule,
   type PriceSchema,
@@ -99,6 +100,15 @@ const WITHHELD_KEYS: readonly string[] = ['id', 'note', 'covers'];
 
 /** Every key a rate may carry — one per-unit figure and its quantity, and nothing that bends the line. */
 const RATE_KEYS: readonly string[] = ['unitsPer', 'quantity'];
+
+/**
+ * Every key an area band may carry — a range, the multiplier it buys at, and a name.
+ *
+ * Deliberately **no price**: a band that carried its own units would be a second ladder beside the
+ * rate it multiplies, and then a reader could not say what a shaft costs without knowing which of
+ * the two won. GitHub issue #429 stage 2, [§ D631](../../../../DECISIONS.md).
+ */
+const AREA_BAND_KEYS: readonly string[] = ['areaM2Range', 'band', 'name'];
 
 /**
  * Every key a declared range may carry — a rated row's schema or its quantity's: a type, a unit, a
@@ -284,13 +294,61 @@ export function parsePriceSchedule(raw: unknown): PriceSchedule {
     };
   });
 
-  const violations = [...shape, ...violationsIn({ version, tiers, changes, extras, withheld })];
+  const bandsDoc = record(doc['areaBands'], 'areaBands');
+  const areaBands: AreaBand[] = list(bandsDoc['bands'], 'areaBands.bands').map((entry, index) => {
+    const where = `areaBands.bands[${String(index)}]`;
+    const item = record(entry, where);
+    for (const key of keysBeyond(item, AREA_BAND_KEYS)) {
+      shape.push(
+        `areaBands.bands[${String(index)}] carries "${key}", and a band is a range, a multiplier ` +
+          'and a name. A price on a band would be a second ladder beside the rate it multiplies ' +
+          '(GitHub issue #429, § D631).',
+      );
+    }
+    const range = list(item['areaM2Range'], `${where}.areaM2Range`);
+    if (range.length !== 2) {
+      throw new PriceScheduleError(`${where}.areaM2Range: expected [from, to].`);
+    }
+    const from = int(range[0], `${where}.areaM2Range[0]`);
+    const to = range[1] === null ? null : int(range[1], `${where}.areaM2Range[1]`);
+    return {
+      areaM2Range: [from, to] as const,
+      band: int(item['band'], `${where}.band`),
+      name: str(item['name'], `${where}.name`),
+    };
+  });
+
+  const violations = [
+    ...shape,
+    ...violationsIn({ version, tiers, changes, extras, withheld, areaBands }),
+  ];
   if (violations.length > 0) {
     throw new PriceScheduleError(
       `data/price-schedule.json is not a usable schedule:\n  ${violations.join('\n  ')}`,
     );
   }
-  return { version, tiers, changes, extras, withheld };
+  return { version, tiers, changes, extras, withheld, areaBands };
+}
+
+/**
+ * **Which band a shaft's plan area falls in** — GitHub issue #429 stage 2,
+ * [§ D631](../../../../DECISIONS.md).
+ *
+ * The quantity the `shaft-area` row is bought with. Half-open on the left, `[from, to)`, so a shaft
+ * sitting exactly on a boundary lands in the **dearer** band: the boundaries are cut in the gaps of
+ * the measured distribution precisely so that no shipped shaft sits on one, and a tie going the
+ * expensive way is the direction that cannot make a shaft cheaper by rounding.
+ *
+ * Returns the **dearest** band for an area above the open top, which cannot happen against a
+ * contiguous table and is the same refusal `core`'s `shaftFootprintM2` takes for the same reason: a
+ * shaft that costs nothing is the defect this whole seam exists to close.
+ */
+export function shaftAreaBandOf(schedule: PriceSchedule, areaM2: number): number {
+  for (const band of schedule.areaBands) {
+    const [from, to] = band.areaM2Range;
+    if (areaM2 >= from && (to === null || areaM2 < to)) return band.band;
+  }
+  return schedule.areaBands.reduce((most, band) => Math.max(most, band.band), 0);
 }
 
 /**
@@ -416,6 +474,8 @@ export function violationsIn(schedule: PriceSchedule): readonly string[] {
       );
     }
   }
+  out.push(...areaBandViolations(schedule));
+
   const byOrder = [...schedule.tiers].sort((a, b) => a.order - b.order);
   for (let i = 1; i < byOrder.length; i += 1) {
     const lower = byOrder[i - 1];
@@ -427,6 +487,79 @@ export function violationsIn(schedule: PriceSchedule): readonly string[] {
           `dearer than "${lower.id}" (${String(lower.typicalUnits)} u).`,
       );
     }
+  }
+  return out;
+}
+
+/**
+ * The band table's own rules — GitHub issue #429 stage 2, [§ D631](../../../../DECISIONS.md).
+ *
+ * `shaftFootprint`'s rules in `core`, pointed at a price: **contiguous from 0 with an open top**, so
+ * every shaft lands in exactly one band and none falls through; **ascending**, because a larger hole
+ * may not cost less than a smaller one; **starting at 0**, because the cheapest band is the one that
+ * charges nothing and a table whose floor was 1 would surcharge every shaft in the game; and the
+ * **top band reachable by the row's own quantity ceiling**, or the dearest band would be a price
+ * nothing can be bought at.
+ */
+function areaBandViolations(schedule: PriceSchedule): readonly string[] {
+  const out: string[] = [];
+  const bands = schedule.areaBands;
+  if (bands.length === 0) {
+    out.push(
+      'areaBands.bands is empty, so no shaft resolves a band and the shaft-area row multiplies ' +
+        'nothing. A file nobody finished and a file that bands nothing must not look alike.',
+    );
+    return out;
+  }
+  let expectedFrom = 0;
+  let expectedBand = 0;
+  for (const [index, band] of bands.entries()) {
+    const [from, to] = band.areaM2Range;
+    if (from !== expectedFrom) {
+      out.push(
+        `areaBands.bands[${String(index)}] starts at ${String(from)} m² and the band below it ` +
+          `ends at ${String(expectedFrom)} m². The table is contiguous from 0, or a shaft falls ` +
+          'through it and costs nothing.',
+      );
+    }
+    if (band.band !== expectedBand) {
+      out.push(
+        `areaBands.bands[${String(index)}] is band ${String(band.band)} where the table's own ` +
+          `order makes it ${String(expectedBand)}. The bands ascend from 0, because a larger ` +
+          'hoistway may not cost less than a smaller one.',
+      );
+    }
+    if (to !== null && to <= from) {
+      out.push(
+        `areaBands.bands[${String(index)}] runs ${String(from)}–${String(to)} m², which is empty ` +
+          'or backwards. A band no shaft can land in is a band that prices nothing.',
+      );
+    }
+    if (to === null && index !== bands.length - 1) {
+      out.push(
+        `areaBands.bands[${String(index)}] has an open top and is not the last band, so every ` +
+          'band under it is unreachable.',
+      );
+    }
+    expectedFrom = to ?? expectedFrom;
+    expectedBand += 1;
+  }
+  const last = bands[bands.length - 1];
+  if (last !== undefined && last.areaM2Range[1] !== null) {
+    out.push(
+      'the dearest area band declares a ceiling, so a shaft above it falls through the table. The ' +
+        'top band is open, exactly as elevator-specs.json#shaftFootprint requires of its own.',
+    );
+  }
+  const rated = schedule.changes.find((change) => change.id === 'shaft-area');
+  const ceiling = rated?.rate?.quantity.max;
+  const dearest = bands.reduce((most, band) => Math.max(most, band.band), 0);
+  if (ceiling !== undefined && ceiling !== dearest) {
+    out.push(
+      `the dearest area band is ${String(dearest)} and "shaft-area" buys at most ` +
+        `${String(ceiling)}. A band the rate cannot reach is a price nothing is sold at, and a ` +
+        'rate that reaches past the table charges for a band that does not exist.',
+    );
   }
   return out;
 }

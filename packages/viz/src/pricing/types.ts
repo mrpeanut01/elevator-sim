@@ -208,6 +208,42 @@ export interface WithheldChange {
 }
 
 /** `data/price-schedule.json`, parsed. */
+/**
+ * **One band of the plan area a new hoistway removes** — GitHub issue **#429** stage 2,
+ * [§ D631](../../../../DECISIONS.md).
+ *
+ * [§ D601](../../../../DECISIONS.md) built the quantity — `config/floorArea.ts#shaftPlanAreaM2`,
+ * one car's footprint times the floors its bank's span reaches — and refused to price it, because
+ * the product owner reserved that as an economy decision. The owner has since ruled: **one
+ * currency, and discrete bands rather than a rate per square metre**, because a shaft's area spans
+ * **49×** across the shipped set and the flat rate that keeps `midtown-office` at its agreed 34 u
+ * would price one more Burj shuttle at 280 u against a whole schedule of 587 (§ D601 § 5).
+ *
+ * **Why this is not a field on the row.** [§ D552](../../../../DECISIONS.md)'s ruling is *linear
+ * only, no curves*, so {@link PriceRate} carries one per-unit figure and its quantity and
+ * `pricing/parse.ts` refuses `rate.quantity.bands` outright. The line stays linear: the `shaft-area`
+ * row charges `unitsPer` **per band above the cheapest**, and the bend from area to band lives
+ * here, outside the rate, where it can be read and argued with.
+ *
+ * **And why it is here rather than in `data/elevator-specs.json`** beside `shaftFootprint`, which
+ * is the other place it could plausibly sit. Where the line between a cheap shaft and a dear one
+ * falls is **game feel**, exactly as 34 u is — `elevator-specs.json` is CIBSE-cited reference data
+ * and a price boundary is not a reference value. `shaftFootprint` says what a hoistway *is*; this
+ * says what one *costs*.
+ */
+export interface AreaBand {
+  /**
+   * `[from, to)` in m², `to` of `null` for the open top band. Half-open and contiguous from 0, which
+   * is `shaftFootprint`'s own rule in `core`: every shaft lands in exactly one band, and a shaft
+   * that fell through the table would be a shaft that costs nothing.
+   */
+  readonly areaM2Range: readonly [number, number | null];
+  /** The multiplier the `shaft-area` rate is charged at. `0` is the cheapest band and is free. */
+  readonly band: number;
+  /** What a screen would call it. Never a figure — the boundaries are the figures. */
+  readonly name: string;
+}
+
 export interface PriceSchedule {
   readonly version: number;
   readonly tiers: readonly PriceTier[];
@@ -215,4 +251,10 @@ export interface PriceSchedule {
   readonly extras: readonly PricedExtra[];
   /** What no scenario sells at any price — GitHub issue #467. Required, and empty is a statement. */
   readonly withheld: readonly WithheldChange[];
+  /**
+   * How a shaft's plan area becomes the `shaft-area` row's quantity — GitHub issue #429 stage 2,
+   * § D631. Required, for `withheld`'s reason: a file nobody finished and a file that bands nothing
+   * must not look alike.
+   */
+  readonly areaBands: readonly AreaBand[];
 }

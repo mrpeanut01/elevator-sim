@@ -24,7 +24,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { loadConfig } from '@elevator-sim/core';
+import { loadConfig, shaftPlanAreaM2 } from '@elevator-sim/core';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -33,6 +33,7 @@ import {
   parsePriceSchedule,
   priceOf,
   purchaseUnits,
+  shaftAreaBandOf,
   smallestPurchaseUnitsOf,
   steppedPurchaseUnits,
   violationsIn,
@@ -303,8 +304,8 @@ describe('rows without a rate stay flat, so every existing price is unchanged', 
   it('prices every flat shipped row at exactly its flat figure through the one purchase function', () => {
     const schedule = shipped();
     const flat = schedule.changes.filter((change) => change.rate === undefined);
-    // Every row but one. The exception is asserted by id below rather than merely subtracted here.
-    expect(flat.length).toBe(schedule.changes.length - 1);
+    // Every row but two. Both exceptions are asserted by id below rather than merely subtracted.
+    expect(flat.length).toBe(schedule.changes.length - 2);
     for (const change of flat) {
       expect(purchaseUnits(change), change.id).toBe(change.priceUnits);
       expect(smallestPurchaseUnitsOf(change), change.id).toBe(change.priceUnits);
@@ -321,11 +322,19 @@ describe('rows without a rate stay flat, so every existing price is unchanged', 
    * that replacement. It is deliberately **by id**: a count would let a second rate row arrive
    * unexamined, and § D552's ruling — *"destination panels per floor is the first case"* — is about
    * a particular row rather than about a quantity of them.
+   *
+   * **A second rate row has since arrived, and it arrived through this case rather than past it** —
+   * GitHub issue #429 stage 2, [§ D631](../../../../DECISIONS.md). `shaft-area` charges a new
+   * hoistway for the plan area it permanently removes, in bands, and it is named here for the same
+   * reason `landing-panels` is: the list is the register of every row that multiplies, and a row
+   * that multiplies without appearing here is a price nobody looked at. Which is exactly what the
+   * by-id discipline above bought — this row could not land quietly.
    */
-  it('ships exactly one rate row, and it is GitHub issue #437’s landing panels', () => {
+  it('ships exactly two rate rows, and names both of them', () => {
     const raw = rawShipped();
     expect(raw.changes.filter((row) => 'rate' in row).map((row) => row['id'])).toEqual([
       'landing-panels',
+      'shaft-area',
     ]);
   });
 
@@ -368,7 +377,89 @@ describe('rows without a rate stay flat, so every existing price is unchanged', 
     const first = raw.changes[0];
     if (first === undefined) throw new Error('the shipped schedule prices nothing');
     const mutated = [{ ...first, rate: {} }, ...raw.changes.slice(1)];
-    expect(mutated.filter((row) => 'rate' in row)).toHaveLength(2);
+    expect(mutated.filter((row) => 'rate' in row)).toHaveLength(3);
+  });
+
+  /**
+   * **The area band is a quantity the building has, and its ceiling is derived from the shipped
+   * set rather than trusted** — GitHub issue #429 stage 2, [§ D631](../../../../DECISIONS.md).
+   *
+   * `landing-panels`' own precedent one row up, and for the same reason: `data/price-schedule.json`
+   * says `quantity.max` is the dearest band any shipped building reaches, and a transcribed figure
+   * goes stale the first time a taller tower lands — at which point a scenario's derived budget
+   * ceiling quietly stops being *above which there is nothing left to buy*, and, worse here, a
+   * shaft in the new tower would be charged for a band the table does not have.
+   *
+   * So the claim is checked against `data/buildings/` **through the loader**, over every bank of
+   * every shipped building, in both directions: the ceiling is reached by something that ships, and
+   * nothing that ships reaches past it.
+   */
+  it('sells exactly the bands the shipped buildings reach, no more and no fewer', async () => {
+    const schedule = shipped();
+    const area = priceOf(schedule, 'shaft-area');
+    if (area.rate === undefined) throw new Error('shaft-area lost its rate');
+    const config = await loadConfig(fileURLToPath(new URL('../../../../data', import.meta.url)));
+    const table = config.elevatorSpecs.shaftFootprint;
+    if (table === undefined) throw new Error('the shipped specs declare no shaftFootprint');
+    const bands = [...config.buildingsById.values()].flatMap((building) =>
+      building.banks.flatMap((bank) => {
+        const areaM2 = shaftPlanAreaM2(bank, building.floors, table);
+        return areaM2 === undefined ? [] : [shaftAreaBandOf(schedule, areaM2)];
+      }),
+    );
+    expect(bands.length).toBeGreaterThan(0);
+    expect(Math.max(...bands)).toBe(area.rate.quantity.max);
+    expect(Math.min(...bands)).toBe(area.rate.quantity.min);
+  });
+
+  /**
+   * **Move the building and require the price to change** — `CLAUDE.md`'s standing requirement,
+   * in the only form a price can take it, GitHub issue #429 stage 2 and [§ D631](../../../../DECISIONS.md).
+   *
+   * A price is not a leg, so this cannot be compared on one. What it *can* be compared on is the
+   * thing the ruling is about: **the same purchase in two real buildings must not cost the same**,
+   * and the difference must come out of the loader rather than out of a constant. So the cheapest
+   * and the dearest shaft in the shipped set are both resolved end to end — real `data/buildings/`,
+   * real footprint table, real band table, real rate — and the two prices are required to differ in
+   * the direction the ruling names.
+   *
+   * § D601 § 9's shape: the quantity moves, and here the quantity moving is what moves the price.
+   */
+  it('charges a small building’s shaft less than a supertall’s, resolved from data/buildings/', async () => {
+    const schedule = shipped();
+    const config = await loadConfig(fileURLToPath(new URL('../../../../data', import.meta.url)));
+    const table = config.elevatorSpecs.shaftFootprint;
+    if (table === undefined) throw new Error('the shipped specs declare no shaftFootprint');
+    const priceIn = (buildingId: string, bankId: string): number => {
+      const building = config.buildingsById.get(buildingId);
+      const bank = building?.banks.find((candidate) => candidate.id === bankId);
+      if (building === undefined || bank === undefined) throw new Error(`${buildingId}/${bankId}`);
+      const areaM2 = shaftPlanAreaM2(bank, building.floors, table);
+      if (areaM2 === undefined) throw new Error(`${buildingId}/${bankId} resolves no area`);
+      const band = shaftAreaBandOf(schedule, areaM2);
+      return (
+        purchaseUnits(priceOf(schedule, 'new-car')) +
+        (band === 0 ? 0 : purchaseUnits(priceOf(schedule, 'shaft-area'), band))
+      );
+    };
+    /* The two ends of the measured distribution: 24.0 m² against 1 178.0 m², a 49× spread. */
+    const smallest = priceIn('ashgate', 'carpark');
+    const dearest = priceIn('burj-class-reference', 'shuttle');
+    expect(smallest).toBeLessThan(dearest);
+    /* The cheapest band charges nothing, so a small building keeps the figure four lists agreed. */
+    expect(smallest).toBe(purchaseUnits(priceOf(schedule, 'new-car')));
+    /*
+     * And the compression is the point: the 49× area spread is a single-figure price spread, well
+     * short of the 280 u a flat rate per m² produced (§ D601 § 5). Stated as a bound rather than as
+     * the figure itself, so moving the ladder does not have to move this test — what may not move
+     * is that the dearest shaft stays inside the schedule's own dearest-row neighbourhood.
+     */
+    expect(dearest - smallest).toBeLessThan(
+      purchaseUnits(priceOf(schedule, 'fifth-car')),
+    );
+    /* A middling tower sits strictly between the two, so the ladder is a ladder and not a switch. */
+    expect(priceIn('midtown-office', 'main')).toBeGreaterThan(smallest);
+    expect(priceIn('midtown-office', 'main')).toBeLessThan(dearest);
   });
 });
 

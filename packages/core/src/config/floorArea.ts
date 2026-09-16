@@ -86,9 +86,54 @@ export function shaftFootprintM2(
   return table.bands.reduce((most, band) => Math.max(most, band.plateAreaM2), 0);
 }
 
+/**
+ * **The plan area ONE shaft of this bank permanently removes from the building** — the quantity
+ * [§ D631](../../../../DECISIONS.md) prices, m².
+ *
+ * One car's {@link shaftFootprintM2} multiplied by the number of floors its bank's span reaches —
+ * the same footprint × span arithmetic {@link resolveFloorArea} charges each floor with, summed
+ * the other way round. A bank with no car, or a bank whose span reaches no floor, is `undefined`
+ * rather than zero: a shaft that costs nothing is the defect this module exists to close, and a
+ * caller that cannot resolve the quantity must say so rather than charge for the cheapest band.
+ *
+ * **It is deliberately per-shaft rather than per-bank.** What a player buys is one more car in one
+ * more hoistway, so the bank's existing cars are not what is being charged for; the price is what
+ * the *next* hole takes out of every plate it passes.
+ *
+ * **Non-test caller**: `packages/viz/src/fixit/parse.ts#fixitContextOf`, which turns it into a
+ * price band through `packages/viz/src/pricing/parse.ts#shaftAreaBandOf`. Nothing in `sim/`,
+ * `dispatch/` or `model/` reads it, so no leg moves — see this module's own header.
+ */
+export function shaftPlanAreaM2(
+  /**
+   * The structural minimum rather than a whole {@link ResolvedBank}: the cars whose plated load
+   * sizes the hole, and the floors that fix the span. A caller holding a resolved bank satisfies it
+   * exactly; a caller holding the two fields — `fixit/parse.ts#fixitContextOf` takes the same
+   * structural-minimum shape for the same reason — does not have to manufacture the rest.
+   */
+  bank: {
+    readonly cars: readonly {
+      readonly ratedLoadLb: number;
+      readonly ratedLoadLbPerDeck?: number | undefined;
+    }[];
+    readonly servesFloors: readonly string[];
+  },
+  floors: readonly { readonly id: string; readonly index: number }[],
+  table: ShaftFootprintTable,
+): number | undefined {
+  const car = bank.cars[0];
+  if (car === undefined) return undefined;
+  const span = spanOf(bank, new Map(floors.map((floor) => [floor.id, floor.index] as const)));
+  if (span === undefined) return undefined;
+  const reached = floors.filter((floor) => floor.index >= span.lo && floor.index <= span.hi).length;
+  if (reached === 0) return undefined;
+  return round2(shaftFootprintM2(car, table) * reached);
+}
+
 /** The lowest and highest floor **index** a bank's shafts pass through, or `undefined`. */
 function spanOf(
-  bank: ResolvedBank,
+  /* Only the served set is read, so only the served set is declared — see {@link shaftPlanAreaM2}. */
+  bank: { readonly servesFloors: readonly string[] },
   indexOfFloorId: ReadonlyMap<string, number>,
 ): { readonly lo: number; readonly hi: number } | undefined {
   let lo: number | undefined;

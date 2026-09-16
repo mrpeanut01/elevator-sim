@@ -103,6 +103,19 @@ export {
   violationsInRushPurse,
 } from './rushPurse.js';
 export type { RushPurseRound, RushPurseSchema, RushPurseTable } from './rushPurse.js';
+
+/** The one fixed rush pre-fit kit and its two appliers — GitHub issue #372, § D640. */
+export {
+  MIN_DOOR_S,
+  RUSH_PREFIT_KIT,
+  RUSH_PREFIT_SINK_ID,
+  claimsRushPrefit,
+  doorCycleWithSaving,
+  prefittedRushBuilding,
+  prefittedRushProfile,
+  violationsInRushPrefit,
+} from './rushPrefit.js';
+export type { RushPrefitClaim, RushPrefitKit, RushPrefitRung } from './rushPrefit.js';
 export type {
   ChimeCompletion,
   ChimeCurrency,
@@ -143,6 +156,13 @@ export {
   resolveBuilding,
   type ResolveBuildingOptions,
 } from './parse.js';
+/**
+ * The plan area one more hoistway would take — GitHub issue #429 stage 2, § D631. Exported because
+ * `packages/viz/src/fixit/parse.ts#fixitContextOf` turns it into the `shaft-area` row's price band,
+ * which is the first reader outside `core`. `resolveFloorArea` stays unexported: its result reaches
+ * `viz` on `ResolvedBuilding.area` already, and a second door to it would be two ways to ask.
+ */
+export { shaftPlanAreaM2 } from './floorArea.js';
 export {
   bankRangeIsFixed,
   describeServiceEvent,
@@ -236,6 +256,7 @@ export type {
   ResolvedBank,
   ResolvedBuilding,
   ResolvedCar,
+  ShaftFootprintTable,
   ResolvedServiceDerateEvent,
   ResolvedServiceEvent,
   ResolvedServiceModeEvent,

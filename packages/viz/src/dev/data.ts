@@ -380,6 +380,8 @@ export async function loadFixitCases(resources: BrowserResources): Promise<Fixit
       buildings: resources.buildings,
       trafficProfiles: resources.trafficProfiles,
       dispatcherProfiles: resources.dispatcherProfiles,
+      /* For the shaft-area price band, and only that — GitHub issue #429 stage 2, § D631. */
+      elevatorSpecs: resources.elevatorSpecs,
     }),
   );
 }

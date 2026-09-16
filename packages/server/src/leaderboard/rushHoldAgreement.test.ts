@@ -61,6 +61,21 @@
  *
  * ## One cell is a fixture, and it is the one no shipped cell could be — GitHub issue #523, item 2
  *
+ * ## The pre-fit cells, and what they are for — GitHub issue #372, § D640
+ *
+ * A cell carrying `prefit` is a sitting that claimed `data/chime-ledger.json`'s `rush-prefit`, and
+ * both halves fit the tower before they play it: this one through
+ * `verify.ts#rushRoundConfigFor`'s `prefit` argument, the viewer's through
+ * `everyday/rush.ts#rushPatchOf`, which writes `RUSH_PREFIT_FIT_OUT` onto the state the press
+ * builds. Two different appliers over one set of values (`core`'s `config/rushPrefit.ts` holds them),
+ * so these cells are what says the two agree on the **legs** rather than on the constants.
+ *
+ * **Every pre-fit cell is paired with the same cell unfitted, and the pair must differ.** That is
+ * `CLAUDE.md`'s standing requirement pointed at a purchase — *move the control and require the run
+ * to change, compared on the legs* — and it is the half that a byte-comparison of two buildings
+ * cannot give: a kit that folded correctly and reached no decision would pass every other check
+ * here, which is what `destination-eta` did for a whole release (§ D112).
+ *
  * This replay resolves a round's dispatcher id against the server's own `data/` and runs that
  * profile's own `selection`. The viewer's press took the selector from a fresh session instead,
  * which seeds it from the *opening* dispatcher. The two agreed on every shipped cell only because no
@@ -90,6 +105,11 @@ interface AgreementCell {
   readonly interventions?: readonly SubmittedIntervention[];
   /** A `selection` both halves give this cell's profile before resolving it — see the docstring's last section. */
   readonly declaredSelection?: NonNullable<SimulationConfig['dispatcherProfile']['selection']>;
+  /**
+   * Whether the sitting claimed `data/chime-ledger.json`'s `rush-prefit` — GitHub issue #372,
+   * § D640, and see the docstring's `## The pre-fit cells` section.
+   */
+  readonly prefit?: boolean;
   /** Seconds from the round's start to the line being crossed, or `null` when it never was. */
   readonly heldS: number | null;
 }
@@ -136,7 +156,8 @@ function labelOf(cell: AgreementCell): string {
     entry.change.kind === 'switch-dispatcher' ? `→${entry.change.toProfileId}@${String(entry.atS)}` : `${entry.change.kind}@${String(entry.atS)}`,
   );
   const declared = cell.declaredSelection === undefined ? [] : [`declaring ${JSON.stringify(cell.declaredSelection)}`];
-  return [cell.buildingId, cell.dispatcherProfileId, ...declared, ...log].join(' ');
+  const prefit = cell.prefit === true ? ['pre-fitted'] : [];
+  return [cell.buildingId, cell.dispatcherProfileId, ...prefit, ...declared, ...log].join(' ');
 }
 
 let resources: VerificationResources;
@@ -205,11 +226,38 @@ describe('the rush hold agreement table — the server’s replay half (PR #513,
     }
   });
 
+  it('pairs every pre-fit cell with the same cell unfitted, and the two differ — GitHub issue #372, § D640', () => {
+    const prefitted = table.cells.filter((cell) => cell.prefit === true);
+    /*
+     * Non-empty, on `NEVER_BREAKS`'s own ground one section down: a rule applied to an empty set
+     * passes because nothing was checked rather than because everything checked out.
+     */
+    expect(prefitted.length, 'no pre-fit cell to pin, so this rule checks nothing').toBeGreaterThan(0);
+    if (REGENERATE) return;
+    for (const cell of prefitted) {
+      const asShipped = table.cells.find(
+        (other) =>
+          other.prefit !== true &&
+          other.buildingId === cell.buildingId &&
+          other.dispatcherProfileId === cell.dispatcherProfileId &&
+          JSON.stringify(other.interventions ?? []) === JSON.stringify(cell.interventions ?? []) &&
+          JSON.stringify(other.declaredSelection ?? null) === JSON.stringify(cell.declaredSelection ?? null),
+      );
+      expect(asShipped, `${labelOf(cell)} has no unfitted twin to be compared against`).toBeDefined();
+      expect(
+        cell.heldS,
+        `${labelOf(cell)} holds exactly as long as the same round on the building as shipped, so the ` +
+          'kit is a purchase that changed no decision — CLAUDE.md’s standing requirement',
+      ).not.toBe(asShipped?.heldS);
+    }
+  });
+
   it.each(table.cells.map((cell) => [labelOf(cell), cell] as const))('%s', (label, cell) => {
     const config = rushRoundConfigFor(
       cell.buildingId,
       { dispatcherProfileId: cell.dispatcherProfileId, ...(cell.interventions === undefined ? {} : { interventions: cell.interventions }) },
       resourcesFor(cell),
+      cell.prefit === true,
     );
     if (typeof config === 'string') throw new Error(`${label} does not resolve on this server: ${config}`);
     const { record } = runSimulation(config);
