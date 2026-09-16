@@ -1990,7 +1990,22 @@ type DecisionReservation = {
  * holes from the earlier #540 collision. The integrator sets this back to `null` and moves
  * `CHARTER_PROGRAMME.md`'s row to **D622** on this commit.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/**
+ * **Wave AD is open, and this lane opened it** — GitHub issue #429 stage 2,
+ * [§ D630](../../../../DECISIONS.md).
+ *
+ * This lane branched from `dd72da9`, where the constant was `null` and `CHARTER_PROGRAMME.md`'s row
+ * read **D623**. Its own block is **D630–D639**, so the first number it wrote turned the charter-row
+ * gate red on the ceiling rather than on anything the lane had done — § D601's situation exactly,
+ * and the four-lane full house wave AB recorded above.
+ *
+ * **The floor is the charter row's own figure and the ceiling is the top of *this lane's* block**,
+ * which is the narrowest range that is true from here. D623–D629 are **not holes**: they are
+ * sibling lanes' blocks this branch cannot see, and holding the floor at 623 is what stops them
+ * being reported as unregistered on every branch of the wave. The integrator reconciles the real
+ * ceiling at close, when it knows which lanes spent what.
+ */
+const OPEN_RESERVATION = { wave: 'AD', from: 623, to: 639 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as

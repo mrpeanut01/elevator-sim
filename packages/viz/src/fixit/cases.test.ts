@@ -69,9 +69,11 @@ import {
   parseElevatorSpecs,
   parseTrafficProfiles,
   resolveBuilding,
+  shaftPlanAreaM2,
 } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { shaftAreaBandOf } from '../pricing/parse.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
 import { DATA_DIR } from '../fixtures.test-helper.js';
@@ -87,7 +89,13 @@ import {
   toggleRepair,
   selectionKeepsTheCrowd,
 } from './engine.js';
-import { fixitContextOf, parseFixitCases } from './parse.js';
+import {
+  UNBANDED_SHAFT_CASES,
+  fixitContextOf,
+  newShaftUnits,
+  parseFixitCases,
+  shaftAreaSurchargeUnits,
+} from './parse.js';
 import {
   FIXIT_RUN_SWITCHES,
   figureValuesOf,
@@ -150,6 +158,13 @@ beforeAll(async () => {
       buildings: resources.entries.map((entry) => entry.resolved),
       trafficProfiles: resources.trafficProfiles,
       dispatcherProfiles: resources.dispatcherProfiles,
+      /*
+       * **The shipped loader passes these, so this suite must too** — GitHub issue #429 stage 2,
+       * § D630. Without them no shaft resolves a plan-area band and every new-shaft repair falls
+       * back to the base price, which would leave the banded prices asserted nowhere while the
+       * product charged them. `dev/data.ts#loadFixitCases` is the path this mirrors.
+       */
+      elevatorSpecs: resources.elevatorSpecs,
     }),
   );
 }, SUITE_TIMEOUT);
@@ -736,6 +751,59 @@ describe('running a case leaves the authored case file alone', () => {
     },
     SUITE_TIMEOUT,
   );
+});
+
+/**
+ * **A shaft costs what its own building's plan area says it costs** — GitHub issue **#429** stage 2,
+ * [§ D630](../../../../DECISIONS.md).
+ *
+ * [§ D601](../../../../DECISIONS.md) measured the quantity and refused to price it; the product
+ * owner has since ruled that area is charged, in the schedule's one currency and in **discrete
+ * bands** rather than at a rate per square metre — because a shaft's plan area spans **49×** across
+ * the shipped set and a flat rate keeping `midtown-office` at its agreed 34 u would price one more
+ * Burj shuttle at 280 u against a schedule of 587 (§ D601 § 5).
+ *
+ * **This is the case that says the ruling reached the product**, on the shipped file rather than on
+ * a fixture. Three claims, and the third is the one that would have been easy to fake:
+ *
+ * 1. the eighteen new-shaft repairs no longer all cost the same, which is the whole point;
+ * 2. every price is the base plus that building-and-bank's own band, re-derived here through
+ *    `core` rather than read back off the case;
+ * 3. and each one is **still unaffordable inside its own budget**, which is § 10.2's lesson and the
+ *    thing a price rise must not quietly break in the other direction.
+ */
+describe('a new shaft is priced by the plan area it takes out of its own building', () => {
+  it('charges the base plus this building’s own area band, and never one figure for all', () => {
+    const schedule = shippedPriceSchedule();
+    const table = resources.elevatorSpecs.shaftFootprint;
+    if (table === undefined) throw new Error('the shipped specs declare no shaftFootprint');
+    const seen = new Map<string, number>();
+    const unbanded: string[] = [];
+    for (const entry of cases.cases) {
+      const shaft = entry.repairs.find((repair) => repair.role === 'new-shaft');
+      if (shaft === undefined) continue;
+      const bankId = shaft.patch.building?.addCars?.[0]?.bankId;
+      const building = resources.entries.find((one) => one.resolved.id === entry.buildingId)?.resolved;
+      const bank = building?.banks.find((candidate) => candidate.id === bankId);
+      const areaM2 =
+        building === undefined || bank === undefined
+          ? undefined
+          : shaftPlanAreaM2(bank, building.floors, table);
+      const expected =
+        newShaftUnits(schedule) +
+        (areaM2 === undefined ? 0 : shaftAreaSurchargeUnits(schedule, shaftAreaBandOf(schedule, areaM2)));
+      expect(shaft.costUnits, `case "${entry.id}"`).toBe(expected);
+      if (areaM2 === undefined) unbanded.push(entry.id);
+      seen.set(entry.id, shaft.costUnits);
+      /* § 10.2's lesson survives the rise: visible, and still out of reach. */
+      expect(shaft.costUnits, `case "${entry.id}" became affordable`).toBeGreaterThan(entry.budgetUnits);
+    }
+    expect(seen.size).toBeGreaterThan(0);
+    /* The claim the ruling is about: one price for every shaft would mean area is not charged. */
+    expect(new Set(seen.values()).size).toBeGreaterThan(1);
+    /* And the two that cannot be banded are the two the register names, in both directions. */
+    expect([...unbanded].sort()).toEqual([...UNBANDED_SHAFT_CASES].sort());
+  });
 });
 
 describe('the editor machinery is live where it is priced', () => {
