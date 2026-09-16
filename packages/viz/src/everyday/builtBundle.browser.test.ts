@@ -177,14 +177,38 @@ const DIST_WEB = fileURLToPath(new URL('../../dist-web', import.meta.url));
  * about 1 043 kB before that PR: the week's merges had grown it from 930.0 kB, and #532 adds about
  * 4 kB gzipped, because `core` ships in the page bundle and in both workers (+1.3 kB each). The owner
  * chose to raise the budget rather than hold #532 for a trim. 1 240 is above the 1 200 `docs/31` § 3
- * named unmeasured, and it is stated here and in `docs/41` § 4.1 so that is visible; the 90 % line is
- * now 1 116 kB.
+ * named unmeasured, and it is stated here and in `docs/41` § 4.1 so that is visible; the 90 % line
+ * was 1 116 kB.
+ *
+ * **Raised to 1 800 on 2026-09-16, by the product owner, deliberately generous.** CI on the PR
+ * merging three lanes (#422 fix-a-building elevation control, #437 destination panels priced per
+ * landing, #412 TWIN shafts) MEASURED the bundle at **1 121.534 kB**, past the then-90 % line of
+ * 1 116. Isolated by building the pre-wave base (`5a52354`) in its own worktree with the identical
+ * toolchain: base total **≈ 1 108.8 kB** gzip (JS 905.97 kB across the page bundle and both
+ * workers, data+HTML 202.8 kB) — already within about 7 kB of the old soft line before any of this
+ * wave's work — and the three lanes together added **≈ 13–15 kB**, split roughly 13 kB of `core`
+ * (present in all three JS bundles: page, `shiftWorker`, `batchWorker` — TWIN's shaft model,
+ * separation math and deadlock gate run unconditionally for every car, so none of it is
+ * TWIN-building-conditional and none of it can be deferred behind a dynamic import) and 2 kB of
+ * `data/price-schedule.json` (`raise-a-floor`, `landing-panels`). Not an accidental dependency: a
+ * simulation-kernel feature that runs for every car in every building. The owner chose 1 800 over a
+ * tighter figure precisely tracking this wave's measured growth, on the same reasoning as the
+ * 2026-09-11 raise: repeatedly relitigating this gate one small increment at a time costs more than
+ * headroom does, and the deterministic hard-cap-plus-90%-line shape still catches an accidental
+ * dependency long before 1 800 kB. The 90 % line is now 1 620 kB.
+ *
+ * **Worth a note for whoever next measures this**: `core` is bundled separately into all three JS
+ * entry points rather than shared, so every byte `core` gains is paid three times; splitting it
+ * into a shared chunk (`build.rolldownOptions.output.manualChunks` or equivalent) would very
+ * likely buy back real headroom, and is the trim `docs/31` § 3 names as the alternative to raising
+ * the number — left as a follow-up because it changes how three separate entry points load rather
+ * than one number, not because generous headroom makes it unnecessary.
  *
  * Tighten it when the bundle shrinks. Raising it is a visible edit a reviewer can refuse, which is
  * the mechanism `docs/31` asks for in place of a vendor metric whose definition can move underneath
  * the number.
  */
-const BUNDLE_BUDGET_KB = 1_240;
+const BUNDLE_BUDGET_KB = 1_800;
 
 /** One shipped file and what it costs on the wire. */
 interface ShippedFile {
