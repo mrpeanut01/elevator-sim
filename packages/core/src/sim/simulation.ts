@@ -171,10 +171,28 @@ import {
   Car,
   deckSlot,
   isAccessPermitted,
-  shaftForBank,
+  shaftsForBank,
+  type CarShaft,
   type CarSnapshot,
   type CommittedStop,
+  type ServedFloor,
+  type ShaftMateSnapshot,
 } from '../model/car/index.js';
+import {
+  admissibleHeightRangeM,
+  isCrossedCommitment,
+  protectedCeilingM,
+  protectedFloorM,
+  reachableHeightRangeM,
+  requiredGapM,
+  respectsClearance,
+  respectsOrder,
+  separationMarginM,
+  type ShaftOccupantState,
+  type ShaftRole,
+  type ShaftSeparation,
+  type ShaftSpanM,
+} from '../model/car/separation.js';
 import {
   DIRECTIONS,
   Passenger,
@@ -290,6 +308,88 @@ const STRUCTURAL_INELIGIBILITY: ReadonlySet<string> = new Set([
   'destinationServiceZone',
   'destinationAccessDenied',
 ]);
+
+/*
+ * **`'shaftBlocked'` is deliberately absent from the set above, and that absence is
+ * INV-TWIN-3** — `docs/11` § 3.1 and § 3.5, GitHub issue #412, `DECISIONS.md` § D620.
+ *
+ * A passenger refused because a TWIN shaft's other car is in the way **is servable**: the
+ * hardware reaches them, the credential permits them, and the block is the control system's own
+ * choice about right now. It follows `serviceMode`, which line 1096 records as *"deliberately
+ * absent"* so a returning car is found again — not `accessDenied`, which is a fact about the
+ * fabric and the credential.
+ *
+ * Filing a transient reason as structural is the `C35` failure with a new label: the retry timer
+ * stops, the call is marked structurally unservable, and a queue nobody could serve is stranded
+ * while the fleet stands idle. `sim/twinShaft.test.ts` asserts it in **both** directions — the
+ * reason is absent from this set, **and** a call refused only for `shaftBlocked` is retried — for
+ * the reason § D130 gives about its own correction to `isServable`: it is a correction, not a
+ * relaxation, and the proof is that the case still fails.
+ */
+
+/**
+ * A two-car hoistway at run time: who is in it, how far apart they must stay, and who is waiting
+ * on whom — `docs/11` § 1.1, GitHub issue #412.
+ *
+ * Built once in the constructor by {@link Simulation.indexTwinShafts} and **not built at all on a
+ * building that declares no TWIN shaft**, which is every building in `data/buildings/`.
+ */
+interface TwinShaftState {
+  readonly id: string;
+  readonly separation: ShaftSeparation;
+  /** The cars, as declared: lower first. C-ORDER forbids this from changing. */
+  readonly lower: Car;
+  readonly upper: Car;
+  /** The hoistway's vertical extent, for the static admissible envelope. */
+  readonly span: ShaftSpanM;
+  /**
+   * Cars that declined to depart and are waiting for this shaft to change — `docs/11` § 2.4
+   * requirement 2's wake list. Drained by the arrival handler, never by a poll.
+   */
+  readonly wake: Set<string>;
+  /** When each deferred car first declined, for § 2.4 requirement 3's bound. */
+  readonly deferredSince: Map<string, SimTime>;
+  /** True while a clearing move is being issued for this shaft. See `Simulation#clearMate`. */
+  clearing: boolean;
+}
+
+/**
+ * The shaft floor indices whose heights fall inside `[lowM, highM]`, as an inclusive index range.
+ *
+ * Returns an **empty** range (`[1, 0]` by construction, since `lowest > highest` when no floor
+ * qualifies) rather than a sentinel: `low <= index <= high` is already false for every index, so
+ * every reader gets the right answer without a branch. A car standing immediately below its mate
+ * legitimately reaches nothing this instant, and that is a state to express rather than to
+ * special-case.
+ *
+ * A scan of the shaft's floors, taken once per car per dispatch pass in {@link
+ * Simulation.shaftMateSnapshot} — never inside a priced call, which is what keeps `docs/11`
+ * § 2.3's gate 1 the O(1) check that row requires.
+ */
+function indexRangeWithin(
+  shaft: CarShaft,
+  [lowM, highM]: readonly [number, number],
+): readonly [number, number] {
+  let low = Number.POSITIVE_INFINITY;
+  let high = Number.NEGATIVE_INFINITY;
+  for (const floor of shaft.floors) {
+    if (floor.heightM < lowM || floor.heightM > highM) continue;
+    if (floor.index < low) low = floor.index;
+    if (floor.index > high) high = floor.index;
+  }
+  return low > high ? [1, 0] : [low, high];
+}
+
+/** Why a commanded move was refused, and what would unblock it. */
+interface SeparationBlock {
+  /** How far short of the required gap the pair of commitments falls, metres. Negative. */
+  readonly marginM: number;
+  readonly mate: Car;
+  /** The height the mate must clear to or past for the blocked move to become legal. */
+  readonly mateMustReachM: number;
+  /** Which car of the shaft was blocked. */
+  readonly role: ShaftRole;
+}
 
 /**
  * How the kernel stopped, which is not the same question as whether everybody was delivered.
@@ -687,6 +787,41 @@ export class Simulation {
   /** Runs cut short en route. Zero under every profile leaving `enRouteDiversion` off. */
   #diversions = 0;
 
+  /* ---- TWIN shafts (docs/11, GitHub issue #412, DECISIONS.md § D620) ---- */
+
+  /**
+   * The two-car hoistways of this building, by shaft id. **Empty on every shipped building**,
+   * and that emptiness is the whole of why a building with no TWIN shaft runs bit-identically:
+   * every separation path below begins with a lookup that misses.
+   */
+  readonly #twinShafts = new Map<string, TwinShaftState>();
+  /** Car id to the shaft it is in, for the cars of two-car shafts only. */
+  readonly #twinShaftByCarId = new Map<string, TwinShaftState>();
+  /** Departures refused by the separation constraint, `docs/11` § 6.2 clause 1's first counter. */
+  #separationDeferrals = 0;
+  /** Compelled moves commanded to get a mate out of the way. § 6.2 clause 1's second counter. */
+  #clearingMoves = 0;
+  /** Separation predicates evaluated, across both gates. § 6.2 clause 1's fourth counter. */
+  #separationChecks = 0;
+  /**
+   * **Commanded moves that breached C-CLEAR** — `docs/11` § 3.4's property P7, in its (b) form.
+   *
+   * The gate at {@link #depart} refuses such a move, so this is zero by construction and a
+   * non-zero value is a defect in the gate rather than in a dispatcher. It is counted anyway, and
+   * `docs/11` § 3.4 says exactly what that is worth: a property that can only see the violations
+   * its own gate already prevented is a tautology. The honest check is the post-hoc one over a
+   * car-position series, which this lane did **not** build — `sim/twinShaft.test.ts` reconstructs
+   * the trajectories itself and takes the continuous minimum, which is the strongest statement
+   * available without that series.
+   */
+  #separationBreaches = 0;
+  /** The longest single deferral, seconds — `docs/11` § 2.4 requirement 3's bound made visible. */
+  #longestSeparationDeferralS = 0;
+  /** Deferrals in which both cars held a stop across the other — `docs/11` § 3.6 clause 3. */
+  #crossedCommitmentDeferrals = 0;
+  /** Whether this run writes `RunRecord.carMoves`. `false` on every shipped path. */
+  readonly #recordCarMoves: boolean;
+
   /* ---- patience and abandonment (docs/14 § 3.1) ---- */
 
   /**
@@ -903,16 +1038,46 @@ export class Simulation {
       );
     }
 
+    /*
+     * **The shafts of every bank, built once** — `docs/11` § 1.2 row "the car factory", GitHub
+     * issue #412, `DECISIONS.md` § D620.
+     *
+     * The factory below used to call `shaftForBank(resolved, bankId)` **per car**, so four cars
+     * in a bank got four structurally identical but distinct `CarShaft` values and nothing in
+     * `core/` could express *these two cars are in the same physical hole* — `docs/11` § 0
+     * claim 1, the fact the whole document is about. Built once per bank here and handed out by
+     * occupancy, two cars of a TWIN shaft receive the **same reference**, which is what makes
+     * shaft identity identity rather than a field two values happen to agree on.
+     *
+     * On every shipped building this is one single-car shaft per car and the value each car
+     * receives is equal to the one it received before, so the run is bit-identical.
+     */
+    const shaftsByBankId = new Map<string, readonly CarShaft[]>(
+      resolved.banks.map((bank) => [bank.id, shaftsForBank(resolved, bank.id)]),
+    );
+
     const crowding = this.#options.lobbyCrowding;
     this.#building = createBuilding<Car>(resolved, {
       createCar: (spec, context) => {
         const passengerTransferS = spec.passengerTransferS ?? typeTransferS;
+        const bankShafts = shaftsByBankId.get(context.bankId) ?? [];
+        const shaft = bankShafts.find((candidate) => candidate.carIds.includes(spec.id));
+        /* c8 ignore next 5 -- `resolveShafts` refuses a layout that leaves a car homeless. */
+        if (shaft === undefined) {
+          throw new SimulationError(
+            `Car "${spec.id}" of bank "${context.bankId}" is in no declared shaft.`,
+          );
+        }
         return new Car({
           id: `${context.bankId}-${spec.id}`,
           bankId: context.bankId,
           spec,
-          shaft: shaftForBank(resolved, context.bankId),
-          homeFloorId: homeFloorIdFor(resolved, requireBank(resolved, context.bankId)),
+          shaft,
+          homeFloorId: twinAwareHomeFloorId(
+            shaft,
+            spec.id,
+            homeFloorIdFor(resolved, requireBank(resolved, context.bankId)),
+          ),
           clock: kernel,
           // Service mode at t=0, straight off the resolved car. Without this line
           // `carConfigSchema.mode` would validate, round-trip and reach no car — the
@@ -939,6 +1104,9 @@ export class Simulation {
       },
     });
     for (const car of this.#building.cars) this.#carsById.set(car.id, car);
+    this.#recordCarMoves = config.recordCarMoves === true;
+    this.#indexTwinShafts();
+    this.#pushTwinDisclaimer(resolved);
 
     /*
      * **The counterweight and the drive, read once per bank** — GitHub issue #431, § D539. This is
@@ -1315,6 +1483,20 @@ export class Simulation {
       capacityCrossings: this.#capacityCrossings,
       capacityMigrations: this.#capacityMigrations,
       diversions: this.#diversions,
+      // **Present exactly when the building has a TWIN shaft**, never "present when non-zero" —
+      // `sim/types.ts` carries the argument. A zero on a TWIN building is `docs/11` § 6.2
+      // clause 1's wiring-bug report and has to be sayable; a conventional building's
+      // `StageActivity` has to stay the object this project's pinned structural digests hash.
+      ...(this.#twinShafts.size === 0
+        ? {}
+        : {
+            separationDeferrals: this.#separationDeferrals,
+            clearingMoves: this.#clearingMoves,
+            separationChecks: this.#separationChecks,
+            separationBreaches: this.#separationBreaches,
+            longestSeparationDeferralS: this.#longestSeparationDeferralS,
+            crossedCommitmentDeferrals: this.#crossedCommitmentDeferrals,
+          }),
       capacityHeld: this.#capacityHeld,
       lateArrivalHoldsRequested: this.#lateArrivalHoldsRequested,
       lateArrivalHoldsGranted: this.#lateArrivalHoldsGranted,
@@ -1403,7 +1585,33 @@ export class Simulation {
       );
     }
 
+    this.#closeOpenDeferrals(this.#kernel.now());
     return this.#finish(endReason);
+  }
+
+  /**
+   * **Time the deferrals that never ended** — and this method is the difference between a
+   * deadlock detector and a metric that cannot see the thing it is for.
+   *
+   * `#longestSeparationDeferralS` is folded when a deferred car is *woken*, which means a
+   * deferral that is never released is never measured: a car that waits out the entire run would
+   * leave the counter reading zero, and *zero* is exactly what a reader would take as evidence of
+   * health. That is the metric being blind in the one case it exists to see, and it is the second
+   * defect the deadlock property found in this lane — the first being two cars started on top of
+   * each other (see {@link twinAwareHomeFloorId}).
+   *
+   * So every deferral still open when the kernel drains is closed against the run's own end. A
+   * deadlocked car then shows up as a deferral lasting the rest of the run, which is a figure that
+   * separates *a car waited* from *a car waited forever* by an order of magnitude rather than by a
+   * flag somebody has to remember to set.
+   */
+  #closeOpenDeferrals(at: SimTime): void {
+    for (const twin of this.#twinShafts.values()) {
+      for (const since of twin.deferredSince.values()) {
+        this.#longestSeparationDeferralS = Math.max(this.#longestSeparationDeferralS, at - since);
+      }
+      twin.deferredSince.clear();
+    }
   }
 
   /**
@@ -4112,6 +4320,7 @@ export class Simulation {
    */
   #depart(car: Car, floorId: string, at: SimTime): void {
     if (!car.shaft.floorsById.has(floorId)) return;
+    const twin = this.#twinShaftByCarId.get(car.id);
     // A double-deck car drives between stop positions, so "go to 27" is "go to 26 and open the
     // upper deck onto 27" — and a car already at 26 has nowhere to go. Normalizing *before* the
     // already-there test is what keeps 26→27 from being commanded as a 4.5 m move that the
@@ -4125,8 +4334,370 @@ export class Simulation {
       return;
     }
 
+    /*
+     * **Gate 2, the movement gate** — `docs/11` § 2.3 row 2 and § 2.4. The last line of defence
+     * and the only one that is authoritative: gate 1 (`estimateCost`'s feasibility filter) may be
+     * wrong and the run is merely inefficient; this one may not be wrong. It is the analogue of
+     * `Car.canStart`, which `car.ts` documents as *"checked here rather than left to the
+     * dispatcher because it is a car function that no dispatcher setting may override"* — and no
+     * dispatcher weight, no profile and no tuning run may make this one pass.
+     *
+     * **It lands here and not in `Car.departFor`**, for the reason § 2.3 gives: `departFor` sees
+     * one car and the constraint is a fact about two, so pushing it into `Car` would require a
+     * `Car` to hold a reference to another `Car` and break the snapshot discipline in the one
+     * class that has most carefully avoided it. `#depart` already holds the whole building.
+     *
+     * **A deferral, not a refusal**, and the difference is the entire liveness argument (§ 2.4).
+     * The car does not move, does **not** lose the stop, does not hand the call back and marks
+     * nothing unservable — it is *waiting*, and `committedStops()` is unchanged. Three things
+     * then have to be true or it is a deadlock rather than a wait, and each is below: the car is
+     * put on the shaft's wake list so the mate's arrival re-steps it (§ 0 row 5 is the trap —
+     * nothing re-steps a car that declined to move); the mate is *compelled* to clear if it is
+     * standing in the way, **whether or not it holds commitments of its own** — § 5's first row
+     * is precisely that a clearing move may happen *"possibly while the car holds committed
+     * stops"*, and it does not discard them, it goes away and comes back; and the deferral is
+     * bounded and observable.
+     */
+    if (twin !== undefined) {
+      const block = this.#separationBlockFor(twin, car, planned.toHeightM, at);
+      if (block !== undefined) {
+        this.#separationDeferrals += 1;
+        // **Is this deferral the MERL shape?** `docs/11` § 3.6 clause 3 is the reason to count it
+        // separately rather than to lump it in: a campaign whose generator never draws the
+        // *blocking-prone* population reports a clean pass that is evidence of nothing, so the run
+        // publishes its own denominator. A crossed pair is the hazard, not the failure — it is
+        // discharged in sequence by the clearing move below — and counting it is how a reader
+        // tells a shaft that met the hard case from one that never saw it.
+        if (this.#isCrossedDeferral(twin, at)) this.#crossedCommitmentDeferrals += 1;
+        const since = twin.deferredSince.get(car.id);
+        if (since === undefined) twin.deferredSince.set(car.id, at);
+        twin.wake.add(car.id);
+        this.#clearMate(twin, car, block, at);
+        return;
+      }
+      twin.deferredSince.delete(car.id);
+    }
+
     const motion = car.departFor(target, at);
     this.#scheduleArrival(car, motion.arrivesAt);
+    if (twin !== undefined) this.#auditSeparation(twin, at);
+  }
+
+  /* ---------------------------------------------------------------- *
+   * TWIN shafts — docs/11, GitHub issue #412, DECISIONS.md § D620
+   * ---------------------------------------------------------------- */
+
+  /**
+   * Index this building's two-car hoistways, once, in the constructor.
+   *
+   * **Leaves both maps empty for every shipped building**, because no bank in `data/buildings/`
+   * declares a `shafts` block and the loader's default layout is one car per hoistway. That is
+   * not an optimisation: it is what makes *"a building without a TWIN shaft produces a
+   * bit-identical run"* a property of the shape rather than a claim in a docstring
+   * (`docs/11` § 1.1). Every separation path in this class begins with a lookup in
+   * {@link #twinShaftByCarId}, and on a conventional building every one of them misses.
+   */
+  #indexTwinShafts(): void {
+    for (const bank of this.#building.banks) {
+      for (const car of bank.cars) {
+        const shaft = car.shaft;
+        const separation = shaft.separation;
+        if (separation === undefined || shaft.carIds.length !== 2) continue;
+        if (this.#twinShafts.has(shaft.id)) continue;
+
+        // `carIds` is ordered lower-first and the order is a declaration, never an observation:
+        // C-ORDER forbids it from changing, so re-deriving it from positions here would be a
+        // second authority on a fact the building already stated (docs/11 § 1.1).
+        const [lowerId, upperId] = shaft.carIds as readonly [string, string];
+        const lower = bank.cars.find((candidate) => candidate.id === `${bank.id}-${lowerId}`);
+        const upper = bank.cars.find((candidate) => candidate.id === `${bank.id}-${upperId}`);
+        /* c8 ignore next -- `resolveShafts` refuses a shaft naming a car the bank does not hold. */
+        if (lower === undefined || upper === undefined) continue;
+
+        const floors = shaft.floors;
+        const state: TwinShaftState = {
+          id: shaft.id,
+          separation,
+          lower,
+          upper,
+          span: {
+            lowestHeightM: floors[0]?.heightM ?? 0,
+            highestHeightM: floors[floors.length - 1]?.heightM ?? 0,
+          },
+          wake: new Set<string>(),
+          deferredSince: new Map<string, SimTime>(),
+          clearing: false,
+        };
+        this.#twinShafts.set(shaft.id, state);
+        this.#twinShaftByCarId.set(lower.id, state);
+        this.#twinShaftByCarId.set(upper.id, state);
+      }
+    }
+  }
+
+  /**
+   * **A TWIN bank ships un-oracled, and says so on every run** — `docs/11` § 7.
+   *
+   * `analytical/roundTripTime.ts` implements `RTT = 2(H·tv + tx) + (S+1)·ts + 2·P·tp`, whose
+   * derivation assumes **one car per shaft, free to travel the whole rise**. Neither assumption
+   * survives a TWIN shaft: a TWIN car's rise is restricted by its mate, and its round trip
+   * includes waiting the expression has no term for. So `CLAUDE.md` § Correctness oracle's
+   * standing instinct — *"if simulation and closed form diverge, assume the simulation is
+   * wrong"* — gives the **wrong answer** here, exactly as `docs/09` § 1.7 argues it does for
+   * destination dispatch. **A TWIN work item that "fixes" the oracle to agree has broken the
+   * oracle.**
+   *
+   * This is the same position the double-deck lane landed in, and its record is the model for
+   * how to say it: the warning was kept and strengthened rather than retired, with the message
+   * changed to say the simulator models something the closed form does not.
+   *
+   * `docs/11` OQ-7 is the open question of whether a closed-form round-trip time for a two-car
+   * shaft exists at all. What that document can honestly say is **"not located here"** — the RTT
+   * literature it reached derives the round trip for one car per shaft, and several relevant
+   * papers are paywalled — which is not the same as *does not exist*. Until it is located or
+   * derived, this sentence is what a reader gets.
+   *
+   * Raised on **no shipped building**, because none declares a TWIN shaft; `sim/twinShaft.test.ts`
+   * proves it fires by running a building that does, which is the difference between a
+   * disclaimer and a sentence about one.
+   */
+  #pushTwinDisclaimer(resolved: ResolvedBuilding): void {
+    if (this.#twinShafts.size === 0) return;
+    const shafts = [...this.#twinShafts.values()];
+    this.#disclaimers.push(
+      `building "${resolved.id}" declares ${shafts.length} TWIN shaft(s) (${shafts.map((shaft) => `"${shaft.id}"`).join(', ')}), each carrying two independently driven cars on one set of guide rails. The closed-form round-trip-time expression this project validates against assumes one car per shaft, free to travel the whole rise, and a TWIN car's rise is restricted by its mate and its round trip includes waiting the expression has no term for — so a simulated round trip for such a bank is deliberately not comparable with it, and an oracle residual measured on one is not evidence about this simulator. No closed-form round trip for a two-car shaft was located in the sources consulted (docs/11 OQ-7).`,
+    );
+  }
+
+  /**
+   * **C-ORDER and C-CLEAR over the shaft's live commitments** — `docs/11` § 2.1 and § 3.4's P7 in
+   * its cheap (b) form. Called after every commanded move and after every arrival.
+   *
+   * Two predicates because they are two failures. C-ORDER asks whether the cars have *crossed*,
+   * which is a modelling failure — a car has passed through another — and wants catching where it
+   * happens rather than inferring from a margin. C-CLEAR asks whether the gap holds, which is a
+   * control failure. They want different bug reports, which is why `docs/11` states them
+   * separately even though the first is implied by the second whenever the clearance is positive.
+   *
+   * **Say what this is worth, because `docs/11` § 3.4 does.** The movement gate refuses a move
+   * that would breach C-CLEAR, so this counter is zero by construction and *"a property that can
+   * only see the violations its own gate already prevented is a tautology"*. What it adds over
+   * nothing is small and real: it evaluates the constraint at a **different instant** from the
+   * gate — after a move completes, after a diversion has shortened one, after a mate has arrived —
+   * so a gate that was right about its own precondition and wrong about the state it left behind
+   * is caught here. It is not a substitute for the post-hoc check over a car-position series, and
+   * `sim/twinShaft.test.ts` does that one instead, over `RunRecord.carMoves`.
+   */
+  #auditSeparation(twin: TwinShaftState, at: SimTime): void {
+    this.#separationChecks += 1;
+    const lower = this.#occupantState(twin.lower, at);
+    const upper = this.#occupantState(twin.upper, at);
+    if (!respectsOrder(lower, upper) || !respectsClearance(lower, upper, twin.separation)) {
+      this.#separationBreaches += 1;
+    }
+  }
+
+  /**
+   * Whether this shaft is in the deadlock MERL's patent defines — `docs/11` § 3.2 and
+   * `model/car/separation.ts#isCrossedCommitment`.
+   *
+   * *"The lower car is carrying a passenger whose destination is at or above the upper car, and
+   * the upper car is carrying a passenger whose destination is at or below the lower car."* Asked
+   * of committed stops rather than of positions, because that is where it is created: by the time
+   * both cars hold such a stop the passengers are aboard, and `Car` has no operation that unboards
+   * them.
+   */
+  #isCrossedDeferral(twin: TwinShaftState, at: SimTime): boolean {
+    const heightsOf = (car: Car): readonly number[] =>
+      car.committedStops().map((stop) => car.shaft.floorsById.get(stop.floorId)?.heightM ?? 0);
+    return isCrossedCommitment(
+      heightsOf(twin.lower),
+      heightsOf(twin.upper),
+      this.#occupantState(twin.lower, at),
+      this.#occupantState(twin.upper, at),
+    );
+  }
+
+  /** One car of a TWIN shaft as `model/car/separation.ts` sees it: four numbers and an id. */
+  #occupantState(car: Car, at: SimTime, targetHeightM?: number | undefined): ShaftOccupantState {
+    return {
+      carId: car.id,
+      heightM: car.positionAt(at),
+      velocityMps: car.velocityAt(at),
+      // A moving car's commitment is where it is going; a standing one's is where it already is,
+      // unless a move is being priced, in which case that move's destination is the commitment
+      // under consideration.
+      targetHeightM: targetHeightM ?? car.motion?.toHeightM,
+    };
+  }
+
+  /**
+   * Whether commanding `car` to `targetHeightM` would breach C-CLEAR at any instant, and by how
+   * much — `undefined` when the move is legal.
+   *
+   * **Exact rather than sampled**, and the exactness is `model/car/separation.ts`'s lemma rather
+   * than this method's: both commitments are reduced to their *protected extremes*, whose
+   * monotonicity makes the minimum of the pair's separation fall at the runs' endpoints. So this
+   * checks two numbers and has thereby checked every instant of both runs. `docs/11` § 2.2 warns
+   * that a sampled check is dishonest because two cars can breach the clearance entirely between
+   * two kernel events; nothing here samples.
+   */
+  #separationBlockFor(
+    twin: TwinShaftState,
+    car: Car,
+    targetHeightM: number,
+    at: SimTime,
+  ): SeparationBlock | undefined {
+    this.#separationChecks += 1;
+    const isLower = this.#twinRoleOf(car) === 'lower';
+    const mate = isLower ? twin.upper : twin.lower;
+    const moving = this.#occupantState(car, at, targetHeightM);
+    const held = this.#occupantState(mate, at);
+    const [lower, upper] = isLower ? [moving, held] : [held, moving];
+    const marginM = separationMarginM(lower, upper, twin.separation);
+    if (marginM >= 0) return undefined;
+
+    // What the mate would have to do to unblock this move: clear by the shortfall, in the
+    // direction that opens the gap. Computed here rather than inside the clearing move so the
+    // deferral's own diagnosis can state it.
+    const gap = requiredGapM(twin.separation);
+    const mateMustReachM = isLower
+      ? protectedCeilingM(moving, twin.separation) + gap
+      : protectedFloorM(moving, twin.separation) - gap;
+    return { marginM, mate, mateMustReachM, role: isLower ? 'lower' : 'upper' };
+  }
+
+  /**
+   * **The compelled clearing move** — `docs/11` § 5, and the half of the liveness argument the
+   * wake list cannot supply on its own.
+   *
+   * § 0 row 5 is the trap this closes: nothing re-steps a car that declined to move, so a car
+   * deferred behind a *standing* mate would wait for an arrival that never comes. The wake list
+   * handles a mate that is already moving; this handles a mate that is not.
+   *
+   * ## Q-PP is answered here, and the answer is **no**
+   *
+   * `docs/11` § 5.2 asks whether a compelled clearing move passes through
+   * `idle.repositionThresholdS`, and states the consequence of *yes* precisely: *"a profile
+   * shipping an 8 s deadband can veto a move the separation constraint requires, and a knob that
+   * is an efficiency tradeoff everywhere else becomes a liveness hazard on a TWIN shaft. The
+   * failure mode is a deadlock produced by a tuning value."* A tuning value may not be able to
+   * deadlock a building, so a clearing move does **not** go through the deadband, does not go
+   * through `#park` at all, and is counted separately — which is § 5.2's own *if no* branch, and
+   * it carries the obligations that branch names: its own counter, and its empty-car driving
+   * landing in the energy proxy through `#depart` like every other move, because § D106 exists
+   * because an energy proxy reconstructed from passenger records is blind to exactly this.
+   *
+   * The 2 s deadband stays shipped at 8 s and is **not** hand-edited, per `docs/07` § 5.
+   *
+   * ## Why this terminates
+   *
+   * A clearing move is always *away* from the blocked car, so it strictly increases the gap and
+   * can never itself be blocked by the car it is clearing for — the gate is monotone in the gap.
+   * The only way it fails is a target outside the shaft, which `admissibleHeightRangeM` has
+   * already excluded at commitment time: the lower car is never committed within one gap of the
+   * top, nor the upper within one gap of the bottom. So every deferral is followed either by a
+   * mate already in flight or by a clearing move, and each arrival wakes the deferred car with a
+   * strictly better gap. That is the whole of INV-TWIN-2's liveness, and
+   * `sim/twinShaft.test.ts` tests it against a configuration built to break it rather than
+   * against this paragraph.
+   */
+  #clearMate(twin: TwinShaftState, blocked: Car, block: SeparationBlock, at: SimTime): void {
+    /*
+     * **Re-entrancy, bounded structurally rather than by argument.**
+     *
+     * This calls {@link #depart}, which can defer, which calls this again — so the recursion is
+     * real and its depth needs a reason. The argument is that a clearing move is always *away*
+     * from the blocked car and therefore strictly increases the gap, so it cannot itself be
+     * blocked by the car it is clearing for. That argument is sound and it is not what this flag
+     * relies on: an argument about a recursive path is exactly the thing that is true until some
+     * later change makes it false, and the failure mode is a stack overflow inside a kernel event
+     * rather than a wrong number. One clearing move per shaft at a time, enforced.
+     */
+    if (twin.clearing) return;
+
+    const mate = block.mate;
+    // A mate already in flight needs no command: its arrival is what wakes the blocked car, and
+    // commanding a moving car is what `Car.canStart` refuses anyway.
+    if (!this.#isIdle(mate)) return;
+
+    // The nearest floor that clears by at least the shortfall, in the direction that opens the
+    // gap. Floors rather than metres, because a car stops at floors.
+    const wantAbove = block.role === 'lower';
+    let target: string | undefined;
+    let best = Number.POSITIVE_INFINITY;
+    for (const floor of mate.shaft.floors) {
+      if (wantAbove ? floor.heightM < block.mateMustReachM : floor.heightM > block.mateMustReachM) {
+        continue;
+      }
+      const distanceM = Math.abs(floor.heightM - mate.heightM);
+      if (distanceM < best) {
+        best = distanceM;
+        target = floor.id;
+      }
+    }
+    if (target === undefined || target === mate.floorId) return;
+
+    this.#clearingMoves += 1;
+    twin.wake.add(blocked.id);
+    twin.clearing = true;
+    try {
+      this.#depart(mate, target, at);
+    } finally {
+      twin.clearing = false;
+    }
+  }
+
+  /**
+   * Re-step every car deferred on this arriving car's shaft — `docs/11` § 2.4 requirement 2.
+   *
+   * **Event-driven and not a poll**, which the doc states as a rejection rather than a
+   * preference: a `dispatchRetryS` poll would work, and it would make the deferral's cost a
+   * function of an unrelated tunable and put a TWIN building's results on a knob that means
+   * something else everywhere else in this repository.
+   *
+   * Called from the arrival handler, after `completeArrival` — so the mate's new position is the
+   * one the woken car is re-checked against, not the one it was blocked by.
+   */
+  #wakeShaftMates(arriving: Car, at: SimTime): void {
+    const twin = this.#twinShaftByCarId.get(arriving.id);
+    if (twin === undefined) return;
+    // C-ORDER and C-CLEAR at the one instant the gate cannot have checked: after a move has
+    // *completed*. The gate proves a pair of commitments legal before either runs; this asks
+    // whether the state they left behind is one, which is a different question and the only one an
+    // in-simulation check can ask that is not a restatement of the gate's own precondition.
+    this.#auditSeparation(twin, at);
+    const woken = [...twin.wake];
+    twin.wake.clear();
+    for (const carId of woken) {
+      const car = this.#carsById.get(carId);
+      if (car === undefined || car.id === arriving.id) continue;
+      const since = twin.deferredSince.get(carId);
+      if (since !== undefined) {
+        this.#longestSeparationDeferralS = Math.max(this.#longestSeparationDeferralS, at - since);
+      }
+      this.#stepCar(car, at);
+    }
+  }
+
+  /**
+   * Which half of its hoistway this car is — `'lower'`, `'upper'`, or `undefined` for a car in a
+   * single-car shaft, which is every car of every shipped building.
+   *
+   * **One authority for the question, because the answer decides which way every inequality in
+   * `model/car/separation.ts` points.** The role was computed inline in three places before this
+   * method had a caller, and three copies of *"which of these two cars is the lower one"* is the
+   * shape of defect this file records elsewhere: they agree until one of them is edited.
+   *
+   * It reads `carIds[0]`, which the building **declared** lower-first, and never infers the order
+   * from positions. C-ORDER forbids the order from changing, so deriving it from where the cars
+   * happen to be would be a second authority on a fact the configuration already states — and one
+   * that would silently swap roles on a run that had already gone wrong.
+   */
+  #twinRoleOf(car: Car): ShaftRole | undefined {
+    const twin = this.#twinShaftByCarId.get(car.id);
+    if (twin === undefined) return undefined;
+    return car.id === twin.lower.id ? 'lower' : 'upper';
   }
 
   /**
@@ -4170,6 +4741,27 @@ export class Simulation {
           // samples against the fleet's own odometers rather than trusting this comment.
           // A diverted run arrives **once**, at the floor it was cut short at, so the sample is
           // the distance actually driven and the odometer check still balances.
+          // **The car-move series, taken here and only here** — `docs/11` § 3.4(a) and § 8 row 9.
+          // Read *before* `completeArrival`, which clears the motion: this is the same structural
+          // fact that puts `sampleTravel` on this line rather than anywhere else. Nothing is
+          // written unless the run asked for the series, so a run that did not ask takes this
+          // branch and does nothing.
+          const completed = arriving.motion;
+          if (this.#recordCarMoves && completed !== undefined) {
+            this.#recorder.recordCarMove({
+              carId: arriving.id,
+              bankId: arriving.bankId,
+              shaftId: arriving.shaft.id,
+              fromFloorId: completed.fromFloorId,
+              toFloorId: completed.toFloorId,
+              fromHeightM: completed.fromHeightM,
+              toHeightM: completed.toHeightM,
+              commandedAt: completed.commandedAt,
+              startedAt: completed.startedAt,
+              arrivesAt: completed.arrivesAt,
+              direction: completed.direction,
+            });
+          }
           this.#recorder.sampleTravel(
             context.time,
             arriving.id,
@@ -4177,6 +4769,12 @@ export class Simulation {
             this.#energyConventionByBankId.get(arriving.bankId),
           );
           this.#stepCar(arriving, context.time);
+          // **The wake, and it is here for a reason** — `docs/11` § 2.4 requirement 2. A car that
+          // declined to depart on separation is re-stepped when its shaft changes, and an arrival
+          // is the only thing that changes one. After `#stepCar(arriving)`, so a mate woken here
+          // is re-checked against where this car has actually ended up and what it has decided to
+          // do next, rather than against a position it is about to leave.
+          this.#wakeShaftMates(arriving, context.time);
         }),
       ),
     );
@@ -4526,7 +5124,51 @@ export class Simulation {
   #snapshots(bank: Bank<Car>, at: SimTime): readonly CarSnapshot[] {
     const enRouteDiversion =
       this.#policies.get(bank.id)?.config.eligibility.enRouteDiversion ?? false;
-    return bank.cars.map((car) => car.snapshot(at, { enRouteDiversion }));
+    return bank.cars.map((car) => {
+      const snapshot = car.snapshot(at, { enRouteDiversion });
+      const mate = this.#shaftMateSnapshot(car, at);
+      return mate === undefined ? snapshot : Object.freeze({ ...snapshot, shaftMate: mate });
+    });
+  }
+
+  /**
+   * The mate half of a TWIN car's snapshot — `docs/11` § 4.2 and § 8 row 4.
+   *
+   * **`undefined` for every car of every shipped building**, so `#snapshots` returns exactly the
+   * objects it returned before TWIN existed and no conventional run's snapshot gains a key.
+   *
+   * The ranges are computed here, in the one place that holds both cars, and handed over as
+   * numbers. That is the purity mechanism working as designed: the estimator reads a field, and
+   * at no point does a `CarSnapshot` acquire a handle to another `Car` (CLAUDE.md invariant 1,
+   * `docs/11` § 4.1's obstacle and § 4.2's answer).
+   *
+   * **Indices, not heights**, because a stop is a floor and the estimator prices floors. The
+   * conversion is a floor scan of the shaft, bounded by the shaft's floor count and taken once
+   * per car per dispatch pass rather than once per priced call — which is what keeps the filter
+   * itself O(1), the cost `docs/11` § 2.3 row 1 requires of a check called thousands of times
+   * per decision.
+   */
+  #shaftMateSnapshot(car: Car, at: SimTime): ShaftMateSnapshot | undefined {
+    const twin = this.#twinShaftByCarId.get(car.id);
+    const role = this.#twinRoleOf(car);
+    if (twin === undefined || role === undefined) return undefined;
+    const mate = role === 'lower' ? twin.upper : twin.lower;
+    const mateState = this.#occupantState(mate, at);
+    this.#separationChecks += 1;
+
+    const gap = requiredGapM(twin.separation);
+    const reachableM = reachableHeightRangeM(role, mateState, twin.separation, twin.span);
+    const admissibleM = admissibleHeightRangeM(role, twin.separation, twin.span);
+
+    return Object.freeze({
+      carId: mate.id,
+      isAbove: role === 'lower',
+      heightM: mateState.heightM,
+      velocityMps: mateState.velocityMps,
+      clearanceM: gap,
+      reachableIndexRange: indexRangeWithin(car.shaft, reachableM),
+      admissibleIndexRange: indexRangeWithin(car.shaft, admissibleM),
+    });
   }
 
   /**
@@ -5924,6 +6566,53 @@ function terminalCarTimings(
  * sky lobby. Derived from the fabric rather than configured, because a home floor a bank's
  * shaft does not serve is a construction error rather than a tuning choice.
  */
+/**
+ * **Where a TWIN shaft's two cars stand at t = 0** — GitHub issue #412, `DECISIONS.md` § D620.
+ *
+ * `homeFloorIdFor` gives every car of a bank the *same* home, which is the entrance on every
+ * shipped building. For two cars in one hoistway that is a starting state in which the separation
+ * is **already breached**: both at the lobby, gap zero, C-ORDER false before a single event has
+ * fired. And it is not merely an untidy initial condition — it is a **dead shaft**. The lower car's
+ * reachable range is empty while its mate is at or below it, so it defers every departure; the
+ * upper car can only clear upward, and whether it ever does is left to a clearing move that has to
+ * fire before either car has done anything. Measured, on `midtown-office` with its first two cars
+ * paired: **neither of them moved for the whole run**, while the bank's other two carried the
+ * building. The run drained, every statistic looked ordinary, and half the fleet was inert.
+ *
+ * `docs/11` does not mention this, and that is not an oversight in the document so much as the
+ * thing it could not see: § 0 fact 1 is that *a shaft is not an object today*, so a document
+ * reasoning about shafts had no reason to ask where a shaft's second car starts. It is recorded
+ * here rather than filed as a detail because it is the first defect the deadlock property found,
+ * and it found it by running rather than by arguing.
+ *
+ * The placement: the **lower** car keeps the bank's home, and the **upper** car takes the lowest
+ * served floor that clears it. Lower-first because the home is an entrance and an entrance is near
+ * the bottom; a shaft whose home is at the top would have the upper car keep it instead, which is
+ * the `undefined` branch below returning the bank's own answer — the pair is then placed by the
+ * first clearing move rather than at construction, and the property test is what would catch a
+ * building where that goes wrong.
+ *
+ * Identity for every car of every single-car shaft, which is every car of every shipped building.
+ */
+function twinAwareHomeFloorId(shaft: CarShaft, carSpecId: string, bankHomeFloorId: string): string {
+  const separation = shaft.separation;
+  if (separation === undefined || shaft.carIds.length !== 2) return bankHomeFloorId;
+  // The lower car keeps the bank's home; only the upper one is displaced.
+  if (shaft.carIds[0] === carSpecId) return bankHomeFloorId;
+
+  const home = shaft.floorsById.get(bankHomeFloorId);
+  /* c8 ignore next -- the bank's home is one of the floors its shaft serves. */
+  if (home === undefined) return bankHomeFloorId;
+
+  const needM = home.heightM + requiredGapM(separation);
+  let best: ServedFloor | undefined;
+  for (const floor of shaft.floors) {
+    if (floor.heightM < needM) continue;
+    if (best === undefined || floor.heightM < best.heightM) best = floor;
+  }
+  return best?.id ?? bankHomeFloorId;
+}
+
 function homeFloorIdFor(building: ResolvedBuilding, bank: ResolvedBank): string {
   let lowest: FloorConfig | undefined;
   let entrance: FloorConfig | undefined;

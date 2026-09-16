@@ -98,12 +98,39 @@ export {
   deckSlot,
   floorIdsServedAt,
   isAccessPermitted,
-  shaftForBank,
   shaftFloor,
   shaftServes,
+  shaftsForBank,
   stopFloorIdOf,
   stopFloorsOf,
 } from './types.js';
+
+/* -------------------------------------------------------------------------- *
+ * TWIN separation — docs/11, GitHub issue #412
+ * -------------------------------------------------------------------------- */
+
+export {
+  admissibleHeightRangeM,
+  assertBrakeDominatesComfort,
+  isCrossedCommitment,
+  protectedCeilingM,
+  protectedFloorM,
+  reachableHeightRangeM,
+  requiredGapM,
+  respectsClearance,
+  respectsOrder,
+  separationMarginM,
+  stoppingDistanceM,
+  validateSeparation,
+  withinRange,
+} from './separation.js';
+
+export type {
+  ShaftOccupantState,
+  ShaftRole,
+  ShaftSeparation,
+  ShaftSpanM,
+} from './separation.js';
 
 export type {
   CarClock,
@@ -121,5 +148,6 @@ export type {
   RouteStop,
   ServedFloor,
   ServedFloorInit,
+  ShaftMateSnapshot,
   ShaftOptions,
 } from './types.js';

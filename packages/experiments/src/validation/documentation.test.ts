@@ -1981,6 +1981,15 @@ type DecisionReservation = {
  * time, now with a full house rather than two of five, and it is the argument for the block being
  * opened before the lanes start rather than a preference for tidiness.
  */
+/**
+ * **Wave AC's reservation is closed.** Three lanes opened it independently from the same
+ * pre-merge base (`5a52354`), each seeing the charter row at its own floor and none seeing its
+ * siblings: #422 wrote D619, #437 wrote D619 too (renumbered to D620 on merge, its own entry and
+ * every cross-reference corrected on the same commit), and #412 wrote D620 (renumbered to D621).
+ * All three numbers the block ever named — D619, D620, D621 — are now spent, and D616/D617 remain
+ * holes from the earlier #540 collision. The integrator sets this back to `null` and moves
+ * `CHARTER_PROGRAMME.md`'s row to **D622** on this commit.
+ */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.

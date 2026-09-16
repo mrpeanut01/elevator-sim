@@ -34,7 +34,7 @@ import type {
   ResolvedCar,
 } from '../../config/types.js';
 import { Car } from '../../model/car/car.js';
-import { shaftForBank, type CarSnapshot } from '../../model/car/types.js';
+import { shaftsForBank, type CarSnapshot } from '../../model/car/types.js';
 import { DISPATCH_DEFAULTS } from '../parameters.js';
 import { createDispatchPolicy } from '../policy.js';
 import type { DispatcherProfileSource } from '../types.js';
@@ -74,7 +74,7 @@ async function midtownBank(homeFloorIds: readonly string[]): Promise<readonly Ca
   const building = config.buildingsById.get('midtown-office') as ResolvedBuilding;
   const bank = building.banks.find((candidate) => candidate.id === 'main');
   if (bank === undefined) throw new Error('midtown-office has no bank "main"');
-  const shaft = shaftForBank(building, 'main');
+  const shaft = shaftsForBank(building, 'main')[0]!;
 
   return homeFloorIds.map((homeFloorId, index) => {
     const spec = bank.cars[index] as ResolvedCar;
@@ -386,7 +386,7 @@ describe('pre-positioning on Garden Apartments', () => {
     const building = config.buildingsById.get('garden-apartments') as ResolvedBuilding;
     const bank = building.banks[0];
     if (bank === undefined) throw new Error('garden-apartments has no bank');
-    const shaft = shaftForBank(building, bank.id);
+    const shaft = shaftsForBank(building, bank.id)[0]!;
     const entranceFloorIds = building.entranceFloors.map((floor) => floor.id);
 
     return {

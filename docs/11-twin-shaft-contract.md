@@ -1,9 +1,34 @@
 # TWIN shafts — the locked contract, written before the implementation
 
-**Status: design only. No production code was written for this document, and nothing in it was
-measured.**
+> **Status, 2026-09-16: the *model* is built and the *measurement* is not** — GitHub issue #412,
+> [`DECISIONS.md` § D620](../DECISIONS.md). This line read *"design only. No production code was
+> written for this document, and nothing in it was measured"* until that commit, and half of it has
+> stopped being true. `CLAUDE.md` records a stale **refusal** as worse than a stale number — *"a
+> control that writes something may not claim it writes nothing"* — so the split is stated here
+> rather than left for a reader to discover by grepping for code this line says does not exist.
+>
+> **Built and tested:** the shaft model (§ 1), the separation constraint and its movement gate
+> (§ 2), the deadlock invariants with a property that catches a violation (§ 3.1–§ 3.5), the
+> feasibility filter and the mate snapshot (§ 4.1–§ 4.3), the compelled clearing move (§ 5), the
+> un-oracled disclaimer (§ 7), and § 3.4(a)'s car-position series — which is **opt-in and off by
+> default**, so a run that does not ask for it produces the record it always did.
+>
+> **Not built, and most of it is the criterion:** every clause of § 6 is unmeasured — no saturation
+> census at a TWIN operating point (OQ-1), no equal-car paired-t interval on ΔTTD, no R1 sectored
+> arm (§ 3.2, § 6.2 clause 5) — the fuzz corpus is not widened (§ 3.6), no `shaftInterference` cost
+> term exists (§ 4.4, correctly: OQ-5 says measure before writing), and no building in
+> `data/buildings/` declares a TWIN shaft (OQ-6). **No performance figure in this document is a
+> result of this project, and that half is unchanged.**
+>
+> **Answered by the implementation:** OQ-2 (conservative), OQ-3 (measured, in the narrow form
+> § D620 states), Q-PP (no), OQ-8 (yes, opt-in), OQ-9 (out, and the type enforces it). **Still
+> open:** OQ-1, OQ-4, OQ-5, OQ-6, OQ-7.
+>
+> One thing below is a **deviation** rather than an omission: § 2.2 proposes the emergency
+> deceleration as a per-car tunable and it ships per **shaft**. § D620 records why.
+
 **Owner: T52 (wave 6). Date: 2026-07-28. Baseline: `63186a8`, plus lane T44's deck geometry, which
-is present on this tree.**
+is present on this tree. The status block above is later and supersedes this line's dating.**
 
 A **TWIN** shaft carries **two independently driven cars on one set of guide rails in one hoistway**.
 It is not the double-deck car lane T44 made simulatable: a double deck is *two cabs bolted into one
@@ -42,7 +67,7 @@ named line on this tree.
 
 | # | Claim | Verdict |
 |---|---|---|
-| 1 | **A shaft is not an object today. It is a per-car value derived from the bank.** | **TRUE.** `sim/simulation.ts:643` calls `shaftForBank(resolved, context.bankId)` **inside the per-car factory**, so four cars in a bank get four structurally identical but distinct `CarShaft` values. Nothing in `core/` represents "these two cars are in the same physical hole" |
+| 1 | **A shaft is not an object today. It is a per-car value derived from the bank.** | **TRUE when written, and CLOSED on 2026-09-16** (§ D620): `CarShaft` carries `id`, `carIds` and `separation`, and `shaftsForBank` hands one value per hoistway. The verdict below is the dated record of the tree this document was written against, kept rather than rewritten. — `sim/simulation.ts:643` calls `shaftForBank(resolved, context.bankId)` **inside the per-car factory**, so four cars in a bank get four structurally identical but distinct `CarShaft` values. Nothing in `core/` represents "these two cars are in the same physical hole" |
 | 2 | `CarShaft` carries geometry and zoning, and no occupancy | **TRUE.** `model/car/types.ts:103-140`: floors, indices, access groups, and T44's deck maps. No car id, no position, no reference to any `Car`. Its docstring calls it *"immutable building fabric, built once and shared by reference"* |
 | 3 | **`Car.departFor` cannot refuse or defer.** It either moves or throws | **TRUE.** `model/car/car.ts:598-650` throws on already-moving, doors not shut, overloaded, floor not served, already there. There is no "not yet" return value, and every throw is a programming error rather than a schedulable condition |
 | 4 | **There is exactly one chokepoint through which a car moves** | **TRUE.** `sim/simulation.ts:2528` `#depart`. Its own comment (2548-2554) says it is *"the only place in the shipped path where a completed move is observable"*, and that **stage-7 repositioning goes through it too**. It already returns silently on `!car.canStart` and on `car.floorId === target` — so a *refusal* path exists in shape today, and a *deferral* path does not |
@@ -50,7 +75,7 @@ named line on this tree.
 | 6 | **`estimateCost` can see exactly one car** | **TRUE.** `model/car/estimateCost.ts` is a free function over `(CarSnapshot, CostRequest)`; `CarSnapshot` (`types.ts:618-655`) has *"no methods, no back-reference to the {@link Car} that produced it, no `Rng`, and no scheduler"*. There is no handle through which the twin's state could be reached — which is the purity mechanism and also the exact obstacle § 4 has to solve |
 | 7 | **Not every infeasibility reason is permanent, and the code already knows it** | **TRUE.** `INFEASIBILITY_REASONS` has seven values (`types.ts:713-728`); `STRUCTURAL_INELIGIBILITY` (`simulation.ts:229-234`) names **four**, and `simulation.ts:1096` says `serviceMode` is *"deliberately absent"* so a returning car is found again. A structural reason stops the retry timer (`#markUnservable`); a transient one does not |
 | 8 | **Double-deck geometry is static and authored, in two places** | **TRUE.** `CarConfig.deckSeparationM` (`config/types.ts:698`) and `BankConfig.servesFloorPairs` (`711-722`). Both are constants for the run. A TWIN clearance is not |
-| 9 | **No run record carries a car-position series** | **TRUE, and documented.** [`docs/07-handoff.md`](07-handoff.md) § 5 records `mixed-use-high-rise/residential-local` as unmeasurable because *"the fix is a car-position series, which no run record carries"*. § 3.4 below turns that from a note into a dependency |
+| 9 | **No run record carries a car-position series** | **TRUE when written, and CLOSED on 2026-09-16 in the opt-in form** (§ D620): `RunRecord.carMoves` exists and is written only when `SimulationConfig.recordCarMoves` asks, so a *default* run still carries none — which is OQ-8's cost half answered rather than dodged. The verdict below is the dated record. — [`docs/07-handoff.md`](07-handoff.md) § 5 records `mixed-use-high-rise/residential-local` as unmeasurable because *"the fix is a car-position series, which no run record carries"*. § 3.4 below turns that from a note into a dependency |
 
 **The consequence, and it is the most useful thing this document says up front: TWIN is not a car
 feature. It is a *shaft* feature in a codebase that has no shafts, and its whole risk is

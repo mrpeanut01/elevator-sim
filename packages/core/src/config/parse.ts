@@ -33,6 +33,7 @@ import {
 } from './resolveCar.js';
 import {
   BANK_ROPE_TUNABLES,
+  BANK_SHAFT_TUNABLES,
   ConfigError,
   ISSUE_CODES,
   WARNING_CODES,
@@ -43,6 +44,7 @@ import {
   trafficProfilesSchema,
 } from './schema.js';
 import type {
+  BankConfig,
   BuildingConfig,
   ConfigIssue,
   ConfigWarning,
@@ -54,6 +56,7 @@ import type {
   ResolvedBuilding,
   ResolvedCar,
   ResolvedServiceEvent,
+  ResolvedShaft,
   TrafficProfiles,
 } from './types.js';
 
@@ -636,10 +639,27 @@ export function resolveBuilding(
       }
     }
 
+    /*
+     * **The hoistway layout** — `docs/11` § 1.2, GitHub issue #412, `DECISIONS.md` § D620.
+     *
+     * Resolved here rather than at run time for the reason every cross-reference in this
+     * function is resolved here: a shaft naming a car that does not exist must be a located
+     * `ConfigError`, not a shaft the runtime silently drops. And resolved to an **always
+     * populated** `shafts` array for the reason `docs/11` § 1.2 gives — the runtime then has one
+     * representation of a hoistway, and the *absence* of the block is handled once, here, rather
+     * than by every consumer.
+     *
+     * A bank that declares none resolves to one single-car shaft per car. That is today's
+     * meaning exactly, it is every shipped building, and it is what makes every pinned run in
+     * this project byte-identical across this change.
+     */
+    const shafts = resolveShafts(bank, cars, at, addIssue);
+
     banks.push({
       id: bank.id,
       ...(bank.name === undefined ? {} : { name: bank.name }),
       servesFloors: bank.servesFloors,
+      shafts,
       ...(bank.servesFloorPairs === undefined ? {} : { servesFloorPairs: bank.servesFloorPairs }),
       ...(bank.ropeClass === undefined ? {} : { ropeClassId: bank.ropeClass }),
       ...(ropeMassKg === undefined ? {} : { ropeMassKg }),
@@ -921,4 +941,168 @@ export function crossCheckDispatcherProfiles(
     });
   }
   return warnings;
+}
+
+/**
+ * **A bank's hoistways, resolved and always populated** — `docs/11` § 1.2, GitHub issue #412,
+ * `DECISIONS.md` § D620.
+ *
+ * Three jobs, and the third is the one that matters:
+ *
+ * 1. **Default the absence.** A bank with no `shafts` block gets one single-car shaft per car,
+ *    named `<bankId>-<carId>`. That is today's meaning exactly, it is every shipped building, and
+ *    it is why every pinned run survives this change byte-identically.
+ * 2. **Check the partition.** Every car in exactly one shaft: a car in none has no hoistway and
+ *    therefore no separation constraint to obey, and a car in two would have two mates with two
+ *    contradictory constraints. Both refuse (`shaft-layout-not-a-partition`).
+ * 3. **Refuse a TWIN shaft whose arithmetic cannot be evaluated.** A two-car shaft must state its
+ *    own `standingClearanceM` and `emergencyDecelerationMps2` — neither has a default, and
+ *    `BANK_SHAFT_TUNABLES` says why: no source read for `docs/11` publishes either figure, and
+ *    inventing one is the failure that document's own brief names. And the emergency
+ *    deceleration must be at least the harshest comfort deceleration among the shaft's cars,
+ *    because that premise is what makes `model/car/separation.ts`'s check exact at *every*
+ *    instant rather than at every sampled one. A safety check that is exact only under an
+ *    unstated premise is worse than no check, so the premise is checked at load
+ *    (`twin-separation-unstated`).
+ *
+ * Errors rather than warnings throughout, on `rope-travel-exceeds-class`'s precedent: none of
+ * these is a building that performs badly, each is a building whose runtime cannot be reasoned
+ * about.
+ *
+ * **Deliberately silent about whether two cars in one shaft is a good idea**, and about what a
+ * clearance should be. `docs/11` § 10 records that no source consulted publishes a minimum
+ * separation in metres; this function checks that a building states one and never what it states.
+ */
+function resolveShafts(
+  bank: BankConfig,
+  cars: readonly ResolvedCar[],
+  at: string,
+  addIssue: (path: string, message: string, code: string) => void,
+): readonly ResolvedShaft[] {
+  const declared = bank.shafts;
+  if (declared === undefined || declared.length === 0) {
+    return Object.freeze(
+      cars.map((car) => ({ id: `${bank.id}-${car.id}`, carIds: Object.freeze([car.id]) })),
+    );
+  }
+
+  const carsById = new Map(cars.map((car) => [car.id, car]));
+  const seen = new Map<string, string>();
+  for (const [shaftIndex, shaft] of declared.entries()) {
+    const path = `${at}.shafts[${shaftIndex}]`;
+    for (const carId of shaft.carIds) {
+      if (!carsById.has(carId)) {
+        addIssue(
+          `${path}.carIds`,
+          `shaft "${shaft.id}" of bank "${bank.id}" holds car "${carId}", which the bank does not declare. Declared cars: ${cars.map((car) => `"${car.id}"`).join(', ') || '(none)'}.`,
+          ISSUE_CODES.shaftLayoutNotAPartition,
+        );
+        continue;
+      }
+      const owner = seen.get(carId);
+      if (owner !== undefined) {
+        addIssue(
+          `${path}.carIds`,
+          `car "${carId}" of bank "${bank.id}" is in shaft "${owner}" and in shaft "${shaft.id}". A car is in one hoistway; two would give it two mates and two contradictory separation constraints.`,
+          ISSUE_CODES.shaftLayoutNotAPartition,
+        );
+        continue;
+      }
+      seen.set(carId, shaft.id);
+    }
+  }
+
+  const homeless = cars.filter((car) => !seen.has(car.id));
+  if (homeless.length > 0) {
+    addIssue(
+      `${at}.shafts`,
+      `bank "${bank.id}" declares a shafts block that leaves car(s) ${homeless.map((car) => `"${car.id}"`).join(', ')} in no hoistway. The block must name every car of the bank: a car with no shaft has no separation constraint to obey and no place in the building.`,
+      ISSUE_CODES.shaftLayoutNotAPartition,
+    );
+  }
+
+  return Object.freeze(
+    declared.map((shaft, shaftIndex) => {
+      const path = `${at}.shafts[${shaftIndex}]`;
+      const carIds: readonly string[] = Object.freeze([...shaft.carIds]);
+      if (carIds.length < 2) return { id: shaft.id, carIds };
+
+      /*
+       * **A TWIN shaft in a double-deck bank is refused, because nobody designed it.**
+       *
+       * `docs/11` § 10 says so in terms: *"The interaction between TWIN and double-deck is
+       * untouched. A double-deck TWIN is physically built and would be a shaft holding two cars
+       * each holding two decks. Nothing here is designed for it, and `carIds` being a two-tuple
+       * does not by itself forbid it."*
+       *
+       * So it is forbidden here rather than left to behave in whatever way the two mechanisms
+       * happen to compose — a clearing move picks its target from the shaft's *floors* and a
+       * double-deck car stands only at *stop positions*, which is one concrete way the pair
+       * misbehaves and is unlikely to be the only one. Refusing a configuration nobody designed
+       * is cheaper than simulating it and finding out afterwards, and it is reversible on the day
+       * somebody designs it.
+       */
+      if (bank.servesFloorPairs !== undefined && bank.servesFloorPairs.length > 0) {
+        addIssue(
+          path,
+          `shaft "${shaft.id}" of bank "${bank.id}" holds two cars in one hoistway, and the bank declares servesFloorPairs. A double-deck TWIN — two cars in one shaft, each with two decks — is physically built and nothing in this simulator is designed for it (docs/11 § 10). Declare one or the other.`,
+          ISSUE_CODES.twinSeparationUnstated,
+        );
+        return { id: shaft.id, carIds };
+      }
+
+      const standingClearanceM = shaft.standingClearanceM;
+      const emergencyDecelerationMps2 = shaft.emergencyDecelerationMps2;
+      if (standingClearanceM === undefined || emergencyDecelerationMps2 === undefined) {
+        const unstated = [
+          ...(standingClearanceM === undefined ? ['standingClearanceM'] : []),
+          ...(emergencyDecelerationMps2 === undefined ? ['emergencyDecelerationMps2'] : []),
+        ];
+        addIssue(
+          path,
+          `shaft "${shaft.id}" of bank "${bank.id}" holds two cars and states no ${unstated.join(' and no ')}. A TWIN shaft's clearance and safety-gear deceleration have no default: no source consulted for docs/11 publishes either figure, so a building that declares two cars in one hoistway declares what keeps them apart.`,
+          ISSUE_CODES.twinSeparationUnstated,
+        );
+        return { id: shaft.id, carIds };
+      }
+
+      // The premise of the exactness lemma. `MotionConstraints.acceleration` is the peak
+      // magnitude and this S-curve model decelerates at the rate it accelerates, so the harshest
+      // comfort deceleration in the shaft is the largest `acceleration` among its cars.
+      const comfortDecelerationMps2 = Math.max(
+        ...carIds.map((carId) => carsById.get(carId)?.acceleration ?? 0),
+      );
+      const separation = {
+        standingClearanceM,
+        bufferM: shaft.bufferM ?? BANK_SHAFT_TUNABLES.bufferM.default,
+        emergencyDecelerationMps2,
+      };
+      /*
+       * **The premise of `model/car/separation.ts`'s exactness lemma, checked twice on purpose.**
+       *
+       * `separation.ts#assertBrakeDominatesComfort` is the authority and `shaftsForBank` calls it
+       * where the shaft is built. This is the *config layer's* copy, and it exists because the two
+       * do different jobs rather than because nobody noticed: a `ModelError` thrown from the model
+       * aborts on the first bad shaft, and a building being edited wants every fault located by
+       * JSON path and reported at once (this file's rule 1). The model's throw is what catches a
+       * hand-built `ResolvedBuilding` in a test, which never passes through here at all.
+       *
+       * Deliberately **not** an import. `parse.test.ts` asserts this module's whole static import
+       * graph, because `parseBuilding`/`resolveBuilding` must stay reachable from a browser build
+       * with no `node:` anything in the graph — and importing `model/car/separation.js` pulls
+       * `model/types.js` and the kernel in behind it. A four-line inequality is the cheaper side of
+       * that trade, and the comment is what stops it drifting silently.
+       */
+      if (emergencyDecelerationMps2 < comfortDecelerationMps2) {
+        addIssue(
+          `${path}.emergencyDecelerationMps2`,
+          `shaft "${shaft.id}" of bank "${bank.id}" declares an emergency deceleration of ${emergencyDecelerationMps2} m/s² against a comfort deceleration of ${comfortDecelerationMps2} m/s² on its own cars. A safety brake that stops a car more gently than its own service brake is not a safety brake, and the separation check is exact at every instant only while the first is at least the second.`,
+          ISSUE_CODES.twinSeparationUnstated,
+        );
+        return { id: shaft.id, carIds };
+      }
+
+      return { id: shaft.id, carIds, separation };
+    }),
+  );
 }

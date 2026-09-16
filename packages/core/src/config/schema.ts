@@ -152,6 +152,33 @@ export const ISSUE_CODES = {
    * on every floor it passes, which is published and which no configuration can avoid paying.
    */
   coreExceedsFloorPlate: 'core-exceeds-floor-plate',
+  /**
+   * **A bank's `shafts` block does not partition its cars** — `docs/11` § 1.2, GitHub issue
+   * #412, `DECISIONS.md` § D620.
+   *
+   * A car named by no shaft, a car named by two, or a shaft naming a car the bank does not
+   * declare. All three refuse rather than warn, because each produces a runtime that cannot be
+   * reasoned about: a car with no hoistway has no separation constraint to obey, and a car in
+   * two hoistways would have two mates and two contradictory ones.
+   *
+   * Raised on **no shipped building**, because no bank in `data/buildings/` declares a `shafts`
+   * block at all — the absence resolves to one shaft per car, which is what every measured run
+   * in this project has been. It is proved by configurations that breach it in
+   * `config/twinShaft.test.ts`, which is the difference between a rule and a sentence about one.
+   */
+  shaftLayoutNotAPartition: 'shaft-layout-not-a-partition',
+  /**
+   * **A two-car shaft states no clearance, or states a safety brake weaker than its own service
+   * brake** — `docs/11` § 2.1 and § 2.2, `DECISIONS.md` § D620.
+   *
+   * Two refusals under one code because both are the same failure: a TWIN shaft whose separation
+   * arithmetic cannot be evaluated. `standingClearanceM` and `emergencyDecelerationMps2` have no
+   * default (`BANK_SHAFT_TUNABLES` says why — no source read here publishes either figure), and
+   * an emergency deceleration below the cars' own comfort deceleration breaks the monotonicity
+   * premise that makes `model/car/separation.ts`'s check exact rather than sampled. A simulator
+   * whose safety check is exact only under an unstated premise is worse than one with no check.
+   */
+  twinSeparationUnstated: 'twin-separation-unstated',
 } as const;
 
 /** Stable codes for non-fatal diagnostics. */
@@ -1546,11 +1573,92 @@ export const BANK_ROPE_TUNABLES = Object.freeze({
   }),
 });
 
+/**
+ * **The TWIN shaft's declared hardware** — `docs/11` § 2.2, GitHub issue #412, § D620.
+ *
+ * Three figures, and all three are a property of a *hoistway* rather than of a dispatcher: a
+ * clearance, a padding on a braking distance, and a brake. None of them is a weight vector and
+ * none of them belongs in `data/dispatcher-profiles.json` (CLAUDE.md invariant 7 puts *strategy*
+ * there; this is steel). They are declared here so the space is explicit and checkable
+ * (invariant 8).
+ *
+ * **No default is proposed for `standingClearanceM`, and that is the whole of `docs/11`'s
+ * position on it**: *"No minimum separation distance in metres is stated anywhere in this
+ * document, because no source read here publishes one, and inventing one would be exactly the
+ * failure the brief for this lane names."* thyssenkrupp's own TWIN material states no numeric
+ * separation; the Gerstenmeyer and Peters paper that calculates one is paywalled and was not
+ * read. So it is **required** on a two-car shaft — a building that declares TWIN must state its
+ * own clearance — rather than defaulted to a figure this project would have made up.
+ */
+export const BANK_SHAFT_TUNABLES = Object.freeze({
+  standingClearanceM: Object.freeze({
+    type: 'number',
+    unit: 'm',
+    min: 0,
+    exclusiveMin: true,
+    /** **Required on a two-car shaft.** See the block comment: no source read here publishes one. */
+    default: undefined,
+    source:
+      'CHOSEN by the building. docs/11 § 10 records that no source consulted publishes a minimum ' +
+      'separation in metres, so this project states none and the hardware a building declares carries it.',
+  }),
+  bufferM: Object.freeze({
+    type: 'number',
+    unit: 'm',
+    min: 0,
+    /**
+     * **Zero**, which is the honest default and not a safe one. `v²/2a` is the
+     * constant-deceleration braking distance and the jerk-limited stop is longer, so the buffer
+     * is what covers the difference — and *how much* it must cover is `docs/11` OQ-3, which is
+     * open. Defaulting it to a number would answer an open question by accident;
+     * `separation.test.ts` measures the excess a building has to cover instead.
+     */
+    default: 0,
+    source: 'CHOSEN. The calibration against the jerk-limited stop is docs/11 OQ-3, unanswered.',
+  }),
+  emergencyDecelerationMps2: Object.freeze({
+    type: 'number',
+    unit: 'm/s^2',
+    min: 0,
+    exclusiveMin: true,
+    /**
+     * **Required on a two-car shaft.** A safety brake is not a comfort brake and this project has
+     * no reference figure for one, so it is declared rather than defaulted — and `parse.ts`
+     * refuses a value below the shaft's own cars' comfort deceleration, because a safety brake
+     * gentler than the service brake is not a safety brake.
+     */
+    default: undefined,
+    source:
+      'CHOSEN by the building. Safety-gear deceleration is hardware; no reference value is taken here.',
+  }),
+});
+
+/**
+ * One hoistway of a bank. Absent from a bank ⇒ one shaft per car, which is every shipped
+ * building. See {@link ShaftConfig}.
+ *
+ * `carIds` is capped at two by the schema rather than by a runtime check, because three cars in
+ * one shaft is a different system with a different safety argument (`docs/11` OQ-9: **out**) and
+ * a config that cannot express it is a stronger guarantee than one that rejects it later.
+ */
+export const shaftConfigSchema = z.strictObject({
+  $comment: comment,
+  id: identifier,
+  carIds: z
+    .array(identifier)
+    .min(1, 'a shaft holds at least one car')
+    .max(2, 'a shaft holds at most two cars; three in one hoistway is out of scope (docs/11 OQ-9)'),
+  standingClearanceM: z.number().gt(0).optional(),
+  bufferM: z.number().min(BANK_SHAFT_TUNABLES.bufferM.min).optional(),
+  emergencyDecelerationMps2: z.number().gt(0).optional(),
+});
+
 export const bankConfigSchema = z.strictObject({
   $comment: comment,
   id: identifier,
   name: z.string().min(1).optional(),
   servesFloors: z.array(identifier).min(2, 'a bank must serve at least two floors'),
+  shafts: z.array(shaftConfigSchema).min(1, 'a shafts block, when present, declares at least one shaft').optional(),
   servesFloorPairs: z
     .array(z.tuple([identifier, identifier]))
     .min(1, 'servesFloorPairs, when present, must list at least one [lower, upper] pair')
