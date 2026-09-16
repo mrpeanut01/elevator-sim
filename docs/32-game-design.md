@@ -671,22 +671,30 @@ renders both in the same red is teaching the player that the product's honesty i
 
 ## 5. The difficulty model
 
-### 5.1 Difficulty and stakes are two different things, and the charter's wording covers one
+### 5.1 Difficulty and stakes are two different things, and the charter's wording now covers both
 
-`charter` non-goal 6 forbids *"a difficulty setting that changes anything other than declared
-traffic parameters and building fabric. Difficulty is demand and geometry; it is never a fudge
-factor on a metric."* [`10-experience-layer-contract.md`](10-experience-layer-contract.md) § 5.5
-carries the same sentence.
+**Status 2026-09-16: RULED by [§ D627](../DECISIONS.md).** This section originally found the
+charter's wording narrower than the shipped mechanic and flagged it as § 9's Q2 rather than
+resolving it on this document's own authority. § D627 adopted the distinction drawn below and
+amended `charter` non-goal 6 itself — kept here as the reasoning behind that amendment, not as a
+still-open gap.
 
-**The shipped difficulty tiers do not move demand or geometry at all.**
+Before that amendment, `charter` non-goal 6 forbade *"a difficulty setting that changes anything
+other than declared traffic parameters and building fabric. Difficulty is demand and geometry; it is
+never a fudge factor on a metric."* [`10-experience-layer-contract.md`](10-experience-layer-contract.md)
+§ 5.5 carried the same sentence, and — because non-goal 6's own prior amendment, [§ D345](../DECISIONS.md),
+had touched the charter but not its mirror — had drifted out of sync with it before this ruling
+brought both current together.
+
+**The shipped difficulty tiers have never moved demand or geometry at all.**
 `packages/viz/src/campaign/economy.ts`'s four tiers move the starting purse (`16 / 8 / 5 / 3`), the
 rate ladder, the miss allowance (`6 / 3 / 1 / 0`) and four bar values — the away share, the worst
 wait, the lobby queue cap and the trip budget. **None of those is a traffic parameter and none is
-fabric**, so read literally the shipped mechanic sits outside the charter's permission and inside
-its prohibition.
+fabric**, so read literally against the pre-amendment sentence the shipped mechanic sat outside the
+charter's permission and inside its prohibition.
 
-This document resolves that by drawing a distinction the charter's sentence does not, and it is
-flagged for the product owner as § 9's **Q2** rather than assumed:
+This document resolved that by drawing a distinction the charter's old sentence did not, which
+§ D627 then adopted into the charter text itself:
 
 > **GD18 — Difficulty is what the building faces. Stakes are what a miss costs you. They are set
 > separately and they are never confused.**
@@ -999,7 +1007,7 @@ points at § 9.
 
 | Contract | What this GDD takes | What it changes in that contract |
 |---|---|---|
-| [`22-charter.md`](22-charter.md) | Pillars **P1**–**P5** as refusal tests; criteria **S1**–**S4**, **S6**, **S8**, **S10** as the targets §§ 2, 4 and 7 are built to; non-goals **1**, **3**, **5**, **6**, **10** as prohibitions | **Nothing.** No pillar amended, no criterion added or restated, no non-goal relaxed. `charter` non-goal 6's *wording* is narrower than a shipped mechanic — recorded as **Q2**, not resolved here |
+| [`22-charter.md`](22-charter.md) | Pillars **P1**–**P5** as refusal tests; criteria **S1**–**S4**, **S6**, **S8**, **S10** as the targets §§ 2, 4 and 7 are built to; non-goals **1**, **3**, **5**, **6**, **10** as prohibitions | **Nothing, as this document stood when written.** No pillar amended, no criterion added or restated, no non-goal relaxed by this GDD's own authority; non-goal 6's wording was narrower than a shipped mechanic, recorded as **Q2** rather than resolved here. **Status 2026-09-16: Q2 is since resolved, [§ D627](../DECISIONS.md), which amended `22-charter.md` non-goal 6 directly** (not by this document) to adopt the difficulty/stakes distinction § 5.1 draws |
 | [`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) | The core loop, the five beats and their numbering; the per-mode declaration table; the retry-cost ladder; **A1**–**A4**, **B1**–**B4**; § 1.4's restatement rule; § 3.4's Endless rush finding; § 5's minute-1/10/hour-3 behaviour | **Nothing.** No second loop statement (§ 0.1). `docs/32 GD1`'s two halves are a coarser handle on § 3.2's five beats, not a competing decomposition, and § 3.4's verdict on the rush is adopted whole |
 | [`10-experience-layer-contract.md`](10-experience-layer-contract.md) | **R2** (no leaderboard from single runs), **R12**, **R13**; § 3.3's byte-identity criterion; § 3.4's dual-presentation finding; § 5.3's four fail states; § 5.4's *progression by mechanism introduced*; § 5.5's whole prohibition list | **Nothing.** § 5.4's campaign ordering is cited and not re-specified, including its own measured correction that stage 1 is not *"winnable trivially"*. § 5.5 is the list of record and § 4.4 is an index into it |
 | [`21-engineer-reimagined-contract.md`](21-engineer-reimagined-contract.md) | § 4's challenges **E1**–**E6**, mapped onto the five beats (§ 1.5); § 6's non-goals **3** (no scalar challenge score, capital on no results page), **6**, **7** | **Nothing.** The mapping adds no challenge and reorders none |
@@ -1043,7 +1051,7 @@ product owner can agree or refuse rather than start from a blank page.
 | # | The question | What this document recommends, and why it does not decide it |
 |---|---|---|
 | **Q1** | **Status 2026-09-16: RULED by [§ D626](../DECISIONS.md)** — demoted off the front door, beside the bench, adopting this row's own recommendation; also closes `docs/35` § 13.1's Q3 placement remainder. The question as it stood: **Is Endless rush a mode or an instrument?** (§ 1.4) | Recommended **demote to an instrument beside the bench**: it serves neither half of the loop, its output is a limit rather than a differential, and a limit is an hour-3 quantity. **This document did not take the interface change itself**; § D626 rules on placement and leaves the tile move to implementation |
-| **Q2** | **Status 2026-09-16: RULED by [§ D627](../DECISIONS.md)** — narrow the charter's wording to name *stakes*, rather than change the shipped tiers; wording not yet drafted. The question as it stood: **`charter` non-goal 6 forbids more than it means to.** (§ 5.1) | It permits difficulty to move *only* declared traffic parameters and building fabric; the shipped difficulty tiers move the purse, the rate ladder, the miss allowance and four goal bars, none of which is either. Recommended the charter's wording be **narrowed to name *stakes* separately** (`docs/32 GD18`) over changing the tiers, which § D627 adopts |
+| **Q2** | **Status 2026-09-16: RULED by [§ D627](../DECISIONS.md)** — `22-charter.md` non-goal 6 amended in place to name *stakes* (including the goal bar) as a category distinct from difficulty; the shipped tiers were not changed. The question as it stood: **`charter` non-goal 6 forbids more than it means to.** (§ 5.1) | It permits difficulty to move *only* declared traffic parameters and building fabric; the shipped difficulty tiers move the purse, the rate ladder, the miss allowance and four goal bars, none of which is either. Recommended the charter's wording be **narrowed to name *stakes* separately** (`docs/32 GD18`) over changing the tiers, which § D627 adopts |
 | **Q3** | **Status 2026-09-16: RULED by [§ D628](../DECISIONS.md)** — yes in principle; scoped as follow-up build work (a seeded stream and an event calendar), not settled as a same-session change. The question as it stood: **Should the campaign's failure odds be rolled?** (§ 3.6) | `failureOddsPct` computes a daily hazard that nothing rolls against, and `career.ts` publishes that refusal in its own words. Recommended building the seeded stream, because a wear clock that cannot bite makes every service booking a purely arithmetic decision. **It needs a seeded stream for a campaign day and an event calendar behind a contract, neither of which exists** |
 | **Q4** | **Status 2026-09-06: ANSWERED by [§ D526](../DECISIONS.md)** — a question is answered rather than superseded, so this is outside [`docs/39`](39-decisions-in-force.md) § 5's five-word vocabulary by design, and carries the `Status 20` prefix so the same grep still finds it. — the daily seed, a record to beat, and a balance to save up; see [`docs/38`](38-what-the-game-is.md) § 2.4 and [`docs/39`](39-decisions-in-force.md) § 2. The question as it stood: **What is the day-2 return mechanism?** (§ 7.4) | The only candidate the product has is Today's tower being the same day for everybody, and it needs the server the front door is built around. Recommend it be treated as `charter S4`'s critical path. **Nothing else in this document produces a reason to return on a specific day**, and inventing one — a daily reward, a streak bonus, an expiring case — would be a currency that measures progress, which `docs/32 GD9` forbids |
 | **Q5** | **Where does the § 2.3 schedule live?** | The eight introductions are specified here and **implemented nowhere**: there is no progression state in the tree, and `docs/32 GD6`'s triggers (*a completed turn of a named kind*) need a record of completed turns that spans modes. Recommend it be built as one derived value over the existing records rather than as a new store, so it cannot disagree with them. **The store's shape is an M2 engineering decision** |

@@ -37102,17 +37102,17 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 
 ---
 
-## D627 — `docs/32` Q2: narrow `charter` non-goal 6's wording to name *stakes* explicitly, rather than change the shipped difficulty tiers
+## D627 — `docs/32` Q2: `charter` non-goal 6 amended in place to name *stakes*, including the goal bar, as a category distinct from difficulty; the shipped tiers are unchanged
 
-**Date: 2026-09-16 · Owner: this session, on the session principal's explicit delegated authority · Rules on: `22-charter.md` non-goal 6, `docs/32-game-design.md` § 5.1 and § 9 Q2.**
+**Date: 2026-09-16 · Owner: this session, on the session principal's explicit delegated authority · Rules on: `22-charter.md` non-goal 6, `docs/10-experience-layer-contract.md` § 5.5, `docs/32-game-design.md` § 5.1, § 8 and § 9 Q2.**
 
 **Why an entry.** Amends the charter, which `CLAUDE.md`'s working agreements name as owned by its own owner rather than by any lane — recording the ruling here is what lets a future reader cite it rather than infer it.
 
-**What was asked.** Charter non-goal 6 permits difficulty to move only declared traffic parameters and building fabric. The shipped difficulty tiers move four other things — the purse, the rate ladder, the miss allowance, and four goal bars — none of which the clause's current wording covers.
+**What was asked, and what turned out to be stale before the question could even be answered.** `docs/32` § 5.1 quoted non-goal 6 as forbidding *"anything other than declared traffic parameters and building fabric"* and flagged the shipped tiers (which also move the purse, the rate ladder, the miss allowance and four goal bars) as sitting outside that wording. **That quote was already stale.** Non-goal 6 had been amended once before, by [§ D345](#d345), to explicitly permit the purse and the miss allowance as *"what a miss costs you"* — but §D345's own amendment note says it **deliberately did not** extend that permission to the goal bars, leaving exactly the gap `docs/32`'s Q2 was really asking about. `docs/10-experience-layer-contract.md` § 5.5, which non-goal 6 says carries the same sentence, had not been updated when §D345 landed and was still carrying the pre-§D345 wording.
 
-**Ruling: narrow the charter's wording to name *stakes* as a category the tiers may legitimately move**, per `docs/32 GD18`'s own proposed reading, rather than change the tiers themselves. Reasoning: the tiers are shipped, already tuned and playtested through other issues (#382's rebalance among them); the charter is the newer, cheaper-to-edit artifact, and non-goal 6's intent — difficulty should not silently rewrite the simulation the player is being measured against — survives a wording fix that names what the tiers actually touch.
+**Ruling: amend non-goal 6 again, to also permit the goal bar as stakes**, adopting `docs/32 GD18`'s three-way distinction (difficulty moves demand/fabric only; stakes may additionally move the purse, miss allowance, contract-ending condition, and now the bar a day is cleared against; neither may touch a measurement — a figure, a suppression ground, a censoring limit, a replication count). The shipped tiers are not changed; this closes the gap between the charter's wording and a mechanic (`campaign/economy.ts`'s four goal bars) that has shipped, been tuned and been playtested (#382) throughout. Applied directly to `22-charter.md` non-goal 6's text, following its own precedent of amending in place with a trailing note rather than leaving the old wording to silently drift. `docs/10` § 5.5's mirrored bullet is brought back in sync with it in the same commit, closing the drift §D345 left open between the two.
 
-**What this does not decide.** The exact clause text is not drafted here; that's an editorial pass against `22-charter.md`'s own conventions, left to whoever implements this ruling.
+**What this does not decide.** Whether the byte-identity M2-gate test `docs/32` § 5.1 proposes (run the same seed at every difficulty setting, require the recording identical) should actually be built is not settled here — it's a good mechanical enforcement of this clause and is left as a suggestion for whoever picks up gate work, not built in this pass.
 
 ---
 

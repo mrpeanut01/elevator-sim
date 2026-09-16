@@ -288,17 +288,28 @@ request against a non-goal exactly as against a pillar, and none of them may be 
 5. **No control that writes nothing, and no silence about it.** Both polarities
    ([§ D219](../DECISIONS.md), [§ D227](../DECISIONS.md)): a dead control may not look live, and a
    live control may not claim to be dead.
-6. **No difficulty setting that moves the bar a run is judged against.** Difficulty may vary what
-   the building faces — declared traffic parameters and building fabric — and **what a miss costs
-   you**: the purse, the miss allowance, what a contract ends on. It may **not** vary the threshold
-   a result is compared to. Two players on different difficulties who post the same run read the
-   same figures and receive the same verdict; only the consequences differ.
-   **The test is mechanical**: take a run and a difficulty, and ask whether changing the difficulty
-   changes any figure or verdict the run produces. If it does, it is forbidden.
+6. **No difficulty setting that moves a measurement.** Difficulty and stakes are two different
+   things and this clause covers both, drawn apart rather than conflated (`docs/32 GD18`):
+   - **Difficulty** may vary what the building faces — declared traffic parameters and building
+     fabric — and nothing else.
+   - **Stakes** may vary what a miss costs you: the purse, the miss allowance, what a contract ends
+     on, and **the bar a day is cleared against**. A bar is not a metric — it is measured identically
+     at every setting and displayed identically at every setting; what a stakes setting changes is
+     only what counts as clearing the day, never the number itself.
+   - **Neither may touch a measurement.** No setting scales a wait, widens a suppression ground,
+     relaxes a censoring limit, changes a replication count, or otherwise changes any *figure* the
+     run produces. Two players on different settings who post the same run read the same figures;
+     only the bar those figures are compared to, and the consequences of missing it, may differ.
+   **The test is mechanical**: take a run and a setting, and ask whether changing the setting changes
+   any *figure* the run produces. If it does, it is forbidden — whether or not it also changes the
+   verdict.
    Amended by [§ D345](../DECISIONS.md) from *"nothing other than declared traffic parameters and
    building fabric"*, which the shipped campaign had never satisfied — `campaign/economy.ts`'s
-   tiers vary the purse and the miss allowance, which this clause now permits, **and the goal bars,
-   which it does not**. It is never a fudge factor on a metric.
+   tiers vary the purse and the miss allowance, which that amendment permitted, **and the goal bars,
+   which it deliberately did not**. **Further amended by [§ D627](../DECISIONS.md)**, which found
+   that deliberate exclusion was the remaining gap `docs/32` § 9 Q2 named: the shipped tiers also
+   move four goal bars, `campaign/economy.ts`'s `DIFFICULTIES[].tests`, which is now permitted under
+   the stakes category above rather than forbidden. It is never a fudge factor on a metric.
 7. **No second engine and no second statistics.** The game layer consumes `packages/core/`; it does
    not approximate it for speed, for pacing, or for a smoother curve.
 8. **No section number, source filename or code identifier on a player surface.** This is a
