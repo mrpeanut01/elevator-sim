@@ -308,10 +308,21 @@ export function rushGeneratedRangeLine(): string {
  * `everyday/chimesPanel.ts#CHIMES_PANEL_COPY.spendRefusal` says that on the screen that lists them.
  */
 export const RUSH_ABSENCES: readonly string[] = Object.freeze([
+  /*
+   * **The second sentence was rewritten when half of it stopped being true** — GitHub issue #372,
+   * [§ D640](../../../../DECISIONS.md). It read *"The two rush purchases in the chime list are the
+   * same gap from the other side, and neither can be bought yet"*, and they are no longer the same
+   * gap: a wider purse still buys nothing, because nothing spends a purse, while starting fitted now
+   * reaches the run and is waiting only on a screen that spends a chime. A register that told a
+   * player both were missing for one reason would be [§ D227](../../../../DECISIONS.md)'s stale
+   * refusal — the more dangerous half, a sentence telling somebody not to look at a control that
+   * works. A substitution, so the corpus does not move: one entry in, one entry out.
+   */
   'The between-round purse — the server works out what each round earned and sends it back, and ' +
     'there is nothing to spend it on: rebuilding the tower between rounds is not built, so a purse ' +
-    'is a record of how far you got rather than a budget. The two rush purchases in the chime list ' +
-    'are the same gap from the other side, and neither can be bought yet.',
+    'is a record of how far you got rather than a budget. Starting with the building fitted is a ' +
+    'different case and is built — it reaches the run — but neither rush purchase can be bought ' +
+    'yet, because no screen spends a chime.',
 ]);
 
 /* -------------------------------------------------------------------------- *

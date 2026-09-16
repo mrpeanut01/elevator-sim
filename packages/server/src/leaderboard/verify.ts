@@ -27,6 +27,10 @@
 import {
   RUSH_STREAM,
   RUSH_TEMPLATE_ID,
+  parseBuilding,
+  prefittedRushBuilding,
+  prefittedRushProfile,
+  resolveBuilding,
   type RunInterventionConfig,
   runSimulation,
   rushTopRatePctPop5min,
@@ -56,7 +60,20 @@ export type RejectionCode =
   | 'rush-posts-as-a-sitting'
   | 'metrics-do-not-reproduce'
   | 'awt-not-quotable'
-  | 'simulation-failed';
+  | 'simulation-failed'
+  /**
+   * A sitting claims `rush-prefit` and this server cannot fit the building — GitHub issue #372,
+   * [§ D640](../../../../DECISIONS.md).
+   *
+   * One cause, and it is a configuration rather than a claim: {@link VerificationResources
+   * .elevatorSpecs} is optional, and the kit resolves each car's door timings and transfer time
+   * against that file before it moves them. **A refusal rather than an unfitted replay**, because
+   * the alternative is a round replayed on the tower as shipped and then compared against a held
+   * time a fitted tower produced — which refuses an honest player as `held-does-not-reproduce` and
+   * sends them looking at their own build. No shipped server reaches it: `bootstrap.ts` gives the
+   * resources `loadConfig`'s own specs, and the optionality is for hand-built fixtures.
+   */
+  | 'cannot-prefit';
 
 export interface VerificationRejected {
   readonly ok: false;
@@ -135,9 +152,16 @@ export function configFor(
    *    one).
    *
    * **What stays refused, each on its own ground:** a bought change mid-run (`interventionWire.ts` —
-   * no submission carries the entitlement to it), an incident answer (§ D486, permanent), a pre-fitted
-   * start (its fitted building is one this server cannot build), and a between-round rebuild, which no
-   * wire carries yet.
+   * no submission carries the entitlement to it), an incident answer (§ D486, permanent), and a
+   * between-round rebuild, which no wire carries yet.
+   *
+   * **A pre-fitted start was on that list and is not any more** — GitHub issue #372,
+   * [§ D640](../../../../DECISIONS.md). It read *"a pre-fitted start (its fitted building is one this
+   * server cannot build)"*, which was true of an arbitrary kit and had never been true of a fixed
+   * one: `rush-prefit` is exactly one kit of three plain fields now, `core`'s `config/rushPrefit.ts`
+   * builds it, and {@link rushRoundConfigFor} replays a sitting that claims it on the fitted tower.
+   * The general between-round rebuild — an arbitrary tier of an arbitrary category — is still
+   * refused and still for that sentence's reason (§ D606 § 2).
    */
   if (run.demandTemplateId === RUSH_TEMPLATE_ID) return 'rush-posts-as-a-sitting';
   // Any other template that declares itself unselectable is one the board does not know, on #220's
@@ -149,14 +173,19 @@ export function configFor(
  * The shared half of {@link configFor} and {@link rushRoundConfigFor}: resolve every id against the
  * server's own `data/`, in the order the refusals have always come in, with the one question that
  * differs between them — *which templates this path admits* — asked by the caller.
+ *
+ * **`prefit` is the rush's alone** — GitHub issue #372, [§ D640](../../../../DECISIONS.md). A single
+ * run carries no modifiers, so {@link configFor} passes `false` and this path is byte-identical to
+ * what it was before that field existed.
  */
 function configOver(
   run: SubmittedRun,
   resources: VerificationResources,
   admits: (template: SimulationConfig['trafficProfiles']['demandTemplates'][number]) => boolean,
+  prefit = false,
 ): SimulationConfig | RejectionCode {
-  const building = resources.buildingsById.get(run.buildingId);
-  if (building === undefined) return 'unknown-building';
+  const asShipped = resources.buildingsById.get(run.buildingId);
+  if (asShipped === undefined) return 'unknown-building';
   const shipped = resources.dispatcherProfilesById.get(run.dispatcherProfileId);
   if (shipped === undefined) return 'unknown-dispatcher';
   const template = resources.trafficProfiles.demandTemplates.find(
@@ -164,10 +193,39 @@ function configOver(
   );
   if (template === undefined || !admits(template)) return 'unknown-template';
 
-  // The player's rules over the **server's** profile. Never a profile the submission carried.
-  const dispatcherProfile = profileWithRules(shipped, run.ruleRows ?? []);
-  // And the log's handovers the same way — a switch to an id this server does not ship is refused
-  // exactly as an unshipped base profile is.
+  /*
+   * **The kit, and it is a real edit put back through the loader** — `core`'s `config/rushPrefit.ts`.
+   *
+   * `prefittedRushBuilding` edits the **authored document** (`ResolvedBuilding.config`) and the
+   * result goes back through `parseBuilding`/`resolveBuilding`, which is how `packages/viz` applies
+   * a fit-out and is the only way the two can agree: a resolved building edited in place would skip
+   * every default, every cross-check and every derived figure the loader computes, and the viewer's
+   * half does not skip them. `rushHoldAgreement.json`'s `prefit` cells pin both paths to one held
+   * figure.
+   */
+  let building = asShipped;
+  if (prefit) {
+    const specs = resources.elevatorSpecs;
+    if (specs === undefined) return 'cannot-prefit';
+    building = resolveBuilding(parseBuilding(prefittedRushBuilding(asShipped.config, specs) as unknown), specs);
+  }
+
+  /*
+   * The player's rules over the **server's** profile. Never a profile the submission carried.
+   *
+   * The kit goes on **under** the rules, for `packages/viz`'s own reason: `drivingProfileOf` writes
+   * the zoning lever at the bottom of its chain and the rules at the top, because a rule list is a
+   * preference and how the group is worked is hardware. The two are disjoint fields either way, so
+   * the ordering is a claim rather than an effect — which is exactly why it is written the same way
+   * on both sides.
+   */
+  const dispatcherProfile = profileWithRules(prefit ? prefittedRushProfile(shipped) : shipped, run.ruleRows ?? []);
+  /*
+   * And the log's handovers the same way — a switch to an id this server does not ship is refused
+   * exactly as an unshipped base profile is. **A switch target carries no kit**, deliberately: the
+   * viewer's stage hands the run a shipped profile as shipped (`dev/main.ts`'s `plainBaselineOf`),
+   * so fitting one here would be this server replaying a run no player can press.
+   */
   const log = interventionsFor(run, resources);
   if (log === 'unknown-dispatcher') return 'unknown-dispatcher';
 
@@ -282,11 +340,21 @@ const RUSH_POSTS_AS_A_SITTING =
  * go through {@link configOver} exactly as a single run's do.
  *
  * It admits **only** the rush template, which is the whole of the difference from {@link configFor}.
+ *
+ * **`prefit` is the one thing a sitting's modifiers change about a round** — GitHub issue #372,
+ * [§ D640](../../../../DECISIONS.md). It comes from `core`'s `claimsRushPrefit` over the claims
+ * `http/api.ts` has already checked against the account's spends, and it fits the tower and the
+ * driving profile with the one kit `config/rushPrefit.ts` holds. The rate is **still derived from
+ * the building as shipped**, deliberately: a rate is a fact about the crowd, the kit moves no floor's
+ * population, and the viewer's press reads it off the unfitted tower for the same reason
+ * (`everyday/rush.ts#rushBuildingOf`). The two `purse-units` top-ups reach nothing here, because a
+ * purse is derived after the replay and spent by nothing (§ D606 § 2).
  */
 export function rushRoundConfigFor(
   buildingId: string,
   round: Pick<SubmittedRun, 'dispatcherProfileId' | 'ruleRows' | 'interventions'>,
   resources: VerificationResources,
+  prefit = false,
 ): SimulationConfig | RejectionCode {
   const building = resources.buildingsById.get(buildingId);
   if (building === undefined) return 'unknown-building';
@@ -303,7 +371,7 @@ export function rushRoundConfigFor(
     ...(round.ruleRows === undefined ? {} : { ruleRows: round.ruleRows }),
     ...(round.interventions === undefined ? {} : { interventions: round.interventions }),
   };
-  return configOver(run, resources, (template) => template.id === RUSH_TEMPLATE_ID);
+  return configOver(run, resources, (template) => template.id === RUSH_TEMPLATE_ID, prefit);
 }
 
 /**

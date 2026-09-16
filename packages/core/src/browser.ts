@@ -226,6 +226,15 @@ export {
   rushPurseOpeningUnits,
   rushPurseRounds,
   violationsInRushPurse,
+  // The one fixed rush pre-fit kit — GitHub issue #372; `config/rushPrefit.ts`, § D640.
+  MIN_DOOR_S,
+  RUSH_PREFIT_KIT,
+  RUSH_PREFIT_SINK_ID,
+  claimsRushPrefit,
+  doorCycleWithSaving,
+  prefittedRushBuilding,
+  prefittedRushProfile,
+  violationsInRushPrefit,
 } from './config/index.js';
 
 export type {
@@ -329,6 +338,9 @@ export type {
   RushPurseRound,
   RushPurseSchema,
   RushPurseTable,
+  RushPrefitClaim,
+  RushPrefitKit,
+  RushPrefitRung,
 } from './config/index.js';
 
 /* -------------------------------------------------------------------------- *

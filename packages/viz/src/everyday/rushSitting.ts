@@ -224,11 +224,24 @@ export interface RushSittingRoundBody {
   readonly claimedHeldS: number | null;
 }
 
+/**
+ * One purchase a sitting claims to have been played with — `packages/server`'s `ClaimedModifier`.
+ *
+ * Named rather than written inline because three modules now pass one: the press that starts a rush
+ * (`everyday/host.ts#startRush`, which gives it to `everyday/rush.ts#rushPatchOf` so a claimed
+ * `rush-prefit` reaches the building), the session that holds it, and this body. The steps are the
+ * account's, checked against its spends by the server and never here.
+ */
+export interface ClaimedRushModifier {
+  readonly sinkId: string;
+  readonly steps: number;
+}
+
 /** A sitting as `POST /api/rush-sittings` reads it — `packages/server`'s `SubmittedRushSitting`. */
 export interface RushSittingBody {
   readonly buildingId: string;
   readonly rounds: readonly RushSittingRoundBody[];
-  readonly modifiers?: readonly { readonly sinkId: string; readonly steps: number }[] | undefined;
+  readonly modifiers?: readonly ClaimedRushModifier[] | undefined;
 }
 
 /**
@@ -287,18 +300,22 @@ export const RUSH_SITTING_COPY = Object.freeze({
  * the reasons, never the first — `runIdentityIssues`' own rule, and for its reason: a reader told
  * about one and then about the next has been made to guess how many there are.
  *
- * **`modifiers` is a parameter and is always empty today**, and that absence is the issue's third
- * criterion rather than an oversight. Nothing in this build spends a chime
+ * **`modifiers` is a parameter and is still empty in every sitting this build produces**, and that
+ * is the issue's third criterion rather than an oversight. Nothing here spends a chime
  * (`everyday/chimesPanel.ts` says so on its own face), so no account holds a rush modifier to
- * claim; and a top-up sold now would buy purse units nothing can spend, which is the defect
- * `CLAUDE.md`'s standing requirement names. The parameter exists because the wire carries the field
- * and a sitting played with a bought purse must never land on the standard board — so the day a
- * spend surface exists, it passes its claims here rather than teaching this module a second way in.
+ * claim. **What changed on 2026-09-16 is what one of them would now do**
+ * ([§ D640](../../../../DECISIONS.md)): a claimed `rush-prefit` reaches the run —
+ * `everyday/host.ts#startRush` passes the sitting's claims to `everyday/rush.ts#rushPatchOf`, which
+ * fits the building, and `packages/server`'s replay fits it with the same three effects — so the
+ * sink is no longer a purchase that would change nothing. The two `purse-units` top-ups still are,
+ * because nothing spends a purse (§ D606 § 2), and selling one now would be the defect
+ * `CLAUDE.md`'s standing requirement names. The parameter is unmoved: the day a spend surface
+ * exists it passes its claims here rather than teaching this module a second way in.
  */
 export function rushSittingOf(input: {
   readonly buildingId: string;
   readonly rounds: readonly RushRoundRecord[];
-  readonly modifiers?: readonly { readonly sinkId: string; readonly steps: number }[] | undefined;
+  readonly modifiers?: readonly ClaimedRushModifier[] | undefined;
 }): RushSittingCheck {
   const rounds = input.rounds;
   if (rounds.length === 0) return { ok: false, reasons: Object.freeze([RUSH_SITTING_COPY.noRounds]) };

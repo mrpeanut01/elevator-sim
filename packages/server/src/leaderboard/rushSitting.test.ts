@@ -70,8 +70,8 @@ interface Truth {
 }
 
 /** One round, measured the way the server measures it — see the module docstring. */
-function truthOf(round: Omit<SubmittedRushRound, 'claimedHeldS'>, buildingId = BUILDING): Truth {
-  const config = rushRoundConfigFor(buildingId, round, resources);
+function truthOf(round: Omit<SubmittedRushRound, 'claimedHeldS'>, buildingId = BUILDING, prefit = false): Truth {
+  const config = rushRoundConfigFor(buildingId, round, resources, prefit);
   if (typeof config === 'string') throw new Error(`the fixture does not resolve: ${config}`);
   const { record } = runSimulation(config);
   const holdAtS = rushHoldAtLegs(record.passengers, record.startedAt, record.endedAt);
@@ -175,12 +175,21 @@ describe('the cheap gate — everything refused before a simulation starts', () 
     expect(issues.join(' ')).toContain('equipment-change');
   });
 
-  it('refuses a modifier that does not top up this purse — a fitted building this server cannot build, or a career purse', () => {
+  it('refuses a modifier this sitting’s replay cannot reach, and takes the two it can', () => {
     const withModifier = (sinkId: string): readonly string[] =>
       rushSittingIssues({ buildingId: BUILDING, rounds: [round], modifiers: [{ sinkId, steps: 1 }] }, purse);
     expect(withModifier('rush-purse-top-up')).toEqual([]);
-    expect(withModifier('rush-prefit').join(' ')).toContain('rush-prefit');
+    /*
+     * **`rush-prefit` used to be on the other side of this assertion** — GitHub issue #372, § D640.
+     * It was refused because *fitted* was authored nowhere and a claim the replay could not build
+     * would have put a sitting on a board keyed *bought* for a run of the tower as shipped (§ D606
+     * § 2). It is one fixed kit now, `core`'s `config/rushPrefit.ts`, and the replay fits every
+     * round with it — so the gate takes it, and the test below plays it.
+     */
+    expect(withModifier('rush-prefit')).toEqual([]);
+    /* A career purse is still not a rush's, and a sink nothing sells is still nothing. */
     expect(withModifier('career-purse-top-up').join(' ')).toContain('career-purse-top-up');
+    expect(withModifier('rush-prefit-deluxe').join(' ')).toContain('rush-prefit-deluxe');
   });
 });
 
@@ -227,6 +236,58 @@ describe('the replay — every round re-simulated, every purse derived', () => {
      */
     expect(topped.rounds[0]?.heldS).toBe(plain.heldS);
   }, 300_000);
+
+  it('fits the tower for a sitting that claims the pre-fit, and the run is a different run', () => {
+    /*
+     * **GitHub issue #372, § D640 — and this is the assertion the purse's own row above cannot
+     * make.** A top-up widens a purse nothing spends, so it holds at the same moment; a pre-fit is
+     * the one modifier that reaches the run, so it must not. Compared on the **hold moment**, which
+     * is what this sitting ranks on and is read off the replay's own legs, rather than on a summary
+     * line — `CLAUDE.md`'s standing requirement pointed at a purchase.
+     *
+     * The claim is honest on both sides: the round claims the held time a *fitted* replay produces,
+     * because that is what a player who bought the kit would have watched.
+     */
+    const fitted = truthOf(PLAIN, BUILDING, true);
+    expect(fitted.heldS, 'the kit changed nothing the rush can see on this cell').not.toBe(plain.heldS);
+
+    const verified = replayRushSitting(
+      { buildingId: BUILDING, rounds: [claimed(PLAIN, fitted)], modifiers: [{ sinkId: 'rush-prefit', steps: 1 }] },
+      { resources, purse, ledger },
+    );
+    if (!verified.ok) throw new Error(`${verified.code}: ${verified.detail}`);
+    expect(verified.heldS).toBe(fitted.heldS);
+    /* A pre-fit grants no units, so the purse opens where the standard board's does. */
+    expect(verified.rounds[0]?.purseBeforeUnits).toBe(0);
+
+    /*
+     * And the other direction, which is the half that says the fitting is driven by the claim rather
+     * than always on: the same round, claiming the same fitted figure, with no modifier on it is
+     * refused because the server replays the tower as shipped and gets a different moment.
+     */
+    const unclaimed = replayRushSitting({ buildingId: BUILDING, rounds: [claimed(PLAIN, fitted)] }, { resources, purse, ledger });
+    expect(unclaimed.ok).toBe(false);
+    if (!unclaimed.ok) expect(unclaimed.code).toBe('held-does-not-reproduce');
+  }, 300_000);
+
+  it('refuses a claimed pre-fit it cannot build, rather than replaying the tower as shipped', () => {
+    /*
+     * The kit resolves each car's door timings against `data/elevator-specs.json`, so a resources
+     * set without one cannot fit a tower. **Refused rather than replayed unfitted**: the alternative
+     * compares an honest player's fitted hold against an as-shipped replay and blames their build.
+     * No shipped server reaches it — `bootstrap.ts` always passes the specs — so it is driven here.
+     */
+    const blind: VerificationResources = { ...resources, elevatorSpecs: undefined };
+    const verified = replayRushSitting(
+      { buildingId: BUILDING, rounds: [claimed(PLAIN, plain)], modifiers: [{ sinkId: 'rush-prefit', steps: 1 }] },
+      { resources: blind, purse, ledger },
+    );
+    expect(verified.ok).toBe(false);
+    if (!verified.ok) {
+      expect(verified.code).toBe('cannot-prefit');
+      expect(verified.simulations, 'a refusal that cannot be built costs no simulation').toBe(0);
+    }
+  });
 
   it('ignores a purse the client smuggles past the gate — every purse is the replay’s, whatever the body says', () => {
     const honest = replayRushSitting(honestSitting(), { resources, purse, ledger });

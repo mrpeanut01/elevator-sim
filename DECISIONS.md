@@ -37161,3 +37161,85 @@ Measured over all eighteen new-shaft repairs: **sixteen** add a car to a bank th
 Whether **any** of the four prices or three boundaries is right — all seven are an agent's draft and all seven await the owner, exactly as § D601's footprints do. Whether `fifth-car` should carry the surcharge too, which is the campaign-shop path § 8 says nothing reaches. Whether the campaign shop should quote a banded price at all, which needs a resolved building where there is none. Whether a **fifth** band is worth cutting once a building lands in the 104–376 bulk's own gaps — § 2 says the distribution does not support one **today**, which is a measurement of a shipped set rather than a property of the design. And whether lettable area should bound a floor's **population**, which § D601 § 11 left open and this entry does not touch.
 
 **Bookkeeping.** This lane was reserved **D630–D639** and spent **D630**. **D631–D639 are returned unspent**, and whether each is free or a hole is the integrator's call at close, on § D430's rule.
+
+---
+
+## D640 — `rush-prefit` is one fixed kit, authored at last: what *fitted* means, applied by `core` and claimable at both ends, with the general rebuild still refused
+
+**Date: 2026-09-16 · GitHub issue [#372](https://github.com/mrpeanut01/elevator-sim/issues/372) · Answers the third of the three questions [§ D606](#d606) § 2 named and declined · Rules on: [`data/chime-ledger.json`](data/chime-ledger.json)'s `rush-prefit` sink, `packages/core/src/config/rushPrefit.ts`, `packages/server/src/leaderboard/rushSitting.ts`, `packages/server/src/leaderboard/verify.ts`, `packages/viz/src/everyday/rush.ts`, `packages/viz/src/everyday/host.ts`, `packages/viz/src/campaign/fitOut.ts`, `packages/server/src/leaderboard/rushHoldAgreement.json`.**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds. It binds nine modules across three packages that no one of them owns; it **moves something already recorded** — § D606 § 2 declined to answer what *fitted* means, and `verify.ts` carried *"a pre-fitted start (its fitted building is one this server cannot build)"* as a standing refusal; and it records two product-owner rulings that bind work nobody has started.
+
+### 1. What is built
+
+`data/chime-ledger.json` has sold **`rush-prefit`, *Start with the building fitted*, for fifteen chimes** since the ledger shipped, and **what *fitted* meant was authored nowhere**. Both ends refused it by name for that reason, which was correct while it was true. It is authored now, as **one kit and no other**:
+
+**Doors L1 + Control L1 + Tenants L1** — `campaign/economy.ts#SHOP`'s three cheapest first rungs, which are [`data/price-schedule.json`](data/price-schedule.json)'s `faster-doors`, `zone-the-tower` and `queue-marshalling`. Three effects, all of them plain fields `core` already carries: a second off each stop's door cycle, a 1.2 s ceiling on per-passenger transfer time, and *the group is worked as zones*.
+
+`packages/core/src/config/rushPrefit.ts` holds the kit and its two appliers, beside `rushPurse.ts` and `chimeLedger.ts` for the reason those two give in terms: `packages/server` has to replay a posted sitting and may not import the viewer, so a rule both ends need lives in the package both already depend on. `packages/viz` reaches it as a `CampaignFitOut` built **from that constant** (`everyday/rush.ts#RUSH_PREFIT_FIT_OUT`) and folds it through `campaign/fitOut.ts` like any other kit, because a pre-fitted rush *is* a fitted building and a second applier beside that one would be the answer that drifts. `packages/server`, which has no shop and no fold, calls the two functions directly.
+
+**The zoning lever is a `viz` concept, and the entry says what it resolves to**, because the brief asked and because the next reader will. `zonesTheTower` is `campaign/economy.ts`'s field, expressed as `authoring/dispatcherSpec.ts`'s **`express` group lever** — and `GroupLevers` lives in `packages/viz` and reaches `core` through nothing. So `core` holds the lever's *conclusion* rather than the lever: `prefittedRushProfile` writes `dispatch.assignmentMode: 'split-demand'`, `dispatch.splitThresholdPassengers` (the profile's own where it declares one, else 10) and `idle.parkingStrategy: 'zone-center'`, which are exactly the three fields `profileFromSpec` writes for `levers.express`, transcribed rather than reinvented. `packages/viz` still goes through the lever, so nothing there gained a second expression of it; the two are held to the same three fields over every shipped dispatcher by a test, and the parking override is part of the claim because `parkingFor` puts express above the profile's own.
+
+**The claim travels the way [§ D606](#d606) built it to.** `EverydayHost.startRush` reads the sitting's modifiers **once**, at the first press, from a new `rushModifiers` binding, and hands them to `everyday/rush.ts#rushPatchOf`; the same set goes to `rushSittingOf` and onto the wire; `packages/server`'s `rushSittingIssues` now accepts the pre-fit alongside the purse top-ups, and `replayRushSitting` reads the set once for the whole sitting and fits every round with it. A sitting is one modifier set — every round of it starts from the same building, which is what *consecutive runs from an as-shipped start* becomes once the start is bought — and the board is already keyed on that set ([§ D543](#d543)).
+
+### 2. That this is a purchase which changes a run is established by runs, not by this entry
+
+`packages/server/src/leaderboard/rushHoldAgreement.json` gains two `prefit` cells. Each half of that agreement plays its **own whole path** to them — the viewer's through the player's press, the server's through `rushRoundConfigFor` — and each cell is required to differ from the same cell as built:
+
+| cell | as built | pre-fitted |
+|---|---|---|
+| `garden-apartments` · `collective` | 1 178 s | **1 214 s** |
+| `midtown-office` · `collective` | 1 640 s | **1 650 s** |
+
+That is `CLAUDE.md`'s standing requirement pointed at a purchase — *move the control and require the run to change, compared on the legs* — and it is the only check here that can catch a kit which folds perfectly and reaches no decision, which is what `destination-eta` did for a whole release ([§ D112](#d112)). The two appliers are separately held byte-identical on every shipped tower, raw and resolved, each side with a negative control so that two no-ops cannot agree.
+
+**Two measured findings, recorded rather than smoothed.** The kit is **inert on `zoned-uppeak`**, which ships declaring exactly what Control L1 concludes — asserted in both directions, so a shipped profile that stopped being zoned goes red rather than making the exception list quietly shorter. And `queue-marshalling`'s ceiling is already inert on `midtown-office`, which `campaign/fitOut.ts` had measured before this lane, so that tower's ten seconds are doors and zoning alone.
+
+### 3. The kit, and why these three rungs — CHOSEN
+
+Every figure here is **CHOSEN** in the product owner's 2026-09-08 sense: an agent's proposal, drafted for the owner to accept, tighten or reject, and not one of them is measured. The lever is one constant and one `priceChimes`.
+
+**Fifteen units against fifteen chimes, at one chime per unit.** 4 + 6 + 5 = 15 in the price schedule, and the sink has charged fifteen chimes since it shipped. One chime per unit is [`data/campaign.json`](data/campaign.json)'s scenario budget rungs' own rate, cited as precedent in the ledger's own `$comment`; it is deliberately **not** the ≈ 1.6 chimes per unit the two `purse-units` sinks charge, because those sell a scalable grant and this is a flat one-time kit, where the round number is the more legible anchor. The arithmetic is re-derived from the shipped schedule by a test rather than transcribed, so a re-priced row goes red here instead of leaving the reasoning behind.
+
+**Machines, Shafts and Car size are deliberately out.** `SHOP`'s own subtitle calls Shafts *"the real fix, and the real cost"*. A flat currency purchase should give a taste of comfort rather than pre-solve the tower. It also keeps the kit clear of `commissioning/` entirely — no `extraShafts`, no `machineClassId` — which is what makes § 5 below possible.
+
+**Control is capped at tier 1.** `zone-the-tower` sets nothing but `zonesTheTower`. Tiers 2 and 3 rewrite `callType`, `passengerAssignment` and `rideTimeWeightFloor`, and a flat currency purchase may not pre-decide the dispatcher-strategy question the player is there to make live.
+
+### 4. Two rulings settled and parked, recorded so nobody asks again
+
+[§ D606](#d606) § 2 named three questions with no answer anywhere. The third is § 1 above. The other two are **answered by the product owner and are not actionable yet**, because the work they bind — the general between-round rebuild — is not built:
+
+1. **A rush rebuild is instantaneous.** No clock and no nights inside a sitting. This departs from Career's shop, which books works over nights in a month grid, and the departure is the reason: a sitting has no calendar, which is § D606's own framing of this exact question, and giving one a clock would make it a different mode.
+2. **A rush rebuild does not require the tier below it inside the same sitting.** [`docs/38`](docs/38-what-the-game-is.md) § 8.2's first buying rule — a tier requires the tier below — holds in the campaign and does not hold here, because a sitting that starts as-shipped every time is a very different ladder.
+
+Neither reaches code on this commit. `rush-prefit` is a fixed kit, so it has no tier to gate and nothing to book; both rulings bind whoever builds the general rebuild.
+
+### 5. What is **not** built, and § D606's boundary is not moved
+
+**The general between-round purse-spend rebuild is not built** — buying an arbitrary tier of an arbitrary category between rounds, which is issue #372's second acceptance criterion in its own words: *a round rebuilt with a larger purse produces a different run*. It remains blocked exactly where [§ D606](#d606) § 2 left it. The purse is still derived, published and spent by nothing; `rushPurse.ts#rushPurseRounds` still has no spend term; `everyday/rushScreenModel.ts#RUSH_ABSENCES` still carries the absence, owned to #372 itself.
+
+**None of § D606's three shapes is taken, and that is the load-bearing claim of this entry.** Each was declined for a reason that is about an *arbitrary* kit, and none of those reasons is true of a fixed one:
+
+- **Moving the derivation into `core`** was declined because `SHOP` is a shop — *"its tiers carry player-facing names, subtitles and effect sentences, and moving them into `core` puts product copy inside the simulator and outside the honesty corpus's reach."* `RUSH_PREFIT_KIT` carries **three numbers and no words**: no name, no subtitle, no effect sentence, no tier, no price in units, no ladder and no second kit. A test asserts that mechanically — no prose literal may appear on the constant — so the claim is checked rather than promised. `SHOP` has not moved and is not reachable from `core`.
+- **Putting the rebuild on the wire as a cause** reduced to the first with an extra field. Nothing is added to the wire here: `modifiers` is [§ D542](#d542)'s own field, already carried, already checked against the account's spends by `chimes/ledger.ts#unbackedModifiers`, already in the board key.
+- **Admitting the two bought intervention kinds on a rush sitting** is untouched. `core/src/sim/interventionWire.ts` refuses `equipment-change` and `building-change` exactly as it did, and a pre-fit is not an intervention — it is the configuration a round starts from, which is why it needs no pricing at replay time.
+
+**And nothing here can price anything.** [`data/price-schedule.json`](data/price-schedule.json) is still parsed only in `packages/viz`; `core` holds the three rungs' unit figures as a **dated transcription** with the schedule named, not as a read. That is the whole difference between a fixed kit and the general feature, and it is why the general feature still needs a boundary decision this lane does not take.
+
+### 6. Two smaller things this lane moved, both corrections
+
+**`doorCycleWithSaving` and `MIN_DOOR_S` moved from `campaign/fitOut.ts` into `core`**, and `fitOut.ts` re-exports `MIN_DOOR_S` and calls the moved function. A change of address rather than of behaviour: the replay needs the same arithmetic on the other side of a package boundary, and two implementations that agree today is the shape this repository has a rule about.
+
+**`RUSH_ABSENCES`'s second sentence was a stale refusal before this lane closed.** It read *"The two rush purchases in the chime list are the same gap from the other side, and neither can be bought yet"*, and they are no longer the same gap: a wider purse still buys nothing, while starting fitted now reaches the run and waits only on a screen that spends a chime. [§ D227](#d227) rates a refusal drawn over a working control as worse than a missing sentence, so it is rewritten as a **substitution** — one register entry in, one out.
+
+### 7. What no surface does yet, said plainly
+
+**No screen spends a chime, so no account holds a `rush-prefit` to claim and every sitting this build produces still carries an empty `modifiers`.** That is GitHub issues #371 and #372's own remaining half, and `everyday/chimesPanel.ts#CHIMES_PANEL_COPY.spendRefusal` says it on its own face. What changed is what a claim would now *do*: before this commit, buying the pre-fit would have been a purchase that changed no run and was refused at the gate; after it, the sink is real, and the day a spend surface ships it fills `EverydayHostBindings.rushModifiers` and nothing else moves. The two `purse-units` sinks are still in the defect `CLAUDE.md`'s standing requirement names, and selling one before a rebuild travels would still be that defect.
+
+### 8. The corpus, as a forecast rather than as the row
+
+[§ D343](#d343) puts the measurement on the integrator, once, after integration. What a lane may honestly publish is a prediction, and this one is **zero in both tiers: no surface added, none removed, no string moved, cases, simulations and failing cases unmoved.** Every player-facing change on this commit is a substitution — one `RUSH_ABSENCES` entry replaced by one — and nothing else here draws a word: the kit carries no copy, the server's two new sentences are API detail rather than a surface, and `honesty/surfaces.ts` is untouched.
+
+### 9. Numbers spent
+
+This lane held **D640–D644** and spent **D640 only**. **D641, D642, D643 and D644 are unspent** and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them — ids here are names, so backfilling one would make it denote two things across time. The integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES` if that is what happens.

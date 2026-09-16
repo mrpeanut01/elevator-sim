@@ -1991,21 +1991,17 @@ type DecisionReservation = {
  * `CHARTER_PROGRAMME.md`'s row to **D622** on this commit.
  */
 /**
- * **Wave AD is open, and this lane opened it** — GitHub issue #429 stage 2,
- * [§ D630](../../../../DECISIONS.md).
- *
- * This lane branched from `dd72da9`, where the constant was `null` and `CHARTER_PROGRAMME.md`'s row
- * read **D623**. Its own block is **D630–D639**, so the first number it wrote turned the charter-row
- * gate red on the ceiling rather than on anything the lane had done — § D601's situation exactly,
- * and the four-lane full house wave AB recorded above.
- *
- * **The floor is the charter row's own figure and the ceiling is the top of *this lane's* block**,
- * which is the narrowest range that is true from here. D623–D629 are **not holes**: they are
- * sibling lanes' blocks this branch cannot see, and holding the floor at 623 is what stops them
- * being reported as unregistered on every branch of the wave. The integrator reconciles the real
- * ceiling at close, when it knows which lanes spent what.
+ * **The wave of 2026-09-16 is closed.** It reserved D623–D644 across two disjoint lane blocks that
+ * each opened the reservation identically from its own branch, exactly as wave AB's four lanes did —
+ * #429 stage 2 (D630–D639, [§ D630](../../../../DECISIONS.md)) and #372's `rush-prefit` sink
+ * (D640–D644, [§ D640](../../../../DECISIONS.md)). Each lane branched from the same pre-wave base
+ * and spent exactly one number: D630 and D640. **D623–D629, D631–D639 and D641–D644 are now holes**
+ * rather than free — the reservation has closed with D640 written above every one of them, which is
+ * exactly the test wave AB's own note names for this state. Registered in `KNOWN_DECISION_HOLES`
+ * below. The reservation is set back to `null` and `CHARTER_PROGRAMME.md`'s row moves to **D641**
+ * on this commit, per the remedy the guard below names.
  */
-const OPEN_RESERVATION = { wave: 'AD', from: 623, to: 639 } as DecisionReservation | null;
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
@@ -2135,6 +2131,65 @@ const OPEN_RESERVATION = { wave: 'AD', from: 623, to: 639 } as DecisionReservati
  */
 
 const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
+  [
+    623,
+    "the wave of 2026-09-16's reservation floor. Neither of its two lane blocks (D630-D639, " +
+      "D640-D644) started here, and nothing else wrote D623-D629 before the reservation closed " +
+      "with D640 written above them, which makes them holes rather than free. Registered under " +
+      "D404 and D430: ids here are names, so reissuing one would make it denote two things across " +
+      "time.",
+  ],
+  [
+    624,
+    "the wave of 2026-09-16's reservation floor; unspent for § 623's reason.",
+  ],
+  [
+    625,
+    "the wave of 2026-09-16's reservation floor; unspent for § 623's reason.",
+  ],
+  [
+    626,
+    "the wave of 2026-09-16's reservation floor; unspent for § 623's reason.",
+  ],
+  [
+    627,
+    "the wave of 2026-09-16's reservation floor; unspent for § 623's reason.",
+  ],
+  [
+    628,
+    "the wave of 2026-09-16's reservation floor; unspent for § 623's reason.",
+  ],
+  [
+    629,
+    "the wave of 2026-09-16's reservation floor; unspent for § 623's reason.",
+  ],
+  [
+    631,
+    "GitHub issue #429 stage 2's lane held D630-D639 and spent only § D630 on the issue whole — " +
+      "the measured area distribution, the four bands and prices, the budget-ceiling re-derivation " +
+      "and the two unbanded fix-it cases. One issue closed end to end is one decision however many " +
+      "modules it touches, which is this column's usual reason for a lane's spare numbers. " +
+      "Registered under D404 and D430.",
+  ],
+  [632, "GitHub issue #429 stage 2's block; unspent for § 631's reason."],
+  [633, "GitHub issue #429 stage 2's block; unspent for § 631's reason."],
+  [634, "GitHub issue #429 stage 2's block; unspent for § 631's reason."],
+  [635, "GitHub issue #429 stage 2's block; unspent for § 631's reason."],
+  [636, "GitHub issue #429 stage 2's block; unspent for § 631's reason."],
+  [637, "GitHub issue #429 stage 2's block; unspent for § 631's reason."],
+  [638, "GitHub issue #429 stage 2's block; unspent for § 631's reason."],
+  [639, "GitHub issue #429 stage 2's block; unspent for § 631's reason."],
+  [
+    641,
+    "GitHub issue #372's `rush-prefit` lane held D640-D644 and spent only § D640 on the sink " +
+      "whole — the fixed kit, its two core-side appliers, both ends' wiring and the two rulings " +
+      "parked for whoever builds the general rebuild. One issue closed end to end is one decision, " +
+      "which is this column's usual reason for a lane's spare numbers. Registered under D404 and " +
+      "D430.",
+  ],
+  [642, "GitHub issue #372's block; unspent for § 641's reason."],
+  [643, "GitHub issue #372's block; unspent for § 641's reason."],
+  [644, "GitHub issue #372's block; unspent for § 641's reason."],
   [
     602,
     "wave AB's lane B returned it unspent, and lanes C and D then wrote a higher" +
