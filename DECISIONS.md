@@ -39725,3 +39725,149 @@ exercise found, one turn before acting on it.
 spent here because the ruling it records is the session principal's and needed a heading of its own.
 D738–D741 stay free rather than holed: nothing is written past them, which is wave P's precedent and
 the one shape § D430 permits at a block's top.
+
+## D738 — the career purse gains a fourth **derived** term, so a chime top-up reaches a run through the shop rather than through a balance
+
+**Date: 2026-09-19 · Owner: wave AD lane A · Rules on:** GitHub issue #557,
+[§ D400](#d400)'s *"a latched purse would be a second answer to a question one of them already
+contains"*, [§ D227](#d227) (the refusal that had to go on the commit that made it false),
+[§ D526](#d526) clauses 3, 4 and 5, `docs/32-game-design.md` GD11–GD14, and the factual aside in
+[§ D737](#d737) § 5 that *"both `purse-units` sinks buy nothing today"* — true when it was written,
+half false from this commit. That entry is left exactly as it stands; this one is the correction,
+on the standing rule that a decision entry is a dated record rather than a page to be refreshed.
+
+**Why an entry at all, under [§ D405](#d405).** The decision reaches well past the module that took
+it: it changes what `campaign/economy.ts#purseOf` *is* (a claim `data/chime-ledger.json`'s own note
+and `everyday/chimesPanel.ts`'s refusal both spoke about), it deletes a shipped player-facing
+refusal, it bumps a persisted schema version other builds will read, and issue #557's own acceptance
+criterion asks in terms for a decision entry if the purse stops being derived. It has not stopped
+being derived, and **saying so where the next reader will look is the point of the heading**.
+
+### 1. What was wrong, in one line each
+
+`data/chime-ledger.json` sells `career-purse-top-up` at 10 chimes for 6 units. `CampaignAction` had
+ten arms and none wrote a grant; `spends` was only ever a debit; `purseOf` was
+`carriedIn + earnedSoFar − committedUnits`, every term derived. So the sink was priced, parsed,
+charged and answered, and changed nothing about any run — `CLAUDE.md`'s standing requirement
+pointed at a purchase, and the first instance of it in this repository's history that **a player
+pays for**. It had not shipped as a lie: the spend panel carried a row saying it could not be
+bought, which is why this entry is about making it real rather than about stopping one.
+
+### 2. The design, and the term that had to be a sum
+
+A fourth arm, `grant-units`, writes one `PurseGrant` row — `{ day, units, sinkId }` — and
+`economy.ts#grantedUnits` sums it into `purseOf`:
+
+```
+purse = max(0, carriedIn + earnedSoFar + granted − committed)
+```
+
+**The purse stays derived**, which is § D400 upheld rather than argued around. The issue's own
+finding — *every term is derived, so there is no additive term a grant could join* — is an argument
+for a fourth term **of the same kind**, not for a stored balance: `grantedUnits` is the mirror of
+`committedUnits`, one sums what arrived from outside the contract and the other what left, and
+neither is latched. `purseTopUpReachesTheRun.test.ts` asserts it the only way that means anything:
+delete the row and the purse goes back to what it was.
+
+### 3. A granted unit reaches a run, and here is the run
+
+`campaign/purseTopUpReachesTheRun.test.ts`, § D427's shape, § D177's comparison — legs, never a
+window statistic. `garden-apartments` at `c1`'s own 3 600 s, seed 20 260 804, both arms driven
+through the **shipped** presses (`host.spendChime`, `campaignAct`, `runCampaignDay`); nothing writes
+a `grants` row or a `fitted` map by hand.
+
+| arm | opening purse | doors L1 (4 u) | top-up | tenants L1 (5 u) | legs |
+|---|---|---|---|---|---|
+| as built | 8 | bought, 4 left | — | **refused, short by 1** | 48 |
+| topped up | 8 | bought, 4 left | **+6 u** | **bought**, 5 left | 48, **5 of them different** |
+
+Same passengers, same seed, **five legs taking a different car or boarding at a different instant**.
+The tier is `tenants` L1, chosen because `fitOut.test.ts` independently measures it moving the legs
+at this exact cell — three of sixteen shop tiers move nothing here for physical reasons, and a leg
+comparison at an empty cell proves the opposite of what it looks like it proves.
+
+**The third arm is the one that says what kind of thing a unit is.** A tower that bought the same
+top-up and pressed nothing runs the **identical** day, leg for leg. So the grant is money: it moves
+the legs by buying something that does, and never by itself.
+
+### 4. GD11–GD14, discharged by construction
+
+`grantUnits` writes one row and touches nothing else — not `day`, `missed`, `trips`, `fitted`,
+`bookings` or `carry`. Units are money (GD12, as amended by [§ D717](#d717) to allow a second
+source); nights are time and no booking's nights move (GD11); `standingOf` reads `clearedDays` and
+`missed`, neither of which is reachable from here, so a top-up cannot open a slot (GD14); and
+`missed` is not writable from this arm, so a bought day back is not **expressible** (GD13 clause 5).
+Asserted rather than promised: the record before and after a purchase is compared field by field.
+
+### 5. § D526's record is the day the money arrived, stated narrowly
+
+The row carries the contract day it landed on and the sink that granted it. It deliberately does
+**not** claim to name the single run it changed: a grant reaches the legs through a works booking it
+helped pay for, possibly nights later, so *the day the money arrived* is the honest record and *the
+run this modified* would be a stronger claim than the mechanism supports. No chime price is stored
+beside it — the account ledger is `packages/server`'s (clause 3), and a sink is never a source
+(clause 5, which `boundaries.test.ts` enforces in both directions).
+
+### 6. Two locks, and the first one is the one that protects a player's chimes
+
+A top-up grants units into *this tower's* purse. With no career desk open — or a contract already
+lost, § 8.10's shut shop — there is no tower for them to land in, and asking the server would take
+the chimes for a grant nothing could record: **issue #557's own defect, bought a second time and
+paid for.** So `everyday/host.ts#spendChime` refuses *before* the ledger is asked, with the host's
+own sentence (`CAREER_TOP_UP_NO_TOWER`, whose second clause is *nothing was spent*), and
+`chimesPanel.ts#SPEND_OFFERS`' `needsOpenTower` draws the row inert for the same reason. `docs/22`
+non-goal 3 is untouched: that rule forbids softening **the server's** refusal, and nothing was sent.
+`career.ts#grantUnits` re-applies both refusals on its own side, which is `applyCampaignAction`'s
+standing convention rather than a second opinion.
+
+### 7. The refusal is deleted on this commit, and the other one is not
+
+§ D227 in the direction it says bites hardest. `SPEND_ABSENCES`' `career-purse-top-up` entry read
+*"A tower's purse is worked out from what the contract carried in and what its days have earned, and
+nothing adds to it from outside"* — exactly true until this commit, and a stale refusal is worse
+than a dead seam because it tells a player not to touch a control that now works. It is **deleted
+rather than reworded**, and the sentence it used to say is kept in the module docstring so a reader
+can see what stopped being true.
+
+**`rush-purse-top-up` keeps its refusal**, and that is a decision rather than an oversight. Its
+cause is different and unfixed: no between-round rebuild travels for the rush ([§ D606](#d606) § 2),
+so a wider rush purse still buys nothing. Issue #557 says in terms not to fold the two together, and
+one sentence about *purses* would be a reader's summary rather than either file's fact — which is
+why both tables in that panel are keyed by sink id and never by modifier kind.
+
+### 8. The persisted career moves to version 2, with a real migration
+
+`CampaignTower.grants` is a new field on a record that is written to `localStorage`, so
+`CAREER_SCHEMA_VERSION` is **2** and `CAREER_SCHEMA_VERSIONS_READ` is `[1, 2]` — the first real use
+that constant has had. A version-1 career is one written before the field existed, and *no top-up
+had been bought* is exactly what an empty list says, so the migration is a fact rather than a guess.
+It is applied to **every** version this build reads rather than to version 1 alone, because
+`isCareerShape` is a shallow gate: a payload missing the array would otherwise decode cleanly and
+throw on the first derivation, and `towersView` runs on mount, so the Campaign tile would die rather
+than draw a refusal a player can read.
+
+### 9. Where a player feels it, which was a choice
+
+The grant is made on the Settings spend panel and becomes visible **in the shop, on the campaign
+desk**: a tier whose row read *Short by N* becomes a tier that can be pressed, and the day that runs
+afterwards is a different day. That is deliberate over a toast or a number flashing on the panel
+that took the payment — `docs/43`'s P4 asks whether there is a reason to come back, and the answer a
+player can act on is *the thing you could not afford this morning is now affordable*, met on the
+screen where they were already standing. The offer sentence says so before the press, with the
+ledger's own figure composed in front of it rather than written into the prose.
+
+### 10. Found and not fixed
+
+The `owns` count the panel reads is the **account's**, so a player who has bought the sink to its
+cap sees *bought* whichever tower's desk is open, while the units themselves are per tower. Nothing
+here is wrong — each purchase lands in the tower that was open when it was made, and the row's own
+sentence says the units are in the purse of the tower each was bought for — but a second contract
+would make *bought* the less useful of the two true sentences. Unmeasured, and no mechanism is
+offered for what the better one would be.
+
+### 11. Numbers spent
+
+**D738 only.** D739–D752 are this lane's block and are **unspent**: the schema bump (§ 8), the two
+refusals (§ 6) and the deleted absence row (§ 7) are all consequences of the one decision above and
+are argued in their own docstrings, which is what § D405 asks for when a choice does not reach past
+the module that took it. Nothing is written past them by this lane.

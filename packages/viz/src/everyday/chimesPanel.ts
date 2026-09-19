@@ -35,7 +35,7 @@
  * is a ruling rather than a lane's choice. The panel now says there is no tally until you sign in,
  * which is true today and stops being drawn the moment a device ledger exists.
  *
- * ## One of the three can be bought, and the other two say why they cannot
+ * ## Two of the three can be bought, and the third says why it cannot
  *
  * This panel shipped with a single sentence across the whole list —
  * *"None of these can be bought yet"* — which was true of the build and is not true of this one.
@@ -48,13 +48,24 @@
  * `packages/server`'s replay fits it with the same three effects, and
  * `leaderboard/rushHoldAgreement.json`'s two `prefit` cells are each required to differ from the
  * same cell as built, which is `CLAUDE.md`'s *move the control and require the run to change*
- * discharged by a run. The two `purse-units` top-ups are **not** offered, and each says so on its
- * own line: `campaign/economy.ts#purseOf` is `carriedIn + earnedSoFar − committed` and has no term
- * a purchase could enter, and no between-round rebuild travels for the rush
- * ([§ D606](../../../../DECISIONS.md) § 2). Selling either would be a control that writes nothing,
- * which `CLAUDE.md`'s standing requirement names and `docs/22` non-goal 5 forbids in **both**
- * polarities — so a price listed without its refusal is the same defect as the refusal without the
- * price.
+ * discharged by a run.
+ *
+ * **`career-purse-top-up` is offered now, and its refusal went the same way on the commit that
+ * made it false** — GitHub issue #557, [§ D738](../../../../DECISIONS.md). That row's sentence read
+ * *"A tower's purse is worked out from what the contract carried in and what its days have earned,
+ * and nothing adds to it from outside"*, and it was exactly true until `campaign/economy.ts`
+ * gained a `PurseGrant` record and a fourth term in `purseOf`. It is **deleted rather than reworded**,
+ * § D227 again, and `campaign/purseTopUpReachesTheRun.test.ts` is the run that earns the deletion:
+ * a tower that bought a top-up and one that did not, same seed, compared on the legs.
+ *
+ * `rush-purse-top-up` is still **not** offered and still says why on its own line: no between-round
+ * rebuild travels for the rush ([§ D606](../../../../DECISIONS.md) § 2). It is a **separate case
+ * with a different cause**, which is why issue #557 refuses to have the two folded together and why
+ * one sentence about *purses* would be a reader's summary rather than either file's fact.
+ *
+ * Selling a sink that reaches nothing would be a control that writes nothing, which `CLAUDE.md`'s
+ * standing requirement names and `docs/22` non-goal 5 forbids in **both** polarities — so a price
+ * listed without its refusal is the same defect as the refusal without the price.
  *
  * **{@link SPEND_ABSENCES} is `screens.ts#UNBUILT_REASONS`' shape, deliberately**: a table keyed by
  * id, one sentence each, and `chimesPanel.test.ts` asserting in both directions that every sink is
@@ -88,6 +99,8 @@ import {
   type ChimeSink,
   type ChimeSpendTable,
 } from '@elevator-sim/core/browser';
+
+import { CAREER_PURSE_TOP_UP_SINK_ID } from '../campaign/economy.js';
 
 /*
  * Named `chimeLedgerDocument` rather than `document`: `boundaries.test.ts` confines the DOM to the
@@ -143,10 +156,15 @@ export type ChimesHome =
  * `pricing/spendWidensTheBudget.test.ts` is the shipped instrument for the other direction.
  */
 export const SPEND_ABSENCES: Readonly<Record<string, string>> = Object.freeze({
-  'career-purse-top-up':
-    'Not offered. A tower\u2019s purse is worked out from what the contract carried in and what its ' +
-    'days have earned, and nothing adds to it from outside \u2014 so units bought here would land in ' +
-    'a figure no day reads.',
+  /*
+   * **`career-purse-top-up`'s entry is deleted, not reworded** — GitHub issue #557, § D227, and the
+   * module docstring carries the sentence it used to say so that a reader can see what stopped
+   * being true. `campaign/economy.ts#purseOf` now has a fourth term and
+   * `campaign/purseTopUpReachesTheRun.test.ts` runs the day twice to prove it reaches the legs.
+   *
+   * `rush-purse-top-up` stays, and staying is a decision rather than an oversight: issue #557 says
+   * in terms that it is a separate case with a different cause and must not be folded in.
+   */
   'rush-purse-top-up':
     'Not offered. The rush works out a purse for every round and there is still nothing to spend it ' +
     'on: rebuilding the tower between rounds is not built, so a wider purse would change no run.',
@@ -255,6 +273,38 @@ export const CHIMES_PANEL_COPY = Object.freeze({
   prefitOwned:
     'Bought. Your next rush starts fitted, and is posted to its own board rather than ranked ' +
     'against towers as built.',
+  /**
+   * **What the career top-up does, said before the press** — GitHub issue #557.
+   *
+   * Three clauses, and each is there because leaving it out would be a small lie a player could
+   * only find by playing. *Into the tower your desk is open on*, because the sink's name says
+   * *this tower* and a purchase made from Settings has to say which one it means. *Spent on works
+   * like any other unit*, because that is `docs/32` GD12's surviving clause — units buy works and
+   * nothing else, so a top-up buys the same things a cleared day buys. And the last sentence is
+   * `docs/32` GD11 and GD13 clause 5 on the face of the control: the works still take their
+   * nights, and a missed day is not for sale at any price.
+   *
+   * The figure is **not** in this string. It is composed beside the price, out of
+   * `data/chime-ledger.json`'s own `grantUnits`, for the reason the price is: one authority for
+   * what a step buys, and a copy of it here would be a second.
+   */
+  purseOffer:
+    'into the purse of the tower your campaign desk is open on, to spend on works there like any ' +
+    'other unit. Works still take the nights they take, and nothing here buys back a missed day.',
+  /** And what it did, which is the same thing in the past tense. */
+  purseOwned:
+    'Bought, as many times as one contract may be topped up. The units are in the purse of the ' +
+    'tower each was bought for, and they are spent on works like any other unit.',
+  /**
+   * No campaign desk is open, so a top-up would be charged and land nowhere.
+   *
+   * The one arm of this panel that is about the **state of play** rather than about the build, the
+   * account or the ledger — and it exists because the alternative is issue #557's own defect with
+   * a second cause: a purchase that reaches no run.
+   */
+  purseNoTower:
+    'Open a building on the Campaign screen first — this tops up that tower\u2019s purse, so there ' +
+    'has to be one.',
   /** No account: there is no tally to spend, which is {@link signedOutHome} pointed at a row. */
   rowSignedOut: 'Sign in and there is a tally to spend this from.',
   /** The account bridge has not answered, so whether this can be pressed is not yet known. */
@@ -270,6 +320,55 @@ export const CHIMES_PANEL_COPY = Object.freeze({
   bootingHome: 'Still finding out whether you are signed in, so this tally may yet change hands.',
   none: 'You have no chimes yet. Finishing anything is what pays them.',
 });
+
+/**
+ * **What an offered sink says about itself, keyed by id** — {@link SPEND_ABSENCES}' mirror.
+ *
+ * Two tables rather than one with an optional half, because the question *is this sold?* is the
+ * question a row's pressability turns on, and `chimesPanel.test.ts` asserts in **both** directions
+ * that every sink the shipped table holds is in exactly one of them. A sink added to
+ * `data/chime-ledger.json` with an entry in neither goes red here rather than drawing a blank row,
+ * and one with an entry in both goes red too — which is the pair of failures a single table with a
+ * nullable field cannot express.
+ *
+ * `needsOpenTower` is the one thing an offer can require of the **state of play** rather than of
+ * the account. `career-purse-top-up`'s own name is *top up **this tower's** purse*, and with no
+ * desk open there is no *this tower*: the units would be charged and land nowhere, which is issue
+ * #557's own defect bought a second time. `everyday/host.ts#spendChime` refuses the same press on
+ * the same ground before the ledger is asked, so the row being inert is the first lock and the host
+ * is the second.
+ */
+export interface ChimesSpendCopy {
+  /** What buying it does, said before the press. */
+  readonly offer: string;
+  /** What it did, once it is bought to its cap — the same sentence in the past tense. */
+  readonly owned: string;
+  /** Whether it needs a career desk open to land in. */
+  readonly needsOpenTower: boolean;
+}
+
+export const SPEND_OFFERS: Readonly<Record<string, ChimesSpendCopy>> = Object.freeze({
+  [CAREER_PURSE_TOP_UP_SINK_ID]: Object.freeze({
+    offer: CHIMES_PANEL_COPY.purseOffer,
+    owned: CHIMES_PANEL_COPY.purseOwned,
+    needsOpenTower: true,
+  }),
+  'rush-prefit': Object.freeze({
+    offer: CHIMES_PANEL_COPY.prefitOffer,
+    owned: CHIMES_PANEL_COPY.prefitOwned,
+    needsOpenTower: false,
+  }),
+});
+
+/**
+ * A sink the shipped table sells that this build has neither an offer nor a refusal for.
+ *
+ * Unreachable while `chimesPanel.test.ts`'s both-directions check is green, and written anyway:
+ * {@link ChimesSpendRowView.note} promises it is never empty on a row that is not `buy`, and a
+ * promise kept by a test in another file is a promise a renderer can still break.
+ */
+const UNDESCRIBED_SINK =
+  'Not offered. This build has nothing to say about this one, which is a fault rather than a price.';
 
 /** *You have 40 chimes.* Singular where it should be, because a player meets this sentence often. */
 function balanceLineOf(table: ChimeSpendTable, balanceChimes: number): string {
@@ -298,6 +397,19 @@ export interface ChimesPanelInput {
    * would take the chimes for it. It draws `unavailable` until a read lands.
    */
   readonly owns?: readonly { readonly sinkId: string; readonly steps: number }[] | undefined;
+  /**
+   * Whether a career desk is open for a {@link SPEND_OFFERS} row that needs one — issue #557.
+   *
+   * `campaign/career.ts#openTowerOf` is the question, asked by the caller rather than here: this
+   * module holds no career and must not learn to, on exactly the ground it holds no source. A lost
+   * contract clears `openTowerId`, so `false` is a state a player reaches by playing rather than an
+   * edge case.
+   *
+   * Defaults to `false`, which is {@link spendable}'s convention and the arm that promises least: a
+   * caller that forgot to say draws a row that cannot be pressed rather than one that can and then
+   * takes the chimes for nothing.
+   */
+  readonly careerTowerOpen?: boolean | undefined;
   /**
    * Whether this build has a spend route at all — `false` on a page served with no API origin.
    *
@@ -329,6 +441,14 @@ function offerOf(
 ): { readonly offer: ChimesSpendOffer; readonly note: string } {
   const absence = SPEND_ABSENCES[sink.id];
   if (absence !== undefined) return { offer: 'not-offered', note: absence };
+  /*
+   * A sink the shipped table sells and this build has no words for. It cannot happen while
+   * `chimesPanel.test.ts`'s both-directions check is green, and drawing a blank note would be the
+   * one thing {@link ChimesSpendRowView.note} promises never to be, so it is refused rather than
+   * rendered empty.
+   */
+  const copy = SPEND_OFFERS[sink.id];
+  if (copy === undefined) return { offer: 'not-offered', note: UNDESCRIBED_SINK };
   if (input.spendable !== true) {
     return { offer: 'unavailable', note: CHIMES_PANEL_COPY.rowNoLedger };
   }
@@ -345,7 +465,16 @@ function offerOf(
    * the chimes and `unbackedModifiers` would still cap the claim at `maxSteps`. So the row says
    * *bought* rather than offering a step the ledger will not honour.
    */
-  if (held >= sink.maxSteps) return { offer: 'owned', note: CHIMES_PANEL_COPY.prefitOwned };
+  if (held >= sink.maxSteps) return { offer: 'owned', note: copy.owned };
+  /*
+   * **After *bought* and before *short*, and the order is the decision.** A row already bought to
+   * its cap says so whatever desk is open — that sentence is true of the account and does not
+   * depend on where the player is standing. *Nowhere to land* comes before *short by N*, because
+   * it is the one a player can act on: opening a desk is a press away, and earning chimes is not.
+   */
+  if (copy.needsOpenTower && input.careerTowerOpen !== true) {
+    return { offer: 'unavailable', note: CHIMES_PANEL_COPY.purseNoTower };
+  }
   if (balance < sink.priceChimes) {
     /*
      * The shortfall, in the currency's own words — `fixit/engine.ts#affordabilityOf`'s *short by
@@ -356,7 +485,29 @@ function offerOf(
     const unit = short === 1 ? CHIME_PRICES.currency.one : CHIME_PRICES.currency.many;
     return { offer: 'short', note: `Short by ${String(short)} ${unit}.` };
   }
-  return { offer: 'buy', note: CHIMES_PANEL_COPY.prefitOffer };
+  return { offer: 'buy', note: offerNoteOf(sink, copy) };
+}
+
+/**
+ * The offer sentence, with the figure the ledger authors in front of it where there is one.
+ *
+ * A `purse-units` sink is worth a number — *6 units into the purse of…* — and a `prefit` grants
+ * none, so its sentence stands on its own. The figure is `data/chime-ledger.json`'s own, for the
+ * reason the price is: two authorities for what a step buys is the defect this whole file is
+ * careful about, and one of them being prose makes it worse rather than better.
+ *
+ * **Read off the sink rather than through `core`'s `chimeGrantUnits`, and the reason is a guard
+ * rather than a preference.** `pricing/spendWidensTheBudget.test.ts` greps for that helper to keep
+ * the **charging** half of this seam inside three named modules — a screen that takes a chime, a
+ * binding that holds the token, and the host verb between them. This module draws a row; it charges
+ * nothing and grants nothing. Calling the charging side's arithmetic to *say a number* would have
+ * widened a landed boundary to make a sentence convenient, and the row offers exactly one step, so
+ * the helper's whole contribution over the authored field would have been multiplying by 1.
+ */
+function offerNoteOf(sink: ChimeSink, copy: ChimesSpendCopy): string {
+  const granted = sink.modifier.grantUnits;
+  if (granted <= 0) return copy.offer;
+  return `${String(granted)} ${granted === 1 ? 'unit' : 'units'} ${copy.offer}`;
 }
 
 /**

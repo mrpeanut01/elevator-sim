@@ -208,7 +208,7 @@ import { todayOf } from '../everyday/today.js';
 import { RUSH_NOT_LANDED, RUSH_RESULT_EMPTY_LEDE, rushDisclosureOf, rushOutcomeOf, rushResultViewOf, rushStageHeaderOf, type RushOutcome } from '../everyday/rush.js';
 import { rushPostViewOf } from '../everyday/rushPost.js';
 import { RUSH_SITTING_COPY, rushSittingOf, type RushRoundRecord } from '../everyday/rushSitting.js';
-import { RUSH_NOT_STANDING } from '../everyday/host.js';
+import { CAREER_TOP_UP_NO_TOWER, RUSH_NOT_STANDING } from '../everyday/host.js';
 import {
   ENGINEER_RETURN_LABEL,
   ENGINEER_RETURN_TITLE,
@@ -8980,6 +8980,28 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      */
     'everyday/chimesPanel.ts#SPEND_ABSENCES',
     /*
+     * And its mirror — what an **offered** sink says about itself, GitHub issue #557, § D738. Two
+     * tables rather than one with an optional half, because *is this sold?* is the question a row's
+     * pressability turns on; `chimesPanel.test.ts` asserts every shipped sink is in exactly one of
+     * them, in both directions.
+     *
+     * `covers` for `SPEND_ABSENCES`' reason, and every arm of it is reached below rather than
+     * claimed: `can-buy` opens a career desk, so the career top-up draws its offer with the
+     * ledger's own grant figure in front of it; the other spendable cases leave the desk closed and
+     * draw the *nowhere for the units to land* arm; and `already-bought` holds that sink at its cap
+     * as well as the pre-fit, so the past-tense sentence is swept too. A sink whose offer is only
+     * ever drawn in one of those states is the half-swept surface this adapter keeps arguing about.
+     */
+    'everyday/chimesPanel.ts#SPEND_OFFERS',
+    /*
+     * The refusal the **host** composes rather than the server — GitHub issue #557, § D738, on
+     * `everyday/host.ts#POST_RUN_NO_SERVER`'s footing in the daily-loop adapter: the host decides
+     * the arm, so the host holds the words, and the screen carries them unrewritten. Reached below
+     * as `already-bought`'s notice, which is a state a player meets by pressing a top-up on a
+     * contract whose month is over.
+     */
+    'everyday/host.ts#CAREER_TOP_UP_NO_TOWER',
+    /*
      * The DISPLAY NAME field's note, which is **two** sentences because it is about two different
      * names — § D490. Both arms are reached below: all but one of the cases draw the device one, and
      * `not-durable` is signed in and named and draws the account one. A pair of sentences with one
@@ -9125,6 +9147,13 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
           chimeBalance: 40,
           chimeSpendable: true,
           chimeOwns: [],
+          /*
+           * **A career desk is open on this one and on no other** — GitHub issue #557. The career
+           * top-up's row is inert without one, so every other case draws its *nowhere for the units
+           * to land* arm and the sentence a player who can actually buy it reads would have shipped
+           * unswept. That is `can-buy`'s own argument one field along.
+           */
+          careerTowerOpen: true,
         },
       ],
       [
@@ -9149,7 +9178,21 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
           accountServer: true,
           chimeBalance: 40,
           chimeSpendable: true,
-          chimeOwns: [{ sinkId: 'rush-prefit', steps: 1 }],
+          /*
+           * Both sold sinks at their cap — GitHub issue #557. The career top-up's *bought* line is
+           * a different sentence from the pre-fit's and is drawn whatever desk is open, because
+           * that claim is about the account rather than about where the player is standing.
+           */
+          chimeOwns: [
+            { sinkId: 'rush-prefit', steps: 1 },
+            { sinkId: 'career-purse-top-up', steps: 3 },
+          ],
+          /*
+           * The host's own refusal, carried unrewritten — `everyday/host.ts#CAREER_TOP_UP_NO_TOWER`.
+           * A player reaches it by pressing a top-up with no contract still running, which is a
+           * state this case can hold without a second whole screen being seeded for it.
+           */
+          chimeNotice: CAREER_TOP_UP_NO_TOWER,
         },
       ],
     ] as const;

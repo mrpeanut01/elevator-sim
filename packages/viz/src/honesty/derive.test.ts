@@ -595,6 +595,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * sweeps.
          */
         'everyday/tutorialModel.ts#TUTORIAL_CASE_ID',
+        /*
+         * The `data/chime-ledger.json` sink a career top-up is sold under — GitHub issue #557,
+         * § D738. Same shape as the line above: a hyphenated slug the derivation cannot tell from
+         * a sentence. What a player reads about it is the sink's **name** and the offer sentence
+         * beside it, both of which `EVERYDAY_SETTINGS` seeds out of `chimesPanelViewOf`'s own
+         * answer; this constant is what `everyday/host.ts` compares a spend against so that the
+         * id lives in one place rather than in two string literals.
+         */
+        'campaign/economy.ts#CAREER_PURSE_TOP_UP_SINK_ID',
       ],
     },
     {

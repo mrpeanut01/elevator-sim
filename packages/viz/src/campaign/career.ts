@@ -318,6 +318,7 @@ export function freshTower(input: {
     fitted: {},
     bookings: [],
     spends: [],
+    grants: [],
     trips: 0,
     serviceAt: SERVICE_AT_TRIPS,
     refit: 0,
@@ -569,6 +570,30 @@ export type CampaignAction =
    */
   | { readonly kind: 'answer-incident'; readonly towerId: string; readonly units: number; readonly label: string }
   /**
+   * **A chime top-up landing in this tower's purse** — GitHub issue #557,
+   * [§ D738](../../../../DECISIONS.md), [§ D717](../../../../DECISIONS.md)'s named fix.
+   *
+   * `units` and `sinkId` are the **server's** answer to a spend, carried rather than looked up, for
+   * exactly the reason `answer-incident` carries its own: the account ledger is
+   * `packages/server`'s, it charged the chimes and it said what the step granted
+   * (`everyday/host.ts#EverydayChimeSpend`'s `bought` arm), and a second computation of the grant
+   * on this side of the wire would be a second authority for a figure `data/chime-ledger.json`
+   * holds. This record never learns the price.
+   *
+   * **A sink, never a source** — § D526 clause 5. `boundaries.test.ts` asserts that no module in
+   * this package names a source at all, in both directions.
+   *
+   * The reducer refuses rather than clamps, and `everyday/host.ts` refuses the **spend** before the
+   * ledger is asked for the same reasons — a grant that landed nowhere would be a player charged
+   * for nothing, which is worse than the dead seam issue #557 opened about.
+   */
+  | {
+      readonly kind: 'grant-units';
+      readonly towerId: string;
+      readonly units: number;
+      readonly sinkId: string;
+    }
+  /**
    * § 6.4 step 4 — *"In a campaign run, evaluate the four tests and mark the day cleared or
    * missed"*, as the one thing that moves a contract forward. See {@link fileDay}.
    *
@@ -613,7 +638,17 @@ export function applyCampaignAction(
     case 'set-build':
       return mapTower(career, action.towerId, (tower) => ({ ...tower, buildId: action.buildId }));
     case 'set-difficulty':
-      /* § 8.3: *"Changing it starts a fresh month"* — the footer says so, and so does this. */
+      /*
+       * § 8.3: *"Changing it starts a fresh month"* — the footer says so, and so does this.
+       *
+       * **`grants` is deliberately not in this list** — GitHub issue #557. The three fields that
+       * are reset are all *this month's*: the bookings and the answers are handed back with the
+       * month, and `carry: undefined` puts the purse back to the new difficulty's opening figure.
+       * A chime top-up is none of those. It was paid for out of an account ledger that this action
+       * cannot refund, and § D526 clause 4 is that nothing a player earned decays — so a fresh
+       * month keeps it. It cannot be farmed by repeating the press: a grant row is written once per
+       * purchase and this action writes none.
+       */
       return mapTower(career, action.towerId, (tower) => ({
         ...tower,
         difficultyId: action.difficultyId,
@@ -633,6 +668,8 @@ export function applyCampaignAction(
       return answerNeed(career, action.towerId, action.optionId);
     case 'answer-incident':
       return answerIncident(career, action.towerId, action.units, action.label);
+    case 'grant-units':
+      return grantUnits(career, action.towerId, action.units, action.sinkId);
     case 'take-offer':
       return takeOffer(career, action.contractId);
     case 'file-day':
@@ -914,6 +951,15 @@ function answerNeed(career: CampaignCareer, towerId: string, optionId: string): 
                 : [],
             /* The month's answers are paid: `carry` above already read the purse they left. */
             spends: [],
+            /*
+             * **And the top-ups go with them, for the same arithmetic** — GitHub issue #557.
+             * `carry: purseOf(entry) − option.units` above has already counted every granted unit
+             * that was not spent, so a row surviving into the new month would be counted twice and
+             * a renewal would mint units nobody bought. Clearing it is not a decay (§ D526
+             * clause 4): the units are in the `carry` line above, which is where a renewed month's
+             * purse comes from.
+             */
+            grants: [],
             trips: option.id === 'refurbish' ? 0 : entry.trips,
             refit: option.id === 'refurbish' ? 0 : entry.refit,
           },
@@ -990,6 +1036,43 @@ function takeOffer(career: CampaignCareer, contractId: string): CampaignCareer {
  * selectable in the dock either. The dock and the desk read the same purse."* A refusal returns the
  * same career object, which is the façade's convention for *nothing moved*.
  */
+/**
+ * **A chime top-up recorded against the tower and the day it landed on** — GitHub issue #557,
+ * [§ D738](../../../../DECISIONS.md).
+ *
+ * ## What it writes, and what it is forbidden to write
+ *
+ * One {@link PurseGrant} row and nothing else. It does not touch `day`, `missed`, `trips`,
+ * `fitted`, `bookings` or `carry`, and that list is the whole of `docs/32` GD11–GD14 discharged by
+ * construction rather than by a promise: units are money (this adds money), nights are time (no
+ * booking's nights move), standing opens slots and buys nothing (`standingOf` reads `clearedDays`
+ * and `missed`, neither of which is here), and no currency buys a verdict, a retry or relief on a
+ * measurement (`missed` is not writable from here, so a bought day back is not expressible).
+ *
+ * ## Three refusals, and the third is the one worth reading
+ *
+ * A tower this career does not hold, a `units` that is not a whole number above zero, and a
+ * **contract that is already lost**. The third is not defensive tidiness: `contractIsLost` is
+ * § 8.10's end of the month, the shop is shut on a tower that has run out of days, and units put
+ * into that purse would buy nothing — the sink's own note promises *this tower's purse*, and a
+ * purse nothing can spend is not one. `everyday/host.ts` refuses the spend on the same ground
+ * **before** the ledger is asked, so this arm is the second lock rather than the first, exactly as
+ * {@link applyCampaignAction}'s docstring says of every other refusal here.
+ *
+ * A refusal returns the record it was given, so a press that reached this with nowhere to land
+ * changes nothing — and the host's own gate is what stops the chimes being taken for it.
+ */
+function grantUnits(career: CampaignCareer, towerId: string, units: number, sinkId: string): CampaignCareer {
+  const tower = towerById(career, towerId);
+  if (tower === undefined) return career;
+  if (!Number.isInteger(units) || units <= 0) return career;
+  if (contractIsLost(tower)) return career;
+  return mapTower(career, towerId, (current) => ({
+    ...current,
+    grants: [...current.grants, { day: current.day, units, sinkId }],
+  }));
+}
+
 function answerIncident(career: CampaignCareer, towerId: string, units: number, label: string): CampaignCareer {
   const tower = towerById(career, towerId);
   if (tower === undefined) return career;

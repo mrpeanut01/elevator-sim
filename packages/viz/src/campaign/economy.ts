@@ -584,6 +584,55 @@ export interface WorksBooking {
 }
 
 /**
+ * **The chime sink that tops a career purse up, by id** — `data/chime-ledger.json`'s own.
+ *
+ * Here rather than in `everyday/` because the **career** is what it reaches: a granted unit is a
+ * {@link PurseGrant} on a tower and `purseOf` is what sums it, so the id belongs beside the
+ * arithmetic that honours it. `data/rush-purse.json#topUpSinkIds` is the same fact for the other
+ * purse, authored in data because `packages/server` reads it at boot; this one has no server half
+ * — no campaign day is replayed anywhere — so a constant beside the economy is the whole of it,
+ * and `purseTopUpReachesTheRun.test.ts` asserts against the shipped ledger that the id is sold and
+ * that it sells `purse-units`. A rename in `data/` goes red there rather than on a player's screen.
+ *
+ * `core/config/rushPrefit.ts#RUSH_PREFIT_SINK_ID` is the precedent and the shape.
+ */
+export const CAREER_PURSE_TOP_UP_SINK_ID = 'career-purse-top-up';
+
+/**
+ * Units a chime top-up put into this tower's purse, on the contract day it was bought —
+ * GitHub issue #557, [§ D738](../../../../DECISIONS.md), [§ D717](../../../../DECISIONS.md).
+ *
+ * A **row rather than a running total**, for exactly the reason {@link IncidentSpend} and
+ * {@link WorksBooking} are: [§ D400](../../../../DECISIONS.md) refuses a latched purse, so a grant
+ * joins `purseOf` as one more sum over a record and never as a stored balance. {@link grantedUnits}
+ * is that sum.
+ *
+ * ## `day` is the record § D526 asks for, and it is the day's run
+ *
+ * *"A run played with a bought modifier carries the modifier on its record."* A career day **is** a
+ * run — `everyday/host.ts#runCampaignDay` is the only thing that turns a tower into one — so the
+ * contract day a grant landed on is the first day whose run can carry it, and every day run from
+ * that record afterwards is a day this row is part of. Stated narrowly on purpose: a grant reaches
+ * the legs through a {@link WorksBooking} it helped pay for, so this names **the day the money
+ * arrived** rather than pretending to name the single run it changed.
+ *
+ * `sinkId` is the ledger's sink and never a source — § D526 clause 5, and `boundaries.test.ts`
+ * asserts this package names no source at all.
+ *
+ * **No price in chimes is recorded here**, and that is § D526 clause 3 rather than an omission: the
+ * chimes are the account ledger's and `packages/server` holds them, so a copy of the price on a
+ * tower would be a second authority for a figure this side of the wire may not compute.
+ */
+export interface PurseGrant {
+  /** 1-based contract day the top-up was bought on. */
+  readonly day: number;
+  /** Units it put into this tower's purse. Whole, and above zero. */
+  readonly units: number;
+  /** The `data/chime-ledger.json` sink that granted them — {@link CAREER_PURSE_TOP_UP_SINK_ID}. */
+  readonly sinkId: string;
+}
+
+/**
  * Units an incident's answer cost, on the day it was given — § 7.5's *spent today*.
  *
  * A row rather than a running total, for the same reason {@link WorksBooking} is: the purse is
@@ -625,6 +674,14 @@ export interface TowerEconomy {
   readonly bookings: readonly WorksBooking[];
   /** Every incident answered for money this month — § 7.5's dock is the only writer. */
   readonly spends: readonly IncidentSpend[];
+  /**
+   * Every chime top-up bought for this tower this month — GitHub issue #557.
+   *
+   * `career.ts`'s `grant-units` arm is the only writer and {@link grantedUnits} the only reader, so
+   * the term enters `purseOf` exactly once. A tower that has bought nothing carries `[]`, which is
+   * what {@link purseOf} read before this field existed.
+   */
+  readonly grants: readonly PurseGrant[];
   /** Loaded car departures since the last service window. */
   readonly trips: number;
   /** Trips at which a service window falls due — § 8.3's `serviceAt`, ≈ 45 000. */
@@ -689,14 +746,45 @@ export function committedUnits(tower: TowerEconomy): number {
   );
 }
 
+/**
+ * § 8.1's second source of units — what chime top-ups put into this purse — GitHub issue #557.
+ *
+ * **A sum over the record, which is what keeps {@link purseOf} derived.** `docs/32` GD12 said a
+ * unit had exactly one source; [§ D717](../../../../DECISIONS.md) recorded the amendment that
+ * `docs/38` § 2.2 had already made, and this is the term it names. It is the mirror of
+ * {@link committedUnits}: that one sums what left, this one sums what arrived from outside the
+ * contract, and neither is stored.
+ *
+ * **It is money and never time, standing, or a verdict** — `docs/32` GD11 and GD13. Nothing here
+ * touches `missed`, `day`, `trips` or a booking's nights, so a top-up cannot buy back a missed day
+ * (GD13 clause 5), cannot shorten works (GD11), and cannot move `standingOf`, which reads
+ * `clearedDays` and `missed` alone and so cannot open a slot (GD14).
+ */
+export function grantedUnits(tower: TowerEconomy): number {
+  return tower.grants.reduce((total, grant) => total + grant.units, 0);
+}
+
 /** § 7.5's *spent today* — the incident answers paid for on the tower's current day. */
 export function spentTodayUnits(tower: TowerEconomy): number {
   return tower.spends.filter((spend) => spend.day === tower.day).reduce((total, spend) => total + spend.units, 0);
 }
 
-/** § 8.1's `purse = max(0, carriedIn + earnedSoFar − committed)`. */
+/**
+ * § 8.1's `purse = max(0, carriedIn + earnedSoFar + granted − committed)`.
+ *
+ * **Still derived, and the fourth term is what makes that worth saying** — GitHub issue #557,
+ * [§ D738](../../../../DECISIONS.md). The issue's own finding was that *every term is derived, so
+ * there is no additive term a grant could join*, which is true of three terms and is an argument
+ * for adding a fourth of the same kind rather than for latching a balance.
+ * [§ D400](../../../../DECISIONS.md) refuses the latch — *"a latched purse would be a second answer
+ * to a question one of them already contains"* — and {@link grantedUnits} sums a record exactly as
+ * {@link committedUnits} does, so nothing here stores a number a second reader could disagree with.
+ */
 export function purseOf(tower: TowerEconomy): number {
-  return Math.max(0, carriedIn(tower) + earnedSoFar(tower) - committedUnits(tower));
+  return Math.max(
+    0,
+    carriedIn(tower) + earnedSoFar(tower) + grantedUnits(tower) - committedUnits(tower),
+  );
 }
 
 /* -------------------------------------------------------------------------- *

@@ -15,7 +15,8 @@ import {
   decodeCareer,
   encodeCareer,
 } from './careerPersist.js';
-import { openingCareer, type CampaignCareer } from './career.js';
+import { openingCareer, type CampaignCareer, type CampaignTower } from './career.js';
+import { purseOf } from './economy.js';
 import { goalsForDay, PENDING_DISPLAY, wasDisplayOf } from '../shift/goals.js';
 import { createCareerStore } from '../everyday/careerStore.js';
 import type { SessionStore } from '../persist/types.js';
@@ -69,6 +70,50 @@ describe('the envelope refuses in both directions', () => {
       const raw = JSON.stringify({ version, career: openingCareer('collective') });
       expect(decodeCareer(raw).refusal, `version ${String(version)}`).toBeUndefined();
     }
+  });
+
+  it('gives a version-1 career the `grants` list its economy sums — the 1 \u2192 2 migration', () => {
+    /*
+     * GitHub issue #557, § D738. A version-1 career is one written before `CampaignTower.grants`
+     * existed, and *no top-up had been bought* is exactly what an empty list says — so this is a
+     * migration rather than a guess, and the envelope is bumped rather than the field being made
+     * optional.
+     *
+     * The failure it prevents is not a refusal: an absent array decodes cleanly past
+     * `isCareerShape`'s shallow gate and throws on the **first derivation**, and `towersView` runs
+     * on mount — so the Campaign tile would die rather than draw a refusal a player can read.
+     */
+    const opening = openingCareer('collective');
+    const legacy = {
+      ...opening,
+      towers: opening.towers.map(({ grants: _grants, ...rest }) => rest),
+    };
+    const back = decodeCareer(JSON.stringify({ version: 1, career: legacy }));
+    expect(back.refusal).toBeUndefined();
+    expect(back.career?.towers.map((tower) => tower.grants)).toEqual([[]]);
+    /* And purseOf is computable on the result, which is the thing the absent array would break. */
+    expect(purseOf(back.career?.towers[0] as CampaignTower)).toBe(8);
+  });
+
+  it('repairs a payload of the current version too, because the shape gate does not check it', () => {
+    /*
+     * Applied to every version this build reads rather than to version 1 alone — a field this
+     * function can always supply is a field the refusal machinery never has to be routed past.
+     */
+    const opening = openingCareer('collective');
+    const missing = {
+      ...opening,
+      towers: opening.towers.map(({ grants: _grants, ...rest }) => rest),
+    };
+    const back = decodeCareer(JSON.stringify({ version: CAREER_SCHEMA_VERSION, career: missing }));
+    expect(back.career?.towers[0]?.grants).toEqual([]);
+  });
+
+  it('returns a career that needs no migration by identity, so a round trip is the identity', () => {
+    const career = openingCareer('collective');
+    const back = decodeCareer(encodeCareer(career));
+    expect(back.career).toEqual(career);
+    expect(back.career?.towers[0]?.grants).toEqual([]);
   });
 
   it('refuses bytes that are not JSON, and bytes that are JSON but not a record', () => {
