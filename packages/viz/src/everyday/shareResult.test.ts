@@ -277,6 +277,24 @@ describe('the artefact as a whole', () => {
     expect(artefact.text).not.toContain('www.');
   });
 
+  /**
+   * The claim this artefact was going to make and may not, until the day's crowd reaches a run.
+   *
+   * `dev/main.ts` seeds a session with `crypto.getRandomValues`, so *everybody is playing this
+   * today* is false of every run this build produces — and the server's own daily fixture, which
+   * `menu/client.ts` already validates onto `BoardsPage.today`, is dropped by
+   * `everyday/host.ts#dailyBoardOf` before any screen sees its seed. Two player surfaces already
+   * state the shared day as fact; this one does not join them, and the test is here so that a
+   * later edit restoring the friendlier wording is red rather than plausible.
+   */
+  it('claims nothing about anybody else’s day, because nothing on this tree makes that true', () => {
+    const artefact = shareArtefactOf(shareFactsOf(runWith(onePerSlice(Array(12).fill(20)), {})));
+    const text = artefact.text.toLowerCase();
+    for (const claim of ['everybody', 'everyone', 'same crowd', 'today', 'daily', 'identical']) {
+      expect(text).not.toContain(claim);
+    }
+  });
+
   it('states on its own face that the run’s configuration is withheld', () => {
     const artefact = shareArtefactOf(shareFactsOf(runWith(onePerSlice(Array(12).fill(20)), {})));
     expect(artefact.lines.at(-1)?.text).toBe(SHARE_COPY.promise);

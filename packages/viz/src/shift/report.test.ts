@@ -62,6 +62,8 @@ import {
   averageWaitFigure,
   clockOf,
   dayReportOf,
+  leadingWith,
+  meanIsPublishable,
   type DayReportInput,
   type ReportSubject,
   type ShapedDayReport,
@@ -315,6 +317,189 @@ describe('the observations, which are never suppressed', () => {
     });
     expect(figure(report, 'deepest-queue').note).toBe('never more than a handful');
     expect(report.diagnosis[0]?.when).toBe('—');
+  });
+
+  it('says how many arrivals the deepest queue was the deepest of — R13 on the promoted cell', () => {
+    const observations = observationsOfRun(saturated);
+    // A figure travels with the count it was taken over, and every person on that landing is a leg
+    // that arrived. The *at once* is the cohort caption: an instant, not a share of the day.
+    const note = figure(reportOf(saturated), 'deepest-queue').note;
+    expect(note).toContain(String(observations.arrived));
+    expect(note).toContain('at once');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The cell the sheet leads with — § D666
+ * -------------------------------------------------------------------------- */
+
+describe('the sheet names the cell it leads with, and a refusal does not take the lead — § D666', () => {
+  /** The grid in declaration order, which is what a renderer that does not re-sort draws. */
+  const gridIds = (report: ShapedDayReport): readonly string[] =>
+    report.figures.map((cell) => cell.id);
+
+  it('leads with a count of people on a day whose mean is published, and moves nothing', () => {
+    const report = reportOf(clean);
+    expect(meanIsPublishable(clean.summary)).toBe(true);
+    expect(report.headlineFigureId).toBe('carried');
+    // The Engineer order, untouched: naming the cell this list already began with is what makes
+    // the promotion cost nothing on every day nothing was refused.
+    expect(gridIds(report).slice(0, 6)).toEqual([
+      'carried',
+      'minute',
+      'average-wait',
+      'worst-wait',
+      'deepest-queue',
+      'stairs',
+    ]);
+  });
+
+  it('leads with the tightest moment on a day whose mean is refused', () => {
+    const report = reportOf(saturated);
+    expect(meanIsPublishable(saturated.summary)).toBe(false);
+    expect(report.headlineFigureId).toBe('deepest-queue');
+    expect(gridIds(report)[0]).toBe('deepest-queue');
+  });
+
+  it('promotes a figure the run produced, with its count, and never an absence', () => {
+    const observations = observationsOfRun(saturated);
+    const lead = figure(reportOf(saturated), 'deepest-queue');
+    expect(lead.value).toBe(String(observations.peakQueue));
+    expect(Number(lead.value)).toBeGreaterThan(0);
+    expect(lead.value).not.toBe(WITHHELD);
+    expect(lead.value).not.toBe(NOT_RECORDED);
+    // Its denominator, in its own note — the visual unit `honesty/surfaces.ts` reads `countShown`
+    // off. Never `ReportFigure.count`, which is the sample a **mean** was taken over.
+    expect(lead.note).toContain(String(observations.arrived));
+    // Read off the grid rather than through `figure()`, which narrows away the field under test.
+    const cell = reportOf(saturated).figures.find((entry) => entry.id === 'deepest-queue');
+    expect(cell?.count).toBeUndefined();
+  });
+
+  it('is a count of people rather than anything a reader could take for the refused mean', () => {
+    const lead = figure(reportOf(saturated), 'deepest-queue');
+    // Not in seconds, and carrying none of the words `honesty/properties.ts#ESTIMATE_CUES` keys
+    // the three suppressible quantities on. This is R3's collision, checked where it is made.
+    expect(lead.value).not.toMatch(/\s*s$/u);
+    for (const cue of [/\baverage\b/iu, /\bmean\b/iu, /\bawt\b/iu, /\btypical\b/iu, /\bpercentile\b/iu]) {
+      expect(`${lead.label} ${lead.value} ${lead.note}`, String(cue)).not.toMatch(cue);
+    }
+    // And it is not a score, a grade or a rating: the cell's tone is the sheet's own queue-depth
+    // bar, which is `hot` or `plain` and ranks this run against nothing.
+    expect(['hot', 'plain']).toContain(lead.tone);
+  });
+
+  it('leaves the refusal exactly where a reader meets it, in full', () => {
+    const report = reportOf(saturated);
+    const wait = figure(report, 'average-wait');
+    // Still on the grid, still refused, still `core`'s own words, still carrying its ground.
+    expect(gridIds(report)).toContain('average-wait');
+    expect(wait.value).toBe(WITHHELD);
+    expect(wait.tone).toBe('withheld');
+    expect(wait.note).toBe(
+      saturated.summary.awtInvalidReason ??
+        'the queues never settled, so there is no cohort to take a mean over — see the small print',
+    );
+    // Nothing on the sheet says the mean is available elsewhere, provisionally or otherwise.
+    expect(wait.value).not.toContain(saturated.summary.meanWaitS.toFixed(1));
+  });
+
+  it('gives the lead back when the run produced no moment to promote', () => {
+    /*
+     * The fallback is not decoration. A refused run whose landings never held anybody draws
+     * `DEEPEST QUEUE 0` under *never more than a handful* — a second absence — so promoting it
+     * would be the defect this change closes, arriving through the remedy.
+     */
+    const noMoment: Observations = {
+      ...observationsOfRun(saturated),
+      peakQueue: 0,
+      peakQueueFloorId: null,
+      peakQueueAtS: null,
+    };
+    const report = dayReportOf({
+      recording: saturated,
+      observations: noMoment,
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'week-day' },
+    });
+    expect(meanIsPublishable(saturated.summary)).toBe(false);
+    expect(report.headlineFigureId).toBe('carried');
+    expect(gridIds(report)[0]).toBe('carried');
+  });
+
+  it('names a lead on a single run too, on the same gate', () => {
+    // A Free Play run's mean is refused on exactly the five grounds a campaign day's is, so the
+    // field is on both shapes rather than on the week's.
+    const subject: ReportSubject = { kind: 'single-run', selection: SELECTION };
+    const report = dayReportOf({
+      recording: saturated,
+      observations: observationsOfRun(saturated),
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: undefined,
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject,
+    });
+    expect(singleRun(report).headlineFigureId).toBe('deepest-queue');
+  });
+
+  it('agrees with the cell that does the refusing, in both directions', () => {
+    /*
+     * One gate, read in one place — § D237's property stated as a test, so a second copy of the
+     * conjunction cannot promote a stand-in on a day the mean was published, or leave the lead
+     * alone on a day it was not.
+     */
+    for (const recording of [clean, saturated]) {
+      const report = reportOf(recording);
+      const refused = figure(report, 'average-wait').value === WITHHELD;
+      expect(refused, recording.buildingId).toBe(!meanIsPublishable(recording.summary));
+      // Both fixtures produce a moment, so the fallback arm is not in play here — the case above
+      // drives that one. The lead is therefore the refusal's own answer and nothing else.
+      expect(report.figures.find((cell) => cell.id === 'deepest-queue')?.value).not.toBe('0');
+      expect(report.headlineFigureId, recording.buildingId).toBe(
+        refused ? 'deepest-queue' : 'carried',
+      );
+    }
+  });
+});
+
+describe('leadingWith is a permutation — the property, not the shipped ids', () => {
+  /* § D134's fictional-schema technique: an id set no shipped sheet produces. */
+  const cells = [{ id: 'a' }, { id: 'b' }, { id: 'c' }] as const;
+
+  it('puts the named cell first and keeps every other one, in order', () => {
+    expect(leadingWith(cells, 'c').map((cell) => cell.id)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('returns the same members whatever it is asked for, including an id nothing carries', () => {
+    for (const id of ['a', 'b', 'c', 'z', '']) {
+      const out = leadingWith(cells, id);
+      expect(out, id).toHaveLength(cells.length);
+      expect([...out].sort((x, y) => x.id.localeCompare(y.id)), id).toEqual([...cells]);
+    }
+  });
+
+  it('is the identity when the named cell is already first', () => {
+    expect(leadingWith(cells, 'a')).toEqual([...cells]);
+  });
+
+  it('drops nothing from a real sheet, on either branch', () => {
+    for (const recording of [clean, saturated]) {
+      const report = reportOf(recording);
+      const ids = [...report.figures.map((cell) => cell.id)].sort();
+      // Every cell `figuresFor` builds is still on the grid; only the order moved.
+      expect(new Set(ids).size, recording.buildingId).toBe(ids.length);
+      for (const id of ['carried', 'minute', 'average-wait', 'worst-wait', 'deepest-queue', 'stairs']) {
+        expect(ids, `${recording.buildingId}/${id}`).toContain(id);
+      }
+    }
   });
 });
 

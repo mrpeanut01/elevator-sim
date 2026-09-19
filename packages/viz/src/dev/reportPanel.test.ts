@@ -2330,4 +2330,49 @@ describe('Casual asks a different question of the same day — issues #110 and #
     const [casual] = both(reportOf(clean));
     expect(casual.smallPrint).toMatch(/every figure the engineer’s view carries/);
   });
+
+  /*
+   * § D666. The sheet names the cell it leads with, and this is the file that has to honour it:
+   * `casualFigureOrderOf` ranks by a frozen list of ids, so a promotion applied only inside
+   * `shift/report.ts` would reach the Engineer grid and be ranked back into the middle of the
+   * Casual one — the register silently overruling a decision the sheet had already taken.
+   */
+  it('honours the sheet’s own lead in both registers, on a run whose mean is refused', () => {
+    const report = reportOf(saturated);
+    expect(report.headlineFigureId).toBe('deepest-queue');
+    for (const view of both(report)) {
+      expect(view.figures[0]?.label).toBe('DEEPEST QUEUE');
+      // The refusal is still on the grid, in full — it lost the lead, not its cell.
+      const wait = view.figures.find((cell) => cell.label === 'AVERAGE WAIT');
+      expect(wait?.value).toBe(WITHHELD);
+    }
+  });
+
+  it('moves nothing in either register on a day the mean is published', () => {
+    const report = reportOf(clean);
+    expect(report.headlineFigureId).toBe('carried');
+    const [casual, engineer] = both(report);
+    // Both orders already begin with CARRIED, which is why naming it costs nothing. Engineer's
+    // whole order is asserted above; this is the Casual half of the same claim.
+    expect(engineer.figures[0]?.label).toBe('CARRIED');
+    expect(casual.figures.map((cell) => cell.label)).toEqual([
+      'CARRIED',
+      'TOOK THE STAIRS',
+      'WORST WAIT',
+      'DEEPEST QUEUE',
+      'AWAY INSIDE A MINUTE',
+      'AVERAGE WAIT',
+      'WORK DONE',
+      'WORK PER DELIVERED LEG',
+    ]);
+  });
+
+  it('is still a permutation after both orderings compose — nothing is dropped', () => {
+    for (const recording of [clean, saturated]) {
+      const [casual, engineer] = both(reportOf(recording));
+      const labels = (view: ReportView) => [...view.figures.map((cell) => cell.label)].sort();
+      expect(labels(casual), recording.buildingId).toEqual(labels(engineer));
+      expect(casual.figures, recording.buildingId).toHaveLength(8);
+    }
+  });
 });

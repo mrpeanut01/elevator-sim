@@ -37613,3 +37613,110 @@ such a zero survives a witness existing.** It does not follow that the other six
 its own measurement and only a search answers it. What does follow is that *"no dial edit wins
 anywhere"* is not a thing the shipped table can be asked, and no document may say it is. The honest
 sentence about an unsearched cell is **none of the ways tried got through**.
+
+---
+
+## D666 — The sheet names the cell it leads with, and a refused mean does not take the lead: the tightest moment is promoted, the refusal is not touched
+
+**Date: 2026-09-19 · Rules on:** `packages/viz/src/shift/report.ts`,
+`packages/viz/src/dev/reportPanel.ts`. Binds `mode/casualDay.ts`'s figure ordering to a decision the
+sheet takes, which is why this is an entry rather than a docstring under [§ D405](#d405).
+
+### 1. The finding
+
+On the worst, most watchable day — a building being outrun, which is the day a player most wants a
+number for — `AVERAGE WAIT` reads **withheld**. That is `awtIsValid` doing exactly its job, it is
+`CLAUDE.md`'s statistical discipline, and [`docs/22`](docs/22-charter.md) non-goal 3 forbids
+dropping or rewording a refusal because a playtest found it discouraging. **None of that is
+touched here and none of it may be.**
+
+What was wrong is the other half. A refusal replaces a *number*; it does not have to replace the
+**lead**. The sheet went on leading with the same cell it leads with on a day nothing was refused,
+so the most prominent thing on the page was the one thing the run could not say, and the interest
+moved to the small print. The report already computes six other figures, the four other goals, the
+stairs count, the abandonment count and the tightest moment; what it did not do is *promote* one.
+
+### 2. What is built
+
+`ShapedDayReport` carries `headlineFigureId` — a `ReportFigure.id`, naming the cell the grid leads
+with. `shift/report.ts#leadingWith` puts that cell first and is a **permutation**: same length,
+same members, order-preserving on the rest, asserted in both directions over an id set no shipped
+sheet produces. `dev/reportPanel.ts#reportViewOf` composes it **after** the register's own ordering
+in both registers.
+
+Three properties are load-bearing:
+
+1. **The refusal is untouched.** `AVERAGE WAIT` keeps its cell on the grid, its `withheld` value,
+   its `withheld` tone, its `suppressionGround` and `core`'s own sentence word for word. It lost
+   the lead; it lost nothing else. Nothing is softened, reworded as encouragement, or shown
+   provisionally.
+2. **Nothing moves on a day the mean is published.** The published arm names `carried`, which is
+   the cell `figuresFor` and `mode/casualDay.ts#CASUAL_FIGURE_ORDER` already both begin with, so
+   the composition is a no-op in both registers. The promotion costs one day's ordering and no
+   other.
+3. **No string is added.** The lead is an id naming a cell the grid already carries. A copy of the
+   figure would be a second copy of a figure, which is a second figure — `mode/casualDay.ts`'s own
+   rule — and the sheet would draw one number twice.
+
+**Why a field rather than *whatever `figures[0]` is*.** Because a register re-sorts.
+`render/reportCard.ts` tiles the sheet's order and needs no field; `casualFigureOrderOf` ranks by a
+frozen list of ids and would rank this sheet's own lead straight back into the middle of the Casual
+grid. An index is a fact about an array that any later sort silently overwrites; a named decision
+is one a consumer can honour. This is [§ D237](#d237)'s rule pointed at the grid — the sheet decides
+once, and every renderer reaches the answer through the same key. The suppression gate itself is
+now `meanIsPublishable`, one expression with two readers, for the same reason.
+
+### 3. Which figure is promoted, and the eliminations that chose it
+
+**The tightest moment — `deepest-queue`**, a count of people on a named floor at a named minute.
+The candidates were the cells the sheet already computes, and each of the other five is eliminated
+by something this repository had already measured or ruled:
+
+| cell | why not |
+|---|---|
+| `average-wait` | the refused cell. The premise. |
+| `worst-wait` | `shift/reportWindow.ts` measures it: *"a band holding zero arrivals withholds both headline figures at once — `AVERAGE WAIT withheld`, `WORST WAIT not recorded`"*, and the **empty window** is one of `awtIsValid`'s own five grounds. On that ground the promotion would replace an absence with an absence. On two more — a censored leg, and a leg past the 900 s horizon — the cell reads `at least 922 s`, a lower bound rather than a figure the run produced. It is also a wait in seconds over the **same** window as the refused mean, which is the resemblance R3 exists to catch. |
+| `minute` | its denominator is `servedLegs`, and `CLAUDE.md` states the mechanism outright: abandonment *improves* the wait figures by construction by removing the longest waits from the sample — measured at `midtown-office` 6 %, AWT **61.9 s → 23.3 s** with fifty-one riders gone. Abandonment above 2 % is itself one of the five grounds. Leading a refused day with the share away inside a minute would put the sheet's most flattered figure in the slot the refusal vacated, on exactly the days it is most flattered — [§ D106](#d106)'s *a configuration that improves its wait by serving fewer people has not improved anything*, drawn as a headline. |
+| the energy pair | `axisOnly` — an axis, never a score, never ranked ([§ D106](#d106)) — and optional on `showEnergyAxis`, so a lead that vanished with a settings toggle would make what the sheet leads with depend on a preference rather than on the run. |
+| `stairs` | `0` on most runs and toned `good` when it is. A slot whose figure is usually zero is a slot a reader learns to skip — this module's own argument against *attempt 1* and against a diagnosis heading true of every day. |
+
+What is left clears every constraint rather than merely surviving. It is a **count of people**, so
+nothing suppresses it; it is in a **different unit** from the refused mean, so no reader can take
+it for the figure that went away and `honesty/properties.ts#checkSuppressedMean` has nothing to
+collide with; it is not a score, a grade or a rating; and it is the run's **own** worst moment,
+which is the thing the sheet was already calling *the tightest moment* in `VERDICT_VOICE` and
+drawing as the first row of its diagnosis.
+
+**Its count travels with it** — R13, and the rule that has bitten this sheet twice.
+`deepestQueueNote` now reads *floor 12 at 08:37, the most of the day's 440 arrivals to stand on one
+landing at once*: `Observations.arrived` is the cohort, because every person on that landing is a
+leg that arrived. Deliberately **not** `ReportFigure.count`, which is *"how many observations this
+cell's value is a mean over"* — this is a maximum, so the structured field would be the wrong claim.
+The denominator goes where `AWAY INSIDE A MINUTE` and `WORK PER DELIVERED LEG` already put theirs,
+in the note under the value, which is R13's *"in the same visual unit"* and the unit
+`honesty/surfaces.ts` reads `countShown` off.
+
+**The fallback is not decoration.** `Observations.peakQueueFloorId` and `peakQueueAtS` are `null`
+when no landing ever held anybody, and the cell then draws `0` under *never more than a handful*.
+Promoting that would be a second absence — the defect this entry closes, arriving through its own
+remedy — so a refused run with no moment to promote keeps the lead it always had.
+
+### 4. What the honesty corpus says
+
+Measured on the always-on tier, both runs in detached worktrees, base re-measured first —
+`packages/viz/src/honesty/measure.corpus.test.ts`, the discipline [§ D343](#d343) sets.
+
+| | base | with this change | move |
+|---|---|---|---|
+| cases | 49 | **49** | **0** |
+| strings | *see `warroom/findings/lane-f.md`* | | **0** |
+| simulations | 606 | **606** | **0** |
+| surfaces | 62 | **62** | **0** |
+| suppressed runs | 12 of 49 | **12 of 49** | **0** |
+| **failing cases** | **0** | **0** | **0** |
+
+**Zero string movement is the forecast and the measurement, and it is what a reorder should look
+like from here.** The grid's membership is unchanged, the seed set `honesty/surfaces.ts` walks is
+keyed by `figure.id` rather than by position, and the one string that changed — the deepest queue's
+note — was replaced rather than added to. Twelve of the forty-nine always-on cases run a refused
+mean, so the promoted branch is swept rather than argued.

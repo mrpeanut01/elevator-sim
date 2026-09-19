@@ -100,6 +100,14 @@ function sheetOf(over: Partial<WeekDayReport> = {}): WeekDayReport {
     nextStep: { surface: 'compare', label: 'Take it to Compare', why: 'Compare settles it.' },
     metaLines: ['Chancery House · Steady hand', 'seed 424242 · 30 minutes'],
     lede: 'A day it could handle.',
+    /*
+     * The cell the sheet leads with — § D666, and `carried` is what `shift/report.ts` names on
+     * every run whose mean is published. `dev/reportPanel.ts` hoists it, so the grid this fixture
+     * is drawn into leads with CARRIED rather than with the order declared below; nothing in this
+     * file asserts a multi-cell order, and the one case that reads `figures[0]` passes a
+     * single-cell grid.
+     */
+    headlineFigureId: 'carried',
     figures: FIGURES,
     verdict: 'cleared',
     verdictLine: 'Shift cleared.',
@@ -319,6 +327,14 @@ describe('what this screen adds on top of the sheet', () => {
  */
 let config: LoadedConfig;
 let clean: VizRecording;
+/**
+ * A run whose mean the summary refuses — the branch § D666 is about.
+ *
+ * A real shipped configuration rather than a hand-built summary, for the reason the clean one is:
+ * the interesting sheet is one the simulator actually produces, and what is under test here is
+ * which cell the Everyday screen ends up leading with once both orderings have composed.
+ */
+let saturated: VizRecording;
 
 const PLAN: ShiftPlan = { shiftLengthS: 900, windowStartS: null, patternId: 'building' };
 
@@ -363,6 +379,15 @@ beforeAll(async () => {
   });
   clean = recordRun({ ...base, demand: { arrivalRatePctPop5min: 12 } }, { recordDecisions: false })
     .recording;
+  const outrun: SimulationConfig = fixtureConfig(config, {
+    buildingId: 'midtown-office',
+    durationS: 900,
+    onTimeout: 'report',
+  });
+  saturated = recordRun(
+    { ...outrun, demand: { arrivalRatePctPop5min: 25 } },
+    { recordDecisions: false },
+  ).recording;
 }, 300_000);
 
 const words = (text: string): number => text.split(/\s+/u).filter(Boolean).length;
@@ -375,9 +400,9 @@ const laidOut = (parts: readonly HonestyPart[]): string[] =>
 const drawnOpen = (parts: readonly HonestyPart[]): string[] =>
   parts.map((part) => (part.kind === 'open' ? part.text : part.handle));
 
-const realView = (): EverydayReportView =>
+const realView = (recording: VizRecording = clean): EverydayReportView =>
   everydayReportViewOf({
-    report: realReport(clean),
+    report: realReport(recording),
     previous: undefined,
     overnight: undefined,
     newerRunOnStage: false,
@@ -561,6 +586,53 @@ describe('every lever routes, and a dispatcher lever keeps its honesty on the ca
  * is unchanged, so the corpus keeps reading the whole note; what these cases hold is that nothing
  * is deleted or re-ordered by the fold, and that the budget is a ceiling measured on real copy.
  */
+/**
+ * § D666 — what the Everyday player meets where the mean used to be.
+ *
+ * Driven on **real** sheets rather than the hand-built fixture above, for the reason the issue
+ * #211 suite gives: what is under test is which cell survives two orderings composing, and a
+ * hand-written grid would have proved that a hand-written grid re-orders. This screen re-uses
+ * `dev/reportPanel.ts#reportViewOf` in the Casual register, which is the register that would have
+ * ranked the sheet's own lead back into the middle of the grid.
+ */
+describe('the sheet leads with a figure the run produced when its mean is refused — § D666', () => {
+  it('leads the Casual grid with the tightest moment, and keeps the refusal on it', () => {
+    const view = realView(saturated);
+    expect(view.sheet.figures[0]?.label).toBe('DEEPEST QUEUE');
+    const lead = view.sheet.figures[0];
+    // A count of people, not a number of seconds, and not the word `withheld`.
+    expect(lead?.value).toMatch(/^\d+$/u);
+    expect(Number(lead?.value)).toBeGreaterThan(0);
+    const wait = view.sheet.figures.find((cell) => cell.label === 'AVERAGE WAIT');
+    expect(wait?.value).toBe('withheld');
+    // The refusal is still the run's own words, Casual's lead in front of them and nothing else —
+    // the property the R3 suite at the top of this file holds, re-asserted on the promoted sheet.
+    expect(wait?.note).toContain('There is no number here');
+  });
+
+  it('carries the promoted cell’s denominator in its own note — R13 through the Casual register', () => {
+    const view = realView(saturated);
+    const observations = shiftObservationsOf(observationsAt(saturated, saturated.endedAt));
+    const lead = view.sheet.figures[0];
+    expect(lead?.note).toContain(String(observations.arrived));
+    expect(lead?.note).toContain(`floor ${String(observations.peakQueueFloorId)}`);
+  });
+
+  it('moves nothing on a day the mean is published', () => {
+    const view = realView();
+    expect(view.sheet.figures[0]?.label).toBe('CARRIED');
+    expect(view.sheet.figures.find((cell) => cell.label === 'AVERAGE WAIT')?.value).not.toBe(
+      'withheld',
+    );
+  });
+
+  it('draws every cell on both branches — the promotion is a reorder, never a filter', () => {
+    const labels = (view: EverydayReportView) =>
+      [...view.sheet.figures.map((cell) => cell.label)].sort();
+    expect(labels(realView(saturated))).toEqual(labels(realView()));
+  });
+});
+
 describe('a figure card’s note leads with its first sentence and folds the rest — issue #211', () => {
   it('joins back to the note byte for byte, and folds only what is over the budget', () => {
     const short = 'One sentence, under the budget.';

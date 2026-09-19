@@ -5,13 +5,43 @@
  * once a day."* That is the cheapest social shape a game of this kind has, and until this module
  * the player-facing product could not use it: every clipboard write and every picture export in
  * the tree is on the Engineer surface (`dev/main.ts#copyArtefact`, and the report's own PNG), and
- * a search for `clipboard` across `everyday/` returned nothing at all. A player who ran today's
- * crowd had no way to show anybody what happened to the people in it.
+ * a search for `clipboard` across `everyday/` returned nothing at all. A player who ran a day had
+ * no way to show anybody what happened to the people in it.
  *
  * It is also the only social mechanism that works **below** the twenty-player floor.
  * `packages/server`'s `distribution.ts#MIN_LADDER_N` withholds every quantile ladder until twenty
  * runs are on a board, and that floor is right and is not relaxed here. A board with four rows on
  * it says almost nothing; one player handing another a seed does not need a population at all.
+ *
+ * ## What this artefact does **not** say, and the measurement that decided it
+ *
+ * It does not say *everybody is playing this today*, and that was going to be its closing line.
+ *
+ * **The seed a run carries is not a shared daily one on this tree.** `dev/main.ts`'s `boot` opens
+ * with `initialState(resources, randomSeed())` and `randomSeed` is `crypto.getRandomValues`, so
+ * the session seed is fresh on every load; `dev/state.ts#withFirstSession` then draws the opening
+ * contract from it through `shift/firstSession.ts#firstSessionContractFor`, so six cold loads give
+ * six different towers. Two player surfaces state the opposite as fact —
+ * `everyday/doorView.ts`'s stepper rule and `everyday/today.ts`'s seed line. An artefact whose
+ * closing line invited a recipient to *play the same day* would be a second false claim built on
+ * the first, and the whole worth of this control is that a recipient can act on what it says.
+ *
+ * **The daily seed is not missing, though, and that is the half worth acting on.**
+ * `packages/server`'s `leaderboard/boardKey.ts#dailySeedFor` is the date's own digits,
+ * `dailyFixtureAt` returns `{ date, seed, config }`, `GET /api/boards` already serves it, and
+ * `menu/client.ts` already validates it field by field onto `BoardsPage.today`. Then
+ * `everyday/host.ts#dailyBoardOf` reads `today.date` to build the board key and **drops
+ * `today.seed` and `today.config`**, which nothing in `packages/viz/` reads. A value authored,
+ * served, schema-checked on the client, carried into a typed structure, and consulted by nothing
+ * is this repository's signature defect — the one `CLAUDE.md` has recorded eleven times in code —
+ * and it is one field access from being closed.
+ *
+ * So the closing line states the spoiler rule and stops. **No conditional arm is built for the
+ * day's crowd and no field is added for one**, deliberately: a branch with no live writer is the
+ * twelfth dead seam, which is the thing this paragraph is about. When a run can be played on the
+ * day's fixture, the arm to add is *this run is today's crowd* — decided by comparing the run's
+ * seed against the server's own `today.seed`, never against a date this module computed, because
+ * `boardKey.ts` says in terms that *which day is it* has one answer and it is the server's.
  *
  * ## What may leave, and what may not — [§ D685](../../../../DECISIONS.md)
  *
@@ -154,8 +184,14 @@ export const SHARE_COPY = Object.freeze({
    * The closing line, and it is addressed to the recipient rather than to the sharer. It states the
    * spoiler rule on the face of the artefact, because a recipient who does not know the dispatcher
    * was withheld will assume it was simply not mentioned and go looking for it.
+   *
+   * **It claims nothing about anybody else's day**, for the reason the module docstring measures:
+   * the seed a run carries on this tree is a fresh one per load, so *the same crowd as everybody
+   * else* would be false, and *play the same day* would be an invitation to something the player
+   * surface cannot hand over. What is true of every run is what it says — this is one run, and
+   * the way it was run is not in the message.
    */
-  promise: 'Same building, same seed, same crowd. How it was run is not in this message.',
+  promise: 'One run, on this building and this seed. How it was run is not in this message.',
 });
 
 /** What one line of the artefact is, for a renderer and for the sweep. */
