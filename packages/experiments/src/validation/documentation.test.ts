@@ -2069,7 +2069,25 @@ type DecisionReservation = {
  * place that rule forbids one to sit. `CHARTER_PROGRAMME.md`'s row moves to **D738** on this
  * commit, per the remedy the guard below names.
  */
-const OPEN_RESERVATION = { wave: 'AD', from: 738, to: 860 } as DecisionReservation | null;
+/*
+ * **Wave AD's reservation is CLOSED.** Six blocks went out across D738-D860, the wave's highest
+ * heading is **D839**, and eighty-seven numbers came back unspent and are registered below with
+ * the reason each lane gave.
+ *
+ * **D840-D860 are free rather than holed**, on § D430's distinction and wave AC-2's worked example
+ * directly above: nothing is written past D839, so a number the wave never reached with nothing
+ * above it is free. Registering them would point this row's `highest + 1` at a hole, which is the
+ * one place that rule forbids one to sit. `CHARTER_PROGRAMME.md`'s row moves to **D840** on this
+ * commit.
+ *
+ * **The sizing lesson this wave adds is about the largest block rather than the smallest.** The
+ * kernel-resume lane held thirty-five and spent two. That block was dispatched wide on a guess
+ * that a resumable run would need a ruling per seam; the measurement found the seams identical and
+ * left nothing to rule on. A block cannot be sized to the decisions a lane will take, because
+ * nobody knows those until the measurement has run — so the honest default is a narrow block and
+ * § D404's ask, which is the mechanism wave AC-2 already proved works when a lane used it.
+ */
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
@@ -2658,6 +2676,137 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
       "two.",
   ],
   [735, "wave AC-2's daily-seed lane; unspent for § 734's reason."],
+  /*
+   * Wave AD. Five lanes returned eighty-seven numbers between them, which is this column's
+   * largest return and is recorded as a sizing lesson rather than as thrift: every one of
+   * the five closed its issue, and four of the five needed one or two numbers to do it.
+   *
+   * D840-D860 are deliberately NOT registered. Nothing in the tree is written above D839,
+   * so those numbers were never reached and are free rather than holed — wave P's
+   * precedent at § 465 above, the same ground D641-D644 sit on.
+   */
+  [
+    739,
+    "wave AD's career-purse lane (GitHub issue #557) held D738-D752 and spent only " +
+      "§ D738 on the issue whole — the fourth derived term, the shop sink the top-up " +
+      "reaches a run through, and the hold at cap. One issue closed end to end is one " +
+      "decision however many modules it touches, which is this column's usual reason for a " +
+      "lane's spare numbers. Registered under D404 and D430.",
+  ],
+  [740, "wave AD AD-A's block; unspent for § 739's reason."],
+  [741, "wave AD AD-A's block; unspent for § 739's reason."],
+  [742, "wave AD AD-A's block; unspent for § 739's reason."],
+  [743, "wave AD AD-A's block; unspent for § 739's reason."],
+  [744, "wave AD AD-A's block; unspent for § 739's reason."],
+  [745, "wave AD AD-A's block; unspent for § 739's reason."],
+  [746, "wave AD AD-A's block; unspent for § 739's reason."],
+  [747, "wave AD AD-A's block; unspent for § 739's reason."],
+  [748, "wave AD AD-A's block; unspent for § 739's reason."],
+  [749, "wave AD AD-A's block; unspent for § 739's reason."],
+  [750, "wave AD AD-A's block; unspent for § 739's reason."],
+  [751, "wave AD AD-A's block; unspent for § 739's reason."],
+  [752, "wave AD AD-A's block; unspent for § 739's reason."],
+  [
+    754,
+    "wave AD's session-shape lane (GitHub issue #559) held D753-D760 and spent only " +
+      "§ D753 — the five shapes composed from the rung, the four documents held to the " +
+      "strings a player reads, and the two modules forbidden a figure of their own. One " +
+      "issue, one decision. Registered under D404 and D430.",
+  ],
+  [755, "wave AD AD-B's block; unspent for § 754's reason."],
+  [756, "wave AD AD-B's block; unspent for § 754's reason."],
+  [757, "wave AD AD-B's block; unspent for § 754's reason."],
+  [758, "wave AD AD-B's block; unspent for § 754's reason."],
+  [759, "wave AD AD-B's block; unspent for § 754's reason."],
+  [760, "wave AD AD-B's block; unspent for § 754's reason."],
+  [
+    766,
+    "wave AD's parameter-routing lane held D761-D785 and spent five, § D761 to § D765. " +
+      "The block was sized wide because a survey of sixty tunables looked as though every " +
+      "finding would be a ruling; four of them were one ruling each and the fifth is a " +
+      "record of what the lane could not fix. Registered under D404 and D430.",
+  ],
+  [767, "wave AD AD-C's block; unspent for § 766's reason."],
+  [768, "wave AD AD-C's block; unspent for § 766's reason."],
+  [769, "wave AD AD-C's block; unspent for § 766's reason."],
+  [770, "wave AD AD-C's block; unspent for § 766's reason."],
+  [771, "wave AD AD-C's block; unspent for § 766's reason."],
+  [772, "wave AD AD-C's block; unspent for § 766's reason."],
+  [773, "wave AD AD-C's block; unspent for § 766's reason."],
+  [774, "wave AD AD-C's block; unspent for § 766's reason."],
+  [775, "wave AD AD-C's block; unspent for § 766's reason."],
+  [776, "wave AD AD-C's block; unspent for § 766's reason."],
+  [777, "wave AD AD-C's block; unspent for § 766's reason."],
+  [778, "wave AD AD-C's block; unspent for § 766's reason."],
+  [779, "wave AD AD-C's block; unspent for § 766's reason."],
+  [780, "wave AD AD-C's block; unspent for § 766's reason."],
+  [781, "wave AD AD-C's block; unspent for § 766's reason."],
+  [782, "wave AD AD-C's block; unspent for § 766's reason."],
+  [783, "wave AD AD-C's block; unspent for § 766's reason."],
+  [784, "wave AD AD-C's block; unspent for § 766's reason."],
+  [785, "wave AD AD-C's block; unspent for § 766's reason."],
+  [
+    788,
+    "wave AD's Scenario lane held D786-D800 and spent § D786 and § D787 — the purchase " +
+      "the hub stops offering, and the stage row that opens its stage through a provided " +
+      "port. Two rulings, and the rest of the copy work reaches past no module and is " +
+      "recorded in its own docstrings under § D405. Registered under D404 and D430.",
+  ],
+  [789, "wave AD AD-D's block; unspent for § 788's reason."],
+  [790, "wave AD AD-D's block; unspent for § 788's reason."],
+  [791, "wave AD AD-D's block; unspent for § 788's reason."],
+  [792, "wave AD AD-D's block; unspent for § 788's reason."],
+  [793, "wave AD AD-D's block; unspent for § 788's reason."],
+  [794, "wave AD AD-D's block; unspent for § 788's reason."],
+  [795, "wave AD AD-D's block; unspent for § 788's reason."],
+  [796, "wave AD AD-D's block; unspent for § 788's reason."],
+  [797, "wave AD AD-D's block; unspent for § 788's reason."],
+  [798, "wave AD AD-D's block; unspent for § 788's reason."],
+  [799, "wave AD AD-D's block; unspent for § 788's reason."],
+  [800, "wave AD AD-D's block; unspent for § 788's reason."],
+  [
+    803,
+    "wave AD's kernel-resume lane held D801-D835 and spent § D801 and § D802. " +
+      "Thirty-three returned is the largest block this column has seen come back, and it " +
+      "is a sizing error rather than a lane's thrift: the block was dispatched wide on the " +
+      "expectation that a resumable run would need a ruling per seam, and the measurement " +
+      "— byte-identical across seven chunkings and four configurations — left nothing to " +
+      "rule on. The lesson is the one § 734's block already records, arriving larger: a " +
+      "block is sized for the decisions a lane will take, and nobody can count those before " +
+      "the measurement. Registered under D404 and D430.",
+  ],
+  [804, "wave AD AD-E's block; unspent for § 803's reason."],
+  [805, "wave AD AD-E's block; unspent for § 803's reason."],
+  [806, "wave AD AD-E's block; unspent for § 803's reason."],
+  [807, "wave AD AD-E's block; unspent for § 803's reason."],
+  [808, "wave AD AD-E's block; unspent for § 803's reason."],
+  [809, "wave AD AD-E's block; unspent for § 803's reason."],
+  [810, "wave AD AD-E's block; unspent for § 803's reason."],
+  [811, "wave AD AD-E's block; unspent for § 803's reason."],
+  [812, "wave AD AD-E's block; unspent for § 803's reason."],
+  [813, "wave AD AD-E's block; unspent for § 803's reason."],
+  [814, "wave AD AD-E's block; unspent for § 803's reason."],
+  [815, "wave AD AD-E's block; unspent for § 803's reason."],
+  [816, "wave AD AD-E's block; unspent for § 803's reason."],
+  [817, "wave AD AD-E's block; unspent for § 803's reason."],
+  [818, "wave AD AD-E's block; unspent for § 803's reason."],
+  [819, "wave AD AD-E's block; unspent for § 803's reason."],
+  [820, "wave AD AD-E's block; unspent for § 803's reason."],
+  [821, "wave AD AD-E's block; unspent for § 803's reason."],
+  [822, "wave AD AD-E's block; unspent for § 803's reason."],
+  [823, "wave AD AD-E's block; unspent for § 803's reason."],
+  [824, "wave AD AD-E's block; unspent for § 803's reason."],
+  [825, "wave AD AD-E's block; unspent for § 803's reason."],
+  [826, "wave AD AD-E's block; unspent for § 803's reason."],
+  [827, "wave AD AD-E's block; unspent for § 803's reason."],
+  [828, "wave AD AD-E's block; unspent for § 803's reason."],
+  [829, "wave AD AD-E's block; unspent for § 803's reason."],
+  [830, "wave AD AD-E's block; unspent for § 803's reason."],
+  [831, "wave AD AD-E's block; unspent for § 803's reason."],
+  [832, "wave AD AD-E's block; unspent for § 803's reason."],
+  [833, "wave AD AD-E's block; unspent for § 803's reason."],
+  [834, "wave AD AD-E's block; unspent for § 803's reason."],
+  [835, "wave AD AD-E's block; unspent for § 803's reason."],
 ]);
 
 /**
