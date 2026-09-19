@@ -212,7 +212,13 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
   'viewer.seed': control(
     'between-games',
     'The seed names the run. It is between-games rather than within-day because it travels with a ' +
-      'submission and the server replays it — a seed changed mid-week would rename days already banked.',
+      'submission and the server replays it — a seed changed mid-week would rename days already ' +
+      'banked. GitHub issue #563 gives it a second non-test writer in the shell, and the scope is ' +
+      'unmoved for campaignFitOut’s reason: everyday/host.ts#runCampaignDay derives a contract ' +
+      'day’s own seed in the same press that starts that day, so it is decided before a run exists ' +
+      'and never inside one, and it renames nothing banked because a filed day carries the seed it ' +
+      'was run at. The Everyday product had no writer at all before that, which is why ten career ' +
+      'days in a row were byte-identical.',
   ),
 
   /* ------------------------------------------------ viewer: what re-runs today */
@@ -290,7 +296,13 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
   'viewer.week': control(
     'between-days',
     'The contract, the day, the streak and what has been banked. day drives grownBuilding’s 11 %/day ' +
-      'and eventFor’s twist, so it is the one field that must move only when the doors open on tomorrow.',
+      'and eventFor’s twist, so it is a field that may move only as a day opens. It used to say the ' +
+      'doors on tomorrow were the only thing that opened one, and GitHub issue #563 made that false: ' +
+      'everyday/host.ts#runCampaignDay is a second writer of day, setting it from CampaignTower.day ' +
+      'on the press that starts a contract day. The scope is unmoved and the second writer is why ' +
+      'the sentence says so — a career day is a day opening, the value is read off the record that ' +
+      'owns it rather than incremented, and nothing already banked is renamed, because week.history ' +
+      'carries each DayOutcome rather than re-deriving it from the counter.',
   ),
   'viewer.parkedWeeks': latent(
     'viewer.buildingId',

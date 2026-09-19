@@ -1,6 +1,10 @@
 {
   "$comment": "The wrinkle library — GitHub issue #159, GAMEPLAY_AND_NAVIGATION.md § 17. A day's twist is a row here rather than a literal in shift/events.ts, which is CLAUDE.md invariant 7 pointed at content. Every template's effect is expressed ONLY in fields the engine actually reads (arrivalRateMultiplier, directionalSplit, carsOutOfService, derate), because a template that named an effect nothing consumes would be a caption that lies about the picture under it — the defect shift/events.ts was written to prevent. Three of the six wrinkle kinds § 17 names are therefore NOT here and are recorded in `unexpressible` with the seam each one needs. The figures are DRAFTED, not measured: a wrinkle is game feel, and the ladder is the product owner's. See packages/viz/src/wrinkles/.",
   "version": 1,
+  "campaignDay": {
+    "$comment": "How often a CONTRACT day is something rather than nothing — GitHub issue #564. A career day consults its contract's calendar first and the wear clock second; on the days neither claims, this share decides whether the building has a day of its own drawn from the weekday pool. It is authored here rather than in code for CLAUDE.md invariant 7's reason, and its type, range and default are declared by packages/viz/src/wrinkles/parse.ts#CAMPAIGN_DAY_EVENT_SHARE (invariant 8). 20 per cent is derived rather than picked: see campaign/incidents.ts#CAMPAIGN_DAY_EVENT_SHARE_PCT for the arithmetic over a twenty-day contract.",
+    "eventSharePct": 20
+  },
   "unexpressible": [
     {
       "kind": "doors slowed on one car",

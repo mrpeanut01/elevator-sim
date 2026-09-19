@@ -108,7 +108,8 @@ import {
   wearOf,
   worksDayLine,
 } from '../campaign/economy.js';
-import { calendarDaysOf } from '../campaign/calendar.js';
+import { calendarDaysOf, calendarEventIdFor } from '../campaign/calendar.js';
+import { SHIFT_EVENTS } from '../shift/events.js';
 import { CONTRACTS } from '../shift/contracts.js';
 import {
   BUILD_IDS,
@@ -492,7 +493,9 @@ export const CALENDAR_LEGEND: readonly { readonly glyph: string; readonly label:
     Object.freeze({ glyph: '×', label: 'missed' }),
     Object.freeze({ glyph: '!', label: 'decision due' }),
     Object.freeze({ glyph: '⚒', label: 'works' }),
-    Object.freeze({ glyph: '⚑', label: 'crowd booked' }),
+    /* Not *crowd booked* since GitHub issue #564 — a contract books what its own building does,
+       and half the shipped bookings take a car rather than bring people. */
+    Object.freeze({ glyph: '⚑', label: 'booked day' }),
     Object.freeze({ glyph: '▢', label: 'today' }),
     Object.freeze({ glyph: '', label: 'blank = not yours yet, or the contract has finished' }),
   ]);
@@ -778,9 +781,17 @@ export function calendarView(input: CampaignInput): CalendarView {
       const facts = factsFor(input, tower);
       const need = needOf(tower);
       /*
-       * A calendared crowd is a flagged day the player can read before it comes — GitHub issue
+       * A calendared day is a flagged day the player can read before it comes — GitHub issue
        * #169 item 1, § D507: `campaign/calendar.ts` books it, the design's Crown Hotel fixture marks
        * it `bad`, and § 8.6's grid already has the glyph for that.
+       *
+       * **It used to say *crowd* here and in the tip, and that stopped being true on the commit
+       * that gave every contract a calendar** — GitHub issue #564, § D227. While `c7` was the only
+       * contract with an entry, every flagged day *was* a coach party; now a block of flats books a
+       * move-in, which takes a car and brings no crowd at all. A tip reading *a crowd is booked*
+       * over a day whose run has the same arrival rate as any other is the caption defect this
+       * repository keeps finding, so the tip names **what** is booked, read off the same table the
+       * mark came from.
        */
       const marks = {
         dueDays: need === undefined ? [] : [tower.day],
@@ -795,12 +806,25 @@ export function calendarView(input: CampaignInput): CalendarView {
           tip:
             cell.towerDay === undefined
               ? `${facts.name} · not yours on working day ${String(cell.careerDay)}`
-              : `${facts.name} · its day ${String(cell.towerDay)} of ${String(CONTRACT_DAYS)}${tipSuffix(cell.mark)}`,
+              : `${facts.name} · its day ${String(cell.towerDay)} of ${String(CONTRACT_DAYS)}${tipSuffix(cell.mark, bookedNameFor(tower.id, cell.towerDay))}`,
         })),
       };
     }),
     legend: CALENDAR_LEGEND,
   };
+}
+
+/**
+ * The name of whatever this contract books on this day, or `undefined` for a day it leaves alone.
+ *
+ * GitHub issue **#564**. One lookup, through `campaign/calendar.ts` and `shift/events.ts`, so the
+ * grid's tip cannot disagree with the day the run is built from — the two used to agree by
+ * coincidence, because `c7` was the only contract with an entry and everything it booked was a
+ * crowd.
+ */
+function bookedNameFor(contractId: string, towerDay: number): string | undefined {
+  const booked = calendarEventIdFor(contractId, towerDay);
+  return booked === undefined ? undefined : SHIFT_EVENTS[booked].name;
 }
 
 /**
@@ -818,7 +842,7 @@ export function calendarView(input: CampaignInput): CalendarView {
  * claim with more words. What is left is the part `economy.test.ts` and `campaignModel.test.ts`
  * already hold: the money is gone, and the nights are spoken for.
  */
-function tipSuffix(mark: CalendarCell['mark']): string {
+function tipSuffix(mark: CalendarCell['mark'], booked?: string): string {
   switch (mark) {
     case 'today':
       return ' · today';
@@ -827,7 +851,14 @@ function tipSuffix(mark: CalendarCell['mark']): string {
     case 'works':
       return ' · works are booked, one car out for the day';
     case 'flagged':
-      return ' · a crowd is booked';
+      /*
+       * **The event's own name, not a category** — GitHub issue #564. Every contract books
+       * something now and they are not all crowds, so this reads the booking off
+       * `campaign/calendar.ts` rather than asserting what kind of day it is. `undefined` is the
+       * honest fallback for a flag `CampaignTower.flaggedDays` carries rather than the calendar;
+       * that array is empty in this build, so the arm is there for the day it is not.
+       */
+      return booked === undefined ? ' · something is booked' : ` · booked: ${booked}`;
     case 'cleared':
       return ' · cleared';
     case 'missed':
