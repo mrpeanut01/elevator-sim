@@ -1867,6 +1867,8 @@ describe('the camera, measured per tower — GitHub issue #324', () => {
 describe('what the stage may adopt — GitHub issue #548', () => {
   const yesterday = syntheticRecording();
   const today = syntheticRecording();
+  /** The § 3.3 row's own input — the shell's state, as `stageBarModelOf` is handed it. */
+  const daily = { screen: 'stage', ctx: 'daily' } as const;
 
   it('takes the first recording that lands', () => {
     expect(stageMayAdopt({ incoming: today, adopted: undefined, runPending: false, standingAtEntry: undefined })).toBe(
@@ -1895,6 +1897,39 @@ describe('what the stage may adopt — GitHub issue #548', () => {
     expect(
       stageMayAdopt({ incoming: yesterday, adopted: undefined, runPending: true, standingAtEntry: yesterday }),
     ).toBe(false);
+  });
+
+  /**
+   * **The half of #548 that is worse than the revert, asserted rather than only described.**
+   *
+   * While the stage holds, `EverydayHost.runState().hasRun` is still **true** — it is a fact about
+   * the host, and what the host has is the run the stage is refusing to draw. Handed to the § 3.3
+   * row unguarded, it made the primary read *Close the day* over a day that was not on screen, and
+   * `EverydayHost.closeDay` would have filed **that** run: the week, the contract, the chime a filed
+   * day pays and anything posted from it would all have inherited a day the player never watched.
+   * A product whose pitch is that a figure is the run's may not file a run nobody saw.
+   *
+   * So `stageScreen.ts` passes `runState.hasRun && !awaitingToday`, and this is what the row then
+   * says. The pair is asserted — the sentence **and** the inert primary — because either alone
+   * passes against a build that says the right thing and leaves the button live.
+   */
+  it('withholds the § 3.3 primary while the stage is holding, so the wrong day cannot file', () => {
+    const held = stageBarModelOf(daily, {
+      hasRun: false,
+      dayClosed: false,
+      recomputing: false,
+      dayEnded: false,
+    });
+    expect(held.note).toBe('the day has not started yet — there is nothing to file');
+    expect(held.primary.inert).toBe(held.note);
+    /* The negative control: the same row with a run actually on the stage does offer the press. */
+    const standing = stageBarModelOf(daily, {
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      dayEnded: false,
+    });
+    expect(standing.primary.inert).toBeUndefined();
   });
 
   /** And takes it the moment it lands — a *different* object is today's, whatever else is in flight. */
