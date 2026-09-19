@@ -23,7 +23,7 @@ import {
   syntheticRecording,
   waitingLeg,
 } from '../live/synthetic.test-helper.js';
-import type { VizRecording } from '../contract/types.js';
+import type { VizRecording, VizSummary } from '../contract/types.js';
 
 import {
   SHARE_COPY,
@@ -39,7 +39,7 @@ const WINDOW = { id: 'whole-run', startS: 0, endS: 1_200 } as const;
 
 function runWith(
   legs: readonly VizRecording['legs'][number][],
-  summary: Parameters<typeof syntheticRecording>[0] extends { summary?: infer S } ? S : never,
+  summary: Partial<VizSummary>,
 ): VizRecording {
   return syntheticRecording({
     legs,
@@ -210,7 +210,11 @@ describe('the spoiler rule — § D685', () => {
    * id is a word a fixture could easily leak. Neither may reach the artefact.
    */
   it('names no dispatcher, in either branch', () => {
-    for (const summary of [{ awtIsValid: true }, { awtIsValid: false, saturated: true, awtInvalidGround: 'saturated' }]) {
+    const branches: readonly Partial<VizSummary>[] = [
+      { awtIsValid: true },
+      { awtIsValid: false, saturated: true, awtInvalidGround: 'saturated' },
+    ];
+    for (const summary of branches) {
       const recording = {
         ...runWith(onePerSlice(Array(12).fill(20)), summary),
         dispatcherProfileId: 'destination-eta',
