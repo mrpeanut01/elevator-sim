@@ -9082,6 +9082,50 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
        */
       ['banked-one', { profile: stored, reduceMotion: false, account: named, accountServer: true, chimeBalance: 1 }],
       ['banked-many', { profile: stored, reduceMotion: false, account: named, accountServer: true, chimeBalance: 40 }],
+      /*
+       * § D672's spend, in the arms a balance and an account alone cannot reach. Every case above
+       * leaves `chimeSpendable` unset, so every row draws its *there is no ledger on this build*
+       * arm and the four sentences a player who can actually buy something meets — the offer, the
+       * shortfall, the bought line and the server's refusal — would ship unswept. That is the same
+       * shape as the two cases above this comment, one field along.
+       */
+      [
+        'can-buy',
+        {
+          profile: stored,
+          reduceMotion: false,
+          account: named,
+          accountServer: true,
+          chimeBalance: 40,
+          chimeSpendable: true,
+          chimeOwns: [],
+        },
+      ],
+      [
+        'cannot-afford',
+        {
+          profile: stored,
+          reduceMotion: false,
+          account: named,
+          accountServer: true,
+          chimeBalance: 2,
+          chimeSpendable: true,
+          chimeOwns: [],
+          chimeNotice: 'There are not enough chimes in the account for that yet.',
+        },
+      ],
+      [
+        'already-bought',
+        {
+          profile: stored,
+          reduceMotion: false,
+          account: named,
+          accountServer: true,
+          chimeBalance: 40,
+          chimeSpendable: true,
+          chimeOwns: [{ sinkId: 'rush-prefit', steps: 1 }],
+        },
+      ],
     ] as const;
 
     for (const [label, input] of cases) {
@@ -9110,14 +9154,20 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
       for (const row of chimes.rows) {
         seeds.push({ field: `${label}.chimes.${row.id}.name`, text: row.name, role: 'label' });
         seeds.push({ field: `${label}.chimes.${row.id}.price`, text: row.price, role: 'label' });
+        /*
+         * Each row's own sentence — § D672. A `reason` rather than prose, on the role
+         * `signIn.notice` already carries: it is a refusal this surface makes about its own row, or
+         * on the offered arm, what pressing it will do. The one sentence this panel used to carry
+         * across the whole list (`spendRefusal`) is gone with the field, § D227's rule.
+         */
+        seeds.push({ field: `${label}.chimes.${row.id}.note`, text: row.note, role: 'reason' });
       }
-      /*
-       * That none of those prices can be bought yet — seeded **by name**, because being reachable
-       * through a `covers` entry is not being swept (wave T's finding). A `reason`, not prose: it
-       * is a refusal this surface makes about its own rows, which is the role
-       * `signIn.notice` already carries for a sentence that explains why something is not offered.
-       */
-      seeds.push({ field: `${label}.chimes.spendRefusal`, text: chimes.spendRefusal, role: 'reason' });
+      /* The fourth thing chimes buy, and why it is not on this list — `prose`, because it is not a refusal. */
+      seeds.push({ field: `${label}.chimes.spendNote`, text: chimes.spendNote, role: 'prose' });
+      if (chimes.notice !== undefined) {
+        /* The **server's** sentence about the last press, carried unrewritten — `signIn.notice`'s role and reason. */
+        seeds.push({ field: `${label}.chimes.notice`, text: chimes.notice, role: 'reason' });
+      }
       /*
        * The account block — § D489's asking half and § 15.1's signed-in one. `fieldValue` is
        * deliberately not seeded: it is the reader's own address, and `settingsView.ts` says why
@@ -9940,9 +9990,28 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
     const recording = context.recording;
     const mid = recording.startedAt + (recording.endedAt - recording.startedAt) / 2;
     const stopped = rushOutcomeOf(recording, mid);
+    /*
+     * The `broke` arm is **synthesised** from the stopped one, so every fabricated field has to be
+     * consistent with the others or the sweep reads a sentence the product could not produce.
+     * `where` joined them when the hold acquired landings (`shift/trouble.ts`): spreading
+     * `stopped` alone leaves it empty, `rushResultViewOf` then drops its fourth beat, and a
+     * player-facing sentence drawn on every real broken run would be swept by nothing — which is
+     * *seeded is not swept* one step along. Two landings splitting the forty, drawn from the
+     * building's own floors so the labels are real, and summing to `overLine` exactly as the
+     * shipped path's do.
+     */
+    const holdFloors = recording.floors.slice(0, 2);
+    const split = Math.floor(RUSH_HOLD_LINE.people / Math.max(1, holdFloors.length));
     const broke: RushOutcome = {
       ...stopped,
       kind: 'broke',
+      where: holdFloors.map((floor, index) => ({
+        floorId: floor.id,
+        label: floor.label ?? floor.id,
+        /* The last landing carries the remainder, so the parts sum to the line. */
+        pastTheLine: index === holdFloors.length - 1 ? RUSH_HOLD_LINE.people - split * index : split,
+        standing: (index === holdFloors.length - 1 ? RUSH_HOLD_LINE.people - split * index : split) + 2,
+      })),
       overLine: RUSH_HOLD_LINE.people,
       saturation: recording.summary.saturation ?? {
         verdict: 'diverging-queue',
@@ -13074,6 +13143,29 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
       seeds.push({ field: `collapse.${arm}.say`, text: view.say, role: 'prose' });
       seeds.push({ field: `collapse.${arm}.finish`, text: view.finish, role: 'label' });
       seeds.push({ field: `collapse.${arm}.finishNote`, text: view.finishNote, role: 'reason' });
+    }
+
+    /*
+     * The two *finished playing* states, seeded as the one string they move.
+     *
+     * A whole arm for each would re-seed nineteen identical strings to reach one that differs: once
+     * a run has ended the only thing this view says differently is the live region's sentence, and
+     * `stageEnded` is a field of every arm already. So the difference is seeded and the duplication
+     * is not — which is the same judgement the `worked` block above makes when it drives one extra
+     * arm for the one field that varies.
+     */
+    for (const [arm, beat] of [
+      ['as-built-ended', 'as-built'],
+      ['answered-ended', 'answered'],
+    ] as const) {
+      const ended = tutorialCollapseViewOf({
+        ...collapseQuoted,
+        beat,
+        runReady: true,
+        changeReady: true,
+        runEnded: true,
+      });
+      seeds.push({ field: `collapse.${arm}.say`, text: ended.say, role: 'prose' });
     }
 
     /*
