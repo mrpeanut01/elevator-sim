@@ -32,6 +32,24 @@
  * `setTimeout` defer, whose whole subject was getting the relabel painted **before** a task that
  * would seize the thread for a second. There is no such task now; the click handler returns
  * immediately and the browser paints on its own schedule.
+ *
+ * ## Neither of this mode's runs is **played** here, and that is deliberate rather than pending
+ *
+ * The Everyday screen plays both: the as-built run before its four figures (GitHub issue #348) and,
+ * since [§ D644](../../../../DECISIONS.md), the pair a press produces, side by side at one playhead.
+ * This panel plays neither, and the divergence is a ruling rather than an oversight — #348 put the
+ * opening sight on the player's screen only and this panel has run without one ever since, on the
+ * ground that the two surfaces are **allowed** to differ in presentation and must not differ in
+ * what the machinery decides: the same `classifyOutcome`, the same `repairRowOf`, the same
+ * `fixedBadgeAfter`, the same figures. `docs/38` § 1's *the fun is watching the people* is a claim
+ * about the game, and this overlay is the Engineer's instrument for the same cases — the surface a
+ * reader opens to get the sheet, beside the bench and the matrix, not the one a stranger meets.
+ *
+ * **So `after` is still dropped in the press handler below, and it is dropped knowingly.** If that
+ * stops being the right answer, the fix is not a second player of its own: it is
+ * `everyday/caseStage.ts` mounted here with this shell's tokens, because § D359's `surfaces-disagree`
+ * property exists for exactly the case where two surfaces over one machinery drift apart, and two
+ * painters would be the drift rather than the cure.
  */
 
 import { el, fill } from './dom.js';

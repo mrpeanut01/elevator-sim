@@ -37378,3 +37378,51 @@ Neither reaches code on this commit. `rush-prefit` is a fixed kit, so it has no 
 ### 9. Numbers spent
 
 This lane held **D640–D644** and spent **D640 only**. **D641, D642, D643 and D644 are unspent** and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them — ids here are names, so backfilling one would make it denote two things across time. The integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES` if that is what happens.
+
+---
+
+## D644 — Fix a building plays the run the player's own change produced, beside the as-built one at a single playhead; the verdict is not withheld behind it
+
+**Date: 2026-09-19 · Owner: this session, on the session principal's explicit delegated authority (recorded here rather than attributed to an unnamed "product owner", per [§ D227](#d227)'s stale-attribution class and the standing rule that an agent lane may not manufacture a human) · Rules on: `packages/viz/src/everyday/caseStage.ts` (renamed from `asBuiltStage.ts`), `packages/viz/src/everyday/fixitScreen.ts`, `packages/viz/src/dev/fixitPanel.ts`, `packages/viz/src/honesty/derive.test.ts`, `docs/35-problem-per-mode.md` § 12.**
+
+**Why an entry.** It renames a module three other files name, adds a row to `honesty/derive.test.ts`'s excluded-mount list, records a deliberate divergence between the two Fix-a-building surfaces, and takes a design position that reads against the precedent [§ D348's issue](https://github.com/mrpeanut01/elevator-sim/issues/348) set one block earlier. None of that is this lane's own module to settle in a docstring under [§ D405](#d405).
+
+**What was found, quoted rather than described.** `everyday/fixitScreen.ts#primary` bound its worker result as
+
+```ts
+onDone: ([before, after]) => {
+  …
+  session.asBuilt = before;
+  assertPairMatchesRepairs(entry, session.state, before, after);
+  session.outcome = classifyOutcome(entry, measuredOf(entry, before, after), spend);
+```
+
+`before` was kept on the session — it is what the four figures and the as-built stage are read from. **`after` was read twice and then went out of scope.** It is a full `VizRecording` of the day the player's own change produced: every leg, every motion, every door mark. Nothing on any screen drew it. `dev/fixitPanel.ts` did the same.
+
+So the shipped state of the mode a first-time player meets was: **the problem is watched and the answer is a table.** GitHub issue #348 had put the opening run on a stage (`docs/35` PM-FB1) and that half is real — a player watches the building fail before a single figure is stated — but the payoff, *find out whether your change worked*, was a card with three measured rows on it. `docs/38` § 1 makes watching the people the hook of the whole product, and this is the one press in the mode where the run being watched is the player's.
+
+**Two adjudications this entry also settles**, because a swarm produced both claims in one sitting and each is half right: *fix-a-building is never watched* is **false** of this tree (#348 shipped), and *`run.ts`'s recording is discarded* is **true** of the repaired half. The accurate sentence is the one above, and it is narrower and more actionable than either.
+
+**Ruling 1 — the pair is played, on one transport at one playhead.** `asBuiltStage.ts` becomes `caseStage.ts` and takes one pane or two. A press mounts a two-pane block above the outcome card: *as it stands* on the left, *with your change* on the right, both painted by `cutaway.ts#drawCutaway` — § 7's own painter — from one `Playback`'s `simTimeS`, read once per frame and passed to both `frameAt` calls.
+
+Widening the block rather than writing a second one is `cutaway.ts`'s own rule one layer up: **two consumers of one painter rather than two painters.** The rename is what keeps the module's name true of what it does; a `mountAsBuiltStage` that plays an as-repaired run is a small lie in a file whose whole subject is not telling them.
+
+**Why the pair rather than the repaired run alone.** A single canvas playing the after-run shows a building running; it does not show that anything changed. The two side by side at one minute is **common random numbers made visible**. `CLAUDE.md`'s statistical discipline requires every alternative under comparison to meet *the same passenger traces*, `fixit/run.ts#fixitRunPlanOf` obeys it by building both configs off one case's seed, horizon and demand, and `#assertPairMatchesRepairs` holds the claim to the legs before either is drawn. Until this block, that discipline reached the player as a basis line under a table. It is now the thing on screen: the same person, at the same landing, at the same minute of the same morning, in two buildings that differ only by what they bought. That is the honest answer to *how is this different from a replay*.
+
+**Ruling 2 — the verdict is not withheld behind the watch, and this is where the entry declines #348's own precedent.** The symmetric move was considered: #348 gates the four figures behind the opening watch, so gate the outcome card behind this one. It is refused on two grounds, the first of which is a defect rather than a preference.
+
+1. **The verdict is not only a card.** `session.fixed` badges the case in the rail, `keepSolved` writes the solved set to the profile and `bankScenarioClear` files the chime — all in the statement that lands the run. Deferring the card alone would put a FIXED badge over a case whose card had not said so, which is `docs/20` defect 16 (*two verdicts about one case on one screen*) rebuilt deliberately. Deferring all of it would mean holding a filed clear behind an animation.
+2. **Watching would become a toll on the loop this mode is made of.** The opening sight is offered once per case and guarantees every player watches the building at least once. A press is the iteration step — change, run, read, change again — and a compulsory watch on each one taxes exactly the behaviour the mode wants.
+
+So the sight is **first in reading order**, the landed run scrolls to it rather than to the card, and the block's own press goes to the verdict. Nothing a player already has is taken away, which is the test this ruling had to pass.
+
+**Ruling 3 — no pause and no intervention on either block, and [§ D623](#d623) clause 3 binds the pair more strongly than the opening run.** That clause kept fix-a-building's no-pause design because *a stage that let a case's opening run be pressed would be a second place to change a building the mode measures twice deliberately*. The pair **is** the two runs the verdict is measured from, so a press on it would edit the thing being judged. No speed chips, no pause, no interventions; the player's own default speed and one skip.
+
+**Ruling 4 — the block publishes no figure, and that is mechanical.** It sits directly above the surface allowed to state what the pair measured. A number on it would be a second place for one measurement to be published, and the second place is the one that goes stale — § D227's class, and why `docs/22` § 5 forbids *a figure without its count* rather than only a wrong figure. `fixitScreen.browser.test.ts` fails on a digit anywhere in the block's own words, which is `landingView.test.ts`'s rule pointed at the one block that stands over a verdict.
+
+**Ruling 5 — `dev/fixitPanel.ts` keeps dropping `after`, knowingly.** The Engineer overlay plays neither of this mode's runs and has not since #348 put the opening sight on the player's screen only. The two surfaces are allowed to differ in presentation and must not differ in what the machinery decides — the same `classifyOutcome`, `repairRowOf`, `fixedBadgeAfter` and figures — and *the fun is watching the people* is a claim about the game rather than about the Engineer's instrument for the same cases. The divergence is written into that file's own docstring rather than left silent, with the remedy named: if it stops being right, the fix is `everyday/caseStage.ts` mounted there with that shell's tokens, never a second player, because [§ D359](#d359)'s `surfaces-disagree` property exists for exactly the drift two painters would be.
+
+**What this does not decide.** Whether the pair should be re-watchable after it has been skipped (today the next press earns a new one, on `asBuiltSeen`'s precedent); whether a scrubber or a speed control ever belongs on a fix case, which § D623 rules against for now; and whether the Engineer panel should gain the block, which is ruling 5's *if*.
+
+**Evidence.** `everyday/caseStage.test.ts` is a document recorder (`docs/16` S9's third tier, borrowed from `dev/menuPanel.test.ts`): eight cases, including *both panes are painted in one animation frame, each from its own recording*, proved with two fixtures whose floor labels are disjoint so a pane drawing the wrong recording fails rather than passes. `everyday/fixitScreen.browser.test.ts` drives the shipped page on **both** branches of the run's own answer — a press with nothing bought, which cannot have fixed anything, and a press with the free diagnosed repair — and asserts on each that two canvases are sized and painting, that the outcome card is on the page at the same instant, that the badge and the § 3.3 primary agree, that a second press replaces the first press's block, and that no digit appears in the block's own words.
+
