@@ -210,28 +210,6 @@ export function units(value: number): string {
  * -------------------------------------------------------------------------- */
 
 /**
- * **All four** of § 8.6's tests, as `ShiftGoal`s.
- *
- * Expressed as `ShiftGoal`s rather than as a private shape so that `shift/goals.ts#readGoal` grades
- * them and `#wasDisplayOf` supplies § 7's *was* — one grading rule for the daily loop and the
- * campaign, rather than a second opinion here about what *met* means. The bars are the picked
- * difficulty's, so changing the difficulty moves the row rather than the copy.
- *
- * ## It used to be three, and the fourth is the whole of GitHub issue #169's item 2
- *
- * The trip budget shipped as a hand-built row carrying a refusal — *"not measured — this run records
- * how many people were carried and how long they stood, and not how many loaded departures the
- * machines made"* — because `GoalObservations` had no field it could read. It has one now
- * (`ENGINE_CONTRACT.md` § 5's `trips`, folded by `core` and cut at the playhead by
- * `live/observations.ts`), so the refusal is **false** and is deleted rather than reworded: § D227
- * binds both ways, and a control that writes something may not claim it writes nothing.
- *
- * The row is no longer special in any way. It is the fourth entry of this list, it grades through
- * the same `readGoal`, and on a recording that carries no travel record it prints the same em dash
- * the other three print below the wake-up gate — which is the only shape in which the row can still
- * decline to answer, and it is a state rather than a sentence.
- */
-/**
  * **The one heading over {@link campaignTestGoals}' bars, and the one sentence saying what they
  * decide** — GitHub issue **#567**, recorded here under [§ D405](../../../../DECISIONS.md).
  *
@@ -283,6 +261,28 @@ export const CONTRACT_ASKS_DECIDES =
   'These four are the contract’s, and they are what files a day cleared or missed against it. The ' +
   'day’s own report grades a separate five, under WHAT TODAY ASKS, and those decide your streak.';
 
+/**
+ * **All four** of § 8.6's tests, as `ShiftGoal`s.
+ *
+ * Expressed as `ShiftGoal`s rather than as a private shape so that `shift/goals.ts#readGoal` grades
+ * them and `#wasDisplayOf` supplies § 7's *was* — one grading rule for the daily loop and the
+ * campaign, rather than a second opinion here about what *met* means. The bars are the picked
+ * difficulty's, so changing the difficulty moves the row rather than the copy.
+ *
+ * ## It used to be three, and the fourth is the whole of GitHub issue #169's item 2
+ *
+ * The trip budget shipped as a hand-built row carrying a refusal — *"not measured — this run records
+ * how many people were carried and how long they stood, and not how many loaded departures the
+ * machines made"* — because `GoalObservations` had no field it could read. It has one now
+ * (`ENGINE_CONTRACT.md` § 5's `trips`, folded by `core` and cut at the playhead by
+ * `live/observations.ts`), so the refusal is **false** and is deleted rather than reworded: § D227
+ * binds both ways, and a control that writes something may not claim it writes nothing.
+ *
+ * The row is no longer special in any way. It is the fourth entry of this list, it grades through
+ * the same `readGoal`, and on a recording that carries no travel record it prints the same em dash
+ * the other three print below the wake-up gate — which is the only shape in which the row can still
+ * decline to answer, and it is a state rather than a sentence.
+ */
 export function campaignTestGoals(difficulty: Difficulty): readonly ShiftGoal[] {
   return Object.freeze([
     Object.freeze({

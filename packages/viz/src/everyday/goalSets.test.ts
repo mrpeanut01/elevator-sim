@@ -41,7 +41,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { openingCareer } from '../campaign/career.js';
-import { DIFFICULTIES } from '../campaign/economy.js';
+import { CONTRACT_DAYS, DIFFICULTIES, DIFFICULTY_IDS } from '../campaign/economy.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { TODAY_ASKS_DECIDES, TODAY_ASKS_HEADING, goalsForDay } from '../shift/goals.js';
 import type { GoalObservations, ShiftGoal } from '../shift/types.js';
@@ -99,14 +99,15 @@ const barOf = (goal: ShiftGoal): string =>
  * order a screen lists them in is not what the player was confused by.
  */
 function setsAgree(): boolean {
-  const contract = new Set(campaignTestGoals(DIFFICULTIES.standard).map(barOf));
-  /* Every rung of the ladder, not one: the daily set hardens and the contract set does not, so a
-     single day could coincide while the two sets are still different questions. */
-  return [...Array(20).keys()].every((index) => {
-    const today = new Set(goalsForDay(index + 1).map(barOf));
-    return (
-      today.size === contract.size && [...today].every((entry) => contract.has(entry))
-    );
+  /* Every tier and every rung of the ladder, not one of each: the daily set hardens and the
+     contract set does not, and the contract set moves with the difficulty the player picked, so one
+     pair could coincide while the two are still different questions everywhere else. */
+  return DIFFICULTY_IDS.every((tier) => {
+    const contract = new Set(campaignTestGoals(DIFFICULTIES[tier]).map(barOf));
+    return [...Array(CONTRACT_DAYS).keys()].every((index) => {
+      const today = new Set(goalsForDay(index + 1).map(barOf));
+      return today.size === contract.size && [...today].every((entry) => contract.has(entry));
+    });
   });
 }
 
@@ -118,7 +119,7 @@ describe('§ 567 — the two goal sets a career player meets one click apart', (
    * reconciles the two sets, this case fails first and says so, and the obligations below relax on
    * the same commit rather than becoming ceremony over one set of bars.
    */
-  it('are genuinely two different sets of bars, on every day of the contract', () => {
+  it('are genuinely two different sets of bars, on every tier and every day of the contract', () => {
     expect(setsAgree()).toBe(false);
     /* And the shape the assessor met: four against five. Derived, never written down twice. */
     expect(campaignTestGoals(DIFFICULTIES.standard)).toHaveLength(4);
@@ -134,7 +135,7 @@ describe('§ 567 — the two goal sets a career player meets one click apart', (
      * contract's eyebrow carries a day number and a later rewording could reintroduce the overlap
      * on one day only.
      */
-    for (let day = 1; day <= 20; day += 1) {
+    for (let day = 1; day <= CONTRACT_DAYS; day += 1) {
       const eyebrow = contractAsksEyebrow(day);
       expect(eyebrow).toContain(CONTRACT_ASKS_HEADING);
       expect(eyebrow).not.toContain(TODAY_ASKS_HEADING);
@@ -217,9 +218,13 @@ describe('§ 567 — the two goal sets a career player meets one click apart', (
     expect(campaign).not.toContain('`WHAT DAY ${String(tower.day)} ASKS`');
     expect(campaign).not.toContain('testsEyebrow:');
     /*
-     * The dead copy is deleted and not merely unread: `BUILDING_COPY` is iterated generically by
-     * `honesty/surfaces.ts`, so a key left behind would keep being swept as a heading no screen
-     * draws — a string in the corpus that no player can meet.
+     * **And the dead copy is deleted rather than left unread**, which is worth one assertion
+     * because of what it turned out to be. `BUILDING_COPY` is claimed in `honesty/surfaces.ts`'s
+     * `covers` and is **not** iterated there — every key of it that reaches the corpus is seeded by
+     * name, and `testsEyebrow` was not one of them. So the phrase was authored on a screen's copy
+     * record, read by no screen, and swept by no property: CLAUDE.md's wave T lesson (*being in
+     * `covers` is not being swept*) one level down, and the reason deleting it costs the corpus
+     * nothing.
      */
     expect(Object.keys(BUILDING_COPY)).not.toContain('testsEyebrow');
   });

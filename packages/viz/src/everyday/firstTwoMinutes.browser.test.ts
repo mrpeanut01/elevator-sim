@@ -114,6 +114,16 @@ describe.skipIf(!HAS_BROWSER)('§ 569 — what a first-time player meets in thei
       await EVERYDAY_SCREEN_ROUTES.collapse(page);
       const press = page.locator('.everyday-collapse-press');
       await press.waitFor({ state: 'visible', timeout: 30_000 });
+      /*
+       * **Measured with the canvas up, which is the state the defect lives in.** Before the run
+       * lands the stage block is one sentence rather than a 42vh canvas, so the press sits high on
+       * the page and a box read then would pass for the wrong reason — the assessor's y = 889.5 was
+       * taken against a drawn canvas.
+       */
+      await page.waitForSelector('.everyday-collapse-stage-canvas', {
+        state: 'visible',
+        timeout: 180_000,
+      });
 
       const box = await press.boundingBox();
       expect(box).not.toBeNull();

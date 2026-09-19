@@ -165,7 +165,10 @@ const MENU_PRIMARY: Readonly<Record<EverydayModePick, string>> = Object.freeze({
 });
 
 const LEAVE_TOWER = "⤺ Leave today's tower";
-const LEAVE_CAMPAIGN = '⤺ Leave the career';
+/* **Career, not Campaign** — `docs/38` § 2.2 and `docs/39` § 3's rename map, GitHub issue
+   #569 item 4. § 3.3's table predates the ruling; `actionBar.test.ts` transcribes its cell and names
+   this deviation in both directions. */
+const LEAVE_CAREER = '⤺ Leave the career';
 const LEAVE_RUSH = '⤺ Leave the rush';
 const STOP_WATCHING = '⤺ Stop watching';
 const MODES = '⌂ Modes';
@@ -374,7 +377,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
   row({
     screen: 'stage',
     ctx: 'campaign',
-    leave: leave(LEAVE_CAMPAIGN),
+    leave: leave(LEAVE_CAREER),
     back: { label: '⟨building⟩', screen: 'building' },
     timeline: { flow: 'campaign', step: 4 },
     primary: primary(['Close the day']),
@@ -433,7 +436,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
   row({
     screen: 'report',
     ctx: 'campaign',
-    leave: leave(LEAVE_CAMPAIGN),
+    leave: leave(LEAVE_CAREER),
     back: { label: 'The day', screen: 'stage' },
     timeline: { flow: 'campaign', step: 5 },
     primary: primary(['Back to ⟨building⟩']),
@@ -452,7 +455,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
   }),
   row({
     screen: 'towers',
-    leave: leave(LEAVE_CAMPAIGN),
+    leave: leave(LEAVE_CAREER),
     timeline: { flow: 'campaign', step: 1 },
     primary: primary(['Open ⟨building⟩']),
     note: '⟨N⟩ buildings want a decision.',
@@ -460,7 +463,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
   }),
   row({
     screen: 'building',
-    leave: leave(LEAVE_CAMPAIGN),
+    leave: leave(LEAVE_CAREER),
     back: { label: 'All buildings', screen: 'towers' },
     timeline: { flow: 'campaign', step: 2 },
     /*
@@ -501,7 +504,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
   }),
   row({
     screen: 'contract',
-    leave: leave(LEAVE_CAMPAIGN),
+    leave: leave(LEAVE_CAREER),
     back: { label: 'All buildings', screen: 'towers' },
     timeline: { flow: 'campaign', step: 3 },
     primary: primary(
