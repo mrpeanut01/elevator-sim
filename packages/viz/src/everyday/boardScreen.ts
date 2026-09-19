@@ -351,6 +351,17 @@ function el<K extends keyof HTMLElementTagNameMap>(
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 const NOTE = `font-size:13px;line-height:1.55;color:${C.warmGrey};margin:${String(G.row)}px 0 0;max-width:70ch;text-wrap:pretty`;
 
+/**
+ * The id the share control's disabled button points `aria-describedby` at.
+ *
+ * A constant rather than two literals, on `everyday/shell.ts#BAR_REASON_ID`'s reason: an
+ * `aria-describedby` naming an id that is not in the document reads as a described control and
+ * describes nothing, which is worse than no attribute at all. Not exported — the browser tier
+ * asserts the binding by resolving whatever id the attribute names, which is the assertion worth
+ * making; a test that imported this and compared it to itself would prove less.
+ */
+const SHARE_NO_RUN_ID = 'everyday-share-no-run';
+
 function mount(host: HTMLElement, context: EverydayScreenShellContext): EverydayScreenHandle {
   const doc = host.ownerDocument;
   // Before the first draw reads RATINGS — a restored ladder must be there on the first paint.
@@ -916,6 +927,18 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
     button.className = 'everyday-share-copy';
     button.textContent = shareCopied ? SHARE_COPY.copied : SHARE_COPY.button;
     button.disabled = artefact === undefined;
+    if (artefact === undefined) {
+      /*
+       * A disabled button owes an accessible name **and** a reason on the control —
+       * `everyday/deadControls.browser.test.ts`'s two clauses, and issue #262's measurement is
+       * that fourteen of fifteen disabled buttons carried neither. The `title` is the reason for a
+       * pointer and the `aria-describedby` is the reason for everything else; both point at the
+       * same sentence, which is the one drawn under the button, so there is no second wording to
+       * go stale.
+       */
+      button.title = SHARE_COPY.noRun;
+      button.setAttribute('aria-describedby', SHARE_NO_RUN_ID);
+    }
     button.style.cssText = [
       'margin-top:10px',
       artefact === undefined ? 'cursor:not-allowed' : 'cursor:pointer',
@@ -974,6 +997,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
     if (artefact === undefined) {
       const none = el(doc, 'p', SHARE_COPY.noRun);
       none.className = 'everyday-share-none';
+      none.id = SHARE_NO_RUN_ID;
       none.style.cssText = NOTE;
       block.append(none);
       return block;
@@ -987,6 +1011,12 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
     if (shareRefusedText !== undefined) {
       const refusal = el(doc, 'p', SHARE_COPY.refused);
       refusal.className = 'everyday-share-refusal';
+      /*
+       * Announced, because the whole of what the press produced is this sentence and the block
+       * under it: a screen reader that is not told has met a button that did nothing, which is the
+       * silent failure § D227 forbids in the one arm where it is most likely.
+       */
+      refusal.setAttribute('role', 'status');
       refusal.style.cssText = `${NOTE};color:${C.terracotta}`;
       /*
        * A `<pre>` rather than a paragraph, because the strip is a row of glyphs a reader is about
