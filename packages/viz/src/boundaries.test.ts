@@ -373,8 +373,23 @@ describe('the wall clock has exactly one home', () => {
      * keeps the invariant this check exists to state — wall-clock time enters through
      * `DisplayClock` and nowhere else — true of every module that draws a frame, which is what it
      * was written to guarantee.
+     *
+     * **`shift/deviceDate.ts` is a third, on exactly that argument** — § D731. `DisplayClock` is
+     * monotonic with a meaningless origin *by design*, so it cannot answer *what is today's date*,
+     * and § D729 puts the daily crowd on the UTC date. That module draws no picture either: it is
+     * one exported one-line function, and `shift/dailySeed.ts` — everything derived from the
+     * reading — takes `nowMs` as an argument and is asserted clock-free by `dailySeed.test.ts`.
+     *
+     * Named here rather than by loosening the regex, and that is the load-bearing half: the regex
+     * matches `Date.now(` and `performance.now(` and would **not** have caught a zero-argument
+     * `new Date()`. Taking the exemption is what keeps the seam declared instead of smuggled
+     * through a spelling, which is this repository's own defect class pointed at a rule.
      */
-    const WALL_CLOCK_EXEMPT = new Set(['playback/clock.ts', 'dev/recordTti.ts']);
+    const WALL_CLOCK_EXEMPT = new Set([
+      'playback/clock.ts',
+      'dev/recordTti.ts',
+      'shift/deviceDate.ts',
+    ]);
     const offenders = (await vizSources())
       .filter((file) => !WALL_CLOCK_EXEMPT.has(file.id) && !isTest(file.id))
       .filter((file) => /\b(?:Date\.now|performance\.now)\s*\(/.test(file.code))
