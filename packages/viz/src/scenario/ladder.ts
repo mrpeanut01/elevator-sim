@@ -135,8 +135,16 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
     'Opens on the Engineer surface, which is where the stages are played. Clearing one there banks no chimes and does not reach a career yet.',
   /** A stage held back. Never the word unwinnable — see the module docstring. */
   heldLead: 'Held back:',
+  /*
+   * **The second sentence is not softening, it is the measurement.** The dial half of the count is
+   * a sample of twelve, and a way through that only a small share of configurations reach is
+   * missed by such a sample most of the time — measured, a cell whose true clearing share is about
+   * 1.5 % reports zero roughly five times in six. A lane searching at k = 200 found three dial
+   * witnesses on a stage whose published count at k = 12 is unchanged, which is that arithmetic
+   * happening rather than a hypothetical. So the row says what a zero here is and is not.
+   */
   heldBody:
-    'nothing that was tried at this budget got through. It is on the list because it is the next step on the path, and it is not offered to play until there is a way through it or it says outright that there is none.',
+    'nothing that was tried at this budget got through, and the dials among them were a sample rather than everything there is — so a rare way through is missed here rather than ruled out. It is on the list because it is the next step on the path, and it is not offered to play until one is found or it says outright that there is none.',
   /** The rung the count is taken at, on every row, because no surface spends a chime yet. */
   baseRungNote: 'Nothing here has bought a wider budget, so the count is the count at the budget it opens on.',
 });
