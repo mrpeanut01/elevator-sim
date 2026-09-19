@@ -94,11 +94,58 @@ export const RUSH_POST_COPY = Object.freeze({
     'of how far it got and not a budget you can take into the next one.',
   /* The round list's own small words. Each is a label rather than a sentence. */
   roundLabel: (round: number): string => `Round ${String(round)}`,
-  drivenBy: (name: string): string => `driven by ${name}`,
+  /**
+   * Who drove it — **every** dispatcher that drove some part of it, in order.
+   *
+   * It took one name and read `driven by Conventional collective` over a round that had run on
+   * *Predictive balanced* since 0:00, because the name it took was the one the round **opened** on
+   * (GitHub issue **#565**, third defect, § D859). A sitting handed over part-way through has no
+   * single driver, and a line that names one is not a shorter truth: it credits the run to a
+   * dispatcher that did not produce it, which is the one thing `docs/43` P3 says a player must be
+   * able to work out from the sheet.
+   *
+   * One name reads exactly as it always did, which is every round nobody handed over.
+   */
+  drivenBy: (names: readonly string[]): string =>
+    names.length <= 1 ? `driven by ${names[0] ?? ''}` : `driven by ${names.slice(0, -1).join(', ')}, then ${String(names.at(-1))}`,
   heldTo: (held: string, wave: number): string => `held ${held}, into wave ${String(wave)}`,
   stoppedAt: (held: string, wave: number): string => `ended by hand at ${held}, in wave ${String(wave)}`,
   presses: (count: number): string => `${String(count)} ${count === 1 ? 'change' : 'changes'} while it played`,
   noPresses: 'nothing changed while it played',
+  /**
+   * One press, with its clock and what it was — `4:21 · switched to Predictive balanced`.
+   *
+   * The shape is the Day report's intervention log line verbatim
+   * (`live/interventions.ts#interventionLogOf`), which is the pattern this repository already had
+   * for *what a change was and when*; the clock is the only thing that differs, and it differs
+   * because a rush is measured in held time and a day in the building's hour.
+   */
+  change: (clock: string, verb: string): string => `${clock} · ${verb}`,
+  /**
+   * What a press was followed by, and deliberately not what it caused.
+   *
+   * A player wants *what did it do*, and the honest answer this sheet can give is what the round
+   * went on to do after it: this build has no counterfactual round to subtract. Saying *it cost you
+   * two minutes* would need the same crowd played without the press, and § D256 refuses a plausible
+   * sentence in place of a measurement. So the line is an observation with its clock attached, and
+   * {@link RUSH_POST_COPY.changesNote} says out loud that the comparison was not made.
+   *
+   * `restOfS` is the time from the press to the end of the round — a subtraction over two moments
+   * the round already carries, not a second reading of anything.
+   */
+  changeHeld: (rest: string, wave: number): string => `drove the remaining ${rest}, to wave ${String(wave)}`,
+  /**
+   * Under a round that recorded a press — the sentence that keeps the lines above observations.
+   *
+   * `CLAUDE.md`: *if you write a sentence about why something performs better, either measure it or
+   * say it is unmeasured.* Nothing here plays the round again without the press, so nothing here
+   * knows what the press was worth, and the sheet says so rather than letting the reader infer a
+   * comparison from two figures on adjacent lines.
+   */
+  changesNote:
+    'Each change is shown with the clock it landed on and what the round did after it. What it was ' +
+    'worth is not measured — that would take the same waves played again without it, and this ' +
+    'sitting has only the round you played.',
   /*
    * **The unit is named on both figures**, which is § D530's rule about a price said in the
    * currency's own words applied to the money inside a mode: `data/rush-purse.json` declares
@@ -131,6 +178,17 @@ export interface RushRoundLineView {
   readonly held: string;
   /** What was pressed during it — never absent, because *nothing* is a fact about the round. */
   readonly presses: string;
+  /**
+   * One line per press: its clock, what it was, and what the round did after it — GitHub issue
+   * #565, § D859. Empty on a round nobody touched, where {@link RushRoundLineView.presses} has
+   * already said so.
+   */
+  readonly changes: readonly string[];
+  /**
+   * {@link RUSH_POST_COPY.changesNote} where {@link RushRoundLineView.changes} has entries,
+   * `undefined` otherwise — a caption over an empty list is a caption over nothing.
+   */
+  readonly changesNote: string | undefined;
   /** What the server said this round earned, once it has answered. `undefined` before a post. */
   readonly earned: string | undefined;
   /** Why this round cannot travel, if it cannot — drawn on its own line. */
@@ -167,6 +225,28 @@ function heldLineOf(outcome: RushOutcome): string {
 }
 
 /**
+ * One line per press — its clock, what it was, and what the round did after it.
+ *
+ * GitHub issue **#565**, § D859. `heldS` is where the round *ended* as the player saw it, which is
+ * the right end for this subtraction precisely because it is the one the player watched: a press at
+ * 26:31 on a round that stopped at 41:02 drove the last 14:31 of what was on screen. The round's
+ * own `holdS` is a different quantity and is the server's (see {@link RushRoundRecord.holdS}); using
+ * it here would describe a stretch the player did not see.
+ *
+ * A press stamped after the end draws its clock and no *what followed* clause rather than a
+ * negative one — `RunInterventionConfig`'s own deadline case, which `core` warns about and this
+ * sheet must not render as `0:-9`.
+ */
+function changeLinesOf(round: RushRoundRecord): readonly string[] {
+  return round.changes.map((change) => {
+    const stamped = RUSH_POST_COPY.change(heldClock(change.atS), change.verb);
+    const restS = round.outcome.heldS - change.atS;
+    if (restS <= 0) return stamped;
+    return `${stamped} — ${RUSH_POST_COPY.changeHeld(heldClock(restS), round.outcome.wave)}`;
+  });
+}
+
+/**
  * The round list, with the server's own figures on it where there are any.
  *
  * `replayed` is the `posted` outcome's rounds, in the same order the sitting was posted in. It is
@@ -182,12 +262,19 @@ function roundLinesOf(
     const answered = replayed?.[index];
     return {
       label: RUSH_POST_COPY.roundLabel(index + 1),
-      driver: RUSH_POST_COPY.drivenBy(round.dispatcherName),
+      /*
+       * `drivers`, not `dispatcherName` — GitHub issue #565, § D859. The fallback is the opening
+       * name rather than the empty string, because a record written before this field existed is
+       * a record whose round genuinely had one driver.
+       */
+      driver: RUSH_POST_COPY.drivenBy(round.drivers.length === 0 ? [round.dispatcherName] : round.drivers),
       held: heldLineOf(round.outcome),
       presses:
         round.interventionCount === 0
           ? RUSH_POST_COPY.noPresses
           : RUSH_POST_COPY.presses(round.interventionCount),
+      changes: changeLinesOf(round),
+      changesNote: round.changes.length === 0 ? undefined : RUSH_POST_COPY.changesNote,
       earned:
         answered === undefined
           ? undefined

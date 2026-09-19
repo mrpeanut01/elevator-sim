@@ -155,17 +155,29 @@ function vectorOf(weights: Readonly<Record<string, number>>): string {
 export const RECOMPUTING_BEAT = 'recomputing the day…';
 
 /**
- * What the stage says a change *did*, past tense, per change kind. Not exported: the sentence a
- * player reads is the stamp, and two exports for one sentence would be two places for it to
- * drift apart. A `switch` with no default, so a fourth `InterventionChange` arm is a compile
- * error here rather than a stamp that renders `undefined` — the exhaustiveness the old
- * `Record<kind, string>` bought, kept across the two arms whose words are parametric:
- * `switch-dispatcher` names the profile's display name (never its id), and `answer-incident`
- * quotes the chosen option's own authored words, so a spectator replaying the record reads the
- * same sentence the player did (§ 20.16 — `atS` is `runIncidentClock`, and the clock beside this
- * verb is how it appears on the report).
+ * What the stage says a change *did*, past tense, per change kind. A `switch` with no default, so
+ * a fourth `InterventionChange` arm is a compile error here rather than a stamp that renders
+ * `undefined` — the exhaustiveness the old `Record<kind, string>` bought, kept across the two arms
+ * whose words are parametric: `switch-dispatcher` names the profile's display name (never its id),
+ * and `answer-incident` quotes the chosen option's own authored words, so a spectator replaying the
+ * record reads the same sentence the player did (§ 20.16 — `atS` is `runIncidentClock`, and the
+ * clock beside this verb is how it appears on the report).
+ *
+ * ## Why it is exported now, when its own docstring used to argue it must not be
+ *
+ * It read *"Not exported: the sentence a player reads is the stamp, and two exports for one
+ * sentence would be two places for it to drift apart."* The argument was about **two sentences**,
+ * and it still holds — what has changed is that a third surface needs the *same* sentence in a
+ * different clock. A rush round is measured in held time (`everyday/rush.ts#heldClock`), not in the
+ * building's hour, so {@link interventionStampOf} and {@link interventionLogOf} — both of which
+ * take `dayStartS` and format through {@link clockAt} — cannot serve it. GitHub issue **#565**'s
+ * third defect is the rush sheet saying *"1 change while it played"* and naming neither the change
+ * nor its clock; `everyday/rushPost.ts` now draws one line per press, and it draws **this** verb.
+ * Exporting the producer is what keeps the Day report's *switched to Predictive balanced* and the
+ * rush sheet's identical, which is the drift the old sentence was protecting against — a second
+ * past-tense vocabulary for one press would be the thing it forbade.
  */
-function stampVerbOf(change: InterventionChange): string {
+export function stampVerbOf(change: InterventionChange): string {
   switch (change.kind) {
     case 'park-cars-lobby':
       return 'parked the cars in the lobby';

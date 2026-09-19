@@ -386,6 +386,30 @@ function mountReportScreen(
         refusal.style.cssText = `${QUIET};margin:4px 0 0;color:${C.terracotta}`;
         item.append(refusal);
       }
+      /*
+       * **What was changed, when, and what the round did after it** — GitHub issue #565's third
+       * defect, § D859. A nested list rather than more separators on the round's own line: these
+       * are claims about *moments inside* the round, and hanging them off the same `·` chain as the
+       * round's own three would read as four more facts about the whole of it.
+       *
+       * The note under them is drawn whenever there is a list and never otherwise, which is the
+       * view's own `changesNote` arm — a caption over nothing is `docs/10` R3.
+       */
+      if (round.changes.length > 0) {
+        const changes = el(doc, 'ul', 'everyday-rush-post-round-changes');
+        changes.style.cssText = 'margin:4px 0 0;padding-left:18px;list-style:none';
+        for (const change of round.changes) {
+          const line = el(doc, 'li', 'everyday-rush-post-round-change', change);
+          line.style.cssText = `${QUIET};margin:2px 0`;
+          changes.append(line);
+        }
+        item.append(changes);
+      }
+      if (round.changesNote !== undefined) {
+        const note = el(doc, 'p', 'everyday-rush-post-round-changes-note', round.changesNote);
+        note.style.cssText = `${QUIET};margin:4px 0 0;max-width:74ch`;
+        item.append(note);
+      }
       list.append(item);
     }
     block.append(list);

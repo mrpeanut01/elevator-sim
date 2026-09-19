@@ -191,6 +191,7 @@ import {
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
   STAGE_SWITCH_PICKER_LABEL,
+  STAGE_SWITCH_PICKER_NOTE,
   stageAlarmOf,
   stageBarModelOf,
   stageCarReadoutOf,
@@ -344,6 +345,7 @@ import {
   SPREAD_CARS_LABEL,
   RECOMPUTING_BEAT,
   SWITCH_PINS_NOTE,
+  stampVerbOf,
   switchDispatcherLabelOf,
 } from '../live/interventions.js';
 import {
@@ -8612,7 +8614,15 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       seeds.push({
         field: `rush.copy.${key}`,
         text,
-        role: key === 'holdLine' || key === 'lede' || key === 'drivingNote' ? 'prose' : 'label',
+        /*
+         * `driverPickNote` joined the prose arm with the pre-run pick — GitHub issue #565, § D857.
+         * It is a sentence about what the control writes, not a label on it, and R-properties that
+         * read a label read it as a caption.
+         */
+        role:
+          key === 'holdLine' || key === 'lede' || key === 'drivingNote' || key === 'driverPickNote'
+            ? 'prose'
+            : 'label',
       });
     }
     /*
@@ -8709,6 +8719,13 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       /* Both refusals on every case — a drawn building, and a table from a different climb. */
       seeds.push({ field: 'rush.house.withheld.unrun', text: RUSH_HOUSE_COPY.unrun, role: 'reason' });
       seeds.push({ field: 'rush.house.withheld.stale', text: RUSH_HOUSE_COPY.stale, role: 'reason' });
+      /*
+       * The tag on the row the player is set to run — GitHub issue #565, § D858. Seeded from the
+       * constant rather than from a row, because which row carries it is a fact about the standing
+       * state and this adapter drives no picker: seeding it off a row would make the string present
+       * or absent depending on which dispatcher a case happened to open on.
+       */
+      seeds.push({ field: 'rush.house.standingTag', text: RUSH_HOUSE_COPY.standingTag, role: 'label' });
     }
 
     /* ------------------------------------------------------- § 13 designer */
@@ -10085,6 +10102,15 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
      * this search exists to read.
      */
     'everyday/rushPost.ts#rushPostViewOf',
+    /*
+     * **The past-tense verb every press is named by** — GitHub issue #565, § D859. It was private to
+     * `live/interventions.ts` and reached the corpus only through the two functions that stamp with
+     * it; the rush sheet needs the same words in held time rather than in the building's hour, so it
+     * is exported and called here. Listed on this adapter rather than on the stage's or the day
+     * report's because this is the surface whose seeds render it directly — the seeds above drive
+     * both of its parametric arms through a round that was handed over.
+     */
+    'live/interventions.ts#stampVerbOf',
     'everyday/rushPost.ts#RUSH_POST_COPY',
     'everyday/rushSitting.ts#rushSittingOf',
     'everyday/rushSitting.ts#RUSH_SITTING_COPY',
@@ -10168,10 +10194,15 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
      * ended by hand, the second is the one that broke — which is the only order a postable sitting
      * can have, since the last round is what posts.
      */
+    const handedTo = context.dispatcherProfiles.profiles.find(
+      (profile) => profile.id !== recording.dispatcherProfileId,
+    );
     const sittingRounds: readonly RushRoundRecord[] = [
       {
         dispatcherProfileId: recording.dispatcherProfileId,
         dispatcherName: dispatcherNameOf(context),
+        drivers: [dispatcherNameOf(context)],
+        changes: [],
         ruleRows: [],
         wireInterventions: [],
         interventionCount: 0,
@@ -10182,6 +10213,20 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
       {
         dispatcherProfileId: recording.dispatcherProfileId,
         dispatcherName: dispatcherNameOf(context),
+        /*
+         * **The handed-over round** — GitHub issue #565, § D859. The second round carries two
+         * presses and the second of them is a handover, so this case drives the arms a round with
+         * one driver cannot: the multi-name `drivenBy`, both change lines, the *what followed*
+         * clause and the note that says the comparison was not made. The target is read off the
+         * shipped shelf rather than named, so a case never invents a dispatcher.
+         */
+        drivers: [dispatcherNameOf(context), ...(handedTo === undefined ? [] : [handedTo.name])],
+        changes: [
+          { atS: 0, verb: stampVerbOf({ kind: 'park-cars-lobby' }) },
+          ...(handedTo === undefined
+            ? []
+            : [{ atS: Math.round(broke.heldS / 2), verb: stampVerbOf({ kind: 'switch-dispatcher', profile: handedTo }) }]),
+        ],
         ruleRows: [],
         wireInterventions: [],
         interventionCount: 2,
@@ -10218,6 +10263,18 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
         seeds.push({ field: `${at}.driver`, text: round.driver, role: 'label' });
         seeds.push({ field: `${at}.held`, text: round.held, role: 'observation' });
         seeds.push({ field: `${at}.presses`, text: round.presses, role: 'observation' });
+        /*
+         * Every press line, and the sentence under them — GitHub issue #565, § D859. `observation`
+         * for the lines, because each is a clock and a stretch read off the round rather than an
+         * estimate over a window, and `prose` for the note, which refuses nothing and offers
+         * nothing: it says what was not measured, which is the claim R13 must not ask for an `n`.
+         */
+        for (const [changeIndex, change] of round.changes.entries()) {
+          seeds.push({ field: `${at}.change${String(changeIndex)}`, text: change, role: 'observation' });
+        }
+        if (round.changesNote !== undefined) {
+          seeds.push({ field: `${at}.changesNote`, text: round.changesNote, role: 'prose' });
+        }
         if (round.earned !== undefined) seeds.push({ field: `${at}.earned`, text: round.earned, role: 'observation' });
         if (round.refusal !== undefined) seeds.push({ field: `${at}.refusal`, text: round.refusal, role: 'reason' });
       }
@@ -10263,6 +10320,7 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_SWITCH_EXPLAINS',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
+    'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_NOTE',
     /*
      * GitHub issue #338: the sentence a handover row carries when its target cannot travel to a
      * board, drawn before the press. Rendered below on a hand-tuned target, which is the one
@@ -10556,6 +10614,16 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       field: 'stage.intervene.switch.pickerLabel',
       text: STAGE_SWITCH_PICKER_LABEL,
       role: 'label',
+    });
+    /*
+     * **The picker's own statement that choosing is not committing** — GitHub issue #565, § D856.
+     * `reason` rather than `prose`: it is a control saying what it does not do, which is the role
+     * every other *this control cannot act* sentence on this adapter carries.
+     */
+    seeds.push({
+      field: 'stage.intervene.switch.pickerNote',
+      text: STAGE_SWITCH_PICKER_NOTE,
+      role: 'reason',
     });
     seeds.push({
       field: 'stage.race.pickerLabel',

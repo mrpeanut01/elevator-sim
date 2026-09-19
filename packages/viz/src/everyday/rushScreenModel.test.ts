@@ -252,17 +252,27 @@ describe('what the screen refuses, and where the refusal sits', () => {
     expect(climb?.value).toBe('+11%');
   });
 
-  it('states who would drive rather than offering a select that writes another mode’s run', () => {
+  it('names who would drive and when they start, and points the player at no other screen', () => {
     const line = rushDrivingLine('Collective control');
     expect(line).toContain('Collective control');
     /*
-     * The screen the copy points at, not the shape of a refusal. The first version of this case
-     * asserted `/not built/`, and the sentence it pinned named the front door as unbuilt long after
-     * the door had landed — a test that holds a refusal's *form* keeps passing while its *subject*
-     * goes stale, which is § D227 with a green tick over it.
+     * **What the line claims, not the shape of a refusal**, and this case has now been wrong about
+     * its subject twice. Its first version asserted `/not built/` over a sentence that named the
+     * front door as unbuilt long after the door had landed; its second asserted `brief`, which was
+     * true and was the defect — GitHub issue **#565** is that the one route to the dispatcher a
+     * rush runs was two screens away in another mode, so the board's own figures were unreachable
+     * from inside the rush. The pick is on the rush's own screen now
+     * (`everyday/rushScreen.ts`, `rush.browser.test.ts`), so the line says **when** the named
+     * dispatcher starts driving — which is the fact the house rows turn on — and sends nobody
+     * anywhere.
+     *
+     * A test that holds a refusal's *form* keeps passing while its *subject* goes stale, which is
+     * § D227 with a green tick over it. So the claims are asserted in both directions: the line
+     * carries the moment, and it carries no route to another screen.
      */
-    expect(line).toContain('brief');
-    expect(line).not.toMatch(/not built/);
+    expect(line).toContain('first second');
+    expect(line).not.toMatch(/not built/u);
+    expect(line).not.toMatch(/brief|front door|today's tower/iu);
   });
 
   /*

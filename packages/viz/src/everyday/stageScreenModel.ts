@@ -993,7 +993,37 @@ export const STAGE_SWITCH_EXPLAINS =
  * player-facing string, and one authored in the mount would reach the static sweep and none of the
  * ten properties — which is exactly what § D347 moved three of the cutaway's captions here for.
  */
-export const STAGE_SWITCH_PICKER_LABEL = 'Who drives the rest of the day';
+export const STAGE_SWITCH_PICKER_LABEL = 'Choose who to hand the day to — the button beside it hands over';
+
+/**
+ * **What the picker does on its own, which is nothing** — GitHub issue **#565**, first defect,
+ * [§ D856](../../../../DECISIONS.md).
+ *
+ * A playability assessor selected *Predictive balanced* here, watched `DRIVING` go on reading
+ * *Conventional collective*, and played a forty-one-minute sitting that came back bit-identical to
+ * the untouched baseline. The wiring was right and is unchanged — `stageScreen.ts`'s `change`
+ * listener calls `syncSwitchArm()` and appends nothing, and the button beside it is the sole caller
+ * of `intervene` — so `DRIVING` was the product being honest. What was missing was any statement of
+ * it on the control, and `STAGE_SWITCH_PICKER_LABEL` read *"Who drives the rest of the day"*, which
+ * is a claim of **effect** over a control of **intent**. That is `CLAUDE.md`'s standing requirement
+ * read from the polarity § D227 added: a control that writes nothing must say so.
+ *
+ * ## Why the picker was not simply made to act instead
+ *
+ * Because the two controls cost different things. The brief's dispatcher `<select>`
+ * (`everyday/briefScreen.ts:360`) *does* act on `change`, and should: it writes standing state, it
+ * is reversible, and nothing is running. This one appends to the run record, which re-simulates the
+ * whole day from t = 0 — so binding it to `change` would fire a full re-simulation on every arrow
+ * key a keyboard user passes through the list, and each one would land on the record as a handover
+ * the player never asked for. `RunInterventionConfig`'s log is append-only and a press is stamped
+ * at the playhead; there is no undo to spend those on. So the two-step stays and says so.
+ *
+ * Drawn text rather than a `title`, for `STAGE_RACE_WATCHING`'s recorded reason one constant over:
+ * a reason a player cannot see is not a reason.
+ */
+export const STAGE_SWITCH_PICKER_NOTE =
+  'Choosing here changes nothing by itself — the day keeps running on whoever is driving until you ' +
+  'press the button beside it.';
 
 /**
  * Why the handover arm cannot act — it would hand the day to the vector already driving.

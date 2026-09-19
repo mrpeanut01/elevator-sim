@@ -144,10 +144,59 @@ describe('the standings are the house’s runs on the standing building', () => 
     }
   });
 
+  /**
+   * **The row the player is set to run, and only that one** — GitHub issue #565, § D858.
+   *
+   * The board's defect was that its figures read as targets on a path no rush screen offered. The
+   * pick is on that screen now and this is how the table says which row it is aiming at. Asserted
+   * in both directions, because a tag that is simply always on says nothing: with no standing
+   * dispatcher named, no row wears it.
+   */
+  it('tags the standing dispatcher’s row and no other — GitHub issue #565', () => {
+    const rows = rushStandingsOf('garden-apartments', nameOf, RUSH_HOUSE_TABLE, 'nearest-car');
+    if (rows.kind !== 'rows') throw new Error(`drew ${rows.kind}, not rows`);
+    const tagged = rows.rows.filter((row) => row.standingTag !== undefined);
+    expect(tagged.map((row) => row.dispatcherId)).toEqual(['nearest-car']);
+    expect(tagged[0]?.standingTag).toBe(RUSH_HOUSE_COPY.standingTag);
+    /* It tags; it does not promote. *Furthest* is the order the eyebrow claims. */
+    const order = rows.rows.map((row) => row.dispatcherId);
+    const untagged = rushStandingsOf('garden-apartments', nameOf);
+    if (untagged.kind !== 'rows') throw new Error('drew no rows');
+    expect(untagged.rows.map((row) => row.dispatcherId)).toEqual(order);
+    expect(untagged.rows.every((row) => row.standingTag === undefined)).toBe(true);
+  });
+
+  /**
+   * **The note says what its rows are runs of** — GitHub issue #565's second defect, § D858.
+   *
+   * The clause is licensed by `everyday/rushHandover.test.ts`, which measures both halves on
+   * Harbour Point: a dispatcher set before the run reproduces its row to the second, and a 0:00
+   * handover to the same dispatcher is a different run whose legs are bit-identical to a
+   * weights-only substitution. The note states the mechanism that measurement established and
+   * claims nothing about the size of the gap, which is one cell's.
+   */
+  it('says the rows drove from the first second, and that a handover is not that', () => {
+    expect(RUSH_HOUSE_COPY.note).toContain('first second');
+    expect(RUSH_HOUSE_COPY.note).toContain('handing the day over part-way through');
+    expect(RUSH_HOUSE_COPY.note).toContain('weight vector');
+    /* No figure: the gap is one building's and the note is drawn on every building. */
+    expect(RUSH_HOUSE_COPY.note).not.toMatch(/\d/u);
+  });
+
   it('publishes no mean on any row', () => {
     for (const buildingId of shippedBuildingIds(config)) {
       for (const row of rowsFor(buildingId)) {
-        expect(Object.keys(row).sort()).toEqual(['dispatcherId', 'held', 'heldThrough', 'name', 'tag', 'wave']);
+        expect(Object.keys(row).sort()).toEqual([
+          'dispatcherId',
+          'held',
+          'heldThrough',
+          'name',
+          'standingTag',
+          'tag',
+          'wave',
+        ]);
+        /* No caller named a standing dispatcher, so no row is the player's — GitHub issue #565. */
+        expect(row.standingTag).toBeUndefined();
         expect([row.wave, row.held, row.tag].join(' ')).not.toMatch(/average|mean|awt/iu);
       }
     }
