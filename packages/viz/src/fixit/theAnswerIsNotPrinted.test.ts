@@ -176,9 +176,10 @@ describe('no fix-it case tells the player which repair is the answer', () => {
   /**
    * **The formula check, and its own control.**
    *
-   * A *tell* here is a word n-gram (two or three words) that appears on at least `MANY` cases'
+   * A *tell* here is a word n-gram (two or three words) that appears on at least `atLeast` cases'
    * diagnosed repairs and on **no** decoy of any case. *"are the target"* was one on seventeen of
-   * eighteen; anything that replaced it would be one too, whatever words it used.
+   * the eighteen and *"the target"* on all of them; anything that replaced it would be one too,
+   * whatever words it used.
    *
    * The threshold is half the cases rather than one, because a handful of low-count phrases survive
    * honestly — three crowd-shaping cases each say *"this run watches the …"*, which is § 10.4's
@@ -217,7 +218,8 @@ describe('no fix-it case tells the player which repair is the answer', () => {
     }));
     expect(tellsIn(withTheTell, 9)).toContain('are the target');
     for (const entry of withTheTell) {
-      expect(RETIRED_TELLS.some((tell) => tell.test(entry.repairs[0]!.effect))).toBe(true);
+      const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed')!;
+      expect(RETIRED_TELLS.some((tell) => tell.test(diagnosed.effect))).toBe(true);
     }
   });
 });
