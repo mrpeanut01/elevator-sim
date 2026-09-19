@@ -59,6 +59,48 @@ export const BOB_RATE_RAD_PER_S = 1.6;
 const ALARM_PULSE_RAD_PER_S = 3;
 
 /**
+ * **The two per-rung ladders, indexed by severity rather than by band name** — and the indirection
+ * is the whole reason both stages can draw one person.
+ *
+ * This repository has **two** four-rung wait ladders and they do not share a boundary above the
+ * first. `frame/overlay.ts#waitBandOf` bands by the **run's own** numbers — half the long-wait
+ * threshold, the long-wait threshold, `serviceLevel.horizonS` — so a run whose horizon is 900 s
+ * calls a 200 s wait `long`. `live/bands.ts#WAIT_BANDS` bands by absolute clock — 30 / 60 / 120 s
+ * — so the Everyday stage calls that same 200 s wait `taking-the-stairs`, its worst rung. Both are
+ * deliberate and both are documented where they live: one is *the fact*, the other is *the
+ * feeling*, and `frame/overlay.ts` says outright that a change to how a queue feels may not
+ * quietly change what a band is.
+ *
+ * **So a figure is given its rung, not its band.** AD-S7's claim is ordinal — *"the fourth band is
+ * visibly taller than the first"* — and it is true of either ladder without the two having to
+ * agree about where a boundary sits. Keying the geometry on a band **name** would have forced one
+ * surface to draw its height off one ladder and its colour off the other, and two channels
+ * carrying the same claim from two ladders is worse than one channel: a reader would meet a taller
+ * capsule in a calmer colour and have no way to tell which was lying.
+ *
+ * `BOB_AMPLITUDE_BY_RANK`'s endpoints are the artefact's (`:2137`, `b >= 2 ? 1.1 : 0.4`); the two
+ * middle rungs are this repository's, added because the handoff's § 1.3 asks for an amplitude that
+ * *"grows with the band"* and the bands are a four-rung ladder. The values are unchanged from when
+ * they were written out by name; only their spelling moved.
+ */
+/** A four-rung ladder, spelled as a tuple so `BAND_*` below index it without a `?? ` fallback. */
+type RungLadder = readonly [number, number, number, number];
+
+const BOB_AMPLITUDE_BY_RANK: RungLadder = Object.freeze([0.4, 0.7, 1.1, 1.6]);
+
+/** See {@link BAND_HEIGHT_SHARE}. The calm end comes down; the worst rung keeps its room. */
+const HEIGHT_SHARE_BY_RANK: RungLadder = Object.freeze([0.7, 0.8, 0.9, 1]);
+
+/** The last rung's index, so a caller with a longer ladder saturates rather than reading `undefined`. */
+const LAST_RANK = BOB_AMPLITUDE_BY_RANK.length - 1;
+
+/** A rung index, clamped into the ladder and rounded. Total: a caller cannot fall off either end. */
+function rankOf(bandRank: number): number {
+  if (!Number.isFinite(bandRank)) return 0;
+  return Math.min(LAST_RANK, Math.max(0, Math.round(bandRank)));
+}
+
+/**
  * How far a rider bobs, by band, in pixels.
  *
  * The artefact has two rungs — `b >= 2 ? 1.1 : 0.4` — and the handoff's own § 1.3 asks for an
@@ -72,10 +114,165 @@ const ALARM_PULSE_RAD_PER_S = 3;
  * the sentence.
  */
 export const BOB_AMPLITUDE_PX: Readonly<Record<WaitBand, number>> = Object.freeze({
-  settling: 0.4,
-  waiting: 0.7,
-  long: 1.1,
-  abandoned: 1.6,
+  settling: BOB_AMPLITUDE_BY_RANK[0],
+  waiting: BOB_AMPLITUDE_BY_RANK[1],
+  long: BOB_AMPLITUDE_BY_RANK[2],
+  abandoned: BOB_AMPLITUDE_BY_RANK[3],
+});
+
+/**
+ * How tall a figure stands, as a share of the room its caller gives it, **by band** —
+ * `docs/28-art-direction.md` § 5.4 **AD-S7**.
+ *
+ * AD-S7 is a rule about the wait ramp rather than about one surface: *"a capsule's **height**
+ * encodes its band as well as its colour: the fourth band is visibly taller than the first …
+ * required by § 7 anyway (never colour-only)"*. Until this constant existed the rule was met on
+ * neither stage — the Engineer lane sized every figure from the floor pitch alone and leaned on
+ * `riderQueue.ts`'s glyph row beside it, and the Everyday cutaway hoisted one `capsuleH` outside
+ * its rider loop and had **no** second channel at all, so at 4.5 px the band rode on hue alone.
+ * That is `UX.md` KB-15's exact prohibition, on the one surface `docs/38` says a beginner meets.
+ *
+ * **The ladder descends from 1 rather than ascending to it, and that is load-bearing.** AD-S7
+ * rejects *width* as the channel because capsules tile on a fixed pitch and a wider capsule changes
+ * how many fit a lane, which would move § 8 (7)'s overlap arithmetic. Height has the same hazard
+ * upward: a taller fourth band would reach further above its floor line and overlap the row above,
+ * exactly where a landing is already deepest. Taking the *calm* end down leaves the worst band at
+ * the height the caller already budgeted for, so no clamp, no lane count and no overlap figure
+ * moves — and the reader still sees the fourth band standing over the first.
+ *
+ * **It is not the only carrier and could not be**, which is why the shares are close rather than
+ * dramatic. Below roughly a 13 px floor pitch the room collapses to its floor and the four rungs
+ * separate by less than a pixel; there the band is carried by AD-S8's slab wash — a whole-row
+ * signal that does not depend on pitch at all — by the colour, by the `+N` chip and by
+ * `describeFrame`'s sentence. Three channels with three different degradation curves, rather than
+ * one channel asserted to survive everything.
+ */
+export const BAND_HEIGHT_SHARE: Readonly<Record<WaitBand, number>> = Object.freeze({
+  settling: HEIGHT_SHARE_BY_RANK[0],
+  waiting: HEIGHT_SHARE_BY_RANK[1],
+  long: HEIGHT_SHARE_BY_RANK[2],
+  abandoned: HEIGHT_SHARE_BY_RANK[3],
+});
+
+/**
+ * The shortest thing this module will still call a person — read out of {@link figureHeightPx}
+ * rather than spelled again.
+ *
+ * `figureHeightPx` clamps to `[8, 16]`, so evaluating it at a pitch of zero returns its own floor,
+ * and its docstring is where the 8 is argued: *"eight pixels is the shortest thing that still
+ * reads as a person"*. A caller deciding whether it has room for a figure asks this rather than
+ * transcribing the number, for `render/carRest.ts#rampEnds`' reason one directory along: a third
+ * copy of a bound is how two of them stop agreeing.
+ */
+export const MIN_FIGURE_HEIGHT_PX = figureHeightPx(0);
+
+export interface RiderFigureInput {
+  /**
+   * The figure's own vertical axis — its head's centre and its body's centre.
+   *
+   * A centre rather than a cell, because the two callers anchor differently and both are right:
+   * the Engineer lane packs figures to the **left** of an 11 px cell so a crowd reads as a crowd
+   * rather than as evenly spaced posts, and the Everyday cutaway tiles them on a 6.5 px pitch
+   * where there is no slack to bias. Passing a cell and centring in it would have moved every
+   * Engineer figure 2.5 px right, which `stageRender.test.ts` catches and which would have been a
+   * layout change smuggled in under a refactor.
+   */
+  readonly centreX: number;
+  /** The line it stands on. The figure is drawn **above** this, never through it. */
+  readonly feetY: number;
+  /**
+   * Head-to-feet, **before** the band share and before the bob — the room the caller has.
+   * {@link BAND_HEIGHT_SHARE} takes it down from here; nothing takes it up.
+   */
+  readonly heightPx: number;
+  /**
+   * Which rung of its own four-rung wait ladder this rider is on — `0` calmest, `3` worst.
+   *
+   * A rung and not a {@link WaitBand}, for the reason {@link BOB_AMPLITUDE_BY_RANK} gives at
+   * length: the two ladders in this package share no boundary above the first, and AD-S7's claim
+   * is ordinal. Out-of-range values saturate rather than throw.
+   */
+  readonly bandRank: number;
+  /**
+   * The identity the bob's phase is hashed from, and the reason two adjacent figures are not one
+   * object with a heartbeat. See {@link bobPhaseOf}.
+   */
+  readonly passengerId: string;
+  /**
+   * Simulated seconds. **Not a wall clock and not an accumulator** — the whole determinism
+   * argument in this module's header rests on the caller having no other kind of time to pass, so
+   * the field is named for the only one that is legal here.
+   */
+  readonly simTimeS: number;
+  /**
+   * The fill, chosen by the caller.
+   *
+   * A colour rather than a `Theme`, and that is what lets one silhouette serve both stages: the
+   * Engineer lane passes `theme.queueBands[band]` and the Everyday cutaway passes
+   * `stageScreenModel.ts#stageInkFor`, which are two palettes for one ramp. A `Theme` parameter
+   * here would have made this function Engineer-only, which is how the nicest drawing in this
+   * repository came to be on the surface a beginner is told never to open.
+   */
+  readonly fill: string;
+  /**
+   * Alpha, default 0.92.
+   *
+   * Not opaque: a crowd of overlapping figures at a deep landing reads as a mass rather than as a
+   * picket fence, and the slab behind them stays visible through the thin ones.
+   */
+  readonly alpha?: number | undefined;
+}
+
+/**
+ * **One person.** The single silhouette both stages draw, so a rider who reads as a rider on the
+ * Everyday cutaway reads as the same rider on the Engineer schematic.
+ *
+ * A head and a body, the design's own proportions (`:2141`, `fh * 0.19`), the band in the height
+ * per AD-S7, and the bob in {@link bobOffsetPx}'s arithmetic — `sin(simTimeS · rate + hash(id))`,
+ * which is a pure function of the frame and the playhead and of nothing else. Scrub back to the
+ * same `t` and the same picture is drawn, which is what `replay/replay.test.ts`'s claim that equal
+ * frame sequences imply equal pictures reduces to.
+ *
+ * It restores `globalAlpha` itself rather than leaving it to the caller, because an alpha left set
+ * is invisible to a recording stub and would silently dim whatever the next brush touched.
+ */
+export function drawRiderFigure(ctx: Canvas2DLike, input: RiderFigureInput): void {
+  const rank = rankOf(input.bandRank);
+  const height = Math.max(0, input.heightPx) * (HEIGHT_SHARE_BY_RANK[rank] ?? 1);
+  if (height <= 0) return;
+  const bob =
+    Math.sin(input.simTimeS * BOB_RATE_RAD_PER_S + bobPhaseOf(input.passengerId)) *
+    (BOB_AMPLITUDE_BY_RANK[rank] ?? 0);
+  const top = input.feetY - height + bob;
+  const headRadius = Math.max(1.4, height * HEAD_RADIUS_FRACTION);
+  const bodyWidth = Math.max(1.6, height * BODY_WIDTH_FRACTION);
+  const centreX = input.centreX;
+  ctx.fillStyle = input.fill;
+  ctx.globalAlpha = input.alpha ?? FIGURE_ALPHA;
+  fillCircle(ctx, centreX, top, headRadius);
+  ctx.fillRect(centreX - bodyWidth / 2, top + height * BODY_TOP_FRACTION, bodyWidth, height * BODY_HEIGHT_FRACTION);
+  ctx.globalAlpha = 1;
+}
+
+/** The body's width as a fraction of the figure — design `:2143`. */
+const BODY_WIDTH_FRACTION = 0.17;
+/** Where the body starts below the head's centre — design `:2142`. */
+const BODY_TOP_FRACTION = 0.3;
+/** How far the body runs, so its foot lands on the line the figure stands on — design `:2143`. */
+const BODY_HEIGHT_FRACTION = 0.68;
+/** See {@link RiderFigureInput.alpha}. */
+const FIGURE_ALPHA = 0.92;
+
+/**
+ * `frame/overlay.ts`' four bands as rungs — the one place this package's *fact* ladder is turned
+ * into a severity index. Ascending, and asserted exhaustive by `riderFigures.test.ts`, so a fifth
+ * band arriving in `WaitBand` fails to compile here rather than silently ranking `0`.
+ */
+export const WAIT_BAND_RANK: Readonly<Record<WaitBand, number>> = Object.freeze({
+  settling: 0,
+  waiting: 1,
+  long: 2,
+  abandoned: 3,
 });
 
 /**
@@ -231,21 +428,25 @@ export function drawRiderLane(
   for (let index = 0; index < shown; index += 1) {
     const rider = input.riders[index];
     if (rider === undefined) continue;
-    const x = input.x + index * FIGURE_WIDTH_PX;
-    const bob = bobOffsetPx(rider, input.simTimeS);
-    const top = input.feetY - figureHeight + bob;
-    ctx.fillStyle = theme.queueBands[rider.band];
-    // Not opaque: a crowd of overlapping figures at a deep landing reads as a mass rather than as
-    // a picket fence, and the slab behind them stays visible through the thin ones.
-    ctx.globalAlpha = 0.92;
-    fillCircle(ctx, x + 3, top, Math.max(1.4, figureHeight * HEAD_RADIUS_FRACTION));
-    ctx.fillRect(
-      x + 2.1,
-      top + figureHeight * 0.3,
-      Math.max(1.6, figureHeight * 0.17),
-      figureHeight * 0.68,
-    );
-    ctx.globalAlpha = 1;
+    /*
+     * One silhouette for both stages — {@link drawRiderFigure}. This loop used to spell the head
+     * and the body inline, and the Everyday cutaway spelled a capsule of its own, so the two
+     * surfaces drew the same person two ways and only one of them had a second channel for the
+     * band. The
+     * cell is {@link FIGURE_WIDTH_PX} wide and the figure keeps the artefact's left bias inside
+     * it, so the head lands on the same pixel it always did and the body moves by 0.05 px — the
+     * head and the body were never quite concentric before, and now they are.
+     */
+    drawRiderFigure(ctx, {
+      // `+ 3` is the artefact's own left bias inside the cell (`:2141`), kept to the pixel.
+      centreX: input.x + index * FIGURE_WIDTH_PX + 3,
+      feetY: input.feetY,
+      heightPx: figureHeight,
+      bandRank: WAIT_BAND_RANK[rider.band],
+      passengerId: rider.passengerId,
+      simTimeS: input.simTimeS,
+      fill: theme.queueBands[rider.band],
+    });
   }
 
   const overflow = total - shown;
@@ -285,7 +486,7 @@ export interface AlarmRuleInput {
  * `render/sky.ts` refuses a `CanvasGradient` for.
  */
 export function drawAlarmRule(ctx: Canvas2DLike, theme: Theme, input: AlarmRuleInput): void {
-  ctx.strokeStyle = rgbaOf(theme.alarm, alarmPulseAlpha(input.simTimeS));
+  ctx.strokeStyle = withAlpha(theme.alarm, alarmPulseAlpha(input.simTimeS));
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(input.x, input.y);
@@ -298,8 +499,14 @@ export function drawAlarmRule(ctx: Canvas2DLike, theme: Theme, input: AlarmRuleI
  *
  * Total: a colour this cannot parse — a themed `rgba()` already, say — comes back unchanged, so a
  * custom palette loses the pulse rather than drawing `rgba(NaN,NaN,NaN,0.4)` and disappearing.
+ *
+ * **Exported, and composed into the value rather than set on `globalAlpha`.** Two callers now: the
+ * alarm rule here, and `everyday/cutaway.ts`'s AD-S8 landing wash. `globalAlpha` is invisible to a
+ * recording stub, so a translucent mark set that way cannot be asserted — which is the failure
+ * `render/sky.ts` refuses a `CanvasGradient` for, and the reason the wash's own opacity is
+ * checkable at all.
  */
-function rgbaOf(hex: string, alpha: number): string {
+export function withAlpha(hex: string, alpha: number): string {
   const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
   if (match === null) return hex;
   const [, r = '00', g = '00', b = '00'] = match;
