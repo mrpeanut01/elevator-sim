@@ -2023,7 +2023,32 @@ type DecisionReservation = {
  * The reservation is set back to `null` and `CHARTER_PROGRAMME.md`'s row moves to **D641** on this
  * commit, per the remedy the guard below names.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/*
+ * **Wave AC-2's reservation, D641-D728, is OPEN.** The playability wave: ten build lanes and five
+ * decision agents dispatched in parallel from one base, each holding a contiguous block allocated
+ * by the integrator before any of them started, per the remedy § D404 names.
+ *
+ * The blocks, so a reader can tell a hole from a number still in flight: D641-D643 (#548 and the
+ * stage's opening rung), D644-D648 (the fix-case pair), D649-D655 (the Scenario ladder), D656-D660
+ * (people on the stage), D661-D665 (the first ninety seconds), D666-D670 (the report's headline
+ * under a refused mean), D671-D678 (the chimes loop), D679-D684 (locating a failure), D685-D690
+ * (the shared result), D691-D700 (the dial-witness search and any rebalance), and D701-D728 across
+ * five decision agents ruling on the open-decision register.
+ *
+ * **Why this is open rather than null, and it is the guard's own docstring asking for it.** With
+ * the reservation closed the boundary is `max(heading) + 1`, so every number below the highest
+ * spent heading that heads nothing is an unregistered hole — and mid-wave that is every block not
+ * yet merged. Measured on this branch while it was still `null`: the max heading was 691 and the
+ * "holes" below it read D641-D643, D645-D648 and D650-D690, which is not a defect but ten lanes
+ * that have not landed yet. That is the failure this mechanism exists to prevent, arriving from the
+ * inside: a gate red on every branch by construction teaches a reader to ignore it.
+ *
+ * Closed at integration, when every lane has reported the highest number it spent and the numbers
+ * no lane spent are registered in `KNOWN_DECISION_HOLES` as permanent. `CHARTER_PROGRAMME.md`'s row
+ * stays at **D641**, the block's floor, for the whole wave — which is what the assertion below
+ * checks and why the row is the integrator's input rather than a lane's.
+ */
+const OPEN_RESERVATION = { wave: 'AC-2', from: 641, to: 728 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
