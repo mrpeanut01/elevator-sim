@@ -211,14 +211,14 @@ export interface FixitSpend {
  * `larger-car-step` and `new-car`, and **those rows are machinery wherever they are bought** —
  * which is the whole of the correction below.
  *
- * ## The defect this closes, and it was reachable on nine repairs
+ * ## The defect this closes, and it was reachable on ten repairs
  *
  * {@link spendOf} used to compute `editorUnits - settingUnits + shaftUnits`, in which
  * `repairUnits` **is not a term at all**. So a repair whose patch buys nothing but machinery
  * reported none of it: `sleeping-sky-lobby`'s 10 u *Re-gear the shuttles* — eight re-geared
  * machines, the **same** `faster-machines` row the editor's own stepper buys at the **same** 10 u —
  * drew *"10 u, of which 0 u is machinery"*, while the stepper beside it drew *"10 u, of which 10 u
- * is machinery"*. Nine of the seventy-two shipped repairs buy `faster-machines`, so nine drew a
+ * is machinery"*. **Ten** of the seventy-two shipped repairs buy `faster-machines`, so ten drew a
  * figure that was false about the purchase the player had just made, and {@link budgetNoteOf}'s
  * machinery branch could not fire for any of them.
  *
@@ -234,7 +234,7 @@ export interface FixitSpend {
  * **What it deliberately does not claim.** A repair buying `cabin-pressurisation`,
  * `regenerative-drive` or `rope-upgrade` would be steel under most readings and is not counted
  * here, because no control on this screen buys one and the word would then mean two things at
- * once. **No shipped repair buys any of the three** — the nine that carry machinery all carry
+ * once. **No shipped repair buys any of the three** — the ten that carry machinery all carry
  * `faster-machines` and the eighteen new shafts carry `new-car` — so the limit is stated rather
  * than measured away, and it moves on the commit that gives the screen such a control.
  */
