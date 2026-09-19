@@ -28,7 +28,6 @@ import {
   CHIMES_PANEL_COPY,
   SPEND_ABSENCES,
   chimesPanelViewOf,
-  offeredSinkIds,
   type ChimesPanelView,
 } from './chimesPanel.js';
 
@@ -116,12 +115,19 @@ describe('what the panel says about spending — § D227 and § D672, a reason p
      * Asserted against `core`'s own constant rather than a literal, and in **both** directions, so
      * a sink that gained or lost an absence fails here rather than on a player's screen.
      */
-    expect(offeredSinkIds()).toEqual([RUSH_PREFIT_SINK_ID]);
+    const view = offered();
+    /*
+     * Read off the **rendered rows** rather than off a helper. A `offeredSinkIds()` export existed
+     * and was deleted because nothing but this file called it — `CLAUDE.md`'s standing requirement
+     * in its plainest form — and reading the view is the better assertion anyway: what a player
+     * can press is what `offer` says, and a second derivation could come to disagree with it.
+     */
+    expect(view.rows.filter((row) => row.offer !== 'not-offered').map((row) => row.id)).toEqual([
+      RUSH_PREFIT_SINK_ID,
+    ]);
     for (const id of Object.keys(SPEND_ABSENCES)) {
       expect(CHIME_PRICES.sinks.map((sink) => sink.id), id).toContain(id);
-      expect(SPEND_ABSENCES[id], id).not.toBe(undefined);
     }
-    const view = offered();
     for (const row of view.rows) {
       expect(row.offer === 'not-offered', row.id).toBe(SPEND_ABSENCES[row.id] !== undefined);
     }

@@ -137,6 +137,7 @@ import { RAIL_DRAWER_COPY, railModel, sublineFor } from '../everyday/rail.js';
 import {
   RUSH_ABSENCES,
   RUSH_HOLD_LINE,
+  RUSH_FITTED_LINE,
   RUSH_SCREEN_COPY,
   rushBandViews,
   rushBarModel,
@@ -8519,6 +8520,13 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/rushScreenModel.ts#rushHoldLineFigure',
     'everyday/rushScreenModel.ts#rushGeneratedRangeLine',
     'everyday/rushScreenModel.ts#rushOpeningLine',
+    /*
+     * That this sitting starts on a fitted tower, and where it will be posted — § D672. Seeded
+     * below rather than merely claimed, on wave T's finding that being in `covers` is not being
+     * swept: it is drawn only when the account owns the kit, so nothing that renders this screen
+     * from a fixture would reach it.
+     */
+    'everyday/rushScreenModel.ts#RUSH_FITTED_LINE',
     'everyday/designerModel.ts#DESIGNER_COPY',
     'everyday/designerModel.ts#designerFigures',
     'everyday/designerModel.ts#designerWarnings',
@@ -8586,6 +8594,12 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     seeds.push({ field: 'rush.holdLine.figure', text: rushHoldLineFigure(), role: 'label' });
     seeds.push({ field: 'rush.generated', text: rushGeneratedRangeLine(), role: 'prose' });
     seeds.push({ field: 'rush.opening', text: rushOpeningLine(), role: 'prose' });
+    /*
+     * § D672's fitted-start disclosure. `prose` rather than `reason`: it refuses nothing and
+     * offers nothing — it is two facts about the run about to be played, which is the role
+     * `rush.driving` carries one line up.
+     */
+    seeds.push({ field: 'rush.fitted', text: RUSH_FITTED_LINE, role: 'prose' });
     seeds.push({
       field: 'rush.driving',
       text: rushDrivingLine('Collective control'),
@@ -8953,6 +8967,18 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      * access that walked round the id grep).
      */
     'everyday/chimesPanel.ts#CHIME_PRICES',
+    /*
+     * Why each sink this build lists is not one it sells — § D672,
+     * `screens.ts#UNBUILT_REASONS`' shape. Player-facing prose, drawn under its own row.
+     *
+     * `covers` rather than a seed of its own, for {@link CHIME_PRICES}' reason one entry up: the
+     * sentences are seeded **per row** out of `chimesPanelViewOf`'s own answer, so what the search
+     * reads is what the screen renders. Every arm is reached, and it took three cases to get there
+     * — every case that leaves `chimeSpendable` unset draws the *there is no ledger on this build*
+     * arm on every row, so the refusals a player with an account actually meets would have shipped
+     * unswept. That is `banked-one`/`banked-many`'s lesson one field along.
+     */
+    'everyday/chimesPanel.ts#SPEND_ABSENCES',
     /*
      * The DISPLAY NAME field's note, which is **two** sentences because it is about two different
      * names — § D490. Both arms are reached below: all but one of the cases draw the device one, and

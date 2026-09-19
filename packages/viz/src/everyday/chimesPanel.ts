@@ -61,6 +61,12 @@
  * either offered or carries a reason and none is both. That is what stops an offer and its reason
  * from drifting apart the way a pair of hand-maintained lists would.
  *
+ * **There is no exported *"which sinks are offered"* helper, and the absence is deliberate.** One
+ * was written and deleted: nothing but a test called it, which is `CLAUDE.md`'s standing
+ * requirement in its plainest form — *name the non-test caller*. The offered set is a **property of
+ * the rendered rows** ({@link ChimesSpendRowView.offer}), so the tests read it off the view a
+ * player sees rather than off a second derivation that could come to disagree with one.
+ *
  * ## Prices, and never a price in money — and one of them buyable
  *
  * The sinks are drawn with what they cost **in chimes**, from `data/chime-ledger.json`, because
@@ -77,7 +83,6 @@
  */
 
 import {
-  RUSH_PREFIT_SINK_ID,
   chimeSpendTableOf,
   parseChimeLedger,
   type ChimeSink,
@@ -386,18 +391,3 @@ export function chimesPanelViewOf(input: ChimesPanelInput): ChimesPanelView {
   };
 }
 
-/**
- * The sinks this build actually sells — every sink the shipped table holds that
- * {@link SPEND_ABSENCES} does not refuse.
- *
- * Derived rather than listed, which is `screens.ts`'s own rule: a second hand-written list is the
- * thing that goes stale against the first. `chimesPanel.test.ts` asserts what this comes out as —
- * exactly `core`'s {@link RUSH_PREFIT_SINK_ID} — in both directions, so a sink that gained or lost
- * an absence fails a test rather than a player.
- */
-export function offeredSinkIds(table: ChimeSpendTable = CHIME_PRICES): readonly string[] {
-  return table.sinks.map((sink) => sink.id).filter((id) => SPEND_ABSENCES[id] === undefined);
-}
-
-/** Whether the shipped table's one offered sink is the pre-fit — used by `rushScreenModel.ts`. */
-export const PREFIT_SINK_ID = RUSH_PREFIT_SINK_ID;

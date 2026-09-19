@@ -234,15 +234,27 @@ describe('§ D219 on the spend verb — one sink is sold, and the rest say why n
      * cell with the same cell unfitted and requires the two to differ, which is `CLAUDE.md`'s
      * *move the control and require the run to change* on the one sink that is sold.
      */
-    const { CHIMES_PANEL_COPY, SPEND_ABSENCES, offeredSinkIds } = await import(
+    const { CHIMES_PANEL_COPY, SPEND_ABSENCES, chimesPanelViewOf } = await import(
       '../everyday/chimesPanel.js'
     );
     expect(Object.hasOwn(CHIMES_PANEL_COPY, 'spendRefusal')).toBe(false);
-    const ids = ledger().sinks.map((sink) => sink.id);
-    for (const id of ids) {
-      const offered = offeredSinkIds().includes(id);
-      const refused = SPEND_ABSENCES[id] !== undefined;
-      expect(offered !== refused, `${id} is both offered and refused, or neither`).toBe(true);
+    /*
+     * Driven through the view a player reads rather than through a helper — there is no exported
+     * *which sinks are offered*, deliberately, because nothing outside a test would have called one.
+     */
+    const rows = chimesPanelViewOf({
+      balanceChimes: 999,
+      home: 'account',
+      spendable: true,
+      owns: [],
+    }).rows;
+    expect(rows.map((row) => row.id).sort()).toEqual(ledger().sinks.map((sink) => sink.id).sort());
+    for (const row of rows) {
+      const refused = SPEND_ABSENCES[row.id] !== undefined;
+      expect(
+        (row.offer === 'not-offered') === refused,
+        `${row.id} is both offered and refused, or neither`,
+      ).toBe(true);
     }
     /* And the refusals really say why, rather than saying *not yet* about nothing in particular. */
     expect(SPEND_ABSENCES['career-purse-top-up']).toMatch(/purse/u);
