@@ -28,12 +28,16 @@ import {
   type BuildingConfig,
   type DispatcherProfile,
   type DispatcherProfiles,
+  type DoorCrowdingConfig,
   type ElevatorSpecs,
   type PatienceConfig,
   type ResolvedBuilding,
   type RunInterventionConfig,
   type SimulationConfig,
+  type SimulationDemandOptions,
 } from '@elevator-sim/core/browser';
+
+import type { RunnerTunables } from './parameterForm.js';
 
 import {
   DEFAULT_LEVERS,
@@ -661,6 +665,72 @@ export interface ViewerState {
    */
   readonly patience: PatienceConfig | null;
 
+  /**
+   * The demand options the Parameters tab's `TRAFFIC_PARAMETERS` source is showing, or `null` for
+   * *every profile decides its own*.
+   *
+   * ## Why this field exists — the parity assessment's single largest gap
+   *
+   * A panel counted the Parameters tab against `core`'s own inventory of what it models as
+   * settable and found **49 of 117 declared tunables reaching no run from any screen**, with the
+   * form already drawing them under a sentence saying so. {@link ViewerState.patience} was the one
+   * schema wired; this is the second, and it is the one that decides *what kind of day this is*.
+   * A game whose every day is the same day has nothing to bring a player back, which is
+   * `docs/43` P4.
+   *
+   * ## Why `null` and not a default block
+   *
+   * `core`'s rule, and the same one `patience` keeps: `traceConfigFor` spreads every demand field
+   * or omits it and never substitutes a default of its own, because *"unset means the reference
+   * data decides, and a default invented here would be a second source of truth for a number
+   * `data/traffic-profiles.json` already states"*. `dev/parameterForm.ts#movedFromDefault` is what
+   * makes `null` reachable in practice: a row sitting at its declared default contributes no key,
+   * so a form nobody has touched decodes to `null` and writes nothing onto the config.
+   *
+   * ## What it does not carry, measured rather than promised
+   *
+   * Eight ids, and **`arrivalRatePctPop5min` and `directionalSplit` are not among them** — both
+   * declare `default: null` and are excluded from the form's controls before a candidate exists.
+   * That is what makes it safe for {@link shiftRunConfigOf} to merge this **after** the day's
+   * event and the calendar: those two write exactly those two fields and nothing else, so the key
+   * sets are disjoint and the ordering cannot take a fire drill's rate away from it.
+   */
+  readonly paramDemand: SimulationDemandOptions | null;
+
+  /**
+   * The lobby-crowding feedback loop the Parameters tab's `CROWDING_PARAMETERS` source is showing,
+   * or `null` for *a lobby's size does not affect how fast it loads*.
+   *
+   * Three rows, and they are the mechanism behind real up-peak collapse: slow boarding lengthens
+   * the queue and a longer queue slows boarding. `core` ships it whole — resolved, consulted by
+   * the door machine, bounded — with no screen able to switch it on, which is this repository's
+   * signature defect and the reason `docs/05`'s standing requirement is written the way it is.
+   *
+   * `null` is the absent block, and `SimulationConfig.lobbyCrowding` says what that means: *"absent
+   * means a lobby's size does not affect how fast it loads, which is what every run this
+   * repository has published assumed."* So at `null` this field writes nothing and the run is
+   * byte-identical to the run before the field existed — which is what the `scope/probes` left arm
+   * measures rather than asserts.
+   *
+   * **It can destabilise a run that was stable**, and that is a finding to read off
+   * `RunSummary.saturation` rather than a defect: the detector exists for exactly this.
+   */
+  readonly lobbyCrowding: DoorCrowdingConfig | null;
+
+  /**
+   * The runner's own tunables the Parameters tab's `SIM_PARAMETERS` source is showing, or `null`
+   * for *`SIM_DEFAULTS` decides*.
+   *
+   * Five of the schema's six rows; the sixth, `sim.assignedWalkS`, is gated off in a single-schema
+   * space because its `activeWhen` names two `DISPATCH_PARAMETERS` rows the picker is not showing.
+   * See `dev/parameterForm.ts#RunnerTunables`.
+   *
+   * Per-field spread-or-omit for {@link ViewerState.paramDemand}'s reason, one surface over: these
+   * numbers live in `SIM_DEFAULTS` and a screen that pinned one would be a second source of truth
+   * for it.
+   */
+  readonly runnerTunables: RunnerTunables | null;
+
   /* --- the week ----------------------------------------------------------- */
   readonly week: WeekState;
   /**
@@ -1248,6 +1318,17 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
      * was before this field existed. See {@link ViewerState.patience}.
      */
     patience: null,
+    /*
+     * `null` on all three, for `patience`' reason one line up: every row of
+     * `TRAFFIC_PARAMETERS`, `CROWDING_PARAMETERS` and `SIM_PARAMETERS` sits at its declared
+     * default on a page that has just loaded, `movedFromDefault` therefore reports nothing moved,
+     * and the opening run is the run it was before these fields existed. See
+     * {@link ViewerState.paramDemand}, {@link ViewerState.lobbyCrowding} and
+     * {@link ViewerState.runnerTunables}.
+     */
+    paramDemand: null,
+    lobbyCrowding: null,
+    runnerTunables: null,
     week: openWeek(contractForBuilding(buildingId)?.id),
     // Nothing has been stepped away from yet. `switchWeek` is the only thing that fills this.
     parkedWeeks: [],
@@ -1889,10 +1970,34 @@ export function shiftRunConfigOf(
        */
       ...(reportWindow === undefined ? {} : { reportWindow }),
       demandTemplate: (calendar.demandTemplateId ?? demandTemplate) as typeof demandTemplate,
-      demand: { ...demand, ...patch.demand, ...calendar.demand },
       /*
-       * The Parameters tab's one applied schema — the audit's B4, and `dev/parameterForm.ts`'s
-       * `APPLIED_SCHEMA`.
+       * **The Parameters tab's traffic source is merged last, and the ordering is a measurement
+       * rather than a preference** — `ViewerState.paramDemand`, and the parity assessment's § 4.
+       *
+       * Last because it is the reader's most explicit statement about the day, which is the same
+       * argument `ruleRows` is written after `selectorSpec` on. What makes that safe rather than
+       * merely defensible is that **the key sets are disjoint**: `shiftRunPatch` writes
+       * `arrivalRatePctPop5min` and `directionalSplit` and nothing else, `calendarPatch` writes
+       * `directionalSplit` and nothing else, and neither of those two ids can be in
+       * `paramDemand` at all — both declare `default: null`, so `collectFormSource`'s
+       * `nullDefault: 'exclude'` keeps them out of the form's controls and out of any candidate.
+       * A fire drill's five-times demand cannot be taken away by this spread, and the day this
+       * stops being true is the day one of those rows acquires a default, which
+       * `dev/parameterForm.test.ts` fails on.
+       *
+       * **Spread-or-omit, for `patience`'s reason below**: at `null` no key of this object comes
+       * from the Parameters tab at all, so a reader who has never opened it runs the day they
+       * would have run before the field existed.
+       */
+      demand: {
+        ...demand,
+        ...patch.demand,
+        ...calendar.demand,
+        ...(state.paramDemand === null ? {} : state.paramDemand),
+      },
+      /*
+       * The Parameters tab's first applied schema — the audit's B4, and the first member of
+       * `dev/parameterForm.ts`'s `APPLIED_SCHEMAS`.
        *
        * **Spread rather than written as `patience: state.patience ?? undefined`**, so a run with no
        * curve carries no `patience` key at all. `sim/patience.ts` is explicit that an absent block
@@ -1902,6 +2007,26 @@ export function shiftRunConfigOf(
        * asserted-in-prose.
        */
       ...(state.patience === null ? {} : { patience: state.patience }),
+      /*
+       * The Parameters tab's crowding source — `ViewerState.lobbyCrowding`.
+       *
+       * **Spread rather than written as `lobbyCrowding: state.lobbyCrowding ?? undefined`**, for
+       * `patience`'s stated reason one line up. `SimulationConfig.lobbyCrowding` is explicit that
+       * an absent block and a present-but-inert one are different claims — absent is *"what every
+       * run this repository has published assumed"* — and `scope/probes.test-helper.ts` compares
+       * the two arms on the legs, so *byte-identical at null* is asserted rather than
+       * asserted-in-prose.
+       */
+      ...(state.lobbyCrowding === null ? {} : { lobbyCrowding: state.lobbyCrowding }),
+      /*
+       * The Parameters tab's runner source — `ViewerState.runnerTunables`.
+       *
+       * Spread whole rather than field by field here, because the decoder has already applied the
+       * discipline: `runnerTunablesFromCandidate` returns only the fields whose control left its
+       * declared default, so an object that reaches this line has no key `SIM_DEFAULTS` should
+       * have been left to answer.
+       */
+      ...(state.runnerTunables === null ? {} : state.runnerTunables),
       /*
        * The run record's intervention log — contract § 1.4, and plain data, so it crosses the
        * shift worker's structured clone like every other field here. **Spread rather than written

@@ -1704,7 +1704,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'not prose, and nothing it returns is a string at all. It is `dev/dom.ts`’s case at the ' +
         'other end of the pipe: the strings near it belong to somebody else, and driving it would ' +
         'put a schema id in the corpus under a decoder’s name.',
-      ids: ['dev/parameterForm.ts#patienceFromCandidate'],
+      ids: [
+        'dev/parameterForm.ts#patienceFromCandidate',
+        /*
+         * Wave AD's three, on exactly the sentence above and for exactly its reason — § D761–
+         * § D763. Each turns the same tab's live point into a `core` configuration object, and
+         * every literal the derivation sees in one is a parameter id (`traffic.demandLevel`,
+         * `sim.lobbyCrowding.maxFactor`) or an enumerated value `core` declares (`uniform`,
+         * `permitted-first`). None of the three returns a string, and the player-facing sentence
+         * about what they do is `appliedNoteFor`'s, which is excluded above under its own reason.
+         */
+        'dev/parameterForm.ts#crowdingFromCandidate',
+        'dev/parameterForm.ts#demandFromCandidate',
+        'dev/parameterForm.ts#runnerTunablesFromCandidate',
+      ],
     },
     {
       reason:

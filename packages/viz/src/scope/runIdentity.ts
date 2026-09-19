@@ -495,6 +495,52 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
         'run, and abandonment moves the mean it would be judged on',
 
   /**
+   * The Parameters tab's traffic source — § D761, and `patience`' answer one field over.
+   *
+   * `null` is *every profile decides its own*, which is what `shiftRunConfigOf` writes nothing
+   * for, so it carries. Anything else does not: a `RunSubmission` is a list of **ids** and a CLI
+   * line is a building, a dispatcher, a seed and a length, and neither has a field for a demand
+   * level, a leg ceiling or a template's peak window. The consequence is the same shape as
+   * `patience`' and arrives from the opposite direction — a run set to `demandLevel: 'max'` is a
+   * *harder* day than the one the server would replay, so the honest player is the one penalised
+   * by the silence, and a run set to `min` would re-verify as a forgery in the player's favour.
+   */
+  paramDemand: (state) =>
+    state.paramDemand === null
+      ? undefined
+      : 'this run carries demand options set on the Parameters tab — what kind of day it is, ' +
+        'rather than which building or dispatcher — and neither a CLI line nor a submission has a ' +
+        'field for one, so a replay would run the day the traffic profiles decide instead',
+
+  /**
+   * The Parameters tab's crowding source — § D762, on `paramDemand`'s exact footing.
+   *
+   * `null` is the absent block, which is what every run this repository has published assumed, so
+   * it carries. A live term does not: it makes every stop at a busy landing longer, which is a
+   * strictly harder run than the one a replay of the same seed would produce.
+   */
+  lobbyCrowding: (state) =>
+    state.lobbyCrowding === null
+      ? undefined
+      : 'this run models a lobby that loads more slowly as it fills, which is a term set on the ' +
+        'Parameters tab and which no selection or submission carries — a replay would run the ' +
+        'same seed with boarding unaffected by the queue, and every stop would be shorter',
+
+  /**
+   * The Parameters tab's runner source — § D763, on `paramDemand`'s exact footing.
+   *
+   * `null` is `SIM_DEFAULTS`, which every published run used, so it carries. Anything else does
+   * not: a walk, a re-offer interval, a drain deadline or a photo-eye probability is a property of
+   * the run rather than of the selection, and the wire names none of them.
+   */
+  runnerTunables: (state) =>
+    state.runnerTunables === null
+      ? undefined
+      : 'this run carries runner settings from the Parameters tab — a sky-lobby walk, a re-offer ' +
+        'interval, a drain deadline or a photo-eye interruption rate — and no selection or ' +
+        'submission carries any of them, so a replay would run this seed at the shipped defaults',
+
+  /**
    * The fabric — issue #129's first field.
    *
    * **Asked as *did the building move?*, never as *is the array non-empty?***, and the distinction

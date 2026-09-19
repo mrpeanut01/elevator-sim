@@ -312,8 +312,9 @@ describe.skipIf(!HAS_BROWSER)('the viewer boots', () => {
      *
      * The form opens on `<dispatcher search space>`, which is one of the sources that is **not**
      * applied, so this is the note a cold load actually shows. `parameterForm.test.ts` holds the
-     * other eleven sources and the applied one; what is added here is that the mount puts the node
-     * on the page at all.
+     * other sources, applied and not; what is added here is that the mount puts the node on the
+     * page at all. The refusal names every applied source (wave AD took the set from one to four),
+     * which is why this asserts the first of them rather than a count.
      *
      * Watched failing by deleting the two `applied` lines from `parameterForm.ts#draw`:
      *
@@ -326,5 +327,6 @@ describe.skipIf(!HAS_BROWSER)('the viewer boots', () => {
     ).toContain('NOT APPLIED');
     expect(loaded.parameterNote).toContain('Run this shift');
     expect(loaded.parameterNote).toContain('PATIENCE_PARAMETERS');
+    expect(loaded.parameterNote).toContain('TRAFFIC_PARAMETERS');
   });
 });

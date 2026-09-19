@@ -40165,3 +40165,278 @@ string, a template literal or a violation following a stripped block comment are
 way they must be. Verified: a source file carrying `Date.now()` and `Math.random()` added under
 `core/src/random`, and a new directory holding source, each turn this test red without any list
 being edited.
+
+
+## D761 — `APPLIED_SCHEMA` becomes `APPLIED_SCHEMAS`, and the Parameters tab's traffic source starts deciding what kind of day it is
+
+**Date: 2026-09-19 · Owner: wave AD lane C · Rules on:** the parity assessment's § 4,
+`packages/viz/src/dev/parameterForm.ts:101` as it stood, [§ D177](#d177) (*move the control and
+require the run to change, compared on the legs*), [§ D227](#d227) (a stale refusal is the more
+dangerous half), `docs/43` P1, P2 and P4, and the UI readiness audit's **B4**, whose repair this
+completes on three more schemas.
+
+**Why an entry at all, under [§ D405](#d405).** It reaches well past the module that took it: it
+adds three fields to `ViewerState`, which forces an answer in `scope/runIdentity.ts` about what a
+submission can carry, a role in `everyday/rush.ts`' exhaustive table and a row in
+`scope/surface.ts`; and it **deletes a shipped player-facing refusal**, which [§ D227](#d227) says
+may only happen on the commit that makes it false.
+
+### 1. What was wrong, in one line
+
+`export const APPLIED_SCHEMA = 'PATIENCE_PARAMETERS';` — one name, and eleven discovered schemas
+drawn beneath a sentence telling the player that moving anything there would give back *"byte for
+byte the day you would have got without touching it"*. A panel counted the cost against `core`'s
+own inventory of what it models as settable: **49 of 117 declared tunables reached no run from any
+screen.** The refusal was true, which is the only reason this is a gap rather than a lie.
+
+### 2. What is live now, and the shape of the wire
+
+Four sources rather than one: `PATIENCE_PARAMETERS` as before, plus `TRAFFIC_PARAMETERS` (this
+entry), `CROWDING_PARAMETERS` ([§ D762](#d762)) and `SIM_PARAMETERS` ([§ D763](#d763)). The seam is
+the one `patience` proved and is unchanged in shape — mount publishes a candidate with its source's
+name → `dev/main.ts` matches on the set → a field on `ViewerState` → `shiftRunConfigOf` spreads it
+onto the config — and what changed is that the match is a set and the branch is one arm per source.
+
+**One arm per source, never a single `update` carrying all four.** `onCandidate` fires on a source
+*change* as well as on an edit, so a combined write would blank the other three fields the moment a
+player moved the picker: a control that silently undoes itself when you look away, which is worse
+than one that does nothing.
+
+Eight of `TRAFFIC_PARAMETERS`' thirty-four rows travel: `demandLevel`, `batchSharesDestination`,
+`interfloorWeighting`, `credentialAssignment`, `maxLegs`, `riseAndFall.peakWindowS`,
+`riseAndFall.baselineFraction` and `lunchTwoWay.mixAmplitude`. The other twenty-six are refused in
+three groups, each for its own reason, and the groups are [§ D765](#d765)'s subject.
+
+### 3. The absent-key discipline, and why it needed a function
+
+`candidateOf` returns every *active* row, defaults included, so a form nobody has touched still
+produces a full map. Writing that map would have been the more insidious failure than not writing
+it at all: every default would stop being a default and become a value pinned by a screen the
+player never opened, and `traffic.interfloorWeighting` would quietly stop meaning *whatever the
+profile says*. `core` refuses that shape in as many words — `traceConfigFor` spreads each demand
+field or omits it, *"never `?? <a default of this file's own>`"*.
+
+So `movedFromDefault(sourceName, candidate)` returns only the ids whose value differs from the
+schema's **own declared default**, read back out of `discoverParameterSchemas()` rather than from a
+table in `packages/viz`. A literal table would have been a second source of truth for numbers
+`core` already states, and it would have gone stale silently, which is the defect class this whole
+tab was an instance of.
+
+The consequence is that `null` is reachable and is the seeded value: a page that has just loaded
+writes no key at all, and the opening run is the run it was before these fields existed.
+
+### 4. The merge order, and why it is safe rather than merely defensible
+
+`paramDemand` is merged **after** the day's event patch and the calendar, on the argument that the
+reader's explicit statement outranks a derived one — `ruleRows` after `selectorSpec`, one surface
+over. What makes that safe is a **measured** fact rather than a judgement: `shiftRunPatch` writes
+`arrivalRatePctPop5min` and `directionalSplit` and nothing else, `calendarPatch` writes
+`directionalSplit` and nothing else, and **neither id can be in `paramDemand` at all** — both
+declare `default: null`, so `collectFormSource`'s `nullDefault: 'exclude'` keeps them out of the
+form's controls and therefore out of every candidate. A fire drill's five-times demand cannot be
+taken away by a slider.
+
+That is asserted in two directions rather than reasoned about:
+`dev/parameterRouting.test.ts` runs a state carrying both a fire drill and a full traffic override
+and requires the drill's rate to survive, and `dev/parameterForm.test.ts` fails the day either id
+acquires a default and starts drawing a control.
+
+### 5. The proof, on the legs
+
+**Field level**, `scope/scope.test.ts`: `viewer.paramDemand` moves the legs — `null` against
+`demandLevel: 'max'` on Midtown Office at 1 800 s.
+
+**Promise level**, `dev/parameterRouting.test.ts`, which is new and is the part worth reading.
+A field-level probe is satisfied by *one* of the eight rows working; the other seven could be dead
+while the gate stayed green, and the screen's own sentence says eight. So there is one case per
+routed id, each run on a building where the thing it changes can happen, each compared on the legs
+and never on a window statistic. The cells were chosen by measurement and the table records why:
+four of the eight are byte-identical on both of the small towers and loud on `secure-tower` and
+`vertical-city`, which is a fact about the buildings rather than about the wire —
+`traffic.maxLegs` needs a journey with more than one leg, `traffic.credentialAssignment` needs a
+tower that declares access zones, `traffic.interfloorWeighting` needs floors whose populations
+differ from uniform, and `traffic.lunchTwoWay.mixAmplitude` needs the template it is gated on.
+`scope/probes.test-helper.ts` learned that lesson on `viewer.outOfServiceCarIds` and it is kept
+here rather than rediscovered.
+
+The inverse half is measured too: at `null` on all three new fields the legs are byte-identical on
+all four buildings, and `shiftRunConfigOf` is asserted to write **no key of its own** onto the
+config — because identical legs alone cannot tell *the default was omitted* from *the default was
+written*, and only the first survives a change to `SIM_DEFAULTS`.
+
+### 6. The refusal that was deleted, and the one that replaced it
+
+`appliedNoteFor`'s *NOT APPLIED* sentence is gone for all four applied sources on this commit,
+which is [§ D227](#d227)'s rule kept rather than quoted. What replaced it is **not** a blanket
+*APPLIED* banner: each of the four gets its own sentence, and the two that apply only part of their
+schema say which rows they leave alone and why, on the screen, in the reader's register.
+`parameterForm.test.ts` asserts in both directions — every applied source's note may not contain
+*NOT APPLIED* or *byte for byte*, and every unapplied one must contain both and must name the
+applied set.
+
+### 7. What a submission cannot carry
+
+`scope/runIdentity.ts` gains three `CARRY_CHECKS` entries, forced in by the walk over `SCOPE_OF` on
+the day the fields landed rather than on the day somebody remembered — the fourth time that list
+has recorded that. `null` carries on all three; anything else is refused by name. The reason is
+`patience`' with the polarity noted: a run set to `demandLevel: 'max'` is a *harder* day than the
+one the server would replay, so silence would punish the honest player, and a run set to `min`
+would re-verify in the player's favour, which is a forgery whoever meant it.
+
+### 8. Why this serves the mandate rather than the inventory
+
+`docs/43` P4 asks whether there is a reason to come back, and names the risk: *a simulator's
+natural end state is a solved configuration*. A game that will not let a player change the
+group-size shape, whether the lobby jams or whether Tuesday differs from Monday is a game running
+one day over and over — with `core`'s own words for the other days printed on a screen that says
+they are unavailable. This entry moves eight of those rows and [§ D765](#d765) records exactly how
+far it did **not** get, because the nineteen a player would most want are not reachable by routing
+at all.
+
+### 9. Numbers spent
+
+D761 here, [§ D762](#d762), [§ D763](#d763), [§ D764](#d764) and [§ D765](#d765). **D766–D785 are
+this lane's remaining block and are unspent**: nothing is written past them.
+
+## D762 — the lobby-crowding loop becomes reachable, whole or not at all
+
+**Date: 2026-09-19 · Owner: wave AD lane C · Rules on:** [§ D761](#d761)'s seam,
+`SimulationConfig.lobbyCrowding`, `CROWDING_PARAMETERS`' own *"there is no default block"*.
+
+`core` ships the feedback loop behind real up-peak collapse — slow boarding lengthens the queue and
+a longer queue slows boarding — resolved, consulted by the door machine, bounded against a declared
+ceiling, and **reachable from no screen**. `ViewerState.lobbyCrowding` is that screen's landing
+place.
+
+**All three rows or none, and that is `core`'s rule rather than a choice made here.**
+`DoorCrowdingConfig` requires every field, and the schema says why there is no default block:
+*"absent means no crowding at all, which is what keeps every published stop length the number it
+already was. The defaults exist so a generic sampler has a floor to start from, not so a run
+silently acquires one."* So `crowdingFromCandidate` emits the block whole the moment any one row
+leaves its declared default and not at all before. The untouched rows travel at their declared
+defaults rather than being substituted, because each of those *is* the value that makes its own
+term inert.
+
+`maxFactor < 1` is refused rather than handed to the run — *"a crowded lobby that boards faster
+than an empty one inverts the loop this exists to model"*. The schema's range starts at 1, so no
+control can produce one; the guard keeps that true of a schema change rather than of today's
+schema, which is `patienceFromCandidate`'s own argument one axis over.
+
+**Proof on the legs**, `scope/scope.test.ts` and `dev/parameterRouting.test.ts`: `null` against
+`{ thresholdPersons: 4, factorPerPerson: 0.06, maxFactor: 3 }` moves the legs on Midtown Office at
+1 800 s and is **byte-identical on Garden Apartments**, which is recorded because it is the cell
+choice rather than a defect — the term is a landing-occupancy loop and needs a landing that fills.
+Four cars and 1 710 people produce one; two hydraulic cars at a residential trickle do not.
+
+**It can destabilise a run that was stable**, and nothing here softens that. It is a finding to be
+read off `RunSummary.saturation`, which is what the detector is for, and the on-screen note says so
+before the player presses Run.
+
+## D763 — four of `SIM_PARAMETERS`' six rows reach the run
+
+**Date: 2026-09-19 · Owner: wave AD lane C · Rules on:** [§ D761](#d761)'s seam,
+[§ D764](#d764) for the fifth row, `SIM_DEFAULTS`.
+
+`ViewerState.runnerTunables` carries `transferWalkS`, `dispatchRetryS`, `drainGraceS` and
+`doorObstructionProbability`, per-field spread-or-omit through `movedFromDefault` for
+[§ D761](#d761) § 3's reason.
+
+Two of the six do not travel and the reasons differ. `sim.assignedWalkS` is gated: its `activeWhen`
+names `dispatch.passengerAssignment` and `dispatch.callType`, which are `DISPATCH_PARAMETERS` rows
+and are not in a single-schema space, so the row is drawn disabled and `candidateOf` omits it —
+the schema's own statement that the field is inert here, which is exactly the statement
+`patienceFromCandidate` declines to override for `spreadS`. `sim.queueSampleCount` is
+[§ D764](#d764).
+
+**Proof on the legs**, `dev/parameterRouting.test.ts`, one cell per row, each measured:
+`sim.transferWalkS` needs a sky lobby and is silent without one; `sim.drainGraceS` can only bite on
+a run still delivering when demand ends, which Garden Apartments is not; `sim.dispatchRetryS` needs
+a call no car could take; `sim.doorObstructionProbability` needs only door closes, which is why it
+is the arm `scope/scope.test.ts` uses for the field-level gate.
+
+## D764 — `sim.queueSampleCount` is refused on the charter, and the refusal is measured
+
+**Date: 2026-09-19 · Owner: wave AD lane C · Rules on:** charter non-goal 6,
+[§ D106](#d106)'s shape, [§ D763](#d763), and the brief's standing warning about
+`METRICS_PARAMETERS`.
+
+`sim.queueSampleCount` is *"the direct input to saturation detection"*. Moving it moves whether a
+run is declared saturated — which is whether its mean is **suppressed** — without moving the run.
+
+That is not an inference. Measured on five shipped buildings at 1 800 s through the shipped
+`shiftRunConfigOf` → `recordRun` path, `queueSampleCount: 3` against the default produces a
+**byte-identical set of legs on every one of them**: `garden-apartments`, `midtown-office`,
+`secure-tower`, `vertical-city` and `st-jude-hospital`. It is the one `SIM_PARAMETERS` row that
+cannot pass [§ D177](#d177) by construction rather than by building.
+
+A control that changes a verdict about a run and not the run is a difficulty setting that moves a
+measurement, which the charter forbids by name. So it stays off the wire, and the screen says so in
+its own sentence rather than in a document.
+
+**And the same argument, stated here so it is not re-litigated, refuses two whole schemas.**
+`METRICS_PARAMETERS`' thirteen rows are every saturation-detector threshold, the long-wait band,
+the percentile method and the abandonment and unserved ceilings. Making them reachable would let a
+player raise `metrics.maxAbandonmentFraction` until a suppressed mean became quotable — a score
+improved by moving the instrument that judges it. `ANALYTICAL_PARAMETERS`' three are the
+closed-form oracle's own assumptions, and the oracle is what this repository validates the
+simulator *against*; a player who can move it can make the simulator agree with arithmetic nobody
+published, which is the circularity `analytical/`'s import discipline exists to prevent. **Neither
+was built, and neither should be.** If a future wave wants the numbers visible, the honest form is
+a read-only disclosure of what the detector used, not a control.
+
+## D765 — three findings the routing work could not fix, and the largest is that nineteen rows draw no control at all
+
+**Date: 2026-09-19 · Owner: wave AD lane C · Rules on:** the parity assessment's § 4, which this
+entry corrects in one particular; `CLAUDE.md`'s `accessZones` paragraph, which is the shape two of
+these take.
+
+### 1. Nineteen `TRAFFIC_PARAMETERS` rows are not drawn, so routing cannot reach them
+
+The assessment said the form *"already draws every declared tunable … with its range, its
+`activeWhen` gate and `core`'s own description, under a sentence telling the player they do
+nothing."* Measured through the shipped `collectFormSource`, that is **false for
+`TRAFFIC_PARAMETERS`**: it yields **15 controls and 19 unsearchable entries**. Those nineteen
+declare `default: null`, and `collectFormSource` asks for `nullDefault: 'exclude'`, so they are
+drawn as *named refusals* beside the controls rather than as controls.
+
+They are, precisely, the rows the brief prioritised: all five `passengerMass` rows, all three
+`dayVariation` rows, all three `batchSize` rows, the three `duty.shares`, the three
+`directionalSplit` shares, `arrivalRatePctPop5min` and `credentialGap.wrongZoneShare`.
+
+**The repair is a control, not a wire.** `default: null` is the *only honest default* for these —
+`docs/10` § 9.3 and the schema rows say why, and the reasoning is right: any number named there is
+imposed on every profile in every building. What that argues for is a control whose **off position
+is the profile**, which is a three-state widget (*profile · off · this value*) rather than a
+slider, and a form that can express one. That is the next piece of work on this tab and it is
+larger than this lane's scope. Nothing about it is blocked; it is simply not routing.
+
+### 2. `traffic.entranceWeight` cannot change a result from this form — the `accessZones` shape
+
+It is declared `perMemberOf: 'building.entranceFloors'`, so in a building-free single-schema space
+it collapses to **one scalar**. The weights are *relative* and normalized across entrances, so one
+number moving every entrance together is arithmetically the mix it already was. Configured,
+declared, validated, consulted — and unable to change a result, which is exactly the polarity
+`CLAUDE.md` records for `accessZones`. It is **not routed**, and the screen says why.
+
+The fix is the same one § 1 needs: a per-entrance control, which needs the form to know which
+building is loaded. Recorded rather than built.
+
+### 3. `traffic.constant.discardFirstS` and `.discardLastS` have no field to travel in
+
+Both are declared tunables. `SimulationDemandOptions` has no field for either, and
+`traceConfigFor`'s `templateOverrides` has no arm for either, so there is no route from any
+`SimulationConfig` to them — not from the viewer, not from the CLI, not from a benchmark. A
+declared tunable `core` itself cannot receive through its own run configuration is a gap in the
+config surface rather than in a screen, and closing it means adding two fields to
+`SimulationDemandOptions` and two arms to `traceConfigFor`. **Not done here**, because it is a
+change to `core`'s run surface and this lane's subject was the viewer's routing; and stated rather
+than left, because a control drawn from a schema `core` cannot be told about is the same defect one
+layer down.
+
+### 4. What is deliberately not offered
+
+No mechanism is offered for why `traffic.interfloorWeighting`, `traffic.maxLegs`,
+`traffic.credentialAssignment` and `sim.transferWalkS` are byte-identical on two shipped buildings
+beyond the structural reason each one's own test row states. Each is building-dependent by
+construction; whether any shipped tower *ought* to make one of them bite is a content question and
+is unmeasured here.

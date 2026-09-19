@@ -246,6 +246,31 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
       '114 controls on that tab binding nothing, and the values living in a closure rather than in ' +
       'this state is what stopped this file from being able to say so.',
   ),
+  'viewer.paramDemand': control(
+    'within-day',
+    'The demand options the Parameters tab’s TRAFFIC_PARAMETERS source writes — the demand level, ' +
+      'whether a group shares a destination, how an interfloor destination is picked, whether ' +
+      'riders carry a credential, the leg ceiling, and the running template’s peak window, ' +
+      'baseline and mix amplitude. within-day on patience’s ground: it does not name the run, it ' +
+      'changes what kind of day the run is, and it re-runs the day like the levers beside it. It ' +
+      'is here at all because a parity assessment counted 49 of core’s 117 declared tunables ' +
+      'reaching no run from any screen, and a game whose every day is the same day has nothing to ' +
+      'bring a player back.',
+  ),
+  'viewer.lobbyCrowding': control(
+    'within-day',
+    'The lobby-crowding feedback loop the Parameters tab’s CROWDING_PARAMETERS source writes — ' +
+      'slow boarding lengthens the queue and a longer queue slows boarding, which is the ' +
+      'mechanism behind real up-peak collapse. within-day for paramDemand’s reason. core shipped ' +
+      'it whole — resolved, consulted by the door machine, bounded — with no screen able to ' +
+      'switch it on.',
+  ),
+  'viewer.runnerTunables': control(
+    'within-day',
+    'The runner’s own tunables the Parameters tab’s SIM_PARAMETERS source writes — the sky-lobby ' +
+      'transfer walk, the re-offer interval, the drain grace, the queue sample count and the ' +
+      'photo-eye interruption rate. within-day for paramDemand’s reason.',
+  ),
   'viewer.outOfServiceCarIds': control(
     'within-day',
     'Cars the reader took out of service by clicking a badge. Re-runs the day; the CLI has no flag ' +

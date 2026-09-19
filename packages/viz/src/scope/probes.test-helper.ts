@@ -655,6 +655,87 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
       }),
     ],
   },
+  'viewer.paramDemand': {
+    /*
+     * **Move the control and require the run to change** — § D177, pointed at the Parameters tab's
+     * traffic source (§ D761).
+     *
+     * The arms are `null` against `demandLevel: 'max'`, and `null` is required to be the run
+     * before the field existed: `shiftRunConfigOf` spreads nothing at all there, so the left leg
+     * is the day this repository has always run.
+     *
+     * `demandLevel` of the eight routed rows because it is the only one reachable on **any**
+     * shipped building — every profile declares an `arrivalRatePctPop5min` range and this asks for
+     * the top of it. Four of the other seven are quiet on both of this file's two buildings and
+     * loud on `secure-tower` and `vertical-city`, which is a fact about the buildings rather than
+     * about the wire; `dev/parameterRouting.test.ts` is the per-id form and runs each of the eight
+     * on a cell where the thing it changes can happen. This row is the field-level gate and that
+     * file is the promise-level one.
+     *
+     * On Midtown Office at 1 800 s for `viewer.patience`' measured reason one row up.
+     */
+    states: [
+      (s) => ({ ...s, buildingId: 'midtown-office', shiftLengthS: 1800, paramDemand: null }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        shiftLengthS: 1800,
+        paramDemand: { demandLevel: 'max' },
+      }),
+    ],
+  },
+  'viewer.lobbyCrowding': {
+    /*
+     * **Move the control and require the run to change** — § D177, pointed at the Parameters tab's
+     * crowding source (§ D762).
+     *
+     * `null` against a live term, which is the pair `SimulationConfig.lobbyCrowding` is written
+     * about: *"absent means a lobby's size does not affect how fast it loads, which is what every
+     * run this repository has published assumed."* So the left arm is required to be byte-identical
+     * to the run before the field existed and the right arm is required to differ — a crowded
+     * landing boards more slowly, and a stop that takes longer changes which car takes the next
+     * call.
+     *
+     * On Midtown Office at 1 800 s, and the cell is measured rather than preferred: the term is a
+     * landing-occupancy feedback loop, so it needs a landing that fills. Four cars and 1 710
+     * people produce one; Garden Apartments' two hydraulic cars at a residential trickle produce a
+     * byte-identical set of legs at every value, which would report a live control dead on a
+     * building where crowding cannot happen.
+     */
+    states: [
+      (s) => ({ ...s, buildingId: 'midtown-office', shiftLengthS: 1800, lobbyCrowding: null }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        shiftLengthS: 1800,
+        lobbyCrowding: { thresholdPersons: 4, factorPerPerson: 0.06, maxFactor: 3 },
+      }),
+    ],
+  },
+  'viewer.runnerTunables': {
+    /*
+     * **Move the control and require the run to change** — § D177, pointed at the Parameters tab's
+     * runner source (§ D763).
+     *
+     * `sim.doorObstructionProbability` of the four routed rows, because the other three each need
+     * a building this file does not load: a sky lobby for the transfer walk, a busy enough tower
+     * for a call no car could take, and a run still delivering when demand ends for the drain
+     * grace. This one needs only door closes, which every run has.
+     *
+     * Its own docstring is why it is the honest arm: *"zero consumes no draws at all"*, so the
+     * left leg at `null` is the run before the feature and the right leg draws from the
+     * `doorObstruction` stream on every close attempt.
+     */
+    states: [
+      (s) => ({ ...s, buildingId: 'midtown-office', shiftLengthS: 1800, runnerTunables: null }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        shiftLengthS: 1800,
+        runnerTunables: { doorObstructionProbability: 0.3 },
+      }),
+    ],
+  },
   'viewer.interventions': {
     /*
      * **The standing requirement, pointed at the stage's one intervention** — press the control's
