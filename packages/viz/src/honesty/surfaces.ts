@@ -8221,7 +8221,7 @@ const EVERYDAY_MENU: SurfaceAdapter = {
       seeds.push({ field: `mode.${mode.screen}.title`, text: mode.title, role: 'label' });
       seeds.push({ field: `mode.${mode.screen}.blurb`, text: mode.blurb, role: 'prose' });
       /*
-       * § 5's session shape — *"~3 min · no losing"*. `role: 'prose'` rather than `estimate`: it is
+       * § 5's session shape — *"8-15 min a day at 4× · no losing"* since § D753 measured it. `role: 'prose'` rather than `estimate`: it is
        * a statement about how long a *player* spends, authored once and true of the mode, not a
        * figure any run produced. R13 asking it for an `n` would be asking the wrong question.
        */
