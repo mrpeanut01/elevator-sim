@@ -19,6 +19,7 @@
  * | block | the failure it exists for |
  * |---|---|
  * | the band's second channel | a wait age carried by colour alone at 4.5 px — `UX.md` KB-15 |
+ * | the wash | an AD-S8 ground that swallows the marks it sits under — AD-A2 |
  * | determinism | a bob read off a wall clock, so a scrubbed frame is not reproducible |
  *
  * Nothing here asserts a coordinate it could have read from the geometry, and nothing asserts a
@@ -31,10 +32,12 @@ import type { VizFloor, VizLeg } from '../contract/types.js';
 import type { FloorQueue } from '../frame/overlay.js';
 import { frameAt } from '../frame/frameAt.js';
 import { queueAt } from '../frame/overlay.js';
+import { WAIT_BANDS } from '../live/bands.js';
 import { syntheticFloor, syntheticRecording } from '../live/synthetic.test-helper.js';
 import { MIN_FIGURE_HEIGHT_PX } from '../render/riderFigures.js';
 import { drawCutaway } from './cutaway.js';
 import { stageGeometryOf, stageInkFor } from './stageScreenModel.js';
+import { EVERYDAY_COLORS as C } from './tokens.js';
 
 /* -------------------------------------------------------------------------- *
  * A recording context that records
@@ -233,6 +236,42 @@ function capsuleHeights(ctx: Recorder, ink: string): readonly number[] {
 }
 
 /* -------------------------------------------------------------------------- *
+ * Contrast, for the wash
+ * -------------------------------------------------------------------------- */
+
+function channels(hex: string): readonly [number, number, number] {
+  return [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)) as unknown as [
+    number,
+    number,
+    number,
+  ];
+}
+function luminance(rgb: readonly [number, number, number]): number {
+  const lin = (c: number): number => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+}
+function contrast(a: readonly [number, number, number], b: readonly [number, number, number]): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((p, q) => q - p) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
+}
+function over(
+  ground: readonly [number, number, number],
+  ink: readonly [number, number, number],
+  alpha: number,
+): readonly [number, number, number] {
+  return [0, 1, 2].map((i) => (ground[i] ?? 0) * (1 - alpha) + (ink[i] ?? 0) * alpha) as unknown as [
+    number,
+    number,
+    number,
+  ];
+}
+
+const BAND_INKS = WAIT_BANDS.map((band) => stageInkFor(band.fromS));
+
+/* -------------------------------------------------------------------------- *
  * The claims
  * -------------------------------------------------------------------------- */
 
@@ -295,6 +334,66 @@ describe('the band is never carried by colour alone', () => {
     });
     expect(short.geometry.rowPitch * 0.62).toBeLessThan(MIN_FIGURE_HEIGHT_PX);
     expect(heads(short.ctx)).toHaveLength(0);
+  });
+});
+
+describe('the AD-S8 landing wash', () => {
+  it('draws the deepest band present, on the landing band, only where somebody stands', () => {
+    const { ctx, geometry } = paint({
+      legs: [waiting('p-fresh', 300), waiting('p-stale', 0)],
+      at: 300,
+    });
+    const washes = ctx.calls.filter(
+      (call) => call.op === 'fillRect' && String(call.args[4]).startsWith('rgba('),
+    );
+    expect(washes).toHaveLength(1);
+    const wash = washes[0];
+    expect(Number(wash?.args[0])).toBe(geometry.landing.x);
+    expect(Number(wash?.args[2])).toBe(geometry.landing.width);
+    // The deepest band, not the newest: the oldest wait on the floor decides the colour.
+    const deepest = stageInkFor(300);
+    expect(String(wash?.args[4])).toContain(String(Number.parseInt(deepest.slice(1, 3), 16)));
+  });
+
+  it('draws no wash on a landing nobody is standing at', () => {
+    const { ctx } = paint({ legs: [], at: 300 });
+    expect(
+      ctx.calls.filter((call) => call.op === 'fillRect' && String(call.args[4]).startsWith('rgba(')),
+    ).toHaveLength(0);
+  });
+
+  it('is the heaviest wash that costs no band its AD-A2 floor, asserted in both directions', () => {
+    /*
+     * The rule the constant answers: *the largest hundredth at which every band that clears 3:1
+     * against the bare ground today still clears it under the worst wash it can sit on.* Worst
+     * means a capsule on a wash of its own band, which is the pair that converges fastest.
+     *
+     * `sun` is at **1.78:1** on the bare ground and is below the floor before any wash — that is
+     * `docs/28` § 7.2's own figure and AD-A2's open defect (#204), and the rule is quantified over
+     * the bands that clear *today* precisely so a pre-existing failure cannot license a heavier
+     * wash. The `expect` below would go red if somebody "fixed" `sun` and left this alone, which
+     * is the right direction for it to fail in.
+     */
+    const ground = channels(C.cardSunk);
+    const clearsBare = BAND_INKS.filter((ink) => contrast(channels(ink), ground) >= 3);
+    expect(clearsBare.length).toBeGreaterThan(0);
+    expect(clearsBare.length).toBeLessThan(BAND_INKS.length);
+
+    const worstUnder = (alpha: number): number =>
+      Math.min(
+        ...clearsBare.map((ink) =>
+          Math.min(...BAND_INKS.map((w) => contrast(channels(ink), over(ground, channels(w), alpha)))),
+        ),
+      );
+    expect(worstUnder(0.13)).toBeGreaterThanOrEqual(3);
+    expect(worstUnder(0.14)).toBeLessThan(3);
+
+    // And the painter uses that alpha rather than one of its own.
+    const { ctx } = paint({ legs: [waiting('p', 0)], at: 300 });
+    const wash = ctx.calls.find(
+      (call) => call.op === 'fillRect' && String(call.args[4]).startsWith('rgba('),
+    );
+    expect(String(wash?.args[4])).toContain('0.130');
   });
 });
 

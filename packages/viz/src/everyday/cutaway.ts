@@ -15,7 +15,7 @@ import type { FloorQueue } from '../frame/overlay.js';
 import { WAIT_BANDS } from '../live/bands.js';
 import { carRestsAt } from '../render/carRest.js';
 import type { Canvas2DLike } from '../render/canvas.js';
-import { drawRiderFigure, MIN_FIGURE_HEIGHT_PX } from '../render/riderFigures.js';
+import { drawRiderFigure, MIN_FIGURE_HEIGHT_PX, withAlpha } from '../render/riderFigures.js';
 import {
   stageBandOf,
   stageCarPaintOf,
@@ -168,6 +168,24 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
     const row = g.rows.find((candidate) => candidate.floorId === floor.floorId);
     if (row === undefined || !row.visible) continue;
 
+    /*
+     * **AD-S8 — the landing carries its own worst band.** *"A whole row going warm is visible from
+     * across a room; twenty-six capsules are not."* A state at the playhead, so it is R6-clean.
+     *
+     * Keyed on `oldestWaitS` through this surface's own ladder rather than on
+     * `FloorQueue.worstBand`, and that is not a shortcut. `worstBand` is `frame/overlay.ts`'
+     * **run-relative** ladder (half the long-wait threshold, the threshold, the horizon) while
+     * every capsule on this stage is coloured by `live/bands.ts`' **absolute** one (30 / 60 /
+     * 120 s). The two disagree above the first boundary, so a wash drawn from one and capsules
+     * drawn from the other would put a warm row under calm marks. `stageBandOf` is monotone in the
+     * wait and `oldestWaitS` is the maximum, so this *is* the deepest band present — measured on
+     * the ladder the reader is looking at.
+     */
+    if (floor.total > 0) {
+      ctx.fillStyle = withAlpha(stageInkFor(floor.oldestWaitS), LANDING_WASH_ALPHA);
+      ctx.fillRect(g.landing.x, row.y - g.rowPitch, g.landing.width, g.rowPitch);
+    }
+
     const cap = stageCrowdCapOf(floor.riders.length);
     for (let index = 0; index < cap.drawn; index += 1) {
       const rider = floor.riders[index];
@@ -301,6 +319,32 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
   }
   ctx.restore();
 }
+
+/**
+ * **The AD-S8 wash's opacity, and it is measured rather than chosen** — `docs/28` § 5.4 asks for
+ * *"an opacity low enough that the capsules still read against it"* and does not name one.
+ *
+ * The rule this number is the answer to: **the largest hundredth at which every band that clears
+ * AD-A2's 3:1 non-text floor today still clears it under the worst wash it can be drawn on** —
+ * worst meaning a capsule on a wash of its own band, which is the pair that converges fastest.
+ * Measured on the shipped `§ 19` inks over `cardSunk`, and pinned in
+ * `everyday/cutawayCrowd.test.ts` in **both** directions:
+ *
+ * | band | on bare `cardSunk` | under a 0.13 wash | under 0.14 |
+ * |---|---|---|---|
+ * | `moss` | 3.58 | **3.007** | 2.966 — below the floor |
+ * | `terracotta` | 4.64 | 3.898 | 3.845 |
+ * | `warmGrey` | 4.94 | 4.148 | 4.091 |
+ * | `sun` | **1.78** | 1.496 | 1.475 |
+ *
+ * **`sun` is below the floor before any wash and this is not the thing that put it there.** That
+ * is `docs/28` § 7.2's own figure — *"the 1.78:1 figure above was invisible until the ramp was
+ * measured against `cardSunk`"* — and AD-A2's open defect, GitHub issue #204. Stating it beside
+ * the number that *is* this file's responsibility is the point: the rule above is written over the
+ * bands that clear today precisely so that a pre-existing failure cannot be used to license a
+ * heavier wash, and so that nobody reads this table as a claim that the ramp passes.
+ */
+const LANDING_WASH_ALPHA = 0.13;
 
 /**
  * Which rung of `live/bands.ts`' four-rung ladder a wait sits on — derived from `WAIT_BANDS`'
