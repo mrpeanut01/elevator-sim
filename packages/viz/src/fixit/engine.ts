@@ -259,7 +259,8 @@ function machineryChangeIdsOf(schedule: PriceSchedule): ReadonlySet<string> {
  *
  * A repair's `costUnits` is `pricing/repairPrice.ts#repairPriceUnits` — the sum of the distinct
  * changes its patch buys, plus the shaft-area surcharge where it adds a car. Re-summing the
- * machinery rows here would drop that surcharge, and a Burj shuttle's band is 16 u of the 50 a
+ * machinery rows here would drop that surcharge, and it is not small: the eighteen shipped shafts
+ * cost 34, 42 or 50 units against one 34 u `new-car` base, so the band is **up to 16 of the 50** a
  * ninth shuttle costs. So the non-machinery changes are summed and taken off the price the case
  * was actually charged, which keeps the band with the shaft it belongs to and needs no second
  * lookup of the building.
