@@ -819,7 +819,7 @@ Corrected 2026-09-10. The paragraph is kept rather than deleted because its shap
 part: a row that names what is *not yet* guarded is right to do so, and is exactly the kind of
 sentence that has to leave on the commit that makes it false ([§ D227](../DECISIONS.md)).
 
-### 4.15 The four-repair menu and the five decoys go, and the diagnosis line goes with them
+### 4.15 The four-repair menu goes from the screen, the decoys survive as prices, and it is the kind-of-fix line that goes
 
 **What the handoff says.** § 10 already cut one quiz — *"There is no guess-the-fault quiz… The case
 now opens with **the diagnosis** printed plainly, and the play is the reconfiguration"* — and what
@@ -828,8 +828,11 @@ it kept is an authored **repair list**: **four priced repairs per case**, plus
 *"Besides the case's four repairs, five standing extras are offered in every case"* — and a printed
 line naming what kind of fix the case wants.
 
-**What the product does** ([§ D525](../DECISIONS.md) clause 2). **The repair list, the decoys and
-the kind-of-fix line all go.** The player gets a budget and the whole editor. The complaint in a
+**What the product does** ([§ D525](../DECISIONS.md) clause 2, narrowed by
+[§ D706](../DECISIONS.md)). **The repair list goes from the screen, the five decoys survive as
+prices in `data/price-schedule.json#extras` and retire only as a menu, and the line that goes is the
+kind-of-fix line** — `asBuilt.note`'s closing *"the fault is in how it is configured, not in what it
+is made of"*. The player gets a budget and the whole editor. The complaint in a
 named person's words stays — [`docs/35`](35-problem-per-mode.md) § 1.4 says why it is the most
 portable writing in the product — and so does the diagnosis; what is withdrawn is the *menu of
 answers* underneath it.
@@ -846,6 +849,20 @@ has a referent once the extras and the repair list go: the criterion must be re-
 and a budget. That is [GitHub issue #233](https://github.com/mrpeanut01/elevator-sim/issues/233)'s,
 and it waits on the scenario schema (#365) rather than on this row. Recorded here rather than in the
 test, because a deviation that hides its cost is the half of this register that goes stale first.
+
+**Corrected 2026-09-19, and one of the two costs above turns out not to be a cost.**
+[§ D706](../DECISIONS.md) ruled that clause 2's retirement is a retirement **from the screen rather
+than from the file**: `repairs[]` stays in `data/fixit-cases.json`, the `diagnosed` entry becoming
+the scenario's pinned witness that one affordable configuration clears it — which § D525 clause 3
+requires of every scenario and which nothing else supplies for a fix case. So
+`cases.test.ts`'s *sells no inert repair* **keeps its referent**, which this row had recorded as
+lost; only the *keeps the extras honest* check is re-aimed, at `price-schedule.json#extras`. The
+heading and the paragraph above also read *"the diagnosis line"* going, and § D525's own words retire
+*"the line that says what kind of fix it is"* while this row's own body says the diagnosis stays —
+the compression is corrected in both places rather than left for a lane to read the wrong way.
+And the whole retirement is **conditioned rather than dated**: it lands on the commit that gives the
+editor the six priced change families those answers live behind, measured at **1 of 18** reachable
+today.
 
 
 ### 4.16 The stage cannot draw a 165-floor tower, and its camera is not yet a way round that
