@@ -269,6 +269,19 @@ const WITHOUT_A_NOTE: Readonly<Record<string, string>> = Object.freeze({
     'chrome — the Parameters tab’s schema-driven form, which draws parameterForm.ts’s own ' +
     'APPLIED/NOT-APPLIED sentence per source. That sentence is the same claim in the form’s own ' +
     'register, and a second one beside it would be two voices on one control.',
+  'viewer.paramDemand':
+    'chrome, on viewer.patience’s ground and for the same reason — the same Parameters tab form ' +
+    'writes it, and § D761 made that form’s per-source sentence stronger rather than weaker: each ' +
+    'applied source now names which of its rows it routes and which it leaves alone. A scope note ' +
+    'beside it would be a second voice on one control.',
+  'viewer.lobbyCrowding':
+    'chrome, on viewer.patience’s ground — the Parameters tab form, § D762. Its block is emitted ' +
+    'whole or not at all because core’s DoorCrowdingConfig requires all three fields, which the ' +
+    'form’s own sentence states; a note repeating it would be the second voice again.',
+  'viewer.runnerTunables':
+    'chrome, on viewer.patience’s ground — the Parameters tab form, § D763. Four of SIM_PARAMETERS’ ' +
+    'six rows; the fifth, sim.queueSampleCount, is refused on the screen with its reason (§ D764), ' +
+    'which is the form’s own register doing the work a scope note would duplicate.',
   'viewer.outOfServiceCarIds':
     'no block — the badge under a shaft on the stage canvas. The rail’s own note covers the ' +
     'picks; a canvas hit has no element to insert a paragraph before.',

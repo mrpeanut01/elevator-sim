@@ -20,8 +20,15 @@ findings is the drift this repository exists to guard against.
 
 ## 0. The one-paragraph summary
 
-The simulator runs a whole day in milliseconds and then plays the recording back, so **there is no
-such thing as a mid-day change** — every change re-runs the day from zero. The product's most-used
+The product plays a whole day back from a recording, so **there is no such thing as a mid-day
+change** — every change re-runs the day from zero. **Read that as a fact about the product and no
+longer about the simulator**, because the word joining them broke on 2026-09-19: [§ D802](../DECISIONS.md)
+gave `Simulation` `advanceTo`/`finish` and proved a chunked run byte-identical to a whole one over
+seven chunkings, so the engine *can* be stopped and resumed. What keeps the sentence true is that
+`record/recordRun.ts` still makes one synchronous call and nothing has taken the seam up. This
+contract is unaffected — every scope below still binds — but the day a viz lane consumes `advanceTo`,
+this paragraph becomes the thing this repository calls a **stale refusal**, and the rules that rest
+on *change re-runs the day* have to be re-derived rather than reworded. The product's most-used
 verb is therefore an unlimited, invisible retry, and nothing models it. This contract names four
 **change scopes** (`presentation`, `within-day`, `between-days`, `between-games`), binds every
 player-writable field to exactly one of them, derives that binding from the state's own keys rather

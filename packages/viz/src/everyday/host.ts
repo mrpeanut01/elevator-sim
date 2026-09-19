@@ -1380,8 +1380,9 @@ export interface EverydayHost {
    * dispatcher nobody is running, and the no-op on re-picking the standing one are all that
    * function's and none of them is restated here.
    *
-   * Takes effect on the **next** run — the simulator runs a whole day in milliseconds and plays the
-   * recording back, so there is no mid-day change (`docs/16` § 1) and the control that changes the
+   * Takes effect on the **next** run — the product plays a whole day back from a recording, so
+   * there is no mid-day change (`docs/16` § 0; true of the product rather than of the simulator
+   * since § D802) and the control that changes the
    * driver is a control that changes tomorrow's question rather than today's answer. This used to
    * say *exactly as {@link setPlainLever} does*, and that comparison was withdrawn rather than
    * reworded: three of that method's four levers reach no run at all, so it is not a thing another
