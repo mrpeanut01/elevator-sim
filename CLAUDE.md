@@ -1355,7 +1355,12 @@ and nothing in this repository checks whether one is *current*. And **the block 
 in motion is a real run** — one pinned morning at Midtown Office, simulated in a worker and played
 back on the stage's own painter over a window that skips the empty lobby at the start and the
 draining tail at the end. Measured on the built bundle at 1440 × 900: **370 ms from navigation to a
-moving canvas**, of which 240 ms is the page drawn. There is no video and no decorative animation,
+moving canvas**, of which 240 ms is the page drawn — **and that pair is pinned to nothing**, which
+this file's own rule forbids. No test re-derives it, no command in any document reproduces it, and
+`DECISIONS.md` carries no entry for it; `docs/41` § 348 nonetheless calls it the only comparable
+figure this repository holds. It is republished here as a **dated reading of one machine on one
+day** rather than as a current claim, on the same footing as the wave-12 audit pair above it, and
+what would pin it is a browser-tier case that navigates the built bundle and asserts a band. There is no video and no decorative animation,
 for the reason a picture of a run would be the one curated thing in the product.
 
 **The viewer is now built to a design handoff, and the handoff is canonical for the interface.**
