@@ -17,31 +17,42 @@
  *
  * It does not say *everybody is playing this today*, and that was going to be its closing line.
  *
- * **The seed a run carries is not a shared daily one on this tree.** `dev/main.ts`'s `boot` opens
- * with `initialState(resources, randomSeed())` and `randomSeed` is `crypto.getRandomValues`, so
- * the session seed is fresh on every load; `dev/state.ts#withFirstSession` then draws the opening
- * contract from it through `shift/firstSession.ts#firstSessionContractFor`, so six cold loads give
- * six different towers. Two player surfaces state the opposite as fact —
- * `everyday/doorView.ts`'s stepper rule and `everyday/today.ts`'s seed line. An artefact whose
- * closing line invited a recipient to *play the same day* would be a second false claim built on
- * the first, and the whole worth of this control is that a recipient can act on what it says.
+ * **This paragraph described the tree it was written on, and that tree changed the same day.** It
+ * is kept as the dated record rather than rewritten, because only the before and the after together
+ * say what moved — and what moved is the reason this control's closing line is what it is.
  *
- * **The daily seed is not missing, though, and that is the half worth acting on.**
+ * **As written, 2026-09-19:** the seed a run carried was not a shared daily one. `dev/main.ts`'s
+ * `boot` opened with `initialState(resources, randomSeed())` and `randomSeed` is
+ * `crypto.getRandomValues`, so the session seed was fresh on every load;
+ * `dev/state.ts#withFirstSession` drew the opening contract from it through
+ * `shift/firstSession.ts#firstSessionContractFor`, so six cold loads gave six different towers. Two
+ * player surfaces stated the opposite as fact — `everyday/doorView.ts`'s stepper rule and
+ * `everyday/today.ts`'s seed line. An artefact whose closing line invited a recipient to *play the
+ * same day* would have been a second false claim built on the first.
+ *
+ * **The daily seed was never missing, and that was the half worth acting on.**
  * `packages/server`'s `leaderboard/boardKey.ts#dailySeedFor` is the date's own digits,
- * `dailyFixtureAt` returns `{ date, seed, config }`, `GET /api/boards` already serves it, and
- * `menu/client.ts` already validates it field by field onto `BoardsPage.today`. Then
- * `everyday/host.ts#dailyBoardOf` reads `today.date` to build the board key and **drops
- * `today.seed` and `today.config`**, which nothing in `packages/viz/` reads. A value authored,
- * served, schema-checked on the client, carried into a typed structure, and consulted by nothing
- * is this repository's signature defect — the one `CLAUDE.md` has recorded eleven times in code —
- * and it is one field access from being closed.
+ * `dailyFixtureAt` returns `{ date, seed, config }`, `GET /api/boards` already served it, and
+ * `menu/client.ts` already validated it field by field onto `BoardsPage.today`. Then
+ * `everyday/host.ts#dailyBoardOf` read `today.date` to build the board key and **dropped
+ * `today.seed` and `today.config`**, which nothing in `packages/viz/` read. A value authored,
+ * served, schema-checked on the client, carried into a typed structure, and consulted by nothing is
+ * this repository's signature defect — the one `CLAUDE.md` has recorded eleven times in code — and
+ * it was one field access from being closed.
  *
- * So the closing line states the spoiler rule and stops. **No conditional arm is built for the
- * day's crowd and no field is added for one**, deliberately: a branch with no live writer is the
- * twelfth dead seam, which is the thing this paragraph is about. When a run can be played on the
- * day's fixture, the arm to add is *this run is today's crowd* — decided by comparing the run's
- * seed against the server's own `today.seed`, never against a date this module computed, because
- * `boardKey.ts` says in terms that *which day is it* has one answer and it is the server's.
+ * **Closed by [§ D729](../../../../DECISIONS.md) to [§ D733](../../../../DECISIONS.md), later the
+ * same day.** The day's crowd is derived from the date, the two surfaces above are conditional and
+ * true, and `TodayRecord.crowdIsToday` is the live writer this paragraph said did not exist. So the
+ * arm it named as owed — *this run is today's crowd* — now has one, and adding it here is ordinary
+ * work rather than the twelfth dead seam.
+ *
+ * **What has not changed is the closing line.** It states the spoiler rule and stops. The artefact
+ * still makes no *everybody is playing this today* claim, because the run a player shares is the
+ * run they played and need not be the day's; the condition is drawable now, and drawing it is a
+ * decision about this control rather than a fact the tree hands over. `today.seed` also remains
+ * unread — it is the **authoritative** copy, and `boardKey.ts` says in terms that *which day is it*
+ * has one answer and it is the server's, so the one thing that copy is still owed is telling a
+ * player whose clock disagrees.
  *
  * ## What may leave, and what may not — [§ D685](../../../../DECISIONS.md)
  *
