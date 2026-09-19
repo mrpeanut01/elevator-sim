@@ -252,7 +252,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'by the `SURVIVORS` adapter, over every scenario and every budget step the shipped table ' +
         'holds. That split is the whole of why this exclusion is safe: the half that speaks to a ' +
         'player is in the corpus and the half that speaks to a regenerator is here.' +
-        ' **The three classifiers join on the same ground and one step further in**: they do not ' +
+        ' **The two classifiers join on the same ground and one step further in**: they do not ' +
         'produce a sentence at all, they *read* the ones `validatePublishedSurvivors` already ' +
         'produced and sort them into the ones that mean the table is broken and the ones that ' +
         'mean the campaign is harsh. `FIRST_HOUR_FLOOR_CITATION` is the `GitHub issue #381` the ' +
@@ -264,7 +264,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
       ids: [
         'scenario/survivors.ts#validatePublishedSurvivors',
         'scenario/survivors.ts#FIRST_HOUR_FLOOR_CITATION',
-        'scenario/survivors.ts#isFirstHourFloorFinding',
         'scenario/survivors.ts#isContentFinding',
         'scenario/survivorSpace.ts#dimensionsCoveredBy',
         'scenario/survivorSpace.ts#reachableChangesOf',

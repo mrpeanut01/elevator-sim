@@ -43,6 +43,7 @@ import type { PriceSchedule } from '../pricing/types.js';
 import { admitPurchase, rungsOf } from './budget.js';
 import { SCENARIO_SURVIVORS_PATH } from './regenerateSurvivors.test-helper.js';
 import {
+  FIRST_HOUR_FLOOR_CITATION,
   MAX_REPLICATIONS,
   MIN_REPLICATIONS,
   SURVIVOR_COPY,
@@ -198,7 +199,7 @@ function isRegistered(line: string): boolean {
     if (line.includes(`"${id}"`) && line.includes('Zero is not a scenario')) return true;
   }
   for (const id of Object.keys(FIRST_HOUR_SINGLE_SURVIVOR)) {
-    if (line.includes(`"${id}"`) && line.includes('GitHub issue #381')) return true;
+    if (line.includes(`"${id}"`) && line.includes(FIRST_HOUR_FLOOR_CITATION)) return true;
   }
   return false;
 }

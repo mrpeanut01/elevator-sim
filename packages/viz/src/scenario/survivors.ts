@@ -550,17 +550,19 @@ export const MAX_REPLICATIONS = 200;
  * against a select that resolved empty. Refusing to draw a difficulty figure would have been the
  * proportionate response; refusing to draw the campaign was not.
  *
- * **One derivation, two consumers.** `dev/data.ts` reads it to decide what is fatal, and
- * `survivors.test.ts` reads it to register the two scenarios that carry the finding today. The
- * citation is the key because #381 owns the rule: when it rules, both consumers move together, and
- * a second copy of this match in either file would be the authority defect one level down.
+ * **The citation is the key because #381 owns the rule**, so a consumer that matches on it moves
+ * when #381 moves. Two read it: {@link CONTENT_RULE_CITATIONS} below, which is what `dev/data.ts`
+ * reaches through, and `survivors.test.ts#isRegistered`, which registers the scenarios
+ * carrying the finding today. A second copy of the literal in either file would be the authority
+ * defect one level down, which is why both import this rather than spelling it out.
+ *
+ * **It had a predicate of its own and that predicate is gone.** `isFirstHourFloorFinding` was the
+ * first shape of the classifier below, matching #381 alone; § D525 clause 3's finding walked past
+ * it and took the campaign screen down a second time, and {@link isContentFinding} replaced it.
+ * Left exported with no caller it would have been the dead seam this repository has shipped eleven
+ * times, so `deadCode.test.ts` was allowed to find it rather than argued with.
  */
 export const FIRST_HOUR_FLOOR_CITATION = 'GitHub issue #381';
-
-/** True where a {@link validatePublishedSurvivors} line is the first-hour floor — see above. */
-export function isFirstHourFloorFinding(line: string): boolean {
-  return line.includes(FIRST_HOUR_FLOOR_CITATION);
-}
 
 /**
  * The rules a violation line cites when it is about the **content** rather than about the table.
