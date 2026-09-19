@@ -38256,3 +38256,103 @@ it.
 **This lane held D671–D678 and spent D671, D672 and D673. D674–D678 are unspent** and become
 permanent holes under [§ D404](#d404) once a later lane writes above them; the integrator registers
 them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+---
+
+## D693 — One refused replication in fifty suppresses a whole estimate row, so the survivor table's `suppressed` column reports *the building is drowning* and *one pair in fifty was refused* as the same number
+
+**Date: 2026-09-19 · Rules on:** GitHub issue **#234**, [§ D692](#d692) § 3, `scenario/survivors.ts`'s
+`PublishedSurvivorStep.suppressed`. Publishes a measurement and endorses a rule it would have been
+easy to weaken. **Nothing is changed by this entry.**
+
+### 1. The question, and why it was asked before any lever was chosen
+
+`data/scenario-survivors.json` reports **24 of 24 configurations suppressed at every rung** on stages
+5, 9 and 10, and 18–24 of 24 on stage 3. `PublishedSurvivorStep.suppressed` exists precisely so a
+reader can tell *nothing cleared* apart from *nothing could be quoted*, and a cell where everything
+is suppressed is a plausible reason for a stage to have no way through that has nothing to do with
+difficulty. Lowering demand on such a cell would move the survivor count without making the stage
+more winnable — a rebalance that looked like it worked and did not.
+
+So the four stages' **baseline** arms were measured rather than reasoned about: one batch per seed
+set, `collective` at each stage's own demand, counting the replications whose own summary refuses to
+quote a mean.
+
+### 2. What was measured
+
+Measured 2026-09-19, the stage's own 50 tuning and 50 holdout replications:
+
+| stage | published `suppressed` | baseline `awtIsValid: false`, tuning | holdout |
+|---|---|---|---|
+| `stage-3-overwhelmed` | 18–24 of 24 | **50 of 50** | **50 of 50** |
+| `stage-5-credentials` | **24 of 24** | 6 of 50 | 4 of 50 |
+| `stage-9-both-ways-at-once` | **24 of 24** | **1 of 50** | **0 of 50** |
+| `stage-10-the-bed-and-the-visitor` | **24 of 24** | 6 of 50 | 7 of 50 |
+| `stage-2-morning-rush` ([§ D692](#d692)) | 6 of 18 | 0 of 50 | 0 of 50 |
+
+**Stage 3 is saturated and says so in its own words**, identically on all fifty: *"Queue length rose
+by 154.1 persons (30.82/min, 19.1× the queue's own scatter) over the 300 s reporting window"* —
+queue growth from 73 to 182 persons across the fifty, never censoring, never abandonment, never an
+empty window. A stage named *Overwhelmed* with a saturated baseline is arguably its design; what is
+not design is that every goal reading a mean is then unjudgeable on it, which is why its one
+survivor gets through on the goals that read an **observation** instead.
+
+**Stages 5, 9 and 10 are the opposite case and report the same number.** Stage 9's baseline refuses
+its mean on **one replication of fifty on the tuning seeds and none of fifty on the holdout**, and
+its cell still reads 24 of 24 suppressed at every rung.
+
+### 3. Why: the rule, which is correct and is not being changed
+
+`batch/report.ts` decides an estimate row's verdict, and its own docstring states it: *"`suppressed`
+— an estimate row **at least one of whose pairs** the run itself refuses to quote."* Measured on the
+same four stages, the comparison rows read:
+
+| stage | `awtS` / `wt95S` / `ttdMeanS` (estimates) | the three observation rows |
+|---|---|---|
+| `stage-2-morning-rush` | `unresolved` | `unresolved` |
+| `stage-5-credentials` | **`suppressed`** | `unresolved` |
+| `stage-9-both-ways-at-once` | **`suppressed`** | `unresolved` |
+| `stage-10-the-bed-and-the-visitor` | **`suppressed`** | `unresolved` |
+
+**The rule is right and the reasoning for it is already written where it lives**, so this entry
+endorses it rather than proposing a threshold:
+
+> *"Dropping the replications a building could not cope with keeps the passenger traces it did cope
+> with; the two arms lose them at different rates, and the ones that fall out are the traces the
+> dispatchers differ most on. The survivors would understate the difference in exactly the case
+> worth fixing."*
+
+That is `CLAUDE.md`'s statistical discipline exactly, and a *"suppress only above 10 %"* rule would
+be the confident-nonsense failure this project is built against. **No threshold is proposed, no
+count is averaged over the survivors, and `suppressedIn`'s filter is untouched.**
+
+### 4. The finding: one column, two facts, and they are opposites
+
+`survivors.ts` invites the strong reading in its own words — *"a survivor count of 3 of 12 over a
+rung where 9 of the 12 refused their own mean is a different fact from 3 of 12 where none did"* —
+and it is right that it is a different fact. What the column cannot say is **which** different fact:
+
+- **stage 3** — every paired run refused; the building is genuinely drowning, and no estimate-based
+  goal can be judged there at any configuration. Structural.
+- **stage 9** — one paired run in fifty refused; forty-nine measured perfectly well, and the row is
+  suppressed because averaging the forty-nine would bias the comparison. An artefact of a correct
+  rule meeting a long tail.
+
+Both print `24 of 24`. A reader — this lane's own dispatch brief among them — takes the second for
+the first.
+
+### 5. What this tells #234, which is the point of having measured it
+
+**The suppression column is not a reason to treat stages 9 and 10 as unrebalanceable.** Their
+buildings measure fine; one replication in fifty does not. A rebalance there is an ordinary demand
+or fabric question, and this entry removes a blocker that was never real.
+
+**Stage 3 is the opposite and the caution stands.** Its zero is partly the instrument, and a demand
+cut there would move the suppressed count and the survivor count together while saying nothing about
+whether the stage became winnable. That is the trap, and it applies to exactly one of the four
+stages it was suspected of.
+
+**What is not measured**, and no sentence is offered in its place ([§ D256](#d256)): *why* stages 5,
+9 and 10 have a long tail of refused replications at all, and which of the five grounds those few
+fire on. This entry measured how many, not which. It is one cheap probe away for whoever takes it —
+stage 9's whole baseline batch is five seconds.
