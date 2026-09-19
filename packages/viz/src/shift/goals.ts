@@ -256,6 +256,54 @@ export const GOAL_BARS = Object.freeze({
 });
 
 /**
+ * **The one heading over {@link goalsForDay}'s bars, and the one sentence saying what they decide**
+ * — GitHub issue **#567**, recorded here under [§ D405](../../../../DECISIONS.md).
+ *
+ * ## Why a constant, and why it lives beside the goals rather than on a screen
+ *
+ * The phrase was authored three times — `everyday/briefView.ts`, `everyday/stageScreenModel.ts` and
+ * a third copy in `everyday/campaignModel.ts` that **no screen read at all** — and
+ * `stageScreenModel.ts` said so in a docstring and left it for the next lane. A heading over a goal
+ * set belongs with the goal set: a sixth bar and a reworded heading then move on one commit, and a
+ * screen cannot head these bars with a synonym without importing one.
+ *
+ * ## The half that is not a tidy-up
+ *
+ * A career player meets **two** goal sets one click apart. These five are one of them. The other is
+ * `everyday/campaignModel.ts#campaignTestGoals` — the contract's four tests at the tower's own
+ * difficulty — and it is headed by {@link CONTRACT_ASKS_HEADING} there. The issue's premise was that
+ * only these are graded; that is **not** what the code does, and the distinction is the fix:
+ *
+ * | | these five | the contract's four |
+ * |---|---|---|
+ * | authored by | `GOAL_BARS`, a ladder that hardens with the week's day | `campaign/economy.ts#DIFFICULTIES`, fixed per tier |
+ * | decides | the day report's verdict, the streak, and whether a clean day is banked (`shift/week.ts#outcomeOf`) | whether the career day is filed **cleared** or **missed** against the contract (`everyday/host.ts`'s `closeDay` → `campaignDayVerdict`) |
+ * | where the player meets it | the brief, the stage strip, the report | the building desk and the contract sheet |
+ *
+ * Neither is decoration and neither can be deleted without losing a grading rule, so both stay and
+ * each says what it decides. {@link TODAY_ASKS_DECIDES} is this set's sentence.
+ *
+ * **No bar moved for this.** Reconciling the two sets by choosing numbers would need a derivation
+ * pinned to a run, the way {@link ENERGY_PER_LEG_MAX_KJ} is pinned; picking a number to make two
+ * headings agree is what `CLAUDE.md` refuses, and weakening either set to make them agree is what
+ * the working agreements refuse.
+ */
+export const TODAY_ASKS_HEADING = 'WHAT TODAY ASKS';
+
+/**
+ * What {@link TODAY_ASKS_HEADING}'s bars decide, in the player's words.
+ *
+ * Drawn where a player is reading these five with the contract's four one click away — today that
+ * is the § 7 stage inside a career run (`everyday/stageScreenModel.ts`). It names the other set
+ * rather than only disclaiming this one, because a sentence saying *these are not the ones* with
+ * nowhere to go reads as a broken screen; `everyday/campaignModel.ts#CONTRACT_ASKS_DECIDES` is its
+ * mirror and the pair is asserted against the two goal sets in `everyday/goalSets.test.ts`.
+ */
+export const TODAY_ASKS_DECIDES =
+  'These five are the week’s, and they decide the report and your streak. What files this day for ' +
+  'the contract is the four on the building desk, under WHAT THE CONTRACT ASKS.';
+
+/**
  * Today's goals: the handoff's four tests every day, in tension (§ 8.6), plus the energy bar.
  *
  * ## The fifth goal, and why it is not the thing § D106 forbids

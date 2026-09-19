@@ -565,7 +565,7 @@ export const POST_RUN_NO_SERVER =
  * one step before the sentence goes stale rather than one step after.
  */
 export const CAREER_TOP_UP_NO_TOWER =
-  'This tops up a tower\u2019s purse, and you have no building on the Campaign screen with a month ' +
+  'This tops up a tower\u2019s purse, and you have no building on the Career screen with a month ' +
   'still running \u2014 so there is nowhere for the units to go. Nothing was spent; open one and ' +
   'press it again.';
 

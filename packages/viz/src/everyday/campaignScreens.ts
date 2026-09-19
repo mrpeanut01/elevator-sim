@@ -974,7 +974,15 @@ function mountBuilding(hostEl: HTMLElement, context: EverydayScreenContext): Mou
     }
 
     /* ---- the four tests ---- */
+    /*
+     * The eyebrow now names the **contract** and the line under it says what these four decide and
+     * what the other set decides — GitHub issue #567. `campaignModel.ts#CONTRACT_ASKS_HEADING`
+     * carries the argument; this is the placement, immediately under the heading and above the
+     * rows, because a reader who cannot tell which bars these are has that question before they
+     * have any other.
+     */
     left.append(eyebrow(doc, view.tests.eyebrow));
+    left.append(note(doc, view.tests.decides, 'everyday-building-tests-decides'));
     const testsMeta = el(doc, 'div');
     testsMeta.style.cssText = `display:flex;justify-content:space-between;gap:12px;${MONO};color:${C.warmGrey};margin-bottom:8px`;
     testsMeta.append(
@@ -1111,7 +1119,7 @@ function mountBuilding(hostEl: HTMLElement, context: EverydayScreenContext): Mou
  * the note because `shell.ts#drawBar` reads the reason off the control, and a bar whose reason
  * lives only in a cell nothing binds to the button is GitHub issue #262's defect.
  */
-const NO_CAMPAIGN = 'No campaign is open.';
+const NO_CAMPAIGN = 'No career is open.';
 
 /** Why *Send your answer* is dead until one of the desk's options is picked (§ 8.2). */
 const NO_ANSWER_PICKED =
@@ -1349,7 +1357,9 @@ function mountContract(hostEl: HTMLElement, context: EverydayScreenContext): Mou
     root.append(pair);
 
     /* ---- the four tests and the conflict ---- */
+    /* GitHub issue #567, as on the desk — the same sentence, because it is the same two sets. */
     root.append(eyebrow(doc, view.tests.eyebrow));
+    root.append(note(doc, view.tests.decides, 'everyday-contract-tests-decides'));
     const testsMeta = el(doc, 'div');
     testsMeta.style.cssText = `display:flex;justify-content:space-between;gap:12px;${MONO};color:${C.warmGrey};margin-bottom:8px`;
     testsMeta.append(

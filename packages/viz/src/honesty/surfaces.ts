@@ -9419,6 +9419,16 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
     'shift/goals.ts#OVERLAP_UNSETTLED',
     'shift/goals.ts#horizonLabelOf',
     'everyday/campaignModel.ts#campaignTestGoals',
+    /*
+     * The contract's own heading and the sentence saying which of the career flow's two goal sets
+     * it is — GitHub issue #567. Both are seeded by name above (`…tests.eyebrow` and
+     * `…tests.decides`, on the desk and on the contract sheet), so these entries record what this
+     * adapter draws rather than standing in for a sweep (CLAUDE.md, wave T: *being in `covers` is
+     * not being swept*).
+     */
+    'everyday/campaignModel.ts#CONTRACT_ASKS_HEADING',
+    'everyday/campaignModel.ts#contractAsksEyebrow',
+    'everyday/campaignModel.ts#CONTRACT_ASKS_DECIDES',
     'everyday/campaignModel.ts#testsHeldLine',
     'everyday/campaignModel.ts#careerStageLabel',
     'everyday/campaignModel.ts#recordLine',
@@ -9703,6 +9713,12 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
         seeds.push({ field: `${label}.desk.month.cleared`, text: desk.month.cleared, role: 'observation' });
         seeds.push({ field: `${label}.desk.month.missed`, text: desk.month.missed, role: 'observation' });
         seeds.push({ field: `${label}.desk.tests.eyebrow`, text: desk.tests.eyebrow, role: 'label' });
+        /*
+         * **Which of the career flow's two goal sets these four are** — GitHub issue #567. Seeded
+         * by name beside the eyebrow it explains, because the eyebrow alone was what a playability
+         * assessor could not tell from the stage's own five bars one click later.
+         */
+        seeds.push({ field: `${label}.desk.tests.decides`, text: desk.tests.decides, role: 'prose' });
         seeds.push({ field: `${label}.desk.tests.note`, text: desk.tests.note, role: 'prose' });
         seeds.push({ field: `${label}.desk.tests.held`, text: desk.tests.held, role: 'observation' });
         for (const row of desk.tests.rows) {
@@ -9771,6 +9787,9 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
         seeds.push({ field: `${label}.contract.purse.total`, text: sheet.purse.totalNote, role: 'prose' });
         seeds.push({ field: `${label}.contract.purse.carry`, text: sheet.purse.carryNote, role: 'prose' });
         seeds.push({ field: `${label}.contract.purse.kit`, text: sheet.purse.kitNote, role: 'prose' });
+        seeds.push({ field: `${label}.contract.tests.eyebrow`, text: sheet.tests.eyebrow, role: 'label' });
+        /* GitHub issue #567, as on the desk — the same two sets, the same sentence. */
+        seeds.push({ field: `${label}.contract.tests.decides`, text: sheet.tests.decides, role: 'prose' });
         seeds.push({ field: `${label}.contract.tests.conflict`, text: sheet.tests.conflict, role: 'prose' });
         seeds.push({ field: `${label}.contract.shop.eyebrow`, text: sheet.shop.eyebrow, role: 'label' });
         seeds.push({ field: `${label}.contract.shop.sub`, text: sheet.shop.sub, role: 'prose' });
@@ -10367,6 +10386,14 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'shift/goals.ts#OVERLAP_UNSETTLED',
     'shift/goals.ts#horizonLabelOf',
     'everyday/stageScreenModel.ts#STAGE_GOALS_COPY',
+    /*
+     * The strip's heading and its *which set is this* sentence — GitHub issue #567. Authored in
+     * `shift/goals.ts` beside the bars they are about rather than on this screen, and reaching the
+     * corpus through `STAGE_GOALS_COPY` above, which this adapter iterates generically: a key added
+     * there is swept the day it is added, and these two are that key's value.
+     */
+    'shift/goals.ts#TODAY_ASKS_HEADING',
+    'shift/goals.ts#TODAY_ASKS_DECIDES',
     /*
      * § 7.5's dock — GitHub issue #171, § D507. The column is `stageScreen.ts`'s to draw and
      * `campaignDock.ts`'s to word, and the incident it draws is `campaign/incidents.ts`'s: the

@@ -120,7 +120,7 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
     blurb: 'Clear days, spend units, keep the contracts you signed.',
     shape: SITTING_SHAPES.careerMode,
     unavailable: unlessBuilt(
-      'the campaign runs, but its Everyday screens are not built yet',
+      'the career runs, but its Everyday screens are not built yet',
       'towers',
       'building',
       'contract',

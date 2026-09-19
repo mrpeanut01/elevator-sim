@@ -13,6 +13,9 @@
  * rather than from literals, so they hold over rows this table gains later.
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -27,6 +30,12 @@ import {
 } from './actionBar.js';
 import { EVERYDAY_SCREENS, RUN_CONTEXTS, type EverydayScreen, type RunContext } from './types.js';
 import { firstPersonWordsIn } from '../watch/view.js';
+
+/**
+ * The shipped left button on the career flow, which is **not** the guide's cell — GitHub issue #569
+ * item 4. Named once here so the five rows below cannot drift from each other.
+ */
+const LEAVE_CAREER = '⤺ Leave the career';
 
 /** One § 3.3 row as the guide prints it. `null` transcribes the table's `—`. */
 interface GuideRow {
@@ -48,6 +57,25 @@ interface GuideRow {
    * only *allowed* is a deviation nobody re-reads.
    */
   readonly shipsInstead?: string;
+  /**
+   * What the build ships on the **left button** instead of {@link GuideRow.leave}.
+   *
+   * Present on the five campaign-flow rows and nowhere else. `docs/38` § 2.2 retires the name
+   * *Campaign* in favour of **Career** and `docs/39` § 3 carries the rename map; § 3.3's table was
+   * written before that ruling, so its cell is transcribed as the guide prints it and the shipped
+   * label is named here. See the deviation case below the table loop, which asserts it in both
+   * directions — GitHub issue #569 item 4.
+   */
+  readonly leaveShipsInstead?: string;
+  /**
+   * What the build ships in place of {@link GuideRow.primary}, variant for variant.
+   *
+   * Present on the `building` row and nowhere else — GitHub issue #569 item 6. § 3.3 writes
+   * *Run the day…*; the press opens the § 7 stage **paused**, which § 7.3 specifies and
+   * `stageScreen.browser.test.ts` pins, so the shipped verb is *Open*. The deviation case below
+   * the table loop asserts it in both directions.
+   */
+  readonly primaryShipsInstead?: readonly string[];
   readonly inverted: boolean;
   readonly wayOut?: string;
 }
@@ -102,6 +130,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     screen: 'stage',
     ctx: 'campaign',
     leave: '⤺ Leave the campaign',
+    leaveShipsInstead: LEAVE_CAREER,
     back: { label: '⟨building⟩', screen: 'building' },
     timeline: { flow: 'campaign', step: 4 },
     primary: ['Close the day'],
@@ -133,6 +162,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     screen: 'report',
     ctx: 'campaign',
     leave: '⤺ Leave the campaign',
+    leaveShipsInstead: LEAVE_CAREER,
     back: { label: 'The day', screen: 'stage' },
     timeline: { flow: 'campaign', step: 5 },
     primary: ['Back to ⟨building⟩'],
@@ -154,6 +184,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
   {
     screen: 'towers',
     leave: '⤺ Leave the campaign',
+    leaveShipsInstead: LEAVE_CAREER,
     back: null,
     timeline: { flow: 'campaign', step: 1 },
     primary: ['Open ⟨building⟩'],
@@ -163,11 +194,19 @@ const GUIDE_TABLE: readonly GuideRow[] = [
   {
     screen: 'building',
     leave: '⤺ Leave the campaign',
+    leaveShipsInstead: LEAVE_CAREER,
     back: { label: 'All buildings', screen: 'towers' },
     timeline: { flow: 'campaign', step: 2 },
     primary: [
       'Run the day and decide as it goes',
       'Run the day with that',
+      'Send your answer',
+      'Choose an option first',
+      'Watch a day here',
+    ],
+    primaryShipsInstead: [
+      'Open the day and decide as it goes',
+      'Open the day with that',
       'Send your answer',
       'Choose an option first',
       'Watch a day here',
@@ -181,6 +220,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
   {
     screen: 'contract',
     leave: '⤺ Leave the campaign',
+    leaveShipsInstead: LEAVE_CAREER,
     back: { label: 'All buildings', screen: 'towers' },
     timeline: { flow: 'campaign', step: 3 },
     primary: ['Lock it in and run day ⟨N⟩', 'Start the month again'],
@@ -323,13 +363,13 @@ describe('the table matches the guide, cell for cell', () => {
       );
       expect(data).toBeDefined();
       if (data === undefined) return;
-      expect(data.leave.label, 'left button').toBe(guide.leave);
+      expect(data.leave.label, 'left button').toBe(guide.leaveShipsInstead ?? guide.leave);
       expect(data.leave.inert, 'inert').toBe(guide.leaveInert ?? false);
       if (guide.back === null) expect(data.back, 'back').toBeUndefined();
       else expect(data.back, 'back').toEqual(guide.back);
       if (guide.timeline === null) expect(data.timeline, 'timeline').toBeUndefined();
       else expect(data.timeline, 'timeline').toEqual(guide.timeline);
-      expect(data.primary.variants, 'primary variants').toEqual(guide.primary);
+      expect(data.primary.variants, 'primary variants').toEqual(guide.primaryShipsInstead ?? guide.primary);
       expect(data.primary.dangerVariants ?? [], 'danger variants').toEqual(guide.danger ?? []);
       const notes = [
         ...(data.note === undefined ? [] : [data.note]),
@@ -342,6 +382,86 @@ describe('the table matches the guide, cell for cell', () => {
       expect(data.wayOut, 'way out').toBe(guide.wayOut);
     });
   }
+
+  /**
+   * **The `building` primary's verb, asserted in both directions** — GitHub issue **#569** item 6.
+   *
+   * § 3.3 writes *Run the day and decide as it goes*. The press runs `host.runCampaignDay` and
+   * opens the § 7 stage **paused** — § 7.3's own specification, drawn with a centred `Start` and
+   * pinned by `stageScreen.browser.test.ts`. So the button promised a start the press did not
+   * perform, and the **verb** moved rather than the behaviour: changing the behaviour would mean
+   * editing the case that holds § 7.3, which is the wrong end of the disagreement to change.
+   *
+   * The guide's cell is still read off the vendored file, so a revision that adopts *Open* makes
+   * this red and the deviation is deleted rather than kept because nobody re-read it. And the
+   * three variants the deviation does **not** touch are asserted unchanged, so this can never
+   * quietly become a licence to reword the whole cell.
+   */
+  it('ships Open where § 3.3 says Run, on the two variants that reach the stage and no others', () => {
+    const row = GUIDE_TABLE.find((entry) => entry.screen === 'building');
+    expect(row?.primaryShipsInstead).toBeDefined();
+    const guideCell = row?.primary ?? [];
+    const shipped = row?.primaryShipsInstead ?? [];
+    expect(shipped).toHaveLength(guideCell.length);
+    /* Exactly two variants differ, and each differs only by its first word. */
+    const moved = guideCell.flatMap((text, index) => (shipped[index] === text ? [] : [index]));
+    expect(moved).toEqual([0, 1]);
+    for (const index of moved) {
+      expect(guideCell[index]?.startsWith('Run the day')).toBe(true);
+      expect(shipped[index]?.startsWith('Open the day')).toBe(true);
+      expect(shipped[index]?.slice('Open'.length)).toBe(guideCell[index]?.slice('Run'.length));
+    }
+
+    const guide = readFileSync(
+      fileURLToPath(
+        new URL('../../../../docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md', import.meta.url),
+      ),
+      'utf8',
+    );
+    expect(
+      guide,
+      'the guide has adopted the verb — the deviation has outlived its reason and should be deleted',
+    ).toContain('Run the day and decide as it goes');
+  });
+
+  /**
+   * **The career flow's left button, asserted in both directions** — GitHub issue **#569** item 4.
+   *
+   * `docs/38` § 2.2 retires the name *Campaign*: the mode is **Career**, and `docs/39` § 3 carries
+   * the rename map. § 3.3's table predates that ruling by months, so five of its cells still read
+   * `⤺ Leave the campaign` and the build ships `⤺ Leave the career` on all five. The table above
+   * transcribes the guide; this case names the deviation.
+   *
+   * Three assertions, and the second is the one that keeps it honest. Allowing the deviation is
+   * easy; what stops it from outliving its reason is reading the **vendored guide** and requiring
+   * it to still say *campaign*. A revision that adopted the ruling would make this case red on the
+   * day it landed, with the fix being to delete the deviation rather than to keep it because nobody
+   * re-read it — § D227's rule pointed at a test rather than at a control, and exactly the shape
+   * the watching-note case below uses.
+   */
+  it('ships Career where § 3.3 still says campaign, on every row of that flow and nowhere else', () => {
+    const guide = readFileSync(
+      fileURLToPath(
+        new URL('../../../../docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md', import.meta.url),
+      ),
+      'utf8',
+    );
+    expect(
+      guide,
+      'the guide has adopted the rename — the deviation has outlived its reason and should be deleted',
+    ).toContain('⤺ Leave the campaign');
+
+    /* Every row whose transcription carries the guide's cell ships the career word, and they are
+       the same five rows — counted from the table rather than listed a second time. */
+    const deviating = GUIDE_TABLE.filter((row) => row.leave === '⤺ Leave the campaign');
+    expect(deviating).toHaveLength(5);
+    for (const row of deviating) expect(row.leaveShipsInstead).toBe(LEAVE_CAREER);
+
+    /* And nothing the build ships anywhere on this bar still says it. */
+    for (const row of ACTION_BAR_ROWS) {
+      expect(row.leave.label, keyOf(row.screen, row.ctx)).not.toContain('campaign');
+    }
+  });
 
   /**
    * **The one cell this build does not transcribe, asserted in both directions** — § D435.
