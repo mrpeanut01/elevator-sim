@@ -60,6 +60,9 @@ import {
   type FixitResources,
 } from '../fixit/run.js';
 import type { FixitCase } from '../fixit/types.js';
+import type { VizRecording } from '../contract/types.js';
+import { frameAt } from '../frame/frameAt.js';
+import { plainLeversOf } from '../mode/plainLevers.js';
 import { recordRun, type RecordedRun } from '../record/recordRun.js';
 import { rushTutorialWorkedAnswerOf } from './rushScreenModel.js';
 import {
@@ -150,11 +153,29 @@ describe('the tutorial names a shipped case, and its answer is that case’s own
      * that test resolves the walkthrough's step against the shipped lever list, and this one
      * resolves the same field against the shipped **repair**. A walkthrough that taught a control
      * the answer does not use would be two demonstrations sharing a screen count.
+     *
+     * **Strengthened when screen two grew the press.** It used
+     * to assert only that the repair patched *something* at `idle.parkingStrategy`, which a repair
+     * that parked every car in the lobby would also have passed — the exact opposite lesson, on a
+     * control whose face now says *spread the cars out*. The value is compared, both ways.
      */
     const step = TUTORIAL_STEPS.find((candidate) => candidate.id === 'spread');
     expect(step).toBeDefined();
+    const lever = plainLeversOf(
+      { name: 'baseline', weights: {}, flags: { pool: false, zone: false, bypass: true }, families: {} },
+      { parking: false, express: false, dwell: undefined },
+    ).find((candidate) => candidate.id === step?.id);
+    expect(lever, 'the tutorial names a lever this build does not ship').toBeDefined();
+
     const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed');
-    expect(diagnosed?.patch.dispatcher?.idle?.parkingStrategy).toBeDefined();
+    const parking = diagnosed?.patch.dispatcher?.idle?.parkingStrategy;
+    expect(parking).toBeDefined();
+    /*
+     * The lever's `writes` clause is the claim — `idle.parkingStrategy: zone-center + split-demand`
+     * — and the case's repair is the shipped fact. They agree on the field **and on the value**,
+     * which is what licenses the press being described as the lever of that name.
+     */
+    expect(lever?.writes).toContain(`idle.parkingStrategy: ${String(parking)}`);
   });
 });
 
@@ -243,5 +264,61 @@ describe('§ D529 — both screens are real runs on the real engine', () => {
     const { why: _tutorialWhy, ...fromTutorial } = tutorialWorkedAnswerOf(facts);
     const { why: _rushWhy, ...fromRush } = rushTutorialWorkedAnswerOf(facts);
     expect(fromRush).toEqual(fromTutorial);
+  });
+});
+
+/**
+ * How far apart the cars stand, averaged over the run.
+ *
+ * The mean absolute height difference over every pair of cars, sampled at a fixed cadence: one
+ * number for *are the three cars together or apart*, which is the whole of what the complaint
+ * describes (*"I still watch all three sit downstairs together"*) and the whole of what the caption
+ * over the second pane claims.
+ *
+ * Measured off the frames the block actually paints — `frame/frameAt.ts` is what `caseStage.ts`
+ * calls per canvas per frame — so this is the picture's own quantity rather than a second reading of
+ * the run. A step of ten simulated seconds over a forty-five minute case is 271 samples, which is
+ * far more resolution than a claim this coarse needs and costs nothing.
+ */
+function meanCarSeparationM(recording: VizRecording, stepS = 10): number {
+  let total = 0;
+  let pairs = 0;
+  for (let t = recording.startedAt; t <= recording.endedAt; t += stepS) {
+    const cars = frameAt(recording, t).cars;
+    for (let i = 0; i < cars.length; i += 1) {
+      for (let j = i + 1; j < cars.length; j += 1) {
+        total += Math.abs((cars[i]?.heightM ?? 0) - (cars[j]?.heightM ?? 0));
+        pairs += 1;
+      }
+    }
+  }
+  return pairs === 0 ? 0 : total / pairs;
+}
+
+describe('the press on screen two is watched, not just measured — `charter S1`', () => {
+  it('spreads the cars, which is what the caption over the second pane says it does', () => {
+    /*
+     * **The one claim this screen makes about the picture rather than about the figures.**
+     *
+     * Screen two's second beat draws the pair side by side and captions them *AS IT STANDS* and
+     * *WITH THE CARS SPREAD OUT*; the control's own read-line, which is `mode/plainLevers.ts`'s,
+     * says it *pushes cars apart across the tower*. Neither of those is a figure the worked answer
+     * measures — `measuredOf` counts long waits, not geometry — so nothing else in this suite could
+     * catch the caption being false, and a caption that describes a picture the run does not draw
+     * is the stale refusal this repository has a rule about, pointed at a player's eyes.
+     *
+     * Measured on this tree at the shipped seed: **1.78 m as built against 5.47 m repaired**, a
+     * factor of 3.08 on a six-storey building. The bar is a factor of two, which is loose enough to
+     * survive a tuning change to the parking strategy and far too tight to survive the repair being
+     * swapped for one that does something else.
+     */
+    const asBuilt = meanCarSeparationM(before.recording);
+    const repaired = meanCarSeparationM(after.recording);
+    expect(asBuilt).toBeGreaterThan(0);
+    expect(
+      repaired / asBuilt,
+      `the cars stand ${asBuilt.toFixed(2)} m apart as built and ${repaired.toFixed(2)} m apart repaired — ` +
+        'the caption over the second pane says they spread out',
+    ).toBeGreaterThan(2);
   });
 });

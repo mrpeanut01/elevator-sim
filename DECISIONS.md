@@ -37424,6 +37424,14 @@ So the sight is **first in reading order**, the landed run scrolls to it rather 
 
 **What this does not decide.** Whether the pair should be re-watchable after it has been skipped (today the next press earns a new one, on `asBuiltSeen`'s precedent); whether a scrubber or a speed control ever belongs on a fix case, which § D623 rules against for now; and whether the Engineer panel should gain the block, which is ruling 5's *if*.
 
+**Numbers spent.** This lane held **D644–D648** and spent **D644 only** — one gap in one mode,
+closed end to end, which is one decision however many modules it touches. **D645–D648 are unspent.**
+Under [§ D404](#d404) and [§ D430](#d430) they become permanent holes once a later lane writes above
+them and belong in `documentation.test.ts#KNOWN_DECISION_HOLES` then, not before: ids here are names,
+so backfilling one would make it denote two things across time. The block was allocated from
+D641–D644, which [§ D640](#d640)'s lane left **free rather than holed** for exactly this — nothing
+had been written past D640 — and this entry is what closes that window on D644.
+
 **Evidence.** `everyday/caseStage.test.ts` is a document recorder (`docs/16` S9's third tier, borrowed from `dev/menuPanel.test.ts`): eight cases, including *both panes are painted in one animation frame, each from its own recording*, proved with two fixtures whose floor labels are disjoint so a pane drawing the wrong recording fails rather than passes. `everyday/fixitScreen.browser.test.ts` drives the shipped page on **both** branches of the run's own answer — a press with nothing bought, which cannot have fixed anything, and a press with the free diagnosed repair — and asserts on each that two canvases are sized and painting, that the outcome card is on the page at the same instant, that the badge and the § 3.3 primary agree, that a second press replaces the first press's block, and that no digit appears in the block's own words.
 
 ---
@@ -37477,3 +37485,131 @@ That is [§ D227](#d227) in the polarity `CLAUDE.md` calls **worse than a dead s
 ### 4. Evidence
 
 `scenario/ladder.test.ts` and `everyday/scenarioModel.test.ts` run on the **shipped** documents rather than a fixture — a fixture would prove that a fixture renders. Between them: the path lists every shipped stage in the campaign's own order with none dropped; a row is offered exactly where the published table's base rung says there is a way through, asserted against the table on every run rather than against a list; held and offered rows carry exactly one of a refusal and an invitation; every drawn figure is recomputed from the documents and compared, so a transcribed one fails; the forbidden vocabulary is checked with its own positive control; the held-stage register row states the count it derived and is **absent entirely** when nothing is held; and the path's own absence is drawn rather than an empty list when no port has provided one, with both arms driven.
+
+---
+
+## D691 — The campaign's dial stratum is a **sample**, and stage 1 has a witness vector: the published zero was read as a census and is not one
+
+**Date: 2026-09-19 · Rules on:** GitHub issue **#234**, [`docs/38`](docs/38-what-the-game-is.md)
+§ 2.1, [`docs/33`](docs/33-difficulty-curve.md) DC-3. Corrects a claim in circulation rather than
+moving any shipped difficulty.
+
+### 1. What was being said, and what the file actually says
+
+`data/scenario-survivors.json` publishes `dials: 0/12` on every one of its thirty cells. That was
+circulating — in a studio war room, in a lane's own dispatch brief, and in prose summarising this
+repository — as:
+
+> *"Dial survivors are 0 of 360. Twelve dial configurations × ten stages × three budget rungs …
+> **NOT ONE CLEARS**. Every way through the campaign that exists anywhere is a dispatcher-dropdown
+> pick."*
+
+**That is a statement about the game, and the measurement it cites cannot support one.**
+`scenario/survivors.ts` draws the distinction on its own face and has since it shipped: *"the
+dropdown is a **census** … the dials are a **sample**."*
+`regenerateSurvivors.test-helper.ts#SURVIVOR_SAMPLE_SIZE` is **12**, chosen the way a replication
+budget is chosen, and `survivors.ts#dialShareInterval` derives an exact Clopper–Pearson interval at
+read time precisely so this cannot happen — at twelve draws, zero survivors bounds the clearing
+share at **about a quarter**, not at nothing.
+
+Nothing had been measured to be impossible. Twelve draws had found nothing, thirty times.
+
+**The numerator was never wrong; the denominator was read as the population.** That is the same
+defect `published.ts` refuses quotients for and `survivors.ts` publishes `examined` beside
+`survivors` for, arriving from the one direction those rules do not cover: a reader who has the
+denominator, and treats it as exhaustive anyway.
+
+### 2. What a wider draw found
+
+Measured 2026-09-19 on this tree. `stage-1-first-call`, master seed **20 260 910**, the stage's own
+**50** tuning and **50** holdout replications under common random numbers, every configuration
+judged by the shipped `campaign/stageSequence.ts#runStageToVerdict` — no second runner and no second
+definition of *clear*:
+
+| rung | dials judged | cleared | draw indices | exact 95 % interval on the share |
+|---|---|---|---|---|
+| base (4 u) | 200 | **3** | 30, 91, 143 | [0.0031, 0.0433] |
+| equipment (24 u) | 200 | **2** | 141, 142 | [0.0012, 0.0357] |
+
+**The wider draw extends the published cell rather than replacing it, and that is a property of the
+sampler rather than a hope.** `survivorSpace.ts#sampleReachableConfigurations` runs one loop against
+one seeded stream and accepts configurations until it has `sampleSize` of them; the stream, the
+bundle draw and the admission filter do not depend on `sampleSize` and only the stopping point
+does. So the first twelve configurations drawn at k = 200 **are** the twelve the published cell
+judged, in the same order — and this run reproduced their verdicts. A witness at index 30 is a
+configuration the published draw never reached, not one it reached and scored differently.
+
+**All three base-rung witnesses buy the same two changes: `idle-parking` and `cost-scaling`.** That
+is the substantive half. `idle-parking` is the change this stage exists to teach, in
+`data/campaign.json`'s own brief, in the player's words: *"between calls the two cars simply sit
+wherever the last passenger left them … You can tell them where to wait instead, and the ground
+floor is only the first guess — try a few, and let the runs say which one this building actually
+wants."* The way through is the one the scenario points at. What the published cell got wrong is
+the **density** of that way through, not its direction.
+
+### 3. What is asserted, and where
+
+`scenario/dialWitness.test.ts`, always-on and costing four cells rather than two hundred. It
+re-draws the base rung at k = 200 — pure, no simulation — and judges **four**: the three witnesses,
+which must clear, and draw **0**, which must not.
+
+That is both halves of `docs/38` § 2.1 held by a run: *"doable with a tweak to the dispatcher and
+failable with the wrong tweak … a stage the dropdown alone does not clear and a witness vector that
+does."* **The negative half is not decoration.** A file asserting only the witnesses would go green
+on a stage that had become trivially clearable, which is DC-1 and the thing `survivors.ts` refuses a
+table for: *"a rung where every configuration clears has nothing for a player to fail."*
+
+`scenario/witnessSearch.test-helper.ts` is the instrument, and it reuses `survivorSpace.ts`'s
+sampler and the shipped judge rather than reimplementing either — `stageRun.ts`'s founding argument,
+which this repository has paid for at three separate levels.
+
+**Deliberately not env-gated.** `deepTiers.test.ts` derives the gated tier set from disk and a tenth
+tier arriving unwired is a red pull request, correctly. Four cells on `garden-apartments` cost
+seconds, so this runs always-on and skips nothing.
+
+### 4. What is **not** done, and why each refusal is mechanical rather than a preference
+
+**`data/scenario-survivors.json` is not re-pinned, and the sample size stays at 12.**
+`data/scenario-survivor-bands.json` records `provenance.approvedAtSampleSize: 12`, and
+`survivorBands.test-helper.ts#sampleSizeIssue` refuses a table regenerated at any other size until
+the product owner re-approves the band. That refusal is right: a band is a **share of what was
+judged**, so widening `k` would silently move all ten band readings without anybody choosing to move
+them. The published count and this witness answer two different questions — *how many of the twelve
+we drew* and *does one exist* — and are deliberately not reconciled into one number.
+
+**No register loses a row.** `survivors.test.ts#UNWINNABLE_AS_MEASURED`,
+`survivorBands.test.ts#OUTSIDE_THEIR_BAND`, `difficultyCurve.test.ts#DC1_UNFAILABLE`,
+`DROPDOWN_CLEARS` and `DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE` are all readings of the **published
+table at k = 12**, and that table has not moved. A row leaves on the commit that makes its own
+measurement stop reproducing, and nothing here makes one stop. Emptying a register on the strength
+of a measurement taken at another sample size would be the same category error this entry exists to
+correct, pointed the other way.
+
+**The master seed is not moved.** Re-drawing the thirty cells at another master seed until a cell
+reports a dial survivor is seed-shopping, and it is refused by name here so that nobody proposes it
+as the cheap version of this.
+
+### 5. The finding this does **not** close, stated in the same breath
+
+**Three of two hundred is 1.5 %.** `data/scenario-survivor-bands.json` puts ladder positions one and
+two at a floor of **0.25** of the configurations judged, approved as drafted by the product owner on
+2026-09-10 ([§ D537](#d537)). So stage 1 is **not unwinnable by dials, and is about seventeen times
+narrower than the owner approved** — and at the published k = 12 a player-facing count will report
+zero roughly **five times in six**, which is what it does today.
+
+So #234's rebalance is still owed in full. What has changed is that it is now aimed at a measured
+quantity — *raise the dial share from 1.5 % toward 25 %* — rather than at a zero that was never a
+zero, and there is a cheap instrument to aim with. **The two levers already measured and waiting on
+a decision each are untouched by this entry**: `garden-apartments` at one car
+([§ D613](#d613), declined on blast radius, and [§ D372](#d372) rules the route is a **new** building
+rather than that edit) and stage 5 at 15 %pop/5 min ([§ D612](#d612), blocked on a DC-3 witness
+search). This entry is what a DC-3 witness search looks like when it succeeds, run on a different
+stage.
+
+### 6. What a reader should take from this about every other zero in that table
+
+**Seven of the ten stages have a published dial count of zero, and this entry has demonstrated that
+such a zero survives a witness existing.** It does not follow that the other six have one — each is
+its own measurement and only a search answers it. What does follow is that *"no dial edit wins
+anywhere"* is not a thing the shipped table can be asked, and no document may say it is. The honest
+sentence about an unsearched cell is **none of the ways tried got through**.

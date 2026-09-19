@@ -59,6 +59,34 @@
  * once a day is filed — and reads `tutorialScreens.ts` off disk to check that `leave` is the one
  * thing both ways out call.
  *
+ * ## Screen two moves a control now — `charter S1`, and why no number is spent on it
+ *
+ * `docs/22` § 4's `S1`: *a first-time player reaches a building in visible trouble within 90 s of
+ * first load*. The shipped path failed that by construction — the first three screens a stranger
+ * met were prose, and the first control that changes a run was six screens in — while screen two's
+ * own lede said *"Watch the three cars, and watch the fourth floor"* on a screen that drew no cars.
+ * That is [§ D227](../../../../DECISIONS.md)'s stale refusal with its polarity reversed: a sentence
+ * telling a reader to look at something that is not there, on the one screen a stranger is deciding
+ * on.
+ *
+ * So screen two plays the run it names, on `everyday/caseStage.ts`'s block, and carries **one**
+ * control — the shipped *Spread the cars out* lever, by its own name — which swaps the block for
+ * the pair, side by side at one playhead. The worked answer **stays**, because § D529 permits one
+ * in the first session and nowhere else; what moved is when it lands, which is after the press, as
+ * confirmation rather than as instruction.
+ *
+ * **No `DECISIONS.md` entry is owed, under [§ D405](../../../../DECISIONS.md).** Nothing here
+ * reaches past the two modules that took it: § D529 clause 1 is unmoved (nothing skips the
+ * walkthrough, nothing reaches Scenario ahead of it, the worked answer stays inside the first
+ * session), § D476's gate and exit are untouched, and the only edits outside this pair are the two
+ * a new player-facing state always owes — its seeds in `honesty/surfaces.ts` and its absence row in
+ * `buildNotes.test.ts#ABSENCE_TRIAGE`. This docstring is the record the working agreement asks for.
+ *
+ * **And `S1` is not declared met here.** What is built is the screen; what nobody has measured on
+ * this tree is the wall clock from first load to a moving canvas, which depends on a worker
+ * simulating two runs. A criterion is met by a measurement, not by the code that makes it
+ * reachable.
+ *
  * ## Outside the difficulty curve
  *
  * `docs/33` § 1.6, under [§ D528](../../../../DECISIONS.md): *"The tutorial is outside the curve …
@@ -70,9 +98,11 @@
  * Pure. No DOM, no host, no `data/` read — `tutorialScreens.ts` mounts what this returns, and the
  * honesty corpus sweeps it without a document.
  */
+import type { DispatcherSpec, GroupLevers } from '../authoring/dispatcherSpec.js';
 import type { VizRecording } from '../contract/types.js';
 import { measuredOf } from '../fixit/run.js';
 import type { FixitCase } from '../fixit/types.js';
+import { plainLeversOf } from '../mode/plainLevers.js';
 import {
   workedAnswerViewOf,
   type WorkedAnswerFacts,
@@ -194,6 +224,69 @@ export const TUTORIAL_COPY = Object.freeze({
     'This is the same building with nothing changed. Watch the three cars, and watch the fourth floor.',
   collapsePending:
     'The day is being simulated now, twice — once as it stands and once with one thing changed. Nothing is shown until both land.',
+  /*
+   * **Screen two's canvas, and the one press beside it** — the beat the tutorial did not have.
+   *
+   * `charter S1` asks that a first-time player reach a building in visible trouble inside ninety
+   * seconds of first load, and until this block landed the first three screens were prose: the
+   * lede above promised *watch the three cars* on a screen that drew no cars, which is § D227's
+   * stale refusal with its polarity reversed — a sentence telling a reader to look at something
+   * that is not there, on the one screen a stranger decides on.
+   *
+   * Two wordings of one block, because two runs play in it: the morning as the building runs it,
+   * and the same morning with the control pressed. Neither carries a digit — every number on this
+   * screen arrives from a run, through the worked answer, and `tutorialModel.test.ts` fails on a
+   * digit anywhere in this table.
+   */
+  stageEyebrow: 'THE MORNING THE LETTER IS ABOUT',
+  stageNote:
+    'Playing now, at the speed you have set. Nothing has been changed: this is the building as it stands.',
+  stageSkip: 'Stop it there',
+  stageEnded: 'That is the morning as the building runs it today, with nothing changed.',
+  stagePending:
+    'The morning is being simulated now. Nothing is drawn until it lands — a picture of a run that has not happened is the one thing a tutorial may not show.',
+  answeredEyebrow: 'THE SAME MORNING, BOTH WAYS',
+  answeredNote:
+    'Both runs at once, at the same minute: the same people arriving at the same landings, in two buildings that differ only in what the idle cars do between calls.',
+  answeredSkip: 'Skip to the answer',
+  answeredEnded: 'That is the same morning both ways, at the same minute.',
+  /*
+   * The two panes' captions. Only the pair carries them — a caption over the only canvas on screen
+   * is a label on the one thing there, which is `caseStage.ts`'s own rule for the field.
+   */
+  paneAsBuilt: 'AS IT STANDS',
+  paneAnswered: 'WITH THE CARS SPREAD OUT',
+  /*
+   * The control. Its **label and its two ends are not authored here** — they are the shipped
+   * lever's own, read through `mode/plainLevers.ts#plainLeversOf`, so the tutorial cannot teach a
+   * control the workshop calls something else. What is authored is only why it is the control on
+   * screen, and the refusal that stands on its face while the second run is still being made.
+   */
+  controlHeading: 'CHANGE ONE THING',
+  controlWhy:
+    'This is the same control the dispatcher workshop lists under that name, and it is the one this building needs. Press it and the same morning runs again with it on.',
+  controlRefusal:
+    'The second run is still being simulated. Until it lands there is nothing to show you, so this will not press.',
+  /*
+   * **The non-visual register for the canvas and the press** — `docs/36` `AX-3`, whose policy is
+   * that a live region is written *when its sentence changes and at no other time*.
+   *
+   * Three sentences and one beat, so the region is a pure function of the state and the mount can
+   * compare before it writes. It is not a second wording of the picture — `docs/36` § 3.3's
+   * refusal — it says which of the two runs is on the canvas and what the one control does, which
+   * is the fact a reader who cannot see the canvas has no other route to.
+   *
+   * **What it does not carry, said rather than implied**: the frame itself. The block this screen
+   * mounts is `everyday/asBuiltStage.ts`, whose canvas has no accessible name on any screen that
+   * draws it, and that gap is registered in {@link TUTORIAL_ABSENCES} rather than papered over
+   * here — a per-frame description assembled by this module would be the second source of truth
+   * `docs/36` § 3.2 refuses.
+   */
+  sayPending: 'The morning is still being simulated.',
+  sayAsBuilt:
+    'The building is playing as it stands. One control sits under the picture: spread the cars out.',
+  sayAnswered:
+    'The cars have been spread out. The same morning is now playing twice side by side, as it stands and with that one change, and the worked answer is under it.',
   complaintHeading: 'The letter',
   symptomHeading: 'What you are looking at',
   workedWhy:
@@ -276,6 +369,80 @@ export function tutorialWalkthroughViewOf(input: {
  * screen two would have to hand the rush one it computed. `tutorialScreens.ts#mountWorkedAnswer`
  * is the one place it is built, on both screens that draw it.
  */
+/**
+ * Which of screen two's two runs is on the canvas.
+ *
+ * `as-built` until the player presses the control: one canvas, the building as it stands.
+ * `answered` afterwards: the **pair**, side by side at one playhead, which is
+ * `everyday/caseStage.ts`'s two-pane block and the reason the press is legible at all — a single
+ * canvas replaced by another single canvas asks the player to remember what they saw, and this
+ * shows them the one variable they moved.
+ *
+ * It is the beat rather than a boolean because the live region, the block's wording, the captions
+ * and the presence of the control are all functions of it, and four booleans that must agree is
+ * four ways to disagree.
+ */
+export type TutorialBeat = 'as-built' | 'answered';
+
+/**
+ * The wording of the block that plays a run.
+ *
+ * Structurally `everyday/caseStage.ts#CaseStageCopy` — the same three fields, so the mount
+ * hands this straight in rather than repacking it. Authored on the model side for that module's
+ * own stated reason: the strings are then swept by the honesty corpus with the rest of this
+ * screen's words, which a block that authored its own copy would not be.
+ */
+export interface TutorialStageCopy {
+  readonly eyebrow: string;
+  readonly note: string;
+  readonly skip: string;
+}
+
+/**
+ * **Screen two's one control**, and the reason this screen exists in the shape it does.
+ *
+ * `charter S1`: *a first-time player reaches a building in visible trouble within 90 s of first
+ * load*. A building in trouble that the player cannot touch is a diagram; the press is what makes
+ * it a game, and it is deliberately the **only** one on the screen.
+ *
+ * ## Its words are the shipped lever's, not this module's
+ *
+ * {@link label}, {@link from} and {@link to} are read out of
+ * `mode/plainLevers.ts#plainLeversOf` at draw time. That is the whole mechanism of *wired to the
+ * existing lever*: a tutorial that restated the label would be a second place to word a control
+ * the workshop already words, and the day the workshop renamed it the first session would be
+ * teaching a name the product no longer uses. `tutorialModel.test.ts` resolves the control's label
+ * against the shipped lever list and fails if it is not exactly one of them.
+ *
+ * **The `writes` clause is deliberately not carried.** `mode/plainLevers.ts` says why in terms —
+ * it is the engineer-facing tooltip, and *an Everyday-only surface would not render it*. It names
+ * `idle.parkingStrategy: zone-center`, which is internal notation on a player surface and would be
+ * a finding the moment the honesty corpus swept it. What the field is for is the test: it is where
+ * the lever and the case's diagnosed repair are pinned to each other, in `tutorialRuns.test.ts`,
+ * which has the case file loaded and can compare them.
+ *
+ * ## And it refuses out loud rather than silently
+ *
+ * {@link refusal} is present exactly while the second run has not landed, and the mount draws it
+ * on the control itself. A press that did nothing and said nothing is the defect
+ * `docs/05-roadmap.md`'s standing requirement is about, in the one place a stranger is deciding
+ * whether the product answers when touched.
+ */
+export interface TutorialControlView {
+  readonly heading: string;
+  /** `mode/plainLevers.ts`' own label for the lever this presses. Never restated here. */
+  readonly label: string;
+  /** The lever's own read-line, from the same place. */
+  readonly reads: string;
+  /** The lever's two ends, in the prototype's words — which is what the canvas shows. */
+  readonly from: string;
+  readonly to: string;
+  /** Why this control is the one on the screen. The tutorial's words, because the reason is. */
+  readonly why: string;
+  /** Present exactly while the second run has not landed. `undefined` means the press is live. */
+  readonly refusal: string | undefined;
+}
+
 export interface TutorialCollapseView {
   readonly eyebrow: string;
   readonly title: string;
@@ -286,8 +453,83 @@ export interface TutorialCollapseView {
   readonly complainer: string | undefined;
   readonly symptomHeading: string;
   readonly symptom: string | undefined;
+  /** Which run is on the canvas — see {@link TutorialBeat}. */
+  readonly beat: TutorialBeat;
+  /** The playing block's words, for whichever run is in it. */
+  readonly stage: TutorialStageCopy;
+  /** What stands where the block was, once its run has ended or been stopped. */
+  readonly stageEnded: string;
+  /** Why there is no canvas yet, or `undefined` once there is one. */
+  readonly stagePending: string | undefined;
+  /**
+   * The captions over the block's panes, in order.
+   *
+   * Empty on the `as-built` beat, where there is one canvas and a caption would label the only
+   * thing on screen — `caseStage.ts`'s own rule for the field, kept rather than restated. Two on
+   * the `answered` beat, because two unlabelled canvases side by side are a puzzle.
+   */
+  readonly paneCaptions: readonly string[];
+  /** The one control, on the `as-built` beat. `undefined` once it has been pressed. */
+  readonly control: TutorialControlView | undefined;
+  /** The live region's whole sentence — `docs/36` `AX-3`. Written only when it changes. */
+  readonly say: string;
   readonly finish: string;
   readonly finishNote: string;
+}
+
+/**
+ * The lever the one press moves, by id — `mode/plainLevers.ts`'s own, and the same id
+ * {@link TUTORIAL_STEPS}' second step carries.
+ *
+ * Module-private on purpose. It is a pin between two shipped things rather than a value anybody
+ * outside needs: the tests resolve the control's **label** against the shipped lever list, which is
+ * the stronger assertion and needs no export to make.
+ */
+const TUTORIAL_LEVER_ID = 'spread';
+
+/*
+ * A neutral vector to read the lever's words off.
+ *
+ * The three fields this control draws — the label and the two ends — are **not functions of the
+ * spec**: `plainLeversOf` reads the weights and flags only for a lever's *current value*, which
+ * this screen does not draw, because the tutorial is not editing anybody's dispatcher. So the
+ * vector handed in is a neutral one and nothing here claims to be the player's.
+ *
+ * Written out rather than taken from `authoring/dispatcherSpec.ts#blankSpec`, which is a value
+ * import that would pull `@elevator-sim/experiments/browser` into a module the honesty corpus
+ * loads for its strings. Type-only here, so the shape is still checked by the compiler.
+ */
+const NEUTRAL_SPEC: DispatcherSpec = Object.freeze({
+  name: 'the building as it stands',
+  weights: {},
+  flags: { pool: false, zone: false, bypass: true },
+  families: {},
+});
+const NEUTRAL_LEVERS: GroupLevers = Object.freeze({
+  parking: false,
+  express: false,
+  dwell: undefined,
+});
+
+function tutorialControlViewOf(changeReady: boolean): TutorialControlView {
+  const lever = plainLeversOf(NEUTRAL_SPEC, NEUTRAL_LEVERS).find(
+    (candidate) => candidate.id === TUTORIAL_LEVER_ID,
+  );
+  if (lever === undefined) {
+    // An honest lookup rather than a fallback label: a tutorial that invented the name of a
+    // control when the shipped list stopped carrying it would be teaching a press that is not
+    // there, which is the one thing a first session may not do.
+    throw new Error(`the tutorial names the plain lever "${TUTORIAL_LEVER_ID}", which is not shipped`);
+  }
+  return Object.freeze({
+    heading: TUTORIAL_COPY.controlHeading,
+    label: lever.label,
+    reads: lever.reads,
+    from: lever.atZero,
+    to: lever.atFull,
+    why: TUTORIAL_COPY.controlWhy,
+    refusal: changeReady ? undefined : TUTORIAL_COPY.controlRefusal,
+  });
 }
 
 /**
@@ -344,12 +586,35 @@ export function tutorialWorkedAnswerOf(facts: WorkedAnswerFacts): WorkedAnswerVi
  * Every quoted field is optional and absent means *the case file has not loaded yet*, never a
  * stand-in: a tutorial that drew a placeholder complaint would be authoring the one piece of
  * writing `docs/35` § 9.1 calls the best in the product.
+ *
+ * ## The three beats, and why they are one function of two inputs
+ *
+ * `beat` says which run is on the canvas and `changeReady` says whether the second one exists yet.
+ * Everything else on the screen follows from those two — the block's wording, whether the control
+ * is there, whether it refuses, and the live region's sentence — so there is exactly one place the
+ * screen's state is decided and the mount holds no opinion of its own. A screen that decided its
+ * own live-region sentence beside a model that decided its own block wording is two answers to
+ * *what is happening*, and `docs/36` `AX-2` exists because those drift.
+ *
+ * **The worked answer is still not a field here**, for the reason it never was: it is its own
+ * component with its own model, because § D529 clause 2 makes it the thing Rush reuses. What this
+ * view decides is only *when* it is drawn, through {@link TutorialCollapseView.beat} — after the
+ * press, as confirmation, which is the half § D529 permits here and nowhere else.
  */
 export function tutorialCollapseViewOf(input: {
   readonly complaint?: string | undefined;
   readonly complainer?: string | undefined;
   readonly symptom?: string | undefined;
+  /** Which run is on the canvas. Defaults to the building as it stands. */
+  readonly beat?: TutorialBeat | undefined;
+  /** Whether the second run has landed. The control refuses out loud until it has. */
+  readonly changeReady?: boolean | undefined;
+  /** Whether there is a recording to draw at all. */
+  readonly runReady?: boolean | undefined;
 }): TutorialCollapseView {
+  const beat: TutorialBeat = input.beat ?? 'as-built';
+  const answered = beat === 'answered';
+  const runReady = input.runReady ?? false;
   return Object.freeze({
     eyebrow: TUTORIAL_COPY.eyebrow,
     title: TUTORIAL_COPY.collapseTitle,
@@ -359,6 +624,36 @@ export function tutorialCollapseViewOf(input: {
     complainer: input.complainer,
     symptomHeading: TUTORIAL_COPY.symptomHeading,
     symptom: input.symptom,
+    beat,
+    stage: Object.freeze(
+      answered
+        ? {
+            eyebrow: TUTORIAL_COPY.answeredEyebrow,
+            note: TUTORIAL_COPY.answeredNote,
+            skip: TUTORIAL_COPY.answeredSkip,
+          }
+        : {
+            eyebrow: TUTORIAL_COPY.stageEyebrow,
+            note: TUTORIAL_COPY.stageNote,
+            skip: TUTORIAL_COPY.stageSkip,
+          },
+    ),
+    stageEnded: answered ? TUTORIAL_COPY.answeredEnded : TUTORIAL_COPY.stageEnded,
+    stagePending: runReady ? undefined : TUTORIAL_COPY.stagePending,
+    paneCaptions: answered
+      ? Object.freeze([TUTORIAL_COPY.paneAsBuilt, TUTORIAL_COPY.paneAnswered])
+      : Object.freeze([]),
+    /*
+     * One press and it is spent. The control leaves on the beat it moved, rather than staying as a
+     * toggle: a second press would have to put the building back, and *undo the fix* is not a
+     * lesson — it is a control whose second state the worked answer below it then contradicts.
+     */
+    control: answered ? undefined : tutorialControlViewOf(input.changeReady ?? false),
+    say: answered
+      ? TUTORIAL_COPY.sayAnswered
+      : runReady
+        ? TUTORIAL_COPY.sayAsBuilt
+        : TUTORIAL_COPY.sayPending,
     finish: TUTORIAL_COPY.finish,
     finishNote: TUTORIAL_COPY.finishNote,
   });
@@ -370,4 +665,15 @@ export function tutorialCollapseViewOf(input: {
  */
 export const TUTORIAL_ABSENCES: readonly string[] = Object.freeze([
   'The tutorial teaches a shipped fix case on Garden Apartments. Which building the first session should use is still open, and an authored one may replace it.',
+  /*
+   * **`docs/36` `AX-1`, on the screen this wave gave a canvas to.** The block is
+   * `everyday/caseStage.ts`, shared with the fix-it screen, and its canvases carry no accessible
+   * name on either. This screen adds the live region `AX-3` asks for and does **not** add a name,
+   * because a per-frame description assembled here would be the second source of truth
+   * `docs/36` § 3.2 refuses — the name has to come from the frame, in the block that holds it.
+   *
+   * Registered rather than left implied: a screen that acquires a picture and says nothing about
+   * who can read it is the silence the standing requirement is about, one clause over.
+   */
+  'The picture on this screen has no name a screen reader can read. The sentence beside it says which run is playing and what the control does; the frame itself does not reach a reader who cannot see it.',
 ]);

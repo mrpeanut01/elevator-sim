@@ -333,6 +333,19 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    */
   { register: 'TUTORIAL_ABSENCES', fragment: 'Which building the first session should use', issue: 270 },
   /*
+   * **`docs/36` `AX-1` on the first session's canvas** — GitHub issue **#239**, the accessibility
+   * sweep that owns every clause `docs/36` records as failing. The entry arrived on the commit that
+   * gave screen two a picture: the block is
+   * `everyday/caseStage.ts`, its canvases are unnamed on both screens that draw them, and the name
+   * has to be produced from the frame inside that block rather than assembled by a screen beside it.
+   *
+   * It is **not** owned by the lane that added the picture, and that is deliberate: this screen
+   * ships the live region `AX-3` asks for. What it cannot ship without writing a second source of
+   * truth about what is on the canvas is the name, which is #239's and shared with the fix-it
+   * screen.
+   */
+  { register: 'TUTORIAL_ABSENCES', fragment: 'no name a screen reader can read', issue: 239 },
+  /*
    * **`Sign out` left this table on the commit that built the control** — GitHub issue #332,
    * [§ D489](../../../../DECISIONS.md). Its entry refused a button on the grounds that *nothing on
    * this surface is signed in*; § 15.1's YOU section holds the session now and *Sign out* is one of

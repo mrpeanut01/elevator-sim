@@ -6,7 +6,24 @@
  * | key | § D529 clause 1 | what it draws |
  * |---|---|---|
  * | `tutorial` | screen one | the walkthrough, over a real run of the tutorial's building |
- * | `collapse` | screen two, `PM-DOOR` | the letter, the symptom, and the worked answer |
+ * | `collapse` | screen two, `PM-DOOR` | the run **playing**, one control, the letter, and the worked answer |
+ *
+ * ## Screen two plays the run it names — `charter S1`
+ *
+ * It used to be a text screen whose lede said *"Watch the three cars, and watch the fourth floor"*,
+ * and `tutorialModel.ts`'s docstring argues why that had to change. The block is
+ * `everyday/caseStage.ts#mountCaseStage`, imported rather than rebuilt: one canvas on
+ * `cutaway.ts#drawCutaway` — § 7's own painter, so a car reads as the same car here — driven by a
+ * `Playback`, opening playing, with a skip press and an `onDone`. The one control under it swaps
+ * that single pane for the **pair**, at one playhead, which is the same block's two-pane form.
+ *
+ * Three things about the press are worth knowing before touching it. It is the shipped lever's own
+ * label, read through `tutorialModel.ts` from `mode/plainLevers.ts`, never a copy. It **refuses out
+ * loud** while the second run is still being simulated, because a press that does nothing and says
+ * nothing is the defect `docs/05-roadmap.md`'s standing requirement is about. And the run it plays
+ * is a different run — `session.asRepaired` is the diagnosed repair selected, through the same
+ * `FixitState` and the same `fixitRunPlanOf` the fix-it screen uses — which `tutorialRuns.test.ts`
+ * asserts on the legs, and on the car geometry the caption claims.
  *
  * Every word comes from `tutorialModel.ts` and `workedAnswer.ts`; this file is the mount and the
  * run seam, which is the split `everyday/` keeps so the words are sweepable without a document.
@@ -47,6 +64,7 @@
  */
 
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
+import { mountCaseStage, type CaseStage, type CaseStagePane } from './caseStage.js';
 import type { VizRecording } from '../contract/types.js';
 import { loadBrowserResources, loadFixitCases, type BrowserResources } from '../dev/data.js';
 import { createOffThreadRunner } from '../dev/offThreadRuns.js';
@@ -54,6 +72,7 @@ import { emptyFixitState, toggleRepair } from '../fixit/engine.js';
 import { FIXIT_RUN_SWITCHES, figureValuesOf, fixitRunPlanOf } from '../fixit/run.js';
 import type { FixitCase, FixitCases } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
+import { everydayProfileStore } from './profileStore.js';
 import { el, EYEBROW, CARD } from './screenDom.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -65,6 +84,7 @@ import {
   tutorialWalkthroughViewOf,
   tutorialWorkedAnswerOf,
   workedAnswerFactsOf,
+  type TutorialBeat,
   type TutorialFigure,
 } from './tutorialModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from './workedAnswer.js';
@@ -457,6 +477,32 @@ function mountTutorial(
  * Screen two — PM-DOOR
  * -------------------------------------------------------------------------- */
 
+/**
+ * **What a stranger meets on screen two, in the order they meet it** — `charter S1`.
+ *
+ * | region | what is in it |
+ * |---|---|
+ * | `header` | the eyebrow, the title, the lede, and what to look at |
+ * | `stageHost` | the canvas, playing — the as-built run, then the repaired one |
+ * | `controlHost` | the one press, *Spread the cars out* |
+ * | `letter` | the tenant's own words |
+ * | `answerHost` | the worked answer, **after** the press and not before it |
+ * | `footer` | the note under the primary |
+ *
+ * Six regions rather than the two this mount used to have, and every split is load-bearing. The
+ * letter is redrawn when the case file arrives; the canvas must **not** be, because a block rebuilt
+ * on a redraw is a run that restarts every time a sentence above it moves — `asBuiltStage.ts`'s
+ * own docstring says so, and it is why the block is mounted outside `render` and merely re-appended
+ * inside it. The worked answer owns its own redraws for the same reason it always did.
+ *
+ * ## The letter moved below the canvas, and that is the only reordering
+ *
+ * The lede says *watch the three cars, and watch the fourth floor*. Whatever that sentence points
+ * at has to be the next thing on the screen or it is pointing at nothing, which is what it was
+ * doing before this block existed. The symptom stays with the header because it says what to look
+ * for; the complaint reads as the evidence for what the player has just watched, so it lands under
+ * the control rather than above the canvas.
+ */
 function mountCollapse(
   host: HTMLElement,
   context: EverydayScreenShellContext,
@@ -467,24 +513,209 @@ function mountCollapse(
   host.append(root);
 
   /*
-   * Two regions rather than one, and the split is not cosmetic: the letter is redrawn when the case
-   * file arrives, and the worked answer owns its own runs and its own redraws. One region would
-   * mean re-mounting the component — and therefore re-asking for a pair of runs — every time the
-   * header moved.
+   * **The non-visual register** — `docs/36` `AX-3`, whose policy is that a live region is written
+   * when its sentence changes and at no other time. The sentence is `view.say`, a pure function of
+   * the beat, and {@link said} is what makes the *at no other time* half true: `render` runs on
+   * every landing run and every case-file arrival, and an unconditional write here would be the
+   * defect `docs/36` § 3.2 names on the Everyday stage — an announcement region rewritten by the
+   * paint loop.
+   *
+   * Visually hidden rather than drawn, on `stageScreen.ts`'s pattern and for its reason: every fact
+   * in it is already on the screen for a sighted player, and printing it again would be two copies
+   * to reconcile. `role="status"` and `aria-live="polite"` together because readers key off one or
+   * the other, and *polite* because a tutorial is not an alert.
    */
+  const say = el(doc, 'p', 'everyday-collapse-say');
+  say.setAttribute('role', 'status');
+  say.setAttribute('aria-live', 'polite');
+  say.style.cssText = [
+    'position:absolute',
+    'width:1px',
+    'height:1px',
+    'margin:-1px',
+    'padding:0',
+    'overflow:hidden',
+    'clip:rect(0 0 0 0)',
+    'clip-path:inset(50%)',
+    'white-space:nowrap',
+    'border:0',
+  ].join(';');
+
   const header = el(doc, 'div', 'everyday-collapse-header');
+  const stageHost = el(doc, 'div', 'everyday-collapse-stage');
+  const controlHost = el(doc, 'div', 'everyday-collapse-control');
+  const letter = el(doc, 'div', 'everyday-collapse-letter');
   const answerHost = el(doc, 'div', 'everyday-collapse-answer');
+  /*
+   * `AX-12` — *focus moves to what just happened*. The press removes the control from the document,
+   * so a keyboard player would otherwise be dropped at the top of the body; the answer this screen
+   * has just earned is what they are sent to instead. `-1` because it is a destination rather than
+   * a stop on the tab order.
+   */
+  answerHost.tabIndex = -1;
   const footer = el(doc, 'div', 'everyday-collapse-footer');
-  root.append(header, answerHost, footer);
+  root.append(say, header, stageHost, controlHost, letter, answerHost, footer);
+
+  /** Which run is on the canvas. The one piece of state the press moves. */
+  let beat: TutorialBeat = 'as-built';
+  /** The mounted block, and the beat it is playing — `undefined` once its run is over. */
+  let stage: CaseStage | undefined;
+  let stageBeat: TutorialBeat | undefined;
+  /** Whether the run for the current beat has finished or been stopped. */
+  let ended = false;
+  let worked: MountedWorkedAnswer | undefined;
+  let said = '';
+
+  /**
+   * The panes for a beat, or `undefined` while a run it needs has not landed.
+   *
+   * The `answered` beat needs **both**: it is `caseStage.ts`'s two-pane block, the same morning
+   * drawn twice at one playhead, which is what makes the press legible rather than something the
+   * player has to hold in their head. Nothing is drawn from one recording and a promise.
+   */
+  function panesFor(which: TutorialBeat, captions: readonly string[]): readonly CaseStagePane[] | undefined {
+    const asBuilt = session.asBuilt;
+    if (asBuilt === undefined) return undefined;
+    if (which === 'as-built') return [{ recording: asBuilt }];
+    const asRepaired = session.asRepaired;
+    const [before, after] = captions;
+    if (asRepaired === undefined || before === undefined || after === undefined) return undefined;
+    return [
+      { recording: asBuilt, caption: before },
+      { recording: asRepaired, caption: after },
+    ];
+  }
+
+  function dropStage(): void {
+    stage?.dispose();
+    stage = undefined;
+    stageBeat = undefined;
+  }
+
+  /**
+   * The press. One control, one beat, and the run it plays is a different run.
+   *
+   * It is not a playback toggle: `session.asRepaired` is the recording of the **diagnosed repair
+   * selected**, built by `request('pair')` out of {@link diagnosedState} — the same `FixitState` the
+   * fix-it screen builds when a player ticks that repair, through the same `fixitRunPlanOf`. So the
+   * thing the press changes is the configuration the simulation ran, and `tutorialRuns.test.ts`
+   * asserts on the legs that the two runs are not the same run.
+   */
+  function pressChange(): void {
+    if (session.asRepaired === undefined) return;
+    beat = 'answered';
+    ended = false;
+    dropStage();
+    render();
+    answerHost.focus();
+  }
+
+  function renderStage(view: ReturnType<typeof tutorialCollapseViewOf>): void {
+    const panes = panesFor(view.beat, view.paneCaptions);
+    if (panes !== undefined && !ended && (stage === undefined || stageBeat !== view.beat)) {
+      dropStage();
+      stageBeat = view.beat;
+      const forBeat = view.beat;
+      stage = mountCaseStage(doc, {
+        panes,
+        speedSimPerRealS: everydayProfileStore().defaultSpeed(),
+        copy: view.stage,
+        /*
+         * Its own classes, never the fix-it screen's. `caseStage.ts` takes them for exactly this
+         * reason: the browser tier asserts a named block is gone once it has been watched, and two
+         * blocks wearing one class make that assertion pass for the wrong reason.
+         */
+        classes: {
+          root: 'everyday-collapse-stage-block',
+          canvas: 'everyday-collapse-stage-canvas',
+          skip: 'everyday-collapse-stage-skip',
+        },
+        onDone: () => {
+          // The run's own end, or the block's one press. Either way this beat is watched.
+          if (stageBeat !== forBeat) return;
+          ended = true;
+          dropStage();
+          render();
+        },
+      });
+    }
+    stageHost.replaceChildren();
+    if (stage !== undefined) {
+      stageHost.append(stage.root);
+      return;
+    }
+    const line = el(
+      doc,
+      'p',
+      'everyday-collapse-stage-note',
+      view.stagePending ?? view.stageEnded,
+    );
+    line.style.cssText = `margin:14px 0 0;font-size:14px;line-height:1.5;color:${C.inkSoft};max-width:66ch;text-wrap:pretty`;
+    stageHost.append(line);
+  }
+
+  function renderControl(view: ReturnType<typeof tutorialCollapseViewOf>): void {
+    controlHost.replaceChildren();
+    const control = view.control;
+    if (control === undefined) return;
+    const card = el(doc, 'div', 'everyday-collapse-control-card');
+    card.style.cssText = `${CARD};margin:16px 0 0;max-width:62ch;display:grid;gap:8px`;
+    const heading = el(doc, 'div', 'everyday-collapse-control-heading', control.heading);
+    heading.style.cssText = EYEBROW;
+    const why = el(doc, 'p', 'everyday-collapse-control-why', control.why);
+    why.style.cssText = `margin:0;font-size:14px;line-height:1.5;color:${C.inkSoft};text-wrap:pretty`;
+
+    const press = el(doc, 'button', 'everyday-collapse-press', control.label);
+    press.type = 'button';
+    press.dataset['lever'] = 'spread';
+    press.style.cssText = `justify-self:start;padding:11px 18px;border:1px solid ${C.rule};border-radius:${String(R.control)}px;background:${C.paper};color:${C.ink};font-size:15px;font-weight:650;cursor:pointer`;
+    /*
+     * The lever's own read-line and its two ends, under its own label — `mode/plainLevers.ts`'s
+     * copy, not a second wording of it. The `writes` clause is the one field of that view this
+     * screen does not draw: it names `idle.parkingStrategy`, which is internal notation on a
+     * player surface.
+     */
+    const reads = el(
+      doc,
+      'p',
+      'everyday-collapse-control-reads',
+      `${control.reads} — from ${control.from} to ${control.to}.`,
+    );
+    reads.style.cssText = `margin:0;font-size:13px;line-height:1.5;color:${C.label};text-wrap:pretty`;
+    card.append(heading, why, press, reads);
+
+    if (control.refusal === undefined) {
+      press.addEventListener('click', pressChange);
+    } else {
+      /*
+       * The refusal is on the control's own face and in its accessible description, because
+       * `deadControls.browser.test.ts` is the thing that checks it: a disabled button owes an
+       * accessible name and a reason, and a press that did nothing and said nothing is the defect
+       * the standing requirement is about.
+       */
+      press.disabled = true;
+      press.title = control.refusal;
+      press.style.cursor = 'progress';
+      press.style.opacity = '.62';
+      const refusal = el(doc, 'p', 'everyday-collapse-control-refusal', control.refusal);
+      refusal.style.cssText = `margin:0;font-size:13px;line-height:1.5;color:${C.label};text-wrap:pretty`;
+      card.append(refusal);
+    }
+    controlHost.append(card);
+  }
 
   function render(): void {
     header.replaceChildren();
+    letter.replaceChildren();
     footer.replaceChildren();
     const entry = loaded?.entry;
     const view = tutorialCollapseViewOf({
       complaint: entry?.complaint.text,
       complainer: entry?.complaint.complainer,
       symptom: entry?.symptom,
+      beat,
+      changeReady: session.asRepaired !== undefined,
+      runReady: session.asBuilt !== undefined && !ended,
     });
 
     const eyebrow = el(doc, 'div', 'everyday-collapse-eyebrow', view.eyebrow);
@@ -503,38 +734,71 @@ function mountCollapse(
       header.append(symptomHeading, symptom);
     }
 
+    renderStage(view);
+    renderControl(view);
+
     if (view.complaint !== undefined) {
       const complaintHeading = el(doc, 'div', 'everyday-collapse-complaint-heading', view.complaintHeading);
       complaintHeading.style.cssText = `${EYEBROW};margin:22px 0 0`;
       const complaint = el(doc, 'blockquote', 'everyday-collapse-complaint', view.complaint);
       complaint.style.cssText = `margin:8px 0 0;padding:0 0 0 14px;border-left:2px solid ${C.rule};font-size:16px;line-height:1.55;color:${C.ink};max-width:60ch;text-wrap:pretty`;
-      header.append(complaintHeading, complaint);
+      letter.append(complaintHeading, complaint);
       if (view.complainer !== undefined) {
         const who = el(doc, 'div', 'everyday-collapse-complainer', view.complainer);
         who.style.cssText = `margin:6px 0 0 16px;font-size:13px;color:${C.label}`;
-        header.append(who);
+        letter.append(who);
       }
+    }
+
+    /*
+     * **The worked answer lands after the press, as confirmation rather than as instruction.**
+     * § D529 permits a worked answer in the first session and nowhere else, so it stays — what
+     * moved is when. Mounted on the beat it is first drawn on and never again: the component owns
+     * its own redraws, and re-mounting it would be a second pair of runs.
+     */
+    if (view.beat === 'answered' && worked === undefined) {
+      worked = mountWorkedAnswer(answerHost, tutorialWorkedAnswerOf);
+    } else {
+      worked?.redraw();
     }
 
     const finishNote = el(doc, 'p', 'everyday-collapse-finish-note', view.finishNote);
     finishNote.style.cssText = `margin:18px 0 0;font-size:12.5px;line-height:1.5;color:${C.label};max-width:60ch;text-wrap:pretty`;
     footer.append(finishNote);
+
+    // `AX-3`: written when the sentence changes, and at no other time.
+    if (view.say !== said) {
+      said = view.say;
+      say.textContent = said;
+    }
   }
 
   render();
   /*
-   * The component, not a copy of it. Screen two and the rush setup screen call the same function
-   * with their own entry point, which is § D529 clause 2's *building it twice* prevented in the one
-   * place a build can prevent it — and it is mounted once, outside `render`, because it owns the
-   * pair of runs it draws.
+   * **This screen asks for the pair itself now.** It used to inherit the ask from
+   * `mountWorkedAnswer`, which is mounted late here — and a screen whose canvas waits on a
+   * component it does not draw yet is a screen that never plays. Both runs are this screen's own
+   * business: the as-built one is what the player watches, the repaired one is what the press
+   * plays, and the worked answer is measured over both.
    */
-  const worked = mountWorkedAnswer(answerHost, tutorialWorkedAnswerOf);
   void ensureLoaded().then(() => {
+    request('pair', render);
     render();
-    worked.redraw();
   });
 
-  return { primary: () => leave(context) };
+  return {
+    primary: () => {
+      leave(context);
+    },
+    /*
+     * `caseStage.ts`'s loop re-asks for a frame while its canvas is merely detached, so a block
+     * left behind by a screen change would poll for the life of the page. Disposing by name is the
+     * block's own instruction and this is the hook that does it.
+     */
+    unmount: () => {
+      dropStage();
+    },
+  };
 }
 
 /* -------------------------------------------------------------------------- *

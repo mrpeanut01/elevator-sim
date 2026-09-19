@@ -8338,6 +8338,35 @@ const EVERYDAY_MENU: SurfaceAdapter = {
         role: 'observation',
       });
     }
+    /*
+     * § D673's acknowledgement, in all four states the card can draw it in — GitHub issue #499.
+     *
+     * A **label**, on `chimesPanel.ts`'s own ground one surface over: the balance in it is a count
+     * of completed turns rather than a figure any run produced, so seeding it as an observation
+     * would ask R13 for a denominator that does not exist. The `balance` arm is seeded twice
+     * because the singular is a different string rather than the same one with a different number
+     * in it — `data/chime-ledger.json` authors `one` and `many` — which is the trap the tally's own
+     * two Settings cases were added for.
+     *
+     * Driven over every completion rather than one, because each names its own turn. The withheld
+     * arm seeds nothing by construction — on `report` the field is `undefined` and there is no
+     * string for the search to read — and `rail.test.ts` asserts that absence, which is what keeps
+     * GD13 clause 2 mechanical rather than remembered.
+     */
+    for (const turn of ['scenario-cleared', 'career-day-paid', 'rush-wave-survived'] as const) {
+      for (const [arm, answer] of [
+        ['one', { kind: 'balance', chimes: 1 }],
+        ['many', { kind: 'balance', chimes: 40 }],
+        ['signed-out', { kind: 'signed-out' }],
+        ['no-ledger', { kind: 'no-ledger' }],
+        ['unreachable', { kind: 'unreachable' }],
+      ] as const) {
+        const line = railModel({ screen: 'menu', ctx: 'daily' }, { banked: { turn, answer } }).banked;
+        if (line !== undefined) {
+          seeds.push({ field: `rail.banked.${turn}.${arm}`, text: line, role: 'label' });
+        }
+      }
+    }
     seeds.push({ field: 'rail.footer.settings', text: footer.settings.label, role: 'label' });
     if (footer.settings.unavailable !== undefined) {
       seeds.push({
@@ -12896,13 +12925,37 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
      * stand-in complaint would be authoring the one piece of writing `docs/35` § 9.1 calls the best
      * in the product.
      */
+    const collapseQuoted = {
+      complaint: entry.complaint.text,
+      complainer: entry.complaint.complainer,
+      symptom: entry.symptom,
+    };
+    /*
+     * **Four arms rather than two, because screen two has a canvas and a press now.**
+     *
+     * The two that were here are the case file's arrival. The two that joined are the beat: the
+     * building as it stands with the control refusing while its second run is made, and the pair
+     * once it has been pressed. Every one of them is a state a player can stand in, and the
+     * refusing arm is the one worth naming — a control that will not press is exactly where a
+     * softened sentence would go in unnoticed.
+     */
     for (const [arm, view] of [
       ['loading', tutorialCollapseViewOf({})],
-      ['loaded', tutorialCollapseViewOf({
-        complaint: entry.complaint.text,
-        complainer: entry.complaint.complainer,
-        symptom: entry.symptom,
-      })],
+      ['loaded', tutorialCollapseViewOf(collapseQuoted)],
+      ['as-built-refusing', tutorialCollapseViewOf({ ...collapseQuoted, runReady: true })],
+      [
+        'as-built-pressable',
+        tutorialCollapseViewOf({ ...collapseQuoted, runReady: true, changeReady: true }),
+      ],
+      [
+        'answered',
+        tutorialCollapseViewOf({
+          ...collapseQuoted,
+          beat: 'answered',
+          runReady: true,
+          changeReady: true,
+        }),
+      ],
     ] as const) {
       seeds.push({ field: `collapse.${arm}.eyebrow`, text: view.eyebrow, role: 'label' });
       seeds.push({ field: `collapse.${arm}.title`, text: view.title, role: 'prose' });
@@ -12918,6 +12971,42 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
       if (view.symptom !== undefined) {
         seeds.push({ field: `collapse.${arm}.symptom`, text: view.symptom, role: 'observation', provenance: 'authored' });
       }
+      /*
+       * The block that plays a run, the line that stands where it was, and the one press — the
+       * beat screen two grew for `charter S1`. Seeded from the view rather than from `TUTORIAL_COPY`
+       * (which is iterated below for its keys anyway) because what is checked here is the string
+       * as **drawn**: which of the two wordings the beat resolved to, and whether the control is
+       * refusing or live.
+       */
+      seeds.push({ field: `collapse.${arm}.stage.eyebrow`, text: view.stage.eyebrow, role: 'label' });
+      seeds.push({ field: `collapse.${arm}.stage.note`, text: view.stage.note, role: 'prose' });
+      seeds.push({ field: `collapse.${arm}.stage.skip`, text: view.stage.skip, role: 'label' });
+      seeds.push({ field: `collapse.${arm}.stageEnded`, text: view.stageEnded, role: 'prose' });
+      if (view.stagePending !== undefined) {
+        seeds.push({ field: `collapse.${arm}.stagePending`, text: view.stagePending, role: 'reason' });
+      }
+      view.paneCaptions.forEach((caption, index) => {
+        seeds.push({ field: `collapse.${arm}.pane.${String(index)}`, text: caption, role: 'label' });
+      });
+      if (view.control !== undefined) {
+        const control = view.control;
+        seeds.push({ field: `collapse.${arm}.control.heading`, text: control.heading, role: 'label' });
+        /*
+         * The label and the two ends are `mode/plainLevers.ts`'s own words, reached through the
+         * tutorial's control rather than restated — so the corpus reads whatever the workshop
+         * calls this lever today, which is the point of drawing them from there.
+         */
+        seeds.push({ field: `collapse.${arm}.control.label`, text: control.label, role: 'label' });
+        seeds.push({ field: `collapse.${arm}.control.reads`, text: control.reads, role: 'prose' });
+        seeds.push({ field: `collapse.${arm}.control.from`, text: control.from, role: 'label' });
+        seeds.push({ field: `collapse.${arm}.control.to`, text: control.to, role: 'label' });
+        seeds.push({ field: `collapse.${arm}.control.why`, text: control.why, role: 'reason' });
+        if (control.refusal !== undefined) {
+          seeds.push({ field: `collapse.${arm}.control.refusal`, text: control.refusal, role: 'reason' });
+        }
+      }
+      /* The non-visual register — `docs/36` `AX-3`. A drawn string like any other. */
+      seeds.push({ field: `collapse.${arm}.say`, text: view.say, role: 'prose' });
       seeds.push({ field: `collapse.${arm}.finish`, text: view.finish, role: 'label' });
       seeds.push({ field: `collapse.${arm}.finishNote`, text: view.finishNote, role: 'reason' });
     }
