@@ -251,9 +251,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'survivor count are `SURVIVOR_COPY` and `survivorSentenceFor`, and **those are driven** — ' +
         'by the `SURVIVORS` adapter, over every scenario and every budget step the shipped table ' +
         'holds. That split is the whole of why this exclusion is safe: the half that speaks to a ' +
-        'player is in the corpus and the half that speaks to a regenerator is here.',
+        'player is in the corpus and the half that speaks to a regenerator is here.' +
+        ' **The three classifiers join on the same ground and one step further in**: they do not ' +
+        'produce a sentence at all, they *read* the ones `validatePublishedSurvivors` already ' +
+        'produced and sort them into the ones that mean the table is broken and the ones that ' +
+        'mean the campaign is harsh. `FIRST_HOUR_FLOOR_CITATION` is the `GitHub issue #381` the ' +
+        'classifier matches on, which is a citation rather than prose; the deriver reads it as ' +
+        '"own prose" because a string constant is all it can see. They exist because throwing on ' +
+        'the second kind took the campaign screen away from every player — the browser tier ' +
+        'caught it against an empty `<select>` — and the split they draw is the same split this ' +
+        'reason already names.',
       ids: [
         'scenario/survivors.ts#validatePublishedSurvivors',
+        'scenario/survivors.ts#FIRST_HOUR_FLOOR_CITATION',
+        'scenario/survivors.ts#isFirstHourFloorFinding',
+        'scenario/survivors.ts#isContentFinding',
         'scenario/survivorSpace.ts#dimensionsCoveredBy',
         'scenario/survivorSpace.ts#reachableChangesOf',
         'scenario/survivorSpace.ts#unreachableChangeIdsOf',

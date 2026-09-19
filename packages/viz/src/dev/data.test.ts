@@ -34,7 +34,7 @@ import { loadBrowserResources, loadCampaign, loadFixitCases, loadReferenceRuns }
  * The contract, and the reason each entry is on it.
  *
  * Every one is fetched under a name that survives a deploy, so every one must be `no-cache` on the
- * server. `__buildings.json` is Vite's generated manifest of `data/buildings/`; the other eight are
+ * server. `__buildings.json` is Vite's generated manifest of `data/buildings/`; the other nine are
  * copies of the files beside them in `data/`.
  */
 const EXPECTED_FETCHES = [
@@ -47,6 +47,8 @@ const EXPECTED_FETCHES = [
   '/price-schedule.json',
   '/reference-runs.json',
   '/scenario-goals.json',
+  /* The measured survivor counts, fetched by `loadCampaign` beside the stages they are keyed by — § D649. */
+  '/scenario-survivors.json',
   '/traffic-profiles.json',
 ] as const;
 
@@ -107,7 +109,7 @@ describe('the documents the viewer fetches by a fixed name', () => {
 
     // Every one of them revalidated, which is the half of the cache repair a response header
     // cannot do. The clients poisoned by the old `immutable` will not revalidate on their own —
-    // that is what `immutable` means — so the request has to ask. Asserted for all eight rather
+    // that is what `immutable` means — so the request has to ask. Asserted for all nine rather
     // than for the one that broke, because the next stale document will be a different one.
     expect(modes).toEqual(EXPECTED_FETCHES.map(() => 'no-cache'));
   });
@@ -127,6 +129,11 @@ describe('the documents the viewer fetches by a fixed name', () => {
     expect(misread).toEqual([
       '/dispatcher-profiles.json',
       '/price-schedule.json',
+      // A fourth instance of the same trap, and it is not a `-profiles.json`: `-survivors` is nine
+      // characters of `[A-Za-z0-9_-]` after a hyphen, so an ordinary English word matches Vite's
+      // hashed-asset shape just as well as the two above. Worth the line, because the comment's
+      // example is the suffix and the rule is the shape.
+      '/scenario-survivors.json',
       '/traffic-profiles.json',
     ]);
 
