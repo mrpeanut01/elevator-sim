@@ -20,6 +20,7 @@
  * |---|---|
  * | the band's second channel | a wait age carried by colour alone at 4.5 px — `UX.md` KB-15 |
  * | the wash | an AD-S8 ground that swallows the marks it sits under — AD-A2 |
+ * | the relief | a boarding that looks exactly like nobody having been there |
  * | determinism | a bob read off a wall clock, so a scrubbed frame is not reproducible |
  *
  * Nothing here asserts a coordinate it could have read from the geometry, and nothing asserts a
@@ -394,6 +395,35 @@ describe('the AD-S8 landing wash', () => {
       (call) => call.op === 'fillRect' && String(call.args[4]).startsWith('rgba('),
     );
     expect(String(wash?.args[4])).toContain('0.130');
+  });
+});
+
+describe('the relief mark', () => {
+  it('draws one tick per recent boarding, in moss, and none when nobody boarded', () => {
+    const at = 300;
+    const legs = [boarded('a', 100, at - 1), boarded('b', 110, at - 2), waiting('c', 250)];
+    const { ctx, queues } = paint({ legs, at });
+    const floor = queues.find((queue) => queue.floorId === 'L0');
+    expect(floor?.recentlyBoarded).toBe(2);
+    const ticks = ctx.calls.filter((call) => call.op === 'stroke' && call.args[0] === C.moss);
+    expect(ticks).toHaveLength(2);
+
+    const quiet = paint({ legs: [waiting('c', 250)], at });
+    expect(quiet.ctx.calls.filter((call) => call.op === 'stroke' && call.args[0] === C.moss)).toHaveLength(0);
+  });
+
+  it('stops being drawn once the relief window has passed, without the rider coming back', () => {
+    // The window is `queueAt`'s, not this painter's — the mark is a reading of `recentlyBoarded`
+    // and nothing here decides how long relief lasts.
+    const legs = [boarded('a', 100, 200)];
+    const during = paint({ legs, at: 202 });
+    const after = paint({ legs, at: 260 });
+    expect(during.queues[0]?.recentlyBoarded).toBe(1);
+    // The rider does not reappear: they boarded, so `queueAt` drops the floor entirely once the
+    // relief window closes. A mark that outlived the window would be drawing a person who is gone.
+    expect(after.queues).toHaveLength(0);
+    expect(after.ctx.calls.filter((call) => call.op === 'stroke' && call.args[0] === C.moss)).toHaveLength(0);
+    expect(heads(after.ctx)).toHaveLength(0);
   });
 });
 

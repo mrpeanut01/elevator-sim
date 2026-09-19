@@ -228,6 +228,43 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
       }
     }
 
+    /*
+     * **The relief mark — *a car just took some of them*.**
+     *
+     * `FloorQueue.recentlyBoarded` has been computed on every frame since `queueAt` shipped and
+     * read by **nothing** on this stage; its only readers were Engineer-side. It is the one moment
+     * in a run where the dispatcher visibly did its job, and without it a boarding is invisible:
+     * the queue simply gets shorter between two frames, which looks exactly like nobody having
+     * been there.
+     *
+     * Drawn as a tick per boarder, in the slots they just vacated — same lane, same pitch, same
+     * right-to-left order — so the read is *these stood here a moment ago and are gone*. In
+     * `moss`, the calm end of the ramp, because relief is the opposite of the thing the warm end
+     * means.
+     *
+     * **It is a transition marker and deliberately not a figure.** It publishes no count: it is
+     * capped at the lane like everything else here, and no `+N` is composed for it, because a
+     * string composed inside a painter is read by no honesty property ([§ D347]). The number who
+     * boarded is `describeQueue`'s to say in words, and it says it.
+     */
+    if (floor.recentlyBoarded > 0) {
+      const ticks = Math.min(floor.recentlyBoarded, perRow);
+      const arm = Math.max(1.5, capsuleH * 0.28);
+      ctx.strokeStyle = C.moss;
+      ctx.lineWidth = Math.max(1, capsuleH * 0.14);
+      ctx.lineCap = 'round';
+      for (let index = 0; index < ticks; index += 1) {
+        const x = g.landing.x + g.landing.width - 6 - (index + 1) * (capsuleW + 2);
+        const y = row.y - 2 - capsuleH * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x + capsuleW * 0.1, y);
+        ctx.lineTo(x + capsuleW * 0.42, y + arm * 0.55);
+        ctx.lineTo(x + capsuleW * 0.95, y - arm * 0.7);
+        ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+    }
+
     if (cap.overflow !== undefined) {
       ctx.fillStyle = C.ink;
       ctx.font = `600 9px ${TYPE.mono}`;
