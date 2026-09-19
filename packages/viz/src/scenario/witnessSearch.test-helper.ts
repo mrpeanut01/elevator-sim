@@ -64,7 +64,11 @@
  */
 
 import { loadConfig } from '@elevator-sim/core';
-import type { DispatcherProfile, ResolvedBuilding } from '@elevator-sim/core/browser';
+import type {
+  DispatcherProfile,
+  ElevatorSpecs,
+  ResolvedBuilding,
+} from '@elevator-sim/core/browser';
 import type { ParameterValue } from '@elevator-sim/experiments/browser';
 import { collectSearchSpace } from '@elevator-sim/experiments/browser';
 
@@ -109,6 +113,8 @@ export interface WitnessFixture {
   readonly published: PublishedScenario;
   readonly baseline: DispatcherProfile;
   readonly building: ResolvedBuilding;
+  /** The sensor defaults those cars resolve against — the sampler needs them to refuse a vector the cars will not take. */
+  readonly elevatorSpecs: ElevatorSpecs | undefined;
   readonly run: (request: Parameters<typeof runBatch>[0]) => ReturnType<typeof runBatch>;
 }
 
@@ -140,6 +146,7 @@ export async function witnessFixtureFor(stageId: string): Promise<WitnessFixture
     published: row,
     baseline,
     building: resources.building,
+    elevatorSpecs: resources.elevatorSpecs,
     run: (request) => runBatch(request, resources),
   };
 }
@@ -162,7 +169,6 @@ export async function drawDialConfigurations(input: {
   const { fixture, sampleSize } = input;
   const stepId = input.stepId ?? null;
   const masterSeed = input.masterSeed ?? SURVIVOR_MASTER_SEED;
-  const config = await loadConfig(DATA_DIR);
   const rung = rungsOf(fixture.stage.budget).find((entry) => entry.stepId === stepId);
   if (rung === undefined) {
     throw new Error(`stage "${fixture.stage.id}" has no budget rung "${String(stepId)}"`);
@@ -172,7 +178,7 @@ export async function drawDialConfigurations(input: {
     schedule: shippedPriceSchedule(),
     baseline: fixture.baseline,
     building: fixture.building,
-    elevatorSpecs: config.elevatorSpecs,
+    elevatorSpecs: fixture.elevatorSpecs,
     units: rung.units,
     sampleSize,
     seed: samplerSeedFor(masterSeed, fixture.stage.id, stepId),
