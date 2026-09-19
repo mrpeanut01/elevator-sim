@@ -50,6 +50,17 @@ import type { FixitCase, FixitState } from './types.js';
 
 const PATCH = { dispatcher: { idle: { parkingStrategy: 'stay' } } };
 
+/**
+ * A new-shaft repair's patch, and it has to be a real one — GitHub issue **#568**.
+ *
+ * Every repair below used to carry {@link PATCH}, including the one whose role is `new-shaft`, and
+ * that was harmless only while `machineryUnits` read the **role**. It reads the **patch** now, so a
+ * shaft that adds no car buys no machinery and correctly reports none. The fixture is corrected
+ * rather than the rule relaxed: a `new-shaft` repair that adds no car is not a thing
+ * `data/fixit-cases.json` can express, and `fixit/parse.ts` refuses one.
+ */
+const SHAFT_PATCH = { building: { addCars: [{ bankId: 'main', copyCarId: 'A', id: 'B' }] } };
+
 const CASE: FixitCase = {
   id: 'test-case',
   name: 'The test case',
@@ -75,7 +86,7 @@ const CASE: FixitCase = {
     { id: 'free-fix', role: 'diagnosed', name: 'Spread the fleet', costUnits: 0, effect: 'target', patch: PATCH },
     { id: 'dear-fix', role: 'costly-fix', name: 'Re-gear', costUnits: 10, effect: 'worst', patch: PATCH },
     { id: 'small-fix', role: 'cheap-fix', name: 'Trim dwell', costUnits: 2, effect: 'mean', patch: PATCH },
-    { id: 'shaft', role: 'new-shaft', name: 'A new shaft', costUnits: 34, effect: 'capital', patch: PATCH },
+    { id: 'shaft', role: 'new-shaft', name: 'A new shaft', costUnits: 34, effect: 'capital', patch: SHAFT_PATCH },
   ],
   result: { head: 'Fixed head.', body: 'Fixed body.' },
 };
@@ -141,9 +152,53 @@ describe('spend and the editor prices', () => {
     expect(toggleExtra(CASE, state, 'tenant-notices', shippedPriceSchedule())).toBe(state);
   });
 
+  /**
+   * A shaft is machinery **because of what its patch buys**, not because of its role — GitHub issue
+   * **#568**. The assertion is unchanged; what moved underneath it is that `spendOf` now reaches the
+   * same 34 through `building.addCars[]` → the schedule's `new-car` row, which is the same row the
+   * editor's own shaft price is read from.
+   */
   it('counts a selected new shaft as machinery — § 10.4 asks how much of the spend was steel', () => {
     const state: FixitState = { ...emptyFixitState(), selectedRepairIds: ['shaft'] };
     expect(spendOf(CASE, state, shippedPriceSchedule()).machineryUnits).toBe(34);
+  });
+
+  /**
+   * **A repair that buys nothing but machinery reports all of it** — GitHub issue **#568**, the
+   * defect this file could not see before.
+   *
+   * The fixture's `dear-fix` is priced 10 u and its patch is a parking rule, so it reports **0** —
+   * correctly, and that is the control. Re-pointed at `faster-machines`, the **same schedule row
+   * the editor's own speed stepper buys at the same 10 u**, it must report 10. The shipped case
+   * that produced the issue is `sleeping-sky-lobby`'s *Re-gear the shuttles*: eight re-geared
+   * machines at 10 u, drawn as *"10 u, of which 0 u is machinery"* beside a stepper drawing *"10 u,
+   * of which 10 u is machinery"*.
+   *
+   * Both arms are asserted, because a rule that answered *machinery* to everything would pass the
+   * second alone.
+   */
+  it('counts machinery bought through a repair patch, and only where the patch buys it', () => {
+    const schedule = shippedPriceSchedule();
+    const parkingRepair: FixitState = { ...emptyFixitState(), selectedRepairIds: ['dear-fix'] };
+    expect(spendOf(CASE, parkingRepair, schedule).machineryUnits).toBe(0);
+
+    const regeared: FixitCase = {
+      ...CASE,
+      repairs: CASE.repairs.map((repair) =>
+        repair.id === 'dear-fix'
+          ? {
+              ...repair,
+              patch: { building: { cars: [{ carIds: ['A'], set: { ratedSpeedDeltaMps: 0.5 } }] } },
+            }
+          : repair,
+      ),
+    };
+    const spend = spendOf(regeared, parkingRepair, schedule);
+    expect(spend.repairUnits).toBe(10);
+    expect(spend.machineryUnits).toBe(10);
+    expect(budgetNoteOf(regeared, spend)).toBe(
+      'You are buying machinery — compare it against the free change first.',
+    );
   });
 
   it('offers the five standing extras at the contract prices, none with a patch', () => {

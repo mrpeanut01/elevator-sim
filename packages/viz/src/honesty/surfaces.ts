@@ -6959,7 +6959,7 @@ function fixitSearchCase(context: HonestyContext): FixitCase {
     },
     budgetUnits: 12,
     repairs: [
-      { id: 's-diagnosed', role: 'diagnosed', name: 'Let the idle fleet wait along its stops', costUnits: repairPriceUnits(shippedPriceSchedule(), repairPatch), effect: 'A setting, and the long waits above are the target.', patch: repairPatch },
+      { id: 's-diagnosed', role: 'diagnosed', name: 'Let the idle fleet wait along its stops', costUnits: repairPriceUnits(shippedPriceSchedule(), repairPatch), effect: 'Waiting cars spread through the floors they serve rather than standing together.', patch: repairPatch },
       { id: 's-costly', role: 'costly-fix', name: 'Re-gear the machines', costUnits: repairPriceUnits(shippedPriceSchedule(), repairPatch), effect: 'Faster climbs shorten the worst wait; the parking stays.', patch: repairPatch },
       { id: 's-cheap', role: 'cheap-fix', name: 'Trim the door dwell', costUnits: repairPriceUnits(shippedPriceSchedule(), repairPatch), effect: 'A second off every stop moves the mean a little.', patch: repairPatch },
       { id: 's-shaft', role: 'new-shaft', name: 'A new shaft · beyond a repair budget', costUnits: repairPriceUnits(shippedPriceSchedule(), repairPatch), effect: 'A capital conversation with the owner, not a work order.', patch: repairPatch },
@@ -6969,6 +6969,19 @@ function fixitSearchCase(context: HonestyContext): FixitCase {
       body: 'Nothing was bought: the cars were always enough — they were parked in the wrong place.',
     },
   };
+}
+
+/**
+ * The dearest repair a case offers — the one the refused arm below needs, asked for by the property
+ * it needs rather than by an index (GitHub issue **#566**).
+ *
+ * Stable on a tie: the first of equal prices, which is what {@link fixitSearchCase} produces, since
+ * its four repairs share one patch and therefore one price.
+ */
+function dearestRepairOf(entry: FixitCase): FixitCase['repairs'][number] {
+  return entry.repairs.reduce((dearest, repair) =>
+    repair.costUnits > dearest.costUnits ? repair : dearest,
+  );
 }
 
 const FIXIT: SurfaceAdapter = {
@@ -7296,7 +7309,17 @@ const FIXIT: SurfaceAdapter = {
     for (const [where, row] of [
       ['selected', { selected: true, refusal: undefined }],
       ['affordable', { selected: false, refusal: undefined }],
-      ['refused', { selected: false, refusal: repairRowOf(entry, spent, entry.repairs[3]!, schedule).refusal }],
+      /*
+       * The **dearest** repair rather than `repairs[3]` — GitHub issue **#566**. The refused arm
+       * needs a repair the budget cannot take, and it reached one by index, which is true of
+       * {@link fixitSearchCase} only because that fixture happens to list its shaft last. Position
+       * stopped being a safe way to name a repair on the commit that gave the two fix-it surfaces
+       * a draw order (`fixit/engine.ts#repairsInDrawOrder`), so this asks for the property it
+       * actually needs. **The seeded string is unmoved**: on the fixture the four repairs share one
+       * patch and therefore one price, so index and property reach rows that are both affordable
+       * and the refusal is `undefined` either way.
+       */
+      ['refused', { selected: false, refusal: repairRowOf(entry, spent, dearestRepairOf(entry), schedule).refusal }],
     ] as const) {
       seeds.push({
         field: `repair.state.${where}`,

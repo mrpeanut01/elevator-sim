@@ -41019,3 +41019,112 @@ for something already happening, which is the marshal-in-the-lobby defect wearin
 **What was deliberately not done.** No new incident *kind* and no new engine field: the repertoire
 is the library that already ships, so nothing here can render a note no passenger experiences.
 [§ D106](#d106) is untouched — nothing in this entry aggregates energy into anything.
+---
+
+## D869 — the fix case's answer key retires now, ahead of the menu § D706 conditions, and the survivor census it rests on is 12 of 18 rather than 1 of 18
+
+**Date: 2026-09-19 · Owner: LANE-AE-C (wave AE) · Narrows [§ D706](#d706) clause 4 and re-measures its § 1 · GitHub issue [#566](https://github.com/mrpeanut01/elevator-sim/issues/566) · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.1, [`docs/12`](docs/12-design-handoff.md) § 4.15, `data/fixit-cases.json`, `packages/viz/src/fixit/engine.ts`, `packages/viz/src/everyday/fixitScreen.ts`, `packages/viz/src/dev/fixitPanel.ts`, `packages/viz/src/honesty/surfaces.ts`.**
+
+**Why an entry.** Two of [§ D405](#d405)'s three grounds. It **moves something already recorded** — § D706 clause 4 held the kind-of-fix line back until the menu goes, and this releases one of the two sentences that clause is about — and it binds a data file, two surfaces and the corpus adapter, none of which one module owns.
+
+### 1. What went, and it is not the menu
+
+`docs/38` § 2.1: *"**The four-repair menu and the five decoys go**, and with them the printed line that says what kind of fix it is."* § D706 conditioned the menu's retirement on an editor that can write the answers, and **nothing in this entry touches that**. What goes here is the **answer key**, in four places:
+
+| where | what it said | how many cases |
+|---|---|---|
+| `repairs[].effect`, `diagnosed` only | *"The 9 waits over a minute are the target"* | **18 of 18** |
+| the same sentence's tail | *"…and it is a setting"* | 7 |
+| `fixit/engine.ts#repairRowOf`'s price line | `free — configuration` | **4** — **no** non-diagnosed repair in the file costs nothing, so those words appeared on the answer and on nothing else. *(Published as five and corrected by derivation on the next commit; a repair's price is not in the file, so it has to be resolved through `data/price-schedule.json` rather than read.)* |
+| the **draw order** | the file authors `repairs[]` in role order and both surfaces drew them in it, so the answer was row one | **18 of 18** |
+
+The last is the one a phrase sweep cannot see, and it is `role` reaching a player-facing surface without anything ever rendering the word. GitHub issue #566 named five sites, the tree had seven, and the shape it was really about was all eighteen.
+
+### 2. Why § D706 clause 4's argument does not reach it
+
+Clause 4 holds back *"the closing sentence of `asBuilt.note`"* — *the fault is in how it is configured, not in what it is made of* — on the ground that **above an open editor it is the only thing narrowing forty-seven priced dimensions to one tier**, so retiring it early strips a beat from the loop and collects none of the benefit. That argument is good, and it is an argument about a sentence that **narrows a search**.
+
+The effect-line tail narrows nothing. It names the row. A hint that says *look at the settings* and a hint that says *press the first button* are different objects, and only the first has a reason to survive the menu. So that sentence leaves on the commit that makes it false, which is [§ D227](#d227) run forwards, and `asBuilt.note` is untouched.
+
+### 3. The census § D706 § 1 rests on, re-measured against the question § D525 clause 3 asks
+
+§ D706 § 1 measured **1 of 18**: the share of cases whose **authored answer's own patch** `fixit/types.ts#FixitState` can write. [§ D525](#d525) clause 3 asks something else — *take every configuration the budget can reach, judge each against the goals, and count the ones that clear* — and measured that way, on the runs rather than on the patches:
+
+| | measured |
+|---|---|
+| cases cleared by the **editor alone**, no repair row touched | **12 of 18** |
+| cases where the enumeration falls through to a repair row | **6** — `zoning-starves-the-top`, `doors-that-never-close`, `express-that-stops-everywhere`, `deliveries-on-the-passenger-group`, `two-cars-out-wrong-month`, `let-faster-than-the-lifts` |
+
+`packages/viz/src/fixit/theAnswerIsNotPrinted.test.ts` **solves** each case rather than asserting it is solvable: a role-blind enumeration of the five control families, singly and then in pairs over parking, run through the same `fixitRunPlanOf`/`measuredOf`/`classifyOutcome` chain both surfaces use, stopping at the first route that clears both measured bars.
+
+**Both figures are right about their own question, and the twelve is a floor.** The enumeration is a sample and stops at the first success, so a case that falls through has not been shown to need the menu. Two of the twelve were reached only by widening the search once — `controller-sends-every-car` needs the **second** rung of the zoning stepper rather than its ceiling, and `one-start-time` needs a parking rule and a speed step **together** — which is the honest size of the uncertainty and is why the number is published as a floor.
+
+**§ D706 § 6's precondition is unmoved and its size is not.** Six cases still have no editor route this search can find, so the menu still cannot go today. It is six rather than seventeen.
+
+### 4. What replaces the tell, and what deliberately does not
+
+`fixit/engine.ts#repairsInDrawOrder` — a stable FNV-1a of `caseId/repairId`, ascending — is what both surfaces draw. It is **in code rather than in the file** because [GitHub issue #233](https://github.com/mrpeanut01/elevator-sim/issues/233) authors sixteen more cases to the same four-role shape, and a reordered file fixes the eighteen that exist and nothing else. It is deterministic, so a screenshot, a browser-tier index and a player's memory of a case all stay true, and it sorts on two ids and nothing else, so it carries no information about which row is which. Over the eighteen the answer lands first five times, second once, third six times and last six times. It deliberately does **not** sort by price: the new shaft is the dearest on every case by construction, so a price sort would put a constant in the last row and hand a quarter of the tell back.
+
+**Nothing rewrites the decoys, and the residual is named rather than papered over.** Three of the four rows still refute themselves in their own copy — *"the empty three-hundred-metre climb that makes the long waits is not a door"* — so a reader who works through all four can still reach the answer by elimination. That copy is true, it is pinned on the legs by `cases.test.ts`, and § D227 requires it to stay true; blurring it into vagueness to hide the answer would trade a measured sentence for a puzzle. **What closes the residual is § D706's retirement of the menu**, and this entry does not pretend otherwise.
+
+### 5. The deviation from the handoff, recorded where deviations go
+
+`GAMEPLAY_AND_NAVIGATION.md` § 10 words the free price as *"Door dwell is free — configuration"* and the product now draws `free`. `CLAUDE.md` keeps the handoff canonical for the interface, so the departure is recorded in `docs/12` § 4.15 with the constraint that forced it: the word `configuration` **is** the retired kind-of-fix line, and `docs/38` § 2.1 is a later ruling of the owner's about that sentence.
+
+### 6. The corpus, as a forecast rather than as the row
+
+[§ D343](#d343) puts the measurement on the integrator. **Forecast: zero in both tiers — no surface added or removed, no string moved, cases, simulations and failing cases unmoved.** The eighteen deleted sentences are not seeded: `honesty/surfaces.ts`'s fix-it adapter drives its own `search-case` fixture rather than `data/fixit-cases.json`, so the shipped file's repair copy does not reach the corpus at all. That fixture's own diagnosed `effect` is reworded here and is a substitution, worth **0**. `repairRowOf`'s price line **is** seeded and `free — configuration` → `free` is also a substitution, worth **0**. `repairsInDrawOrder` moves no string, because the adapter seeds by `repair.id` rather than by position. The one term that could have moved is `repair.state.refused`, whose seed now asks for the **dearest** repair rather than `repairs[3]`; on that fixture the four repairs share one patch and therefore one price, so both reach a row that is affordable, the refusal is `undefined` either way and the string is unmoved. **It is a forecast and not a claim** — the integrator's measurement is the row.
+
+### 7. Numbers spent
+
+This lane holds **D869–D878** and spends **D869 and D870**. D871 to D878 are unspent and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+---
+
+## D870 — the 10 u shuttle re-gear buys ascent on a complaint measured in descent, and the machinery figure counts what the patch buys rather than what the role is
+
+**Date: 2026-09-19 · Owner: LANE-AE-C (wave AE) · GitHub issue [#568](https://github.com/mrpeanut01/elevator-sim/issues/568) · Rules on: `data/fixit-cases.json`, `packages/viz/src/fixit/engine.ts`.**
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it changes what `machineryUnits` means for every caller of `fixit/engine.ts#spendOf`, and it records a measured mechanism that `data/elevator-specs.json`'s `airPressure` block and [`CLAUDE.md`](CLAUDE.md)'s `symmetric-speed` exemption are both about, on a surface neither of them mentions.
+
+### 1. The measurement, taken before the copy was written
+
+`sleeping-sky-lobby`, the case's own pinned seed, one run per arm through `fixitRunPlanOf`, compared on the complaint (*waits over a minute for a car down from a sky lobby*) and on the scoped worst wait:
+
+| arm | shuttle rated / descent | complaint | worst wait |
+|---|---|---|---|
+| as built | 10.0 / 10.0 | 9 | 70 s |
+| **the repair** — `S1`–`S8` +0.5 | 10.5 / **10.0, capped** | **9 (0 %)** | 69 s |
+| the same at **+2.0** | 12.0 / **10.0, capped** | **9 (0 %)** | 68 s |
+| the editor's stepper, +0.5 on every car | 10.5 / 10.0 | **4 (55.6 %)** | 62 s |
+| **locals only**, +0.5, shuttles untouched | 10.0 / 10.0 | **4 (55.6 %)** | 63 s |
+| shuttles pressurised, **no** speed bought | 10.0 / uncapped | 9 (0 %) | 70 s |
+| **shuttles +0.5 and pressurised** | 10.5 / **uncapped** | **1 (88.9 %)** | 61 s |
+
+### 2. What it establishes, and what the issue's own hypothesis got wrong
+
+GitHub issue #568 proposed that the 0 % / 56 % gap is *eight cars against all of them*, and said in terms that it was a hypothesis needing a run. **It is not what the gap is.** The locals-only arm reproduces the stepper's figure exactly — 55.6 %, with a rest-of-building delta agreeing to thirteen decimal places — so the shuttles contribute **nothing** to the stepper's win, and re-gearing them four times harder does not help either.
+
+**The cause is the air-pressure descent cap, and it was run in both directions.** `vertical-city`'s shuttle bank travels 307.5 m, above `data/elevator-specs.json#airPressure.appliesAboveTravelM` of 300, so its descent is held at `descentCapMps` 10.0 m/s whatever rated speed is bought — and the complaint is measured on legs going **down**, sky lobby to street. Lifting the cap alone changes nothing (9 → 9, the control that says the cap is not doing the work by itself); lifting it **and** buying the same half metre takes the complaint to 1. So the repair buys speed in the one direction the letter is not about.
+
+This is `CLAUDE.md`'s `symmetric-speed` exemption arriving in gameplay. One clause to read precisely: `analyzeUpPeak`'s `directionalSpeedAsymmetry` warning is documented as raised by `ctf-class-reference/shuttle` and **no other shipped bank**, and that stays true — the asymmetry here is created by a *patch*, not authored.
+
+### 3. What changed, and what deliberately did not
+
+**The promise changed, not the repair.** Its `effect` said *"Every shuttle covers its three hundred metres sooner, so the 70 s worst wait shortens"*; it now says the climb is sooner, the descent is not, and why. Making the repair *work* — adding `cabinPressurised` to its patch — was available and refused: it would turn the case's costly decoy into a second answer inside the budget, which is rebalancing a case to make a sentence true.
+
+**Two more false promises were found by checking the family rather than assuming it.** Issue #568's fourth criterion asked for the other twelve `Re-gear …`/`Re-plant …` repairs to be checked the same way. Measured on each one's own case, eight repairs claim the worst wait shortens and **two of them lengthen it**: `every-deck-calls-itself-full/regear-the-shuttles` 77 s → **79 s**, and `restaurant-above-the-ballroom/regear-guest-cars` 79 s → **82 s**. Both now say the worst wait does not shorten. `fixit/theAnswerIsNotPrinted.test.ts` reads the claim **out of the prose** — a repair whose effect names the worst wait and a direction must move it that way — so the guard is not a list somebody has to remember to extend.
+
+**A third, outside the re-gear family and outside the issue, is corrected on the same ground.** `everyone-leaves-at-once/destination-panels` said *"panels stand on the wrong side of that ride"*; measured, they take the complaint from 12 to 1 and the worst wait from 117 s to 63 s. They cost 13 u against an 11 u budget, so what a player reads now is that they reach the letter and do not fit. § D227 binds both ways, and a refusal that has stopped being true is the half this repository rates worse than a dead seam.
+
+### 4. The machinery figure
+
+`spendOf` computed `editorUnits - settingUnits + shaftUnits`, in which **`repairUnits` is not a term**. So a repair whose patch buys nothing but machinery reported none of it: the 10 u re-gear — eight machines, bought through the **same** `faster-machines` schedule row the editor's stepper buys at the **same** 10 u — drew *"10 u, of which 0 u is machinery"* beside a stepper drawing *"10 u, of which 10 u is machinery"*, and `budgetNoteOf`'s machinery branch could not fire for it. **Ten of the seventy-two shipped repairs buy `faster-machines`**, so ten drew a figure that was false about the purchase just made. *(Published as nine on the commit that landed this entry, and corrected on the next: the figure was counted off a listing by eye rather than derived, which is this repository's oldest lesson about a published number arriving inside the paragraph that argues for deriving them. Derived: `pricing/repairPrice.ts#pathsIn` over all seventy-two patches, resolved through `changes[].covers`, gives ten for `faster-machines` and eighteen for `new-car`.)*
+
+**Machinery is stated once and derived now.** `engine.ts#MACHINERY_EDITOR_PATHS` is the three `covers` paths the editor's own machinery controls buy — `editor.speed`, `editor.capacityStep`, `editor.shaft` — and those rows are machinery wherever they are bought. A repair's share is its price **less** the non-machinery changes its patch buys, which keeps GitHub issue #429's shaft-area band with the shaft it belongs to and needs no second lookup of the building; a repair whose patch buys no machinery row is zero by construction whatever its price, so a `costUnits` that did not come from the schedule cannot be attributed to steel.
+
+**A `machinery: true` flag on all thirty-seven schedule rows was considered and refused.** It is a new classification — is a regenerative drive machinery? a re-roped shaft? a destination panel? — authored by a lane with no authority to classify it, and `CLAUDE.md` invariant 7 would then make each answer a tunable this lane invented. **The limit that leaves is stated rather than measured away**: a repair buying `cabin-pressurisation`, `regenerative-drive` or `rope-upgrade` is not counted, because no control on this screen buys one. **No shipped repair buys any of the three**, so the limit is theoretical today, and it moves on the commit that draws such a control.
+
+### 5. The corpus
+
+**Forecast: zero in both tiers.** The four rewritten `effect` strings are not seeded — `honesty/surfaces.ts`'s fix-it adapter drives its own fixture rather than the shipped file — and `machineryUnits` reaches three seeded strings (`spend.*.capital`, the spent row and `budget.note`) on states that adapter builds from that fixture, whose repairs buy a parking rule and therefore no machinery at all. The figures those strings carry are unmoved and so are their counts. The integrator's measurement is the row.

@@ -60,23 +60,13 @@
  *   this is knife-edge only against future engine changes, which re-validate every case anyway.
  */
 
-import { readFile, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
-
-import {
-  parseBuilding,
-  parseDispatcherProfiles,
-  parseElevatorSpecs,
-  parseTrafficProfiles,
-  resolveBuilding,
-  shaftPlanAreaM2,
-} from '@elevator-sim/core';
+import { shaftPlanAreaM2 } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { shaftAreaBandOf } from '../pricing/parse.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
-import { DATA_DIR } from '../fixtures.test-helper.js';
+import { fixitResourcesFromDisk, shippedFixitCases } from './resources.test-helper.js';
 import {
   COMPLAINT_GONE_PCT,
   REST_DROP_LIMIT_POINTS,
@@ -89,13 +79,7 @@ import {
   toggleRepair,
   selectionKeepsTheCrowd,
 } from './engine.js';
-import {
-  UNBANDED_SHAFT_CASES,
-  fixitContextOf,
-  newShaftUnits,
-  parseFixitCases,
-  shaftAreaSurchargeUnits,
-} from './parse.js';
+import { UNBANDED_SHAFT_CASES, newShaftUnits, shaftAreaSurchargeUnits } from './parse.js';
 import {
   FIXIT_RUN_SWITCHES,
   figureValuesOf,
@@ -116,57 +100,12 @@ import { recordRun, type RecordedRun } from '../record/recordRun.js';
 
 const SUITE_TIMEOUT = 300_000;
 
-/**
- * The loaded `data/`, in `FixitResources`' shape — the browser loader's exact inputs, read from
- * disk because `dev/data.ts` fetches over HTTP and this suite runs under Node. Same parsers, same
- * resolution door.
- */
-async function resourcesFromDisk(): Promise<FixitResources> {
-  const [specsRaw, trafficRaw, dispatchersRaw] = await Promise.all([
-    readFile(join(DATA_DIR, 'elevator-specs.json'), 'utf8'),
-    readFile(join(DATA_DIR, 'traffic-profiles.json'), 'utf8'),
-    readFile(join(DATA_DIR, 'dispatcher-profiles.json'), 'utf8'),
-  ]);
-  const elevatorSpecs = parseElevatorSpecs(JSON.parse(specsRaw));
-  const trafficProfiles = parseTrafficProfiles(JSON.parse(trafficRaw));
-  const dispatcherProfiles = parseDispatcherProfiles(JSON.parse(dispatchersRaw));
-  const trafficProfileIds = new Set(trafficProfiles.profiles.map((profile) => profile.id));
-  const dir = join(DATA_DIR, 'buildings');
-  const names = (await readdir(dir)).filter((name) => name.endsWith('.json')).sort();
-  const entries = await Promise.all(
-    names.map(async (name) => {
-      const config = parseBuilding(JSON.parse(await readFile(join(dir, name), 'utf8')), name);
-      return {
-        config,
-        resolved: resolveBuilding(config, elevatorSpecs, { file: name, trafficProfileIds }),
-      };
-    }),
-  );
-  return { entries, elevatorSpecs, trafficProfiles, dispatcherProfiles, trafficProfileIds };
-}
-
 let resources: FixitResources;
 let cases: FixitCases;
 
 beforeAll(async () => {
-  resources = await resourcesFromDisk();
-  const raw = JSON.parse(await readFile(join(DATA_DIR, 'fixit-cases.json'), 'utf8')) as unknown;
-  cases = parseFixitCases(
-    raw,
-    fixitContextOf({
-      schedule: shippedPriceSchedule(),
-      buildings: resources.entries.map((entry) => entry.resolved),
-      trafficProfiles: resources.trafficProfiles,
-      dispatcherProfiles: resources.dispatcherProfiles,
-      /*
-       * **The shipped loader passes these, so this suite must too** — GitHub issue #429 stage 2,
-       * § D631. Without them no shaft resolves a plan-area band and every new-shaft repair falls
-       * back to the base price, which would leave the banded prices asserted nowhere while the
-       * product charged them. `dev/data.ts#loadFixitCases` is the path this mirrors.
-       */
-      elevatorSpecs: resources.elevatorSpecs,
-    }),
-  );
+  resources = await fixitResourcesFromDisk();
+  cases = await shippedFixitCases(resources);
 }, SUITE_TIMEOUT);
 
 function caseOf(id: string): FixitCase {

@@ -142,6 +142,7 @@ import {
   emptyFixitState,
   fixedBadgeAfter,
   repairRowOf,
+  repairsInDrawOrder,
   budgetNoteOf,
   parkingPriceUnits,
   setParkingStrategy,
@@ -897,7 +898,8 @@ function mountFixit(
     const grid = el(doc, 'div', 'everyday-fixit-repairs');
     grid.style.cssText =
       'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;max-width:80ch';
-    for (const repair of entry.repairs) {
+    /* Draw order, not authored order — GitHub issue #566; see `fixit/engine.ts#repairsInDrawOrder`. */
+    for (const repair of repairsInDrawOrder(entry)) {
       const row = repairRowOf(entry, session.state, repair, scheduleNow());
       grid.append(
         toggleRow(session, {
