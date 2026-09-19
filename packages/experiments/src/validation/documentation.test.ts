@@ -2033,7 +2033,16 @@ type DecisionReservation = {
  * (people on the stage), D661-D665 (the first ninety seconds), D666-D670 (the report's headline
  * under a refused mean), D671-D678 (the chimes loop), D679-D684 (locating a failure), D685-D690
  * (the shared result), D691-D700 (the dial-witness search and any rebalance), and D701-D728 across
- * five decision agents ruling on the open-decision register.
+ * five decision agents ruling on the open-decision register, and **D736-D741** for a sixth
+ * allocated mid-wave, after a lane surfaced a question about the survivor bands' sample size that
+ * nobody had written down.
+ *
+ * **The ceiling moved once, from 728 to 741, and that is the mechanism working rather than a
+ * slip.** A block is allocated before a lane starts, and a question that arrives mid-wave needs a
+ * block that did not exist when the wave opened. § D404 says a lane asks rather than taking the
+ * number above its block, because the next lane holds it; the integrator raising the ceiling on
+ * request is the other half of that rule. The agent that needed D736 flagged the ceiling rather
+ * than stepping over it, which is the behaviour the reservation exists to produce.
  *
  * **Why this is open rather than null, and it is the guard's own docstring asking for it.** With
  * the reservation closed the boundary is `max(heading) + 1`, so every number below the highest
@@ -2048,7 +2057,7 @@ type DecisionReservation = {
  * stays at **D641**, the block's floor, for the whole wave — which is what the assertion below
  * checks and why the row is the integrator's input rather than a lane's.
  */
-const OPEN_RESERVATION = { wave: 'AC-2', from: 641, to: 728 } as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'AC-2', from: 641, to: 741 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
