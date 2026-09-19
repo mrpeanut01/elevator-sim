@@ -223,16 +223,16 @@ export const RUSH_SCREEN_COPY = Object.freeze({
  * **That this sitting starts on a fitted tower, said before it starts** — GitHub issue #372,
  * [§ D640](../../../../DECISIONS.md), [§ D672](../../../../DECISIONS.md).
  *
- * Drawn only when the account owns the kit, and `EverydayHost.rushStartsFitted` is the one
- * derivation behind both this sentence and the claim the press sends — so a screen cannot promise
- * a fitted tower the sitting does not get.
+ * Drawn by `everyday/rushScreen.ts`, and only when the account owns the kit:
+ * `EverydayHost.rushStartsFitted` is the one derivation behind both this sentence and the claim the
+ * press sends, so `everyday/rushScreen.ts` cannot promise a fitted tower the sitting does not get.
  *
  * Two facts and no third. **What is fitted**, because a player is owed the difference between this
  * run and the same run as built; and **where it is posted**, because the board is keyed by the
  * modifier set (`leaderboard/boardKey.ts`) and a sitting landing on a board the player did not
  * expect is the kind of surprise a purchase must not hold. **No price**, because a chime figure
- * beside a run's own screen is `docs/32` GD13 clause 3 — the tally in Settings is where a price
- * belongs, and it is where this was bought.
+ * beside a run's own screen is `docs/32` GD13 clause 3 — `everyday/settingsView.ts`'s tally is
+ * where a price belongs, and it is where this was bought.
  */
 export const RUSH_FITTED_LINE =
   'This tower starts fitted — the doors, the control and the tenancies are already in. A fitted ' +

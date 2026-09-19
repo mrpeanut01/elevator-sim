@@ -452,6 +452,13 @@ describe('every rush constant names the module that draws it — § D227, GitHub
      * than a second screen quoting a second string.
      */
     RUSH_TUTORIAL_WHY: 'rushScreenModel.ts',
+    /*
+     * § D672's disclosure: a sitting the account has bought a fitted start for says so before it
+     * starts, and says where it will be posted. Drawn by the setup screen on
+     * `EverydayHost.rushStartsFitted`, which is the same derivation the claim itself comes from —
+     * so the screen cannot promise a fitted tower the sitting does not get.
+     */
+    RUSH_FITTED_LINE: 'rushScreen.ts',
   });
 
   it('declares a renderer for every exported constant, so a new one cannot arrive unclaimed', () => {
