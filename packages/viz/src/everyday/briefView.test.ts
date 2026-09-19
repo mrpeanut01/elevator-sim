@@ -33,7 +33,8 @@ const TODAY: TodayRecord = {
   facts: [{ label: 'Floors', value: '14 above ground' }],
   load: { word: '590 per working car', note: '1,180 people and 2 working cars today, as the building is configured. The day shows whether that is comfortable; this plate does not grade it.' },
   asks: ['Carry 90% of the people who turn up', 'Nobody waits longer than 120 s'],
-  seedLine: 'tower chancery-house · crowd 424242 · everyone identical',
+  seedLine: 'tower chancery-house · crowd 424242 · today’s date, so everyone playing today meets this crowd',
+  crowdIsToday: true,
   firstSessionLine: undefined,
   driver: 'Steady hand',
 };

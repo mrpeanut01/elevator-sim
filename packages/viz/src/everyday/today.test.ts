@@ -85,6 +85,7 @@ const recordFor = (
     dispatcherName: 'Steady hand',
     goals: pendingGoals(day),
     seed: 424_242n,
+    crowdIsToday: true,
     firstSession: false,
     units: 'metric',
   });
@@ -191,6 +192,7 @@ describe('the facts come from the resolved building', () => {
       dispatcherName: undefined,
       goals: [],
       seed: 1n,
+      crowdIsToday: true,
       firstSession: false,
       units: 'metric',
     });
@@ -239,7 +241,47 @@ describe('the rest of the record', () => {
     const record = recordFor(midtown, 2, 1);
     expect(record.dayLabel).toBe('TUESDAY · DAY 2');
     expect(record.weekday).toBe('Tuesday');
-    expect(record.seedLine).toBe('tower midtown-office · crowd 424242 · everyone identical');
+    expect(record.seedLine).toBe(
+      'tower midtown-office · crowd 424242 · today’s date, so everyone playing today meets this crowd',
+    );
+  });
+
+  it('refuses the shared-crowd claim on a run whose crowd is not the day’s', () => {
+    /*
+     * § D730. The arm a `?seed=` deep link draws, and the arm a session left open across UTC
+     * midnight draws. A line that said *everyone playing today meets this crowd* over either would
+     * be § D729's defect surviving inside its own repair — so the claim is conditional, and the
+     * refusing arm is a fact the player wants rather than a hedge: nothing is comparing this run.
+     */
+    const own = todayOf({
+      week: weekOn(2, 1),
+      calendar: NO_CALENDAR,
+      building: midtown,
+      buildingId: midtown.id,
+      dispatcherName: 'Steady hand',
+      goals: pendingGoals(2),
+      seed: 424_242n,
+      crowdIsToday: false,
+      firstSession: false,
+      units: 'metric',
+    });
+    expect(own.seedLine).toBe('tower midtown-office · crowd 424242 · a crowd of this run’s own, not the day’s');
+    expect(own.seedLine).not.toContain('everyone');
+    expect(own.crowdIsToday).toBe(false);
+    expect(recordFor(midtown, 2, 1).crowdIsToday).toBe(true);
+  });
+
+  it('keeps the lede off the question of who else is playing', () => {
+    /*
+     * The lede read *“Everyone runs the same building on the same crowd”* and **neither half was
+     * true** — the crowd was `crypto.getRandomValues` and the building is still the one this
+     * player's own week was opened on (§ D730). The claim lives on the seed line, which can
+     * condition it; what is left here is the half that holds on every day and every tower.
+     */
+    const lede = recordFor(midtown, 2, 1).lede;
+    expect(lede).toContain('The only thing you choose is who drives.');
+    expect(lede).not.toContain('Everyone');
+    expect(lede).not.toContain('same crowd');
   });
 
   it('asks what the day’s own goals ask, in `goalsForDay`’s order', () => {
@@ -315,6 +357,7 @@ function briefOn(state: ViewerState): ReturnType<typeof todayOf> {
     dispatcherName: 'Steady hand',
     goals: pendingGoals(state.week.day),
     seed: state.seed,
+    crowdIsToday: true,
     firstSession: false,
     units: 'metric',
   });

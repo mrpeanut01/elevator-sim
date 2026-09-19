@@ -216,6 +216,8 @@ import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
 import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
+import { dailySeedAt } from '../shift/dailySeed.js';
+import { deviceNowMs } from '../shift/deviceDate.js';
 
 import { savedProfilesOf } from '../batch/library.js';
 import { mountBatchPanel } from './batchPanel.js';
@@ -739,7 +741,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /* ---------------------------------------------------------------------- *
    * State
    * ---------------------------------------------------------------------- */
-  let state: ViewerState = applyDeepLink(initialState(resources, randomSeed()), resources);
+  /*
+   * **The page opens on the day's crowd, not on a crowd nobody chose** — [§ D729](../../../../DECISIONS.md).
+   *
+   * This read `randomSeed()` — `crypto.getRandomValues` — while five player-facing strings said
+   * the opposite in terms, the door's *"One tower a day, the same for everybody"* among them. Six
+   * cold loads gave six different towers, because `dev/state.ts#withFirstSession` draws the first
+   * session's contract from this value.
+   *
+   * `shift/dailySeed.ts` carries the whole argument; the two clauses that matter here are that the
+   * derivation is the server's own (`boardKey.ts#dailySeedFor`, the UTC date's digits) rather than
+   * a second one, and that it is **synchronous** — a seed that waited for `GET /api/boards` would
+   * be a page that waited for it, and the shipped static artifact has no API origin to ask.
+   *
+   * `applyDeepLink` still runs over the top, so `?seed=` is the reader's own choice and wins,
+   * exactly as `?building=` does a line below.
+   */
+  let state: ViewerState = applyDeepLink(
+    initialState(resources, dailySeedAt(deviceNowMs())),
+    resources,
+  );
   // A deep link names the building before anything can have been edited, so the editor's working
   // copy follows it unconditionally here — `withBuilding`'s pristine test is trivially true.
   state = withBuilding(state, resources, state.buildingId);
@@ -8148,7 +8169,22 @@ export function seedEntryOf(raw: string): SeedEntry {
 }
 
 /**
- * A seed nobody chose, so the first shift is not the same shift for everybody.
+ * A seed nobody chose — **the transport's draw, and no longer the page's opening state**.
+ *
+ * ## What this docstring used to say, and why the correction is the point
+ *
+ * It read *"A seed nobody chose, so the first shift is not the same shift for everybody"*, and it
+ * was **true of the boot** until [§ D729](../../../../DECISIONS.md): `boot` opened on this value
+ * and `dev/state.ts#withFirstSession` drew the first session's tower from it, while five
+ * player-facing strings asserted a shared daily crowd. A module that described its own defect
+ * accurately for as long as five screens denied it is this repository's oldest lesson pointed the
+ * other way — nobody was misled by the code.
+ *
+ * The **one** remaining non-test caller is the transport's seed field: blanking it is the reader
+ * asking for a crowd of their own, which is a control rather than a default, and `isDailySeed`
+ * then correctly refuses the door's shared-crowd sentence over the run it produces. It is named
+ * here rather than left to a grep, because a `randomSeed` with no caller would be the twelfth dead
+ * seam and the roadmap's standing requirement asks for the caller by name.
  *
  * `crypto.getRandomValues` and not `Math.random()`: invariant 2 is about the *simulation's* random
  * numbers and this is not one of them, but the habit is worth keeping — and a seed is written into

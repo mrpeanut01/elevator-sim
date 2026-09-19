@@ -146,6 +146,34 @@ describe('nothing in the derivation reads a clock', () => {
   });
 });
 
+describe('the page opens on it', () => {
+  /** `dev/main.ts`'s source with block comments removed — the boot line is code, not prose. */
+  function bootCode(): string {
+    return readFileSync(fileURLToPath(new URL('../dev/main.ts', import.meta.url)), 'utf8').replace(
+      /\/\*[\s\S]*?\*\//g,
+      '',
+    );
+  }
+
+  it('seeds the opening state from the day, not from `randomSeed`', () => {
+    /*
+     * A source-text check rather than a behavioural one, because `boot` needs a document and this
+     * is the one line in it that cannot be exercised without one. It is the regression that
+     * matters: § D729 is one expression on one line, and putting `randomSeed()` back would restore
+     * the defect silently while five strings went on asserting the opposite.
+     */
+    const code = bootCode();
+    expect(code).toContain('initialState(resources, dailySeedAt(deviceNowMs()))');
+    expect(code).not.toContain('initialState(resources, randomSeed())');
+  });
+
+  it('keeps `randomSeed` for the transport’s draw, so it is not a dead seam', () => {
+    // The roadmap's standing requirement: name the non-test caller. Blanking the seed field is a
+    // reader asking for a crowd of their own, which is a control rather than a default.
+    expect(bootCode()).toContain("entry.kind === 'draw' ? randomSeed() : entry.seed");
+  });
+});
+
 describe('the rotation rules `docs/37` § 4.3 states, measured rather than assumed', () => {
   /**
    * The sequence a date-derived seed produces, over two years of consecutive UTC dates.

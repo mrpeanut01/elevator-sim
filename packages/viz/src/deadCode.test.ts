@@ -374,8 +374,6 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    */
   'scenario/measureScenarioSurvivors':
     'the instrument that produced data/scenario-survivors.json; its caller is the regeneration driver',
-  'scenario/validatePublishedSurvivors':
-    'the survivor table’s schema; its consumer is survivors.test.ts, which drives every clause',
   'scenario/dialShareInterval':
     'the sampled half’s exact binomial interval, derived at read time; the guard is its consumer',
   'scenario/unreachableChangeIdsOf':

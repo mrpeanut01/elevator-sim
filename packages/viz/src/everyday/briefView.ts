@@ -270,9 +270,21 @@ export function lockedForScore(): BriefRefusalCard {
   const built = isScreenBuilt('tuner');
   return {
     heading: 'LOCKED FOR SCORE',
+    /*
+     * **This read *“The tower, the machines and the crowd are the same for everyone today”*** until
+     * [§ D730](../../../../DECISIONS.md), and one of the three was true. The crowd is the day’s
+     * now (§ D729, the UTC date’s own digits); the **tower** never was and no seed makes it so,
+     * because `shift/week.ts` is a week over one `contractId` — a returning player’s tower is the
+     * one their own week was opened on. The machines are that tower’s, whatever it has had fitted.
+     *
+     * Unconditional, where `everyday/today.ts#seedLineOf` and `doorView.ts#sameForEveryoneLine`
+     * have two arms: this card says what LOCKED FOR SCORE *means* — which of the run’s inputs are
+     * not the reader’s to pick here — rather than making a claim about who else is playing it.
+     * The two lines that do make that claim are on the same screen and carry the condition.
+     */
     what:
-      'The tower, the machines and the crowd are the same for everyone today. You can change all ' +
-      'of them — the run just stops counting.',
+      'The crowd is the day’s and the tower is your week’s — neither is yours to pick from here. ' +
+      'You can change all of it, the machines too — the run just stops counting.',
     /*
      * **The door names a state, never a destination** — GitHub issue #225,
      * [§ D496](../../../../DECISIONS.md). It read *Take it to the sandbox*, a verb and a place, which

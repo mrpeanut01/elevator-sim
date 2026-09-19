@@ -1136,6 +1136,28 @@ export function disclosureOf(mode: ViewMode): DisclosureMode {
  * its address. The week is opened fresh on the drawn contract rather than switched to — nothing has
  * been played, so there is nothing to park — and the building follows the week, `withBuilding`'s
  * own rule.
+ *
+ * ## The seed it draws from is the day's — [§ D729](../../../../DECISIONS.md)
+ *
+ * `state.seed` was `crypto.getRandomValues` at boot, so this function drew a *different tower on
+ * every cold load* while the door printed *"One tower a day, the same for everybody"*. It is now
+ * `shift/dailySeed.ts#dailySeedAt` — the UTC date's own digits — so two devices opening for the
+ * first time on the same day draw the same contract, and the sentence is true of the state it
+ * describes.
+ *
+ * **Nothing here moved to achieve that**, which is the part worth saying. § D514's rule is that the
+ * draw is a named stream off the seed the door already prints, *"so the draw is reproducible from
+ * what the player can read"*. Pinning the seed to the date keeps that property exactly and
+ * strengthens what it buys: the number a player reads **is** the date, so the tower is reproducible
+ * from a calendar rather than only from a number somebody copied down.
+ *
+ * ## And what it still does not make true — [§ D730](../../../../DECISIONS.md)
+ *
+ * This runs **once per device**, on the load that restored nothing. Every later day comes from
+ * `shift/week.ts`, which is a week over one `contractId` — so a returning player's tower is the one
+ * their own week was opened on and is nobody else's. *One tower a day* is a property of a product
+ * this one does not yet have, and the strings say the narrower true thing instead of the wider
+ * false one; `everyday/buildNotes.ts` carries the gap.
  */
 export function withFirstSession(state: ViewerState, resources: BrowserResources): ViewerState {
   const contractId = firstSessionContractFor(state.seed);
