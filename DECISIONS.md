@@ -37720,3 +37720,254 @@ like from here.** The grid's membership is unchanged, the seed set `honesty/surf
 keyed by `figure.id` rather than by position, and the one string that changed — the deepest queue's
 note — was replaced rather than added to. Twelve of the forty-nine always-on cases run a refused
 mean, so the promoted branch is swept rather than argued.
+
+---
+
+## D692 — Stage 2 is a **measured null at 0 of 60**, its suppression is produced by the configurations and not by the scenario, and seven stages are withheld from players on the strength of twelve draws
+
+**Date: 2026-09-19 · Rules on:** GitHub issue **#234**, [`docs/38`](docs/38-what-the-game-is.md)
+§ 2.1, [§ D649](#d649)'s offered/held gate, [§ D691](#d691). Publishes a null and an exposure;
+moves no shipped difficulty and no bar.
+
+### 1. Why stage 2 and not another
+
+`docs/38` § 2.1 asks that the first one or two scenarios be *"doable with a tweak to the dispatcher
+and failable with the wrong tweak … **a stage the dropdown alone does not clear and a witness vector
+that does**"* — DC-2 and DC-3 together. Stage 2 is the only stage on the ladder that already has the
+first half: its **dropdown census is 0**, exactly and not by sampling, because thirteen shipped
+profiles is a population and every one the rung affords is played. So a dial witness at stage 2
+would have made it the first scenario in the product that is precisely the sentence § 2.1 writes.
+
+### 2. The measurement
+
+Same apparatus as [§ D691](#d691), and the sample is five times the published one.
+`stage-2-morning-rush`, `midtown-office` at 2.5 %pop/5 min, master seed **20 260 910**, **base rung
+(4 u)**, the stage's own **50** tuning and **50** holdout replications under common random numbers,
+judged by `campaign/stageSequence.ts#runStageToVerdict`. Measured 2026-09-19, 554 s:
+
+| stratum | judged | cleared | exact 95 % interval on the share |
+|---|---|---|---|
+| dropdown (census) | 6 | **0** | — it is a census, not a sample |
+| **dials (sample)** | **60** | **0** | **[0.0000, 0.0596]** |
+
+**This is a null and it is a result.** The published cell's `dials: 0/12` bounded the clearing share
+at about **0.24**; sixty draws bound it at **0.060**. That is the first quantitative statement
+anybody has been able to make about a zero in this table, and it is what `UNWINNABLE_AS_MEASURED`'s
+stage-2 row has been standing in for.
+
+**It is still not "unwinnable", and the register's name is not a claim.** Sixty draws that found
+nothing are consistent with a share of one in twenty. The honest sentence is **none of the sixty
+ways tried got through**, and § D691 § 6's rule is restated here rather than assumed: *"no dial edit
+wins anywhere"* is not a thing the shipped table can be asked.
+
+The draw reproduced the published cell as a prefix, as § D691 established it must: indices 0–11 are
+the twelve the table judged, and none of them cleared here either. `dropdown 0/6` reproduces exactly.
+Of 62 draws, 2 were inert and 0 were refused, so 60 distinct configurations were judged.
+
+### 3. The suppression at stage 2 is produced by the configurations, not by the scenario
+
+`PublishedSurvivorStep.suppressed` exists so a reader can tell *nothing cleared* apart from *nothing
+could be quoted*, and stage 2's published cell reports **6 of 18**. At k = 60 it reports **21 of
+66** — the same third of the space, measured five times wider.
+
+A third of a stage's affordable space refusing its own mean is a large enough fact to be the reason
+a stage has no way through, so it was measured rather than assumed. **The stage's own baseline arm
+is clean:** `collective` at stage 2's demand produces `awtIsValid: true` on **50 of 50** tuning
+replications and **50 of 50** holdout replications. `stage-1-first-call` is the same, 50/50 on both.
+
+So the suppression in those cells is not the scenario refusing to speak about itself. It is
+**reached by what the player buys**: a configuration the base rung affords pushes this building into
+a state where an orderable measure will not stand behind its own number, and a configuration whose
+mean is refused cannot clear a goal that reads one, whatever else it does.
+
+**Which of the five grounds fires is not measured here, and no sentence is offered in its place.**
+Naming a plausible one — saturation, an empty window, censoring, a leg past the 900 s abandonment
+horizon, an abandonment rate above 2 % — would be exactly what [§ D256](#d256) refuses. Establishing
+it means re-running a *suppressed* configuration and reading its own words, which this entry did not
+do. What it does establish is the half that changes where to look: **not the baseline.**
+
+### 4. The exposure this creates for [§ D649](#d649)'s gate, stated as a measurement rather than a ruling
+
+§ D649 derives whether a stage is **offered** to the player from the published table rather than
+authoring it: base-rung survivors ≥ 1, or a declared diagnosis, means offered; zero with
+`diagnosis: null` means listed with its count and **held**. That derivation is right, and this entry
+does not propose changing it.
+
+What this entry records is what it is currently resting on. The base-rung count is a **census plus a
+twelve-draw sample**, and on today's table **seven of ten stages are held**. § D691 measured a stage
+whose dial count was 0 of 12 and which has **three** witnesses at 200 draws. So a held stage is one
+of two things and the table cannot say which:
+
+- a stage with no way through at any sample size, or
+- a stage with a way through that twelve draws did not reach — which is what stage 1 turned out to
+  be, at a share of 1.5 %, where twelve draws miss roughly **five times in six**.
+
+**Stage 2 is now the one held stage where that is partly answered**: not at 12 draws and not at 60,
+with the share bounded at 0.060. The other six are unsearched, and this entry says so rather than
+implying the gate is wrong.
+
+**No register loses a row and no gate moves on this entry.** Stage 2 stays in
+`survivors.test.ts#UNWINNABLE_AS_MEASURED` and `survivorBands.test.ts#OUTSIDE_THEIR_BAND`, because
+both read the published k = 12 table and that table has not moved, and because both readings remain
+true at k = 60. What has changed is that the stage-2 row is now backed by a number.
+
+### 5. What this tells #234 about where to aim
+
+**Stage 2 needs content, and stage 1 needs density.** They are different jobs and the same issue has
+been carrying them as one:
+
+- **Stage 1** has a way through and it is seventeen times too rare (§ D691). Nothing needs to be
+  invented; the share needs to rise.
+- **Stage 2** has no way through that 66 configurations could find, from a dropdown census that is
+  exhaustive and a dial sample five times the published one. Raising its share means giving it a way
+  through, and the two measured levers point in opposite directions: the demand levers are DC-R1's to
+  move, while about a third of what the budget reaches is being spent on configurations whose runs
+  refuse to be quoted — which is `docs/33` C2's *"the demand or the fabric moves, never the goal"*
+  applied to a stage whose problem may be that its affordable space is largely self-defeating.
+
+**And the direction is not obvious, which this project has already paid to learn.**
+[§ D611](#d611) measured stage 7 becoming *easier* to clear from the dropdown as demand **rose**,
+because the bar is `collective`'s own count on the same seeds and `collective` degrades faster under
+load than the profiles a player can pick. Any stage-2 rebalance has to be measured in both
+directions rather than reasoned about in one.
+
+---
+
+## D685 — What leaves the product about a run: the result artefact carries outcomes and identity, and never an input
+
+**GitHub issue #553.** `docs/38` § 2.1's daily shared seed is the cheapest growth shape this genre
+has, and the player-facing product could not use it: every clipboard write and every picture export
+in the tree is on the Engineer surface — `dev/main.ts#copyArtefact` and the report's own PNG — and a
+search for `clipboard` across `packages/viz/src/everyday/` returned nothing at all. A player who ran
+a day had no way to show anybody what happened to the people in it.
+
+It is also the one social mechanism that works **below** § D506's twenty-player floor.
+`packages/server`'s `distribution.ts#MIN_LADDER_N` withholds every quantile ladder until twenty runs
+are on a board, and that floor is correct and is not relaxed here. A board with four rows says
+almost nothing; one player handing another a seed needs no population at all.
+
+`packages/viz/src/everyday/shareResult.ts` is the artefact and the control is under the daily board
+on `everyday/boardScreen.ts` — which is where the board itself has least to say, because that tab
+draws *nobody has posted to today's board yet* on exactly the days a player most wants to hand the
+seed to a friend. Posting needs a server and an account; this needs neither.
+
+### 1. The rule — outcomes and identity, never an input
+
+- An **outcome** is what happened to the people: the wait-band strip, the counts, and the mean or
+  the refusal standing where it would be. An outcome is a fact about *the run the sharer played*,
+  not about what the building needs, so publishing one hands over no answer — a different
+  configuration on the same seed draws a different strip.
+- An **input** is anything the player chose or bought — the dispatcher, its weights and rules, any
+  lever, any equipment setting, any fabric change, any modifier — and anything the product *derived
+  about* those choices: the report's lede, its verdict, its diagnosis, its levers card, its goal
+  readings. None of it travels. The recipient is meant to play the seed, and a message naming the
+  dispatcher that worked is the answer with the puzzle attached.
+- **Identity** is the two things a recipient needs to meet the same crowd: the building and the
+  seed.
+
+**The rule is mechanised twice and neither is a comment.** `ShareRunFacts` has no field an input
+could travel in, and `shareFactsOf` is the only projection from a recording —
+`VizRecording.dispatcherProfileId` is one property access away and is deliberately not read.
+`shareResult.test.ts` renders a recording whose dispatcher is named and requires the name and the id
+absent from every line, and enumerates the facts type's keys so that widening it is red rather than
+plausible. A rule that lives only in a docstring is the rule this repository keeps finding has gone
+stale; this one is the type.
+
+### 2. Every figure is somebody else's answer
+
+The mean is `shift/report.ts#averageWaitFigure`'s, whole — its value, its count and its suppression
+ground — so the artefact and the Day report cannot disagree about one run. That matters here more
+than anywhere: the sheet's gate is `meanIsPublishable`, which is `awtIsValid && !saturated` and
+**not** the flag alone, and a share path that re-derived the gate would publish a mean the sheet
+withholds on exactly the runs somebody would want to share. The refusal's wording is
+`mode/disclosure.ts#suppressionBannerFor` — the Casual one-line projection of the single per-ground
+table — rather than the run's own statistics prose, which is Engineer register and would arrive on a
+player surface as internal notation. The bands and their classification are `live/bands.ts`'.
+
+The one quantity the module folds itself is **which slice of the shift a call belongs to**, because
+no shipped function answers it: `waitBandsAt` on the `whole-run` basis is non-decreasing in `t` and
+therefore flat after the first bad minute. The wait is still not the module's opinion — it ends at
+`boardedAt ?? refusedAt`, censored at the run's end, which is `live/bands.ts`' rule and
+`live/observations.ts`' — and the test asserts the strip's bands against
+`waitBandsAt(recording, endedAt, 'whole-run')`, so the duplication is **checked** rather than
+trusted.
+
+### 3. No score, and this is the surface most likely to grow one
+
+`docs/22` § 5 non-goal 1 forbids a scalar score, grade or rating over a run, and a share grid wants
+a number at the top more than anything else in the product does. There is none and none is derivable
+from what leaves: no total, no percentage, no streak, no rank, no letter. Every figure carries the
+count it was computed over (non-goal 2), and the refusal is neither omitted nor softened
+(non-goal 3) — a run whose mean is refused publishes the refusal in the mean's place, and the
+artefact is the same shape either way.
+
+A slice nobody called in draws its own glyph and never the calmest band's face: a slice with nobody
+in it did not go well, it did not happen.
+
+### 4. No telemetry, and no URL
+
+`docs/26` § 10 non-goal 2 forbids a third-party tracker outright, non-goal 8 makes § 7's table the
+whole allowlist, and `docs/38` § 2.4 puts no telemetry supporting a purchase or a conversion on the
+play side. A share control is exactly where such a thing arrives, so: the module imports nothing
+from `telemetry/`, makes no request of any kind, and **the artefact carries no URL**.
+
+The last is a decision rather than an oversight. There is no address the bundle could honestly name
+— the deployment's host is a repository variable read by `deploy-viz.yml`, not a constant in the
+source — a fabricated one is worse than none, and a link is precisely where a campaign parameter
+would later be bolted on. What travels is text a player pastes where they choose, which is
+`docs/26` § 10 non-goal 6's own distinction: the player is publishing their own words, and the
+product is not sharing anything.
+
+### 5. The refusal, both polarities — § D227
+
+A browser denies the clipboard for reasons the player did not cause and cannot see. With no finished
+run the button is drawn **unpressable with a sentence saying why** rather than greyed and silent,
+which is `everyday/postRun.ts`'s rule that a filled primary consuming a click and producing nothing
+is worse than a disabled one; the sentence is bound to the button by `title` and `aria-describedby`,
+which is what `everyday/deadControls.browser.test.ts` asks of every disabled control. With a
+clipboard that refuses, the artefact goes **on the page** — a `<pre>` with `user-select:all`,
+because reflowed into a paragraph the band strip stops being the artefact — under a line, announced
+with `role="status"`, saying what happened. The one thing the control never does is fail quietly.
+
+### 6. What it may not say, and the defect that decided it
+
+**It does not claim anybody else is playing this.** The closing line was going to read *"Same
+building, same seed, same crowd"*, and that is **false on this tree**. `dev/main.ts`'s `boot` opens
+with `initialState(resources, randomSeed())` and `randomSeed` is `crypto.getRandomValues`, so the
+session seed is fresh on every load; `dev/state.ts#withFirstSession` then draws the opening contract
+from it through `shift/firstSession.ts#firstSessionContractFor`, so six cold loads give six
+different towers. Two player surfaces state the opposite as fact —
+`everyday/doorView.ts`'s stepper rule (*"One tower a day, the same for everybody"*) and
+`everyday/today.ts`'s seed line (*"everyone identical"*). Those are not this decision's to fix and
+are reported separately; what **is** this decision's is that the artefact does not become the third.
+
+**The daily seed is not missing, and that is the half worth acting on.**
+`packages/server/src/leaderboard/boardKey.ts#dailySeedFor` is the date's own digits,
+`dailyFixtureAt` returns `{ date, seed, config }`, `GET /api/boards` already serves it, and
+`menu/client.ts#isDailyFixture` already validates it field by field onto `BoardsPage.today`. Then
+`everyday/host.ts#dailyBoardOf` takes `today.date` to build the board key and **drops `today.seed`
+and `today.config`**, which nothing in `packages/viz/` reads. A value authored, served,
+schema-checked on the client, carried into a typed structure and consulted by nothing is this
+repository's signature defect — the one `CLAUDE.md` records eleven times in code and twice in
+`data/` — and it is one field access from being closed.
+
+**So no conditional arm is built for the day's crowd and no field is added for one**, deliberately:
+a branch with no live writer is the twelfth instance of that same defect, which is what the
+paragraph above is about. When a run can be played on the day's fixture, the arm to add is *this run
+is today's crowd*, and it is decided by comparing the run's seed against the server's own
+`today.seed` — **never** against a date the client computed, because `boardKey.ts` says in terms
+that *which day is it* has one answer and it is the server's.
+
+### 7. The corpus
+
+Seeded into the adapter that already drives the daily board, rendered from the case's **own**
+recording rather than a fixture: R3 then asks whether this artefact published *this* run's refused
+mean and R13 asks whether the count beside it is *this* run's `waitCount`. Both branches are reached
+across the corpus rather than manufactured, because the cases genuinely differ — twelve of the
+forty-nine always-on cases run a refused mean.
+
+**No new surface, and that is the right answer rather than a saving.** The artefact is drawn under
+the daily board by a surface the adapter already drives, so § D489's ruling applies: a state on an
+existing surface moves the strings and not the surface count. `shareFactsOf` and `shareSlicesOf` are
+deliberately not in `covers` — the derivation finds no prose in either, and a `covers` entry for
+nothing is a coverage claim for nothing, which is wave T's lesson read in the other direction.
