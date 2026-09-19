@@ -39871,3 +39871,118 @@ offered for what the better one would be.
 refusals (§ 6) and the deleted absence row (§ 7) are all consequences of the one decision above and
 are argued in their own docstrings, which is what § D405 asks for when a choice does not reach past
 the module that took it. Nothing is written past them by this lane.
+
+## D836 — The core dead-code audit's scope is derived from disk, and the first thing the derivation found is the directory the audit was named after
+
+**Date: 2026-09-19 · Owner: LANE-AD-F (wave AD) · Rules on:**
+`packages/core/src/dispatch/deadCode.test.ts`'s module list and its `DEAD_CANDIDATES` register.
+**Binds every directory of `packages/core/src`, present and future, which is why this is an entry
+rather than a docstring ([§ D405](#d405)).**
+
+### 1. The defect
+
+`AUDITED_MODULES` was fourteen hand-written directory names, and the symbol walk is **per-directory
+rather than recursive** — `audit()` compares `dirname(path)` against the module directory, which is
+why `core/src/model` and `core/src/model/car` were both listed. The list named
+`core/src/dispatch/policies`, `/predictor` and `/terms`, and **not `core/src/dispatch` itself**. So
+`lifecycle.ts`, `normalize.ts`, `parameters.ts`, `policy.ts`, `scoringEngine.ts`, `selector.ts` and
+`types.ts` — 137 exports, and the load-bearing dispatch core — were outside the audit for its whole
+life.
+
+Nothing could report that, and that is the decision rather than the fix: **a hand-written list
+cannot say what is missing from it.** `packages/viz/src/deadCode.test.ts:447` had already met this
+one package over and answered it by asserting its list against `readdirSync` in both directions.
+This is the same answer in `core`, one step further: the list is not *checked* against disk, it is
+**derived** from it, and a hand-written list survives only as a floor.
+
+### 2. What the audit now covers, and how it cannot narrow
+
+`AUDITED_MODULES` is every directory in `core/src` — the root included — that holds at least one
+file that is neither a test nor a barrel. A directory holding only barrels or only tests is
+excluded because it has no export site to read, and the assertion re-derives that rather than
+taking it on trust: today that is `core/src` (two barrels) and `core/src/physics` (two
+subdirectories and no source of its own), and both are named so that a directory falling out of
+scope is a diff rather than a silence.
+
+Three guards, because a derivation that broke would narrow **silently** and an empty list passes
+every other assertion in the file: the fourteen directories the audit covered before are kept as
+`MODULES_AUDITED_BEFORE_THE_DERIVATION` and asserted present; `core/src/dispatch` is asserted
+present by name; and two load-bearing dispatch entry points, `createDispatchPolicy` and `scoreCar`,
+must appear among the scanned symbols. Verified by control: a directory created under `core/src`
+with one uncalled export turns the audit red without any list being edited.
+
+### 3. What the widened audit found — four of 137, and two dispositions
+
+`dispatch/DISPATCH_PARAMETER_IDS` and `dispatch/tunablePathsOf` are **surface**, and are in
+`PUBLIC_API_ONLY` with the reason: both are on the package barrel, neither alters a simulation, and
+`tunablePathsOf` states in its own docstring that its consumer is the guard — *"so a test can assert
+that `DISPATCH_PARAMETERS` covers all of it"* — which is invariant 8 being checkable rather than
+aspirational.
+
+`dispatch/termReferenceScale` and `dispatch/isParameterActive` are **findings**, and are in
+`DEAD_CANDIDATES`, which goes **3 → 5**. That is the first time that number has gone up, and the
+reason is the only one that should ever move it upward: the audit looked somewhere it had never
+looked. Neither symbol is new and neither regressed.
+
+**`isParameterActive` is the one to read.** It has a named would-be caller that is blocked from
+being one: `packages/experiments/src/tuning/space/types.ts` restates the `activeWhen` evaluation
+rule and says why in terms — *"it is one only because that function is not on
+`@elevator-sim/core`'s barrel … If those three names reach the barrel, delete this and import
+them."* `docs/06` says there is one rule and that *"an optimizer implements it once"*; there are
+two implementations, pinned against each other by `collect.test.ts`. The disposition is therefore
+neither deletion nor a permanent reason — it is three names onto the barrel and a restatement
+deleted in another package, which is a cross-package change this lane reports rather than rushes.
+Registered so the finding is visible while it waits, which is what the register is for.
+
+### 4. What this does not do
+
+It does not widen the *definition* of a caller, touch `PUBLIC_API_ONLY`'s existing entries, or move
+any bound. The scanner, the barrel rule and the both-directions allowlist check are untouched.
+
+## D837 — Invariants 2 and 3 are scanned over every non-test source in `packages/core/src`, and the scan's scope is derived rather than named
+
+**Date: 2026-09-19 · Owner: LANE-AD-F (wave AD) · Rules on:** nothing recorded; it mechanises
+`CLAUDE.md` invariants 2 and 3 over the package they are stated about. **Binds every file in
+`packages/core/src`, which is why it is an entry.** New file:
+`packages/core/src/sourceInvariants.test.ts`.
+
+### 1. The gap, and the fact that it was a scope claim rather than a false one
+
+Four suites scanned source text for a global RNG and a wall clock, and every one named its files:
+`kernel/kernel.test.ts` (the kernel's four sources and two of its tests),
+`dispatch/predictor/causality.test.ts`, `dispatch/policies/policies.test.ts` (over
+`sim/simulation.ts`) and `model/car/estimateCost.test.ts` (over `estimateCost.ts` and
+`separation.ts`). Together they leave most of the package unscanned, and **nothing said so** — a
+reader meeting any of them would reasonably conclude the invariant was enforced.
+
+**It was not enforced; it was held.** Measured before writing a line: all 106 non-test sources under
+`core/src`, comments and quoted literals stripped, **zero** occurrences of `Math.random`,
+`Date.now`, `new Date`, `performance.now`, `process.hrtime`, `setTimeout`, `setInterval`,
+`setImmediate`, `requestAnimationFrame`, `queueMicrotask` or `process.nextTick`. That is the best
+moment to mechanise a rule and the only one at which it is free: a scan written the day after the
+first violation has to argue about the violation instead.
+
+### 2. Derived, not named — the same ruling as [§ D836](#d836), for the same reason
+
+The scanned set is every `.ts` file under `core/src` that is not a test and not a declaration,
+walked from disk. A file added tomorrow is scanned without anybody remembering to add it. The
+existing four scanners stay exactly where they are: each checks more than this one does — the
+kernel's also covers its own tests, the ambient environment and its import list, and
+`estimateCost.test.ts`'s asserts the module imports no `random/` path at all, which is a stronger
+claim than *"does not say `Math.random`"*. This is the floor under them, not a replacement.
+
+### 3. Two things it deliberately does not do
+
+**It does not scan test files.** The invariants are properties of what the package does. The
+exclusion is measured rather than assumed: four test files match, and all four matches are the
+other scanners' own regex literals. A regex literal is a literal, but a stripper that removes them
+safely is harder than one that removes quoted strings — `/` is also division — and a stripper that
+is too eager hides a real violation, which is the one direction this test may not fail in.
+
+**It does not pass by not looking.** A witness file per directory, asserted against the tree in both
+directions, so a walk that stopped descending is red; a floor under the file count; a positive
+control that each pattern fires on code that violates it; and a negative control that a comment, a
+string, a template literal or a violation following a stripped block comment are each handled the
+way they must be. Verified: a source file carrying `Date.now()` and `Math.random()` added under
+`core/src/random`, and a new directory holding source, each turn this test red without any list
+being edited.
