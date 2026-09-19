@@ -289,9 +289,20 @@ describe('the artefact as a whole', () => {
    */
   it('claims nothing about anybody else’s day, because nothing on this tree makes that true', () => {
     const artefact = shareArtefactOf(shareFactsOf(runWith(onePerSlice(Array(12).fill(20)), {})));
-    const text = artefact.text.toLowerCase();
-    for (const claim of ['everybody', 'everyone', 'same crowd', 'today', 'daily', 'identical']) {
-      expect(text).not.toContain(claim);
+    const forbidden = ['everybody', 'everyone', 'same crowd', 'today', 'daily', 'identical'];
+    for (const claim of forbidden) expect(artefact.text.toLowerCase()).not.toContain(claim);
+
+    /*
+     * **And the copy table, not only the artefact** — which is what caught the real instance of
+     * this. `SHARE_COPY.note` read *"so whoever you send it to can play the same crowd"* after the
+     * artefact's own closing line had been corrected to drop exactly that claim: a sentence taken
+     * off one surface and left on the control beside it, where it is read **before** the press by
+     * the player deciding whether to make it. The copy table is a surface.
+     */
+    for (const [key, text] of Object.entries(SHARE_COPY)) {
+      for (const claim of forbidden) {
+        expect(text.toLowerCase(), `SHARE_COPY.${key} claims "${claim}"`).not.toContain(claim);
+      }
     }
   });
 

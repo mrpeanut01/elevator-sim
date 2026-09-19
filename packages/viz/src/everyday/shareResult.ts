@@ -155,11 +155,18 @@ export const SHARE_COPY = Object.freeze({
    * The standing note under the button, before any press. Three claims, because a player who did
    * not know them would read the press as something else: what goes (observations and the seed),
    * what does not (how they did it), and that nothing is sent anywhere.
+   *
+   * **It said a fourth thing and it was false** — *"so whoever you send it to can play the same
+   * crowd"* — which is the claim this module's docstring measures and the artefact's own closing
+   * line was corrected to drop. A sentence taken off the artefact and left on the control beside
+   * it is the same false claim wearing a different hat, and it is worse here: this one is read
+   * **before** the press, by the player deciding whether the button does what they want. The
+   * general rule the miss is worth stating for: when a claim comes off one surface it comes off
+   * every surface in the same commit, and *the copy table* is a surface.
    */
   note:
     'Copies what happened to the people, the building and the seed — as text, to your clipboard. ' +
-    'How you ran it does not travel, so whoever you send it to can play the same crowd. Nothing ' +
-    'is sent anywhere by this button.',
+    'How you ran it does not travel. Nothing is sent anywhere by this button.',
   /*
    * The clipboard refused. § D227 both ways: a control that cannot write must say so, and it must
    * say what to do instead. A browser denies the clipboard for reasons the player did not cause
