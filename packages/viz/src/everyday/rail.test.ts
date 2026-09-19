@@ -38,17 +38,17 @@ const screensOf = (ctx: RunContext, inCampaign: boolean, openBuilding?: string):
   railGroups(ctx, inCampaign, openBuilding).flatMap((group) => group.items.map((item) => item.screen));
 
 describe('the rail offers a campaign only inside one', () => {
-  it('renders CAMPAIGN in a campaign and nowhere else', () => {
-    expect(titlesOf('campaign', true)).toContain('CAMPAIGN');
+  it('renders CAREER in a career and nowhere else — docs/39 § 3’s rename map', () => {
+    expect(titlesOf('campaign', true)).toContain('CAREER');
     for (const ctx of RUN_CONTEXTS) {
-      expect(titlesOf(ctx, false), `${ctx}, not in a campaign`).not.toContain('CAMPAIGN');
+      expect(titlesOf(ctx, false), `${ctx}, not in a campaign`).not.toContain('CAREER');
     }
     /*
      * Both halves of the condition, not just the flag. `railGroups` takes the context *and* whether
      * a campaign is under way, and a reader could satisfy the case above by testing either one —
      * so the daily context with `inCampaign` true is the arm that separates them.
      */
-    expect(titlesOf('daily', true)).not.toContain('CAMPAIGN');
+    expect(titlesOf('daily', true)).not.toContain('CAREER');
   });
 
   it('always offers DESIGN and WORLD', () => {
@@ -64,7 +64,7 @@ describe('the rail offers a campaign only inside one', () => {
     // a desk row with an invented label would claim a building nobody opened.
     expect(screensOf('campaign', true)).not.toContain('building');
     const withBuilding = railGroups('campaign', true, 'Chancery House');
-    const campaign = withBuilding.find((group) => group.title === 'CAMPAIGN');
+    const campaign = withBuilding.find((group) => group.title === 'CAREER');
     const desk = campaign?.items.find((item) => item.screen === 'building');
     expect(desk?.label).toBe('Chancery House');
     expect(campaign?.items.map((item) => item.screen)).toEqual(['towers', 'building', 'contract']);
@@ -520,7 +520,7 @@ describe('the whole model', () => {
     // The default matters: it is what the shell passes today, and a default of `true` would put
     // entries into a campaign nobody started on the front door.
     expect(railModel({ screen: 'menu', ctx: 'campaign' }).groups.map((g) => g.title))
-      .not.toContain('CAMPAIGN');
+      .not.toContain('CAREER');
   });
 });
 

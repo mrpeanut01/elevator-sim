@@ -654,7 +654,15 @@ function mountStage(
   goalRows.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.tight)}px`;
   const goalNote = el(doc, 'span', 'everyday-stage-goals-note');
   goalNote.style.cssText = `font-size:11px;line-height:1.4;color:${C.label}`;
-  goals.append(goalHeading, goalRows, goalNote);
+  /*
+   * **Which of a career player's two goal sets this strip is** — GitHub issue #567. Under the
+   * heading rather than under the rows, and above {@link goalNote}: a reader who cannot tell these
+   * five from the contract's four has that question before they have the one about playheads. Empty
+   * on every other flow, and the element is hidden rather than left as a blank line.
+   */
+  const goalContract = el(doc, 'span', 'everyday-stage-goals-contract');
+  goalContract.style.cssText = `font-size:11px;line-height:1.4;color:${C.inkSoft}`;
+  goals.append(goalHeading, goalContract, goalRows, goalNote);
 
   /**
    * **The alarm strip is a picture again, and its announcement moved to {@link alarmSay}** —
@@ -2198,9 +2206,13 @@ function mountStage(
       endedAt: recording.endedAt,
       history: week.history,
       day: week.day,
+      /* The screen's own flow, never the recording's — GitHub issue #567. */
+      contract: context.ctx === 'campaign',
     });
     goals.style.display = 'flex';
     goalHeading.textContent = strip.heading;
+    goalContract.textContent = strip.contract;
+    goalContract.style.display = strip.contract === '' ? 'none' : '';
     goalNote.textContent = strip.note;
     goalRows.replaceChildren();
     for (const row of strip.rows) {

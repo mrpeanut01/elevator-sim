@@ -112,6 +112,29 @@ interface TutorialSession {
 /** One session for the whole tutorial: screen two reuses the run screen one already paid for. */
 const session: TutorialSession = {};
 
+/**
+ * **Whether the pair screen two's footer is about is genuinely still coming** — GitHub issue
+ * **#569** item 1, recorded here under [§ D405](../../../../DECISIONS.md).
+ *
+ * The footer reads *“The day is being simulated now, twice … Nothing is shown until both land.”* A
+ * playability assessor read it under a screen showing **both runs side by side**, which is § D227's
+ * first direction on the one screen the same report called the best thing in the product: a correct
+ * sentence about the waiting state, still drawn in the settled one.
+ *
+ * Two causes, and this predicate is the second half of the fix. The first is that
+ * {@link COLLAPSE_SCREEN}'s `bar` is re-resolved only when something asks the shell for it, and
+ * nothing did when the runs landed — {@link mountCollapse}'s `render` now asks. The second is that
+ * the bar asked a **different question** from the component under it: the bar read
+ * `session.asRepaired === undefined` while `mountWorkedAnswer` draws its own pending line only when
+ * no failure has been reported either. A pair that failed to load or failed to run is not *coming*,
+ * and a footer promising it would land is the same defect at the other end.
+ *
+ * So there is one predicate and both readers ask it.
+ */
+function collapsePairPending(): boolean {
+  return loadFailure === undefined && runFailure === undefined && session.asRepaired === undefined;
+}
+
 interface LoadedTutorial {
   /**
    * `BrowserResources` **is** a `FixitResources` — same five fields, structurally — so this is the
@@ -554,7 +577,30 @@ function mountCollapse(
    */
   answerHost.tabIndex = -1;
   const footer = el(doc, 'div', 'everyday-collapse-footer');
-  root.append(say, header, stageHost, controlHost, letter, answerHost, footer);
+  /**
+   * **The canvas and the one press, side by side where there is room for both** — GitHub issue
+   * **#569** item 5, recorded here under [§ D405](../../../../DECISIONS.md).
+   *
+   * Stacked, they did not fit: a playability assessor measured the press at y = 889.5 in a 900 px
+   * viewport, and this shell's scroller is the inner `main.everyday-screen` rather than the window,
+   * so a player who did not know to scroll *inside* the page never reached the first run-affecting
+   * control the product offers.
+   *
+   * `flex-wrap` rather than a media query or a grid template, because the two bases say the whole
+   * rule: give the canvas 560 px and the control 300 px and they sit on one line wherever 876 px of
+   * content width exists, and wrap into the original stacked order — canvas first, then the press —
+   * wherever it does not. No breakpoint is authored, nothing needs `matchMedia`, and the narrow
+   * layout is the one this screen already shipped.
+   *
+   * Reading order is unchanged in both, which is what `docs/36`'s `AX-12` needs: the press is still
+   * the element after the canvas, so a keyboard player meets them in the same order at every width.
+   */
+  const playRow = el(doc, 'div', 'everyday-collapse-play');
+  playRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start';
+  stageHost.style.cssText = 'flex:1 1 560px;min-width:0';
+  controlHost.style.cssText = 'flex:1 1 300px;min-width:0;max-width:44ch';
+  playRow.append(stageHost, controlHost);
+  root.append(say, header, playRow, letter, answerHost, footer);
 
   /** Which run is on the canvas. The one piece of state the press moves. */
   let beat: TutorialBeat = 'as-built';
@@ -565,6 +611,8 @@ function mountCollapse(
   let ended = false;
   let worked: MountedWorkedAnswer | undefined;
   let said = '';
+  /** What the action bar was last told — see the `refreshBar` note in {@link render}. */
+  let barPending = collapsePairPending();
 
   /**
    * The panes for a beat, or `undefined` while a run it needs has not landed.
@@ -663,6 +711,13 @@ function mountCollapse(
   function renderControl(view: ReturnType<typeof tutorialCollapseViewOf>): void {
     controlHost.replaceChildren();
     const control = view.control;
+    /*
+     * **The column comes down with the control, rather than holding its width empty.** The press is
+     * spent on the beat it moves, and the `answered` beat draws the canvas twice — so an empty
+     * flex item still claiming 300 px would narrow the two-pane comparison for nothing. See the
+     * play row's note above for why the two sit side by side at all.
+     */
+    controlHost.style.display = control === undefined ? 'none' : '';
     if (control === undefined) return;
     const card = el(doc, 'div', 'everyday-collapse-control-card');
     card.style.cssText = `${CARD};margin:16px 0 0;max-width:62ch;display:grid;gap:8px`;
@@ -784,6 +839,22 @@ function mountCollapse(
       said = view.say;
       say.textContent = said;
     }
+
+    /*
+     * **And the footer follows the same landing the canvas does** — GitHub issue #569 item 1.
+     *
+     * The bar is resolved by the shell, not by this mount, and nothing asked it again when the two
+     * runs arrived: {@link request}'s `onDone` calls `render`, which repaints everything inside this
+     * screen and nothing outside it. So the pending sentence outlived the state it describes for as
+     * long as the player stayed. Asked on the change rather than on every render, because the shell
+     * rebuilds the row and `render` runs on every landing run and every case-file arrival —
+     * `mountCollapse`'s own `AX-3` reasoning one element over.
+     */
+    const pendingNow = collapsePairPending();
+    if (pendingNow !== barPending) {
+      barPending = pendingNow;
+      context.refreshBar();
+    }
   }
 
   render();
@@ -832,9 +903,7 @@ export const COLLAPSE_SCREEN: EverydayScreenModule = {
    */
   bar(state): ActionBarModel {
     const base = actionBarFor(state);
-    return session.asRepaired === undefined
-      ? { ...base, note: TUTORIAL_COPY.collapsePending }
-      : base;
+    return collapsePairPending() ? { ...base, note: TUTORIAL_COPY.collapsePending } : base;
   },
   mount: mountCollapse,
 };

@@ -377,10 +377,10 @@ export function sublineFor(state: EverydayState): string {
       if (state.ctx === 'replay') return REPLAY_COPY.subline;
       return state.ctx === 'rush' ? 'READING THE RUSH' : 'READING THE REPORT';
     case 'towers':
-      return 'CAMPAIGN';
+      return 'CAREER';
     case 'building':
     case 'contract':
-      return 'CAMPAIGN';
+      return 'CAREER';
     case 'rush':
       return 'IN THE RUSH';
     case 'fixit':
@@ -427,7 +427,7 @@ export function railGroups(
 
   if (ctx === 'campaign' && inCampaign) {
     groups.push({
-      title: 'CAMPAIGN',
+      title: 'CAREER',
       items: Object.freeze([
         item('towers', 'All buildings'),
         ...(openBuilding === undefined ? [] : [item('building', openBuilding)]),

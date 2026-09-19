@@ -256,7 +256,7 @@ export const CAMPAIGN_ABSENCES: readonly string[] = Object.freeze([
    * The entry's own three sentences are untouched and still true, which is why nothing here moved
    * into or out of the player-facing list.
    */
-  'A day is run from here and scored by the day itself; the month grid marks a day cleared or missed when the campaign day is filed, and nothing files one automatically.',
+  'A day is run from here and scored by the day itself; the month grid marks a day cleared or missed when the career day is filed, and nothing files one automatically.',
   /*
    * **The session-only entry is deleted, not reworded** — GitHub issue #375, § D227, and the same
    * rule the incidents entry above came out under. It read *"The career is this session's. Nothing

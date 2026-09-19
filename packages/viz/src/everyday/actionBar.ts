@@ -165,7 +165,7 @@ const MENU_PRIMARY: Readonly<Record<EverydayModePick, string>> = Object.freeze({
 });
 
 const LEAVE_TOWER = "⤺ Leave today's tower";
-const LEAVE_CAMPAIGN = '⤺ Leave the campaign';
+const LEAVE_CAMPAIGN = '⤺ Leave the career';
 const LEAVE_RUSH = '⤺ Leave the rush';
 const STOP_WATCHING = '⤺ Stop watching';
 const MODES = '⌂ Modes';
@@ -463,9 +463,32 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     leave: leave(LEAVE_CAMPAIGN),
     back: { label: 'All buildings', screen: 'towers' },
     timeline: { flow: 'campaign', step: 2 },
+    /*
+     * **The first two variants are the one cell of § 3.3 whose verb this build does not ship** —
+     * GitHub issue **#569** item 6, recorded here under [§ D405](../../../../DECISIONS.md).
+     *
+     * The guide writes *Run the day and decide as it goes* and *Run the day with that*. What the
+     * press does is `host.runCampaignDay` and `go('stage')`: the day is **simulated** on a worker
+     * and the § 7 stage opens **paused**, on its own start hour, with § 7.3's single centred
+     * `Start` over the first frame. A playability assessor pressed this, met a stopped clock, and
+     * recorded *"two starts for one intention"*.
+     *
+     * **The verb is what moved, and deliberately not the behaviour.** § 7.3 specifies the paused
+     * entry in as many words, `stageScreen.ts` draws the `Start` the specification asks for, and
+     * `stageScreen.browser.test.ts` pins it with its own argument — *"a stage that entered playing
+     * would be a day the player never chose to start"*. Making the press play would contradict the
+     * handoff, which `CLAUDE.md` makes canonical for what the screen looks like, and would do it by
+     * editing the case that holds the rule. So this label says what the press does; whether the
+     * stage should open playing is a design question for the owner and is filed as one.
+     *
+     * *Open*, then, rather than *Run* — and the rest of the guide's cell is untouched, because
+     * *decide as it goes* is true: the desk's options travel onto the stage, which is what the
+     * row's own note already promises. `actionBar.test.ts` transcribes the guide's cell and names
+     * this deviation beside it, in both directions.
+     */
     primary: primary([
-      'Run the day and decide as it goes',
-      'Run the day with that',
+      'Open the day and decide as it goes',
+      'Open the day with that',
       'Send your answer',
       'Choose an option first',
       'Watch a day here',

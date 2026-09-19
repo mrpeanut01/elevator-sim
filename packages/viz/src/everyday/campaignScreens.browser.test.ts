@@ -88,13 +88,15 @@ describe.skipIf(!HAS_BROWSER)('the Everyday campaign screens', () => {
     expect(await tile.textContent()).not.toContain('not built');
     await enterCampaign(page);
 
-    expect(await page.textContent('.everyday-towers h1')).toBe('Campaign');
+    /* **Career, not Campaign** — `docs/38` § 2.2 and `docs/39` § 3's rename map, GitHub issue #569
+       item 4. The tile has read *Career* since the ruling; the screen it opens now agrees. */
+    expect(await page.textContent('.everyday-towers h1')).toBe('Career');
     // The § 3.3 campaign timeline, which only a `ctx: 'campaign'` state resolves.
     const bar = await page.textContent('.everyday-bar-timeline');
     expect(bar).toContain('All buildings');
     expect(bar).toContain('Contract');
-    // And the rail's CAMPAIGN group, gated on the same fact.
-    expect(await page.textContent('.everyday-rail')).toContain('CAMPAIGN');
+    // And the rail's CAREER group, gated on the same fact.
+    expect(await page.textContent('.everyday-rail')).toContain('CAREER');
     await page.close();
   });
 

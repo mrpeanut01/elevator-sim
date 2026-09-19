@@ -374,7 +374,7 @@ export function buildNotesViewOf(): BuildNotesView {
     },
     {
       heading: 'Running a tower over a season',
-      note: 'The campaign — contracts, months and the things that happen to you.',
+      note: 'Your career — contracts, months and the things that happen to you.',
       entries: CAMPAIGN_ABSENCES,
     },
     {

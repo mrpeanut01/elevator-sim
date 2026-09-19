@@ -231,6 +231,58 @@ export function units(value: number): string {
  * the other three print below the wake-up gate — which is the only shape in which the row can still
  * decline to answer, and it is a state rather than a sentence.
  */
+/**
+ * **The one heading over {@link campaignTestGoals}' bars, and the one sentence saying what they
+ * decide** — GitHub issue **#567**, recorded here under [§ D405](../../../../DECISIONS.md).
+ *
+ * ## What was wrong
+ *
+ * The desk and the contract sheet headed these four `WHAT DAY n ASKS`. One click later the § 7
+ * stage heads a **different** five bars `WHAT TODAY ASKS`. Four against five, no shared value, two
+ * headings differing by one word, and a playability assessor could not tell which decided the day.
+ * A third literal of the *other* heading sat in {@link BUILDING_COPY} as `testsEyebrow` and was read
+ * by **no screen at all** — a dead copy constant, deleted on the commit that made these two
+ * distinct rather than left to look like a third opinion.
+ *
+ * ## What is true, which is not what the issue assumed
+ *
+ * Both sets are graded. They grade different things, and that is the whole of the fix:
+ *
+ * - **These four** are `campaign/economy.ts#DIFFICULTIES[tower.difficultyId].tests` — fixed for the
+ *   tier, the same on day 1 and day 20 — and {@link campaignDayVerdict} folds them into the
+ *   `cleared` / `missed` mark `campaign/career.ts#fileDay` writes against the contract. Miss enough
+ *   and the contract ends.
+ * - **The other five** are `shift/goals.ts#goalsForDay` — a ladder that hardens with the week's day
+ *   — and they decide the day report's verdict, the streak and whether a clean day is banked.
+ *
+ * So the day number stays in the eyebrow (these bars *are* asked on day n, and the sheet beside them
+ * counts days), and the subject changes from *the day* to *the contract*, which is the noun the
+ * screen this sits on already uses everywhere else. `everyday/goalSets.test.ts` fails if the two
+ * sets diverge and the two screens stop saying so.
+ *
+ * **No bar moved for this**, in either set. Reconciling them by choosing numbers would need a
+ * derivation pinned to a run, and lowering either to make them agree is weakening a goal to make a
+ * day pass.
+ */
+export const CONTRACT_ASKS_HEADING = 'WHAT THE CONTRACT ASKS';
+
+/** `WHAT THE CONTRACT ASKS ON DAY 6` — {@link CONTRACT_ASKS_HEADING} with the tower's own day. */
+export function contractAsksEyebrow(day: number): string {
+  return `${CONTRACT_ASKS_HEADING} ON DAY ${String(day)}`;
+}
+
+/**
+ * What {@link CONTRACT_ASKS_HEADING}'s bars decide, and what the other set decides, in the player's
+ * words. `shift/goals.ts#TODAY_ASKS_DECIDES` is its mirror on the stage.
+ *
+ * Its own key rather than an extension of {@link BUILDING_COPY.testsNote}: that line is about
+ * *whether today can be read at all* and carries its own § D227 correction, and welding a second
+ * subject onto it would put two arguments in one sentence for the next lane to separate again.
+ */
+export const CONTRACT_ASKS_DECIDES =
+  'These four are the contract’s, and they are what files a day cleared or missed against it. The ' +
+  'day’s own report grades a separate five, under WHAT TODAY ASKS, and those decide your streak.';
+
 export function campaignTestGoals(difficulty: Difficulty): readonly ShiftGoal[] {
   return Object.freeze([
     Object.freeze({
@@ -427,7 +479,7 @@ export function testsHeldLine(rows: readonly CampaignTestRow[]): string {
 
 /** The authored chrome of the triage screen, one frozen object so the sweep renders every line. */
 export const TOWERS_COPY = Object.freeze({
-  title: 'Campaign',
+  title: 'Career',
   lede:
     'You are the supervisor, not the operator. Each building runs on the standing order you gave it ' +
     'and maintenance gets on with the rest — you hear from them when a lift fails, a crowd is booked, ' +
@@ -960,7 +1012,6 @@ export const BUILDING_COPY = Object.freeze({
     'Nothing temporary in place. Anything you set for an incident reverts on its own when the incident ' +
     'closes, so a bad week cannot quietly become your standing order.',
   monthHeading: 'THIS MONTH',
-  testsEyebrow: 'WHAT TODAY ASKS',
   /*
    * **This read *"all four, or the day is missed"* when the fourth graded nothing**, and it is left
    * exactly as the correction wrote it now that all four do — § D227's first direction, on the line
@@ -1075,6 +1126,8 @@ export interface BuildingView {
   };
   readonly tests: {
     readonly eyebrow: string;
+    /** {@link CONTRACT_ASKS_DECIDES} — which of the career flow's two goal sets this is. */
+    readonly decides: string;
     readonly note: string;
     readonly held: string;
     readonly rows: readonly CampaignTestRow[];
@@ -1265,7 +1318,8 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
       missed: String(tower.missed),
     },
     tests: {
-      eyebrow: `WHAT DAY ${String(tower.day)} ASKS`,
+      eyebrow: contractAsksEyebrow(tower.day),
+      decides: CONTRACT_ASKS_DECIDES,
       note: BUILDING_COPY.testsNote,
       held: testsHeldLine(rows),
       rows,
@@ -1413,6 +1467,8 @@ export interface ContractView {
   };
   readonly tests: {
     readonly eyebrow: string;
+    /** {@link CONTRACT_ASKS_DECIDES} — which of the career flow's two goal sets this is. */
+    readonly decides: string;
     readonly note: string;
     readonly held: string;
     readonly rows: readonly CampaignTestRow[];
@@ -1642,7 +1698,8 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       kitNote: CONTRACT_COPY.purseKitNote,
     },
     tests: {
-      eyebrow: `WHAT DAY ${String(tower.day)} ASKS`,
+      eyebrow: contractAsksEyebrow(tower.day),
+      decides: CONTRACT_ASKS_DECIDES,
       note: BUILDING_COPY.testsNote,
       held: testsHeldLine(rows),
       rows,
