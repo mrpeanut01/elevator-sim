@@ -37709,11 +37709,20 @@ Measured on the always-on tier, both runs in detached worktrees, base re-measure
 | | base | with this change | move |
 |---|---|---|---|
 | cases | 49 | **49** | **0** |
-| strings | *see `warroom/findings/lane-f.md`* | | **0** |
+| strings | *owed* | *owed* | **0 forecast** |
 | simulations | 606 | **606** | **0** |
 | surfaces | 62 | **62** | **0** |
 | suppressed runs | 12 of 49 | **12 of 49** | **0** |
 | **failing cases** | **0** | **0** | **0** |
+
+**The strings row is a forecast rather than a measurement, and it says so.** The lane that wrote
+this entry cited a working file for the two counts; that file lives in a scratchpad this repository
+does not carry, so the row pointed a later reader at something they could never open — a figure
+published with nothing behind it, which is what `CLAUDE.md`'s *"if you publish a number, pin it to
+the run that produced it"* forbids. The counts are **owed**, and they are owed to the integrator
+rather than to this entry: [§ D343](#d343) puts the corpus measurement once on the integrated tree,
+so a lane could not honestly have filled them in either. The zero below is what this change is
+expected to move, published before the measurement so it can be scored against it.
 
 **Zero string movement is the forecast and the measurement, and it is what a reorder should look
 like from here.** The grid's membership is unchanged, the seed set `honesty/surfaces.ts` walks is
