@@ -37,7 +37,7 @@ import { WAIT_BANDS } from '../live/bands.js';
 import { syntheticFloor, syntheticRecording } from '../live/synthetic.test-helper.js';
 import { MIN_FIGURE_HEIGHT_PX } from '../render/riderFigures.js';
 import { drawCutaway } from './cutaway.js';
-import { stageGeometryOf, stageInkFor } from './stageScreenModel.js';
+import { MAX_LANDING_FIGURES, stageGeometryOf, stageInkFor } from './stageScreenModel.js';
 import { EVERYDAY_COLORS as C } from './tokens.js';
 
 /* -------------------------------------------------------------------------- *
@@ -410,6 +410,66 @@ describe('the relief mark', () => {
 
     const quiet = paint({ legs: [waiting('c', 250)], at });
     expect(quiet.ctx.calls.filter((call) => call.op === 'stroke' && call.args[0] === C.moss)).toHaveLength(0);
+  });
+
+  it('puts the ticks behind the tail of the queue rather than on top of it', () => {
+    /*
+     * The obvious placement -- the slots the boarders vacated -- is wrong, and wrong in a way a
+     * screenshot of a *quiet* landing would never show. A boarder leaves from the front and the
+     * people behind close up into those slots on the very next frame, so a tick drawn there lands
+     * on somebody who is still standing. This case has both at once.
+     */
+    const at = 300;
+    const legs = [
+      boarded('gone-1', 50, at - 1),
+      boarded('gone-2', 55, at - 2),
+      waiting('here-1', 100),
+      waiting('here-2', 110),
+      waiting('here-3', 120),
+    ];
+    const { ctx, queues } = paint({ legs, at });
+    expect(queues[0]?.recentlyBoarded).toBe(2);
+    expect(queues[0]?.total).toBe(3);
+
+    // Where each figure stands, and where each tick is struck. The tick's path opens with a
+    // `moveTo` at its own left edge, so the two are comparable on one axis.
+    const figureXs = heads(ctx).map((call) => Number(call.args[0]));
+    const tickXs: number[] = [];
+    for (let index = 0; index < ctx.calls.length; index += 1) {
+      if (ctx.calls[index]?.op !== 'stroke' || ctx.calls[index]?.args[0] !== C.moss) continue;
+      for (let back = index - 1; back >= 0; back -= 1) {
+        if (ctx.calls[back]?.op !== 'moveTo') continue;
+        tickXs.push(Number(ctx.calls[back]?.args[0]));
+        break;
+      }
+    }
+    expect(figureXs).toHaveLength(3);
+    expect(tickXs).toHaveLength(2);
+    // The lane fills right to left, so "behind the tail" means every tick is left of every figure.
+    // A capsule cell is 6.5 px wide; a whole cell of clearance is what makes this a real check
+    // rather than a float comparison that would pass on a one-pixel offset.
+    expect(Math.max(...tickXs)).toBeLessThan(Math.min(...figureXs) - 4.5);
+  });
+
+  it('shares the landing\'s 26-mark budget rather than extending it', () => {
+    // A cap that stops capping at exactly the moment the picture is busiest is not a cap. The
+    // standing crowd takes priority: it is the live claim, and relief has just stopped being one.
+    // Inside the run's own window: `syntheticRecording` ends at 600 s and both `frameAt` and
+    // `queueAt` clamp, so a boarding stamped past the horizon would still read as *waiting* and
+    // this case would silently become a different one.
+    const at = 500;
+    const legs = [
+      ...Array.from({ length: 30 }, (_, index) => waiting(`w-${String(index)}`, 100 + index)),
+      ...Array.from({ length: 10 }, (_, index) => boarded(`b-${String(index)}`, 50, at - 1)),
+    ];
+    const { ctx, queues } = paint({ legs, at });
+    expect(queues[0]?.total).toBe(30);
+    expect(queues[0]?.recentlyBoarded).toBe(10);
+    const figures = heads(ctx).length;
+    const ticks = ctx.calls.filter((call) => call.op === 'stroke' && call.args[0] === C.moss).length;
+    expect(figures).toBe(MAX_LANDING_FIGURES);
+    expect(ticks).toBe(0);
+    expect(figures + ticks).toBeLessThanOrEqual(MAX_LANDING_FIGURES);
   });
 
   it('stops being drawn once the relief window has passed, without the rider coming back', () => {

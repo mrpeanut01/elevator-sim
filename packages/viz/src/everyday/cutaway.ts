@@ -28,6 +28,7 @@ import {
   stageCarRestBarOf,
   stageCrowdCapOf,
   stageInkFor,
+  MAX_LANDING_FIGURES,
   STAGE_OUT_OF_SERVICE,
   type StageGeometry,
 } from './stageScreenModel.js';
@@ -242,25 +243,41 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
      * the queue simply gets shorter between two frames, which looks exactly like nobody having
      * been there.
      *
-     * Drawn as a tick per boarder, in the slots they just vacated — same lane, same pitch, same
-     * right-to-left order — so the read is *these stood here a moment ago and are gone*. In
-     * `moss`, the calm end of the ramp, because relief is the opposite of the thing the warm end
-     * means.
+     * Drawn as a tick per boarder, **immediately behind the tail of the queue** — the same lane,
+     * the same pitch and the same right-to-left order the crowd uses, continuing from where the
+     * crowd stops. So the read is *these were part of this queue a moment ago*, and on a landing a
+     * car has emptied the ticks stand exactly where the crowd was. In `moss`, the calm end of the
+     * ramp, because relief is the opposite of what the warm end means.
      *
-     * **It is a transition marker and deliberately not a figure.** It publishes no count: it is
-     * capped at the lane like everything else here, and no `+N` is composed for it, because a
-     * string composed inside a painter is read by no honesty property ([§ D347]). The number who
-     * boarded is `describeQueue`'s to say in words, and it says it.
+     * **Behind the tail rather than in the slots they vacated**, which is the obvious placement and
+     * is wrong: a boarder leaves from the *front*, and the people behind them close up into those
+     * slots on the very next frame. Drawing there puts the tick on top of somebody who is still
+     * standing.
+     *
+     * **The landing's mark budget is shared rather than extended.** {@link MAX_LANDING_FIGURES} is
+     * § 14's *at most 26 figures, then `+N`*, and the ticks come out of the same 26 with the
+     * standing crowd taking priority — the live claim outranks the one that has just stopped being
+     * live. A landing cannot draw 26 people and then 26 more marks; that would be a cap that stops
+     * capping at exactly the moment the picture is busiest.
+     *
+     * **It is a transition marker and deliberately not a figure.** It publishes no count, and no
+     * `+N` is composed for it, because a string composed inside a painter is read by no honesty
+     * property ([§ D347]) — which is why the crowd's own overflow chip below still comes from
+     * `stageScreenModel.ts#stageCrowdCapOf`. The number who boarded is `describeQueue`'s to say in
+     * words, and it says it.
      */
-    if (floor.recentlyBoarded > 0) {
-      const ticks = Math.min(floor.recentlyBoarded, perRow);
+    const ticks = Math.min(floor.recentlyBoarded, Math.max(0, MAX_LANDING_FIGURES - cap.drawn));
+    if (ticks > 0) {
       const arm = Math.max(1.5, capsuleH * 0.28);
       ctx.strokeStyle = C.moss;
       ctx.lineWidth = Math.max(1, capsuleH * 0.14);
       ctx.lineCap = 'round';
       for (let index = 0; index < ticks; index += 1) {
-        const x = g.landing.x + g.landing.width - 6 - (index + 1) * (capsuleW + 2);
-        const y = row.y - 2 - capsuleH * 0.5;
+        const position = cap.drawn + index;
+        const lane = Math.floor(position / perRow);
+        const slot = position % perRow;
+        const x = g.landing.x + g.landing.width - 6 - (slot + 1) * (capsuleW + 2) - lane * 1.5;
+        const y = row.y - 2 - lane * (capsuleH * 0.25) - capsuleH * 0.5;
         ctx.beginPath();
         ctx.moveTo(x + capsuleW * 0.1, y);
         ctx.lineTo(x + capsuleW * 0.42, y + arm * 0.55);
