@@ -38,6 +38,19 @@
  * and is therefore printed on a saturated day, which is the day a reader most needs it. That split
  * is `docs/10` R9: one gate, for exactly the figures the flag speaks for, widened to nothing.
  *
+ * ## What takes the lead when that gate closes — § D666
+ *
+ * The refusal is not softened, reworded, hedged or drawn provisionally, and it does not leave the
+ * grid: it keeps its cell, its tone, its ground and `core`'s own sentence, word for word. What
+ * changed is that it stops being the most prominent thing on the page by default. The sheet now
+ * names the cell it leads with ({@link ShapedOnlyFields.headlineFigureId}), and on a refused run
+ * that is the **tightest moment** — the deepest a landing stood, on a named floor, at a named
+ * minute, out of the day's own arrivals. A count of people, in a different unit from the figure
+ * that went away, so no reader can take it for a substitute and
+ * `honesty/properties.ts#checkSuppressedMean` has nothing to collide with. See
+ * {@link TIGHTEST_MOMENT} for the eliminations that chose it over the other five cells, and
+ * {@link headlineFigureIdOf} for the run that gets no promotion because it produced no moment.
+ *
  * ## Energy: two figures, no colour, no total
  *
  * The handoff has no energy figure. `docs/12` § 4.2 adds one and § D106 says why dropping it to
@@ -394,6 +407,40 @@ interface ShapedOnlyFields {
    * own basis could not be told apart from a sheet of a different question, which is the defect.
    */
   readonly basis: ReportBasis;
+  /**
+   * **Which cell this sheet leads its grid with** — a `ReportFigure.id`, and the sheet's answer to
+   * *what is the figure of this day?*
+   *
+   * ## The finding this closes
+   *
+   * On the day a reader most wants a number, `AVERAGE WAIT` reads `withheld`. That refusal is
+   * right and is untouched — it keeps its place in the grid, its tone, its ground and
+   * `core`'s own sentence, word for word. What was wrong is that nothing took its place: the sheet
+   * led with the same cell it leads with on a day nothing was refused, so the most prominent thing
+   * on the page was the one thing the run could not say. A refusal replaces a number; it does not
+   * have to replace the **lead**. See {@link TIGHTEST_MOMENT} for which cell is promoted and the
+   * five eliminations that chose it.
+   *
+   * ## Why the id rather than the figure
+   *
+   * A copy of the cell would be a second copy of a figure, which is a second figure —
+   * `mode/casualDay.ts`'s rule, and the sheet would then draw one number twice. An id names a cell
+   * the grid already carries, and {@link leadingWith} is the one expression that acts on it.
+   *
+   * ## Why a field rather than *whatever `figures[0]` is*
+   *
+   * Because a register can re-sort. `render/reportCard.ts` tiles *the sheet's order* and needs no
+   * field; `dev/reportPanel.ts` draws the Casual grid through
+   * `mode/casualDay.ts#casualFigureOrderOf`, which ranks by a frozen list of ids and would rank
+   * this sheet's own lead straight back into the middle of the grid. An index is a fact about an
+   * array that any later sort silently overwrites; a named decision is one a consumer can honour.
+   * This is § D237's rule pointed at the grid: the sheet decides once, and every renderer reaches
+   * the answer through the same key.
+   *
+   * On **both** shapes, because a Free Play run's mean is refused on exactly the same five grounds
+   * a campaign day's is.
+   */
+  readonly headlineFigureId: string;
 }
 
 /**
@@ -842,6 +889,12 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
   const dispatcherName = input.dispatcherName ?? recording.dispatcherProfileId;
   const readings = readGoals(input.goals, observations);
   const judgement = judgementOf(readings, summary, observations);
+  /*
+   * Decided once, above the grid, because two things read it: the order `figuresFor` returns, and
+   * the field every renderer reaches it through. Deriving it a second time inside either would be
+   * the two-answers-to-one-question shape § D237 closed in the verdict.
+   */
+  const headlineFigureId = headlineFigureIdOf(summary, observations);
 
   const core: ReportCore = {
     /*
@@ -869,7 +922,14 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
      */
     basis: basisOf(input),
     lede: judgement.lede,
-    figures: figuresFor(summary, observations, dayStartS, input.showEnergyAxis ?? true),
+    headlineFigureId,
+    figures: figuresFor(
+      summary,
+      observations,
+      dayStartS,
+      input.showEnergyAxis ?? true,
+      headlineFigureId,
+    ),
     verdict: judgement.verdict,
     verdictLine: judgement.verdictLine,
     diagnosisHeading: judgement.diagnosisHeading,
@@ -1241,16 +1301,135 @@ function legCount(count: number, noun: string): string {
 }
 
 /* -------------------------------------------------------------------------- *
- * The figure grid
+ * The figure grid, and the cell it leads with
  * -------------------------------------------------------------------------- */
+
+/**
+ * The cell this sheet leads with when its mean may be published — and it is deliberately the cell
+ * both registers already lead with.
+ *
+ * `figuresFor` puts `carried` first and `mode/casualDay.ts#CASUAL_FIGURE_ORDER` puts `carried`
+ * first, so naming it here makes {@link leadingWith} a **no-op on every day the mean is
+ * published**. That is the whole design of {@link ShapedOnlyFields.headlineFigureId}: the field
+ * does not re-decide either register's ordering, it records which cell that ordering leads with so
+ * that one day — the refused one — can move it.
+ */
+const HEADLINE_WHEN_PUBLISHED = 'carried';
+
+/**
+ * The cell that stands in when the mean is refused: **the tightest moment**, as a count of people.
+ *
+ * ## Why this sheet needs a stand-in at all
+ *
+ * On the day a reader most wants a number, {@link averageWaitFigure} draws the word `withheld`,
+ * and that is `awtIsValid` doing its job — it is not softened here, not reworded, not shown
+ * provisionally, and not moved out of the grid. What was missing is the other half: the run
+ * produced six other figures and the sheet went on leading with the same cell it leads with on a
+ * day nothing was refused, so the refusal was the most interesting thing on the page by default.
+ * A refusal replaces a number; it does not have to replace the **lead**.
+ *
+ * ## Why `deepest-queue` and not one of the other five — derived, not picked
+ *
+ * The candidates are the cells this sheet already computes. Each of the other five is eliminated
+ * by something the repository has already measured or already ruled:
+ *
+ * - **`average-wait`** is the refused cell. That is the premise.
+ * - **`worst-wait`** is the closest thing on the sheet to the refused figure — a wait in seconds
+ *   over the *same* `reportWindow` — and it fails on its own terms before the resemblance even
+ *   matters. `shift/reportWindow.ts` measures it: *"a band holding zero arrivals withholds both
+ *   headline figures at once — `AVERAGE WAIT withheld`, `WORST WAIT not recorded`"*, and the
+ *   empty window is one of `awtIsValid`'s own five grounds. So on that ground the promotion would
+ *   replace an absence with an absence. On two more of the five — a censored leg, and a leg past
+ *   the 900 s horizon — the cell reads `at least 922 s`, a lower bound rather than a figure the
+ *   run produced.
+ * - **`minute`** is the trap this project has a rule for. Its denominator is `servedLegs`, and
+ *   `CLAUDE.md` states the mechanism outright: abandonment *improves* the wait figures by
+ *   construction, because it removes the longest waits from the sample — measured at
+ *   `midtown-office` 6 %, AWT 61.9 s → 23.3 s with fifty-one riders gone. Abandonment above 2 %
+ *   is itself one of the five grounds, so leading a refused day with the share away inside a
+ *   minute would put the sheet's most flattered figure in the slot the refusal vacated, on the
+ *   very days it is most flattered. That is § D106's *a configuration that improves its wait by
+ *   serving fewer people has not improved anything*, drawn as a headline.
+ * - **the energy pair** is `axisOnly` — an axis, never a score, never ranked (§ D106) — and it is
+ *   optional (`showEnergyAxis`), so a lead that could vanish with a settings toggle would make
+ *   what the sheet leads with depend on a preference rather than on the run.
+ * - **`stairs`** is `0` on most runs and is toned `good` when it is, and a slot whose figure is
+ *   usually zero is a slot a reader learns to skip — this module's own argument against
+ *   {@link attemptLine}'s *attempt 1* and against a diagnosis heading that is true of every day.
+ *
+ * What is left is the deepest queue, and it clears every constraint rather than merely surviving:
+ * it is a **count of people** rather than an estimate, so nothing suppresses it; it is in a
+ * different unit from the refused mean, so no reader can take it for the figure that went away and
+ * `honesty/properties.ts#checkSuppressedMean` has nothing to collide with; it is not a score, a
+ * grade or a rating; and it is the run's **own** worst moment, on a named floor at a named minute,
+ * which is the one thing the sheet was already calling *the tightest moment* in
+ * {@link VERDICT_VOICE} and drawing as the first row of the diagnosis.
+ *
+ * Its count travels in its own note ({@link deepestQueueNote}), not in {@link ReportFigure.count}:
+ * that field is *"how many observations this cell's value is a mean over"* and this is a maximum,
+ * so declaring one would be the wrong claim in a structured field. The note is where `minute` and
+ * the per-leg energy figure already carry their denominators, and the note is the unit
+ * `honesty/surfaces.ts` reads `countShown` off.
+ */
+const TIGHTEST_MOMENT = 'deepest-queue';
+
+/**
+ * Which cell this sheet leads with — see {@link TIGHTEST_MOMENT} for the derivation.
+ *
+ * Two arms and one gate, and the gate is {@link meanIsPublishable} rather than a second copy of
+ * its conjunction, so the cell that is promoted and the cell that is refused cannot disagree about
+ * which day this is.
+ *
+ * The fallback is not decoration. `Observations.peakQueueFloorId` and `peakQueueAtS` are `null`
+ * when no landing ever held anybody, and {@link deepestQueueNote} draws *"never more than a
+ * handful"* there — a cell whose value is `0` and whose note names no floor and no minute. Leading
+ * with it would be leading with a second absence, which is the defect this promotion exists to
+ * close, so a run with no moment to promote keeps the lead it always had.
+ */
+function headlineFigureIdOf(summary: VizSummary, observations: Observations): string {
+  if (meanIsPublishable(summary)) return HEADLINE_WHEN_PUBLISHED;
+  const hasMoment =
+    observations.peakQueueFloorId !== null &&
+    observations.peakQueueAtS !== null &&
+    observations.peakQueue > 0;
+  return hasMoment ? TIGHTEST_MOMENT : HEADLINE_WHEN_PUBLISHED;
+}
+
+/**
+ * `figures` with the named cell first — a **permutation**, and asserted as one.
+ *
+ * Total and order-preserving on the rest, so the result has the same length and the same members
+ * as the input on every possible input, including an id no cell carries. That is
+ * `mode/casualDay.ts#casualFigureOrderOf`'s property and its reason: *the order is the reframing;
+ * the membership is not*. A promotion that dropped a cell would be a figure a reader never sees,
+ * which is a larger sin than the one being fixed.
+ *
+ * Generic over the cell type for `casualFigureOrderOf`'s stated reason — `dev/reportPanel.ts`
+ * applies it on either side of the register's own ordering, and a test can call it on a synthetic
+ * id set no shipped sheet produces.
+ *
+ * Exported because the Casual register re-sorts the grid **after** this module has ordered it
+ * (`casualFigureOrderOf` ranks by a frozen list of ids, so a sheet's own lead would be ranked back
+ * into the middle), and a second implementation of *put this one first* in that file would be two
+ * answers to one question. `dev/reportPanel.ts#reportViewOf` is the non-test caller.
+ */
+export function leadingWith<T extends { readonly id: string }>(
+  figures: readonly T[],
+  id: string,
+): readonly T[] {
+  const lead = figures.find((cell) => cell.id === id);
+  if (lead === undefined) return figures;
+  return [lead, ...figures.filter((cell) => cell !== lead)];
+}
 
 function figuresFor(
   summary: VizSummary,
   observations: Observations,
   dayStartS: SimTime,
   showEnergyAxis: boolean,
+  headlineFigureId: string,
 ): readonly ReportFigure[] {
-  return [
+  const grid: readonly ReportFigure[] = [
     {
       id: 'carried',
       label: 'CARRIED',
@@ -1294,6 +1473,35 @@ function figuresFor(
      */
     ...(showEnergyAxis ? energyFigures(summary) : []),
   ];
+  /*
+   * The grid above is the Engineer order, unchanged — carried, the minute share, the two wait
+   * figures, the deepest queue, the stairs, then the axis. What {@link leadingWith} does to it is
+   * nothing at all on a day the mean is published, because {@link HEADLINE_WHEN_PUBLISHED} names
+   * the cell this list already begins with. On a refused day it moves one cell to the front, and
+   * the refusal keeps its own place in the grid with its own words. See {@link TIGHTEST_MOMENT}.
+   */
+  return leadingWith(grid, headlineFigureId);
+}
+
+/**
+ * **The suppression gate, as one expression** — and the reason it is a function rather than a
+ * repeated conjunction.
+ *
+ * `AVERAGE WAIT` is the only figure this sheet may refuse, and the test is `awtIsValid &&
+ * !saturated` — both, not either, which is `docs/12` § 4.2's own wording and the conservative
+ * direction. Until {@link headlineFigureIdOf} there was exactly one reader and the conjunction
+ * lived inside it; there are two now, and two of them is precisely the shape § D237 closed in the
+ * verdict: *the sheet must not decide one question in two places*. A headline that promoted a
+ * stand-in on a slightly different test from the one that refused the mean would put a cell in
+ * the lead slot on a day the mean was published, or leave the lead where it was on a day it was
+ * not, and nothing in the suite would say which had happened.
+ *
+ * Exported for the same reason {@link averageWaitFigure} is: `report.test.ts` states it as a
+ * premise of the fixtures rather than recomputing it, so a change in `core`'s saturation detector
+ * arrives here as a premise failure.
+ */
+export function meanIsPublishable(summary: VizSummary): boolean {
+  return summary.awtIsValid && !summary.saturated;
 }
 
 /**
@@ -1319,8 +1527,7 @@ function figuresFor(
  * {@link ReportFigure.count}.
  */
 export function averageWaitFigure(summary: VizSummary): ReportFigure {
-  const publishable = summary.awtIsValid && !summary.saturated;
-  if (!publishable) {
+  if (!meanIsPublishable(summary)) {
     return {
       id: 'average-wait',
       label: 'AVERAGE WAIT',
@@ -1516,12 +1723,43 @@ function worstWaitFigure(summary: VizSummary): ReportFigure {
  */
 const LONG_WORST_WAIT_S = 120;
 
-/** *floor 12 at 08:37*, or the honest absence of one. Never a clock time the run did not have. */
+/**
+ * *floor 12 at 08:37, the most of the day's 440 arrivals to stand on one landing at once* — or the
+ * honest absence of one. Never a clock time the run did not have.
+ *
+ * ## The denominator, and why it arrived with {@link TIGHTEST_MOMENT}
+ *
+ * This cell is the one the sheet promotes into the lead when the mean is refused, and R13's rule
+ * is that a figure travels with the count it was taken over. It used to carry a place and a minute
+ * and no population at all — true, and `23` with nothing to read it against, which is the shape
+ * `docs/10` R3 refuses one step before a figure goes missing entirely. `Observations.arrived` is
+ * the cohort: every person standing on that landing is a leg that arrived, so the maximum is drawn
+ * from that count and from no other.
+ *
+ * **Not `ReportFigure.count`**, which is *"how many observations this cell's value is a mean
+ * over"*. This is a maximum, so the structured field would be the wrong claim; the denominator
+ * goes where `AWAY INSIDE A MINUTE` and `WORK PER DELIVERED LEG` already put theirs, in the note
+ * under the value, which is R13's *"in the same visual unit"* and the unit `honesty/surfaces.ts`
+ * reads `countShown` off.
+ *
+ * *at once* is load-bearing rather than decorative: it is what keeps an instantaneous count from
+ * reading as a share of the day, which is the cohort-caption rule § D417 states for TOOK THE
+ * STAIRS one function down.
+ *
+ * The empty arm takes no denominator. There is no moment, so there is nothing for a population to
+ * be the population *of* — and a count beside *never more than a handful* would be a caption over
+ * a hole. That arm is also the one {@link headlineFigureIdOf} refuses to promote, for the same
+ * reason.
+ */
 function deepestQueueNote(observations: Observations, dayStartS: SimTime): string {
   if (observations.peakQueueFloorId === null || observations.peakQueueAtS === null) {
     return 'never more than a handful';
   }
-  return `floor ${observations.peakQueueFloorId} at ${clockOf(observations.peakQueueAtS, dayStartS)}`;
+  return (
+    `floor ${observations.peakQueueFloorId} at ` +
+    `${clockOf(observations.peakQueueAtS, dayStartS)}, the most of the day’s ` +
+    `${String(observations.arrived)} arrivals to stand on one landing at once`
+  );
 }
 
 /**

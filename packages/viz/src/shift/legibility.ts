@@ -26,11 +26,17 @@
  *
  * `docs/35` § 11 item 5 lists *whether 120 contiguous seconds is the right legibility window* as
  * open and a design choice rather than a fact. It stays a declared assumption: at the stage's
- * default speed (`stageScreenModel.ts#DEFAULT_STAGE_SPEED_INDEX`) two simulated minutes are on the
- * order of ten real seconds, which is the time a reader spends on one screen before their eye
- * moves, and a shorter window would count a crowd the cutaway drew for one frame. It is uncited
- * by construction; a playtest is what would move it, and the constant is here so a playtest has
- * one thing to move.
+ * default speed (`stageScreenModel.ts#DEFAULT_STAGE_SPEED_INDEX`) two simulated minutes are **thirty
+ * real seconds**, long enough to notice a crowd, ask why, and act, and a shorter window would count
+ * a crowd the cutaway drew for one frame. It is uncited by construction; a playtest is what would
+ * move it, and the constant is here so a playtest has one thing to move.
+ *
+ * **That figure read *"on the order of ten real seconds"* until [§ D641](../../../../DECISIONS.md)**,
+ * and it was correct for the `30×` default § D354 chose. The opening rung is now `4×`, so the same
+ * 120 simulated seconds is thirty real ones — the window did **not** move, the speed under it did,
+ * and the argument for the window got stronger rather than weaker. Corrected on the commit that made
+ * it stale, which is `CLAUDE.md`'s rule for a published number and for the sentence that states a
+ * mechanism alike.
  *
  * ## The sweep, and the run it pins to
  *

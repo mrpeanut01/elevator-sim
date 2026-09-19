@@ -137,7 +137,8 @@ describe('the hold line — forty past two minutes at once, read at the stream�
     }
     const brokeView = rushResultViewOf(broke, undefined);
     expect(brokeView.head).toBe(`Wave ${String(broke.wave)} is where it stopped draining`);
-    expect(brokeView.account).toHaveLength(3);
+    /* Four beats since the hold is located: comfortable, the trend, it broke, and **where**. */
+    expect(brokeView.account).toHaveLength(4);
     /* The trend test is quoted from the recording, never computed here. */
     expect(brokeView.account[1]).toContain('people a minute');
     expect(brokeView.account[1]).toContain(`${String(broke.saturation?.sampleCount ?? 0)} samples`);
@@ -145,6 +146,53 @@ describe('the hold line — forty past two minutes at once, read at the stream�
     expect(stoppedView.account).toHaveLength(2);
     expect(stoppedView.footer).toContain('not posted');
     expect(stoppedView.lede).toContain('does not have a breaking point');
+  });
+
+  it('places the hold on landings, which core’s own reader has none to give', () => {
+    /*
+     * § D515 decides *when* forty people have been standing over two minutes at once and can say
+     * nothing about *where*: `rushHoldAtLegs` reads three fields of a leg and not one of them is a
+     * floor. `shift/trouble.ts` adds the landings, and this is the assertion that the result a
+     * player reads carries them.
+     */
+    const broke = rushOutcomeOf(rush, undefined);
+    expect(broke.kind).toBe('broke');
+    expect(broke.where.length).toBeGreaterThan(0);
+    for (const place of broke.where) {
+      expect(place.label.length).toBeGreaterThan(0);
+      /* Every figure inside its cohort — R13, and the arithmetic that says the place is real. */
+      expect(place.pastTheLine).toBeGreaterThan(0);
+      expect(place.pastTheLine).toBeLessThanOrEqual(place.standing);
+    }
+    /* The landings partition the people past the line: none counted twice, none dropped. */
+    expect(broke.where.reduce((sum, place) => sum + place.pastTheLine, 0)).toBe(broke.overLine);
+
+    const beat = rushResultViewOf(broke, undefined).account[3];
+    expect(beat).toBeDefined();
+    expect(beat).toContain(broke.where.length === 1 ? 'all in one place' : 'not in one place');
+    expect(beat).toContain(broke.where[0]?.label ?? '');
+    expect(beat).toContain(`of ${String(broke.overLine)} past two minutes across the building`);
+    /* Where and when, never why — charter non-goal 4 — and no mean anywhere near it (R3). */
+    for (const word of ['because', 'due to', 'caused', 'mean', 'average']) {
+      expect(beat?.toLowerCase()).not.toContain(word);
+    }
+    /*
+     * A hold on a single landing may not be worded as *not in one place*, which is the clearest
+     * case this beat reports and so the last one that may contradict itself.
+     */
+    const one = rushResultViewOf({ ...broke, where: broke.where.slice(0, 1) }, undefined).account[3];
+    expect(one).toContain('They were all in one place');
+    expect(one).not.toContain('not in one place');
+    const two = rushResultViewOf(
+      { ...broke, where: [...broke.where.slice(0, 1), ...broke.where.slice(0, 1)] },
+      undefined,
+    ).account[3];
+    expect(two).toContain('They were not in one place');
+
+    /* A hand stop crossed no line, so there is no place to name and no fourth beat. */
+    const stopped = rushOutcomeOf(rush, (rushHoldAt(rush) ?? 0) - 60);
+    expect(stopped.where).toEqual([]);
+    expect(rushResultViewOf(stopped, undefined).account).toHaveLength(2);
   });
 
   it('banks the waves before the one it broke in, and a hand stop banks none — GitHub issue #499', () => {

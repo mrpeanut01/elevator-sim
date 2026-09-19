@@ -117,6 +117,7 @@ import type { ViewMode } from '../mode/types.js';
 import {
   clockOf,
   ENERGY_FIGURE_IDS,
+  leadingWith,
   type ReportBasis,
   type ReportNextStep,
   type ShapedDayReport,
@@ -1508,10 +1509,25 @@ export function reportViewOf(
      * cell rather than a position — the two are independent, and a reorder that had to be kept in
      * step with a per-index lookup is the shape of coupling that goes wrong when a ninth figure
      * lands.
+     *
+     * **`leadingWith` runs last, and it runs in both registers** — § D666. The sheet names the
+     * cell it leads with, and on a run whose mean is refused that is a figure the run produced
+     * rather than the word `withheld`. It has to be applied *after* `casualFigureOrderOf` and not
+     * instead of it: that function ranks by a frozen list of ids, so the sheet's own lead would be
+     * ranked straight back into the middle of the Casual grid and the promotion would reach the
+     * Engineer sheet only. Both are permutations, so composing them is one too — nothing is
+     * dropped and the membership is unchanged, which is what the Casual reorder's own note above
+     * means by *the order is the reframing; the membership is not*.
+     *
+     * On every day the mean is published this is a **no-op in both registers**, because
+     * `shift/report.ts` names the cell each ordering already begins with. The composition is
+     * unconditional on purpose: a branch here would be this module deciding when a promotion
+     * applies, which is a decision the sheet has already taken and may not take twice.
      */
-    figures: (casual ? casualFigureOrderOf(shaped.figures) : shaped.figures).map((cell) =>
-      figureViewOf(cell, mode),
-    ),
+    figures: leadingWith(
+      casual ? casualFigureOrderOf(shaped.figures) : shaped.figures,
+      shaped.headlineFigureId,
+    ).map((cell) => figureViewOf(cell, mode)),
     verdictLine: shaped.verdictLine,
     /*
      * Three verdicts, three colours — and the third is **neutral**, not a warning.

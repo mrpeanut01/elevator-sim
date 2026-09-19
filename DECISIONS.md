@@ -24619,7 +24619,7 @@ on an unhandled page error, which is the same disease.
 
 ## D354 — the stage speed ladder is honest, and the default is a decision rather than a constant
 
-> **Status 2026-09-06: AMENDED by [§ D525](#d525).** The ladder stands; the opening speed moves from `30×` to a watching rung, `1×` or `4×`, chosen by playtest. See [`docs/39`](docs/39-decisions-in-force.md).
+> **Status 2026-09-06: AMENDED by [§ D525](#d525) · implemented 2026-09-19 by [§ D641](#d641).** The ladder stands; the opening speed has moved from `30×` to `4×`. § D525 left the rung to a playtest and § D641 took it on the content arithmetic, saying so rather than claiming one. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-08-24 · Owner: orchestrator · Lane: FIX-257 · Closes: #257 · Unblocks: #258**
 
@@ -34375,6 +34375,8 @@ unmoved. The range event has no equivalent writer yet; § D523 says whose questi
 ## D525 — Three modes: Scenario, Career and Rush; no proposed fixes; difficulty is the number of ways through; everything plays live
 
 > **Status 2026-09-10: AMENDED by [§ D535](#d535).** Clause 2's whole editor is every declared dial less the weight-set selector and the arrival predictor, which no scenario sells at any price; per-scenario scarcity is still a price, never a removed control. See [`docs/39`](docs/39-decisions-in-force.md).
+>
+> **Status 2026-09-19: NARROWED by [§ D706](#d706)** *(agent session, delegated authority — not the product owner)*. Clause 2's retirement stands and is a retirement from the screen rather than from the file: the diagnosed repair stays in `data/` as the scenario's pinned witness, the five decoys survive as prices in the one schedule, the diagnosis is not retired, and all three retirements wait for the editor that can write the answers — measured, 1 of 18 today. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/38`](docs/38-what-the-game-is.md), [§ D373](#d373), [§ D477](#d477), [§ D354](#d354), [§ D497](#d497), [§ D514](#d514), [§ D515](#d515), `docs/32` § 1.2 and GD4, `docs/23` § 4, `docs/16` S5's `ranked` row, the design handoff §§ 5 and 10, GitHub issues #217 and #220.**
 
@@ -34996,6 +34998,8 @@ that the two earlier ways through were closed.
 ---
 
 ## D537 — The survivor band narrows by ladder position: shares in data, drafted for approval, judged at the base rung, read by one acceptance check
+
+> **Status 2026-09-19: AMENDED by [§ D736](#d736).** Every approved figure stands and no band verdict moves; what is amended is clause 5's sample-size refusal, whose remedy now includes reading the band at `approvedAtSampleSize` off the draw's own prefix while the table is measured wider. Taken by an agent session on delegated authority. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-10 · GitHub issue #234 · Rules on: [§ D525](#d525) clause 3, [§ D528](#d528) clause 2, `docs/33` DC-4's band as the precedent for shape, GitHub issues #367 and #467.**
 
@@ -36768,6 +36772,8 @@ Whether the four footprint figures are right — all four are chosen and all fou
 
 ## D606 — A rush sitting posts from the viewer, and the purse stays unspendable: the boundary that blocks it is named rather than moved, and the citation for it was the wrong way round
 
+> **Status 2026-09-16: AMENDED by [§ D640](#d640).** The boundary § 2 names is still not moved and the general between-round rebuild is still not built; the **three questions** § 2 named as unanswered are all answered — *fitted* is one fixed kit, a rush rebuild is instantaneous, and a tier does not require the tier below inside one sitting. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-15 · GitHub issue [#372](https://github.com/mrpeanut01/elevator-sim/issues/372) · Builds the client half of [§ D542](#d542) and [§ D543](#d543) · Corrects a citation carried in `data/rush-purse.json`.**
 
 **Why an entry.** Two of [§ D405](#d405)'s three grounds. It binds `everyday/host.ts`, `everyday/reportScreen.ts`, `menu/client.ts`, `dev/main.ts`, `honesty/surfaces.ts` and `everyday/rushScreenModel.ts#RUSH_ABSENCES` — six modules `everyday/rushSitting.ts` does not own — and it **refuses to move a boundary already recorded**, which is the kind of answer that has to be findable by the next person who asks the same question.
@@ -37098,6 +37104,13 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 
 ## D626 — Endless Rush is demoted off the front door, closing `docs/32` Q1 and the placement remainder `docs/35` § 13.1 left open on Q3
 
+> **Status 2026-09-19: SUPERSEDED IN PART by [§ D737](#d737).** The placement clause is
+> superseded — Rush is the front door's third tile, as § D525 ruled and as
+> `everyday/modes.ts` ships; this entry's argument is `docs/32` GD4's, which § D525 read by
+> name and withdrew. What stands is its restatement that § D477's substance is untouched,
+> and its critique of whether the rush serves the loop, which § D737 re-asks rather than
+> settles. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-16 · Owner: this session, on the session principal's explicit delegated authority · Rules on: `docs/32-game-design.md` § 9 Q1, `docs/35-problem-per-mode.md` § 13.1 Q3, and (per [§ D477](#d477), unchanged by this entry) the mode's continued existence.**
 
 **Why an entry.** Amends a standing table two other documents cite and is exactly the shape of cross-document decision `CLAUDE.md`'s working agreements ask to be recorded rather than left implicit.
@@ -37175,6 +37188,8 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 ---
 
 ## D631 — A shaft's plan area is priced, in four bands cut from the measured distribution rather than at a rate per square metre, and the two cases that cannot be banded are named rather than charged the cheapest
+
+> **Status 2026-09-19: AMENDED by [§ D721](#d721)**, before sign-off. Every quantity in § 2 and § 3 reproduces on the tree at `393bda2`. Two claims do not: the gap table's **rank** column (the second- and third-widest gaps by ratio are 33.0 → 56.0 at 1.697× and 24.0 → 33.0 at 1.375×, both inside band 0, and the two named here are fourth and fifth), and **"the fourteen shipped buildings"**, which is seventeen. No price, boundary, band or population moves. This entry's text is left standing as the record it is. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-16 · GitHub issue [#429](https://github.com/mrpeanut01/elevator-sim/issues/429), stage 2 · Completes [§ D601](#d601), which built the area model and refused the price · Spends [§ D552](#d552)'s rate × quantity seam for the second time, after [§ D620](#d620) · Rules on: `data/price-schedule.json`, `data/campaign.json`, `data/engineering-briefs.json`, `packages/core/src/config/floorArea.ts`, `packages/viz/src/pricing/`, `packages/viz/src/fixit/parse.ts`.**
 
@@ -37378,3 +37393,2335 @@ Neither reaches code on this commit. `rush-prefit` is a fixed kit, so it has no 
 ### 9. Numbers spent
 
 This lane held **D640–D644** and spent **D640 only**. **D641, D642, D643 and D644 are unspent** and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them — ids here are names, so backfilling one would make it denote two things across time. The integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES` if that is what happens.
+
+---
+
+## D644 — Fix a building plays the run the player's own change produced, beside the as-built one at a single playhead; the verdict is not withheld behind it
+
+**Date: 2026-09-19 · Owner: this session, on the session principal's explicit delegated authority (recorded here rather than attributed to an unnamed "product owner", per [§ D227](#d227)'s stale-attribution class and the standing rule that an agent lane may not manufacture a human) · Rules on: `packages/viz/src/everyday/caseStage.ts` (renamed from `asBuiltStage.ts`), `packages/viz/src/everyday/fixitScreen.ts`, `packages/viz/src/dev/fixitPanel.ts`, `packages/viz/src/honesty/derive.test.ts`, `docs/35-problem-per-mode.md` § 12.**
+
+**Why an entry.** It renames a module three other files name, adds a row to `honesty/derive.test.ts`'s excluded-mount list, records a deliberate divergence between the two Fix-a-building surfaces, and takes a design position that reads against the precedent [§ D348's issue](https://github.com/mrpeanut01/elevator-sim/issues/348) set one block earlier. None of that is this lane's own module to settle in a docstring under [§ D405](#d405).
+
+**What was found, quoted rather than described.** `everyday/fixitScreen.ts#primary` bound its worker result as
+
+```ts
+onDone: ([before, after]) => {
+  …
+  session.asBuilt = before;
+  assertPairMatchesRepairs(entry, session.state, before, after);
+  session.outcome = classifyOutcome(entry, measuredOf(entry, before, after), spend);
+```
+
+`before` was kept on the session — it is what the four figures and the as-built stage are read from. **`after` was read twice and then went out of scope.** It is a full `VizRecording` of the day the player's own change produced: every leg, every motion, every door mark. Nothing on any screen drew it. `dev/fixitPanel.ts` did the same.
+
+So the shipped state of the mode a first-time player meets was: **the problem is watched and the answer is a table.** GitHub issue #348 had put the opening run on a stage (`docs/35` PM-FB1) and that half is real — a player watches the building fail before a single figure is stated — but the payoff, *find out whether your change worked*, was a card with three measured rows on it. `docs/38` § 1 makes watching the people the hook of the whole product, and this is the one press in the mode where the run being watched is the player's.
+
+**Two adjudications this entry also settles**, because a swarm produced both claims in one sitting and each is half right: *fix-a-building is never watched* is **false** of this tree (#348 shipped), and *`run.ts`'s recording is discarded* is **true** of the repaired half. The accurate sentence is the one above, and it is narrower and more actionable than either.
+
+**Ruling 1 — the pair is played, on one transport at one playhead.** `asBuiltStage.ts` becomes `caseStage.ts` and takes one pane or two. A press mounts a two-pane block above the outcome card: *as it stands* on the left, *with your change* on the right, both painted by `cutaway.ts#drawCutaway` — § 7's own painter — from one `Playback`'s `simTimeS`, read once per frame and passed to both `frameAt` calls.
+
+Widening the block rather than writing a second one is `cutaway.ts`'s own rule one layer up: **two consumers of one painter rather than two painters.** The rename is what keeps the module's name true of what it does; a `mountAsBuiltStage` that plays an as-repaired run is a small lie in a file whose whole subject is not telling them.
+
+**Why the pair rather than the repaired run alone.** A single canvas playing the after-run shows a building running; it does not show that anything changed. The two side by side at one minute is **common random numbers made visible**. `CLAUDE.md`'s statistical discipline requires every alternative under comparison to meet *the same passenger traces*, `fixit/run.ts#fixitRunPlanOf` obeys it by building both configs off one case's seed, horizon and demand, and `#assertPairMatchesRepairs` holds the claim to the legs before either is drawn. Until this block, that discipline reached the player as a basis line under a table. It is now the thing on screen: the same person, at the same landing, at the same minute of the same morning, in two buildings that differ only by what they bought. That is the honest answer to *how is this different from a replay*.
+
+**Ruling 2 — the verdict is not withheld behind the watch, and this is where the entry declines #348's own precedent.** The symmetric move was considered: #348 gates the four figures behind the opening watch, so gate the outcome card behind this one. It is refused on two grounds, the first of which is a defect rather than a preference.
+
+1. **The verdict is not only a card.** `session.fixed` badges the case in the rail, `keepSolved` writes the solved set to the profile and `bankScenarioClear` files the chime — all in the statement that lands the run. Deferring the card alone would put a FIXED badge over a case whose card had not said so, which is `docs/20` defect 16 (*two verdicts about one case on one screen*) rebuilt deliberately. Deferring all of it would mean holding a filed clear behind an animation.
+2. **Watching would become a toll on the loop this mode is made of.** The opening sight is offered once per case and guarantees every player watches the building at least once. A press is the iteration step — change, run, read, change again — and a compulsory watch on each one taxes exactly the behaviour the mode wants.
+
+So the sight is **first in reading order**, the landed run scrolls to it rather than to the card, and the block's own press goes to the verdict. Nothing a player already has is taken away, which is the test this ruling had to pass.
+
+**Ruling 3 — no pause and no intervention on either block, and [§ D623](#d623) clause 3 binds the pair more strongly than the opening run.** That clause kept fix-a-building's no-pause design because *a stage that let a case's opening run be pressed would be a second place to change a building the mode measures twice deliberately*. The pair **is** the two runs the verdict is measured from, so a press on it would edit the thing being judged. No speed chips, no pause, no interventions; the player's own default speed and one skip.
+
+**Ruling 4 — the block publishes no figure, and that is mechanical.** It sits directly above the surface allowed to state what the pair measured. A number on it would be a second place for one measurement to be published, and the second place is the one that goes stale — § D227's class, and why `docs/22` § 5 forbids *a figure without its count* rather than only a wrong figure. `fixitScreen.browser.test.ts` fails on a digit anywhere in the block's own words, which is `landingView.test.ts`'s rule pointed at the one block that stands over a verdict.
+
+**Ruling 5 — `dev/fixitPanel.ts` keeps dropping `after`, knowingly.** The Engineer overlay plays neither of this mode's runs and has not since #348 put the opening sight on the player's screen only. The two surfaces are allowed to differ in presentation and must not differ in what the machinery decides — the same `classifyOutcome`, `repairRowOf`, `fixedBadgeAfter` and figures — and *the fun is watching the people* is a claim about the game rather than about the Engineer's instrument for the same cases. The divergence is written into that file's own docstring rather than left silent, with the remedy named: if it stops being right, the fix is `everyday/caseStage.ts` mounted there with that shell's tokens, never a second player, because [§ D359](#d359)'s `surfaces-disagree` property exists for exactly the drift two painters would be.
+
+**What this does not decide.** Whether the pair should be re-watchable after it has been skipped (today the next press earns a new one, on `asBuiltSeen`'s precedent); whether a scrubber or a speed control ever belongs on a fix case, which § D623 rules against for now; and whether the Engineer panel should gain the block, which is ruling 5's *if*.
+
+**Numbers spent.** This lane held **D644–D648** and spent **D644 only** — one gap in one mode,
+closed end to end, which is one decision however many modules it touches. **D645–D648 are unspent.**
+Under [§ D404](#d404) and [§ D430](#d430) they become permanent holes once a later lane writes above
+them and belong in `documentation.test.ts#KNOWN_DECISION_HOLES` then, not before: ids here are names,
+so backfilling one would make it denote two things across time. The block was allocated from
+D641–D644, which [§ D640](#d640)'s lane left **free rather than holed** for exactly this — nothing
+had been written past D640 — and this entry is what closes that window on D644.
+
+**Evidence.** `everyday/caseStage.test.ts` is a document recorder (`docs/16` S9's third tier, borrowed from `dev/menuPanel.test.ts`): eight cases, including *both panes are painted in one animation frame, each from its own recording*, proved with two fixtures whose floor labels are disjoint so a pane drawing the wrong recording fails rather than passes. `everyday/fixitScreen.browser.test.ts` drives the shipped page on **both** branches of the run's own answer — a press with nothing bought, which cannot have fixed anything, and a press with the free diagnosed repair — and asserts on each that two canvases are sized and painting, that the outcome card is on the page at the same instant, that the badge and the § 3.3 primary agree, that a second press replaces the first press's block, and that no digit appears in the block's own words.
+
+---
+
+## D649 — The ten campaign stages reach the Scenario hub as the ordered path they were authored to be; a stage with no measured way through is **listed with its count and not offered**, and the register row saying the two schemas were separate is deleted as a correction
+
+**Date: 2026-09-19 · Owner: this session, on the session principal's explicit delegated authority (recorded here rather than attributed to an unnamed "product owner", per [§ D227](#d227)'s stale-attribution class and the standing rule that an agent lane may not manufacture a human) · Rules on: `packages/viz/src/scenario/ladder.ts` (new), `packages/viz/src/everyday/scenarioLadderPort.ts` (new), `packages/viz/src/everyday/scenarioModel.ts`, `packages/viz/src/everyday/scenarioScreen.ts`, `packages/viz/src/dev/data.ts`, `packages/viz/src/dev/main.ts`, `packages/viz/src/honesty/run.ts`, `packages/viz/src/honesty/surfaces.ts`, `packages/viz/vite.config.ts`, `docs/39-decisions-in-force.md`.**
+
+**Why an entry.** It deletes a clause from a **shipped refusal register** a player reads, adds a served `data/` document, changes a loader's failure mode, adds a field to `HonestyContext`, and rules on how a measured zero is presented to a player. None of that is one module's to settle in a docstring under [§ D405](#d405).
+
+### 1. What was found
+
+`data/campaign.json` authors ten campaign stages: a brief of two to three sentences each, a `teaches` line, a building, a demand, a duration, a starting dispatcher, an editable set, a tuning seed set, a disjoint holdout set, fifty replications, a goal set, a lever per fail state, and — since GitHub issue **#365** closed on 2026-09-10 — **a budget**, with an ordered ladder of bought rungs, each priced in chimes and carrying its own [invariant 8](CLAUDE.md) schema. `data/scenario-survivors.json` publishes a measured survivor count for every one of them at every rung, pinned to a named command, a tree and a master seed.
+
+**Nothing a player could open read any of it.** `everyday/scenarioModel.ts` listed two entries, and `SCENARIO_ABSENCES[0]` said, on the player's own screen:
+
+> *"The ten campaign stages are authored to the campaign record rather than to the scenario schema, so this list cannot reach them until the two are one thing. They are played on the Engineer surface, and a stage cleared there does not count toward your Career."*
+
+**The first clause had been false for nine days.** `campaign/types.ts#CampaignStage` carries `budget: ScenarioBudget` as a **required** field — `campaign/parse.ts` refuses a stage without one rather than defaulting it — and all ten stages author it. `docs/38` § 2.1's *"That record, plus a budget, is the scenario schema"* was satisfied. The sentence told a reader the wiring was blocked on a schema that had already shipped.
+
+That is [§ D227](#d227) in the polarity `CLAUDE.md` calls **worse than a dead seam**: a dead seam does nothing, and a stale refusal tells the reader not to touch a thing that works. It is recorded here because the deletion must be legible as a **correction rather than a move** — the next reader of this file should be able to tell the two apart without re-deriving the history.
+
+### 2. What is ruled
+
+1. **The ordered path is listed.** `scenario/ladder.ts` joins the stages to the published table and the Scenario hub draws the result under its two entries, in `data/campaign.json`'s own order, each row carrying the stage's name, its `teaches` line, its own opening sentence, its shape, its budget and its measured count.
+
+2. **Zero is not offered, and zero is not hidden either.** `docs/38` § 2.1: *"**Zero is not a scenario** unless it declares itself a diagnosis."* Measured at the budget they open on, seven of the ten have no way through and none declares one. They are **listed with their counts and not offered to play**. The alternative — hiding them — was rejected because the ten stages *are* the ordered path, and a player who cannot see positions 2 and 4 cannot see that there is one. A held row is not a control at all, which is GAMEPLAY § 20.12 rather than a disabled button, and `viewportGates.browser.test.ts`'s clause 3 counts what a player can reach.
+
+3. **The offer decision is derived from the measurement, in one place.** Base-rung `survivors ≥ 1`, or a declared `diagnosis`, offers the scenario; a zero with no diagnosis holds it. Nothing in `everyday/` knows which stages those are. A list of ids there would be a second authority on a number `data/scenario-survivors.json` owns, and a rebalance would have to remember to move it. As it stands a rebalance opens a stage with **no edit in code**, which is the property this wiring was designed for: it landed in the same wave as a rebalance lane working the same file.
+
+4. **A held scenario may not be called unwinnable, and the reason is a measurement rather than a courtesy.** `scenario/survivors.ts` draws the distinction and this ruling binds it into player copy: the **dropdown is a census** — thirteen shipped profiles is a population, so a zero there is exact — and the **dials are a sample**, `k = 12` at every rung. `dialShareInterval` puts 0 of 12 at *about a quarter or fewer with 95 % confidence*. So the claim the measurement supports is **none found**, and *none exists* is not one. The shipped sentence is *nothing that was tried at this budget got through*, and both `scenario/ladder.test.ts` and `everyday/scenarioModel.test.ts` assert that vocabulary against a listed pattern with its own positive control, on `everyday/refusalsAreCurrent.test.ts`'s stated ground that a phrasing a guard does not know is a phrasing it does not check.
+
+5. **The count is drawn at the base rung and says so.** `docs/38` § 2.1 asks that *"the scenario shows the count for the budget the player actually has"*. Nothing in this build spends a chime — `everyday/chimesPanel.ts` says so on its own face — so every row draws the base rung's count and the budget line says outright that nothing here has bought a wider one. A bought rung's count beside an unbought budget would be a figure the player's own state does not support, which is `docs/22` non-goal 2.
+
+6. **The count's sentence is `survivorSentenceFor`'s, verbatim.** Not paraphrased, not re-worded for the hub. A second sentence about one count is a second authority on it, and that sentence already names `examined` before `survivors` so a reader meets the denominator first — R13's shape, which the honesty corpus has found violated twice on rows that had a count nearby and not inside them.
+
+7. **A register row is kept rather than the register emptied.** The lane's brief asked for `SCENARIO_ABSENCES[0]` to be emptied on the commit that made it false. Half of it became false and half did not: a stage is still played on the Engineer surface and a clear there still banks no chimes. **That half survives, narrowed to say only itself.** Deleting a true refusal to make a register read zero is § D227 pointed the other way, and this file would rather carry one honest row forever than read empty for a wave. A third row is added and is **derived on every read** — the number of held stages is a measurement of `data/scenario-survivors.json`, and writing *"seven of ten"* into TypeScript would put a figure where a regeneration cannot reach it, which `CLAUDE.md` records three published numbers doing.
+
+8. **An offered stage opens where the stages are played, and says so.** `context.enterEngineer()`, the seam `everyday/shell.ts` already provides and `everyday/reportScreen.ts`'s lever button already uses. It is not a second door and writes no `inert` of its own. The row's note says where it opens and that the clear banks nothing yet, so the register's surviving row and the row a player presses agree.
+
+9. **`data/scenario-survivors.json` is served and validated before anything publishes from it.** It joins `vite.config.ts`'s `WEB_DATA_FILES` and is fetched by `dev/data.ts#loadCampaign` beside the stages it is keyed by — a loader that could return one without the other would let a caller hold half a scenario. A malformed table **refuses the campaign load** rather than returning an unchecked one, on the same ground the goal table above it does: the only thing downstream does with it is publish a difficulty figure to a player.
+
+### 3. What this does **not** decide
+
+**It does not make a campaign stage playable inside Everyday Mode, and it does not pretend to.** A stage's verdict is a fifty-replication batch judged against `data/scenario-goals.json`, and no Everyday screen runs one. The path is reachable and legible from the front door; the clear still happens on the Engineer surface and still banks nothing. That is exactly what the surviving register row says, and the day a stage can be played from this list is the day `everyday/host.ts#bankScenarioClear` gains its second caller — which that method's own docstring has been waiting for since GitHub issue #499.
+
+**It does not rebalance anything.** Seven of ten measuring zero is GitHub issue **#234**'s, and this ruling deliberately makes that content's state visible to a player rather than only to a test register. No traffic rate and no building fabric moved on this commit.
+
+**It does not rule on what a diagnosis should say.** `docs/38` § 2.1 permits a zero that *"declares itself a diagnosis"*, no shipped stage declares one, and whether any of the seven should is a content decision for the lane that rebalances them.
+
+### 4. Evidence
+
+`scenario/ladder.test.ts` and `everyday/scenarioModel.test.ts` run on the **shipped** documents rather than a fixture — a fixture would prove that a fixture renders. Between them: the path lists every shipped stage in the campaign's own order with none dropped; a row is offered exactly where the published table's base rung says there is a way through, asserted against the table on every run rather than against a list; held and offered rows carry exactly one of a refusal and an invitation; every drawn figure is recomputed from the documents and compared, so a transcribed one fails; the forbidden vocabulary is checked with its own positive control; the held-stage register row states the count it derived and is **absent entirely** when nothing is held; and the path's own absence is drawn rather than an empty list when no port has provided one, with both arms driven.
+
+---
+
+## D691 — The campaign's dial stratum is a **sample**, and stage 1 has a witness vector: the published zero was read as a census and is not one
+
+> **Status 2026-09-19: AMENDED by [§ D736](#d736).** § 4's first refusal is lifted: the sample size rises to 200 and the band is read at the size it was approved against, so no band reading moves. The master-seed refusal and the register rule in the same section stand. See [`docs/39`](docs/39-decisions-in-force.md).
+
+**Date: 2026-09-19 · Rules on:** GitHub issue **#234**, [`docs/38`](docs/38-what-the-game-is.md)
+§ 2.1, [`docs/33`](docs/33-difficulty-curve.md) DC-3. Corrects a claim in circulation rather than
+moving any shipped difficulty.
+
+### 1. What was being said, and what the file actually says
+
+`data/scenario-survivors.json` publishes `dials: 0/12` on every one of its thirty cells. That was
+circulating — in a studio war room, in a lane's own dispatch brief, and in prose summarising this
+repository — as:
+
+> *"Dial survivors are 0 of 360. Twelve dial configurations × ten stages × three budget rungs …
+> **NOT ONE CLEARS**. Every way through the campaign that exists anywhere is a dispatcher-dropdown
+> pick."*
+
+**That is a statement about the game, and the measurement it cites cannot support one.**
+`scenario/survivors.ts` draws the distinction on its own face and has since it shipped: *"the
+dropdown is a **census** … the dials are a **sample**."*
+`regenerateSurvivors.test-helper.ts#SURVIVOR_SAMPLE_SIZE` is **12**, chosen the way a replication
+budget is chosen, and `survivors.ts#dialShareInterval` derives an exact Clopper–Pearson interval at
+read time precisely so this cannot happen — at twelve draws, zero survivors bounds the clearing
+share at **about a quarter**, not at nothing.
+
+Nothing had been measured to be impossible. Twelve draws had found nothing, thirty times.
+
+**The numerator was never wrong; the denominator was read as the population.** That is the same
+defect `published.ts` refuses quotients for and `survivors.ts` publishes `examined` beside
+`survivors` for, arriving from the one direction those rules do not cover: a reader who has the
+denominator, and treats it as exhaustive anyway.
+
+### 2. What a wider draw found
+
+Measured 2026-09-19 on this tree. `stage-1-first-call`, master seed **20 260 910**, the stage's own
+**50** tuning and **50** holdout replications under common random numbers, every configuration
+judged by the shipped `campaign/stageSequence.ts#runStageToVerdict` — no second runner and no second
+definition of *clear*:
+
+| rung | dials judged | cleared | draw indices | exact 95 % interval on the share |
+|---|---|---|---|---|
+| base (4 u) | 200 | **3** | 30, 91, 143 | [0.0031, 0.0433] |
+| equipment (24 u) | 200 | **2** | 141, 142 | [0.0012, 0.0357] |
+
+**The wider draw extends the published cell rather than replacing it, and that is a property of the
+sampler rather than a hope.** `survivorSpace.ts#sampleReachableConfigurations` runs one loop against
+one seeded stream and accepts configurations until it has `sampleSize` of them; the stream, the
+bundle draw and the admission filter do not depend on `sampleSize` and only the stopping point
+does. So the first twelve configurations drawn at k = 200 **are** the twelve the published cell
+judged, in the same order — and this run reproduced their verdicts. A witness at index 30 is a
+configuration the published draw never reached, not one it reached and scored differently.
+
+**All three base-rung witnesses buy the same two changes: `idle-parking` and `cost-scaling`.** That
+is the substantive half. `idle-parking` is the change this stage exists to teach, in
+`data/campaign.json`'s own brief, in the player's words: *"between calls the two cars simply sit
+wherever the last passenger left them … You can tell them where to wait instead, and the ground
+floor is only the first guess — try a few, and let the runs say which one this building actually
+wants."* The way through is the one the scenario points at. What the published cell got wrong is
+the **density** of that way through, not its direction.
+
+### 3. What is asserted, and where
+
+`scenario/dialWitness.test.ts`, always-on and costing four cells rather than two hundred. It
+re-draws the base rung at k = 200 — pure, no simulation — and judges **four**: the three witnesses,
+which must clear, and draw **0**, which must not.
+
+That is both halves of `docs/38` § 2.1 held by a run: *"doable with a tweak to the dispatcher and
+failable with the wrong tweak … a stage the dropdown alone does not clear and a witness vector that
+does."* **The negative half is not decoration.** A file asserting only the witnesses would go green
+on a stage that had become trivially clearable, which is DC-1 and the thing `survivors.ts` refuses a
+table for: *"a rung where every configuration clears has nothing for a player to fail."*
+
+`scenario/witnessSearch.test-helper.ts` is the instrument, and it reuses `survivorSpace.ts`'s
+sampler and the shipped judge rather than reimplementing either — `stageRun.ts`'s founding argument,
+which this repository has paid for at three separate levels.
+
+**Deliberately not env-gated.** `deepTiers.test.ts` derives the gated tier set from disk and a tenth
+tier arriving unwired is a red pull request, correctly. Four cells on `garden-apartments` cost
+seconds, so this runs always-on and skips nothing.
+
+### 4. What is **not** done, and why each refusal is mechanical rather than a preference
+
+**`data/scenario-survivors.json` is not re-pinned, and the sample size stays at 12.**
+`data/scenario-survivor-bands.json` records `provenance.approvedAtSampleSize: 12`, and
+`survivorBands.test-helper.ts#sampleSizeIssue` refuses a table regenerated at any other size until
+the product owner re-approves the band. That refusal is right: a band is a **share of what was
+judged**, so widening `k` would silently move all ten band readings without anybody choosing to move
+them. The published count and this witness answer two different questions — *how many of the twelve
+we drew* and *does one exist* — and are deliberately not reconciled into one number.
+
+**No register loses a row.** `survivors.test.ts#UNWINNABLE_AS_MEASURED`,
+`survivorBands.test.ts#OUTSIDE_THEIR_BAND`, `difficultyCurve.test.ts#DC1_UNFAILABLE`,
+`DROPDOWN_CLEARS` and `DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE` are all readings of the **published
+table at k = 12**, and that table has not moved. A row leaves on the commit that makes its own
+measurement stop reproducing, and nothing here makes one stop. Emptying a register on the strength
+of a measurement taken at another sample size would be the same category error this entry exists to
+correct, pointed the other way.
+
+**The master seed is not moved.** Re-drawing the thirty cells at another master seed until a cell
+reports a dial survivor is seed-shopping, and it is refused by name here so that nobody proposes it
+as the cheap version of this.
+
+### 5. The finding this does **not** close, stated in the same breath
+
+**Three of two hundred is 1.5 %.** `data/scenario-survivor-bands.json` puts ladder positions one and
+two at a floor of **0.25** of the configurations judged, approved as drafted by the product owner on
+2026-09-10 ([§ D537](#d537)). So stage 1 is **not unwinnable by dials, and is about seventeen times
+narrower than the owner approved** — and at the published k = 12 a player-facing count will report
+zero roughly **five times in six**, which is what it does today.
+
+So #234's rebalance is still owed in full. What has changed is that it is now aimed at a measured
+quantity — *raise the dial share from 1.5 % toward 25 %* — rather than at a zero that was never a
+zero, and there is a cheap instrument to aim with. **The two levers already measured and waiting on
+a decision each are untouched by this entry**: `garden-apartments` at one car
+([§ D613](#d613), declined on blast radius, and [§ D372](#d372) rules the route is a **new** building
+rather than that edit) and stage 5 at 15 %pop/5 min ([§ D612](#d612), blocked on a DC-3 witness
+search). This entry is what a DC-3 witness search looks like when it succeeds, run on a different
+stage.
+
+### 6. What a reader should take from this about every other zero in that table
+
+**Seven of the ten stages have a published dial count of zero, and this entry has demonstrated that
+such a zero survives a witness existing.** It does not follow that the other six have one — each is
+its own measurement and only a search answers it. What does follow is that *"no dial edit wins
+anywhere"* is not a thing the shipped table can be asked, and no document may say it is. The honest
+sentence about an unsearched cell is **none of the ways tried got through**.
+
+---
+
+## D666 — The sheet names the cell it leads with, and a refused mean does not take the lead: the tightest moment is promoted, the refusal is not touched
+
+**Date: 2026-09-19 · Rules on:** `packages/viz/src/shift/report.ts`,
+`packages/viz/src/dev/reportPanel.ts`. Binds `mode/casualDay.ts`'s figure ordering to a decision the
+sheet takes, which is why this is an entry rather than a docstring under [§ D405](#d405).
+
+### 1. The finding
+
+On the worst, most watchable day — a building being outrun, which is the day a player most wants a
+number for — `AVERAGE WAIT` reads **withheld**. That is `awtIsValid` doing exactly its job, it is
+`CLAUDE.md`'s statistical discipline, and [`docs/22`](docs/22-charter.md) non-goal 3 forbids
+dropping or rewording a refusal because a playtest found it discouraging. **None of that is
+touched here and none of it may be.**
+
+What was wrong is the other half. A refusal replaces a *number*; it does not have to replace the
+**lead**. The sheet went on leading with the same cell it leads with on a day nothing was refused,
+so the most prominent thing on the page was the one thing the run could not say, and the interest
+moved to the small print. The report already computes six other figures, the four other goals, the
+stairs count, the abandonment count and the tightest moment; what it did not do is *promote* one.
+
+### 2. What is built
+
+`ShapedDayReport` carries `headlineFigureId` — a `ReportFigure.id`, naming the cell the grid leads
+with. `shift/report.ts#leadingWith` puts that cell first and is a **permutation**: same length,
+same members, order-preserving on the rest, asserted in both directions over an id set no shipped
+sheet produces. `dev/reportPanel.ts#reportViewOf` composes it **after** the register's own ordering
+in both registers.
+
+Three properties are load-bearing:
+
+1. **The refusal is untouched.** `AVERAGE WAIT` keeps its cell on the grid, its `withheld` value,
+   its `withheld` tone, its `suppressionGround` and `core`'s own sentence word for word. It lost
+   the lead; it lost nothing else. Nothing is softened, reworded as encouragement, or shown
+   provisionally.
+2. **Nothing moves on a day the mean is published.** The published arm names `carried`, which is
+   the cell `figuresFor` and `mode/casualDay.ts#CASUAL_FIGURE_ORDER` already both begin with, so
+   the composition is a no-op in both registers. The promotion costs one day's ordering and no
+   other.
+3. **No string is added.** The lead is an id naming a cell the grid already carries. A copy of the
+   figure would be a second copy of a figure, which is a second figure — `mode/casualDay.ts`'s own
+   rule — and the sheet would draw one number twice.
+
+**Why a field rather than *whatever `figures[0]` is*.** Because a register re-sorts.
+`render/reportCard.ts` tiles the sheet's order and needs no field; `casualFigureOrderOf` ranks by a
+frozen list of ids and would rank this sheet's own lead straight back into the middle of the Casual
+grid. An index is a fact about an array that any later sort silently overwrites; a named decision
+is one a consumer can honour. This is [§ D237](#d237)'s rule pointed at the grid — the sheet decides
+once, and every renderer reaches the answer through the same key. The suppression gate itself is
+now `meanIsPublishable`, one expression with two readers, for the same reason.
+
+### 3. Which figure is promoted, and the eliminations that chose it
+
+**The tightest moment — `deepest-queue`**, a count of people on a named floor at a named minute.
+The candidates were the cells the sheet already computes, and each of the other five is eliminated
+by something this repository had already measured or ruled:
+
+| cell | why not |
+|---|---|
+| `average-wait` | the refused cell. The premise. |
+| `worst-wait` | `shift/reportWindow.ts` measures it: *"a band holding zero arrivals withholds both headline figures at once — `AVERAGE WAIT withheld`, `WORST WAIT not recorded`"*, and the **empty window** is one of `awtIsValid`'s own five grounds. On that ground the promotion would replace an absence with an absence. On two more — a censored leg, and a leg past the 900 s horizon — the cell reads `at least 922 s`, a lower bound rather than a figure the run produced. It is also a wait in seconds over the **same** window as the refused mean, which is the resemblance R3 exists to catch. |
+| `minute` | its denominator is `servedLegs`, and `CLAUDE.md` states the mechanism outright: abandonment *improves* the wait figures by construction by removing the longest waits from the sample — measured at `midtown-office` 6 %, AWT **61.9 s → 23.3 s** with fifty-one riders gone. Abandonment above 2 % is itself one of the five grounds. Leading a refused day with the share away inside a minute would put the sheet's most flattered figure in the slot the refusal vacated, on exactly the days it is most flattered — [§ D106](#d106)'s *a configuration that improves its wait by serving fewer people has not improved anything*, drawn as a headline. |
+| the energy pair | `axisOnly` — an axis, never a score, never ranked ([§ D106](#d106)) — and optional on `showEnergyAxis`, so a lead that vanished with a settings toggle would make what the sheet leads with depend on a preference rather than on the run. |
+| `stairs` | `0` on most runs and toned `good` when it is. A slot whose figure is usually zero is a slot a reader learns to skip — this module's own argument against *attempt 1* and against a diagnosis heading true of every day. |
+
+What is left clears every constraint rather than merely surviving. It is a **count of people**, so
+nothing suppresses it; it is in a **different unit** from the refused mean, so no reader can take
+it for the figure that went away and `honesty/properties.ts#checkSuppressedMean` has nothing to
+collide with; it is not a score, a grade or a rating; and it is the run's **own** worst moment,
+which is the thing the sheet was already calling *the tightest moment* in `VERDICT_VOICE` and
+drawing as the first row of its diagnosis.
+
+**Its count travels with it** — R13, and the rule that has bitten this sheet twice.
+`deepestQueueNote` now reads *floor 12 at 08:37, the most of the day's 440 arrivals to stand on one
+landing at once*: `Observations.arrived` is the cohort, because every person on that landing is a
+leg that arrived. Deliberately **not** `ReportFigure.count`, which is *"how many observations this
+cell's value is a mean over"* — this is a maximum, so the structured field would be the wrong claim.
+The denominator goes where `AWAY INSIDE A MINUTE` and `WORK PER DELIVERED LEG` already put theirs,
+in the note under the value, which is R13's *"in the same visual unit"* and the unit
+`honesty/surfaces.ts` reads `countShown` off.
+
+**The fallback is not decoration.** `Observations.peakQueueFloorId` and `peakQueueAtS` are `null`
+when no landing ever held anybody, and the cell then draws `0` under *never more than a handful*.
+Promoting that would be a second absence — the defect this entry closes, arriving through its own
+remedy — so a refused run with no moment to promote keeps the lead it always had.
+
+### 4. What the honesty corpus says
+
+Measured on the always-on tier by `packages/viz/src/honesty/measure.corpus.test.ts`, **both runs in
+detached worktrees at the same commit `ec81d82`** — the base being that tree with this change
+reverse-applied, so the two differ in this change and in nothing else. Run alone rather than
+alongside each other: an earlier attempt with three heavy jobs on the box lost a worker and had to
+be retaken, and a measurement whose verdict disagrees with its own output is one somebody later
+mistakes for a failure.
+
+| | base (`ec81d82`, change reverted) | with this change | move |
+|---|---|---|---|
+| cases | 49 (49 evaluated, 0 skipped) | **49 (49 evaluated, 0 skipped)** | **0** |
+| strings checked | 755 845 | **755 845** | **0** |
+| simulations | 606 | **606** | **0** |
+| surfaces | 62 | **62** | **0** |
+| suppressed runs | 12 of 49 | **12 of 49** | **0** |
+| withheld cells | 6 076 in 31 combinations | **6 076 in 31 combinations** | **0** |
+| **failing cases** | **0** | **0** | **0** |
+
+**The two runs' output files are byte-identical apart from their wall clocks**, surface set and
+failing-case list included — so the surfaces row is a **set diff** rather than a comparison of two
+counts, which is the check `CLAUDE.md`'s Phase 9 column had to reconstruct by hand the one time this
+number went stale. The trees were confirmed to differ before either run.
+
+**Zero to the string is the forecast and the measurement, and that is what a reorder should look
+like from here.** The grid's membership is unchanged; `honesty/surfaces.ts` seeds each cell by
+`figure.id` rather than by position, so an ordering cannot move the count; and the one string that
+changed — the deepest queue's note — was **replaced** rather than added to, which is the shape wave
+F recorded as *a wave that moved words on a player screen and moved the corpus by nothing*. Twelve
+of the forty-nine always-on cases run a refused mean, so the promoted branch is swept rather than
+argued: the corpus reads the promoted cell's value and its new note on real refused runs under all
+ten properties, `suppressed-mean` and `estimate-without-n` included — the two that have fired on
+this exact sheet before.
+
+**No violation was introduced, so none was registered.** `honesty.test.ts#OUTSTANDING` and
+`honesty/properties.ts` are both untouched by this lane, which is the diff that tells *fixed the
+strings* from *moved the gate*.
+
+**The one figure this lane is not entitled to publish is the integrated one.** [§ D343](#d343) puts
+that measurement once, on the integrated tree, after the wave — the pair above is an isolation of
+this change against its own base and is not a claim about what the wave's row will read.
+
+### 5. Numbers spent
+
+This lane held **D666–D670** and spent **D666 only** — one gap on one surface, closed end to end,
+which is one decision however many modules it touches. **D667, D668, D669 and D670 are unspent**
+and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes
+above them; ids here are names, so backfilling one would make it denote two things across time. The
+integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES` if that is what happens.
+
+**Zero string movement is the forecast and the measurement, and it is what a reorder should look
+like from here.** The grid's membership is unchanged, the seed set `honesty/surfaces.ts` walks is
+keyed by `figure.id` rather than by position, and the one string that changed — the deepest queue's
+note — was replaced rather than added to. Twelve of the forty-nine always-on cases run a refused
+mean, so the promoted branch is swept rather than argued.
+
+---
+
+## D692 — Stage 2 is a **measured null at 0 of 60**, its suppression is produced by the configurations and not by the scenario, and seven stages are withheld from players on the strength of twelve draws
+
+**Date: 2026-09-19 · Rules on:** GitHub issue **#234**, [`docs/38`](docs/38-what-the-game-is.md)
+§ 2.1, [§ D649](#d649)'s offered/held gate, [§ D691](#d691). Publishes a null and an exposure;
+moves no shipped difficulty and no bar.
+
+### 1. Why stage 2 and not another
+
+`docs/38` § 2.1 asks that the first one or two scenarios be *"doable with a tweak to the dispatcher
+and failable with the wrong tweak … **a stage the dropdown alone does not clear and a witness vector
+that does**"* — DC-2 and DC-3 together. Stage 2 is the only stage on the ladder that already has the
+first half: its **dropdown census is 0**, exactly and not by sampling, because thirteen shipped
+profiles is a population and every one the rung affords is played. So a dial witness at stage 2
+would have made it the first scenario in the product that is precisely the sentence § 2.1 writes.
+
+### 2. The measurement
+
+Same apparatus as [§ D691](#d691), and the sample is five times the published one.
+`stage-2-morning-rush`, `midtown-office` at 2.5 %pop/5 min, master seed **20 260 910**, **base rung
+(4 u)**, the stage's own **50** tuning and **50** holdout replications under common random numbers,
+judged by `campaign/stageSequence.ts#runStageToVerdict`. Measured 2026-09-19, 554 s:
+
+| stratum | judged | cleared | exact 95 % interval on the share |
+|---|---|---|---|
+| dropdown (census) | 6 | **0** | — it is a census, not a sample |
+| **dials (sample)** | **60** | **0** | **[0.0000, 0.0596]** |
+
+**This is a null and it is a result.** The published cell's `dials: 0/12` bounded the clearing share
+at about **0.24**; sixty draws bound it at **0.060**. That is the first quantitative statement
+anybody has been able to make about a zero in this table, and it is what `UNWINNABLE_AS_MEASURED`'s
+stage-2 row has been standing in for.
+
+**It is still not "unwinnable", and the register's name is not a claim.** Sixty draws that found
+nothing are consistent with a share of one in twenty. The honest sentence is **none of the sixty
+ways tried got through**, and § D691 § 6's rule is restated here rather than assumed: *"no dial edit
+wins anywhere"* is not a thing the shipped table can be asked.
+
+The draw reproduced the published cell as a prefix, as § D691 established it must: indices 0–11 are
+the twelve the table judged, and none of them cleared here either. `dropdown 0/6` reproduces exactly.
+Of 62 draws, 2 were inert and 0 were refused, so 60 distinct configurations were judged.
+
+### 3. The suppression at stage 2 is produced by the configurations, not by the scenario
+
+`PublishedSurvivorStep.suppressed` exists so a reader can tell *nothing cleared* apart from *nothing
+could be quoted*, and stage 2's published cell reports **6 of 18**. At k = 60 it reports **21 of
+66** — the same third of the space, measured five times wider.
+
+A third of a stage's affordable space refusing its own mean is a large enough fact to be the reason
+a stage has no way through, so it was measured rather than assumed. **The stage's own baseline arm
+is clean:** `collective` at stage 2's demand produces `awtIsValid: true` on **50 of 50** tuning
+replications and **50 of 50** holdout replications. `stage-1-first-call` is the same, 50/50 on both.
+
+So the suppression in those cells is not the scenario refusing to speak about itself. It is
+**reached by what the player buys**: a configuration the base rung affords pushes this building into
+a state where an orderable measure will not stand behind its own number, and a configuration whose
+mean is refused cannot clear a goal that reads one, whatever else it does.
+
+**Which of the five grounds fires is not measured here, and no sentence is offered in its place.**
+Naming a plausible one — saturation, an empty window, censoring, a leg past the 900 s abandonment
+horizon, an abandonment rate above 2 % — would be exactly what [§ D256](#d256) refuses. Establishing
+it means re-running a *suppressed* configuration and reading its own words, which this entry did not
+do. What it does establish is the half that changes where to look: **not the baseline.**
+
+### 4. The exposure this creates for [§ D649](#d649)'s gate, stated as a measurement rather than a ruling
+
+§ D649 derives whether a stage is **offered** to the player from the published table rather than
+authoring it: base-rung survivors ≥ 1, or a declared diagnosis, means offered; zero with
+`diagnosis: null` means listed with its count and **held**. That derivation is right, and this entry
+does not propose changing it.
+
+What this entry records is what it is currently resting on. The base-rung count is a **census plus a
+twelve-draw sample**, and on today's table **seven of ten stages are held**. § D691 measured a stage
+whose dial count was 0 of 12 and which has **three** witnesses at 200 draws. So a held stage is one
+of two things and the table cannot say which:
+
+- a stage with no way through at any sample size, or
+- a stage with a way through that twelve draws did not reach — which is what stage 1 turned out to
+  be, at a share of 1.5 %, where twelve draws miss roughly **five times in six**.
+
+**Stage 2 is now the one held stage where that is partly answered**: not at 12 draws and not at 60,
+with the share bounded at 0.060. The other six are unsearched, and this entry says so rather than
+implying the gate is wrong.
+
+**No register loses a row and no gate moves on this entry.** Stage 2 stays in
+`survivors.test.ts#UNWINNABLE_AS_MEASURED` and `survivorBands.test.ts#OUTSIDE_THEIR_BAND`, because
+both read the published k = 12 table and that table has not moved, and because both readings remain
+true at k = 60. What has changed is that the stage-2 row is now backed by a number.
+
+### 5. What this tells #234 about where to aim
+
+**Stage 2 needs content, and stage 1 needs density.** They are different jobs and the same issue has
+been carrying them as one:
+
+- **Stage 1** has a way through and it is seventeen times too rare (§ D691). Nothing needs to be
+  invented; the share needs to rise.
+- **Stage 2** has no way through that 66 configurations could find, from a dropdown census that is
+  exhaustive and a dial sample five times the published one. Raising its share means giving it a way
+  through, and the two measured levers point in opposite directions: the demand levers are DC-R1's to
+  move, while about a third of what the budget reaches is being spent on configurations whose runs
+  refuse to be quoted — which is `docs/33` C2's *"the demand or the fabric moves, never the goal"*
+  applied to a stage whose problem may be that its affordable space is largely self-defeating.
+
+**And the direction is not obvious, which this project has already paid to learn.**
+[§ D611](#d611) measured stage 7 becoming *easier* to clear from the dropdown as demand **rose**,
+because the bar is `collective`'s own count on the same seeds and `collective` degrades faster under
+load than the profiles a player can pick. Any stage-2 rebalance has to be measured in both
+directions rather than reasoned about in one.
+
+---
+
+## D685 — What leaves the product about a run: the result artefact carries outcomes and identity, and never an input
+
+**GitHub issue #553.** `docs/38` § 2.1's daily shared seed is the cheapest growth shape this genre
+has, and the player-facing product could not use it: every clipboard write and every picture export
+in the tree is on the Engineer surface — `dev/main.ts#copyArtefact` and the report's own PNG — and a
+search for `clipboard` across `packages/viz/src/everyday/` returned nothing at all. A player who ran
+a day had no way to show anybody what happened to the people in it.
+
+It is also the one social mechanism that works **below** § D506's twenty-player floor.
+`packages/server`'s `distribution.ts#MIN_LADDER_N` withholds every quantile ladder until twenty runs
+are on a board, and that floor is correct and is not relaxed here. A board with four rows says
+almost nothing; one player handing another a seed needs no population at all.
+
+`packages/viz/src/everyday/shareResult.ts` is the artefact and the control is under the daily board
+on `everyday/boardScreen.ts` — which is where the board itself has least to say, because that tab
+draws *nobody has posted to today's board yet* on exactly the days a player most wants to hand the
+seed to a friend. Posting needs a server and an account; this needs neither.
+
+### 1. The rule — outcomes and identity, never an input
+
+- An **outcome** is what happened to the people: the wait-band strip, the counts, and the mean or
+  the refusal standing where it would be. An outcome is a fact about *the run the sharer played*,
+  not about what the building needs, so publishing one hands over no answer — a different
+  configuration on the same seed draws a different strip.
+- An **input** is anything the player chose or bought — the dispatcher, its weights and rules, any
+  lever, any equipment setting, any fabric change, any modifier — and anything the product *derived
+  about* those choices: the report's lede, its verdict, its diagnosis, its levers card, its goal
+  readings. None of it travels. The recipient is meant to play the seed, and a message naming the
+  dispatcher that worked is the answer with the puzzle attached.
+- **Identity** is the two things a recipient needs to meet the same crowd: the building and the
+  seed.
+
+**The rule is mechanised twice and neither is a comment.** `ShareRunFacts` has no field an input
+could travel in, and `shareFactsOf` is the only projection from a recording —
+`VizRecording.dispatcherProfileId` is one property access away and is deliberately not read.
+`shareResult.test.ts` renders a recording whose dispatcher is named and requires the name and the id
+absent from every line, and enumerates the facts type's keys so that widening it is red rather than
+plausible. A rule that lives only in a docstring is the rule this repository keeps finding has gone
+stale; this one is the type.
+
+### 2. Every figure is somebody else's answer
+
+The mean is `shift/report.ts#averageWaitFigure`'s, whole — its value, its count and its suppression
+ground — so the artefact and the Day report cannot disagree about one run. That matters here more
+than anywhere: the sheet's gate is `meanIsPublishable`, which is `awtIsValid && !saturated` and
+**not** the flag alone, and a share path that re-derived the gate would publish a mean the sheet
+withholds on exactly the runs somebody would want to share. The refusal's wording is
+`mode/disclosure.ts#suppressionBannerFor` — the Casual one-line projection of the single per-ground
+table — rather than the run's own statistics prose, which is Engineer register and would arrive on a
+player surface as internal notation. The bands and their classification are `live/bands.ts`'.
+
+The one quantity the module folds itself is **which slice of the shift a call belongs to**, because
+no shipped function answers it: `waitBandsAt` on the `whole-run` basis is non-decreasing in `t` and
+therefore flat after the first bad minute. The wait is still not the module's opinion — it ends at
+`boardedAt ?? refusedAt`, censored at the run's end, which is `live/bands.ts`' rule and
+`live/observations.ts`' — and the test asserts the strip's bands against
+`waitBandsAt(recording, endedAt, 'whole-run')`, so the duplication is **checked** rather than
+trusted.
+
+### 3. No score, and this is the surface most likely to grow one
+
+`docs/22` § 5 non-goal 1 forbids a scalar score, grade or rating over a run, and a share grid wants
+a number at the top more than anything else in the product does. There is none and none is derivable
+from what leaves: no total, no percentage, no streak, no rank, no letter. Every figure carries the
+count it was computed over (non-goal 2), and the refusal is neither omitted nor softened
+(non-goal 3) — a run whose mean is refused publishes the refusal in the mean's place, and the
+artefact is the same shape either way.
+
+A slice nobody called in draws its own glyph and never the calmest band's face: a slice with nobody
+in it did not go well, it did not happen.
+
+### 4. No telemetry, and no URL
+
+`docs/26` § 10 non-goal 2 forbids a third-party tracker outright, non-goal 8 makes § 7's table the
+whole allowlist, and `docs/38` § 2.4 puts no telemetry supporting a purchase or a conversion on the
+play side. A share control is exactly where such a thing arrives, so: the module imports nothing
+from `telemetry/`, makes no request of any kind, and **the artefact carries no URL**.
+
+The last is a decision rather than an oversight. There is no address the bundle could honestly name
+— the deployment's host is a repository variable read by `deploy-viz.yml`, not a constant in the
+source — a fabricated one is worse than none, and a link is precisely where a campaign parameter
+would later be bolted on. What travels is text a player pastes where they choose, which is
+`docs/26` § 10 non-goal 6's own distinction: the player is publishing their own words, and the
+product is not sharing anything.
+
+### 5. The refusal, both polarities — § D227
+
+A browser denies the clipboard for reasons the player did not cause and cannot see. With no finished
+run the button is drawn **unpressable with a sentence saying why** rather than greyed and silent,
+which is `everyday/postRun.ts`'s rule that a filled primary consuming a click and producing nothing
+is worse than a disabled one; the sentence is bound to the button by `title` and `aria-describedby`,
+which is what `everyday/deadControls.browser.test.ts` asks of every disabled control. With a
+clipboard that refuses, the artefact goes **on the page** — a `<pre>` with `user-select:all`,
+because reflowed into a paragraph the band strip stops being the artefact — under a line, announced
+with `role="status"`, saying what happened. The one thing the control never does is fail quietly.
+
+### 6. What it may not say, and the defect that decided it
+
+**It does not claim anybody else is playing this.** The closing line was going to read *"Same
+building, same seed, same crowd"*, and that is **false on this tree**. `dev/main.ts`'s `boot` opens
+with `initialState(resources, randomSeed())` and `randomSeed` is `crypto.getRandomValues`, so the
+session seed is fresh on every load; `dev/state.ts#withFirstSession` then draws the opening contract
+from it through `shift/firstSession.ts#firstSessionContractFor`, so six cold loads give six
+different towers. Two player surfaces state the opposite as fact —
+`everyday/doorView.ts`'s stepper rule (*"One tower a day, the same for everybody"*) and
+`everyday/today.ts`'s seed line (*"everyone identical"*). Those are not this decision's to fix and
+are reported separately; what **is** this decision's is that the artefact does not become the third.
+
+**The daily seed is not missing, and that is the half worth acting on.**
+`packages/server/src/leaderboard/boardKey.ts#dailySeedFor` is the date's own digits,
+`dailyFixtureAt` returns `{ date, seed, config }`, `GET /api/boards` already serves it, and
+`menu/client.ts#isDailyFixture` already validates it field by field onto `BoardsPage.today`. Then
+`everyday/host.ts#dailyBoardOf` takes `today.date` to build the board key and **drops `today.seed`
+and `today.config`**, which nothing in `packages/viz/` reads. A value authored, served,
+schema-checked on the client, carried into a typed structure and consulted by nothing is this
+repository's signature defect — the one `CLAUDE.md` records eleven times in code and twice in
+`data/` — and it is one field access from being closed.
+
+**So no conditional arm is built for the day's crowd and no field is added for one**, deliberately:
+a branch with no live writer is the twelfth instance of that same defect, which is what the
+paragraph above is about. When a run can be played on the day's fixture, the arm to add is *this run
+is today's crowd*, and it is decided by comparing the run's seed against the server's own
+`today.seed` — **never** against a date the client computed, because `boardKey.ts` says in terms
+that *which day is it* has one answer and it is the server's.
+
+### 7. The corpus
+
+Seeded into the adapter that already drives the daily board, rendered from the case's **own**
+recording rather than a fixture: R3 then asks whether this artefact published *this* run's refused
+mean and R13 asks whether the count beside it is *this* run's `waitCount`. Both branches are reached
+across the corpus rather than manufactured, because the cases genuinely differ — twelve of the
+forty-nine always-on cases run a refused mean.
+
+**No new surface, and that is the right answer rather than a saving.** The artefact is drawn under
+the daily board by a surface the adapter already drives, so § D489's ruling applies: a state on an
+existing surface moves the strings and not the surface count. `shareFactsOf` and `shareSlicesOf` are
+deliberately not in `covers` — the derivation finds no prose in either, and a `covers` entry for
+nothing is a coverage claim for nothing, which is wave T's lesson read in the other direction.
+
+## D641 — The stage opens at `4×`: § D525 clause 4's watching rung, chosen on the content arithmetic rather than by playtest
+
+**Date: 2026-09-19 · Owner: lane BUG-548 · Lane block: D641–D643 · Implements: [§ D525](#d525) clause 4 · Amends: [§ D354](#d354) · Closes the build half of: [#411](https://github.com/mrpeanut01/elevator-sim/issues/411)**
+
+**Decision.** `stageScreenModel.ts#DEFAULT_STAGE_SIM_PER_REAL_S` moves from `30` to `4`. The ladder
+is untouched — all seven rungs still ship and every label still equals its multiplier, which is
+§ D354's own result and is not reopened.
+
+**What ruled it, and what was left open.** [§ D525](#d525) clause 4, the product owner's, 2026-09-06:
+*"every scenario and every rush plays live, meaning the stage plays at a watching speed … the
+opening speed moves from § D354's `30×` to a watching rung, `1×` or `4×`"*. Its own closing section
+says *"what it does not decide: which watching rung opens a run, which is a playtest's."* **This
+decision takes that call on arithmetic instead, and says so rather than claiming a playtest.** A
+playtest is still the better instrument and is owed; what it would be choosing between is now `4×`
+and `1×` on a build where neither is `30×`, which is strictly more useful than deciding it on a
+build the ruling has already rejected. **The build half of #411 is closed and the playtest half is
+not.**
+
+**§ D354's three reasons, taken one at a time.** Reason 1 — *it cannot be the honest `1×`* — stands
+untouched and is half of why this is `4×`. Reason 2 — *the fastest rung inside [§ D344](#d344)'s
+`S ≤ 39` budget*, i.e. the most day per minute that still clears the bound — is what § D525
+overturned: the default is for watching the people, and buying day per minute is what the chips and
+§ 2.3's skip control are for. Reason 3 — *it moves no picture* — was an argument for not moving, and
+the ruling moves it. `stageScreenModel.test.ts`' property case is rewritten accordingly rather than
+loosened: it now asserts *inside the budget*, *above 1:1*, *not the maximum of the discrete tier*,
+*the ladder open in both directions*, and *a door cycle of at least two real seconds*.
+
+**Why `4×` and not `1×`, in three measurements.**
+
+1. **The door cycle, which is what a watching speed exists to make visible.** `docs/28` § 6's own
+   table: a 9.8 s hall-call cycle (open 1.8 s, dwell 5 s, close 3.0 s, from
+   `data/elevator-specs.json`) is **2.45 real seconds at `4×`**, **0.33 s** at `30×` and **9.8 s** at
+   `1×`. Twenty frames is a flicker; 588 frames for one pair of doors is not what § 7 asks a player
+   to read, which is *which landing is backing up*.
+2. **The content census, counted rather than estimated.** `data/campaign.json` — ten stages, all
+   **900 s**. `data/scenario-goals.json` — twelve, all **900 s**. `data/fixit-cases.json` — one at
+   1 500 s, **fifteen at 1 800 s**, two at 2 700 s. The mode § D525 puts first is 900 s, which is
+   **3 min 45 s at `4×`** and **15 minutes at `1×`**, against a tile that publishes *"~3-5 min a
+   case"* on the player's own screen.
+3. **The ladder stays open in both directions.** A default on the bottom rung can only be adjusted
+   one way. At `4×`, `8×` and `30×` remain above it and inside § D344's budget, and `1×` remains
+   below for a player who wants one car.
+
+**What it costs, stated rather than glossed.** `docs/28` AD-S6's measurement of `office-day`'s quiet
+head — 08:00–08:30 at one twentieth of nominal — was **60 real seconds** at `30×` and is **7.5 real
+minutes** at `4×`; that whole template is 2.5 real hours. It is the only one of the seven shipped
+templates with a phase schedule, it is not what the Everyday content runs, and § 2.3's skip control
+answers it — none of which makes 7.5 minutes of an empty lobby a thing to leave unsaid. AD-S6 is
+corrected on this commit.
+
+**A number this decision does not fix, and will not pretend to.** The session shapes on
+`everyday/modes.ts`' three tiles and `everyday/scenarioModel.ts`' two entries — *"~3-5 min a case"*,
+*"~2 min a building-day"*, *"~5 min a case"*, repeated in `docs/23` § 4, `docs/32` § 1.2 and
+`docs/12` § 4 — correspond to roughly **5–6 simulated seconds per real second**, which is no rung on
+this ladder. They are wrong by a factor of six at `30×` and by about 1.5 at `4×`: **less wrong, and
+still wrong.** The likely history is § D354's own defect one document over — before that decision the
+chip *labelled* `4×` ran at 8 — but that is a plausible sentence rather than a measurement, so it is
+offered as a guess and marked as one. Correcting five player-facing strings is not this constant's
+to do; it is filed rather than absorbed, as **GitHub issue #559**, which carries the five sites,
+the four documents that repeat them, and this paragraph's guess marked as a guess.
+
+**The stale sites this commit corrects**, on `CLAUDE.md`'s rule that a published number and a stated
+mechanism go stale the same way: `shift/legibility.ts`'s *"two simulated minutes are on the order of
+ten real seconds"* (thirty, at `4×` — and the window itself did not move, the speed under it did);
+`docs/28` § 6's motion table, whose *(default)* marker moves to the `4×` row, and AD-S6's arithmetic;
+`docs/29` § 4.1's *"0.33 s of wall time at the default"*, which is a change **in that section's
+favour** — the door material #196 names does not survive 0.33 s and fits 2.45 s comfortably, so the
+discrete tier is now what a player meets rather than one they reach by moving a chip; and `docs/38`
+§ 2.3. Three test literals reading `30×` are replaced by a read through
+`stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX).label` rather than by the new number, which is #257's defect
+class one level up — a rung that has now moved twice would have had to be re-transcribed twice.
+
+## D671 — The ledger's read answers a balance **and the sinks the account bought**; § D526 clause 5 is untouched, because a sink is not a source
+
+**2026-09-19.** GitHub issue **#372**, `docs/38` § 2.4, [§ D526](#d526) clause 5.
+
+`GET /api/chimes` shipped with one key and a docstring that made a point of it: *"Not a list of
+entries, not a breakdown by source, not the last thing that was earned."* `api.test.ts` asserted the
+key set rather than the value, so a second field failed a test instead of shipping. It now answers
+two, and this entry is why that is not the widening it looks like.
+
+**What changed is that a spend exists** ([§ D672](#d672)). A run claims a modifier by naming its
+sink; `chimes/ledger.ts#unbackedModifiers` refuses a claim the account never paid for. So a play
+surface that cannot read what it bought **cannot claim it**. The only other place that knowledge
+could live is the client — a second authority for a fact the ledger already holds, and one a reload
+loses, which means a player paying fifteen chimes and then being refused the thing they paid for.
+
+**Clause 5's property is untouched, and it is worth naming which one.** Clause 5 is *the play
+surface … never knows a **source***. A source is where a chime **came from**; a modifier is a sink
+the account **spent one on**, chosen by pressing. So the property the clause was built for holds
+exactly: an external add is one more source, it moves the balance, and it cannot appear in
+`modifiers` because nothing but the spend verb writes one. `boundaries.test.ts`'s rule that no
+viewer module names a source is unmoved, in both directions.
+
+**What is still not on the wire**: a price, an entry, a date, a count of anything a run measured. A
+modifier is `{sinkId, steps}` — the pair `leaderboard/boardKey.ts` already puts in a board key, for
+the same reason — and `chime-ledger.json`'s `priceChimes` stays on the server. Two purchases of one
+sink are **summed** before they go out, because this is not an entry list and `unbackedModifiers`
+sums the same way on the way back in, so the client's claim and the server's check count one
+quantity. `api.test.ts` asserts the body's key set **and each modifier's**, so a third field fails a
+test rather than shipping.
+
+**The earn verb is unmoved.** It answers one balance, and `EverydayChimeBalance.owns` is therefore
+**optional** rather than filled with `[]` by whatever calls it — `undefined` means *this answer says
+nothing about what is owned*. A binding that supplied an empty list to satisfy a type would erase a
+purchase on the player's next clear, which is a defect an optional field makes unspellable.
+
+## D672 — One sink is sold, and it is the only one that reaches a run; the other two are listed with their own refusals, and the scenario rung's refusal is **not** moved
+
+**2026-09-19.** GitHub issue **#372**, `docs/38` § 2.1 and § 2.4, [§ D640](#d640), [§ D606](#d606)
+§ 2, [§ D227](#d227), `docs/32` GD13, `docs/22` non-goal 5.
+
+`data/chime-ledger.json` has sold three sinks to nobody since GitHub issue #368, under one sentence
+across the whole list: *"None of these can be bought yet."* That was honest and it was the loop's
+open end. This builds the spend — `menu/client.ts#spendChimes`, `EverydayHost.spendChime`, the press
+on the tally in Settings — and sells **exactly one sink**.
+
+### 1. Why `rush-prefit` and nothing else
+
+It is the only sink that reaches a run, and that is measured rather than argued.
+`everyday/rush.ts#rushPatchOf` writes `campaignFitOut` for a claimed one, `packages/server`'s replay
+fits the same three effects, and `leaderboard/rushHoldAgreement.test.ts` **pairs every pre-fit cell
+with the same cell unfitted and requires the two to differ** — `garden-apartments` holds 1 178 s as
+built and 1 214 s fitted, `midtown-office` 1 640 s and 1 650 s. That is `CLAUDE.md`'s standing
+requirement — *move the control and require the run to change* — discharged by a run, on the one
+thing this entry sells.
+
+**The other two are refused on their own rows** (`everyday/chimesPanel.ts#SPEND_ABSENCES`,
+`screens.ts#UNBUILT_REASONS`' shape, one sentence per key, asserted in both directions):
+
+- `career-purse-top-up` — `campaign/economy.ts#purseOf` is `carriedIn + earnedSoFar −
+  committedUnits`, every term derived, and **not one of `CampaignAction`'s ten arms writes a
+  grant**; `spends` is only ever appended to, as a debit. There is nowhere for a bought unit to
+  land. What would change that is a grant record summed into `purseOf` beside `spends`, which is a
+  change to the career economy and is **not taken here**.
+- `rush-purse-top-up` — no between-round rebuild travels (§ D606 § 2, which weighed moving
+  `economy.ts#SHOP` into `core` and declined), so nothing spends a purse.
+
+Selling either would be `docs/22` non-goal 5 with a price on it: a control that writes nothing,
+looking live. This repository has shipped that eleven times in code and twice in `data/`; it has
+never yet shipped one a player paid for.
+
+### 2. The scenario budget rung is **not** built, and the refusal that blocks it is **not** moved
+
+`core/config/chimeLedger.ts#REFUSED_MODIFIER_KINDS` refuses `budget-units` **by name** and
+`parseChimeLedger` throws on it. That refusal is correct — `docs/38` § 2.4 prices a rung in
+`data/campaign.json` and a price for one act in two documents is an authority defect across a
+network boundary — and the tempting move is to route around it with a second spend path that charges
+a price the ledger deliberately does not hold. **It is not taken, and three independent reasons each
+suffice:**
+
+1. **It would buy nothing.** Measured from `data/scenario-survivors.json` (provenance `measured`,
+   tree `3ffa138`, master seed 20260910): the equipment rung (+20 u, 20 chimes) and the building
+   rung (+30 u, 30 chimes) move the survivor count on **zero of ten stages**, and the survivor
+   **names** are identical at all three rungs on every stage that has one. Fifty chimes — eight fix
+   cases out of a lifetime ceiling of eighteen — for the same configurations. A compliant rung
+   screen must draw the count beside the rung (`docs/38` § 2.1 requires it on the scenario's own
+   face), and drawn honestly on today's data it tells the player not to buy.
+2. **There is nothing reachable to sell it on.** `everyday/scenarioModel.ts` lists two entries and
+   the ten stages that author the rungs are played on the Engineer surface; the eighteen fix cases,
+   which are the reachable Scenario content, carry a flat `budgetUnits` with no steps at all.
+3. **Nothing reads a budget during play.** `scenario/budget.ts` is loaded, validated and consulted
+   by no play path (GitHub issue #553) — `CLAUDE.md`'s dead-seam pattern about to happen a twelfth
+   time, and a spend route into it would be a purchase feeding a seam.
+
+**What would unblock it, in order:** the fix cases re-authored to the scenario schema with a
+`budget.steps` ladder (#365's remaining half, which has no issue), survivor counts per case per
+rung (#367's shape), a `(scenarioId, stepId) → chimes` resolution in `core` so the server can price
+it without a second copy of the ladder — and a rebalance, because a rung that moves no count is a
+rung nobody should be sold. **The rebalance is a different lane's job and is not attempted here.**
+
+### 3. What is deleted rather than reworded, all on the commit that made each false — § D227
+
+- `CHIMES_PANEL_COPY.spendRefusal`, the field and the sentence. What replaced it is narrower and
+  harder to let go stale: a reason per row, and `spendWidensTheBudget.test.ts` asserting that every
+  sink is either offered or refused and none is both.
+- `leaderboard/boardKey.ts`'s *"`rush-prefit` is refused on a sitting, because its fitted building is
+  one this server cannot build"* — **false since § D640 lifted it on 2026-09-16**, in a file last
+  touched on the 11th. § D227's more dangerous half: a refusal drawn over a control that works.
+- `rushScreenModel.ts#RUSH_ABSENCES`' *"neither rush purchase can be bought yet"*.
+- `settingsView.ts`'s register note opening *"nothing in this build spends a chime"*, and
+  `host.ts#rushModifiers`' *"undefined in every shipped binding"*.
+
+And one **inverted** rather than deleted: `pricing/spendWidensTheBudget.test.ts`'s grep asserted that
+**nothing** in the viewer charges for a chime. It now asserts exactly which three modules do, and a
+second grep asserts that exactly one applies the claim — charging and applying are different
+questions and the separation is the whole subject of the standing requirement.
+
+### 4. Two shapes the screen deliberately does not take
+
+**The claim is derived, not bound.** `host.ts#rushModifiers`' docstring promised *"when a spend
+surface ships it fills this and nothing else changes"*. It is kept by **not** filling it: the host
+already reads what the account owns (§ D671), so `rushClaims()` derives the claim there and a
+`dev/main.ts` binding would be a second answer to *what did this account buy*. The parameter stays
+for the one caller that must drive a claim directly — `rushHoldAgreement.test.ts`, which is how the
+fitted and as-built cells are measured against each other.
+
+**The rush setup screen discloses and does not sell.** When the account owns the kit it says the
+tower starts fitted and that a fitted sitting is posted to its own board — two facts, no price,
+because a chime figure beside a mode's own screen is GD13 clause 3 and a pitch there would be a
+store. **It says nothing about whether a tier bought between rounds persists**, which is an open
+question a screen must not answer by implication.
+
+## D673 — A finished turn is acknowledged on the rail, as a tally of completed turns: not on the results page, and not on the card that carries a run figure
+
+**2026-09-19.** GitHub issue **#499**, `docs/32` § 3.4 and GD13, `docs/38` § 2.4, [§ D106](#d106),
+[§ D227](#d227), [§ D533](#d533).
+
+`everyday/fixitScreen.ts` banked a cleared fix case under a comment reading *"Nothing is drawn and
+nothing is awaited"*, and `dev/main.ts`'s earn binding posted and discarded under a docstring saying
+a banked turn *"changes a number on the Settings screen and nothing a player is looking at when they
+finish"*. Both sentences were true of the build and the second was the defect: the only surface
+drawing a balance is Settings, so **a player could clear all eighteen fix cases, earn the entire
+108-chime lifetime ceiling, and never learn the currency exists.**
+
+### 1. Why the rail, and why not the sheet
+
+`docs/32` GD13 clause 2 keeps a currency **off a results page**, out of any comparison between
+players, and out of any verdict; clause 3 keeps it away from a wait figure. None of that is relaxed
+and none of it may be. What `docs/32` § 3.4 licenses in terms — arguing for standing — is a **tally
+of completed turns** as distinct from a statistic over a run, and a chime is that by construction:
+`docs/38` § 2.4 pays a flat authored award for finishing a turn, and *no chime is ever scaled by a
+wait figure or any quantity the run can suppress*. So the acknowledgement is a tally beside a tally,
+and `report` is the one screen it is withheld on.
+
+### 2. Why **not** the `PLAYING AS` card, which is where it was drafted
+
+The obvious site is beside `rail.ts#careerLineOf`'s *3 days running*, which is itself a turn tally.
+It is the wrong one, and clearing the letter of a prohibition while landing where its reason bites is
+not clearing it: that line composes `3 days running · **best 84%**`, and `bestMinutePct` is a **run
+figure**. A chime count three pixels under it is a currency beside a wait figure — GD13 clause 3, and
+underneath it § D106's own argument, that a currency beside a wait figure becomes a score.
+
+**So what does *beside* mean.** It cannot mean *anywhere on a page that also draws a figure*, or no
+surface in this product could draw a chime at all — the rail is on every screen, and
+`everyday/settingsView.ts` has drawn the balance next to it since #368, which shipped and was
+reviewed. It means **the same block**. The identity card is one; the top of the rail, under *Main
+menu*, where nothing numeric is drawn, is not. `rail.test.ts` asserts the card carries neither
+currency word, over the whole footer's JSON rather than over a named field, so a lane putting a
+second currency line on that card fails a test rather than a player.
+
+### 3. The four states, and the one that would otherwise be a silence
+
+`balance`, `signed-out`, `no-ledger`, `unreachable`. Four sentences because four things are true of
+four players, and the one worth defending is `signed-out`: a visitor earns **nothing** on this build
+— `dev/main.ts` returns on no token, the route 401s, and there is no device ledger — so the line
+names the clear **and** says the chime went nowhere. Saying nothing would be § D227 in the half
+`CLAUDE.md` calls the more dangerous one: silence about a mechanism that did not run.
+
+### 4. The two figures it will not carry, and each absence is a rule
+
+**Not the award.** `data/chime-ledger.json` prices a completion and `boundaries.test.ts` forbids any
+module in `packages/viz` naming a **source**, so an award drawn here would be a second authority for
+a price this package may not read.
+
+**Not the delta.** *First time only* (§ D533) means a scenario re-cleared pays nothing, so a `+6` on
+a second clear would be false; and a first clear happens before anything has read the balance, so
+there is no *before* to subtract. A difference of two reads taken at different moments is a figure
+nothing produced.
+
+What is left is the turn and the one read § D526 clause 5 licenses — enough for a player to learn
+that finishing things pays something, and that they have some.
+
+### 5. What was considered and not built
+
+**The arrival cue.** § D530 named the currency after that sound, so playing it on a bank is the one
+acknowledgement that touches no GD13 clause at all. It is not built here and the reason is
+mechanical rather than a judgement: the only `AudioSink` in the tree is created inside
+`everyday/stageScreen.ts`'s mount, which is not mounted when a fix case is cleared, so it needs an
+audio owner above the stage screen. It is also not a substitute — `docs/36` makes a sound-only
+signal an accessibility failure — so it would be a second channel beside this line, not instead of
+it.
+
+**This lane held D671–D678 and spent D671, D672 and D673. D674–D678 are unspent** and become
+permanent holes under [§ D404](#d404) once a later lane writes above them; the integrator registers
+them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+---
+
+## D693 — One refused replication in fifty suppresses a whole estimate row, so the survivor table's `suppressed` column reports *the building is drowning* and *one pair in fifty was refused* as the same number
+
+**Date: 2026-09-19 · Rules on:** GitHub issue **#234**, [§ D692](#d692) § 3, `scenario/survivors.ts`'s
+`PublishedSurvivorStep.suppressed`. Publishes a measurement and endorses a rule it would have been
+easy to weaken. **Nothing is changed by this entry.**
+
+### 1. The question, and why it was asked before any lever was chosen
+
+`data/scenario-survivors.json` reports **24 of 24 configurations suppressed at every rung** on stages
+5, 9 and 10, and 18–24 of 24 on stage 3. `PublishedSurvivorStep.suppressed` exists precisely so a
+reader can tell *nothing cleared* apart from *nothing could be quoted*, and a cell where everything
+is suppressed is a plausible reason for a stage to have no way through that has nothing to do with
+difficulty. Lowering demand on such a cell would move the survivor count without making the stage
+more winnable — a rebalance that looked like it worked and did not.
+
+So the four stages' **baseline** arms were measured rather than reasoned about: one batch per seed
+set, `collective` at each stage's own demand, counting the replications whose own summary refuses to
+quote a mean.
+
+### 2. What was measured
+
+Measured 2026-09-19, the stage's own 50 tuning and 50 holdout replications:
+
+| stage | published `suppressed` | baseline `awtIsValid: false`, tuning | holdout |
+|---|---|---|---|
+| `stage-3-overwhelmed` | 18–24 of 24 | **50 of 50** | **50 of 50** |
+| `stage-5-credentials` | **24 of 24** | 6 of 50 | 4 of 50 |
+| `stage-9-both-ways-at-once` | **24 of 24** | **1 of 50** | **0 of 50** |
+| `stage-10-the-bed-and-the-visitor` | **24 of 24** | 6 of 50 | 7 of 50 |
+| `stage-2-morning-rush` ([§ D692](#d692)) | 6 of 18 | 0 of 50 | 0 of 50 |
+
+**Stage 3 is saturated and says so in its own words**, identically on all fifty: *"Queue length rose
+by 154.1 persons (30.82/min, 19.1× the queue's own scatter) over the 300 s reporting window"* —
+queue growth from 73 to 182 persons across the fifty, never censoring, never abandonment, never an
+empty window. A stage named *Overwhelmed* with a saturated baseline is arguably its design; what is
+not design is that every goal reading a mean is then unjudgeable on it, which is why its one
+survivor gets through on the goals that read an **observation** instead.
+
+**Stages 5, 9 and 10 are the opposite case and report the same number.** Stage 9's baseline refuses
+its mean on **one replication of fifty on the tuning seeds and none of fifty on the holdout**, and
+its cell still reads 24 of 24 suppressed at every rung.
+
+### 3. Why: the rule, which is correct and is not being changed
+
+`batch/report.ts` decides an estimate row's verdict, and its own docstring states it: *"`suppressed`
+— an estimate row **at least one of whose pairs** the run itself refuses to quote."* Measured on the
+same four stages, the comparison rows read:
+
+| stage | `awtS` / `wt95S` / `ttdMeanS` (estimates) | the three observation rows |
+|---|---|---|
+| `stage-2-morning-rush` | `unresolved` | `unresolved` |
+| `stage-5-credentials` | **`suppressed`** | `unresolved` |
+| `stage-9-both-ways-at-once` | **`suppressed`** | `unresolved` |
+| `stage-10-the-bed-and-the-visitor` | **`suppressed`** | `unresolved` |
+
+**The rule is right and the reasoning for it is already written where it lives**, so this entry
+endorses it rather than proposing a threshold:
+
+> *"Dropping the replications a building could not cope with keeps the passenger traces it did cope
+> with; the two arms lose them at different rates, and the ones that fall out are the traces the
+> dispatchers differ most on. The survivors would understate the difference in exactly the case
+> worth fixing."*
+
+That is `CLAUDE.md`'s statistical discipline exactly, and a *"suppress only above 10 %"* rule would
+be the confident-nonsense failure this project is built against. **No threshold is proposed, no
+count is averaged over the survivors, and `suppressedIn`'s filter is untouched.**
+
+### 4. The finding: one column, two facts, and they are opposites
+
+`survivors.ts` invites the strong reading in its own words — *"a survivor count of 3 of 12 over a
+rung where 9 of the 12 refused their own mean is a different fact from 3 of 12 where none did"* —
+and it is right that it is a different fact. What the column cannot say is **which** different fact:
+
+- **stage 3** — every paired run refused; the building is genuinely drowning, and no estimate-based
+  goal can be judged there at any configuration. Structural.
+- **stage 9** — one paired run in fifty refused; forty-nine measured perfectly well, and the row is
+  suppressed because averaging the forty-nine would bias the comparison. An artefact of a correct
+  rule meeting a long tail.
+
+Both print `24 of 24`. A reader — this lane's own dispatch brief among them — takes the second for
+the first.
+
+### 5. What this tells #234, which is the point of having measured it
+
+**The suppression column is not a reason to treat stages 9 and 10 as unrebalanceable.** Their
+buildings measure fine; one replication in fifty does not. A rebalance there is an ordinary demand
+or fabric question, and this entry removes a blocker that was never real.
+
+**Stage 3 is the opposite and the caution stands.** Its zero is partly the instrument, and a demand
+cut there would move the suppressed count and the survivor count together while saying nothing about
+whether the stage became winnable. That is the trap, and it applies to exactly one of the four
+stages it was suspected of.
+
+**What is not measured**, and no sentence is offered in its place ([§ D256](#d256)): *why* stages 5,
+9 and 10 have a long tail of refused replications at all, and which of the five grounds those few
+fire on. This entry measured how many, not which. It is one cheap probe away for whoever takes it —
+stage 9's whole baseline batch is five seconds.
+
+---
+
+## D729 — The day's crowd is the UTC date's own digits, derived on the device from the server's own expression
+
+> **Taken 2026-09-19 by an agent session under delegated authority**, not by the product owner. The
+> session principal's standing instruction for this wave is that decisions are taken by the swarm
+> rather than escalated; this entry, [§ D730](#d730), [§ D731](#d731), [§ D732](#d732) and
+> [§ D733](#d733) are taken under it. A later reader weighing this against a product-owner ruling
+> should treat it as an agent ruling and say so — [§ D626](#d626) is the cautionary case in this
+> repository for what happens when that distinction is lost.
+
+**The defect, and it is the worst thing this product has shipped.** `dev/main.ts`'s boot opened the
+session on `randomSeed()` — `crypto.getRandomValues` — and `dev/state.ts#withFirstSession` drew the
+first session's tower from it. Six cold loads in a headless Chromium against the real bundle gave
+six different towers (BUILD-REALITY, 2026-09-19: Midtown Office, Crown Hotel, Secure Tower,
+Empire-State-class, Harbour Point, Vertical City). Reproduced here without a browser by running
+`firstSessionContractFor` over twenty simulated `randomSeed()` draws: **ten distinct contracts of
+the eleven eligible**.
+
+Meanwhile **five** player-facing strings asserted the opposite as fact — `doorView.ts`'s stepper
+rule and its closing sentence, `today.ts`'s seed line and its lede, and `briefView.ts`'s LOCKED FOR
+SCORE card. Every other figure in this product is measured or withheld. These were asserted. On the
+first screen of the first mode, about the one property the whole pitch rests on.
+
+`randomSeed`'s own docstring had said so the entire time — *"A seed nobody chose, so the first shift
+is not the same shift for everybody"* — which is what makes this a screen nobody re-read rather than
+a mechanism nobody understood.
+
+### 1. What was already built, which reframes the whole thing
+
+**It was not a missing feature. It was a four-layer pipeline consumed by nothing** — this
+repository's signature dead-seam defect, one field access from closed (LANE-H, verified at source):
+
+| step | site | state |
+|---|---|---|
+| the seed defined | `server/leaderboard/boardKey.ts#dailySeedFor` — the date with its dashes removed | built |
+| the fixture built | `boardKey.ts#dailyFixtureAt` → `{ date, seed, config }` | built |
+| served | `server/http/api.ts` — `GET /api/boards` | built |
+| validated on the client, field by field | `menu/client.ts#isDailyFixture` | built |
+| carried into a typed structure | `menu/client.ts` → `BoardsPage.today` | built |
+| **a screen reading `today.seed`** | — | **nothing** |
+
+`everyday/host.ts#dailyBoardOf` takes `today.date` for the board key and drops `today.seed` and
+`today.config`; a grep for either across `packages/viz/src` returns zero. So the copy was not lying
+about something nobody had built. It was describing something built and unread.
+
+### 2. The ruling
+
+**The day's crowd is the UTC date's own digits**, `shift/dailySeed.ts`, and the client derives it
+rather than waiting for it. Three properties earn that derivation over the alternatives, each tested
+rather than assumed:
+
+1. **There is already exactly one derivation and this is it.** A second expression — a hash, a
+   salted digest, a rotation table — would be a second answer to a question the server has already
+   answered, which is the defect `boardKey.ts` exists to have removed. `dailySeed.test.ts` pins the
+   agreement against the **server's own source text** rather than against a copy, on
+   `menu/client.test.ts`'s precedent, because `viz` may not import `server` ([§ D215](#d215) § 3).
+2. **A player can check it unaided.** The seed the door prints *is* today's date — `crowd 20260919`
+   on 2026-09-19 — so the claim is verifiable against a calendar the reader already has. That is the
+   standard every withheld figure in this product is held to, pointed at an assertion for once.
+   `boardKey.ts` chose these digits for the same reason and says so.
+3. **A shipped salt buys nothing.** It ships in the bundle, so it is public the moment anybody
+   looks; it makes tomorrow's crowd no less guessable and it breaks property 1. Rejected on that
+   rather than on taste.
+
+### 3. Why the client computes it, against [§ D218](#d218) § 3
+
+§ D218 § 3 says the client never computes which challenge today is, because *"a client's clock is
+not trustworthy in a competition"*. **That rule is kept and it does not reach here**, for three
+reasons that are facts rather than readings:
+
+- **The failure mode is bounded and already handled.** A device a day out plays yesterday's crowd.
+  `boardKey.ts#placeSubmission` then places that run on the **personal log** rather than on the
+  daily board, because it is not `dailyFixtureAt(now)`'s seed. The server's clock still decides
+  every ranked thing and nothing accuses anybody. A challenge window is the opposite: it opens and
+  closes, so a wrong clock lets somebody in early.
+- **There is no server answer to defer to on the build a stranger opens.** The shipped static
+  artifact carries no `<meta name="elevator-sim-api">` — `packages/viz/index.html` forbids one and
+  `deploy-viz.yml` injects it from a repository variable — so `BoardsPage.today` is `undefined` and
+  § D218 § 3's premise (*"the server is already this repository's first wall clock"*) does not hold
+  there.
+- **The page must open before any network answers.** `boot` builds the opening state synchronously.
+  A seed that waited for a fetch would be a page that waited for one, and on an API-less build it
+  would wait forever.
+
+So the division is: **the device's clock decides which day you play; the server's clock decides
+which board your run posts to.** `host.ts#dailyBoardOf` is untouched and still works out no day of
+its own.
+
+### 4. What the invariants get
+
+- **Invariant 3** (no wall clock in `core/`) is untouched: `core` never learns a calendar exists.
+  What crosses the boundary is `SimulationConfig.seed`, a `bigint`, exactly as before. The clock is
+  in `viz`, which is the half of the split allowed one — see [§ D731](#d731) for the seam.
+- **Invariant 2** (no global RNG) is untouched: `shift/firstSession.ts` still derives a named
+  `first-session` stream from the seed, [§ D514](#d514)'s shape, and nothing in that module moved.
+- **Invariant 5** (a run record carries its seed) is what makes a replay survive this: a replay
+  replays the record's seed and never re-derives one, so a run recorded today still replays
+  tomorrow.
+- **[§ D366](#d366)** (no entry-screen override survives a reload) is untouched: nothing is stored.
+  The seed is re-derived on every load, which is `isFirstDayOnALegibleTower`'s own shape.
+- **[§ D514](#d514)** is strengthened rather than superseded. Its rule is that the draw is
+  reproducible from the number the player reads; the number is now the date, so the tower is
+  reproducible from a calendar.
+
+### 5. What is owed and is deliberately not built here
+
+`today.seed` is still read by nothing. Now that the client derives the same value, the server's copy
+is the **authoritative** one and its only remaining use is to tell a player their device's clock
+disagrees. Building that means a field on `EverydayHost`, which is heavily contested in this wave;
+it is named here rather than guessed at.
+
+---
+
+## D730 — "The same for everybody" is true of the crowd and false of the tower, and the strings say which
+
+> **Taken 2026-09-19 by an agent session under delegated authority** — see [§ D729](#d729)'s note.
+
+[§ D729](#d729) makes the crowd the day's. **It does not make the tower the day's, and no seed
+does.** `shift/week.ts` is a week over one `contractId`: `openWeek` opens it and `nextDay` advances
+the day inside it, so a returning player's tower is the one their own week was opened on, and
+`dev/state.ts#withFirstSession` — the only thing that draws a tower from the seed at all — runs
+**once per device**, on the load that restored nothing.
+
+So *"One tower a day"* is a property of a product this one does not have. `docs/38` § 2.1 specifies
+that product (*"Today's scenario. One seed, the same for everybody, once a day"*) and it is not
+built.
+
+**The ruling: each string is narrowed to the claim that holds, and the part that does not hold is
+named rather than reworded away** ([§ D227](#d227)).
+
+| site | was | is |
+|---|---|---|
+| `doorView.ts#DOOR_RULE` | *One tower a day, the same for everybody* | *One crowd a day, the same for everybody — the tower is the one your week is on* |
+| `doorView.ts#SAME_FOR_EVERYONE` → `sameForEveryoneLine(crowdIsToday)` | *Everyone plays the same tower, the same crowd, the same day* | two arms; neither says the tower is shared |
+| `today.ts#seedLine` → `seedLineOf` | *crowd `<n>` · everyone identical* | *crowd 20260919 · today's date, so everyone playing today meets this crowd*, or *· a crowd of this run's own, not the day's* |
+| `today.ts#ledeOf` tail | *Everyone runs the same building on the same crowd* | *The only thing you choose is who drives* |
+| `briefView.ts#lockedForScore` | *The tower, the machines and the crowd are the same for everyone today* | *The crowd is the day's and the tower is your week's — neither is yours to pick from here* |
+
+**Two of the five are conditional, and that is load-bearing rather than cautious.** Two ordinary
+states reach these screens with a crowd nobody else has: a `?seed=` deep link, which is the reader's
+own choice and wins over the opening state exactly as `?building=` does; and a session left open
+across UTC midnight, seeded on yesterday's date and still running. A single unconditional sentence
+would have been § D729's defect surviving inside its own repair. `TodayRecord.crowdIsToday` carries
+the answer to all three surfaces from one place, § 16 rule 14's own shape, so the door and the brief
+cannot disagree about one run — which is the `surfaces-disagree` class the honesty corpus exists
+for. It is asked **per draw** in `doorScreen.ts` and `briefScreen.ts` rather than latched at boot,
+because a flag written once would go quietly stale at midnight with the door still saying *everyone
+identical*: § D227 arriving through a cache instead of through a sentence.
+
+`docs/12` § 4's deviation register is the right home for these as *design* deviations from the
+handoff, whose § 6 closing sentence is the source of two of them. **`CLAUDE.md`'s rule is unchanged
+and is what decides this**: the handoff wins every disagreement about what the screen looks like and
+the simulator wins every disagreement about what a number means, and all five of these are claims
+about the run rather than about the layout.
+
+---
+
+## D731 — `viz` gets one declared calendar-clock seam, and the wall-clock boundary is exempted by name rather than loosened
+
+> **Taken 2026-09-19 by an agent session under delegated authority** — see [§ D729](#d729)'s note.
+
+`packages/viz` had **no calendar clock at all**: `new Date(` appears in no production file under
+`packages/viz/src`, and `boundaries.test.ts` rule 2 keeps it that way — *wall-clock time enters
+through `DisplayClock` and nowhere else*, grepped for `Date.now(` and `performance.now(` outside
+`playback/clock.ts` and `dev/recordTti.ts`.
+
+**`DisplayClock` cannot be the seam, by its own design.** It is *"Milliseconds since some fixed
+origin. Monotonic; the origin is not meaningful"*, and it prefers `performance.now()` precisely
+because a clock that steps backwards would move a playhead. It cannot answer *what is today's date*.
+
+**The ruling: one module, one function, one line, named in the exemption.** `shift/deviceDate.ts`
+exports `deviceNowMs()` and nothing else; `boundaries.test.ts#WALL_CLOCK_EXEMPT` gains it beside
+`dev/recordTti.ts` **on that entry's own argument — it draws no picture**. Everything derived from
+the reading lives in `shift/dailySeed.ts`, which takes `nowMs` as an argument and whose
+clock-freedom is asserted by `dailySeed.test.ts` rather than promised.
+
+**Two alternatives were available and both are worse, which is the whole of why the exemption is
+taken rather than avoided.**
+
+1. **Widening the exemption to `dev/main.ts`.** That file draws every frame the Engineer shell
+   produces. Exempting it exempts the thing rule 2 was written to protect.
+2. **Spelling the read as `new Date()`.** The grep matches `Date.now(` and `performance.now(` and
+   would not have caught it. It would have worked, nothing would have gone red, and it would have
+   been this repository's signature defect with its polarity reversed — not a behaviour no test
+   reaches, but a **rule** no test reaches, got round by choosing a spelling. A boundary evaded by
+   wording is worse than one nobody wrote.
+
+`dailySeed.test.ts` holds the second of those shut directly: it asserts that `dailySeed.ts` contains
+no `Date.now(`, no `performance.now(` and **no zero-argument `new Date()`**, and that the one
+`new Date(` it does contain is the constructor over its own `nowMs` argument.
+
+---
+
+## D732 — The daily rotation rules are measured, and deliberately not adopted, because a rotation would have no observer
+
+> **Taken 2026-09-19 by an agent session under delegated authority** — see [§ D729](#d729)'s note.
+
+`docs/37` § 4.3 carries the gameplay guide § 17's three rotation rules — **no tower twice in seven
+days; no wrinkle template twice in fourteen; the pair never inside a month** — and a rotation
+authored in `data/` was the third candidate for § D729's derivation. It was tested and rejected, and
+both halves are recorded because the measurement outlives the decision.
+
+**Measured, over 730 consecutive UTC dates against the eleven eligible contracts** (pinned by
+`dailySeed.test.ts`, re-derivable there): the date-derived draw repeats a tower **inside seven days
+on 308 of them, 42.2 %**, and on **consecutive days 56 times**. So it plainly does not satisfy
+rule 1, and saying so is better than a rotation that claims to.
+
+**It is declined anyway, on a reason that outranks the arithmetic: a rotation would have no
+observer.** `dev/state.ts#withFirstSession` runs once per device, on the load that restored nothing,
+so a player draws **exactly one element of the sequence, ever**, and the order of the other 729 is a
+property nothing in the product can display. Building it would be a behaviour that is configured,
+validated and reached by nothing — the defect `CLAUDE.md` has recorded eleven times in code and
+twice in `data/` — wearing a design document.
+
+Two further reasons, each smaller and each real:
+
+- **A `data/` rotation needs an epoch and a length**, both of which go stale when the eligible set
+  moves. That set is *derived* from `shift/legibility.ts`'s measured table ([§ D512](#d512),
+  [§ D514](#d514)) and has grown from five members to eleven in three waves; a hand-authored cycle
+  beside it is the second copy § D514 was written to avoid.
+- **It would be a second authority on *which tower today***, beside the server's
+  `DAILY_FIXTURE_CONFIG`, which names one fixed building.
+
+**The rule becomes worth implementing on the day the daily door draws a tower a day**, which is
+GitHub issue #159's generator and not this module's. `docs/37` § 4.3 already requires that generator
+to *assert non-exhaustion over a simulated year* rather than inherit it from the table, and the
+measurement above is left as its first input.
+
+---
+
+## D733 — The door stops promising a duration the run does not have
+
+> **Taken 2026-09-19 by an agent session under delegated authority** — see [§ D729](#d729)'s note.
+
+`doorView.ts#DOOR_STEPS` step 2 read *"The whole shift in a couple of minutes."*
+
+**Measured**, by running the shipped derivation `shift/dayLength.ts#wholeDayFor` over
+`data/buildings/` and `data/traffic-profiles.json`: **ten of the eleven contracts a first session
+can open on run a 36 000 s authored day**, and only `crown-hotel` keeps the 1 800 s slice. At the
+opening stage speed — `4×`, [§ D641](#d641) — 36 000 simulated seconds is **two and a half real
+hours**. § D641's own docstring had already measured that and named five further stale session
+shapes, leaving them with *"Correcting five player-facing strings is not this constant's to do."*
+
+**The ruling: the promise changes, and the rotation is not bounded to fit it.** Bounding the
+eligible set to towers whose day fits three minutes leaves **one tower**, which is not a rotation;
+and shortening the daily run reverses the product owner's ruling on
+`ISSUE_VERIFICATION_FINDINGS.md` § AB (*Everyday day only, stages unchanged*), which is not an agent
+session's to reverse. So step 2 names the day and leaves the length to the speed control, which is
+the only thing on that screen that decides it: *"A whole working day, at whatever speed you set."*
+No figure replaces the one removed, because a duration this screen does not control is a number the
+run did not produce.
+
+**What this does not fix, named rather than absorbed.** The same arithmetic is still wrong on five
+strings outside this lane's ownership — `everyday/modes.ts`'s three tile shapes (*~3-5 min a case*,
+*~2 min a building-day*, *~5 min*) and `everyday/scenarioModel.ts`'s two entries, of which
+*Today's scenario · ~3 min* is the one that names the run this entry is about. They are § D641's
+list, still open, and now with the day-length measurement attached.
+
+---
+
+**This lane held D729–D735 and spent D729, D730, D731, D732 and D733. D734 and D735 are unspent**
+and become permanent holes under [§ D404](#d404) once a later lane writes above them; the integrator
+registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+
+---
+
+## D701 — § D606's three questions are closed by § D640, and the three sentences that still say otherwise are the stale-refusal class: what remains open in the rush package boundary is a fourth question nobody has asked
+
+**Date: 2026-09-19 · Owner: the studio war room's rulings lane · Closes `DECISIONS-OPEN.md` row OD-7 · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.3, [`docs/39`](docs/39-decisions-in-force.md) §§ 1 and 2, `packages/server/src/leaderboard/boardKey.ts`, [§ D606](#d606) § 2, [§ D640](#d640) § 4, GitHub issue [#372](https://github.com/mrpeanut01/elevator-sim/issues/372).**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. It **moves something already recorded** — `docs/38` § 2.3 states as fact that three questions have no answer, and two of them were answered by the product owner — and it binds three documents and one module that the lane taking it does not own. It takes **no design decision**: everything it closes was closed on 2026-09-16, and saying so is the whole of its content.
+
+### 1. The three questions, and where each was answered
+
+[§ D606](#d606) § 2 named three questions with *"no answer in `docs/38` § 2.3 or anywhere else"*. [§ D640](#d640), three days later, answered all three:
+
+| question | answer | where |
+|---|---|---|
+| What does `rush-prefit`'s *fitted* mean? | **One fixed kit and no other** — Doors L1 + Control L1 + Tenants L1, `data/price-schedule.json`'s `faster-doors` (4 u), `zone-the-tower` (6 u) and `queue-marshalling` (5 u), fifteen units against the sink's fifteen chimes | § D640 §§ 1 and 3; built in `core/src/config/rushPrefit.ts` |
+| Does a rush rebuild book nights? | **No — it is instantaneous.** No clock and no nights inside a sitting, because a sitting has no calendar and giving one a clock would make it a different mode | § D640 § 4.1, **the product owner** |
+| Does a tier still require the tier below inside one sitting? | **No.** `ENGINE_CONTRACT` § 8.2's first buying rule holds in the campaign and not here | § D640 § 4.2, **the product owner** |
+
+**The third is built and proved on the legs rather than argued.** `packages/server/src/leaderboard/rushHoldAgreement.json` carries `prefit` cells each half plays through its own whole path — `garden-apartments`/`collective` **1 178 s as built against 1 214 s pre-fitted**, `midtown-office`/`collective` **1 640 s against 1 650 s** — which is `CLAUDE.md`'s standing requirement pointed at a purchase, and the only check that catches a kit which folds perfectly and reaches no decision. The other two **reach no code and need none**: a fixed kit has no tier to gate and nothing to book, and both rulings bind whoever builds the general rebuild.
+
+### 2. Three sentences still say the questions are open, and two are the dangerous half of § D227
+
+[§ D227](#d227) rates a refusal drawn over a working control as worse than a missing sentence, because it tells a reader not to touch something that works. Three sites carry one:
+
+1. **`docs/38` § 2.3** — *"the three questions this section does not answer (whether a rush rebuild books nights, whether a tier still requires the tier below inside one sitting, and what `rush-prefit`'s *fitted* means)"*. All three are answered. Corrected to say so and to cite § D640, as a **correction rather than a deletion** on this repository's usual rule.
+2. **`docs/38` § 2.3, the next clause** — *"the same blockage is why nothing sells the rush's two chime sinks: a wider purse would buy nothing"*. That is no longer one blockage. § D640 § 6 rewrote `everyday/rushScreenModel.ts#RUSH_ABSENCES` for exactly this reason: a wider purse still buys nothing, while **starting fitted now reaches the run and waits only on a screen that spends a chime**. The owner's page carries the wording the shipped register was corrected away from, which is the stale refusal arriving one level up from the screen.
+3. **`packages/server/src/leaderboard/boardKey.ts`** — *"`rush-prefit` is refused on a sitting, because its fitted building is one this server cannot build."* False since § D640; `rushSitting.ts#rushSittingIssues` accepts the claim and `replayRushSitting` fits every round with it. **That one was found and deleted independently, by [§ D672](#d672), between this ruling being drafted and being applied** — the sentence is gone from the file and `docs/39` § 2 carries the row. Left in this list rather than struck out, because three sites is what the survey found and a ruling that quietly drops the one somebody else fixed reads as though it never saw it.
+
+**No count moves and no figure is republished here.** Every change is a substitution in prose, and the honesty corpus is untouched: no player-facing string is drawn by any of the three.
+
+### 3. `docs/39` owes two rows, under its own § 0
+
+[`docs/39`](docs/39-decisions-in-force.md) § 0 requires a row on the commit a decision lands. [§ D542](#d542) and [§ D543](#d543) both have one; **§ D606, which built their client half, and § D640, which made one of their sinks real, have none** — `grep` over that file returns neither id. Both rows are added on this commit, and § D606 takes an **AMENDED** marker naming § D640.
+
+### 4. What is still open, and it is a fourth question rather than one of the three
+
+The **general between-round rebuild** — buying an arbitrary tier of an arbitrary category between rounds, GitHub issue #372's second acceptance criterion — is still not built, and § D606 § 2's package boundary is still not moved. Nothing here moves it.
+
+**And a fourth question is named rather than answered, on § D606's own precedent.** § D640 § 1 holds that *"a sitting is one modifier set — every round of it starts from the same building"*, and [§ D542](#d542) clause 4 holds that the **purse** is a balance that carries from round to round. Neither says **whether a tier bought with that purse between rounds persists into the round after it.** § D640 § 4.2's reason for dropping the tier-below rule — *"a sitting that starts as-shipped every time is a very different ladder"* — is about **sittings** and does not reach **rounds**. The question could not be asked before § D640, because the tier-below rule was what stood in front of it.
+
+**The evidence leans and does not decide, so it is not decided here.** Every row in `data/price-schedule.json` is a capital price and Career's equivalent is permanent for the contract; `data/rush-purse.json` states the intent as *"a player who lasts longer has more to rebuild with"*, which reads oddly if a purchase evaporates each round; and the one fitted start the mode has applies to every round of its sitting. Against that, a lean is not a measurement, and which way this falls changes how the mode feels rather than what any figure means — [§ D256](#d256)'s refusal applied to a design question. It binds only the general rebuild, which nobody has started, so it costs nothing to leave open and would cost a boundary to invent.
+
+### 5. What this does not decide
+
+Whether the rush's purse should be spendable at all, which is #372's own second criterion. Where § D606's boundary moves, which is that entry's three shapes and is untouched. What a spend surface looks like — § D640 § 7 records that the day one ships it fills `EverydayHostBindings.rushModifiers` and nothing else moves, and that is still true.
+
+### 6. Numbers spent
+
+This lane held **D701–D705** and spent **D701** only. **D702, D703, D704 and D705 are unspent** and become permanent holes under [§ D404](#d404) and [§ D430](#d430) once a later lane writes above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES` if that is what happens.
+
+
+---
+
+## D706 — The fix-case repair menu retires from the screen and not from the file: the diagnosed repair becomes the scenario's pinned witness, the decoys survive as prices, and all three retirements wait for the editor that can write the answers
+
+> **Taken by an agent session under authority delegated by the session principal on 2026-09-19, not by the product owner.** It **narrows** [§ D525](#d525) clause 2 in one place, named in § 4 below, and conditions the rest of it on a measurement. `docs/39` § 2 carries the row and § D525 carries the marker, on this commit.
+
+**Date: 2026-09-19 · Narrows [§ D525](#d525) clause 2 · Reads it together with [§ D525](#d525) clause 3 · GitHub issues [#233](https://github.com/mrpeanut01/elevator-sim/issues/233), [#177](https://github.com/mrpeanut01/elevator-sim/issues/177) item 7 · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.1, [`docs/12`](docs/12-design-handoff.md) § 4.15, [`docs/39`](docs/39-decisions-in-force.md) §§ 2 and 3, [`docs/37`](docs/37-content-plan.md) § 5.2, `data/fixit-cases.json`, `data/price-schedule.json`, `packages/viz/src/fixit/parse.ts`, `packages/viz/src/fixit/types.ts`, `packages/viz/src/fixit/cases.test.ts`, `packages/viz/src/everyday/fixitScreen.ts`, `packages/viz/src/dev/fixitPanel.ts`.**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds. It binds a content lane, a UI lane and a documents lane that no one of them owns; it **moves something already recorded** — § D525 clause 2's treatment of the decoys, and `docs/39` § 3's rename map, which says the diagnosis goes where the ruling's own words say the *kind-of-fix line* goes; and it records a ruling that binds work nobody has started.
+
+### 1. The measurement this rests on, taken before the ruling
+
+Each of the eighteen shipped cases' `diagnosed` repair was read for its patch paths and compared against the five control families `fixit/types.ts#FixitState` draws — `speedSteps`, `capacitySteps`, `zoneOverlapFloors`, `parkingStrategy` and `topFloorRaiseM`.
+
+| the answer's path | cases | reachable from the shipped editor |
+|---|---|---|
+| `dispatcher.idle.parkingStrategy` within `{stay, lobby, zone-center}` | 1 | **yes** |
+| the same, plus `repositionThresholdS` and `repositionEnergyWeight` | 1 | partial |
+| `predicted-demand`; `fixed-floor` + `parkingFloorIndex`; `dispatch.assignmentMode`; `answer.dwell*`; `cars[].dwell*S` | 4 | no |
+| `building.floorPopulations[]` | 3 | no |
+| `building.banks[]` | 8 | no — `run.ts#widenedRangesOf` only **grows** a served run by at most three floors at each end, never narrows, never touches access zoning, and returns a double-deck bank unchanged |
+
+**One of eighteen.** And the gap is a **drawn-control** gap and nothing else: every one of the eighteen answers buys a path `data/price-schedule.json#changes[].covers` already prices — `idle-parking` at 0 u covers all four idle fields, and `dispatch-rules`, `dwell-policy`, `door-dwell`, `tenant-floors` and `rezone-bank` cover the rest. **Six families the editor does not draw.** Not a schema gap, not a pricing gap, not an engine gap.
+
+### 2. The conflict this resolves, and it is inside one ruling
+
+[§ D525](#d525) clause 3 is the owner's own: *"One survivor is the hardest a scenario may be; zero is a diagnosis scenario … or it is not a scenario."* Retiring the repair list before the editor can write those answers leaves **seventeen scenarios with no demonstrated way through**, none of which declares itself a diagnosis. So clause 2 landing first stands against clause 3 of the same ruling.
+
+**Nothing here says the owner's reason was wrong, and it is not narrowed.** *A four-item priced menu with exactly one right answer is a proposed fix* survives this analysis whole. What is ruled is **where the retirement bites** and **in what order**.
+
+### 3. The ruling. Six clauses
+
+1. **§ D525 clause 2's retirement of the repair list stands, and it is a retirement from the screen rather than from the file.** No repair row, no effect line, no role and no price on a menu is ever drawn again, on either surface. **`repairs[]` stays in `data/fixit-cases.json`**, and the `diagnosed` entry becomes the case's **pinned witness that at least one affordable configuration clears it** — which clause 3 requires of every scenario and which nothing else supplies for a fix case, because `data/scenario-survivors.json` covers the ten campaign stages and no fix case, over a move set that excludes the entire building tier by its own `provenance`. A field nothing draws proposes nothing to anybody.
+2. **`fixit/parse.ts`'s four-role rule relaxes to one.** *Exactly one repair of each of `diagnosed`, `costly-fix`, `cheap-fix`, `new-shaft`* becomes *at least one `diagnosed`*; the other three are optional. Their only job was to be the wrong rows on a menu that no longer exists. A case that keeps them keeps them as **authored negative controls**, which is what `cases.test.ts` compares on the legs.
+3. **The five standing extras survive as prices and retire as a menu.** They stay in `data/price-schedule.json#extras` and stop being drawn as a short list beside the answers. This is the **narrowing**, argued in § 4.
+4. **The kind-of-fix line retires on the same commit as the menu and not before.** It is the closing sentence of `asBuilt.note`, *"The fault is in how it is configured, not in what it is made of."* — **one sentence, verbatim identical on all eighteen cases**, so eighteen string edits and no schema change. Its harm is a function of which world it sits in: above a four-item menu it is a hint over four options; above the open editor it would be the only thing narrowing **forty-seven priced dimensions** (60 declared less § D535's 13 withheld, per `data/scenario-survivors.json#provenance`) down to one tier. Retiring it early strips the third beat from `docs/23` § 6's only *"All five beats work"* row and collects none of the benefit. It leaves on the commit that makes it false, which is [§ D227](#d227)'s rule run forwards.
+5. **The diagnosis is not retired.** § D525 clause 2 retires *"the line that says what kind of fix it is"*, and `docs/12` § 4.15's body says *"the complaint … stays … and so does the diagnosis; what is withdrawn is the menu of answers underneath it."* `docs/39` § 3's rename map and `docs/12` § 4.15's heading compress that into *"the diagnosis line"*, which reads as the diagnosis block going. Both are corrected on this commit.
+6. **The whole retirement is conditioned, not dated.** It lands on the commit that gives the fix-it editor the six priced change families of § 1 **and** demonstrates, per retiring case, that its answer is reachable and clears — the standing requirement `CLAUDE.md` states, pointed at a retirement: *move the control and require the run to change, compared on the legs*. Until then the menu ships exactly as it is.
+
+### 4. The one narrowing, with the argument against it
+
+**The owner named the decoys.** Clause 3 above keeps them as prices. The grounds:
+
+- **The stated reason does not reach them.** *"The owner does not want fixes proposed"*: a decoy proposes no fix. It prices a **non**-fix and says so in its own words — *"The wait feels shorter. It is not."* It is the product refusing to hand the player an answer, which is the same direction the ruling is travelling in.
+- **§ D525's own amendment of [§ D414](#d414) left them standing:** *"`docs/35` § 6's placement question is settled and § 7's repair lists retire; **the rest stands**."* The decoys are `docs/35` **§ 1.4 `PM-b`**, one of the three mechanisms that document calls portable, not § 7's repair lists.
+- **Under clause 3 a decoy is not a menu item at all.** It is a member of the affordable configuration space that does not survive, which is exactly what the survivor count counts. They are already in the one schedule (#366).
+
+**The argument against, weighed rather than omitted:** with forty-seven priced dimensions a player can spend badly in a thousand ways, so five hand-written bad spends are redundant, and the owner said the word. **It loses on one measured point:** the other dimensions are dials whose badness a first-timer cannot read, and these five are the only *legible* bad spends in the product, each carrying a sentence saying why it fixes nothing. They cost about forty lines in `fixit/engine.ts#EXTRA_COPY` and are already priced. **If the product owner reads this and disagrees, this is the clause to reverse, and reversing it is a forty-line deletion and one test.**
+
+### 5. The sixteen further cases are authored now
+
+`docs/37` § 5.2 classifies § 10.6's twenty-six further cases as 6 engine-blocked, 4 schema-blocked, **16 authorable today**, and § 4.2 prices them at `16 × 7.67 min` of play against a reachable total of about 2.5 hours. They are authored now rather than held, on four grounds:
+
+1. **The schema is not about to turn over.** The build clause 3 § 6 conditions it on is item 7 of GitHub issue **#177, which is closed as completed**; #233 is content authoring and a pipeline; #365 is the scenario schema. **No open issue owns those six families**, and this entry names that rather than assuming somebody holds it.
+2. **The diagnosed repair is not rework** — under clause 1 it is the artefact clause 3 requires, and § 1 establishes that every shipped one already buys only priced paths.
+3. **The discard is bounded and measured.** `data/fixit-cases.json` is 5 061 authored lines over 18 cases; `repairs[]` is 2 719 of them, of which the `diagnosed` entry is **1 369** and the three others **1 314, about 73 lines a case**. Sixteen cases discard about **1 168 lines of a ~4 500-line project — 26 %** — and even that is copy, since the patches remain usable as negative controls.
+4. **Holding parks the largest content lever in the product** on the only row in `docs/23` § 6 where every beat of the loop works.
+
+**Binding condition.** Each of the sixteen **records which `data/price-schedule.json` row its diagnosed repair buys**, in the case entry. Today that mapping exists only as patch paths to be read against `changes[].covers` by hand. Recorded, the conversion under clause 1 is a deletion and a field copy; unrecorded, it is eighteen and then thirty-four manual reconciliations.
+
+**`parse.ts`'s four-role rule refuses the tempting middle course** until clause 2 relaxes it, so the sixteen are authored to the shipped four-role shape. It is named here because it is the first thing the next reader will propose.
+
+### 6. What this breaks, costs and forecloses
+
+**Breaks**, each on the commit that lands the retirement: `parse.ts`'s role rule (clause 2); `cases.test.ts`'s *"sells no inert repair"* iterating what is authored rather than requiring four — **its referent survives, which is what clause 1 preserves and what `docs/12` § 4.15 recorded as lost**; `cases.test.ts`'s *"keeps the extras honest"* re-aimed at `price-schedule.json#extras`; the repair and extra rows on **both** surfaces (`everyday/fixitScreen.ts`, `dev/fixitPanel.ts`); `fixitScreenModel.ts#COPY`'s `repairsHint`, `stateSelected` and `stateAffordable` losing their subject; eighteen `asBuilt.note` strings edited.
+
+**Costs**: the editor build — six priced change families, of which `tenant-floors` (a per-floor population control) and `rezone-bank` (narrowing, keying, access lockouts, car removal, double-deck-safe) are substantial and between them carry **eleven of the eighteen answers**. This entry does not make that build cheaper. It makes it the named precondition.
+
+**Forecloses**: the clean-break reading of § D525 clause 1 in which a fix case becomes indistinguishable from a campaign stage under one schema, because `repairs[].diagnosed` is a field stages do not have. **Named with its migration rather than hidden:** the long-run home for that witness is a fix-case survivors file beside `data/scenario-survivors.json`, measured through `fixit/run.ts`'s own move set — which, unlike `campaign/stageRun.ts`, applies `banks`, `addCars`, `floorPopulations` and `floors` through `parseBuilding`. `repairs[].diagnosed` is the interim carrier, and the day that sweep exists the field can go.
+
+### 7. What this does not decide, and the obligation it carries
+
+**Whether the ninety-second turn is still fun once the menu is a forty-seven-dial editor.** No evidence in this repository reaches it: `docs/26` K3 is the instrument and has no data, and `docs/22` § 4 states that nothing in this tree measures a first session. `docs/20` PART C measured the version that exists. **The obligation that follows is a playtest of the built editor against a shipped case, taken before any repair row is deleted** — which clause 6's conditioning makes cheap, because the editor and the menu coexist until it is run.
+
+Also undecided: which lane builds the six families; whether `docs/37` § 5.2's four schema-blocked cases are unblocked in the same pass (#233's own cheapest item, untouched here); and the sign of `fixit/types.ts#EDITOR_PARKING_STRATEGIES`'s withholding of `predicted-demand`, which § 8 files rather than rules.
+
+### 8. A stale refusal found on the way, pinned by a run rather than by a sentence
+
+`fixit/types.ts#EDITOR_PARKING_STRATEGIES` withholds `predicted-demand` because *"the stage reports `no-forecast` rather than guessing, so the option would be a press that changes no leg — which is [§ D219](#d219)'s defect wearing a select's clothes."* `core/src/sim/simulation.ts:4838-4850` records that being fixed, in the past tense — the bank is resolved once through `resolvePrepositionContext` and the forecast comes from the bank's arrival model, where before *"`predicted-demand` answered `no-forecast` for every car of every run."* `sleeping-sky-lobby`'s diagnosed repair is that strategy and is pinned at nine long waits to zero, and `cases.test.ts`'s *"sells no inert repair"* — every repair of every case compared **on the legs** — is green over all eighteen cases in 59.77 s on this tree.
+
+So a control that works is withheld on a written reason that is false, which `CLAUDE.md` rates worse than a dead seam ([§ D227](#d227)). Offering it takes § 1's reachability from **one of eighteen to two of eighteen** at the cost of one `as const` entry. **Filed as its own issue rather than taken here**, because the same commit should draw the floor control `fixed-floor` needs, and neither belongs in a decision.
+
+### 9. The corpus, as a forecast rather than as the row
+
+[§ D343](#d343) puts the measurement on the integrator, once, after integration. **This entry changes no code and draws no word: zero in both tiers — no surface added, none removed, no string moved, cases, simulations and failing cases unmoved.** The two commits it binds will both move it and each owes its own forecast: the sixteen cases add strings without adding a surface, and the retirement removes four repairs' name and effect per case plus the five extras' name and line, on an adapter that stays.
+
+### 10. Numbers spent
+
+This lane held **D706–D710** and spent **D706 only**. D707, D708, D709 and D710 are **unspent** and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them — ids here are names, so backfilling one would make it denote two things across time. The integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+
+---
+
+## D711 — The device chime ledger records turns, not a balance, so a device balance never merges and is never discarded; it earns and reads and does not yet spend
+
+**Date: 2026-09-19 · Owner: the integrator, as a product-owner call under the latitude [`docs/38`](docs/38-what-the-game-is.md) § 2.4 leaves · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.4, [§ D526](#d526) clause 5, [§ D533](#d533), [§ D490](#d490), GitHub issue [#368](https://github.com/mrpeanut01/elevator-sim/issues/368)'s fifth acceptance criterion, `packages/viz/src/everyday/chimesPanel.ts`, `packages/core/src/config/chimeLedger.ts`, `packages/viz/src/everyday/profile.ts`, [`docs/26`](docs/26-telemetry-and-privacy.md) § 13.2. Dated before the code.**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds. It binds modules in three packages that no one of them owns — the viewer's ledger store and panel, `core`'s table projections, the server's earn route and its rate budget; it **moves something already recorded**, because `docs/38` § 2.4 carries a named open ruling and `everyday/chimesPanel.ts`'s docstring carries the same one in code; and it answers a question a document refuses to close without a number.
+
+### 1. What was open, and what the tree was doing about it
+
+`docs/38` § 2.4 and [§ D526](#d526) clause 5 both require that *without an account the ledger is on this device alone and says so*. It is not built, and the page says why: **what is missing is not code but a ruling** — *what happens to a device balance when an account arrives, merged, discarded, or which one wins* — and a ledger built without answering it *"would either silently double a balance or silently drop one."*
+
+The cost of leaving it open is the whole of a first session. `dev/main.ts#bankCompletion` posts nothing without a token, `http/api.ts#chimeEarn` answers `401` if it did, `everyday/profile.ts` — `localStorage`'s owner — holds no chime, and `CHIMES_PANEL_COPY.signedOutHome` says so on the one screen that draws the tally. **A stranger who clears three fix cases has finished eighteen chimes' worth of turns and is shown a hard zero.**
+
+**And the omission stopped being quiet this week, which is why this is taken now rather than later.** The wave that built the spend surface also made the signed-out earn *speak*: `bankCompletion` answers `{ kind: 'signed-out' }` rather than returning, on the argument its own docstring gives — *"a visitor earns nothing at all on this build … and telling them that is [§ D227](#d227) in the half that binds hardest."* That is right, and it is correctly argued, and its consequence is that the product is about to tell a stranger **on every case they clear** that they earned nothing, with a spend surface beside it answering the same. Four refusals on the one mechanism this product has for *come back tomorrow*. A refusal that is true is not a resting place when the thing it refuses is a requirement two documents already carry.
+
+The panel's sentence is **correct about this build** and was arrived at honestly — the review of PR #485 found the opposite sentence shipped over no store, which is [§ D227](#d227) in the polarity `CLAUDE.md` calls the worse half, and the fix pass renamed the arm `device` → `signed-out` so that a real ledger would have to introduce its own name rather than inherit a sentence. Nothing here criticises that correction. What it says is that being correct about a product that turns a stranger away is not a resting place.
+
+### 2. The ruling
+
+1. **A device chime ledger ships**, in the split the tree already keeps for device artefacts: a pure half and a DOM half, its own versioned slot, memory-only where storage is denied with the player not told it saved, quarantine-on-corrupt and a one-way seal on clear. `everyday/careerStore.ts` and `campaign/careerPersist.ts` are the model and the reasons are theirs.
+2. **It records turns, never a balance.** The stored artefact is the same vocabulary the wire already accepts — `core/config/chimeLedger.ts#CHIME_COMPLETIONS`, which is *"the whole of what a client may post"* — plus, per account, which of them have been replayed. **The balance is derived** from the shipped table on every read. There is no stored balance, so there is no number for a hostile edit to set and none for two readers to disagree about.
+3. **On sign-in, the device's unreplayed turns are posted through the earn verb that already exists**, and [§ D533](#d533)'s record decides what each one pays. A turn the account has been paid for answers `200` and pays nothing; one it has not pays once. **Nothing is merged, nothing is discarded, and no route gains an amount.**
+4. **The device's record is kept, not consumed** — [§ D490](#d490)'s *"the device-local value is kept, not overwritten"* — so a sign-out gives the signed-out tally back, exactly as the device-local display name answers again when a session ends.
+5. **One chooser, and it is declared.** A single expression answers *whose tally is this* for every surface that draws one, on `everyday/profile.ts#effectiveNameOf`'s shape, and the pair is registered in `honesty/agreement.ts#AGREED_FIGURES`. Two surfaces drawing a balance from two slots is [§ D359](#d359)'s signature, and `surfaces-disagree` is the property that exists to catch it.
+6. **The replay marker is keyed per account, never globally**, and the reason is in § 4 below.
+7. **The device ledger earns and reads. It does not spend**, and § 5 is the measurement rather than the caution.
+
+### 3. Why merge, discard and one-wins are all answers to the wrong question
+
+Each presupposes the device holds a **balance**, and each fails on something already ruled.
+
+**Merge** is a client naming an amount. `core/config/chimeLedger.ts` refuses that as a signature rather than as a rule: *"there is no function here that takes an amount, so nothing downstream can be handed one. A purchase is, mechanically, a client naming an amount, and there is no argument for it to name."* A merge route would be the first, and `localStorage` is the player's own file — so a merged balance moves [§ D533](#d533)'s record from the server to the client, which is the one thing that ruling exists to prevent. It also doubles on the two-device case by construction, which is `docs/38` § 2.4's own prediction arriving where it said it would.
+
+**Discard** is [§ D490](#d490)'s *"the mint wins"* with a number instead of a name, and that entry refused it in terms: a player *"would sign in and find it replaced … which is the sign-in **costing** them something, and the whole of [§ D456](#d456)'s second refusal test is that the social layer may not take the game away."* An honest discard has to be announced, which puts an anti-advertisement on the screen that exists to make an account worth having.
+
+**One-wins** is the right shape for the *record* and is kept for it — clause 4 above **is** one-wins. As an answer about the *balance* it is discard with a longer path back: the player earns twenty-four, signs in, sees zero, and gets the twenty-four back only by signing out, which nobody does to check. It would also have the panel say two true and contradictory things one press apart.
+
+### 4. What makes the ruling safe is a measurement, not a judgement
+
+[§ D533](#d533) built the reconciliation already, for a different reason: `chime_entries.turn_key` and a partial unique index over `(user_id, entry_key, turn_key)` (migration 6, `store.ts`), which makes *"one entry per account, source and turn a property of the table rather than of the one statement that asks."* A device that stores turns therefore hands the server requests it already knows how to refuse.
+
+**The exploit surface added is exactly zero, and § D533 says so in its own words.** Its *what is unchecked* paragraph already concedes the standing bound: *"a client composing its own requests can collect each fix case's award and a full rush's awards once per account, and no more."* A device replay **is** a client composing those requests. The bound is the index, not the client, so it does not move: eighteen fix-case ids at six chimes is one hundred and eight per account for all time, a rush pays only beyond the account's best, and both verbs share twenty writes per account per fifteen minutes (`http/api.ts#CHIMES_PER_ACCOUNT`, `accounts/credentials.ts#LOGIN_TTL_MS`). A device-bought modifier cannot reach a board at all: `chimes/ledger.ts#unbackedModifiers` refuses a claim not backed by that account's own spends, and every post route answers `401` without a token.
+
+**The two cases that break a naive answer are the two the ruling is shaped by.** One account on two devices: each device replays its own turns and the index pays the union once, where a merged balance pays the overlap twice. One device with two accounts: each account is paid once for the same turns, which manufactures nothing — chimes are per-account with no route between them, [§ D526](#d526) clause 3 keeps them off every results page and out of every comparison, and a player who wants the hundred and eight on fifty accounts can already post for it today. **That second case is why the replay marker is per account**: a global marker buys no safety, because the safety is the server's index, and costs the one thing that actually happens, which is a player signing into the wrong account first and losing their first session for good.
+
+**`career-day-paid` is the exception and is named rather than smoothed.** It carries no turn key, and [§ D533](#d533) clause 4 puts it outside first-time-only in terms — *"nothing on the wire can tell a second day from one day posted twice"* — with `http/api.test.ts` asserting it still pays on every post. So the device record is the only bound on a career-day replay, and the ruling neither weakens that clause nor pretends to strengthen it: **a device replays its career-day count once per account and never again**, believed within the posture a live day is already believed in. It is the clause to distrust first.
+
+### 5. What a device may not do yet, and this is measured rather than cautious
+
+`docs/38` § 2.4's *"a run played with device-only chimes can be played and not posted"* presumes a device can spend. **Measured against this tree, no sink reaches a run except through what the server says the account owns.** `everyday/host.ts#rushClaims` derives the only shipped claim from `owned`, which comes from `GET /api/chimes` ([§ D671](#d671)); `campaign/economy.ts#TowerEconomy` has no field for a bought purse and `purseOf` no term for one; and the scenario rung is refused by name in `core`, where `parseChimeLedger` throws on `budget-units`. A device spend built today would buy nothing that reaches a run — `charter` non-goal 5, and the defect `CLAUDE.md` has paid for eleven times in code and twice in `data/`.
+
+So the device ledger earns and reads. `CHIMES_PANEL_COPY.spendRefusal` already carries the truth for both homes and is not touched by this; the day a device-reachable sink exists is the day this clause is revisited, by a decision that cites a run rather than a plan.
+
+### 6. What this does not change
+
+[§ D526](#d526) is not amended: clause 5 already required this ledger, and this entry says how it is built rather than what it says. [§ D533](#d533) is not amended: it is what makes the ruling safe. [§ D490](#d490) is not amended: it is the precedent, and its two-slot shape is adopted rather than extended. No new route, no new wire field, no amount anywhere, no source name on the play side — `boundaries.test.ts`'s `.sources` guard is untouched and the device ledger passes it, because a **completion** is what a client names and a **source** is what the ledger calls the entry, which `core/config/chimeLedger.ts` keeps apart on purpose.
+
+And nothing here is a retention claim. That a visible first-session tally makes a player return is `charter S4` and is **unmeasured**; no copy and no docstring may say it, and no plausible replacement sentence may go in its place ([§ D280](#d280), [§ D256](#d256)).
+
+### 7. The corpus, as a forecast rather than as the row
+
+[§ D343](#d343) puts the measurement on the integrator, once, after integration. The prediction for the commit that lands the store: **no surface added and none removed** — the panel is already swept through `everyday/settingsView.ts#settingsScreenViewOf`, and a fourth `ChimesHome` arm is a state on a surface that exists, which is [§ D489](#d489)'s ruling showing up in the measurement again. **Strings move**, by the panel's new home sentence times the settings arms that construct it, plus one per arm for the balance line now that a signed-out case can carry a figure. A fourth home that no settings arm constructs would ship **unswept**, which is wave T's lesson one step along, so the arm is added to the corpus's settings fixtures on the same commit or the forecast is wrong in the direction nobody notices.
+
+### 8. Numbers spent
+
+This lane held **D711–D715** and spent **D711 only**. **D712, D713, D714 and D715 are unspent** and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+
+---
+
+## D716 — #536's four Career asks, adjudicated against `docs/38`: the past-performance gate is `docs/32` GD14's and is already built, an auto-running tower is a presentation control that may never file, and a contract's AQLs are bounded by what a goal may read
+
+**Date: 2026-09-19 · GitHub issue [#536](https://github.com/mrpeanut01/elevator-sim/issues/536) · Rules on: [`docs/38`](docs/38-what-the-game-is.md) §§ 2.2, 2.3 and 4, [`docs/32`](docs/32-game-design.md) GD12 and GD14, [`docs/16`](docs/16-change-scope-contract.md) S2, `packages/viz/src/campaign/career.ts#offerRefusalOf`, `packages/viz/src/shift/contracts.ts`, `packages/viz/src/everyday/campaignModel.ts#towersView`, `packages/viz/src/shift/types.ts#GOAL_OBSERVATION_IDS`. Cites [§ D400](#d400), [§ D401](#d401), [§ D427](#d427), [§ D525](#d525).**
+
+**Why an entry.** [§ D405](#d405)'s third ground on its own: it records rulings that bind work
+nobody has started, across three directories none of which owns the question, and it refuses one
+reading of a product-owner issue while ruling three others permitted. Nothing in this entry changes
+a line of code.
+
+**The framing, because it decides three of the four asks.** #536 is the **owner's own issue**, filed
+five days after he ruled `docs/38`. Its asks are his intent, so the question is never *may he ask for
+this* but *what honouring it looks like inside rules he also set*. Read that way, three of four are
+already permitted and one of those is already built. The issue carries **no comments**.
+
+### 1. Contracts gated on past performance — already permitted, and already built
+
+The distinction is **slots versus content**, and `docs/32` GD14 draws it: *"A slot is a limit on
+attention, not on permission … At standing zero a player may reach every screen, every building,
+every dispatcher and every mode. What they may not do is run six contracts at once."*
+
+`campaign/career.ts#offerRefusalOf` **is** the gate #536 describes, shipped since [§ D510](#d510).
+*x time of past performance* is `slotsOpen(standingOf(…)) > towersHeld` over `SLOTS` at
+`0 / 14 / 30 / 60 / 110 / 180`, where standing is `cleared × 2 − missed × 3` — so slot 2 is seven
+cleared days and no misses. *Good* past performance is the same expression read from the other side,
+a miss costing three where a clear pays two, plus the second clause: `atRiskTowers(…)` refuses
+**every** offer while any held tower is inside its difficulty's missed-day allowance. *The contract
+can be cancelled* is `contractIsLost`, and three lost is `careerIsOver`. Nothing is owed here but the
+words: the terms exist and no screen states them, which is § 4 below.
+
+**The reading that is refused, and the tree named the hazard before the issue was filed.**
+`shift/contracts.ts` carries a section headed *"Every contract is open, and there is no state in
+which one is not"*, and it says exactly what is at stake: *"the dead code beneath the design's early
+return — **a completion-based unlock ladder** — is deliberately **not** ported, because porting a
+branch the design disabled is how a gate arrives by accident."* So a lane must not read #536 as
+permission to gate **which contract may be opened**; `docs/38` § 4's *"Nothing locked, ever"* is
+absolute and `contractStatus` has three answers, none of them `locked`.
+
+**One dead end checked and not found.** `slotsOpen` answers **0** below standing zero
+(`SLOTS[0].standing === 0`) and `career.lost` is written nowhere but `openingCareer`, which reads
+like a softlock: no slot, no offer, career not over. It is unreachable. `hand-back` is an option on
+`renewalNeed` alone, which falls due at day 20, where `cleared = 19 − missed` and `missed ≤ 3`, so
+standing on hand-back is `38 − 5 · missed ≥ 23`; and `fileDay` refuses only `day > CONTRACT_DAYS`, so
+a lost month still pays standing back. Recorded as checked, because a softlock claimed and not
+reachable sends the next reader further than one never mentioned.
+
+### 2. Chimes as the driving focus of changes to a building — permitted, and see [§ D717](#d717)
+
+`docs/38` § 2.2 and § 2.4 put chimes exactly one step upstream of every change a career makes:
+chimes → purse → works → the building. *Driving focus* is a claim about attention and explanation,
+which is permitted and **unbuilt** — `everyday/chimesPanel.ts` says on its own face that nothing buys
+them. The two prohibitions are untouched: a chime may not open a slot (GD14) and may not buy a missed
+day back (GD13 clause 5), and neither has a sink in `data/chime-ledger.json`. What the ask uncovered
+is that a chime top-up is a **second source of units** against GD12's *exactly one*, recorded as
+§ D717 rather than left for a screen to discover.
+
+### 3. Towers that auto-run on the campaign screen — permitted, narrowed to a transport
+
+> **A tower that runs on the campaign screen is a `presentation` control over a recording the day
+> already produced. It may play, seek, loop and colour. It may not file, and it may not grade.**
+
+**Why this is a skip rather than a second kind of day.** `docs/38` § 2.3's *live* is a property of
+the **seam** — a press stamped at the playhead, written to `interventions[]`, the day re-simulated
+with the crowd held either side. It is not a duty to watch, and § 1 rules the opposite in the same
+document: *"If you would rather not watch, you can speed it up or skip to the end."* That control is
+built (`everyday/stageScreen.ts#skipToEnd`, § D525 clause 4, issue #369) and its docstring is this
+ruling's template — *"It reaches the transport and nothing else … a day watched at `1×`, at `600×`
+and a day skipped are the same day."* `docs/16` **S2** is the rule underneath: a presentation control
+must reach a sink and must not reach the legs. A tower card that plays is the same object at a
+different address, and the product already ships one on a non-stage screen — `everyday/landingScreen.ts`
+plays a real pinned morning in a canvas.
+
+**Why *may not file* is the half that carries the ruling.** [§ D400](#d400) settles who files:
+*"§ 6.4 and § 16 rule 1 give exactly one thing permission to file — *Close the day*"*, and
+[§ D401](#d401) settles what a filed day is — it runs `shiftLengthForContract(tower.id)`, the length
+its contract is graded over. A card that filed would be a second filing seam, and `file-day` writes
+`tower.day` **and** `career.today` precisely so two records cannot disagree about what day it is.
+Three of the owner's own sentences refuse the progression reading directly: `docs/38` § 1's Career
+line *"It waits for you between sessions"*; § 2.4's *"Nothing refills, expires, or decays while the
+player is away"*; and `docs/23` § 4's reason Career is a mode at all — *"it turns the retry from free
+into a decision"* — which a day that files itself removes, taking GD12's *a unit is a cleared day*
+with it.
+
+**What the narrowing buys, because it is not a consolation.** The card's status colour comes off the
+**same recording the stage will play**, so an amber tower is a real thing that happened in the day
+the player is about to grade; *"click into a building … probably when there is an issue"* gets a
+mechanism instead of a mood; and `docs/38` § 4's *"No second engine: live is the stage's property"*
+is untouched. Today's screen has none of it. `everyday/campaignModel.ts#towersView` is a table of
+text rows, six slot cards, five stat tiles and a month grid; it **does** carry a per-tower `status`,
+and what is wrong with it is where that comes from — `towerRowView` sets it from
+`needOf(tower)?.title`, so it reports what the **desk** wants rather than what the **building** is
+doing, and no colour, graphic or moving thing is drawn anywhere on the screen.
+
+**What is not ruled here.** Whether the owner meant towers to *progress* rather than *play* — days
+filing themselves, standing and units accruing with no press. That overturns `docs/38` § 1 and § 2.4
+and is his, not a lane's. Put as one question in the issue.
+
+### 4. A contract document with AQLs, incentives and penalties — permitted, bounded by one type
+
+Presentation of terms the career already computes is a re-dress and is permitted: the AQLs are
+`shift/goals.ts#goalsForDay`'s five day-goals, the incentive is `economy.ts#rateOnDay` stepping every
+five days, cancellation is `contractIsLost`, and the renewal's four options are `career.ts#renewalNeed`.
+The screen is `everyday/campaignModel.ts#contractView`, which already has a `termsHeading`.
+
+**The bound is a type, not a preference.** `shift/types.ts#GOAL_OBSERVATION_IDS` is
+`carryPct · minutePct · peakQueue · abandoned · worstWaitS · loadedDepartures · workPerServedLegKJ`,
+and the docstring beside it says why: *"Everything a goal may read — and structurally nothing that
+`awtIsValid` could suppress."* So **an AQL may be authored only over `GOAL_OBSERVATION_IDS`**, and
+#536's own two examples split across the line: **max wait is already gradeable** (`worstWaitS`, with
+`worstWaitIsCensored` refusing a maximum that belongs to somebody still standing) and **average wait
+cannot be an AQL at all**. A contract that promised a bar on a mean would be promising a grade the
+engine refuses to give, which is this product's signature defect wearing a legal font.
+
+**One clause of the ask is a mechanism rather than a re-dress.** *Monetary penalties*, read as a
+debit of units already earned, is a second **sink** on units, and § D717 amends GD12's source clause
+and deliberately not its sink clause. The penalty that already exists may be presented and needs no
+ruling: a missed day pays nothing and costs three standing, and standing is what opens slots. A real
+debit is the owner's call, and it has to be a `spends` entry rather than a latched figure, because
+`purseOf` is derived — [§ D400](#d400)'s *"A latched purse would be a second answer to a question one
+of them already contains."*
+
+### 5. The corpus
+
+[§ D343](#d343) puts the measurement on the integrator. This entry changes no code and draws no
+string: **zero in both tiers, no surface added or removed, cases, simulations and failing cases
+unmoved.**
+
+### 6. Numbers spent
+
+This lane held **D716–D720** and spent **D716, D717 and D718**. **D719 and D720 are unspent** and
+become permanent holes under [§ D404](#d404) and [§ D430](#d430) once a later lane writes above them;
+the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`. § D430's second clause
+applies if D720 turns out to be the **wave's** top number rather than this lane's — a hole may not sit
+at a block's top, so the integrator's own closing numbers have to sit above it.
+
+
+---
+
+## D717 — a chime top-up is a second source of units, and `docs/32` GD12 said there was exactly one: the amendment is recorded rather than left for a screen to contradict
+
+**Date: 2026-09-19 · Surfaced by GitHub issue [#536](https://github.com/mrpeanut01/elevator-sim/issues/536)'s second ask · Rules on: [`docs/32`](docs/32-game-design.md) § 3.2 GD12, [`docs/39`](docs/39-decisions-in-force.md) § 2, [`data/chime-ledger.json`](data/chime-ledger.json)'s `career-purse-top-up`, `packages/viz/src/everyday/campaignModel.ts#CONTRACT_COPY`. Records an amendment [§ D526](#d526) and [`docs/38`](docs/38-what-the-game-is.md) § 2.4 already made.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: it **moves something already recorded**. GD12 is a
+numbered design rule in a document this decision does not own, and `docs/39` § 0 requires a row and a
+marker on the same commit as the ruling that moves one.
+
+**The decision.** `docs/32` **GD12**'s *one source* clause is **amended**. A unit now has **two**
+sources — the contract's rate, paid per cleared day and stepping every five days, and a chime
+top-up. GD12's *one sink* clause is **not** amended: works remain the only thing a unit buys.
+
+**What made it true, and it was true before this entry.** `docs/38` § 2.2 says chimes *"can top up a
+tower's purse"*; § 2.4 says they *"buy budget: … a tower's purse up"*; and
+`data/chime-ledger.json` has shipped **`career-purse-top-up` — ten chimes for six units, `maxSteps: 3`**
+since the ledger landed. `docs/38` wins over `docs/32` where they disagree, so the amendment dates
+from § D526 rather than from today. **What did not happen is the recording**: `GD12` appears exactly
+once anywhere outside its own definition — `docs/32:1071`, on a different clause — and there is no
+`docs/39` § 2 row and no status marker. That is `docs/39` § 0's failure mode arriving on a lettered
+rule instead of on a numbered decision, and it was found by reading #536 rather than by any check.
+
+**Why it is worth an entry rather than a quiet edit, stated as the consequence rather than as
+tidiness.** GD12's reading is load-bearing on a shipped screen and in the design's own argument.
+`everyday/campaignModel.ts#CONTRACT_COPY.lede` tells a player *"You are paid for each day you clear …
+and you spend it on the tower itself"*, and GD12's own worked example — *"at Standard's week-four rate
+of 6 u a day, a fourth car is about six cleared days"* — reads a **purse** as a count of cleared days.
+A top-up breaks that reading and nothing else. So: **every price in the shop is still a duration**,
+because prices are untouched and the sink clause stands; **a purse is no longer a record of days you
+cleared**, and the lede is the sentence that has to change on the commit a spend surface ships.
+[§ D227](#d227)'s rule binds it — a control that writes something may not claim it writes nothing,
+and its mirror, a sentence that describes a purse with one source may not survive a second.
+
+**What is not amended, said so nobody reads this as a general relaxation.** GD13's five clauses are
+untouched. A chime still may not open a slot — that is GD14's attention scarcity and it has no sink in
+the ledger — and still may not buy a missed day back, which is GD13 clause 5's relief on a
+measurement. `docs/32` § 3.1's three-currency analysis stands, as `docs/39` already records under
+§ D526. And GD11's ordering is untouched: a top-up widens a purse, and what the purse buys still
+takes a car out before it gives one back ([§ D504](#d504)).
+
+**What is amended in the documents is not yet true in the code, and the entry says so rather than
+letting a lane discover it.** `career-purse-top-up` grants six units and **no arm of
+`CampaignAction` writes a granted unit into a tower**; `economy.ts#purseOf` is
+`carriedIn + earnedSoFar − committedUnits`, all three derived, and `everyday/host.ts` writes a bought
+sink into the rush's `owned` set. So the career's own purse sink is priced, parsed, carried onto the
+wire, charged against a real balance, answered with a real `grantUnits` — and **reaches no run**.
+That is `CLAUDE.md`'s standing requirement pointed at a purchase, and this entry is the warning
+rather than the fix. The shape the fix has to take, because the alternative is the defect
+[§ D400](#d400) already refused: a **record of grants** on the tower, summed into `purseOf` beside
+`spends`, never a latched total.
+
+**The corpus.** No code changes on this entry and no string moves: **zero in both tiers.** The string
+that *will* move is `CONTRACT_COPY.lede`, on the commit that ships a spend surface, and that commit's
+lane owns the measurement under [§ D343](#d343).
+
+
+---
+
+## D718 — epic #231's AC2 named an instrument that does not exist and no threshold at all; it is rewritten onto the instrument that does, and the telemetry gate stays where it can be enforced
+
+**Date: 2026-09-19 · GitHub issue [#231](https://github.com/mrpeanut01/elevator-sim/issues/231), answering that issue's own 2026-09-10 comment · Rules on: #231's acceptance criteria. Cites [`docs/22-charter.md`](docs/22-charter.md) § 4, `CHARTER_PROGRAMME.md` § M4, [`docs/33`](docs/33-difficulty-curve.md) DC-4 and DC-6, [§ D374](#d374), [§ D256](#d256).**
+
+**Why an entry.** [§ D405](#d405)'s second and third grounds: it moves a recorded acceptance
+criterion this module does not own, and it binds a milestone gate nobody has started. It is taken
+under `CLAUDE.md`'s working agreement — *do not weaken an acceptance criterion to make a phase pass;
+raise it instead* — and the whole of § 2 below is the argument that this is the second.
+
+**The decision.** #231's AC2, *"Difficulty tuned against telemetry rather than against opinion"*, is
+**replaced by two criteria**: one about the difficulty measurement, evaluable today and currently
+red, and one restating that no difficulty figure may be reported as tuned against players before a
+recruited cohort exists. The exact wording is in the issue-body edit this entry travels with.
+
+### 1. The finding, which is worse than *blocked*
+
+`docs/22-charter.md` § 4 sets the standard: *"Each names its instrument, and each can fail."* AC2
+fails it twice. It names an instrument that does not exist — #236, the study that would have supplied
+the human half, was **closed by the owner on 2026-09-09** as *"not this repository's work"*, and
+`docs/30-playtest-programme.md` says of itself at `:4` that it *"recruits nobody"*. And it states
+**no threshold and no failure condition**, so there is no reading of it that could be checked on the
+day telemetry ships. An epic criterion that cannot be evaluated does not block work honestly; it
+blocks it for free, and it makes the epic's own child list unfinishable whatever the children do.
+
+**And the gate it reaches for is not this epic's to hold.** `CHARTER_PROGRAMME.md` § M4's exit
+criteria already carry *"`charter S1` through `charter S4` met on a recruited cohort, measured by
+telemetry"*, and `charter` § 4 carries S1–S4 with their instruments and their *unevaluated* column.
+So the project holds the telemetry gate **twice** — once where it has an owner and an instrument
+register, and once as an epic checkbox that can only ever be unticked. Deleting the second copy
+removes no gate.
+
+### 2. Why the replacement is a raise and not a weakening, in four grounds
+
+1. **Nothing is weaker than a criterion that cannot fail.** By charter § 4's own definition the old
+   clause is not a criterion.
+2. **The telemetry gate is not removed — the duplicate is.** It stays at M4's exit criterion and at
+   `charter S1`–`S4`, and the second replacement clause restates it locally so the rewrite cannot be
+   read as a waiver by somebody who only reads the epic.
+3. **The replacement is harder to close today than the clause it replaces.** It is evaluable **and
+   currently red**: `docs/33` § 4.7 reports **DC-6 green** and **DC-4 green on 7 of 13 contracts**
+   (§ 4.7j, § 4.7k), so five rows of the shipped ladder fail this criterion on the day it is
+   adopted. A criterion is not weakened by being made capable of being failed by the tree that
+   exists.
+4. **It adds an obligation the old clause did not carry** — *pinned to the run that produced it* —
+   which is `CLAUDE.md`'s rule about published numbers and [§ D256](#d256)'s refusal of an
+   unmeasured mechanism, pointed at figures `docs/33` § 4.7a already records going stale once:
+   *"§ 4.2's published figures no longer reproduce, and that is the first finding."*
+
+### 3. The objection, answered rather than left for a reviewer
+
+[§ D374](#d374) rules that the playtest gates are **recruited for rather than re-scoped**, and
+charter § 4 leaves S6 and S7 standing as *process only* rather than rewriting them. That ruling is
+about **charter criteria** and is untouched here: S1–S4, S6 and S7 stay exactly where § D374 put
+them, cohort and all. What is rewritten is an **epic acceptance criterion** that duplicated one of
+them at a level with no instrument, no owner and no gate — and § D374 is the reason the telemetry
+clause survives as the second replacement clause instead of being deleted.
+
+### 4. What this does not do
+
+It does not touch #231's other three criteria; AC1's target was settled when `docs/37` landed, and
+AC4 is a defect count. It closes nothing. It does not rule on #382's successor work or on #234. And
+it makes no claim about difficulty being *well* tuned — the criterion it installs is red today, which
+is the point of installing it.
+
+**The corpus.** No code changes and no string moves: **zero in both tiers.**
+
+
+---
+
+## D721 — #429's shaft-area bands re-measured before sign-off: every quantity reproduces, the gap ranking does not, and the boundaries are derived up to a class with no observable member
+
+**Date: 2026-09-19 · GitHub issue [#429](https://github.com/mrpeanut01/elevator-sim/issues/429),
+stage 2 · Corrects two published claims in [§ D631](#d631) and in
+[`data/price-schedule.json`](data/price-schedule.json) · Moves no price, no boundary and no
+band. · Rules on: `data/price-schedule.json`'s `areaBands` block and `shaft-area` row.**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds, and the first is the one that matters: it
+**moves something already recorded**, and a decision record preserves its own text as history
+([§ D281](#d281)), so a correction to § D631 arrives as a new entry rather than as an edit to that
+one. It also binds a governed `data/` file no module owns.
+
+### 1. Why it was re-measured at all
+
+§ D631's seven figures are marked CHOSEN and await the product owner's sign-off. **A derivation
+offered for approval is worth exactly what it reproduces**, and this repository's own rule is that a
+published number is pinned to the run that produced it. So the run was done again, on the tree at
+`393bda2`, through `config/loader.ts#loadConfig` and `config/floorArea.ts#shaftPlanAreaM2` — the same
+two functions `pricing/rate.test.ts` calls, not the raw JSON, because the reference towers expand
+their floors at load and a raw derivation is silently wrong by an order of magnitude.
+
+### 2. Everything about the quantities reproduces
+
+**62 banks.** Minimum **24.0 m²** (`ashgate/carpark`), p25 **176.0**, median **240.0**, p75 **376.0**,
+maximum **1 178.0** (`burj-class-reference/shuttle`), spread **49.08×**. The three smallest are
+24.0, 33.0 and 56.0 on the three banks § D631 names. **Seven banks sit at exactly 200.0 m²**, the
+figure that refuses a boundary there. Band populations at 80/400/800 are **3 / 44 / 8 / 7**, summing
+to 62. `midtown-office/main` is **142.8 m²** and lands in band 1. Not one of those moved.
+
+*(p75 is 376.0 under nearest-rank and 372.0 under linear interpolation. § D631's figure is the
+nearest-rank one and nothing rests on the choice; it is said here so the next reader who gets 372
+knows they have found a convention rather than a drift.)*
+
+### 3. Two things do not reproduce, and one of them carries the derivation
+
+**(a) The gap ranking is wrong.** § D631 publishes *"the three widest gaps by ratio"* as
+56.0 → 104.0 (1.86×, widest), 640.0 → 850.0 (1.33×, second) and 376.0 → 464.0 (1.23×, third). The
+**ratios are all correct** — measured 1.857, 1.328 and 1.234. **The ranks are not.** Over the same
+62 banks the three widest by ratio are:
+
+| gap | ratio | rank |
+|---|---|---|
+| 56.0 → 104.0 | **1.857×** | widest — § D631's, correct |
+| **33.0 → 56.0** | **1.697×** | **second, and unlisted** |
+| **24.0 → 33.0** | **1.375×** | **third, and unlisted** |
+| 640.0 → 850.0 | 1.328× | **fourth** — published as second |
+| 376.0 → 464.0 | 1.234× | **fifth** — published as third |
+
+Both unlisted gaps sit **inside band 0**, among the three banks the ruling prices at 0 u. The
+omission is sound and the sentence describing it is not: § D631's own argument — *"an absolute gap of
+210 m² at the top is a smaller discontinuity than one of 48 m² at the bottom"* — read consistently
+favours 33 → 56 (23 m², 1.697×) over 640 → 850 (210 m², 1.328×), and the entry took the second.
+
+**What the rule actually is, stated so it reproduces:** *the widest gap by ratio in each of the three
+places where a boundary would do work.* A boundary at 40 or 44 strands a single bank in its own band
+and, because the ladder is linear in the band index, charges `garden-apartments/main` 8 u more than
+`ashgate/carpark` for a 9 m² difference — **which is the 200 m² knife-edge § D631 refuses, arriving
+from the bottom of the range instead of the middle.** The partition, the boundaries and every price
+are unchanged by this correction. Only the account of how they were reached moves, and it had to,
+because a derivation that does not reproduce is not one.
+
+**(b) "the fourteen shipped buildings" is seventeen.** Published in § D631 § 2 and **twice** in
+`data/price-schedule.json` — in `areaBands`'s `$comment` and in the `shaft-area` row's note. It is a
+stale word rather than a stale measurement, and the measurement is what settles it: dropping the
+three towers that would make fourteen gives **41 banks** and populations 2/32/2/5, reproducing
+nothing, while § D631's own DERIVED note names `empire-state-class-reference/bank-g` — one of them.
+Only the full seventeen give 62 banks and 3/44/8/7. `RISKS.md` **R38**, in one word, in a governed
+`data/` file.
+
+### 4. What the classification actually is, now it has been checked
+
+**Derived, and sign-off on these is a formality:**
+
+1. **Band 0 = 0 u** — forced by keeping the three smallest shipped shafts at exactly the 34 u four
+   shipped lists independently agreed.
+2. **Four bands, not five** — the widest gap left inside the 44-bank bulk is 1.105×, against three at
+   1.234–1.857×.
+3. **A ladder linear in the band index** — not a preference and not even a choice. [§ D552](#d552)
+   rules *linear only, no curves*, `pricing/parse.ts` refuses `rate.quantity.bands` **by name**, and a
+   rated row computes `unitsPer × quantity`. With the quantity being the band index the ladder can
+   only be `0, k, 2k, 3k`. A curve is **not expressible in the schema**.
+4. **80, 400 and 800 m²** — derived **up to an equivalence class with no observable member**. Any
+   value strictly inside `(56, 104)`, `(376, 464)` and `(640, 850)` gives the identical partition and
+   the identical price for every shipped bank. There is no 90 and no 420 for anybody to prefer, and
+   the round figure is the only content those three numbers carry on today's set.
+5. **`quantity.max = 3`** — derived from disk in both directions by `pricing/rate.test.ts`, never
+   transcribed.
+
+**Chosen, with residual freedom, and it is one number: `unitsPer: 8`.** § D631's criterion is that
+the dearest shaft become *"the dearest single purchase on the schedule and nothing more"*, just above
+`fifth-car`'s 54 u. **`k = 7` satisfies it too** — 34 + 21 = 55 u, also the dearest, also nothing
+more — and every downstream check holds: the budget ceiling would read 608 rather than 611,
+`dearestChangeUnits` is unmoved either way because both 21 and 24 sit under 54, no scenario rung
+moves, and `rate.test.ts` states its compression claim as a bound rather than as the figure. **The
+whole open question is 3 u at the top of the game's dearest purchase**, and it is put to the owner as
+that rather than folded into six derivations.
+
+### 5. What this does not decide
+
+Whether `unitsPer` is 8 or 7 — that is the owner's, and § 4 is the whole of what they need. Whether
+any boundary should move, which nothing here proposes and which no shipped bank could register.
+Whether a **fifth** band is worth cutting once a tower lands in the 104–376 bulk's own gaps, which
+§ D631 § 11 already leaves open as a measurement of a shipped set. And nothing about the campaign
+shop path § D631 § 8 declares partial.
+
+
+---
+
+## D722 — A relief mark is not an entrance animation: AD-M4's subject is a capsule's presence, and what the landing just did is a second state beside it
+
+**Date: 2026-09-19 · Rules on:** [`docs/28-art-direction.md`](docs/28-art-direction.md) AD-M4 and
+§ 5.4, `packages/viz/src/everyday/cutaway.ts`, `packages/viz/src/everyday/stageScreenModel.ts`.
+Answers a question a render spike filed as needing an art-direction ruling and declined to take on
+its own say-so. **Moves no rule.**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. It binds `docs/28`, which no rendering module
+owns, and it **settles a question already recorded as open** — the spike filed *"a person visibly
+boarding"* as not-recommended pending this ruling. `docs/28` § 9 also says an entry is owed when a
+lane changes a shipped appearance the guide describes in words, and a mark on the Casual stage is
+one.
+
+### 1. What was asked, and the narrower question underneath it
+
+The spike asked whether AD-M4 is absolute or binds only above a speed rung, having found that a
+0.4 s boarding slide is under one frame above about `8×`. **That framing is refused before it is
+answered**: § 6 holds all four motion rules uniform across all seven rungs, at the worst one, and
+AD-M2 already refuses *"a per-rung transition policy"* by name, *"because it would make the
+picture's meaning a function of the transport."* So no rule here is scoped by speed, and the
+spike's own argument for moving AD-M4 is unavailable.
+
+What the spike found that **is** worth ruling on is narrower and better.
+`frame/overlay.ts#FloorQueue.recentlyBoarded` — legs that boarded at this floor within
+`reliefWindowS` of `t` — is computed on every frame and **read by nothing on the Casual stage**. Its
+three readers are all Engineer: `render/riderQueue.ts:231`, `render/mood.ts:474`,
+`render/describeFrame.ts:306`. Its own docstring states the gap: a rider who boards *"would
+otherwise vanish between two frames with nothing on screen distinguishing 'a car came' from 'they
+were never here' — which is the one moment in a run where the dispatcher visibly did its job."*
+
+So: **is a relief mark the thing AD-M4 forbids?**
+
+### 2. AD-M4's reason is what fixes its scope, and it fixes it narrowly
+
+The rule carries three grounds — riders arrive in **batches**, a batch appears inside one frame at
+`600×`, and a per-capsule stagger is *"an animation queue that never drains"* — and one operative
+test: **"A capsule is present at the playhead or it is not."**
+
+Every one of those is about **a capsule's own presence**: a rider mark arriving or departing. The
+rule forbids making that presence a *process* rather than a *fact of the playhead*. It is AD-M1's
+family aimed at the arrival instant — a stagger would be a second opinion about when people arrived,
+and a wrong one, because they arrived together.
+
+**A relief mark is not in that subject.** It stages nothing, moves nothing and delays nothing. It is
+a tally beside the landing reporting a count over a trailing window, drawn from a pure fold of `t`:
+`queueAt` has no cursor and no memo, and `queueAt(r, 12.5)` answers the same called before or after
+`queueAt(r, 900)`. The capsules keep doing exactly what AD-M4 requires of them, unchanged.
+
+**AD-M3 is the rule that could have bitten, and does not**, for AD-S17's reason one surface over: the
+**window** is what converts a discrete event into a state, and a frame rendered at `t` in isolation
+carries the count complete. That is why AD-S17's rest bar is legal where an event-shaped *"the car
+has parked"* flash is not.
+
+### 3. What the top rung costs, said rather than omitted
+
+AD-S17's own discipline. At `600×` ten simulated seconds pass per frame, so a five-second window is
+**half a frame** and most frames miss it; at `240×` about one frame a boarding; at `30×` about ten;
+**at `4×`, the rung the stage opens on since [§ D641](#d641), about 75**; at `1×` about 300. **It
+degrades to absence, never to a false statement** — which is the whole difference from a cue, since a
+cue that fires for one event in twelve is decoration that looks like information, while a windowed
+state a frame misses is simply not drawn and the queue shrinking says what it says today.
+
+**Worth one sentence about timing rather than none.** § D641 moved the opening rung from `30×` to
+`4×` on the commit before this entry, which is the difference between a boarding being on screen for
+about ten frames and for about seventy-five. This ruling does not depend on that — AD-M4's scope is
+not speed-dependent and nothing here is argued from a rung — but it is why the mark is worth building
+now rather than being true and invisible.
+
+**That is not a per-rung policy.** The mark means the same thing at every rung; what varies is
+whether a frame lands inside the window — exactly as it varies for the `▲`/`▼` glyph in the car's own
+slot, which § 5.7 already ruled *"adds no new instability to the picture; it inherits the one the
+channel has."* AD-M2 is untouched.
+
+### 4. Band-dependent capsule height was never inside AD-M4, and three rules already require it
+
+A capsule's **height** is not its entrance or its exit: a tall capsule is present at the playhead or
+it is not, exactly as a short one is, and `rider.band` is a pure function of `waitedS` at `t`. No
+transition, no stagger, nothing outliving a frame.
+
+It is separately **required** by AD-S7 (`docs/28` § 5.4), by `docs/36` AX-5's *hue plus size*, which
+adopts AD-S7 by reference, and by `UX.md` KB-15's *colour is never the only signal* — and the tree
+fails all three: `everyday/cutaway.ts:146` computes `capsuleH` **once, outside the rider loop**, and
+the only rider field the painter reads is `waitedS`, for the hue. So the band rides on hue alone at
+4.5 px, which `docs/28:530` calls *"the P3 gap, and it is a scale problem before it is a colour
+problem."* Filing this behind an art-direction ruling was a category error. It needs a lane.
+
+### 5. What stays refused, and it is the item that was actually filed
+
+A rider sliding from its queue slot to the car door over `[boardedAt, boardedAt + δ]` **is** AD-M4's
+subject: it makes a departure a process, it interpolates over an instant the recording states as a
+point, and it needs state that outlives a frame. **Refused at every rung**, on the third ground and
+on § 6's uniformity. **AD-M4 is not amended, narrowed or dated by this entry** — what is added is a
+sentence saying what its subject is, so the next reader does not file a tally under a rule about
+animation.
+
+### 6. The § 4.2 clarification this forced, which a reviewer would otherwise trip on
+
+§ 4.2's decidable test says *"name the field on `live/observations.ts#observationsAt` it is drawn
+from."* `recentlyBoarded` is `queueAt`'s. Read literally that test refuses a rule § 5.4 already
+relies on — **AD-S7 draws from `QueuedRider.band` and AD-S8 from `FloorQueue.worstBand`, both
+`queueAt`'s**, and § 5.4 says of AD-S8 *"This is a state at `t`, so it is R6-clean."* `observationsAt`
+is named there because it was the fold in hand when § 4.2 was written, not because the other fold is
+refused. § 4.2 gains one sentence naming both folds; the governing property is unchanged and is the
+one § 4.2 already states — *a count of what had happened by `t`, or a state right now* — and
+`summary` stays refused in every form.
+
+### 7. What this does not decide
+
+Whether a relief mark is worth building, which is a lane's priority call and not a rule. Its colour
+and its contrast, which AD-A2 requires measured **on the ground it is drawn on** and this entry has
+run no such measurement — AD-S19 says so in its own text. The relief window's length, which stays
+`DEFAULT_RELIEF_WINDOW_S` and is a display dwell rather than a modelling constant. And whether riders
+should ever animate in any other form, which is not asked and not answered: item 5 disposes of the
+only instance anybody proposed.
+
+
+---
+
+## D723 — Four published counts corrected against the tree, and the two gates that could not see two of them
+
+**Date: 2026-09-19 · Rules on:** [`CLAUDE.md`](CLAUDE.md), [`docs/37-content-plan.md`](docs/37-content-plan.md)
+§§ 3, 4.2, 4.3 and 8, [`docs/38-what-the-game-is.md`](docs/38-what-the-game-is.md) §§ 2.2 and 3,
+`packages/experiments/src/validation/contentPlan.test.ts`. **Decides no design question and moves no
+shipped behaviour.**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. Each correction moves a figure published in a
+document its own module does not own; and one of them **moves something already recorded** —
+`docs/37` § 8 publishes *"the daily rotation is what covers the difference, and it does not exist"*
+as a blocker on GitHub issue #249's critical path, and it has been false since #159 landed.
+
+### 1. The four, each measured rather than reasoned about
+
+| published | where | the tree at `393bda2` |
+|---|---|---|
+| *"§ 4's **seventeen** screen keys… **sixteen** are registered"* | `CLAUDE.md` | **21** keys, **20** registered, `menu` shell-owned |
+| wrinkle templates **today 0**, target 20 | `docs/37` § 4.2 | **25** ship, and the rotation is built |
+| Daily loop **61 200 s**, **33** clean days over `c1`–`c13`, **39.0** watch-minutes | `docs/37` § 3 | **77 400 s**, **42** clean days over **16** contracts, **48.0** |
+| career persistence *"owed"* / *"filed as engineering work"* | `docs/38` §§ 2.2, 3 | **built** — #375 |
+
+Each is `RISKS.md` **R38**: the thing that drifts is the measurement, not the ambition.
+
+### 2. Two of them are worse than a count, and both for the reason this file keeps recording
+
+**`docs/37` § 8 publishes a stale blocker.** *"#159 is on #249's critical path… the daily rotation is
+what covers the difference, and it does not exist."* It exists. `shift/events.ts#eventFor` draws
+through `wrinkles/draw.ts#drawWrinkle` on every day the week's rota draws; `library.ts#assertRotates`
+refuses at **load** a library that breaks § 17's *no template twice in fourteen days*; and with 18
+weekday and 5 weekend templates the draw's own gap is 18 calendar days and 15 respectively, both
+clearing fourteen. The two rotation rules that name a **tower** are *"not implemented, and
+deliberately not faked"*, because nothing in this build selects the day's tower — which is the
+standing requirement honoured rather than a gap. **A stale refusal is worse than a dead seam**
+([§ D227](#d227)), and a stale blocker on a plan is that one register up: it tells a scheduler that
+a quarter's content depends on work that is done.
+
+**`docs/38` § 2.2 is the same shape from the other side.** It says the career does not persist and
+names the three things persistence would cost. All three exist, and `campaign/career.ts` **already
+records deleting the player-facing version of that same sentence under § D227**, on the commit that
+made it false. The design document outlived the refusal its own module retired.
+
+### 3. Two gates could not see two of these, and that is the finding worth keeping
+
+`contentPlan.test.ts` exists to stop exactly this, and on both rows it was structurally unable to.
+
+- **The wrinkle row is invisible to it.** Its `KEY` is `/^\`([a-z-]+)\`$/` and that row's key cell is
+  `*(new)*`, so `keyedRows` never sees it and `derived()` has no `wrinkles` entry. **A row without a
+  key is a row outside the gate**, and *today 0* survived twenty-five templates landing.
+- **The Daily loop row is checked by nothing.** `simulatedSeconds()` derives Campaign, Fix a building
+  and The gauntlet, and stops. So § 3's totals were updated by hand across three waves while the
+  **derivation cell beside them** still enumerated `c1`–`c13` — a correct-looking table whose own
+  workings had gone stale, which is harder to spot than a wrong number.
+
+Both are repaired rather than worked around, on `RISKS.md` **R40**: the wrinkle row takes the key
+`` `wrinkles` ``, `derived()` takes an eighth entry reading `templates` out of `data/wrinkles.json`,
+and § 1's *what ships today* table takes the matching row, because the test asserts **both** tables
+against the same key set. `simulatedSeconds()` is not extended here — the daily loop's seconds are a
+fold over `shift/contracts.ts` rather than over `data/`, and a deriver for it is worth its own
+commit — **so that hole is left open and named rather than quietly left open**.
+
+### 4. One count is corrected by deleting it
+
+`CLAUDE.md`'s screen-key sentence is restated **without a number**, pointing at
+`everyday/types.ts#EVERYDAY_SCREENS`, which carries the count, states it in its own docstring, and
+names the ruling beside every key past the handoff's seventeen. The count has been 17, 20 and 21;
+`types.ts` says in terms that *"a number in a docstring that has stopped matching the array under it
+is this repository's signature defect, and the same sentence has now been wrong once and corrected
+twice."* **A second copy is how two copies come to disagree**, and this is the copy that did.
+
+### 5. What this does not decide
+
+Whether 25 wrinkle templates is the right number — the target is restated at what ships because
+`contentPlan.test.ts` correctly refuses a target under today's count, and whether more are wanted is
+#159's and #249's. Whether `docs/37` § 4.1's *"up from the measured 4.8"* still holds: it is a third
+figure in the same chain, it was not re-derived here, and naming a plausible replacement instead of
+measuring is what [§ D256](#d256) refuses — it is marked for whoever takes that row. And nothing
+about `live/honesty.ts` or `leaderboard/boardKey.ts`, whose corrections landed in the same wave and
+are **docstring records under [§ D405](#d405)**, spending no number: one is four sites inside a module
+that owns all four, and the other is [§ D640](#d640) arriving at a site § D640's own *Rules on* list
+missed.
+
+
+---
+
+## D736 — The dial sample size is the instrument's precision, not a difficulty setting: `k` rises from 12 to 200, and the owner-approved band is read at the size it was approved against by taking the draw's own prefix
+
+**Date: 2026-09-19 · Owner: this session, on the session principal's explicit delegated authority ·
+Rules on:** [§ D537](#d537) clause 5's sample-size refusal, [§ D691](#d691) § 4's first refusal,
+`packages/viz/src/scenario/survivorBands.test-helper.ts#sampleSizeIssue`,
+`packages/viz/src/scenario/regenerateSurvivors.test-helper.ts#SURVIVOR_SAMPLE_SIZE`,
+`data/scenario-survivors.json`, GitHub issue **#234**, `docs/22-charter.md` non-goal 6.
+**Moves no band figure, no goal bar, no demand rate and no building fabric.**
+
+**Why an entry.** All three of § D405's grounds. It amends the reading rules of an owner ruling,
+which bind every lane that regenerates the survivor table. It lifts a refusal two decisions recorded
+as standing (§ D537 clause 5, § D691 § 4). And it answers a charter question — whether a sample size
+is a *setting* under non-goal 6 — which reaches well past `scenario/`.
+
+**Taken by an agent session under delegated authority, and recorded as such** so a later reader can
+tell it from a product-owner ruling. **It deliberately moves no figure the product owner approved**,
+and § 5 below states the one place where their approved figure and the shipped enforcement disagree,
+as a finding rather than as an edit.
+
+### 1. What was asked, raised independently by two lanes in one wave
+
+`data/scenario-survivor-bands.json` records `provenance.approvedAtSampleSize: 12` and
+`survivorBands.test-helper.ts#sampleSizeIssue` refuses a table regenerated at any other size until
+the owner re-approves. [§ D691](#d691) ran a dial-witness search at **k = 200** on
+`stage-1-first-call`, found **three** witnesses where the published cell reports `dials: 0/12`, and
+**correctly declined to re-pin the table** on the strength of that refusal. A second lane reached
+the same place from the other side: if `k` is a knob and moving it moves ten published readings, is
+that not `charter` non-goal 6 — a setting that moves a measurement?
+
+### 2. What a band is a share of, which is the question everything else turns on
+
+**Of a sample, and the code and the ruling both say so.** `survivorBands.test-helper.ts#bandReadingOf`
+computes `judged = examined − unjudged` and `admittedCountsOf` scales `minShare` and `maxShare` by
+it; `examined` is the affordable dropdown census **plus** `provenance.sampleSize` dial draws.
+[§ D537](#d537) clause 5 states it in the owner's own record: *"a share moves with either … even
+where the scenario has not."* So a share is **not** an estimate of a population quantity and is
+**not** portable across `k`, and reading it as one would silently re-specify a figure the owner
+approved.
+
+**But the band file carries two kinds of claim and only one of them is a share.** Below position
+three `minShare` is **0**, so the floor there is entirely `MIN_SURVIVORS = 1` — the *ruled* clause
+(§ D537 clause 3, [§ D525](#d525) clause 3's *zero is not a scenario*), an **existence** claim.
+An existence claim is portable across `k` and strictly improves with it. **Seven of the ten stages
+are withheld from players today on that clause and on no share at all** ([§ D649](#d649)'s gate,
+[§ D692](#d692) § 4).
+
+### 3. Two measurements nobody had taken, and they decide it
+
+**(a) The band's stringency is a function of `k`, and at positions one and two it is enforced above
+the figure the owner approved.** Computed from the shipped band file and the shipped census sizes,
+as the dial share a stage must show to reach its floor:
+
+| position | k = 12 | k = 50 | k = 200 | limit |
+|---|---|---|---|---|
+| 1 (`minShare` 0.25) | **0.333** | 0.260 | 0.255 | → 0.25 |
+| 2 (`minShare` 0.25) | **0.417** | 0.280 | 0.260 | → 0.25 |
+| 4, 6–10 (`minShare` 0, floor = 1 survivor) | 0.083 | 0.020 | 0.005 | → 0 |
+
+The census dilutes the numerator — stage 1 brings one survivor to six census slots, stage 2 brings
+none — so at `k = 12` the check demands a third and five twelfths where the owner approved a
+quarter, converging on the approved figure only as `k` grows.
+
+**(b) At the clearing share this campaign was measured to have, `k = 12` misses it five times in
+six.** § D691 put stage 1's base-rung dial share at 3 of 200 ≈ 1.5 %. The chance `k` draws find
+nothing is `(1−p)^k`:
+
+| k | misses a 1.5 % way through | a zero bounds the share at (the shipped `dialShareInterval`) |
+|---|---|---|
+| **12** | **83.4 %** | **0.2646** |
+| 60 | 40.4 % | 0.0596 — reproduces [§ D692](#d692)'s published interval exactly |
+| **200** | **4.9 %** | **0.0183** |
+
+**199 is the sample at which a 1.5 % way through is found with 95 % confidence**, and 200 is that
+rounded up. It is **not** `CLAUDE.md`'s 50–200 replication budget: `survivors.ts` warns in terms
+that *"there are two sample sizes, not one"*, and the coincidence is named here so nobody leans
+on it.
+
+### 4. The ruling
+
+**(a) `k` is the precision of an instrument and not a difficulty setting. There is no non-goal 6
+violation.** The charter's test is mechanical: *"take a run and a setting, and ask whether changing
+the setting changes any figure the run produces."* `k` is not a setting any player is on — it is one
+constant, identical for everyone, consumed by a weekly regeneration — and moving it changes no
+figure any run produces, which is **measured rather than argued**: § D691 § 2 established that
+`survivorSpace.ts#sampleReachableConfigurations` runs one loop against one seeded stream whose only
+`sampleSize`-dependent step is where it stops, and that the twelve judgements the published cell
+took reproduce verdict-for-verdict inside a two-hundred-draw table. Non-goal 6's *"changes a
+replication count"* clause is the nearest thing in the charter and it cuts the other way: it forbids
+a **setting** from varying `n` between players, and it cannot mean the project may never choose `n`
+without freezing `CLAUDE.md`'s own 50–200 and [§ D108](#d108)'s acceptance matrix with it.
+
+**What would be a violation, named so nobody proposes it as the cheap version:** raising `k` only on
+the cells that read zero. That conditions the search on the outcome and makes shares incomparable
+across the ladder. **`k` is uniform across every cell.**
+
+**(b) `SURVIVOR_SAMPLE_SIZE` rises from 12 to 200** and `data/scenario-survivors.json` is
+regenerated once, at the same master seed **20 260 910**. The master seed does **not** move — § D691
+refused seed-shopping by name and that refusal is untouched.
+
+**(c) The band keeps being read at the size it was approved against, off the draw's own prefix — so
+not one band figure and not one band verdict moves.** Because the accepted sequence does not depend
+on `sampleSize`, a table at k = 200 *contains* the table at k = 12: the first twelve draws are the
+twelve the owner's approval was read over, in order, with the same verdicts. The check reads census
+plus those twelve. **`OUTSIDE_THEIR_BAND` is byte-identical across this change, and that is the
+assertion rather than the hope** — the regenerated table's prefix block must equal the cells of the
+table published at `3ffa138`, which is still in the tree to diff against.
+
+**(d) `data/scenario-survivor-bands.json` is not edited at all.** `approvedAtSampleSize` stays
+**12**: it is a record of what a product owner approved, and an agent session does not rewrite one.
+
+**(e) `sampleSizeIssue` is kept and inverted rather than weakened.** It stops refusing a table
+measured at a *wider* size and starts refusing one the band cannot be read at the approved size
+from — a table whose `sampleSize` is **below** `approvedAtSampleSize`, or which does not publish the
+prefix counts. Its diagnosis was always right; only its remedy was a false dilemma. It offered
+*"re-approve the band, or regenerate at the old size"*, and the third branch — **regenerate at the
+new size and read the band at the old one** — was available the whole time and is exact.
+
+### 5. What is reported and deliberately not repaired
+
+**An owner-approved figure is being enforced above its approved value, and that is a finding to
+report rather than a number to edit.** § 3(a): positions one and two carry an approved `minShare` of
+**0.25** and the check demands **0.333** and **0.417** of the dial stratum at `k = 12`, because the
+census dilutes the numerator. Raising `k` to 200 moves the enforced figures to 0.255 and 0.260 —
+closer to what was approved, as a side effect of precision rather than as anybody's choice. **The
+shares are not touched.** `CLAUDE.md`'s rule for a published figure that does not reproduce is that
+it is a finding to report, and that binds harder, not softer, when the figure is a product owner's.
+
+**Whether the band should be re-approved at the full draw is the owner's and is filed rather than
+taken.** § 6's advisory reading is built so that decision can be made from a measurement instead of
+from an argument.
+
+### 6. The forcing function, because a frozen read is a second staleness waiting to happen
+
+Reading the band at a 2026-09-10 prefix means nothing would ever oblige anybody to look at it again.
+So `survivorBands.test.ts` gains a **second, advisory reading at the full sample**, published in the
+same output as the gating one, with a register of the scenarios on which the two disagree — checked
+in **both** directions, on `honesty.test.ts`'s standing ground that *a register that can only grow
+is decoration*. It gates nothing. It is the sheet the owner reads when they decide § 5's question.
+
+### 7. What moves, and what a reader should not expect to move
+
+**Monotone in `k`, so widening can only open a stage and never close one.** § D649's gate is
+base-rung `survivors ≥ 1` or a declared diagnosis; the census does not depend on `k` and the dial
+count cannot fall as `k` rises. A held stage that stays held after two hundred draws is held on
+fourteen times tighter evidence; one that opens was never held, only under-sampled.
+
+- **`OUTSIDE_THEIR_BAND`** — unchanged, by construction (§ 4(c)).
+- **`UNWINNABLE_AS_MEASURED`** — membership may shrink and every surviving row's prose must be
+  rewritten, because *"0 of 18"* becomes *"0 of 206"*, which is a far stronger claim. **Stage 2 will
+  not leave**: § D692 already searched it at k = 60 and found nothing. **Which of the other five
+  leave is unmeasured and no guess is offered in its place** ([§ D256](#d256)).
+- **`FIRST_HOUR_SINGLE_SURVIVOR`** — stage 1's reason is falsified on two of its three rungs and the
+  third is unmeasured, **so whether the row leaves is not forecast here**. The check fires per step
+  (`survivors.ts:708`), so a row leaves only once *every* rung moves off exactly one; its reason
+  reads *"one at every rung"*, and at k = 200 stage 1 reads four survivors at base and three at the
+  equipment rung (§ D691 measured both). **§ D691 never drew the building rung at 200**, and saying
+  the row leaves would be inferring a third cell from two.
+- **`DROPDOWN_CLEARS`, `DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE`, `DC1_UNFAILABLE`** — unchanged. The
+  first two are census readings and the census does not depend on `k`; [§ D556](#d556)'s
+  both-directions reconciliation is **run rather than assumed**.
+
+### 8. The cost, bounded rather than estimated
+
+`regenerateSurvivors.test-helper.ts` records the k = 12 sweep at **932 s quiet / 1 900 s contended**
+over 480 judgements, *"very unevenly spread"* — `stage-3-overwhelmed` alone 389 s. The dropdown half
+does not scale; the dial half goes 360 → **6 000** judgements. At the average the k = 12 run implies
+that is about **3 h 20 m**; at the two per-judgement figures actually measured at a wider draw —
+9.2 s at stage 2 (§ D692) and ≈ 0.6 s at stage 1 (§ D691) — it could be four times that. **A
+quotient is not a measurement** ([§ D256](#d256)), so no figure is published here: the lane measures
+`stage-3-overwhelmed` alone at k = 200 first and extrapolates from the ladder's most expensive cell.
+
+Two conditions on the run. It carries an explicit `--testTimeout`, because `CLAUDE.md` records a
+deep run that *"wrote complete figures at 76 minutes while vitest called it failed at its
+3 600 000 ms test timeout"*. And **if 200 will not fit, the `k` that does is shipped with the
+detection probability it buys written into `provenance.scope`** — an intermediate `k` is a valid
+table and strictly better than twelve, and what is forbidden is shipping a smaller one silently.
+
+### 9. What this does **not** decide
+
+**It does not rebalance anything, and it does not make stage 1 easier.** At k = 200 stage 1's base
+rung reads **4 of 206** against a floor asking **52** — about thirteen times the survivors it has.
+§ D691's *"about seventeen times narrower"* is the same gap read on the dial stratum alone, 1.5 %
+against 0.25; the two differ only by whether the six census slots sit in the denominator, and
+**widening `k` moves neither**. **#234's rebalance is owed in full**, and the two levers already
+measured are untouched — [§ D372](#d372)'s route for
+stage 1 (a *new* failable building, `garden-apartments` left alone) is still unbuilt, and
+[§ D612](#d612)'s stage-5 lever is still blocked on its own DC-3 witness search.
+
+It does not decide whether the band should be re-approved at the full draw (§ 5), whether any of the
+seven held stages should declare a `diagnosis`, or which of the five unsearched zeros are sampling
+artefacts — that last is what the regeneration is for.
+
+**Bookkeeping.** This lane was reserved **D736–D741** and spent **D736**; D737–D741 are returned
+unspent. **The block sat above wave AC-2's open reservation ceiling of D728**, and this lane
+flagged it rather than stepping over it, per § D404; the integrator raised the ceiling to D741,
+which is the other half of that rule and is why this number is legible at all.
+
+## D737 — Rush stays on the front door: § D626's placement clause is superseded, because its argument is the recommendation § D525 read by name and withdrew
+
+**Date: 2026-09-19 · Owner: the product owner, ruling in session on the evidence below ·
+Rules on:** [§ D626](#d626)'s placement clause, [§ D525](#d525) clause 1,
+[§ D477](#d477), [§ D529](#d529) clause 2, `docs/32-game-design.md` GD4 and § 9 Q1,
+`docs/39-decisions-in-force.md` §§ 1 and 2.
+**Moves no code: `everyday/modes.ts` already ships three tiles with Rush third.**
+
+**Why an entry.** It moves something already recorded, and it binds four documents no module owns.
+
+### 1. The argument § D626 rests on is the one § D525 withdrew
+
+§ D626 argues that the rush *"produces a limit, not a differential"* and *"serves neither half of
+the core loop"*. That is `docs/32` **GD4**, word for word on both clauses — and GD4 is named in
+§ D525's own `Rules on:` line and withdrawn by it, a disposition `docs/39` § 2 already records.
+So the answer to *does this engage anything § D525 had not weighed?* is **no**: it re-adopts a
+recommendation the product owner read by name and set aside ten days earlier.
+
+### 2. Both gates it claimed were open were already spent
+
+It reasons from § D477's *placement left open*. The **status blockquote directly above the clause it
+quotes** reads *"AMENDED by § D525 — the placement this entry left open is settled: the front door,
+as Rush."* Its second gate, `docs/35` § 13.1's forcing event — *"the moment #220 is scheduled"* —
+fired on 2026-09-06 when § D515 built it.
+
+### 3. It contradicts a second product-owner ruling, uncited
+
+§ D529 clause 2: *"Screen two is reused as the Rush tutorial when the player later opens Rush."* A
+mode the owner's own onboarding ruling gives a tutorial to is not a bench instrument. And `docs/38`
+§ 2 — the page these rulings are the record of — lists under the Rush row's **what it retires**
+column, in full: *"The recommendation that the rush is a bench instrument."*
+
+### 4. The bench cannot house what Rush now is
+
+`everyday/benchModel.ts` quotes the bench's governing sentence: *"Nothing here is posted and nothing
+here is scored."* Rush posts (§ D542), is ranked on a board keyed building × date × modifier set
+(§ D543) and pays chimes (§ D533). Housing it there needs that sentence rewritten. § D626 does not
+address this and **could not have** — all three of those decisions post-date the GD4 argument it
+adopted.
+
+### 5. And the economy leans on it
+
+`data/chime-ledger.json` carries four sources and three sinks. **Two of the three sinks are Rush's**,
+and `rush-prefit` is the only sink in that file that reaches a run at all: both `purse-units` sinks
+buy nothing today and `scenario-budget-step` is refused by name in `core/config/chimeLedger.ts`.
+`earn-rush-wave` is itself a product-owner ruling (§ D533).
+
+### 6. What this does not decide
+
+**§ D626's critique is not answered, only its placement clause.** Whether the rush serves `docs/23`
+§ 3.4's loop is a live question and is re-asked on the evidence that post-dates GD4 — including a
+counter-example to *a limit, not a differential* that landed the same day as § D626, from a
+different session, so its author could not have seen it: `rushHoldAgreement.json` pins
+`garden-apartments`/`collective` at **1 178 s as built against 1 214 s pre-fitted**, one bought
+change on the same derived seed, replayed independently by both packages. That is a held-stream
+counterfactual.
+
+§ D477's substance is untouched: the mode is kept, the fail state is the lobby overfilling, the ramp
+is traffic and/or breakdowns.
+
+### 7. The procedural half, which is separately real
+
+§ D626 added **no `docs/39` row and no status marker**, though § 0 of that file requires both on the
+same commit. `grep` returned neither id. This entry lands both, and the same omission for § D606 and
+§ D640 was closed by § D701's commit. A decision that supersedes another and leaves no trace in the
+index is how a superseded ruling goes on being read as current — which is the defect this whole
+exercise found, one turn before acting on it.
+
+### 8. Numbers spent
+
+**D737 only.** It is the first number of the block opened mid-wave for the survivor-band question,
+spent here because the ruling it records is the session principal's and needed a heading of its own.
+D738–D741 stay free rather than holed: nothing is written past them, which is wave P's precedent and
+the one shape § D430 permits at a block's top.

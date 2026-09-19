@@ -31,6 +31,7 @@ const outcome = (kind: RushOutcome['kind'], heldS: number): RushOutcome => ({
   carried: 150,
   longestWaitS: 130,
   overLine: 40,
+  where: [],
   saturation: undefined,
 });
 

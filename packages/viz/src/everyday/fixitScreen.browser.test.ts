@@ -105,6 +105,33 @@ async function openFixit(page: Page): Promise<void> {
    * where they always did — on the figures. The case that is *about* the stage is the one that
    * does not skip.
    */
+  await skipTheOpeningRun(page);
+}
+
+/**
+ * Press past a case's opening run and land on its four figures — the player's own control.
+ *
+ * GitHub issue #348 opens **every** case on its as-built run played, and states the four figures
+ * only once that run has been watched or skipped. The sight is offered **once per case**, which
+ * `fixitScreen.ts#CaseSession.asBuiltSeen` says in terms — so a case opened *second* opens on a
+ * sight of its own, and a driver that merely waited for its figures would be waiting out a whole
+ * simulated morning.
+ *
+ * **How long that wait is now, and why this is a helper rather than a longer budget.**
+ * [§ D641](../../../../DECISIONS.md) moved `stageScreenModel.ts#DEFAULT_STAGE_SIM_PER_REAL_S` from
+ * `30×` to `4×` — § D525 clause 4's watching rung. These cases are authored on a 1 800 s morning,
+ * so the opening block that took **60 s** to play through now takes **450 s**. The two cases below
+ * that open a second case used to sit through it inside this tier's 120 s budget and cannot any
+ * more: both timed out on the shipped bundle, and a probe of the same walk found the block still up
+ * and the grid still empty at 60 s, which is the shape of a run playing rather than a run stuck.
+ *
+ * Raising the budget would buy a tier that spends fifteen minutes watching a run no player watches,
+ * and would hide the next real stall behind it. Pressing *Skip to the figures* is what a player
+ * does, it is what {@link openFixit} has done for the first case since #348 landed, and it leaves
+ * both cases asserting exactly what they asserted before — the busy state on a painted frame, and a
+ * figure grid that never draws a partial reading.
+ */
+async function skipTheOpeningRun(page: Page): Promise<void> {
   await page.waitForSelector('.everyday-fixit-skip', { timeout: 120_000 });
   await page.click('.everyday-fixit-skip');
   await page.waitForFunction(
@@ -199,6 +226,33 @@ async function recordPrimaryStates(page: Page): Promise<void> {
 /** What the recorder caught, in order. */
 async function primaryStates(page: Page): Promise<readonly PrimaryState[]> {
   return page.evaluate(() => (window as RecordingWindow).__primaryStates ?? []);
+}
+
+/**
+ * What the pair block and the verdict beside it read, in one evaluate.
+ *
+ * One round trip rather than five, and — more to the point — **one instant**: the claim these cases
+ * make is that the sight and the verdict are on the page *together*, and reading them in separate
+ * evaluates would be reading them at two moments and asserting about neither.
+ */
+async function pairAndVerdict(page: Page): Promise<{
+  readonly text: string;
+  readonly pairs: number;
+  readonly outcomes: number;
+  readonly asBuiltStages: number;
+  readonly fixedTags: number;
+  readonly primaryLabel: string;
+}> {
+  return page.evaluate(() => ({
+    text: document.querySelector('.everyday-fixit-pair')?.textContent ?? '',
+    pairs: document.querySelectorAll('.everyday-fixit-pair').length,
+    outcomes: document.querySelectorAll('.everyday-fixit-outcome').length,
+    asBuiltStages: document.querySelectorAll('.everyday-fixit-stage').length,
+    fixedTags: [...document.querySelectorAll('.everyday-fixit-tag')].filter(
+      (tag) => tag.textContent === 'FIXED',
+    ).length,
+    primaryLabel: document.querySelector('.everyday-bar-primary')?.textContent ?? '',
+  }));
 }
 
 describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () => {
@@ -464,6 +518,104 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
     }
   });
 
+  /**
+   * **[§ D644](../../../../DECISIONS.md) — the run the player's own change produced is watched.**
+   *
+   * Until that entry `primary`'s `onDone` bound `([before, after])`, kept `before` and let `after`
+   * go out of scope: the day the player bought was simulated, measured and never drawn. Four claims,
+   * and the last two are the ones the node tier cannot make:
+   *
+   * 1. a pair block is up after a press, with **two** canvases, both sized and painting;
+   * 2. the block publishes **no figure** — the card under it is the surface allowed to say what the
+   *    pair measured, and a second place for one measurement is how a measurement goes stale;
+   * 3. the verdict is **not withheld** behind the sight, on **both** branches of the run's own
+   *    answer. `session.fixed` badges the rail, `keepSolved` writes the profile and
+   *    `bankScenarioClear` files the chime in the statement that lands the run, so a card that
+   *    lagged them would be `docs/20` defect 16 — *two verdicts about one case on one screen* —
+   *    rebuilt on purpose. The badge and the card are asserted to **agree**, not to read any
+   *    particular way (§ D220 § 4);
+   * 4. a second press replaces the pair rather than leaving the first press's picture over the
+   *    second press's verdict.
+   *
+   * The first press selects nothing, which is the *did not clear* branch by construction: with no
+   * repair bought the two configurations are the same building and the complaint cannot have moved.
+   * The second selects the free diagnosed repair, which is the branch the case was authored for.
+   */
+  it('plays the pair after a press, on both branches, without withholding the verdict', async () => {
+    const page = await coldLoad();
+    try {
+      await openFixit(page);
+
+      /* ---- branch one: nothing bought, so nothing can have been fixed ---- */
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-fixit-pair', { timeout: 120_000 });
+      await page.waitForFunction(
+        () => {
+          const canvases = [
+            ...document.querySelectorAll<HTMLCanvasElement>('.everyday-fixit-pair-canvas'),
+          ];
+          return canvases.length === 2 && canvases.every((c) => c.width > 0 && c.height > 0);
+        },
+        undefined,
+        { timeout: 30_000 },
+      );
+
+      const unchanged = await pairAndVerdict(page);
+      expect(unchanged.text).toContain('WATCH WHAT YOU CHANGED');
+      expect(unchanged.text).toContain('As it stands');
+      expect(unchanged.text).toContain('With your change');
+      // The opening block is gone and this one is not it: the two are addressable apart.
+      expect(unchanged.asBuiltStages).toBe(0);
+      // Nothing is withheld — the card is on the page beside the sight rather than behind it.
+      expect(unchanged.outcomes).toBe(1);
+      // No figure anywhere in the block's own words.
+      expect(unchanged.text).not.toMatch(/\d/);
+      // Nothing bought: the badge cannot read FIXED, and the card and the badge say one thing.
+      expect(unchanged.fixedTags).toBe(0);
+      expect(unchanged.primaryLabel).toBe('Run it again');
+
+      /* ---- branch two: the free diagnosed repair, and a second press over the first ---- */
+      await page.click('.everyday-fixit-pair-skip');
+      await page.waitForFunction(
+        () => document.querySelectorAll('.everyday-fixit-pair').length === 0,
+        undefined,
+        { timeout: 30_000 },
+      );
+      // Skip takes the sight away and leaves the verdict, which is where the press says it goes.
+      expect(await page.locator('.everyday-fixit-outcome').count()).toBe(1);
+
+      await page.locator('.everyday-fixit-repair').nth(await repairIndex(page, 'free')).click();
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-fixit-pair', { timeout: 120_000 });
+      await page.waitForFunction(
+        () => {
+          const canvases = [
+            ...document.querySelectorAll<HTMLCanvasElement>('.everyday-fixit-pair-canvas'),
+          ];
+          return canvases.length === 2 && canvases.every((c) => c.width > 0 && c.height > 0);
+        },
+        undefined,
+        { timeout: 30_000 },
+      );
+
+      const repaired = await pairAndVerdict(page);
+      // One block, not two: the second press replaced the first press's picture.
+      expect(repaired.pairs).toBe(1);
+      expect(repaired.outcomes).toBe(1);
+      expect(repaired.text).not.toMatch(/\d/);
+      /*
+       * The badge agrees with the § 3.3 primary, whichever way this run went — a passed case reads
+       * `Next building` and wears FIXED, one that did not reads `Run it again` and does not. What
+       * the run measured is not asserted; that the two surfaces say one thing is.
+       */
+      const solved = repaired.primaryLabel === 'Next building';
+      expect(solved || repaired.primaryLabel === 'Run it again').toBe(true);
+      expect(repaired.fixedTags).toBe(solved ? 1 : 0);
+    } finally {
+      await page.close();
+    }
+  });
+
   it('keeps painting through the pair, and through opening a case — GitHub issue #165', async () => {
     const page = await coldLoad();
     try {
@@ -514,11 +666,9 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       // And opening a second case, which takes an as-built run of its own.
       await recordFrames(page, '.everyday-fixit-measuring');
       await page.locator('.everyday-fixit-case').nth(1).click();
-      await page.waitForFunction(
-        () => document.querySelectorAll('.everyday-fixit-figure').length === 4,
-        undefined,
-        { timeout: 120_000 },
-      );
+      /* The second case opens on a sight of its own — see {@link skipTheOpeningRun}. The sampler
+         runs across the skip, so the window this reads is still the one the open produced. */
+      await skipTheOpeningRun(page);
       /*
        * The busy state the open run never had, on a painted frame. Before the move this ran inside
        * `mainColumn`, so a player clicking a rail row got a screen that simply stopped and there
@@ -581,11 +731,13 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
         });
       });
       await page.locator('.everyday-fixit-case').nth(1).click();
-      await page.waitForFunction(
-        () => document.querySelectorAll('.everyday-fixit-figure').length === 4,
-        undefined,
-        { timeout: 120_000 },
-      );
+      /*
+       * The second case opens on a sight of its own — see {@link skipTheOpeningRun}. The observer
+       * is watching the whole document across the skip, so the states this case is about are all
+       * still recorded: the grid says *measuring*, then draws nothing while the run is watched,
+       * then draws four. What it must never write is one, two or three.
+       */
+      await skipTheOpeningRun(page);
       const shapes = await page.evaluate(
         () => (window as unknown as { __figureShapes?: string[] }).__figureShapes ?? [],
       );

@@ -247,6 +247,22 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * playing day: **#367**, the survivor count per budget step, which is the first thing that has to
    * know what rung a scenario is on.
    */
+  /*
+   * **The shell's register is not empty any more, and the row arrived with a fix rather than with
+   * a gap** — [§ D730](../../../../DECISIONS.md). § D729 made the day's crowd the UTC date, so
+   * half of `docs/38` § 2.1's daily puzzle ships. The half that does not is the **reach**: a week
+   * runs one contract, so nothing moves a returning player to the day's tower, and that is a thing
+   * the player cannot see from where they stand — which is this register's own test for what
+   * belongs in it.
+   *
+   * The owner is **#159**, the wrinkle library and the daily generator, because that is the issue
+   * that gives the daily door a tower a day. `docs/37` § 4.3 already scopes the rotation rules to
+   * it and requires its generator to assert non-exhaustion over a simulated year; § D732 measured
+   * what the current draw does and declined to build a rotation nothing can observe, and left the
+   * figures as that generator's first input. Inventing a new number would split one thing across
+   * two queues, which is the rush row's own reasoning below.
+   */
+  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'your week’s after that', issue: 159 },
   { register: 'STAGE_ABSENCES', fragment: 'no works to buy while the day plays', issue: 367 },
   /*
    * **The rush's register is not empty any more, and the entry that refilled it came in with the
@@ -332,6 +348,19 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * the issue that owns it closes.
    */
   { register: 'TUTORIAL_ABSENCES', fragment: 'Which building the first session should use', issue: 270 },
+  /*
+   * **`docs/36` `AX-1` on the first session's canvas** — GitHub issue **#239**, the accessibility
+   * sweep that owns every clause `docs/36` records as failing. The entry arrived on the commit that
+   * gave screen two a picture: the block is
+   * `everyday/caseStage.ts`, its canvases are unnamed on both screens that draw them, and the name
+   * has to be produced from the frame inside that block rather than assembled by a screen beside it.
+   *
+   * It is **not** owned by the lane that added the picture, and that is deliberate: this screen
+   * ships the live region `AX-3` asks for. What it cannot ship without writing a second source of
+   * truth about what is on the canvas is the name, which is #239's and shared with the fix-it
+   * screen.
+   */
+  { register: 'TUTORIAL_ABSENCES', fragment: 'no name a screen reader can read', issue: 239 },
   /*
    * **`Sign out` left this table on the commit that built the control** — GitHub issue #332,
    * [§ D489](../../../../DECISIONS.md). Its entry refused a button on the grounds that *nothing on

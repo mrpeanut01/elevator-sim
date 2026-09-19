@@ -341,7 +341,9 @@ describe('the version 1 → 2 migration', () => {
       profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
       progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
       units: 'metric',
-      defaultSpeedSimPerRealS: 30,
+      /* The migration writes the *default*, so this is read from it rather than transcribed — the
+         rung has moved twice (#257, § D641) and a literal here would have to move with it. */
+      defaultSpeedSimPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S,
       soundOn: true,
     });
     expect(loadProfile(backing)).toEqual({ name: 'Nadia R.', avatarColor: '#4F8A5B' });
@@ -388,7 +390,8 @@ describe('the version 2 → 3 migration, and the units preference beside it', ()
       profile: { name: 'Nadia R.', avatarColor: '#4F8A5B' },
       progress: { solvedCaseIds: ['leaky-lobby'], ratings: [] },
       units: 'imperial',
-      defaultSpeedSimPerRealS: 30,
+      /* The default, read rather than transcribed — see the version 1 → 2 case above. */
+      defaultSpeedSimPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S,
       soundOn: true,
     });
     expect(loadUnits(backing)).toBe('imperial');

@@ -19,6 +19,8 @@ import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
 import { BODY, CARD, el, EYEBROW, LEDE, MONO, pill, QUIET, section, unavailableBand } from './screenDom.js';
 import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
+import { isDailySeed } from '../shift/dailySeed.js';
+import { deviceNowMs } from '../shift/deviceDate.js';
 import { todayOf } from './today.js';
 import {
   EVERYDAY_COLORS as C,
@@ -56,6 +58,16 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
       dispatcherName: host.dispatcherById(selection.dispatcherId)?.name,
       goals: host.goalsToday(),
       seed: host.seed(),
+      /*
+       * Whether the run in front of the reader is on the day’s crowd — § D729, § D730.
+       *
+       * **Read here, per draw, rather than latched at boot**, for the same reason `units` is two
+       * lines below: a session left open across UTC midnight was seeded on yesterday’s date and is
+       * still running, and a `?seed=` deep link never was the day’s at all. A flag written once
+       * would have gone quietly stale at midnight with the door still saying *everyone identical*,
+       * which is § D227’s stale claim arriving through a cache instead of through a sentence.
+       */
+      crowdIsToday: isDailySeed(host.seed(), deviceNowMs()),
       firstSession: isFirstDayOnALegibleTower(host.week()),
       /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
       units: everydayProfileStore().units(),

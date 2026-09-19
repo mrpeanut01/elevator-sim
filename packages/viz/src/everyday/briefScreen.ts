@@ -49,6 +49,8 @@ import {
 import { everydayProfileStore } from './profileStore.js';
 import { drawElevation } from './elevation.js';
 import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
+import { isDailySeed } from '../shift/dailySeed.js';
+import { deviceNowMs } from '../shift/deviceDate.js';
 import { todayOf, type TodayRecord } from './today.js';
 import {
   EVERYDAY_COLORS as C,
@@ -97,6 +99,9 @@ function mountBrief(
       dispatcherName: data.dispatcherById(selection.dispatcherId)?.name,
       goals: data.goalsToday(),
       seed: data.seed(),
+      /* § D729, § D730 — per draw, `doorScreen.ts#viewOf`'s reason, and the same question so the
+         two screens cannot disagree about one run (§ 16 rule 14). */
+      crowdIsToday: isDailySeed(data.seed(), deviceNowMs()),
       firstSession: isFirstDayOnALegibleTower(data.week()),
       /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
       units: everydayProfileStore().units(),

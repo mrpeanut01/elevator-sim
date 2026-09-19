@@ -1822,14 +1822,22 @@ describe('the chime ledger over the wire', () => {
     expect(typeof bodyOf(mine)['balanceChimes']).toBe('number');
   });
 
-  it('returns one key and nothing else, which is the whole of the read verb', async () => {
+  it('returns a balance and the sinks it bought, and nothing else, which is the whole of the read verb', async () => {
     /*
      * **§ D526 clause 5, asserted as a key set rather than trusted as a habit.** *The play surface
      * reads one balance … and never knows a source.* A field added to this body — the last source,
-     * a history, a breakdown — fails here, and it fails whether or not anybody remembers why. It is
-     * also what makes an add from outside invisible to play: there is nothing else in this body for
-     * a new source to show up in. Asserted after an earn and a spend rather than on a fresh
-     * account, so an empty ledger cannot be what makes the body small.
+     * a history, a breakdown, a date, a price — fails here, and it fails whether or not anybody
+     * remembers why. It is also what makes an add from outside invisible to play: an external add
+     * is one more **source**, it moves the balance, and there is nothing in this body for it to
+     * show up in. Asserted after an earn and a spend rather than on a fresh account, so an empty
+     * ledger cannot be what makes the body small.
+     *
+     * **`modifiers` is the second key and it arrived by a ruling** ([§ D671](../../../../DECISIONS.md)).
+     * A sink the account bought is not a source: the play surface chose it by pressing, and a run
+     * that claims it is checked against exactly this list by `chimes/ledger.ts#unbackedModifiers`.
+     * A client that could not read it would either lose a fifteen-chime purchase on reload or keep
+     * a second copy of a fact the ledger already holds. Its own key set is asserted below for the
+     * same reason the body's is — `priceChimes` never leaves the server.
      */
     const player = await signIn();
     for (let i = 0; i < 3; i += 1) {
@@ -1843,7 +1851,35 @@ describe('the chime ledger over the wire', () => {
       body: { modifier: 'career-purse-top-up', steps: 1 },
     });
     const mine = await call('GET', '/api/chimes', { token: player.token });
-    expect(Object.keys(bodyOf(mine))).toEqual(['balanceChimes']);
+    expect(Object.keys(bodyOf(mine)).sort()).toEqual(['balanceChimes', 'modifiers']);
+    const modifiers = bodyOf(mine)['modifiers'] as readonly Record<string, unknown>[];
+    expect(modifiers.map((entry) => entry['sinkId'])).toEqual(['career-purse-top-up']);
+    for (const entry of modifiers) expect(Object.keys(entry).sort()).toEqual(['sinkId', 'steps']);
+  });
+
+  it('sums two purchases of one sink into one owned row rather than listing the entries', async () => {
+    /*
+     * The read is not an entry list, which is the half of § D526 clause 5 that survived § D671
+     * untouched. Two spends on one sink are one thing owned twice, and `unbackedModifiers` sums the
+     * same way on the way back in — so a client reading this and a server checking a claim are
+     * counting one quantity rather than two shapes of the same one.
+     */
+    const player = await signIn();
+    for (let i = 0; i < 6; i += 1) {
+      await call('POST', '/api/chimes/earn', {
+        token: player.token,
+        body: { completion: 'scenario-cleared', scenarioId: SCENARIO_IDS[i] },
+      });
+    }
+    for (let i = 0; i < 2; i += 1) {
+      const spent = await call('POST', '/api/chimes/spend', {
+        token: player.token,
+        body: { modifier: 'career-purse-top-up', steps: 1 },
+      });
+      expect(spent.status).toBe(200);
+    }
+    const mine = await call('GET', '/api/chimes', { token: player.token });
+    expect(bodyOf(mine)['modifiers']).toEqual([{ sinkId: 'career-purse-top-up', steps: 2 }]);
   });
 
   it('banks a turn a client names and refuses one it invents', async () => {
@@ -1856,6 +1892,7 @@ describe('the chime ledger over the wire', () => {
     });
     expect(earned.status).toBe(200);
     expect(Number(bodyOf(earned)['balanceChimes'])).toBeGreaterThan(before);
+    /* The **earn**'s answer is still one key: § D671 widened the read and not the two verbs. */
     expect(Object.keys(bodyOf(earned))).toEqual(['balanceChimes']);
 
     const invented = await call('POST', '/api/chimes/earn', {

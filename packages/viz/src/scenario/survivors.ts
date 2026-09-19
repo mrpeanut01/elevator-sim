@@ -529,6 +529,79 @@ export const MAX_REPLICATIONS = 200;
  * caller is a test whose failure text is the thing a future reader will actually see, and
  * `toEqual([])` prints every violation at once.
  */
+/**
+ * Whether a violation line is **#381's first-hour floor** rather than a fault in the table.
+ *
+ * ## Why this predicate exists, and it is a load-bearing distinction rather than a convenience
+ *
+ * {@link validatePublishedSurvivors} returns one flat list, and the lines in it are two different
+ * kinds of thing. Most say **the table cannot publish a count** — a missing provenance field, a
+ * step keyed to no stage, strata that do not sum. A reader cannot trust any figure on such a table,
+ * so `dev/data.ts` refuses the campaign load rather than drawing from it.
+ *
+ * The first-hour floor is not that. It says the table is **well formed and reports a scenario that
+ * is too narrow** — `stage-1-first-call` has exactly one survivor, which is a fact about the
+ * *content* that the count correctly measured. The table is doing its job; what it found is that
+ * the ladder is harsh at position one.
+ *
+ * **Treating the second as the first took the campaign screen away from every player.** The loader
+ * threw on any violation, the shipped table carries this finding, so `#campaign-profile` rendered
+ * with zero options and the Lab's campaign tab was dead — caught by `savedDispatcher.browser.test.ts`
+ * against a select that resolved empty. Refusing to draw a difficulty figure would have been the
+ * proportionate response; refusing to draw the campaign was not.
+ *
+ * **The citation is the key because #381 owns the rule**, so a consumer that matches on it moves
+ * when #381 moves. Two read it: {@link CONTENT_RULE_CITATIONS} below, which is what `dev/data.ts`
+ * reaches through, and `survivors.test.ts#isRegistered`, which registers the scenarios
+ * carrying the finding today. A second copy of the literal in either file would be the authority
+ * defect one level down, which is why both import this rather than spelling it out.
+ *
+ * **It had a predicate of its own and that predicate is gone.** `isFirstHourFloorFinding` was the
+ * first shape of the classifier below, matching #381 alone; § D525 clause 3's finding walked past
+ * it and took the campaign screen down a second time, and {@link isContentFinding} replaced it.
+ * Left exported with no caller it would have been the dead seam this repository has shipped eleven
+ * times, so `deadCode.test.ts` was allowed to find it rather than argued with.
+ */
+export const FIRST_HOUR_FLOOR_CITATION = 'GitHub issue #381';
+
+/**
+ * The rules a violation line cites when it is about the **content** rather than about the table.
+ *
+ * Each of these is a game-design rule the count is judged against: the first-hour floor, § D525's
+ * *zero is not a scenario*, the diagnosis shape a zero may declare instead, DC-1's *something here
+ * must be failable*, DC-3's ladder ceiling, and the budget's own rule. A line citing one of them is
+ * a **true report about the campaign**, produced by a table that is working.
+ *
+ * A structural violation cites none of them, because there is no design rule to cite — a missing
+ * `provenance.tree`, a step keyed to no stage or strata that do not sum are faults in the document
+ * itself, and no figure on such a table can be trusted.
+ *
+ * **The list is the classifier and it is deliberately the citations rather than the sentences.** A
+ * content rule added later will carry its own citation as every one of these does, so it joins this
+ * set by being written normally rather than by somebody remembering to widen a filter. That is the
+ * property the first version of this lacked: it matched #381 alone, and § D525 clause 3's finding
+ * walked straight past it and took the campaign screen down a second time.
+ */
+const CONTENT_RULE_CITATIONS: readonly string[] = Object.freeze([
+  FIRST_HOUR_FLOOR_CITATION,
+  '§ D525 clause 3',
+  'docs/10 § 5.4',
+  'docs/38 § 2.4',
+  'DC-1',
+  'DC-3',
+]);
+
+/**
+ * Whether a violation line reports a fact about the **content** rather than a fault in the table.
+ *
+ * `dev/data.ts` refuses the campaign load on a malformed table and **not** on a content finding,
+ * because a finding is a working measurement saying the ladder is harsh — and denying every player
+ * the campaign screen over one is the defect this predicate was written to close.
+ */
+export function isContentFinding(line: string): boolean {
+  return CONTENT_RULE_CITATIONS.some((citation) => line.includes(citation));
+}
+
 export function validatePublishedSurvivors(
   table: PublishedSurvivors,
   context: SurvivorContext,

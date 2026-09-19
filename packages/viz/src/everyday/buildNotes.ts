@@ -228,6 +228,28 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    * dispatcher pair open the workshop with the honesty kept on the card as a caveat rather than a
    * refusal. That also closes GitHub issue #177's item 2.
    */
+  /*
+   * **An entry that arrives rather than leaves, which this register has not recorded before** —
+   * [§ D730](../../../../DECISIONS.md), GitHub issue #159.
+   *
+   * [§ D370](../../../../DECISIONS.md)'s queue reading is that this register only falls, and every
+   * note above it is a deletion. This one is added, so it owes a reason. `docs/38` § 2.1 declares a
+   * daily puzzle — *“Today's scenario. One seed, the same for everybody, once a day”* — and half of
+   * it now ships: [§ D729](../../../../DECISIONS.md) makes the crowd the day's. The other half does
+   * not, and **the player cannot see that it does not**, which is this register's whole test: a
+   * week runs one contract, so a player who keeps playing stays on the tower their week was opened
+   * on while the world's day turns over without them.
+   *
+   * It is stated as the **reach** rather than as *one tower a day is not built*, which is the
+   * over-claiming shape the race row above got wrong: what is absent is not a draw —
+   * `shift/firstSession.ts` draws a tower from the date perfectly well — it is that nothing draws
+   * a *second* one. Narrow enough that the thing which would falsify it is the thing it names.
+   *
+   * The row leaves on the commit that gives the daily door a tower a day, and not before.
+   */
+  'The tower is the day’s on your first day and your week’s after that — the crowd turns over every ' +
+    'day and everybody meets the same one, but a week runs a single tower, so nothing moves you to ' +
+    'the day’s tower once you have started. The door says which is which rather than claiming both.',
 ]);
 
 /**
@@ -328,7 +350,14 @@ export function buildNotesViewOf(): BuildNotesView {
     },
     {
       heading: 'Scenario',
-      note: 'Two of the four kinds of scenario are playable; the rest wait on the schema.',
+      /*
+       * **This note said the rest *"wait on the schema"* and that had stopped being true** —
+       * [§ D649](../../../../DECISIONS.md). The schema landed with GitHub issue #365 and the ten
+       * campaign stages are listed on the hub as the ordered path they were authored to be. What
+       * they wait on is a runner, which is what the entries below now say. § D227 in the polarity
+       * that bites after a lane lands, on a panel whose whole job is to be current.
+       */
+      note: 'The ten stages on the path and the fix cases are listed; what a listed scenario still cannot do is said on its own row.',
       entries: SCENARIO_ABSENCES,
     },
     {

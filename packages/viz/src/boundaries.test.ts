@@ -290,6 +290,19 @@ const EVERYDAY_SHELL_FILES = new Set([
    * are the model's, pinned by `stageScreen.test.ts` against this file.
    */
   'everyday/cutaway.ts',
+  /*
+   * The fix-case stage's mount — `asBuiltStage.ts` until § D644 renamed it, because it stopped
+   * being only the as-built one. It builds the block, owns the transport and takes one pane or
+   * two: the as-built run alone when a case opens, and the pair at one playhead once the player
+   * has run their own change. Its words are `fixitScreenModel.ts`'s and its painting is
+   * `cutaway.ts`'s directly above; what is here is the document.
+   *
+   * It is listed separately rather than folded into `fixitScreen.ts` because the tutorial mounts
+   * it too (§ D529's second screen), so it is a shared mount rather than one screen's DOM half —
+   * and a rename is exactly how a file arrives on this list unannounced. This entry is owed
+   * because the old name never needed one.
+   */
+  'everyday/caseStage.ts',
   /* The brief's elevation painter, shared with the campaign's tower screen since GitHub issue #353; it sizes a canvas. */
   'everyday/elevation.ts',
   /* The § 11 workshop's DOM half — its words and decisions stay pure in workshopModel.ts. */
@@ -373,8 +386,23 @@ describe('the wall clock has exactly one home', () => {
      * keeps the invariant this check exists to state — wall-clock time enters through
      * `DisplayClock` and nowhere else — true of every module that draws a frame, which is what it
      * was written to guarantee.
+     *
+     * **`shift/deviceDate.ts` is a third, on exactly that argument** — § D731. `DisplayClock` is
+     * monotonic with a meaningless origin *by design*, so it cannot answer *what is today's date*,
+     * and § D729 puts the daily crowd on the UTC date. That module draws no picture either: it is
+     * one exported one-line function, and `shift/dailySeed.ts` — everything derived from the
+     * reading — takes `nowMs` as an argument and is asserted clock-free by `dailySeed.test.ts`.
+     *
+     * Named here rather than by loosening the regex, and that is the load-bearing half: the regex
+     * matches `Date.now(` and `performance.now(` and would **not** have caught a zero-argument
+     * `new Date()`. Taking the exemption is what keeps the seam declared instead of smuggled
+     * through a spelling, which is this repository's own defect class pointed at a rule.
      */
-    const WALL_CLOCK_EXEMPT = new Set(['playback/clock.ts', 'dev/recordTti.ts']);
+    const WALL_CLOCK_EXEMPT = new Set([
+      'playback/clock.ts',
+      'dev/recordTti.ts',
+      'shift/deviceDate.ts',
+    ]);
     const offenders = (await vizSources())
       .filter((file) => !WALL_CLOCK_EXEMPT.has(file.id) && !isTest(file.id))
       .filter((file) => /\b(?:Date\.now|performance\.now)\s*\(/.test(file.code))
@@ -914,5 +942,62 @@ describe('§ D526 clause 5 — the balance is all the play surface knows', () =>
     const files = (await vizSources()).map((file) => file.id);
     expect(files).toContain('everyday/chimesPanel.ts');
     expect(files).toContain('everyday/settingsView.ts');
+  });
+});
+
+/**
+ * **The share path reaches nothing** — [§ D685](../../../DECISIONS.md) § 4, `docs/26` § 10.
+ *
+ * `everyday/shareResult.ts` decides what leaves the product about a run, and a share control is
+ * exactly where a tracker arrives: it is the one place in the product whose whole purpose is that
+ * something goes outward, so *outward* is the word a later change will reach for. `docs/26` § 10
+ * non-goal 2 refuses a third-party tracker outright and non-goal 8 makes § 7's table the whole
+ * allowlist; `docs/38` § 2.4 puts no telemetry supporting a purchase or a conversion on the play
+ * side.
+ *
+ * The module's own tests already assert that the **artefact** carries no URL. This asserts the
+ * other half, which no test over rendered text can see: that the module carrying it names no
+ * network primitive and holds no telemetry import. The two together are what *nothing is sent
+ * anywhere by this button* means, and that sentence is on the screen — `SHARE_COPY.note` — so it is
+ * a claim the product makes to a player rather than a preference of this file.
+ *
+ * **The clipboard is deliberately not on the forbidden list.** `navigator.clipboard.writeText` is
+ * the whole of what the control does and it writes to the reader's own machine; a rule that could
+ * not tell it from `sendBeacon` would be a rule about the word *navigator*.
+ */
+describe('§ D685 § 4 — nothing on the share path reaches the network', () => {
+  /** The ways a browser module can make a request. `fetch` last, so the others are not shadowed by it. */
+  const NETWORK_PRIMITIVE = /\b(?:XMLHttpRequest|sendBeacon|EventSource|WebSocket|importScripts|fetch)\b/;
+
+  it('names no network primitive and imports no telemetry', async () => {
+    const share = (await vizSources()).find((file) => file.id === 'everyday/shareResult.ts');
+    // The path is real — a typo here would make every assertion below vacuously true.
+    expect(share, 'everyday/shareResult.ts is gone or has moved; this rule has nothing to confine').toBeDefined();
+
+    const found = NETWORK_PRIMITIVE.exec((share as SourceFile).identifiers);
+    expect(
+      found?.[0] ?? null,
+      'the share path named a way to make a request. `docs/26` § 10 non-goal 2 refuses a tracker ' +
+        'outright, and the button says on its own face that nothing is sent anywhere — a sentence ' +
+        'the product owes a player, not a preference. If a share genuinely has to reach a server, ' +
+        'that is a decision citing a measured `charter S4`, and the copy changes on the same commit.',
+    ).toBeNull();
+
+    expect(
+      /from\s+['"][^'"]*telemetry\//.test((share as SourceFile).code),
+      'the share path imports from `telemetry/`. `docs/26` § 7 is the whole allowlist and a share ' +
+        'event is not in it.',
+    ).toBe(false);
+  });
+
+  /**
+   * The negative control this file keeps the habit of: the pattern must catch what it claims to.
+   * Without it the rule above passes just as well against a regexp that matches nothing.
+   */
+  it('positive control: the rule catches a request the module does not make', () => {
+    expect(NETWORK_PRIMITIVE.test("void fetch('/api/share', { method: 'POST' });")).toBe(true);
+    expect(NETWORK_PRIMITIVE.test('navigator.sendBeacon(url, body);')).toBe(true);
+    // And it does not fire on the one outward-looking thing the control legitimately does.
+    expect(NETWORK_PRIMITIVE.test('await navigator.clipboard.writeText(artefact.text);')).toBe(false);
   });
 });

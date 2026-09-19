@@ -87,7 +87,10 @@ describe('the engineer’s maths is the real rule', () => {
     expect(maths).toContain(
       `${String(recording.summary.serviceLevel.overHorizonCount)} past the`,
     );
-    expect(maths).toContain('grounds pass');
+    // The card used to say *"All four of `awtIsValid`’s grounds pass"* and there are five
+    // ([§ D723](../../../../DECISIONS.md)); the reword that corrected the count also took the
+    // identifier out, so this assertion follows the copy rather than the symbol name.
+    expect(maths).toContain('checks that can withhold an average pass');
   }, 600_000);
 
   it('does not reproduce the prototype’s invented figure', () => {

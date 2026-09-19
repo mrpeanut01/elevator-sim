@@ -101,8 +101,21 @@ export interface TodayRecord {
   readonly load: TodayLoad | undefined;
   /** *What today asks* — the goal labels, in the order the rail and the report read them. */
   readonly asks: readonly string[];
-  /** `tower chancery-house · crowd 424242 · everyone identical`. */
+  /**
+   * `tower chancery-house · crowd 20260919 · today’s date, so everyone’s crowd`, or the arm
+   * beside it — {@link crowdIsToday} decides which, and both are true of the state they draw on.
+   */
   readonly seedLine: string;
+  /**
+   * Whether this run’s crowd is the one every player has today —
+   * `shift/dailySeed.ts#isDailySeed`, asked by the caller because only the caller has a clock.
+   *
+   * Echoed onto the record rather than re-derived, because three screens state the claim — this
+   * module’s seed line, the door’s closing sentence and the brief’s LOCKED FOR SCORE card — and
+   * two of them reading a different answer from the third is exactly the `surfaces-disagree` shape
+   * the honesty corpus exists for. § 16 rule 14 in one field: one day record narrates everything.
+   */
+  readonly crowdIsToday: boolean;
   /**
    * `shift/firstSession.ts`'s line on a first day nobody has played on a legible tower, or
    * `undefined` on every other day — GitHub issue #208, § D514.
@@ -139,6 +152,20 @@ export interface TodayInput {
   /** `host.goalsToday()` — pending before a run, which is what *what today asks* wants. */
   readonly goals: readonly GoalReading[];
   readonly seed: bigint;
+  /**
+   * Whether {@link seed} is the day’s crowd — `shift/dailySeed.ts#isDailySeed(seed, nowMs)`,
+   * asked by the caller and passed in.
+   *
+   * **Required rather than optional, `calendar`’s own reason**, and the default it would have taken
+   * is the dangerous one: `true` would restore § D729’s defect inside its own fix, on every caller
+   * that forgot the field. This module has no clock and may not have one — `shift/deviceDate.ts` is
+   * the package’s single calendar seam — so the question cannot be answered here.
+   *
+   * Two ordinary states answer `false`: a `?seed=` deep link, which is the reader’s own choice and
+   * wins over the opening state; and a session left open across UTC midnight, which is why the
+   * caller asks at render time rather than latching it at boot.
+   */
+  readonly crowdIsToday: boolean;
   /**
    * How machine specifications read — § 15.1's `Units` row, GitHub issue #170,
    * [§ D448](../../../../DECISIONS.md).
@@ -271,8 +298,16 @@ function loadOf(building: ResolvedBuilding | undefined, held: number): TodayLoad
  * Composed rather than authored, because the prototype's lede is a sentence about Chancery House
  * specifically (*"Fourteen floors, eleven hundred people and three lifts…"*) and this build runs
  * eight buildings. What is kept from it is the shape: what is here, how many people, how many
- * lifts, and then the one sentence that is true of every day — the tower is the same for everyone
- * and the dispatcher is the only variable.
+ * lifts, and then the one sentence that is true of every day.
+ *
+ * **That last sentence read *“Everyone runs the same building on the same crowd”* until
+ * [§ D730](../../../../DECISIONS.md), and neither half of it was true.** The crowd was
+ * `crypto.getRandomValues` at boot (§ D729 fixed that); the *building* still is not shared, and
+ * no seed makes it so — `shift/week.ts` is a week over one `contractId`, so a returning player's
+ * tower is the one their own week was opened on. The claim about the crowd now lives on the seed
+ * line, where {@link TodayRecord.crowdIsToday} can condition it and where § 6 put it in the first
+ * place (*“printed so two players can confirm they had the same morning”*). What is left here is
+ * the half that holds on every day and every tower: the dispatcher is the only thing you choose.
  */
 function ledeOf(building: ResolvedBuilding | undefined, event: ShiftEvent, held: number): string {
   if (building === undefined) {
@@ -291,9 +326,41 @@ function ledeOf(building: ResolvedBuilding | undefined, event: ShiftEvent, held:
     `${String(building.floors.length)} floors, ` +
     `${groupThousands(building.totalPopulation)} people and ${lifts}. ` +
     `${event.name}: ${event.note} ` +
-    'Everyone runs the same building on the same crowd. The only thing that differs is who you ' +
-    'put in charge of the lifts.'
+    'The only thing you choose is who drives.'
   );
+}
+
+/**
+ * § 6’s seed line — the tower, the crowd, and what the crowd number means.
+ *
+ * ## The claim it used to make, and why it was the worst string in the product
+ *
+ * It read *“tower `<id>` · crowd `<n>` · everyone identical”* while `dev/main.ts` opened the
+ * session on `crypto.getRandomValues`, so the number beside the words was a number nobody else had.
+ * Every other figure in this product is either measured or withheld; this one was asserted. Six
+ * cold loads gave six different towers ([§ D729](../../../../DECISIONS.md)).
+ *
+ * ## What it says now, and why there are two arms rather than a fix
+ *
+ * The crowd is the UTC date’s own digits, so the number **is** the date — which makes the claim
+ * the one thing on this screen a player can check without being told, against a calendar they
+ * already have. That is the standard every withheld figure here is held to, pointed at an
+ * assertion for once.
+ *
+ * It is conditional because two ordinary states reach this screen with a crowd nobody else has: a
+ * `?seed=` deep link, and a session left open past UTC midnight. A single unconditional sentence
+ * would have been § D729’s defect surviving inside its own repair, which is the shape
+ * [§ D227](../../../../DECISIONS.md) exists to refuse — and the second arm is not a hedge: it is a
+ * fact the player wants, because it says the run is theirs alone and nothing is comparing it.
+ *
+ * **Neither arm names the tower as shared**, and that is [§ D730](../../../../DECISIONS.md)
+ * rather than an omission. The tower is the one this player’s week was opened on.
+ */
+function seedLineOf(input: TodayInput): string {
+  const crowd = `tower ${input.buildingId} · crowd ${input.seed.toString()}`;
+  return input.crowdIsToday
+    ? `${crowd} · today’s date, so everyone playing today meets this crowd`
+    : `${crowd} · a crowd of this run’s own, not the day’s`;
 }
 
 /** Today, from the week and the building. Pure and total: every arm answers something drawable. */
@@ -313,7 +380,8 @@ export function todayOf(input: TodayInput): TodayRecord {
     facts: factsOf(building, held, input.units),
     load: loadOf(building, held),
     asks: input.goals.map((reading) => reading.goal.label),
-    seedLine: `tower ${input.buildingId} · crowd ${input.seed.toString()} · everyone identical`,
+    seedLine: seedLineOf(input),
+    crowdIsToday: input.crowdIsToday,
     firstSessionLine: input.firstSession ? FIRST_SESSION_LINE : undefined,
     driver: input.dispatcherName ?? EM_DASH,
   };

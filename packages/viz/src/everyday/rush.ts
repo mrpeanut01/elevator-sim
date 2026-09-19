@@ -68,6 +68,7 @@ import { declaredSelectorSpecOf, initialState, resolvedBuildingOf, type ViewerSt
 import { demandDisclosureOf, type DemandBand } from '../fixit/parse.js';
 import { waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
+import { troubleOf } from '../shift/trouble.js';
 import { RUSH_CONTRACT_ID, openRush, switchWeek } from '../shift/week.js';
 
 import { EM_DASH } from './figures.js';
@@ -404,6 +405,26 @@ export function rushOverLineAt(recording: VizRecording, t: number): number {
   return waitBandsAt(recording, t).counts[3]?.count ?? 0;
 }
 
+/**
+ * One landing the hold was standing on when the line was crossed — § D515's moment, **located**.
+ *
+ * `core`'s `rushHoldAtLegs` decides *when* the line holds and has no landing to give: it reads
+ * three fields of a leg and not one of them is a floor. So the rush could say a run broke at
+ * 12:12 and could not say **where**, which is the half a player can act on —
+ * `shift/trouble.ts` is the arithmetic that adds it, and the module docstring there carries the
+ * argument. `label` is resolved here rather than there because a landing's display name is the
+ * building's and the locator takes no view of display.
+ */
+export interface RushHoldPlace {
+  readonly floorId: string;
+  /** The landing's own label, or its id where the building authored none. */
+  readonly label: string;
+  /** People standing at this landing when the line was crossed. */
+  readonly standing: number;
+  /** Of those, how many had been past two minutes — the cohort the line counts. */
+  readonly pastTheLine: number;
+}
+
 export interface RushOutcome {
   /** `broke` when the hold line was crossed; `stopped` when the player ended it first. */
   readonly kind: 'broke' | 'stopped';
@@ -417,6 +438,11 @@ export interface RushOutcome {
   readonly longestWaitS: number;
   /** People past two minutes at `atS`, against the line. */
   readonly overLine: number;
+  /**
+   * The landings the hold was standing on, in the locator's own order — empty on a run ended by
+   * hand, which crossed no line and therefore has no place to name.
+   */
+  readonly where: readonly RushHoldPlace[];
   readonly saturation: VizSaturation | undefined;
 }
 
@@ -444,8 +470,28 @@ export function rushOutcomeOf(recording: VizRecording, stoppedAtS: number | unde
     carried: o.carried,
     longestWaitS: longest,
     overLine: rushOverLineAt(recording, atS),
+    where: broke ? holdPlacesOf(recording) : [],
     saturation: recording.summary.saturation,
   };
+}
+
+/**
+ * The hold, located — `shift/trouble.ts` asked for § D515's moment and nothing else.
+ *
+ * Only on a run that broke. A hand stop crossed no line, so there is no moment to locate and the
+ * result already says as much in its own words rather than naming the deepest landing and letting
+ * a reader take it for a breaking point.
+ */
+function holdPlacesOf(recording: VizRecording): readonly RushHoldPlace[] {
+  const labelOf = (id: string): string => recording.floors.find((floor) => floor.id === id)?.label ?? id;
+  return troubleOf(recording, { includeHoldLine: true }).moments
+    .filter((moment) => moment.source === 'hold')
+    .map((moment) => ({
+      floorId: moment.floorId,
+      label: labelOf(moment.floorId),
+      standing: moment.figures.find((figure) => figure.id === 'standing-here')?.value ?? 0,
+      pastTheLine: moment.figures.find((figure) => figure.id === 'past-band-here')?.value ?? 0,
+    }));
 }
 
 /**
@@ -542,7 +588,10 @@ export interface RushResultView {
   readonly eyebrow: string;
   readonly head: string;
   readonly lede: string;
-  /** The account's beats, in order — three when it broke, two when it was stopped. */
+  /**
+   * The account's beats, in order — **four** when it broke and the hold could be placed, three when
+   * it broke and it could not, two when it was stopped by hand.
+   */
   readonly account: readonly string[];
   readonly figures: readonly RushResultFigure[];
   readonly footer: string;
@@ -553,6 +602,14 @@ export interface RushResultView {
 
 /** The result screen before any rush has landed. */
 export const RUSH_RESULT_EMPTY_LEDE = 'A rush has not run yet, so there is no furthest wave to report. Start one from the Endless rush screen.';
+
+/**
+ * How many landings the *where* beat names before it starts counting instead.
+ *
+ * Three, which is `describeFrame.ts#maxQueueFloors`' argument on a smaller surface: a description
+ * rather than a manifest. It is a display dwell and nothing statistical reads it.
+ */
+export const RUSH_WHERE_NAMED = 3;
 
 export const RUSH_RESULT_COPY = Object.freeze({
   eyebrow: 'ENDLESS RUSH · THE RESULT',
@@ -568,6 +625,35 @@ export const RUSH_RESULT_COPY = Object.freeze({
       : `The sheet's trend test over the whole run does not call the queue divergent (${saturation.verdict}, ${String(saturation.sampleCount)} samples), which is what a line reached and then cleared looks like.`,
   beatTrendAbsent: 'This recording carries no trend test, so where the queue began to diverge is not on it.',
   beatBroke: (held: string): string => `At ${held} held, forty people had been over two minutes at once, and the rush ended there.`,
+  /**
+   * **Where it broke** — the beat this result did not have, GitHub issue's L7 shape and the reason
+   * `shift/trouble.ts` exists. Empty on a hand stop, where there is no line crossed to place.
+   *
+   * Every figure carries the cohort it is over (R13) and there is no mean in it, which is not an
+   * accident of wording: the locator holds no mean for one to be drawn beside. It says **where**
+   * and **when** and deliberately not **why** — charter non-goal 4 — because nothing in this
+   * product measures why a landing stopped draining, and a plausible sentence in place of a
+   * measurement is § D256's defect.
+   *
+   * At most {@link RUSH_WHERE_NAMED} landings are named, with the rest counted rather than listed:
+   * a hold spread over eleven landings is a paragraph nobody reads, and a count that drops the
+   * ones it does not name would understate the crowd.
+   */
+  beatWhere: (places: readonly RushHoldPlace[], overLine: number): string | undefined => {
+    if (places.length === 0) return undefined;
+    const named = places.slice(0, RUSH_WHERE_NAMED);
+    const parts = named.map((place) => `${String(place.pastTheLine)} of the ${String(place.standing)} standing at ${place.label}`);
+    const rest = places.length - named.length;
+    const tail = rest === 0 ? '' : `, and ${String(rest)} more ${rest === 1 ? 'landing' : 'landings'} holding the remainder`;
+    /*
+     * **One landing is not "not in one place"**, and the singular arm exists because the plural
+     * sentence contradicts itself there: a hold entirely on the lobby would have read *They were
+     * not in one place: 40 of the 43 standing at G*. A run that breaks on a single landing is the
+     * clearest case this beat has to report, so it is the last one that may be worded wrongly.
+     */
+    const opening = places.length === 1 ? 'They were all in one place' : 'They were not in one place';
+    return `${opening}: ${parts.join(', ')}${tail} — of ${String(overLine)} past two minutes across the building.`;
+  },
   beatStopped: (over: number): string =>
     `${String(over)} people were past two minutes when it stopped, against a line of ${String(RUSH_HOLD_LINE.people)}. Where this building breaks is not yet known.`,
   brokeFooter: `Waves are identical for everyone, generated once from seed ${String(RUSH_STREAM.seed)}.`,
@@ -583,12 +669,20 @@ export function rushResultViewOf(outcome: RushOutcome, disclosure: string | unde
   const held = heldClock(outcome.heldS);
   const broke = outcome.kind === 'broke';
   const trend = outcome.saturation === undefined ? RUSH_RESULT_COPY.beatTrendAbsent : RUSH_RESULT_COPY.beatTrend(outcome.saturation);
+  const where = RUSH_RESULT_COPY.beatWhere(outcome.where, outcome.overLine);
   return {
     eyebrow: RUSH_RESULT_COPY.eyebrow,
     head: broke ? RUSH_RESULT_COPY.brokeHead(outcome.wave) : RUSH_RESULT_COPY.stoppedHead(outcome.wave),
     lede: broke ? RUSH_RESULT_COPY.brokeLede(held, outcome.arrived) : RUSH_RESULT_COPY.stoppedLede,
     account: broke
-      ? [RUSH_RESULT_COPY.beatComfortable, trend, RUSH_RESULT_COPY.beatBroke(held)]
+      ? [
+          RUSH_RESULT_COPY.beatComfortable,
+          trend,
+          RUSH_RESULT_COPY.beatBroke(held),
+          /* The fourth beat, and only when the hold could be placed — a run that broke with no
+           * landing to name drops it rather than drawing an empty one. */
+          ...(where === undefined ? [] : [where]),
+        ]
       : [RUSH_RESULT_COPY.beatComfortable, RUSH_RESULT_COPY.beatStopped(outcome.overLine)],
     figures: [
       { label: RUSH_RESULT_COPY.furthestWave, value: String(outcome.wave) },

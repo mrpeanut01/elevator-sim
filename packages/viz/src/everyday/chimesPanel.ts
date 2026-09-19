@@ -35,19 +35,45 @@
  * is a ruling rather than a lane's choice. The panel now says there is no tally until you sign in,
  * which is true today and stops being drawn the moment a device ledger exists.
  *
- * ## Prices, and never a price in money — and none of them buyable yet
+ * ## One of the three can be bought, and the other two say why they cannot
+ *
+ * This panel shipped with a single sentence across the whole list —
+ * *"None of these can be bought yet"* — which was true of the build and is not true of this one.
+ * [§ D672](../../../../DECISIONS.md) builds the spend, and § D227 says a refusal that stops being
+ * true is **deleted on the commit that makes it false**, not reworded, so `spendRefusal` is gone
+ * rather than softened.
+ *
+ * What replaced it is narrower and harder: **a reason per row**. `rush-prefit` is offered because
+ * it reaches a run — `everyday/rush.ts#rushPatchOf` fits the building for a claimed one,
+ * `packages/server`'s replay fits it with the same three effects, and
+ * `leaderboard/rushHoldAgreement.json`'s two `prefit` cells are each required to differ from the
+ * same cell as built, which is `CLAUDE.md`'s *move the control and require the run to change*
+ * discharged by a run. The two `purse-units` top-ups are **not** offered, and each says so on its
+ * own line: `campaign/economy.ts#purseOf` is `carriedIn + earnedSoFar − committed` and has no term
+ * a purchase could enter, and no between-round rebuild travels for the rush
+ * ([§ D606](../../../../DECISIONS.md) § 2). Selling either would be a control that writes nothing,
+ * which `CLAUDE.md`'s standing requirement names and `docs/22` non-goal 5 forbids in **both**
+ * polarities — so a price listed without its refusal is the same defect as the refusal without the
+ * price.
+ *
+ * **{@link SPEND_ABSENCES} is `screens.ts#UNBUILT_REASONS`' shape, deliberately**: a table keyed by
+ * id, one sentence each, and `chimesPanel.test.ts` asserting in both directions that every sink is
+ * either offered or carries a reason and none is both. That is what stops an offer and its reason
+ * from drifting apart the way a pair of hand-maintained lists would.
+ *
+ * **There is no exported *"which sinks are offered"* helper, and the absence is deliberate.** One
+ * was written and deleted: nothing but a test called it, which is `CLAUDE.md`'s standing
+ * requirement in its plainest form — *name the non-test caller*. The offered set is a **property of
+ * the rendered rows** ({@link ChimesSpendRowView.offer}), so the tests read it off the view a
+ * player sees rather than off a second derivation that could come to disagree with one.
+ *
+ * ## Prices, and never a price in money — and one of them buyable
  *
  * The sinks are drawn with what they cost **in chimes**, from `data/chime-ledger.json`, because
  * *top up this tower's purse: 10 chimes* is one of the two sentences
  * [§ D530](../../../../DECISIONS.md) chose the name against. There is no other kind of price in
  * this file and no field in the table that could carry one — the parser refuses an unrecognised key
  * by name, citing the decision that refuses it.
- *
- * **And the panel says, on its own face, that none of them can be bought yet**
- * ({@link ChimesPanelView.spendRefusal}). No screen in this build posts a spend: the career purse
- * is GitHub issue #371's and the two rush sinks are #372's. A price list with no refusal beside it
- * is a control that writes nothing failing to say so, which is the rule above in the direction it
- * usually bites.
  *
  * ## The document is bundled rather than fetched
  *
@@ -102,13 +128,67 @@ export type ChimesHome =
   /** The account bridge has not answered yet, which is a real window a player can meet. */
   | 'booting';
 
-/** One thing chimes will be spent on, as a row a player reads. */
+/**
+ * **Why a sink this build lists is not one it sells** — `screens.ts#UNBUILT_REASONS`' shape, and
+ * its argument one directory over: a key that is not offered carries **that key's own sentence**,
+ * so an offer and its refusal move on one commit or not at all.
+ *
+ * Keyed by sink id rather than by modifier kind, because the two `purse-units` sinks are not
+ * refused for one reason: a tower's purse and a rush's purse are different quantities with
+ * different things missing behind them, and one sentence about *purses* would be a reader's summary
+ * rather than either file's fact.
+ *
+ * Both are `CLAUDE.md`'s standing requirement in the polarity it says binds hardest — *a control
+ * that writes nothing must say so* — and both are checked rather than asserted:
+ * `pricing/spendWidensTheBudget.test.ts` is the shipped instrument for the other direction.
+ */
+export const SPEND_ABSENCES: Readonly<Record<string, string>> = Object.freeze({
+  'career-purse-top-up':
+    'Not offered. A tower\u2019s purse is worked out from what the contract carried in and what its ' +
+    'days have earned, and nothing adds to it from outside \u2014 so units bought here would land in ' +
+    'a figure no day reads.',
+  'rush-purse-top-up':
+    'Not offered. The rush works out a purse for every round and there is still nothing to spend it ' +
+    'on: rebuilding the tower between rounds is not built, so a wider purse would change no run.',
+});
+
+/**
+ * What a row can be, and **pressability is `offer === 'buy'` and nothing else**.
+ *
+ * Five rather than two, because five different things are true of five different players standing
+ * in front of the same row, and a screen that collapsed them would tell at least one of them
+ * something false. Every arm but `buy` carries a {@link ChimesSpendRowView.note}.
+ */
+export type ChimesSpendOffer =
+  /** Offered, affordable, and there is an account and a route to spend through. */
+  | 'buy'
+  /** Offered and the balance does not cover it. The note carries the shortfall. */
+  | 'short'
+  /** Bought already, up to what one run may claim. A second purchase would buy nothing. */
+  | 'owned'
+  /** Nothing is wrong with the sink; something is missing here and now — no account, or no server. */
+  | 'unavailable'
+  /** This build does not sell it, and {@link SPEND_ABSENCES} says why. */
+  | 'not-offered';
+
+/** One thing chimes are spent on, as a row a player reads. */
 export interface ChimesSpendRowView {
   readonly id: string;
-  /** What it is called — *Top up this tower's purse*. Not a button: nothing here presses. */
+  /** What it is called — *Top up this tower's purse*. */
   readonly name: string;
   /** *10 chimes*, in the currency's own words and never in money. */
   readonly price: string;
+  /** What this row is for this player right now. A control is live exactly when this is `buy`. */
+  readonly offer: ChimesSpendOffer;
+  /**
+   * The one sentence this row owes — what buying it does, or why it cannot be bought.
+   *
+   * **Never `undefined` on any arm but `buy`**, and a field that could vanish is a field a renderer
+   * forgets to draw. On `buy` it is the effect and its cost, because a player is entitled to know
+   * what a purchase does to their next run **before** they press — including that a fitted sitting
+   * is posted to its own board.
+   */
+  readonly note: string;
 }
 
 /** § 15.1's account block gains a tally — the balance, where it lives, and what it buys. */
@@ -123,17 +203,29 @@ export interface ChimesPanelView {
   readonly spendHeading: string;
   readonly rows: readonly ChimesSpendRowView[];
   /**
-   * **That none of the rows above can be bought yet, said on the screen that lists them.**
+   * **The fourth thing `docs/38` § 2.4 says chimes buy, and why it is not on this list.**
    *
-   * `CLAUDE.md`'s standing requirement, in the half it says binds hardest: *a control that writes
-   * nothing must say so.* There is no spend control anywhere in this build — no screen posts
-   * `POST /api/chimes/spend` — so a price list drawn without this line would be the eleven-times
-   * defect wearing a ladder, and a player would go looking for the button.
+   * It read *"None of these can be bought yet"* and was deleted on the commit that made it false
+   * ([§ D227](../../../../DECISIONS.md), [§ D672](../../../../DECISIONS.md)) rather than reworded.
+   * The per-row refusals took over its job; this took over the half it also did, which was telling
+   * a player the list is not the whole of what a chime is for.
    *
-   * Never `undefined`. When a spend surface exists this becomes the sentence saying where, and a
-   * field that could vanish is a field a renderer forgets to draw.
+   * A scenario's budget is priced **by the scenario** — § 2.4 in terms, and
+   * `core/config/chimeLedger.ts#REFUSED_MODIFIER_KINDS` refuses a second price for it by name — so
+   * it cannot be a row here and must not become one. Saying so is what stops a reader concluding
+   * the design shrank.
+   *
+   * Never `undefined`: a field that could vanish is a field a renderer forgets to draw.
    */
-  readonly spendRefusal: string;
+  readonly spendNote: string;
+  /**
+   * What the **server** said about the last press, or `undefined` before one.
+   *
+   * Carried unrewritten, which is `docs/22` non-goal 3: a client that composed its own *you need
+   * three more* would be publishing an arithmetic nobody did, and softening a refusal because it
+   * reads badly is the thing that non-goal names.
+   */
+  readonly notice: string | undefined;
 }
 
 /**
@@ -149,10 +241,26 @@ export const CHIMES_PANEL_COPY = Object.freeze({
     'Chimes are what finishing something pays you. Nothing about them changes while you are away ' +
     '— none of this refills, runs out, or asks you to come back on a particular day, and there is ' +
     'nothing here to buy with money.',
-  spendHeading: 'WHAT THEY WILL BUY',
-  spendRefusal:
-    'None of these can be bought yet. This build banks what you finish and has no screen that ' +
-    'spends it, so the prices above are what is planned rather than what is offered.',
+  spendHeading: 'WHAT THEY BUY',
+  spendNote:
+    'A wider budget for a scenario is the fourth thing chimes are for, and it is not on this list ' +
+    'because each scenario sets its own price for it rather than this table \u2014 so nothing here ' +
+    'charges one.',
+  /** What the one offered row does, said before the press rather than after it. */
+  prefitOffer:
+    'Your next rush starts with the doors, the control and the tenancies already fitted, and it is ' +
+    'bought once. A rush played on a fitted tower is posted to its own board rather than ranked ' +
+    'against towers as built.',
+  /** And what it does once it is bought, which is the same thing in the past tense. */
+  prefitOwned:
+    'Bought. Your next rush starts fitted, and is posted to its own board rather than ranked ' +
+    'against towers as built.',
+  /** No account: there is no tally to spend, which is {@link signedOutHome} pointed at a row. */
+  rowSignedOut: 'Sign in and there is a tally to spend this from.',
+  /** The account bridge has not answered, so whether this can be pressed is not yet known. */
+  rowBooting: 'Still finding out whether you are signed in, so this is not offered for a moment.',
+  /** Served with no API origin: there is no ledger on this build to spend out of. */
+  rowNoLedger: 'This build was served without a ledger, so there is nothing here to spend.',
   accountHome:
     'Your tally lives with your account, so it follows you to whatever you sign in on next, and a ' +
     'run you widened can be posted like any other.',
@@ -176,13 +284,79 @@ function priceOf(table: ChimeSpendTable, sink: ChimeSink): string {
   return `${String(sink.priceChimes)} ${unit}`;
 }
 
-/** What this panel needs, and it is deliberately three fields. */
+/** What this panel needs. */
 export interface ChimesPanelInput {
   /** The one read. Zero for an account with nothing banked, and for a device with no tally. */
   readonly balanceChimes: number;
   readonly home: ChimesHome;
+  /**
+   * What the account already owns — `EverydayHost.chimeBalance()`'s `owns`
+   * ([§ D671](../../../../DECISIONS.md)), summed by sink on the server.
+   *
+   * `undefined` is **nobody has asked yet** and is deliberately not `[]`: drawing a row as buyable
+   * over an account that already owns it would sell a player the same thing twice, and the server
+   * would take the chimes for it. It draws `unavailable` until a read lands.
+   */
+  readonly owns?: readonly { readonly sinkId: string; readonly steps: number }[] | undefined;
+  /**
+   * Whether this build has a spend route at all — `false` on a page served with no API origin.
+   *
+   * Separate from {@link home}, because *nobody is signed in* and *there is no server* are
+   * different sentences and this panel has had that exact conflation before (the review of
+   * PR #485). Defaults to `false`, which is the arm that promises least: a caller that forgot to
+   * say draws a row that cannot be pressed rather than one that can and then cannot.
+   */
+  readonly spendable?: boolean | undefined;
+  /** The server's own sentence about the last press, carried unrewritten. */
+  readonly notice?: string | undefined;
   /** Overridden by the corpus and by tests; the shipped table otherwise. */
   readonly table?: ChimeSpendTable | undefined;
+}
+
+/**
+ * What one row is for this player, right now.
+ *
+ * The order of the tests is the order the sentences are worth saying in, and it is a decision:
+ * **the build first, then the account, then the ledger.** A sink this build does not sell is not
+ * sold to a signed-in player either, so that answer comes before anything about the account; and
+ * whether there is an account comes before whether there are enough chimes, because a visitor has
+ * no balance to be short of.
+ */
+function offerOf(
+  sink: ChimeSink,
+  input: ChimesPanelInput,
+  balance: number,
+): { readonly offer: ChimesSpendOffer; readonly note: string } {
+  const absence = SPEND_ABSENCES[sink.id];
+  if (absence !== undefined) return { offer: 'not-offered', note: absence };
+  if (input.spendable !== true) {
+    return { offer: 'unavailable', note: CHIMES_PANEL_COPY.rowNoLedger };
+  }
+  if (input.home === 'booting') return { offer: 'unavailable', note: CHIMES_PANEL_COPY.rowBooting };
+  if (input.home !== 'account') {
+    return { offer: 'unavailable', note: CHIMES_PANEL_COPY.rowSignedOut };
+  }
+  if (input.owns === undefined) {
+    return { offer: 'unavailable', note: CHIMES_PANEL_COPY.rowBooting };
+  }
+  const held = input.owns.find((entry) => entry.sinkId === sink.id)?.steps ?? 0;
+  /*
+   * At the cap this run may claim, a second purchase buys nothing — `chimeSpendPrice` would take
+   * the chimes and `unbackedModifiers` would still cap the claim at `maxSteps`. So the row says
+   * *bought* rather than offering a step the ledger will not honour.
+   */
+  if (held >= sink.maxSteps) return { offer: 'owned', note: CHIMES_PANEL_COPY.prefitOwned };
+  if (balance < sink.priceChimes) {
+    /*
+     * The shortfall, in the currency's own words — `fixit/engine.ts#affordabilityOf`'s *short by
+     * N u* one screen over. It is a subtraction of two counts of completed turns and not a figure
+     * any run produced, which is what keeps it on the right side of `docs/22` non-goal 2.
+     */
+    const short = sink.priceChimes - balance;
+    const unit = short === 1 ? CHIME_PRICES.currency.one : CHIME_PRICES.currency.many;
+    return { offer: 'short', note: `Short by ${String(short)} ${unit}.` };
+  }
+  return { offer: 'buy', note: CHIMES_PANEL_COPY.prefitOffer };
 }
 
 /**
@@ -206,7 +380,14 @@ export function chimesPanelViewOf(input: ChimesPanelInput): ChimesPanelView {
     lede: CHIMES_PANEL_COPY.lede,
     homeNote,
     spendHeading: CHIMES_PANEL_COPY.spendHeading,
-    rows: table.sinks.map((sink) => ({ id: sink.id, name: sink.name, price: priceOf(table, sink) })),
-    spendRefusal: CHIMES_PANEL_COPY.spendRefusal,
+    rows: table.sinks.map((sink) => ({
+      id: sink.id,
+      name: sink.name,
+      price: priceOf(table, sink),
+      ...offerOf(sink, input, balance),
+    })),
+    spendNote: CHIMES_PANEL_COPY.spendNote,
+    ...(input.notice === undefined ? { notice: undefined } : { notice: input.notice }),
   };
 }
+

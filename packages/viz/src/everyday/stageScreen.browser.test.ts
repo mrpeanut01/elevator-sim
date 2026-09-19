@@ -58,7 +58,13 @@ import {
   openPage,
 } from '../dev/browserTier.test-helper.js';
 import { ACTION_BAR_ROWS } from './actionBar.js';
-import { STAGE_DAY_OVER, STAGE_SKIP_COPY, STAGE_SPEEDS } from './stageScreenModel.js';
+import {
+  DEFAULT_STAGE_SPEED_INDEX,
+  STAGE_DAY_OVER,
+  STAGE_SKIP_COPY,
+  STAGE_SPEEDS,
+  stageSpeedAt,
+} from './stageScreenModel.js';
 import { REST_BAR_MIN_PX } from '../render/carRest.js';
 import { EVERYDAY_COLORS } from './tokens.js';
 
@@ -380,20 +386,21 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     expect(await canvasHasPaint(page)).toBe(true);
 
     /*
-     * § 4.6: the day opens at the player's default speed, which is `30×` until a setting exists.
+     * § 4.6: the day opens at the player's default speed, and this asserts the page opens on it.
      *
-     * **The chip's words moved and the pacing did not** — GitHub issue #257 renamed this rung from
-     * `1×` to `30×` because 30 simulated seconds per real second is what it has always run at, and
-     * `1×` now names the true 1:1 rung at the bottom of the ladder. The multiplier this case is
-     * about is unchanged; only the face of the button is. The pure half owns the *reason* the
-     * default is 30 (`stageScreenModel.ts`); what is checked here is that the page opens on it.
+     * **Read through the ladder rather than written down** — the rung has moved twice now and the
+     * literal that used to stand here would have had to move with it. GitHub issue #257 renamed it
+     * from `1×` to `30×` without the pacing moving at all, and [§ D641](../../../../DECISIONS.md)
+     * then moved the pacing to `4×` under [§ D525](../../../../DECISIONS.md) clause 4. The pure half
+     * owns the *reason* (`stageScreenModel.ts`); what is checked here is that the page opens on
+     * whatever that reason chose.
      */
     const pressed = await page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>('.everyday-stage-speed')]
         .filter((button) => button.getAttribute('aria-pressed') === 'true')
         .map((button) => button.textContent),
     );
-    expect(pressed).toEqual(['30×']);
+    expect(pressed).toEqual([stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX).label]);
 
     /* And the playhead was at the *start*: playing only ever takes the clock forward from it. */
     await page.click(`.everyday-stage-speed[data-speed-index="${String(TOP_SPEED_INDEX)}"]`);

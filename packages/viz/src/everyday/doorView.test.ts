@@ -18,7 +18,7 @@ import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js'
 import type { WatchRecord } from '../watch/types.js';
 import { HISTORY_DAYS, openWeek, outcomeOf } from '../shift/week.js';
 
-import { DAY_OFFSET_MIN, doorScreenViewOf, DOOR_STEPS } from './doorView.js';
+import { DAY_OFFSET_MIN, doorScreenViewOf, DOOR_STEPS, sameForEveryoneLine } from './doorView.js';
 import { EM_DASH } from './figures.js';
 import type { TodayRecord } from './today.js';
 
@@ -70,7 +70,8 @@ const TODAY: TodayRecord = {
   facts: [],
   load: undefined,
   asks: [],
-  seedLine: 'tower chancery-house · crowd 424242 · everyone identical',
+  seedLine: 'tower chancery-house · crowd 424242 · today’s date, so everyone playing today meets this crowd',
+  crowdIsToday: true,
   firstSessionLine: undefined,
   driver: 'Steady hand',
 };
@@ -214,5 +215,47 @@ describe('the rest of § 6.1', () => {
     expect(view.lede).toBe(TODAY.lede);
     expect(view.seedLine).toBe(TODAY.seedLine);
     expect(view.driver.name).toBe('Steady hand');
+  });
+
+  it('promises no duration the run does not have — § D733', () => {
+    /*
+     * Step 2 read *“The whole shift in a couple of minutes”*. Ten of the eleven contracts a first
+     * session can open on run a 36 000 s authored day (`shift/dayLength.ts#wholeDayFor` over
+     * `data/`), and at the opening stage speed — `4×`, § D641 — that is two and a half real
+     * hours. The step names the day and leaves the length to the speed the player sets, which is
+     * the only thing on this screen that actually controls it.
+     */
+    const watch = DOOR_STEPS.find((step) => step.head === 'Watch the day');
+    expect(watch?.body).toContain('A whole working day');
+    expect(watch?.body).not.toMatch(/couple of minutes|\bminutes?\b/);
+    for (const step of DOOR_STEPS) expect(step.body).not.toMatch(/\d/);
+  });
+
+  it('states the rule as one crowd a day, because one tower a day is not what this build does', () => {
+    // § D730: a week runs one contract, so the tower turns over when a contract does. The crowd
+    // is what turns over daily, and it is the thing the rule can honestly promise.
+    const rule = viewAt(0, false).rule;
+    expect(rule).toContain('One crowd a day, the same for everybody');
+    expect(rule).not.toContain('One tower a day');
+  });
+
+  it('claims a shared crowd only on a run that has one', () => {
+    /*
+     * § D729 and § D730 together, at the one sentence that used to carry the whole false claim.
+     * The two arms are the two states that reach this screen: the day's crowd, and a crowd of the
+     * run's own — a `?seed=` deep link, or a session left open past UTC midnight.
+     */
+    const shared = sameForEveryoneLine(true);
+    const own = sameForEveryoneLine(false);
+    expect(shared).toContain('Everyone playing today meets the same crowd');
+    expect(shared).toContain('today’s date');
+    expect(own).toContain('nobody else is playing it');
+    expect(own).not.toContain('Everyone');
+    // Neither arm says the tower is shared, because it is not — on either of them.
+    for (const line of [shared, own]) {
+      expect(line).toContain('The tower is the one your week is on');
+      expect(line).not.toContain('the same tower');
+    }
+    expect(viewAt(0, false).sameForEveryone).toBe(shared);
   });
 });

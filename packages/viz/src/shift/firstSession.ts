@@ -19,6 +19,15 @@
  *    shift every stochastic dispatcher's sequence on a day the player never touched. The seed is the
  *    one the door already prints, so the draw is reproducible from what the player can read.
  *
+ *    **Since [§ D729](../../../../DECISIONS.md) that seed is the UTC date's own digits**
+ *    (`shift/dailySeed.ts`), where it used to be `crypto.getRandomValues` at boot. Nothing in this
+ *    module changed and nothing needed to: the property above is what carries the fix, because a
+ *    draw that is reproducible from the number the player reads becomes a draw that is
+ *    reproducible from *the date* the moment the number is the date. That is why a rotation table
+ *    was not written instead — see `dailySeed.ts`'s closing section, which measures what this draw
+ *    does over two years and says why the rotation rules `docs/37` § 4.3 states are not adopted
+ *    while `dev/state.ts#withFirstSession` runs once per device.
+ *
  * ## What it does not decide
  *
  * The campaign's `c1` stays Garden Apartments — § D512 left that to #270 and #234, and the campaign

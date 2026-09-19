@@ -26,17 +26,23 @@
  *    second document would be the authority defect this file exists to record, wearing a test.
  *    What is asserted here is the join: the rungs that test reads are the rungs whose chime prices
  *    are authored beside them.
- * 3. **No shipped chime sink reaches a run at all**, and this is the refusal. The three that
- *    survive grant a career purse (GitHub issue **#371**), a rush purse and a pre-fitted rush
- *    (**#372**); nothing in `packages/viz/src` consumes a sink's modifier, no screen posts
- *    `POST /api/chimes/spend`, and the panel that lists the prices says so on its own face
- *    (`everyday/chimesPanel.ts#ChimesPanelView.spendRefusal`). A price list with a green legs test
- *    beside it and no spend anywhere would be exactly the inert control this repository has shipped
- *    eleven times in code and twice in `data/`.
+ * 3. **Exactly one shipped chime sink reaches a run, and the other two say on the screen why they
+ *    do not.** This clause read *"no shipped chime sink reaches a run at all"* and ended *"what
+ *    would put the first branch back [is] a screen that spends, and a seam that applies what it
+ *    bought"*. [§ D672](../../../../DECISIONS.md) is that screen and that seam, for `rush-prefit`
+ *    alone: `everyday/rush.ts#rushPatchOf` fits the building for a claimed one and the server's
+ *    replay fits it with the same three effects. `career-purse-top-up` and `rush-purse-top-up` are
+ *    **not** sold — `campaign/economy.ts#purseOf` is `carriedIn + earnedSoFar − committedUnits`
+ *    with no term a grant could enter, and no between-round rebuild travels for the rush
+ *    ([§ D606](../../../../DECISIONS.md) § 2) — and `everyday/chimesPanel.ts#SPEND_ABSENCES` says
+ *    which and why on the screen that lists the prices.
  *
- * **What would put the first branch back.** A screen that spends, and a seam that applies what it
- * bought — then this file compares the legs across it, on `tiersReachTheRun.test.ts`'s shape and
- * with `legsKey` as its key, the way it did before it was measuring a duplicate.
+ * **Where the legs proof for the one sold sink lives, and why it is not here.** Point 2's rule,
+ * applied to itself: `packages/server/src/leaderboard/rushHoldAgreement.test.ts` pairs every
+ * pre-fit cell with the same cell unfitted and requires the two to differ, in `CLAUDE.md`'s own
+ * words. Re-proving that here against a second table would be the authority defect this file
+ * exists to record, wearing a test. What this file asserts is the **join**: that the sinks the
+ * panel offers are the sinks something applies, and that the ones it does not offer say why.
  */
 
 import { readFileSync } from 'node:fs';
@@ -143,7 +149,7 @@ describe('a scenario budget has one price, and it is the scenario that names it 
   });
 });
 
-describe('§ D219 on the spend verb — no control exists yet, said rather than implied', () => {
+describe('§ D219 on the spend verb — one sink is sold, and the rest say why not', () => {
   it('sells only sinks whose seam is unbuilt, and names the issue each is waiting on', () => {
     /*
      * Named rather than counted, so that a sink acquiring a seam has to come here and say so. A
@@ -157,25 +163,53 @@ describe('§ D219 on the spend verb — no control exists yet, said rather than 
     expect(Object.keys(owners).sort()).toEqual(ledger().sinks.map((sink) => sink.id).sort());
   });
 
-  it('has no module in the viewer that applies a bought modifier to a run', async () => {
+  it('applies a bought modifier in exactly the modules allowed to, and nowhere else', async () => {
     /*
-     * The refusal, as a grep rather than as a sentence — `boundaries.test.ts`'s own instrument, for
-     * the reason that file gives: *agents have reported green suites that were red*. `grantUnits`
-     * is what a spend would have to reach to change a configuration, and `chimeSpendPrice` is what
-     * a screen would have to call to charge for one.
+     * **This assertion is inverted rather than deleted, and the inversion is the record.** It read
+     * *"has no module in the viewer that applies a bought modifier to a run"* and expected `[]`,
+     * under a docstring saying that a spend surface is what would put the other branch back.
+     * [§ D672](../../../../DECISIONS.md) put it back: one sink is sold, and the grep that was a
+     * refusal is now a **boundary**.
+     *
+     * The grep is unchanged, so what it is counting is the same thing it counted before: the
+     * **charging** half — what a screen would have to call to take a chime, and what a spend would
+     * have to reach to grant a unit. Three modules and no fourth. `menu/client.ts` is the only
+     * thing that names the route, `dev/main.ts` the only binding that holds a token, and
+     * `everyday/host.ts` the only verb between them. A fourth would be a second answer to *what
+     * does a spend cost*, which is the whole subject of this file.
      */
     const applying = /grantUnits|chimeSpendPrice|chimeGrantUnits|chimes\/spend/u;
-    const offenders = (await vizSourceFiles())
+    const reaching = (await vizSourceFiles())
       .filter((file) => !file.id.includes('.test.') && !file.id.includes('test-helper'))
       .filter((file) => applying.test(file.code))
       .map((file) => file.id)
       .sort((a, b) => a.localeCompare(b));
     expect(
-      offenders,
-      'a module in the viewer applies or charges for a chime modifier. That is good news and this ' +
-        'test is now wrong: § D219 asks for the legs, so replace this refusal with the comparison ' +
-        'this file used to hold — `tiersReachTheRun.test.ts`’s shape, keyed on boarding identities.',
-    ).toEqual([]);
+      reaching,
+      'a module charges for a chime that is not one of the three this seam runs through. Either it ' +
+        'is a second spend surface, or this list is stale — say which.',
+    ).toEqual(['dev/main.ts', 'everyday/host.ts', 'menu/client.ts']);
+  });
+
+  it('applies the one bought modifier in exactly one module, which is not one of those three', async () => {
+    /*
+     * **Charging and applying are different greps and the separation is the point.** A screen that
+     * took a chime and a module that changed a run are the two halves this repository has shipped
+     * apart eleven times — the standing requirement's whole subject. `claimsRushPrefit` is the
+     * apply: `everyday/rush.ts#rushPatchOf` writes `campaignFitOut` for a claimed `rush-prefit`,
+     * and the server's replay fits the same three effects.
+     *
+     * One module, and none of the three above, which is what says the seam is joined at the host
+     * rather than duplicated: the charge comes back through `spendChime` and the claim goes out
+     * through `startRush`, and neither file knows the other exists.
+     */
+    const claiming = /claimsRushPrefit/u;
+    const reaching = (await vizSourceFiles())
+      .filter((file) => !file.id.includes('.test.') && !file.id.includes('test-helper'))
+      .filter((file) => claiming.test(file.code))
+      .map((file) => file.id)
+      .sort((a, b) => a.localeCompare(b));
+    expect(reaching).toEqual(['everyday/rush.ts']);
   });
 
   it('positive control: that grep really would catch a consumer', async () => {
@@ -187,14 +221,43 @@ describe('§ D219 on the spend verb — no control exists yet, said rather than 
     expect((await vizSourceFiles()).length).toBeGreaterThan(100);
   });
 
-  it('says it on the screen that lists the prices, which is where a player meets the claim', async () => {
+  it('says on the screen that lists the prices which of them can be bought and which cannot', async () => {
     /*
-     * The other half of the same refusal, and the half § D227 says binds hardest: *a control that
-     * writes nothing must say so.* A register entry nobody opens would not have done — the sentence
-     * has to be beside the ladder it is about.
+     * **The half § D227 says binds hardest, in both polarities now.** This asserted a single
+     * sentence — *"None of these can be bought yet"* — and that sentence is **deleted** on the
+     * commit that made it false rather than reworded. What replaced it is a reason per row, which
+     * is a stronger claim and a harder one to let go stale: every sink the shipped table holds is
+     * either offered or carries its own refusal, and none is both.
+     *
+     * Where the legs proof lives, named rather than duplicated — point 2 of this file's own
+     * docstring: `packages/server/src/leaderboard/rushHoldAgreement.test.ts` pairs every pre-fit
+     * cell with the same cell unfitted and requires the two to differ, which is `CLAUDE.md`'s
+     * *move the control and require the run to change* on the one sink that is sold.
      */
-    const { CHIMES_PANEL_COPY } = await import('../everyday/chimesPanel.js');
-    expect(CHIMES_PANEL_COPY.spendRefusal).toMatch(/can be bought yet/u);
-    expect(CHIMES_PANEL_COPY.spendRefusal).toMatch(/no screen that|has no screen/u);
+    const { CHIMES_PANEL_COPY, SPEND_ABSENCES, chimesPanelViewOf } = await import(
+      '../everyday/chimesPanel.js'
+    );
+    expect(Object.hasOwn(CHIMES_PANEL_COPY, 'spendRefusal')).toBe(false);
+    /*
+     * Driven through the view a player reads rather than through a helper — there is no exported
+     * *which sinks are offered*, deliberately, because nothing outside a test would have called one.
+     */
+    const rows = chimesPanelViewOf({
+      balanceChimes: 999,
+      home: 'account',
+      spendable: true,
+      owns: [],
+    }).rows;
+    expect(rows.map((row) => row.id).sort()).toEqual(ledger().sinks.map((sink) => sink.id).sort());
+    for (const row of rows) {
+      const refused = SPEND_ABSENCES[row.id] !== undefined;
+      expect(
+        (row.offer === 'not-offered') === refused,
+        `${row.id} is both offered and refused, or neither`,
+      ).toBe(true);
+    }
+    /* And the refusals really say why, rather than saying *not yet* about nothing in particular. */
+    expect(SPEND_ABSENCES['career-purse-top-up']).toMatch(/purse/u);
+    expect(SPEND_ABSENCES['rush-purse-top-up']).toMatch(/between rounds/u);
   });
 });

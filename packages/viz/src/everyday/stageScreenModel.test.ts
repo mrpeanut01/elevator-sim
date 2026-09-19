@@ -59,6 +59,7 @@ import {
   stageInkFor,
   stageInterventionsOf,
   stageLegend,
+  stageMayAdopt,
   stageNextStretchOf,
   stageOpeningLineOf,
   stageSpeedAt,
@@ -84,6 +85,13 @@ import { shiftObservationsOf } from '../shift/observations.js';
 /* -------------------------------------------------------------------------- *
  * § 4.6 — the transport
  * -------------------------------------------------------------------------- */
+
+/**
+ * A hall-call door cycle, in simulated seconds — `docs/28` § 6's own figure, which is what its
+ * motion table divides by each rung to say what a boarding looks like at that speed. Here so the
+ * opening rung's case can make the same division rather than quote its answer.
+ */
+const DOOR_CYCLE_S = 9.8;
 
 describe('§ 4.6 — the speed table', () => {
   /**
@@ -195,25 +203,49 @@ describe('§ 4.6 — the speed table', () => {
   });
 
   /**
-   * **#257's AC3 — the default is a decision, and these are the three reasons it gives.**
+   * **The default is a decision, and these are the reasons it gives** — #257's AC3, re-argued for
+   * [§ D641](../../../../DECISIONS.md) after [§ D525](../../../../DECISIONS.md) clause 4 moved the
+   * rung.
    *
-   * Asserted as properties rather than as the number 30, so the case says *why* rather than *what*:
-   * a lane that moves the default has to break one of these three arguments, not edit a literal.
+   * Asserted as properties rather than as the number 4, so the case says *why* rather than *what*: a
+   * lane that moves the default again has to break one of these arguments, not edit a literal. The
+   * case that used to stand here asserted *the fastest rung inside the budget*, which is § D354's
+   * reason 2 — the one the owner's ruling overturned — and it is replaced rather than loosened.
    */
-  it('opens at the fastest rung inside the § D344 budget, and not at 1:1', () => {
+  it('opens at a watching rung: inside § D344’s budget, above 1:1, and with the ladder open both ways', () => {
     const opening = stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX);
     const discrete = STAGE_SPEEDS.filter((speed) => speed.simPerRealS <= 39);
     /* Inside the budget, so the discrete-cue tier is what a player meets rather than something
-       they have to go looking for. */
+       they have to go looking for. § D354's reason 2 survives as a bound; what it lost is the
+       *fastest* half. */
     expect(opening.simPerRealS).toBeLessThanOrEqual(39);
-    /* The fastest such rung — the most day per minute that still clears the bound. */
-    expect(opening.simPerRealS).toBe(Math.max(...discrete.map((speed) => speed.simPerRealS)));
     /*
-     * And not the honest 1×. `rise-and-fall` is thirty simulated minutes, so 1:1 opens a
-     * half-hour sitting; `office-day` is ten simulated hours. § 4.6's rule is that a day must
-     * never vanish in three seconds, and a day that never ends is that rule from the other side.
+     * And not the honest 1× — § D354's reason 1, which § D525 did not touch. `rise-and-fall` is
+     * thirty simulated minutes, so 1:1 opens a half-hour sitting; `office-day` is ten simulated
+     * hours. § 4.6's rule is that a day must never vanish in three seconds, and a day that never
+     * ends is that rule from the other side.
      */
     expect(opening.simPerRealS).toBeGreaterThan(1);
+    /*
+     * **A watching rung rather than the fastest one** — § D525 clause 4 permits `1×` or `4×` and
+     * nothing else, so the default may not be the top of the discrete tier. Stated as *not the
+     * maximum*, which is the exact claim the superseded case made in the other direction.
+     */
+    expect(opening.simPerRealS).toBeLessThan(Math.max(...discrete.map((speed) => speed.simPerRealS)));
+    /*
+     * **The ladder is open in both directions from the opening rung**, which is § D641's third
+     * reason and the one a bottom-rung default would lose: a player who wants more day per minute
+     * has somewhere to go that is still inside the budget, and a player who wants one car has
+     * somewhere below.
+     */
+    expect(discrete.some((speed) => speed.simPerRealS > opening.simPerRealS)).toBe(true);
+    expect(STAGE_SPEEDS.some((speed) => speed.simPerRealS < opening.simPerRealS)).toBe(true);
+    /*
+     * **And a door cycle is an event at it** — `docs/28` § 6's 9.8 s hall-call cycle, which is the
+     * measurement § D641 decides on. Two real seconds is the floor for *a thing that happened*
+     * rather than a flicker; at the superseded 30 it was 0.33 s.
+     */
+    expect(DOOR_CYCLE_S / opening.simPerRealS).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -1843,5 +1875,119 @@ describe('the camera, measured per tower — GitHub issue #324', () => {
         lobby,
       );
     });
+  });
+});
+
+/**
+ * **GitHub issue #548 — the stage reverts mid-play and discards the shift.**
+ *
+ * The reported route is *Brief → Start the day → the stage*, and the two presses either side of the
+ * navigation are the whole of it: `everyday/briefScreen.ts`'s primary is
+ * `host.startRun(); context.go('stage');`, and `startRun` *"returns before the run lands (the
+ * simulation is on a worker)"*. `dev/main.ts` deliberately leaves the **previous** recording on
+ * `state.recording` while a run is in flight — *"the recording on screen is the one from before, it
+ * is complete, and it plays"* — which is right for the Engineer workbench and is what the Everyday
+ * stage then adopted: yesterday's day, played as today's, until today's landed 15–60 s later and
+ * rebuilt the transport at the start of the run with the speed chip back at its default.
+ *
+ * The decision is {@link stageMayAdopt}'s, and the fact it was missing is *is a run the player asked
+ * for still simulating*. These cases are the issue as a rule; `everyday/stageScreen.test.ts` pins
+ * the call site, because a rule the mount has stopped asking passes its own test while the product
+ * does the old thing.
+ */
+describe('what the stage may adopt — GitHub issue #548', () => {
+  const yesterday = syntheticRecording();
+  const today = syntheticRecording();
+  /** The § 3.3 row's own input — the shell's state, as `stageBarModelOf` is handed it. */
+  const daily = { screen: 'stage', ctx: 'daily' } as const;
+
+  it('takes the first recording that lands', () => {
+    expect(stageMayAdopt({ incoming: today, adopted: undefined, runPending: false, standingAtEntry: undefined })).toBe(
+      true,
+    );
+  });
+
+  it('takes nothing when there is nothing to take', () => {
+    expect(
+      stageMayAdopt({ incoming: undefined, adopted: undefined, runPending: true, standingAtEntry: undefined }),
+    ).toBe(false);
+  });
+
+  it('does not re-adopt what it is already playing', () => {
+    expect(stageMayAdopt({ incoming: today, adopted: today, runPending: false, standingAtEntry: undefined })).toBe(
+      false,
+    );
+  });
+
+  /**
+   * **The defect, as a rule.** The stage is entered the instant the press is made, so what stands on
+   * the host is the run the pending one is about to replace. Adopting it is the mid-play revert:
+   * the player watches somebody else's day and has it taken away when theirs arrives.
+   */
+  it('refuses the run that is standing while the day the player asked for is still simulating', () => {
+    expect(
+      stageMayAdopt({ incoming: yesterday, adopted: undefined, runPending: true, standingAtEntry: yesterday }),
+    ).toBe(false);
+  });
+
+  /**
+   * **The half of #548 that is worse than the revert, asserted rather than only described.**
+   *
+   * While the stage holds, `EverydayHost.runState().hasRun` is still **true** — it is a fact about
+   * the host, and what the host has is the run the stage is refusing to draw. Handed to the § 3.3
+   * row unguarded, it made the primary read *Close the day* over a day that was not on screen, and
+   * `EverydayHost.closeDay` would have filed **that** run: the week, the contract, the chime a filed
+   * day pays and anything posted from it would all have inherited a day the player never watched.
+   * A product whose pitch is that a figure is the run's may not file a run nobody saw.
+   *
+   * So `stageScreen.ts` passes `runState.hasRun && !awaitingToday`, and this is what the row then
+   * says. The pair is asserted — the sentence **and** the inert primary — because either alone
+   * passes against a build that says the right thing and leaves the button live.
+   */
+  it('withholds the § 3.3 primary while the stage is holding, so the wrong day cannot file', () => {
+    const held = stageBarModelOf(daily, {
+      hasRun: false,
+      dayClosed: false,
+      recomputing: false,
+      dayEnded: false,
+    });
+    expect(held.note).toBe('the day has not started yet — there is nothing to file');
+    expect(held.primary.inert).toBe(held.note);
+    /* The negative control: the same row with a run actually on the stage does offer the press. */
+    const standing = stageBarModelOf(daily, {
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      dayEnded: false,
+    });
+    expect(standing.primary.inert).toBeUndefined();
+  });
+
+  /** And takes it the moment it lands — a *different* object is today's, whatever else is in flight. */
+  it('takes the day when it lands, even with another run already in flight behind it', () => {
+    expect(stageMayAdopt({ incoming: today, adopted: undefined, runPending: true, standingAtEntry: yesterday })).toBe(
+      true,
+    );
+  });
+
+  /**
+   * § 1.4's re-simulation is not this case and must not be caught by it: an intervention re-runs the
+   * day, so a run is pending over a recording this stage is already playing, and the new one has to
+   * be adopted (`stageScreen.ts#adopt` resumes at the same playhead).
+   */
+  it('still adopts a re-simulated day pressed from the stage itself', () => {
+    expect(stageMayAdopt({ incoming: today, adopted: yesterday, runPending: true, standingAtEntry: undefined })).toBe(
+      true,
+    );
+  });
+
+  /**
+   * The gate is the *pending run*, not the recording's age. With nothing in flight the run that
+   * stands is the run that stands, and the stage plays it — that is walking back onto a day.
+   */
+  it('adopts the standing run once nothing is in flight to replace it', () => {
+    expect(
+      stageMayAdopt({ incoming: yesterday, adopted: undefined, runPending: false, standingAtEntry: yesterday }),
+    ).toBe(true);
   });
 });

@@ -16,7 +16,7 @@
  *
  * ## What is derived, and from where
  *
- * Six of the seven are `data/`. The seventh, the contract list, is a frozen constant in
+ * Seven of the eight are `data/`. The eighth, the contract list, is a frozen constant in
  * `packages/viz/src/shift/contracts.ts` — `@elevator-sim/experiments` depends on `core` alone and
  * may not import `viz`, so it is read as **text** and counted two independent ways (`id: 'cN'` and
  * `buildingId:`) which are required to agree. Two ways rather than one because a single regex over
@@ -75,6 +75,15 @@ const derived = (): ReadonlyMap<string, number> => {
   const proof = readJson('data', 'proof-cases.json');
   const dispatchers = readJson('data', 'dispatcher-profiles.json');
   const traffic = readJson('data', 'traffic-profiles.json');
+  /*
+   * **The eighth, added 2026-09-19 ([§ D723](../../../../DECISIONS.md)), and the reason is what it
+   * had been missing.** `docs/37` § 4.2's wrinkle row carried the key cell `*(new)*`, which `KEY`
+   * does not match, so `keyedRows` never saw the row and *today 0* survived twenty-five templates
+   * landing. A row without a key is a row outside the gate; the fix is to key it and derive it
+   * like every other, on `RISKS.md` R40 — a gate that cannot go red is repaired rather than
+   * worked around.
+   */
+  const wrinkles = readJson('data', 'wrinkles.json');
 
   return new Map([
     [
@@ -94,6 +103,7 @@ const derived = (): ReadonlyMap<string, number> => {
       'demand-templates',
       lengthOf(traffic['demandTemplates'], 'data/traffic-profiles.json demandTemplates'),
     ],
+    ['wrinkles', lengthOf(wrinkles['templates'], 'data/wrinkles.json templates')],
   ]);
 };
 
@@ -165,7 +175,7 @@ describe('docs/37-content-plan.md § 1 — what ships today', () => {
     const rows = keyedRows(plan, 4);
     expect(
       [...rows.keys()].sort(),
-      `${PLAN} § 1's inventory table did not parse into the seven keyed rows this check reads. ` +
+      `${PLAN} § 1's inventory table did not parse into the eight keyed rows this check reads. ` +
         'Either a key was renamed, or the table changed shape — in both cases the gate stopped ' +
         'gating and must be repaired rather than deleted (RISKS.md R40).',
     ).toEqual([...counts.keys()].sort());
@@ -195,7 +205,7 @@ describe('docs/37-content-plan.md § 4.2 — the targets', () => {
     const rows = keyedRows(plan, 6);
     expect(
       [...rows.keys()].sort(),
-      `${PLAN} § 4.2's target table did not parse into the seven keyed rows this check reads.`,
+      `${PLAN} § 4.2's target table did not parse into the eight keyed rows this check reads.`,
     ).toEqual([...counts.keys()].sort());
 
     const wrong: string[] = [];

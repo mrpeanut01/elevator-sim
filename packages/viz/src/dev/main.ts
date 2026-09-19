@@ -63,6 +63,7 @@ import { publishEverydayAccount } from '../everyday/accountPort.js';
 // The success sentence both shells say after a 201 — see `submitScore`.
 import { POST_RUN_COPY } from '../everyday/postRun.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
+import { provideScenarioLadderFrom } from '../everyday/scenarioLadderPort.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
   ENGINEER_RETURN_LABEL,
@@ -215,6 +216,8 @@ import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
 import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
+import { dailySeedAt } from '../shift/dailySeed.js';
+import { deviceNowMs } from '../shift/deviceDate.js';
 
 import { savedProfilesOf } from '../batch/library.js';
 import { mountBatchPanel } from './batchPanel.js';
@@ -738,7 +741,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /* ---------------------------------------------------------------------- *
    * State
    * ---------------------------------------------------------------------- */
-  let state: ViewerState = applyDeepLink(initialState(resources, randomSeed()), resources);
+  /*
+   * **The page opens on the day's crowd, not on a crowd nobody chose** — [§ D729](../../../../DECISIONS.md).
+   *
+   * This read `randomSeed()` — `crypto.getRandomValues` — while five player-facing strings said
+   * the opposite in terms, the door's *"One tower a day, the same for everybody"* among them. Six
+   * cold loads gave six different towers, because `dev/state.ts#withFirstSession` draws the first
+   * session's contract from this value.
+   *
+   * `shift/dailySeed.ts` carries the whole argument; the two clauses that matter here are that the
+   * derivation is the server's own (`boardKey.ts#dailySeedFor`, the UTC date's digits) rather than
+   * a second one, and that it is **synchronous** — a seed that waited for `GET /api/boards` would
+   * be a page that waited for it, and the shipped static artifact has no API origin to ask.
+   *
+   * `applyDeepLink` still runs over the top, so `?seed=` is the reader's own choice and wins,
+   * exactly as `?building=` does a line below.
+   */
+  let state: ViewerState = applyDeepLink(
+    initialState(resources, dailySeedAt(deviceNowMs())),
+    resources,
+  );
   // A deep link names the building before anything can have been edited, so the editor's working
   // copy follows it unconditionally here — `withBuilding`'s pristine test is trivially true.
   state = withBuilding(state, resources, state.buildingId);
@@ -3109,6 +3131,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let ghostRefusal: string | undefined;
   /** Whether the job in flight on {@link shiftRunner} is the rival's — see {@link scheduleGhost}. */
   let ghostInFlight = false;
+  /**
+   * Whether a **shift** — the player's own day — is in flight on {@link shiftRunner}, for
+   * `everyday/host.ts#runPending` — GitHub issue **#548**.
+   *
+   * Separate from `shiftRunner.isRunning()` because that is true of three different jobs and the
+   * question is about one: the rival's race ({@link scheduleGhost}) and {@link verifyCurrent}'s
+   * replay check both run on this runner and neither replaces `state.recording`, so a screen that
+   * read `isRunning()` would wait for a run that was never coming.
+   *
+   * Raised by {@link runShift} and taken down in the runner's `onRunning(false)`, which is the one
+   * hook that sees a success, a cancel and a failure alike — `ghostInFlight` and the recompute beat
+   * are settled there for exactly that reason. On the success path it falls **before**
+   * {@link applyShift} runs, and that ordering is load-bearing rather than incidental: nothing is
+   * notified between the two (subscribers hear {@link renderAll}, which `applyShift` calls after it
+   * has written the new recording), so no screen can observe *nothing pending* beside the old run.
+   */
+  let shiftInFlight = false;
   /** The plan behind the run on screen, held so a pick change can re-race without re-planning. */
   let lastShiftPlan: ShiftRunConfig | undefined;
   /** What the strip geometry was last drawn for — see {@link drawRaceStrip}'s keying. */
@@ -3258,6 +3297,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       if (!running) {
         ghostInFlight = false;
+        /* And no shift is pending either, however this one ended — GitHub issue #548. */
+        shiftInFlight = false;
         /*
          * And neither can the intervention strip's `recomputing` beat — review finding 4. The
          * success path settles it in its own `runShift` callback; a failed or cancelled re-run
@@ -3942,6 +3983,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let campaign: CampaignPanelHandle | undefined;
   void loadCampaign(resources)
     .then((loaded) => {
+      /* § D649: the Everyday Scenario hub draws the same stages, with their measured counts. */
+      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors);
       campaign = mountCampaignPanel({
         elements: ui.campaign,
         resources,
@@ -4126,8 +4169,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
             const token = accountState.token;
             if (token === undefined) return { kind: 'signed-out' };
             const answer = await client.chimes(token);
+            /* The read answers a balance **and what the account owns** — § D671, and see there for why. */
             return answer.ok
-              ? { kind: 'balance', chimes: answer.value }
+              ? { kind: 'balance', chimes: answer.value.balanceChimes, owns: answer.value.modifiers }
               : { kind: 'unreachable', detail: answer.detail };
           },
     /*
@@ -4137,22 +4181,70 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * `closeShift` banks nothing: a daily-loop week contract's clear is not a scenario's (§ D533's
      * second ruling), and a Career day closes through `closeShift` into whatever week is standing.
      *
-     * Fire and forget, deliberately: each caller is a synchronous path that files something — a day,
-     * a rush's end, a clear — and a filing that could fail because a network call failed would be a
-     * worse trade than a chime nobody banked. The ledger is append-only and the balance is re-read
-     * whenever Settings opens, so a dropped bank costs one award and corrupts nothing.
+     * **It answers now, and it did not** ([§ D673](../../../../DECISIONS.md)). It read *"fire and
+     * forget, deliberately … a banked turn changes a number on the Settings screen and nothing a
+     * player is looking at when they finish"*, and the second half of that sentence was the defect
+     * rather than the design: a player could clear all eighteen fix cases and never learn the
+     * currency exists, because the one screen that draws a balance is Settings.
      *
-     * Silent on refusal for the same reason it is silent on success: § D526 clause 3 keeps a
-     * currency figure off a results page, and a *could not bank that* notice on one would be the
-     * same figure wearing an apology.
+     * **What has not changed is the trade the old sentence was protecting.** `everyday/host.ts`'s
+     * `bankTurn` is still the caller and still never awaits into a filing path — a day, a rush's
+     * end and a clear all file synchronously and a failed network call may not stop one. The answer
+     * is read by the rail, which is `docs/32` § 3.4's tally of completed turns and not a results
+     * page, so § D526 clause 3 is untouched. A refusal is answered rather than swallowed for the
+     * same reason: *signed in and it did not bank* and *nobody is signed in* are different
+     * sentences, and the second is the one a signed-out player is owed.
+     *
+     * The token is read at call time, on {@link chimeBalance}'s rule. **No token is `signed-out`
+     * rather than silence**, which is the state the old binding simply returned from: a visitor
+     * earns nothing at all on this build (there is no device ledger — `everyday/chimesPanel.ts`
+     * says so), and telling them that is § D227 in the half that binds hardest.
      */
     bankCompletion:
       client === undefined
         ? undefined
-        : (turn) => {
+        : async (turn) => {
             const token = accountState.token;
-            if (token === undefined) return;
-            void client.bankCompletion(token, turn);
+            if (token === undefined) return { kind: 'signed-out' };
+            const answer = await client.bankCompletion(token, turn);
+            /*
+             * The earn answers the balance alone — § D671 widened the **read**, not the two verbs —
+             * so `owns` is left off rather than filled in. `everyday/host.ts#EverydayChimeBalance`
+             * makes it optional for exactly this: `owns: []` here would tell the host the account
+             * bought nothing, and the next clear after a purchase would silently erase it.
+             */
+            return answer.ok
+              ? { kind: 'balance', chimes: answer.value }
+              : { kind: 'unreachable', detail: answer.detail };
+          },
+    /*
+     * The spend verb — GitHub issue **#372**, [§ D672](../../../../DECISIONS.md). The body carries a
+     * sink and a number of steps and never a price; `data/chime-ledger.json` prices it on the
+     * server and the store refuses the write inside one statement when the balance cannot cover it.
+     *
+     * The 409 comes back as `short` carrying **the server's own sentence**, unrewritten:
+     * `docs/22` non-goal 3 forbids softening a refusal, and a client that composed *you need 3
+     * more* would be publishing an arithmetic nobody did.
+     */
+    spendChime:
+      client === undefined
+        ? undefined
+        : async (sinkId, steps) => {
+            const token = accountState.token;
+            if (token === undefined) return { kind: 'signed-out' };
+            const answer = await client.spendChimes(token, sinkId, steps);
+            if (answer.ok) {
+              return { kind: 'bought', chimes: answer.value.balanceChimes, grantUnits: answer.value.grantUnits };
+            }
+            /*
+             * `not-enough-chimes` is the server's own `error` key on its 409 and is the only refusal
+             * a player can reach by playing; everything else — an unknown sink, a rate limit, a dead
+             * network — is a build or a moment rather than a shortfall and reads differently on a
+             * screen. `chimes/ledger.ts#ChimeRefusal` draws the same line.
+             */
+            return answer.code === 'not-enough-chimes'
+              ? { kind: 'short', detail: answer.detail }
+              : { kind: 'unreachable', detail: answer.detail };
           },
     /*
      * **This binding and `accountActions` below are absent together, and a screen reads that.**
@@ -4246,6 +4338,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
     startRun: () => {
       context.runShift();
     },
+    /*
+     * Whether a shift the player asked for is still simulating — {@link shiftInFlight}, which is the
+     * one flag that means *this runner is producing the recording that will replace the one on
+     * screen*. `everyday/stageScreen.ts` is the caller — GitHub issue #548.
+     */
+    runPending: () => shiftInFlight,
     /*
      * The runner's own cancel, the Run button's cancel face: the result is dropped unread, and
      * `onRunning(false)` takes the rival's flag and the recompute beat down with it. A no-op with
@@ -5631,6 +5729,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       // so the flag follows the runner rather than trailing it.
       lastShiftPlan = plan;
       ghostInFlight = false;
+      // GitHub issue #548 — what the Everyday stage reads to tell today's day from what it replaces.
+      shiftInFlight = true;
       shiftRunner.start({
         label: 'shift',
         config: plan.config,
@@ -5670,6 +5770,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
         },
       });
     } catch (error) {
+      /* `shiftRunner.start` threw or was never reached, so `onRunning(false)` will not fire. */
+      shiftInFlight = false;
       failRun(error);
     }
   }
@@ -8067,7 +8169,22 @@ export function seedEntryOf(raw: string): SeedEntry {
 }
 
 /**
- * A seed nobody chose, so the first shift is not the same shift for everybody.
+ * A seed nobody chose — **the transport's draw, and no longer the page's opening state**.
+ *
+ * ## What this docstring used to say, and why the correction is the point
+ *
+ * It read *"A seed nobody chose, so the first shift is not the same shift for everybody"*, and it
+ * was **true of the boot** until [§ D729](../../../../DECISIONS.md): `boot` opened on this value
+ * and `dev/state.ts#withFirstSession` drew the first session's tower from it, while five
+ * player-facing strings asserted a shared daily crowd. A module that described its own defect
+ * accurately for as long as five screens denied it is this repository's oldest lesson pointed the
+ * other way — nobody was misled by the code.
+ *
+ * The **one** remaining non-test caller is the transport's seed field: blanking it is the reader
+ * asking for a crowd of their own, which is a control rather than a default, and `isDailySeed`
+ * then correctly refuses the door's shared-crowd sentence over the run it produces. It is named
+ * here rather than left to a grep, because a `randomSeed` with no caller would be the twelfth dead
+ * seam and the roadmap's standing requirement asks for the caller by name.
  *
  * `crypto.getRandomValues` and not `Math.random()`: invariant 2 is about the *simulation's* random
  * numbers and this is not one of them, but the habit is worth keeping — and a seed is written into

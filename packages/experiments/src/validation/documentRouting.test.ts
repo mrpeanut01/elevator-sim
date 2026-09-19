@@ -117,16 +117,16 @@ function rowsByFirstCell(table: string): ReadonlyMap<string, string> {
 const keyOf = (cell: string): string => cell.replace(/[^0-9A-Za-z]/gu, '');
 
 /* -------------------------------------------------------------------------- *
- * § 10 — the fourteen specified code changes
+ * § 10 — the fifteen specified code changes
  * -------------------------------------------------------------------------- */
 
-const SPECIFIED_CHANGES = 14;
+const SPECIFIED_CHANGES = 15;
 
 /** A disposition is one of four words, so a reconciliation cannot decay into prose. */
 const DISPOSITION = /(issue #\d+|new issue —|out of scope —|built —)/u;
 
 describe(`${SPEC} § 10 — every specified code change is routed`, () => {
-  it('declares fourteen changes, numbered 1 to 14', () => {
+  it('declares fifteen changes, numbered 1 to 15', () => {
     // The header cell is `#`, which carries no key. Dropped by name rather than by "keyOf is
     // empty", so a genuinely blank first cell in a body row still fails this case.
     const declared = firstCells(section('## 10.'))

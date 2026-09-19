@@ -157,8 +157,8 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
     n: '2',
     head: 'Watch the day',
     body:
-      'The whole shift in a couple of minutes. You can speed it up, not steer it — the dispatcher ' +
-      'is the decision you already made.',
+      'A whole working day, at whatever speed you set. You can speed it up, not steer it — the ' +
+      'dispatcher is the decision you already made.',
   }),
   Object.freeze({
     n: '3',
@@ -169,15 +169,53 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
   }),
 ]);
 
-/** § 6's closing sentence, verbatim. */
-export const SAME_FOR_EVERYONE =
-  'Everyone plays the same tower, the same crowd, the same day. The only thing that differs is ' +
-  'the dispatcher you bring.';
+/**
+ * § 6's closing sentence — **no longer verbatim, and the deviation is the whole entry**.
+ *
+ * The handoff's line is *“Everyone plays the same tower, the same crowd, the same day. The only
+ * thing that differs is the dispatcher you bring.”* `CLAUDE.md` makes the handoff canonical for
+ * what the screen looks like and makes this simulator canonical for what a number means, and this
+ * sentence is on the second side of that line: it is a claim about the run, and the run did not
+ * support it. `dev/main.ts` opened the session on `crypto.getRandomValues` and six cold loads gave
+ * six different towers, so *the same tower, the same crowd* was false in both halves
+ * ([§ D729](../../../../DECISIONS.md), [§ D730](../../../../DECISIONS.md)).
+ *
+ * **One half is now true and the other is not, so the sentence says which.** The crowd is the UTC
+ * date's own digits, shared by everyone who plays today and checkable against the number printed
+ * directly above this line. The **tower** is not shared and no seed makes it so: `shift/week.ts`
+ * is a week over one `contractId`, and only a first session draws its tower from the seed at all.
+ *
+ * Conditional on `today.crowdIsToday` for `everyday/today.ts#seedLineOf`'s reason — a `?seed=`
+ * deep link and a session left open across UTC midnight both reach this screen with a crowd nobody
+ * else has, and an unconditional sentence would be the defect surviving inside its own repair.
+ *
+ * `docs/12` § 4's deviation register is where this belongs as a *design* deviation; it is recorded
+ * here as well because a reader who greps the handoff for this sentence lands on this file first.
+ */
+export function sameForEveryoneLine(crowdIsToday: boolean): string {
+  return crowdIsToday
+    ? 'Everyone playing today meets the same crowd — the number above is today’s date, and the ' +
+        'run is seeded from it. The tower is the one your week is on, and the dispatcher is yours ' +
+        'to bring.'
+    : 'This run is on a crowd of its own rather than the day’s, so nobody else is playing it. ' +
+        'The tower is the one your week is on, and the dispatcher is yours to bring.';
+}
 
-/** § 6.1's line under the stepper, verbatim from the prototype. */
+/**
+ * § 6.1's line under the stepper — the prototype's, with *tower* corrected to *crowd*.
+ *
+ * It read *“One tower a day, the same for everybody”*. **One tower a day is a property of a
+ * product this one does not have**: a week runs one contract and a player advances days inside it,
+ * so the tower changes when a contract does and not when the date does. The crowd is what turns
+ * over daily ([§ D730](../../../../DECISIONS.md)), and it is what this rule now states.
+ *
+ * Unconditional, unlike {@link sameForEveryoneLine}, because it states **how the product picks a
+ * crowd** rather than a claim about the run standing in front of the reader — and the two lines
+ * that do make that claim are on the same screen, four lines below.
+ */
 const DOOR_RULE =
-  'One tower a day, the same for everybody. A run counts once; every earlier day stays open as a ' +
-  'replay that does not.';
+  'One crowd a day, the same for everybody — the tower is the one your week is on. A run counts ' +
+  'once; every earlier day stays open as a replay that does not.';
 
 /** The world band, which every world figure on this screen degrades to. */
 const WORLD_BAND: WorldBandView = Object.freeze({
@@ -300,7 +338,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     },
     seedLine: input.today.seedLine,
     firstSessionLine: input.today.firstSessionLine,
-    sameForEveryone: SAME_FOR_EVERYONE,
+    sameForEveryone: sameForEveryoneLine(input.today.crowdIsToday),
     primary: primaryOf(clamped, chips),
   };
 }

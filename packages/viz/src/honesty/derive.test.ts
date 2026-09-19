@@ -54,6 +54,41 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The locator’s two vocabularies and the function that returns them — `shift/trouble.ts`, ' +
+        'GitHub issue L7’s shape. `TROUBLE_SOURCES` is `held-landing`/`hold`/`deepest-queue`/' +
+        '`worst-wait` and `LOCATED_FIGURE_IDS` is `standing-here`/`past-band-here`/' +
+        '`past-band-everywhere`/`held-for`/`waited`; both are derived only because the ' +
+        'two-adjacent-words scanner reads a hyphenated id as prose. **This module ships no words ' +
+        'at all** — it returns `LocatedMoment`s carrying a `floorId`, a simulated second, a band ' +
+        'and counts, and it deliberately had its `troubleLinesOf` deleted before landing so that ' +
+        'no renderer here could go uncalled. An id is a contract, not a string a player reads, ' +
+        'which is the same ground `MoodSegment.bandId` stands on in `live/bands.ts`. What a ' +
+        'player actually reads from this arithmetic is the rush result’s *where* beat, ' +
+        '`everyday/rush.ts#RUSH_RESULT_COPY.beatWhere`, and it **is** seeded — ' +
+        '`honesty/surfaces.ts`’ rush-result adapter renders both arms and gives the synthesised ' +
+        '`broke` arm a `where` for exactly that reason. `troubleOf` is derived transitively ' +
+        'through those two constants and carries no literal of its own.',
+      ids: [
+        'shift/trouble.ts#TROUBLE_SOURCES',
+        'shift/trouble.ts#LOCATED_FIGURE_IDS',
+        'shift/trouble.ts#troubleOf',
+        'everyday/rush.ts#rushOutcomeOf',
+      ],
+    },
+    {
+      reason:
+        'A CSS colour with an alpha composed into it, derived only because the two-adjacent-words ' +
+        'scanner reads the `${String(` / `Number.parseInt` line break inside its own `rgba()` template ' +
+        'as prose. `withAlpha` returns a value for `fillStyle` and `strokeStyle`; no string it ' +
+        'produces is ever drawn as text, and its two callers — `drawAlarmRule` here and ' +
+        '`everyday/cutaway.ts`’s AD-S8 landing wash — both hand it straight to a brush. It is ' +
+        'composed into the value rather than set on `globalAlpha` precisely so a recording stub can ' +
+        'see the opacity, which is what makes `everyday/cutawayCrowd.test.ts` able to pin the wash ' +
+        'at the measured 0.13; that is a rendering claim, checked there, and not a sentence.',
+      ids: ['render/riderFigures.ts#withAlpha'],
+    },
+    {
+      reason:
         'The house’s rush table — GitHub issue #418, § D547. `parseRushHouseTable`’s literals are ' +
         'load-time refusals addressed to whoever edited `data/rush-house-runs.json` ("carried more ' +
         'people than had arrived", "measures a pair a second time"), and `RUSH_HOUSE_TABLE` is ' +
@@ -216,9 +251,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'survivor count are `SURVIVOR_COPY` and `survivorSentenceFor`, and **those are driven** — ' +
         'by the `SURVIVORS` adapter, over every scenario and every budget step the shipped table ' +
         'holds. That split is the whole of why this exclusion is safe: the half that speaks to a ' +
-        'player is in the corpus and the half that speaks to a regenerator is here.',
+        'player is in the corpus and the half that speaks to a regenerator is here.' +
+        ' **The two classifiers join on the same ground and one step further in**: they do not ' +
+        'produce a sentence at all, they *read* the ones `validatePublishedSurvivors` already ' +
+        'produced and sort them into the ones that mean the table is broken and the ones that ' +
+        'mean the campaign is harsh. `FIRST_HOUR_FLOOR_CITATION` is the `GitHub issue #381` the ' +
+        'classifier matches on, which is a citation rather than prose; the deriver reads it as ' +
+        '"own prose" because a string constant is all it can see. They exist because throwing on ' +
+        'the second kind took the campaign screen away from every player — the browser tier ' +
+        'caught it against an empty `<select>` — and the split they draw is the same split this ' +
+        'reason already names.',
       ids: [
         'scenario/survivors.ts#validatePublishedSurvivors',
+        'scenario/survivors.ts#FIRST_HOUR_FLOOR_CITATION',
+        'scenario/survivors.ts#isContentFinding',
         'scenario/survivorSpace.ts#dimensionsCoveredBy',
         'scenario/survivorSpace.ts#reachableChangesOf',
         'scenario/survivorSpace.ts#unreachableChangeIdsOf',
@@ -312,16 +358,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'everyday/shell.ts#mountEverydayShell',
         /*
-         * GitHub issue #348's as-built stage on the fix-it screen and the painter it shares with
-         * § 7's stage. `mountAsBuiltStage` builds a canvas and a transport, so it cannot run
-         * without a document; every word it draws is `everyday/fixitScreenModel.ts`'s copy table,
-         * whose three as-built keys the FIXIT adapter seeds by name because no model reaches them
-         * — the first probe of this wave's corpus move found them in `covers` and in nothing's
-         * output. `drawCutaway` paints geometry and floor labels onto a
-         * canvas context and authors no sentence — it is derived because a floor label is a word
-         * beside a word — and the labels it draws are the recording's own.
+         * The fix-it screen's stage blocks and the painter they share with § 7's stage — GitHub
+         * issue #348's as-built run, and since [§ D644](../../../../DECISIONS.md) the pair a press
+         * produces. `mountCaseStage` builds canvases and a transport, so it cannot run without a
+         * document; every word it draws is `everyday/fixitScreenModel.ts`'s copy table, whose three
+         * as-built and five pair keys the FIXIT adapter seeds by name because no model reaches them
+         * — the first probe of wave T's corpus move found the as-built three in `covers` and in
+         * nothing's output, and the five joined them by name rather than repeating that. The module
+         * was `asBuiltStage.ts` under this exclusion until it grew the second block.
+         * `drawCutaway` paints geometry and floor labels onto a canvas context and authors no
+         * sentence — it is derived because a floor label is a word beside a word — and the labels it
+         * draws are the recording's own.
          */
-        'everyday/asBuiltStage.ts#mountAsBuiltStage',
+        'everyday/caseStage.ts#mountCaseStage',
         'everyday/cutaway.ts#drawCutaway',
         /*
          * The brief's elevation painter, shared with the campaign's tower screen since GitHub

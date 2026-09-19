@@ -113,6 +113,14 @@ import type {
 } from '@elevator-sim/core/browser';
 
 /*
+ * The one sink id this host names — `core`'s own constant rather than a literal, so a rename there
+ * fails the build here instead of quietly claiming a modifier the ledger does not sell. It is a
+ * **sink**, not a source: § D526 clause 5 forbids this package naming where a chime came from, and
+ * `boundaries.test.ts` asserts exactly that, in both directions.
+ */
+import { RUSH_PREFIT_SINK_ID } from '@elevator-sim/core/browser';
+
+/*
  * Type-only, and it has to stay that way: `boundaries.test.ts` asserts that the value importers
  * of `menu/client.js` are exactly `dev/main.ts` and `honesty/surfaces.ts`, and it exempts type
  * imports by name. The row shape crosses this façade; the transport does not.
@@ -302,8 +310,94 @@ export type EverydayChimeBalance =
   | { readonly kind: 'signed-out' }
   /** There is a server and it did not answer, or refused. `detail` is renderable as it stands. */
   | { readonly kind: 'unreachable'; readonly detail: string }
-  /** The account's balance, in whole chimes. */
-  | { readonly kind: 'balance'; readonly chimes: number };
+  /** The account's balance, in whole chimes, and the sinks it has bought. */
+  | {
+      readonly kind: 'balance';
+      readonly chimes: number;
+      /**
+       * What this account owns — [§ D671](../../../../DECISIONS.md), `menu/client.ts#ChimeTally`.
+       *
+       * Summed by sink on the server, so two purchases of one sink are one row. A screen reads it
+       * to know whether a modifier may be claimed; nothing here carries a price.
+       *
+       * **Optional, and `undefined` is *this answer says nothing about what is owned* rather than
+       * *owns nothing*.** § D671 widened the ledger's **read**; it did not widen the earn verb,
+       * whose answer is still one balance. So `chimeBalance` fills this and `bankCompletion` does
+       * not, and the host keeps whatever it last learned rather than being told by an earn that the
+       * account bought nothing. A binding that supplied `[]` here to satisfy the type would erase a
+       * purchase on the next clear, which is the shape of defect an optional field makes
+       * unspellable.
+       */
+      readonly owns?: readonly EverydayOwnedModifier[] | undefined;
+    };
+
+/**
+ * One sink this account has bought, summed over its purchases.
+ *
+ * Structurally {@link ClaimedRushModifier}, and deliberately its own name: that one is *what a
+ * sitting claims*, this is *what the ledger says was paid for*, and the whole of
+ * `chimes/ledger.ts#unbackedModifiers` is the comparison between them. A single type would make the
+ * two indistinguishable at exactly the seam whose job is to tell them apart.
+ */
+export interface EverydayOwnedModifier {
+  readonly sinkId: string;
+  readonly steps: number;
+}
+
+/**
+ * What a spend came back with — GitHub issue **#372**, [§ D672](../../../../DECISIONS.md).
+ *
+ * {@link EverydayChimeBalance}'s four states with one more: a spend can be refused **by the
+ * balance**, which a read cannot. `short` is the server's own 409, carried rather than rewritten —
+ * `docs/22` non-goal 3 forbids softening a refusal, and a client that invented *you need 3 more*
+ * would be publishing an arithmetic the server did not do.
+ */
+export type EverydayChimeSpend =
+  | { readonly kind: 'no-server' }
+  | { readonly kind: 'signed-out' }
+  | { readonly kind: 'unreachable'; readonly detail: string }
+  /** The ledger refused it: not enough in the account. `detail` is the server's sentence. */
+  | { readonly kind: 'short'; readonly detail: string }
+  /** Bought. The balance after, and the units the step granted — `0` for a kit. */
+  | { readonly kind: 'bought'; readonly chimes: number; readonly grantUnits: number };
+
+/**
+ * **The acknowledgement a finished turn gets, and the only place a chime may be drawn beside
+ * play** — [§ D673](../../../../DECISIONS.md), GitHub issue #499, `docs/32` § 3.4.
+ *
+ * ## Why this exists at all
+ *
+ * `bankCompletion` used to answer nothing, under a docstring saying a banked turn *"changes a
+ * number on the Settings screen and nothing a player is looking at when they finish"*. That was
+ * true and it was the defect: a player could clear all eighteen fix cases, earn the whole 108-chime
+ * lifetime ceiling, and **never learn the currency exists**, because the one surface that draws a
+ * balance is Settings and a stranger does not open it.
+ *
+ * ## Why it is not a softening of `docs/32` GD13
+ *
+ * GD13 clause 2 keeps a currency off a **results page**, out of any **comparison between players**,
+ * and out of any **verdict**; clause 3 keeps it away from a **wait figure**. None of those is
+ * relaxed. What `docs/32` § 3.4 licenses — and it licenses it in terms, for standing — is a **tally
+ * of completed turns** as distinct from a statistic over a run, and a chime is exactly that by
+ * construction: `docs/38` § 2.4 pays a flat authored award for finishing a turn and *"no chime is
+ * ever scaled by a wait figure or any quantity the run can suppress"*. So the acknowledgement is
+ * drawn on the rail, beside the turn tally already there (`everyday/rail.ts`'s *3 days running*),
+ * and `everyday/shell.ts` withholds it while a screen showing the run's outcome is up.
+ *
+ * ## What it carries and what it may never carry
+ *
+ * The **turn**, and the ledger's **one read** — never an award, never a delta, never a source. An
+ * award would be a second authority for a price `data/chime-ledger.json` holds and
+ * `boundaries.test.ts` forbids this package naming; a delta needs a *before* the play surface does
+ * not reliably hold, and *first time only* (§ D533) means a re-clear pays nothing, so a `+6` drawn
+ * on one would be false.
+ */
+export interface EverydayChimeTally {
+  /** What was finished. The play surface's own vocabulary — never a source. */
+  readonly turn: ChimeTurn['completion'];
+  /** What the ledger said when it was told. `balance` is the only arm that carries a figure. */
+  readonly answer: EverydayChimeBalance;
+}
 
 /**
  * Compose the two board reads into one of {@link EverydayDailyBoard}'s four states.
@@ -1092,6 +1186,26 @@ export interface EverydayHost {
   recording(): VizRecording | undefined;
 
   /**
+   * **Whether a day the player has asked for is still being simulated** — GitHub issue **#548**.
+   *
+   * {@link startRun} *"returns before the run lands (the simulation is on a worker)"*, and
+   * `dev/main.ts` deliberately leaves the **previous** recording on the state while it does: the
+   * Engineer workbench says outright that *"the recording on screen is the one from before, it is
+   * complete, and it plays"*, and that is the right answer for a surface whose status line names the
+   * run in flight. The Everyday product has no such line, and § 7.3 says entering the stage is
+   * entering **the player's** day — so the stage needs to be able to tell *this is today's run*
+   * from *this is what today's run is about to replace*, and {@link recording} alone cannot.
+   *
+   * It is `dev/main.ts`'s shift runner's own fact, bound rather than re-derived: a second answer to
+   * *is a run in flight* is exactly the divergence `CLAUDE.md`'s standing requirement is about, and
+   * it would be invisible — both halves would agree on every ordinary run and disagree on a cancel.
+   *
+   * `false` where the binding is not supplied, on {@link EverydayHostBindings.cancelRun}'s ground:
+   * a shell that starts no run has none pending.
+   */
+  runPending(): boolean;
+
+  /**
    * The run on the stage as a **pointer** — GitHub issue #340, `docs/26` § 2.1.
    *
    * *"A run is fully reconstructible from a small tuple of ids, a rate, a duration, a window and a
@@ -1525,6 +1639,43 @@ export interface EverydayHost {
   bankScenarioClear(scenarioId: string): void;
 
   /**
+   * The last finished turn and what the ledger said about it, or `undefined` before one —
+   * [§ D673](../../../../DECISIONS.md). See {@link EverydayChimeTally}.
+   *
+   * **Synchronous, and that is the point**: `everyday/shell.ts#drawRail` is a paint, and a rail
+   * that had to await a read would draw the absence first and the acknowledgement a frame later, on
+   * the one line whose whole job is to be there when the player looks. Every write to it comes from
+   * an answer this host already awaited, and every write notifies {@link EverydayHost.subscribe}.
+   */
+  chimeTally(): EverydayChimeTally | undefined;
+
+  /**
+   * Whether the **next** rush sitting will start on a fitted tower —
+   * [§ D672](../../../../DECISIONS.md), GitHub issue #372.
+   *
+   * One derivation, shared with the claim itself, so the sentence the setup screen draws and the
+   * modifier the press sends cannot come to disagree. It is `false` before the ledger has been
+   * read, which is the arm that claims least: a screen promising a fitted tower over an account
+   * nobody has asked about would be a figure with no source, and the sitting would run as built.
+   *
+   * **It says nothing about a purse**, and must not be widened to. Nothing spends one
+   * ([§ D606](../../../../DECISIONS.md) § 2), and nothing here says anything about whether a tier
+   * bought between rounds would persist into the next — that question is open and a screen
+   * implying an answer would be answering it.
+   */
+  rushStartsFitted(): boolean;
+
+  /**
+   * Buy one step of a modifier — GitHub issue **#372**, [§ D672](../../../../DECISIONS.md).
+   *
+   * The play surface's second verb. A sink id and a step count go out; a balance and a grant come
+   * back, or a refusal that is the server's own sentence. A successful spend rewrites what
+   * {@link chimeBalance} would answer and what {@link EverydayHostBindings.rushModifiers} claims,
+   * so the purchase reaches the next sitting without a reload.
+   */
+  spendChime(sinkId: string, steps: number): Promise<EverydayChimeSpend>;
+
+  /**
    * § 6.1's replay: park the week and stand a replay week on `day` — `everyday/replay.ts`, GitHub
    * issue #177 item 1, § D517. The run is the brief's to start, as on any day. Returns the reason it
    * cannot, or `undefined` when the replay week is standing.
@@ -1597,6 +1748,13 @@ export interface EverydayHostBindings {
    * field, and a shell that omits it cancels nothing.
    */
   cancelRun?(): void;
+  /**
+   * Whether the shift runner has a run of the player's in flight — `dev/main.ts`'s own flag, read
+   * where it lives. See {@link EverydayHost.runPending} for what reads it and why. **Optional** on
+   * {@link cancelRun}'s ground: a binding literal that starts no run has nothing pending, and
+   * `false` is the honest answer for one.
+   */
+  runPending?(): boolean;
   /**
    * Stop the run in flight **and** refuse to file the run that stands — `dev/main.ts`'s shift runner's
    * `cancel`, then `shift/banking.ts#LEFT_UNFINISHED_CANNOT_BANK` on that recording at every filing press.
@@ -1689,7 +1847,20 @@ export interface EverydayHostBindings {
    * account's best, and this port neither knows nor guesses what was already paid: a caller posts
    * what it finished, and the record is the server's.
    */
-  readonly bankCompletion?: ((turn: ChimeTurn) => void) | undefined;
+  readonly bankCompletion?: ((turn: ChimeTurn) => Promise<EverydayChimeBalance>) | undefined;
+  /**
+   * Buy `steps` of one modifier — the spend verb, GitHub issue **#372**,
+   * [§ D672](../../../../DECISIONS.md). `undefined` with no API origin, on {@link dailyBoard}'s rule.
+   *
+   * **The argument is a sink and a number of steps, and never a price.** `data/chime-ledger.json`
+   * prices it on the server and the store refuses the write inside one statement when the balance
+   * cannot cover it, so a client naming an amount has nowhere to put it — [§ D526](../../../../DECISIONS.md)
+   * clause 6 expressed as a signature, exactly as {@link bankCompletion}'s absence of one is.
+   *
+   * This one **answers**, unlike the earn: a spend is a press a player made and is waiting on, and
+   * a purchase whose refusal nobody drew would be a control that writes nothing without saying so.
+   */
+  readonly spendChime?: ((sinkId: string, steps: number) => Promise<EverydayChimeSpend>) | undefined;
   /**
    * Post the run on screen — GitHub issue #221's write half. `undefined` when there is no API
    * origin, on {@link dailyBoard}'s rule: the absence is a property of the page, decided once at
@@ -1722,14 +1893,19 @@ export interface EverydayHostBindings {
    * [§ D640](../../../../DECISIONS.md). Read **once**, at the sitting's first press.
    *
    * **`undefined` in every shipped binding, and that is a fact about this build rather than a seam
-   * left loose.** No screen spends a chime — `everyday/chimesPanel.ts#CHIMES_PANEL_COPY.spendRefusal`
-   * says so on its own face, and that is GitHub issues #371 and #372's own second half — so no
-   * account holds a rush modifier to claim and there is nothing to answer. The field exists because
-   * a claim is the one thing that cannot be derived here: the balance and the spends are the
-   * server's, `boundaries.test.ts` forbids this file holding an account, and `dev/main.ts` is where
-   * the three things live. When a spend surface ships it fills this and nothing else changes —
-   * `startRush` already gives the claims to `everyday/rush.ts#rushPatchOf`, which fits the building
-   * for a claimed `rush-prefit`, and `rushSittingOf` already puts them on the wire.
+   * left loose.** It said *"undefined in every shipped binding"* because no screen spent a chime;
+   * [§ D672](../../../../DECISIONS.md) built one, and the promise the rest of this docstring made —
+   * *"when a spend surface ships it fills this and nothing else changes"* — was kept by **not**
+   * filling it. {@link rushClaims} derives the claim from what the ledger says the account owns,
+   * which this host already reads, so a `dev/main.ts` binding would be a second answer to *what did
+   * this account buy*. The parameter stays because a caller that wants to drive a claim directly
+   * needs one — `rushHoldAgreement.test.ts` is that caller, and it is how the fitted and as-built
+   * cells are measured against each other. Supplied, it wins; absent, the derivation answers.
+   *
+   * What is unchanged is why it could not simply live in `dev/main.ts`: the balance and the spends
+   * are the server's, `boundaries.test.ts` forbids this file holding an account, and `startRush`
+   * already gives the claims to `everyday/rush.ts#rushPatchOf`, which fits the building for a
+   * claimed `rush-prefit`, while `rushSittingOf` already puts them on the wire.
    */
   readonly rushModifiers?: (() => readonly ClaimedRushModifier[]) | undefined;
   /**
@@ -1950,6 +2126,51 @@ export function createEverydayHost(
   const notifyCampaign = (): void => {
     for (const listener of [...campaignListeners]) listener();
   };
+  /**
+   * The last turn banked and the ledger's answer to it — {@link EverydayHost.chimeTally}.
+   *
+   * Host-scoped like the career and the rush, and for the same reason: it is not a fact about the
+   * run on the stage, and a field on `ViewerState` would make it one. It survives navigation and
+   * does not survive a reload, which is correct — after a reload the rail has nothing to
+   * acknowledge, because nothing was just finished.
+   */
+  let chimeTally: EverydayChimeTally | undefined;
+  /**
+   * What the account owns, as the ledger last answered — the claim {@link bankTurn} and
+   * {@link spendChime} keep current so a purchase reaches the next sitting without a reload.
+   *
+   * `undefined` means *nobody has asked*, which is a different thing from *owns nothing*: a rush
+   * pressed before any read must claim nothing rather than guess, and `readTally` below is what
+   * turns the first into the second.
+   */
+  let owned: readonly EverydayOwnedModifier[] | undefined;
+  /**
+   * Bank a finished turn and keep what came back — GitHub issue #499,
+   * [§ D673](../../../../DECISIONS.md).
+   *
+   * The three earn sites call this rather than the binding, so the acknowledgement cannot be wired
+   * on one path and forgotten on the other two. It still never throws into its caller: each of them
+   * is a synchronous path that files something, and a filing that failed because a network call
+   * failed would be a worse trade than a chime nobody banked.
+   */
+  const bankTurn = (turn: ChimeTurn): void => {
+    const bank = b.bankCompletion;
+    if (bank === undefined) {
+      chimeTally = { turn: turn.completion, answer: { kind: 'no-server' } };
+      notifyCampaign();
+      return;
+    }
+    void bank(turn).then(
+      (answer) => {
+        chimeTally = { turn: turn.completion, answer };
+        if (answer.kind === 'balance' && answer.owns !== undefined) owned = answer.owns;
+        notifyCampaign();
+      },
+      () => {
+        /* A rejected promise is a binding fault rather than an answer; the tally keeps the last real one. */
+      },
+    );
+  };
   /** The rush in progress — GitHub issue #220. Host-scoped like the career: a rush is not a day. */
   /**
    * § 6.1's replay in progress. `pressed` is whether this session has asked for a run — its brief's
@@ -1980,6 +2201,32 @@ export function createEverydayHost(
         readonly rounds: readonly RushRoundRecord[];
       }
     | undefined;
+  /**
+   * What the next sitting may claim, from what the ledger says this account owns —
+   * [§ D672](../../../../DECISIONS.md).
+   *
+   * **One sink, and the omissions are the design.** `rush-prefit` is the only modifier in the
+   * shipped table that reaches a run: `everyday/rush.ts#rushPatchOf` fits the building for it,
+   * `packages/server`'s replay fits it with the same three effects, and
+   * `leaderboard/rushHoldAgreement.json`'s two `prefit` cells are each required to differ from the
+   * same cell as built — which is `CLAUDE.md`'s *move the control and require the run to change*
+   * discharged by a run rather than by an argument. The two `purse-units` top-ups reach nothing,
+   * because no between-round rebuild travels (§ D606 § 2), so claiming one would put a modifier on
+   * a board key that separated a player's runs and changed none of them.
+   *
+   * **One step, not what was bought.** The sink's `maxSteps` is 1 and its note says why — *a
+   * building is fitted or it is not* — so a second purchase would be unbacked at the claim
+   * (`chimes/ledger.ts#unbackedModifiers` caps a claim at the sink's own cap) rather than worth
+   * twice as much. An account that somehow owns two claims one.
+   *
+   * `undefined` {@link owned} claims nothing: nobody has asked the ledger yet, and a claim made on
+   * a guess is a claim the server would refuse the whole sitting for.
+   */
+  const rushClaims = (): readonly ClaimedRushModifier[] =>
+    (owned ?? []).some((entry) => entry.sinkId === RUSH_PREFIT_SINK_ID && entry.steps >= 1)
+      ? Object.freeze([{ sinkId: RUSH_PREFIT_SINK_ID, steps: 1 }])
+      : [];
+
   /** The building's profile band, for § D478's line — `fixit/parse.ts#fixitContextOf`'s own lookup. */
   const bandOf = (building: ResolvedBuilding): DemandBand | undefined =>
     b.resources.trafficProfiles.profiles.find((profile) => profile.id === building.trafficProfile)?.arrivalRatePctPop5min;
@@ -2138,6 +2385,7 @@ export function createEverydayHost(
     careerNotice: () => careerLoadNotice,
     savedDispatchers: () => b.state().savedDispatchers,
     recording: () => b.state().recording,
+    runPending: () => b.runPending?.() ?? false,
     /*
      * GitHub issue #340. Built from the two bindings that already exist rather than from a new one:
      * `resources` and `state()` are what `runSubmissionOf` takes, and `runIsOwn()` is the shell's
@@ -2399,7 +2647,7 @@ export function createEverydayHost(
        * a worse trade than a chime nobody banked. The balance is read again next time Settings is
        * opened, and the ledger is append-only, so nothing is lost that was not already spent.
        */
-      if (verdict === 'cleared') b.bankCompletion?.({ completion: 'career-day-paid' });
+      if (verdict === 'cleared') bankTurn({ completion: 'career-day-paid' });
     },
     intervene: (atS, change) => {
       // Gated here as well as on the control, because the record cannot grow before it exists and
@@ -2676,7 +2924,17 @@ export function createEverydayHost(
     /* {@link dailyBoard}'s split, applied to the ledger's one read. GitHub issue #368. */
     chimeBalance: async () => {
       const read = b.chimeBalance;
-      return read === undefined ? { kind: 'no-server' } : read();
+      if (read === undefined) return { kind: 'no-server' };
+      const answer = await read();
+      /*
+       * A read is the only thing that can tell this host what the account owned **before** this
+       * session — a purchase made on another device, or this one before a reload. So it writes
+       * {@link owned} as well as answering, and `undefined` stays `undefined` on every other arm:
+       * *nobody has asked* and *owns nothing* are different, and a rush pressed under the first
+       * claims nothing rather than guessing.
+       */
+      if (answer.kind === 'balance' && answer.owns !== undefined) owned = answer.owns;
+      return answer;
     },
     /*
      * {@link dailyBoard}'s split, applied to a write: the host's part is that there is nowhere to
@@ -2814,13 +3072,19 @@ export function createEverydayHost(
           endedAtS: undefined,
           buildingId: building.id,
           /*
-           * **Read once, here** — GitHub issue #372, § D640. The binding answers what the account
-           * bought and claims for this sitting, and `[]` when there is nothing to ask: no surface in
-           * this build spends a chime, so that is every sitting today. A sitting is one modifier set
-           * and the board is keyed on it, so this is taken with `before` and `buildingId` and never
-           * re-read on *Run the rush again*.
+           * **Read once, here** — GitHub issue #372, § D640, [§ D672](../../../../DECISIONS.md). A
+           * sitting is one modifier set and the board is keyed on it, so this is taken with
+           * `before` and `buildingId` and never re-read on *Run the rush again*.
+           *
+           * The binding wins where a caller supplies one — `rushHoldAgreement.test.ts` drives the
+           * fitted and as-built cells that way. **The shipped path is the fallback**, and it is a
+           * fallback rather than a second binding for § D227's reason: `rushModifiers`' own
+           * docstring promised *"when a spend surface ships it fills this and nothing else
+           * changes"*, and a second binding in `dev/main.ts` reading the same ledger this host has
+           * already read would be two answers to *what did this account buy* — the shape
+           * § D490 exists to refuse one field over.
            */
-          modifiers: b.rushModifiers?.() ?? [],
+          modifiers: b.rushModifiers?.() ?? rushClaims(),
           rounds: [],
         };
       } else {
@@ -2927,7 +3191,7 @@ export function createEverydayHost(
         ]),
       };
       const waves = rushWavesOutlastedOf(rushOutcomeOf(recording, atS));
-      if (waves !== undefined) b.bankCompletion?.({ completion: 'rush-wave-survived', waves });
+      if (waves !== undefined) bankTurn({ completion: 'rush-wave-survived', waves });
     },
     leaveRush: () => {
       if (rushSession === undefined) return;
@@ -2952,7 +3216,35 @@ export function createEverydayHost(
       return building === undefined ? undefined : rushDisclosureOf(building, bandOf(building));
     },
     bankScenarioClear: (scenarioId) => {
-      b.bankCompletion?.({ completion: 'scenario-cleared', scenarioId });
+      bankTurn({ completion: 'scenario-cleared', scenarioId });
+    },
+    chimeTally: () => chimeTally,
+    rushStartsFitted: () => rushClaims().length > 0,
+    /*
+     * The spend verb — GitHub issue #372, § D672. `dailyBoard`'s split applied to a write that
+     * answers: the host's part is that there is nowhere to spend on a build served with no API
+     * origin, and everything else is the caller's, because the account and the token are.
+     *
+     * A bought sink is written into {@link owned} here rather than re-read, so the claim
+     * `rushModifiers` makes is current the instant the press returns. The server is still the
+     * authority — `chimes/ledger.ts#unbackedModifiers` refuses a claim the ledger does not back —
+     * and this is a cache of the answer it just gave, not a second ledger.
+     */
+    spendChime: async (sinkId, steps) => {
+      const spend = b.spendChime;
+      if (spend === undefined) return { kind: 'no-server' };
+      const outcome = await spend(sinkId, steps);
+      if (outcome.kind === 'bought') {
+        const rest = (owned ?? []).filter((entry) => entry.sinkId !== sinkId);
+        const had = (owned ?? []).find((entry) => entry.sinkId === sinkId)?.steps ?? 0;
+        owned = Object.freeze([...rest, { sinkId, steps: had + steps }]);
+        chimeTally = {
+          ...(chimeTally ?? { turn: 'scenario-cleared' as const }),
+          answer: { kind: 'balance', chimes: outcome.chimes, owns: owned },
+        };
+        notifyCampaign();
+      }
+      return outcome;
     },
     startReplay: (day) => {
       const state = b.state();

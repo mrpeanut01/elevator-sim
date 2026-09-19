@@ -76,6 +76,7 @@ import { DAILY_BOARD_METRIC, type EverydayChallengeToday, type EverydayDailyBoar
 import { everydayAccount } from './accountPort.js';
 import { everydayProgressWith } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
+import { SHARE_COPY, shareArtefactOf, shareFactsOf } from './shareResult.js';
 import { WATCH_CHECKING_LABEL, WATCH_IT_LABEL } from './watchStage.js';
 import type { EverydayScreenHandle, EverydayScreenModule } from './screens.js';
 import { pressWatchRow } from './watchPress.js';
@@ -350,6 +351,17 @@ function el<K extends keyof HTMLElementTagNameMap>(
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 const NOTE = `font-size:13px;line-height:1.55;color:${C.warmGrey};margin:${String(G.row)}px 0 0;max-width:70ch;text-wrap:pretty`;
 
+/**
+ * The id the share control's disabled button points `aria-describedby` at.
+ *
+ * A constant rather than two literals, on `everyday/shell.ts#BAR_REASON_ID`'s reason: an
+ * `aria-describedby` naming an id that is not in the document reads as a described control and
+ * describes nothing, which is worse than no attribute at all. Not exported — the browser tier
+ * asserts the binding by resolving whatever id the attribute names, which is the assertion worth
+ * making; a test that imported this and compared it to itself would prove less.
+ */
+const SHARE_NO_RUN_ID = 'everyday-share-no-run';
+
 function mount(host: HTMLElement, context: EverydayScreenShellContext): EverydayScreenHandle {
   const doc = host.ownerDocument;
   // Before the first draw reads RATINGS — a restored ladder must be there on the first paint.
@@ -378,6 +390,19 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
    * same press on the same host.
    */
   let watchChecking: string | undefined;
+
+  /**
+   * The share control's two transient states — GitHub issue #553's shape, `dev/main.ts`'s
+   * technique.
+   *
+   * `shareCopied` flips the button's face for a moment so a press that produced no visible change
+   * on the page is still answered; `shareRefusedText` holds the artefact when the browser would
+   * not take it, because a control that cannot write must say so **and** hand over what it could
+   * not write (§ D227, and `docs/22` § 5 non-goal 5). Both are cleared by a redraw, which is
+   * correct: neither is a fact about the run.
+   */
+  let shareCopied = false;
+  let shareRefusedText: string | undefined;
 
   const status = el(doc, 'div', BOARD_SCREEN_COPY.loading);
   status.style.cssText = NOTE;
@@ -861,6 +886,161 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
   }
 
   /**
+   * **Show somebody what happened** — the result artefact's control, [§ D685](../../../../DECISIONS.md).
+   *
+   * ## Why it is on this tab
+   *
+   * The daily board is where a player meets today's shared seed and everybody else's runs, so it is
+   * where *show somebody* is the next thought. It is also where the board itself has least to say:
+   * `packages/server`'s ladder is withheld below twenty runs, and this tab draws
+   * {@link BOARD_SCREEN_COPY.dailyEmpty} — *nobody has posted to today's board yet* — on exactly
+   * the days a player most wants to hand the seed to a friend. Posting needs a server and an
+   * account; this needs neither.
+   *
+   * ## The refusal, both ways
+   *
+   * A browser may deny the clipboard for reasons the player did not cause and cannot see. § D227
+   * binds both polarities, so: with no finished run the button is drawn **unpressable with a
+   * sentence saying why** rather than greyed and silent (`everyday/postRun.ts`'s rule — a filled
+   * primary that consumes a click and produces nothing is worse than a disabled one); and a
+   * clipboard that refuses puts the artefact **on the page**, selectable, with a line saying what
+   * happened. The one thing it never does is fail quietly.
+   *
+   * ## Nothing leaves the page
+   *
+   * No request, no event, no link — see `everyday/shareResult.ts`. `everyday/boardScreen.browser.test.ts`
+   * and the module's own tests are where that is checked rather than asserted here.
+   */
+  function shareBlock(): HTMLElement {
+    const block = el(doc, 'div');
+    block.className = 'everyday-share';
+    block.style.cssText = `margin-top:${String(G.section)}px;border:1px solid ${C.rule};border-radius:${String(R.card)}px;background:${C.card};padding:16px 18px`;
+    const heading = el(doc, 'div', SHARE_COPY.eyebrow);
+    heading.style.cssText = EYEBROW;
+    block.append(heading);
+
+    const recording = context.host.recording();
+    const artefact = recording === undefined ? undefined : shareArtefactOf(shareFactsOf(recording));
+
+    const button = doc.createElement('button');
+    button.type = 'button';
+    button.className = 'everyday-share-copy';
+    /*
+     * The face never changes — see `SHARE_COPY.copied`. A button that stops saying what pressing it
+     * does has to be put back, and putting it back needs a timer, which `boundaries.test.ts`
+     * confines to the dev entry point for the reason its own name gives.
+     */
+    button.textContent = SHARE_COPY.button;
+    button.disabled = artefact === undefined;
+    if (artefact === undefined) {
+      /*
+       * A disabled button owes an accessible name **and** a reason on the control —
+       * `everyday/deadControls.browser.test.ts`'s two clauses, and issue #262's measurement is
+       * that fourteen of fifteen disabled buttons carried neither. The `title` is the reason for a
+       * pointer and the `aria-describedby` is the reason for everything else; both point at the
+       * same sentence, which is the one drawn under the button, so there is no second wording to
+       * go stale.
+       */
+      button.title = SHARE_COPY.noRun;
+      button.setAttribute('aria-describedby', SHARE_NO_RUN_ID);
+    }
+    button.style.cssText = [
+      'margin-top:10px',
+      artefact === undefined ? 'cursor:not-allowed' : 'cursor:pointer',
+      'border:none',
+      `border-radius:${String(R.pill)}px`,
+      `background:${artefact === undefined ? C.ruleLight : C.ink}`,
+      `color:${artefact === undefined ? C.warmGrey : C.paper}`,
+      'padding:10px 20px',
+      `font-family:${TYPE.body}`,
+      'font-size:15px',
+      'font-weight:600',
+    ].join(';');
+    button.addEventListener('click', () => {
+      if (artefact === undefined) return;
+      /*
+       * `dev/main.ts#copyArtefact`'s technique, kept: await the write, and on rejection show the
+       * text rather than reporting an error the reader did not cause. The `clipboard` object is
+       * absent altogether outside a secure context, so it is read off this screen's own window and
+       * a missing one takes the same branch as a refusing one — the player's situation is
+       * identical either way.
+       */
+      const clipboard = doc.defaultView?.navigator.clipboard;
+      if (clipboard === undefined) {
+        shareRefusedText = artefact.text;
+        redraw();
+        return;
+      }
+      void clipboard.writeText(artefact.text).then(
+        () => {
+          if (disposed) return;
+          shareCopied = true;
+          shareRefusedText = undefined;
+          redraw();
+        },
+        () => {
+          if (disposed) return;
+          shareCopied = false;
+          shareRefusedText = artefact.text;
+          redraw();
+        },
+      );
+    });
+    block.append(button);
+
+    if (artefact === undefined) {
+      const none = el(doc, 'p', SHARE_COPY.noRun);
+      none.className = 'everyday-share-none';
+      none.id = SHARE_NO_RUN_ID;
+      none.style.cssText = NOTE;
+      block.append(none);
+      return block;
+    }
+
+    const note = el(doc, 'p', SHARE_COPY.note);
+    note.className = 'everyday-share-note';
+    note.style.cssText = NOTE;
+    block.append(note);
+
+    if (shareCopied) {
+      /*
+       * Announced rather than swapped onto the button, and it stands until the next draw. There is
+       * nothing to expire: *the result is on your clipboard* stays true until something else is
+       * put there, so a line that vanished after a second would be a fact removed on a schedule.
+       */
+      const done = el(doc, 'p', SHARE_COPY.copied);
+      done.className = 'everyday-share-copied';
+      done.setAttribute('role', 'status');
+      done.style.cssText = `${NOTE};color:${C.moss}`;
+      block.append(done);
+    }
+
+    if (shareRefusedText !== undefined) {
+      const refusal = el(doc, 'p', SHARE_COPY.refused);
+      refusal.className = 'everyday-share-refusal';
+      /*
+       * Announced, because the whole of what the press produced is this sentence and the block
+       * under it: a screen reader that is not told has met a button that did nothing, which is the
+       * silent failure § D227 forbids in the one arm where it is most likely.
+       */
+      refusal.setAttribute('role', 'status');
+      refusal.style.cssText = `${NOTE};color:${C.terracotta}`;
+      /*
+       * A `<pre>` rather than a paragraph, because the strip is a row of glyphs a reader is about
+       * to select and paste: reflowed, it is not the artefact any more. `user-select:all` makes
+       * one click take the whole of it, which is the shortest route from *the browser refused* to
+       * *the player has the text*.
+       */
+      const fallback = el(doc, 'pre', shareRefusedText);
+      fallback.className = 'everyday-share-text';
+      fallback.style.cssText = `margin-top:${String(G.row)}px;padding:12px 14px;border:1px solid ${C.rule};border-radius:${String(R.control)}px;background:${C.paper};color:${C.ink};font:13px/1.6 ${TYPE.mono};white-space:pre-wrap;user-select:all`;
+      block.append(refusal, fallback);
+    }
+
+    return block;
+  }
+
+  /**
    * {@link challengeTabViewOf}'s answer, drawn — GitHub issue #221's third criterion.
    *
    * `dailyBlock`'s split, kept: the decision about *what* the tab says is in the pure function so
@@ -944,7 +1124,12 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
     );
 
     if (tab === 'daily') {
-      body.append(dailyBlock());
+      /*
+       * The board first, the share control under it. The order is the argument: the board is what
+       * the tab is for, and the artefact is what a player does when the board has nothing to say —
+       * which below the ladder's twenty-run floor is most days.
+       */
+      body.append(dailyBlock(), shareBlock());
       return;
     }
     if (tab === 'challenge') {

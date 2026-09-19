@@ -624,17 +624,16 @@ export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
    * the two-wordings defect this array's own entries exist to prevent.
    */
   /*
-   * **The chime spend is absent and is deliberately not registered here** — GitHub issue #368, and
-   * the review of PR #485's blocking 1.
+   * **The chime spend is not registered here, and the reason survived the spend being built** —
+   * GitHub issue #368, the review of PR #485's blocking 1, [§ D672](../../../../DECISIONS.md).
    *
-   * Nothing in this build spends a chime. The obvious move is a row in this register, and it is the
-   * wrong one for the reason the entry above gives: this section's contract is *rows this screen
-   * does not draw*, and the chime block **is** drawn, two centimetres up, listing what each
-   * modifier will cost. A refusal about a ladder belongs beside the ladder, so it is
-   * `chimesPanel.ts#ChimesPanelView.spendRefusal` — on the same face, in the same paint, seeded by
-   * name in `honesty/surfaces.ts` and asserted in `pricing/spendWidensTheBudget.test.ts`. A second
-   * wording down here would be the defect this array exists to prevent, and the one a player is
-   * least likely to read.
+   * This paragraph opened *"nothing in this build spends a chime"*, and one sink is sold now. What
+   * did not change is why no row belongs in this register: this section's contract is *rows this
+   * screen does not draw*, and the chime block **is** drawn, two centimetres up. The two sinks that
+   * are still not offered say so **on their own rows** — `chimesPanel.ts#SPEND_ABSENCES`, one
+   * sentence each, seeded by name in `honesty/surfaces.ts` and asserted in both directions by
+   * `pricing/spendWidensTheBudget.test.ts`. A second wording down here would be the defect this
+   * array exists to prevent, and the one a player is least likely to read.
    *
    * The **read** and the **earn** are not absences at all any more: `settingsScreen.ts` asks the
    * account for its balance and `everyday/host.ts#closeDay` banks a contract day, which is what
@@ -729,6 +728,23 @@ export interface SettingsScreenInput {
    * state would be a screen claiming to know something about the ledger that it does not.
    */
   readonly chimeBalance?: number | undefined;
+  /**
+   * What the account already owns — `EverydayHost.chimeBalance()`'s `owns`
+   * ([§ D671](../../../../DECISIONS.md)). `undefined` until a read lands, which the panel draws as
+   * *not offered for a moment* rather than as *you own nothing*: selling a player a kit they
+   * already have would take the chimes for it.
+   */
+  readonly chimeOwns?: readonly { readonly sinkId: string; readonly steps: number }[] | undefined;
+  /**
+   * Whether this build has a spend route at all — `false` on a page served with no API origin.
+   *
+   * Kept apart from the account state for `chimesPanel.ts#ChimesPanelInput.spendable`'s reason:
+   * *nobody is signed in* and *there is no server* are different sentences, and this panel has
+   * shipped that exact conflation before.
+   */
+  readonly chimeSpendable?: boolean | undefined;
+  /** The server's own sentence about the last spend press, carried unrewritten. */
+  readonly chimeNotice?: string | undefined;
 }
 
 /** § 15.1's screen for this state. Total; every sentence a player can meet starts here. */
@@ -784,6 +800,14 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
       chimes: chimesPanelViewOf({
         balanceChimes: input.chimeBalance ?? 0,
         home: signedIn ? 'account' : account === undefined ? 'booting' : 'signed-out',
+        /*
+         * Spread rather than assigned, because `exactOptionalPropertyTypes` is on and an explicit
+         * `undefined` is a different type from an absent key — and here the difference is the
+         * whole of `owns`' meaning: absent is *nobody has asked yet*.
+         */
+        ...(input.chimeOwns === undefined ? {} : { owns: input.chimeOwns }),
+        ...(input.chimeSpendable === undefined ? {} : { spendable: input.chimeSpendable }),
+        ...(input.chimeNotice === undefined ? {} : { notice: input.chimeNotice }),
       }),
       signIn: signInViewOf(input),
       saveNotice:

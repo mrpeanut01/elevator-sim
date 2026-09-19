@@ -110,7 +110,7 @@ import {
   WORKSHOP_COPY,
 } from '../everyday/workshopModel.js';
 import { briefBarModel, briefScreenViewOf, lockedForScore, raceAgainstCard } from '../everyday/briefView.js';
-import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, SAME_FOR_EVERYONE } from '../everyday/doorView.js';
+import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, sameForEveryoneLine } from '../everyday/doorView.js';
 import { HOST_PENDING_REASON } from '../everyday/host.js';
 import {
   BUILD_NOTES_POINTER,
@@ -137,6 +137,7 @@ import { RAIL_DRAWER_COPY, railModel, sublineFor } from '../everyday/rail.js';
 import {
   RUSH_ABSENCES,
   RUSH_HOLD_LINE,
+  RUSH_FITTED_LINE,
   RUSH_SCREEN_COPY,
   rushBandViews,
   rushBarModel,
@@ -216,6 +217,7 @@ import {
   SHELL_SKIP_LABEL,
 } from '../everyday/types.js';
 import { scenarioHubViewOf } from '../everyday/scenarioModel.js';
+import type { ScenarioLadderRung } from '../scenario/ladder.js';
 import {
   TUTORIAL_ABSENCES,
   TUTORIAL_COPY,
@@ -298,6 +300,11 @@ import {
   challengeTabViewOf,
   dailyBoardViewOf,
 } from '../everyday/boardScreen.js';
+import {
+  SHARE_COPY,
+  shareArtefactOf,
+  shareFactsOf,
+} from '../everyday/shareResult.js';
 // The challenge tab's own wire shapes, restated as fixtures — see `challengeStates`.
 import type { ChallengeBoardPage } from '../menu/challenge.js';
 import type { EverydayChallengeToday } from '../everyday/host.js';
@@ -720,6 +727,15 @@ export interface HonestyContext {
   readonly bundleAt: (at: number) => FrameBundle;
   /** `data/scenario-survivors.json` — GitHub issue #367's published counts. See `run.ts`. */
   readonly survivors: PublishedSurvivors;
+  /**
+   * The ordered path the Scenario hub lists — `scenario/ladder.ts`, [§ D649](../../../../DECISIONS.md).
+   *
+   * Joined in `run.ts` rather than here, and **empty** where no stage table was handed in. Both
+   * arms matter to the sweep: a populated path draws ten stages' worth of words, and an empty one
+   * draws the hub's own sentence about the path being absent, which is a refusal a player can meet
+   * on a slow boot.
+   */
+  readonly scenarioPath: readonly ScenarioLadderRung[];
 }
 
 /** Just enough of `SearchSpace` for the controls surfaces, so the type does not cross a barrel. */
@@ -7099,13 +7115,29 @@ const FIXIT: SurfaceAdapter = {
 
     /*
      * The as-built stage's three words — GitHub issue #348. Authored in the copy table so they are
-     * sweepable, and seeded here directly because their only reader is `everyday/asBuiltStage.ts`,
+     * sweepable, and seeded here directly because their only reader is `everyday/caseStage.ts`,
      * a mount, which the search cannot drive; the rail and bar models below reach the table's other
      * keys, and these three would otherwise be in `covers` and in nothing's output.
      */
     seeds.push({ field: 'asBuilt.eyebrow', text: FIXIT_SCREEN_COPY.asBuiltStageEyebrow, role: 'label', provenance: 'authored' });
     seeds.push({ field: 'asBuilt.note', text: FIXIT_SCREEN_COPY.asBuiltStageNote, role: 'prose', provenance: 'authored' });
     seeds.push({ field: 'asBuilt.skip', text: FIXIT_SCREEN_COPY.asBuiltStageSkip, role: 'label', provenance: 'authored' });
+
+    /*
+     * The pair stage's five words — [§ D644](../../../../DECISIONS.md), on exactly the ground the
+     * three above sit on: their only reader is the same mount, so being in `covers` would be being
+     * in nothing's output. Wave T's finding in one line — *a claim of seeding is not seeding*.
+     *
+     * The note is the one worth a property looking at. It says the verdict below is measured from
+     * these two runs and no others, which is a claim about provenance rather than a figure, and it
+     * is true by construction: `fixitScreen.ts#primary` assigns `asBuilt`/`asRepaired` and computes
+     * the outcome in one statement, and clears the block on the next press.
+     */
+    seeds.push({ field: 'pair.eyebrow', text: FIXIT_SCREEN_COPY.pairStageEyebrow, role: 'label', provenance: 'authored' });
+    seeds.push({ field: 'pair.note', text: FIXIT_SCREEN_COPY.pairStageNote, role: 'prose', provenance: 'authored' });
+    seeds.push({ field: 'pair.skip', text: FIXIT_SCREEN_COPY.pairStageSkip, role: 'label', provenance: 'authored' });
+    seeds.push({ field: 'pair.before', text: FIXIT_SCREEN_COPY.pairStageBeforeCaption, role: 'label', provenance: 'authored' });
+    seeds.push({ field: 'pair.after', text: FIXIT_SCREEN_COPY.pairStageAfterCaption, role: 'label', provenance: 'authored' });
 
     /* ---- the case rail: both tags, and the derived {fixed}/{total} on both sides of solved ---- */
     for (const [where, solvedIds] of [
@@ -8312,6 +8344,35 @@ const EVERYDAY_MENU: SurfaceAdapter = {
         role: 'observation',
       });
     }
+    /*
+     * § D673's acknowledgement, in all four states the card can draw it in — GitHub issue #499.
+     *
+     * A **label**, on `chimesPanel.ts`'s own ground one surface over: the balance in it is a count
+     * of completed turns rather than a figure any run produced, so seeding it as an observation
+     * would ask R13 for a denominator that does not exist. The `balance` arm is seeded twice
+     * because the singular is a different string rather than the same one with a different number
+     * in it — `data/chime-ledger.json` authors `one` and `many` — which is the trap the tally's own
+     * two Settings cases were added for.
+     *
+     * Driven over every completion rather than one, because each names its own turn. The withheld
+     * arm seeds nothing by construction — on `report` the field is `undefined` and there is no
+     * string for the search to read — and `rail.test.ts` asserts that absence, which is what keeps
+     * GD13 clause 2 mechanical rather than remembered.
+     */
+    for (const turn of ['scenario-cleared', 'career-day-paid', 'rush-wave-survived'] as const) {
+      for (const [arm, answer] of [
+        ['one', { kind: 'balance', chimes: 1 }],
+        ['many', { kind: 'balance', chimes: 40 }],
+        ['signed-out', { kind: 'signed-out' }],
+        ['no-ledger', { kind: 'no-ledger' }],
+        ['unreachable', { kind: 'unreachable' }],
+      ] as const) {
+        const line = railModel({ screen: 'menu', ctx: 'daily' }, { banked: { turn, answer } }).banked;
+        if (line !== undefined) {
+          seeds.push({ field: `rail.banked.${turn}.${arm}`, text: line, role: 'label' });
+        }
+      }
+    }
     seeds.push({ field: 'rail.footer.settings', text: footer.settings.label, role: 'label' });
     if (footer.settings.unavailable !== undefined) {
       seeds.push({
@@ -8459,6 +8520,13 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/rushScreenModel.ts#rushHoldLineFigure',
     'everyday/rushScreenModel.ts#rushGeneratedRangeLine',
     'everyday/rushScreenModel.ts#rushOpeningLine',
+    /*
+     * That this sitting starts on a fitted tower, and where it will be posted — § D672. Seeded
+     * below rather than merely claimed, on wave T's finding that being in `covers` is not being
+     * swept: it is drawn only when the account owns the kit, so nothing that renders this screen
+     * from a fixture would reach it.
+     */
+    'everyday/rushScreenModel.ts#RUSH_FITTED_LINE',
     'everyday/designerModel.ts#DESIGNER_COPY',
     'everyday/designerModel.ts#designerFigures',
     'everyday/designerModel.ts#designerWarnings',
@@ -8526,6 +8594,12 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     seeds.push({ field: 'rush.holdLine.figure', text: rushHoldLineFigure(), role: 'label' });
     seeds.push({ field: 'rush.generated', text: rushGeneratedRangeLine(), role: 'prose' });
     seeds.push({ field: 'rush.opening', text: rushOpeningLine(), role: 'prose' });
+    /*
+     * § D672's fitted-start disclosure. `prose` rather than `reason`: it refuses nothing and
+     * offers nothing — it is two facts about the run about to be played, which is the role
+     * `rush.driving` carries one line up.
+     */
+    seeds.push({ field: 'rush.fitted', text: RUSH_FITTED_LINE, role: 'prose' });
     seeds.push({
       field: 'rush.driving',
       text: rushDrivingLine('Collective control'),
@@ -8894,6 +8968,18 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      */
     'everyday/chimesPanel.ts#CHIME_PRICES',
     /*
+     * Why each sink this build lists is not one it sells — § D672,
+     * `screens.ts#UNBUILT_REASONS`' shape. Player-facing prose, drawn under its own row.
+     *
+     * `covers` rather than a seed of its own, for {@link CHIME_PRICES}' reason one entry up: the
+     * sentences are seeded **per row** out of `chimesPanelViewOf`'s own answer, so what the search
+     * reads is what the screen renders. Every arm is reached, and it took three cases to get there
+     * — every case that leaves `chimeSpendable` unset draws the *there is no ledger on this build*
+     * arm on every row, so the refusals a player with an account actually meets would have shipped
+     * unswept. That is `banked-one`/`banked-many`'s lesson one field along.
+     */
+    'everyday/chimesPanel.ts#SPEND_ABSENCES',
+    /*
      * The DISPLAY NAME field's note, which is **two** sentences because it is about two different
      * names — § D490. Both arms are reached below: all but one of the cases draw the device one, and
      * `not-durable` is signed in and named and draws the account one. A pair of sentences with one
@@ -9022,6 +9108,50 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
        */
       ['banked-one', { profile: stored, reduceMotion: false, account: named, accountServer: true, chimeBalance: 1 }],
       ['banked-many', { profile: stored, reduceMotion: false, account: named, accountServer: true, chimeBalance: 40 }],
+      /*
+       * § D672's spend, in the arms a balance and an account alone cannot reach. Every case above
+       * leaves `chimeSpendable` unset, so every row draws its *there is no ledger on this build*
+       * arm and the four sentences a player who can actually buy something meets — the offer, the
+       * shortfall, the bought line and the server's refusal — would ship unswept. That is the same
+       * shape as the two cases above this comment, one field along.
+       */
+      [
+        'can-buy',
+        {
+          profile: stored,
+          reduceMotion: false,
+          account: named,
+          accountServer: true,
+          chimeBalance: 40,
+          chimeSpendable: true,
+          chimeOwns: [],
+        },
+      ],
+      [
+        'cannot-afford',
+        {
+          profile: stored,
+          reduceMotion: false,
+          account: named,
+          accountServer: true,
+          chimeBalance: 2,
+          chimeSpendable: true,
+          chimeOwns: [],
+          chimeNotice: 'There are not enough chimes in the account for that yet.',
+        },
+      ],
+      [
+        'already-bought',
+        {
+          profile: stored,
+          reduceMotion: false,
+          account: named,
+          accountServer: true,
+          chimeBalance: 40,
+          chimeSpendable: true,
+          chimeOwns: [{ sinkId: 'rush-prefit', steps: 1 }],
+        },
+      ],
     ] as const;
 
     for (const [label, input] of cases) {
@@ -9050,14 +9180,20 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
       for (const row of chimes.rows) {
         seeds.push({ field: `${label}.chimes.${row.id}.name`, text: row.name, role: 'label' });
         seeds.push({ field: `${label}.chimes.${row.id}.price`, text: row.price, role: 'label' });
+        /*
+         * Each row's own sentence — § D672. A `reason` rather than prose, on the role
+         * `signIn.notice` already carries: it is a refusal this surface makes about its own row, or
+         * on the offered arm, what pressing it will do. The one sentence this panel used to carry
+         * across the whole list (`spendRefusal`) is gone with the field, § D227's rule.
+         */
+        seeds.push({ field: `${label}.chimes.${row.id}.note`, text: row.note, role: 'reason' });
       }
-      /*
-       * That none of those prices can be bought yet — seeded **by name**, because being reachable
-       * through a `covers` entry is not being swept (wave T's finding). A `reason`, not prose: it
-       * is a refusal this surface makes about its own rows, which is the role
-       * `signIn.notice` already carries for a sentence that explains why something is not offered.
-       */
-      seeds.push({ field: `${label}.chimes.spendRefusal`, text: chimes.spendRefusal, role: 'reason' });
+      /* The fourth thing chimes buy, and why it is not on this list — `prose`, because it is not a refusal. */
+      seeds.push({ field: `${label}.chimes.spendNote`, text: chimes.spendNote, role: 'prose' });
+      if (chimes.notice !== undefined) {
+        /* The **server's** sentence about the last press, carried unrewritten — `signIn.notice`'s role and reason. */
+        seeds.push({ field: `${label}.chimes.notice`, text: chimes.notice, role: 'reason' });
+      }
       /*
        * The account block — § D489's asking half and § 15.1's signed-in one. `fieldValue` is
        * deliberately not seeded: it is the reader's own address, and `settingsView.ts` says why
@@ -9880,9 +10016,28 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
     const recording = context.recording;
     const mid = recording.startedAt + (recording.endedAt - recording.startedAt) / 2;
     const stopped = rushOutcomeOf(recording, mid);
+    /*
+     * The `broke` arm is **synthesised** from the stopped one, so every fabricated field has to be
+     * consistent with the others or the sweep reads a sentence the product could not produce.
+     * `where` joined them when the hold acquired landings (`shift/trouble.ts`): spreading
+     * `stopped` alone leaves it empty, `rushResultViewOf` then drops its fourth beat, and a
+     * player-facing sentence drawn on every real broken run would be swept by nothing — which is
+     * *seeded is not swept* one step along. Two landings splitting the forty, drawn from the
+     * building's own floors so the labels are real, and summing to `overLine` exactly as the
+     * shipped path's do.
+     */
+    const holdFloors = recording.floors.slice(0, 2);
+    const split = Math.floor(RUSH_HOLD_LINE.people / Math.max(1, holdFloors.length));
     const broke: RushOutcome = {
       ...stopped,
       kind: 'broke',
+      where: holdFloors.map((floor, index) => ({
+        floorId: floor.id,
+        label: floor.label ?? floor.id,
+        /* The last landing carries the remainder, so the parts sum to the line. */
+        pastTheLine: index === holdFloors.length - 1 ? RUSH_HOLD_LINE.people - split * index : split,
+        standing: (index === holdFloors.length - 1 ? RUSH_HOLD_LINE.people - split * index : split) + 2,
+      })),
       overLine: RUSH_HOLD_LINE.people,
       saturation: recording.summary.saturation ?? {
         verdict: 'diverging-queue',
@@ -11065,6 +11220,27 @@ const GAUNTLET: SurfaceAdapter = {
      * only its ranking is missing, which is what an upcoming challenge looks like from here.
      */
     'everyday/boardScreen.ts#challengeTabViewOf',
+    /*
+     * The result artefact, on the same tab and therefore in the same adapter — GitHub issue #553,
+     * [§ D685](../../../../DECISIONS.md).
+     *
+     * **Seeded below, not merely listed here.** Wave T's finding is one line long and it is this
+     * one: being in `covers` is not being swept, and a claim of seeding is not seeding. Every one
+     * of these is rendered from the case's own recording or iterated out of the copy table.
+     *
+     * It is not a new adapter because it is not a new screen: the artefact is drawn under the
+     * daily board, by the surface this adapter already drives, so § D489's ruling applies — a
+     * state on an existing surface moves the strings and not the surface count.
+     *
+     * **Two exports are deliberately not here**, and the derivation is what says so rather than a
+     * judgement: `shareFactsOf` and `shareSlicesOf` compose no sentence at all — one is the
+     * projection that decides what may leave a run and the other folds a wait into a band index —
+     * so the two-adjacent-words scanner does not reach them and a `covers` entry for either would
+     * be a coverage claim for nothing. Every word they lead to is `shareArtefactOf`'s or the copy
+     * table's, and both are driven below.
+     */
+    'everyday/shareResult.ts#SHARE_COPY',
+    'everyday/shareResult.ts#shareArtefactOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -11288,6 +11464,45 @@ const GAUNTLET: SurfaceAdapter = {
       seeds.push({ field: `board.copy.${key}`, text, role: 'label' });
     }
     seeds.push({ field: 'board.daily.absent', text: DAILY_BOARD_ABSENCE, role: 'reason' });
+
+    /*
+     * **The result artefact — what leaves the product about this run** (§ D685).
+     *
+     * Rendered from the case's **own** recording rather than from a fixture, which is the whole
+     * value of putting it here: the properties judge every line against the run it describes, so
+     * R3 asks whether this artefact published *this* run's refused mean and R13 asks whether the
+     * count beside the mean is *this* run's `waitCount`. A fixture would have been judged against
+     * a run nobody played.
+     *
+     * Both branches are reached across the corpus rather than manufactured, because the cases
+     * genuinely differ: `suppressed` is already the context's own field, and the arms it selects
+     * here are the same arms the player meets. The roles are the module's own `ShareLineRole`,
+     * whose members are spelled to match `TextRole` so this mapping is the identity and cannot
+     * quietly reclassify a refusal as prose.
+     *
+     * No `playhead` is seeded and that is correct rather than an omission: the artefact exists only
+     * for a finished run, so there is no instant short of the end at which it says anything, and a
+     * playhead here would put a whole-run figure on the temporal axis under a clock it never had.
+     */
+    for (const line of shareArtefactOf(shareFactsOf(context.recording)).lines) {
+      seeds.push({
+        field: `share.${line.field}`,
+        text: line.text,
+        role: line.role,
+        declaredCount: line.count,
+        countShown: line.count !== undefined,
+        /* The three quantities `awtIsValid` speaks for — only the mean is one of them here. */
+        gated: line.field === 'mean',
+      });
+    }
+    /*
+     * The artefact's own chrome and its two refusals, iterated generically on
+     * `BOARD_SCREEN_COPY`'s precedent — so a key added to the table is swept by existing, rather
+     * than by somebody remembering to list it here.
+     */
+    for (const [key, text] of Object.entries(SHARE_COPY)) {
+      seeds.push({ field: `share.copy.${key}`, text, role: 'label' });
+    }
     seeds.push({ field: 'ladder.world.absent', text: LADDER_WORLD_ABSENCE, role: 'reason' });
     seeds.push({ field: 'ladder.empty', text: LADDER_EMPTY, role: 'reason' });
     /*
@@ -11682,7 +11897,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
        (a day inside the week, a chip from before it), and the bar and rail adapters carry the rest. */
     'everyday/replay.ts#REPLAY_COPY',
     'everyday/doorView.ts#DOOR_STEPS',
-    'everyday/doorView.ts#SAME_FOR_EVERYONE',
+    'everyday/doorView.ts#sameForEveryoneLine',
     'everyday/briefView.ts#briefScreenViewOf',
     'everyday/briefView.ts#briefBarModel',
     'everyday/briefView.ts#BRIEF_NOTE_LEAD',
@@ -11694,6 +11909,16 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/scenarioModel.ts#scenarioHubViewOf',
     'everyday/scenarioModel.ts#SCENARIO_COPY',
     'everyday/scenarioModel.ts#SCENARIO_ABSENCES',
+    /*
+     * § D649's ordered path. The hub is the only reader of both: `scenarioLadderOf` produces every
+     * row this adapter seeds, and `SCENARIO_LADDER_COPY` is the small set of sentences it writes
+     * that `survivorSentenceFor` does not — the held-back refusal, the *opens on the Engineer
+     * surface* note, and the line saying which rung the count is taken at. Covered here rather
+     * than given an adapter of its own because a ladder rendered on its own would be a second
+     * rendering of words only this screen draws, and `derive.test.ts` reads this list.
+     */
+    'scenario/ladder.ts#scenarioLadderOf',
+    'scenario/ladder.ts#SCENARIO_LADDER_COPY',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
     /* GitHub issue #211: the handle on a folded card note, seeded once — the note itself is the producer's whole string. */
@@ -11742,6 +11967,14 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         dispatcherName: entry.report.metaLines[0],
         goals: entry.readings,
         seed: 424_242n,
+        /*
+         * The day's crowd — § D729, § D730. Seeded `true` here and `false` below, because the
+         * seed line and the door's closing sentence both have two arms and the arm a developer
+         * never sees is the one most likely to say something a run cannot support. A pinned
+         * fixture seed is not a calendar reading either way: what is being swept is the **state**
+         * a player reaches, which is what this corpus is for.
+         */
+        crowdIsToday: true,
         /* A first day nobody has played, on a legible tower — the one state that draws the line. */
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         /*
@@ -11755,6 +11988,29 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       seeds.push({ field: `${at}.today.label`, text: today.dayLabel, role: 'label' });
       seeds.push({ field: `${at}.today.lede`, text: today.lede, role: 'observation' });
       seeds.push({ field: `${at}.today.seed`, text: today.seedLine, role: 'label' });
+      /*
+       * The other arm of the seed line — § D730. A `?seed=` deep link and a session left open past
+       * UTC midnight both reach this screen with a crowd nobody else has, and the sentence that
+       * arm draws is the one that must never claim otherwise. Seeded as the *line* rather than as
+       * a second whole record, on the imperial facts' own argument below: `todayOf` is pure and
+       * total in this field, so every other field would be identical by construction.
+       */
+      seeds.push({
+        field: `${at}.today.seed.own`,
+        text: todayOf({
+          week: entry.week,
+          calendar: null,
+          building: context.building,
+          buildingId: context.building.id,
+          dispatcherName: entry.report.metaLines[0],
+          goals: entry.readings,
+          seed: 424_242n,
+          crowdIsToday: false,
+          firstSession: entry.week.day === 1 && entry.week.history.length === 0,
+          units: 'metric',
+        }).seedLine,
+        role: 'label',
+      });
       if (today.firstSessionLine !== undefined) {
         seeds.push({ field: `${at}.today.firstSession`, text: today.firstSessionLine, role: 'observation' });
       }
@@ -11778,6 +12034,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         dispatcherName: entry.report.metaLines[0],
         goals: entry.readings,
         seed: 424_242n,
+        crowdIsToday: true,
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         units: 'imperial',
       }).facts;
@@ -11849,7 +12106,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         }
 
         /* ---- Scenario: § D525's hub, the first tile's whole surface (issue #364) ---- */
-        const hub = scenarioHubViewOf();
+        const hub = scenarioHubViewOf(context.scenarioPath);
         seeds.push({ field: `${arm}.scenario.eyebrow`, text: hub.eyebrow, role: 'prose' });
         seeds.push({ field: `${arm}.scenario.title`, text: hub.title, role: 'prose' });
         seeds.push({ field: `${arm}.scenario.lede`, text: hub.lede, role: 'prose' });
@@ -11858,6 +12115,53 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           seeds.push({ field: `${at}.title`, text: scenarioEntry.title, role: 'prose' });
           seeds.push({ field: `${at}.blurb`, text: scenarioEntry.blurb, role: 'prose' });
           seeds.push({ field: `${at}.shape`, text: scenarioEntry.shape, role: 'observation' });
+        }
+        /*
+         * The ordered path — § D649. Every row, held or offered, and the count on each one's face.
+         *
+         * `waysThrough` is seeded `role: 'observation'` with `declaredCount` set to the `k` it is a
+         * count over, for `SURVIVORS`' own stated reason: R13 wants the estimate to carry its own
+         * `n` in its own box, and `survivorSentenceFor` names `examined` before `survivors` so the
+         * denominator arrives first. It is deliberately **not** `role: 'goal'` — a survivor count
+         * has no across-seed pass rate and R12's own words make it *a statement about the
+         * configuration, not a goal*.
+         *
+         * A held row's `refusal` is `role: 'reason'`, which is the half of this surface most worth
+         * sweeping: it is the sentence that says a listed scenario cannot be played, and R3's shape
+         * is that a refusal replaces the figure rather than hiding it. The figure is beside it.
+         */
+        if (hub.path !== undefined) {
+          const path = hub.path;
+          seeds.push({ field: `${arm}.scenario.path.heading`, text: path.heading, role: 'label' });
+          seeds.push({ field: `${arm}.scenario.path.lede`, text: path.lede, role: 'prose' });
+          seeds.push({
+            field: `${arm}.scenario.path.offer`,
+            text: path.offerLine,
+            role: 'observation',
+            declaredCount: path.rows.length,
+            countShown: path.offerLine.includes(String(path.rows.length)),
+          });
+          for (const row of path.rows) {
+            const at = `${arm}.scenario.path.${row.id}`;
+            seeds.push({ field: `${at}.title`, text: row.title, role: 'prose' });
+            seeds.push({ field: `${at}.teaches`, text: row.teaches, role: 'prose' });
+            seeds.push({ field: `${at}.opening`, text: row.openingLine, role: 'prose' });
+            seeds.push({ field: `${at}.shape`, text: row.shape, role: 'observation' });
+            seeds.push({ field: `${at}.budget`, text: row.budgetLine, role: 'observation' });
+            seeds.push({
+              field: `${at}.ways`,
+              text: row.waysThrough,
+              role: 'observation',
+              declaredCount: examinedFor(context, row.id),
+              countShown: row.waysThrough.includes(String(examinedFor(context, row.id))),
+            });
+            if (row.note !== undefined) {
+              seeds.push({ field: `${at}.note`, text: row.note, role: 'prose' });
+            }
+            if (row.refusal !== undefined) {
+              seeds.push({ field: `${at}.refusal`, text: row.refusal, role: 'reason' });
+            }
+          }
         }
         /*
          * The note and the absences are `reason`, not `prose`: each one says why the list is short.
@@ -12035,7 +12339,13 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     for (const step of DOOR_STEPS) {
       seeds.push({ field: `door.step.${step.n}`, text: step.body, role: 'prose' });
     }
-    seeds.push({ field: 'door.same', text: SAME_FOR_EVERYONE, role: 'prose' });
+    for (const crowdIsToday of [true, false]) {
+      seeds.push({
+        field: `door.same.${String(crowdIsToday)}`,
+        text: sameForEveryoneLine(crowdIsToday),
+        role: 'prose',
+      });
+    }
     /*
      * Both arms of § 3.3's brief note — the named one and the fallback. The fallback is seeded
      * because it is what a bar drawn before the screen knows its driver says, and a sentence no
@@ -12813,13 +13123,37 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
      * stand-in complaint would be authoring the one piece of writing `docs/35` § 9.1 calls the best
      * in the product.
      */
+    const collapseQuoted = {
+      complaint: entry.complaint.text,
+      complainer: entry.complaint.complainer,
+      symptom: entry.symptom,
+    };
+    /*
+     * **Four arms rather than two, because screen two has a canvas and a press now.**
+     *
+     * The two that were here are the case file's arrival. The two that joined are the beat: the
+     * building as it stands with the control refusing while its second run is made, and the pair
+     * once it has been pressed. Every one of them is a state a player can stand in, and the
+     * refusing arm is the one worth naming — a control that will not press is exactly where a
+     * softened sentence would go in unnoticed.
+     */
     for (const [arm, view] of [
       ['loading', tutorialCollapseViewOf({})],
-      ['loaded', tutorialCollapseViewOf({
-        complaint: entry.complaint.text,
-        complainer: entry.complaint.complainer,
-        symptom: entry.symptom,
-      })],
+      ['loaded', tutorialCollapseViewOf(collapseQuoted)],
+      ['as-built-refusing', tutorialCollapseViewOf({ ...collapseQuoted, runReady: true })],
+      [
+        'as-built-pressable',
+        tutorialCollapseViewOf({ ...collapseQuoted, runReady: true, changeReady: true }),
+      ],
+      [
+        'answered',
+        tutorialCollapseViewOf({
+          ...collapseQuoted,
+          beat: 'answered',
+          runReady: true,
+          changeReady: true,
+        }),
+      ],
     ] as const) {
       seeds.push({ field: `collapse.${arm}.eyebrow`, text: view.eyebrow, role: 'label' });
       seeds.push({ field: `collapse.${arm}.title`, text: view.title, role: 'prose' });
@@ -12835,8 +13169,67 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
       if (view.symptom !== undefined) {
         seeds.push({ field: `collapse.${arm}.symptom`, text: view.symptom, role: 'observation', provenance: 'authored' });
       }
+      /*
+       * The block that plays a run, the line that stands where it was, and the one press — the
+       * beat screen two grew for `charter S1`. Seeded from the view rather than from `TUTORIAL_COPY`
+       * (which is iterated below for its keys anyway) because what is checked here is the string
+       * as **drawn**: which of the two wordings the beat resolved to, and whether the control is
+       * refusing or live.
+       */
+      seeds.push({ field: `collapse.${arm}.stage.eyebrow`, text: view.stage.eyebrow, role: 'label' });
+      seeds.push({ field: `collapse.${arm}.stage.note`, text: view.stage.note, role: 'prose' });
+      seeds.push({ field: `collapse.${arm}.stage.skip`, text: view.stage.skip, role: 'label' });
+      seeds.push({ field: `collapse.${arm}.stageEnded`, text: view.stageEnded, role: 'prose' });
+      if (view.stagePending !== undefined) {
+        seeds.push({ field: `collapse.${arm}.stagePending`, text: view.stagePending, role: 'reason' });
+      }
+      view.paneCaptions.forEach((caption, index) => {
+        seeds.push({ field: `collapse.${arm}.pane.${String(index)}`, text: caption, role: 'label' });
+      });
+      if (view.control !== undefined) {
+        const control = view.control;
+        seeds.push({ field: `collapse.${arm}.control.heading`, text: control.heading, role: 'label' });
+        /*
+         * The label and the two ends are `mode/plainLevers.ts`'s own words, reached through the
+         * tutorial's control rather than restated — so the corpus reads whatever the workshop
+         * calls this lever today, which is the point of drawing them from there.
+         */
+        seeds.push({ field: `collapse.${arm}.control.label`, text: control.label, role: 'label' });
+        seeds.push({ field: `collapse.${arm}.control.reads`, text: control.reads, role: 'prose' });
+        seeds.push({ field: `collapse.${arm}.control.from`, text: control.from, role: 'label' });
+        seeds.push({ field: `collapse.${arm}.control.to`, text: control.to, role: 'label' });
+        seeds.push({ field: `collapse.${arm}.control.why`, text: control.why, role: 'reason' });
+        if (control.refusal !== undefined) {
+          seeds.push({ field: `collapse.${arm}.control.refusal`, text: control.refusal, role: 'reason' });
+        }
+      }
+      /* The non-visual register — `docs/36` `AX-3`. A drawn string like any other. */
+      seeds.push({ field: `collapse.${arm}.say`, text: view.say, role: 'prose' });
       seeds.push({ field: `collapse.${arm}.finish`, text: view.finish, role: 'label' });
       seeds.push({ field: `collapse.${arm}.finishNote`, text: view.finishNote, role: 'reason' });
+    }
+
+    /*
+     * The two *finished playing* states, seeded as the one string they move.
+     *
+     * A whole arm for each would re-seed nineteen identical strings to reach one that differs: once
+     * a run has ended the only thing this view says differently is the live region's sentence, and
+     * `stageEnded` is a field of every arm already. So the difference is seeded and the duplication
+     * is not — which is the same judgement the `worked` block above makes when it drives one extra
+     * arm for the one field that varies.
+     */
+    for (const [arm, beat] of [
+      ['as-built-ended', 'as-built'],
+      ['answered-ended', 'answered'],
+    ] as const) {
+      const ended = tutorialCollapseViewOf({
+        ...collapseQuoted,
+        beat,
+        runReady: true,
+        changeReady: true,
+        runEnded: true,
+      });
+      seeds.push({ field: `collapse.${arm}.say`, text: ended.say, role: 'prose' });
     }
 
     /*
@@ -13045,11 +13438,18 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     /*
      * `everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES` stood here until GitHub issue #221 emptied
      * it — the post block on the report screen made its last row false, so the row and its triage
-     * entry went together. An empty array produces no prose, so `derive.test.ts` no longer finds it
-     * and a `covers` entry would be a coverage claim for nothing. The section is still drawn and
-     * still swept: it draws the `empty` line below, which is now the third register to reach that
-     * arm.
+     * entry went together. An empty array produces no prose, so `derive.test.ts` stopped finding
+     * it and a `covers` entry would have been a coverage claim for nothing.
+     *
+     * **It is back, and the round trip is the thing worth reading.** [§ D730](../../../../DECISIONS.md)
+     * put a row in it: § D729 made the day's crowd the UTC date, and what is still absent is that
+     * a week runs one contract, so nothing moves a returning player to the day's tower. The entry
+     * is seeded through `view.sections` below like every other register's, and it is the register
+     * itself that decides which arm is drawn — so this claim went false when the array emptied and
+     * true again when it refilled, without anybody editing this file for either. That is
+     * `derive.test.ts` working in the direction it is usually not tested in.
      */
+    'everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES',
     'everyday/buildNotes.ts#REGISTER_EMPTY_LINE',
     'everyday/settingsView.ts#SETTINGS_ABSENCES',
     /*
@@ -13258,6 +13658,18 @@ const EVERYDAY_WATCHING: SurfaceAdapter = {
  * refusal — *nothing gets through this one as it stands* — and R3's shape is that a refusal
  * replaces the number rather than hiding it.
  */
+/**
+ * The `k` a scenario's base-rung count is taken over, for R13's *the estimate carries its own `n`*.
+ *
+ * Read off `context.survivors` rather than carried on the row, because the row carries the
+ * **sentence** and the sentence is `survivorSentenceFor`'s. A count re-derived from the table is a
+ * count that cannot disagree with the words beside it; a count copied onto the row could.
+ */
+function examinedFor(context: HonestyContext, scenarioId: string): number {
+  const scenario = context.survivors.scenarios.find((entry) => entry.id === scenarioId);
+  return scenario?.steps.find((step) => step.stepId === null)?.examined ?? 0;
+}
+
 const SURVIVORS: SurfaceAdapter = {
   id: 'scenario/survivors.ts#survivorSentenceFor',
   covers: ['scenario/survivors.ts#survivorSentenceFor', 'scenario/survivors.ts#SURVIVOR_COPY'],

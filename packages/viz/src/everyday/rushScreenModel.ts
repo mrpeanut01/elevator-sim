@@ -219,6 +219,25 @@ export const RUSH_SCREEN_COPY = Object.freeze({
  * the prose does not, which is a mismatch a reader can see. It is also § 9.3's own figure note —
  * *the run ends at 120 s × 40 people*.
  */
+/**
+ * **That this sitting starts on a fitted tower, said before it starts** — GitHub issue #372,
+ * [§ D640](../../../../DECISIONS.md), [§ D672](../../../../DECISIONS.md).
+ *
+ * Drawn by `everyday/rushScreen.ts`, and only when the account owns the kit:
+ * `EverydayHost.rushStartsFitted` is the one derivation behind both this sentence and the claim the
+ * press sends, so `everyday/rushScreen.ts` cannot promise a fitted tower the sitting does not get.
+ *
+ * Two facts and no third. **What is fitted**, because a player is owed the difference between this
+ * run and the same run as built; and **where it is posted**, because the board is keyed by the
+ * modifier set (`leaderboard/boardKey.ts`) and a sitting landing on a board the player did not
+ * expect is the kind of surprise a purchase must not hold. **No price**, because a chime figure
+ * beside a run's own screen is `docs/32` GD13 clause 3 — `everyday/settingsView.ts`'s tally is
+ * where a price belongs, and it is where this was bought.
+ */
+export const RUSH_FITTED_LINE =
+  'This tower starts fitted — the doors, the control and the tenancies are already in. A fitted ' +
+  'sitting is posted to its own board rather than ranked against towers as built.';
+
 export function rushHoldLineFigure(): string {
   return `${String(RUSH_HOLD_LINE.overS)} s × ${String(RUSH_HOLD_LINE.people)} people`;
 }
@@ -302,27 +321,38 @@ export function rushGeneratedRangeLine(): string {
  * the register's own case — an absence a player can meet, said where the build says what it does
  * not have. It leaves on the commit that makes it false, as every entry here has.
  *
- * The two chime sinks are named in the same breath because they are the same absence from the other
- * end: `data/chime-ledger.json` sells a wider purse and a fitted start, and neither can be bought,
- * because a purse that buys nothing is a purchase that changes no run.
- * `everyday/chimesPanel.ts#CHIMES_PANEL_COPY.spendRefusal` says that on the screen that lists them.
+ * **The two chime sinks have stopped being one absence, and this register now names only one.**
+ * `data/chime-ledger.json` sells a wider purse and a fitted start;
+ * [§ D672](../../../../DECISIONS.md) built the spend for the second and deliberately not for the
+ * first, because a purse that buys nothing is a purchase that changes no run. So the pre-fit leaves
+ * this list on the commit that made it sellable, and what stays is the purse alone — which is what
+ * this register is for. `everyday/chimesPanel.ts#SPEND_ABSENCES` carries the purse's own refusal on
+ * the screen that lists the prices, which is where a player meets it; a second wording here would
+ * be the two-wordings defect, and the one a player is less likely to read.
  */
 export const RUSH_ABSENCES: readonly string[] = Object.freeze([
   /*
-   * **The second sentence was rewritten when half of it stopped being true** — GitHub issue #372,
-   * [§ D640](../../../../DECISIONS.md). It read *"The two rush purchases in the chime list are the
-   * same gap from the other side, and neither can be bought yet"*, and they are no longer the same
-   * gap: a wider purse still buys nothing, because nothing spends a purse, while starting fitted now
-   * reaches the run and is waiting only on a screen that spends a chime. A register that told a
-   * player both were missing for one reason would be [§ D227](../../../../DECISIONS.md)'s stale
-   * refusal — the more dangerous half, a sentence telling somebody not to look at a control that
-   * works. A substitution, so the corpus does not move: one entry in, one entry out.
+   * **This entry has now lost its second sentence twice, and the second loss is the instructive
+   * one** — GitHub issue #372, [§ D640](../../../../DECISIONS.md),
+   * [§ D672](../../../../DECISIONS.md).
+   *
+   * It read *"neither rush purchase can be bought yet"*, then — once the pre-fit reached the run —
+   * *"starting with the building fitted is a different case and is built … but neither can be
+   * bought yet"*. § D672 sells the pre-fit, so that clause is **deleted** rather than reworded a
+   * third time (§ D227): the pre-fit is not an absence, and an absence register carrying a note
+   * about a control that works is the more dangerous half of that rule.
+   *
+   * **A rewrite naming where it *is* bought was drafted and rejected by a guard**, which is worth
+   * recording because the guard was right. `refusalsAreCurrent.test.ts`' unkeyed-register clause
+   * refuses an entry that contains *not built* and the authored name of a registered screen — and
+   * *"rebuilding between rounds is not built … the tally in Settings sells it"* is exactly that
+   * shape, whatever the author meant. An entry a reader could parse as *Settings is not built* is
+   * an entry that will be read that way. The register says what is missing and nothing else; where
+   * the pre-fit is sold is `everyday/settingsView.ts`'s own screen to say.
    */
   'The between-round purse — the server works out what each round earned and sends it back, and ' +
     'there is nothing to spend it on: rebuilding the tower between rounds is not built, so a purse ' +
-    'is a record of how far you got rather than a budget. Starting with the building fitted is a ' +
-    'different case and is built — it reaches the run — but neither rush purchase can be bought ' +
-    'yet, because no screen spends a chime.',
+    'is a record of how far you got rather than a budget.',
 ]);
 
 /* -------------------------------------------------------------------------- *

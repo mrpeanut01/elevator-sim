@@ -253,9 +253,16 @@ function harnessOf(
       watching: () => harness.watching,
       /* No page, so no API origin, so nothing to ask — the honest no-server arm. */
       dailyBoard: undefined,
-      /* Recorded rather than posted: what is asserted is which turn the host names, and when. */
+      /*
+       * Recorded rather than posted: what is asserted is which turn the host names, and when.
+       *
+       * It answers a balance since § D673, because the rail draws one. The figure is the count of
+       * turns this harness has been told about rather than a ledger's arithmetic — a stub that
+       * invented an award would be asserting `data/chime-ledger.json`'s prices from a test.
+       */
       bankCompletion: (turn) => {
         harness.banked.push(turn);
+        return Promise.resolve({ kind: 'balance', chimes: harness.banked.length });
       },
       onChange: (listener) => {
         calls.push('onChange');
@@ -2070,6 +2077,46 @@ describe('what the host banks — GitHub issue #499, first time only', () => {
     const answer: unknown = host.bankScenarioClear('sleeping-sky-lobby');
     expect(answer).toBeUndefined();
     expect(h.banked).toEqual([{ completion: 'scenario-cleared', scenarioId: 'sleeping-sky-lobby' }]);
+  });
+
+  it('keeps the ledger’s answer for the rail and notifies once it lands — § D673', async () => {
+    /*
+     * The half of GitHub issue #499 that was missing: the clear was banked and **nothing was
+     * drawn**, so a player could clear every fix case and never learn a currency existed. The
+     * filing path is still synchronous and still answers nothing — the assertion above — and what
+     * changed is that the answer is kept and the rail is told.
+     */
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    let notified = 0;
+    host.subscribe(() => {
+      notified += 1;
+    });
+    expect(host.chimeTally()).toBeUndefined();
+    host.bankScenarioClear('sleeping-sky-lobby');
+    /* Not yet: the answer is a promise, and a tally drawn before it lands would be a guess. */
+    expect(host.chimeTally()).toBeUndefined();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(host.chimeTally()).toEqual({
+      turn: 'scenario-cleared',
+      answer: { kind: 'balance', chimes: 1 },
+    });
+    expect(notified).toBeGreaterThan(0);
+  });
+
+  it('says there is no ledger rather than nothing when the build was served without one', async () => {
+    /*
+     * § D227 in the half `CLAUDE.md` calls the more dangerous one, applied to an absence: a build
+     * with no API origin banks nothing, and the rail is owed a line that says the turn happened
+     * rather than a silence the player reads as *it did not count*.
+     */
+    const h = harnessOf(base());
+    const host = createEverydayHost({ ...h.bindings, bankCompletion: undefined });
+    host.bankScenarioClear('sleeping-sky-lobby');
+    await Promise.resolve();
+    expect(host.chimeTally()).toEqual({ turn: 'scenario-cleared', answer: { kind: 'no-server' } });
+    expect(h.banked).toEqual([]);
   });
 
 });

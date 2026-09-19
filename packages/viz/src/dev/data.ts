@@ -40,6 +40,11 @@ import type { PriceSchedule } from '../pricing/types.js';
 import type { FixitCases } from '../fixit/types.js';
 import { parseProofCases, type ProofCaseSet } from '../gauntlet/proofCases.js';
 import { validatePublishedGoalRates, type PublishedGoalRates } from '../scenario/published.js';
+import {
+  isContentFinding,
+  validatePublishedSurvivors,
+  type PublishedSurvivors,
+} from '../scenario/survivors.js';
 import { parseReferenceRuns } from '../watch/reference.js';
 import type { WatchableRun } from '../watch/types.js';
 
@@ -277,10 +282,19 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
  * campaign checked against a malformed table would be checked against nothing.
  */
 export async function loadCampaign(resources: BrowserResources): Promise<LoadedCampaign> {
-  const [campaignRaw, publishedRaw, briefsRaw] = await Promise.all([
+  const [campaignRaw, publishedRaw, briefsRaw, survivorsRaw] = await Promise.all([
     fetchJson('/campaign.json'),
     fetchJson('/scenario-goals.json'),
     fetchJson('/engineering-briefs.json'),
+    /*
+     * The measured survivor counts — GitHub issue #367, [§ D649](../../../../DECISIONS.md).
+     *
+     * Fetched **here** rather than in a loader of its own, on this function's own stated ground:
+     * the table is keyed by `data/campaign.json`'s stages and means nothing without them, so a
+     * loader that could return one and not the other would let a caller hold half a scenario.
+     * It is validated below before anything reads it, exactly as the goal table is.
+     */
+    fetchJson('/scenario-survivors.json'),
   ]);
 
   const published = publishedRaw as PublishedGoalRates;
@@ -327,7 +341,46 @@ export async function loadCampaign(resources: BrowserResources): Promise<LoadedC
    */
   const briefs = parseEngineeringBriefs(briefsRaw, context);
 
-  return { campaign, briefs, published, space, dimensionHelp };
+  /*
+   * The survivor table, checked against the campaign it is keyed by — § D649.
+   *
+   * After `parseCampaign`, because `validatePublishedSurvivors` takes the stages as its context:
+   * a table checked against no campaign is a table checked against nothing, which is the ordering
+   * the goal table above is loaded in for the same reason. A malformed table **refuses the
+   * campaign load** rather than returning an unchecked one, because the only thing downstream does
+   * with it is publish a difficulty figure to a player, and `docs/38` § 2.1 makes an unpinned one
+   * worse than none.
+   */
+  const survivors = survivorsRaw as PublishedSurvivors;
+  const survivorViolations = validatePublishedSurvivors(survivors, {
+    stages: campaign.stages,
+    schedule: resources.priceSchedule,
+  });
+  /*
+   * **Only a malformed table refuses the load, and #381's first-hour floor is not one.**
+   *
+   * The first shape of this check threw on every violation, and the shipped table carries the
+   * floor's finding for `stage-1-first-call` — so `loadCampaign` threw on a well-formed table,
+   * `#campaign-profile` rendered with zero options, and the Lab's campaign tab was dead for every
+   * player. `savedDispatcher.browser.test.ts` caught it against a select that resolved empty, and
+   * the browser leg was green at the base commit, so it was this wave's to fix.
+   *
+   * The distinction is `scenario/survivors.ts#isContentFinding`, and it is the reason the
+   * predicate lives there rather than here: a finding that the *content* is too narrow is a true
+   * thing a working table reported, while a missing provenance field or a step keyed to no stage
+   * means no figure on the table can be trusted. The second is worth denying a screen over; the
+   * first is a measurement doing its job, and it is registered in
+   * `scenario/survivors.test.ts#FIRST_HOUR_SINGLE_SURVIVOR` where a reader can act on it.
+   */
+  const malformed = survivorViolations.filter((line) => !isContentFinding(line));
+  if (malformed.length > 0) {
+    throw new Error(
+      `data/scenario-survivors.json is not a valid survivor table, so no scenario can publish a ` +
+        `count from it:\n  ${malformed.join('\n  ')}`,
+    );
+  }
+
+  return { campaign, briefs, published, space, dimensionHelp, survivors };
 }
 
 export interface LoadedCampaign {
@@ -337,6 +390,16 @@ export interface LoadedCampaign {
   readonly published: PublishedGoalRates;
   readonly space: SearchSpace;
   readonly dimensionHelp: ReadonlyMap<string, string>;
+  /**
+   * `data/scenario-survivors.json`, validated against {@link campaign} — GitHub issue #367,
+   * [§ D649](../../../../DECISIONS.md).
+   *
+   * What `scenario/ladder.ts` joins to the stages so the Scenario hub can draw each one's measured
+   * count on its own face. Held here rather than fetched by the hub because `everyday/` may not
+   * import this module — see `everyday/scenarioLadderPort.ts` for the direction the dependency
+   * points instead.
+   */
+  readonly survivors: PublishedSurvivors;
 }
 
 /**

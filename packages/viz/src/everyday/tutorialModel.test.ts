@@ -31,6 +31,7 @@ import {
   tutorialCollapseViewOf,
   tutorialIsDue,
   tutorialWalkthroughViewOf,
+  type TutorialCollapseView,
   type TutorialProgress,
 } from './tutorialModel.js';
 
@@ -299,5 +300,203 @@ describe('the tutorial is outside `docs/33`’s difficulty curve — § D528', (
     expect(doc).toContain('The tutorial is outside the curve.');
     expect(doc).toContain('not a ladder position and is governed by none of DC-1 through DC-9');
     expect(doc).toContain('It is the one place a worked answer is permitted');
+  });
+});
+
+
+/*
+ * The shipped plain levers, read off a neutral vector. The two fields this file compares against —
+ * a lever's `label` and its `writes` clause — are not functions of the spec, which is why a neutral
+ * one is honest here and why `tutorialModel.ts` reads them the same way.
+ */
+const SHIPPED_LEVERS = plainLeversOf(
+  { name: 'baseline', weights: {}, flags: { pool: false, zone: false, bypass: true }, families: {} },
+  { parking: false, express: false, dwell: undefined },
+);
+
+/** Screen two in a named state, so each case below reads as the beat a player is standing in. */
+const collapse = (
+  over: Partial<Parameters<typeof tutorialCollapseViewOf>[0]> = {},
+): TutorialCollapseView =>
+  tutorialCollapseViewOf({
+    complaint: 'all three sit downstairs together',
+    complainer: 'resident, floor 4',
+    symptom: 'waits over a minute for a car up',
+    ...over,
+  });
+
+describe('screen two is a canvas and one press — `charter S1`', () => {
+  /*
+   * The finding this block was built for. `charter S1` (`docs/22` § 4) asks that a first-time
+   * player *reach a building in visible trouble within 90 s of first load*, and the shipped path was
+   * three prose screens with the first run-changing control on the sixth. Screen two's own lede has
+   * said *"Watch the three cars, and watch the fourth floor"* since § D529 and the screen drew no
+   * cars — § D227's stale refusal with its polarity reversed, on the one screen a stranger decides
+   * on. What these cases hold is that the picture is there, that exactly one control sits under it,
+   * and that the control is the shipped lever rather than a tutorial-shaped copy of it.
+   */
+  it('presses the shipped lever, by its own label and its own ends', () => {
+    const control = collapse({ runReady: true, changeReady: true }).control;
+    expect(control, 'screen two no longer offers a control').toBeDefined();
+
+    const named = SHIPPED_LEVERS.filter((lever) => lever.label === control?.label);
+    expect(named, `"${String(control?.label)}" is not one of the shipped plain levers`).toHaveLength(1);
+    const lever = named[0];
+    expect(control?.reads).toBe(lever?.reads);
+    expect(control?.from).toBe(lever?.atZero);
+    expect(control?.to).toBe(lever?.atFull);
+
+    /*
+     * And it is the **same** lever the walkthrough's second step teaches, which is what makes the
+     * two screens one lesson rather than two demonstrations sharing a screen count. The step is
+     * pinned to the lever by id above; this pins the control to the same lever by label, so the two
+     * screens cannot drift apart through the lever list.
+     */
+    const step = TUTORIAL_STEPS.find((candidate) => candidate.id === 'spread');
+    expect(control?.label).toBe(step?.control);
+    expect(lever?.writes).toContain('idle.parkingStrategy');
+  });
+
+  it('draws the lever’s player-facing words and never its `writes` clause', () => {
+    /*
+     * `mode/plainLevers.ts` states the rule this checks: `writes` *"names the owned field for the
+     * engineer-facing tooltip … an Everyday-only surface would not render it"*. It reads
+     * `idle.parkingStrategy: zone-center + split-demand`, which is internal notation on a player
+     * surface and a finding the honesty corpus would report the day it was drawn. Asserted over
+     * every string the control carries rather than over the one field, because the defect is a
+     * paste rather than a wiring mistake.
+     */
+    const control = collapse({ runReady: true, changeReady: true }).control;
+    const drawn = [
+      control?.heading ?? '',
+      control?.label ?? '',
+      control?.reads ?? '',
+      control?.from ?? '',
+      control?.to ?? '',
+      control?.why ?? '',
+    ];
+    for (const text of drawn) {
+      expect(/parkingStrategy|zone-center|split-demand/u.test(text), text).toBe(false);
+    }
+  });
+
+  it('refuses out loud while the second run has not landed, and stops refusing when it has', () => {
+    /*
+     * Both polarities of the standing requirement in one case. A press that does nothing and says
+     * nothing is the defect; so is a press that says it cannot work once it can. The refusal is a
+     * function of one input, so there is no third state for the two to disagree in.
+     */
+    const waiting = collapse({ runReady: true, changeReady: false }).control;
+    expect(waiting?.refusal).toBe(TUTORIAL_COPY.controlRefusal);
+    const ready = collapse({ runReady: true, changeReady: true }).control;
+    expect(ready?.refusal).toBeUndefined();
+  });
+
+  it('spends the press: the control is gone on the beat it moved, and the answer is drawn there', () => {
+    /*
+     * The worked answer **stays** — § D529 permits one in the first session and nowhere else — and
+     * what moved is when it lands: after the press, as confirmation, rather than before it as
+     * instruction. The beat is how the mount knows, so it is the beat that is asserted here; the
+     * mount's own half is read off disk below.
+     */
+    expect(collapse({ runReady: true, changeReady: true }).beat).toBe('as-built');
+    const answered = collapse({ beat: 'answered', runReady: true, changeReady: true });
+    expect(answered.beat).toBe('answered');
+    expect(answered.control, 'the press survived the beat it spent').toBeUndefined();
+  });
+
+  it('words the block for whichever run is in it, and labels the pair rather than the single', () => {
+    const asBuilt = collapse({ runReady: true, changeReady: true });
+    const answered = collapse({ beat: 'answered', runReady: true, changeReady: true });
+    expect(asBuilt.stage.eyebrow).not.toBe(answered.stage.eyebrow);
+    expect(asBuilt.stage.note).not.toBe(answered.stage.note);
+    expect(asBuilt.stageEnded).not.toBe(answered.stageEnded);
+    /*
+     * `caseStage.ts`'s own rule for the field, kept rather than restated: a caption over the only
+     * canvas on screen labels the one thing there, and two unlabelled canvases side by side are a
+     * puzzle rather than a comparison.
+     */
+    expect(asBuilt.paneCaptions).toEqual([]);
+    expect(answered.paneCaptions).toHaveLength(2);
+    expect(new Set(answered.paneCaptions).size).toBe(2);
+  });
+
+  it('says there is no picture yet rather than drawing an empty frame', () => {
+    const cold = collapse({ runReady: false });
+    expect(cold.stagePending).toBe(TUTORIAL_COPY.stagePending);
+    expect(collapse({ runReady: true }).stagePending).toBeUndefined();
+  });
+
+  it('gives the live region a sentence per state, which is what `AX-3` needs to be satisfiable', () => {
+    /*
+     * `docs/36` `AX-3`: *a live region is written when its sentence changes, and at no other time*.
+     * The mount can only obey that if the sentence is a function of the state rather than of the
+     * render, so the five states a player passes through must produce five different strings —
+     * otherwise a real change would be a write the mount correctly suppresses, which is the same
+     * failure as a missing announcement and harder to see.
+     */
+    const said = [
+      collapse({ runReady: false }).say,
+      collapse({ runReady: true, changeReady: true }).say,
+      collapse({ runReady: true, changeReady: true, runEnded: true }).say,
+      collapse({ beat: 'answered', runReady: true, changeReady: true }).say,
+      collapse({ beat: 'answered', runReady: true, changeReady: true, runEnded: true }).say,
+    ];
+    expect(new Set(said).size).toBe(5);
+    for (const sentence of said) expect(sentence.trim()).not.toBe('');
+  });
+
+  it('tells *no picture yet* apart from *the picture has finished*', () => {
+    /*
+     * **A bug this screen shipped for one commit, kept as a case.** `runReady` and `runEnded` were
+     * one flag, so a run that played to its own end printed *the morning is being simulated now*
+     * about a morning the player had just watched — a sentence telling a reader to wait for
+     * something that had already happened, which is § D227's shape on a pending state.
+     *
+     * The two absences look identical on screen (no canvas) and are opposites, so they are asserted
+     * against each other rather than each on its own.
+     */
+    const cold = collapse({ runReady: false });
+    const finished = collapse({ runReady: true, runEnded: true, changeReady: true });
+    expect(cold.stagePending).toBe(TUTORIAL_COPY.stagePending);
+    expect(finished.stagePending, 'a finished run is still described as pending').toBeUndefined();
+    expect(finished.stageEnded).toBe(TUTORIAL_COPY.stageEnded);
+    expect(cold.say).not.toBe(finished.say);
+    /*
+     * And `runEnded` cannot outrun `runReady`: a run that has not arrived has not finished either,
+     * so the model collapses the impossible pair rather than letting a caller invent it.
+     */
+    expect(collapse({ runReady: false, runEnded: true }).say).toBe(TUTORIAL_COPY.sayPending);
+  });
+
+  it('mounts the picture once per beat, disposes it on the way out, and draws the answer after the press', () => {
+    /*
+     * The mount's half, read off disk on this file's own pattern — the `viz` project is
+     * `environment: 'node'` and a DOM mount is not drivable here, so what is asserted is the wiring
+     * a model test cannot see.
+     *
+     * Four clauses, each a defect somebody has shipped in this tree:
+     * 1. the block is `caseStage.ts`'s, not a second canvas written for this screen;
+     * 2. it is built outside `render`'s rebuild path, or a sentence moving above it restarts the run
+     *    (`caseStage.ts`'s own docstring);
+     * 3. it is disposed on `unmount`, because that loop re-asks for a frame while merely detached
+     *    and a block left behind polls for the life of the page;
+     * 4. the worked answer is mounted on the `answered` beat and nowhere else.
+     */
+    expect(SCREENS_SOURCE).toContain("from './caseStage.js'");
+    expect(SCREENS_SOURCE).toContain('mountCaseStage(doc, {');
+    expect(SCREENS_SOURCE).toContain('unmount: () => {');
+    expect(SCREENS_SOURCE).toContain('dropStage();');
+    expect(SCREENS_SOURCE).toContain("view.beat === 'answered' && worked === undefined");
+    // `AX-3`'s *and at no other time*: the write is guarded on the sentence having changed.
+    expect(SCREENS_SOURCE).toContain('if (view.say !== said)');
+    expect(SCREENS_SOURCE).toContain("say.setAttribute('aria-live', 'polite')");
+    /*
+     * And the press is a real button, so it is in the tab order and operable by keyboard without
+     * anything being added for it — `docs/36` `AX-9`. A `div` with a click handler is the shape
+     * that fails that clause, and it is the shape this assertion exists to fail.
+     */
+    expect(SCREENS_SOURCE).toContain("el(doc, 'button', 'everyday-collapse-press', control.label)");
+    expect(SCREENS_SOURCE).toContain('press.addEventListener');
   });
 });

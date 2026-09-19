@@ -688,14 +688,34 @@ export interface LeaderboardClient {
   submitChallenge(token: string, submission: ChallengeSubmission): Promise<Result<ChallengeEntryAccepted>>;
   challengeBoard(challengeId: string, metric: string): Promise<Result<ChallengeBoardPage>>;
   /**
-   * The account's chime balance — GitHub issue **#368**, and **one number is the whole answer**.
+   * The account's chime tally — GitHub issue **#368**, [§ D671](../../../../DECISIONS.md).
    *
    * [§ D526](../../../../DECISIONS.md) clause 5: *the play surface reads one balance and posts two
    * verbs, earn and spend, and never knows a source.* There is deliberately no method here that
    * lists entries, asks where a chime came from, or reads a history — the server serves none, and
    * a client that offered one would be the first thing a *where did this go* screen needed.
+   *
+   * **The answer is a balance and the sinks this account bought**, which used to be the balance
+   * alone. § D671 is the ruling and `http/api.ts#chimeBalance` carries the argument: a sink the
+   * account **spent on** is not a source it **earned from**, and a play surface that cannot read
+   * what it bought cannot claim it on a run — `chimes/ledger.ts#unbackedModifiers` refuses a claim
+   * the ledger does not back, so the alternative is a client-side second copy that a reload loses.
+   * No price is on this wire, in either direction.
    */
-  chimes(token: string): Promise<Result<number>>;
+  chimes(token: string): Promise<Result<ChimeTally>>;
+  /**
+   * Buy `steps` of one modifier — the spend verb, and **there is no amount on it either**.
+   *
+   * {@link bankCompletion}'s argument in the other direction: the caller names a **sink** and a
+   * number of steps, `data/chime-ledger.json` prices it on the server, and the store refuses the
+   * write inside one statement when the balance cannot cover it. A client that named a price would
+   * be a purchase ([§ D526](../../../../DECISIONS.md) clause 6 as a signature).
+   *
+   * The answer is the new balance and what the step granted — never a receipt id, which would be a
+   * token that could be replayed, lost or shared. A run proves its modifier by naming the sink, and
+   * the server sums what the account bought.
+   */
+  spendChimes(token: string, sinkId: string, steps: number): Promise<Result<ChimeSpendAccepted>>;
   /**
    * Bank a turn the player finished — the earn verb, and **there is no amount on it**.
    *
@@ -709,6 +729,32 @@ export interface LeaderboardClient {
    * once per account and a rush only the waves beyond the account's best, whatever this sends.
    */
   bankCompletion(token: string, turn: ChimeTurn): Promise<Result<number>>;
+}
+
+/**
+ * One modifier this account has bought, summed over its purchases — `{sinkId, steps}` and nothing
+ * else.
+ *
+ * The same pair `packages/server/src/leaderboard/boardKey.ts` puts in a board key, and for the same
+ * reason: the key names the sink and the steps and `chime-ledger.json`'s `priceChimes` never leaves
+ * the server.
+ */
+export interface OwnedChimeModifier {
+  readonly sinkId: string;
+  readonly steps: number;
+}
+
+/** What {@link LeaderboardClient.chimes} answers — [§ D671](../../../../DECISIONS.md). */
+export interface ChimeTally {
+  readonly balanceChimes: number;
+  readonly modifiers: readonly OwnedChimeModifier[];
+}
+
+/** What {@link LeaderboardClient.spendChimes} answers: the new balance, and what the step granted. */
+export interface ChimeSpendAccepted {
+  readonly balanceChimes: number;
+  /** Units this spend added, or `0` for a sink that grants no units — a `prefit` is a kit, not a count. */
+  readonly grantUnits: number;
 }
 
 /**
@@ -850,6 +896,40 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
   };
 
+  /**
+   * The read verb's answer — {@link balance} plus the sinks the account owns
+   * ([§ D671](../../../../DECISIONS.md)).
+   *
+   * **A missing or malformed `modifiers` is `unexpected-response`, not an empty list**, on
+   * {@link balance}'s own argument one field over: drawing *you own nothing* over an account that
+   * bought something would refuse a player the thing they paid for, which is a screen lying about
+   * a store. A well-formed empty array is a real and common answer and is kept.
+   */
+  const tally = (body: unknown): ChimeTally | undefined => {
+    const chimes = balance(body);
+    const rows = (body as Record<string, unknown> | null)?.['modifiers'];
+    if (chimes === undefined || !Array.isArray(rows)) return undefined;
+    const modifiers: OwnedChimeModifier[] = [];
+    for (const row of rows) {
+      const entry = row as Record<string, unknown> | null;
+      const sinkId = entry?.['sinkId'];
+      const steps = entry?.['steps'];
+      if (typeof sinkId !== 'string' || sinkId === '') return undefined;
+      if (typeof steps !== 'number' || !Number.isInteger(steps) || steps < 1) return undefined;
+      modifiers.push({ sinkId, steps });
+    }
+    return { balanceChimes: chimes, modifiers: Object.freeze(modifiers) };
+  };
+
+  /** The spend verb's answer. A grant this client cannot read is the whole answer being refused. */
+  const spendAccepted = (body: unknown): ChimeSpendAccepted | undefined => {
+    const chimes = balance(body);
+    const granted = (body as Record<string, unknown> | null)?.['grantUnits'];
+    return chimes === undefined || typeof granted !== 'number' || !Number.isFinite(granted)
+      ? undefined
+      : { balanceChimes: chimes, grantUnits: granted };
+  };
+
   return {
     // `() => null` rather than a shape check: there is nothing in the body a caller is allowed to
     // read, so a "wrong shape" refusal would be a distinction with nothing behind it.
@@ -873,9 +953,19 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
       call({ method: 'POST', url: `${base}/api/auth/redeem`, token: undefined, body: { token: linkToken } }, session),
     logout: (token) => call({ method: 'POST', url: `${base}/api/logout`, token, body: {} }, () => null),
     me: (token) => call({ method: 'GET', url: `${base}/api/me`, token, body: undefined }, user),
-    chimes: (token) => call({ method: 'GET', url: `${base}/api/chimes`, token, body: undefined }, balance),
+    chimes: (token) => call({ method: 'GET', url: `${base}/api/chimes`, token, body: undefined }, tally),
     bankCompletion: (token, turn) =>
       call({ method: 'POST', url: `${base}/api/chimes/earn`, token, body: { ...turn } }, balance),
+    /*
+     * The body is `{modifier, steps}` and never a price — see {@link LeaderboardClient.spendChimes}.
+     * `modifier` rather than `sinkId` because that is what `http/api.ts#chimeSpend` reads, and this
+     * client does not get to choose the wire's spelling.
+     */
+    spendChimes: (token, sinkId, steps) =>
+      call(
+        { method: 'POST', url: `${base}/api/chimes/spend`, token, body: { modifier: sinkId, steps } },
+        spendAccepted,
+      ),
     setDisplayName: (token, displayName) =>
       call({ method: 'POST', url: `${base}/api/me/display-name`, token, body: { displayName } }, user),
     submit: (token, submission) =>
