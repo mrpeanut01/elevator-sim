@@ -102,6 +102,21 @@ const ROW_RADIUS_PX = 11;
 /** The prototype's mono figure colour on the *This device* rows — § 19 lists it only as a shaft tint. */
 const FACT_FIGURE_COLOR = '#8D6A2F';
 
+/**
+ * The id stem each chime row's drawn sentence carries, and which that row's button describes itself
+ * with — `everyday/boardScreen.ts#SHARE_NO_RUN_ID`'s reason, one row further.
+ *
+ * A constant rather than a literal at the two sites that must agree: an `aria-describedby` naming
+ * an id that is not in the document reads as a described control and describes nothing, which is
+ * worse than no attribute at all. The sink's own id is appended, so the ids are unique in the
+ * document and stable across paints.
+ *
+ * Not exported — the browser tier asserts the binding by resolving whatever id the attribute names
+ * (`deadControls.browser.test.ts`), which is the assertion worth making; a test that imported this
+ * and compared it to itself would prove less.
+ */
+const CHIMES_ROW_REASON_ID = 'everyday-chimes-reason';
+
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -502,6 +517,26 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     button.dataset.sink = row.id;
     const note = el(doc, 'div', 'everyday-settings-chimes-note');
     note.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.5;margin-top:3px;max-width:70ch`;
+    /*
+     * **The sentence is bound to the control, not merely drawn beside it** — `docs/36` AX-16, and
+     * `everyday/boardScreen.ts#SHARE_NO_RUN_ID`'s shape: `aria-describedby` at the node already on
+     * the page, never a second copy of the words, so there is no second wording to go stale.
+     *
+     * Without it a reader on a row that cannot be bought heard *dimmed* and nothing else, while a
+     * sighted player read the reason directly under the button —
+     * `screenReaderWalkthrough.browser.test.ts`'s `disabled-says-why` and
+     * `deadControls.browser.test.ts` both found all three rows, on the same three sentences.
+     *
+     * **Set once, here, rather than on every paint**, and on every arm rather than only the dead
+     * ones: {@link ChimesSpendRowView.note} is never absent — it is the effect on `buy` and the
+     * reason on the other four — so an attribute that came and went with the state would be a
+     * fourth thing `paintChimeRows` has to get right for a description that is always true. The
+     * id is the sink's, so it is stable across paints and unique in the document. The `title` is
+     * the pointer's half of the same sentence and *is* state-dependent: it is written only while
+     * the control refuses, below.
+     */
+    note.id = `${CHIMES_ROW_REASON_ID}-${row.id}`;
+    button.setAttribute('aria-describedby', note.id);
     button.addEventListener('click', () => {
       void buyChime(row.id);
     });
@@ -540,6 +575,14 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       const live = row.offer === 'buy';
       parts.button.textContent = `${row.name} — ${row.price}`;
       parts.button.disabled = !live || spending;
+      /*
+       * A pointer gets the same sentence a reader gets from `aria-describedby` above, and only
+       * while the control will not work — `boardScreen.ts`'s share button, for its reason: the
+       * `title` is the reason for a pointer and the description is the reason for everything else,
+       * both pointing at the one sentence drawn under the button.
+       */
+      if (parts.button.disabled) parts.button.title = row.note;
+      else parts.button.removeAttribute('title');
       parts.button.style.cssText = [
         'width:100%',
         'box-sizing:border-box',
