@@ -437,6 +437,24 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
   'viewer.patience':
     'the Parameters tab’s one applied schema, and the field it is written from is a mount that redraws at its declared defaults on every load — so persisting it would restore a run in which riders abandon while the four controls that say so read “none”, which is the screen and the run disagreeing rather than a session being remembered. It is also unreproducible elsewhere (runIdentity.ts refuses it by name) and abandonment moves the mean it would be judged on',
 
+  'viewer.paramDemand':
+    'the Parameters tab’s traffic source (§ D761), excluded on viewer.patience’ ground and for the '
+    + 'same mechanism: the form is a mount that redraws at its declared defaults on every load, so a '
+    + 'restored value would run a day at demandLevel max while the control that set it reads the '
+    + 'profile’s own — the screen and the run disagreeing rather than a session being remembered. '
+    + 'runIdentity.ts refuses it by name for the second reason, that neither a CLI line nor a '
+    + 'submission carries it, so a restored run could not be reproduced anywhere else',
+  'viewer.lobbyCrowding':
+    'the Parameters tab’s crowding block (§ D762), on the ground above. It is emitted whole or not '
+    + 'at all because core’s DoorCrowdingConfig requires all three fields, which makes a restored '
+    + 'partial state impossible to draw honestly: the form would show three defaults and the run '
+    + 'would carry three values',
+  'viewer.runnerTunables':
+    'four of SIM_PARAMETERS’ six rows (§ D763), on the ground above. The fifth, queueSampleCount, '
+    + 'is refused on the screen itself (§ D764) because it moves whether a mean is suppressed '
+    + 'without moving a leg — a restored value there would change a verdict with nothing on screen '
+    + 'to explain it',
+
   /* --- the four editors’ working copies ---------------------------------- */
   'viewer.dispatcherSpec':
     'a working copy is a diff against something in data/, and data/ is free to change between the save and the load — a restored draft of a different profile is worse than no draft',
