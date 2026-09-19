@@ -312,16 +312,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'everyday/shell.ts#mountEverydayShell',
         /*
-         * GitHub issue #348's as-built stage on the fix-it screen and the painter it shares with
-         * § 7's stage. `mountAsBuiltStage` builds a canvas and a transport, so it cannot run
-         * without a document; every word it draws is `everyday/fixitScreenModel.ts`'s copy table,
-         * whose three as-built keys the FIXIT adapter seeds by name because no model reaches them
-         * — the first probe of this wave's corpus move found them in `covers` and in nothing's
-         * output. `drawCutaway` paints geometry and floor labels onto a
-         * canvas context and authors no sentence — it is derived because a floor label is a word
-         * beside a word — and the labels it draws are the recording's own.
+         * The fix-it screen's stage blocks and the painter they share with § 7's stage — GitHub
+         * issue #348's as-built run, and since [§ D644](../../../../DECISIONS.md) the pair a press
+         * produces. `mountCaseStage` builds canvases and a transport, so it cannot run without a
+         * document; every word it draws is `everyday/fixitScreenModel.ts`'s copy table, whose three
+         * as-built and five pair keys the FIXIT adapter seeds by name because no model reaches them
+         * — the first probe of wave T's corpus move found the as-built three in `covers` and in
+         * nothing's output, and the five joined them by name rather than repeating that. The module
+         * was `asBuiltStage.ts` under this exclusion until it grew the second block.
+         * `drawCutaway` paints geometry and floor labels onto a canvas context and authors no
+         * sentence — it is derived because a floor label is a word beside a word — and the labels it
+         * draws are the recording's own.
          */
-        'everyday/asBuiltStage.ts#mountAsBuiltStage',
+        'everyday/caseStage.ts#mountCaseStage',
         'everyday/cutaway.ts#drawCutaway',
         /*
          * The brief's elevation painter, shared with the campaign's tower screen since GitHub

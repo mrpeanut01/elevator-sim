@@ -52,13 +52,33 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   /*
    * The as-built run, played before the four figures — GitHub issue #348, `docs/35` PM-FB1. Three
    * strings: the block's eyebrow, the sentence that says the figures below are read off this very
-   * run, and the one press. Here rather than in `asBuiltStage.ts` so the corpus sweeps them with the
+   * run, and the one press. Here rather than in `caseStage.ts` so the corpus sweeps them with the
    * rest of this screen's words.
    */
   asBuiltStageEyebrow: 'WATCH IT AS IT STANDS',
   asBuiltStageNote:
     'The morning the letter is about, as the building runs today. The four figures below are read from this run and no other.',
   asBuiltStageSkip: 'Skip to the figures',
+  /*
+   * The pair, played after a press — [§ D644](../../../../DECISIONS.md). Five strings: the block's
+   * eyebrow, the sentence saying what the two panes are and where the verdict under them comes
+   * from, the one press, and a caption over each canvas. Here rather than in `caseStage.ts` for the
+   * reason the three above are: the corpus sweeps this screen's words and not that mount's.
+   *
+   * **The note carries no figure, and that is deliberate rather than incidental.** This block sits
+   * directly above the outcome card, which is the surface allowed to state what the pair measured
+   * (`fixit/engine.ts#classifyOutcome`, with each row's before and after and the basis line under
+   * them). A number here would be a second place for one measurement to be published, and the
+   * second place is the one that goes stale — § D227's class, and the reason `docs/22` § 5 forbids
+   * a figure without its count rather than only a wrong figure.
+   */
+  pairStageEyebrow: 'WATCH WHAT YOU CHANGED',
+  pairStageNote:
+    'The same morning and the same crowd, played once on each building — as it stands on the left, ' +
+    'with your change on the right. The verdict below is measured from these two runs and no others.',
+  pairStageSkip: 'Skip to the verdict',
+  pairStageBeforeCaption: 'As it stands',
+  pairStageAfterCaption: 'With your change',
   diagnosisEyebrow: 'THE DIAGNOSIS',
   repairsEyebrow: 'RECONFIGURE IT YOURSELF',
   repairsHint:

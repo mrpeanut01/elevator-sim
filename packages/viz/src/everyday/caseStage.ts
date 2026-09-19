@@ -1,0 +1,269 @@
+/**
+ * **A fix case's runs, played** — one block, one transport, one or two canvases.
+ *
+ * This file was `asBuiltStage.ts` and mounted exactly one recording: the as-built run, played
+ * before the four figures (GitHub issue #348, `docs/35` PM-FB1). It is renamed and widened by
+ * [§ D644](../../../../DECISIONS.md) because the mode has a **second** run worth watching and it
+ * was being thrown away — `fixitScreen.ts#primary` bound `onDone: ([before, after])`, kept `before`
+ * on the session and let `after` go out of scope after `measuredOf` had read it. A player watched
+ * the building fail and was handed a table when their own change worked. Widening this block rather
+ * than writing a second one is `cutaway.ts`'s own rule one layer up: **two consumers of one painter
+ * rather than two painters**, so a car that reads as a car on § 7's stage reads as the same car in
+ * both of this mode's blocks.
+ *
+ * ## What it is, and what it deliberately is not
+ *
+ * Canvases painted by `cutaway.ts#drawCutaway` — the painter § 7's stage uses — driven by a single
+ * `Playback` at the player's own default speed, opening **playing**, because the point is that the
+ * run arrives as a sight. A *skip* press, and the run's own end, both call
+ * {@link CaseStageInput.onDone}; nothing else on this block is a control. No speed chips, no pause,
+ * no interventions: those are the stage's, and [§ D623](../../../../DECISIONS.md) clause 3 ruled
+ * that a fix case keeps its no-pause design, because a stage that let a case's run be pressed would
+ * be a second place to change a building this mode measures twice on purpose. That ruling was
+ * written about the opening run and it binds the pair for the same reason and more strongly: the
+ * pair **is** the two runs the verdict is measured from, so a press on it would edit the thing being
+ * judged.
+ *
+ * ## One playhead over two recordings, and why that is honest rather than a trick
+ *
+ * With two panes the transport is built over the **longer** recording and both panes are painted at
+ * its `simTimeS`. `frameAt` and `queueAt` clamp into their own recording's span, so a shorter pane
+ * holds on its last frame rather than extrapolating a run that had ended.
+ *
+ * Nothing here asserts the two runs are comparable — that is
+ * `fixit/run.ts#assertPairMatchesRepairs`'s job and it runs on the legs at the press site, before
+ * this block is built. What this block adds is that the two are shown **at the same minute**, which
+ * is the only reading under which *the same crowd, before and after* is something a player can see
+ * rather than a sentence they are asked to take.
+ *
+ * **That is common random numbers made visible, and it is why this mode's watching is not a replay.**
+ * `CLAUDE.md`'s statistical discipline requires every alternative under comparison to be fed *the
+ * same passenger traces*; `fixit/run.ts#fixitRunPlanOf` obeys it by building both configs off one
+ * case's seed, horizon and demand and differing only in the patches. Until this block existed, that
+ * discipline was something the product asserted in a basis line under a table. Side by side at one
+ * playhead it is the thing on screen: the same person, at the same landing, at the same minute of
+ * the same morning, in two buildings that differ only by what the player bought. A replay shows you
+ * a run again; this shows you the one variable you moved.
+ *
+ * ## Why the block, not the screen, owns the loop
+ *
+ * `fixitScreen.ts` rebuilds its main column on every redraw, and a canvas rebuilt on every redraw is
+ * a run that restarts every time a repair is toggled. So a block is built **once per case** (the
+ * as-built pane) or **once per run** (the pair) and re-appended, its loop keyed on the first canvas
+ * still being in a document: a detached block stops asking for frames, and a block the screen has
+ * finished with is disposed by name.
+ */
+
+import type { VizRecording } from '../contract/types.js';
+import { frameAt } from '../frame/frameAt.js';
+import { queueAt } from '../frame/overlay.js';
+import { systemClock } from '../playback/clock.js';
+import { Playback } from '../playback/playback.js';
+import { drawCutaway, sizeCanvas } from './cutaway.js';
+import { stageGeometryOf } from './stageScreenModel.js';
+import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from './tokens.js';
+
+/** The words this block draws — authored on the model side (`fixitScreenModel.ts`), passed in. */
+export interface CaseStageCopy {
+  readonly eyebrow: string;
+  readonly note: string;
+  readonly skip: string;
+}
+
+/**
+ * One run on screen.
+ *
+ * `caption` is `undefined` on a single-pane block, where a caption would be a label on the only
+ * thing there. On a pair both panes carry one, because two unlabelled canvases side by side are a
+ * puzzle rather than a comparison.
+ */
+export interface CaseStagePane {
+  readonly recording: VizRecording;
+  readonly caption?: string;
+}
+
+/**
+ * Which DOM classes this block wears.
+ *
+ * Passed rather than derived, because the two blocks this module mounts must be addressable apart:
+ * the browser tier asserts the as-built block is **gone** once skipped, and a pair block wearing the
+ * same class would make that assertion pass for the wrong reason.
+ */
+export interface CaseStageClasses {
+  readonly root: string;
+  readonly canvas: string;
+  readonly skip: string;
+}
+
+export interface CaseStageInput {
+  /** One pane, or two drawn side by side at one playhead. Empty is a programming error. */
+  readonly panes: readonly CaseStagePane[];
+  /** Simulated seconds per real second — the player's own default, read by the caller. */
+  readonly speedSimPerRealS: number;
+  readonly copy: CaseStageCopy;
+  readonly classes: CaseStageClasses;
+  /** Called once, on the skip press or the run's end, whichever comes first. */
+  readonly onDone: () => void;
+}
+
+export interface CaseStage {
+  readonly root: HTMLElement;
+  /** Stop the loop and the transport. Idempotent. */
+  dispose(): void;
+}
+
+export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage {
+  const panes = input.panes;
+  const longestPane = panes[0];
+  if (longestPane === undefined) {
+    throw new Error('caseStage: a stage with no run to play is not a stage.');
+  }
+
+  const root = doc.createElement('section');
+  root.className = input.classes.root;
+  root.style.cssText = [
+    'margin-top:14px',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.card)}px`,
+    `background:${C.card}`,
+    'padding:14px 17px',
+    'max-width:80ch',
+  ].join(';');
+
+  const head = doc.createElement('div');
+  head.style.cssText = 'display:flex;align-items:baseline;gap:12px;flex-wrap:wrap';
+  const eyebrow = doc.createElement('div');
+  eyebrow.textContent = input.copy.eyebrow;
+  eyebrow.style.cssText = `font:500 9.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
+  const skip = doc.createElement('button');
+  skip.type = 'button';
+  skip.className = input.classes.skip;
+  skip.textContent = input.copy.skip;
+  skip.style.cssText = [
+    'margin-left:auto',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.control)}px`,
+    'background:transparent',
+    `color:${C.ink}`,
+    'padding:6px 12px',
+    'font-size:12.5px',
+    'font-weight:600',
+    'cursor:pointer',
+  ].join(';');
+  head.append(eyebrow, skip);
+
+  const note = doc.createElement('p');
+  note.textContent = input.copy.note;
+  note.style.cssText = `font-size:13px;line-height:1.5;color:${C.inkSoft};margin:6px 0 10px`;
+
+  /*
+   * `auto-fit`/`minmax` rather than a fixed two-column rule: a pair that will not fit side by side
+   * stacks, and a stacked pair is still a before and an after in reading order. A single pane takes
+   * the whole row under the same declaration, so there is one layout here rather than two.
+   */
+  const grid = doc.createElement('div');
+  grid.style.cssText = [
+    'display:grid',
+    'grid-template-columns:repeat(auto-fit,minmax(260px,1fr))',
+    'gap:10px',
+  ].join(';');
+
+  const canvases: HTMLCanvasElement[] = [];
+  for (const pane of panes) {
+    const cell = doc.createElement('div');
+    cell.style.cssText = 'min-width:0;display:flex;flex-direction:column;gap:5px';
+    if (pane.caption !== undefined) {
+      const caption = doc.createElement('div');
+      caption.textContent = pane.caption;
+      caption.style.cssText = `font:500 9.5px ${TYPE.mono};letter-spacing:.12em;color:${C.label};text-transform:uppercase`;
+      cell.append(caption);
+    }
+    const canvas = doc.createElement('canvas');
+    canvas.className = input.classes.canvas;
+    canvas.style.cssText = `display:block;width:100%;height:42vh;border-radius:${String(R.tile)}px;background:${C.cardSunk}`;
+    cell.append(canvas);
+    canvases.push(canvas);
+    grid.append(cell);
+  }
+  root.append(head, note, grid);
+
+  /*
+   * The transport runs on the longest pane, so neither run is cut short by the other's horizon. The
+   * fix-it pair shares one `durationS` by construction — `fixit/run.ts#configOf` reads it off the
+   * case for both configs — so on the shipped cases this picks either. It is written for the run
+   * that reports short rather than on the assumption that none can.
+   */
+  const longest = panes.reduce(
+    (a, b) => (b.recording.endedAt > a.recording.endedAt ? b : a),
+    longestPane,
+  ).recording;
+  const playback = new Playback(longest, systemClock(), {
+    speed: input.speedSimPerRealS,
+    autoplay: true,
+  });
+  const labelOf =
+    (recording: VizRecording) =>
+    (id: string): string =>
+      recording.floors.find((floor) => floor.id === id)?.label ?? id;
+
+  let done = false;
+  let frameHandle: number | undefined;
+  const finish = (): void => {
+    if (done) return;
+    done = true;
+    playback.pause();
+    if (frameHandle !== undefined) doc.defaultView?.cancelAnimationFrame(frameHandle);
+    frameHandle = undefined;
+    input.onDone();
+  };
+  skip.addEventListener('click', finish);
+
+  const first = canvases[0];
+  const paint = (): void => {
+    frameHandle = undefined;
+    if (done || first === undefined) return;
+    if (!first.isConnected) {
+      // Detached rather than finished: ask again once the screen has re-appended the block.
+      frameHandle = doc.defaultView?.requestAnimationFrame(paint);
+      return;
+    }
+    const simTimeS = playback.simTimeS;
+    canvases.forEach((canvas, index) => {
+      const pane = panes[index];
+      if (pane === undefined) return;
+      const ctx = sizeCanvas(canvas);
+      if (ctx === undefined) return;
+      const rect = canvas.getBoundingClientRect();
+      const recording = pane.recording;
+      drawCutaway(ctx, {
+        recording,
+        frame: frameAt(recording, simTimeS),
+        queues: queueAt(recording, simTimeS),
+        geometry: stageGeometryOf({
+          width: rect.width,
+          height: rect.height,
+          floors: recording.floors,
+          shafts: recording.shafts,
+          outOfServiceCarIds: recording.outOfServiceCarIds,
+        }),
+        floorLabelOf: labelOf(recording),
+      });
+    });
+    if (playback.state === 'ended') {
+      finish();
+      return;
+    }
+    frameHandle = doc.defaultView?.requestAnimationFrame(paint);
+  };
+  frameHandle = doc.defaultView?.requestAnimationFrame(paint);
+
+  return {
+    root,
+    dispose: () => {
+      done = true;
+      playback.pause();
+      if (frameHandle !== undefined) doc.defaultView?.cancelAnimationFrame(frameHandle);
+      frameHandle = undefined;
+    },
+  };
+}

@@ -7099,13 +7099,29 @@ const FIXIT: SurfaceAdapter = {
 
     /*
      * The as-built stage's three words — GitHub issue #348. Authored in the copy table so they are
-     * sweepable, and seeded here directly because their only reader is `everyday/asBuiltStage.ts`,
+     * sweepable, and seeded here directly because their only reader is `everyday/caseStage.ts`,
      * a mount, which the search cannot drive; the rail and bar models below reach the table's other
      * keys, and these three would otherwise be in `covers` and in nothing's output.
      */
     seeds.push({ field: 'asBuilt.eyebrow', text: FIXIT_SCREEN_COPY.asBuiltStageEyebrow, role: 'label', provenance: 'authored' });
     seeds.push({ field: 'asBuilt.note', text: FIXIT_SCREEN_COPY.asBuiltStageNote, role: 'prose', provenance: 'authored' });
     seeds.push({ field: 'asBuilt.skip', text: FIXIT_SCREEN_COPY.asBuiltStageSkip, role: 'label', provenance: 'authored' });
+
+    /*
+     * The pair stage's five words — [§ D644](../../../../DECISIONS.md), on exactly the ground the
+     * three above sit on: their only reader is the same mount, so being in `covers` would be being
+     * in nothing's output. Wave T's finding in one line — *a claim of seeding is not seeding*.
+     *
+     * The note is the one worth a property looking at. It says the verdict below is measured from
+     * these two runs and no others, which is a claim about provenance rather than a figure, and it
+     * is true by construction: `fixitScreen.ts#primary` assigns `asBuilt`/`asRepaired` and computes
+     * the outcome in one statement, and clears the block on the next press.
+     */
+    seeds.push({ field: 'pair.eyebrow', text: FIXIT_SCREEN_COPY.pairStageEyebrow, role: 'label', provenance: 'authored' });
+    seeds.push({ field: 'pair.note', text: FIXIT_SCREEN_COPY.pairStageNote, role: 'prose', provenance: 'authored' });
+    seeds.push({ field: 'pair.skip', text: FIXIT_SCREEN_COPY.pairStageSkip, role: 'label', provenance: 'authored' });
+    seeds.push({ field: 'pair.before', text: FIXIT_SCREEN_COPY.pairStageBeforeCaption, role: 'label', provenance: 'authored' });
+    seeds.push({ field: 'pair.after', text: FIXIT_SCREEN_COPY.pairStageAfterCaption, role: 'label', provenance: 'authored' });
 
     /* ---- the case rail: both tags, and the derived {fixed}/{total} on both sides of solved ---- */
     for (const [where, solvedIds] of [

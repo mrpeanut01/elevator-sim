@@ -175,7 +175,7 @@ import type {
 } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type { VizRecording } from '../contract/types.js';
-import { mountAsBuiltStage, type AsBuiltStage } from './asBuiltStage.js';
+import { mountCaseStage, type CaseStage } from './caseStage.js';
 import { createOffThreadRunner } from '../dev/offThreadRuns.js';
 import { actionBarFor } from './actionBar.js';
 import { sideBySide } from './screenDom.js';
@@ -223,6 +223,27 @@ const PROTO = Object.freeze({
   passedWash: 'rgba(79,138,91,.09)',
 } as const);
 
+/**
+ * The two stage blocks' DOM classes, one constant each — GitHub issue #556, § D644.
+ *
+ * Named rather than inlined at the two mount sites because the browser tier addresses both blocks by
+ * these strings and asserts one is **absent** where the other may be present: the as-built block is
+ * gone once skipped, and a pair block wearing its class would make that assertion pass for the wrong
+ * reason. The as-built set is exactly what `asBuiltStage.ts` hard-coded before the module was
+ * widened, so no selector in the tier moved when it was.
+ */
+const AS_BUILT_STAGE_CLASSES = Object.freeze({
+  root: 'everyday-fixit-stage',
+  canvas: 'everyday-fixit-stage-canvas',
+  skip: 'everyday-fixit-skip',
+});
+
+const PAIR_STAGE_CLASSES = Object.freeze({
+  root: 'everyday-fixit-pair',
+  canvas: 'everyday-fixit-pair-canvas',
+  skip: 'everyday-fixit-pair-skip',
+});
+
 interface CaseSession {
   state: FixitState;
   fixed: boolean;
@@ -236,7 +257,33 @@ interface CaseSession {
    */
   asBuiltSeen: boolean;
   /** The mounted as-built stage, kept across redraws so a toggled repair does not restart it. */
-  asBuiltStage: AsBuiltStage | undefined;
+  asBuiltStage: CaseStage | undefined;
+  /**
+   * **The run the player's own change produced** — [§ D644](../../../../DECISIONS.md).
+   *
+   * Until that entry this object existed for the length of one statement: `primary`'s `onDone` bound
+   * `([before, after])`, read `after` twice — once to hold the pair's claim to its legs, once to
+   * measure the outcome — and let it go out of scope. A full recording of the day the player bought,
+   * simulated and thrown away unseen, on the one press this mode exists for.
+   *
+   * Held beside {@link CaseSession.asBuilt} rather than as a `{ before, after }` record, because
+   * `onDone` assigns both in the same statement and `asBuilt` **is** the before half: a record would
+   * hold one recording twice and give the screen two places to disagree about which run the verdict
+   * was measured from. Session-local and per case, exactly as `asBuilt` is and for the reason this
+   * file's docstring already gives — a recording is megabytes of legs, and it is not progress.
+   */
+  asRepaired: VizRecording | undefined;
+  /**
+   * Whether the player has watched the pair to its end or skipped it.
+   *
+   * {@link CaseSession.asBuiltSeen}'s rule pointed at the other end of the turn, with one deliberate
+   * difference: the opening sight is offered **once per case**, and this one **once per run**,
+   * because the next press produces a different day. A verdict is never withheld behind it — see the
+   * mount site.
+   */
+  pairSeen: boolean;
+  /** The mounted pair stage, kept across redraws so a toggled repair does not restart it. */
+  pairStage: CaseStage | undefined;
 }
 
 interface LoadedFixit {
@@ -345,6 +392,9 @@ function ensureRestored(): void {
       asBuilt: undefined,
       asBuiltSeen: false,
       asBuiltStage: undefined,
+      asRepaired: undefined,
+      pairSeen: false,
+      pairStage: undefined,
     });
   }
 }
@@ -379,6 +429,9 @@ function sessionOf(entry: FixitCase): CaseSession {
       asBuilt: undefined,
       asBuiltSeen: false,
       asBuiltStage: undefined,
+      asRepaired: undefined,
+      pairSeen: false,
+      pairStage: undefined,
     };
     sessions.set(entry.id, session);
   }
@@ -737,10 +790,11 @@ function mountFixit(
      */
     if (session.asBuilt !== undefined && !session.asBuiltSeen) {
       const recording = session.asBuilt;
-      session.asBuiltStage ??= mountAsBuiltStage(doc, {
-        recording,
+      session.asBuiltStage ??= mountCaseStage(doc, {
+        panes: [{ recording }],
         speedSimPerRealS: everydayProfileStore().defaultSpeed(),
         copy: { eyebrow: COPY.asBuiltStageEyebrow, note: COPY.asBuiltStageNote, skip: COPY.asBuiltStageSkip },
+        classes: AS_BUILT_STAGE_CLASSES,
         onDone: () => {
           const current = sessionOf(entry);
           current.asBuiltSeen = true;
@@ -887,7 +941,47 @@ function mountFixit(
     /* -- 6. the § 10.3 subset the engine prices: machinery, zones and parking -- */
     main.append(machinesCard(loadedFixit, entry, session, summary));
 
-    /* -- 7. the result, once run (§ 10.4) -- */
+    /*
+     * -- 7. the pair, played — [§ D644](../../../../DECISIONS.md), the payoff this mode was missing.
+     *
+     * Mounted once per run on the two recordings the verdict is measured from, re-appended on every
+     * redraw so a toggled repair does not restart it, and gone once watched or skipped.
+     *
+     * **It withholds nothing, and that is the whole of why it sits here rather than in front of the
+     * card.** GitHub issue #348 gates the four figures behind the opening watch, and the symmetric
+     * move — gate the verdict behind this one — was considered and refused. The verdict is not only
+     * a card: `session.fixed` badges the case in the rail, `keepSolved` writes it to the profile and
+     * `bankScenarioClear` files the chime, all in the statement that lands the run. Deferring the
+     * card alone would put a FIXED badge over a case whose card had not said so, which is `docs/20`
+     * defect 16 — *two verdicts about one case on one screen* — rebuilt on purpose; and deferring
+     * the rest would make watching a toll on the one loop this mode is made of, which is iterating.
+     * So the sight comes **first in reading order** and the press below it goes to the verdict,
+     * neither of which costs the player a fact they already have.
+     */
+    if (session.asBuilt !== undefined && session.asRepaired !== undefined && !session.pairSeen) {
+      const before = session.asBuilt;
+      const after = session.asRepaired;
+      session.pairStage ??= mountCaseStage(doc, {
+        panes: [
+          { recording: before, caption: COPY.pairStageBeforeCaption },
+          { recording: after, caption: COPY.pairStageAfterCaption },
+        ],
+        speedSimPerRealS: everydayProfileStore().defaultSpeed(),
+        copy: { eyebrow: COPY.pairStageEyebrow, note: COPY.pairStageNote, skip: COPY.pairStageSkip },
+        classes: PAIR_STAGE_CLASSES,
+        onDone: () => {
+          const current = sessionOf(entry);
+          current.pairSeen = true;
+          current.pairStage?.dispose();
+          current.pairStage = undefined;
+          live?.redraw();
+          live?.root.querySelector('.everyday-fixit-outcome')?.scrollIntoView({ block: 'nearest' });
+        },
+      });
+      main.append(session.pairStage.root);
+    }
+
+    /* -- 8. the result, once run (§ 10.4) -- */
     if (session.outcome !== undefined) main.append(outcomeCard(session.outcome));
 
     return main;
@@ -1409,6 +1503,20 @@ function mountFixit(
         running = false;
         if (before === undefined || after === undefined) return;
         session.asBuilt = before;
+        /*
+         * **And the repaired run is kept** — [§ D644](../../../../DECISIONS.md). It was read twice
+         * on the next two lines and dropped, which made the day the player's own change produced the
+         * only run in this product that is simulated and never drawn. The pair block below the
+         * machinery card plays it beside `before` at one playhead.
+         *
+         * A previous run's block is disposed and its watched flag cleared in the same statement, so
+         * the pair on screen is always the pair the card under it was measured from: two presses in
+         * a row must not leave the first press's picture over the second press's verdict.
+         */
+        session.asRepaired = after;
+        session.pairStage?.dispose();
+        session.pairStage = undefined;
+        session.pairSeen = false;
         // GitHub issue #350: the claim the basis line will make, checked on the legs first.
         assertPairMatchesRepairs(entry, session.state, before, after);
         session.outcome = classifyOutcome(entry, measuredOf(entry, before, after), spend);
@@ -1438,7 +1546,16 @@ function mountFixit(
         // the screen that must draw this outcome is the one on the page now.
         live?.redraw();
         live?.refreshBar();
-        live?.root.querySelector('.everyday-fixit-outcome')?.scrollIntoView({ block: 'nearest' });
+        /*
+         * The sight, not the card — `docs/38` § 1's *watching is the point*. The pair block is what
+         * the redraw above has just built, so it is what a landed run scrolls to; the card is the
+         * next thing under it and the block's own press goes there. Falls back to the card, because
+         * a run whose pair block did not mount must still land the player on its verdict.
+         */
+        const landOn =
+          live?.root.querySelector('.everyday-fixit-pair') ??
+          live?.root.querySelector('.everyday-fixit-outcome');
+        landOn?.scrollIntoView({ block: 'nearest' });
       },
       onFailed: (message) => {
         ask = undefined;
