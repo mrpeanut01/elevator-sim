@@ -40440,3 +40440,161 @@ No mechanism is offered for why `traffic.interfloorWeighting`, `traffic.maxLegs`
 beyond the structural reason each one's own test row states. Each is building-dependent by
 construction; whether any shipped tower *ought* to make one of them bite is a content question and
 is unmeasured here.
+
+## D838 — the `experiments` dead-code audit's scope is derived from disk, and the four directories nobody had named hold 83 uncalled exports
+
+**Date: 2026-09-19 · Owner: LANE-AD-G (wave AD) · Rules on:** nothing recorded; it applies
+`CLAUDE.md`'s standing requirement (*name the non-test caller*) to the four directories of
+`packages/experiments` that no audit had ever covered. **Refines [§ D836](DECISIONS.md)'s
+derivation one package along, and binds `packages/experiments/src/tuning/callers.test-helper.ts`,
+which is shared, so it is an entry rather than a docstring.** New file:
+`packages/experiments/src/deadCode.test.ts`.
+
+### 1. The gap, measured before it was acted on
+
+`server` and `viz` derive their audit scope from the tree; `core` began doing so in `6bf548d`.
+`experiments` had four audits, each naming its own directory by hand — `tuning/{search,space,report}`,
+`runner`, `teaching`, `fuzz` — **six directories out of ten**. Derived from disk, the scope is:
+
+| directory | exports | audited before |
+|---|---|---|
+| `benchmark/` | **565** | no |
+| `reports/` | **106** | no |
+| `validation/` | **55** | no |
+| `oracle/` | **33** | no |
+| `runner/` | 109 | yes |
+| `tuning/{search,space,report}` | 207 | yes |
+| `fuzz/` | 71 | yes |
+| `teaching/` | 24 | yes |
+
+**759 exports had never been asked the question**, and `benchmark/` is where this project's
+published intervals live — the class `CLAUDE.md` records three figures failing.
+
+**Two corrections to the figures this lane was handed.** `benchmark/` measures **565** here rather
+than 566, on today's tree. And the *package root* is **0**, not 8: `experiments/src` holds only
+`index.ts` and `browser.ts`, both barrels, and the eight are `export type { … } from …` re-export
+clauses that the scanner's `EXPORTED` pattern never matched — it requires an identifier after
+`type`. They were never in scope to lose, and the derivation excludes the root for exactly the
+reason `core`'s excludes `core/src`.
+
+### 2. What the derivation is, and the two things that stop it narrowing silently
+
+Scope is `deriveScope()` — every directory under `experiments/src` holding at least one file that
+is not a test and not a barrel. The four earlier audits' directories are subtracted, and the union
+is asserted to be the whole derived scope in both directions, so a directory is covered here,
+covered there, or provably has no export site. The excluded set is **also named**
+(`experiments/src`, `experiments/src/tuning`, `experiments/src/validation/golden`), so a directory
+falling out of scope is a diff rather than a silence.
+
+**The hand-written half is checked against the files it mirrors.** `COVERED_BY_AN_EARLIER_AUDIT`
+maps each subtracted directory to the audit that claims it, and the assertion reads that file and
+requires the literal to still be there. A directory moved between audits, or dropped from one,
+fails here instead of becoming silent double-coverage or silent no-coverage.
+
+**And the control the tree cannot provide.** A dead-code audit cannot test its own scope against
+the tree it audits, because that tree holds no directory that *ought* to be a finding. So one is
+built: a synthetic package in a temporary root, two modules, one export imported by a sibling and
+one imported by nothing, plus a barrel naming the second. The derivation must find the module
+nobody listed, the audit must report its export, and it must **not** report the imported one — with
+no list in the file edited. That is why `auditModules` grew a `root` parameter; the alternative was
+a control that mutates `packages/` and can fail into a dirty worktree.
+
+A second control was added after it went red on something outside its subject. `boundNames` cannot
+see a namespace import, so an export reached by `import * as ns` reads dead while being called.
+Measured: no non-test file reaches an `experiments` export that way. The assertion is scoped to
+imports that could actually resolve into this package — written broadly first, it failed on
+`viz/src/render/canvas.ts` importing its own `./tokens.js`, and a control that fails on something
+it does not cover is a control somebody deletes rather than reads.
+
+### 3. 83 findings, in three registers, split by a measured property rather than a judgement
+
+780 exports in scope, **83 with no caller**. They are not one list, and they are not
+`PUBLIC_API_ONLY`:
+
+| register | count | what it means |
+|---|---|---|
+| `PACKAGE_SURFACE` | **25** | on `experiments/src/index.ts` or `browser.ts`; a consumer outside the package *can* import it |
+| `SUITE_ONLY` | **52** | on no package barrel; every reference is a `*.test.ts` in this package |
+| `DEAD_CANDIDATES` | **6** | no reference anywhere — not a caller, not a barrel, not a test |
+
+Reachability was computed by walking the package barrels transitively, not assumed. **All three are
+findings**, and the middle register is named `SUITE_ONLY` rather than folded into the first for the
+reason § D836 refused `termReferenceScale`: a public-API claim about a symbol nothing outside the
+package can reach is false. Each count is a literal, and the only honest reason any of them may
+rise is the one that put them there — the audit looking somewhere it had never looked.
+
+### 4. Three things the registers say that prose did not
+
+**Twelve study renderers are printed by nothing.** `benchmark/` splits into study modules that
+drive themselves — `counterweightOptimum.ts`, `descentCapHeight.ts` and `diversionDetourStudy.ts`
+each end in a `process.stdout.write(format…(study))` block, a real caller in the symbol's own file —
+and modules that do not. Every uncalled renderer belongs to the second group: `regeneratePins.ts`
+imports the `run*` entry points and reads their *figures*, never their prose.
+
+**Twenty-four of the fifty-two `SUITE_ONLY` entries are five files' worth of test scaffolding
+sitting in the production namespace** — `validation/{harness,golden,perfInstrument,serviceMode,syntheticBuilding}.ts`
+and `oracle/upPeakCase.ts`. They are not `.test-helper.ts` files, so the scanner reads their
+exports as production exports with no production caller, which is not wrong. Renaming them is the
+obvious disposition and is a rename several suites import; it is reported rather than taken.
+
+**`benchmark/derivedPublishedForms` is a stale refusal rather than a plain absence, and it is the
+sharpest of the six.** Its docstring says *"the set is the vocabulary Layer B checks published
+literals against"* and names the two precisions it renders at. Layer B is
+`benchmark/published.test.ts`, it does not call this function, and it has its own `derivableForms()`
+at lines 106–120 rendering the same pins at **1 to 5** decimal places — strictly wider, and live.
+So a dead symbol carries a sentence telling the next reader it is the vocabulary of a guard that
+built its own. **Disposition: deletion, stated and not taken.** `published.ts` is the file the pin
+guard rests on, and removing lines from it belongs in a change reviewed on its own terms rather
+than riding in on an audit's first widening. Nothing here was deleted to make a register smaller.
+
+### 5. What this does not do
+
+It does not merge the four earlier audits into this one — each carries an allowlist argued symbol
+by symbol over several waves, and rewriting four files' reasoning to gain one `describe` block
+would trade evidence for tidiness. It does not widen the definition of a caller, touch any existing
+allowlist entry, or move any bound. The scanner, the barrel rule and the both-directions staleness
+check are untouched.
+
+## D839 — the barrel disposition offered for `dispatch/isParameterActive` does not close it, and two of the three names are the ones that move
+
+**Date: 2026-09-19 · Owner: LANE-AD-G (wave AD) · Refuses:** the disposition recorded in
+[§ D836](DECISIONS.md) and in `packages/experiments/src/tuning/space/types.ts`'s own docstring.
+**Changes no code**; it corrects a stated instruction, which is why it is an entry rather than a
+docstring note.
+
+### 1. The instruction, and what is wrong with it
+
+`experiments/src/tuning/space/types.ts` restates `core`'s `activeWhen` evaluation rule and says why:
+*"it is one only because that function is not on `@elevator-sim/core`'s barrel … **If those three
+names reach the barrel, delete this and import them.**"* § D836 registered
+`dispatch/isParameterActive` in `core`'s `DEAD_CANDIDATES` citing exactly that sentence, with the
+disposition *"three names onto the barrel and a restatement deleted in another package"*.
+
+**It is true of two of the three.** `activeWhenSatisfied` and `isActiveWhenRange` take a bare
+condition, so `core`'s versions are drop-in and the barrel is the only obstacle. `isParameterActive`
+is declared `(parameter: DispatchParameterSpec, read)`; the function that would replace it is
+`types.ts#isActive`, declared `(parameter: SearchParameter, read)` — and the header of that same
+file states, in its own words, that *"a `SearchParameter` is deliberately **not** a
+`DispatchParameterSpec`"*. It is a union over four schemas, not the dispatch spec. Substituting one
+for the other needs a cast, and a cast is precisely what would stop the two rules being checked
+against each other, which is the property `collect.test.ts` exists to hold.
+
+### 2. Why this matters rather than being pedantry
+
+`isParameterActive` is the symbol the register entry is *about*. So executing the stated
+disposition in full — three names onto `core`'s public barrel, two functions deleted in
+`experiments`, a pin in `collect.test.ts` made vacuous, a register edited in another lane's
+just-landed file — would close the two names nobody registered and **leave the registered one
+exactly as uncalled as it is today**, because a barrel is not a caller and the only would-be caller
+cannot use its type. A cross-package change that does not close the finding it cites is worth
+refusing rather than performing.
+
+### 3. Disposition
+
+**Not done, and the instruction is corrected where a reader meets it** rather than only here:
+`types.ts`'s docstring now says which two of the three are drop-in and why the third is not.
+`core`'s register entry is left untouched — it is another lane's file and its finding is still
+true; what has changed is that the remedy beside it is known to be partial. Whoever takes it next
+needs a disposition for `isParameterActive` on its own terms — a caller that holds a
+`DispatchParameterSpec`, or deletion — and the barrel move is a separate, smaller change that
+closes nothing in any register.

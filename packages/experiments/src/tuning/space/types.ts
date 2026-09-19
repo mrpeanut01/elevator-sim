@@ -126,8 +126,20 @@ export type GateReader = (id: string) => ParameterValue | undefined;
  * not `activeWhenSatisfied`, `isParameterActive` or `isActiveWhenRange`. `experiments` may import
  * `@elevator-sim/core` and nothing else — reaching into a subpath is a dependency in everything
  * but the manifest — so the rule is restated here, once, and `collect.test.ts` pins it against
- * `core`'s own table of cases from `dispatch/parameters.test.ts`. **If those three names reach the
- * barrel, delete this and import them.**
+ * `core`'s own table of cases from `dispatch/parameters.test.ts`.
+ *
+ * **That instruction used to read *"if those three names reach the barrel, delete this and import
+ * them"*, and it is true of two of the three rather than all three** (`DECISIONS.md` § D839).
+ * {@link activeWhenSatisfied} and {@link isActiveWhenRange} take a bare condition, so `core`'s
+ * versions are drop-in and the barrel is the only thing in the way. `isParameterActive` is **not**:
+ * it is declared `(parameter: DispatchParameterSpec, ...)`, and this module's {@link isActive}
+ * takes a {@link SearchParameter}, which the header of this file says is *deliberately not* a
+ * `DispatchParameterSpec`. Passing one to the other needs a cast, and a cast is exactly the thing
+ * that would stop the two rules being checked against each other. So a barrel move closes the
+ * first two and leaves `isParameterActive` as uncalled as it is today -- which matters, because
+ * that symbol is the one `core/src/dispatch/deadCode.test.ts` registers with *this* restatement
+ * named as its would-be caller (§ D836). The disposition offered there does not close the
+ * finding it was offered for.
  *
  * The rule, unchanged:
  *

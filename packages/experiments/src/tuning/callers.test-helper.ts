@@ -284,13 +284,27 @@ export interface ModuleAudit {
  *
  * @param modules paths relative to `packages/`, e.g. `experiments/src/runner`. Not recursive:
  *   each names one directory, so a submodule is audited by naming it.
+ * @param scope the corpus to read. Defaults to every `src/` file under `packages/`.
+ * @param root what `modules` and the corpus's paths are relative to. Defaults to `packages/`, and
+ *   the **only** reason it is a parameter is so that an audit can be pointed at a synthetic tree
+ *   and watched going red. `experiments/src/deadCode.test.ts` derives its module list from disk,
+ *   and a derivation is the one thing a dead-code audit cannot check against the tree it is
+ *   auditing: the tree has no directory that *ought* to be a finding. So that file builds one in
+ *   a temporary root — a module the list does not name, holding a single uncalled export — and
+ *   requires this function to report it with no list edited. Without the parameter that control
+ *   would have to mutate `packages/` itself, which is a control that can fail into a dirty
+ *   worktree.
  */
-export function auditModules(modules: readonly string[], scope: Corpus = corpus()): ModuleAudit {
+export function auditModules(
+  modules: readonly string[],
+  scope: Corpus = corpus(),
+  root: string = PACKAGES_DIR,
+): ModuleAudit {
   const all = scope.files;
   const symbols: AuditedSymbol[] = [];
 
   for (const moduleRelative of modules) {
-    const moduleDir = join(PACKAGES_DIR, moduleRelative);
+    const moduleDir = join(root, moduleRelative);
     const short = basename(moduleRelative);
     for (const path of all) {
       if (dirname(path) !== moduleDir || isTest(path) || isBarrel(path)) continue;
@@ -299,13 +313,13 @@ export function auditModules(modules: readonly string[], scope: Corpus = corpus(
         const name = EXPORTED.exec(line)?.[1];
         if (name === undefined || seen.has(name)) continue;
         seen.add(name);
-        symbols.push({ key: `${short}/${name}`, name, file: relative(PACKAGES_DIR, path) });
+        symbols.push({ key: `${short}/${name}`, name, file: relative(root, path) });
       }
     }
   }
 
   const uncalled = symbols.filter((symbol) => {
-    const own = join(PACKAGES_DIR, symbol.file);
+    const own = join(root, symbol.file);
     const selfUses = (code(scope.text(own)).match(new RegExp(`\\b${symbol.name}\\b`, 'g')) ?? [])
       .length;
     if (selfUses > 1) return false;
