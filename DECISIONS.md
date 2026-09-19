@@ -40910,7 +40910,7 @@ requirement says does not count.
 |---|---|---|
 | `repairs[].effect`, `diagnosed` only | *"The 9 waits over a minute are the target"* | **18 of 18** |
 | the same sentence's tail | *"…and it is a setting"* | 7 |
-| `fixit/engine.ts#repairRowOf`'s price line | `free — configuration` | 5 — **no** non-diagnosed repair in the file costs nothing, so those words appeared on the answer and on nothing else |
+| `fixit/engine.ts#repairRowOf`'s price line | `free — configuration` | **4** — **no** non-diagnosed repair in the file costs nothing, so those words appeared on the answer and on nothing else. *(Published as five and corrected by derivation on the next commit; a repair's price is not in the file, so it has to be resolved through `data/price-schedule.json` rather than read.)* |
 | the **draw order** | the file authors `repairs[]` in role order and both surfaces drew them in it, so the answer was row one | **18 of 18** |
 
 The last is the one a phrase sweep cannot see, and it is `role` reaching a player-facing surface without anything ever rendering the word. GitHub issue #566 named five sites, the tree had seven, and the shape it was really about was all eighteen.

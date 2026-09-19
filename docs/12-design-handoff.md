@@ -891,7 +891,7 @@ argument is good and it **does not reach** the second line: every diagnosed repa
 by naming the complaint as *the target*, seven of them adding *"and it is a setting"*, which
 narrows nothing and marks the row. So the eighteen sentences leave now, with two tells the ruling
 had not named — `repairRowOf`'s `free — configuration` price line, which is *it is a setting* in a
-price's clothes and appeared on the correct repair and on nothing else in the five cases whose
+price's clothes and appeared on the correct repair and on nothing else in the four cases whose
 answer is free; and the **draw order**, since `data/fixit-cases.json` authors every case's repairs
 in role order and both surfaces drew them in it, putting the answer in row one eighteen times out of
 eighteen. `fixit/engine.ts#repairsInDrawOrder` shuffles the rows deterministically per case.

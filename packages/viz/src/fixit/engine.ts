@@ -906,7 +906,7 @@ function drawKeyOf(caseId: string, repairId: string): number {
  * It read `'free — configuration'`, and the second word is `docs/38` § 2.1's *"printed line that
  * says what kind of fix it is"* wearing a price's clothes: *a line saying it is a setting, not a
  * shaft is a proposed fix with the price removed*. It was worse than a hint, because **no
- * non-diagnosed repair in `data/fixit-cases.json` costs nothing** — so in the five cases whose
+ * non-diagnosed repair in `data/fixit-cases.json` costs nothing** — so in the four cases whose
  * diagnosed repair is free, the words *free — configuration* appeared on the answer and on nothing
  * else. `free` is the whole of what the row knows and the whole of what the player is owed; what
  * the change is made of is the thing they are here to work out.
