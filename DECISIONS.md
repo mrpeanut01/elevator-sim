@@ -40780,3 +40780,116 @@ true; what has changed is that the remedy beside it is known to be partial. Whoe
 needs a disposition for `isParameterActive` on its own terms — a caller that holds a
 `DispatchParameterSpec`, or deletion — and the barrel move is a separate, smaller change that
 closes nothing in any register.
+
+## D801 — the kernel's event valve is counted over the kernel's life, and its message stops naming the call that was holding it
+
+**Date: 2026-09-19 · Owner: lane AD-E · Lane block: D801–D835 · Binds: `packages/core/src/sim/simulation.ts` · Cited by: `packages/core/src/kernel/kernel.ts`, `packages/core/src/sim/interrupt.test.ts`**
+
+**Decision.** `SimKernelOptions` gains `eventBudgetScope?: 'per-call' | 'lifetime'`, defaulting to
+`'per-call'`, which is the historical behaviour and is what every existing caller keeps.
+`Simulation` constructs its kernel with `'lifetime'`. Under that scope `maxEventsPerRun` is counted
+over every event the kernel has fired since construction or `reset()`, and the thrown message names
+**neither the calling method nor `currentTime`**.
+
+**Why.** [§ D802](#d802) lets a caller split one drain into as many bounded calls as it likes. Under
+the per-call default that hands the caller N budgets instead of one, so a livelock the valve catches
+in a single call runs on forever in ten — and, the part that matters more here, **the same seed
+produces a different record depending on where the caller paused**, which is `CLAUDE.md`
+invariant 5 failing quietly. The two scopes are indistinguishable for a kernel drained exactly once,
+because `fired` and `processedCount()` are then the same number, so nothing that existed before this
+entry can tell the difference.
+
+**The message is part of the decision and was the harder half.** It travels into `Simulation`'s
+warnings and therefore into the persisted `RunRecord`, and two of its parts varied with the
+chunking rather than with the run:
+
+| part | one call | stepped | why |
+|---|---|---|---|
+| the method | `SimKernel.runUntilEmpty` | `SimKernel.run` | the valve tripped inside whichever call was holding it |
+| the clock | the last event's time | the previous boundary | a lifetime budget can be found already spent at the *start* of a later chunk, with the clock parked at a time the caller chose |
+
+Both were found by measurement rather than by reading — `sim/interrupt.test.ts`'s digest comparison
+failed twice, and the diff each time was one string and nothing else in the whole result. Under
+`'lifetime'` the message says `SimKernel` and reads `lastEventTime()`; under `'per-call'` it is
+byte-for-byte what it always was, because there the budget really is a property of the one call and
+the clock is necessarily on the last event it fired.
+
+**`SimKernel.lastEventTime()` is new and is the other half of the same problem.** `run(until)`
+advances the clock to `until` whether or not anything fired there, so *"how far has the caller asked
+us to look"* and *"when did this run stop"* stopped being the same number the moment a caller could
+stop early. Everything meaning the second now reads this; for a run drained by `runUntilEmpty()` the
+two are identical, which is why substituting it moved no existing figure.
+
+**What is not decided here.** The default is untouched and no existing caller is migrated. A caller
+that legitimately drains a kernel more than once and wants a fresh budget each time still gets one,
+and nothing in this tree is now relying on that without saying so.
+
+## D802 — a run can be stopped and resumed, and a run advanced in chunks is byte-identical to one advanced in a single call
+
+**Date: 2026-09-19 · Owner: lane AD-E · Lane block: D801–D835 · Rests on: [§ D801](#d801) · Cited by: `packages/core/src/sim/simulation.ts`, `packages/core/src/sim/interrupt.test.ts`**
+
+**Decision.** `Simulation` gains `advanceTo(untilS)`, `finish()`, `now()`, `isDrained()`,
+`hasStarted` and `hasFinished`. `run()` is `finish()` under its historical name and is unchanged in
+behaviour, including its refusal of a second call. The schedule is laid down by whichever of
+`advanceTo`/`finish` is called first, and both go through one private `#drain`.
+
+**Why.** `run()` was the only method on the class that moved the clock. Every dispatch decision in a
+day was therefore taken before the first frame of it could be drawn, which is what `docs/16` § 1
+states outright — *"there is no such thing as a mid-day change; every change re-runs the day from
+zero"* — and it makes `docs/43` P1's central moment, *the tower developing a problem in front of you
+and you seeing it before the numbers do*, **structurally unavailable rather than merely unbuilt**.
+P1's stated failure mode, *set it up, press go, read a table*, was not a risk on this tree; it was
+the architecture. `kernel/kernel.ts` has always implemented the bounded drain. Nothing exposed it.
+
+**The claim this rests on, and it is a run rather than an argument.** A run advanced in N chunks
+produces a **byte-identical** `RunRecord` to the same run advanced in one call. Not statistically
+equivalent and not equivalent up to floating point. `sim/interrupt.test.ts` proves it by sha-256
+over the serialized record, seven chunkings × four configurations:
+
+| configuration | record digest, identical across all seven chunkings |
+|---|---|
+| `midtown-office`/`collective`, seed 20 260 919 | `de2a19652b6a1cb813367c69bf594581b19e43bcae669004bb74fe248ebc1d1c` |
+| the same with `recordCarMoves` | `e390ada68f58a4f1f0e73ab0c6ce11b6bfd4a7325423314ee1cf1a49de8e8156` |
+| `garden-apartments`/`eta`, seed 20 260 919 | `ff0ce378c58478894fde5fe2b40da4faa91c78c705f1afd5f3369e61a55115a8` |
+| `midtown-office`/`collective`, seed 20 260 920 — the control | `21e3367554bcb3a2f7d6b707eafe26d8b7a57524759b4362ef6763881213c9e2` |
+
+The chunkings are every 60 s (14 boundaries), 1 s (899), 0.37 s (2 432), π·1.7 s (168), **the
+record's own event times** (651 — every boundary landing exactly on an instant the run produced),
+one pause at 450 s, and `0 s, 300 s, 9 000 s` — the last stepping far past the end of the day, which
+is what catches a clock parked at `until`. A fourth configuration in that file,
+`midtown-office`/`collective-enroute`, is the profile that **cancels events mid-flight**
+([§ D205](#d205)), because cancellation is the one kernel operation that could plausibly interact
+with a boundary. The control seed is there because an equality is worth nothing from an instrument
+that cannot report a difference.
+
+**Mid-event and mid-dwell are measured, not argued from step sizes.** Passenger records cannot show
+a dwell — every alighting and boarding at a stop is recorded at **one instant** — so the case that
+carries the cut assertions asks for `recordCarMoves` and reads intervals off `CarMoveRecord`:
+strictly inside `(startedAt, arrivesAt)` is mid-flight, strictly inside
+`(arrivesAt, next.commandedAt)` at the same floor is mid-dwell.
+
+**Two things were not free**, and both are fixed at the source rather than absorbed here: the event
+valve's budget and its message ([§ D801](#d801)), and `SimKernel.run(until)` parking the clock, for
+which every end-of-run reading in this class now goes through `#endOfRunS()`.
+
+**Fork-at-`t` is assessed and deliberately not built as a clone.** A `Simulation` holds 103 private
+fields, live `Car`/`Floor`/`DispatchPolicy` objects, a `MetricsRecorder`, a `StreamSet`, and
+`#carArrivals`/`#pendingTicks` holding `ScheduledEvent` handles by **identity**; all ten non-test
+`schedule` call sites in `core/` are in this one file and every one passes an arrow closure over
+`this`, so the queue is neither serialisable nor structured-cloneable. **Fork by replay needs none
+of it and is stronger**: construct a second `Simulation` from the same config, `advanceTo(t)`, and
+let it differ — its prefix is not a copy of the first run's prefix, it *is* that computation, from
+the same seed. Common random numbers arrive free because the trace is drawn in the constructor
+before a car moves. `runs one present into two futures on the identical passenger trace` asserts the
+three parts: the same population, a genuine divergence, and each arm byte-identical to running that
+arm straight through. **What is missing for fork-at-`t` is a mutation seam on a live `Simulation`,
+not a snapshot** — every mid-run change is presently authored up front as a `serviceEvents` entry or
+a `RunInterventionConfig`, and the honest shape is to append to that one schedule at the current
+clock rather than to invent a second authority beside `#onServiceChange`.
+
+**This ships with no non-test caller and that is stated rather than discovered.** The caller will be
+`packages/viz/src/record/recordRun.ts`, which says in its own first line that it is *"the only place
+in the package that runs a simulation"*, with `dev/shiftWorker.ts` behind it; that is a
+`packages/viz` change and this was a `packages/core` lane. By this repository's own definition it is
+a dead seam until then, and `sim/interrupt.test.ts` exercising it is precisely what the standing
+requirement says does not count.
