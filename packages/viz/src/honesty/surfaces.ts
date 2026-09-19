@@ -13438,11 +13438,18 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     /*
      * `everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES` stood here until GitHub issue #221 emptied
      * it — the post block on the report screen made its last row false, so the row and its triage
-     * entry went together. An empty array produces no prose, so `derive.test.ts` no longer finds it
-     * and a `covers` entry would be a coverage claim for nothing. The section is still drawn and
-     * still swept: it draws the `empty` line below, which is now the third register to reach that
-     * arm.
+     * entry went together. An empty array produces no prose, so `derive.test.ts` stopped finding
+     * it and a `covers` entry would have been a coverage claim for nothing.
+     *
+     * **It is back, and the round trip is the thing worth reading.** [§ D730](../../../../DECISIONS.md)
+     * put a row in it: § D729 made the day's crowd the UTC date, and what is still absent is that
+     * a week runs one contract, so nothing moves a returning player to the day's tower. The entry
+     * is seeded through `view.sections` below like every other register's, and it is the register
+     * itself that decides which arm is drawn — so this claim went false when the array emptied and
+     * true again when it refilled, without anybody editing this file for either. That is
+     * `derive.test.ts` working in the direction it is usually not tested in.
      */
+    'everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES',
     'everyday/buildNotes.ts#REGISTER_EMPTY_LINE',
     'everyday/settingsView.ts#SETTINGS_ABSENCES',
     /*
