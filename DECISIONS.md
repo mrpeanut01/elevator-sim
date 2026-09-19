@@ -37104,6 +37104,13 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 
 ## D626 — Endless Rush is demoted off the front door, closing `docs/32` Q1 and the placement remainder `docs/35` § 13.1 left open on Q3
 
+> **Status 2026-09-19: SUPERSEDED IN PART by [§ D737](#d737).** The placement clause is
+> superseded — Rush is the front door's third tile, as § D525 ruled and as
+> `everyday/modes.ts` ships; this entry's argument is `docs/32` GD4's, which § D525 read by
+> name and withdrew. What stands is its restatement that § D477's substance is untouched,
+> and its critique of whether the rush serves the loop, which § D737 re-asks rather than
+> settles. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-16 · Owner: this session, on the session principal's explicit delegated authority · Rules on: `docs/32-game-design.md` § 9 Q1, `docs/35-problem-per-mode.md` § 13.1 Q3, and (per [§ D477](#d477), unchanged by this entry) the mode's continued existence.**
 
 **Why an entry.** Amends a standing table two other documents cite and is exactly the shape of cross-document decision `CLAUDE.md`'s working agreements ask to be recorded rather than left implicit.
@@ -39642,3 +39649,78 @@ artefacts — that last is what the regeneration is for.
 unspent. **The block sat above wave AC-2's open reservation ceiling of D728**, and this lane
 flagged it rather than stepping over it, per § D404; the integrator raised the ceiling to D741,
 which is the other half of that rule and is why this number is legible at all.
+
+## D737 — Rush stays on the front door: § D626's placement clause is superseded, because its argument is the recommendation § D525 read by name and withdrew
+
+**Date: 2026-09-19 · Owner: the product owner, ruling in session on the evidence below ·
+Rules on:** [§ D626](#d626)'s placement clause, [§ D525](#d525) clause 1,
+[§ D477](#d477), [§ D529](#d529) clause 2, `docs/32-game-design.md` GD4 and § 9 Q1,
+`docs/39-decisions-in-force.md` §§ 1 and 2.
+**Moves no code: `everyday/modes.ts` already ships three tiles with Rush third.**
+
+**Why an entry.** It moves something already recorded, and it binds four documents no module owns.
+
+### 1. The argument § D626 rests on is the one § D525 withdrew
+
+§ D626 argues that the rush *"produces a limit, not a differential"* and *"serves neither half of
+the core loop"*. That is `docs/32` **GD4**, word for word on both clauses — and GD4 is named in
+§ D525's own `Rules on:` line and withdrawn by it, a disposition `docs/39` § 2 already records.
+So the answer to *does this engage anything § D525 had not weighed?* is **no**: it re-adopts a
+recommendation the product owner read by name and set aside ten days earlier.
+
+### 2. Both gates it claimed were open were already spent
+
+It reasons from § D477's *placement left open*. The **status blockquote directly above the clause it
+quotes** reads *"AMENDED by § D525 — the placement this entry left open is settled: the front door,
+as Rush."* Its second gate, `docs/35` § 13.1's forcing event — *"the moment #220 is scheduled"* —
+fired on 2026-09-06 when § D515 built it.
+
+### 3. It contradicts a second product-owner ruling, uncited
+
+§ D529 clause 2: *"Screen two is reused as the Rush tutorial when the player later opens Rush."* A
+mode the owner's own onboarding ruling gives a tutorial to is not a bench instrument. And `docs/38`
+§ 2 — the page these rulings are the record of — lists under the Rush row's **what it retires**
+column, in full: *"The recommendation that the rush is a bench instrument."*
+
+### 4. The bench cannot house what Rush now is
+
+`everyday/benchModel.ts` quotes the bench's governing sentence: *"Nothing here is posted and nothing
+here is scored."* Rush posts (§ D542), is ranked on a board keyed building × date × modifier set
+(§ D543) and pays chimes (§ D533). Housing it there needs that sentence rewritten. § D626 does not
+address this and **could not have** — all three of those decisions post-date the GD4 argument it
+adopted.
+
+### 5. And the economy leans on it
+
+`data/chime-ledger.json` carries four sources and three sinks. **Two of the three sinks are Rush's**,
+and `rush-prefit` is the only sink in that file that reaches a run at all: both `purse-units` sinks
+buy nothing today and `scenario-budget-step` is refused by name in `core/config/chimeLedger.ts`.
+`earn-rush-wave` is itself a product-owner ruling (§ D533).
+
+### 6. What this does not decide
+
+**§ D626's critique is not answered, only its placement clause.** Whether the rush serves `docs/23`
+§ 3.4's loop is a live question and is re-asked on the evidence that post-dates GD4 — including a
+counter-example to *a limit, not a differential* that landed the same day as § D626, from a
+different session, so its author could not have seen it: `rushHoldAgreement.json` pins
+`garden-apartments`/`collective` at **1 178 s as built against 1 214 s pre-fitted**, one bought
+change on the same derived seed, replayed independently by both packages. That is a held-stream
+counterfactual.
+
+§ D477's substance is untouched: the mode is kept, the fail state is the lobby overfilling, the ramp
+is traffic and/or breakdowns.
+
+### 7. The procedural half, which is separately real
+
+§ D626 added **no `docs/39` row and no status marker**, though § 0 of that file requires both on the
+same commit. `grep` returned neither id. This entry lands both, and the same omission for § D606 and
+§ D640 was closed by § D701's commit. A decision that supersedes another and leaves no trace in the
+index is how a superseded ruling goes on being read as current — which is the defect this whole
+exercise found, one turn before acting on it.
+
+### 8. Numbers spent
+
+**D737 only.** It is the first number of the block opened mid-wave for the survivor-band question,
+spent here because the ruling it records is the session principal's and needed a heading of its own.
+D738–D741 stay free rather than holed: nothing is written past them, which is wave P's precedent and
+the one shape § D430 permits at a block's top.
