@@ -28,6 +28,9 @@
  *   never says so.
  * - **`unexpressible` is non-empty.** Three of § 17's six kinds need a seam that does not exist,
  *   and the list is how that stays visible; emptying it is a claim that all six are reachable.
+ * - **`campaignDay.eventSharePct` is present and inside its declared range.** GitHub issue #564:
+ *   the rate a contract day meets an event at is balance rather than mechanism, so it is authored
+ *   in the document and its schema is {@link CAMPAIGN_DAY_EVENT_SHARE} here.
  */
 
 import type { DirectionalSplit } from '@elevator-sim/core/browser';
@@ -78,6 +81,27 @@ export const REQUIRED_TEMPLATE_IDS: readonly string[] = Object.freeze([
   'fire-drill',
   'conference',
 ]);
+
+/**
+ * The schema of `campaignDay.eventSharePct` — type, range and default, in one place.
+ *
+ * `CLAUDE.md` invariant 8's shape pointed at authored content rather than at a dispatcher
+ * dimension: *every tunable declares its schema … so the space is explicit and checkable.* The
+ * document carries the value; this carries what a legal value is, so a rebalance that types `200`
+ * is a refusal naming the bound rather than a career that meets an event every single day.
+ *
+ * The range is the whole closed interval on purpose. `0` is a legal setting and means *the
+ * calendar and the wear clock are the only things that happen*, which is what this repository
+ * shipped before issue #564 and is therefore a state a rebalance must be able to return to;
+ * `100` is legal and means *every unclaimed day draws*, which is the opposite end and is the one
+ * a reviewer should argue about rather than the parser.
+ */
+export const CAMPAIGN_DAY_EVENT_SHARE = Object.freeze({
+  type: 'number' as const,
+  minPct: 0,
+  maxPct: 100,
+  defaultPct: 20,
+});
 
 const SPLIT_TOLERANCE = 1e-9;
 
@@ -332,10 +356,29 @@ export function parseWrinkleLibrary(value: unknown): WrinkleLibrary {
     );
   }
 
+  /*
+   * The contract day's rate — GitHub issue #564, and the block is **required** rather than
+   * defaulted. A missing block would be read as `defaultPct` and the document would then disagree
+   * with the run about a figure the run is balanced on, which is the second-source-of-truth defect
+   * `BREAKDOWN_AT_FRACTION` above is already written about. {@link CAMPAIGN_DAY_EVENT_SHARE} is
+   * what a legal value is; the document is what the value is.
+   */
+  const campaignRaw = record(raw['campaignDay'], 'wrinkles.json.campaignDay');
+  const eventSharePct = num(campaignRaw['eventSharePct'], 'wrinkles.json.campaignDay.eventSharePct');
+  if (
+    eventSharePct < CAMPAIGN_DAY_EVENT_SHARE.minPct ||
+    eventSharePct > CAMPAIGN_DAY_EVENT_SHARE.maxPct
+  ) {
+    violations.push(
+      `wrinkles.json.campaignDay.eventSharePct: ${String(eventSharePct)} is outside ` +
+        `${String(CAMPAIGN_DAY_EVENT_SHARE.minPct)}…${String(CAMPAIGN_DAY_EVENT_SHARE.maxPct)}.`,
+    );
+  }
+
   if (violations.length > 0) {
     throw new WrinkleLibraryError(
       `data/wrinkles.json is not a usable library:\n- ${violations.join('\n- ')}`,
     );
   }
-  return { version, templates, unexpressible };
+  return { version, templates, unexpressible, campaignDay: { eventSharePct } };
 }

@@ -183,8 +183,17 @@ describe('the opening career', () => {
      * built the schema, the storage and the reconciliation the session-only entry named, and
      * deleted that entry rather than rewording it (§ D227). Pinned exactly so the next deletion or
      * addition is a deliberate edit here rather than a count drifting.
+     *
+     * **Two since GitHub issue #563**, and it is the first time this count has gone **up** — which
+     * is § D227 read in the direction it usually is not. `everyday/host.ts#runCampaignDay` now
+     * derives each contract day's crowd from a base seed the host captures once per session, and
+     * `campaign/careerPersist.ts` restores the month without it, so a day picked up after a reload
+     * is a different morning. That is a true absence created by a fix, and a register that only
+     * ever shrank would be a register that had stopped being a record of the build.
      */
-    expect(CAMPAIGN_ABSENCES.length).toBe(1);
+    expect(CAMPAIGN_ABSENCES.length).toBe(2);
+    /* The new one names both halves — what is not kept, and what still is. */
+    expect(CAMPAIGN_ABSENCES.join(' ')).toContain('replays exactly');
     for (const entry of CAMPAIGN_ABSENCES) expect(entry.length).toBeGreaterThan(40);
     expect(CAMPAIGN_ABSENCES.join(' ')).not.toContain('draws this build cannot make');
     /*

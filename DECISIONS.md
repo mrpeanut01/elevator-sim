@@ -40893,3 +40893,129 @@ in the package that runs a simulation"*, with `dev/shiftWorker.ts` behind it; th
 `packages/viz` change and this was a `packages/core` lane. By this repository's own definition it is
 a dead seam until then, and `sim/interrupt.test.ts` exercising it is precisely what the standing
 requirement says does not count.
+
+## D840 — a career day's crowd is derived from the day, and the career day is the day the building is grown to
+
+**Date: 2026-09-19 · Owner: lane AE-A · Lane block: D840–D855 · Binds: `packages/viz/src/everyday/host.ts`, `packages/viz/src/campaign/incidents.ts` · Cited by: `packages/viz/src/campaign/careerPersist.ts`, `packages/viz/src/campaign/career.ts`, `packages/viz/src/campaign/careerDayIsADifferentDay.test.ts`**
+
+**Decision.** `everyday/host.ts#runCampaignDay` writes two more fields into the patch that starts a
+contract day. `seed` becomes `campaign/incidents.ts#careerDaySeedFor(base, tower.id, tower.day)`,
+derived with `core`'s own `deriveStreamSeed` under a labelled stream, where `base` is
+`ViewerState.seed` as the page was opened, captured once per session in a host local and never
+re-read. `week` becomes `{ ...week, day: tower.day, dayIdx: (tower.day - 1) % 7 }`, set from
+`CampaignTower.day` rather than incremented.
+
+**Why.** GitHub issue #563. Twelve played career sittings at Garden Apartments produced ten
+**byte-identical** days — 44 of 44 carried, 52 s worst wait, 24.6 kJ, every day — and the streak
+card read *1 clean day* after nine. Neither cause was logic that was wrong:
+
+- **`ViewerState.seed` had no writer in the Everyday product at all.** It is born once at boot from
+  the UTC date ([§ D729](#d729)) and that patch wrote seven fields and not this one. The same seed
+  on the same configuration is the same question, which is the engine working exactly as designed
+  and the mode failing.
+- **The growth the report announced was true of a counter the career never advanced.**
+  `dev/state.ts#shiftRunConfigOf` grows the fabric with `grownBuilding(fabric, state.week.day)` and
+  `tomorrowFactsOf` announces the next morning's tenants from the same chain one day on;
+  `campaign/career.ts#fileDay` advances `CampaignTower.day` and touches `week` never. `TENANTS
+  120 → 135` was literally `week.day 1 → 2`, and the contract re-ran day 1 for a month.
+
+**Why `ViewerState.seed` and not `SimulationConfig.trafficSeed`.** Invariant 5 decides it.
+`watch/record.ts` already persists `state.seed` and `state.week.day` and restores both, so a derived
+seed written onto `state.seed` replays with **no schema change**. `trafficSeed` is the more
+expressive seam — it re-rolls the crowd while the machine's streams stand still, which is *same
+machine, different Tuesday* — and it is written by nothing in `packages/viz`; using it needs a new
+`WatchRecord` field and a version bump, and `record.ts` refuses a record of another version
+outright, so every recording a player has saved would stop loading. The honest cost of the cheaper
+seam is stated rather than hidden: a career day changes the dispatcher's own noise sequence as well
+as the crowd, which is *a different day* rather than *the same day with different people*.
+
+**Why the base is captured once and never re-read.** `runCampaignDay` writes `seed`, so it may not
+also read it as the base: the derivation would chain, and a second press of *run day 5* — the retry
+`WeekState.attempt` counts, and `docs/16`'s most-used verb — would hand the player a different
+crowd. A player could re-roll until the morning was easy and every sheet would still be honest about
+a day nobody could reproduce. `deviceNowMs()` does not appear on this path either, for the stronger
+version of the same reason: a seed that read a clock would make the day a player replays a different
+day from the day they played.
+
+**What that costs, recorded rather than discovered.** `campaign/careerPersist.ts` restores the month
+and not the base, so a contract day picked up after a reload is a different morning. It is an
+absence rather than a defect — carrying the base costs a `CAREER_SCHEMA_VERSION` bump and this build
+quarantines a version it does not read, so every saved career would be set aside — and it is in
+`career.ts#CAMPAIGN_ABSENCES`, which is the **first** time that register has grown. [§ D227](#d227)
+binds both ways, and a register that only ever shrank would have stopped being a record of the
+build.
+
+**What it moves that was already recorded.** `careerPersist.ts` enumerates where the week and the
+career are joined and named `take-offer` as the only press writing both. There are two now, and the
+second narrows the disagreement rather than widening it: on every day a career actually plays, the
+`was` column finds the week entry `wasDisplayOf` looks for. The withholding that entry is about is
+still what happens on a restored career whose week was reset.
+
+**Proved on the legs, not by a caption.** `campaign/careerDayIsADifferentDay.test.ts` runs ten
+consecutive days through the shipped press and asserts ten distinct seeds **and** ten distinct leg
+sets — separately, because a derivation producing ten seeds and one run would be the defect wearing
+a fix. It asserts the retry is the *same* legs, that day 2's tower is exactly day 1's state grown
+one day, and that `tomorrowFactsOf`'s announced population is the one the next morning delivers.
+Measured at the shipped date seed over ten days: 60/67/40/56/50/73/58/51/76/59 legs, worst wait
+29.3 s to 100.0 s, 14.93 to 31.13 kJ a delivered leg, population 120 → 240.
+
+## D841 — an incident is a repertoire rather than a raised failure rate, and the rate is authored data
+
+**Date: 2026-09-19 · Owner: lane AE-A · Lane block: D840–D855 · Binds: `data/wrinkles.json`, `packages/viz/src/campaign/incidents.ts`, `packages/viz/src/campaign/calendar.ts` · Cited by: `packages/viz/src/wrinkles/parse.ts`, `packages/viz/src/wrinkles/types.ts`, `packages/viz/src/campaign/incidents.test.ts`**
+
+**Decision.** `campaign/incidents.ts#campaignEventFor` gains a third stage. After the contract's
+calendar and after § 8.3's wear draw, a contract day draws — on its own labelled stream — from
+`data/wrinkles.json`'s **weekday** pool at a share the document declares
+(`campaignDay.eventSharePct`, shipped at **20**), and is otherwise ordinary. `CONTRACT_CALENDAR`
+gains an authored schedule for **every** shipped contract rather than for `c7` alone, and
+`ContractCalendarEntry.eventId` widens from `'coach-party'` to `ShiftEventId`.
+`campaignIncidentOf`'s gate becomes the event's own `changesNothing` instead of a list of two ids.
+
+**Why.** GitHub issue #564. Ten played career days read `NOTHING HAPPENING` on every one, with **one
+genuine decision** in the sitting and **zero** during the run: three live, well-labelled mid-run
+arms with no reason to be pressed. The obvious reading is that `economy.ts#FRESH_ODDS_PCT` is too
+low. **It is not, and it is deliberately unmoved.** 0.4 % a day on a freshly serviced building is
+`ENGINE_CONTRACT.md` § 8.3's own figure and it is right — a lift that has done no work does not fail
+— and raising it would make the wear clock, the service interval and the shop's whole relief
+arithmetic describe a building that breaks for no reason. What was missing is that **a breakdown was
+the only thing a career day could be**: `data/wrinkles.json` has held eighteen weekday templates
+since #159, every one expressed in fields the engine reads, and a career had never drawn one.
+
+**Why the rate is data.** Invariant 7 — the rate a career meets an event at is balance, so it is a
+row rather than a literal in a reducer — and invariant 8's shape pointed at content:
+`wrinkles/parse.ts#CAMPAIGN_DAY_EVENT_SHARE` declares the type, the range and the default, and a
+document outside that range is a load-time refusal naming the bound. The block is **required rather
+than defaulted**, because a missing one would be read as the default and the document would then
+disagree with the run about a figure the run is balanced on.
+
+**The price, which is what this issue's criterion asks for.** The pool holds eighteen templates of
+which one is `ordinary`, so the rate a player meets is `0.20 × 17/18` = 18.9 % a day rather than the
+share. Over a twenty-day contract with **no** authored day: `1 − (1 − 0.189)^20` = **98.5 %** carry
+at least one, expected count **3.78**; measured over 200 base seeds, 197/200 and **3.79**. On `c1`,
+whose three authored days are now in the calendar: **200/200** and a measured mean of **6.22**. Five
+of the eighteen templates take a car, so P(at least one car-taking day in twenty) is **68 %** on top
+of the wear clock. 20 is drafted rather than measured, on the footing `data/wrinkles.json`'s own
+`$comment` puts its effect figures: a draw frequency is not a bar a run can be right or wrong about.
+The bound was chosen by what it costs — at 50 % a player meets ten events in a month and the word
+stops meaning anything; at 5 % the expected count is one, which is indistinguishable from the rate
+the issue was filed about.
+
+**Why every contract books something now.** The table held `c7` alone and its own docstring gave the
+reason: the only shipped quirk naming a calendared crowd is Crown Hotel's. The reason is good and is
+a constraint on **what** a contract books, not on whether it books anything — read as the latter it
+left a career begun at Garden Apartments, which is the only contract `openingCareer` holds, meeting
+no calendared event in twenty days. Each contract now books from its own building's line, nothing
+before day 3 and nothing inside four days of another, both asserted rather than described.
+
+**The dock's gate had to move with it.** `campaignIncidentOf` returned `undefined` for everything
+but two ids, which was returning it for `ordinary` alone while those two were all a career day could
+draw. It is not any more, and a dock answering *NOTHING HAPPENING* over a morning with a car tied up
+is the caption defect `shift/events.ts` spends its module note on. Every day that changes the run
+gets a dock; the red tag and the booked crowd keep their authored arms, and the rest is worded from
+the event. **The technician is offered only where the car is out for the rest of the day** — every
+car-taking weekday template returns its car by itself, so three units for a call-out would be paying
+for something already happening, which is the marshal-in-the-lobby defect wearing a price.
+
+**What was deliberately not done.** No new incident *kind* and no new engine field: the repertoire
+is the library that already ships, so nothing here can render a note no passenger experiences.
+[§ D106](#d106) is untouched — nothing in this entry aggregates energy into anything.

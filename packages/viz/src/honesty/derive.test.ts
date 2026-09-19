@@ -1980,6 +1980,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'campaign/calendar.ts#calendarEventIdFor',
         'campaign/incidents.ts#CAMPAIGN_INCIDENT_STREAM',
         'campaign/incidents.ts#campaignEventFor',
+        /*
+         * **Two more of exactly the same kind** — GitHub issues #563 and #564. `campaign-day` is
+         * the label `deriveStreamSeed` mixes into the draw that decides whether a contract day is
+         * a day of its own, and `career-day-seed` the label it mixes into the crowd a career day
+         * is played at. Both are hyphenated identifiers the scan reads as two adjacent words and
+         * neither reaches a screen as itself: what a player reads of the day drawn is
+         * `SHIFT_EVENTS`' name and note through `campaignIncidentOf`, exactly as above, and what
+         * they read of the seed is the door's own crowd line, which asks
+         * `shift/dailySeed.ts#isDailySeed` rather than printing a stream name.
+         */
+        'campaign/incidents.ts#CAMPAIGN_DAY_STREAM',
+        'campaign/incidents.ts#CAREER_DAY_SEED_STREAM',
+        'campaign/incidents.ts#careerDaySeedFor',
       ],
     },
     {

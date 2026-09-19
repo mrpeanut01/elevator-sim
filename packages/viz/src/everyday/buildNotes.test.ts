@@ -319,6 +319,19 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * entry deleted while the map still names it fails here.
    */
   { register: 'CAMPAIGN_ABSENCES', fragment: 'nothing files on', issue: 223 },
+  /*
+   * **A row that arrived with a fix rather than with a gap**, which this table has now recorded
+   * three times and is the direction § D370's queue reading is weakest about. GitHub issue **#563**
+   * gave a contract day a crowd of its own, derived once per session from the seed the page opened
+   * on; `campaign/careerPersist.ts` restores the month and not that base, so a day picked up after
+   * a reload is a different morning and a day already recorded still replays exactly.
+   *
+   * The owner is **#375**, the issue that built career persistence, rather than a new number: what
+   * is absent is a field in *that* envelope, and carrying it costs the `CAREER_SCHEMA_VERSION` bump
+   * #375's own docstring argues about. Inventing a second issue would split one thing across two
+   * queues, which is the rush row's reasoning above.
+   */
+  { register: 'CAMPAIGN_ABSENCES', fragment: 'The month is remembered and the mornings are not', issue: 375 },
 
   /* Settings. Two of the six are #229's remainder after its premise was refuted (§ D368). */
   /*
