@@ -186,10 +186,17 @@ export function movedFromDefault(
  *
  * Because the true statement differs, and a banner that said *"nothing here is applied"* would be
  * wrong on the screens where it matters. Four of the twelve discovered schemas reach a run; eight
- * and the dispatcher space do not, and **each of the eight is refused for its own reason** rather
- * than by a blanket sentence. Saying so per source is the difference between a disclaimer and a
- * fact — and, since § D227, the difference between a refusal that is pinned by a run and one
+ * and the dispatcher space do not. Saying so per source is the difference between a disclaimer and
+ * a fact — and, since § D227, the difference between a refusal that is pinned by a run and one
  * pinned by another sentence.
+ *
+ * **The four applied sources have four different sentences and the eight share one, and that
+ * asymmetry is honest rather than lazy.** What an applied source owes the reader is *which of its
+ * rows travel and which do not*, and that differs per schema; what an unapplied source owes is one
+ * claim, *nothing here reaches the run*, which is the same claim for all eight. Two of the eight —
+ * `METRICS_PARAMETERS` and `ANALYTICAL_PARAMETERS` — are refused on the charter rather than merely
+ * unbuilt, and that argument is § D764's rather than this screen's, because it is a ruling about
+ * what the product may ship and not a fact about today's wiring.
  *
  * ## Why the refusal says what the tab *is* rather than only what it is not
  *
