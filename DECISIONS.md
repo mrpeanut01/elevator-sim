@@ -39872,6 +39872,185 @@ refusals (§ 6) and the deleted absence row (§ 7) are all consequences of the o
 are argued in their own docstrings, which is what § D405 asks for when a choice does not reach past
 the module that took it. Nothing is written past them by this lane.
 
+## D786 — The Scenario hub stops offering a purchase nothing sells: the rung prices come off the row and the refusal names who cannot sell rather than who has not bought
+
+**Date: 2026-09-19 · Owner: wave AD lane D · Rules on:** [§ D227](#d227) in both polarities,
+[§ D649](#d649)'s ladder, [§ D672](#d672)'s reason-per-sink table, `data/chime-ledger.json`'s own
+refusal of a scenario-budget sink, [`docs/38`](docs/38-what-the-game-is.md) § 2.1,
+[`docs/43`](docs/43-what-winning-looks-like.md) § 3 (*honesty is the one floor axis that may never
+be traded*), `packages/viz/src/scenario/ladder.ts`, `packages/viz/src/scenario/ladder.test.ts`,
+`packages/viz/src/everyday/scenarioScreen.browser.test.ts`.
+
+**Why an entry, under [§ D405](#d405).** Two of the three grounds. It **moves something already
+recorded** — the sentence § D649 shipped on every row of the hub — and it **corrects a claim about
+a module it does not own**, `everyday/chimesPanel.ts`, whose face `scenario/ladder.ts` cited as the
+mitigation for exactly this and which had stopped saying it one wave earlier.
+
+### 1. What shipped, and it shipped in `dist-web`
+
+`scenario/ladder.ts#budgetLineOf` drew, on every one of the ten rows:
+
+> *Opens on 4 units of change. 2 wider budgets **can be bought**, in order: Widen to the equipment
+> tier (20 chimes), Widen to the building tier (30 chimes). Nothing **here** has bought a wider
+> budget, so the count is the count at the budget it opens on.*
+
+`data/chime-ledger.json` has three sinks and none of them is a scenario budget. It is not an
+omission and it may not be closed by adding one: that file refuses a `scenario-budget-step` by name,
+`core/config/chimeLedger.ts#REFUSED_MODIFIER_KINDS` refuses the modifier kind, and the reason is
+recorded there — `data/campaign.json` already prices every rung, and two authorities for one price
+is a player paying a different amount depending on which screen they stand on. What *would* let a
+rung be bought through the ledger is a parser `packages/server` can reach; the only one is
+`packages/viz/src/scenario/budget.ts` and invariant 6 forbids the server importing the viewer.
+
+So the promise was not merely unbuilt. It was unbuildable on the route the sentence implied, on the
+first screen of the mode `docs/38` § 2.1 makes *"the only mode a first-time player should meet"*.
+
+### 2. Both polarities of § D227, in one sentence
+
+The first clause is a **promise the product cannot keep**. The second clause is worse in the way
+`CLAUDE.md` says the second polarity always is: *"Nothing **here** has bought a wider budget"* reads
+to a first arrival as *you have not saved up yet*. It is a refusal that refuses nothing, and it is
+the reason deleting the promise alone would not have been enough.
+
+And the module's own mitigation was false when it was written. `scenario/ladder.ts`'s docstring said
+*"no surface spends a chime on it yet (the chimes panel says so on its own face)"*. § D672 deleted
+that blanket sentence in the same wave and replaced it with a reason **per sink**, keyed by sink id
+— and a scenario budget is not a sink, so `chimesPanel.ts#SPEND_ABSENCES` cannot carry it. A row
+there would assert a sink that does not exist and would fail that file's own both-directions check.
+
+### 3. The direction taken, and why fulfilment was not available
+
+Three directions were open: build the sink, delete the sentence, or register the refusal. **The
+first is closed by a ruling in force** (§ 1). The third is closed by the register's shape (§ 2) and
+`CHIMES_PANEL_COPY.spendNote` already says the only true thing that panel can say — that *nothing
+there* charges one — which is what sends a reader here. That leaves this module as the only surface
+that can say it, and it was saying the opposite.
+
+Weighed and recorded: a working purchase would buy **nothing measured** today even if the sink
+existed. `data/scenario-survivors.json` gives all three offered stages exactly one survivor,
+identical at every rung, and seven of ten stages zero at every rung — GitHub issue #558, re-derived
+by the panel and not touched here. That is not the reason for the direction, which stands on § 1
+alone, but it removes any case for fulfilling the promise in a hurry.
+
+### 4. What is drawn now, and the one thing deliberately deleted
+
+> *Opens on 4 units of change. 2 wider budgets sit above it, in order: Widen to the equipment tier,
+> Widen to the building tier. No screen in this build sells a wider budget, so the count below is
+> the count at the budget it opens on.*
+
+**The rung count and each rung's name stay** — they are facts about the stage, and the rungs are
+real: `scenario/budgetReachesTheRun.test.ts` drives `rungsOf` over the shipped stages and proves on
+the boarding identities that a change the base rung cannot pay for is refused and the same change at
+the bought rung moves the run. **The chime prices go.** A price is an instruction to act and there
+is no act; it is the only part of that sentence a player could have tried to use, and therefore the
+part that reads as an offer. Nothing moves in `data/campaign.json`, and
+`pricing/spendWidensTheBudget.test.ts` still reads the same prices off disk and still asserts the
+scenario is their one authority.
+
+### 5. It is checked in both directions, and the check binds the next lane too
+
+`scenario/ladder.test.ts` holds one case over the shipped stages: no purchase vocabulary on the
+line, and **the set of figures the line draws is enumerated** rather than each price checked absent
+— a price that happened to equal the opening units would pass a `not.toContain`. And the second
+half: every row with a rung above its base must carry the refusal. So this goes red if somebody
+re-adds a price, **and it goes red if somebody builds the sink and forgets to come back here**,
+which is § D227's rule turned into an instrument instead of an instruction.
+`everyday/scenarioScreen.browser.test.ts` asserts the same two things on the built bundle, because
+the built bundle is where the panel found the string.
+
+### 6. Numbers spent
+
+**D786 and D787.** D788–D800 are this lane's block and are **unspent**: nothing is written past
+them, which is wave P's precedent and the one shape § D430 permits at a block's top. The R9
+disclosure in `everyday/fixitScreenModel.ts` takes no number of its own — it records no new choice,
+it points at [§ D706](#d706), which already rules that retirement and its sequencing, and § D405 is
+explicit that a docstring is the record where a choice does not reach past its module.
+
+## D787 — A Scenario stage row opens that stage: the identity travels through a provided port rather than through the shell's swap
+
+**Date: 2026-09-19 · Owner: wave AD lane D · Rules on:** [§ D649](#d649)'s ladder,
+[§ D525](#d525) clause 1, [`docs/38`](docs/38-what-the-game-is.md) § 2.1,
+[`docs/43`](docs/43-what-winning-looks-like.md) P2 (*every control does what its label says*),
+`packages/viz/src/everyday/scenarioOpenPort.ts` (new), `packages/viz/src/everyday/scenarioScreen.ts`,
+`packages/viz/src/everyday/shell.ts`, `packages/viz/src/dev/campaignPanel.ts`,
+`packages/viz/src/dev/main.ts`.
+
+**Why an entry, under [§ D405](#d405).** It binds three modules none of which owns the others — a
+screen in `everyday/`, a panel in `dev/`, and the boot that joins them — and it adds a seam across
+the one boundary in this package that may not be crossed by an import.
+
+### 1. What was wrong
+
+§ D649 put the ten campaign stages on the Scenario hub and gave the three offered ones a button.
+Every one of those buttons called `context.enterEngineer()`, and `shell.ts#enterEngineer` **takes no
+argument**. Three controls, one destination, no identity carried: press *stage 1*, *stage 3* or
+*stage 5* and land on the Engineer surface holding whatever the campaign picker was holding.
+
+Measured rather than reasoned about: the press was reverted in a working tree and
+`everyday/scenarioScreen.browser.test.ts` run against it. The old press did not land on the *wrong*
+stage — **it did not open the Lab at all**, so `#panel-campaign` kept its `hidden` for the full 30 s
+wait. A player pressing *stage 4* arrived on the Run tab with the picker out of sight.
+
+The copy was honest about the swap (*"Opens on the Engineer surface"*), which is why this was a gap
+rather than a lie. It is still the difference between Scenario being a mode and being a table of
+contents, and `docs/38` § 2.1 makes it the mode a first-time player meets.
+
+### 2. The design, and the one that was rejected
+
+**Rejected: a parameter on `enterEngineer`.** That function owns the cover, the `inert` ordering and
+the `resize`; it knows nothing about the Engineer surface's panels and must not learn, because
+`everyday/boot.ts` already imports `dev/main.js` and closing that cycle is what produced this
+directory's last module-init `undefined`. A shell carrying a campaign stage id would be the swap
+owning a second thing it cannot check.
+
+**Taken: a provided port**, the shape `everyday/swap.ts`, `everyday/engineerBridge.ts` and
+`everyday/scenarioLadderPort.ts` already have. `dev/main.ts` provides an opener once it has a
+campaign panel; the hub consumes whatever has been provided. The press is two calls in one turn —
+the swap, then the opener — in `everyday/reportScreen.ts`'s established order and for its reason:
+the swap clears the `inert`, so the tab the opener focuses is a live control.
+
+The opener's two halves sit where each belongs. `dev/campaignPanel.ts#openStage` selects the stage
+and draws it **through the dropdown's own handler**, now named `drawChosenStage`, so there is one
+answer to *what does choosing a stage do* rather than two; `dev/main.ts` brings the tab to the front
+with `context.openTab('campaign')`, the route every tab press already takes.
+
+### 3. One guarantee, made by ordering and asserted rather than promised
+
+**A drawn stage row always has a live opener.** `dev/main.ts` provides the opener and the ladder
+inside one synchronous `.then`, and the **ladder goes last** — the hub draws no row until the ladder
+arrives, so there is no window in which a press can find no opener.
+`everyday/scenarioScreen.test.ts` reads `dev/main.ts` off disk and requires that order, because
+swapping two adjacent statements is a tidy-up nothing else in the tree would notice.
+
+`openStage` still answers honestly rather than relying on that: `false` for an id the panel cannot
+play, read back off the `<select>` rather than inferred from the list that was meant to fill it. The
+hub does not branch on it, and the reason is structural and stated at the call site — the rows and
+the panel's playable list are built from the same array of the same `loadCampaign` resolution.
+
+### 4. Two stale claims corrected on the same commit, both about callers and tests
+
+**`shell.ts:138` said *"Its one non-test caller is `everyday/reportScreen.ts`'s lever button"*** and
+had two callers for a wave. That is `CLAUDE.md`'s *name the non-test caller* failing in the
+direction `deadCode.test.ts` has caught twice before. Corrected — and **derived rather than
+corrected once**: `everyday/scenarioScreen.test.ts` reads the `everyday/` directory off disk and
+requires the caller set and the docstring to agree in both directions. Its first draft reported
+three callers, because a docstring in the new port quotes the call while explaining itself; the
+census now strips comments before searching, which is the `{@link}`-looks-like-a-caller trap in a
+third shape.
+
+**`scenarioScreen.ts` cited a test file that did not exist.** `scenarioScreen.test.ts` is now
+written, and it does *not* drive the presses either — `vitest.config.ts` sets `environment: 'node'`
+for every project and there is no jsdom, so no node test in this package can click anything. The
+presses are driven in `scenarioScreen.browser.test.ts` against the built bundle, by the player's own
+route.
+
+### 5. What this does not do
+
+A clear on a stage opened this way still banks no chimes and still does not reach a career, and
+`everyday/scenarioModel.ts#SCENARIO_ABSENCES` still says so in the player's words — it is unchanged
+and still true, because the stage is still *played* on the Engineer surface. The seven held rows are
+untouched: they are not controls, and GitHub issue #558's rebalance is what opens them.
+
 ## D836 — The core dead-code audit's scope is derived from disk, and the first thing the derivation found is the directory the audit was named after
 
 **Date: 2026-09-19 · Owner: LANE-AD-F (wave AD) · Rules on:**

@@ -6,8 +6,19 @@
  *
  * The one behaviour worth naming: each entry routes with `context.go(entry.screen)`, the same
  * navigation a rail row performs. That is what keeps `door` and `fixit` reachable after § D525
- * retired their tiles, and `scenarioScreen.test.ts` drives the presses rather than asserting the
- * rows exist.
+ * retired their tiles.
+ *
+ * **Which file drives those presses, corrected.** This sentence read *"and `scenarioScreen.test.ts`
+ * drives the presses rather than asserting the rows exist"* and **that file did not exist** — a
+ * docstring citing a test nobody had written, which is `CLAUDE.md`'s stale-claim class pointed at
+ * the evidence rather than at the product. It exists now and it does not drive a press either:
+ * `vitest.config.ts` sets `environment: 'node'` for every project and there is no jsdom here, so no
+ * node test in this package can click anything. The presses are driven in
+ * `scenarioScreen.browser.test.ts`, against the built bundle, by the player's own route;
+ * `scenarioScreen.test.ts` holds what is decidable without a document, and the two **entry** presses
+ * are driven by every browser file that reaches a re-homed screen through
+ * `browserTier.test-helper.ts#openScenarioEntry` — `shell`, `fixitScreen`, `standaloneScreens`,
+ * `progress`, `campaignJourney`, `chimeTurns` and `keyboardJourneys`.
  *
  * ## The ordered path, and the two things drawing it costs — § D649
  *
@@ -24,14 +35,25 @@
  *   whole card**, since `smallScreen.browser.test.ts` measured a card at 620–788 px against a
  *   250 px scrollport at 360 px: see the mount site for the measurement.
  *
- * Where the offered stages open is `context.enterEngineer()`, the seam the shell already provides
- * and `reportScreen.ts`'s lever button already uses. The row says so on its own face; it is not a
- * second door, and it writes no `inert` of its own.
+ * ## Where an offered stage opens — § D787
+ *
+ * Two calls in one turn, and neither is a second door. `context.enterEngineer()` hands the page
+ * over, exactly as the rail's footer row and `reportScreen.ts`'s lever button do, and writes no
+ * `inert` of its own. `scenarioOpenPort.ts#scenarioOpen` then puts **that row's** stage in the
+ * campaign picker and brings its tab to the front.
+ *
+ * This paragraph used to end at the first call, and so did the code: every offered row called
+ * `enterEngineer()`, which takes no argument, so three buttons performed one swap and the player
+ * arrived at whatever stage the picker was holding. The row's face said *"Opens on the Engineer
+ * surface"*, which was true of the swap and is why this was a gap rather than a lie — but a hub
+ * whose every press lands in the same place is a table of contents, and `docs/38` § 2.1 makes this
+ * the one mode a first-time player meets.
  */
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import { scenarioHubViewOf } from './scenarioModel.js';
 import { onScenarioLadderProvided, scenarioLadder } from './scenarioLadderPort.js';
+import { scenarioOpen } from './scenarioOpenPort.js';
 import { el } from './screenDom.js';
 import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from './tokens.js';
 
@@ -218,7 +240,25 @@ function pathBlock(
     if (head instanceof HTMLButtonElement) {
       head.type = 'button';
       head.addEventListener('click', () => {
+        /*
+         * **The swap first, then the stage — in that order and in one turn** — § D787, and the
+         * order is `everyday/reportScreen.ts`'s lever button's for its reason: `enterEngineer`
+         * clears the `inert` this shell holds over the other surface, so the tab the opener brings
+         * to the front is a live control rather than a covered one, and the focus it takes lands.
+         * `enterEngineer` is idempotent, which matters because a queued second click must not
+         * toggle the world.
+         *
+         * **The opener's `false` is not branched on, and that is a structural argument rather than
+         * an oversight.** It answers `false` only for an id the campaign panel cannot play, and a
+         * row cannot carry one: `scenario/ladder.ts#scenarioLadderOf` builds these rows from
+         * `loaded.campaign.stages`, and `dev/campaignPanel.ts`'s `playable` list opens with a
+         * spread of that same array from the same `loadCampaign` resolution. One document, one
+         * boot, one array — so a drawn row's id is in that list by construction. The port is still
+         * required to answer honestly, because the caller that one day holds an id from somewhere
+         * else must be able to find out; `scenarioScreen.test.ts` drives both answers.
+         */
         context.enterEngineer();
+        scenarioOpen()?.openStage(row.id);
       });
     }
 

@@ -64,6 +64,7 @@ import { publishEverydayAccount } from '../everyday/accountPort.js';
 import { POST_RUN_COPY } from '../everyday/postRun.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
 import { provideScenarioLadderFrom } from '../everyday/scenarioLadderPort.js';
+import { provideScenarioOpen } from '../everyday/scenarioOpenPort.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
   ENGINEER_RETURN_LABEL,
@@ -3983,8 +3984,6 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let campaign: CampaignPanelHandle | undefined;
   void loadCampaign(resources)
     .then((loaded) => {
-      /* § D649: the Everyday Scenario hub draws the same stages, with their measured counts. */
-      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors);
       campaign = mountCampaignPanel({
         elements: ui.campaign,
         resources,
@@ -3992,6 +3991,27 @@ function boot(ui: Elements, resources: BrowserResources): void {
         mode: () => state.mode,
         savedProfiles: () => savedProfilesOf(state.savedDispatchers),
       });
+      /*
+       * § D787: a Scenario hub row opens **its** stage. The two halves of that press are the
+       * panel's (select the stage, draw its brief) and this module's (bring the campaign tab to the
+       * front), and both are here because `everyday/` may not import this file.
+       */
+      provideScenarioOpen({
+        openStage: (stageId) => {
+          if (campaign?.openStage(stageId) !== true) return false;
+          context.openTab('campaign');
+          return true;
+        },
+      });
+      /*
+       * § D649: the Everyday Scenario hub draws the same stages, with their measured counts.
+       *
+       * **Last, and the order is load-bearing** — `everyday/scenarioOpenPort.ts` states it and
+       * `everyday/scenarioScreen.test.ts` reads this file to check it. The hub draws no row until
+       * this line runs, so handing the path over only after the opener exists is what makes *a
+       * drawn stage row always has a live opener* true by construction rather than by timing.
+       */
+      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors);
     })
     .catch((error: unknown) => {
       setText(ui.campaign.error, error instanceof Error ? error.message : String(error));

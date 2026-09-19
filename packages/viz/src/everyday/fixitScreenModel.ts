@@ -14,6 +14,28 @@
  * interpolate is either the engine's own spend arithmetic or § 9's prices read from
  * the schedule's own figures, passed in — never a literal (GitHub issue #366).
  *
+ * ## Three of these words are ruled to retire, and the ruling says when — [§ D706](../../../../DECISIONS.md)
+ *
+ * `docs/38` § 2.1 retires *"the four-repair menu and the five decoys … and with them the printed
+ * line that says what kind of fix it is"*, under the heading **No proposed fixes**, and this module
+ * still ships `repairsEyebrow`, `repairsHint` and `diagnosisEyebrow` while `everyday/fixitScreen.ts`
+ * still draws the toggle grid. **That is sequencing and not a page nobody re-read**, which is worth
+ * a paragraph here because a reader arriving at these constants from `docs/38` will otherwise find
+ * a design ruling and a screen that contradicts it, with nothing in between — an adversarial panel
+ * did exactly that on 2026-09-19 and filed it as a suspected gap.
+ *
+ * § D706 is the ruling in between, it is **in force** (`docs/39` § 2), and it is a measurement
+ * rather than a preference: **1 of 18** shipped cases' `diagnosed` answers is reachable from the
+ * editor `fixit/types.ts#FixitState` draws today, so retiring the menu before the editor can write
+ * the other seventeen answers would leave seventeen scenarios at zero survivors, against § D525
+ * clause 3's own definition of what a scenario is. So all three retirements land **together**, on
+ * the commit that gives this screen the priced change families those answers live behind, and the
+ * `diagnosed` repair stays in `data/fixit-cases.json` afterwards as the scenario's pinned witness.
+ *
+ * Nothing in this module may be read as a claim that the retirement has happened, and nothing a
+ * player reads here says it has. When it lands, these three keys go and this paragraph goes with
+ * them.
+ *
  * ## The copy is the prototype's
  *
  * Every sentence in {@link FIXIT_SCREEN_COPY} is transcribed from
