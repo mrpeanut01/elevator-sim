@@ -328,7 +328,14 @@ export function buildNotesViewOf(): BuildNotesView {
     },
     {
       heading: 'Scenario',
-      note: 'Two of the four kinds of scenario are playable; the rest wait on the schema.',
+      /*
+       * **This note said the rest *"wait on the schema"* and that had stopped being true** —
+       * [§ D649](../../../../DECISIONS.md). The schema landed with GitHub issue #365 and the ten
+       * campaign stages are listed on the hub as the ordered path they were authored to be. What
+       * they wait on is a runner, which is what the entries below now say. § D227 in the polarity
+       * that bites after a lane lands, on a panel whose whole job is to be current.
+       */
+      note: 'The ten stages on the path and the fix cases are listed; what a listed scenario still cannot do is said on its own row.',
       entries: SCENARIO_ABSENCES,
     },
     {
