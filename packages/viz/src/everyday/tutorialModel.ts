@@ -285,8 +285,12 @@ export const TUTORIAL_COPY = Object.freeze({
   sayPending: 'The morning is still being simulated.',
   sayAsBuilt:
     'The building is playing as it stands. One control sits under the picture: spread the cars out.',
+  sayAsBuiltEnded:
+    'The morning has finished playing, with nothing changed. The one control under it is still there: spread the cars out.',
   sayAnswered:
     'The cars have been spread out. The same morning is now playing twice side by side, as it stands and with that one change, and the worked answer is under it.',
+  sayAnsweredEnded:
+    'Both mornings have finished playing, side by side. The worked answer is under them.',
   complaintHeading: 'The letter',
   symptomHeading: 'What you are looking at',
   workedWhy:
@@ -609,12 +613,23 @@ export function tutorialCollapseViewOf(input: {
   readonly beat?: TutorialBeat | undefined;
   /** Whether the second run has landed. The control refuses out loud until it has. */
   readonly changeReady?: boolean | undefined;
-  /** Whether there is a recording to draw at all. */
+  /**
+   * Whether this beat has a recording to draw at all.
+   *
+   * **Not the same question as {@link runEnded}, and folding them into one flag was a bug this
+   * screen shipped for exactly one commit.** *No picture yet* and *the picture has finished* are
+   * opposite states that happen to share an absent canvas: with one flag, a run that played to its
+   * own end printed *the morning is being simulated now* about a morning the player had just
+   * watched — a sentence telling a reader to wait for something that had already happened.
+   */
   readonly runReady?: boolean | undefined;
+  /** Whether that recording's playback has finished or been stopped. */
+  readonly runEnded?: boolean | undefined;
 }): TutorialCollapseView {
   const beat: TutorialBeat = input.beat ?? 'as-built';
   const answered = beat === 'answered';
   const runReady = input.runReady ?? false;
+  const runEnded = runReady && (input.runEnded ?? false);
   return Object.freeze({
     eyebrow: TUTORIAL_COPY.eyebrow,
     title: TUTORIAL_COPY.collapseTitle,
@@ -649,11 +664,20 @@ export function tutorialCollapseViewOf(input: {
      * lesson — it is a control whose second state the worked answer below it then contradicts.
      */
     control: answered ? undefined : tutorialControlViewOf(input.changeReady ?? false),
-    say: answered
-      ? TUTORIAL_COPY.sayAnswered
-      : runReady
-        ? TUTORIAL_COPY.sayAsBuilt
-        : TUTORIAL_COPY.sayPending,
+    /*
+     * Five states, five sentences, and the pairing is what `docs/36` `AX-3` needs: the mount may
+     * only write the region when the sentence changes, so a state that shared a sentence with its
+     * neighbour would be a real change the mount correctly suppressed.
+     */
+    say: !runReady
+      ? TUTORIAL_COPY.sayPending
+      : answered
+        ? runEnded
+          ? TUTORIAL_COPY.sayAnsweredEnded
+          : TUTORIAL_COPY.sayAnswered
+        : runEnded
+          ? TUTORIAL_COPY.sayAsBuiltEnded
+          : TUTORIAL_COPY.sayAsBuilt,
     finish: TUTORIAL_COPY.finish,
     finishNote: TUTORIAL_COPY.finishNote,
   });

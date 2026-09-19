@@ -431,16 +431,42 @@ describe('screen two is a canvas and one press — `charter S1`', () => {
     /*
      * `docs/36` `AX-3`: *a live region is written when its sentence changes, and at no other time*.
      * The mount can only obey that if the sentence is a function of the state rather than of the
-     * render, so the three states a player passes through must produce three different strings —
-     * otherwise a real change would be a write the mount correctly suppresses.
+     * render, so the five states a player passes through must produce five different strings —
+     * otherwise a real change would be a write the mount correctly suppresses, which is the same
+     * failure as a missing announcement and harder to see.
      */
     const said = [
       collapse({ runReady: false }).say,
       collapse({ runReady: true, changeReady: true }).say,
+      collapse({ runReady: true, changeReady: true, runEnded: true }).say,
       collapse({ beat: 'answered', runReady: true, changeReady: true }).say,
+      collapse({ beat: 'answered', runReady: true, changeReady: true, runEnded: true }).say,
     ];
-    expect(new Set(said).size).toBe(3);
+    expect(new Set(said).size).toBe(5);
     for (const sentence of said) expect(sentence.trim()).not.toBe('');
+  });
+
+  it('tells *no picture yet* apart from *the picture has finished*', () => {
+    /*
+     * **A bug this screen shipped for one commit, kept as a case.** `runReady` and `runEnded` were
+     * one flag, so a run that played to its own end printed *the morning is being simulated now*
+     * about a morning the player had just watched — a sentence telling a reader to wait for
+     * something that had already happened, which is § D227's shape on a pending state.
+     *
+     * The two absences look identical on screen (no canvas) and are opposites, so they are asserted
+     * against each other rather than each on its own.
+     */
+    const cold = collapse({ runReady: false });
+    const finished = collapse({ runReady: true, runEnded: true, changeReady: true });
+    expect(cold.stagePending).toBe(TUTORIAL_COPY.stagePending);
+    expect(finished.stagePending, 'a finished run is still described as pending').toBeUndefined();
+    expect(finished.stageEnded).toBe(TUTORIAL_COPY.stageEnded);
+    expect(cold.say).not.toBe(finished.say);
+    /*
+     * And `runEnded` cannot outrun `runReady`: a run that has not arrived has not finished either,
+     * so the model collapses the impossible pair rather than letting a caller invent it.
+     */
+    expect(collapse({ runReady: false, runEnded: true }).say).toBe(TUTORIAL_COPY.sayPending);
   });
 
   it('mounts the picture once per beat, disposes it on the way out, and draws the answer after the press', () => {

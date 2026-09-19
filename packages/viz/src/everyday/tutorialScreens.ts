@@ -573,6 +573,12 @@ function mountCollapse(
    * drawn twice at one playhead, which is what makes the press legible rather than something the
    * player has to hold in their head. Nothing is drawn from one recording and a promise.
    */
+  /** Whether this beat has the recordings it needs — the question `runReady` is over. */
+  function hasRunFor(which: TutorialBeat): boolean {
+    if (session.asBuilt === undefined) return false;
+    return which === 'as-built' || session.asRepaired !== undefined;
+  }
+
   function panesFor(which: TutorialBeat, captions: readonly string[]): readonly CaseStagePane[] | undefined {
     const asBuilt = session.asBuilt;
     if (asBuilt === undefined) return undefined;
@@ -715,7 +721,14 @@ function mountCollapse(
       symptom: entry?.symptom,
       beat,
       changeReady: session.asRepaired !== undefined,
-      runReady: session.asBuilt !== undefined && !ended,
+      /*
+       * Two questions rather than one. *Is there a run to draw* decides whether the screen says the
+       * morning is still being simulated; *has it finished* decides whether the line under the
+       * heading is the ended one. Conflating them printed *being simulated now* about a run the
+       * player had just watched to its end.
+       */
+      runReady: hasRunFor(beat),
+      runEnded: ended,
     });
 
     const eyebrow = el(doc, 'div', 'everyday-collapse-eyebrow', view.eyebrow);
