@@ -1199,9 +1199,11 @@ verdict:
   because a corpus that grew an axis and stayed green is a different claim from one that had to be
   repaired first. **Say the gaps in the same breath.** Clause 4 —
   *every unit names its non-test caller* — is **mechanised for reachability and not for the naming**.
-  All **28** `packages/viz/src` directories are now inside `AUDITED_MODULES`:
-  `packages/viz/src/deadCode.test.ts:124-154` lists them and `:356-366` asserts that list against
-  `readdirSync` in both directions, so an export with no caller is caught. **What no test checks is
+  **Every** `packages/viz/src` directory is inside `AUDITED_MODULES`, and this sentence no longer
+  says how many, because saying how many is what keeps going wrong:
+  `packages/viz/src/deadCode.test.ts:124-158` lists them and `:447` asserts that list against
+  `readdirSync` in both directions, so an export with no caller is caught. **The count is derived
+  there and quoted nowhere**, which is the fix rather than a fourth correction. **What no test checks is
   the clause's own words** — that each unit *names* its caller in prose — and there the four
   dead-code audits cover 7 of 49, and the evidence is a hand-written table plus one prose line per unit. It is
   the clause to distrust first, and a fifth audit under `packages/viz` is the fix — **done in
@@ -1211,11 +1213,17 @@ verdict:
   unchanged.
 
   **Two of those figures are dated and one was live and wrong, which is the distinction this row
-  keeps failing.** The directory count is a present-tense claim about the tree — it read **19**, was
-  corrected to **27**, and the tree now holds **28**
-  (`find packages/viz/src -mindepth 1 -maxdepth 1 -type d | wc -l`; `release/` landed 2026-09-06).
-  **That is the third value this one figure has taken, which is the argument for deriving it rather
-  than quoting it.** The wave-12 pair is a record of what that audit found when it landed, and is now marked
+  keeps failing.** The directory count was a present-tense claim about the tree — it read **19**, was
+  corrected to **27**, then to **28**, and on 2026-09-19 an adversarial assessor ran the command this
+  paragraph itself prints and got **32**
+  (`find packages/viz/src -mindepth 1 -maxdepth 1 -type d | wc -l`).
+  **That is the fourth value this one figure has taken, and the third time it has been corrected in
+  the very paragraph arguing that it should be derived rather than quoted.** So it is no longer
+  quoted: the sentence above says *every* directory and points at the assertion that makes that true.
+  A figure a reader can regenerate in one command does not need a copy of itself in prose, and this
+  one proved across four values that a copy will go stale faster than anybody re-reads it. The two
+  citations beside it were wrong as well — `:124-154` for a list ending at 158, and `:356-366` for an
+  assertion at 447 — which is the same defect one level down: a line number is a published figure. The wave-12 pair is a record of what that audit found when it landed, and is now marked
   as such rather than silently refreshed. **The export count is deliberately not re-published**: two
   derivations disagreed (2 357 against ~2 893 by a cruder scan), and the audit's own figure cannot be
   read off a run because vitest intercepts `console.log` — the same trap that made
