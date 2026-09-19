@@ -88,7 +88,7 @@
  * another lane in the wave this landed, and no owner was reachable to agree a seam.
  *
  * **This module deliberately ships no words.** It had a `troubleLinesOf` and it was deleted before
- * landing, because a renderer with no renderer to call it is the same defect one layer up. The
+ * landing, because a renderer nothing calls is the same defect one layer up. The
  * honesty rules above are the wiring's brief; the vocabulary is the surface's to choose, and
  * `rush.ts#RUSH_RESULT_COPY.beatWhere` is the worked example of what one looks like.
  */
