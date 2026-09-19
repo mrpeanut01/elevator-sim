@@ -43,6 +43,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The session-shape spans — GitHub issue #559, § D753. `everyday/sittingShape.ts#SITTING_SPANS` is ' +
+        'four records of two numbers each, in simulated seconds, and its only strings are the `source` ' +
+        'field: the file each span was read from, for `sittingShape.test.ts` to assert it against. It is ' +
+        'derived only because a file path with a `#` in it reads as prose to the two-adjacent-words ' +
+        'scanner. Nothing draws a `source` on any screen. What a player reads is the five strings ' +
+        '`SITTING_SHAPES` composes **from** these spans, and those are claimed by ' +
+        '`everyday/modes.ts#EVERYDAY_MODES` and the Scenario hub, which draw them.',
+      ids: ['everyday/sittingShape.ts#SITTING_SPANS'],
+    },
+    {
+      reason:
         'The energy figure ids — GitHub PR #515’s review finding L1, § D539. `ENERGY_FIGURE_IDS` holds ' +
         '`energy-work` and `energy-per-leg`, the two `ReportFigure.id` keys `dev/reportPanel.ts#reportDeltaOf` ' +
         'reads to withhold those rows between two runs on different equipment, and it is derived only ' +

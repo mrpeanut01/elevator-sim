@@ -8154,6 +8154,16 @@ const EVERYDAY_MENU: SurfaceAdapter = {
   id: 'everyday/modes.ts#EVERYDAY_MODES',
   covers: [
     'everyday/modes.ts#EVERYDAY_MODES',
+    /*
+     * Where a session shape is composed — GitHub issue #559, [§ D753](../../../../DECISIONS.md).
+     * Three of the five strings it produces are this adapter's, seeded below as `mode.shape`; the
+     * other two are the Scenario hub's and reach the corpus through `EVERYDAY_SCENARIO_HUB`, which
+     * claims `SCENARIO_ENTRY_SHAPES` for the same reason. The declaration is claimed here because
+     * this is the surface that draws most of it, and `derive.test.ts` asks for one home per
+     * declaration rather than one per string.
+     */
+    'everyday/sittingShape.ts#SITTING_SHAPES',
+    'everyday/sittingShape.ts#sittingLengthPhrase',
     'everyday/rail.ts#RAIL_DRAWER_COPY',
     /* The shell's skip link, GitHub issue #404 — chrome the shell draws and does not author. */
     'everyday/types.ts#SHELL_SKIP_LABEL',
@@ -11952,6 +11962,14 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/scenarioModel.ts#scenarioHubViewOf',
     'everyday/scenarioModel.ts#SCENARIO_COPY',
     'everyday/scenarioModel.ts#SCENARIO_ABSENCES',
+    /*
+     * The hub's two session shapes — GitHub issue #559, [§ D753](../../../../DECISIONS.md). They
+     * are the shapes `ENTRIES` carries, which `scenarioHubViewOf` above already seeds one row at a
+     * time; this list is the same two exported by name so `sittingShape.test.ts` can check them
+     * against the one module allowed to compose a session shape. Claimed here rather than excluded
+     * because the words **are** drawn on this screen, which is what a `covers` entry says.
+     */
+    'everyday/scenarioModel.ts#SCENARIO_ENTRY_SHAPES',
     /*
      * § D649's ordered path. The hub is the only reader of both: `scenarioLadderOf` produces every
      * row this adapter seeds, and `SCENARIO_LADDER_COPY` is the small set of sentences it writes

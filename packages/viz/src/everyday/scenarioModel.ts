@@ -47,6 +47,7 @@
  * the path off `scenarioLadderPort.ts`, and the honesty corpus sweeps it without a document.
  */
 import { ladderOfferCounts, SCENARIO_LADDER_COPY, type ScenarioLadderRung } from '../scenario/ladder.js';
+import { SITTING_SHAPES } from './sittingShape.js';
 import type { EverydayScreen } from './types.js';
 
 /** One thing a player can start from the hub. */
@@ -152,17 +153,33 @@ const ENTRIES: readonly ScenarioEntry[] = Object.freeze([
     id: 'today',
     title: "Today's scenario",
     blurb: 'One building, one day, one seed — the same day for everybody.',
-    shape: '~3 min · no losing — a day is a score, not a pass',
+    /*
+     * Composed in `everyday/sittingShape.ts` from the contract day's own length and the rung the
+     * stage opens on, never typed here — GitHub issue #559, which measured *"~3 min"* against a
+     * clock and found it out by a factor of four. **No figure is repeated in this comment**: a
+     * number written beside a number that is computed is the defect § D753 exists to close, and it
+     * would go stale on the next rung move exactly as the five strings did.
+     */
+    shape: SITTING_SHAPES.contractDay,
     screen: 'door' as const,
   }),
   Object.freeze({
     id: 'fix-a-building',
     title: 'Fix a building',
     blurb: 'A building with something wrong. Diagnose it, change it, re-run it.',
-    shape: '~5 min a case · retry as often as you like',
+    shape: SITTING_SHAPES.fixCase,
     screen: 'fixit' as const,
   }),
 ]);
+
+/**
+ * Every session shape this hub draws, for `sittingShape.test.ts` to check against the one module
+ * allowed to compose one. Exported rather than re-derived in the test, because a test that rebuilt
+ * the list would go on passing when a row was added carrying a figure of its own.
+ */
+export const SCENARIO_ENTRY_SHAPES: readonly string[] = Object.freeze(
+  ENTRIES.map((entry) => entry.shape),
+);
 
 /**
  * What this hub does not reach yet, in the player's words.

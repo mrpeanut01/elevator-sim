@@ -798,11 +798,17 @@ one schema with a budget and a price ladder, alongside the campaign stages and t
 challenges. A menu that kept them as tiles would offer the same content twice — once as a mode and
 once as a scenario — which is the thing the ruling exists to stop.
 
-**What did not change, and it is most of the table.** Every length and loop cell survives on the
-row that inherited it: the hub's *Today's scenario* entry still reads *~3 min · no losing — a day is
-a score, not a pass*, and its *Fix a building* entry still reads *~5 min a case · retry as often as
-you like*. § 5 is a table about **sessions**, and the sessions are unchanged; what moved is which
-surface offers them.
+**Every loop cell survived on the row that inherited it. The length cells did not, and that is the
+one place this document's own division of authority has teeth** ([§ D753](../DECISIONS.md), GitHub
+issue #559). § 5 is a table about **sessions**, and which surface offers them is all that § D525
+moved — but the handoff's *lengths* were measured against a wall clock and are out by roughly a
+factor of four, because the handoff is a prototype with its own toy simulator and its session shapes
+were never played on this build's content at this build's playback speed. **The handoff still wins
+every disagreement about what the screen looks like; the simulator wins every disagreement about
+what a number means**, and a session length is a number. So the hub's *Today's scenario* entry now
+reads *8-15 min a day at 4× · no losing — a day is a score, not a pass*, and its *Fix a building*
+entry reads *13-23 min a case at 4×, skippable · retry as often as you like* — the wording the
+handoff authored, carrying a figure it did not.
 
 **What holds the pair honest was not built on the tree this row landed on, and this row said so
 — then stopped being true.** As written it read: *"`everyday/actionBar.test.ts`'s `GUIDE_TABLE` still

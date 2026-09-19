@@ -102,17 +102,21 @@ diagnostic half is the cheap half.
 ### 1.2 The four front-door modes
 
 The first four columns are
-[`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 4's, which took them in turn from
-`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md`'s session-shapes table — the
-same table `packages/viz/src/everyday/modes.ts` already reproduces word for word in each tile's
-`shape` field. **They are cited, not re-derived.** The last two columns are this document's.
+[`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 4's. **They are cited, not
+re-derived** — and what they cite changed: the lengths were the handoff's session-shapes table,
+reproduced word for word in each tile's `shape` field, until [§ D753](../DECISIONS.md) played one
+sitting of each mode against a wall clock and found them out by roughly a factor of four. The
+lengths below are § 4's measured column; the tiles' own strings are composed in
+`packages/viz/src/everyday/sittingShape.ts` and checked against this table by
+`packages/viz/src/everyday/sittingShape.test.ts`, so a rung move fails here. The last two columns
+are this document's.
 
 | Mode | Length | Beats | Retry costs | **Half served** | **What it is for** |
 |---|---|---|---|---|---|
-| **Today's tower** | ~3 min | 1 and 5 | one per day | **Diagnostic**, with a *social* fifth beat | The only mode whose verdict is against other people on the same seed rather than against your own previous attempt |
-| **Campaign** | ~2 min a building-day | 3, by pricing it | units, and a works night | **Both**, with the adjudicative half made expensive | The only mode where a change costs something and persists past the day |
-| **Endless rush** | ~5 min | 1 only | nothing — no retry exists | **Neither** — see § 1.4 | It answers *where does this configuration break*. That is a limit, not a differential |
-| **Fix a building** | ~5 min a case | all five, on one screen | free, and it says so | **Both, entire** | The only mode that closes the loop without navigating |
+| **Today's tower** | 8-15 min a day at 4× | 1 and 5 | one per day | **Diagnostic**, with a *social* fifth beat | The only mode whose verdict is against other people on the same seed rather than against your own previous attempt |
+| **Campaign** | ~4 min a building-day at 4× | 3, by pricing it | units, and a works night | **Both**, with the adjudicative half made expensive | The only mode where a change costs something and persists past the day |
+| **Endless rush** | 4-23 min at 4× | 1 only | nothing — no retry exists | **Neither** — see § 1.4 | It answers *where does this configuration break*. That is a limit, not a differential |
+| **Fix a building** | 13-23 min a case at 4× | all five, on one screen | free, and it says so | **Both, entire** | The only mode that closes the loop without navigating |
 
 **One mode serves the adjudicative half in full without qualification, and it is Fix a building.**
 That is a structural fact about the build rather than a preference:
@@ -206,8 +210,8 @@ watches a rush learns a number about a configuration they did not change.
 > front door is an interface change, and the interface is the handoff's (§ 9, open question **Q1**).
 
 **One thing about the rush is not a disposition question and can be settled without one.** The tile
-advertises *`~5 min · the run always ends; the question is when`* and opens onto a screen whose
-primary refuses, because there is no engine behind it —
+advertised *`~5 min · the run always ends; the question is when`* and opened onto a screen whose
+primary refused, because there was no engine behind it —
 [`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 4.1 row 2 names this as
 disagreement 2 between the build and the handoff. **A session shape is a claim about a session the
 build can deliver.** Advertising one it cannot is the polarity of [§ D227](../DECISIONS.md) that
@@ -956,9 +960,22 @@ document takes the decision** (§ 9, **Q1**).
 
 By minute 10 the player has met rows 1 and 2 of § 2.3 and nothing else: **the loop, and the held
 day**. The schedule is built to `charter S3` (median first session ≥ 10 minutes) and `charter S2`
-(60 % of first sessions complete one diagnose–change–prove cycle) with the handoff's own session
-lengths as the arithmetic — ~5 minutes for a case and ~3 for a tower day puts the second
-introduction at about minute 8, inside the budget with a turn to spare.
+(60 % of first sessions complete one diagnose–change–prove cycle). It was drafted with the
+handoff's own session lengths as the arithmetic — ~5 minutes for a case and ~3 for a tower day put
+the second introduction at about minute 8, inside the budget with a turn to spare.
+
+**That arithmetic does not survive the measurement, and the schedule is left standing rather than
+quietly re-fitted** ([§ D753](../DECISIONS.md), GitHub issue #559). At the stage's opening rung a
+fix-a-building case is **13-23 min a case at 4×** of watching and a tower day is
+**8-15 min a day at 4×**, so a first session that plays one of each ends its second turn between
+minute 21 and minute 38 rather than at minute 8. `charter S3` is *comfortably* met by that and
+`charter S2` is the one at risk, in the direction nobody designed for: the budget is not too tight,
+the turns are too long to fit two of them inside a first sitting. **What this does not settle is whether that is a defect**, because the
+figure is a floor on the *watching* and the player has a skip on every case stage and a speed ladder
+on every campaign and rush stage — neither of which anything in this repository has measured a
+player's use of. Naming a number for how often a first-time player skips would be a guess inside a
+schedule, which is what [§ D256](../DECISIONS.md) refuses. It is an open question for § 9 and a
+playtest, not a paragraph.
 
 **Failure has been met exactly once and it cost nothing** — a Fix a building retry — which is the
 ordering § 4.2 argues for. **The economy has not appeared.** Introducing a currency inside the first

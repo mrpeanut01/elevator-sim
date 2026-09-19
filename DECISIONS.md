@@ -38075,16 +38075,13 @@ templates with a phase schedule, it is not what the Everyday content runs, and �
 answers it — none of which makes 7.5 minutes of an empty lobby a thing to leave unsaid. AD-S6 is
 corrected on this commit.
 
-**A number this decision does not fix, and will not pretend to.** The session shapes on
-`everyday/modes.ts`' three tiles and `everyday/scenarioModel.ts`' two entries — *"~3-5 min a case"*,
-*"~2 min a building-day"*, *"~5 min a case"*, repeated in `docs/23` § 4, `docs/32` § 1.2 and
-`docs/12` § 4 — correspond to roughly **5–6 simulated seconds per real second**, which is no rung on
-this ladder. They are wrong by a factor of six at `30×` and by about 1.5 at `4×`: **less wrong, and
-still wrong.** The likely history is § D354's own defect one document over — before that decision the
-chip *labelled* `4×` ran at 8 — but that is a plausible sentence rather than a measurement, so it is
-offered as a guess and marked as one. Correcting five player-facing strings is not this constant's
-to do; it is filed rather than absorbed, as **GitHub issue #559**, which carries the five sites,
-the four documents that repeat them, and this paragraph's guess marked as a guess.
+**A number this decision did not fix — and the paragraph that said so is deleted here, on the
+commit that made it false** ([§ D753](#d753), [§ D227](#d227)). What stood in this place named five
+player-facing session shapes as outstanding, filed them as **GitHub issue #559**, and carried a
+guess about their history. #559 is closed: all five are measured against a wall clock and moved, and
+a paragraph telling a reader that work is open after it is done is the § D227 polarity `CLAUDE.md`
+calls worse than a dead seam. **The guess is carried forward rather than lost** — it is in § D753,
+still marked as a guess, and still not a measurement. Nothing else in this entry is touched.
 
 **The stale sites this commit corrects**, on `CLAUDE.md`'s rule that a published number and a stated
 mechanism go stale the same way: `shift/legibility.ts`'s *"two simulated minutes are on the order of
@@ -38096,6 +38093,186 @@ discrete tier is now what a player meets rather than one they reach by moving a 
 § 2.3. Three test literals reading `30×` are replaced by a read through
 `stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX).label` rather than by the new number, which is #257's defect
 class one level up — a rung that has now moved twice would have had to be re-transcribed twice.
+
+## D753 — Five session shapes are settled by a clock rather than by a division, and the figure is composed from the rung so the next rung move carries it
+
+**Date: 2026-09-19 · Owner: lane AD-B · Lane block: D753–D760 · Closes: [#559](https://github.com/mrpeanut01/elevator-sim/issues/559) · Deletes a paragraph of: [§ D641](#d641) under [§ D227](#d227) · Cited by: `packages/viz/src/everyday/sittingShape.ts`**
+
+**Decision.** The five strings a player reads before choosing a mode — three mode tiles and the
+Scenario hub's two entries — stop being typed and are composed in one module,
+`packages/viz/src/everyday/sittingShape.ts`, by dividing the **shipped content's own span** by
+`stageScreenModel.ts#DEFAULT_STAGE_SIM_PER_REAL_S`, rounding **up** to the minute, and naming the
+rung by `stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX).label`. `modes.ts` and `scenarioModel.ts` consume
+them by name and `sittingShape.test.ts` fails on a minute literal in either file.
+
+| surface | was | is |
+|---|---|---|
+| Scenario tile | `~3-5 min a case · retry as often as you like` | ``8-23 min at 4×, skippable · retry as often as you like`` |
+| Career tile | `~2 min a building-day · three lost contracts ends the career` | ``~4 min a building-day at 4× · three lost contracts ends the career`` |
+| Rush tile | `~5 min · the run always ends; the question is when` | ``4-23 min at 4× · the run always ends; the question is when`` |
+| hub · Today's scenario | `~3 min · no losing — a day is a score, not a pass` | ``8-15 min a day at 4× · no losing — a day is a score, not a pass`` |
+| hub · Fix a building | `~5 min a case · retry as often as you like` | ``13-23 min a case at 4×, skippable · retry as often as you like`` |
+
+The right-hand column is **what those strings read on this date**, quoted as a dated record. It is
+not the source: the module is, and the figures in it move with the rung without this entry being
+rewritten, which is the whole of the decision.
+
+**The measurement, because the issue asked for a clock and not a quotient.**
+`packages/viz/src/everyday/sittingClock.measure.test.ts` builds the real run each mode plays through
+the shipped config builders, simulates it, and plays the recording end to end through the real
+`Playback` against `systemClock()` at the shipped rung, asking for a frame on a 16 ms timer the way
+`caseStage.ts`' own loop asks for one. Gated on `SITTING_OUT` and it writes to a file, because
+vitest intercepts `console.log` — `honesty/measure.corpus.test.ts`' two reasons. It costs as long as
+the sittings it plays. Measured at `4×`:
+
+| cell | asked / watched (sim s) | simulate | watched (real) | measured sim s per real s |
+|---|---|---|---|---|
+| building-day · `garden-apartments` · Scenario 1's hour | 3 600 / 3 600.0 | 75 ms | **900.0 s** (15.0 min) | 4.0000 |
+| building-day · `chancery-house` · the default shift | 1 800 / 1 800.0 | 417 ms | **450.0 s** (7.5 min) | 3.9999 |
+| fix case · `sleeping-sky-lobby` · as-built then the pair | 3 600 / 3 828.8 | 903 ms | **957.2 s** (16.0 min) | 4.0000 |
+| rush · `midtown-office`/`collective` · held at 1 640 s | 5 400 / 1 640.0 | 2 716 ms | **410.0 s** (6.8 min) | 3.9999 |
+
+**The box was not quiet, and the reason that does not spoil it is worth one paragraph rather than a
+caveat.** `CLAUDE.md` records a figure taken under contention measuring the box, and the load
+average over this run was **2.1 to 12.4, median 6.0** on four cores, with other lanes running vitest and a
+headless browser. It does not reach this measurement, for a mechanical reason: `Playback`
+re-anchors the playhead on the display clock every frame, so a late frame advances *further* rather
+than later, and the loop's only exposure is one frame's overshoot at the end — 64 ms at this rung.
+The check that this reasoning is right is in the table: over 164 005 frames and forty-five real
+minutes the four cells read **4.0000, 3.9999, 4.0000 and 3.9999** simulated seconds per real
+second, which is one part in forty thousand, under that load. That is the property being asserted —
+the file's own case allows five per cent and the run used none of it. The raw milliseconds are
+reported because they were measured; **no published figure is one of them** — every string divides
+a span by the rung.
+
+**What the clock saw that a division could not, and two of the three mattered.**
+
+1. **The playhead does track the clock.** `Playback` re-anchors on every frame against the display
+   clock, so a frame loop that cannot keep up drops *pictures* and not *time*. That is a claim about
+   the implementation, and the run asserts it rather than assuming it: no cell's measured
+   `span ÷ watch` is more than one part in forty thousand from the rung. **This is the
+   load-bearing finding** — it is the
+   licence for every other figure in this entry to be derived from the ladder rather than played
+   out, and without it a rung would be a setting rather than a promise.
+2. **The simulate wait is real wall clock and is below the rounding.** A sitting begins with a run
+   being computed before a frame is drawn, and it is not a function of the rung, so no derivation
+   can see it: **75 ms** for the opening building-day, 417 ms for a second, 903 ms for a fix
+   case's pair and **2 716 ms** for a rush. Against seven to twenty-three minutes of watching it is
+   under the minute these strings round to, so it is **named in the module and not added**. That
+   conclusion was not available without measuring it — and the rush's is thirty-six times the
+   shortest, which is the shape no function of the rung could have produced.
+3. **The player's own dwell is refused.** Reading the letter, choosing a repair, looking at the
+   report. Nothing here measures it and no constant invents one, so every published figure is a
+   **floor on the watching** rather than a total, and the strings carry *watched* where there is
+   room for the word. A friendly total assembled from a measured half and a guessed half would put
+   the guess inside the number, where no reader can see it — which is what [§ D256](#d256) refuses.
+
+**The spans are the content's, censused rather than estimated**, and `sittingShape.test.ts` asserts
+each against the file it came from:
+
+- **`campaignStage` 900 s**, all ten of `data/campaign.json`.
+- **`contractDay` 1 800–3 600 s**, `dev/state.ts#DEFAULT_SHIFT_LENGTH_S` and the one contract that
+  names its own hour (`shift/contracts.ts`, § D234).
+- **`fixCase` 3 085–5 400 s**, which is the entry that is *not* an authored duration: a case plays
+  the as-built run and then the pair, and each recording runs past its authored `durationS` while
+  the building drains, so the span is not `2 × durationS`. Censused over all eighteen cases by the
+  measure file's span leg.
+- **`rush` 956–5 400 s**, over the 221 measured cells in `data/rush-house-runs.json`. **95 of them
+  never hold at all** and run the whole 5 400 s stream, so the top of that range is the *commonest*
+  case rather than the worst — which is the opposite of what a reader assumes a range's top is, and
+  is why it is said here.
+
+**How *true* and *decision-useful* were balanced, because `docs/43` makes these a P2 and P4 surface
+rather than an honesty one.** A figure that is accurate and useless — *a sitting is however long you
+sit* — satisfies § D227 and fails the player, who came to the tile to find out whether they have the
+evening. Four choices, each one a place the honest answer and the useful answer pulled apart:
+
+1. **A range is published where the content has one, and it is not averaged.** Over the same 221
+   cells the rush's **median** sitting is 4 420 s, which is 18 minutes at this rung; publishing
+   that one figure would be more comfortable and would erase the thing the mode is *for*. Its
+   second clause has always said *the run always ends; the question is when*, and a range is the
+   first time that clause has had a figure agreeing with it.
+2. **The rung is named on the face of every string.** *at `4×`* is a scrap of engineering
+   vocabulary on the last screen before an evening is committed, and that is a real P2 cost rather
+   than a free one. It buys two things: the figure stays true for a player who has moved their **Default
+   speed** in Settings, since the string says which rung it is quoted at; and the word is the exact
+   label on the chip they are about to meet. The alternative — reading
+   `everydayProfileStore().defaultSpeed()` — would make `EVERYDAY_MODES` a function of browser
+   storage, and a tile that cannot be built without a `localStorage` cannot be swept by
+   `honesty/surfaces.ts`.
+3. **The escape is named beside the length.** The two strings that reach a fix case carry
+   *skippable*, because a twenty-minute figure with no exit beside it reads as a twenty-minute
+   commitment, and `caseStage.ts` ships a skip on every run a case plays — it has a skip and
+   deliberately no speed chips. Naming the length without the escape would be true and would
+   misinform, which is the same failure as naming neither.
+4. **Rounding goes up, always.** `Math.ceil`. Twenty-two and a half minutes reads *23*, not *20*.
+   Every rounding error this module can make lands on the side of *the sitting cannot be longer than
+   advertised*, and `sittingShape.test.ts` asserts that over every rung on the ladder.
+
+**A corroboration § D641 offered is withdrawn, and this is the more interesting half of the entry.**
+That decision's reason 2 checked its own choice of rung against a published promise: *"the Scenario
+tile publishes `~3-5 min a case` on the player's own screen: `4×` lands inside that promise and `1×`
+is three to four times outside it."* The promise was **wrong** — it corresponded to no rung on the
+ladder — so the check was against a number nobody had measured. And now that the figure is derived
+from the rung, the check is **circular rather than merely unsupported**: a session shape composed by
+dividing by `DEFAULT_STAGE_SIM_PER_REAL_S` can never disagree with `DEFAULT_STAGE_SIM_PER_REAL_S`.
+**No future rung choice may cite a session shape as evidence for itself.** § D641's content census
+is untouched, because a census of `data/` is a measurement.
+
+**The sibling that solved the same problem the other way.** `scenario/ladder.ts#shapeOf` draws a
+path row as *"15 min in the building"* — building time, explicitly not real time — and says why:
+*"the stage plays a recording back at a speed the player picks and a bare `15 min` would be a claim
+about their evening."* That is right for a row describing a **run**. These five describe a
+**session**, where a claim about the evening is the whole of what they are for, and refusing to make
+one would be the accurate-and-useless answer above. The two modules disagree on purpose and each
+says so.
+
+**§ D641's paragraph is deleted in both places it stood** — in this file and in
+`stageScreenModel.ts`' docstring — on the commit that makes it false, which is § D227 in the
+polarity `CLAUDE.md` calls worse than a dead seam: a dead seam does nothing, and a sentence saying a
+defect is open after it is closed sends a reader hunting work that is done.
+`sittingShape.test.ts` keeps it deleted by failing on § D641's own clause — *"Correcting five
+player-facing strings is not this"* — in either carrier, and on the withdrawn corroboration's
+*"`4×` lands inside that promise"*. **The clause and not the literal**, because this entry and
+`modes.ts` both quote a retired string on purpose, as the record of what moved, and a literal check
+would have forbidden the entry that closes a defect from describing it.
+
+**The guess is carried forward, still marked as a guess.** § D641 suggested the history is § D354's
+own defect one document over — before that decision the chip *labelled* `4×` ran at 8, which is
+close to the 5–6 simulated seconds per real second the five strings implied. **That is a plausible
+sentence and not a measurement**, it was offered as a guess, and it is repeated here as one. Nothing
+in this lane's work tested it and no mechanism is offered in its place.
+
+**Four documents moved with the strings**, because a figure repeated in prose is the class
+`CLAUDE.md` records three published numbers committing: `docs/23` § 3.2 and § 4 (the session-shapes
+table and its *"the shipped tiles carry the handoff's lengths verbatim"* paragraph), `docs/32` § 1.2
+and § 7.2, and `docs/12` § 4. They are not left to agree by diligence:
+`sittingShape.test.ts` asserts each document carries **today's** length phrase, so a rung move turns
+all three red on the same commit that moves the tiles.
+
+**The division of authority this rests on is `CLAUDE.md`'s own**, and it is worth stating because
+the five figures came *from* the design handoff and the handoff is canonical for the interface: *the
+handoff wins every disagreement about what the screen looks like, and the simulator wins every
+disagreement about what a number means.* A session length is a number. The handoff is a prototype
+with its own toy simulator — its report sheet computes *average wait* as `28 + (100 − pct) × 0.9` —
+so its session shapes were never played on this build's content at this build's playback speed. The
+handoff's **wording** survives on every one of the five strings; only the figure moved.
+
+**What is found and not fixed.** `docs/32` § 7.2's minute-10 onboarding schedule was arithmetic on
+the handoff's lengths and does not survive them: a first session that plays one case and one
+contract day ends its second turn far later than minute 8. That is recorded in the document with
+the figures, in the direction nobody designed for —
+`charter S3`'s ten-minute median is comfortably met and `charter S2`'s one-cycle target is the one at
+risk — and deliberately **not** re-fitted here, because the honest figure is a floor on the watching
+and nothing in this repository has measured how often a first-time player presses skip. Naming one
+would be a guess inside a schedule.
+
+**D753 only.** **D754–D760 are unspent.** Every other decision this lane took reaches no further
+than the module that took it — the module's own docstring is the record, which is [§ D405](#d405) —
+and under [§ D404](#d404) and [§ D430](#d430) they become permanent holes once a later lane writes
+above them, because ids here are names and backfilling one would make it denote two things across
+time. The integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES` if that is what
+happens.
 
 ## D671 — The ledger's read answers a balance **and the sinks the account bought**; § D526 clause 5 is untouched, because a sink is not a source
 
@@ -38644,7 +38821,8 @@ measurement above is left as its first input.
 can open on run a 36 000 s authored day**, and only `crown-hotel` keeps the 1 800 s slice. At the
 opening stage speed — `4×`, [§ D641](#d641) — 36 000 simulated seconds is **two and a half real
 hours**. § D641's own docstring had already measured that and named five further stale session
-shapes, leaving them with *"Correcting five player-facing strings is not this constant's to do."*
+shapes, which it declined to correct and filed as GitHub issue #559 — closed since by
+[§ D753](#d753).
 
 **The ruling: the promise changes, and the rotation is not bounded to fit it.** Bounding the
 eligible set to towers whose day fits three minutes leaves **one tower**, which is not a rotation;
@@ -38655,11 +38833,15 @@ the only thing on that screen that decides it: *"A whole working day, at whateve
 No figure replaces the one removed, because a duration this screen does not control is a number the
 run did not produce.
 
-**What this does not fix, named rather than absorbed.** The same arithmetic is still wrong on five
-strings outside this lane's ownership — `everyday/modes.ts`'s three tile shapes (*~3-5 min a case*,
-*~2 min a building-day*, *~5 min*) and `everyday/scenarioModel.ts`'s two entries, of which
-*Today's scenario · ~3 min* is the one that names the run this entry is about. They are § D641's
-list, still open, and now with the day-length measurement attached.
+**What this did not fix is now fixed, and the paragraph saying otherwise is corrected here rather
+than left to age** ([§ D753](#d753), [§ D227](#d227)). This entry named five strings outside its own
+ownership as still carrying the same wrong arithmetic — `everyday/modes.ts`'s three tile shapes and
+`everyday/scenarioModel.ts`'s two entries, of which *Today's scenario* is the one that names the run
+this entry is about. All five were measured against a wall clock and moved by § D753 on 2026-09-19,
+and they are now composed from the rung rather than typed, so the class this paragraph left open is
+closed. **Everything above is untouched**: this entry's own ruling — the door names the day and
+leaves the length to the speed control — stands exactly as taken, and § D753 does not put a figure
+back on that screen.
 
 ---
 
