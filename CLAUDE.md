@@ -171,6 +171,24 @@ verdict:
   `vitest.config.ts`'s own docstring records a 0.60 s case failing at 5 454 ms at a third of that
   load. A figure taken under contention measures the box.
 
+  **Then both tiers were measured a second time, on the head rather than on the base, and that is
+  the new habit rather than a repeated one.** The figures above were taken on `5c4de11`, and the
+  viz leg was **red** on that commit — two defects of the integrator's own, a superseded classifier
+  left exported with no caller and this file's sibling `vitest.config.ts` carrying an annotation
+  census stale by three. § D487 is the precedent and it is exact: a row taken on a tree green in
+  four projects and red in a fifth, where the lane that fixed the fifth then moved the row by one
+  string a case. So the same measurement was run again on `fb1cc8c`, the green head, and **both
+  tiers reproduced to the string** — always-on 765 545 / 62 surfaces / 0 failing, deep 952 182 / 63
+  / 0, with the surface sets, the building histograms and the fit-out draws unmoved.
+
+  **The structural argument was available and was deliberately not relied on.** The deleted symbol
+  had zero references outside its own definition and `honesty/surfaces.ts` imports three things
+  from that module, none of them touched, so nothing the corpus renders *could* have changed. That
+  reasoning was correct, and it is the kind of reasoning § D487's own row was wrong about. Every
+  wave before this one re-measured the **base** to tell a correction from a move; this is the first
+  to re-measure the **head** after a late fix, and it costs 1 427 s to stop a row resting on an
+  argument.
+
   **Wave AB's move is 217 strings a case in both tiers, and the small change is the whole of the
   interest: the remainder is 10 strings across 49 cases and 7 across 60.** Measured on the
   integrated tree after wave AB, both tiers in one sitting, with the base at `e53f28b` re-measured
