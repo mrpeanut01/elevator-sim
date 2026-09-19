@@ -15,7 +15,12 @@ import type { FloorQueue } from '../frame/overlay.js';
 import { WAIT_BANDS } from '../live/bands.js';
 import { carRestsAt } from '../render/carRest.js';
 import type { Canvas2DLike } from '../render/canvas.js';
-import { drawRiderFigure, MIN_FIGURE_HEIGHT_PX, withAlpha } from '../render/riderFigures.js';
+import {
+  bandHeightShareAtRank,
+  drawRiderFigure,
+  MIN_FIGURE_HEIGHT_PX,
+  withAlpha,
+} from '../render/riderFigures.js';
 import {
   stageBandOf,
   stageCarPaintOf,
@@ -221,7 +226,7 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
          * The ladder descends from `capsuleH` rather than ascending to it, so nothing reaches
          * further above its floor line than it did and § 8 (7)'s overlap arithmetic is untouched.
          */
-        const height = capsuleH * bandHeightShareOf(bandRank);
+        const height = capsuleH * bandHeightShareAtRank(bandRank, WAIT_BANDS.length);
         ctx.fillStyle = ink;
         roundedRect(ctx, x, feetY - height, capsuleW, height, capsuleW / 2);
         ctx.fill();
@@ -396,23 +401,6 @@ function stageBandRankOf(waitedS: number): number {
   const rank = WAIT_BANDS.findIndex((band) => band.id === id);
   return rank < 0 ? 0 : rank;
 }
-
-/**
- * AD-S7's height ladder for the capsule branch, in the one shape that keeps it agreeing with the
- * figure branch: the same ramp `render/riderFigures.ts` applies, evaluated here because a capsule
- * is not a figure and does not go through `drawRiderFigure`.
- *
- * Spelled as an interpolation from {@link CAPSULE_MIN_HEIGHT_SHARE} to 1 over the ladder's own
- * length, so the two branches cannot drift into different ladders when a rung is added.
- */
-function bandHeightShareOf(rank: number): number {
-  const rungs = Math.max(1, WAIT_BANDS.length - 1);
-  const clamped = Math.min(rungs, Math.max(0, rank));
-  return CAPSULE_MIN_HEIGHT_SHARE + (1 - CAPSULE_MIN_HEIGHT_SHARE) * (clamped / rungs);
-}
-
-/** The calmest rung's share — `render/riderFigures.ts#BAND_HEIGHT_SHARE.settling`, one ramp. */
-const CAPSULE_MIN_HEIGHT_SHARE = 0.7;
 
 /**
  * The cast `render/`'s painters take, and the one `dev/main.ts:7121` already makes at `drawScene`'s

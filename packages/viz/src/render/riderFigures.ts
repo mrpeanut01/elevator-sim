@@ -88,11 +88,60 @@ type RungLadder = readonly [number, number, number, number];
 
 const BOB_AMPLITUDE_BY_RANK: RungLadder = Object.freeze([0.4, 0.7, 1.1, 1.6]);
 
-/** See {@link BAND_HEIGHT_SHARE}. The calm end comes down; the worst rung keeps its room. */
-const HEIGHT_SHARE_BY_RANK: RungLadder = Object.freeze([0.7, 0.8, 0.9, 1]);
+/**
+ * The calmest rung's share of the room its caller gives it. The ramp runs from here to 1.
+ *
+ * `0.7` rather than something more dramatic because the height is not the only carrier and could
+ * not be: a rung's worth of it is about a pixel at the Everyday stage's widest pitch and less than
+ * one below that. It is the channel that makes the ramp survive greyscale and a reader who cannot
+ * resolve a 4.5 px hue difference — a second answer, not a louder one.
+ */
+const MIN_HEIGHT_SHARE = 0.7;
 
 /** The last rung's index, so a caller with a longer ladder saturates rather than reading `undefined`. */
 const LAST_RANK = BOB_AMPLITUDE_BY_RANK.length - 1;
+
+/**
+ * **AD-S7's height ladder, as one ramp over any number of rungs** —
+ * `docs/28-art-direction.md` § 5.4.
+ *
+ * AD-S7 is a rule about the wait ramp rather than about one surface: *"a capsule's **height**
+ * encodes its band as well as its colour: the fourth band is visibly taller than the first …
+ * required by § 7 anyway (never colour-only)"*. Until this ramp existed the rule was met on
+ * neither stage — the Engineer lane sized every figure from the floor pitch alone and leaned on
+ * `riderQueue.ts`'s glyph row beside it, and the Everyday cutaway hoisted one `capsuleH` outside
+ * its rider loop and had **no** second channel at all, so at 4.5 px the band rode on hue alone.
+ * That is `UX.md` KB-15's exact prohibition, on the one surface `docs/38` says a beginner meets.
+ *
+ * AD-S7 rejects *width* as the channel because capsules tile on a fixed pitch and a wider capsule
+ * changes how many fit a lane, which would move § 8 (7)'s overlap arithmetic. Height has the same
+ * hazard upward, which is why this ramp runs the way it does.
+ *
+ * Exported because there are two callers and they band on two different ladders: {@link
+ * drawRiderFigure} evaluates it over `frame/overlay.ts`' four, and `everyday/cutaway.ts` evaluates
+ * it over `live/bands.ts`' four for the capsule branch, which does not go through the figure at
+ * all. Those were the same four numbers written twice for about an hour, which is exactly long
+ * enough for somebody to change one of them.
+ *
+ * Linear from {@link MIN_HEIGHT_SHARE} to `1`, and `1` is reached at the worst rung rather than
+ * passed: **the ladder descends from the room the caller budgeted rather than ascending to it.** A
+ * taller worst band would reach further above its floor line precisely where a landing is deepest,
+ * which would move `figureClearancePx`'s clamp on one stage and § 8 (7)'s overlap arithmetic on
+ * the other. Taking the calm end down moves neither.
+ *
+ * Total: a rung off either end saturates, and a ladder with fewer than two rungs gives every
+ * rider the whole of the room — see the comment on the guard.
+ */
+export function bandHeightShareAtRank(rank: number, rungs: number): number {
+  // A ladder with one rung is no ladder, and nothing descends from the room the caller budgeted:
+  // every rider gets the whole of it. Returning the *calm* end here would have made a
+  // single-banded building draw every one of its people short, which is the flattering direction
+  // and therefore the wrong one.
+  const top = Math.floor(rungs) - 1;
+  if (!(top >= 1)) return 1;
+  const clamped = Number.isFinite(rank) ? Math.min(top, Math.max(0, rank)) : 0;
+  return MIN_HEIGHT_SHARE + (1 - MIN_HEIGHT_SHARE) * (clamped / top);
+}
 
 /** A rung index, clamped into the ladder and rounded. Total: a caller cannot fall off either end. */
 function rankOf(bandRank: number): number {
@@ -118,40 +167,6 @@ export const BOB_AMPLITUDE_PX: Readonly<Record<WaitBand, number>> = Object.freez
   waiting: BOB_AMPLITUDE_BY_RANK[1],
   long: BOB_AMPLITUDE_BY_RANK[2],
   abandoned: BOB_AMPLITUDE_BY_RANK[3],
-});
-
-/**
- * How tall a figure stands, as a share of the room its caller gives it, **by band** —
- * `docs/28-art-direction.md` § 5.4 **AD-S7**.
- *
- * AD-S7 is a rule about the wait ramp rather than about one surface: *"a capsule's **height**
- * encodes its band as well as its colour: the fourth band is visibly taller than the first …
- * required by § 7 anyway (never colour-only)"*. Until this constant existed the rule was met on
- * neither stage — the Engineer lane sized every figure from the floor pitch alone and leaned on
- * `riderQueue.ts`'s glyph row beside it, and the Everyday cutaway hoisted one `capsuleH` outside
- * its rider loop and had **no** second channel at all, so at 4.5 px the band rode on hue alone.
- * That is `UX.md` KB-15's exact prohibition, on the one surface `docs/38` says a beginner meets.
- *
- * **The ladder descends from 1 rather than ascending to it, and that is load-bearing.** AD-S7
- * rejects *width* as the channel because capsules tile on a fixed pitch and a wider capsule changes
- * how many fit a lane, which would move § 8 (7)'s overlap arithmetic. Height has the same hazard
- * upward: a taller fourth band would reach further above its floor line and overlap the row above,
- * exactly where a landing is already deepest. Taking the *calm* end down leaves the worst band at
- * the height the caller already budgeted for, so no clamp, no lane count and no overlap figure
- * moves — and the reader still sees the fourth band standing over the first.
- *
- * **It is not the only carrier and could not be**, which is why the shares are close rather than
- * dramatic. Below roughly a 13 px floor pitch the room collapses to its floor and the four rungs
- * separate by less than a pixel; there the band is carried by AD-S8's slab wash — a whole-row
- * signal that does not depend on pitch at all — by the colour, by the `+N` chip and by
- * `describeFrame`'s sentence. Three channels with three different degradation curves, rather than
- * one channel asserted to survive everything.
- */
-export const BAND_HEIGHT_SHARE: Readonly<Record<WaitBand, number>> = Object.freeze({
-  settling: HEIGHT_SHARE_BY_RANK[0],
-  waiting: HEIGHT_SHARE_BY_RANK[1],
-  long: HEIGHT_SHARE_BY_RANK[2],
-  abandoned: HEIGHT_SHARE_BY_RANK[3],
 });
 
 /**
@@ -238,7 +253,8 @@ export interface RiderFigureInput {
  */
 export function drawRiderFigure(ctx: Canvas2DLike, input: RiderFigureInput): void {
   const rank = rankOf(input.bandRank);
-  const height = Math.max(0, input.heightPx) * (HEIGHT_SHARE_BY_RANK[rank] ?? 1);
+  const height =
+    Math.max(0, input.heightPx) * bandHeightShareAtRank(rank, BOB_AMPLITUDE_BY_RANK.length);
   if (height <= 0) return;
   const bob =
     Math.sin(input.simTimeS * BOB_RATE_RAD_PER_S + bobPhaseOf(input.passengerId)) *
@@ -299,13 +315,17 @@ export function bobPhaseOf(passengerId: string): number {
   return ((hash >>> 0) / 0x100000000) * Math.PI * 2;
 }
 
-/** How far above its resting place a rider's figure sits, at this instant. */
-export function bobOffsetPx(rider: QueuedRider, simTimeS: number): number {
-  return (
-    Math.sin(simTimeS * BOB_RATE_RAD_PER_S + bobPhaseOf(rider.passengerId)) *
-    BOB_AMPLITUDE_PX[rider.band]
-  );
-}
+/*
+ * **`bobOffsetPx` was here and is deleted rather than kept.**
+ *
+ * It took a `QueuedRider` and returned this instant's offset, and its only caller was
+ * `drawRiderLane`'s inline figure loop. {@link drawRiderFigure} now owns that arithmetic, and it
+ * cannot take a `QueuedRider`: the Everyday cutaway bands on a different ladder and passes a rung.
+ * A second entry point returning the same number from a different argument is how two callers come
+ * to bob two ways, and an export whose only remaining callers are tests is the defect `CLAUDE.md`
+ * counts eleven times in this tree. Closed by deletion, on `model/bank.ts`'s precedent — two of
+ * that seam's five members went the same way.
+ */
 
 /**
  * The alarm rule's alpha at this instant — design `:2154`, `0.35 + 0.3 · sin(t · 3)`.

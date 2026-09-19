@@ -17,10 +17,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { Canvas2DLike } from './canvas.js';
 import {
-  BAND_HEIGHT_SHARE,
   BOB_AMPLITUDE_PX,
   MIN_FIGURE_HEIGHT_PX,
   WAIT_BAND_RANK,
+  bandHeightShareAtRank,
   drawRiderFigure,
   figureHeightPx,
   withAlpha,
@@ -104,21 +104,28 @@ describe('the band rides on a rung, not on a band name', () => {
     expect(headY(draw({ bandRank: -4 }))).toBe(headY(draw({ bandRank: 0 })));
   });
 
-  it('keeps the two exported band tables and the rung ladder as one ramp', () => {
-    // The tables are what `render/canvas.ts` and `figureClearancePx` read; the ladder is what the
-    // figure reads. They were one set of numbers written twice until this ramp existed, and this
-    // is the assertion that keeps them one.
+  it('keeps one ramp for both ladders, ascending, ending at the room the caller gave', () => {
+    // Two callers band on two different four-rung ladders and evaluate this one ramp. The
+    // assertions are properties rather than four numbers, because the hazard is a future edit that
+    // makes the worst band taller "so it stands out" and silently moves `figureClearancePx`'s
+    // clamp here and § 8 (7)'s overlap arithmetic on the Everyday stage.
     const order = ['settling', 'waiting', 'long', 'abandoned'] as const;
     order.forEach((band, rank) => {
       expect(WAIT_BAND_RANK[band]).toBe(rank);
     });
-    const shares = order.map((band) => BAND_HEIGHT_SHARE[band]);
+    const shares = [0, 1, 2, 3].map((rank) => bandHeightShareAtRank(rank, 4));
     const bobs = order.map((band) => BOB_AMPLITUDE_PX[band]);
     expect(shares).toStrictEqual([...shares].sort((a, b) => a - b));
     expect(bobs).toStrictEqual([...bobs].sort((a, b) => a - b));
-    // The worst rung keeps the whole of the room its caller budgeted: the ladder descends from 1
-    // rather than ascending to it, which is what keeps every overlap figure on both stages fixed.
-    expect(shares[shares.length - 1]).toBe(1);
+    expect(shares[3]).toBe(1);
+    expect(shares[0]).toBeLessThan(1);
+    // The same ramp over a ladder of another length still ends at 1 and still ascends.
+    expect(bandHeightShareAtRank(5, 6)).toBe(1);
+    expect(bandHeightShareAtRank(0, 1)).toBe(1);
+    // And it saturates rather than overshooting, which is what keeps the clamp above safe.
+    expect(bandHeightShareAtRank(99, 4)).toBe(1);
+    expect(bandHeightShareAtRank(-9, 4)).toBe(bandHeightShareAtRank(0, 4));
+    expect(bandHeightShareAtRank(Number.NaN, 4)).toBe(bandHeightShareAtRank(0, 4));
   });
 
   it('takes the calm end down and never the worst end up', () => {

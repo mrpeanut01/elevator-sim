@@ -54,6 +54,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A CSS colour with an alpha composed into it, derived only because the two-adjacent-words ' +
+        'scanner reads the `${String(` / `Number.parseInt` line break inside its own `rgba()` template ' +
+        'as prose. `withAlpha` returns a value for `fillStyle` and `strokeStyle`; no string it ' +
+        'produces is ever drawn as text, and its two callers — `drawAlarmRule` here and ' +
+        '`everyday/cutaway.ts`’s AD-S8 landing wash — both hand it straight to a brush. It is ' +
+        'composed into the value rather than set on `globalAlpha` precisely so a recording stub can ' +
+        'see the opacity, which is what makes `everyday/cutawayCrowd.test.ts` able to pin the wash ' +
+        'at the measured 0.13; that is a rendering claim, checked there, and not a sentence.',
+      ids: ['render/riderFigures.ts#withAlpha'],
+    },
+    {
+      reason:
         'The house’s rush table — GitHub issue #418, § D547. `parseRushHouseTable`’s literals are ' +
         'load-time refusals addressed to whoever edited `data/rush-house-runs.json` ("carried more ' +
         'people than had arrived", "measures a pair a second time"), and `RUSH_HOUSE_TABLE` is ' +
