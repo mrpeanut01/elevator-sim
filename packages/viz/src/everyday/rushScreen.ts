@@ -41,6 +41,7 @@ import {
   rushLeftBehindLine,
   rushOpeningLine,
   rushTutorialWorkedAnswerOf,
+  RUSH_FITTED_LINE,
   RUSH_SCREEN_COPY as COPY,
 } from './rushScreenModel.js';
 import { rushStandingsOf } from './rushHouse.js';
@@ -261,6 +262,16 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   const drivingNote = el(doc, 'p', undefined, COPY.drivingNote);
   drivingNote.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:9px 0 0`;
   drivingBlock.append(drivingNote);
+  /*
+   * § D672: a sitting the account has bought a fitted start for says so before it starts, and says
+   * where it will be posted. Absent otherwise — there is no control here and no price, because the
+   * tally in Settings is what sells it and a pitch on a mode's own screen would be a store.
+   */
+  if (context.host.rushStartsFitted()) {
+    const fitted = el(doc, 'p', 'everyday-rush-fitted', RUSH_FITTED_LINE);
+    fitted.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:12px 0 0`;
+    drivingBlock.append(fitted);
+  }
   /* § D478: a stream this far outside the building's band says so before it starts. */
   const disclosureLine = context.host.rushDisclosure();
   if (disclosureLine !== undefined) {

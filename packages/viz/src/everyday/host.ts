@@ -1650,6 +1650,22 @@ export interface EverydayHost {
   chimeTally(): EverydayChimeTally | undefined;
 
   /**
+   * Whether the **next** rush sitting will start on a fitted tower —
+   * [§ D672](../../../../DECISIONS.md), GitHub issue #372.
+   *
+   * One derivation, shared with the claim itself, so the sentence the setup screen draws and the
+   * modifier the press sends cannot come to disagree. It is `false` before the ledger has been
+   * read, which is the arm that claims least: a screen promising a fitted tower over an account
+   * nobody has asked about would be a figure with no source, and the sitting would run as built.
+   *
+   * **It says nothing about a purse**, and must not be widened to. Nothing spends one
+   * ([§ D606](../../../../DECISIONS.md) § 2), and nothing here says anything about whether a tier
+   * bought between rounds would persist into the next — that question is open and a screen
+   * implying an answer would be answering it.
+   */
+  rushStartsFitted(): boolean;
+
+  /**
    * Buy one step of a modifier — GitHub issue **#372**, [§ D672](../../../../DECISIONS.md).
    *
    * The play surface's second verb. A sink id and a step count go out; a balance and a grant come
@@ -1877,14 +1893,19 @@ export interface EverydayHostBindings {
    * [§ D640](../../../../DECISIONS.md). Read **once**, at the sitting's first press.
    *
    * **`undefined` in every shipped binding, and that is a fact about this build rather than a seam
-   * left loose.** No screen spends a chime — `everyday/chimesPanel.ts#CHIMES_PANEL_COPY.spendRefusal`
-   * says so on its own face, and that is GitHub issues #371 and #372's own second half — so no
-   * account holds a rush modifier to claim and there is nothing to answer. The field exists because
-   * a claim is the one thing that cannot be derived here: the balance and the spends are the
-   * server's, `boundaries.test.ts` forbids this file holding an account, and `dev/main.ts` is where
-   * the three things live. When a spend surface ships it fills this and nothing else changes —
-   * `startRush` already gives the claims to `everyday/rush.ts#rushPatchOf`, which fits the building
-   * for a claimed `rush-prefit`, and `rushSittingOf` already puts them on the wire.
+   * left loose.** It said *"undefined in every shipped binding"* because no screen spent a chime;
+   * [§ D672](../../../../DECISIONS.md) built one, and the promise the rest of this docstring made —
+   * *"when a spend surface ships it fills this and nothing else changes"* — was kept by **not**
+   * filling it. {@link rushClaims} derives the claim from what the ledger says the account owns,
+   * which this host already reads, so a `dev/main.ts` binding would be a second answer to *what did
+   * this account buy*. The parameter stays because a caller that wants to drive a claim directly
+   * needs one — `rushHoldAgreement.test.ts` is that caller, and it is how the fitted and as-built
+   * cells are measured against each other. Supplied, it wins; absent, the derivation answers.
+   *
+   * What is unchanged is why it could not simply live in `dev/main.ts`: the balance and the spends
+   * are the server's, `boundaries.test.ts` forbids this file holding an account, and `startRush`
+   * already gives the claims to `everyday/rush.ts#rushPatchOf`, which fits the building for a
+   * claimed `rush-prefit`, while `rushSittingOf` already puts them on the wire.
    */
   readonly rushModifiers?: (() => readonly ClaimedRushModifier[]) | undefined;
   /**
@@ -3198,6 +3219,7 @@ export function createEverydayHost(
       bankTurn({ completion: 'scenario-cleared', scenarioId });
     },
     chimeTally: () => chimeTally,
+    rushStartsFitted: () => rushClaims().length > 0,
     /*
      * The spend verb — GitHub issue #372, § D672. `dailyBoard`'s split applied to a write that
      * answers: the host's part is that there is nowhere to spend on a build served with no API

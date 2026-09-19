@@ -94,9 +94,20 @@
  * to reach and not a run**: a posted rush sitting's `rush-purse-top-up` opens the purse
  * `leaderboard/rushSitting.ts` derives, and the sitting's rows and board key carry the set — but no
  * between-round rebuild travels yet, so nothing spends that purse and the legs are unchanged by it.
- * `rush-prefit` is refused on a sitting, because its fitted building is one this server cannot build.
- * Until a rebuild travels the separation stays the honest one: the account paid for something, and
- * the board says which runs were played by accounts that did.
+ *
+ * **The sentence that stood here about the pre-fit was false and is deleted** — it read
+ * *"`rush-prefit` is refused on a sitting, because its fitted building is one this server cannot
+ * build"*, and [§ D640](../../../../DECISIONS.md) lifted that refusal on 2026-09-16 while this file
+ * was last touched on the 11th. `leaderboard/rushSitting.ts` accepts the claim by id and
+ * {@link replayRushSitting} fits every round with `core`'s kit, so a fitted sitting's rows really
+ * are a different run from the same sitting as built — `rushHoldAgreement.json` pins both and
+ * requires them to differ. That is [§ D227](../../../../DECISIONS.md)'s more dangerous half, a
+ * refusal drawn over a control that works, and it is deleted rather than reworded.
+ *
+ * So the separation carries two different weights now, and the key does not have to tell them
+ * apart: a `purse-units` set separates runs whose legs are identical, and a `prefit` set separates
+ * runs whose legs are not. Either way the board says which runs were played by accounts that
+ * bought something, and never what they paid.
  */
 
 import type { ClaimedModifier } from '../chimes/ledger.js';

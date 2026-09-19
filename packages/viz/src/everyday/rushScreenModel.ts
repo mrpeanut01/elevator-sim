@@ -219,6 +219,25 @@ export const RUSH_SCREEN_COPY = Object.freeze({
  * the prose does not, which is a mismatch a reader can see. It is also § 9.3's own figure note —
  * *the run ends at 120 s × 40 people*.
  */
+/**
+ * **That this sitting starts on a fitted tower, said before it starts** — GitHub issue #372,
+ * [§ D640](../../../../DECISIONS.md), [§ D672](../../../../DECISIONS.md).
+ *
+ * Drawn only when the account owns the kit, and `EverydayHost.rushStartsFitted` is the one
+ * derivation behind both this sentence and the claim the press sends — so a screen cannot promise
+ * a fitted tower the sitting does not get.
+ *
+ * Two facts and no third. **What is fitted**, because a player is owed the difference between this
+ * run and the same run as built; and **where it is posted**, because the board is keyed by the
+ * modifier set (`leaderboard/boardKey.ts`) and a sitting landing on a board the player did not
+ * expect is the kind of surprise a purchase must not hold. **No price**, because a chime figure
+ * beside a run's own screen is `docs/32` GD13 clause 3 — the tally in Settings is where a price
+ * belongs, and it is where this was bought.
+ */
+export const RUSH_FITTED_LINE =
+  'This tower starts fitted — the doors, the control and the tenancies are already in. A fitted ' +
+  'sitting is posted to its own board rather than ranked against towers as built.';
+
 export function rushHoldLineFigure(): string {
   return `${String(RUSH_HOLD_LINE.overS)} s × ${String(RUSH_HOLD_LINE.people)} people`;
 }
@@ -302,10 +321,14 @@ export function rushGeneratedRangeLine(): string {
  * the register's own case — an absence a player can meet, said where the build says what it does
  * not have. It leaves on the commit that makes it false, as every entry here has.
  *
- * The two chime sinks are named in the same breath because they are the same absence from the other
- * end: `data/chime-ledger.json` sells a wider purse and a fitted start, and neither can be bought,
- * because a purse that buys nothing is a purchase that changes no run.
- * `everyday/chimesPanel.ts#CHIMES_PANEL_COPY.spendRefusal` says that on the screen that lists them.
+ * **The two chime sinks have stopped being one absence, and this entry says which is which.**
+ * `data/chime-ledger.json` sells a wider purse and a fitted start;
+ * [§ D672](../../../../DECISIONS.md) built the spend for the second and deliberately not for the
+ * first, because a purse that buys nothing is a purchase that changes no run. So an entry saying
+ * *neither can be bought yet* would now be [§ D227](../../../../DECISIONS.md)'s more dangerous
+ * half — a sentence telling a player not to look at a control that works — and the clause is
+ * corrected on the same commit as the control. `everyday/chimesPanel.ts#SPEND_ABSENCES` carries
+ * the purse's own refusal on the screen that lists the prices, which is where a player meets it.
  */
 export const RUSH_ABSENCES: readonly string[] = Object.freeze([
   /*
@@ -321,8 +344,8 @@ export const RUSH_ABSENCES: readonly string[] = Object.freeze([
   'The between-round purse — the server works out what each round earned and sends it back, and ' +
     'there is nothing to spend it on: rebuilding the tower between rounds is not built, so a purse ' +
     'is a record of how far you got rather than a budget. Starting with the building fitted is a ' +
-    'different case and is built — it reaches the run — but neither rush purchase can be bought ' +
-    'yet, because no screen spends a chime.',
+    'different case: it reaches the run, and it can be bought — the tally in Settings sells it and ' +
+    'nothing else here.',
 ]);
 
 /* -------------------------------------------------------------------------- *

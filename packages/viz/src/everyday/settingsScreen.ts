@@ -226,6 +226,18 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
    * red in three files while four projects were green — wave R's lesson arriving again.
    */
   let lastReadToken: string | undefined | null = null;
+  /** What the account owns, once a read has landed — § D671. `undefined` is *nobody has asked*. */
+  let chimeOwns: readonly { readonly sinkId: string; readonly steps: number }[] | undefined;
+  /** Whether this page has a spend route at all — set by the first read's own arm. */
+  let chimeSpendable = false;
+  /** The server's sentence about the last press, or `undefined`. Never this file's own wording. */
+  let chimeNotice: string | undefined;
+  /**
+   * Whether a press is in flight. One at a time, and the button is disabled for the round trip:
+   * the store refuses a double spend inside one statement, and a screen that leaned on that rather
+   * than preventing it would be testing the server with a player's chimes.
+   */
+  let spending = false;
   /** Set by `unmount`, so a late answer cannot paint a screen that has gone. `boardScreen.ts`'s shape. */
   let disposed = false;
 
@@ -233,6 +245,9 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     settingsScreenViewOf({
       profile: store.current(),
       chimeBalance,
+      chimeOwns,
+      chimeSpendable,
+      chimeNotice,
       draftName,
       durable,
       reduceMotion: engineerSettings()?.reduceMotion(),
@@ -453,11 +468,16 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
    * the loop below can be built once and never rebuilt. A table that gained a sink between two
    * paints is not a thing that can happen: it is bundled with the module.
    *
-   * **They are not dimmed by affordability any more, and the deletion is the point.** A row faded
-   * because the balance will not cover it is a row telling a player it becomes pressable when the
-   * balance does. Nothing in this build spends a chime, `chimesRefusal` below says so in the
-   * player's own words, and a dimming rule that implied otherwise beside that sentence would have
-   * the panel disagreeing with itself.
+   * **Every row is a button and only one of them is ever live** — GitHub issue #372,
+   * [§ D672](../../../../DECISIONS.md). A row carries its own `offer`, a control is enabled exactly
+   * when that reads `buy`, and every other arm draws the row's own sentence under it. This used to
+   * say the opposite — *"nothing in this build spends a chime"* — and that sentence went with the
+   * `spendRefusal` field on the commit that made it false (§ D227), rather than being softened.
+   *
+   * A disabled `<button>` is still a `<button>`, which is the choice worth naming: the refusal is
+   * **drawn** under it rather than left on a `title`, because `everyday/modes.ts` already argues
+   * that a tooltip is not a sentence a player reads, and `rushScreenModel.ts`'s issue #262 measured
+   * what happens when a refusal sits somewhere a player has to find.
    */
   const chimesBlock = el(doc, 'div');
   chimesBlock.style.cssText = `margin-top:14px;padding-top:14px;border-top:1px solid ${C.ruleLight}`;
@@ -472,14 +492,28 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   const chimesSpendHeading = el(doc, 'div', undefined, view.you.chimes.spendHeading);
   chimesSpendHeading.style.cssText = `font-size:11px;letter-spacing:0.08em;color:${C.warmGrey};margin-top:12px`;
   const chimesRows = el(doc, 'div');
-  chimesRows.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:6px';
-  for (const row of view.you.chimes.rows) {
-    const line = el(doc, 'div', undefined, `${row.name} — ${row.price}`);
-    line.style.cssText = `font-size:12.5px;color:${C.ink}`;
-    chimesRows.append(line);
-  }
-  const chimesRefusal = el(doc, 'div', 'everyday-settings-chimes-refusal', view.you.chimes.spendRefusal);
-  chimesRefusal.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.5;margin-top:8px;max-width:70ch`;
+  chimesRows.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-top:6px';
+  /** Each row's button and its drawn sentence, rebuilt by nothing and repainted by {@link paintChimes}. */
+  const chimeRowParts = view.you.chimes.rows.map((row) => {
+    const wrap = el(doc, 'div', 'everyday-settings-chimes-row');
+    wrap.dataset.sink = row.id;
+    const button = el(doc, 'button', 'everyday-settings-chimes-buy');
+    button.type = 'button';
+    button.dataset.sink = row.id;
+    const note = el(doc, 'div', 'everyday-settings-chimes-note');
+    note.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.5;margin-top:3px;max-width:70ch`;
+    button.addEventListener('click', () => {
+      void buyChime(row.id);
+    });
+    wrap.append(button, note);
+    chimesRows.append(wrap);
+    return { button, note };
+  });
+  const chimesSpendNote = el(doc, 'div', 'everyday-settings-chimes-spend-note', view.you.chimes.spendNote);
+  chimesSpendNote.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.5;margin-top:10px;max-width:70ch`;
+  const chimesNotice = el(doc, 'div', 'everyday-settings-chimes-notice');
+  chimesNotice.style.cssText = `font-size:12.5px;color:${C.ink};line-height:1.5;margin-top:8px;max-width:70ch`;
+  chimesNotice.hidden = true;
   chimesBlock.append(
     chimesHeading,
     chimesBalance,
@@ -487,8 +521,45 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     chimesHome,
     chimesSpendHeading,
     chimesRows,
-    chimesRefusal,
+    chimesSpendNote,
+    chimesNotice,
   );
+
+  /**
+   * Repaint the tally's rows from the view — labels, enabled state, each row's sentence, and the
+   * server's notice.
+   *
+   * Text and `disabled` only, on this file's build-once rule: the rows are the shipped table's
+   * sinks and the table is bundled with the module, so the set cannot change between two paints.
+   * A rebuild here would take the caret out of the name field above it, which is issue #106.
+   */
+  function paintChimeRows(next: SettingsScreenView): void {
+    for (const [index, row] of next.you.chimes.rows.entries()) {
+      const parts = chimeRowParts[index];
+      if (parts === undefined) continue;
+      const live = row.offer === 'buy';
+      parts.button.textContent = `${row.name} — ${row.price}`;
+      parts.button.disabled = !live || spending;
+      parts.button.style.cssText = [
+        'width:100%',
+        'box-sizing:border-box',
+        'text-align:left',
+        'padding:8px 10px',
+        `border:1px solid ${live ? C.ink : C.ruleLight}`,
+        'border-radius:8px',
+        `background:${live ? C.sun : 'transparent'}`,
+        `color:${live ? C.ink : C.warmGrey}`,
+        'font-size:12.5px',
+        'font-weight:600',
+        `cursor:${live && !spending ? 'pointer' : 'not-allowed'}`,
+      ].join(';');
+      parts.note.textContent = row.note;
+    }
+    chimesSpendNote.textContent = next.you.chimes.spendNote;
+    chimesNotice.textContent = next.you.chimes.notice ?? '';
+    chimesNotice.hidden = next.you.chimes.notice === undefined;
+  }
+  paintChimeRows(view);
 
   youCard.append(identityRow, nameNote, homeBlock, chimesBlock);
   root.append(youHeading, youCard);
@@ -938,6 +1009,7 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
      */
     chimesBalance.textContent = view.you.chimes.balanceLine;
     chimesHome.textContent = view.you.chimes.homeNote;
+    paintChimeRows(view);
     for (const [index, button] of swatchButtons.entries()) {
       const swatch = view.you.swatches[index];
       if (swatch !== undefined) button.style.cssText = swatchStyle(swatch.color, swatch.selected);
@@ -1235,8 +1307,58 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     void context.host.chimeBalance().then((answer) => {
       if (disposed || everydayAccount()?.token !== token) return;
       chimeBalance = answer.kind === 'balance' ? answer.chimes : undefined;
+      /*
+       * **What the account owns travels with the balance** — § D671, one read. `undefined` on
+       * every other arm, because *the server refused* and *this account owns nothing* are
+       * different, and the panel draws a row as *not offered for a moment* under the first rather
+       * than offering a player a kit they may already have paid for.
+       *
+       * `no-server` is also what sets {@link chimeSpendable} to `false`: the page has no route, and
+       * that is a different sentence from *nobody is signed in* — which is the conflation the
+       * review of PR #485 found on this panel and this keeps out of it.
+       */
+      chimeOwns = answer.kind === 'balance' ? answer.owns : undefined;
+      chimeSpendable = answer.kind !== 'no-server';
       redrawIdentity();
     });
+  }
+
+  /**
+   * Buy one step of a sink — the press behind the one live row,
+   * [§ D672](../../../../DECISIONS.md).
+   *
+   * ## Three things it does in this order, and the order is the decision
+   *
+   * **Disable first.** The button is taken out of the tab order for the whole round trip, so a
+   * second press cannot spend the same chimes — the store refuses a double spend inside one
+   * statement anyway, and a screen that let a player press twice and then told them off would be
+   * relying on that rather than respecting it.
+   *
+   * **Carry the answer, never compose one.** A refusal is the server's sentence
+   * (`docs/22` non-goal 3); this file writes none of its own. A success draws no sentence at all,
+   * because the balance line and the row's own *bought* are what a player needs and a *thank you*
+   * beside a currency figure is the shape `docs/32` GD13 exists to keep out.
+   *
+   * **Re-read rather than patch.** `lastReadToken` is cleared so the next read is not skipped, and
+   * the balance and what the account owns come back from the ledger together. A screen that
+   * decremented its own copy would be a second authority for a figure the server holds.
+   */
+  async function buyChime(sinkId: string): Promise<void> {
+    if (spending) return;
+    spending = true;
+    chimeNotice = undefined;
+    redrawIdentity();
+    const outcome = await context.host.spendChime(sinkId, 1);
+    if (disposed) return;
+    spending = false;
+    chimeNotice =
+      outcome.kind === 'short' || outcome.kind === 'unreachable' ? outcome.detail : undefined;
+    if (outcome.kind === 'bought') {
+      chimeBalance = outcome.chimes;
+      lastReadToken = null;
+      readChimeBalance();
+    }
+    redrawIdentity();
   }
 
   const stopAccountWatch = onEverydayAccount(() => {

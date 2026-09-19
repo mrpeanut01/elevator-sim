@@ -150,7 +150,19 @@ export const SHARE_COPY = Object.freeze({
   /* The control, on the daily tab. */
   eyebrow: 'SHOW SOMEBODY',
   button: 'Copy the result',
-  copied: 'Copied',
+  /*
+   * The confirmation, and it is a **line** rather than a face on the button.
+   *
+   * It was the button's label for one commit, restored after 1 400 ms by a `setTimeout` — and
+   * `boundaries.test.ts`'s *schedules no timers anywhere, so tests never wait* is right to refuse
+   * that: a timer in a screen module is what makes a suite wait, and the rule confines them to the
+   * dev entry point where the Engineer copy control lives. Removing it rather than widening the
+   * exemption made the control better in two ways, which is the argument for reading a refusal
+   * before arguing with it. The button never stops saying what pressing it does, so the question
+   * *what would happen if I pressed that again* always has the same answer; and a `role="status"`
+   * line is **announced**, where a silently swapped button label is not.
+   */
+  copied: 'Copied — the result is on your clipboard.',
   /*
    * The standing note under the button, before any press. Three claims, because a player who did
    * not know them would read the press as something else: what goes (observations and the seed),

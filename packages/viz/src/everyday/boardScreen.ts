@@ -925,7 +925,12 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
     const button = doc.createElement('button');
     button.type = 'button';
     button.className = 'everyday-share-copy';
-    button.textContent = shareCopied ? SHARE_COPY.copied : SHARE_COPY.button;
+    /*
+     * The face never changes — see `SHARE_COPY.copied`. A button that stops saying what pressing it
+     * does has to be put back, and putting it back needs a timer, which `boundaries.test.ts`
+     * confines to the dev entry point for the reason its own name gives.
+     */
+    button.textContent = SHARE_COPY.button;
     button.disabled = artefact === undefined;
     if (artefact === undefined) {
       /*
@@ -972,17 +977,6 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
           shareCopied = true;
           shareRefusedText = undefined;
           redraw();
-          /*
-           * The face goes back on its own — `dev/main.ts#copyArtefact`'s 1 400 ms, kept, because a
-           * button reading *Copied* for the rest of the session is a button that has stopped
-           * describing what pressing it would do. Guarded on `disposed`, so a player who navigates
-           * away inside the window does not have a timer writing into a torn-down tree.
-           */
-          doc.defaultView?.setTimeout(() => {
-            if (disposed || !shareCopied) return;
-            shareCopied = false;
-            redraw();
-          }, 1_400);
         },
         () => {
           if (disposed) return;
@@ -1007,6 +1001,19 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
     note.className = 'everyday-share-note';
     note.style.cssText = NOTE;
     block.append(note);
+
+    if (shareCopied) {
+      /*
+       * Announced rather than swapped onto the button, and it stands until the next draw. There is
+       * nothing to expire: *the result is on your clipboard* stays true until something else is
+       * put there, so a line that vanished after a second would be a fact removed on a schedule.
+       */
+      const done = el(doc, 'p', SHARE_COPY.copied);
+      done.className = 'everyday-share-copied';
+      done.setAttribute('role', 'status');
+      done.style.cssText = `${NOTE};color:${C.moss}`;
+      block.append(done);
+    }
 
     if (shareRefusedText !== undefined) {
       const refusal = el(doc, 'p', SHARE_COPY.refused);
