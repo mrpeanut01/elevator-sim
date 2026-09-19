@@ -1637,7 +1637,8 @@ export class Simulation {
    *
    * 1. **The event valve's budget was per-call**, so ten chunks bought ten budgets. The kernel
    *    now takes `eventBudgetScope: 'lifetime'` and this class asks for it, so the valve trips on
-   *    exactly the same event however the caller stepped — including the warning's own text.
+   *    exactly the same event however the caller stepped — including the warning's own text
+   *    (`DECISIONS.md` § D801).
    * 2. **{@link SimKernel.run} advances the clock to `until`** whether or not anything fired
    *    there, so a caller who advanced past the end of the day would have left the clock ahead of
    *    the last thing that happened, and the end-of-run readings would have moved with it. Every
@@ -1706,8 +1707,8 @@ export class Simulation {
    * the standing requirement says does not count. A barrel re-export and a `{@link}` tag look
    * exactly like a caller and are not one, and neither is `sim/interrupt.test.ts`.
    *
-   * Recorded here rather than in `DECISIONS.md` under [§ D405](../../../../DECISIONS.md): this
-   * docstring is the record the working agreement asks for.
+   * `DECISIONS.md` § D802 is the record, with the four digests and the seven chunkings behind the
+   * guarantee above; § D801 is the kernel half it rests on.
    *
    * ```ts
    * const sim = new Simulation(config);

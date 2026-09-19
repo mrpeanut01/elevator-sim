@@ -36,6 +36,9 @@ export interface SimKernelOptions {
    * The two scopes are indistinguishable for a kernel that is drained exactly once — `fired` and
    * `processedCount()` are the same number there — so this changes nothing for every existing
    * caller, and the default keeps it that way for callers that never think about it.
+   *
+   * `DECISIONS.md` § D801, which also carries why the thrown message names neither the calling
+   * method nor the clock under this scope.
    */
   readonly eventBudgetScope?: 'per-call' | 'lifetime';
 }

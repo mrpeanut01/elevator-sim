@@ -4,7 +4,8 @@
  * `Simulation.advanceTo` exists so that a player can act *during* a day rather than only before
  * it (`docs/43` P1, `docs/16` § 1). The whole value of that depends on one claim, and this file
  * is that claim: **a run advanced in N chunks produces a byte-identical `RunRecord` to the same
- * run advanced in one call**, for every chunking, on the same seed.
+ * run advanced in one call**, for every chunking, on the same seed. `DECISIONS.md` § D802 is the
+ * decision and pins this file's digests; § D801 is the kernel change it rests on.
  *
  * Not "statistically equivalent" and not "equivalent up to floating point". The same bytes. A
  * simulator whose answer depends on when you looked at it is worse than one you cannot look
