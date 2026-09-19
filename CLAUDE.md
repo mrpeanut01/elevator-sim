@@ -1246,10 +1246,13 @@ through the player's own path** (`enterEngineerStage`, `reopenEngineerMenu`) rat
 cover off, which is the difference between a tier that tests the product and one that tests a surface
 nobody can open — and that helper had gone stale with the hand-off, leaving the tier red in 25 cases
 across 12 files while the product worked. And **all four mode tiles open now**: every one of
-§ 4's seventeen screen keys is accounted for — **sixteen are registered in `everyday/screens.ts`
-and `menu` is the shell's own**, which `screens.ts`'s docstring states and this sentence used to
-blur — so `UNBUILT_REASONS` is empty for
-the first time. The constant and the both-directions test around it stay exactly where they are — a
+the inventory's screen keys is accounted for — **twenty-one keys, of which twenty are registered in
+`everyday/screens.ts` and `menu` is the shell's own** — so `UNBUILT_REASONS` is empty for
+the first time. **The count is not repeated here, because it has moved four times and this sentence
+has been wrong once already** ([§ D723](DECISIONS.md)): `everyday/types.ts#EVERYDAY_SCREENS` carries
+it, states it in its own docstring, and names the ruling beside every key past the design handoff's
+seventeen — `scenario` ([§ D525](DECISIONS.md)), `tutorial` and `collapse` ([§ D529](DECISIONS.md))
+and `landing` (GitHub issue #244). Read it there. The constant and the both-directions test around it stay exactly where they are — a
 screen that ever leaves the registry owes its sentence back, and an empty table is a state that must
 keep being checked rather than a rule that can be deleted.
 

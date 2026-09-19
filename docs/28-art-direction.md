@@ -258,6 +258,14 @@ the value at this playhead is a different number*. So:
 > `live/observations.ts#observationsAt` it is drawn from. If the answer is a field of
 > `VizRecording.summary`, the cue is refused.**
 
+> **`frame/overlay.ts#queueAt`'s fields answer that test too, and the sentence names
+> `observationsAt` only because that was the fold in hand when it was written.** AD-S7 draws from
+> `QueuedRider.band`, AD-S8 from `FloorQueue.worstBand` and AD-S19 from `FloorQueue.recentlyBoarded`,
+> and § 5.4 already calls the second of those *"a state at `t`, so it is R6-clean."* The governing
+> property is the one stated above the test — *a count of what had happened by `t`, or a state right
+> now* — and both folds have it. `VizRecording.summary` stays refused in every form
+> ([§ D722](../DECISIONS.md)).
+
 `observationsAt` is the permitted vocabulary, and it is generous. Every one of these is a count of
 what had happened by `t`, or a state right now, and every one is R6-clean by construction:
 `waitingNow`, `longestCurrentWaitS`, `arrived`, `boarded`, `carried`, `servedUnderThresholdCount`,
@@ -528,7 +536,7 @@ handoff wins what the screen looks like and the simulator wins what a number mea
 
 ### 5.4 Making pressure legible before the report names it
 
-This is `charter P3` discharged on the stage, inside § 4's ceiling. Four channels exist; each has a
+This is `charter P3` discharged on the stage, inside § 4's ceiling. **Five** channels exist; each has a
 finding and a rule.
 
 **The ramp is the core read, and it is 4.5 px wide.** `guide § 7.2` says the wait ramp *"is the
@@ -567,6 +575,37 @@ and it is a scale problem before it is a colour problem.**
   is already R6-clean, and it is the most under-weighted element on the screen.** Give it the visual
   weight its role deserves before proposing any new instrument. A new whole-run gauge is refused by
   § 4.4; this lane is the permitted version of the same wish, and it exists.
+- **AD-S19 — a boarding leaves a mark, and it is a count at the playhead rather than a motion.**
+  `FloorQueue.recentlyBoarded` — legs that boarded at this floor within `reliefWindowS` of `t` — is
+  computed on every frame and **read by nothing on this stage**; its three readers are all the
+  Engineer canvas's (`render/riderQueue.ts:231`, `render/mood.ts:474`,
+  `render/describeFrame.ts:306`), and `render/riderQueue.ts:98` already owns the glyph, `✓`. The gap
+  is the one that module's own docstring names: a rider who boards *"would otherwise vanish between
+  two frames with nothing on screen distinguishing 'a car came' from 'they were never here'"* —
+  **the one moment in a run where the player's decision visibly pays off, and today the queue just
+  gets shorter.** The landing carries a tally of that count while the window holds it.
+
+  **It is a state and not a cue, which is AD-S17's argument for a different quantity and
+  [§ D722](../DECISIONS.md)'s ruling here.** The window is what converts a discrete event into a
+  state: a frame rendered at `t` in isolation carries the count complete, so AD-M3 is met by
+  construction, and AD-M4 does not reach it because no capsule appears, moves or departs differently
+  — a capsule is still present at the playhead or it is not.
+
+  **Say what the top rung costs.** Ten simulated seconds pass per frame at `600×`, so the shipped
+  five-second window is **half a frame** there and most frames will not land inside it; at `240×`
+  about one frame a boarding, at `30×` about ten, **at `4×` — the rung the stage opens on since
+  [§ D641](../DECISIONS.md) — about seventy-five**, at `1×` about three hundred. **It degrades to
+  absence, never to a false statement** — which is exactly the difference from an event cue, and it
+  is why the meaning does not change with the rung and AD-M2 is untouched: what varies is only
+  whether a frame samples the window, as it already varies for the `▲`/`▼` in the car's own slot.
+
+  **Two constraints on whoever builds it.** The count's **string** is composed in
+  `everyday/stageScreenModel.ts` and never inside `drawCutaway` — a `fillText` argument composed in a
+  painter is read by no honesty property ([§ D347](../DECISIONS.md)), which is how a live figure
+  shipped unswept for a wave, and the `+N` overflow chip is already kept in the model for this
+  reason. And its **contrast is measured on the ground it is drawn on**, AD-A2 and § D336's shape:
+  **this rule runs no such measurement and does not pretend to**, so the figure is the lane's to take
+  and pin, as `render/carRest.test.ts` pins AD-S17's.
 
 **The P3 acceptance test for this screen, written so a reviewer can run it:** take the report's
 headline sentence for a bad day, and name the frame during the run at which the player could have
@@ -881,7 +920,14 @@ two had to move a citation.**
 - **AD-M4 — no entrance or exit animation on riders.** Passengers arrive in **batches**, not one at a
   time. At `600×` a batch appears within one frame *(re-checked for #257: written as `30×`, same
   rung)*, and a per-capsule stagger would be an animation queue that never drains on a busy building.
-  A capsule is present at the playhead or it is not.
+  A capsule is present at the playhead or it is not. **That sentence is the rule's whole subject,
+  and [§ D722](../DECISIONS.md) fixes its scope against the reading that would swallow AD-S19: what
+  this rule governs is a *capsule's own presence*, so a separate mark reporting what a landing just
+  did — a count over a trailing window, folded from `t` and carried between no two frames — is a
+  different thing and is not forbidden here. What is forbidden is making a rider's arrival or
+  departure a *process*: a stagger, a fade, a slide from a queue slot into a car door. Those stay
+  refused at every rung, because § 6's rules do not tier and AD-M2 refuses a per-rung policy by
+  name.**
 
 **What this does *not* rule out**, so the rules are not read as "no motion at all": the day itself
 moves, and that is the whole point of the screen. Cars travel, doors open, queues grow and drain,

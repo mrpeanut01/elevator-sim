@@ -465,6 +465,10 @@ stale assertion again and that suite says so.
 
 ### 3.2 What a unit means
 
+> **Status 2026-09-19: AMENDED by [§ D717](../DECISIONS.md).** A chime top-up is a second source of
+> units; the one-sink clause and *every price in the shop is a duration* stand, and a purse is no
+> longer a count of cleared days. See [`docs/39`](39-decisions-in-force.md).
+
 > **GD12 — A unit is a cleared day.** It has exactly one source — the contract's rate, paid per
 > cleared day and stepping every five days — and exactly one sink, which is works. **So every price
 > in the shop is a duration**, and it can be read as one without any conversion: at Standard's

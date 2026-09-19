@@ -18,7 +18,7 @@
  * reproduced. What is printed instead:
  *
  * - **When suppressed**, `summary.awtInvalidReason` **verbatim**. `core` already writes an
- *   excellent sentence there, naming which of the four grounds fired and with what numbers, and
+ *   excellent sentence there, naming which of the five grounds fired and with what numbers, and
  *   paraphrasing it here would create a second account of a refusal — the failure mode this card
  *   exists to prevent, one level up. When the flag is set with no reason (the saturation-only
  *   path), the same sentence `overlayAt` falls back to is used, so the two surfaces cannot
@@ -271,13 +271,18 @@ function engineerTitle(suppressed: boolean): string {
  * The engineer's plain sentence.
  *
  * The design's suppressed copy opens *"the queues are still growing"*, which is true of exactly
- * one of the four grounds `awtIsValid` fails on. Since Phase 8 the flag also fails on an empty
+ * one of the **five** grounds `awtIsValid` fails on. Since Phase 8 the flag also fails on an empty
  * window, on censoring above the unserved limit, and on a leg past the 900 s abandonment horizon —
  * and *the trend test sees a queue still growing at the horizon, the censoring test sees one that
- * has not cleared by it; neither sees a queue that grew enormously and drained just in time*. So
- * the design's opening clause is kept only for the ground it describes, and the other three get a
- * sentence that does not claim a growing queue. The second half — *"the counts above are real; the
- * average is not"* — is the design's and is true of all four.
+ * has not cleared by it; neither sees a queue that grew enormously and drained just in time*. **The
+ * fifth landed with wave 13's patience feature and sits above censoring rather than below it**:
+ * abandonment over 2 % suppresses outright, because abandonment improves the mean by construction
+ * — it removes the longest waits from the sample. So the design's opening clause is kept only for
+ * the ground it describes, and the other **four** get a sentence that does not claim a growing
+ * queue. The second half — *"the counts above are real; the average is not"* — is the design's and
+ * is true of all **five**. *(This docstring said "four" and enumerated four for as long as there
+ * were four, and did not move when the fifth landed;* `closedPlain` *below already says five —*
+ * [§ D723](../../../../DECISIONS.md)*.)*
  */
 function engineerPlain(recording: VizRecording, suppressed: boolean): string {
   if (!suppressed) {
@@ -353,8 +358,8 @@ function mathsOf(
     `${String(s.unservedCount)} of ${String(level.arrivalCount)} arrivals unserved when the ` +
     `window closed, and ${String(level.overHorizonCount)} past the ` +
     `${level.horizonS.toFixed(0)} s abandonment horizon. Longest wait ${longest}; ${overLong}. ` +
-    'All four of `awtIsValid`’s grounds pass, so this run’s averages are quotable — over that ' +
-    'window and that n, and nothing wider.'
+    'All five of the checks that can withhold an average pass, so this run’s averages are ones ' +
+    'the simulator will stand behind — over that window and that n, and nothing wider.'
   );
 }
 

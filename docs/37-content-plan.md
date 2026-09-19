@@ -22,7 +22,7 @@ owns that and this document defers to it in full), or what any individual piece 
 
 **A target count is a goal and is therefore prose.** Every *current* count it is compared against is
 derived from `data/` or from the module that holds the list, and
-`packages/experiments/src/validation/contentPlan.test.ts` re-derives all seven and fails when § 1's
+`packages/experiments/src/validation/contentPlan.test.ts` re-derives all eight and fails when § 1's
 table and the tree disagree. That split is [`RISKS.md`](../RISKS.md) **R38** applied deliberately:
 the thing that drifts is the measurement, not the ambition.
 
@@ -42,6 +42,7 @@ fix cases and forty proof cases*. **Four are right and one is wrong.**
 | Proof cases | `proof-cases` | **40** | `towers` × `crowds` in [`data/proof-cases.json`](../data/proof-cases.json) — 8 × 5 |
 | Dispatcher profiles | `dispatchers` | **13** | `profiles` in [`data/dispatcher-profiles.json`](../data/dispatcher-profiles.json) |
 | Traffic demand templates | `demand-templates` | **8** | `demandTemplates` in [`data/traffic-profiles.json`](../data/traffic-profiles.json). The eighth, `endless-rush`, is GitHub issue #220's stream and declares `selectable: false`: a mode's own record that no list offers and no rotation may draw, so it counts here and buys the daily loop nothing |
+| Wrinkle templates | `wrinkles` | **25** | `templates` in [`data/wrinkles.json`](../data/wrinkles.json). Keyed here for the first time on 2026-09-19 ([§ D723](../DECISIONS.md)): the § 4.2 row's key cell read *(new)*, which the gate's `KEY` pattern does not match, so *today 0* survived twenty-five templates landing |
 
 **The correction is the contracts row: there are ten, not five.** The issue's *five* is the number
 the design handoff specifies and the number this project shipped until `chancery-house`,
@@ -121,29 +122,32 @@ day. So the multiplier is **at least 5×**, and 5 is what this document uses.
 
 | mode | simulated seconds shipped | derivation | watched? | real watch minutes at 30× |
 |---|---|---|---|---|
-| Daily loop | **61 200** | 33 clean days is the floor — `needClean` over `c1`–`c13` is 1+2+2+2+2+3+3+3+3+3+3+3+3 — at 1 800 s each, except `c1`'s authored 3 600 s: 3 600 + 32 × 1 800 | yes | **34.0** |
+| Daily loop | **77 400** | 42 clean days is the floor — `needClean` summed over the sixteen contracts `CONTRACTS` holds is 1 + 2 + 2 + 2 + 2 + 3 × 11 — at 1 800 s each, except `c1`'s authored 3 600 s: 3 600 + 41 × 1 800 | yes | **43.0** |
 | Campaign | **9 000** | 10 stages × `durationS` 900 | yes | **5.0** |
 | Fix a building | 33 900 | 18 cases, `run.durationS` 1 500–2 700 | no | 0 |
 | The gauntlet | 38 400 | 8 towers × (900 + 900 + 1 200 + 1 200 + 600) crowd horizons | no | 0 |
-| **watched total** | **70 200** | | | **39.0** |
+| **watched total** | **86 400** | | | **48.0** |
 
-**Thirty-nine minutes.** That is the whole of what this game asks a player to watch, and it is
+**Forty-eight minutes.** That is the whole of what this game asks a player to watch, and it is
 worth stating in one line because it is the figure the issue's *"a few hours of content"* is hiding:
 the hours are real, and almost none of them are the simulator running. *(It read **twenty-five**
-until § 7.3's two buildings shipped their contracts and **thirty** until the first three reference
-towers shipped theirs — GitHub issues #424, #425 and #430. Nine clean days at 1 800 s is nine
-watch-minutes, and the row is re-derived here on each wave rather than left to drift —
-`RISKS.md` R38.)*
+until § 7.3's two buildings shipped their contracts, **thirty** until the first three reference
+towers shipped theirs — GitHub issues #424, #425 and #430 — and **thirty-nine** until the last three
+did. Three clean days at 1 800 s is three watch-minutes, and the row is re-derived here on each wave
+rather than left to drift — `RISKS.md` R38. **This row's derivation had gone stale while its totals
+were updated**, which is the worse half: it enumerated `c1`–`c13` at 33 clean days against a tree
+holding sixteen contracts at 42, and `contentPlan.test.ts` re-derives the other three modes'
+simulated seconds and **not this one** ([§ D723](../DECISIONS.md)).)*
 
 **The finite play-hours, then:**
 
 | mode | arithmetic | play-hours |
 |---|---|---|
-| Daily loop + campaign | 39.0 watch-minutes × 5 (§ 2) = 195 min | **3.25** |
+| Daily loop + campaign | 48.0 watch-minutes × 5 (§ 2) = 240 min | **4.00** |
 | Fix a building | 18 cases × 7.67 min (below) = 138 min | **2.30** |
 | The gauntlet | one press per dispatcher a player wants rated | ~0 |
 | Endless rush | unbounded by construction | excluded |
-| **total** | | **≈ 5.6** |
+| **total** | | **≈ 6.3** |
 
 **Where 7.67 minutes a case comes from.** A clean solve is: understand the fault (the charter's own
 first-session standard is *understood why within three minutes*), choose among four repairs against a
@@ -153,7 +157,7 @@ exactly one affordable repair clears both bars, so a wrong first spend is the ex
 those; add one choose-and-read cycle of 3 minutes to each. `(8 × 6 + 10 × 9) ÷ 18 = 7.67`. The three
 per-step figures are assumptions; the 10-of-18 split is a measurement.
 
-**So the issue's adjective was right even though its contracts count was wrong.** Four and a bit
+**So the issue's adjective was right even though its contracts count was wrong.** Six and a bit
 hours is a few hours.
 
 ---
@@ -174,7 +178,10 @@ measured against.
 The session rate is an assumption and the sensitivity is published rather than hidden, because it is
 the only free parameter: charter `S4` commits to **25 % of day-one players returning within 7 days**
 and to nothing about frequency. **The target is the midpoint of that band: 8.5 finite play-hours**,
-up from the measured 4.8.
+up from the measured 4.8. *(**4.8 is the dated record it was when this document landed**, and it is
+left standing rather than refreshed: § 3's total is re-derived on each wave and now reads ≈ 6.3, but
+what 4.8 was measured over has not been re-derived here, and naming a plausible replacement instead
+of measuring is what [§ D256](../DECISIONS.md) refuses — [§ D723](../DECISIONS.md) § 5.)*
 
 ### 4.2 The per-type targets, each derived separately
 
@@ -191,7 +198,7 @@ independently**.
 | Proof cases | `proof-cases` | 40 | **40** | **unchanged, by rule.** A rating is only comparable if the cases never move; growing the building set must not touch this list. § 7 is the one permitted move | 0 |
 | Dispatchers | `dispatchers` | 13 | **13** | **unchanged.** `CLAUDE.md` invariant 7: only a genuinely new *cost term* justifies new dispatcher code, and a weight vector adds no run to watch | 0, by construction |
 | Demand templates | `demand-templates` | 8 | **9** | § 4.4, and one of the eight is #220's unselectable stream, so seven are the rotation's | 0 directly; multiplies the rotation |
-| Wrinkle templates | *(new)* | 0 | **20** | § 4.3, and it is the gameplay guide's own figure | unbounded — this is the row that makes the daily loop not run out |
+| Wrinkle templates | `wrinkles` | **25** | **25** | § 4.3, and it was the gameplay guide's own figure of 20 — **met and exceeded**: the library ships 25 templates, so the target is restated at what ships and the row is now derived like every other | unbounded — this is the row that makes the daily loop not run out |
 
 **At the targets as first derived, 4.38 + 1.00 + 0.17 + 3.32 = 8.87 play-hours**, against a band of
 6.5–10.8 and a midpoint target of 8.5. Seven independently derived targets landing inside a band
@@ -231,7 +238,7 @@ constraints and they are where the building target comes from.
 | rule | minimum for satisfiability | legal choices a day at the minimum | at the target |
 |---|---|---|---|
 | no tower twice in 7 days | **8 towers** | `8 − 7 = 1` — a fixed cycle, not a draw | **22** → `22 − 7 = 15` (the first target, 12, left 5) |
-| no template twice in 14 days | **15 templates** | `15 − 14 = 1` — same defect | **20** → `20 − 14 = 6` |
+| no template twice in 14 days | **15 templates** | `15 − 14 = 1` — same defect | **25 shipped** → `25 − 14 = 11`; the draw is `day mod pool.length` over 18 weekday and 5 weekend templates, so the gap is 18 calendar days for a weekday and 15 for a weekend, both clearing fourteen, and `wrinkles/library.ts#assertRotates` refuses a library that breaks it **at load** |
 | pair never inside a month | 31 pairs | — | 22 × 20 = **440** against a 30-day window (240 at 12) |
 
 **Eight buildings satisfies the first rule and defeats its purpose**, which is the finding: at
@@ -540,7 +547,7 @@ nothing a display name does not already buy them.
 | **#233** — expand Fix a building | **AC1 target: 44 cases** (§ 4.2, from § 10.6's own catalogue of 26). **Do the schema widening first** (§ 5.2): `FixitCase.run`'s three fields reach the demand *level* and not its *shape*, which blocks four catalogue cases for a `fixit/` reason rather than an engine one. **Six of the 26 are blocked outright** and § 5.2 names all ten and the check that confirms the classification. So the realistic first tranche is **16**, not 26. **AC4** is already specified — `docs/33` § 5.3's DC-7 bands, and new cases take a band rather than an index. **Plus the disclosure paragraph** § 7.3 says is owed |
 | **#249** — publish a content cadence | **The honest input, which is not the one the issue expects.** At the § 4.1 rate a median player consumes ~40 min a week; one fix case is 7.67 min. **A cadence cannot be justified as content replacement** — a weekly case replaces a sixth of a week's play — so it must be justified as *a reason to return*, which is a different design argument and belongs in #249 rather than here. What this document does give it: the per-type authoring costs in § 6 (285 lines a fix case today), so the cadence is set by what the pipeline sustains rather than by ambition |
 | **#158** — the two proof-case buildings | **Resolved: option 1, author them** (§ 7.3), with the deadline condition — **before the daily board ships**, after which option 2 becomes the only honest exit and must be recorded rather than applied to the vendored file. #158's own option 2 as worded (*amend § 12.3*) is **unavailable**; § 7.3 says why and what replaces it. **Both towers landed on 2026-09-14** (GitHub issues #500, #501) — and the owner's 2026-09-10 ruling on #419 keeps them **out of the forty**, so the recorded deviation in `data/proof-cases.json` stands permanently and #158's *naming* half is what the two buildings actually close |
-| **#159** — the wrinkle library | **Target: 20 templates** (§ 4.3, its own figure). **All six of its named kinds are authorable today** (§ 5.1; two were all-day only until #346 landed under § D523); the route the library takes into a run is the question it still has to settle. **#159 is on #249's critical path** — § 4.2's finite targets reach 8.87 h and the quarter needs up to 10.8; the daily rotation is what covers the difference, and it does not exist |
+| **#159** — the wrinkle library | **Target: 20 templates — met and exceeded; `data/wrinkles.json` ships 25.** All six of its named kinds are authorable (§ 5.1; two were all-day only until #346 landed under [§ D523](../DECISIONS.md)), and three further kinds § 17 names are recorded in the file's own `unexpressible` block with the seam each needs. **The route into a run is built**: `shift/events.ts#eventFor` draws through `wrinkles/draw.ts#drawWrinkle`, which keeps § 17's *no template twice in fourteen days* and is checked at load by `library.ts#assertRotates`; the two rotation rules that name a **tower** are deliberately not faked, because nothing in this build selects the day's tower. **This row previously read *"the daily rotation is what covers the difference, and it does not exist"*, and that stopped being true when #159 landed** — a stale claim on #249's critical path, which is the class `CLAUDE.md` calls worse than a dead seam ([§ D723](../DECISIONS.md)) |
 | **#235** — traffic realism | Unchanged by this document. § 5.3 records that patience, lobby crowding and the stairs metrics have landed in `core` and that what blocks content using them is the content schemas, not the engine |
 
 ---
