@@ -49,8 +49,24 @@ import { describe, expect, it } from 'vitest';
 /** The monorepo's `packages/` directory. */
 const PACKAGES_DIR = fileURLToPath(new URL('../../../', import.meta.url));
 
-/** The modules audited. Both are Phase 5's, and both are where the four dead behaviours lived. */
-const AUDITED_MODULES = [
+/**
+ * **The fourteen directories this audit covered while its scope was a hand-written list.**
+ *
+ * Kept as a **floor** rather than as the scope: {@link AUDITED_MODULES} is derived from disk
+ * below, and a derivation that broke would narrow silently — an empty list passes every
+ * assertion in this file. So the list the audit is known to have covered may only grow, and the
+ * assertion that pins it is the one thing here a reader can check against the file's own history.
+ *
+ * It is also the evidence for why the derivation had to happen. `core/src/dispatch` is **not** in
+ * it, and the symbol walk is per-directory rather than recursive (`audit()` compares
+ * `dirname(path)` against the module directory — which is why `core/src/model` and
+ * `core/src/model/car` are both listed). So `lifecycle.ts`, `normalize.ts`, `parameters.ts`,
+ * `policy.ts`, `scoringEngine.ts`, `selector.ts` and `types.ts` — the load-bearing dispatch core —
+ * were outside the audit for as long as it has existed, and nothing could say so, because a
+ * hand-written list cannot report what is missing from it. `packages/viz/src/deadCode.test.ts`
+ * had already met this and fixed it by deriving; this is the same fix one package along.
+ */
+const MODULES_AUDITED_BEFORE_THE_DERIVATION = [
   'core/src/dispatch/policies', 'core/src/dispatch/predictor',
   'core/src/analytical', 'core/src/config', 'core/src/dispatch/terms', 'core/src/kernel',
   'core/src/metrics', 'core/src/model', 'core/src/model/car', 'core/src/physics/doors',
@@ -116,6 +132,28 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
 // walk exactly as the ten schemas above are, by the `_PARAMETERS` suffix.
 'sim/PATIENCE_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 'traffic/TRAFFIC_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
+
+/* ---- Added when the module list stopped being hand-written and `core/src/dispatch` joined ---- */
+
+/*
+ * **Two of the four exports the widened audit surfaced.** `core/src/dispatch` had been outside
+ * this audit for its whole life — 137 exports across `selector.ts`, `types.ts`, `lifecycle.ts`,
+ * `scoringEngine.ts`, `policy.ts`, `parameters.ts` and `normalize.ts` — and four of them have no
+ * caller. That is a good ratio and it is not the point: the point is that nothing could have
+ * reported it, because a hand-written module list cannot say what is missing from it.
+ *
+ * These two are surface on the same footing as the ten `_PARAMETERS` tables above, and both are on
+ * the package barrel (`core/src/index.ts` and `core/src/browser.ts`), so a consumer outside this
+ * repository can reach them. Neither alters a simulation: one is a membership index over the
+ * declared ids, the other enumerates what the engine reads. `tunablePathsOf` says in its own
+ * docstring that its consumer is the guard — *"so a test can assert that `DISPATCH_PARAMETERS`
+ * covers all of it"* — which is invariant 8 being checkable rather than aspirational, and is the
+ * one shape where the guard being the only caller is the design rather than a gap.
+ *
+ * The other two are findings and are in DEAD_CANDIDATES below, where a finding belongs.
+ */
+'dispatch/DISPATCH_PARAMETER_IDS': 'invariant 8 membership index over the declared ids; on the barrel',
+'dispatch/tunablePathsOf': 'invariant 8 coverage instrument; the guard is its consumer by design',
 
 // -- Geometry and state accessors. Each reads a value object the run already has.
 'model/directionBetween': 'accessor over two floor indices',
@@ -267,6 +305,58 @@ const isTest = (path: string): boolean =>
  */
 const isBarrel = (path: string): boolean =>
   basename(path) === 'index.ts' || path.replace(/\\/g, '/').endsWith('core/src/browser.ts');
+
+/**
+ * Every directory under `core/src`, relative to `packages/`, deepest first is not required —
+ * the order is the walk's and the assertions sort.
+ *
+ * Derived rather than transcribed, for the reason the whole file exists: a list of directories is
+ * a list of claims, and the one claim a hand-written list can never make is *and these are all of
+ * them*.
+ */
+function directoriesUnder(moduleRelative: string): readonly string[] {
+  const out: string[] = [];
+  const visit = (dir: string): void => {
+    for (const entry of readdirSync(dir)) {
+      if (entry === 'node_modules' || entry === 'dist' || entry.startsWith('.')) continue;
+      const path = join(dir, entry);
+      if (!statSync(path).isDirectory()) continue;
+      out.push(relative(PACKAGES_DIR, path).replace(/\\/g, '/'));
+      visit(path);
+    }
+  };
+  visit(join(PACKAGES_DIR, moduleRelative));
+  return out;
+}
+
+/**
+ * The files in `dir` itself that this audit can read an export site out of: not a test, not a
+ * barrel, and directly in the directory rather than under it — because the symbol walk is
+ * per-directory (`audit()` compares `dirname(path)`), so a parent never covers a child.
+ */
+function auditableFilesIn(moduleRelative: string): readonly string[] {
+  const dir = join(PACKAGES_DIR, moduleRelative);
+  return readdirSync(dir)
+    .filter((entry) => entry.endsWith('.ts') && !entry.endsWith('.d.ts'))
+    .map((entry) => join(dir, entry))
+    .filter((path) => !isTest(path) && !isBarrel(path))
+    .map((path) => relative(PACKAGES_DIR, path).replace(/\\/g, '/'))
+    .sort();
+}
+
+/**
+ * **The modules audited — derived from the tree rather than remembered.**
+ *
+ * Every directory in `core/src`, including `core/src` itself, that holds at least one auditable
+ * file. A directory holding only barrels or only tests is *not* skipped by judgement: it has no
+ * export site for this audit to read, so including it would add nothing and excluding it removes
+ * nothing. The assertion below checks that in both directions, so the exclusion is a measurement
+ * rather than a preference — and a new directory, or a first non-barrel file in an existing one,
+ * is covered by an audit nobody had to remember to widen.
+ */
+const AUDITED_MODULES: readonly string[] = ['core/src', ...directoriesUnder('core/src')]
+  .filter((moduleRelative) => auditableFilesIn(moduleRelative).length > 0)
+  .sort();
 
 /**
  * Does `source` *use* `name` as a value, rather than only passing it through?
@@ -548,6 +638,30 @@ const DEAD_CANDIDATES: Readonly<Record<string, string>> = Object.freeze({
   'metrics/legDurations': 'no reference outside its own file',
   'sim/SIM_EVENT_TYPE_IDS': 'no reference outside its own file',
   'config/configError': 'no reference outside its own file',
+  /*
+   * -- The two findings the widened module list surfaced in `core/src/dispatch`, and the second is
+   * the one worth reading.
+   *
+   * `dispatch/termReferenceScale` is the programmatic form of that module's scale table. Its only
+   * references anywhere are `normalize.test.ts` and `terms/dutyMismatch.test.ts`, and it is on no
+   * barrel, so it is not even *reachable* from outside the package — which is why it is a finding
+   * here rather than surface in PUBLIC_API_ONLY. A claim of public API for a symbol a consumer
+   * cannot import would be this file's own defect.
+   *
+   * `dispatch/isParameterActive` is the sharper one, because it has a **named would-be caller that
+   * is blocked from being one.** `experiments/src/tuning/space/types.ts:118-131` restates the
+   * `activeWhen` evaluation rule and says exactly why: *"This is a restatement of
+   * `activeWhenSatisfied` in `core/dispatch/parameters.ts`, and it is one only because that
+   * function is not on `@elevator-sim/core`'s barrel … **If those three names reach the barrel,
+   * delete this and import them.**"* `docs/06` says there is one rule and *"an optimizer implements
+   * it once"*; there are two implementations, pinned against each other by `collect.test.ts`. So
+   * the disposition here is neither deletion nor a reason — it is **three names onto the barrel and
+   * a restatement deleted in another package**, which is a cross-package change and is reported
+   * rather than rushed. Registered so the finding is visible while it waits, which is what this
+   * register is for.
+   */
+  'dispatch/termReferenceScale': 'the module’s scale table in programmatic form; on no barrel, and only two tests call it',
+  'dispatch/isParameterActive': 'the shared activeWhen rule; experiments restates it because this name is not on the barrel',
   // `car/stopFloorsOf` was here — "reads a car snapshot; only its own test calls it" — until
   // `Car.divertFrontier` needed the shaft's route nodes in travel order to find a commit point
   // (`DECISIONS.md` § D205). It now has a non-test caller on the shipped path, so the entry is
@@ -559,8 +673,38 @@ const DEAD_CANDIDATES: Readonly<Record<string, string>> = Object.freeze({
  * The assertions
  * -------------------------------------------------------------------------- */
 
-describe('every export of the fourteen audited core modules has a caller or a stated reason', () => {
+describe('every export of the audited core modules has a caller or a stated reason', () => {
   const { symbols, uncalled } = audit();
+
+  it('names every directory under core/src — derived from the tree, not from memory', () => {
+    // The clause being mechanised is CLAUDE.md's "name the non-test caller"; a hand-written module
+    // list is that clause failing one level up, and it had already failed here — `core/src/dispatch`
+    // itself, 137 exports across the dispatch core, was outside the audit's scope from the day the
+    // list was written, and no assertion in this file could have said so.
+    //
+    // Both directions. Every directory on disk is either audited or has no auditable file in it,
+    // and the second half is checked rather than asserted: an exclusion whose reason is not
+    // re-derived here is a hand-written list wearing a derivation's clothes.
+    const onDisk = ['core/src', ...directoriesUnder('core/src')].sort();
+    const excluded = onDisk.filter((moduleRelative) => !AUDITED_MODULES.includes(moduleRelative));
+    expect([...AUDITED_MODULES, ...excluded].sort()).toEqual(onDisk);
+    for (const moduleRelative of excluded) {
+      expect(
+        auditableFilesIn(moduleRelative),
+        `${moduleRelative} is excluded from the audit, so it must hold no auditable file`,
+      ).toEqual([]);
+    }
+    // And what is excluded today, named — so that a directory falling out of scope is a diff on
+    // this line rather than a silent narrowing. `core/src` holds `index.ts` and `browser.ts`, both
+    // barrels; `core/src/physics` holds only its two subdirectories.
+    expect(excluded).toEqual(['core/src', 'core/src/physics']);
+
+    // The floor: a derivation that returned nothing would pass every other assertion in this file.
+    for (const moduleRelative of MODULES_AUDITED_BEFORE_THE_DERIVATION) {
+      expect(AUDITED_MODULES, 'the audit may widen and may never narrow').toContain(moduleRelative);
+    }
+    expect(AUDITED_MODULES).toContain('core/src/dispatch');
+  });
 
   it('scans every audited module and finds the exports it is supposed to be auditing', () => {
     // A scanner that silently matched nothing would pass every assertion below. These two names
@@ -573,6 +717,11 @@ describe('every export of the fourteen audited core modules has a caller or a st
     // One load-bearing entry point from the newly-audited half, for the same reason.
     expect(symbols.map((symbol) => symbol.key)).toContain('traffic/generateTrace');
     expect(symbols.map((symbol) => symbol.key)).toContain('metrics/summarizeRun');
+    // And from `core/src/dispatch` itself, which the derived module list brought in: the policy
+    // the engine dispatches through and the scorer it dispatches with. Both were outside this
+    // audit for its whole life, which is a floor that must now fail if the derivation regresses.
+    expect(symbols.map((symbol) => symbol.key)).toContain('dispatch/createDispatchPolicy');
+    expect(symbols.map((symbol) => symbol.key)).toContain('dispatch/scoreCar');
   });
 
   it('has no export that is dead — no caller and no recorded reason to have none', () => {
@@ -606,6 +755,16 @@ describe('every export of the fourteen audited core modules has a caller or a st
    * `@deprecated` note whose stated ground — *"so existing importers keep compiling"* — had no
    * importers behind it, so the note was instructing a reader about a constituency that did not
    * exist.
+   *
+   * **3 → 5, and this is the first time this number has gone up.** The comment above says it may,
+   * *with a reason*, and the reason here is the only one that should ever move it upward: the audit
+   * looked somewhere it had never looked. `core/src/dispatch` joined the scope when the module list
+   * stopped being hand-written (§ D836), and two of that directory's 137 exports have no caller —
+   * `termReferenceScale` and `isParameterActive`. Neither is new code and neither regressed; both
+   * have been in this state for as long as the file has existed, unseen because the list that
+   * decided where to look could not report what it omitted. A register growing because the
+   * instrument widened is the instrument working. What it must not do is grow because a symbol was
+   * added and nobody wired it, which is why the number stays a literal.
    */
   it('names every dead candidate, and the count is the one recorded', () => {
     const open = uncalled.filter((symbol) => symbol.key in DEAD_CANDIDATES);
@@ -617,7 +776,7 @@ describe('every export of the fourteen audited core modules has a caller or a st
     expect(
       open.length,
       `dispose a candidate and lower this number; never raise it silently. DEAD_CANDIDATES currently holds ${Object.keys(DEAD_CANDIDATES).length}`,
-    ).toBe(3);
+    ).toBe(5);
   });
 
   it('keeps the allowlist honest: no entry may outlive the condition that justified it', () => {

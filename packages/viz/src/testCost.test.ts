@@ -187,7 +187,17 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * of the set it names. Raised on the commit that made the tree exceed them, with nothing
      * existing raised to make room.
      */
-    ['viz', { count: 98, totalMs: 109_200_000 }],
+    /*
+     * **98 → 105, and all seven are one file** — `everyday/sittingClock.measure.test.ts`, GitHub
+     * issue #559 and § D753's wall-clock instrument. It plays each mode's real recording end to end
+     * through the shipped `Playback` against a system clock, which is the only way to settle a
+     * claim about a player's evening: the five session-shape strings were out by a factor of four
+     * and a division could not have found that. One reading cost **45.3 real minutes and 164 005
+     * frames**, so four of its cases carry an hour and the rest ten to thirty minutes. It is gated
+     * on `SITTING_OUT` and registered in `deepTiers.test.ts`, so the ordinary suite never pays for
+     * it — which is what makes the annotation honest rather than a budget being satisfied upward.
+     */
+    ['viz', { count: 105, totalMs: 126_600_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this
@@ -205,7 +215,14 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * is that single site and nothing else. Nothing was annotated upward to make room, and nothing
      * existing was raised.
      */
-    ['viz-browser', { count: 71, totalMs: 17_820_000 }],
+    /*
+     * **71 → 73, both `everyday/scenarioScreen.browser.test.ts`** — § D787's proof that a Scenario
+     * stage row opens *its* stage. It presses every offered row on the built bundle and requires
+     * the id in `#campaign-stage` to equal that row's, which is a claim only a browser can check
+     * and only across rows: pressing one row passes against the defect, because the picker opens
+     * on stage 1.
+     */
+    ['viz-browser', { count: 73, totalMs: 18_300_000 }],
   ]);
 
 /**

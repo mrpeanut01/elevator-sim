@@ -45,11 +45,44 @@
  *
  * The **base** rung, always. `docs/38` § 2.1 asks that *"the scenario shows the count for the
  * budget the player actually has"*, and nothing in this build has bought a rung: the bought-budget
- * ladder is authored and priced and no surface spends a chime on it yet (the chimes panel says so
- * on its own face). Showing a bought rung's count beside a budget nobody has bought would be a
- * figure the player's own state does not support, which is `docs/22` non-goal 2. When a spend
- * surface ships, {@link scenarioLadderOf} takes the rung it has bought and this docstring is the
- * paragraph that changes.
+ * ladder is authored and priced and **no surface in the product spends a chime on it**. Showing a
+ * bought rung's count beside a budget nobody has bought would be a figure the player's own state
+ * does not support, which is `docs/22` non-goal 2. When a spend surface ships,
+ * {@link scenarioLadderOf} takes the rung it has bought and this docstring is the paragraph that
+ * changes.
+ *
+ * ## The row says that itself, because no other surface can — [§ D786](../../../../DECISIONS.md)
+ *
+ * This paragraph used to end *"(the chimes panel says so on its own face)"* and that mitigation was
+ * **false on the commit it was written on**. [§ D672](../../../../DECISIONS.md) deleted the panel's
+ * blanket *"None of these can be bought yet"* in the same wave and replaced it with a reason per
+ * **sink**, keyed by sink id — and a scenario's budget is not a sink and, by
+ * `data/chime-ledger.json`'s own ruling, may never become one: the file refuses a
+ * `scenario-budget-step` by name and `core/config/chimeLedger.ts#REFUSED_MODIFIER_KINDS` refuses
+ * the modifier kind, because `data/campaign.json` already prices every rung and two authorities for
+ * one price is a player paying a different amount depending on which screen they stand on. So
+ * `everyday/chimesPanel.ts#SPEND_ABSENCES` **cannot** carry this — a row there would assert a sink
+ * that does not exist and would fail that file's own both-directions check — and
+ * `CHIMES_PANEL_COPY.spendNote` correctly says only that *nothing there* charges one, which sends
+ * the reader here.
+ *
+ * Which leaves this module as the only surface that can say it, and until § D786 it said the
+ * opposite: {@link budgetLineOf} drew *"2 wider budgets **can be bought**, in order: … (20 chimes),
+ * … (30 chimes)"* on every row of the mode `docs/38` § 2.1 makes *"the only mode a first-time
+ * player should meet"*, and the mitigating clause under it — *"Nothing **here** has bought a wider
+ * budget"* — reads as *you have not saved up yet* rather than as *nobody can*. That is
+ * [§ D227](../../../../DECISIONS.md) in both polarities at once, on the first screen of the first
+ * mode, and it shipped in `dist-web`.
+ *
+ * **The prices go and the ladder stays.** The rungs are real — `scenario/budgetReachesTheRun.test.ts`
+ * drives `rungsOf` over the shipped stages and proves on the boarding identities that a change the
+ * base rung cannot pay for is refused and the *same* change at the bought rung moves the run — so a
+ * player is told how many wider budgets a stage has and what each widens, which is a fact about the
+ * content. What is **not** drawn is the chime figure, because a price is an instruction to act and
+ * there is no act: it is the only part of that sentence a player could have tried to use, and it is
+ * the part that reads as an offer. Nothing in `data/campaign.json` moves; `pricing/spendWidensTheBudget.test.ts`
+ * still reads the same prices off disk and still asserts the scenario is their one authority. When a
+ * spend surface ships, {@link budgetLineOf} takes the prices back on that commit.
  *
  * Pure. No DOM, no host, no `data/` read — the caller supplies both documents, exactly as
  * `scenario/survivors.ts#validatePublishedSurvivors` takes its context rather than fetching one.
@@ -104,7 +137,7 @@ export interface ScenarioLadderRung {
   readonly buildingId: string;
   /** How long a run is and how many of them stand behind the verdict. Derived. */
   readonly shape: string;
-  /** What it opens on, what can be bought, and which rung the count below is taken at. */
+  /** What it opens on, what sits above that, and which rung the count below is taken at — § D786. */
   readonly budgetLine: string;
   /** {@link survivorSentenceFor} on the base rung, verbatim. The count in the player's words. */
   readonly waysThrough: string;
@@ -130,9 +163,20 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
   heading: 'The path',
   /** Drawn over the ladder. Says what the ordering is, since the rows carry no number a player set. */
   lede: 'Ten buildings in the order they are meant to be met, each one adding a single idea to the last.',
-  /** A stage that is offered. It opens where the stages are played today. */
+  /**
+   * A stage that is offered. It opens **this** stage where the stages are played today.
+   *
+   * It read *"Opens on the Engineer surface"* while every row's press called
+   * `shell.ts#enterEngineer()`, which takes no argument — so all three offered rows performed the
+   * same swap and the player arrived with whatever stage the campaign picker was holding. The
+   * sentence was true of the swap and said nothing false; it was the press that carried no
+   * identity. [§ D787](../../../../DECISIONS.md) gives the press its stage, and this word changes
+   * with it: *this stage*, singular, is now a claim about what the press does and is checked by
+   * `everyday/scenarioScreen.test.ts` pressing three different rows and requiring three different
+   * ids to arrive.
+   */
   openNote:
-    'Opens on the Engineer surface, which is where the stages are played. Clearing one there banks no chimes and does not reach a career yet.',
+    'Opens this stage on the Engineer surface, which is where the stages are played. Clearing it there banks no chimes and does not reach a career yet.',
   /** A stage held back. Never the word unwinnable — see the module docstring. */
   heldLead: 'Held back:',
   /*
@@ -145,8 +189,19 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    */
   heldBody:
     'nothing that was tried at this budget got through, and the dials among them were a sample rather than everything there is — so a rare way through is missed here rather than ruled out. It is on the list because it is the next step on the path, and it is not offered to play until one is found or it says outright that there is none.',
-  /** The rung the count is taken at, on every row, because no surface spends a chime yet. */
-  baseRungNote: 'Nothing here has bought a wider budget, so the count is the count at the budget it opens on.',
+  /*
+   * **The refusal, on every row that has a rung above its base** — § D786.
+   *
+   * It read *"Nothing here has bought a wider budget, so the count is the count at the budget it
+   * opens on"*, under a sentence saying the wider budgets *can be bought*. Both halves were wrong
+   * in the way § D227 names: the first is a promise nothing in the product can keep, and the second
+   * reads as *you have not saved up yet* to the one reader it is drawn for. This says who cannot
+   * sell it rather than who has not bought it, which is the difference between a refusal and a
+   * price tag with no till. It stops being drawn on the commit that makes it false — see the module
+   * docstring for what that commit has to contain.
+   */
+  baseRungNote:
+    'No screen in this build sells a wider budget, so the count below is the count at the budget it opens on.',
 });
 
 /* -------------------------------------------------------------------------- *
@@ -182,10 +237,18 @@ function shapeOf(stage: LadderStage): string {
 }
 
 /**
- * What the budget opens on, what chimes can buy, and which rung the count is taken at.
+ * What the budget opens on, what sits above it, and which rung the count is taken at.
  *
  * Every figure is `rungsOf`'s, so a screen, this sentence and the survivor table cannot disagree
  * about what a player standing on a rung actually has — the reason that function exists.
+ *
+ * **No chime price is drawn and that is § D786 rather than an omission.** The rungs' prices are
+ * authored in `data/campaign.json` and read by `scenario/budget.ts#rungsOf`,
+ * `scenario/budgetReachesTheRun.test.ts` and `pricing/spendWidensTheBudget.test.ts`; what no module
+ * in the product does is charge one. A price on a row a player cannot buy from is the only part of
+ * this sentence they could act on, so it is the part that goes while nothing sells it. What each
+ * rung *widens* stays, because that is a fact about the stage. `ladder.test.ts` asserts both
+ * halves, in both directions.
  */
 function budgetLineOf(budget: ScenarioBudget): string {
   const rungs = rungsOf(budget);
@@ -194,13 +257,11 @@ function budgetLineOf(budget: ScenarioBudget): string {
   if (budget.steps.length === 0) {
     return `${opens} No wider budget is authored for it.`;
   }
-  const bought = budget.steps
-    .map((step) => `${step.name} (${String(step.chimes)} chimes)`)
-    .join(', ');
+  const named = budget.steps.map((step) => step.name).join(', ');
   const ladder =
     budget.steps.length === 1
-      ? `One wider budget can be bought: ${bought}.`
-      : `${String(budget.steps.length)} wider budgets can be bought, in order: ${bought}.`;
+      ? `One wider budget sits above it: ${named}.`
+      : `${String(budget.steps.length)} wider budgets sit above it, in order: ${named}.`;
   return `${opens} ${ladder} ${SCENARIO_LADDER_COPY.baseRungNote}`;
 }
 

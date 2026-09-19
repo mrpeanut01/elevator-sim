@@ -32,11 +32,16 @@ import { candidateOf, controlsFor, defaultValues } from '../controls/controls.js
 import { glossaryFor, GLOSSARY_TERMS } from '../mode/glossary.js';
 
 import {
-  APPLIED_SCHEMA,
+  APPLIED_SCHEMAS,
   appliedNoteFor,
   collectFormSource,
+  crowdingFromCandidate,
+  demandFromCandidate,
   formStatusLine,
+  isAppliedSchema,
+  movedFromDefault,
   patienceFromCandidate,
+  runnerTunablesFromCandidate,
 } from './parameterForm.js';
 
 /** The shipped dispatcher space, which is what the form opens on. */
@@ -121,15 +126,17 @@ describe('what the Parameters tab does to a run, said on the tab', () => {
     return candidateOf(source.space, values);
   }
 
-  it('names one applied schema, and it is one core actually declares', () => {
-    // Derived rather than asserted against a literal: if `core` renames the export, the picker's
+  it('names four applied schemas, and every one is a schema core actually declares', () => {
+    // Derived rather than asserted against a literal: if `core` renames an export, the picker's
     // entry moves with it and this fails on the same commit instead of the branch going quiet.
-    expect([...discoverParameterSchemas().keys()]).toContain(APPLIED_SCHEMA);
+    const declared = [...discoverParameterSchemas().keys()];
+    for (const name of APPLIED_SCHEMAS) expect(declared).toContain(name);
+    expect(APPLIED_SCHEMAS).toHaveLength(4);
   });
 
   it('tells a reader outright that the other schemas change nothing', () => {
     for (const name of discoverParameterSchemas().keys()) {
-      if (name === APPLIED_SCHEMA) continue;
+      if (isAppliedSchema(name)) continue;
       const note = appliedNoteFor(name);
       expect(note, `${name} draws no refusal`).toContain('NOT APPLIED');
       // The claim has to be checkable by the reader on the spot, which means naming the button and
@@ -137,19 +144,60 @@ describe('what the Parameters tab does to a run, said on the tab', () => {
       // document nobody on this screen is reading.
       expect(note).toContain('Run this shift');
       expect(note).toContain('byte for byte');
-      expect(note).toContain(APPLIED_SCHEMA);
+      for (const applied of APPLIED_SCHEMAS) expect(note).toContain(applied);
     }
   });
 
-  it('and says the opposite where the opposite is true', () => {
-    const note = appliedNoteFor(APPLIED_SCHEMA);
-    expect(note).toContain('APPLIED');
-    expect(note).not.toContain('NOT APPLIED');
+  it('and says the opposite on every source where the opposite is true', () => {
+    /*
+     * **§ D227, which is the half of this defect class that does real damage.** A stale refusal is
+     * worse than a dead seam: it tells the reader not to touch a control that works. So the note
+     * for an applied source may not carry the refusal's words, and this runs over the whole set
+     * rather than over the one name somebody remembered.
+     */
+    for (const name of APPLIED_SCHEMAS) {
+      const note = appliedNoteFor(name);
+      expect(note, `${name} draws no applied note`).toContain('APPLIED');
+      expect(note, `${name} still says NOT APPLIED`).not.toContain('NOT APPLIED');
+      expect(note, `${name} does not say what to press`).toContain('Run this shift');
+      expect(note, `${name} still promises a byte-identical day`).not.toContain('byte for byte');
+    }
+  });
+
+  it('says how to read the patience note’s own consequence', () => {
+    const note = appliedNoteFor('PATIENCE_PARAMETERS');
     // Abandonment improves AWT by construction, so the note that makes the control reachable is
     // also the note that has to say how to read it — CLAUDE.md's *beside the mean, never folded
     // into it*, at the one screen that can now switch it on.
     expect(note).toContain('abandoned');
     expect(note).toContain('suppressed');
+  });
+
+  it('counts the traffic source the way the form actually collects it', () => {
+    /*
+     * **The note's arithmetic, derived rather than read back off the note.** It says eight rows
+     * reach the run, seven do not, and nineteen draw no control at all; 8 + 7 = 15 is the number of
+     * controls `collectFormSource` builds and 19 is the size of `space.unsearchable`. A sentence
+     * whose figures are checked against nothing is how a refusal goes stale — § D227 — and this is
+     * the cheapest place to make the two agree, because the form is the thing the player is
+     * looking at while they read it.
+     */
+    const source = collectFormSource('TRAFFIC_PARAMETERS');
+    if (!source.ok) throw new Error(source.reason);
+    expect(controlsFor(source.space, defaultValues(source.space))).toHaveLength(8 + 7);
+    expect(source.space.unsearchable.size).toBe(19);
+  });
+
+  it('names, on the traffic note itself, the rows it does not apply', () => {
+    /*
+     * A source that applies *some* of its rows is the shape a blanket sentence gets wrong in both
+     * directions, and `appliedNoteFor`'s own docstring says why each of the four is refused. The
+     * note has to carry the count a reader can check against the picker's refusal list.
+     */
+    const note = appliedNoteFor('TRAFFIC_PARAMETERS');
+    expect(note).toContain('eight');
+    expect(note).toContain('Seven rows are NOT applied');
+    expect(note).toContain('nineteen');
   });
 
   it('decodes the schema’s own default as “nobody leaves”', () => {
@@ -158,12 +206,12 @@ describe('what the Parameters tab does to a run, said on the tab', () => {
      * absent block is what makes a run byte-identical to one produced before patience existed. A
      * form that opened on a curve would put an unstated behaviour into every run in the product.
      */
-    expect(patienceFromCandidate(candidateFor(APPLIED_SCHEMA))).toBeNull();
+    expect(patienceFromCandidate(candidateFor('PATIENCE_PARAMETERS'))).toBeNull();
   });
 
   it('decodes an exponential curve, and drops the field that schema says is inert', () => {
     const curve = patienceFromCandidate(
-      candidateFor(APPLIED_SCHEMA, {
+      candidateFor('PATIENCE_PARAMETERS', {
         'sim.patience.distribution': 'exponential',
         'sim.patience.meanS': 120,
         'sim.patience.minS': 5,
@@ -177,7 +225,7 @@ describe('what the Parameters tab does to a run, said on the tab', () => {
 
   it('decodes a uniform curve with its spread', () => {
     const curve = patienceFromCandidate(
-      candidateFor(APPLIED_SCHEMA, {
+      candidateFor('PATIENCE_PARAMETERS', {
         'sim.patience.distribution': 'uniform',
         'sim.patience.meanS': 200,
         'sim.patience.spreadS': 60,
@@ -199,5 +247,156 @@ describe('what the Parameters tab does to a run, said on the tab', () => {
         ]),
       ),
     ).toBeNull();
+  });
+});
+
+/**
+ * **The absent-key discipline, and the three decoders that keep it** — the parity assessment's § 4.
+ *
+ * `candidateOf` returns every *active* row, defaults included, so the danger of routing a schema is
+ * not that the wire fails but that it succeeds too well: a form nobody has touched would write a
+ * full record onto the config, and every default in it would stop being a default and start being a
+ * pinned value chosen by a screen the player never opened. `core` refuses that shape in as many
+ * words — `traceConfigFor` spreads each demand field or omits it, *"never `?? <a default of this
+ * file's own>`"* — and these cases are what stop the viewer restating the rule instead of keeping
+ * it.
+ *
+ * **That the three reach a run is `scope/scope.test.ts`'s business, not this file's**, exactly as
+ * it already is for `patience`: `viewer.paramDemand`, `viewer.lobbyCrowding` and
+ * `viewer.runnerTunables` each move the legs there. Legs are the only evidence this repository
+ * accepts for *a control is not inert* (§ D177), and restating it here would be a second answer.
+ */
+describe('the day-shaping schemas decode, and an untouched form decodes to nothing', () => {
+  function candidateFor(
+    sourceName: string,
+    edits: Readonly<Record<string, ParameterValue>> = {},
+  ): ReadonlyMap<string, ParameterValue> {
+    const source = collectFormSource(sourceName);
+    if (!source.ok) throw new Error(`${sourceName} does not collect: ${source.reason}`);
+    const values = new Map(defaultValues(source.space));
+    for (const [id, value] of Object.entries(edits)) values.set(id, value);
+    return candidateOf(source.space, values);
+  }
+
+  it('reports nothing moved on a form at its declared defaults, in every applied source', () => {
+    for (const name of APPLIED_SCHEMAS) {
+      expect(movedFromDefault(name, candidateFor(name)).size, `${name} moved at rest`).toBe(0);
+    }
+  });
+
+  it('reports exactly the row that moved, and reads the default off core rather than a literal', () => {
+    const moved = movedFromDefault(
+      'CROWDING_PARAMETERS',
+      candidateFor('CROWDING_PARAMETERS', { 'sim.lobbyCrowding.factorPerPerson': 0.05 }),
+    );
+    expect([...moved.keys()]).toEqual(['sim.lobbyCrowding.factorPerPerson']);
+  });
+
+  it('decodes an untouched traffic form to null, so the profiles keep deciding', () => {
+    expect(demandFromCandidate(candidateFor('TRAFFIC_PARAMETERS'))).toBeNull();
+  });
+
+  it('decodes only the traffic rows that moved', () => {
+    const demand = demandFromCandidate(
+      candidateFor('TRAFFIC_PARAMETERS', {
+        'traffic.demandLevel': 'max',
+        'traffic.interfloorWeighting': 'uniform',
+      }),
+    );
+    // `maxLegs`, `credentialAssignment` and `batchSharesDestination` are untouched and therefore
+    // absent, not present-at-their-default: an absent key means *the profile decides* and a present
+    // one means *this screen decided*, and they are different claims to `core`.
+    expect(demand).toEqual({ demandLevel: 'max', interfloorWeighting: 'uniform' });
+  });
+
+  it('refuses an enumerated traffic value core does not declare', () => {
+    // `requireOneOf`'s own measurement: `interfloorWeighting: 'bogus'` produced 719 legs, silently
+    // `population`, because the read is `=== 'uniform' ? … : …`. A cast here would put that back.
+    expect(
+      demandFromCandidate(
+        new Map<string, ParameterValue>([['traffic.interfloorWeighting', 'bogus']]),
+      ),
+    ).toBeNull();
+  });
+
+  it('never carries the two demand fields the day’s event owns', () => {
+    /*
+     * The ordering argument in `shiftRunConfigOf` rests on this: `paramDemand` is merged after the
+     * event patch and the calendar, which is safe only because the key sets are disjoint. Both of
+     * those write `directionalSplit` and one writes `arrivalRatePctPop5min`, and both ids declare
+     * `default: null`, so `collectFormSource`'s `nullDefault: 'exclude'` keeps them out of the
+     * controls entirely. The day one of them acquires a default is the day a fire drill's demand
+     * could be taken away by a slider, and this is what fails then.
+     */
+    const source = collectFormSource('TRAFFIC_PARAMETERS');
+    if (!source.ok) throw new Error(source.reason);
+    for (const id of ['traffic.arrivalRatePctPop5min', 'traffic.directionalSplit.incoming']) {
+      expect(source.space.unsearchable.has(id), `${id} now draws a control`).toBe(true);
+    }
+  });
+
+  it('decodes an untouched crowding form to null — no block, not an inert one', () => {
+    // `SimulationConfig.lobbyCrowding`: absent means *a lobby's size does not affect how fast it
+    // loads*, which is what every run this repository has published assumed. A block of zeroes
+    // would be a different claim about the same run.
+    expect(crowdingFromCandidate(candidateFor('CROWDING_PARAMETERS'))).toBeNull();
+  });
+
+  it('decodes the crowding block whole the moment one row moves', () => {
+    // All three or none, because `DoorCrowdingConfig` requires every field. The two untouched rows
+    // travel at their declared defaults, which `CROWDING_PARAMETERS` says are *"the value that
+    // makes the term inert"* — so a block built from one moved row is the term asked for and
+    // nothing more.
+    expect(
+      crowdingFromCandidate(
+        candidateFor('CROWDING_PARAMETERS', {
+          'sim.lobbyCrowding.thresholdPersons': 8,
+          'sim.lobbyCrowding.factorPerPerson': 0.04,
+          'sim.lobbyCrowding.maxFactor': 2.5,
+        }),
+      ),
+    ).toEqual({ thresholdPersons: 8, factorPerPerson: 0.04, maxFactor: 2.5 });
+  });
+
+  it('refuses a crowding ceiling below one rather than handing it to the run', () => {
+    // *"A crowded lobby that boards faster than an empty one inverts the loop this exists to
+    // model."* The schema's range starts at 1, so no control can produce this; the guard keeps
+    // that true of a schema change rather than of today's schema.
+    expect(
+      crowdingFromCandidate(
+        new Map<string, ParameterValue>([
+          ['sim.lobbyCrowding.thresholdPersons', 5],
+          ['sim.lobbyCrowding.factorPerPerson', 0.1],
+          ['sim.lobbyCrowding.maxFactor', 0.5],
+        ]),
+      ),
+    ).toBeNull();
+  });
+
+  it('decodes an untouched runner form to null, so SIM_DEFAULTS keeps deciding', () => {
+    expect(runnerTunablesFromCandidate(candidateFor('SIM_PARAMETERS'))).toBeNull();
+  });
+
+  it('decodes only the runner rows that moved, and never the one the schema gates off', () => {
+    const tunables = runnerTunablesFromCandidate(
+      candidateFor('SIM_PARAMETERS', { 'sim.doorObstructionProbability': 0.2 }),
+    );
+    expect(tunables).toEqual({ doorObstructionProbability: 0.2 });
+    // `sim.assignedWalkS` is `activeWhen` two `DISPATCH_PARAMETERS` rows this space does not hold,
+    // so `candidateOf` omits it. That is the schema's own statement that the field is inert here,
+    // and substituting a number for it would be this file inventing a value `core` refuses to read.
+    expect(
+      candidateFor('SIM_PARAMETERS').has('sim.assignedWalkS'),
+      'sim.assignedWalkS is no longer gated off in a single-schema space',
+    ).toBe(false);
+  });
+
+  it('agrees with the shell about which sources are applied', () => {
+    // One set read in two places: `dev/main.ts` branches on `isAppliedSchema` and the note is
+    // drawn from the same constant, so the sentence and the branch cannot disagree — which is the
+    // failure mode this whole tab was an instance of.
+    for (const name of discoverParameterSchemas().keys()) {
+      expect(isAppliedSchema(name)).toBe(APPLIED_SCHEMAS.includes(name));
+    }
   });
 });

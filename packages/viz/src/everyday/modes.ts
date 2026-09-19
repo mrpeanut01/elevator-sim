@@ -25,6 +25,7 @@
  */
 
 import { isScreenBuilt } from './screens.js';
+import { SITTING_SHAPES } from './sittingShape.js';
 import type { EverydayMode, EverydayScreen } from './types.js';
 
 /** `undefined` when every named screen is built; otherwise the refusal for the tile to carry. */
@@ -88,7 +89,15 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
     pick: 'scenario' as const,
     title: 'Scenario',
     blurb: 'A building with something wrong with it. Watch it, read the letter, and fix it.',
-    shape: '~3-5 min a case · retry as often as you like',
+    /*
+     * The session shape is **composed once**, in `everyday/sittingShape.ts`, from the shipped
+     * content's own span divided by the rung the stage opens on. It read *"~3-5 min a case"* until
+     * GitHub issue #559 measured it: that figure corresponded to no rung on the ladder and was out
+     * by a factor of four. It is not typed here, and `sittingShape.test.ts` fails on a minute
+     * literal in this file, because three places composing five figures is how they came to
+     * disagree with the ladder in the first place.
+     */
+    shape: SITTING_SHAPES.scenarioMode,
     unavailable: unlessBuilt(
       'the scenarios run, but the screen that lists them is not built yet',
       'scenario',
@@ -109,7 +118,7 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
     pick: 'campaign' as const,
     title: 'Career',
     blurb: 'Clear days, spend units, keep the contracts you signed.',
-    shape: '~2 min a building-day · three lost contracts ends the career',
+    shape: SITTING_SHAPES.careerMode,
     unavailable: unlessBuilt(
       'the campaign runs, but its Everyday screens are not built yet',
       'towers',
@@ -138,7 +147,7 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
     pick: 'rush' as const,
     title: 'Rush',
     blurb: 'One climbing day until the building stops draining.',
-    shape: '~5 min · the run always ends; the question is when',
+    shape: SITTING_SHAPES.rushMode,
     unavailable: unlessBuilt(
       'not built yet — the rush setup screen draws, but nothing behind it generates the climb',
       'rush',

@@ -64,6 +64,7 @@ import { publishEverydayAccount } from '../everyday/accountPort.js';
 import { POST_RUN_COPY } from '../everyday/postRun.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
 import { provideScenarioLadderFrom } from '../everyday/scenarioLadderPort.js';
+import { provideScenarioOpen } from '../everyday/scenarioOpenPort.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
   ENGINEER_RETURN_LABEL,
@@ -252,7 +253,14 @@ import { mountRuleEditor } from './ruleEditor.js';
 import { mountSelectorEditor } from './selectorEditor.js';
 import { mountLeftRail, shiftGoalsOf } from './leftRail.js';
 import { mountMachinesEditor } from './machinesEditor.js';
-import { APPLIED_SCHEMA, mountParameterForm, patienceFromCandidate } from './parameterForm.js';
+import {
+  crowdingFromCandidate,
+  demandFromCandidate,
+  isAppliedSchema,
+  mountParameterForm,
+  patienceFromCandidate,
+  runnerTunablesFromCandidate,
+} from './parameterForm.js';
 import { mountReport, runProgressOf } from './reportPanel.js';
 import { mountRightRail } from './rightRail.js';
 import { mountScenarios } from './scenariosPanel.js';
@@ -3916,11 +3924,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * `packages/cli/src`. 114 live controls, 12 schemas, and a run that came back byte for byte
    * whatever a player moved.
    *
-   * What is wired is `sim.patience.*`, and it is wired **through the state** rather than read out of
-   * the form at Run time: `ViewerState.patience` is what `shiftRunConfigOf` reads, which is what
-   * puts this control inside `scope/scope.test.ts`'s derived key set — the instrument that would
-   * have caught the original defect and could not see a closure local. The other eleven schemas and
-   * the dispatcher space say *NOT APPLIED* on screen, in the form, above their own controls.
+   * What is wired is `sim.patience.*`, `traffic.*`, `sim.lobbyCrowding.*` and the runner's own
+   * `sim.*` rows, and each is wired **through the state** rather than read out of the form at Run
+   * time: `ViewerState.patience`, `.paramDemand`, `.lobbyCrowding` and `.runnerTunables` are what
+   * `shiftRunConfigOf` reads, which is what puts these controls inside `scope/scope.test.ts`'s
+   * derived key set — the instrument that would have caught the original defect and could not see
+   * a closure local. The other eight schemas and the dispatcher space say *NOT APPLIED* on screen,
+   * in the form, above their own controls, and `appliedNoteFor` gives each of the four applied
+   * sources its own sentence about what it does and which of its rows it leaves alone.
    *
    * The branch is here rather than in the mount because **this file is what knows what a run
    * reads**. `dev/parameterForm.ts` publishes what the picker is showing and names its source; the
@@ -3932,14 +3943,35 @@ function boot(ui: Elements, resources: BrowserResources): void {
     status: ui.paramStatus,
     refusal: ui.paramRefusal,
     onCandidate: (sourceName, candidate) => {
-      if (sourceName !== APPLIED_SCHEMA) return;
+      if (!isAppliedSchema(sourceName)) return;
       /*
        * `context.update` and **not** `runShift()`. An edit here takes effect on the next Run, which
        * is what `mountDispatcherEditor` and `mountSelectorEditor` already do and for the same
        * reason: a slider that re-simulated on every change would put a run inside a drag. The
        * on-screen note says *press Run this shift to see it* for exactly this reason.
+       *
+       * **One arm per applied source, and never a write to a field this source does not own.**
+       * `onCandidate` fires on a source change as well as on an edit, so a single
+       * `context.update` carrying all four decoders would blank the other three the moment a
+       * player moved the picker — a control that silently undoes itself when you look away,
+       * which is worse than one that does nothing. Each arm writes exactly its own field.
        */
-      context.update({ patience: patienceFromCandidate(candidate) });
+      switch (sourceName) {
+        case 'PATIENCE_PARAMETERS':
+          context.update({ patience: patienceFromCandidate(candidate) });
+          return;
+        case 'TRAFFIC_PARAMETERS':
+          context.update({ paramDemand: demandFromCandidate(candidate) });
+          return;
+        case 'CROWDING_PARAMETERS':
+          context.update({ lobbyCrowding: crowdingFromCandidate(candidate) });
+          return;
+        case 'SIM_PARAMETERS':
+          context.update({ runnerTunables: runnerTunablesFromCandidate(candidate) });
+          return;
+        default:
+          return;
+      }
     },
   });
 
@@ -3983,8 +4015,6 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let campaign: CampaignPanelHandle | undefined;
   void loadCampaign(resources)
     .then((loaded) => {
-      /* § D649: the Everyday Scenario hub draws the same stages, with their measured counts. */
-      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors);
       campaign = mountCampaignPanel({
         elements: ui.campaign,
         resources,
@@ -3992,6 +4022,27 @@ function boot(ui: Elements, resources: BrowserResources): void {
         mode: () => state.mode,
         savedProfiles: () => savedProfilesOf(state.savedDispatchers),
       });
+      /*
+       * § D787: a Scenario hub row opens **its** stage. The two halves of that press are the
+       * panel's (select the stage, draw its brief) and this module's (bring the campaign tab to the
+       * front), and both are here because `everyday/` may not import this file.
+       */
+      provideScenarioOpen({
+        openStage: (stageId) => {
+          if (campaign?.openStage(stageId) !== true) return false;
+          context.openTab('campaign');
+          return true;
+        },
+      });
+      /*
+       * § D649: the Everyday Scenario hub draws the same stages, with their measured counts.
+       *
+       * **Last, and the order is load-bearing** — `everyday/scenarioOpenPort.ts` states it and
+       * `everyday/scenarioScreen.test.ts` reads this file to check it. The hub draws no row until
+       * this line runs, so handing the path over only after the opener exists is what makes *a
+       * drawn stage row always has a live opener* true by construction rather than by timing.
+       */
+      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors);
     })
     .catch((error: unknown) => {
       setText(ui.campaign.error, error instanceof Error ? error.message : String(error));

@@ -387,11 +387,17 @@ five when asking a mode what it serves.
 
 1. #191's beat 2 is *"form a hypothesis about what is wrong"*. It is renamed **diagnose**, because
    the modes differ most at this beat and one of them removes it deliberately (§ 3.4).
-2. #191's list names five beats and no time budget. **One turn is three to five minutes**, taken
-   from the handoff's own session shapes for the two modes that contain a whole turn:
-   Fix a building at *~5 min a case*, Today's tower at *~3 min*
-   (`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md`:249-254). A *session* is
-   several turns; a *turn* is one pass through the five beats.
+2. #191's list names five beats and no time budget. The handoff supplies one — *~5 min a case*
+   and *~3 min* for a tower day
+   (`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md`:249-254) — and **the
+   shipped build does not meet it, by a factor of four**. Measured against a wall clock rather than
+   divided ([§ D753](../DECISIONS.md), GitHub issue #559): a fix-a-building case is
+   **13-23 min a case at 4×** and a tower day is **8-15 min a day at 4×**. A
+   *session* is several turns; a *turn* is one pass through the five beats. **This is a finding
+   about the build, not a correction of the handoff** — `CLAUDE.md`'s division is that the handoff
+   wins every disagreement about what the screen looks like and the simulator wins every
+   disagreement about what a number means, and a session length is a number. What the gap means for
+   § 7's ten-minute schedule is recorded in [`32-game-design.md`](32-game-design.md) § 7.2.
 
 ### 3.3 The structural fact the loop is built on, and it is not a limitation
 
@@ -470,18 +476,25 @@ Built **from** the design handoff's session-shapes table
 handoff's, unchanged. The last three are this document's, and where the shipped build disagrees with
 the handoff it is named in § 4.1 rather than smoothed over.
 
-| Mode | Length (handoff) | The loop (handoff) | Beats emphasised | Why it exists separately | Retry costs |
+| Mode | Length (**measured**, handoff's in brackets) | The loop (handoff) | Beats emphasised | Why it exists separately | Retry costs |
 |---|---|---|---|---|---|
-| **Today's tower** | ~3 min | one day, one score, once a day | **1 and 5** | It is the only container where the verdict is against *other people's* runs on the same seed rather than against your own previous attempt. It makes the loop social | one per day |
-| **Campaign** | ongoing, ~2 min a building-day | clear days, spend units, keep contracts | **3**, by pricing it | The only container that makes a change *cost* something and persist past the day. It turns the retry from free into a decision | units, and a works night |
-| **Endless rush** | ~5 min | one climbing day until it stops draining | **1 only** — see § 3.4 | It answers *where does this configuration break*, which no other mode asks. A calibration instrument, not a turn of the loop | nothing — no retry exists |
-| **Fix a building** | ~5 min a case | diagnose, reconfigure, re-run, pass or retry | **all five, on one screen** | The only container where the diagnosis is given and the play is what to do about it — and the only one that closes without navigating | free, and it says so |
+| **Today's tower** | 8-15 min a day at 4× (~3 min) | one day, one score, once a day | **1 and 5** | It is the only container where the verdict is against *other people's* runs on the same seed rather than against your own previous attempt. It makes the loop social | one per day |
+| **Campaign** | ongoing, ~4 min a building-day at 4× (~2 min) | clear days, spend units, keep contracts | **3**, by pricing it | The only container that makes a change *cost* something and persist past the day. It turns the retry from free into a decision | units, and a works night |
+| **Endless rush** | 4-23 min at 4× (~5 min) | one climbing day until it stops draining | **1 only** — see § 3.4 | It answers *where does this configuration break*, which no other mode asks. A calibration instrument, not a turn of the loop | nothing — no retry exists |
+| **Fix a building** | 13-23 min a case at 4× (~5 min) | diagnose, reconfigure, re-run, pass or retry | **all five, on one screen** | The only container where the diagnosis is given and the play is what to do about it — and the only one that closes without navigating | free, and it says so |
 
-**The shipped tiles carry the handoff's lengths verbatim.** `packages/viz/src/everyday/modes.ts:73`,
-`:88`, `:108` and `:127` each set a `shape` field reproducing the handoff's length and lose-condition
-word for word. The handoff's table is not an alternative statement to be reconciled with — **it is
-already the shipped build's source for this data**, which is the strongest possible argument for
-building on it rather than over it.
+**The shipped tiles carried the handoff's lengths verbatim until they were measured, and that is
+why this column now has two figures in it** ([§ D753](../DECISIONS.md), GitHub issue #559). Each
+tile's `shape` field reproduced the handoff's length and lose-condition word for word, and the
+handoff's prototype has its own toy simulator — its report sheet computes *average wait* as
+`28 + (100 − pct) × 0.9` — so its lengths were never measured against this build's content or this
+build's playback speed. Played out against a real clock at the stage's opening rung they are out by
+roughly a factor of four. **The lose-condition and loop words are still the handoff's, verbatim**;
+only the lengths moved, and they are now composed in
+`packages/viz/src/everyday/sittingShape.ts` by dividing the shipped content's own span by
+`stageScreenModel.ts#DEFAULT_STAGE_SIM_PER_REAL_S`, so this table goes red when the rung moves
+(`packages/viz/src/everyday/sittingShape.test.ts`) rather than ageing quietly as it did for two rung
+moves.
 
 **Fix a building's self-containment is verified, not assumed.** `packages/viz/src/everyday/actionBar.ts:309-321`
 gives the `fixit` row no `timeline` and no `back`; `packages/viz/src/everyday/fixitScreen.ts:769`
@@ -497,7 +510,7 @@ something the build has not finished; in the fifth the build quotes the handoff 
 | # | Disagreement | Evidence |
 |---|---|---|
 | **1** | **The Fix a building tile's refusal sentence is stale on both of its clauses.** It reads *"the three cases run, but their Everyday screen is not built yet"*. `data/fixit-cases.json` holds **18** cases and the module's own docstring says eighteen; the screen is registered | `packages/viz/src/everyday/modes.ts:44` vs `:129` and `:134`; `data/fixit-cases.json` |
-| **2** | **Endless rush advertises a session shape for an engine that does not exist.** The tile opens, carrying *"~5 min · the run always ends; the question is when"*, onto a setup screen whose primary refuses | `packages/viz/src/everyday/modes.ts:108`; `packages/viz/src/everyday/rushScreenModel.ts:269-274` (four separate absences) and `:277-278` |
+| **2** | **Endless rush advertised a session shape for an engine that did not exist.** The tile opened, carrying *"~5 min · the run always ends; the question is when"*, onto a setup screen whose primary refused. **Both halves are closed**: the engine landed with GitHub issue #220 (§ D515), and the shape was measured and moved by [§ D753](../DECISIONS.md) — the tile now reads *"4-23 min at 4× · the run always ends; the question is when"* | `packages/viz/src/everyday/modes.ts:108`; `packages/viz/src/everyday/rushScreenModel.ts:269-274` (four separate absences) and `:277-278` |
 | **3** | **Campaign's loop is *clear days*, and nothing clears one.** *"the month grid marks a day cleared or missed when the campaign day is filed, and nothing files one automatically"* | `packages/viz/src/campaign/career.ts:173` |
 | **4** | **Today's tower's score has no world to be placed in.** The handoff's front door opens on yesterday's world result and two histograms of other people's runs; the build has no server to post or verify them | `docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md` § 6.1; `packages/viz/src/everyday/shell.ts:124` |
 | **5** | **The handoff's stage → report step dead-ends in the build**, in Today's tower and Campaign and **not** in Fix a building | `packages/viz/src/everyday/stageScreen.ts:878-882` files the day and does not navigate; `packages/viz/src/everyday/shell.ts:965-982` enables a breadcrumb stop by *position in the timeline* rather than by *whether the destination has anything to show*. Traced in [`ISSUE_VERIFICATION_FINDINGS.md`](../ISSUE_VERIFICATION_FINDINGS.md) § M (issue #206) |

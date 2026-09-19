@@ -263,6 +263,19 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       chimeOwns,
       chimeSpendable,
       chimeNotice,
+      /*
+       * **Whether a top-up has a tower to land in** — GitHub issue #557. Read at draw time rather
+       * than latched, because the career moves while this screen is open: a player can hand a
+       * contract back, come here and find the row honestly inert. `campaign()` is the host's one
+       * read of the record, and the open desk is the tower the sink's own name means by *this
+       * tower*.
+       *
+       * The decision that a lost contract is no target is `host.ts#careerGrantTarget`'s, and it is
+       * deliberately not re-made here: this asks whether a desk is open, and the host is what
+       * refuses the spend. Two answers to *may this be bought?* is the disagreement the panel's own
+       * docstring spends a paragraph on.
+       */
+      careerTowerOpen: context.host.campaign().openTowerId !== undefined,
       draftName,
       durable,
       reduceMotion: engineerSettings()?.reduceMotion(),
@@ -1394,8 +1407,17 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     const outcome = await context.host.spendChime(sinkId, 1);
     if (disposed) return;
     spending = false;
+    /*
+     * **`refused` joins the two arms that carry a sentence** — GitHub issue #557. It is the one
+     * refusal the host composed rather than the server (`host.ts#CAREER_TOP_UP_NO_TOWER`), and it
+     * is carried here unrewritten for exactly the reason the server's two are: a screen that
+     * softened it would be publishing a second account of what happened, and this one has the
+     * clause a player most needs — nothing was spent.
+     */
     chimeNotice =
-      outcome.kind === 'short' || outcome.kind === 'unreachable' ? outcome.detail : undefined;
+      outcome.kind === 'short' || outcome.kind === 'unreachable' || outcome.kind === 'refused'
+        ? outcome.detail
+        : undefined;
     if (outcome.kind === 'bought') {
       chimeBalance = outcome.chimes;
       lastReadToken = null;

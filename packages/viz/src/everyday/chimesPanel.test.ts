@@ -23,10 +23,13 @@ import { describe, expect, it } from 'vitest';
 
 import { RUSH_PREFIT_SINK_ID } from '@elevator-sim/core/browser';
 
+import { CAREER_PURSE_TOP_UP_SINK_ID } from '../campaign/economy.js';
+
 import {
   CHIME_PRICES,
   CHIMES_PANEL_COPY,
   SPEND_ABSENCES,
+  SPEND_OFFERS,
   chimesPanelViewOf,
   type ChimesPanelView,
 } from './chimesPanel.js';
@@ -101,19 +104,38 @@ describe('what the panel says off an account — the review of PR #485, blocking
 
 describe('what the panel says about spending — § D227 and § D672, a reason per row', () => {
   const OWNS_NOTHING: readonly { sinkId: string; steps: number }[] = [];
+  /*
+   * **A career desk is open here**, because that is the ordinary state of a player who has pressed
+   * Campaign once, and the row that needs one is inert without it. The arm where none is open has
+   * its own cases below rather than being the default — a default that refused everything would
+   * make the pressability assertions pass for the wrong reason.
+   */
   const offered = (): ChimesPanelView =>
-    chimesPanelViewOf({ balanceChimes: 40, home: 'account', spendable: true, owns: OWNS_NOTHING });
+    chimesPanelViewOf({
+      balanceChimes: 40,
+      home: 'account',
+      spendable: true,
+      owns: OWNS_NOTHING,
+      careerTowerOpen: true,
+    });
 
-  it('offers exactly the one sink that reaches a run, and refuses the rest by name', () => {
+  it('offers exactly the sinks that reach a run, and refuses the rest by name', () => {
     /*
-     * **The claim this whole lane turns on.** `rush-prefit` reaches a run — `everyday/rush.ts`
-     * fits the building for it and `leaderboard/rushHoldAgreement.json`'s two `prefit` cells are
-     * each required to differ from the same cell as built. Neither `purse-units` sink reaches
-     * anything: `campaign/economy.ts#purseOf` has no term a grant could enter, and no between-round
-     * rebuild travels for the rush (§ D606 § 2). Selling one would be `docs/22` non-goal 5.
+     * **The claim this whole lane turns on, and it moved on the commit that made it move.**
+     * `rush-prefit` reaches a run — `everyday/rush.ts` fits the building for it and
+     * `leaderboard/rushHoldAgreement.json`'s two `prefit` cells are each required to differ from
+     * the same cell as built. `career-purse-top-up` reaches one now, which it did not until
+     * GitHub issue #557: `campaign/economy.ts#purseOf` gained a fourth derived term and
+     * `campaign/purseTopUpReachesTheRun.test.ts` is the run that earns the offer — a tower that
+     * bought a top-up and one that did not, same seed, compared on the legs.
      *
-     * Asserted against `core`'s own constant rather than a literal, and in **both** directions, so
-     * a sink that gained or lost an absence fails here rather than on a player's screen.
+     * `rush-purse-top-up` is still refused, and for its **own** cause rather than a shared one: no
+     * between-round rebuild travels (§ D606 § 2), so a wider rush purse still buys nothing. Issue
+     * #557 refuses to have the two folded together, which is why the two tables below are keyed by
+     * sink id and never by modifier kind.
+     *
+     * Asserted in **both** directions over the shipped table, so a sink that gained or lost an
+     * entry fails here rather than on a player's screen.
      */
     const view = offered();
     /*
@@ -123,6 +145,7 @@ describe('what the panel says about spending — § D227 and § D672, a reason p
      * can press is what `offer` says, and a second derivation could come to disagree with it.
      */
     expect(view.rows.filter((row) => row.offer !== 'not-offered').map((row) => row.id)).toEqual([
+      CAREER_PURSE_TOP_UP_SINK_ID,
       RUSH_PREFIT_SINK_ID,
     ]);
     for (const id of Object.keys(SPEND_ABSENCES)) {
@@ -131,6 +154,58 @@ describe('what the panel says about spending — § D227 and § D672, a reason p
     for (const row of view.rows) {
       expect(row.offer === 'not-offered', row.id).toBe(SPEND_ABSENCES[row.id] !== undefined);
     }
+  });
+
+  it('says of every shipped sink either what it does or why it is not sold, and never both', () => {
+    /*
+     * The pair of failures a single table with a nullable field cannot express: a sink the shipped
+     * ledger sells with words in neither table draws a blank row, and one with words in both is two
+     * answers to *is this sold?*. `offerOf` has a third refusal behind this for the first case, and
+     * it is deliberately unreachable while this case is green.
+     */
+    for (const sink of CHIME_PRICES.sinks) {
+      const described = [SPEND_ABSENCES[sink.id] !== undefined, SPEND_OFFERS[sink.id] !== undefined];
+      expect(described.filter(Boolean).length, sink.id).toBe(1);
+    }
+    for (const id of Object.keys(SPEND_OFFERS)) {
+      expect(CHIME_PRICES.sinks.map((sink) => sink.id), id).toContain(id);
+    }
+  });
+
+  it('will not sell a tower top-up with no tower open, and says so rather than going quiet', () => {
+    /*
+     * The one arm of this panel about the **state of play** rather than the build, the account or
+     * the ledger. `everyday/host.ts#spendChime` refuses the same press on the same ground before
+     * the ledger is asked, so an inert row is the first lock and the host is the second — the
+     * chimes are not taken for units with nowhere to land.
+     */
+    const view = chimesPanelViewOf({
+      balanceChimes: 400,
+      home: 'account',
+      spendable: true,
+      owns: OWNS_NOTHING,
+    });
+    const row = view.rows.find((entry) => entry.id === CAREER_PURSE_TOP_UP_SINK_ID);
+    expect(row?.offer).toBe('unavailable');
+    expect(row?.note).toBe(CHIMES_PANEL_COPY.purseNoTower);
+    /* And the sink that needs no desk is unaffected by the same input. */
+    expect(view.rows.find((entry) => entry.id === RUSH_PREFIT_SINK_ID)?.offer).toBe('buy');
+  });
+
+  it('puts the ledger’s own grant figure in front of the offer rather than a copy of it', () => {
+    /*
+     * *6 units into the purse of…* — the number is `data/chime-ledger.json`'s, composed beside the
+     * sentence rather than written into it, for the reason the price is: two authorities for what a
+     * step buys is the defect this file is most careful about, and one of them being prose makes it
+     * worse rather than better.
+     */
+    const sink = CHIME_PRICES.sinks.find((entry) => entry.id === CAREER_PURSE_TOP_UP_SINK_ID);
+    const granted = sink?.modifier.grantUnits ?? 0;
+    expect(granted).toBeGreaterThan(0);
+    const row = offered().rows.find((entry) => entry.id === CAREER_PURSE_TOP_UP_SINK_ID);
+    expect(row?.note).toBe(`${String(granted)} units ${CHIMES_PANEL_COPY.purseOffer}`);
+    /* The sentence itself carries no figure, so the two cannot come to disagree. */
+    expect(CHIMES_PANEL_COPY.purseOffer).not.toMatch(/\d/u);
   });
 
   it('gives every row a sentence, and makes only the offered one pressable', () => {
@@ -142,6 +217,7 @@ describe('what the panel says about spending — § D227 and § D672, a reason p
     const view = offered();
     for (const row of view.rows) expect(row.note.length, row.id).toBeGreaterThan(0);
     expect(view.rows.filter((row) => row.offer === 'buy').map((row) => row.id)).toEqual([
+      CAREER_PURSE_TOP_UP_SINK_ID,
       RUSH_PREFIT_SINK_ID,
     ]);
   });

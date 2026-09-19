@@ -150,33 +150,62 @@ describe('a scenario budget has one price, and it is the scenario that names it 
 });
 
 describe('§ D219 on the spend verb — one sink is sold, and the rest say why not', () => {
-  it('sells only sinks whose seam is unbuilt, and names the issue each is waiting on', () => {
+  it('names the issue each sink’s seam belongs to, built or not', () => {
     /*
      * Named rather than counted, so that a sink acquiring a seam has to come here and say so. A
      * kind that appears without an owner is a sink somebody added without deciding what applies it.
+     *
+     * **Two of the three seams are built now.** `rush-prefit` is § D672's, and `career-purse-top-up`
+     * is GitHub issue **#557**'s — the owner moved from #371 because the purse seam it was waiting
+     * on was built by the issue that found it dead: `campaign/economy.ts#purseOf` gained a fourth
+     * derived term, and `campaign/purseTopUpReachesTheRun.test.ts` is the legs comparison that
+     * earns it. `rush-purse-top-up` is the one still waiting, for its own cause (§ D606 § 2).
      */
     const owners: Readonly<Record<string, string>> = {
-      'career-purse-top-up': '#371',
+      'career-purse-top-up': '#557',
       'rush-purse-top-up': '#372',
       'rush-prefit': '#372',
     };
     expect(Object.keys(owners).sort()).toEqual(ledger().sinks.map((sink) => sink.id).sort());
   });
 
-  it('applies a bought modifier in exactly the modules allowed to, and nowhere else', async () => {
+  it('lets exactly one module name the spend route, and no second one', async () => {
     /*
-     * **This assertion is inverted rather than deleted, and the inversion is the record.** It read
-     * *"has no module in the viewer that applies a bought modifier to a run"* and expected `[]`,
-     * under a docstring saying that a spend surface is what would put the other branch back.
-     * [§ D672](../../../../DECISIONS.md) put it back: one sink is sold, and the grep that was a
-     * refusal is now a **boundary**.
+     * **The sharp half of what the case below used to assert, kept sharp.** *Is there a second
+     * spend surface?* is a question about the **route**: a module that names `POST /api/chimes/spend`
+     * is a module that can take a player's chimes. There is one, and a second would be a second
+     * answer to *what does a spend cost* — the whole subject of this file.
+     */
+    const route = /chimes\/spend/u;
+    const reaching = (await vizSourceFiles())
+      .filter((file) => !file.id.includes('.test.') && !file.id.includes('test-helper'))
+      .filter((file) => route.test(file.code))
+      .map((file) => file.id);
+    expect(reaching, 'a second module can take a chime').toEqual(['menu/client.ts']);
+  });
+
+  it('accounts for every module that touches a granted unit, with a role each', async () => {
+    /*
+     * **This assertion was inverted rather than deleted, and then it grew by two.** It read *"has
+     * no module in the viewer that applies a bought modifier to a run"* and expected `[]`, under a
+     * docstring saying that a spend surface is what would put the other branch back.
+     * [§ D672](../../../../DECISIONS.md) put it back at three; GitHub issue **#557** and
+     * [§ D738](../../../../DECISIONS.md) take it to five, and the list is *named with a role each*
+     * because the grep cannot tell charging from recording from drawing:
      *
-     * The grep is unchanged, so what it is counting is the same thing it counted before: the
-     * **charging** half — what a screen would have to call to take a chime, and what a spend would
-     * have to reach to grant a unit. Three modules and no fourth. `menu/client.ts` is the only
-     * thing that names the route, `dev/main.ts` the only binding that holds a token, and
-     * `everyday/host.ts` the only verb between them. A fourth would be a second answer to *what
-     * does a spend cost*, which is the whole subject of this file.
+     * - `menu/client.ts` — the only module that names the route (the case above).
+     * - `dev/main.ts` — the only binding that holds a token, handing the server's answer back.
+     * - `everyday/host.ts` — the one verb between them, and the only module that posts the grant.
+     * - `campaign/career.ts` — the **apply**, and the reason this list could grow honestly: the
+     *   reducer that records a granted unit into a tower's purse, which is the `purse-units`
+     *   counterpart of `rush.ts`'s pre-fit claim below. It charges nothing; it is what a charge
+     *   reaches.
+     * - `everyday/chimesPanel.ts` — draws `6 units into the purse of…` from the sink's own
+     *   authored figure. It charges nothing and grants nothing, and it reads the field rather than
+     *   `core`'s `chimeGrantUnits` precisely so that the charging side's arithmetic stays where the
+     *   case above keeps it.
+     *
+     * A sixth arrival has to come here and say which of those it is.
      */
     const applying = /grantUnits|chimeSpendPrice|chimeGrantUnits|chimes\/spend/u;
     const reaching = (await vizSourceFiles())
@@ -186,12 +215,18 @@ describe('§ D219 on the spend verb — one sink is sold, and the rest say why n
       .sort((a, b) => a.localeCompare(b));
     expect(
       reaching,
-      'a module charges for a chime that is not one of the three this seam runs through. Either it ' +
-        'is a second spend surface, or this list is stale — say which.',
-    ).toEqual(['dev/main.ts', 'everyday/host.ts', 'menu/client.ts']);
+      'a module touches a granted unit and is not one of the five this seam runs through. Either ' +
+        'it is a second spend surface, or this list is stale — say which.',
+    ).toEqual([
+      'campaign/career.ts',
+      'dev/main.ts',
+      'everyday/chimesPanel.ts',
+      'everyday/host.ts',
+      'menu/client.ts',
+    ]);
   });
 
-  it('applies the one bought modifier in exactly one module, which is not one of those three', async () => {
+  it('applies the rush’s bought modifier in exactly one module, which is none of those five', async () => {
     /*
      * **Charging and applying are different greps and the separation is the point.** A screen that
      * took a chime and a module that changed a run are the two halves this repository has shipped
@@ -256,8 +291,14 @@ describe('§ D219 on the spend verb — one sink is sold, and the rest say why n
         `${row.id} is both offered and refused, or neither`,
       ).toBe(true);
     }
-    /* And the refusals really say why, rather than saying *not yet* about nothing in particular. */
-    expect(SPEND_ABSENCES['career-purse-top-up']).toMatch(/purse/u);
+    /*
+     * And the one remaining refusal really says why, rather than saying *not yet* about nothing in
+     * particular. **`career-purse-top-up`'s entry is gone rather than reworded** — GitHub issue
+     * #557, § D738, § D227 in the direction it says bites hardest: the sentence said a tower's
+     * purse has no term anything outside the contract can enter, which stopped being true on the
+     * commit that gave it one. Asserted absent, so a reworded version of it cannot creep back.
+     */
+    expect(SPEND_ABSENCES['career-purse-top-up']).toBeUndefined();
     expect(SPEND_ABSENCES['rush-purse-top-up']).toMatch(/between rounds/u);
   });
 });

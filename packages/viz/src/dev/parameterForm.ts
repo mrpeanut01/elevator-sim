@@ -76,7 +76,19 @@ import {
   discoverParameterSchemas,
 } from '@elevator-sim/experiments/browser';
 import type { ParameterValue, SearchSpace } from '@elevator-sim/experiments/browser';
-import type { PatienceConfig } from '@elevator-sim/core/browser';
+import {
+  CREDENTIAL_ASSIGNMENTS,
+  DEMAND_LEVELS,
+  INTERFLOOR_WEIGHTINGS,
+} from '@elevator-sim/core/browser';
+import type {
+  CredentialAssignment,
+  DemandLevel,
+  DoorCrowdingConfig,
+  InterfloorWeighting,
+  PatienceConfig,
+  SimulationDemandOptions,
+} from '@elevator-sim/core/browser';
 
 import {
   applyControlEdit,
@@ -94,16 +106,78 @@ import { glossaryFor } from '../mode/glossary.js';
 const SEARCH_SPACE_SOURCE = '<dispatcher search space>';
 
 /**
- * The one discovered schema the Run button reads — `core`'s own export name, which is what
+ * The discovered schemas the Run button reads — `core`'s own export names, which is what
  * `discoverParameterSchemas()` keys by.
  *
- * Exported because **`dev/main.ts` decides what to do with it and this file decides nothing**: the
- * mount publishes a candidate with its source's name, the shell matches on this constant, and
- * `dev/state.ts#shiftRunConfigOf` puts the result on the config. One name, read in both places, so
- * the sentence {@link appliedNoteFor} prints and the branch that applies it cannot disagree — which
- * is the failure mode this whole tab was an instance of.
+ * ## Why this is a set and was a string
+ *
+ * It was `APPLIED_SCHEMA = 'PATIENCE_PARAMETERS'`: one name, and eleven schemas drawn under
+ * {@link appliedNoteFor}'s *NOT APPLIED* sentence. A panel assessment counted what that cost —
+ * **49 of the engine's 117 declared tunables reached no run from any screen** — and named the
+ * repair as one constant wide. It is wider than one constant, because each schema needs a decoder
+ * and a field on `ViewerState` to land in, but the routing seam is the one `patience`
+ * already proved: the mount publishes a candidate with its source's name, the shell matches on
+ * this set, and `dev/state.ts#shiftRunConfigOf` puts the result on the config.
+ *
+ * Exported because **`dev/main.ts` decides what to do with each name and this file decides
+ * nothing**. One set, read in both places, so the sentence {@link appliedNoteFor} prints and the
+ * branch that applies it cannot disagree — which is the failure mode this whole tab was an
+ * instance of, and which § D227 says is the more dangerous half: a control described as inert that
+ * is live tells the reader not to touch something that works.
+ *
+ * **Four of the twelve, not twelve.** What keeps the other eight off this list is written down
+ * rather than left to be inferred — see {@link appliedNoteFor}, which prints the reason per source,
+ * and § D761–§ D764.
  */
-export const APPLIED_SCHEMA = 'PATIENCE_PARAMETERS';
+export const APPLIED_SCHEMAS: readonly string[] = Object.freeze([
+  'CROWDING_PARAMETERS',
+  'PATIENCE_PARAMETERS',
+  'SIM_PARAMETERS',
+  'TRAFFIC_PARAMETERS',
+]);
+
+/** Whether a picker source is one the Run button reads. */
+export function isAppliedSchema(sourceName: string): boolean {
+  return APPLIED_SCHEMAS.includes(sourceName);
+}
+
+/**
+ * The ids of one schema whose candidate value is **not** its declared default — the absent-key
+ * discipline, expressed once and derived from the schema rather than from literals here.
+ *
+ * ## Why this exists at all
+ *
+ * `candidateOf` returns every *active* row, defaulted rows included, so a form nobody has touched
+ * still produces a full map. Writing that map onto the config would turn every default into a
+ * **pinned** value: `traffic.interfloorWeighting` would stop meaning *whatever the profile says*
+ * and start meaning *population, because a screen the player never opened said so*. `core` is
+ * explicit that the two are different claims — `traceConfigFor` spreads every one of these
+ * fields or omits it, never `?? <a default of its own>` — and this is how the viewer inherits
+ * that discipline instead of restating it.
+ *
+ * Compared against `discoverParameterSchemas()`' own `default`, which is the same array
+ * {@link collectFormSource} builds the controls from. A literal table here would be a second
+ * source of truth for a number `core` already states, and it would go stale silently, which is
+ * the defect class this file is an instance of.
+ *
+ * `null` defaults are deliberately not special-cased: `collectFormSource` asks for
+ * `nullDefault: 'exclude'`, so a row declaring one draws no control and cannot be in a candidate.
+ */
+export function movedFromDefault(
+  sourceName: string,
+  candidate: ReadonlyMap<string, ParameterValue>,
+): ReadonlyMap<string, ParameterValue> {
+  const rows = discoverParameterSchemas().get(sourceName);
+  const moved = new Map<string, ParameterValue>();
+  if (rows === undefined) return moved;
+  const declared = new Map(rows.map((row) => [row.id, row.default as unknown]));
+  for (const [id, value] of candidate) {
+    if (!declared.has(id)) continue;
+    if (Object.is(declared.get(id), value)) continue;
+    moved.set(id, value);
+  }
+  return moved;
+}
 
 /**
  * What this schema does to the next run, in the reader's register — the audit's **B4**.
@@ -111,9 +185,18 @@ export const APPLIED_SCHEMA = 'PATIENCE_PARAMETERS';
  * ## Why a sentence per schema rather than one banner
  *
  * Because the true statement differs, and a banner that said *"nothing here is applied"* would be
- * wrong on the one screen where it matters. Eleven of the twelve discovered schemas and the
- * dispatcher space are **drawn and not applied**; `PATIENCE_PARAMETERS` is applied. Saying so per
- * source is the difference between a disclaimer and a fact.
+ * wrong on the screens where it matters. Four of the twelve discovered schemas reach a run; eight
+ * and the dispatcher space do not. Saying so per source is the difference between a disclaimer and
+ * a fact — and, since § D227, the difference between a refusal that is pinned by a run and one
+ * pinned by another sentence.
+ *
+ * **The four applied sources have four different sentences and the eight share one, and that
+ * asymmetry is honest rather than lazy.** What an applied source owes the reader is *which of its
+ * rows travel and which do not*, and that differs per schema; what an unapplied source owes is one
+ * claim, *nothing here reaches the run*, which is the same claim for all eight. Two of the eight —
+ * `METRICS_PARAMETERS` and `ANALYTICAL_PARAMETERS` — are refused on the charter rather than merely
+ * unbuilt, and that argument is § D764's rather than this screen's, because it is a ruling about
+ * what the product may ship and not a fact about today's wiring.
  *
  * ## Why the refusal says what the tab *is* rather than only what it is not
  *
@@ -124,22 +207,229 @@ export const APPLIED_SCHEMA = 'PATIENCE_PARAMETERS';
  * be, and a reader who knows it will stop expecting the Run button to move.
  */
 export function appliedNoteFor(sourceName: string): string {
-  if (sourceName === APPLIED_SCHEMA) {
-    return (
-      'APPLIED — these four reach the next shift. What you set here is written onto the run as ' +
-      'sim.patience, so riders give up and leave. Abandonment improves the average wait by ' +
-      'construction, because it removes the longest waits from the sample: read the abandoned ' +
-      'count beside the mean, never instead of it, and above 2 % the mean is suppressed outright. ' +
-      'Press Run this shift to see it. Every other schema on this picker is drawn and not applied.'
-    );
+  switch (sourceName) {
+    case 'PATIENCE_PARAMETERS':
+      return (
+        'APPLIED — these four reach the next shift. What you set here is written onto the run as ' +
+        'sim.patience, so riders give up and leave. Abandonment improves the average wait by ' +
+        'construction, because it removes the longest waits from the sample: read the abandoned ' +
+        'count beside the mean, never instead of it, and above 2 % the mean is suppressed ' +
+        'outright. Press Run this shift to see it.'
+      );
+    case 'TRAFFIC_PARAMETERS':
+      return (
+        'APPLIED, in part — eight of these rows reach the next shift as the run’s demand options: ' +
+        'the demand level, whether a group shares a destination, how an interfloor floor is ' +
+        'picked, whether riders carry a credential, the leg ceiling, and the peak window, ' +
+        'baseline and mix amplitude of whichever template is running. A row you have not moved ' +
+        'writes nothing at all, so a default stays the profile’s rather than becoming this ' +
+        'screen’s. Seven rows are NOT applied, in three groups, each refused for its own reason: ' +
+        'the template and the ' +
+        'three template durations are owned by the pattern and shift-length controls, and writing ' +
+        'them here would be a second hand on one dial; the entrance weight is one number for ' +
+        'however many entrances a building has, and relative weights that all move together ' +
+        'normalize back to the mix they already were; and the two constant-template discards have ' +
+        'no field on SimulationDemandOptions to travel in. The nineteen rows listed as not ' +
+        'searchable draw no control here at all. Press Run this shift to see the rest.'
+      );
+    case 'CROWDING_PARAMETERS':
+      return (
+        'APPLIED — all three reach the next shift as sim.lobbyCrowding, the feedback loop behind ' +
+        'real up-peak collapse: slow boarding lengthens the queue and a longer queue slows ' +
+        'boarding. Leave all three where they are and the run carries no crowding block at all, ' +
+        'which is what every figure this project has published was measured under; move any one ' +
+        'and all three travel together, because core takes the term whole. It can destabilise a ' +
+        'run that was stable — that is a finding to read off the saturation verdict, not a ' +
+        'defect. Press Run this shift to see it.'
+      );
+    case 'SIM_PARAMETERS':
+      return (
+        'APPLIED — four of these six reach the next shift as the runner’s own tunables: the sky- ' +
+        'lobby transfer walk, the re-offer interval for a call no car could take, the drain grace ' +
+        'past the end of demand, and how often a door close is interrupted by the photo-eye. A ' +
+        'row you have not moved writes nothing. Two are NOT applied, each for its own reason: the ' +
+        'walk from a destination panel to its named car is gated off here because its activeWhen ' +
+        'names two dispatcher rows this picker is not showing; and the queue sample count is the ' +
+        'saturation detector’s own input, so moving it would change whether this run’s average is ' +
+        'suppressed without changing a single leg of the run — a difficulty setting that moves a ' +
+        'measurement, which this project does not ship. The first two can also be quiet on a ' +
+        'building that has no sky lobby and no run that outlives its demand. Press Run this shift ' +
+        'to see them.'
+      );
+    default:
+      return (
+        `NOT APPLIED — nothing the Run button does reads ${sourceName}. Move a control here, press ` +
+        'Run this shift, and the day that comes back is byte for byte the day you would have got ' +
+        'without touching it. What this is instead: the search space a generic optimizer would be ' +
+        'handed — every tunable core declares, with its type, its range and the gates that decide ' +
+        `when it is live. ${APPLIED_SCHEMAS.join(', ')} are the sources on this picker that do ` +
+        'reach a run.'
+      );
   }
-  return (
-    `NOT APPLIED — nothing the Run button does reads ${sourceName}. Move a control here, press Run ` +
-    'this shift, and the day that comes back is byte for byte the day you would have got without ' +
-    'touching it. What this is instead: the search space a generic optimizer would be handed — ' +
-    'every tunable core declares, with its type, its range and the gates that decide when it is ' +
-    `live. ${APPLIED_SCHEMA} is the one source on this picker that does reach a run.`
+}
+
+/**
+ * The demand options a `TRAFFIC_PARAMETERS` candidate describes, or `null` for *the profiles
+ * decide everything*, which is what every run this repository has published was measured under.
+ *
+ * ## Eight ids, and the other twenty-six named rather than dropped
+ *
+ * Three groups, and the reason differs by group, which is why {@link appliedNoteFor} prints them
+ * rather than a count:
+ *
+ * 1. **Nineteen rows declare `default: null`** and {@link collectFormSource} asks for
+ *    `nullDefault: 'exclude'`, so they draw no control and cannot appear in a candidate at all.
+ *    These are the ones a player would most want — body mass, day-to-day variation, the group-size
+ *    curve, the duty shares, the directional split. Routing cannot reach them because there is
+ *    nothing to route: the repair is a control, not a wire. Recorded as a finding rather than
+ *    fixed here (§ D765).
+ * 2. **Four rows have another shipped writer.** `traffic.template` is `config.demandTemplate`,
+ *    which the pattern editor and Free Play's template select already own, and the three
+ *    `*.durationS` rows are `config.durationS`, which the shift-length control owns. A second hand
+ *    on one dial is how a screen comes to disagree with itself about what it set.
+ * 3. **Three rows cannot travel.** `traffic.entranceWeight` is declared `perMemberOf
+ *    'building.entranceFloors'` and collapses to one scalar in a building-free space; the weights
+ *    are relative and normalized across entrances, so one number moving every entrance together
+ *    is the mix it already was. `traffic.constant.discardFirstS` and `.discardLastS` have no field
+ *    on `SimulationDemandOptions` for `traceConfigFor` to spread. Both are findings (§ D765).
+ *
+ * ## Spread-or-omit, per field
+ *
+ * {@link movedFromDefault} is what makes that true: a row at its declared default contributes no
+ * key, so an untouched form returns `null` and the run is the run before this field existed.
+ */
+export function demandFromCandidate(
+  candidate: ReadonlyMap<string, ParameterValue>,
+): SimulationDemandOptions | null {
+  const moved = movedFromDefault('TRAFFIC_PARAMETERS', candidate);
+  if (moved.size === 0) return null;
+  const demandLevel = oneOf(moved, 'traffic.demandLevel', DEMAND_LEVELS);
+  const interfloorWeighting = oneOf(
+    moved,
+    'traffic.interfloorWeighting',
+    INTERFLOOR_WEIGHTINGS,
   );
+  const credentialAssignment = oneOf(
+    moved,
+    'traffic.credentialAssignment',
+    CREDENTIAL_ASSIGNMENTS,
+  );
+  const batchSharesDestination = moved.get('traffic.batchSharesDestination');
+  const maxLegs = numberIn(moved, 'traffic.maxLegs');
+  const peakWindowS = numberIn(moved, 'traffic.riseAndFall.peakWindowS');
+  const baselineFraction = numberIn(moved, 'traffic.riseAndFall.baselineFraction');
+  const mixAmplitude = numberIn(moved, 'traffic.lunchTwoWay.mixAmplitude');
+  const options: SimulationDemandOptions = {
+    ...(demandLevel === undefined ? {} : { demandLevel: demandLevel as DemandLevel }),
+    ...(typeof batchSharesDestination === 'boolean' ? { batchSharesDestination } : {}),
+    ...(interfloorWeighting === undefined
+      ? {}
+      : { interfloorWeighting: interfloorWeighting as InterfloorWeighting }),
+    ...(credentialAssignment === undefined
+      ? {}
+      : { credentialAssignment: credentialAssignment as CredentialAssignment }),
+    ...(maxLegs === undefined ? {} : { maxLegs }),
+    ...(peakWindowS === undefined ? {} : { peakWindowS }),
+    ...(baselineFraction === undefined ? {} : { baselineFraction }),
+    ...(mixAmplitude === undefined ? {} : { mixAmplitude }),
+  };
+  return Object.keys(options).length === 0 ? null : options;
+}
+
+/**
+ * The lobby-crowding term a `CROWDING_PARAMETERS` candidate describes, or `null` for *a lobby's
+ * size does not affect how fast it loads*.
+ *
+ * **All three or none, and that is `core`'s rule rather than a choice made here.**
+ * `DoorCrowdingConfig` requires every field and `CROWDING_PARAMETERS`' own docstring says why the
+ * block has no default: *"absent means no crowding at all, which is what keeps every published
+ * stop length the number it already was. The defaults exist so a generic sampler has a floor to
+ * start from, not so a run silently acquires one."* So the block is emitted whole the moment any
+ * one row leaves its declared default, and not at all before — which is the same absent-key
+ * discipline `patience` keeps, expressed over three fields instead of one.
+ *
+ * The untouched values travel with it rather than being substituted: each declared default is the
+ * value that makes its own term inert, so a block built from two moved rows and one default is the
+ * term the player asked for and nothing more.
+ */
+export function crowdingFromCandidate(
+  candidate: ReadonlyMap<string, ParameterValue>,
+): DoorCrowdingConfig | null {
+  if (movedFromDefault('CROWDING_PARAMETERS', candidate).size === 0) return null;
+  const thresholdPersons = numberIn(candidate, 'sim.lobbyCrowding.thresholdPersons');
+  const factorPerPerson = numberIn(candidate, 'sim.lobbyCrowding.factorPerPerson');
+  const maxFactor = numberIn(candidate, 'sim.lobbyCrowding.maxFactor');
+  if (thresholdPersons === undefined || factorPerPerson === undefined || maxFactor === undefined) {
+    return null;
+  }
+  // `resolveDoorConfig` refuses a ceiling below 1 — *"a crowded lobby that boards faster than an
+  // empty one inverts the loop this exists to model"* — and the schema's range starts at 1, so no
+  // control can produce one. This is the guard that keeps that true of a schema change rather than
+  // of today's schema, which is `patienceFromCandidate`'s own argument one axis over.
+  if (maxFactor < 1) return null;
+  return { thresholdPersons, factorPerPerson, maxFactor };
+}
+
+/**
+ * The four runner tunables a `SIM_PARAMETERS` candidate describes, or `null` for *the runner's own
+ * defaults*.
+ *
+ * Spread-or-omit per field through {@link movedFromDefault}, for {@link demandFromCandidate}'s
+ * reason: `SIM_DEFAULTS` is where these numbers live and a screen that pinned one would be a
+ * second source of truth for it.
+ *
+ * **Four of the schema's six rows, and each of the two omissions is refused for its own reason.**
+ *
+ * `sim.assignedWalkS`'s `activeWhen` names `dispatch.passengerAssignment` and `dispatch.callType`,
+ * which are `DISPATCH_PARAMETERS` rows and are not in this single-schema space, so the row is
+ * drawn disabled and `candidateOf` omits it — the schema's own statement that the field is inert
+ * here, which is exactly the statement `patienceFromCandidate` declines to override for `spreadS`.
+ *
+ * **`sim.queueSampleCount` is refused on the charter, and the refusal is measured rather than
+ * argued** (§ D764). It is *"the direct input to saturation detection"*, and moving it moves
+ * whether a run is declared saturated — which is whether its mean is suppressed — without moving
+ * the run. Measured on five shipped buildings at 1 800 s, `queueSampleCount: 3` against the
+ * default produces a **byte-identical set of legs on every one of them**. A control that changes
+ * a verdict about a run and not the run is a difficulty setting that moves a measurement, which is
+ * charter non-goal 6, and it is the same objection that keeps `METRICS_PARAMETERS` off
+ * {@link APPLIED_SCHEMAS} entirely. The measurement is what distinguishes this from an oversight:
+ * it is the one `SIM_PARAMETERS` row that cannot pass § D177 by construction rather than by
+ * building.
+ */
+export interface RunnerTunables {
+  readonly transferWalkS?: number | undefined;
+  readonly dispatchRetryS?: number | undefined;
+  readonly drainGraceS?: number | undefined;
+  readonly doorObstructionProbability?: number | undefined;
+}
+
+/** See {@link RunnerTunables}. */
+export function runnerTunablesFromCandidate(
+  candidate: ReadonlyMap<string, ParameterValue>,
+): RunnerTunables | null {
+  const moved = movedFromDefault('SIM_PARAMETERS', candidate);
+  if (moved.size === 0) return null;
+  const transferWalkS = numberIn(moved, 'sim.transferWalkS');
+  const dispatchRetryS = numberIn(moved, 'sim.dispatchRetryS');
+  const drainGraceS = numberIn(moved, 'sim.drainGraceS');
+  const doorObstructionProbability = numberIn(moved, 'sim.doorObstructionProbability');
+  const tunables: RunnerTunables = {
+    ...(transferWalkS === undefined ? {} : { transferWalkS }),
+    ...(dispatchRetryS === undefined ? {} : { dispatchRetryS }),
+    ...(drainGraceS === undefined ? {} : { drainGraceS }),
+    ...(doorObstructionProbability === undefined ? {} : { doorObstructionProbability }),
+  };
+  return Object.keys(tunables).length === 0 ? null : tunables;
+}
+
+/** One candidate value, if it is one of a declared set. Never a cast over an arbitrary string. */
+function oneOf(
+  candidate: ReadonlyMap<string, ParameterValue>,
+  id: string,
+  allowed: readonly string[],
+): string | undefined {
+  const value = candidate.get(id);
+  return typeof value === 'string' && allowed.includes(value) ? value : undefined;
 }
 
 /**

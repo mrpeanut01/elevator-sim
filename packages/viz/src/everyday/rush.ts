@@ -195,6 +195,17 @@ const RUSH_FIELD_ROLES = Object.freeze({
   selectorSpec: 'fresh',
   ruleRows: 'dispatcher',
   patience: 'fresh',
+  /*
+   * The Parameters tab's other three applied sources, on `patience`'s exact ground: a run under a
+   * rush reads each of them, and `freshFieldsOf(initialState(...))` reads back the `null` every
+   * one of them seeds at — so a rush is the day nobody touched that tab, whatever the player set
+   * before pressing. That matters more here than for most fields on this table, because a rush is
+   * posted to a board the server verifies by replay: a crowding block or a demand override the
+   * submission does not carry would re-verify as a different run.
+   */
+  paramDemand: 'fresh',
+  lobbyCrowding: 'fresh',
+  runnerTunables: 'fresh',
   week: 'rush',
   parkedWeeks: 'rush',
   savedDispatchers: 'dispatcher',

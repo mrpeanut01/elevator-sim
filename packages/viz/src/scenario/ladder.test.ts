@@ -117,6 +117,55 @@ describe('the ordered path', () => {
     }
   });
 
+  it('offers no purchase on the budget line while no screen sells one — § D786', () => {
+    /*
+     * **The worst thing on the Scenario hub, asserted in both directions.**
+     *
+     * The line read *"2 wider budgets **can be bought**, in order: Widen to the equipment tier
+     * (20 chimes), Widen to the building tier (30 chimes)"* on every row, and shipped in
+     * `dist-web`. `data/chime-ledger.json` has no scenario-budget sink and by its own ruling may
+     * never have one — it refuses `scenario-budget-step` by name and
+     * `core/config/chimeLedger.ts#REFUSED_MODIFIER_KINDS` refuses the modifier kind — so nothing in
+     * the product could charge that price. § D227 in both polarities at once, on the first screen
+     * of the mode `docs/38` § 2.1 rules first.
+     *
+     * Two halves, because either alone would pass on a line that is wrong:
+     *
+     * 1. **No purchase verb and no chime figure.** A price is the only part of that sentence a
+     *    player could have acted on, and there is no act.
+     * 2. **The refusal is there, and it names who cannot sell rather than who has not bought.**
+     *    The deleted mitigation — *"Nothing here has bought a wider budget"* — reads to a first
+     *    arrival as *you have not saved up yet*, which is why deleting the promise alone would not
+     *    have been enough.
+     *
+     * It goes red the moment somebody re-adds a price, **and it goes red the moment somebody builds
+     * the sink and forgets this line**: clause 2 requires the refusal on every row that has a rung,
+     * so a spend surface that ships has to come back here.
+     */
+    const purchase = /\bcan be bought\b|\bbuy\b|\bbought\b|\bchimes?\b|\bprices?\b|\bcosts?\b/iu;
+    let withRungs = 0;
+    for (const rung of ladder()) {
+      const stage = campaign.stages.find((row) => row.id === rung.id);
+      if (stage === undefined) throw new Error(`no stage for ${rung.id}`);
+      expect(rung.budgetLine, rung.id).not.toMatch(purchase);
+      /*
+       * **Every figure on the line, enumerated** — rather than *this price is absent*, which a
+       * price that happens to equal the opening units could pass by coincidence. The line draws the
+       * units it opens on, and the number of rungs above it when there is more than one; a third
+       * figure of any kind is a regression whether or not it is one of today's prices.
+       */
+      const figures = new Set([...rung.budgetLine.matchAll(/\d+/gu)].map((match) => match[0]));
+      const allowed = new Set([String(rungsOf(stage.budget)[0]?.units)]);
+      if (stage.budget.steps.length > 1) allowed.add(String(stage.budget.steps.length));
+      expect([...figures].sort(), rung.id).toEqual([...allowed].sort());
+      if (stage.budget.steps.length === 0) continue;
+      withRungs += 1;
+      expect(rung.budgetLine, rung.id).toContain(SCENARIO_LADDER_COPY.baseRungNote);
+    }
+    // The clause above is vacuous if no shipped stage authors a rung; it does, and this says so.
+    expect(withRungs).toBeGreaterThan(0);
+  });
+
   it('never calls a held scenario unwinnable, because the dial half is a sample', () => {
     /*
      * The one thing this module may not say, asserted rather than reviewed.
@@ -182,7 +231,6 @@ describe('the ordered path', () => {
       expect(rung.budgetLine, rung.id).toContain(String(rungsOf(stage.budget)[0]?.units));
       for (const step of stage.budget.steps) {
         expect(rung.budgetLine, `${rung.id}/${step.id}`).toContain(step.name);
-        expect(rung.budgetLine, `${rung.id}/${step.id}`).toContain(String(step.chimes));
       }
       // The building is named by its id from the stage, so a renamed building cannot be stranded.
       expect(config.buildingsById.has(rung.buildingId), rung.id).toBe(true);

@@ -296,7 +296,7 @@ describe('every field the module is asked about has an answer, and no answer is 
     );
   });
 
-  it('asks about the three fields issue #129 is about, the four it always did, patience, and the intervention log', () => {
+  it('asks about the three fields issue #129 is about, the four it always did, patience, the intervention log and the Parameters tab’s three', () => {
     // Non-vacuity for the assertion above: a `fieldsAnsweredFor` that returned nothing would agree
     // with a `CARRY_CHECKS` that was empty, and both would be catastrophically wrong.
     //
@@ -314,6 +314,10 @@ describe('every field the module is asked about has an answer, and no answer is 
     // `commissioning`'s answer one product over — the identity carries, a fitted tower does not,
     // and the walk over `SCOPE_OF` forced it in here on the day the field landed rather than on the
     // day somebody remembered, which is the third time this list has recorded that.
+    // `paramDemand`, `lobbyCrowding` and `runnerTunables` are the thirteenth, fourteenth and
+    // fifteenth — wave AD's § D761–§ D763, the Parameters tab's three new applied sources. They
+    // arrived here on the day the fields landed, by the same walk over `SCOPE_OF` that forced
+    // `patience` in, which is the fourth time this list has recorded that.
     expect(sorted(fieldsAnsweredFor('ranked').map(({ field }) => field))).toEqual([
       'calendar',
       // `campaignEventId` is the twelfth — GitHub issues #171 and #169 item 1, § D507: the
@@ -323,9 +327,12 @@ describe('every field the module is asked about has an answer, and no answer is 
       'commissioning',
       'interventions',
       'levers',
+      'lobbyCrowding',
       'outOfServiceCarIds',
+      'paramDemand',
       'patience',
       'ruleRows',
+      'runnerTunables',
       'savedClasses',
       'selectorSpec',
       'week',

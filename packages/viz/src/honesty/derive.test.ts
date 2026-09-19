@@ -43,6 +43,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The session-shape spans — GitHub issue #559, § D753. `everyday/sittingShape.ts#SITTING_SPANS` is ' +
+        'four records of two numbers each, in simulated seconds, and its only strings are the `source` ' +
+        'field: the file each span was read from, for `sittingShape.test.ts` to assert it against. It is ' +
+        'derived only because a file path with a `#` in it reads as prose to the two-adjacent-words ' +
+        'scanner. Nothing draws a `source` on any screen. What a player reads is the five strings ' +
+        '`SITTING_SHAPES` composes **from** these spans, and those are claimed by ' +
+        '`everyday/modes.ts#EVERYDAY_MODES` and the Scenario hub, which draw them.',
+      ids: ['everyday/sittingShape.ts#SITTING_SPANS'],
+    },
+    {
+      reason:
         'The energy figure ids — GitHub PR #515’s review finding L1, § D539. `ENERGY_FIGURE_IDS` holds ' +
         '`energy-work` and `energy-per-leg`, the two `ReportFigure.id` keys `dev/reportPanel.ts#reportDeltaOf` ' +
         'reads to withhold those rows between two runs on different equipment, and it is derived only ' +
@@ -595,6 +606,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * sweeps.
          */
         'everyday/tutorialModel.ts#TUTORIAL_CASE_ID',
+        /*
+         * The `data/chime-ledger.json` sink a career top-up is sold under — GitHub issue #557,
+         * § D738. Same shape as the line above: a hyphenated slug the derivation cannot tell from
+         * a sentence. What a player reads about it is the sink's **name** and the offer sentence
+         * beside it, both of which `EVERYDAY_SETTINGS` seeds out of `chimesPanelViewOf`'s own
+         * answer; this constant is what `everyday/host.ts` compares a spend against so that the
+         * id lives in one place rather than in two string literals.
+         */
+        'campaign/economy.ts#CAREER_PURSE_TOP_UP_SINK_ID',
       ],
     },
     {
@@ -1695,7 +1715,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'not prose, and nothing it returns is a string at all. It is `dev/dom.ts`’s case at the ' +
         'other end of the pipe: the strings near it belong to somebody else, and driving it would ' +
         'put a schema id in the corpus under a decoder’s name.',
-      ids: ['dev/parameterForm.ts#patienceFromCandidate'],
+      ids: [
+        'dev/parameterForm.ts#patienceFromCandidate',
+        /*
+         * Wave AD's three, on exactly the sentence above and for exactly its reason — § D761–
+         * § D763. Each turns the same tab's live point into a `core` configuration object, and
+         * every literal the derivation sees in one is a parameter id (`traffic.demandLevel`,
+         * `sim.lobbyCrowding.maxFactor`) or an enumerated value `core` declares (`uniform`,
+         * `permitted-first`). None of the three returns a string, and the player-facing sentence
+         * about what they do is `appliedNoteFor`'s, which is excluded above under its own reason.
+         */
+        'dev/parameterForm.ts#crowdingFromCandidate',
+        'dev/parameterForm.ts#demandFromCandidate',
+        'dev/parameterForm.ts#runnerTunablesFromCandidate',
+      ],
     },
     {
       reason:

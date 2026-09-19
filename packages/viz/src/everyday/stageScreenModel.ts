@@ -251,9 +251,17 @@ export const STAGE_SPEEDS: readonly [StageSpeed, ...StageSpeed[]] = Object.freez
  * **2. The content census, counted rather than estimated.** `data/campaign.json` is ten stages of
  * **900 s**; `data/scenario-goals.json` twelve of **900 s**; `data/fixit-cases.json` one of 1 500 s,
  * fifteen of **1 800 s** and two of 2 700 s. So the mode § D525 puts first is 900 s, which is
- * **3 min 45 s at `4×`** and **15 minutes at `1×`**. `everyday/modes.ts`'s Scenario tile publishes
- * *"~3-5 min a case"* on the player's own screen: `4×` lands inside that promise and `1×` is three
- * to four times outside it.
+ * **3 min 45 s at `4×`** and **15 minutes at `1×`**.
+ *
+ * **The corroboration this reason originally carried has been withdrawn, and the withdrawal is
+ * worth more than it was** ([§ D753](../../../../DECISIONS.md), GitHub issue #559). It read: *"the
+ * Scenario tile publishes `~3-5 min a case` on the player's own screen: `4×` lands inside that
+ * promise and `1×` is three to four times outside it."* That tile's figure was **wrong** — it
+ * corresponded to no rung on this ladder — so the check was against a number nobody had measured.
+ * The figure is now composed in `everyday/sittingShape.ts` by dividing the content's own span by
+ * **this constant**, which makes the check circular rather than merely unsupported: a session shape
+ * derived from the rung can never disagree with the rung, and no future rung choice may cite one as
+ * evidence. What survives untouched is the census above, which is a measurement of the content.
  *
  * **3. The ladder stays usable in both directions.** A default on the bottom rung can only be
  * adjusted one way. At `4×` a player who wants more day per minute has `8×` and `30×` still inside
@@ -268,12 +276,14 @@ export const STAGE_SPEEDS: readonly [StageSpeed, ...StageSpeed[]] = Object.freez
  * skip control and the chips are the answer to it — but it is a real move and AD-S6's arithmetic is
  * corrected on the commit that makes it stale rather than left to age.
  *
- * **And one number this does not fix.** The session shapes on `everyday/modes.ts`' three tiles and
- * `everyday/scenarioModel.ts`' two entries — *"~3-5 min a case"*, *"~2 min a building-day"*,
- * *"~5 min a case"* — correspond to roughly **5–6 simulated seconds per real second**, which is no
- * rung on this ladder. They are wrong by a factor of six at `30×` and by about 1.5 at `4×`: less
- * wrong, and still wrong. Correcting five player-facing strings is not this constant's to do, and
- * saying so here is better than a decomposition nobody measured.
+ * **A paragraph that stood here is deleted rather than updated** ([§ D753](../../../../DECISIONS.md)).
+ * It named five player-facing session shapes as outstanding and said correcting them was not this
+ * constant's to do. GitHub issue **#559** measured them against a wall clock and moved all five, so
+ * the sentence became the § D227 polarity `CLAUDE.md` calls worse than a dead seam — a refusal that
+ * tells a reader work is open after it is done — and § D227 requires it gone on the commit that
+ * makes it false rather than left to age. The five figures now divide the content's span by this
+ * constant; `everyday/sittingShape.ts` is where they are composed and `sittingShape.test.ts` is
+ * what keeps them from being composed anywhere else.
  *
  * The index is **derived from the declared multiplier rather than written down beside it**, so a
  * rung inserted below the default cannot silently move it. That is #257's own defect class one level

@@ -78,15 +78,22 @@ export const CAREER_STORAGE_KEY = 'elevator-sim:career';
 export const CAREER_QUARANTINE_KEY = 'elevator-sim:career:refused';
 
 /** The envelope's shape number, refused in both directions. */
-export const CAREER_SCHEMA_VERSION = 1;
+export const CAREER_SCHEMA_VERSION = 2;
 
 /**
  * The shapes this build reads, as against the one it writes.
  *
- * One entry today, and the constant exists anyway: the next lane to add a sibling key adds its
- * number here and a migration below, rather than discovering that the set was a literal.
+ * **Two entries now, and the second is the first real use this constant has had.** Version 2 is
+ * `CampaignTower.grants` — GitHub issue #557's chime top-up, `campaign/economy.ts#PurseGrant`. A
+ * version-1 career is a career written before that field existed, and *no top-up had been bought*
+ * is exactly what an empty list says, so the migration is a real one rather than a guess and the
+ * envelope is bumped rather than the field being made optional. The alternative — reading a v1
+ * payload as v1 and letting `grantedUnits` find `undefined` — is the shallow-check defect
+ * {@link isCareerShape} already has a docstring about: it decodes cleanly and throws on the first
+ * derivation, and `towersView` runs on mount, so the Campaign tile dies rather than drawing a
+ * refusal a player can read.
  */
-export const CAREER_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1]);
+export const CAREER_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2]);
 
 /** Why a read produced no career. Never `undefined` on a refusal — the player is owed the reason. */
 export type CareerLoadRefusal =
@@ -175,6 +182,27 @@ function isCareerShape(value: unknown): value is CampaignCareer {
   return true;
 }
 
+/**
+ * Every tower given the `grants` list its economy sums — the version 1 → 2 migration.
+ *
+ * **Applied to every version this build reads rather than to version 1 alone**, and that is
+ * {@link isCareerShape}'s lesson rather than belt and braces: the shape gate above does not check
+ * `grants` (it checks what the *first* derivation indexes or does arithmetic on, and an absent
+ * array is repaired here instead), so a version-2 payload with a tower missing one would otherwise
+ * reach `economy.ts#grantedUnits` and throw. A field this function can always supply is a field the
+ * refusal machinery never has to be routed past.
+ *
+ * Returns its input by identity when nothing is missing, so a career that needs no migration is not
+ * a fresh object — `careerPersist.test.ts` reads that as *the round trip is the identity*.
+ */
+function withGrants(career: CampaignCareer): CampaignCareer {
+  if (career.towers.every((tower) => Array.isArray(tower.grants))) return career;
+  return {
+    ...career,
+    towers: career.towers.map((tower) => (Array.isArray(tower.grants) ? tower : { ...tower, grants: [] })),
+  };
+}
+
 /** The career as bytes. One shape, one version, written together. */
 export function encodeCareer(career: CampaignCareer): string {
   return JSON.stringify({ version: CAREER_SCHEMA_VERSION, career });
@@ -202,5 +230,5 @@ export function decodeCareer(raw: string | null): CareerLoad {
   if (!isCareerShape(career)) {
     return { career: undefined, refusal: 'shape', notice: CAREER_LOAD_NOTICES.shape };
   }
-  return { career, refusal: undefined, notice: undefined };
+  return { career: withGrants(career), refusal: undefined, notice: undefined };
 }

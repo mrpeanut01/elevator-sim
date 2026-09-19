@@ -129,6 +129,21 @@ export interface CampaignPanelOptions {
 export interface CampaignPanelHandle {
   /** Redraw the briefing. Called when the tab is selected. */
   refresh(): void;
+  /**
+   * **Put a named stage in the picker and draw it, exactly as choosing it from the dropdown would**
+   * — [§ D787](../../../../DECISIONS.md), the Engineer half of the Scenario hub's press.
+   *
+   * Answers `false` and changes nothing when the id is not one this panel can play, which is the
+   * only honest answer: `playable` is the campaign's ten plus whichever engineering briefs loaded,
+   * and a caller holding an id from somewhere else must be able to tell that nothing happened
+   * rather than land a player on a panel showing a different stage. `true` means the picker now
+   * holds that id and the brief, the weights and the intent have been drawn for it.
+   *
+   * It does **not** open the tab or hand the page over. Both belong to `dev/main.ts`, which owns
+   * navigation; this is the panel's own half and nothing else, so the two cannot disagree about
+   * which surface is in front.
+   */
+  openStage(stageId: string): boolean;
 }
 
 /**
@@ -1318,7 +1333,16 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     });
   }
 
-  ui.stage.addEventListener('change', () => {
+  /**
+   * Draw whatever the stage picker now holds — the dropdown's own handler, named.
+   *
+   * A function rather than an inline handler because {@link CampaignPanelHandle.openStage} performs
+   * the same act from the Scenario hub, and two copies of this sequence would be two answers to
+   * *what does choosing a stage do*. The `change` event is deliberately **not** re-dispatched from
+   * `openStage` instead: a synthetic event would run every listener on that element, now and
+   * whenever somebody adds a second one, which is a wider promise than this seam makes.
+   */
+  function drawChosenStage(): void {
     const stage = currentStage();
     if (stage !== undefined) ui.profile.value = openingProfileFor(stage);
     ui.output.replaceChildren();
@@ -1327,7 +1351,9 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     drawBrief();
     drawWeights();
     drawIntent();
-  });
+  }
+
+  ui.stage.addEventListener('change', drawChosenStage);
   ui.profile.addEventListener('change', () => {
     ui.error.textContent = '';
     resetWeights();
@@ -1390,11 +1416,13 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   /*
    * **The setting picker is refilled every time this tab is shown**, off the panel's own `hidden`
    * attribute — `dev/batchPanel.ts`'s observer, third application, and here it is the *only*
-   * caller available: `dev/main.ts` assigns this handle to a variable and never reads it, so
-   * {@link CampaignPanelHandle.refresh} has no non-test caller at all. Hanging the refill on that
-   * handle would have been CLAUDE.md's standing requirement broken inside the fix for a defect of
-   * the same class. The stale handle is reported rather than repaired here; it belongs to whoever
-   * owns `dev/main.ts`'s tab wiring.
+   * caller available: `dev/main.ts` holds this handle so that the Scenario hub's press can reach
+   * {@link CampaignPanelHandle.openStage} (§ D787), and reads it for nothing else, so
+   * {@link CampaignPanelHandle.refresh} **still has no non-test caller**. Hanging the refill on
+   * that handle would have been CLAUDE.md's standing requirement broken inside the fix for a defect
+   * of the same class, and hanging it there *now* — when the handle is finally read — would be the
+   * same mistake with an alibi. The stale half is reported rather than repaired here; it belongs to
+   * whoever owns `dev/main.ts`'s tab wiring.
    */
   const panel = ui.output.closest('[role="tabpanel"]');
   if (panel !== null && typeof MutationObserver === 'function') {
@@ -1411,6 +1439,26 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       drawWeights();
       /* Only while nothing is on screen: a finished run's timing line is not to be overwritten. */
       if (ui.output.childElementCount === 0) drawIntent();
+    },
+    openStage: (stageId) => {
+      /*
+       * Refused against {@link playable} rather than against the `<select>`'s options, because that
+       * list is what {@link currentStage} resolves through: an id the element would accept and this
+       * array does not hold would leave the picker reading one stage and every function below it
+       * answering `undefined`.
+       */
+      if (!playable.some((stage) => stage.id === stageId)) return false;
+      ui.stage.value = stageId;
+      /*
+       * A `<select>` silently ignores a value no option carries, so the write is **read back**
+       * rather than trusted. {@link playable} and {@link fillStageOptions} are built from the same
+       * loaded document but not from the same expression, and this seam's answer is a claim about
+       * what the panel is *showing* — so it is taken from the element rather than from the list
+       * that was supposed to have filled it.
+       */
+      if (ui.stage.value !== stageId) return false;
+      drawChosenStage();
+      return true;
     },
   };
 }

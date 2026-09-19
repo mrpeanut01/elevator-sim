@@ -53,6 +53,7 @@ import {
   oddsAfterWorksPct,
   offerFeeOf,
   perfectMonthUnits,
+  grantedUnits,
   purseOf,
   rateOnDay,
   renewalOffer,
@@ -80,6 +81,7 @@ function tower(patch: Partial<TowerEconomy> = {}): TowerEconomy {
     fitted: {},
     bookings: [],
     spends: [],
+    grants: [],
     trips: 0,
     serviceAt: 45_000,
     refit: 0,
@@ -198,6 +200,36 @@ describe('§ 8.1’s day and money arithmetic', () => {
       bookings: [{ categoryId: 'shafts', level: 1, startIdx: 0, nights: 8, units: 34 }],
     });
     expect(purseOf(overspent)).toBe(0);
+  });
+
+  it('adds a chime top-up as a fourth term and keeps every one of them derived', () => {
+    /*
+     * GitHub issue #557, § D738. `grantedUnits` is `committedUnits`' mirror — one sums what
+     * arrived from outside the contract, the other what left — and the purse is still
+     * `max(0, carriedIn + earnedSoFar + granted − committed)` with nothing stored.
+     */
+    const plain = tower({ day: 3 });
+    const granted = tower({
+      day: 3,
+      grants: [
+        { day: 1, units: 6, sinkId: 'career-purse-top-up' },
+        { day: 3, units: 6, sinkId: 'career-purse-top-up' },
+      ],
+    });
+    expect(grantedUnits(plain)).toBe(0);
+    expect(grantedUnits(granted)).toBe(12);
+    expect(purseOf(granted)).toBe(purseOf(plain) + 12);
+    /* And it is a sum over the record: take the rows away and the purse is the plain one again. */
+    expect(purseOf({ ...granted, grants: [] })).toBe(purseOf(plain));
+  });
+
+  it('lets a top-up pay for a booking the month’s own money could not', () => {
+    /* The seam the issue is about, in arithmetic: a purse short by one unit is a purse that
+       refuses a tier, and six granted units are what stop it refusing. */
+    const short = tower({ bookings: [{ categoryId: 'doors', level: 1, startIdx: 0, nights: 0, units: 4 }] });
+    expect(purseOf(short)).toBe(4);
+    const toppedUp = { ...short, grants: [{ day: 1, units: 6, sinkId: 'career-purse-top-up' }] };
+    expect(purseOf(toppedUp)).toBe(10);
   });
 
   it('counts kit carried in from an earlier month as fitted and as costing nothing again', () => {

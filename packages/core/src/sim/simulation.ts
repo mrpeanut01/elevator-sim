@@ -918,7 +918,21 @@ export class Simulation {
    */
   #rangeMoved = false;
 
-  #ran = false;
+  /**
+   * Whether the schedule has been laid down and the clock is allowed to move.
+   *
+   * Separate from {@link #finished} because {@link advanceTo} starts a run without ending it,
+   * which is the whole of this class's interruption seam. `#started` is set by whichever of
+   * {@link advanceTo} / {@link finish} / {@link run} is called first.
+   */
+  #started = false;
+
+  /**
+   * Whether the books have been closed. A replication is single-use in exactly the sense it
+   * always was: once {@link finish} has been entered, no further advance and no second finish.
+   * Set *before* the final drain, so a run that throws out of its audit still refuses a retry.
+   */
+  #finished = false;
 
   constructor(config: SimulationConfig) {
     this.#options = resolveOptions(config);
@@ -926,7 +940,15 @@ export class Simulation {
       config.seed,
       config.trafficSeed === undefined ? {} : { trafficSeed: config.trafficSeed },
     );
-    this.#kernel = new SimKernel({ maxEventsPerRun: this.#options.maxEvents });
+    // `eventBudgetScope: 'lifetime'` and not the default, because {@link Simulation.advanceTo}
+    // splits one drain into as many calls as the caller likes. Under the per-call default a run
+    // stepped in ten chunks would get ten times the event valve's budget, so the same seed would
+    // produce a different record depending on where the caller paused — which is invariant 5
+    // failing quietly. For a run advanced in one call the two scopes are the same number.
+    this.#kernel = new SimKernel({
+      maxEventsPerRun: this.#options.maxEvents,
+      eventBudgetScope: 'lifetime',
+    });
     this.#trafficModel = config.trafficModel;
     this.#resolved = config.building;
     this.#interventions = Object.freeze([...(config.interventions ?? [])]);
@@ -1555,6 +1577,11 @@ export class Simulation {
   /**
    * Run to completion and reconcile the books.
    *
+   * The historical name for {@link finish}, and exactly that method — kept because it is what
+   * every caller in this repository and every code sample says, and because a run that is never
+   * interrupted should not have to know that interruption exists. Use {@link advanceTo} first
+   * when you want to stop part-way; the result is byte-identical either way.
+   *
    * @throws SimulationError if the conservation audit fails, if the event budget was exhausted,
    *   or if the drain deadline fired with passengers still in the system and `onTimeout` is
    *   `throw`.
@@ -1562,31 +1589,284 @@ export class Simulation {
    *   `TypeError` from a bug propagates **unchanged**; see {@link isEventBudgetExhaustion}.
    */
   run(): SimulationResult {
-    if (this.#ran) {
+    return this.finish();
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Interruption
+   * ---------------------------------------------------------------- */
+
+  /**
+   * **Advance simulated time to `untilS` and stop there, with the run still open.**
+   *
+   * This is the seam that makes a mid-run change expressible at all. Before it, `run()` was the
+   * only method on this class that moved the clock, so every decision in a day was taken before
+   * the first frame of it could be drawn and `docs/16` § 1's *"there is no such thing as a mid-day
+   * change"* was a statement about the architecture rather than about the product. The kernel has
+   * always had the bounded drain ({@link SimKernel.run}); what was missing was this one method
+   * exposing it, and the guarantee below that exposing it costs nothing.
+   *
+   * ## The guarantee
+   *
+   * **A run advanced in any number of chunks produces a byte-identical `RunRecord` to the same
+   * run advanced in one call.** Not "statistically equivalent", not "equivalent up to floating
+   * point" — the same bytes, for every chunking, including boundaries that fall in the middle of
+   * a car's flight or a door's dwell. `sim/interrupt.test.ts` proves it by sha-256 over the
+   * serialized record across seven chunkings on four configurations — two buildings, three
+   * dispatchers, one of them the profile that cancels events mid-flight, and one run carrying the
+   * car-move series so the *motion* is hashed and not only the passengers — and it proves the
+   * instrument can fail by showing a neighbouring seed hashing differently.
+   *
+   * Three things make that true, and each of them is a `CLAUDE.md` invariant rather than a
+   * courtesy of this implementation:
+   *
+   * - **Invariant 2 (no global RNG).** Every draw this class makes happens in the constructor —
+   *   the trace, the patience table, the stairs choices — from named streams on the injected
+   *   `StreamSet`. Nothing between two chunks touches a stream, so no chunking can move one.
+   * - **Invariant 4 (ties break by `(time, sequence)`).** The queue owns the sequence counter and
+   *   the total order is global, so a pause is a pause *between* events and never inside the
+   *   ordering. A chunk boundary partitions the same sequence of events; it cannot reorder it.
+   * - **No wall clock (invariant 3).** A boundary is a simulated instant, so there is nothing for
+   *   the split to be measured against except the clock that is already deterministic.
+   *
+   * ## The two things that were *not* free
+   *
+   * Both were divergences between a chunked and an unchunked drain, and both are fixed at the
+   * source rather than papered over here, because a simulator whose answer depends on when you
+   * looked at it is worse than one you cannot look into:
+   *
+   * 1. **The event valve's budget was per-call**, so ten chunks bought ten budgets. The kernel
+   *    now takes `eventBudgetScope: 'lifetime'` and this class asks for it, so the valve trips on
+   *    exactly the same event however the caller stepped — including the warning's own text
+   *    (`DECISIONS.md` § D801).
+   * 2. **{@link SimKernel.run} advances the clock to `until`** whether or not anything fired
+   *    there, so a caller who advanced past the end of the day would have left the clock ahead of
+   *    the last thing that happened, and the end-of-run readings would have moved with it. Every
+   *    such reading now goes through {@link #endOfRunS}, which asks the kernel for the last event
+   *    it *dispatched*. For an unchunked run the two are the same number.
+   *
+   * ## What it does not do, and why that turns out not to matter
+   *
+   * It does not fork, clone or snapshot. There is exactly one timeline per `Simulation`, and it
+   * only ever moves forwards — `untilS` before {@link now} is a `RangeError` from the kernel,
+   * which is invariant 3's *simulated time never runs backwards* arriving at this layer unchanged.
+   *
+   * **A clone is nevertheless the wrong way to get two futures from one present, and this is the
+   * place to say so before somebody spends a month on it.** A `Simulation` holds 103 private
+   * fields, live `Car`, `Floor` and `DispatchPolicy` objects, a `MetricsRecorder` and a
+   * `StreamSet` — and, decisively, a kernel whose queue holds **closures over `this`**. Counted
+   * rather than estimated: `core/` has exactly **ten** non-test `schedule`/`scheduleAfter` call
+   * sites and every one of them is in this file (the six matches elsewhere, in `model/car/car.ts`,
+   * `physics/doors/doorMachine.ts` and `physics/motion/index.ts`, are docstring examples), and
+   * every one passes an arrow function. So the queue is neither serialisable nor
+   * structured-cloneable. The ten are the small half of the cost; the large half is that
+   * `#carArrivals` and `#pendingTicks` hold `ScheduledEvent` handles by **identity** for
+   * cancellation, and that `Car`, `Floor`, `DispatchPolicy`, `MetricsRecorder`,
+   * `CapacityReassignmentMonitor` and `BankDemandForecast` would each need deep-copy semantics
+   * that do not exist and that nothing would check.
+   *
+   * **The same outcome is already available without any of that, and it is exact rather than
+   * approximately exact: fork by replay.** Construct a second `Simulation` from the same
+   * `SimulationConfig`, `advanceTo(t)`, and let it differ from there. Its prefix is not a *copy*
+   * of the first run's prefix, it **is** the first run's prefix — the same computation from the
+   * same seed — which is a stronger guarantee than any snapshot could give, and it is exactly the
+   * two facts this package already proves: the trace is a function of `(seed, config)` and of
+   * nothing the elevators do (`sim/determinism.test.ts`), and a chunked advance equals an
+   * unchunked one (`sim/interrupt.test.ts`). Common random numbers come free rather than being
+   * plumbed, because both branches draw their population in the constructor before a car moves.
+   * The cost is one replay of the prefix, which on the runs measured in `sim/interrupt.test.ts`
+   * is a fraction of a second for a 900 s day.
+   *
+   * **What is actually missing for fork-at-`t` is a mutation seam, not a snapshot**: there is no
+   * way to tell a *live* `Simulation` that something has changed, because every mid-run change is
+   * authored up front as a `serviceEvents` entry or a `RunInterventionConfig`. The honest shape
+   * for it is to append to that one schedule at the current clock rather than to invent a second
+   * authority — {@link #scheduleServiceEvents} explains at length why `#onServiceChange` is the
+   * sole authority on what a mid-run change does to a group, and a rival path applying
+   * `Car.setMode` itself would be a second copy of all of it, wrong the day either copy moved.
+   * That is the next piece of engine work and it is deliberately not done here.
+   *
+   * ## Who calls it
+   *
+   * **Nothing outside a test does, on the commit that lands it**, and this repository's standing
+   * requirement is that such a thing is named rather than discovered: a behaviour that is
+   * configurable, unit-tested in isolation and called from no shipped path has already shipped
+   * eleven times in code here, and "is it reachable?" is the wrong question — *name the non-test
+   * caller* is the right one.
+   *
+   * So: the caller is **`packages/viz/src/record/recordRun.ts`**, which says in its own first
+   * line that it is *"the only place in the package that runs a simulation"*, and its worker
+   * `dev/shiftWorker.ts` behind it. Today `recordRun` calls {@link run} and turns a finished
+   * result into a `VizRecording` that the renderer replays; what this seam lets it do instead is
+   * advance the run as the playhead moves, which is what `docs/43` P1 is asking for and what
+   * `docs/16` § 1 says is impossible. That is a `packages/viz` change and this is a
+   * `packages/core` lane, so it is not made here.
+   *
+   * **Until it is made, this is a dead seam by this repository's own definition**, and one wave is
+   * the whole of the licence: the test file beside it exercises it, which is precisely the thing
+   * the standing requirement says does not count. A barrel re-export and a `{@link}` tag look
+   * exactly like a caller and are not one, and neither is `sim/interrupt.test.ts`.
+   *
+   * `DECISIONS.md` § D802 is the record, with the four digests and the seven chunkings behind the
+   * guarantee above; § D801 is the kernel half it rests on.
+   *
+   * ```ts
+   * const sim = new Simulation(config);
+   * sim.advanceTo(300);            // nine o'clock, doors opening
+   * // …read sim.building, sim.stageActivity, change nothing or change something…
+   * sim.advanceTo(600);
+   * const result = sim.finish();   // identical to new Simulation(config).run()
+   * ```
+   *
+   * @param untilS absolute simulated seconds. Events at exactly `untilS` fire.
+   * @throws {SimulationError} if the books are already closed.
+   * @throws {RangeError} if `untilS` is not finite or is before {@link now}.
+   * @throws whatever a handler threw, unchanged. The one exception is the event valve, which is
+   *   recorded here exactly as {@link finish} records it and then ends the run — see
+   *   {@link #drain}. It has to be handled in both, and identically, or the same livelock would
+   *   produce a different record depending on which call was holding it when it tripped.
+   */
+  advanceTo(untilS: SimTime): void {
+    if (this.#finished) {
+      throw new SimulationError(
+        `Simulation "${this.#runId}" has already finished; its books are closed and its clock cannot move again. A replication is single-use; build another for a second run, or two replications will share car positions and stop being independent.`,
+      );
+    }
+    this.#begin();
+    this.#drain(untilS);
+  }
+
+  /**
+   * **Drain whatever is left, close the books and return the result.**
+   *
+   * Identical to {@link run} — `run()` is this method under its historical name — and the only
+   * way to obtain a {@link SimulationResult}. Safe to call whether or not {@link advanceTo} has
+   * been used: with no prior advance it lays the schedule down itself, which is exactly what
+   * `run()` has always done.
+   *
+   * @throws SimulationError if the conservation audit fails, if the event budget was exhausted,
+   *   or if the drain deadline fired with passengers still in the system and `onTimeout` is
+   *   `throw`.
+   * @throws whatever a handler threw. A routing failure, a `ModelError` from a car or a plain
+   *   `TypeError` from a bug propagates **unchanged**; see {@link isEventBudgetExhaustion}.
+   */
+  finish(): SimulationResult {
+    if (this.#finished) {
       throw new SimulationError(
         `Simulation "${this.#runId}" has already run. A replication is single-use; build another for a second run, or two replications will share car positions and stop being independent.`,
       );
     }
-    this.#ran = true;
+    this.#begin();
+    // Before the drain, not after: a run that throws out of its conservation audit has still
+    // happened, and offering a retry on the same instance would hand back a second result from
+    // cars that are no longer where they started. This is where `#ran = true` used to sit.
+    this.#finished = true;
+
+    this.#drain(undefined);
+    this.#closeOpenDeferrals(this.#endOfRunS());
+    return this.#finish(this.#endReason);
+  }
+
+  /** Current simulated time, in seconds. Zero before the first advance. */
+  now(): SimTime {
+    return this.#kernel.now();
+  }
+
+  /**
+   * Whether nothing further is pending — the day is over and {@link finish} has only the books
+   * left to close.
+   *
+   * The loop condition for a caller stepping a run: advance, draw, repeat while this is `false`.
+   * `true` before the first advance is not a finished run, it is an unstarted one, which is why
+   * {@link hasStarted} exists beside it.
+   */
+  isDrained(): boolean {
+    return this.#started && this.#kernel.isEmpty();
+  }
+
+  /** Whether the clock has been allowed to move at all. */
+  get hasStarted(): boolean {
+    return this.#started;
+  }
+
+  /** Whether the books are closed. A finished replication refuses every further call. */
+  get hasFinished(): boolean {
+    return this.#finished;
+  }
+
+  /**
+   * Lay the schedule down, exactly once.
+   *
+   * Idempotent because {@link advanceTo} and {@link finish} are each a legal first call and a
+   * caller may mix them freely. Nothing here draws from a stream — every stochastic decision in
+   * a replication is made in the constructor — so *when* this runs cannot change what the run is.
+   */
+  #begin(): void {
+    if (this.#started) return;
+    this.#started = true;
 
     this.#scheduleTrace();
     this.#scheduleQueueSamples();
     this.#scheduleServiceEvents();
     this.#scheduleInterventions();
+  }
 
-    let endReason: RunEndReason = 'drained';
+  /** How the run ended. `'drained'` until the event valve says otherwise. */
+  #endReason: RunEndReason = 'drained';
+
+  /**
+   * **The one place the clock moves**, bounded (`untilS`) or unbounded (`undefined`).
+   *
+   * Both entry points go through it, and that is the point rather than tidiness: the event valve
+   * has to be caught and recorded in exactly one wording, and — the part that is easy to miss —
+   * it has to be recorded **once**. A tripped valve leaves the queue non-empty and the lifetime
+   * budget already spent, so a second drain would throw again the instant it looked at the queue
+   * and push a second identical warning into the record. An uninterrupted run drains once and
+   * warns once; a stepped run would have warned once per remaining step plus once more for
+   * `finish`, and the record would have carried the caller's stepping choice as data. So a run
+   * whose valve has tripped is over: every later drain is a no-op and the clock stays where the
+   * last event left it.
+   */
+  #drain(untilS: SimTime | undefined): void {
+    if (this.#endReason === 'event-budget') return;
     try {
-      this.#kernel.runUntilEmpty();
+      if (untilS === undefined) this.#kernel.runUntilEmpty();
+      else this.#kernel.run(untilS);
     } catch (error) {
       if (!this.#isEventBudgetExhaustion(error)) throw error;
-      endReason = 'event-budget';
-      this.#warnings.push(
-        `event budget exhausted at t=${this.#kernel.now()}s after ${this.#kernel.processedCount()} events (sim.maxEvents=${this.#options.maxEvents}): ${error.message}`,
-      );
+      this.#noteEventBudgetExhaustion(error);
     }
+  }
 
-    this.#closeOpenDeferrals(this.#kernel.now());
-    return this.#finish(endReason);
+  /**
+   * Record the event valve tripping, in the one wording both entry points share.
+   *
+   * The warning text is part of the `RunRecord`, so the two drains must produce the same bytes
+   * for the same run. It reads `#endOfRunS()` rather than the clock for the reason
+   * {@link advanceTo} gives: after a bounded drain the clock may sit at a boundary the caller
+   * chose, and a warning that named it would be reporting where somebody looked rather than
+   * where the run stopped.
+   */
+  #noteEventBudgetExhaustion(error: Error): void {
+    this.#endReason = 'event-budget';
+    this.#warnings.push(
+      `event budget exhausted at t=${this.#endOfRunS()}s after ${this.#kernel.processedCount()} events (sim.maxEvents=${this.#options.maxEvents}): ${error.message}`,
+    );
+  }
+
+  /**
+   * **When this run stopped**, as opposed to how far a caller asked the clock to look.
+   *
+   * The time of the last event the kernel dispatched, falling back to the clock when none has
+   * fired at all (an empty trace with no queue samples). For a run drained in one
+   * `runUntilEmpty()` this is `kernel.now()` to the bit, because that call leaves the clock on
+   * the last event it fired — which is why substituting it everywhere changed no existing
+   * figure. For a run advanced past its own end in bounded chunks it is the only correct answer:
+   * `SimKernel.run(until)` parks the clock at `until`, and a run that ended at 1 843 s must not
+   * report 3 600 s because the caller asked to see the whole day.
+   */
+  #endOfRunS(): SimTime {
+    return this.#kernel.lastEventTime() ?? this.#kernel.now();
   }
 
   /**
@@ -5710,7 +5990,7 @@ export class Simulation {
     // would bury the cause under its symptom.
     if (status === 'aborted') {
       throw new SimulationError(
-        `Run "${this.#runId}" was aborted: the event budget (sim.maxEvents=${this.#options.maxEvents}) was exhausted at t=${this.#kernel.now()}s, with the queue still non-empty and ${undelivered.length} of ${audit.generated} journeys in the system. Its drain deadline was t=${this.#deadlineS}s. This is a handler that is not making progress, not a saturated building: raising sim.drainGraceS or lowering demand will not fix it, and the summary attached to this error describes a run that stopped in the middle.${problems.length === 0 ? '' : ` The conservation audit reports ${problems.length} problem${problems.length === 1 ? '' : 's'} as a consequence, beginning: ${problems[0] ?? ''}.`}`,
+        `Run "${this.#runId}" was aborted: the event budget (sim.maxEvents=${this.#options.maxEvents}) was exhausted at t=${this.#endOfRunS()}s, with the queue still non-empty and ${undelivered.length} of ${audit.generated} journeys in the system. Its drain deadline was t=${this.#deadlineS}s. This is a handler that is not making progress, not a saturated building: raising sim.drainGraceS or lowering demand will not fix it, and the summary attached to this error describes a run that stopped in the middle.${problems.length === 0 ? '' : ` The conservation audit reports ${problems.length} problem${problems.length === 1 ? '' : 's'} as a consequence, beginning: ${problems[0] ?? ''}.`}`,
         result,
       );
     }

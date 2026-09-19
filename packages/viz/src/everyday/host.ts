@@ -161,7 +161,12 @@ import {
   type CampaignCareer,
   type CampaignTower,
 } from '../campaign/career.js';
-import { DIFFICULTIES, purseOf } from '../campaign/economy.js';
+import {
+  CAREER_PURSE_TOP_UP_SINK_ID,
+  DIFFICULTIES,
+  contractIsLost,
+  purseOf,
+} from '../campaign/economy.js';
 import { fitOutOf } from '../campaign/fitOut.js';
 import {
   answerChangeOf,
@@ -358,6 +363,19 @@ export type EverydayChimeSpend =
   | { readonly kind: 'unreachable'; readonly detail: string }
   /** The ledger refused it: not enough in the account. `detail` is the server's sentence. */
   | { readonly kind: 'short'; readonly detail: string }
+  /**
+   * **Refused on this side of the wire, before the ledger was asked** — GitHub issue #557.
+   *
+   * The one refusal in this type the server did not compose, and it exists because the alternative
+   * is worse than a dead seam: `career-purse-top-up` grants units into *this tower's* purse, and
+   * with no career desk open there is no tower for them to land in. Asking the server would take
+   * the chimes for a grant nothing could record — issue #557's own defect, bought a second time
+   * and paid for.
+   *
+   * `docs/22` non-goal 3 is untouched by it. That rule forbids **softening the server's** refusal,
+   * and this sentence is not the server's to soften: nothing was sent.
+   */
+  | { readonly kind: 'refused'; readonly detail: string }
   /** Bought. The balance after, and the units the step granted — `0` for a kit. */
   | { readonly kind: 'bought'; readonly chimes: number; readonly grantUnits: number };
 
@@ -525,6 +543,30 @@ export type EverydayPostOutcome =
 export const POST_RUN_NO_SERVER =
   'This site has no leaderboard server behind it, so this run cannot be posted. It is still on ' +
   'screen and still in the report — nothing about it is lost.';
+
+/**
+ * **Why a career top-up was refused before the ledger was asked** — GitHub issue #557.
+ *
+ * {@link POST_RUN_NO_SERVER}'s footing: the host decides the arm, so the host holds the words, and
+ * a screen that authored its own sentence for a state it does not decide is
+ * `honesty/agreement.ts`'s `surfaces-disagree` waiting to happen. The second sentence is the one
+ * that matters — **nothing was spent** — because the state this refuses is the one where a player
+ * would otherwise have paid for units with nowhere to land.
+ *
+ * ## It says *with a month still running* rather than *open*, and that is a correction
+ *
+ * The gate behind it refuses **two** states — no desk open, and a desk whose contract is lost —
+ * while the panel's own `needsOpenTower` knows only the first, deliberately
+ * (`everyday/settingsScreen.ts` says why: two answers to *may this be bought?* is the disagreement
+ * to avoid). So the press **is** reachable on a lost contract, and a sentence reading *you have no
+ * building open* would be flatly false to the player standing on one. A refusal the host composes
+ * has to be true of every state the host refuses in, which is [§ D227](../../../../DECISIONS.md)
+ * one step before the sentence goes stale rather than one step after.
+ */
+export const CAREER_TOP_UP_NO_TOWER =
+  'This tops up a tower\u2019s purse, and you have no building on the Campaign screen with a month ' +
+  'still running \u2014 so there is nowhere for the units to go. Nothing was spent; open one and ' +
+  'press it again.';
 
 /**
  * **What posting a rush sitting came back with** — GitHub issue #372's fourth criterion, in
@@ -1338,8 +1380,9 @@ export interface EverydayHost {
    * dispatcher nobody is running, and the no-op on re-picking the standing one are all that
    * function's and none of them is restated here.
    *
-   * Takes effect on the **next** run — the simulator runs a whole day in milliseconds and plays the
-   * recording back, so there is no mid-day change (`docs/16` § 1) and the control that changes the
+   * Takes effect on the **next** run — the product plays a whole day back from a recording, so
+   * there is no mid-day change (`docs/16` § 0; true of the product rather than of the simulator
+   * since § D802) and the control that changes the
    * driver is a control that changes tomorrow's question rather than today's answer. This used to
    * say *exactly as {@link setPlainLever} does*, and that comparison was withdrawn rather than
    * reworded: three of that method's four levers reach no run at all, so it is not a thing another
@@ -2119,6 +2162,25 @@ export function createEverydayHost(
   const setCareer = (next: CampaignCareer): void => {
     career = next;
     careerStore.save(next);
+  };
+  /**
+   * **Which tower a chime top-up would land in, or `undefined` when none would** — GitHub issue
+   * #557, [§ D738](../../../../DECISIONS.md).
+   *
+   * The open desk, and only if its contract is still running. Both halves are reachable by playing
+   * rather than exotic: `answerNeed`'s *hand back* clears `openTowerId`, and `contractIsLost` is
+   * § 8.10's end of a month, whose shop is shut — units put into that purse would buy nothing.
+   *
+   * **One derivation, read by both the gate and the write** in {@link EverydayHost.spendChime}, so
+   * the question *may this be bought?* and the question *where does it go?* cannot come to
+   * disagree. `campaign/career.ts#grantUnits` re-applies the same two refusals on its own side,
+   * which is this file's standing convention rather than a second opinion: the reducer is the lock
+   * and this is the key that is not cut for a door that is not there.
+   */
+  const careerGrantTarget = (): string | undefined => {
+    const open = career.towers.find((tower) => tower.id === career.openTowerId);
+    if (open === undefined || contractIsLost(open)) return undefined;
+    return open.id;
   };
   /** {@link EverydayHost.drivingProfile}'s memo — see the binding for why it is keyed on identity. */
   let drivingCache: { readonly forState: ViewerState; readonly profile: DispatcherProfile } | undefined;
@@ -3233,6 +3295,18 @@ export function createEverydayHost(
     spendChime: async (sinkId, steps) => {
       const spend = b.spendChime;
       if (spend === undefined) return { kind: 'no-server' };
+      /*
+       * **The one gate that has to come before the charge** — GitHub issue #557,
+       * [§ D738](../../../../DECISIONS.md). A career top-up grants units into *this tower's* purse,
+       * and `career.ts#grantUnits` refuses a tower the career does not hold or a contract already
+       * lost. A spend made anyway would be charged by the ledger and recorded by nothing, which is
+       * the defect the issue opened about with a player's chimes attached to it. The row is drawn
+       * inert on the same ground (`chimesPanel.ts#SPEND_OFFERS`' `needsOpenTower`), so this is the
+       * second lock rather than the first — `applyCampaignAction`'s own convention.
+       */
+      if (sinkId === CAREER_PURSE_TOP_UP_SINK_ID && careerGrantTarget() === undefined) {
+        return { kind: 'refused', detail: CAREER_TOP_UP_NO_TOWER };
+      }
       const outcome = await spend(sinkId, steps);
       if (outcome.kind === 'bought') {
         const rest = (owned ?? []).filter((entry) => entry.sinkId !== sinkId);
@@ -3242,6 +3316,31 @@ export function createEverydayHost(
           ...(chimeTally ?? { turn: 'scenario-cleared' as const }),
           answer: { kind: 'balance', chimes: outcome.chimes, owns: owned },
         };
+        /*
+         * **And the units land in the career, on the tower and the day they were bought for** —
+         * issue #557, § D526's *"a run played with a bought modifier carries the modifier on its
+         * record"*.
+         *
+         * `outcome.grantUnits` is the **server's** figure: it charged the chimes and said what the
+         * step granted, and a second computation here would be a second authority for a price
+         * `data/chime-ledger.json` holds. What the grant *does* is `campaign/economy.ts#purseOf`'s
+         * and `campaign/career.ts#grantUnits`' decision, not this closure's — the split
+         * `answer-incident` already keeps, where the host posts the action and the reducer rules on
+         * it.
+         *
+         * Written through the same `applyCampaignAction` + {@link setCareer} pair every other
+         * career write goes through, so the grant is persisted by the one writer rather than by a
+         * fourth mutation site.
+         */
+        const target = careerGrantTarget();
+        if (sinkId === CAREER_PURSE_TOP_UP_SINK_ID && target !== undefined && outcome.grantUnits > 0) {
+          const next = applyCampaignAction(
+            career,
+            { kind: 'grant-units', towerId: target, units: outcome.grantUnits, sinkId },
+            bindings.resources.priceSchedule,
+          );
+          if (next !== career) setCareer(next);
+        }
         notifyCampaign();
       }
       return outcome;

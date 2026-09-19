@@ -134,9 +134,17 @@ export interface EverydayScreenShellContext extends EverydayScreenContext {
    * it. It is **not a second door** — the rail's footer row calls the same function, both are
    * idempotent, and neither writes `inert` itself.
    *
-   * Its one non-test caller is `everyday/reportScreen.ts`'s lever button (GitHub issue #213). That
-   * button's label names an Engineer panel, and until this seam existed its handler navigated
+   * Its non-test callers are `everyday/reportScreen.ts`'s lever button (GitHub issue #213) and,
+   * since [§ D787](../../../../DECISIONS.md), `everyday/scenarioScreen.ts`'s stage rows. The
+   * lever button's label names an Engineer panel, and until this seam existed its handler navigated
    * *inside* this shell, so it named a surface it did not open.
+   *
+   * **This census read *"Its one non-test caller"* for a wave after the second one landed**, which
+   * is `CLAUDE.md`'s *name the non-test caller* failing in the direction `deadCode.test.ts` has
+   * caught twice before — a docstring naming callers that are no longer the callers. Neither of the
+   * two passes an argument, and neither may: what a stage row carries beyond the swap it carries
+   * through `everyday/scenarioOpenPort.ts`, because this function owns the cover and the `inert`
+   * ordering and must not learn what a campaign stage is.
    */
   enterEngineer(): void;
   /**

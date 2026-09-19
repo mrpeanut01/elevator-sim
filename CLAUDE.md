@@ -113,13 +113,62 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave AC-2's, measured 2026-09-19 on the integrated tree**; the paragraph above
+  below are wave AD's, measured 2026-09-19 on the integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **765 545** | **606** | **62** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **952 182** | **4 710** | **63** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **765 741** | **606** | **62** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **952 422** | **4 710** | **63** | **0** | **green**, and the register is empty |
+
+  **Wave AD's move is exactly 4.00 strings a case in both tiers, every one of them on one surface,
+  and this is the first time this column has scored three forecasts and had all three come out
+  right with the attribution measured rather than divided.** Measured on the integrated tree after
+  wave AD, both tiers in one sitting, on a head CI had already reported green in every project —
+  which is § D487's rule obeyed in the order it was written rather than repaired afterwards.
+
+  **The base reproduced to the string in both tiers**, at `74c586d`: always-on 765 545 / 62
+  surfaces / 0 failing, deep 952 182 / 63 / 0, identical to wave AC-2's published row. That is the
+  habit § D442 set, and it is the only thing that tells a correction apart from a move.
+
+  | | base `74c586d` | wave AD | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 765 545 | **765 741** | **+196** | **4.00** |
+  | deep strings | 952 182 | **952 422** | **+240** | **4.00** |
+  | surfaces | 62 / 63 | **62 / 63** | **0** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **4 × 49 = 196 and 4 × 60 = 240**, both exact, with no conditional remainder in either tier —
+  which is what a constant seeded once per case looks like and is a different shape from wave AC-2's
+  638-plus-a-remainder directly above.
+
+  **The move is attributed by a probe rather than by a quotient, and the probe says one surface.**
+  The first corpus case was rendered on each tree and its strings tallied by producer:
+  `everyday/settingsView.ts#settingsScreenViewOf` goes **708 → 712**, and *nothing else in the tree
+  moves at all* — the whole-case total goes 14 088 → 14 092. That is GitHub issue #557's career
+  purse reaching the Settings chime panel, which now knows whether a top-up has a tower to land in.
+  A division would have produced the same 4 and licensed no claim about which lane earned it, which
+  is what [§ D256](DECISIONS.md) refuses.
+
+  **Three lanes forecast and all three were right**, the second time this column has managed that
+  (wave R was the first). AD-A predicted *non-zero, small, and no new surface* for the purse work,
+  and its own surface is the entire move. AD-D predicted **0 strings and 0 surfaces in both tiers**
+  for the Scenario copy on the ground that every change is a substitution on an existing seed, and
+  AD-F predicted **0** for two test files and a `DECISIONS.md` append. Neither appears anywhere in
+  the producer diff. The forecasts sum to the measurement, so there is no remainder to argue about
+  and none is invented.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers and against both
+  bases: identical, nothing added, nothing removed — on a wave that made three Parameters-tab
+  schemas reach the run, rebuilt the Scenario hub's budget offer, taught a stage row to open its
+  own stage, and gave the kernel a resume. Every one of them entered an adapter that already
+  existed. **The deep tier's one-surface lead survives and the diff names it**:
+  `campaign/judge.ts#judgeStage` is the only surface in deep and not in always-on, and nothing is
+  in always-on and not in deep.
+
+  **Both tiers exited 0 with the verdict matching the figures** — always-on 96 110 ms, deep
+  1 324 421 ms, on a box whose load average was under 2 for the whole sitting. That is said because
+  a figure taken under contention measures the box, which this column has recorded twice.
 
   **Wave AC-2's move is 638 strings a case in both tiers, and the base had drifted in both — which
   is the half worth reading.** The playability wave: ten build lanes and six decision agents, people
@@ -1199,9 +1248,11 @@ verdict:
   because a corpus that grew an axis and stayed green is a different claim from one that had to be
   repaired first. **Say the gaps in the same breath.** Clause 4 —
   *every unit names its non-test caller* — is **mechanised for reachability and not for the naming**.
-  All **28** `packages/viz/src` directories are now inside `AUDITED_MODULES`:
-  `packages/viz/src/deadCode.test.ts:124-154` lists them and `:356-366` asserts that list against
-  `readdirSync` in both directions, so an export with no caller is caught. **What no test checks is
+  **Every** `packages/viz/src` directory is inside `AUDITED_MODULES`, and this sentence no longer
+  says how many, because saying how many is what keeps going wrong:
+  `packages/viz/src/deadCode.test.ts:124-158` lists them and `:447` asserts that list against
+  `readdirSync` in both directions, so an export with no caller is caught. **The count is derived
+  there and quoted nowhere**, which is the fix rather than a fourth correction. **What no test checks is
   the clause's own words** — that each unit *names* its caller in prose — and there the four
   dead-code audits cover 7 of 49, and the evidence is a hand-written table plus one prose line per unit. It is
   the clause to distrust first, and a fifth audit under `packages/viz` is the fix — **done in
@@ -1211,11 +1262,17 @@ verdict:
   unchanged.
 
   **Two of those figures are dated and one was live and wrong, which is the distinction this row
-  keeps failing.** The directory count is a present-tense claim about the tree — it read **19**, was
-  corrected to **27**, and the tree now holds **28**
-  (`find packages/viz/src -mindepth 1 -maxdepth 1 -type d | wc -l`; `release/` landed 2026-09-06).
-  **That is the third value this one figure has taken, which is the argument for deriving it rather
-  than quoting it.** The wave-12 pair is a record of what that audit found when it landed, and is now marked
+  keeps failing.** The directory count was a present-tense claim about the tree — it read **19**, was
+  corrected to **27**, then to **28**, and on 2026-09-19 an adversarial assessor ran the command this
+  paragraph itself prints and got **32**
+  (`find packages/viz/src -mindepth 1 -maxdepth 1 -type d | wc -l`).
+  **That is the fourth value this one figure has taken, and the third time it has been corrected in
+  the very paragraph arguing that it should be derived rather than quoted.** So it is no longer
+  quoted: the sentence above says *every* directory and points at the assertion that makes that true.
+  A figure a reader can regenerate in one command does not need a copy of itself in prose, and this
+  one proved across four values that a copy will go stale faster than anybody re-reads it. The two
+  citations beside it were wrong as well — `:124-154` for a list ending at 158, and `:356-366` for an
+  assertion at 447 — which is the same defect one level down: a line number is a published figure. The wave-12 pair is a record of what that audit found when it landed, and is now marked
   as such rather than silently refreshed. **The export count is deliberately not re-published**: two
   derivations disagreed (2 357 against ~2 893 by a cruder scan), and the audit's own figure cannot be
   read off a run because vitest intercepts `console.log` — the same trap that made
@@ -1347,7 +1404,12 @@ and nothing in this repository checks whether one is *current*. And **the block 
 in motion is a real run** — one pinned morning at Midtown Office, simulated in a worker and played
 back on the stage's own painter over a window that skips the empty lobby at the start and the
 draining tail at the end. Measured on the built bundle at 1440 × 900: **370 ms from navigation to a
-moving canvas**, of which 240 ms is the page drawn. There is no video and no decorative animation,
+moving canvas**, of which 240 ms is the page drawn — **and that pair is pinned to nothing**, which
+this file's own rule forbids. No test re-derives it, no command in any document reproduces it, and
+`DECISIONS.md` carries no entry for it; `docs/41` § 348 nonetheless calls it the only comparable
+figure this repository holds. It is republished here as a **dated reading of one machine on one
+day** rather than as a current claim, on the same footing as the wave-12 audit pair above it, and
+what would pin it is a browser-tier case that navigates the built bundle and asserts a band. There is no video and no decorative animation,
 for the reason a picture of a run would be the one curated thing in the product.
 
 **The viewer is now built to a design handoff, and the handoff is canonical for the interface.**

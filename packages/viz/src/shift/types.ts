@@ -783,8 +783,10 @@ export interface WeekState {
    *
    * ## Why a week has to count attempts
    *
-   * The simulator runs a whole day in milliseconds and plays the recording back, so **there is no
-   * mid-day change** — moving any control discards today and simulates a different one
+   * The product plays a whole day back from a recording, so **there is no mid-day change** —
+   * moving any control discards today and simulates a different one. (True of the product, no
+   * longer of the simulator: § D802 made `Simulation` interruptible and proved it bit-identical;
+   * what holds this is that `record/recordRun.ts` still makes one call.)
    * ([`docs/16`](../../../../docs/16-change-scope-contract.md) § 1). The retry is therefore the
    * product's most-used verb, and until this field nothing modelled it.
    *

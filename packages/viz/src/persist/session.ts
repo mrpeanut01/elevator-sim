@@ -13,7 +13,8 @@
  * ## Why every path here returns a value and none of them throws
  *
  * The natural caller of {@link saveSession} is *every state change in the shell*: the product has
- * no mid-day intervention, so moving any control re-runs the day ([`docs/16`](../../../../docs/16-change-scope-contract.md)
+ * no mid-day intervention — the product, not the simulator, since § D802 — so moving any control
+ * re-runs the day ([`docs/16`](../../../../docs/16-change-scope-contract.md)
  * § 1) and that is exactly the moment the week has changed and wants writing. A save that threw
  * would therefore turn a full storage quota into a dead slider. And the natural caller of
  * {@link loadSession} is boot, where a throw is a blank page.
