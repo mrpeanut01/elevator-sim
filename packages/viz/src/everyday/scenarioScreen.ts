@@ -118,7 +118,13 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
    */
   const stopListening = onScenarioLadderProvided(() => {
     draw();
-    context.refreshBar();
+    /*
+     * **No `context.refreshBar()` here, and the absence is the point.** The § 3.3 primary is the
+     * first *entry*, which the path does not touch — see the comment on it below — so asking for a
+     * bar redraw would be motion over a row that cannot have changed, and `shell.ts` keeps a guard
+     * for a confirm strip a redraw would wipe. A screen asks for that redraw when one of its own
+     * bar facts moves; none of this screen's do.
+     */
   });
 
   /*
@@ -165,6 +171,12 @@ function pathBlock(
   const rows = el(doc, 'ol', 'everyday-scenario-path-rows');
   rows.style.cssText = 'list-style:none;margin:16px 0 0;padding:0;display:grid;gap:12px';
 
+  /*
+   * Every cell inside a card is a `div`, never a `p`. An offered row's card **is** the button, and
+   * `<p>` inside `<button>` is outside that element's content model — the two entry cards above
+   * have used `div` for the same reason since they were written. Held rows follow so that the two
+   * shapes are one stylesheet rather than two.
+   */
   for (const row of path.rows) {
     const item = el(doc, 'li', 'everyday-scenario-path-row');
     item.style.cssText = 'margin:0;padding:0;min-width:0';
@@ -189,11 +201,11 @@ function pathBlock(
     name.style.cssText = `font-family:${TYPE.heading};font-size:18px;font-weight:650;letter-spacing:-.02em;color:${C.ink};margin:4px 0 0`;
     const teaches = el(doc, 'div', 'everyday-scenario-path-teaches', row.teaches);
     teaches.style.cssText = `font-size:13.5px;line-height:1.5;color:${C.inkSoft};margin:5px 0 0`;
-    const opening = el(doc, 'p', 'everyday-scenario-path-opening', row.openingLine);
+    const opening = el(doc, 'div', 'everyday-scenario-path-opening', row.openingLine);
     opening.style.cssText = `font-size:14px;line-height:1.55;color:${C.inkSoft};margin:9px 0 0;max-width:58ch;text-wrap:pretty`;
     const shape = el(doc, 'div', 'everyday-scenario-path-shape', row.shape);
     shape.style.cssText = `font:500 11px ${TYPE.mono};letter-spacing:.04em;color:${C.label};margin:10px 0 0`;
-    const budget = el(doc, 'p', 'everyday-scenario-path-budget', row.budgetLine);
+    const budget = el(doc, 'div', 'everyday-scenario-path-budget', row.budgetLine);
     budget.style.cssText = `font-size:13px;line-height:1.5;color:${C.inkSoft};margin:7px 0 0;max-width:58ch;text-wrap:pretty`;
     /*
      * The count, in `scenario/survivors.ts`'s own words — `docs/38` § 2.1's *"drawn on the
@@ -201,14 +213,14 @@ function pathBlock(
      * count that appeared only where it was flattering would be the one curated figure in the
      * product.
      */
-    const ways = el(doc, 'p', 'everyday-scenario-path-ways', row.waysThrough);
+    const ways = el(doc, 'div', 'everyday-scenario-path-ways', row.waysThrough);
     ways.style.cssText = `font-size:13px;line-height:1.5;color:${C.inkSoft};margin:7px 0 0;max-width:58ch;text-wrap:pretty`;
 
     card.append(position, name, teaches, opening, shape, budget, ways);
 
     const tail = row.playable ? row.note : row.refusal;
     if (tail !== undefined) {
-      const line = el(doc, 'p', row.playable ? 'everyday-scenario-path-note' : 'everyday-scenario-path-refusal', tail);
+      const line = el(doc, 'div', row.playable ? 'everyday-scenario-path-note' : 'everyday-scenario-path-refusal', tail);
       line.style.cssText = `font-size:13px;line-height:1.5;color:${C.inkSoft};margin:9px 0 0;max-width:58ch;text-wrap:pretty`;
       card.append(line);
     }
