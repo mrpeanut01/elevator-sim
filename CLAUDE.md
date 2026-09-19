@@ -113,13 +113,63 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave AB's, measured 2026-09-15 on the integrated tree**; the paragraph above
+  below are wave AC-2's, measured 2026-09-19 on the integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **733 546** | **606** | **62** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **912 990** | **4 710** | **63** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **765 545** | **606** | **62** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **952 182** | **4 710** | **63** | **0** | **green**, and the register is empty |
+
+  **Wave AC-2's move is 638 strings a case in both tiers, and the base had drifted in both — which
+  is the half worth reading.** The playability wave: ten build lanes and six decision agents, people
+  drawn on the stage, a before-and-after pair on the fix-case screen, a canvas and a control in the
+  tutorial, a shareable result, a chime line on the rail, the ten campaign stages reaching the
+  Scenario hub, and a located hold on the rush. Measured on the integrated tree, both tiers, with
+  the base at `cae5034` re-measured first in a detached worktree.
+
+  **The base did not reproduce, in either tier**, and the published row was correct when it was
+  taken:
+
+  | | published for wave AB | measured at `cae5034` | drift |
+  |---|---|---|---|
+  | always-on strings | 733 546 | **734 281** | **+735** |
+  | deep strings | 912 990 | **913 890** | **+900** |
+  | surfaces · cases · simulations · failing | 62 / 63 · 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** |
+
+  Waves landed after AB without this row being re-measured, so subtracting from the published
+  figures would have attributed 735 and 900 of somebody else's strings to this wave — the mistake
+  the waves P and Q row exists to record, arriving for the third time. It was caught the only way it
+  can be, and **independently corroborated inside the wave**: a lane measuring its own move in
+  isolated worktrees read the same base, 734 281, without being told what the integrator had
+  measured.
+
+  | | base `cae5034` | wave AC-2 | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 734 281 | **765 545** | **+31 264** | **638.04** |
+  | deep strings | 913 890 | **952 182** | **+38 292** | **638.20** |
+  | surfaces | 62 / 63 | **62 / 63** | **0** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **Both quotients sit a hair above 638**, which is wave AB's shape a wave later: 49 × 638 = 31 262
+  against 31 264 measured, and 60 × 638 = 38 280 against 38 292 — a per-case constant of **exactly
+  638** plus a conditional remainder of **2 strings in one tier and 12 in the other**. The
+  conditional terms are named rather than guessed: the rush's located hold draws a landing list
+  whose length is the run's, and the tutorial's collapse screen draws five arms of which a case
+  reaches as many as its run earns.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers and against both
+  bases: **identical, nothing added, nothing removed** — on a wave that built seven new player
+  surfaces' worth of words. Every one entered an adapter that already existed, which is what several
+  lanes forecast before the measurement and what § D489's ruling looks like from here. **The deep
+  tier's one-surface lead survives and the diff names it**: `campaign/judge.ts#judgeStage` is the
+  only surface in deep and not in always-on, and nothing is in always-on and not in deep.
+
+  **Both tiers exited 0 with the verdict matching the figures**, on a quiet box — always-on 96 972 ms,
+  deep 1 373 041 ms. That is worth one line because two agents filed false failures earlier in this
+  wave measuring under load average 31–41 with 126 vitest processes competing, and
+  `vitest.config.ts`'s own docstring records a 0.60 s case failing at 5 454 ms at a third of that
+  load. A figure taken under contention measures the box.
 
   **Wave AB's move is 217 strings a case in both tiers, and the small change is the whole of the
   interest: the remainder is 10 strings across 49 cases and 7 across 60.** Measured on the

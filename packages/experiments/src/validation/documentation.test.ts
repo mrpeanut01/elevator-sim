@@ -2057,7 +2057,19 @@ type DecisionReservation = {
  * stays at **D641**, the block's floor, for the whole wave — which is what the assertion below
  * checks and why the row is the integrator's input rather than a lane's.
  */
-const OPEN_RESERVATION = { wave: 'AC-2', from: 641, to: 741 } as DecisionReservation | null;
+/*
+ * **Wave AC-2's reservation is CLOSED.** Sixteen blocks went out across D641-D741, seventy numbers
+ * came back unspent and are registered below, and the wave's highest heading is **D737** — the
+ * product owner's ruling that Rush stays on the front door, which needed a heading of its own and
+ * took the first number of the block opened mid-wave for the survivor-band question.
+ *
+ * **D738-D741 are free rather than holed**, and the distinction is § D430's: nothing is written
+ * past them, so on wave P's own precedent a number a wave never reaches with nothing above it is
+ * free. Registering them would point the charter row's `highest + 1` at a hole, which is the one
+ * place that rule forbids one to sit. `CHARTER_PROGRAMME.md`'s row moves to **D738** on this
+ * commit, per the remedy the guard below names.
+ */
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
