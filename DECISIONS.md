@@ -37713,26 +37713,53 @@ remedy — so a refused run with no moment to promote keeps the lead it always h
 
 ### 4. What the honesty corpus says
 
-Measured on the always-on tier, both runs in detached worktrees, base re-measured first —
-`packages/viz/src/honesty/measure.corpus.test.ts`, the discipline [§ D343](#d343) sets.
+Measured on the always-on tier by `packages/viz/src/honesty/measure.corpus.test.ts`, **both runs in
+detached worktrees at the same commit `ec81d82`** — the base being that tree with this change
+reverse-applied, so the two differ in this change and in nothing else. Run alone rather than
+alongside each other: an earlier attempt with three heavy jobs on the box lost a worker and had to
+be retaken, and a measurement whose verdict disagrees with its own output is one somebody later
+mistakes for a failure.
 
-| | base | with this change | move |
+| | base (`ec81d82`, change reverted) | with this change | move |
 |---|---|---|---|
-| cases | 49 | **49** | **0** |
-| strings | *owed* | *owed* | **0 forecast** |
+| cases | 49 (49 evaluated, 0 skipped) | **49 (49 evaluated, 0 skipped)** | **0** |
+| strings checked | 755 845 | **755 845** | **0** |
 | simulations | 606 | **606** | **0** |
 | surfaces | 62 | **62** | **0** |
 | suppressed runs | 12 of 49 | **12 of 49** | **0** |
+| withheld cells | 6 076 in 31 combinations | **6 076 in 31 combinations** | **0** |
 | **failing cases** | **0** | **0** | **0** |
 
-**The strings row is a forecast rather than a measurement, and it says so.** The lane that wrote
-this entry cited a working file for the two counts; that file lives in a scratchpad this repository
-does not carry, so the row pointed a later reader at something they could never open — a figure
-published with nothing behind it, which is what `CLAUDE.md`'s *"if you publish a number, pin it to
-the run that produced it"* forbids. The counts are **owed**, and they are owed to the integrator
-rather than to this entry: [§ D343](#d343) puts the corpus measurement once on the integrated tree,
-so a lane could not honestly have filled them in either. The zero below is what this change is
-expected to move, published before the measurement so it can be scored against it.
+**The two runs' output files are byte-identical apart from their wall clocks**, surface set and
+failing-case list included — so the surfaces row is a **set diff** rather than a comparison of two
+counts, which is the check `CLAUDE.md`'s Phase 9 column had to reconstruct by hand the one time this
+number went stale. The trees were confirmed to differ before either run.
+
+**Zero to the string is the forecast and the measurement, and that is what a reorder should look
+like from here.** The grid's membership is unchanged; `honesty/surfaces.ts` seeds each cell by
+`figure.id` rather than by position, so an ordering cannot move the count; and the one string that
+changed — the deepest queue's note — was **replaced** rather than added to, which is the shape wave
+F recorded as *a wave that moved words on a player screen and moved the corpus by nothing*. Twelve
+of the forty-nine always-on cases run a refused mean, so the promoted branch is swept rather than
+argued: the corpus reads the promoted cell's value and its new note on real refused runs under all
+ten properties, `suppressed-mean` and `estimate-without-n` included — the two that have fired on
+this exact sheet before.
+
+**No violation was introduced, so none was registered.** `honesty.test.ts#OUTSTANDING` and
+`honesty/properties.ts` are both untouched by this lane, which is the diff that tells *fixed the
+strings* from *moved the gate*.
+
+**The one figure this lane is not entitled to publish is the integrated one.** [§ D343](#d343) puts
+that measurement once, on the integrated tree, after the wave — the pair above is an isolation of
+this change against its own base and is not a claim about what the wave's row will read.
+
+### 5. Numbers spent
+
+This lane held **D666–D670** and spent **D666 only** — one gap on one surface, closed end to end,
+which is one decision however many modules it touches. **D667, D668, D669 and D670 are unspent**
+and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes
+above them; ids here are names, so backfilling one would make it denote two things across time. The
+integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES` if that is what happens.
 
 **Zero string movement is the forecast and the measurement, and it is what a reorder should look
 like from here.** The grid's membership is unchanged, the seed set `honesty/surfaces.ts` walks is
