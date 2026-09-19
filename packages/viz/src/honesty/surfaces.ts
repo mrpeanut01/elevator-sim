@@ -110,7 +110,7 @@ import {
   WORKSHOP_COPY,
 } from '../everyday/workshopModel.js';
 import { briefBarModel, briefScreenViewOf, lockedForScore, raceAgainstCard } from '../everyday/briefView.js';
-import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, SAME_FOR_EVERYONE } from '../everyday/doorView.js';
+import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, sameForEveryoneLine } from '../everyday/doorView.js';
 import { HOST_PENDING_REASON } from '../everyday/host.js';
 import {
   BUILD_NOTES_POINTER,
@@ -11871,7 +11871,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
        (a day inside the week, a chip from before it), and the bar and rail adapters carry the rest. */
     'everyday/replay.ts#REPLAY_COPY',
     'everyday/doorView.ts#DOOR_STEPS',
-    'everyday/doorView.ts#SAME_FOR_EVERYONE',
+    'everyday/doorView.ts#sameForEveryoneLine',
     'everyday/briefView.ts#briefScreenViewOf',
     'everyday/briefView.ts#briefBarModel',
     'everyday/briefView.ts#BRIEF_NOTE_LEAD',
@@ -11941,6 +11941,14 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         dispatcherName: entry.report.metaLines[0],
         goals: entry.readings,
         seed: 424_242n,
+        /*
+         * The day's crowd — § D729, § D730. Seeded `true` here and `false` below, because the
+         * seed line and the door's closing sentence both have two arms and the arm a developer
+         * never sees is the one most likely to say something a run cannot support. A pinned
+         * fixture seed is not a calendar reading either way: what is being swept is the **state**
+         * a player reaches, which is what this corpus is for.
+         */
+        crowdIsToday: true,
         /* A first day nobody has played, on a legible tower — the one state that draws the line. */
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         /*
@@ -11954,6 +11962,29 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       seeds.push({ field: `${at}.today.label`, text: today.dayLabel, role: 'label' });
       seeds.push({ field: `${at}.today.lede`, text: today.lede, role: 'observation' });
       seeds.push({ field: `${at}.today.seed`, text: today.seedLine, role: 'label' });
+      /*
+       * The other arm of the seed line — § D730. A `?seed=` deep link and a session left open past
+       * UTC midnight both reach this screen with a crowd nobody else has, and the sentence that
+       * arm draws is the one that must never claim otherwise. Seeded as the *line* rather than as
+       * a second whole record, on the imperial facts' own argument below: `todayOf` is pure and
+       * total in this field, so every other field would be identical by construction.
+       */
+      seeds.push({
+        field: `${at}.today.seed.own`,
+        text: todayOf({
+          week: entry.week,
+          calendar: null,
+          building: context.building,
+          buildingId: context.building.id,
+          dispatcherName: entry.report.metaLines[0],
+          goals: entry.readings,
+          seed: 424_242n,
+          crowdIsToday: false,
+          firstSession: entry.week.day === 1 && entry.week.history.length === 0,
+          units: 'metric',
+        }).seedLine,
+        role: 'label',
+      });
       if (today.firstSessionLine !== undefined) {
         seeds.push({ field: `${at}.today.firstSession`, text: today.firstSessionLine, role: 'observation' });
       }
@@ -11977,6 +12008,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         dispatcherName: entry.report.metaLines[0],
         goals: entry.readings,
         seed: 424_242n,
+        crowdIsToday: true,
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         units: 'imperial',
       }).facts;
@@ -12281,7 +12313,13 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     for (const step of DOOR_STEPS) {
       seeds.push({ field: `door.step.${step.n}`, text: step.body, role: 'prose' });
     }
-    seeds.push({ field: 'door.same', text: SAME_FOR_EVERYONE, role: 'prose' });
+    for (const crowdIsToday of [true, false]) {
+      seeds.push({
+        field: `door.same.${String(crowdIsToday)}`,
+        text: sameForEveryoneLine(crowdIsToday),
+        role: 'prose',
+      });
+    }
     /*
      * Both arms of § 3.3's brief note — the named one and the fallback. The fallback is seeded
      * because it is what a bar drawn before the screen knows its driver says, and a sentence no
