@@ -422,7 +422,15 @@ describe('every case is solved without being told which repair is the answer', (
     SUITE_TIMEOUT,
   );
 
-  /** The census § D706 § 6 is conditioned on, stated as a number rather than as a feeling. */
+  /**
+   * The census § D706 § 6 is conditioned on, stated as a number rather than as a feeling.
+   *
+   * **This reads {@link SOLVED_BY} rather than re-measuring it**, deliberately: the measurement is
+   * the case above, which holds every row of that table against a run, and a second sweep here
+   * would cost another ninety runs to produce the same twelve. What this adds is that the split
+   * is written down as a figure a reader can fail, so a later change that quietly moves a case
+   * from the editor's column to the menu's has to move this line too.
+   */
   it('names how many cases the editor alone clears', () => {
     const editorOnly = SOLVED_BY.filter(([, route]) => !route.startsWith('repair:'));
     expect(editorOnly).toHaveLength(12);
