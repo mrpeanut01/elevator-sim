@@ -2476,6 +2476,176 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   ],
   [466, "wave P, lane A’s block; unspent for § 465’s reason."],
   [467, "wave P, lane A’s block; unspent for § 465’s reason."],
+  /*
+   * **Wave AC-2's returns, registered at integration once every lane had reported.** Sixteen
+   * blocks, and the list is derived from `DECISIONS.md`'s own headings rather than from the lanes'
+   * reports — which is not a formality here. **Two lanes reported numbers the file does not
+   * carry**, D656-D660 and D679-D682. Both had correctly recorded their decisions as § D405
+   * docstrings and mis-reported the bookkeeping, and a report of a report is not a measurement.
+   *
+   * **D737-D741 are deliberately NOT registered, and that is § D430 biting rather than an
+   * omission.** They are the top of the block a sixth decision agent was allocated mid-wave, when
+   * the survivor bands' sample size turned out to need a ruling; that agent spent § D736, which is
+   * the highest heading in this file. So nothing is written past D737-D741, and on wave P's own
+   * precedent two entries above — *a number a wave never reaches, with nothing above it, is free
+   * rather than holed* — they are free. Registering them would point the charter row's
+   * `highest + 1` at a hole, which is the one place § D430 says a hole may not sit. When this
+   * reservation is closed the charter row moves to **D737** and those five stay free.
+   */
+  [
+    642,
+    "wave AC-2's #548 lane, which also took the stage's opening rung, spent § D641 on both " +
+      "— the rung and the five stale session shapes it measured and left standing. One issue " +
+      "closed end to end is one decision however many strings it moves, which is this " +
+      "column's usual reason for a lane's spare numbers.",
+  ],
+  [643, "wave AC-2's #548 lane; unspent for § 642's reason."],
+  [
+    645,
+    "wave AC-2's fix-case pair lane spent § D644 on the pair whole — the run the player's " +
+      "change produced drawn beside the as-built one at a single playhead, and the verdict " +
+      "not withheld behind it.",
+  ],
+  [646, "wave AC-2's fix-case pair lane; unspent for § 645's reason."],
+  [647, "wave AC-2's fix-case pair lane; unspent for § 645's reason."],
+  [648, "wave AC-2's fix-case pair lane; unspent for § 645's reason."],
+  [
+    650,
+    "wave AC-2's Scenario-ladder lane spent § D649 on the ladder whole: the ten stages " +
+      "reaching the hub, the held-stage rule, the offer decision derived from the survivor " +
+      "table rather than authored, and the register row deleted as a correction.",
+  ],
+  [651, "wave AC-2's Scenario-ladder lane; unspent for § 650's reason."],
+  [652, "wave AC-2's Scenario-ladder lane; unspent for § 650's reason."],
+  [653, "wave AC-2's Scenario-ladder lane; unspent for § 650's reason."],
+  [654, "wave AC-2's Scenario-ladder lane; unspent for § 650's reason."],
+  [655, "wave AC-2's Scenario-ladder lane; unspent for § 650's reason."],
+  [
+    656,
+    "wave AC-2's people-on-the-stage lane spent NOTHING. It reported the whole block as " +
+      "spent and no `## D656` to `## D660` heading exists — the report was wrong and the file " +
+      "is not, and its decisions are docstring records under § D405. Found by deriving the " +
+      "headings from `DECISIONS.md` rather than trusting the lane's own report, which is why " +
+      "this reason can be written at all.",
+  ],
+  [657, "wave AC-2's people-on-the-stage lane; unspent for § 656's reason."],
+  [658, "wave AC-2's people-on-the-stage lane; unspent for § 656's reason."],
+  [659, "wave AC-2's people-on-the-stage lane; unspent for § 656's reason."],
+  [660, "wave AC-2's people-on-the-stage lane; unspent for § 656's reason."],
+  [
+    661,
+    "wave AC-2's first-ninety-seconds lane spent NOTHING, deliberately and by its own " +
+      "report: every decision it took reached no further than the module taking it, so § " +
+      "D405's docstring is the record the working agreement asks for. A lane returning a " +
+      "whole block for that reason is the rule working, not a lane failing to write up.",
+  ],
+  [662, "wave AC-2's first-ninety-seconds lane; unspent for § 661's reason."],
+  [663, "wave AC-2's first-ninety-seconds lane; unspent for § 661's reason."],
+  [664, "wave AC-2's first-ninety-seconds lane; unspent for § 661's reason."],
+  [665, "wave AC-2's first-ninety-seconds lane; unspent for § 661's reason."],
+  [
+    667,
+    "wave AC-2's report-headline lane spent § D666 on the headline whole — the sheet naming " +
+      "the cell it leads with, the tightest moment promoted, and the refused mean left " +
+      "untouched.",
+  ],
+  [668, "wave AC-2's report-headline lane; unspent for § 667's reason."],
+  [669, "wave AC-2's report-headline lane; unspent for § 667's reason."],
+  [670, "wave AC-2's report-headline lane; unspent for § 667's reason."],
+  [
+    674,
+    "wave AC-2's chimes-loop lane spent § D671, § D672 and § D673 — the ledger's read, the " +
+      "one sink that reaches a run, and where a finished turn may be acknowledged — and " +
+      "returned five.",
+  ],
+  [675, "wave AC-2's chimes-loop lane; unspent for § 674's reason."],
+  [676, "wave AC-2's chimes-loop lane; unspent for § 674's reason."],
+  [677, "wave AC-2's chimes-loop lane; unspent for § 674's reason."],
+  [678, "wave AC-2's chimes-loop lane; unspent for § 674's reason."],
+  [
+    679,
+    "wave AC-2's locating-a-failure lane spent NOTHING. It reported D679 to D682 — written " +
+      "without a section sigil, because they head nothing and `citations.test.ts` caught the " +
+      "first draft of this very sentence — and no heading for any of the four exists, so its " +
+      "decisions are docstring records under D405's rule. Second block in this wave where a " +
+      "lane's report and the file disagreed, and both were settled by deriving the headings " +
+      "rather than by reading the report.",
+  ],
+  [680, "wave AC-2's locating-a-failure lane; unspent for § 679's reason."],
+  [681, "wave AC-2's locating-a-failure lane; unspent for § 679's reason."],
+  [682, "wave AC-2's locating-a-failure lane; unspent for § 679's reason."],
+  [683, "wave AC-2's locating-a-failure lane; unspent for § 679's reason."],
+  [684, "wave AC-2's locating-a-failure lane; unspent for § 679's reason."],
+  [
+    686,
+    "wave AC-2's shared-result lane spent § D685 on what leaves the product about a run — " +
+      "outcomes and identity, and never an input.",
+  ],
+  [687, "wave AC-2's shared-result lane; unspent for § 686's reason."],
+  [688, "wave AC-2's shared-result lane; unspent for § 686's reason."],
+  [689, "wave AC-2's shared-result lane; unspent for § 686's reason."],
+  [690, "wave AC-2's shared-result lane; unspent for § 686's reason."],
+  [
+    694,
+    "wave AC-2's dial-witness lane spent § D691, § D692 and § D693 on the sample, the " +
+      "measured null and the suppression column, and returned the rest of a block sized for a " +
+      "rebalance it did not take.",
+  ],
+  [695, "wave AC-2's dial-witness lane; unspent for § 694's reason."],
+  [696, "wave AC-2's dial-witness lane; unspent for § 694's reason."],
+  [697, "wave AC-2's dial-witness lane; unspent for § 694's reason."],
+  [698, "wave AC-2's dial-witness lane; unspent for § 694's reason."],
+  [699, "wave AC-2's dial-witness lane; unspent for § 694's reason."],
+  [700, "wave AC-2's dial-witness lane; unspent for § 694's reason."],
+  [
+    702,
+    "wave AC-2's RULING-RUSH decision agent spent § D701 on the open register's OD-7 and " +
+      "returned four. It ruled on two rows and escalated the other, OD-1, rather than " +
+      "deciding it — a ruling that supersedes a product-owner decision is the owner's, and a " +
+      "lane's block may not be spent on one.",
+  ],
+  [703, "RULING-RUSH's block; unspent for § 702's reason."],
+  [704, "RULING-RUSH's block; unspent for § 702's reason."],
+  [705, "RULING-RUSH's block; unspent for § 702's reason."],
+  [
+    707,
+    "wave AC-2's RULING-FIXCASE decision agent spent § D706 on OD-2 whole: the fix-case " +
+      "repair menu retires from the screen and not from the file.",
+  ],
+  [708, "RULING-FIXCASE's block; unspent for § 707's reason."],
+  [709, "RULING-FIXCASE's block; unspent for § 707's reason."],
+  [710, "RULING-FIXCASE's block; unspent for § 707's reason."],
+  [
+    712,
+    "wave AC-2's RULING-CHIMES decision agent spent § D711 on OD-3 whole: the device chime " +
+      "ledger records turns, not a balance.",
+  ],
+  [713, "RULING-CHIMES's block; unspent for § 712's reason."],
+  [714, "RULING-CHIMES's block; unspent for § 712's reason."],
+  [715, "RULING-CHIMES's block; unspent for § 712's reason."],
+  [
+    719,
+    "wave AC-2's RULING-CAREER decision agent spent § D716, § D717 and § D718 on OD-4 and " +
+      "OD-5 — #536's four asks, the GD12 amendment nobody had recorded, and #231's " +
+      "unreachable AC2.",
+  ],
+  [720, "RULING-CAREER's block; unspent for § 719's reason."],
+  [
+    724,
+    "wave AC-2's RULING-CRAFT decision agent spent § D721, § D722 and § D723 on OD-8, OD-6 " +
+      "and OD-10, and recorded `live/honesty.ts`'s four stale sites and `boardKey.ts` as § " +
+      "D405 docstring records rather than taking a fourth number for them.",
+  ],
+  [725, "RULING-CRAFT's block; unspent for § 724's reason."],
+  [726, "RULING-CRAFT's block; unspent for § 724's reason."],
+  [727, "RULING-CRAFT's block; unspent for § 724's reason."],
+  [728, "RULING-CRAFT's block; unspent for § 724's reason."],
+  [
+    734,
+    "wave AC-2's daily-seed lane spent § D729 to § D733 on the day's crowd and returned " +
+      "two.",
+  ],
+  [735, "wave AC-2's daily-seed lane; unspent for § 734's reason."],
 ]);
 
 /**
