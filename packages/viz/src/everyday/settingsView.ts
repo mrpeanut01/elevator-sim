@@ -745,6 +745,16 @@ export interface SettingsScreenInput {
   readonly chimeSpendable?: boolean | undefined;
   /** The server's own sentence about the last spend press, carried unrewritten. */
   readonly chimeNotice?: string | undefined;
+  /**
+   * Whether a career desk is open for a top-up to land in — GitHub issue #557.
+   *
+   * `chimesPanel.ts#ChimesPanelInput.careerTowerOpen`, passed through. It is the caller's answer
+   * rather than this view's because the career is `everyday/host.ts`'s record and neither this file
+   * nor the panel holds one — the same division that keeps a source out of both.
+   *
+   * Absent defaults to `false` at the panel, which is the arm that promises least.
+   */
+  readonly careerTowerOpen?: boolean | undefined;
 }
 
 /** § 15.1's screen for this state. Total; every sentence a player can meet starts here. */
@@ -808,6 +818,7 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
         ...(input.chimeOwns === undefined ? {} : { owns: input.chimeOwns }),
         ...(input.chimeSpendable === undefined ? {} : { spendable: input.chimeSpendable }),
         ...(input.chimeNotice === undefined ? {} : { notice: input.chimeNotice }),
+        ...(input.careerTowerOpen === undefined ? {} : { careerTowerOpen: input.careerTowerOpen }),
       }),
       signIn: signInViewOf(input),
       saveNotice:
