@@ -118,6 +118,7 @@ export const SHARE_COPY = Object.freeze({
    */
   brand: 'Elevator Sim',
   /* The control, on the daily tab. */
+  eyebrow: 'SHOW SOMEBODY',
   button: 'Copy the result',
   copied: 'Copied',
   /*
