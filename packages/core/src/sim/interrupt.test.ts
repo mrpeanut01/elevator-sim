@@ -454,8 +454,8 @@ describe('interruption leaves the invariants where it found them', () => {
    *
    * The expensive way to run one present into two futures is to clone a `Simulation`. It holds
    * 103 private fields, live `Car`/`Floor`/`DispatchPolicy` objects and a kernel queue of
-   * closures over `this`, so a clone is a refactor of 23 scheduling sites across four modules
-   * before it is anything else.
+   * closures over `this` — see {@link Simulation.advanceTo} for the census — so a clone is a
+   * refactor before it is anything else.
    *
    * The cheap way needs nothing that is not already here, and gives a *stronger* guarantee: build
    * both arms from the same config, advance both to `t`, and let them differ from there. Neither

@@ -1653,12 +1653,16 @@ export class Simulation {
    * **A clone is nevertheless the wrong way to get two futures from one present, and this is the
    * place to say so before somebody spends a month on it.** A `Simulation` holds 103 private
    * fields, live `Car`, `Floor` and `DispatchPolicy` objects, a `MetricsRecorder` and a
-   * `StreamSet` — and, decisively, a kernel whose queue holds **closures over `this`**. The 23
-   * `schedule`/`scheduleAfter` sites in `core/` (here, `model/car/car.ts`,
-   * `physics/doors/doorMachine.ts`, `physics/motion/index.ts`) all pass an arrow function, so the
-   * queue is neither serialisable nor structured-cloneable, and making it so means turning every
-   * handler into a payload plus a dispatch table across four modules and then giving every live
-   * object deep-copy semantics that do not exist.
+   * `StreamSet` — and, decisively, a kernel whose queue holds **closures over `this`**. Counted
+   * rather than estimated: `core/` has exactly **ten** non-test `schedule`/`scheduleAfter` call
+   * sites and every one of them is in this file (the six matches elsewhere, in `model/car/car.ts`,
+   * `physics/doors/doorMachine.ts` and `physics/motion/index.ts`, are docstring examples), and
+   * every one passes an arrow function. So the queue is neither serialisable nor
+   * structured-cloneable. The ten are the small half of the cost; the large half is that
+   * `#carArrivals` and `#pendingTicks` hold `ScheduledEvent` handles by **identity** for
+   * cancellation, and that `Car`, `Floor`, `DispatchPolicy`, `MetricsRecorder`,
+   * `CapacityReassignmentMonitor` and `BankDemandForecast` would each need deep-copy semantics
+   * that do not exist and that nothing would check.
    *
    * **The same outcome is already available without any of that, and it is exact rather than
    * approximately exact: fork by replay.** Construct a second `Simulation` from the same
