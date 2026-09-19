@@ -12,8 +12,12 @@
 
 import type { Frame, VizRecording } from '../contract/types.js';
 import type { FloorQueue } from '../frame/overlay.js';
+import { WAIT_BANDS } from '../live/bands.js';
 import { carRestsAt } from '../render/carRest.js';
+import type { Canvas2DLike } from '../render/canvas.js';
+import { drawRiderFigure, MIN_FIGURE_HEIGHT_PX } from '../render/riderFigures.js';
 import {
+  stageBandOf,
   stageCarPaintOf,
   stageCarReadoutOf,
   stageCarRestBarOf,
@@ -145,9 +149,25 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
   const capsuleW = 4.5;
   const capsuleH = Math.max(5, Math.min(11, g.rowPitch * 0.62));
   const perRow = Math.max(1, Math.floor((g.landing.width - 8) / (capsuleW + 2)));
+  /*
+   * **Figures or capsules, and the threshold is derived rather than chosen** — see
+   * {@link drawRiderFigure}. `render/riderFigures.ts#MIN_FIGURE_HEIGHT_PX` is that module's own
+   * floor for *"the shortest thing that still reads as a person"*, read out of `figureHeightPx`
+   * rather than transcribed. `capsuleH` is `rowPitch × 0.62`, so the switch falls at a row pitch
+   * of **12.9 px** — which lands, without anybody arranging it, on the pitch at which this stage
+   * already stops giving a floor its own label (`stageScreenModel.ts`'s 13 px). The argument is
+   * the same in both places: below it there is not room to say a thing per row.
+   *
+   * At 165 floors on `whole` the pitch is about 3 px and this is `false` everywhere, which is the
+   * regime the camera exists for. What does **not** degrade there is AD-S7's height channel below
+   * — the capsule branch applies it too — nor AD-S8's wash, which is a whole-row signal and does
+   * not depend on pitch at all.
+   */
+  const asFigures = capsuleH >= MIN_FIGURE_HEIGHT_PX;
   for (const floor of input.queues) {
     const row = g.rows.find((candidate) => candidate.floorId === floor.floorId);
     if (row === undefined || !row.visible) continue;
+
     const cap = stageCrowdCapOf(floor.riders.length);
     for (let index = 0; index < cap.drawn; index += 1) {
       const rider = floor.riders[index];
@@ -156,11 +176,40 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
       const slot = index % perRow;
       /* Right-to-left from the well, so the queue reads as a crowd pressed against the doors. */
       const x = g.landing.x + g.landing.width - 6 - (slot + 1) * (capsuleW + 2) - lane * 1.5;
-      const y = row.y - 2 - capsuleH - lane * (capsuleH * 0.25);
-      ctx.fillStyle = stageInkFor(rider.waitedS);
-      roundedRect(ctx, x, y, capsuleW, capsuleH, capsuleW / 2);
-      ctx.fill();
+      const feetY = row.y - 2 - lane * (capsuleH * 0.25);
+      const bandRank = stageBandRankOf(rider.waitedS);
+      const ink = stageInkFor(rider.waitedS);
+      if (asFigures) {
+        /*
+         * One silhouette, two stages. The bob is `sin(simTimeS · rate + hash(passengerId))` inside
+         * `drawRiderFigure` — simulated time and a passenger id, never a wall clock and never an
+         * accumulator, so scrubbing back to this instant redraws this picture exactly.
+         */
+        drawRiderFigure(asCanvas2DLike(ctx), {
+          centreX: x + capsuleW / 2,
+          feetY,
+          heightPx: capsuleH,
+          bandRank,
+          passengerId: rider.passengerId,
+          simTimeS: frame.simTimeS,
+          fill: ink,
+        });
+      } else {
+        /*
+         * **AD-S7 at a pitch too small for a person.** The capsule survives, and it now carries the
+         * band in its **height** as well as its hue. `capsuleH` used to be hoisted outside this
+         * loop, so every rider was the same size and at 4.5 px the band rode on colour alone —
+         * `UX.md` KB-15's exact prohibition, on the one surface `docs/38` says a beginner meets.
+         * The ladder descends from `capsuleH` rather than ascending to it, so nothing reaches
+         * further above its floor line than it did and § 8 (7)'s overlap arithmetic is untouched.
+         */
+        const height = capsuleH * bandHeightShareOf(bandRank);
+        ctx.fillStyle = ink;
+        roundedRect(ctx, x, feetY - height, capsuleW, height, capsuleW / 2);
+        ctx.fill();
+      }
     }
+
     if (cap.overflow !== undefined) {
       ctx.fillStyle = C.ink;
       ctx.font = `600 9px ${TYPE.mono}`;
@@ -251,6 +300,49 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
     }
   }
   ctx.restore();
+}
+
+/**
+ * Which rung of `live/bands.ts`' four-rung ladder a wait sits on — derived from `WAIT_BANDS`'
+ * order rather than transcribed, so a fifth rung is ranked rather than dropped.
+ *
+ * `stageBandOf` returns the rung's **id**; the figure geometry wants its **position**, because
+ * AD-S7's claim is ordinal and this package holds two ladders that share no boundary above the
+ * first. See `render/riderFigures.ts#BOB_AMPLITUDE_BY_RANK`.
+ */
+function stageBandRankOf(waitedS: number): number {
+  const id = stageBandOf(waitedS);
+  const rank = WAIT_BANDS.findIndex((band) => band.id === id);
+  return rank < 0 ? 0 : rank;
+}
+
+/**
+ * AD-S7's height ladder for the capsule branch, in the one shape that keeps it agreeing with the
+ * figure branch: the same ramp `render/riderFigures.ts` applies, evaluated here because a capsule
+ * is not a figure and does not go through `drawRiderFigure`.
+ *
+ * Spelled as an interpolation from {@link CAPSULE_MIN_HEIGHT_SHARE} to 1 over the ladder's own
+ * length, so the two branches cannot drift into different ladders when a rung is added.
+ */
+function bandHeightShareOf(rank: number): number {
+  const rungs = Math.max(1, WAIT_BANDS.length - 1);
+  const clamped = Math.min(rungs, Math.max(0, rank));
+  return CAPSULE_MIN_HEIGHT_SHARE + (1 - CAPSULE_MIN_HEIGHT_SHARE) * (clamped / rungs);
+}
+
+/** The calmest rung's share — `render/riderFigures.ts#BAND_HEIGHT_SHARE.settling`, one ramp. */
+const CAPSULE_MIN_HEIGHT_SHARE = 0.7;
+
+/**
+ * The cast `render/`'s painters take, and the one `dev/main.ts:7121` already makes at `drawScene`'s
+ * call site for the same reason: `Canvas2DLike.fillStyle` is a `string` where the DOM's is
+ * `string | CanvasGradient | CanvasPattern`. That narrowing is deliberate — `render/sky.ts` refuses
+ * a `CanvasGradient` outright, because a gradient is one opaque object in a recorded transcript and
+ * a determinism test cannot see the ramp inside it. A real context is a superset in every direction
+ * this package uses, so the cast loses nothing a caller could rely on.
+ */
+function asCanvas2DLike(ctx: CanvasRenderingContext2D): Canvas2DLike {
+  return ctx as unknown as Canvas2DLike;
 }
 
 function roundedRect(
