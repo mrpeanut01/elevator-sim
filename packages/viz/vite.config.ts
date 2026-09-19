@@ -84,6 +84,11 @@ const WEB_DATA_FILES: readonly string[] = Object.freeze([
   'dispatcher-profiles.json',
   'campaign.json',
   'scenario-goals.json',
+  /*
+   * The measured survivor counts — GitHub issue #367, § D649. Fetched by `loadCampaign` beside the
+   * stages it is keyed by, so the Scenario hub can draw each scenario's difficulty on its own face.
+   */
+  'scenario-survivors.json',
   /* The engineering briefs that ship, authored to the scenario schema — GitHub issue #227. */
   'engineering-briefs.json',
   'fixit-cases.json',
