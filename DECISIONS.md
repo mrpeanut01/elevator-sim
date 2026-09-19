@@ -38042,3 +38042,208 @@ discrete tier is now what a player meets rather than one they reach by moving a 
 § 2.3. Three test literals reading `30×` are replaced by a read through
 `stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX).label` rather than by the new number, which is #257's defect
 class one level up — a rung that has now moved twice would have had to be re-transcribed twice.
+
+## D671 — The ledger's read answers a balance **and the sinks the account bought**; § D526 clause 5 is untouched, because a sink is not a source
+
+**2026-09-19.** GitHub issue **#372**, `docs/38` § 2.4, [§ D526](#d526) clause 5.
+
+`GET /api/chimes` shipped with one key and a docstring that made a point of it: *"Not a list of
+entries, not a breakdown by source, not the last thing that was earned."* `api.test.ts` asserted the
+key set rather than the value, so a second field failed a test instead of shipping. It now answers
+two, and this entry is why that is not the widening it looks like.
+
+**What changed is that a spend exists** ([§ D672](#d672)). A run claims a modifier by naming its
+sink; `chimes/ledger.ts#unbackedModifiers` refuses a claim the account never paid for. So a play
+surface that cannot read what it bought **cannot claim it**. The only other place that knowledge
+could live is the client — a second authority for a fact the ledger already holds, and one a reload
+loses, which means a player paying fifteen chimes and then being refused the thing they paid for.
+
+**Clause 5's property is untouched, and it is worth naming which one.** Clause 5 is *the play
+surface … never knows a **source***. A source is where a chime **came from**; a modifier is a sink
+the account **spent one on**, chosen by pressing. So the property the clause was built for holds
+exactly: an external add is one more source, it moves the balance, and it cannot appear in
+`modifiers` because nothing but the spend verb writes one. `boundaries.test.ts`'s rule that no
+viewer module names a source is unmoved, in both directions.
+
+**What is still not on the wire**: a price, an entry, a date, a count of anything a run measured. A
+modifier is `{sinkId, steps}` — the pair `leaderboard/boardKey.ts` already puts in a board key, for
+the same reason — and `chime-ledger.json`'s `priceChimes` stays on the server. Two purchases of one
+sink are **summed** before they go out, because this is not an entry list and `unbackedModifiers`
+sums the same way on the way back in, so the client's claim and the server's check count one
+quantity. `api.test.ts` asserts the body's key set **and each modifier's**, so a third field fails a
+test rather than shipping.
+
+**The earn verb is unmoved.** It answers one balance, and `EverydayChimeBalance.owns` is therefore
+**optional** rather than filled with `[]` by whatever calls it — `undefined` means *this answer says
+nothing about what is owned*. A binding that supplied an empty list to satisfy a type would erase a
+purchase on the player's next clear, which is a defect an optional field makes unspellable.
+
+## D672 — One sink is sold, and it is the only one that reaches a run; the other two are listed with their own refusals, and the scenario rung's refusal is **not** moved
+
+**2026-09-19.** GitHub issue **#372**, `docs/38` § 2.1 and § 2.4, [§ D640](#d640), [§ D606](#d606)
+§ 2, [§ D227](#d227), `docs/32` GD13, `docs/22` non-goal 5.
+
+`data/chime-ledger.json` has sold three sinks to nobody since GitHub issue #368, under one sentence
+across the whole list: *"None of these can be bought yet."* That was honest and it was the loop's
+open end. This builds the spend — `menu/client.ts#spendChimes`, `EverydayHost.spendChime`, the press
+on the tally in Settings — and sells **exactly one sink**.
+
+### 1. Why `rush-prefit` and nothing else
+
+It is the only sink that reaches a run, and that is measured rather than argued.
+`everyday/rush.ts#rushPatchOf` writes `campaignFitOut` for a claimed one, `packages/server`'s replay
+fits the same three effects, and `leaderboard/rushHoldAgreement.test.ts` **pairs every pre-fit cell
+with the same cell unfitted and requires the two to differ** — `garden-apartments` holds 1 178 s as
+built and 1 214 s fitted, `midtown-office` 1 640 s and 1 650 s. That is `CLAUDE.md`'s standing
+requirement — *move the control and require the run to change* — discharged by a run, on the one
+thing this entry sells.
+
+**The other two are refused on their own rows** (`everyday/chimesPanel.ts#SPEND_ABSENCES`,
+`screens.ts#UNBUILT_REASONS`' shape, one sentence per key, asserted in both directions):
+
+- `career-purse-top-up` — `campaign/economy.ts#purseOf` is `carriedIn + earnedSoFar −
+  committedUnits`, every term derived, and **not one of `CampaignAction`'s ten arms writes a
+  grant**; `spends` is only ever appended to, as a debit. There is nowhere for a bought unit to
+  land. What would change that is a grant record summed into `purseOf` beside `spends`, which is a
+  change to the career economy and is **not taken here**.
+- `rush-purse-top-up` — no between-round rebuild travels (§ D606 § 2, which weighed moving
+  `economy.ts#SHOP` into `core` and declined), so nothing spends a purse.
+
+Selling either would be `docs/22` non-goal 5 with a price on it: a control that writes nothing,
+looking live. This repository has shipped that eleven times in code and twice in `data/`; it has
+never yet shipped one a player paid for.
+
+### 2. The scenario budget rung is **not** built, and the refusal that blocks it is **not** moved
+
+`core/config/chimeLedger.ts#REFUSED_MODIFIER_KINDS` refuses `budget-units` **by name** and
+`parseChimeLedger` throws on it. That refusal is correct — `docs/38` § 2.4 prices a rung in
+`data/campaign.json` and a price for one act in two documents is an authority defect across a
+network boundary — and the tempting move is to route around it with a second spend path that charges
+a price the ledger deliberately does not hold. **It is not taken, and three independent reasons each
+suffice:**
+
+1. **It would buy nothing.** Measured from `data/scenario-survivors.json` (provenance `measured`,
+   tree `3ffa138`, master seed 20260910): the equipment rung (+20 u, 20 chimes) and the building
+   rung (+30 u, 30 chimes) move the survivor count on **zero of ten stages**, and the survivor
+   **names** are identical at all three rungs on every stage that has one. Fifty chimes — eight fix
+   cases out of a lifetime ceiling of eighteen — for the same configurations. A compliant rung
+   screen must draw the count beside the rung (`docs/38` § 2.1 requires it on the scenario's own
+   face), and drawn honestly on today's data it tells the player not to buy.
+2. **There is nothing reachable to sell it on.** `everyday/scenarioModel.ts` lists two entries and
+   the ten stages that author the rungs are played on the Engineer surface; the eighteen fix cases,
+   which are the reachable Scenario content, carry a flat `budgetUnits` with no steps at all.
+3. **Nothing reads a budget during play.** `scenario/budget.ts` is loaded, validated and consulted
+   by no play path (GitHub issue #553) — `CLAUDE.md`'s dead-seam pattern about to happen a twelfth
+   time, and a spend route into it would be a purchase feeding a seam.
+
+**What would unblock it, in order:** the fix cases re-authored to the scenario schema with a
+`budget.steps` ladder (#365's remaining half, which has no issue), survivor counts per case per
+rung (#367's shape), a `(scenarioId, stepId) → chimes` resolution in `core` so the server can price
+it without a second copy of the ladder — and a rebalance, because a rung that moves no count is a
+rung nobody should be sold. **The rebalance is a different lane's job and is not attempted here.**
+
+### 3. What is deleted rather than reworded, all on the commit that made each false — § D227
+
+- `CHIMES_PANEL_COPY.spendRefusal`, the field and the sentence. What replaced it is narrower and
+  harder to let go stale: a reason per row, and `spendWidensTheBudget.test.ts` asserting that every
+  sink is either offered or refused and none is both.
+- `leaderboard/boardKey.ts`'s *"`rush-prefit` is refused on a sitting, because its fitted building is
+  one this server cannot build"* — **false since § D640 lifted it on 2026-09-16**, in a file last
+  touched on the 11th. § D227's more dangerous half: a refusal drawn over a control that works.
+- `rushScreenModel.ts#RUSH_ABSENCES`' *"neither rush purchase can be bought yet"*.
+- `settingsView.ts`'s register note opening *"nothing in this build spends a chime"*, and
+  `host.ts#rushModifiers`' *"undefined in every shipped binding"*.
+
+And one **inverted** rather than deleted: `pricing/spendWidensTheBudget.test.ts`'s grep asserted that
+**nothing** in the viewer charges for a chime. It now asserts exactly which three modules do, and a
+second grep asserts that exactly one applies the claim — charging and applying are different
+questions and the separation is the whole subject of the standing requirement.
+
+### 4. Two shapes the screen deliberately does not take
+
+**The claim is derived, not bound.** `host.ts#rushModifiers`' docstring promised *"when a spend
+surface ships it fills this and nothing else changes"*. It is kept by **not** filling it: the host
+already reads what the account owns (§ D671), so `rushClaims()` derives the claim there and a
+`dev/main.ts` binding would be a second answer to *what did this account buy*. The parameter stays
+for the one caller that must drive a claim directly — `rushHoldAgreement.test.ts`, which is how the
+fitted and as-built cells are measured against each other.
+
+**The rush setup screen discloses and does not sell.** When the account owns the kit it says the
+tower starts fitted and that a fitted sitting is posted to its own board — two facts, no price,
+because a chime figure beside a mode's own screen is GD13 clause 3 and a pitch there would be a
+store. **It says nothing about whether a tier bought between rounds persists**, which is an open
+question a screen must not answer by implication.
+
+## D673 — A finished turn is acknowledged on the rail, as a tally of completed turns: not on the results page, and not on the card that carries a run figure
+
+**2026-09-19.** GitHub issue **#499**, `docs/32` § 3.4 and GD13, `docs/38` § 2.4, [§ D106](#d106),
+[§ D227](#d227), [§ D533](#d533).
+
+`everyday/fixitScreen.ts` banked a cleared fix case under a comment reading *"Nothing is drawn and
+nothing is awaited"*, and `dev/main.ts`'s earn binding posted and discarded under a docstring saying
+a banked turn *"changes a number on the Settings screen and nothing a player is looking at when they
+finish"*. Both sentences were true of the build and the second was the defect: the only surface
+drawing a balance is Settings, so **a player could clear all eighteen fix cases, earn the entire
+108-chime lifetime ceiling, and never learn the currency exists.**
+
+### 1. Why the rail, and why not the sheet
+
+`docs/32` GD13 clause 2 keeps a currency **off a results page**, out of any comparison between
+players, and out of any verdict; clause 3 keeps it away from a wait figure. None of that is relaxed
+and none of it may be. What `docs/32` § 3.4 licenses in terms — arguing for standing — is a **tally
+of completed turns** as distinct from a statistic over a run, and a chime is that by construction:
+`docs/38` § 2.4 pays a flat authored award for finishing a turn, and *no chime is ever scaled by a
+wait figure or any quantity the run can suppress*. So the acknowledgement is a tally beside a tally,
+and `report` is the one screen it is withheld on.
+
+### 2. Why **not** the `PLAYING AS` card, which is where it was drafted
+
+The obvious site is beside `rail.ts#careerLineOf`'s *3 days running*, which is itself a turn tally.
+It is the wrong one, and clearing the letter of a prohibition while landing where its reason bites is
+not clearing it: that line composes `3 days running · **best 84%**`, and `bestMinutePct` is a **run
+figure**. A chime count three pixels under it is a currency beside a wait figure — GD13 clause 3, and
+underneath it § D106's own argument, that a currency beside a wait figure becomes a score.
+
+**So what does *beside* mean.** It cannot mean *anywhere on a page that also draws a figure*, or no
+surface in this product could draw a chime at all — the rail is on every screen, and
+`everyday/settingsView.ts` has drawn the balance next to it since #368, which shipped and was
+reviewed. It means **the same block**. The identity card is one; the top of the rail, under *Main
+menu*, where nothing numeric is drawn, is not. `rail.test.ts` asserts the card carries neither
+currency word, over the whole footer's JSON rather than over a named field, so a lane putting a
+second currency line on that card fails a test rather than a player.
+
+### 3. The four states, and the one that would otherwise be a silence
+
+`balance`, `signed-out`, `no-ledger`, `unreachable`. Four sentences because four things are true of
+four players, and the one worth defending is `signed-out`: a visitor earns **nothing** on this build
+— `dev/main.ts` returns on no token, the route 401s, and there is no device ledger — so the line
+names the clear **and** says the chime went nowhere. Saying nothing would be § D227 in the half
+`CLAUDE.md` calls the more dangerous one: silence about a mechanism that did not run.
+
+### 4. The two figures it will not carry, and each absence is a rule
+
+**Not the award.** `data/chime-ledger.json` prices a completion and `boundaries.test.ts` forbids any
+module in `packages/viz` naming a **source**, so an award drawn here would be a second authority for
+a price this package may not read.
+
+**Not the delta.** *First time only* (§ D533) means a scenario re-cleared pays nothing, so a `+6` on
+a second clear would be false; and a first clear happens before anything has read the balance, so
+there is no *before* to subtract. A difference of two reads taken at different moments is a figure
+nothing produced.
+
+What is left is the turn and the one read § D526 clause 5 licenses — enough for a player to learn
+that finishing things pays something, and that they have some.
+
+### 5. What was considered and not built
+
+**The arrival cue.** § D530 named the currency after that sound, so playing it on a bank is the one
+acknowledgement that touches no GD13 clause at all. It is not built here and the reason is
+mechanical rather than a judgement: the only `AudioSink` in the tree is created inside
+`everyday/stageScreen.ts`'s mount, which is not mounted when a fix case is cleared, so it needs an
+audio owner above the stage screen. It is also not a substitute — `docs/36` makes a sound-only
+signal an accessibility failure — so it would be a second channel beside this line, not instead of
+it.
+
+**This lane held D671–D678 and spent D671, D672 and D673. D674–D678 are unspent** and become
+permanent holes under [§ D404](#d404) once a later lane writes above them; the integrator registers
+them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
