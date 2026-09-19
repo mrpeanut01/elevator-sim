@@ -38083,7 +38083,8 @@ this ladder. They are wrong by a factor of six at `30×` and by about 1.5 at `4�
 still wrong.** The likely history is § D354's own defect one document over — before that decision the
 chip *labelled* `4×` ran at 8 — but that is a plausible sentence rather than a measurement, so it is
 offered as a guess and marked as one. Correcting five player-facing strings is not this constant's
-to do; it is filed rather than absorbed.
+to do; it is filed rather than absorbed, as **GitHub issue #559**, which carries the five sites,
+the four documents that repeat them, and this paragraph's guess marked as a guess.
 
 **The stale sites this commit corrects**, on `CLAUDE.md`'s rule that a published number and a stated
 mechanism go stale the same way: `shift/legibility.ts`'s *"two simulated minutes are on the order of
