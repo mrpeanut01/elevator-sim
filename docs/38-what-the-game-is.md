@@ -162,12 +162,21 @@ with anyone else.
 in nights, a wear clock, contracts you can lose. This is the Campaign as built and specified in
 [`32-game-design.md`](32-game-design.md) § 3, under a name that says what it is.
 
-**What changes.** One thing, and it is the thing the mode cannot be a career without: **it
-persists**. `packages/viz/src/campaign/career.ts` says on its own screen that *"the career is this
-session's"*, and [`27-flow-maps.md`](27-flow-maps.md) F2 records that a reload loses a campaign
-three days in without saying so. A career that vanishes on reload is a session, not a career. The
-module names what persistence costs, a schema, a migration, and a reconciliation with the week, and
-that is engineering work to file rather than a design question to reopen.
+**What changes. One thing, and it is the thing the mode cannot be a career without: it persists —
+and it does now.** `packages/viz/src/campaign/career.ts` used to say on its own screen that *"the
+career is this session's"*, and [`27-flow-maps.md`](27-flow-maps.md) F2 recorded that a reload lost a
+campaign three days in without saying so. A career that vanishes on reload is a session, not a
+career. **Built for GitHub issue #375**: `campaign/careerPersist.ts` is the versioned envelope,
+refused in both directions and quarantining a save it cannot read rather than overwriting it;
+`everyday/careerStore.ts` is the storage half, `localStorage` where the browser grants it and
+memory-only where it does not, with the player never told a save happened that did not; and
+`everyday/host.ts` restores on open and saves through **one** writer. The third cost the module named
+— a reconciliation with `ViewerState.week` — turned out to be **non-interference**: the week and the
+career are different records with different lifetimes on separate keys, neither evidence about the
+other, and `careerPersist.test.ts` asserts that in both directions rather than leaving it to the fact
+that nobody has written a coupling. **The session-only sentence was deleted rather than reworded on
+the commit that made it false** — [§ D227](../DECISIONS.md), because a stale refusal tells the player
+not to try.
 
 **What does not change.** The economy rules GD11 to GD14 stand. Units are money, nights are time,
 standing opens slots and buys nothing. No currency buys access, a verdict, or a retry. One
@@ -181,8 +190,8 @@ that is relief on a failure.
 
 **The two halves docs/32 § 3.6 and § 9 named as owed have both landed**: a works night takes a car
 out of passenger service ([§ D504](../DECISIONS.md)), and a campaign day's event is drawn from the contract's
-calendar and § 8.3's odds on a stream off the seed ([§ D507](../DECISIONS.md)). What the rename leaves owed is
-persistence, above.
+calendar and § 8.3's odds on a stream off the seed ([§ D507](../DECISIONS.md)). **The rename leaves
+nothing owed: persistence was the last item and it is built.**
 
 ### 2.3 Rush
 
@@ -275,11 +284,16 @@ result screen keeps the round list, names what drove each round and how far it g
 sitting whole — and the purse figures a player reads are the server's reply to their own post and
 are computed nowhere in `packages/viz`. **One half is still not built**: no between-round rebuild
 travels, so the purse is derived and nothing spends it. That is a package boundary and a ruling
-rather than a missing feature — § D606 names the three shapes the boundary could move in and the
-three questions this section does not answer (whether a rush rebuild books nights, whether a tier
-still requires the tier below inside one sitting, and what `rush-prefit`'s *fitted* means) — and
-the same blockage is why nothing sells the rush's two chime sinks: a wider purse would buy
-nothing, so selling it would be a control that changes no run.
+rather than a missing feature — § D606 names the three shapes the boundary could move in, and **the
+three questions it recorded as unanswered are answered** ([§ D640](../DECISIONS.md), 2026-09-16):
+*fitted* is one fixed kit, Doors L1 + Control L1 + Tenants L1 at fifteen units against the sink's
+fifteen chimes; a rush rebuild is **instantaneous**, with no clock and no nights inside a sitting;
+and a tier **does not** require the tier below it inside the same sitting, both of the last two ruled
+by the product owner. **The two rush chime sinks are no longer one gap**: a wider purse still buys
+nothing, because nothing spends a purse, while **starting fitted reaches the run** — pinned at
+`garden-apartments`/`collective`, 1 178 s as built against 1 214 s pre-fitted — and waits only on a
+screen that spends a chime. `everyday/rushScreenModel.ts#RUSH_ABSENCES` says the same thing on the
+build's own face ([§ D701](../DECISIONS.md)).
 
 **A run carries its modifiers onto the board.** The standard board is the standard purse and the
 building as shipped, the same for everyone; a run with a bought purse or a pre-fitted building ranks
@@ -336,17 +350,26 @@ never knows where an entry came from. A fix case cleared posts an earn today, an
 or brief will once it is playable in Everyday; a budget widened posts a spend; the screen shows what
 is in the account and lets the player spend or earn against it, and that is the whole of its
 contract. Without an account the ledger is on this device alone and says
-so, in the shape the tree already uses for device-only artefacts, and a run played with device-only
-chimes can be played and not posted.
+so, in the shape the tree already uses for device-only artefacts. *Amended by
+[§ D711](../DECISIONS.md) on 2026-09-19:* the device ledger records **turns** — a case cleared, a day
+paid, a wave outlasted — and never a balance, which it derives; and it **earns and reads without
+spending**, because no sink in this build reaches a run except through what the server says the
+account owns, so a device spend would buy nothing. A signed-out run stays playable and unpostable, as
+it already is.
 
-**That last sentence is a requirement and is not built**, and it is flagged here because the first
-attempt shipped its *face* without its *store*: the Settings panel told a signed-out player their
-tally was kept on this device while `everyday/profile.ts` — `localStorage`'s owner — had no chime
-field, so the balance was a hard zero described as a ledger (the review of PR #485). The panel now
-says there is no tally until you sign in, which is true of this build and contradicts the paragraph
-above on purpose. What is missing is not code but a ruling: **what happens to a device balance when
-an account arrives** — merged, discarded, or which one wins — and a device ledger built without
-answering that would either silently double a balance or silently drop one.
+**What happens when an account arrives no longer needs an answer, because nothing crosses but a
+turn.** On sign-in the device posts the turns it has not yet posted for that account, through the
+earn verb that already exists, and [§ D533](../DECISIONS.md)'s first-time-only record decides what
+each one pays: a turn already paid answers and pays nothing, one that is not pays once. **Nothing is
+merged and nothing is discarded**, and the device keeps its own record, so signing out gives the
+signed-out tally back — [§ D490](../DECISIONS.md)'s two slots with one chooser, the shape this
+product already uses for the display name.
+
+**This paragraph used to record the ruling as open, and the reason is worth keeping**: the first
+attempt shipped the *face* without the *store* — the Settings panel told a signed-out player their
+tally was kept on this device while `everyday/profile.ts`, `localStorage`'s owner, had no chime field
+(the review of PR #485). The sentence was corrected rather than the store, because building one meant
+taking this ruling. It is taken; the store is owed.
 
 **No purchase ships, and the ledger is built so an add from outside is invisible to play.** A
 ledger has sources; today they are the three completions above. Any external add, a purchase or a
@@ -444,7 +467,9 @@ Named so the next lane does not discover it. None of it is built by this page.
   is built so one could be a source later*.
 - The honesty corpus's strings move with the tiles. Measured once, after integration, on the
   integrator, per [§ D343](../DECISIONS.md).
-- Career persistence is filed as engineering work against `career.ts`'s own stated cost.
+- Career persistence is **built** — GitHub issue #375, `campaign/careerPersist.ts` and
+  `everyday/careerStore.ts`, against `career.ts`'s own stated cost of a schema, a migration and a
+  reconciliation with the week. This line read *"filed as engineering work"* until that landed.
 - A reference building at 165 levels and 57 lifts is authored, and [§ D527](../DECISIONS.md)'s five
   measurements are taken before it is called carried; the stage gains a zoned or scrolled drawing,
   recorded as a handoff deviation.

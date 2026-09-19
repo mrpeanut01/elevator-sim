@@ -34375,6 +34375,8 @@ unmoved. The range event has no equivalent writer yet; § D523 says whose questi
 ## D525 — Three modes: Scenario, Career and Rush; no proposed fixes; difficulty is the number of ways through; everything plays live
 
 > **Status 2026-09-10: AMENDED by [§ D535](#d535).** Clause 2's whole editor is every declared dial less the weight-set selector and the arrival predictor, which no scenario sells at any price; per-scenario scarcity is still a price, never a removed control. See [`docs/39`](docs/39-decisions-in-force.md).
+>
+> **Status 2026-09-19: NARROWED by [§ D706](#d706)** *(agent session, delegated authority — not the product owner)*. Clause 2's retirement stands and is a retirement from the screen rather than from the file: the diagnosed repair stays in `data/` as the scenario's pinned witness, the five decoys survive as prices in the one schedule, the diagnosis is not retired, and all three retirements wait for the editor that can write the answers — measured, 1 of 18 today. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/38`](docs/38-what-the-game-is.md), [§ D373](#d373), [§ D477](#d477), [§ D354](#d354), [§ D497](#d497), [§ D514](#d514), [§ D515](#d515), `docs/32` § 1.2 and GD4, `docs/23` § 4, `docs/16` S5's `ranked` row, the design handoff §§ 5 and 10, GitHub issues #217 and #220.**
 
@@ -34996,6 +34998,8 @@ that the two earlier ways through were closed.
 ---
 
 ## D537 — The survivor band narrows by ladder position: shares in data, drafted for approval, judged at the base rung, read by one acceptance check
+
+> **Status 2026-09-19: AMENDED by [§ D736](#d736).** Every approved figure stands and no band verdict moves; what is amended is clause 5's sample-size refusal, whose remedy now includes reading the band at `approvedAtSampleSize` off the draw's own prefix while the table is measured wider. Taken by an agent session on delegated authority. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-10 · GitHub issue #234 · Rules on: [§ D525](#d525) clause 3, [§ D528](#d528) clause 2, `docs/33` DC-4's band as the precedent for shape, GitHub issues #367 and #467.**
 
@@ -36768,6 +36772,8 @@ Whether the four footprint figures are right — all four are chosen and all fou
 
 ## D606 — A rush sitting posts from the viewer, and the purse stays unspendable: the boundary that blocks it is named rather than moved, and the citation for it was the wrong way round
 
+> **Status 2026-09-16: AMENDED by [§ D640](#d640).** The boundary § 2 names is still not moved and the general between-round rebuild is still not built; the **three questions** § 2 named as unanswered are all answered — *fitted* is one fixed kit, a rush rebuild is instantaneous, and a tier does not require the tier below inside one sitting. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-15 · GitHub issue [#372](https://github.com/mrpeanut01/elevator-sim/issues/372) · Builds the client half of [§ D542](#d542) and [§ D543](#d543) · Corrects a citation carried in `data/rush-purse.json`.**
 
 **Why an entry.** Two of [§ D405](#d405)'s three grounds. It binds `everyday/host.ts`, `everyday/reportScreen.ts`, `menu/client.ts`, `dev/main.ts`, `honesty/surfaces.ts` and `everyday/rushScreenModel.ts#RUSH_ABSENCES` — six modules `everyday/rushSitting.ts` does not own — and it **refuses to move a boundary already recorded**, which is the kind of answer that has to be findable by the next person who asks the same question.
@@ -37176,6 +37182,8 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 
 ## D631 — A shaft's plan area is priced, in four bands cut from the measured distribution rather than at a rate per square metre, and the two cases that cannot be banded are named rather than charged the cheapest
 
+> **Status 2026-09-19: AMENDED by [§ D721](#d721)**, before sign-off. Every quantity in § 2 and § 3 reproduces on the tree at `393bda2`. Two claims do not: the gap table's **rank** column (the second- and third-widest gaps by ratio are 33.0 → 56.0 at 1.697× and 24.0 → 33.0 at 1.375×, both inside band 0, and the two named here are fourth and fifth), and **"the fourteen shipped buildings"**, which is seventeen. No price, boundary, band or population moves. This entry's text is left standing as the record it is. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-16 · GitHub issue [#429](https://github.com/mrpeanut01/elevator-sim/issues/429), stage 2 · Completes [§ D601](#d601), which built the area model and refused the price · Spends [§ D552](#d552)'s rate × quantity seam for the second time, after [§ D620](#d620) · Rules on: `data/price-schedule.json`, `data/campaign.json`, `data/engineering-briefs.json`, `packages/core/src/config/floorArea.ts`, `packages/viz/src/pricing/`, `packages/viz/src/fixit/parse.ts`.**
 
 **Why an entry.** Three of [§ D405](#d405)'s grounds. It adds authored figures to a governed `data/` file that need the product owner's approval and are drafted for it here. It **moves figures already recorded** — the budget ceiling in `data/campaign.json` (30 sites) and `data/engineering-briefs.json` (6), and the price of a new shaft in the shipped fix-it cases, none of which this lane's module owns. And it **settles a question § D601 deliberately left open**, which a docstring may not do on its own.
@@ -37489,6 +37497,8 @@ That is [§ D227](#d227) in the polarity `CLAUDE.md` calls **worse than a dead s
 ---
 
 ## D691 — The campaign's dial stratum is a **sample**, and stage 1 has a witness vector: the published zero was read as a census and is not one
+
+> **Status 2026-09-19: AMENDED by [§ D736](#d736).** § 4's first refusal is lifted: the sample size rises to 200 and the band is read at the size it was approved against, so no band reading moves. The master-seed refusal and the register rule in the same section stand. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-19 · Rules on:** GitHub issue **#234**, [`docs/38`](docs/38-what-the-game-is.md)
 § 2.1, [`docs/33`](docs/33-difficulty-curve.md) DC-3. Corrects a claim in circulation rather than
@@ -38621,3 +38631,987 @@ list, still open, and now with the day-length measurement attached.
 **This lane held D729–D735 and spent D729, D730, D731, D732 and D733. D734 and D735 are unspent**
 and become permanent holes under [§ D404](#d404) once a later lane writes above them; the integrator
 registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+
+---
+
+## D701 — § D606's three questions are closed by § D640, and the three sentences that still say otherwise are the stale-refusal class: what remains open in the rush package boundary is a fourth question nobody has asked
+
+**Date: 2026-09-19 · Owner: the studio war room's rulings lane · Closes `DECISIONS-OPEN.md` row OD-7 · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.3, [`docs/39`](docs/39-decisions-in-force.md) §§ 1 and 2, `packages/server/src/leaderboard/boardKey.ts`, [§ D606](#d606) § 2, [§ D640](#d640) § 4, GitHub issue [#372](https://github.com/mrpeanut01/elevator-sim/issues/372).**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. It **moves something already recorded** — `docs/38` § 2.3 states as fact that three questions have no answer, and two of them were answered by the product owner — and it binds three documents and one module that the lane taking it does not own. It takes **no design decision**: everything it closes was closed on 2026-09-16, and saying so is the whole of its content.
+
+### 1. The three questions, and where each was answered
+
+[§ D606](#d606) § 2 named three questions with *"no answer in `docs/38` § 2.3 or anywhere else"*. [§ D640](#d640), three days later, answered all three:
+
+| question | answer | where |
+|---|---|---|
+| What does `rush-prefit`'s *fitted* mean? | **One fixed kit and no other** — Doors L1 + Control L1 + Tenants L1, `data/price-schedule.json`'s `faster-doors` (4 u), `zone-the-tower` (6 u) and `queue-marshalling` (5 u), fifteen units against the sink's fifteen chimes | § D640 §§ 1 and 3; built in `core/src/config/rushPrefit.ts` |
+| Does a rush rebuild book nights? | **No — it is instantaneous.** No clock and no nights inside a sitting, because a sitting has no calendar and giving one a clock would make it a different mode | § D640 § 4.1, **the product owner** |
+| Does a tier still require the tier below inside one sitting? | **No.** `ENGINE_CONTRACT` § 8.2's first buying rule holds in the campaign and not here | § D640 § 4.2, **the product owner** |
+
+**The third is built and proved on the legs rather than argued.** `packages/server/src/leaderboard/rushHoldAgreement.json` carries `prefit` cells each half plays through its own whole path — `garden-apartments`/`collective` **1 178 s as built against 1 214 s pre-fitted**, `midtown-office`/`collective` **1 640 s against 1 650 s** — which is `CLAUDE.md`'s standing requirement pointed at a purchase, and the only check that catches a kit which folds perfectly and reaches no decision. The other two **reach no code and need none**: a fixed kit has no tier to gate and nothing to book, and both rulings bind whoever builds the general rebuild.
+
+### 2. Three sentences still say the questions are open, and two are the dangerous half of § D227
+
+[§ D227](#d227) rates a refusal drawn over a working control as worse than a missing sentence, because it tells a reader not to touch something that works. Three sites carry one:
+
+1. **`docs/38` § 2.3** — *"the three questions this section does not answer (whether a rush rebuild books nights, whether a tier still requires the tier below inside one sitting, and what `rush-prefit`'s *fitted* means)"*. All three are answered. Corrected to say so and to cite § D640, as a **correction rather than a deletion** on this repository's usual rule.
+2. **`docs/38` § 2.3, the next clause** — *"the same blockage is why nothing sells the rush's two chime sinks: a wider purse would buy nothing"*. That is no longer one blockage. § D640 § 6 rewrote `everyday/rushScreenModel.ts#RUSH_ABSENCES` for exactly this reason: a wider purse still buys nothing, while **starting fitted now reaches the run and waits only on a screen that spends a chime**. The owner's page carries the wording the shipped register was corrected away from, which is the stale refusal arriving one level up from the screen.
+3. **`packages/server/src/leaderboard/boardKey.ts`** — *"`rush-prefit` is refused on a sitting, because its fitted building is one this server cannot build."* False since § D640; `rushSitting.ts#rushSittingIssues` accepts the claim and `replayRushSitting` fits every round with it. **That one was found and deleted independently, by [§ D672](#d672), between this ruling being drafted and being applied** — the sentence is gone from the file and `docs/39` § 2 carries the row. Left in this list rather than struck out, because three sites is what the survey found and a ruling that quietly drops the one somebody else fixed reads as though it never saw it.
+
+**No count moves and no figure is republished here.** Every change is a substitution in prose, and the honesty corpus is untouched: no player-facing string is drawn by any of the three.
+
+### 3. `docs/39` owes two rows, under its own § 0
+
+[`docs/39`](docs/39-decisions-in-force.md) § 0 requires a row on the commit a decision lands. [§ D542](#d542) and [§ D543](#d543) both have one; **§ D606, which built their client half, and § D640, which made one of their sinks real, have none** — `grep` over that file returns neither id. Both rows are added on this commit, and § D606 takes an **AMENDED** marker naming § D640.
+
+### 4. What is still open, and it is a fourth question rather than one of the three
+
+The **general between-round rebuild** — buying an arbitrary tier of an arbitrary category between rounds, GitHub issue #372's second acceptance criterion — is still not built, and § D606 § 2's package boundary is still not moved. Nothing here moves it.
+
+**And a fourth question is named rather than answered, on § D606's own precedent.** § D640 § 1 holds that *"a sitting is one modifier set — every round of it starts from the same building"*, and [§ D542](#d542) clause 4 holds that the **purse** is a balance that carries from round to round. Neither says **whether a tier bought with that purse between rounds persists into the round after it.** § D640 § 4.2's reason for dropping the tier-below rule — *"a sitting that starts as-shipped every time is a very different ladder"* — is about **sittings** and does not reach **rounds**. The question could not be asked before § D640, because the tier-below rule was what stood in front of it.
+
+**The evidence leans and does not decide, so it is not decided here.** Every row in `data/price-schedule.json` is a capital price and Career's equivalent is permanent for the contract; `data/rush-purse.json` states the intent as *"a player who lasts longer has more to rebuild with"*, which reads oddly if a purchase evaporates each round; and the one fitted start the mode has applies to every round of its sitting. Against that, a lean is not a measurement, and which way this falls changes how the mode feels rather than what any figure means — [§ D256](#d256)'s refusal applied to a design question. It binds only the general rebuild, which nobody has started, so it costs nothing to leave open and would cost a boundary to invent.
+
+### 5. What this does not decide
+
+Whether the rush's purse should be spendable at all, which is #372's own second criterion. Where § D606's boundary moves, which is that entry's three shapes and is untouched. What a spend surface looks like — § D640 § 7 records that the day one ships it fills `EverydayHostBindings.rushModifiers` and nothing else moves, and that is still true.
+
+### 6. Numbers spent
+
+This lane held **D701–D705** and spent **D701** only. **D702, D703, D704 and D705 are unspent** and become permanent holes under [§ D404](#d404) and [§ D430](#d430) once a later lane writes above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES` if that is what happens.
+
+
+---
+
+## D706 — The fix-case repair menu retires from the screen and not from the file: the diagnosed repair becomes the scenario's pinned witness, the decoys survive as prices, and all three retirements wait for the editor that can write the answers
+
+> **Taken by an agent session under authority delegated by the session principal on 2026-09-19, not by the product owner.** It **narrows** [§ D525](#d525) clause 2 in one place, named in § 4 below, and conditions the rest of it on a measurement. `docs/39` § 2 carries the row and § D525 carries the marker, on this commit.
+
+**Date: 2026-09-19 · Narrows [§ D525](#d525) clause 2 · Reads it together with [§ D525](#d525) clause 3 · GitHub issues [#233](https://github.com/mrpeanut01/elevator-sim/issues/233), [#177](https://github.com/mrpeanut01/elevator-sim/issues/177) item 7 · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.1, [`docs/12`](docs/12-design-handoff.md) § 4.15, [`docs/39`](docs/39-decisions-in-force.md) §§ 2 and 3, [`docs/37`](docs/37-content-plan.md) § 5.2, `data/fixit-cases.json`, `data/price-schedule.json`, `packages/viz/src/fixit/parse.ts`, `packages/viz/src/fixit/types.ts`, `packages/viz/src/fixit/cases.test.ts`, `packages/viz/src/everyday/fixitScreen.ts`, `packages/viz/src/dev/fixitPanel.ts`.**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds. It binds a content lane, a UI lane and a documents lane that no one of them owns; it **moves something already recorded** — § D525 clause 2's treatment of the decoys, and `docs/39` § 3's rename map, which says the diagnosis goes where the ruling's own words say the *kind-of-fix line* goes; and it records a ruling that binds work nobody has started.
+
+### 1. The measurement this rests on, taken before the ruling
+
+Each of the eighteen shipped cases' `diagnosed` repair was read for its patch paths and compared against the five control families `fixit/types.ts#FixitState` draws — `speedSteps`, `capacitySteps`, `zoneOverlapFloors`, `parkingStrategy` and `topFloorRaiseM`.
+
+| the answer's path | cases | reachable from the shipped editor |
+|---|---|---|
+| `dispatcher.idle.parkingStrategy` within `{stay, lobby, zone-center}` | 1 | **yes** |
+| the same, plus `repositionThresholdS` and `repositionEnergyWeight` | 1 | partial |
+| `predicted-demand`; `fixed-floor` + `parkingFloorIndex`; `dispatch.assignmentMode`; `answer.dwell*`; `cars[].dwell*S` | 4 | no |
+| `building.floorPopulations[]` | 3 | no |
+| `building.banks[]` | 8 | no — `run.ts#widenedRangesOf` only **grows** a served run by at most three floors at each end, never narrows, never touches access zoning, and returns a double-deck bank unchanged |
+
+**One of eighteen.** And the gap is a **drawn-control** gap and nothing else: every one of the eighteen answers buys a path `data/price-schedule.json#changes[].covers` already prices — `idle-parking` at 0 u covers all four idle fields, and `dispatch-rules`, `dwell-policy`, `door-dwell`, `tenant-floors` and `rezone-bank` cover the rest. **Six families the editor does not draw.** Not a schema gap, not a pricing gap, not an engine gap.
+
+### 2. The conflict this resolves, and it is inside one ruling
+
+[§ D525](#d525) clause 3 is the owner's own: *"One survivor is the hardest a scenario may be; zero is a diagnosis scenario … or it is not a scenario."* Retiring the repair list before the editor can write those answers leaves **seventeen scenarios with no demonstrated way through**, none of which declares itself a diagnosis. So clause 2 landing first stands against clause 3 of the same ruling.
+
+**Nothing here says the owner's reason was wrong, and it is not narrowed.** *A four-item priced menu with exactly one right answer is a proposed fix* survives this analysis whole. What is ruled is **where the retirement bites** and **in what order**.
+
+### 3. The ruling. Six clauses
+
+1. **§ D525 clause 2's retirement of the repair list stands, and it is a retirement from the screen rather than from the file.** No repair row, no effect line, no role and no price on a menu is ever drawn again, on either surface. **`repairs[]` stays in `data/fixit-cases.json`**, and the `diagnosed` entry becomes the case's **pinned witness that at least one affordable configuration clears it** — which clause 3 requires of every scenario and which nothing else supplies for a fix case, because `data/scenario-survivors.json` covers the ten campaign stages and no fix case, over a move set that excludes the entire building tier by its own `provenance`. A field nothing draws proposes nothing to anybody.
+2. **`fixit/parse.ts`'s four-role rule relaxes to one.** *Exactly one repair of each of `diagnosed`, `costly-fix`, `cheap-fix`, `new-shaft`* becomes *at least one `diagnosed`*; the other three are optional. Their only job was to be the wrong rows on a menu that no longer exists. A case that keeps them keeps them as **authored negative controls**, which is what `cases.test.ts` compares on the legs.
+3. **The five standing extras survive as prices and retire as a menu.** They stay in `data/price-schedule.json#extras` and stop being drawn as a short list beside the answers. This is the **narrowing**, argued in § 4.
+4. **The kind-of-fix line retires on the same commit as the menu and not before.** It is the closing sentence of `asBuilt.note`, *"The fault is in how it is configured, not in what it is made of."* — **one sentence, verbatim identical on all eighteen cases**, so eighteen string edits and no schema change. Its harm is a function of which world it sits in: above a four-item menu it is a hint over four options; above the open editor it would be the only thing narrowing **forty-seven priced dimensions** (60 declared less § D535's 13 withheld, per `data/scenario-survivors.json#provenance`) down to one tier. Retiring it early strips the third beat from `docs/23` § 6's only *"All five beats work"* row and collects none of the benefit. It leaves on the commit that makes it false, which is [§ D227](#d227)'s rule run forwards.
+5. **The diagnosis is not retired.** § D525 clause 2 retires *"the line that says what kind of fix it is"*, and `docs/12` § 4.15's body says *"the complaint … stays … and so does the diagnosis; what is withdrawn is the menu of answers underneath it."* `docs/39` § 3's rename map and `docs/12` § 4.15's heading compress that into *"the diagnosis line"*, which reads as the diagnosis block going. Both are corrected on this commit.
+6. **The whole retirement is conditioned, not dated.** It lands on the commit that gives the fix-it editor the six priced change families of § 1 **and** demonstrates, per retiring case, that its answer is reachable and clears — the standing requirement `CLAUDE.md` states, pointed at a retirement: *move the control and require the run to change, compared on the legs*. Until then the menu ships exactly as it is.
+
+### 4. The one narrowing, with the argument against it
+
+**The owner named the decoys.** Clause 3 above keeps them as prices. The grounds:
+
+- **The stated reason does not reach them.** *"The owner does not want fixes proposed"*: a decoy proposes no fix. It prices a **non**-fix and says so in its own words — *"The wait feels shorter. It is not."* It is the product refusing to hand the player an answer, which is the same direction the ruling is travelling in.
+- **§ D525's own amendment of [§ D414](#d414) left them standing:** *"`docs/35` § 6's placement question is settled and § 7's repair lists retire; **the rest stands**."* The decoys are `docs/35` **§ 1.4 `PM-b`**, one of the three mechanisms that document calls portable, not § 7's repair lists.
+- **Under clause 3 a decoy is not a menu item at all.** It is a member of the affordable configuration space that does not survive, which is exactly what the survivor count counts. They are already in the one schedule (#366).
+
+**The argument against, weighed rather than omitted:** with forty-seven priced dimensions a player can spend badly in a thousand ways, so five hand-written bad spends are redundant, and the owner said the word. **It loses on one measured point:** the other dimensions are dials whose badness a first-timer cannot read, and these five are the only *legible* bad spends in the product, each carrying a sentence saying why it fixes nothing. They cost about forty lines in `fixit/engine.ts#EXTRA_COPY` and are already priced. **If the product owner reads this and disagrees, this is the clause to reverse, and reversing it is a forty-line deletion and one test.**
+
+### 5. The sixteen further cases are authored now
+
+`docs/37` § 5.2 classifies § 10.6's twenty-six further cases as 6 engine-blocked, 4 schema-blocked, **16 authorable today**, and § 4.2 prices them at `16 × 7.67 min` of play against a reachable total of about 2.5 hours. They are authored now rather than held, on four grounds:
+
+1. **The schema is not about to turn over.** The build clause 3 § 6 conditions it on is item 7 of GitHub issue **#177, which is closed as completed**; #233 is content authoring and a pipeline; #365 is the scenario schema. **No open issue owns those six families**, and this entry names that rather than assuming somebody holds it.
+2. **The diagnosed repair is not rework** — under clause 1 it is the artefact clause 3 requires, and § 1 establishes that every shipped one already buys only priced paths.
+3. **The discard is bounded and measured.** `data/fixit-cases.json` is 5 061 authored lines over 18 cases; `repairs[]` is 2 719 of them, of which the `diagnosed` entry is **1 369** and the three others **1 314, about 73 lines a case**. Sixteen cases discard about **1 168 lines of a ~4 500-line project — 26 %** — and even that is copy, since the patches remain usable as negative controls.
+4. **Holding parks the largest content lever in the product** on the only row in `docs/23` § 6 where every beat of the loop works.
+
+**Binding condition.** Each of the sixteen **records which `data/price-schedule.json` row its diagnosed repair buys**, in the case entry. Today that mapping exists only as patch paths to be read against `changes[].covers` by hand. Recorded, the conversion under clause 1 is a deletion and a field copy; unrecorded, it is eighteen and then thirty-four manual reconciliations.
+
+**`parse.ts`'s four-role rule refuses the tempting middle course** until clause 2 relaxes it, so the sixteen are authored to the shipped four-role shape. It is named here because it is the first thing the next reader will propose.
+
+### 6. What this breaks, costs and forecloses
+
+**Breaks**, each on the commit that lands the retirement: `parse.ts`'s role rule (clause 2); `cases.test.ts`'s *"sells no inert repair"* iterating what is authored rather than requiring four — **its referent survives, which is what clause 1 preserves and what `docs/12` § 4.15 recorded as lost**; `cases.test.ts`'s *"keeps the extras honest"* re-aimed at `price-schedule.json#extras`; the repair and extra rows on **both** surfaces (`everyday/fixitScreen.ts`, `dev/fixitPanel.ts`); `fixitScreenModel.ts#COPY`'s `repairsHint`, `stateSelected` and `stateAffordable` losing their subject; eighteen `asBuilt.note` strings edited.
+
+**Costs**: the editor build — six priced change families, of which `tenant-floors` (a per-floor population control) and `rezone-bank` (narrowing, keying, access lockouts, car removal, double-deck-safe) are substantial and between them carry **eleven of the eighteen answers**. This entry does not make that build cheaper. It makes it the named precondition.
+
+**Forecloses**: the clean-break reading of § D525 clause 1 in which a fix case becomes indistinguishable from a campaign stage under one schema, because `repairs[].diagnosed` is a field stages do not have. **Named with its migration rather than hidden:** the long-run home for that witness is a fix-case survivors file beside `data/scenario-survivors.json`, measured through `fixit/run.ts`'s own move set — which, unlike `campaign/stageRun.ts`, applies `banks`, `addCars`, `floorPopulations` and `floors` through `parseBuilding`. `repairs[].diagnosed` is the interim carrier, and the day that sweep exists the field can go.
+
+### 7. What this does not decide, and the obligation it carries
+
+**Whether the ninety-second turn is still fun once the menu is a forty-seven-dial editor.** No evidence in this repository reaches it: `docs/26` K3 is the instrument and has no data, and `docs/22` § 4 states that nothing in this tree measures a first session. `docs/20` PART C measured the version that exists. **The obligation that follows is a playtest of the built editor against a shipped case, taken before any repair row is deleted** — which clause 6's conditioning makes cheap, because the editor and the menu coexist until it is run.
+
+Also undecided: which lane builds the six families; whether `docs/37` § 5.2's four schema-blocked cases are unblocked in the same pass (#233's own cheapest item, untouched here); and the sign of `fixit/types.ts#EDITOR_PARKING_STRATEGIES`'s withholding of `predicted-demand`, which § 8 files rather than rules.
+
+### 8. A stale refusal found on the way, pinned by a run rather than by a sentence
+
+`fixit/types.ts#EDITOR_PARKING_STRATEGIES` withholds `predicted-demand` because *"the stage reports `no-forecast` rather than guessing, so the option would be a press that changes no leg — which is [§ D219](#d219)'s defect wearing a select's clothes."* `core/src/sim/simulation.ts:4838-4850` records that being fixed, in the past tense — the bank is resolved once through `resolvePrepositionContext` and the forecast comes from the bank's arrival model, where before *"`predicted-demand` answered `no-forecast` for every car of every run."* `sleeping-sky-lobby`'s diagnosed repair is that strategy and is pinned at nine long waits to zero, and `cases.test.ts`'s *"sells no inert repair"* — every repair of every case compared **on the legs** — is green over all eighteen cases in 59.77 s on this tree.
+
+So a control that works is withheld on a written reason that is false, which `CLAUDE.md` rates worse than a dead seam ([§ D227](#d227)). Offering it takes § 1's reachability from **one of eighteen to two of eighteen** at the cost of one `as const` entry. **Filed as its own issue rather than taken here**, because the same commit should draw the floor control `fixed-floor` needs, and neither belongs in a decision.
+
+### 9. The corpus, as a forecast rather than as the row
+
+[§ D343](#d343) puts the measurement on the integrator, once, after integration. **This entry changes no code and draws no word: zero in both tiers — no surface added, none removed, no string moved, cases, simulations and failing cases unmoved.** The two commits it binds will both move it and each owes its own forecast: the sixteen cases add strings without adding a surface, and the retirement removes four repairs' name and effect per case plus the five extras' name and line, on an adapter that stays.
+
+### 10. Numbers spent
+
+This lane held **D706–D710** and spent **D706 only**. D707, D708, D709 and D710 are **unspent** and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them — ids here are names, so backfilling one would make it denote two things across time. The integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+
+---
+
+## D711 — The device chime ledger records turns, not a balance, so a device balance never merges and is never discarded; it earns and reads and does not yet spend
+
+**Date: 2026-09-19 · Owner: the integrator, as a product-owner call under the latitude [`docs/38`](docs/38-what-the-game-is.md) § 2.4 leaves · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.4, [§ D526](#d526) clause 5, [§ D533](#d533), [§ D490](#d490), GitHub issue [#368](https://github.com/mrpeanut01/elevator-sim/issues/368)'s fifth acceptance criterion, `packages/viz/src/everyday/chimesPanel.ts`, `packages/core/src/config/chimeLedger.ts`, `packages/viz/src/everyday/profile.ts`, [`docs/26`](docs/26-telemetry-and-privacy.md) § 13.2. Dated before the code.**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds. It binds modules in three packages that no one of them owns — the viewer's ledger store and panel, `core`'s table projections, the server's earn route and its rate budget; it **moves something already recorded**, because `docs/38` § 2.4 carries a named open ruling and `everyday/chimesPanel.ts`'s docstring carries the same one in code; and it answers a question a document refuses to close without a number.
+
+### 1. What was open, and what the tree was doing about it
+
+`docs/38` § 2.4 and [§ D526](#d526) clause 5 both require that *without an account the ledger is on this device alone and says so*. It is not built, and the page says why: **what is missing is not code but a ruling** — *what happens to a device balance when an account arrives, merged, discarded, or which one wins* — and a ledger built without answering it *"would either silently double a balance or silently drop one."*
+
+The cost of leaving it open is the whole of a first session. `dev/main.ts#bankCompletion` posts nothing without a token, `http/api.ts#chimeEarn` answers `401` if it did, `everyday/profile.ts` — `localStorage`'s owner — holds no chime, and `CHIMES_PANEL_COPY.signedOutHome` says so on the one screen that draws the tally. **A stranger who clears three fix cases has finished eighteen chimes' worth of turns and is shown a hard zero.**
+
+**And the omission stopped being quiet this week, which is why this is taken now rather than later.** The wave that built the spend surface also made the signed-out earn *speak*: `bankCompletion` answers `{ kind: 'signed-out' }` rather than returning, on the argument its own docstring gives — *"a visitor earns nothing at all on this build … and telling them that is [§ D227](#d227) in the half that binds hardest."* That is right, and it is correctly argued, and its consequence is that the product is about to tell a stranger **on every case they clear** that they earned nothing, with a spend surface beside it answering the same. Four refusals on the one mechanism this product has for *come back tomorrow*. A refusal that is true is not a resting place when the thing it refuses is a requirement two documents already carry.
+
+The panel's sentence is **correct about this build** and was arrived at honestly — the review of PR #485 found the opposite sentence shipped over no store, which is [§ D227](#d227) in the polarity `CLAUDE.md` calls the worse half, and the fix pass renamed the arm `device` → `signed-out` so that a real ledger would have to introduce its own name rather than inherit a sentence. Nothing here criticises that correction. What it says is that being correct about a product that turns a stranger away is not a resting place.
+
+### 2. The ruling
+
+1. **A device chime ledger ships**, in the split the tree already keeps for device artefacts: a pure half and a DOM half, its own versioned slot, memory-only where storage is denied with the player not told it saved, quarantine-on-corrupt and a one-way seal on clear. `everyday/careerStore.ts` and `campaign/careerPersist.ts` are the model and the reasons are theirs.
+2. **It records turns, never a balance.** The stored artefact is the same vocabulary the wire already accepts — `core/config/chimeLedger.ts#CHIME_COMPLETIONS`, which is *"the whole of what a client may post"* — plus, per account, which of them have been replayed. **The balance is derived** from the shipped table on every read. There is no stored balance, so there is no number for a hostile edit to set and none for two readers to disagree about.
+3. **On sign-in, the device's unreplayed turns are posted through the earn verb that already exists**, and [§ D533](#d533)'s record decides what each one pays. A turn the account has been paid for answers `200` and pays nothing; one it has not pays once. **Nothing is merged, nothing is discarded, and no route gains an amount.**
+4. **The device's record is kept, not consumed** — [§ D490](#d490)'s *"the device-local value is kept, not overwritten"* — so a sign-out gives the signed-out tally back, exactly as the device-local display name answers again when a session ends.
+5. **One chooser, and it is declared.** A single expression answers *whose tally is this* for every surface that draws one, on `everyday/profile.ts#effectiveNameOf`'s shape, and the pair is registered in `honesty/agreement.ts#AGREED_FIGURES`. Two surfaces drawing a balance from two slots is [§ D359](#d359)'s signature, and `surfaces-disagree` is the property that exists to catch it.
+6. **The replay marker is keyed per account, never globally**, and the reason is in § 4 below.
+7. **The device ledger earns and reads. It does not spend**, and § 5 is the measurement rather than the caution.
+
+### 3. Why merge, discard and one-wins are all answers to the wrong question
+
+Each presupposes the device holds a **balance**, and each fails on something already ruled.
+
+**Merge** is a client naming an amount. `core/config/chimeLedger.ts` refuses that as a signature rather than as a rule: *"there is no function here that takes an amount, so nothing downstream can be handed one. A purchase is, mechanically, a client naming an amount, and there is no argument for it to name."* A merge route would be the first, and `localStorage` is the player's own file — so a merged balance moves [§ D533](#d533)'s record from the server to the client, which is the one thing that ruling exists to prevent. It also doubles on the two-device case by construction, which is `docs/38` § 2.4's own prediction arriving where it said it would.
+
+**Discard** is [§ D490](#d490)'s *"the mint wins"* with a number instead of a name, and that entry refused it in terms: a player *"would sign in and find it replaced … which is the sign-in **costing** them something, and the whole of [§ D456](#d456)'s second refusal test is that the social layer may not take the game away."* An honest discard has to be announced, which puts an anti-advertisement on the screen that exists to make an account worth having.
+
+**One-wins** is the right shape for the *record* and is kept for it — clause 4 above **is** one-wins. As an answer about the *balance* it is discard with a longer path back: the player earns twenty-four, signs in, sees zero, and gets the twenty-four back only by signing out, which nobody does to check. It would also have the panel say two true and contradictory things one press apart.
+
+### 4. What makes the ruling safe is a measurement, not a judgement
+
+[§ D533](#d533) built the reconciliation already, for a different reason: `chime_entries.turn_key` and a partial unique index over `(user_id, entry_key, turn_key)` (migration 6, `store.ts`), which makes *"one entry per account, source and turn a property of the table rather than of the one statement that asks."* A device that stores turns therefore hands the server requests it already knows how to refuse.
+
+**The exploit surface added is exactly zero, and § D533 says so in its own words.** Its *what is unchecked* paragraph already concedes the standing bound: *"a client composing its own requests can collect each fix case's award and a full rush's awards once per account, and no more."* A device replay **is** a client composing those requests. The bound is the index, not the client, so it does not move: eighteen fix-case ids at six chimes is one hundred and eight per account for all time, a rush pays only beyond the account's best, and both verbs share twenty writes per account per fifteen minutes (`http/api.ts#CHIMES_PER_ACCOUNT`, `accounts/credentials.ts#LOGIN_TTL_MS`). A device-bought modifier cannot reach a board at all: `chimes/ledger.ts#unbackedModifiers` refuses a claim not backed by that account's own spends, and every post route answers `401` without a token.
+
+**The two cases that break a naive answer are the two the ruling is shaped by.** One account on two devices: each device replays its own turns and the index pays the union once, where a merged balance pays the overlap twice. One device with two accounts: each account is paid once for the same turns, which manufactures nothing — chimes are per-account with no route between them, [§ D526](#d526) clause 3 keeps them off every results page and out of every comparison, and a player who wants the hundred and eight on fifty accounts can already post for it today. **That second case is why the replay marker is per account**: a global marker buys no safety, because the safety is the server's index, and costs the one thing that actually happens, which is a player signing into the wrong account first and losing their first session for good.
+
+**`career-day-paid` is the exception and is named rather than smoothed.** It carries no turn key, and [§ D533](#d533) clause 4 puts it outside first-time-only in terms — *"nothing on the wire can tell a second day from one day posted twice"* — with `http/api.test.ts` asserting it still pays on every post. So the device record is the only bound on a career-day replay, and the ruling neither weakens that clause nor pretends to strengthen it: **a device replays its career-day count once per account and never again**, believed within the posture a live day is already believed in. It is the clause to distrust first.
+
+### 5. What a device may not do yet, and this is measured rather than cautious
+
+`docs/38` § 2.4's *"a run played with device-only chimes can be played and not posted"* presumes a device can spend. **Measured against this tree, no sink reaches a run except through what the server says the account owns.** `everyday/host.ts#rushClaims` derives the only shipped claim from `owned`, which comes from `GET /api/chimes` ([§ D671](#d671)); `campaign/economy.ts#TowerEconomy` has no field for a bought purse and `purseOf` no term for one; and the scenario rung is refused by name in `core`, where `parseChimeLedger` throws on `budget-units`. A device spend built today would buy nothing that reaches a run — `charter` non-goal 5, and the defect `CLAUDE.md` has paid for eleven times in code and twice in `data/`.
+
+So the device ledger earns and reads. `CHIMES_PANEL_COPY.spendRefusal` already carries the truth for both homes and is not touched by this; the day a device-reachable sink exists is the day this clause is revisited, by a decision that cites a run rather than a plan.
+
+### 6. What this does not change
+
+[§ D526](#d526) is not amended: clause 5 already required this ledger, and this entry says how it is built rather than what it says. [§ D533](#d533) is not amended: it is what makes the ruling safe. [§ D490](#d490) is not amended: it is the precedent, and its two-slot shape is adopted rather than extended. No new route, no new wire field, no amount anywhere, no source name on the play side — `boundaries.test.ts`'s `.sources` guard is untouched and the device ledger passes it, because a **completion** is what a client names and a **source** is what the ledger calls the entry, which `core/config/chimeLedger.ts` keeps apart on purpose.
+
+And nothing here is a retention claim. That a visible first-session tally makes a player return is `charter S4` and is **unmeasured**; no copy and no docstring may say it, and no plausible replacement sentence may go in its place ([§ D280](#d280), [§ D256](#d256)).
+
+### 7. The corpus, as a forecast rather than as the row
+
+[§ D343](#d343) puts the measurement on the integrator, once, after integration. The prediction for the commit that lands the store: **no surface added and none removed** — the panel is already swept through `everyday/settingsView.ts#settingsScreenViewOf`, and a fourth `ChimesHome` arm is a state on a surface that exists, which is [§ D489](#d489)'s ruling showing up in the measurement again. **Strings move**, by the panel's new home sentence times the settings arms that construct it, plus one per arm for the balance line now that a signed-out case can carry a figure. A fourth home that no settings arm constructs would ship **unswept**, which is wave T's lesson one step along, so the arm is added to the corpus's settings fixtures on the same commit or the forecast is wrong in the direction nobody notices.
+
+### 8. Numbers spent
+
+This lane held **D711–D715** and spent **D711 only**. **D712, D713, D714 and D715 are unspent** and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+
+---
+
+## D716 — #536's four Career asks, adjudicated against `docs/38`: the past-performance gate is `docs/32` GD14's and is already built, an auto-running tower is a presentation control that may never file, and a contract's AQLs are bounded by what a goal may read
+
+**Date: 2026-09-19 · GitHub issue [#536](https://github.com/mrpeanut01/elevator-sim/issues/536) · Rules on: [`docs/38`](docs/38-what-the-game-is.md) §§ 2.2, 2.3 and 4, [`docs/32`](docs/32-game-design.md) GD12 and GD14, [`docs/16`](docs/16-change-scope-contract.md) S2, `packages/viz/src/campaign/career.ts#offerRefusalOf`, `packages/viz/src/shift/contracts.ts`, `packages/viz/src/everyday/campaignModel.ts#towersView`, `packages/viz/src/shift/types.ts#GOAL_OBSERVATION_IDS`. Cites [§ D400](#d400), [§ D401](#d401), [§ D427](#d427), [§ D525](#d525).**
+
+**Why an entry.** [§ D405](#d405)'s third ground on its own: it records rulings that bind work
+nobody has started, across three directories none of which owns the question, and it refuses one
+reading of a product-owner issue while ruling three others permitted. Nothing in this entry changes
+a line of code.
+
+**The framing, because it decides three of the four asks.** #536 is the **owner's own issue**, filed
+five days after he ruled `docs/38`. Its asks are his intent, so the question is never *may he ask for
+this* but *what honouring it looks like inside rules he also set*. Read that way, three of four are
+already permitted and one of those is already built. The issue carries **no comments**.
+
+### 1. Contracts gated on past performance — already permitted, and already built
+
+The distinction is **slots versus content**, and `docs/32` GD14 draws it: *"A slot is a limit on
+attention, not on permission … At standing zero a player may reach every screen, every building,
+every dispatcher and every mode. What they may not do is run six contracts at once."*
+
+`campaign/career.ts#offerRefusalOf` **is** the gate #536 describes, shipped since [§ D510](#d510).
+*x time of past performance* is `slotsOpen(standingOf(…)) > towersHeld` over `SLOTS` at
+`0 / 14 / 30 / 60 / 110 / 180`, where standing is `cleared × 2 − missed × 3` — so slot 2 is seven
+cleared days and no misses. *Good* past performance is the same expression read from the other side,
+a miss costing three where a clear pays two, plus the second clause: `atRiskTowers(…)` refuses
+**every** offer while any held tower is inside its difficulty's missed-day allowance. *The contract
+can be cancelled* is `contractIsLost`, and three lost is `careerIsOver`. Nothing is owed here but the
+words: the terms exist and no screen states them, which is § 4 below.
+
+**The reading that is refused, and the tree named the hazard before the issue was filed.**
+`shift/contracts.ts` carries a section headed *"Every contract is open, and there is no state in
+which one is not"*, and it says exactly what is at stake: *"the dead code beneath the design's early
+return — **a completion-based unlock ladder** — is deliberately **not** ported, because porting a
+branch the design disabled is how a gate arrives by accident."* So a lane must not read #536 as
+permission to gate **which contract may be opened**; `docs/38` § 4's *"Nothing locked, ever"* is
+absolute and `contractStatus` has three answers, none of them `locked`.
+
+**One dead end checked and not found.** `slotsOpen` answers **0** below standing zero
+(`SLOTS[0].standing === 0`) and `career.lost` is written nowhere but `openingCareer`, which reads
+like a softlock: no slot, no offer, career not over. It is unreachable. `hand-back` is an option on
+`renewalNeed` alone, which falls due at day 20, where `cleared = 19 − missed` and `missed ≤ 3`, so
+standing on hand-back is `38 − 5 · missed ≥ 23`; and `fileDay` refuses only `day > CONTRACT_DAYS`, so
+a lost month still pays standing back. Recorded as checked, because a softlock claimed and not
+reachable sends the next reader further than one never mentioned.
+
+### 2. Chimes as the driving focus of changes to a building — permitted, and see [§ D717](#d717)
+
+`docs/38` § 2.2 and § 2.4 put chimes exactly one step upstream of every change a career makes:
+chimes → purse → works → the building. *Driving focus* is a claim about attention and explanation,
+which is permitted and **unbuilt** — `everyday/chimesPanel.ts` says on its own face that nothing buys
+them. The two prohibitions are untouched: a chime may not open a slot (GD14) and may not buy a missed
+day back (GD13 clause 5), and neither has a sink in `data/chime-ledger.json`. What the ask uncovered
+is that a chime top-up is a **second source of units** against GD12's *exactly one*, recorded as
+§ D717 rather than left for a screen to discover.
+
+### 3. Towers that auto-run on the campaign screen — permitted, narrowed to a transport
+
+> **A tower that runs on the campaign screen is a `presentation` control over a recording the day
+> already produced. It may play, seek, loop and colour. It may not file, and it may not grade.**
+
+**Why this is a skip rather than a second kind of day.** `docs/38` § 2.3's *live* is a property of
+the **seam** — a press stamped at the playhead, written to `interventions[]`, the day re-simulated
+with the crowd held either side. It is not a duty to watch, and § 1 rules the opposite in the same
+document: *"If you would rather not watch, you can speed it up or skip to the end."* That control is
+built (`everyday/stageScreen.ts#skipToEnd`, § D525 clause 4, issue #369) and its docstring is this
+ruling's template — *"It reaches the transport and nothing else … a day watched at `1×`, at `600×`
+and a day skipped are the same day."* `docs/16` **S2** is the rule underneath: a presentation control
+must reach a sink and must not reach the legs. A tower card that plays is the same object at a
+different address, and the product already ships one on a non-stage screen — `everyday/landingScreen.ts`
+plays a real pinned morning in a canvas.
+
+**Why *may not file* is the half that carries the ruling.** [§ D400](#d400) settles who files:
+*"§ 6.4 and § 16 rule 1 give exactly one thing permission to file — *Close the day*"*, and
+[§ D401](#d401) settles what a filed day is — it runs `shiftLengthForContract(tower.id)`, the length
+its contract is graded over. A card that filed would be a second filing seam, and `file-day` writes
+`tower.day` **and** `career.today` precisely so two records cannot disagree about what day it is.
+Three of the owner's own sentences refuse the progression reading directly: `docs/38` § 1's Career
+line *"It waits for you between sessions"*; § 2.4's *"Nothing refills, expires, or decays while the
+player is away"*; and `docs/23` § 4's reason Career is a mode at all — *"it turns the retry from free
+into a decision"* — which a day that files itself removes, taking GD12's *a unit is a cleared day*
+with it.
+
+**What the narrowing buys, because it is not a consolation.** The card's status colour comes off the
+**same recording the stage will play**, so an amber tower is a real thing that happened in the day
+the player is about to grade; *"click into a building … probably when there is an issue"* gets a
+mechanism instead of a mood; and `docs/38` § 4's *"No second engine: live is the stage's property"*
+is untouched. Today's screen has none of it. `everyday/campaignModel.ts#towersView` is a table of
+text rows, six slot cards, five stat tiles and a month grid; it **does** carry a per-tower `status`,
+and what is wrong with it is where that comes from — `towerRowView` sets it from
+`needOf(tower)?.title`, so it reports what the **desk** wants rather than what the **building** is
+doing, and no colour, graphic or moving thing is drawn anywhere on the screen.
+
+**What is not ruled here.** Whether the owner meant towers to *progress* rather than *play* — days
+filing themselves, standing and units accruing with no press. That overturns `docs/38` § 1 and § 2.4
+and is his, not a lane's. Put as one question in the issue.
+
+### 4. A contract document with AQLs, incentives and penalties — permitted, bounded by one type
+
+Presentation of terms the career already computes is a re-dress and is permitted: the AQLs are
+`shift/goals.ts#goalsForDay`'s five day-goals, the incentive is `economy.ts#rateOnDay` stepping every
+five days, cancellation is `contractIsLost`, and the renewal's four options are `career.ts#renewalNeed`.
+The screen is `everyday/campaignModel.ts#contractView`, which already has a `termsHeading`.
+
+**The bound is a type, not a preference.** `shift/types.ts#GOAL_OBSERVATION_IDS` is
+`carryPct · minutePct · peakQueue · abandoned · worstWaitS · loadedDepartures · workPerServedLegKJ`,
+and the docstring beside it says why: *"Everything a goal may read — and structurally nothing that
+`awtIsValid` could suppress."* So **an AQL may be authored only over `GOAL_OBSERVATION_IDS`**, and
+#536's own two examples split across the line: **max wait is already gradeable** (`worstWaitS`, with
+`worstWaitIsCensored` refusing a maximum that belongs to somebody still standing) and **average wait
+cannot be an AQL at all**. A contract that promised a bar on a mean would be promising a grade the
+engine refuses to give, which is this product's signature defect wearing a legal font.
+
+**One clause of the ask is a mechanism rather than a re-dress.** *Monetary penalties*, read as a
+debit of units already earned, is a second **sink** on units, and § D717 amends GD12's source clause
+and deliberately not its sink clause. The penalty that already exists may be presented and needs no
+ruling: a missed day pays nothing and costs three standing, and standing is what opens slots. A real
+debit is the owner's call, and it has to be a `spends` entry rather than a latched figure, because
+`purseOf` is derived — [§ D400](#d400)'s *"A latched purse would be a second answer to a question one
+of them already contains."*
+
+### 5. The corpus
+
+[§ D343](#d343) puts the measurement on the integrator. This entry changes no code and draws no
+string: **zero in both tiers, no surface added or removed, cases, simulations and failing cases
+unmoved.**
+
+### 6. Numbers spent
+
+This lane held **D716–D720** and spent **D716, D717 and D718**. **D719 and D720 are unspent** and
+become permanent holes under [§ D404](#d404) and [§ D430](#d430) once a later lane writes above them;
+the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`. § D430's second clause
+applies if D720 turns out to be the **wave's** top number rather than this lane's — a hole may not sit
+at a block's top, so the integrator's own closing numbers have to sit above it.
+
+
+---
+
+## D717 — a chime top-up is a second source of units, and `docs/32` GD12 said there was exactly one: the amendment is recorded rather than left for a screen to contradict
+
+**Date: 2026-09-19 · Surfaced by GitHub issue [#536](https://github.com/mrpeanut01/elevator-sim/issues/536)'s second ask · Rules on: [`docs/32`](docs/32-game-design.md) § 3.2 GD12, [`docs/39`](docs/39-decisions-in-force.md) § 2, [`data/chime-ledger.json`](data/chime-ledger.json)'s `career-purse-top-up`, `packages/viz/src/everyday/campaignModel.ts#CONTRACT_COPY`. Records an amendment [§ D526](#d526) and [`docs/38`](docs/38-what-the-game-is.md) § 2.4 already made.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: it **moves something already recorded**. GD12 is a
+numbered design rule in a document this decision does not own, and `docs/39` § 0 requires a row and a
+marker on the same commit as the ruling that moves one.
+
+**The decision.** `docs/32` **GD12**'s *one source* clause is **amended**. A unit now has **two**
+sources — the contract's rate, paid per cleared day and stepping every five days, and a chime
+top-up. GD12's *one sink* clause is **not** amended: works remain the only thing a unit buys.
+
+**What made it true, and it was true before this entry.** `docs/38` § 2.2 says chimes *"can top up a
+tower's purse"*; § 2.4 says they *"buy budget: … a tower's purse up"*; and
+`data/chime-ledger.json` has shipped **`career-purse-top-up` — ten chimes for six units, `maxSteps: 3`**
+since the ledger landed. `docs/38` wins over `docs/32` where they disagree, so the amendment dates
+from § D526 rather than from today. **What did not happen is the recording**: `GD12` appears exactly
+once anywhere outside its own definition — `docs/32:1071`, on a different clause — and there is no
+`docs/39` § 2 row and no status marker. That is `docs/39` § 0's failure mode arriving on a lettered
+rule instead of on a numbered decision, and it was found by reading #536 rather than by any check.
+
+**Why it is worth an entry rather than a quiet edit, stated as the consequence rather than as
+tidiness.** GD12's reading is load-bearing on a shipped screen and in the design's own argument.
+`everyday/campaignModel.ts#CONTRACT_COPY.lede` tells a player *"You are paid for each day you clear …
+and you spend it on the tower itself"*, and GD12's own worked example — *"at Standard's week-four rate
+of 6 u a day, a fourth car is about six cleared days"* — reads a **purse** as a count of cleared days.
+A top-up breaks that reading and nothing else. So: **every price in the shop is still a duration**,
+because prices are untouched and the sink clause stands; **a purse is no longer a record of days you
+cleared**, and the lede is the sentence that has to change on the commit a spend surface ships.
+[§ D227](#d227)'s rule binds it — a control that writes something may not claim it writes nothing,
+and its mirror, a sentence that describes a purse with one source may not survive a second.
+
+**What is not amended, said so nobody reads this as a general relaxation.** GD13's five clauses are
+untouched. A chime still may not open a slot — that is GD14's attention scarcity and it has no sink in
+the ledger — and still may not buy a missed day back, which is GD13 clause 5's relief on a
+measurement. `docs/32` § 3.1's three-currency analysis stands, as `docs/39` already records under
+§ D526. And GD11's ordering is untouched: a top-up widens a purse, and what the purse buys still
+takes a car out before it gives one back ([§ D504](#d504)).
+
+**What is amended in the documents is not yet true in the code, and the entry says so rather than
+letting a lane discover it.** `career-purse-top-up` grants six units and **no arm of
+`CampaignAction` writes a granted unit into a tower**; `economy.ts#purseOf` is
+`carriedIn + earnedSoFar − committedUnits`, all three derived, and `everyday/host.ts` writes a bought
+sink into the rush's `owned` set. So the career's own purse sink is priced, parsed, carried onto the
+wire, charged against a real balance, answered with a real `grantUnits` — and **reaches no run**.
+That is `CLAUDE.md`'s standing requirement pointed at a purchase, and this entry is the warning
+rather than the fix. The shape the fix has to take, because the alternative is the defect
+[§ D400](#d400) already refused: a **record of grants** on the tower, summed into `purseOf` beside
+`spends`, never a latched total.
+
+**The corpus.** No code changes on this entry and no string moves: **zero in both tiers.** The string
+that *will* move is `CONTRACT_COPY.lede`, on the commit that ships a spend surface, and that commit's
+lane owns the measurement under [§ D343](#d343).
+
+
+---
+
+## D718 — epic #231's AC2 named an instrument that does not exist and no threshold at all; it is rewritten onto the instrument that does, and the telemetry gate stays where it can be enforced
+
+**Date: 2026-09-19 · GitHub issue [#231](https://github.com/mrpeanut01/elevator-sim/issues/231), answering that issue's own 2026-09-10 comment · Rules on: #231's acceptance criteria. Cites [`docs/22-charter.md`](docs/22-charter.md) § 4, `CHARTER_PROGRAMME.md` § M4, [`docs/33`](docs/33-difficulty-curve.md) DC-4 and DC-6, [§ D374](#d374), [§ D256](#d256).**
+
+**Why an entry.** [§ D405](#d405)'s second and third grounds: it moves a recorded acceptance
+criterion this module does not own, and it binds a milestone gate nobody has started. It is taken
+under `CLAUDE.md`'s working agreement — *do not weaken an acceptance criterion to make a phase pass;
+raise it instead* — and the whole of § 2 below is the argument that this is the second.
+
+**The decision.** #231's AC2, *"Difficulty tuned against telemetry rather than against opinion"*, is
+**replaced by two criteria**: one about the difficulty measurement, evaluable today and currently
+red, and one restating that no difficulty figure may be reported as tuned against players before a
+recruited cohort exists. The exact wording is in the issue-body edit this entry travels with.
+
+### 1. The finding, which is worse than *blocked*
+
+`docs/22-charter.md` § 4 sets the standard: *"Each names its instrument, and each can fail."* AC2
+fails it twice. It names an instrument that does not exist — #236, the study that would have supplied
+the human half, was **closed by the owner on 2026-09-09** as *"not this repository's work"*, and
+`docs/30-playtest-programme.md` says of itself at `:4` that it *"recruits nobody"*. And it states
+**no threshold and no failure condition**, so there is no reading of it that could be checked on the
+day telemetry ships. An epic criterion that cannot be evaluated does not block work honestly; it
+blocks it for free, and it makes the epic's own child list unfinishable whatever the children do.
+
+**And the gate it reaches for is not this epic's to hold.** `CHARTER_PROGRAMME.md` § M4's exit
+criteria already carry *"`charter S1` through `charter S4` met on a recruited cohort, measured by
+telemetry"*, and `charter` § 4 carries S1–S4 with their instruments and their *unevaluated* column.
+So the project holds the telemetry gate **twice** — once where it has an owner and an instrument
+register, and once as an epic checkbox that can only ever be unticked. Deleting the second copy
+removes no gate.
+
+### 2. Why the replacement is a raise and not a weakening, in four grounds
+
+1. **Nothing is weaker than a criterion that cannot fail.** By charter § 4's own definition the old
+   clause is not a criterion.
+2. **The telemetry gate is not removed — the duplicate is.** It stays at M4's exit criterion and at
+   `charter S1`–`S4`, and the second replacement clause restates it locally so the rewrite cannot be
+   read as a waiver by somebody who only reads the epic.
+3. **The replacement is harder to close today than the clause it replaces.** It is evaluable **and
+   currently red**: `docs/33` § 4.7 reports **DC-6 green** and **DC-4 green on 7 of 13 contracts**
+   (§ 4.7j, § 4.7k), so five rows of the shipped ladder fail this criterion on the day it is
+   adopted. A criterion is not weakened by being made capable of being failed by the tree that
+   exists.
+4. **It adds an obligation the old clause did not carry** — *pinned to the run that produced it* —
+   which is `CLAUDE.md`'s rule about published numbers and [§ D256](#d256)'s refusal of an
+   unmeasured mechanism, pointed at figures `docs/33` § 4.7a already records going stale once:
+   *"§ 4.2's published figures no longer reproduce, and that is the first finding."*
+
+### 3. The objection, answered rather than left for a reviewer
+
+[§ D374](#d374) rules that the playtest gates are **recruited for rather than re-scoped**, and
+charter § 4 leaves S6 and S7 standing as *process only* rather than rewriting them. That ruling is
+about **charter criteria** and is untouched here: S1–S4, S6 and S7 stay exactly where § D374 put
+them, cohort and all. What is rewritten is an **epic acceptance criterion** that duplicated one of
+them at a level with no instrument, no owner and no gate — and § D374 is the reason the telemetry
+clause survives as the second replacement clause instead of being deleted.
+
+### 4. What this does not do
+
+It does not touch #231's other three criteria; AC1's target was settled when `docs/37` landed, and
+AC4 is a defect count. It closes nothing. It does not rule on #382's successor work or on #234. And
+it makes no claim about difficulty being *well* tuned — the criterion it installs is red today, which
+is the point of installing it.
+
+**The corpus.** No code changes and no string moves: **zero in both tiers.**
+
+
+---
+
+## D721 — #429's shaft-area bands re-measured before sign-off: every quantity reproduces, the gap ranking does not, and the boundaries are derived up to a class with no observable member
+
+**Date: 2026-09-19 · GitHub issue [#429](https://github.com/mrpeanut01/elevator-sim/issues/429),
+stage 2 · Corrects two published claims in [§ D631](#d631) and in
+[`data/price-schedule.json`](data/price-schedule.json) · Moves no price, no boundary and no
+band. · Rules on: `data/price-schedule.json`'s `areaBands` block and `shaft-area` row.**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds, and the first is the one that matters: it
+**moves something already recorded**, and a decision record preserves its own text as history
+([§ D281](#d281)), so a correction to § D631 arrives as a new entry rather than as an edit to that
+one. It also binds a governed `data/` file no module owns.
+
+### 1. Why it was re-measured at all
+
+§ D631's seven figures are marked CHOSEN and await the product owner's sign-off. **A derivation
+offered for approval is worth exactly what it reproduces**, and this repository's own rule is that a
+published number is pinned to the run that produced it. So the run was done again, on the tree at
+`393bda2`, through `config/loader.ts#loadConfig` and `config/floorArea.ts#shaftPlanAreaM2` — the same
+two functions `pricing/rate.test.ts` calls, not the raw JSON, because the reference towers expand
+their floors at load and a raw derivation is silently wrong by an order of magnitude.
+
+### 2. Everything about the quantities reproduces
+
+**62 banks.** Minimum **24.0 m²** (`ashgate/carpark`), p25 **176.0**, median **240.0**, p75 **376.0**,
+maximum **1 178.0** (`burj-class-reference/shuttle`), spread **49.08×**. The three smallest are
+24.0, 33.0 and 56.0 on the three banks § D631 names. **Seven banks sit at exactly 200.0 m²**, the
+figure that refuses a boundary there. Band populations at 80/400/800 are **3 / 44 / 8 / 7**, summing
+to 62. `midtown-office/main` is **142.8 m²** and lands in band 1. Not one of those moved.
+
+*(p75 is 376.0 under nearest-rank and 372.0 under linear interpolation. § D631's figure is the
+nearest-rank one and nothing rests on the choice; it is said here so the next reader who gets 372
+knows they have found a convention rather than a drift.)*
+
+### 3. Two things do not reproduce, and one of them carries the derivation
+
+**(a) The gap ranking is wrong.** § D631 publishes *"the three widest gaps by ratio"* as
+56.0 → 104.0 (1.86×, widest), 640.0 → 850.0 (1.33×, second) and 376.0 → 464.0 (1.23×, third). The
+**ratios are all correct** — measured 1.857, 1.328 and 1.234. **The ranks are not.** Over the same
+62 banks the three widest by ratio are:
+
+| gap | ratio | rank |
+|---|---|---|
+| 56.0 → 104.0 | **1.857×** | widest — § D631's, correct |
+| **33.0 → 56.0** | **1.697×** | **second, and unlisted** |
+| **24.0 → 33.0** | **1.375×** | **third, and unlisted** |
+| 640.0 → 850.0 | 1.328× | **fourth** — published as second |
+| 376.0 → 464.0 | 1.234× | **fifth** — published as third |
+
+Both unlisted gaps sit **inside band 0**, among the three banks the ruling prices at 0 u. The
+omission is sound and the sentence describing it is not: § D631's own argument — *"an absolute gap of
+210 m² at the top is a smaller discontinuity than one of 48 m² at the bottom"* — read consistently
+favours 33 → 56 (23 m², 1.697×) over 640 → 850 (210 m², 1.328×), and the entry took the second.
+
+**What the rule actually is, stated so it reproduces:** *the widest gap by ratio in each of the three
+places where a boundary would do work.* A boundary at 40 or 44 strands a single bank in its own band
+and, because the ladder is linear in the band index, charges `garden-apartments/main` 8 u more than
+`ashgate/carpark` for a 9 m² difference — **which is the 200 m² knife-edge § D631 refuses, arriving
+from the bottom of the range instead of the middle.** The partition, the boundaries and every price
+are unchanged by this correction. Only the account of how they were reached moves, and it had to,
+because a derivation that does not reproduce is not one.
+
+**(b) "the fourteen shipped buildings" is seventeen.** Published in § D631 § 2 and **twice** in
+`data/price-schedule.json` — in `areaBands`'s `$comment` and in the `shaft-area` row's note. It is a
+stale word rather than a stale measurement, and the measurement is what settles it: dropping the
+three towers that would make fourteen gives **41 banks** and populations 2/32/2/5, reproducing
+nothing, while § D631's own DERIVED note names `empire-state-class-reference/bank-g` — one of them.
+Only the full seventeen give 62 banks and 3/44/8/7. `RISKS.md` **R38**, in one word, in a governed
+`data/` file.
+
+### 4. What the classification actually is, now it has been checked
+
+**Derived, and sign-off on these is a formality:**
+
+1. **Band 0 = 0 u** — forced by keeping the three smallest shipped shafts at exactly the 34 u four
+   shipped lists independently agreed.
+2. **Four bands, not five** — the widest gap left inside the 44-bank bulk is 1.105×, against three at
+   1.234–1.857×.
+3. **A ladder linear in the band index** — not a preference and not even a choice. [§ D552](#d552)
+   rules *linear only, no curves*, `pricing/parse.ts` refuses `rate.quantity.bands` **by name**, and a
+   rated row computes `unitsPer × quantity`. With the quantity being the band index the ladder can
+   only be `0, k, 2k, 3k`. A curve is **not expressible in the schema**.
+4. **80, 400 and 800 m²** — derived **up to an equivalence class with no observable member**. Any
+   value strictly inside `(56, 104)`, `(376, 464)` and `(640, 850)` gives the identical partition and
+   the identical price for every shipped bank. There is no 90 and no 420 for anybody to prefer, and
+   the round figure is the only content those three numbers carry on today's set.
+5. **`quantity.max = 3`** — derived from disk in both directions by `pricing/rate.test.ts`, never
+   transcribed.
+
+**Chosen, with residual freedom, and it is one number: `unitsPer: 8`.** § D631's criterion is that
+the dearest shaft become *"the dearest single purchase on the schedule and nothing more"*, just above
+`fifth-car`'s 54 u. **`k = 7` satisfies it too** — 34 + 21 = 55 u, also the dearest, also nothing
+more — and every downstream check holds: the budget ceiling would read 608 rather than 611,
+`dearestChangeUnits` is unmoved either way because both 21 and 24 sit under 54, no scenario rung
+moves, and `rate.test.ts` states its compression claim as a bound rather than as the figure. **The
+whole open question is 3 u at the top of the game's dearest purchase**, and it is put to the owner as
+that rather than folded into six derivations.
+
+### 5. What this does not decide
+
+Whether `unitsPer` is 8 or 7 — that is the owner's, and § 4 is the whole of what they need. Whether
+any boundary should move, which nothing here proposes and which no shipped bank could register.
+Whether a **fifth** band is worth cutting once a tower lands in the 104–376 bulk's own gaps, which
+§ D631 § 11 already leaves open as a measurement of a shipped set. And nothing about the campaign
+shop path § D631 § 8 declares partial.
+
+
+---
+
+## D722 — A relief mark is not an entrance animation: AD-M4's subject is a capsule's presence, and what the landing just did is a second state beside it
+
+**Date: 2026-09-19 · Rules on:** [`docs/28-art-direction.md`](docs/28-art-direction.md) AD-M4 and
+§ 5.4, `packages/viz/src/everyday/cutaway.ts`, `packages/viz/src/everyday/stageScreenModel.ts`.
+Answers a question a render spike filed as needing an art-direction ruling and declined to take on
+its own say-so. **Moves no rule.**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. It binds `docs/28`, which no rendering module
+owns, and it **settles a question already recorded as open** — the spike filed *"a person visibly
+boarding"* as not-recommended pending this ruling. `docs/28` § 9 also says an entry is owed when a
+lane changes a shipped appearance the guide describes in words, and a mark on the Casual stage is
+one.
+
+### 1. What was asked, and the narrower question underneath it
+
+The spike asked whether AD-M4 is absolute or binds only above a speed rung, having found that a
+0.4 s boarding slide is under one frame above about `8×`. **That framing is refused before it is
+answered**: § 6 holds all four motion rules uniform across all seven rungs, at the worst one, and
+AD-M2 already refuses *"a per-rung transition policy"* by name, *"because it would make the
+picture's meaning a function of the transport."* So no rule here is scoped by speed, and the
+spike's own argument for moving AD-M4 is unavailable.
+
+What the spike found that **is** worth ruling on is narrower and better.
+`frame/overlay.ts#FloorQueue.recentlyBoarded` — legs that boarded at this floor within
+`reliefWindowS` of `t` — is computed on every frame and **read by nothing on the Casual stage**. Its
+three readers are all Engineer: `render/riderQueue.ts:231`, `render/mood.ts:474`,
+`render/describeFrame.ts:306`. Its own docstring states the gap: a rider who boards *"would
+otherwise vanish between two frames with nothing on screen distinguishing 'a car came' from 'they
+were never here' — which is the one moment in a run where the dispatcher visibly did its job."*
+
+So: **is a relief mark the thing AD-M4 forbids?**
+
+### 2. AD-M4's reason is what fixes its scope, and it fixes it narrowly
+
+The rule carries three grounds — riders arrive in **batches**, a batch appears inside one frame at
+`600×`, and a per-capsule stagger is *"an animation queue that never drains"* — and one operative
+test: **"A capsule is present at the playhead or it is not."**
+
+Every one of those is about **a capsule's own presence**: a rider mark arriving or departing. The
+rule forbids making that presence a *process* rather than a *fact of the playhead*. It is AD-M1's
+family aimed at the arrival instant — a stagger would be a second opinion about when people arrived,
+and a wrong one, because they arrived together.
+
+**A relief mark is not in that subject.** It stages nothing, moves nothing and delays nothing. It is
+a tally beside the landing reporting a count over a trailing window, drawn from a pure fold of `t`:
+`queueAt` has no cursor and no memo, and `queueAt(r, 12.5)` answers the same called before or after
+`queueAt(r, 900)`. The capsules keep doing exactly what AD-M4 requires of them, unchanged.
+
+**AD-M3 is the rule that could have bitten, and does not**, for AD-S17's reason one surface over: the
+**window** is what converts a discrete event into a state, and a frame rendered at `t` in isolation
+carries the count complete. That is why AD-S17's rest bar is legal where an event-shaped *"the car
+has parked"* flash is not.
+
+### 3. What the top rung costs, said rather than omitted
+
+AD-S17's own discipline. At `600×` ten simulated seconds pass per frame, so a five-second window is
+**half a frame** and most frames miss it; at `240×` about one frame a boarding; at `30×` about ten;
+**at `4×`, the rung the stage opens on since [§ D641](#d641), about 75**; at `1×` about 300. **It
+degrades to absence, never to a false statement** — which is the whole difference from a cue, since a
+cue that fires for one event in twelve is decoration that looks like information, while a windowed
+state a frame misses is simply not drawn and the queue shrinking says what it says today.
+
+**Worth one sentence about timing rather than none.** § D641 moved the opening rung from `30×` to
+`4×` on the commit before this entry, which is the difference between a boarding being on screen for
+about ten frames and for about seventy-five. This ruling does not depend on that — AD-M4's scope is
+not speed-dependent and nothing here is argued from a rung — but it is why the mark is worth building
+now rather than being true and invisible.
+
+**That is not a per-rung policy.** The mark means the same thing at every rung; what varies is
+whether a frame lands inside the window — exactly as it varies for the `▲`/`▼` glyph in the car's own
+slot, which § 5.7 already ruled *"adds no new instability to the picture; it inherits the one the
+channel has."* AD-M2 is untouched.
+
+### 4. Band-dependent capsule height was never inside AD-M4, and three rules already require it
+
+A capsule's **height** is not its entrance or its exit: a tall capsule is present at the playhead or
+it is not, exactly as a short one is, and `rider.band` is a pure function of `waitedS` at `t`. No
+transition, no stagger, nothing outliving a frame.
+
+It is separately **required** by AD-S7 (`docs/28` § 5.4), by `docs/36` AX-5's *hue plus size*, which
+adopts AD-S7 by reference, and by `UX.md` KB-15's *colour is never the only signal* — and the tree
+fails all three: `everyday/cutaway.ts:146` computes `capsuleH` **once, outside the rider loop**, and
+the only rider field the painter reads is `waitedS`, for the hue. So the band rides on hue alone at
+4.5 px, which `docs/28:530` calls *"the P3 gap, and it is a scale problem before it is a colour
+problem."* Filing this behind an art-direction ruling was a category error. It needs a lane.
+
+### 5. What stays refused, and it is the item that was actually filed
+
+A rider sliding from its queue slot to the car door over `[boardedAt, boardedAt + δ]` **is** AD-M4's
+subject: it makes a departure a process, it interpolates over an instant the recording states as a
+point, and it needs state that outlives a frame. **Refused at every rung**, on the third ground and
+on § 6's uniformity. **AD-M4 is not amended, narrowed or dated by this entry** — what is added is a
+sentence saying what its subject is, so the next reader does not file a tally under a rule about
+animation.
+
+### 6. The § 4.2 clarification this forced, which a reviewer would otherwise trip on
+
+§ 4.2's decidable test says *"name the field on `live/observations.ts#observationsAt` it is drawn
+from."* `recentlyBoarded` is `queueAt`'s. Read literally that test refuses a rule § 5.4 already
+relies on — **AD-S7 draws from `QueuedRider.band` and AD-S8 from `FloorQueue.worstBand`, both
+`queueAt`'s**, and § 5.4 says of AD-S8 *"This is a state at `t`, so it is R6-clean."* `observationsAt`
+is named there because it was the fold in hand when § 4.2 was written, not because the other fold is
+refused. § 4.2 gains one sentence naming both folds; the governing property is unchanged and is the
+one § 4.2 already states — *a count of what had happened by `t`, or a state right now* — and
+`summary` stays refused in every form.
+
+### 7. What this does not decide
+
+Whether a relief mark is worth building, which is a lane's priority call and not a rule. Its colour
+and its contrast, which AD-A2 requires measured **on the ground it is drawn on** and this entry has
+run no such measurement — AD-S19 says so in its own text. The relief window's length, which stays
+`DEFAULT_RELIEF_WINDOW_S` and is a display dwell rather than a modelling constant. And whether riders
+should ever animate in any other form, which is not asked and not answered: item 5 disposes of the
+only instance anybody proposed.
+
+
+---
+
+## D723 — Four published counts corrected against the tree, and the two gates that could not see two of them
+
+**Date: 2026-09-19 · Rules on:** [`CLAUDE.md`](CLAUDE.md), [`docs/37-content-plan.md`](docs/37-content-plan.md)
+§§ 3, 4.2, 4.3 and 8, [`docs/38-what-the-game-is.md`](docs/38-what-the-game-is.md) §§ 2.2 and 3,
+`packages/experiments/src/validation/contentPlan.test.ts`. **Decides no design question and moves no
+shipped behaviour.**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. Each correction moves a figure published in a
+document its own module does not own; and one of them **moves something already recorded** —
+`docs/37` § 8 publishes *"the daily rotation is what covers the difference, and it does not exist"*
+as a blocker on GitHub issue #249's critical path, and it has been false since #159 landed.
+
+### 1. The four, each measured rather than reasoned about
+
+| published | where | the tree at `393bda2` |
+|---|---|---|
+| *"§ 4's **seventeen** screen keys… **sixteen** are registered"* | `CLAUDE.md` | **21** keys, **20** registered, `menu` shell-owned |
+| wrinkle templates **today 0**, target 20 | `docs/37` § 4.2 | **25** ship, and the rotation is built |
+| Daily loop **61 200 s**, **33** clean days over `c1`–`c13`, **39.0** watch-minutes | `docs/37` § 3 | **77 400 s**, **42** clean days over **16** contracts, **48.0** |
+| career persistence *"owed"* / *"filed as engineering work"* | `docs/38` §§ 2.2, 3 | **built** — #375 |
+
+Each is `RISKS.md` **R38**: the thing that drifts is the measurement, not the ambition.
+
+### 2. Two of them are worse than a count, and both for the reason this file keeps recording
+
+**`docs/37` § 8 publishes a stale blocker.** *"#159 is on #249's critical path… the daily rotation is
+what covers the difference, and it does not exist."* It exists. `shift/events.ts#eventFor` draws
+through `wrinkles/draw.ts#drawWrinkle` on every day the week's rota draws; `library.ts#assertRotates`
+refuses at **load** a library that breaks § 17's *no template twice in fourteen days*; and with 18
+weekday and 5 weekend templates the draw's own gap is 18 calendar days and 15 respectively, both
+clearing fourteen. The two rotation rules that name a **tower** are *"not implemented, and
+deliberately not faked"*, because nothing in this build selects the day's tower — which is the
+standing requirement honoured rather than a gap. **A stale refusal is worse than a dead seam**
+([§ D227](#d227)), and a stale blocker on a plan is that one register up: it tells a scheduler that
+a quarter's content depends on work that is done.
+
+**`docs/38` § 2.2 is the same shape from the other side.** It says the career does not persist and
+names the three things persistence would cost. All three exist, and `campaign/career.ts` **already
+records deleting the player-facing version of that same sentence under § D227**, on the commit that
+made it false. The design document outlived the refusal its own module retired.
+
+### 3. Two gates could not see two of these, and that is the finding worth keeping
+
+`contentPlan.test.ts` exists to stop exactly this, and on both rows it was structurally unable to.
+
+- **The wrinkle row is invisible to it.** Its `KEY` is `/^\`([a-z-]+)\`$/` and that row's key cell is
+  `*(new)*`, so `keyedRows` never sees it and `derived()` has no `wrinkles` entry. **A row without a
+  key is a row outside the gate**, and *today 0* survived twenty-five templates landing.
+- **The Daily loop row is checked by nothing.** `simulatedSeconds()` derives Campaign, Fix a building
+  and The gauntlet, and stops. So § 3's totals were updated by hand across three waves while the
+  **derivation cell beside them** still enumerated `c1`–`c13` — a correct-looking table whose own
+  workings had gone stale, which is harder to spot than a wrong number.
+
+Both are repaired rather than worked around, on `RISKS.md` **R40**: the wrinkle row takes the key
+`` `wrinkles` ``, `derived()` takes an eighth entry reading `templates` out of `data/wrinkles.json`,
+and § 1's *what ships today* table takes the matching row, because the test asserts **both** tables
+against the same key set. `simulatedSeconds()` is not extended here — the daily loop's seconds are a
+fold over `shift/contracts.ts` rather than over `data/`, and a deriver for it is worth its own
+commit — **so that hole is left open and named rather than quietly left open**.
+
+### 4. One count is corrected by deleting it
+
+`CLAUDE.md`'s screen-key sentence is restated **without a number**, pointing at
+`everyday/types.ts#EVERYDAY_SCREENS`, which carries the count, states it in its own docstring, and
+names the ruling beside every key past the handoff's seventeen. The count has been 17, 20 and 21;
+`types.ts` says in terms that *"a number in a docstring that has stopped matching the array under it
+is this repository's signature defect, and the same sentence has now been wrong once and corrected
+twice."* **A second copy is how two copies come to disagree**, and this is the copy that did.
+
+### 5. What this does not decide
+
+Whether 25 wrinkle templates is the right number — the target is restated at what ships because
+`contentPlan.test.ts` correctly refuses a target under today's count, and whether more are wanted is
+#159's and #249's. Whether `docs/37` § 4.1's *"up from the measured 4.8"* still holds: it is a third
+figure in the same chain, it was not re-derived here, and naming a plausible replacement instead of
+measuring is what [§ D256](#d256) refuses — it is marked for whoever takes that row. And nothing
+about `live/honesty.ts` or `leaderboard/boardKey.ts`, whose corrections landed in the same wave and
+are **docstring records under [§ D405](#d405)**, spending no number: one is four sites inside a module
+that owns all four, and the other is [§ D640](#d640) arriving at a site § D640's own *Rules on* list
+missed.
+
+
+---
+
+## D736 — The dial sample size is the instrument's precision, not a difficulty setting: `k` rises from 12 to 200, and the owner-approved band is read at the size it was approved against by taking the draw's own prefix
+
+**Date: 2026-09-19 · Owner: this session, on the session principal's explicit delegated authority ·
+Rules on:** [§ D537](#d537) clause 5's sample-size refusal, [§ D691](#d691) § 4's first refusal,
+`packages/viz/src/scenario/survivorBands.test-helper.ts#sampleSizeIssue`,
+`packages/viz/src/scenario/regenerateSurvivors.test-helper.ts#SURVIVOR_SAMPLE_SIZE`,
+`data/scenario-survivors.json`, GitHub issue **#234**, `docs/22-charter.md` non-goal 6.
+**Moves no band figure, no goal bar, no demand rate and no building fabric.**
+
+**Why an entry.** All three of § D405's grounds. It amends the reading rules of an owner ruling,
+which bind every lane that regenerates the survivor table. It lifts a refusal two decisions recorded
+as standing (§ D537 clause 5, § D691 § 4). And it answers a charter question — whether a sample size
+is a *setting* under non-goal 6 — which reaches well past `scenario/`.
+
+**Taken by an agent session under delegated authority, and recorded as such** so a later reader can
+tell it from a product-owner ruling. **It deliberately moves no figure the product owner approved**,
+and § 5 below states the one place where their approved figure and the shipped enforcement disagree,
+as a finding rather than as an edit.
+
+### 1. What was asked, raised independently by two lanes in one wave
+
+`data/scenario-survivor-bands.json` records `provenance.approvedAtSampleSize: 12` and
+`survivorBands.test-helper.ts#sampleSizeIssue` refuses a table regenerated at any other size until
+the owner re-approves. [§ D691](#d691) ran a dial-witness search at **k = 200** on
+`stage-1-first-call`, found **three** witnesses where the published cell reports `dials: 0/12`, and
+**correctly declined to re-pin the table** on the strength of that refusal. A second lane reached
+the same place from the other side: if `k` is a knob and moving it moves ten published readings, is
+that not `charter` non-goal 6 — a setting that moves a measurement?
+
+### 2. What a band is a share of, which is the question everything else turns on
+
+**Of a sample, and the code and the ruling both say so.** `survivorBands.test-helper.ts#bandReadingOf`
+computes `judged = examined − unjudged` and `admittedCountsOf` scales `minShare` and `maxShare` by
+it; `examined` is the affordable dropdown census **plus** `provenance.sampleSize` dial draws.
+[§ D537](#d537) clause 5 states it in the owner's own record: *"a share moves with either … even
+where the scenario has not."* So a share is **not** an estimate of a population quantity and is
+**not** portable across `k`, and reading it as one would silently re-specify a figure the owner
+approved.
+
+**But the band file carries two kinds of claim and only one of them is a share.** Below position
+three `minShare` is **0**, so the floor there is entirely `MIN_SURVIVORS = 1` — the *ruled* clause
+(§ D537 clause 3, [§ D525](#d525) clause 3's *zero is not a scenario*), an **existence** claim.
+An existence claim is portable across `k` and strictly improves with it. **Seven of the ten stages
+are withheld from players today on that clause and on no share at all** ([§ D649](#d649)'s gate,
+[§ D692](#d692) § 4).
+
+### 3. Two measurements nobody had taken, and they decide it
+
+**(a) The band's stringency is a function of `k`, and at positions one and two it is enforced above
+the figure the owner approved.** Computed from the shipped band file and the shipped census sizes,
+as the dial share a stage must show to reach its floor:
+
+| position | k = 12 | k = 50 | k = 200 | limit |
+|---|---|---|---|---|
+| 1 (`minShare` 0.25) | **0.333** | 0.260 | 0.255 | → 0.25 |
+| 2 (`minShare` 0.25) | **0.417** | 0.280 | 0.260 | → 0.25 |
+| 4, 6–10 (`minShare` 0, floor = 1 survivor) | 0.083 | 0.020 | 0.005 | → 0 |
+
+The census dilutes the numerator — stage 1 brings one survivor to six census slots, stage 2 brings
+none — so at `k = 12` the check demands a third and five twelfths where the owner approved a
+quarter, converging on the approved figure only as `k` grows.
+
+**(b) At the clearing share this campaign was measured to have, `k = 12` misses it five times in
+six.** § D691 put stage 1's base-rung dial share at 3 of 200 ≈ 1.5 %. The chance `k` draws find
+nothing is `(1−p)^k`:
+
+| k | misses a 1.5 % way through | a zero bounds the share at (the shipped `dialShareInterval`) |
+|---|---|---|
+| **12** | **83.4 %** | **0.2646** |
+| 60 | 40.4 % | 0.0596 — reproduces [§ D692](#d692)'s published interval exactly |
+| **200** | **4.9 %** | **0.0183** |
+
+**199 is the sample at which a 1.5 % way through is found with 95 % confidence**, and 200 is that
+rounded up. It is **not** `CLAUDE.md`'s 50–200 replication budget: `survivors.ts` warns in terms
+that *"there are two sample sizes, not one"*, and the coincidence is named here so nobody leans
+on it.
+
+### 4. The ruling
+
+**(a) `k` is the precision of an instrument and not a difficulty setting. There is no non-goal 6
+violation.** The charter's test is mechanical: *"take a run and a setting, and ask whether changing
+the setting changes any figure the run produces."* `k` is not a setting any player is on — it is one
+constant, identical for everyone, consumed by a weekly regeneration — and moving it changes no
+figure any run produces, which is **measured rather than argued**: § D691 § 2 established that
+`survivorSpace.ts#sampleReachableConfigurations` runs one loop against one seeded stream whose only
+`sampleSize`-dependent step is where it stops, and that the twelve judgements the published cell
+took reproduce verdict-for-verdict inside a two-hundred-draw table. Non-goal 6's *"changes a
+replication count"* clause is the nearest thing in the charter and it cuts the other way: it forbids
+a **setting** from varying `n` between players, and it cannot mean the project may never choose `n`
+without freezing `CLAUDE.md`'s own 50–200 and [§ D108](#d108)'s acceptance matrix with it.
+
+**What would be a violation, named so nobody proposes it as the cheap version:** raising `k` only on
+the cells that read zero. That conditions the search on the outcome and makes shares incomparable
+across the ladder. **`k` is uniform across every cell.**
+
+**(b) `SURVIVOR_SAMPLE_SIZE` rises from 12 to 200** and `data/scenario-survivors.json` is
+regenerated once, at the same master seed **20 260 910**. The master seed does **not** move — § D691
+refused seed-shopping by name and that refusal is untouched.
+
+**(c) The band keeps being read at the size it was approved against, off the draw's own prefix — so
+not one band figure and not one band verdict moves.** Because the accepted sequence does not depend
+on `sampleSize`, a table at k = 200 *contains* the table at k = 12: the first twelve draws are the
+twelve the owner's approval was read over, in order, with the same verdicts. The check reads census
+plus those twelve. **`OUTSIDE_THEIR_BAND` is byte-identical across this change, and that is the
+assertion rather than the hope** — the regenerated table's prefix block must equal the cells of the
+table published at `3ffa138`, which is still in the tree to diff against.
+
+**(d) `data/scenario-survivor-bands.json` is not edited at all.** `approvedAtSampleSize` stays
+**12**: it is a record of what a product owner approved, and an agent session does not rewrite one.
+
+**(e) `sampleSizeIssue` is kept and inverted rather than weakened.** It stops refusing a table
+measured at a *wider* size and starts refusing one the band cannot be read at the approved size
+from — a table whose `sampleSize` is **below** `approvedAtSampleSize`, or which does not publish the
+prefix counts. Its diagnosis was always right; only its remedy was a false dilemma. It offered
+*"re-approve the band, or regenerate at the old size"*, and the third branch — **regenerate at the
+new size and read the band at the old one** — was available the whole time and is exact.
+
+### 5. What is reported and deliberately not repaired
+
+**An owner-approved figure is being enforced above its approved value, and that is a finding to
+report rather than a number to edit.** § 3(a): positions one and two carry an approved `minShare` of
+**0.25** and the check demands **0.333** and **0.417** of the dial stratum at `k = 12`, because the
+census dilutes the numerator. Raising `k` to 200 moves the enforced figures to 0.255 and 0.260 —
+closer to what was approved, as a side effect of precision rather than as anybody's choice. **The
+shares are not touched.** `CLAUDE.md`'s rule for a published figure that does not reproduce is that
+it is a finding to report, and that binds harder, not softer, when the figure is a product owner's.
+
+**Whether the band should be re-approved at the full draw is the owner's and is filed rather than
+taken.** § 6's advisory reading is built so that decision can be made from a measurement instead of
+from an argument.
+
+### 6. The forcing function, because a frozen read is a second staleness waiting to happen
+
+Reading the band at a 2026-09-10 prefix means nothing would ever oblige anybody to look at it again.
+So `survivorBands.test.ts` gains a **second, advisory reading at the full sample**, published in the
+same output as the gating one, with a register of the scenarios on which the two disagree — checked
+in **both** directions, on `honesty.test.ts`'s standing ground that *a register that can only grow
+is decoration*. It gates nothing. It is the sheet the owner reads when they decide § 5's question.
+
+### 7. What moves, and what a reader should not expect to move
+
+**Monotone in `k`, so widening can only open a stage and never close one.** § D649's gate is
+base-rung `survivors ≥ 1` or a declared diagnosis; the census does not depend on `k` and the dial
+count cannot fall as `k` rises. A held stage that stays held after two hundred draws is held on
+fourteen times tighter evidence; one that opens was never held, only under-sampled.
+
+- **`OUTSIDE_THEIR_BAND`** — unchanged, by construction (§ 4(c)).
+- **`UNWINNABLE_AS_MEASURED`** — membership may shrink and every surviving row's prose must be
+  rewritten, because *"0 of 18"* becomes *"0 of 206"*, which is a far stronger claim. **Stage 2 will
+  not leave**: § D692 already searched it at k = 60 and found nothing. **Which of the other five
+  leave is unmeasured and no guess is offered in its place** ([§ D256](#d256)).
+- **`FIRST_HOUR_SINGLE_SURVIVOR`** — stage 1's reason is falsified on two of its three rungs and the
+  third is unmeasured, **so whether the row leaves is not forecast here**. The check fires per step
+  (`survivors.ts:708`), so a row leaves only once *every* rung moves off exactly one; its reason
+  reads *"one at every rung"*, and at k = 200 stage 1 reads four survivors at base and three at the
+  equipment rung (§ D691 measured both). **§ D691 never drew the building rung at 200**, and saying
+  the row leaves would be inferring a third cell from two.
+- **`DROPDOWN_CLEARS`, `DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE`, `DC1_UNFAILABLE`** — unchanged. The
+  first two are census readings and the census does not depend on `k`; [§ D556](#d556)'s
+  both-directions reconciliation is **run rather than assumed**.
+
+### 8. The cost, bounded rather than estimated
+
+`regenerateSurvivors.test-helper.ts` records the k = 12 sweep at **932 s quiet / 1 900 s contended**
+over 480 judgements, *"very unevenly spread"* — `stage-3-overwhelmed` alone 389 s. The dropdown half
+does not scale; the dial half goes 360 → **6 000** judgements. At the average the k = 12 run implies
+that is about **3 h 20 m**; at the two per-judgement figures actually measured at a wider draw —
+9.2 s at stage 2 (§ D692) and ≈ 0.6 s at stage 1 (§ D691) — it could be four times that. **A
+quotient is not a measurement** ([§ D256](#d256)), so no figure is published here: the lane measures
+`stage-3-overwhelmed` alone at k = 200 first and extrapolates from the ladder's most expensive cell.
+
+Two conditions on the run. It carries an explicit `--testTimeout`, because `CLAUDE.md` records a
+deep run that *"wrote complete figures at 76 minutes while vitest called it failed at its
+3 600 000 ms test timeout"*. And **if 200 will not fit, the `k` that does is shipped with the
+detection probability it buys written into `provenance.scope`** — an intermediate `k` is a valid
+table and strictly better than twelve, and what is forbidden is shipping a smaller one silently.
+
+### 9. What this does **not** decide
+
+**It does not rebalance anything, and it does not make stage 1 easier.** At k = 200 stage 1's base
+rung reads **4 of 206** against a floor asking **52** — about thirteen times the survivors it has.
+§ D691's *"about seventeen times narrower"* is the same gap read on the dial stratum alone, 1.5 %
+against 0.25; the two differ only by whether the six census slots sit in the denominator, and
+**widening `k` moves neither**. **#234's rebalance is owed in full**, and the two levers already
+measured are untouched — [§ D372](#d372)'s route for
+stage 1 (a *new* failable building, `garden-apartments` left alone) is still unbuilt, and
+[§ D612](#d612)'s stage-5 lever is still blocked on its own DC-3 witness search.
+
+It does not decide whether the band should be re-approved at the full draw (§ 5), whether any of the
+seven held stages should declare a `diagnosis`, or which of the five unsearched zeros are sampling
+artefacts — that last is what the regeneration is for.
+
+**Bookkeeping.** This lane was reserved **D736–D741** and spent **D736**; D737–D741 are returned
+unspent. **The block sat above wave AC-2's open reservation ceiling of D728**, and this lane
+flagged it rather than stepping over it, per § D404; the integrator raised the ceiling to D741,
+which is the other half of that rule and is why this number is legible at all.
