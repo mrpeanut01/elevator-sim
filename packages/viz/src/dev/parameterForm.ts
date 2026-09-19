@@ -216,7 +216,8 @@ export function appliedNoteFor(sourceName: string): string {
         'picked, whether riders carry a credential, the leg ceiling, and the peak window, ' +
         'baseline and mix amplitude of whichever template is running. A row you have not moved ' +
         'writes nothing at all, so a default stays the profile’s rather than becoming this ' +
-        'screen’s. Four rows are NOT applied and each has its own reason: the template and the ' +
+        'screen’s. Seven rows are NOT applied, in three groups, each refused for its own reason: ' +
+        'the template and the ' +
         'three template durations are owned by the pattern and shift-length controls, and writing ' +
         'them here would be a second hand on one dial; the entrance weight is one number for ' +
         'however many entrances a building has, and relative weights that all move together ' +

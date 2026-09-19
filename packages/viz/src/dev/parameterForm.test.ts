@@ -173,6 +173,21 @@ describe('what the Parameters tab does to a run, said on the tab', () => {
     expect(note).toContain('suppressed');
   });
 
+  it('counts the traffic source the way the form actually collects it', () => {
+    /*
+     * **The note's arithmetic, derived rather than read back off the note.** It says eight rows
+     * reach the run, seven do not, and nineteen draw no control at all; 8 + 7 = 15 is the number of
+     * controls `collectFormSource` builds and 19 is the size of `space.unsearchable`. A sentence
+     * whose figures are checked against nothing is how a refusal goes stale — § D227 — and this is
+     * the cheapest place to make the two agree, because the form is the thing the player is
+     * looking at while they read it.
+     */
+    const source = collectFormSource('TRAFFIC_PARAMETERS');
+    if (!source.ok) throw new Error(source.reason);
+    expect(controlsFor(source.space, defaultValues(source.space))).toHaveLength(8 + 7);
+    expect(source.space.unsearchable.size).toBe(19);
+  });
+
   it('names, on the traffic note itself, the rows it does not apply', () => {
     /*
      * A source that applies *some* of its rows is the shape a blanket sentence gets wrong in both
@@ -181,7 +196,7 @@ describe('what the Parameters tab does to a run, said on the tab', () => {
      */
     const note = appliedNoteFor('TRAFFIC_PARAMETERS');
     expect(note).toContain('eight');
-    expect(note).toContain('NOT applied');
+    expect(note).toContain('Seven rows are NOT applied');
     expect(note).toContain('nineteen');
   });
 
