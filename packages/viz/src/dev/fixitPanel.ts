@@ -64,6 +64,7 @@ import {
   emptyFixitState,
   fixedBadgeAfter,
   repairRowOf,
+  repairsInDrawOrder,
   parkingPriceUnits,
   setParkingStrategy,
   spendOf,
@@ -411,7 +412,8 @@ function scheduleNow(): PriceSchedule {
           el(doc, 'p', { text: entry.diagnosis.reasoning, style: { color: MUTED, margin: '0' } }),
         ]),
         el(doc, 'h2', { text: 'Quick repairs', style: h2Style() }),
-        ...entry.repairs.map((repair) => repairToggle(entry, session, repair.id)),
+        /* Draw order, not authored order — GitHub issue #566; see `fixit/engine.ts#repairsInDrawOrder`. */
+        ...repairsInDrawOrder(entry).map((repair) => repairToggle(entry, session, repair.id)),
         el(doc, 'h2', { text: 'Also on offer', style: h2Style() }),
         ...standingExtrasFrom(scheduleNow()).map((extra) => extraToggle(entry, session, extra.id)),
         el(doc, 'h2', { text: 'Machinery, priced against the same budget', style: h2Style() }),

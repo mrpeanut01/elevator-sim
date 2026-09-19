@@ -381,9 +381,12 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       expect(before.pressed).toBe('false');
 
       /*
-       * A **priced** repair rather than the first: the diagnosed fix is free in every shipped
-       * case, so pressing it would move `aria-pressed` and leave the spend line identical — a test
-       * that would pass on a screen whose budget arithmetic was disconnected. This is § D219's
+       * A **priced** repair rather than the first: the diagnosed fix is free on this case — on
+       * **five** of the eighteen, measured, and `repairIndex` is why this reads as a search rather
+       * than as a claim about all of them — so pressing it would move `aria-pressed` and leave the
+       * spend line identical, which is a test that would pass on a screen whose budget arithmetic
+       * was disconnected. Nor is *the first* the diagnosed row any more, since GitHub issue #566
+       * gave the surfaces a draw order; the row is found by its price either way. This is § D219's
        * rule (*move the control and require the run to change*) at the cheapest place to apply it,
        * and it caught its own first draft: see {@link repairIndex}.
        */

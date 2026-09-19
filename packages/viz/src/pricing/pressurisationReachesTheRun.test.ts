@@ -182,7 +182,7 @@ function caseWith(options: {
             id: 'r-diagnosed',
             role: 'diagnosed',
             name: 'Spread the fleet',
-            effect: 'A setting; the waits above are the target.',
+            effect: 'Waiting cars spread through the floors they serve.',
             patch: { dispatcher: { idle: { parkingStrategy: 'stay' } } },
           },
           {

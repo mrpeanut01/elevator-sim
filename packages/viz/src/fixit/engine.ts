@@ -30,12 +30,13 @@ import type {
   FixitState,
 } from './types.js';
 import {
+  changeCovering,
   priceOf,
   purchaseUnits,
   smallestPurchaseUnitsOf,
   steppedPurchaseUnits,
 } from '../pricing/parse.js';
-import { changesAtPaths } from '../pricing/repairPrice.js';
+import { changesAtPaths, changesBought } from '../pricing/repairPrice.js';
 import type { PriceSchedule } from '../pricing/types.js';
 
 /**
@@ -195,11 +196,88 @@ export interface FixitSpend {
   readonly editorUnits: number;
   readonly totalUnits: number;
   /**
-   * The machinery share of the total — the editor's steel plus a selected new shaft. § 10.4's
-   * spent row says *"how much of it was machinery"*, and a shaft is machinery wherever it is
-   * priced.
+   * The machinery share of the total — **whichever control bought it**. § 10.4's spent row says
+   * *"how much of it was machinery"*, and {@link MACHINERY_EDITOR_PATHS} is the one statement of
+   * what the word covers.
    */
   readonly machineryUnits: number;
+}
+
+/**
+ * **What *machinery* means, stated once and derived from the schedule** — GitHub issue **#568**.
+ *
+ * These are the three `covers` paths the fix-it editor's own machinery controls buy: the speed
+ * stepper, the capacity stepper and a new shaft. The schedule resolves them to `faster-machines`,
+ * `larger-car-step` and `new-car`, and **those rows are machinery wherever they are bought** —
+ * which is the whole of the correction below.
+ *
+ * ## The defect this closes, and it was reachable on nine repairs
+ *
+ * {@link spendOf} used to compute `editorUnits - settingUnits + shaftUnits`, in which
+ * `repairUnits` **is not a term at all**. So a repair whose patch buys nothing but machinery
+ * reported none of it: `sleeping-sky-lobby`'s 10 u *Re-gear the shuttles* — eight re-geared
+ * machines, the **same** `faster-machines` row the editor's own stepper buys at the **same** 10 u —
+ * drew *"10 u, of which 0 u is machinery"*, while the stepper beside it drew *"10 u, of which 10 u
+ * is machinery"*. Nine of the seventy-two shipped repairs buy `faster-machines`, so nine drew a
+ * figure that was false about the purchase the player had just made, and {@link budgetNoteOf}'s
+ * machinery branch could not fire for any of them.
+ *
+ * ## Why a derived set rather than a `machinery: true` on every schedule row
+ *
+ * A flag would be a **new classification**, authored across thirty-seven rows by nobody with the
+ * authority to classify them — is a regenerative drive machinery? a re-roped shaft? a destination
+ * panel? — and `CLAUDE.md` invariant 7 would then make each answer a tunable this lane invented.
+ * Derived, the set restates the definition the engine has always used and changes no price and no
+ * answer for the editor: the three rows are exactly `editorPricingFrom`'s three, read through the
+ * same `covers` paths.
+ *
+ * **What it deliberately does not claim.** A repair buying `cabin-pressurisation`,
+ * `regenerative-drive` or `rope-upgrade` would be steel under most readings and is not counted
+ * here, because no control on this screen buys one and the word would then mean two things at
+ * once. **No shipped repair buys any of the three** — the nine that carry machinery all carry
+ * `faster-machines` and the eighteen new shafts carry `new-car` — so the limit is stated rather
+ * than measured away, and it moves on the commit that gives the screen such a control.
+ */
+const MACHINERY_EDITOR_PATHS: readonly string[] = Object.freeze([
+  'editor.speed',
+  'editor.capacityStep',
+  'editor.shaft',
+]);
+
+/** The schedule rows {@link MACHINERY_EDITOR_PATHS} resolves to, by id. */
+function machineryChangeIdsOf(schedule: PriceSchedule): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const path of MACHINERY_EDITOR_PATHS) {
+    const change = changeCovering(schedule, path);
+    if (change !== undefined) ids.add(change.id);
+  }
+  return ids;
+}
+
+/**
+ * The machinery inside one repair's price, **subtracted rather than re-summed**.
+ *
+ * A repair's `costUnits` is `pricing/repairPrice.ts#repairPriceUnits` — the sum of the distinct
+ * changes its patch buys, plus the shaft-area surcharge where it adds a car. Re-summing the
+ * machinery rows here would drop that surcharge, and a Burj shuttle's band is 16 u of the 50 a
+ * ninth shuttle costs. So the non-machinery changes are summed and taken off the price the case
+ * was actually charged, which keeps the band with the shaft it belongs to and needs no second
+ * lookup of the building.
+ *
+ * **The patch is asked first, and that guard is not tidiness.** A subtraction alone attributes
+ * every unexplained unit of the price to machinery, and a repair whose `costUnits` does not come
+ * from the schedule — a fixture, or a file written before GitHub issue #366 moved the prices into
+ * `data/price-schedule.json` — would then report steel it never bought. So a repair whose patch
+ * buys **no** machinery row is 0 by construction, whatever it costs.
+ */
+function repairMachineryUnits(schedule: PriceSchedule, repair: FixitRepair): number {
+  const machinery = machineryChangeIdsOf(schedule);
+  const bought = changesBought(schedule, repair.patch);
+  if (!bought.some((change) => machinery.has(change.id))) return 0;
+  const otherUnits = bought
+    .filter((change) => !machinery.has(change.id))
+    .reduce((sum, change) => sum + purchaseUnits(change), 0);
+  return Math.max(0, repair.costUnits - otherUnits);
 }
 
 /**
@@ -237,9 +315,17 @@ export function spendOf(
     steppedPurchaseUnits(priceOf(schedule, 'faster-machines'), state.speedSteps) +
     steppedPurchaseUnits(priceOf(schedule, 'larger-car-step'), state.capacitySteps) +
     settingUnits;
-  const shaftUnits = repairs
-    .filter((repair) => repair.role === 'new-shaft')
-    .reduce((sum, repair) => sum + repair.costUnits, 0);
+  /*
+   * **The repairs' own machinery, which used to be missing** — GitHub issue #568. This was
+   * `repairs.filter(role === 'new-shaft')`, so a repair that bought eight re-geared machines
+   * reported none; see {@link MACHINERY_EDITOR_PATHS}. It is read off the **patch** rather than
+   * off the role, because the role is a menu position and the patch is what was bought — and
+   * because `docs/38` § 2.1 retires the roles while the machinery figure survives them.
+   */
+  const repairMachinery = repairs.reduce(
+    (sum, repair) => sum + repairMachineryUnits(schedule, repair),
+    0,
+  );
   return {
     repairUnits,
     extraUnits,
@@ -251,9 +337,10 @@ export function spendOf(
      * rule cuts steel: `rezone-bank` books a night of works, and it books it against a controller
      * and a landing sign rather than a shaft. Folding them in would make `budgetNoteOf` answer *you
      * are buying machinery* to a player who bought a setting, which is `docs/20` defect 8 read the
-     * other way round.
+     * other way round. A **repair** that rezones is excluded by the same rule and by the same
+     * statement of it, which is what `repairMachineryUnits` subtracts.
      */
-    machineryUnits: editorUnits - settingUnits + shaftUnits,
+    machineryUnits: editorUnits - settingUnits + repairMachinery,
   };
 }
 
@@ -765,7 +852,65 @@ function awayText(pct: number | null, boarded: number): string {
   return pct === null ? 'nobody rode' : `${pct.toFixed(1)} % of ${String(boarded)} journeys`;
 }
 
-/** The repair list rows the panel draws — name, price, effect, and § 10.2's refusal wording. */
+/**
+ * **The order the repairs are drawn in, and it is not the order they are authored in** — GitHub
+ * issue **#566**.
+ *
+ * `data/fixit-cases.json` lists every case's repairs in role order — `diagnosed`, `costly-fix`,
+ * `cheap-fix`, `new-shaft` — which is convenient for an author and is an **answer key** for a
+ * player: on all eighteen shipped cases the correct repair was the first row on the screen, in both
+ * surfaces. That is `role` reaching a player-facing surface without anything ever rendering the
+ * word, which is the tell `docs/38` § 2.1 retires and the one a phrase sweep cannot see.
+ *
+ * ## Why here rather than by reordering the file
+ *
+ * A reordered file fixes the eighteen cases that exist and nothing else: GitHub issue **#233**
+ * authors sixteen more, to the same four-role shape (`fixit/parse.ts` still requires it), and each
+ * one would arrive answer-first unless somebody remembered. Draw order is a presentation decision,
+ * so it is taken once, here, over whatever the file holds.
+ *
+ * ## What the order is
+ *
+ * A stable FNV-1a hash of `caseId/repairId`, ascending. It is **deterministic** — the same case
+ * draws the same order on every load, on both surfaces and for every player, so a screenshot, a
+ * browser-tier index and a player's own memory of a case all stay true — and it carries **no
+ * information about which repair is which**, because the input is two ids and nothing else. Over
+ * the eighteen shipped cases the diagnosed repair lands first five times, second once, third six
+ * times and last six times.
+ *
+ * It does not sort by price, which was the other candidate: the new shaft is the dearest on every
+ * shipped case by construction, so a price sort would put a constant in the last row and hand back
+ * a quarter of the tell.
+ */
+export function repairsInDrawOrder(entry: FixitCase): readonly FixitRepair[] {
+  return [...entry.repairs].sort(
+    (a, b) => drawKeyOf(entry.id, a.id) - drawKeyOf(entry.id, b.id) || (a.id < b.id ? -1 : 1),
+  );
+}
+
+/** FNV-1a over `caseId/repairId`, 32-bit. Stable across loads, platforms and builds. */
+function drawKeyOf(caseId: string, repairId: string): number {
+  let hash = 0x811c9dc5;
+  for (const unit of `${caseId}/${repairId}`) {
+    hash ^= unit.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash;
+}
+
+/**
+ * The repair list rows the panel draws — name, price, effect, and § 10.2's refusal wording.
+ *
+ * ## The price line says *free* and no longer says what kind of fix it is — GitHub issue **#566**
+ *
+ * It read `'free — configuration'`, and the second word is `docs/38` § 2.1's *"printed line that
+ * says what kind of fix it is"* wearing a price's clothes: *a line saying it is a setting, not a
+ * shaft is a proposed fix with the price removed*. It was worse than a hint, because **no
+ * non-diagnosed repair in `data/fixit-cases.json` costs nothing** — so in the five cases whose
+ * diagnosed repair is free, the words *free — configuration* appeared on the answer and on nothing
+ * else. `free` is the whole of what the row knows and the whole of what the player is owed; what
+ * the change is made of is the thing they are here to work out.
+ */
 export function repairRowOf(
   entry: FixitCase,
   state: FixitState,
@@ -783,7 +928,7 @@ export function repairRowOf(
   return {
     selected,
     selectable,
-    priceLine: repair.costUnits === 0 ? 'free — configuration' : `${String(repair.costUnits)} u`,
+    priceLine: repair.costUnits === 0 ? 'free' : `${String(repair.costUnits)} u`,
     refusal:
       selected || affordability.selectable
         ? undefined

@@ -65,7 +65,7 @@ function validCase(): Record<string, unknown> {
     diagnosis: { text: 'The cars park at the wrong end.', reasoning: 'Every long wait began that way.' },
     budgetUnits: 12,
     repairs: [
-      { id: 'r-diagnosed', role: 'diagnosed', name: 'Spread the fleet', effect: 'A setting; the waits above are the target.', patch: { dispatcher: { idle: { parkingStrategy: 'stay' } } } },
+      { id: 'r-diagnosed', role: 'diagnosed', name: 'Spread the fleet', effect: 'Waiting cars spread through the floors they serve.', patch: { dispatcher: { idle: { parkingStrategy: 'stay' } } } },
       { id: 'r-costly', role: 'costly-fix', name: 'Re-gear the machines', effect: 'Shortens the worst wait; the parking stays.', patch: { building: { cars: [{ carIds: ['*'], set: { ratedSpeedDeltaMps: 0.5 } }] } } },
       { id: 'r-cheap', role: 'cheap-fix', name: 'Trim the dwell', effect: 'Moves the mean a little.', patch: { building: { cars: [{ carIds: ['*'], set: { dwellHallCallS: 2.5 } }] } } },
       { id: 'r-shaft', role: 'new-shaft', name: 'A new shaft · beyond a repair budget', effect: 'A capital conversation with the owner.', patch: { building: { addCars: [{ bankId: 'main', copyCarId: 'A', id: 'B' }] } } },
