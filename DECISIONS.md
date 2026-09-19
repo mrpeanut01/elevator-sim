@@ -38356,3 +38356,268 @@ stages it was suspected of.
 9 and 10 have a long tail of refused replications at all, and which of the five grounds those few
 fire on. This entry measured how many, not which. It is one cheap probe away for whoever takes it —
 stage 9's whole baseline batch is five seconds.
+
+---
+
+## D729 — The day's crowd is the UTC date's own digits, derived on the device from the server's own expression
+
+> **Taken 2026-09-19 by an agent session under delegated authority**, not by the product owner. The
+> session principal's standing instruction for this wave is that decisions are taken by the swarm
+> rather than escalated; this entry, [§ D730](#d730), [§ D731](#d731), [§ D732](#d732) and
+> [§ D733](#d733) are taken under it. A later reader weighing this against a product-owner ruling
+> should treat it as an agent ruling and say so — [§ D626](#d626) is the cautionary case in this
+> repository for what happens when that distinction is lost.
+
+**The defect, and it is the worst thing this product has shipped.** `dev/main.ts`'s boot opened the
+session on `randomSeed()` — `crypto.getRandomValues` — and `dev/state.ts#withFirstSession` drew the
+first session's tower from it. Six cold loads in a headless Chromium against the real bundle gave
+six different towers (BUILD-REALITY, 2026-09-19: Midtown Office, Crown Hotel, Secure Tower,
+Empire-State-class, Harbour Point, Vertical City). Reproduced here without a browser by running
+`firstSessionContractFor` over twenty simulated `randomSeed()` draws: **ten distinct contracts of
+the eleven eligible**.
+
+Meanwhile **five** player-facing strings asserted the opposite as fact — `doorView.ts`'s stepper
+rule and its closing sentence, `today.ts`'s seed line and its lede, and `briefView.ts`'s LOCKED FOR
+SCORE card. Every other figure in this product is measured or withheld. These were asserted. On the
+first screen of the first mode, about the one property the whole pitch rests on.
+
+`randomSeed`'s own docstring had said so the entire time — *"A seed nobody chose, so the first shift
+is not the same shift for everybody"* — which is what makes this a screen nobody re-read rather than
+a mechanism nobody understood.
+
+### 1. What was already built, which reframes the whole thing
+
+**It was not a missing feature. It was a four-layer pipeline consumed by nothing** — this
+repository's signature dead-seam defect, one field access from closed (LANE-H, verified at source):
+
+| step | site | state |
+|---|---|---|
+| the seed defined | `server/leaderboard/boardKey.ts#dailySeedFor` — the date with its dashes removed | built |
+| the fixture built | `boardKey.ts#dailyFixtureAt` → `{ date, seed, config }` | built |
+| served | `server/http/api.ts` — `GET /api/boards` | built |
+| validated on the client, field by field | `menu/client.ts#isDailyFixture` | built |
+| carried into a typed structure | `menu/client.ts` → `BoardsPage.today` | built |
+| **a screen reading `today.seed`** | — | **nothing** |
+
+`everyday/host.ts#dailyBoardOf` takes `today.date` for the board key and drops `today.seed` and
+`today.config`; a grep for either across `packages/viz/src` returns zero. So the copy was not lying
+about something nobody had built. It was describing something built and unread.
+
+### 2. The ruling
+
+**The day's crowd is the UTC date's own digits**, `shift/dailySeed.ts`, and the client derives it
+rather than waiting for it. Three properties earn that derivation over the alternatives, each tested
+rather than assumed:
+
+1. **There is already exactly one derivation and this is it.** A second expression — a hash, a
+   salted digest, a rotation table — would be a second answer to a question the server has already
+   answered, which is the defect `boardKey.ts` exists to have removed. `dailySeed.test.ts` pins the
+   agreement against the **server's own source text** rather than against a copy, on
+   `menu/client.test.ts`'s precedent, because `viz` may not import `server` ([§ D215](#d215) § 3).
+2. **A player can check it unaided.** The seed the door prints *is* today's date — `crowd 20260919`
+   on 2026-09-19 — so the claim is verifiable against a calendar the reader already has. That is the
+   standard every withheld figure in this product is held to, pointed at an assertion for once.
+   `boardKey.ts` chose these digits for the same reason and says so.
+3. **A shipped salt buys nothing.** It ships in the bundle, so it is public the moment anybody
+   looks; it makes tomorrow's crowd no less guessable and it breaks property 1. Rejected on that
+   rather than on taste.
+
+### 3. Why the client computes it, against [§ D218](#d218) § 3
+
+§ D218 § 3 says the client never computes which challenge today is, because *"a client's clock is
+not trustworthy in a competition"*. **That rule is kept and it does not reach here**, for three
+reasons that are facts rather than readings:
+
+- **The failure mode is bounded and already handled.** A device a day out plays yesterday's crowd.
+  `boardKey.ts#placeSubmission` then places that run on the **personal log** rather than on the
+  daily board, because it is not `dailyFixtureAt(now)`'s seed. The server's clock still decides
+  every ranked thing and nothing accuses anybody. A challenge window is the opposite: it opens and
+  closes, so a wrong clock lets somebody in early.
+- **There is no server answer to defer to on the build a stranger opens.** The shipped static
+  artifact carries no `<meta name="elevator-sim-api">` — `packages/viz/index.html` forbids one and
+  `deploy-viz.yml` injects it from a repository variable — so `BoardsPage.today` is `undefined` and
+  § D218 § 3's premise (*"the server is already this repository's first wall clock"*) does not hold
+  there.
+- **The page must open before any network answers.** `boot` builds the opening state synchronously.
+  A seed that waited for a fetch would be a page that waited for one, and on an API-less build it
+  would wait forever.
+
+So the division is: **the device's clock decides which day you play; the server's clock decides
+which board your run posts to.** `host.ts#dailyBoardOf` is untouched and still works out no day of
+its own.
+
+### 4. What the invariants get
+
+- **Invariant 3** (no wall clock in `core/`) is untouched: `core` never learns a calendar exists.
+  What crosses the boundary is `SimulationConfig.seed`, a `bigint`, exactly as before. The clock is
+  in `viz`, which is the half of the split allowed one — see [§ D731](#d731) for the seam.
+- **Invariant 2** (no global RNG) is untouched: `shift/firstSession.ts` still derives a named
+  `first-session` stream from the seed, [§ D514](#d514)'s shape, and nothing in that module moved.
+- **Invariant 5** (a run record carries its seed) is what makes a replay survive this: a replay
+  replays the record's seed and never re-derives one, so a run recorded today still replays
+  tomorrow.
+- **[§ D366](#d366)** (no entry-screen override survives a reload) is untouched: nothing is stored.
+  The seed is re-derived on every load, which is `isFirstDayOnALegibleTower`'s own shape.
+- **[§ D514](#d514)** is strengthened rather than superseded. Its rule is that the draw is
+  reproducible from the number the player reads; the number is now the date, so the tower is
+  reproducible from a calendar.
+
+### 5. What is owed and is deliberately not built here
+
+`today.seed` is still read by nothing. Now that the client derives the same value, the server's copy
+is the **authoritative** one and its only remaining use is to tell a player their device's clock
+disagrees. Building that means a field on `EverydayHost`, which is heavily contested in this wave;
+it is named here rather than guessed at.
+
+---
+
+## D730 — "The same for everybody" is true of the crowd and false of the tower, and the strings say which
+
+> **Taken 2026-09-19 by an agent session under delegated authority** — see [§ D729](#d729)'s note.
+
+[§ D729](#d729) makes the crowd the day's. **It does not make the tower the day's, and no seed
+does.** `shift/week.ts` is a week over one `contractId`: `openWeek` opens it and `nextDay` advances
+the day inside it, so a returning player's tower is the one their own week was opened on, and
+`dev/state.ts#withFirstSession` — the only thing that draws a tower from the seed at all — runs
+**once per device**, on the load that restored nothing.
+
+So *"One tower a day"* is a property of a product this one does not have. `docs/38` § 2.1 specifies
+that product (*"Today's scenario. One seed, the same for everybody, once a day"*) and it is not
+built.
+
+**The ruling: each string is narrowed to the claim that holds, and the part that does not hold is
+named rather than reworded away** ([§ D227](#d227)).
+
+| site | was | is |
+|---|---|---|
+| `doorView.ts#DOOR_RULE` | *One tower a day, the same for everybody* | *One crowd a day, the same for everybody — the tower is the one your week is on* |
+| `doorView.ts#SAME_FOR_EVERYONE` → `sameForEveryoneLine(crowdIsToday)` | *Everyone plays the same tower, the same crowd, the same day* | two arms; neither says the tower is shared |
+| `today.ts#seedLine` → `seedLineOf` | *crowd `<n>` · everyone identical* | *crowd 20260919 · today's date, so everyone playing today meets this crowd*, or *· a crowd of this run's own, not the day's* |
+| `today.ts#ledeOf` tail | *Everyone runs the same building on the same crowd* | *The only thing you choose is who drives* |
+| `briefView.ts#lockedForScore` | *The tower, the machines and the crowd are the same for everyone today* | *The crowd is the day's and the tower is your week's — neither is yours to pick from here* |
+
+**Two of the five are conditional, and that is load-bearing rather than cautious.** Two ordinary
+states reach these screens with a crowd nobody else has: a `?seed=` deep link, which is the reader's
+own choice and wins over the opening state exactly as `?building=` does; and a session left open
+across UTC midnight, seeded on yesterday's date and still running. A single unconditional sentence
+would have been § D729's defect surviving inside its own repair. `TodayRecord.crowdIsToday` carries
+the answer to all three surfaces from one place, § 16 rule 14's own shape, so the door and the brief
+cannot disagree about one run — which is the `surfaces-disagree` class the honesty corpus exists
+for. It is asked **per draw** in `doorScreen.ts` and `briefScreen.ts` rather than latched at boot,
+because a flag written once would go quietly stale at midnight with the door still saying *everyone
+identical*: § D227 arriving through a cache instead of through a sentence.
+
+`docs/12` § 4's deviation register is the right home for these as *design* deviations from the
+handoff, whose § 6 closing sentence is the source of two of them. **`CLAUDE.md`'s rule is unchanged
+and is what decides this**: the handoff wins every disagreement about what the screen looks like and
+the simulator wins every disagreement about what a number means, and all five of these are claims
+about the run rather than about the layout.
+
+---
+
+## D731 — `viz` gets one declared calendar-clock seam, and the wall-clock boundary is exempted by name rather than loosened
+
+> **Taken 2026-09-19 by an agent session under delegated authority** — see [§ D729](#d729)'s note.
+
+`packages/viz` had **no calendar clock at all**: `new Date(` appears in no production file under
+`packages/viz/src`, and `boundaries.test.ts` rule 2 keeps it that way — *wall-clock time enters
+through `DisplayClock` and nowhere else*, grepped for `Date.now(` and `performance.now(` outside
+`playback/clock.ts` and `dev/recordTti.ts`.
+
+**`DisplayClock` cannot be the seam, by its own design.** It is *"Milliseconds since some fixed
+origin. Monotonic; the origin is not meaningful"*, and it prefers `performance.now()` precisely
+because a clock that steps backwards would move a playhead. It cannot answer *what is today's date*.
+
+**The ruling: one module, one function, one line, named in the exemption.** `shift/deviceDate.ts`
+exports `deviceNowMs()` and nothing else; `boundaries.test.ts#WALL_CLOCK_EXEMPT` gains it beside
+`dev/recordTti.ts` **on that entry's own argument — it draws no picture**. Everything derived from
+the reading lives in `shift/dailySeed.ts`, which takes `nowMs` as an argument and whose
+clock-freedom is asserted by `dailySeed.test.ts` rather than promised.
+
+**Two alternatives were available and both are worse, which is the whole of why the exemption is
+taken rather than avoided.**
+
+1. **Widening the exemption to `dev/main.ts`.** That file draws every frame the Engineer shell
+   produces. Exempting it exempts the thing rule 2 was written to protect.
+2. **Spelling the read as `new Date()`.** The grep matches `Date.now(` and `performance.now(` and
+   would not have caught it. It would have worked, nothing would have gone red, and it would have
+   been this repository's signature defect with its polarity reversed — not a behaviour no test
+   reaches, but a **rule** no test reaches, got round by choosing a spelling. A boundary evaded by
+   wording is worse than one nobody wrote.
+
+`dailySeed.test.ts` holds the second of those shut directly: it asserts that `dailySeed.ts` contains
+no `Date.now(`, no `performance.now(` and **no zero-argument `new Date()`**, and that the one
+`new Date(` it does contain is the constructor over its own `nowMs` argument.
+
+---
+
+## D732 — The daily rotation rules are measured, and deliberately not adopted, because a rotation would have no observer
+
+> **Taken 2026-09-19 by an agent session under delegated authority** — see [§ D729](#d729)'s note.
+
+`docs/37` § 4.3 carries the gameplay guide § 17's three rotation rules — **no tower twice in seven
+days; no wrinkle template twice in fourteen; the pair never inside a month** — and a rotation
+authored in `data/` was the third candidate for § D729's derivation. It was tested and rejected, and
+both halves are recorded because the measurement outlives the decision.
+
+**Measured, over 730 consecutive UTC dates against the eleven eligible contracts** (pinned by
+`dailySeed.test.ts`, re-derivable there): the date-derived draw repeats a tower **inside seven days
+on 308 of them, 42.2 %**, and on **consecutive days 56 times**. So it plainly does not satisfy
+rule 1, and saying so is better than a rotation that claims to.
+
+**It is declined anyway, on a reason that outranks the arithmetic: a rotation would have no
+observer.** `dev/state.ts#withFirstSession` runs once per device, on the load that restored nothing,
+so a player draws **exactly one element of the sequence, ever**, and the order of the other 729 is a
+property nothing in the product can display. Building it would be a behaviour that is configured,
+validated and reached by nothing — the defect `CLAUDE.md` has recorded eleven times in code and
+twice in `data/` — wearing a design document.
+
+Two further reasons, each smaller and each real:
+
+- **A `data/` rotation needs an epoch and a length**, both of which go stale when the eligible set
+  moves. That set is *derived* from `shift/legibility.ts`'s measured table ([§ D512](#d512),
+  [§ D514](#d514)) and has grown from five members to eleven in three waves; a hand-authored cycle
+  beside it is the second copy § D514 was written to avoid.
+- **It would be a second authority on *which tower today***, beside the server's
+  `DAILY_FIXTURE_CONFIG`, which names one fixed building.
+
+**The rule becomes worth implementing on the day the daily door draws a tower a day**, which is
+GitHub issue #159's generator and not this module's. `docs/37` § 4.3 already requires that generator
+to *assert non-exhaustion over a simulated year* rather than inherit it from the table, and the
+measurement above is left as its first input.
+
+---
+
+## D733 — The door stops promising a duration the run does not have
+
+> **Taken 2026-09-19 by an agent session under delegated authority** — see [§ D729](#d729)'s note.
+
+`doorView.ts#DOOR_STEPS` step 2 read *"The whole shift in a couple of minutes."*
+
+**Measured**, by running the shipped derivation `shift/dayLength.ts#wholeDayFor` over
+`data/buildings/` and `data/traffic-profiles.json`: **ten of the eleven contracts a first session
+can open on run a 36 000 s authored day**, and only `crown-hotel` keeps the 1 800 s slice. At the
+opening stage speed — `4×`, [§ D641](#d641) — 36 000 simulated seconds is **two and a half real
+hours**. § D641's own docstring had already measured that and named five further stale session
+shapes, leaving them with *"Correcting five player-facing strings is not this constant's to do."*
+
+**The ruling: the promise changes, and the rotation is not bounded to fit it.** Bounding the
+eligible set to towers whose day fits three minutes leaves **one tower**, which is not a rotation;
+and shortening the daily run reverses the product owner's ruling on
+`ISSUE_VERIFICATION_FINDINGS.md` § AB (*Everyday day only, stages unchanged*), which is not an agent
+session's to reverse. So step 2 names the day and leaves the length to the speed control, which is
+the only thing on that screen that decides it: *"A whole working day, at whatever speed you set."*
+No figure replaces the one removed, because a duration this screen does not control is a number the
+run did not produce.
+
+**What this does not fix, named rather than absorbed.** The same arithmetic is still wrong on five
+strings outside this lane's ownership — `everyday/modes.ts`'s three tile shapes (*~3-5 min a case*,
+*~2 min a building-day*, *~5 min*) and `everyday/scenarioModel.ts`'s two entries, of which
+*Today's scenario · ~3 min* is the one that names the run this entry is about. They are § D641's
+list, still open, and now with the day-length measurement attached.
+
+---
+
+**This lane held D729–D735 and spent D729, D730, D731, D732 and D733. D734 and D735 are unspent**
+and become permanent holes under [§ D404](#d404) once a later lane writes above them; the integrator
+registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
