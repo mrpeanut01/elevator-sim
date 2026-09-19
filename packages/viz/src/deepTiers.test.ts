@@ -195,6 +195,16 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'reading, which is why it is gated rather than run. The figures it produced are derived ' +
       'from the rung by everyday/sittingShape.ts, so the ordinary suite checks the derivation ' +
       'and this file checks the derivation against a clock.',
+    /*
+     * Not scheduled, and that is a choice rather than an omission. A reading costs three quarters
+     * of an hour of wall clock and measures nothing about the tree: the shipped strings are
+     * *derived* from the rung by `sittingShape.ts`, and `sittingShape.test.ts` asserts that
+     * derivation on every run. What this instrument settles is whether the derivation matches a
+     * real clock, which changes only when `Playback` or the ladder changes — so it is run by hand
+     * when one of those moves, and a nightly job would spend forty-five minutes confirming
+     * arithmetic that a millisecond of unit test already holds.
+     */
+    scheduled: false,
   },
   'packages/viz/src/everyday/rushHouseSweep.test.ts': {
     gates: ['ELEVATOR_SIM_RUSH_HOUSE'],
