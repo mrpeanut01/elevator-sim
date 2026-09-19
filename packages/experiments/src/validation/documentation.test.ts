@@ -2087,7 +2087,18 @@ type DecisionReservation = {
  * nobody knows those until the measurement has run — so the honest default is a narrow block and
  * § D404's ask, which is the mechanism wave AC-2 already proved works when a lane used it.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/*
+ * **Wave AE is OPEN and reserves D840-D910.** Six lanes against the playability panel's ranked
+ * list, each holding a block named in its own dispatch brief. The row in
+ * `CHARTER_PROGRAMME.md` already reads D840 because wave AD's closure moved it there, so the
+ * floor assertion below is satisfied by that commit rather than by this one.
+ *
+ * **Sized narrower per lane than wave AD's, which is that wave's own lesson applied.** AD's
+ * kernel lane held thirty-five and spent two. A block cannot be sized to the decisions a lane
+ * will take, so these are sized to the issues each lane closes, and a lane that needs more asks
+ * under § D404 rather than taking the number above its block.
+ */
+const OPEN_RESERVATION = { wave: 'AE', from: 840, to: 910 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
