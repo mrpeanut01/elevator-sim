@@ -19,6 +19,25 @@ export interface SimKernelOptions {
    * This is an *event count*, never a wall-clock timeout — there is no wall clock in `core/`.
    */
   readonly maxEventsPerRun?: number;
+
+  /**
+   * What {@link maxEventsPerRun} is counted over: one `run`/`runUntilEmpty` call (`'per-call'`,
+   * the default and the historical behaviour) or the whole life of the kernel since construction
+   * or {@link reset} (`'lifetime'`).
+   *
+   * **This exists so that a drain can be split into chunks without silently multiplying the
+   * budget.** A caller that advances a simulation in N bounded calls rather than one unbounded
+   * one gets N × `maxEventsPerRun` under `'per-call'`, so a livelock that the valve would have
+   * caught in one call runs forever in ten — and, worse for this repository, the same seed
+   * produces a *different* record depending on how the caller chose to step it. Under
+   * `'lifetime'` the valve trips on exactly the same event whatever the chunking, which is what
+   * {@link Simulation.advanceTo} needs to be bit-identical to {@link Simulation.run}.
+   *
+   * The two scopes are indistinguishable for a kernel that is drained exactly once — `fired` and
+   * `processedCount()` are the same number there — so this changes nothing for every existing
+   * caller, and the default keeps it that way for callers that never think about it.
+   */
+  readonly eventBudgetScope?: 'per-call' | 'lifetime';
 }
 
 /**
@@ -43,8 +62,10 @@ export class SimKernel implements EventScheduler {
   private readonly queue = new EventQueue();
   private readonly startTime: SimTime;
   private readonly maxEventsPerRun: number;
+  private readonly eventBudgetScope: 'per-call' | 'lifetime';
   private currentTime: SimTime;
   private processed = 0;
+  private lastDispatchedTime: SimTime | undefined;
   private running = false;
 
   constructor(options: SimKernelOptions = {}) {
@@ -64,6 +85,7 @@ export class SimKernel implements EventScheduler {
 
     this.startTime = startTime;
     this.maxEventsPerRun = maxEventsPerRun;
+    this.eventBudgetScope = options.eventBudgetScope ?? 'per-call';
     this.currentTime = startTime;
   }
 
@@ -93,6 +115,23 @@ export class SimKernel implements EventScheduler {
   /** Number of events fired since construction (or since the last {@link reset}). */
   processedCount(): number {
     return this.processed;
+  }
+
+  /**
+   * Simulated time of the most recently *dispatched* event, or `undefined` if none has fired.
+   *
+   * Not the same thing as {@link now}, and the difference is the whole reason it exists.
+   * {@link runUntilEmpty} leaves the clock at the last event's time, so the two agree; but
+   * {@link run} advances the clock to `until` whether or not anything fired there, so a caller
+   * that drains in bounded chunks can finish with the clock ahead of the last thing that
+   * happened. Anything that means *"when did this run stop"* — as opposed to *"how far has the
+   * caller asked us to look"* — has to read this, or the same run reports a different end time
+   * depending on where the caller chose to pause.
+   *
+   * Cancelled events never dispatch, so they never move it.
+   */
+  lastEventTime(): SimTime | undefined {
+    return this.lastDispatchedTime;
   }
 
   /** `true` when no events are pending. */
@@ -242,6 +281,7 @@ export class SimKernel implements EventScheduler {
     this.queue.reset();
     this.currentTime = this.startTime;
     this.processed = 0;
+    this.lastDispatchedTime = undefined;
   }
 
   /**
@@ -269,11 +309,33 @@ export class SimKernel implements EventScheduler {
         if (until !== undefined && next.time > until) {
           break;
         }
-        if (fired >= this.maxEventsPerRun) {
+        // `'lifetime'` counts every event this kernel has ever fired, so splitting one drain
+        // into several bounded calls does not hand the caller a fresh budget each time. For a
+        // kernel drained exactly once the two are the same number, which is why the default
+        // scope leaves every existing caller's behaviour — and its error text — untouched.
+        const lifetime = this.eventBudgetScope === 'lifetime';
+        const spent = lifetime ? this.processed : fired;
+        if (spent >= this.maxEventsPerRun) {
+          // **Under `'lifetime'` the message names neither the calling method nor the clock**,
+          // and neither omission is cosmetic. This message travels into `Simulation`'s warnings
+          // and therefore into the `RunRecord`, so anything in it that varies with *how the
+          // caller chose to step* puts the caller's stepping choice into a persisted record —
+          // the same seed, the same events, the same instant, two different bytes.
+          //
+          // Both varied. The method name is `run` from a bounded chunk and `runUntilEmpty` from
+          // an unbounded drain. And a lifetime budget can be found already spent at the *start*
+          // of a later chunk, with the clock parked at a boundary the caller picked, so
+          // `currentTime` would report where somebody looked rather than where the run stopped —
+          // {@link lastEventTime} is the same distinction one layer up.
+          //
+          // Under `'per-call'` the budget really is a property of the one call and the clock is
+          // necessarily on the last event it fired, so that message is exactly what it was.
+          const at = lifetime ? (this.lastDispatchedTime ?? this.currentTime) : this.currentTime;
           throw new Error(
-            `SimKernel.${caller}: fired ${fired} events at t=${this.currentTime}s without ` +
-              `draining the queue (maxEventsPerRun=${this.maxEventsPerRun}). This usually means a ` +
-              `handler reschedules itself at the same instant without making progress.`,
+            `${lifetime ? 'SimKernel' : `SimKernel.${caller}`}: fired ${spent} events at ` +
+              `t=${at}s without draining the queue ` +
+              `(maxEventsPerRun=${this.maxEventsPerRun}). This usually means a handler ` +
+              `reschedules itself at the same instant without making progress.`,
           );
         }
         this.queue.pop();
@@ -289,6 +351,7 @@ export class SimKernel implements EventScheduler {
   /** Advance the clock to the event's time and invoke its handler. */
   private dispatch(entry: ScheduledEvent<unknown>): void {
     this.currentTime = entry.time;
+    this.lastDispatchedTime = entry.time;
     this.processed += 1;
 
     const context: EventContext = {
