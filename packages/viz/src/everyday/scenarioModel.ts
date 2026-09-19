@@ -183,13 +183,21 @@ const ENTRIES: readonly ScenarioEntry[] = Object.freeze([
  * that this list cannot reach them and that four of the six are refused at load, so the entry says
  * both rather than being deleted.
  *
- * **The third row is new and is the price of listing the path** — § D649. Seven of the ten stages
- * are listed with a measured count of zero and are not offered, and a register that carried the
- * listing without the reason would be the hub looking finished again. It says *held back* rather
- * than *unwinnable*, because the dial half of that count is a sample: `survivors.ts#dialShareInterval`
- * puts 0 of 12 at about a quarter or fewer with 95 % confidence, so none-found is the claim the
- * measurement supports and none-exists is not. The count it names is **derived on every read**
- * from the provided path, so a rebalance moves this sentence rather than stranding it.
+ * **Two more rows are drawn and are deliberately not in this constant** — § D649,
+ * {@link scenarioHubViewOf}. One names the stages listed with a measured count of zero, because a
+ * register that carried the listing without the reason would be the hub looking finished again;
+ * the other is the path's own absence on a boot that has not handed one over. Both are **derived
+ * on every read** — the first counts the held rows, and writing *"seven of ten"* here would put a
+ * figure from `data/scenario-survivors.json` into TypeScript, where a regeneration cannot reach
+ * it, which is the defect `CLAUDE.md` records three published numbers committing.
+ *
+ * That is why this constant holds only the two **unconditional** rows: it is what
+ * `everyday/buildNotes.ts` carries to the Settings panel and what
+ * `everyday/refusalsAreCurrent.test.ts` sweeps for a screen wrongly called unbuilt, and neither
+ * of those can read a state. A derived row is checked where it is derived —
+ * `scenarioModel.test.ts` asserts the count it states against the rows it counted, and that it is
+ * **absent entirely** when nothing is held, which is what makes it a register row rather than
+ * decoration.
  */
 export const SCENARIO_ABSENCES: readonly string[] = Object.freeze([
   'The ten stages on the path are played on the Engineer surface. A stage cleared there banks no chimes and does not reach a career; that will count once a stage can be played from this list.',
