@@ -66,6 +66,7 @@ import {
 import type { VizRecording } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
 import type { ViewerState } from '../dev/state.js';
+import { stampVerbOf } from '../live/interventions.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import { switchUnpostableReasonOf, switchWireOf, type WireIntervention } from '../scope/switchWire.js';
 
@@ -88,19 +89,64 @@ export const MAX_SITTING_ROUNDS = 12;
  * -------------------------------------------------------------------------- */
 
 /**
+ * One press a round recorded, as the sheet reads it back — GitHub issue **#565**, § D859.
+ *
+ * Reading only: it never travels. What the server replays is {@link RushRoundRecord.wireInterventions},
+ * which carries the change itself; this is the same press turned into the two things a player needs
+ * to follow a causal chain (`docs/43` P3) — when it happened and what it was.
+ */
+export interface RushRoundChange {
+  /** Seconds from the round's start — `RunInterventionConfig.atS`, unaltered. */
+  readonly atS: number;
+  /**
+   * What it was, past tense, in the stage stamp's own words — `live/interventions.ts#stampVerbOf`.
+   *
+   * The producer is shared rather than re-worded here for the reason that function's own docstring
+   * now gives: the Day report's *switched to Predictive balanced* and this sheet's have to be the
+   * same sentence, or one press acquires two accounts of itself.
+   */
+  readonly verb: string;
+}
+
+/**
  * One finished round of a sitting.
  *
  * Two halves, and they are different things on purpose. The **wire** half — the ids, the rows, the
- * log and {@link holdS} — is what a post carries. The **reading** half — the driver's name, the
- * outcome, the press count — is what the round list draws, and none of it travels: a name is a
- * display string the server neither reads nor trusts, and the outcome is the player's own view of a
- * round the server will replay for itself.
+ * log and {@link RushRoundRecord.holdS} — is what a post carries. The **reading** half — the
+ * drivers, the changes, the outcome, the press count — is what the round list draws, and none of it
+ * travels: a name is a display string the server neither reads nor trusts, and the outcome is the
+ * player's own view of a round the server will replay for itself.
  */
 export interface RushRoundRecord {
   /** The dispatcher the round was driven from, by id. */
   readonly dispatcherProfileId: string;
-  /** What that dispatcher is called, for the round list. Never on the wire. */
+  /**
+   * What the round **opened** on, for the round list. Never on the wire.
+   *
+   * Read {@link RushRoundRecord.drivers} before drawing this on its own: a round that was handed
+   * over part-way through did not run on this dispatcher, and a line saying *driven by* over this
+   * name alone is GitHub issue **#565**'s third defect.
+   */
   readonly dispatcherName: string;
+  /**
+   * Every dispatcher that drove some part of the round, in the order they drove it — the opening
+   * one, then each `switch-dispatcher` press's target. GitHub issue #565, § D859.
+   *
+   * Never on the wire: a name is a display string, and the server replays the round from the ids
+   * and the log rather than from this. One entry on a round nobody handed over, so the ordinary
+   * sheet reads exactly as it did.
+   */
+  readonly drivers: readonly string[];
+  /**
+   * What the player changed while it played, in time order — one entry per press, whether or not
+   * it travels. GitHub issue #565, § D859.
+   *
+   * Beside {@link interventionCount} rather than instead of it, because the two answer different
+   * questions and the sheet draws both: the count is *how much happened*, this is *what happened*.
+   * The sheet read `1 change while it played` and said neither what nor when, which is the one
+   * thing `docs/43` P3's causal-chain protocol needs from a sitting.
+   */
+  readonly changes: readonly RushRoundChange[];
   /** The player's rules over it, in first-match order. */
   readonly ruleRows: readonly RuleRowConfig[];
   /**
@@ -158,9 +204,22 @@ export function rushRoundRecordOf(input: {
   unpostable.push(...wire.refusals);
 
   const holdAtS = rushHoldAt(recording);
+  /*
+   * The changes and the drivers, in time order — GitHub issue #565, § D859. The log is authored in
+   * press order, which is time order for a control that appends at the playhead, but the sheet's
+   * claim is *in time order* and it holds that claim itself rather than inheriting it, which is
+   * `live/interventions.ts#interventionLogOf`'s own defensive copy and its reason.
+   */
+  const ordered = [...state.interventions].sort((a, b) => a.atS - b.atS);
+  const drivers = [
+    input.dispatcherName,
+    ...ordered.flatMap((entry) => (entry.change.kind === 'switch-dispatcher' ? [entry.change.profile.name] : [])),
+  ];
   return Object.freeze({
     dispatcherProfileId: state.dispatcherId,
     dispatcherName: input.dispatcherName,
+    drivers: Object.freeze(drivers),
+    changes: Object.freeze(ordered.map((entry) => ({ atS: entry.atS, verb: stampVerbOf(entry.change) }))),
     ruleRows: Object.freeze([...state.ruleRows]),
     wireInterventions: wire.log,
     interventionCount: state.interventions.length,

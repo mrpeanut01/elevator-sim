@@ -40893,3 +40893,169 @@ in the package that runs a simulation"*, with `dev/shiftWorker.ts` behind it; th
 `packages/viz` change and this was a `packages/core` lane. By this repository's own definition it is
 a dead seam until then, and `sim/interrupt.test.ts` exercising it is precisely what the standing
 requirement says does not count.
+
+## D856 — the stage's dispatcher picker says on its own face that choosing is not committing, rather than being made to act
+
+**Date: 2026-09-19 · Owner: LANE-AE-B (wave AE) · Rules on:** nothing recorded; it applies
+`CLAUDE.md`'s standing requirement in the polarity [§ D227](DECISIONS.md) added — *a control that
+writes nothing must say so*. Binds `packages/viz/src/everyday/stageScreenModel.ts`,
+`everyday/stageScreen.ts` and `honesty/surfaces.ts`, so it is an entry rather than a docstring.
+GitHub issue **#565**, first defect.
+
+**What was wrong.** A playability assessor selected *Predictive balanced* in § 7.6's picker,
+watched `DRIVING` go on reading *Conventional collective*, and played a forty-one-minute sitting
+that came back bit-identical to the untouched baseline. They called it *"the one place a player can
+be actively misled by the product."*
+
+**The wiring was not the defect and is unchanged.** `stageScreen.ts`'s `change` listener calls
+`syncSwitchArm()` and appends nothing; the button beside it is the sole caller of `intervene`. So
+`DRIVING` continuing to name the old dispatcher was the product being honest. What was missing was
+any statement of that on the control, and the picker's accessible name read *"Who drives the rest of
+the day"* — a claim of **effect** on a control of **intent**.
+
+**Why it was not simply made to act, which is the half worth recording.** The brief's dispatcher
+`<select>` (`everyday/briefScreen.ts:360`) *does* act on `change`, and should: it writes standing
+state, nothing is running, and it is reversible. This one appends to the run record, which
+re-simulates the whole day from t = 0. Bound to `change` it would fire a full re-simulation on every
+arrow key a keyboard user passes through the list, and each one would land on an append-only log as
+a handover nobody asked for. Two controls, two behaviours, and each now states which it is.
+
+**What ships.** `STAGE_SWITCH_PICKER_LABEL` becomes a label of intent, and a new drawn
+`STAGE_SWITCH_PICKER_NOTE` says *"Choosing here changes nothing by itself — the day keeps running on
+whoever is driving until you press the button beside it."* Drawn text pointed at by
+`aria-describedby`, never a `title`, for `STAGE_RACE_WATCHING`'s recorded reason: a reason a player
+cannot see is not a reason.
+
+**Proved by a run, in both directions** (`everyday/stageScreen.browser.test.ts`). Selecting leaves
+the record's log empty and the legs byte-identical — hashed in the page, because a stamp is a
+caption and a caption is exactly what this control had instead of an effect. Pressing grows the log
+by one and moves the legs.
+
+**One thing that measurement found and this lane did not fix.** The case had to be moved off this
+file's default `garden-apartments` to assert the press at all: that day is **29 legs on two cars**,
+and a handover from `collective` to `nearest-car` reproduces it byte for byte. Measured beside it in
+node on a full garden-apartments day, **ten of the twelve** other shipped dispatchers change no leg
+either — only `nearest-car` and `zoned-uppeak` move it. That is `docs/43` P1's dominance check
+finding the first tower too small for the choice to matter, and it is recorded here rather than
+repaired, because a browser case is the wrong instrument to establish it and no lane was asked to.
+
+
+## D857 — a rush's dispatcher is chosen before the run, on the rush's own screen, and the refusal that kept it off is withdrawn by a measurement
+
+**Date: 2026-09-19 · Owner: LANE-AE-B (wave AE) · Rules on:** the refusal recorded in
+`everyday/rushScreenModel.ts#rushDrivingLine`'s docstring, which is **withdrawn**. Binds
+`everyday/rushScreen.ts`, `everyday/rushScreenModel.ts`, `honesty/surfaces.ts` and a new
+`everyday/rushHandover.test.ts`. GitHub issue **#565**, second defect.
+
+**What was wrong.** The rush setup screen ranked `data/rush-house-runs.json`'s figures under
+*furthest anyone has held* and offered no way to reach them. The table's own `provenance.path` sets
+the dispatcher **before** the run — `withBuilding → withDispatcher → rushPatchOf` — and the only
+dispatcher control a player could find inside the mode was § 7.6's **mid-run** handover. The
+assessor's lost-count item 7 is *"I never found where to choose a dispatcher before a rush starts."*
+
+**The refusal that kept it off was wrong in both halves.** It read: *"The only thing such a select
+could write in this build is `ViewerState.dispatcherId`, which is who drives the next **daily** run
+— so a player who changed it on the rush setup would have altered a different mode's run from a
+screen whose own run does not exist."* The screen's own run exists (GitHub issue #220 built the
+engine; `rushBarModel` is `return base`), and `dispatcherId` is the field **a rush reads** —
+`everyday/rush.ts#RUSH_FIELD_ROLES` records it as `dispatcher`, *the dispatcher they bring, the rush
+tests it*. The control was refused on the ground that it could only reach another mode, when it is
+the one control that reaches this one.
+
+**The gap is measured rather than narrated** (`everyday/rushHandover.test.ts`), Harbour Point, the
+rush's own seed, four arms compared on the legs:
+
+| arm | what it is | held |
+|---|---|---|
+| A | `predictive-balanced` set **before** the run — the house's own path | **2 766 s** |
+| C | `collective`, untouched — the naive line | **2 480 s** |
+| B | `collective` with a `switch-dispatcher` to `predictive-balanced` at 0:00 | **2 364 s** |
+| D | `collective`'s configuration carrying `predictive-balanced`'s **weight vector alone** | **2 364 s** |
+
+Three things follow, in the order they matter. **A reproduces the board to the second**, from a
+fresh session through the setters `EverydayHost.setDispatcher` calls — so the figure was reachable
+all along and no screen inside the rush offered the route. **B is a different run from A by 402 s**,
+and lands 116 s *below* touching nothing: playing the product's own advice, the only way the product
+offered, cost the assessor nearly two minutes. **D is bit-identical to B on the legs**, so a
+handover's effect is exactly the weight substitution and exactly nothing else — which is what
+`dispatch/policy.ts#adoptWeights` does and what `dispatch/selector.ts` § *Why only the weights
+switch* argues it must do. That identity is asserted rather than inferred from two hold moments
+agreeing, because two runs can agree on one scalar and differ everywhere else.
+
+**What ships.** The prototype's own select, in the driving block, calling the same
+`EverydayHost.setDispatcher` the brief's calls, with `rushScreen.ts#syncDriver` re-reading the
+host afterwards so the driving line, the picker and the tagged house row are all facts about the
+state. `rushDrivingLine` loses its *"Picking another is on the brief, which today's tower opens"*
+clause on this commit (§ D227) and says **when** the named dispatcher starts driving instead.
+
+**What the control also writes is said before it is pressed, not discovered afterwards.** There is
+one standing dispatcher and a rush runs it, so this control cannot be rush-scoped without a second
+field and a second thing to restore on the way out. `RUSH_SCREEN_COPY.driverPickNote` says *"This is
+the dispatcher you are standing with, so picking here also changes who drives your next day."*
+
+**What is deliberately not claimed.** Nothing says *why* the weights-only vector holds less than
+either whole configuration. One cell, one seed, one building — `CLAUDE.md`'s seven-sites lesson and
+[§ D256](DECISIONS.md)'s refusal of a plausible sentence in place of a measurement. What generalises
+is the negative, and it follows from arm D rather than from the seconds.
+
+
+## D858 — the house board says what its rows are runs of, and marks the row the player is set to run
+
+**Date: 2026-09-19 · Owner: LANE-AE-B (wave AE) · Rules on:** nothing recorded; it adds to
+[§ D547](DECISIONS.md)'s standings. Binds `everyday/rushHouse.ts`, `everyday/rushScreen.ts` and
+`honesty/surfaces.ts`. GitHub issue **#565**, second defect, the display half of
+[§ D857](DECISIONS.md).
+
+**Either the board's figure is reachable and the player should be able to reach it, or it may not be
+presented as a target.** § D857 measured that it *is* reachable and built the route. This is the
+other half: the board now states the path it was measured on, because a player who hands the day
+over mid-run has not taken that path and the table must not read as though they had.
+
+`RUSH_HOUSE_COPY.note` gains: *"Each row drove from the run's first second, which is what picking
+one below does; handing the day over part-way through swaps the weight vector and leaves the rest of
+the opening dispatcher's settings running, so it is not what these rows measured."* Every clause of
+that is what `everyday/rushHandover.test.ts` measured, and it carries **no figure**, deliberately:
+the 402-second gap is Harbour Point's, and this note is drawn on every building.
+
+`RushHouseRowView.standingTag` marks the one row the player is set to run. Matched by **id**, never
+by the drawn name — `nameOf` prints an unknown id as itself, so matching on the name would tag two
+rows on a build that had lost a profile. It tags and does not promote: *furthest* stays the order
+the eyebrow claims, and a table that floated the player's own pick to the top would be answering a
+different question from the one it is headed with. Words rather than colour alone, `docs/36`'s rule.
+`rushHouse.test.ts` asserts it in both directions, because a tag that is always on says nothing.
+
+
+## D859 — a rush round records what drove it and what was changed, and the sheet stops crediting the opening dispatcher
+
+**Date: 2026-09-19 · Owner: LANE-AE-B (wave AE) · Rules on:** nothing recorded; it is the display
+half [§ D542](DECISIONS.md)'s sitting left to whoever needed it. Binds
+`everyday/rushSitting.ts`, `everyday/rushPost.ts`, `everyday/reportScreen.ts`,
+`live/interventions.ts` and `honesty/surfaces.ts`. GitHub issue **#565**, third defect.
+
+**What was wrong.** The sheet read *"Round 1 · driven by Conventional collective · held 39:24, into
+wave 14 · 1 change while it played."* The round had run on *Predictive balanced* since 0:00. So it
+named the dispatcher the round **opened** on, and reported the press as a bare count that said
+neither what changed, nor when, nor what followed. The assessor's causal-chain protocol —
+`docs/43` P3 — broke exactly there.
+
+**The shape was already in the repository and is reused rather than invented.**
+`live/interventions.ts#interventionLogOf` draws the Day report's log as `clock · verb`, sharing
+`stampVerbOf` and `clockAt` with the stage stamp so the two cannot disagree about what a press was
+called. A rush is measured in **held time** rather than in the building's hour, so it cannot use
+either function — but it must use the same words. `stampVerbOf` is therefore exported, and its
+docstring's own argument against exporting (*"two exports for one sentence would be two places for
+it to drift apart"*) is answered rather than deleted: that argument was about two *sentences*, and
+this is one sentence in a second clock.
+
+**What ships.** `RushRoundRecord` gains `drivers` — every dispatcher that drove part of the round,
+in order — and `changes`, one `{ atS, verb }` per press in time order. Both are reading-only and
+never travel: the server replays a round from its ids and its wire log. `RUSH_POST_COPY.drivenBy`
+takes a list, and a round with one driver reads exactly as it always did. Each change draws as
+`26:31 · switched to Capacity aware — drove the remaining 14:31, to wave 14`.
+
+**And what a change was *worth* is not claimed.** *Drove the remaining 14:31* is a subtraction over
+two moments the round already holds; saying *it cost you two minutes* would need the same waves
+played again without the press, and this sitting has only the round that was played.
+`RUSH_POST_COPY.changesNote` says so under the list, because two figures on adjacent lines invite a
+reader to subtract a counterfactual nobody ran — `CLAUDE.md`'s rule that a mechanism is measured or
+said to be unmeasured, and [§ D256](DECISIONS.md)'s refusal.

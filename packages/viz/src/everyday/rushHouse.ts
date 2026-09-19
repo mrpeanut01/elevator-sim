@@ -199,7 +199,23 @@ export const RUSH_HOUSE_COPY = Object.freeze({
     'Rows marked house are the game’s own runs: every shipped dispatcher, once, on this building ' +
     'and the same waves you face. Nobody played them, and the order does not rank the ' +
     'dispatchers — one crowd, one run each. Outlast one and you have outlasted a machine on the ' +
-    'same arrivals.',
+    'same arrivals. Each row drove from the run’s first second, which is what picking one below ' +
+    'does; handing the day over part-way through swaps the weight vector and leaves the rest of ' +
+    'the opening dispatcher’s settings running, so it is not what these rows measured.',
+  /**
+   * The row the player is set to run — GitHub issue **#565**, second defect,
+   * [§ D858](../../../../DECISIONS.md).
+   *
+   * The board's whole defect was that its figures looked like targets on a path no rush screen
+   * offered. The pick is on that screen now, and this is the other half of making the route
+   * visible: the row a player is about to attempt is marked as theirs to attempt, so the table
+   * stops being a list of strangers' results and becomes a list of one of which is selected.
+   *
+   * Words rather than colour alone, because a row set apart only by its background says nothing to
+   * a screen reader and nothing in high contrast — `docs/36`'s rule, and the same reason
+   * {@link RushHouseRowView.heldThrough} is a field the frame reads rather than a shade it infers.
+   */
+  standingTag: 'yours next',
   /** A building the house has not run — anything drawn in the designer. */
   unrun:
     'The house has not run this building. Its runs are measured on the shipped towers as they ' +
@@ -225,6 +241,12 @@ export interface RushHouseRowView {
   readonly held: string;
   /** True when the line was never crossed, so the frame can set the row apart. */
   readonly heldThrough: boolean;
+  /**
+   * {@link RUSH_HOUSE_COPY.standingTag} on the row the player is set to run, `undefined` on every
+   * other — GitHub issue #565, § D858. `undefined` on every row when the caller names no standing
+   * dispatcher, which is every caller that is not the setup screen.
+   */
+  readonly standingTag: string | undefined;
 }
 
 export type RushStandingsView =
@@ -253,11 +275,17 @@ function measuredOnThisStream(table: RushHouseTable): boolean {
  *
  * `nameOf` is the host's honest lookup — `EverydayHost.dispatcherById` — so a dispatcher this build
  * does not know is printed as its id rather than as somebody else's name.
+ *
+ * `standingDispatcherId` is who the player is set to run, and it only tags a row
+ * ({@link RUSH_HOUSE_COPY.standingTag}) — it never re-orders, never filters and never promotes.
+ * *Furthest* stays the order the eyebrow claims; a table that floated the player's own pick to the
+ * top would be answering a different question from the one it is headed with.
  */
 export function rushStandingsOf(
   buildingId: string,
   nameOf: (dispatcherId: string) => string | undefined,
   table: RushHouseTable = RUSH_HOUSE_TABLE,
+  standingDispatcherId?: string | undefined,
 ): RushStandingsView {
   if (!measuredOnThisStream(table)) return { kind: 'withheld', reason: 'stale', refusal: RUSH_HOUSE_COPY.stale };
   const here = table.runs
@@ -276,6 +304,12 @@ export function rushStandingsOf(
         wave: run.brokeAtS === null ? RUSH_HOUSE_COPY.neverBroke : `wave ${String(playerWaveAt(run.brokeAtS))}`,
         held: run.brokeAtS === null ? `all ${String(LAST_GENERATED_WAVE)} waves` : heldClock(run.brokeAtS),
         heldThrough: !broke,
+        /*
+         * Marked by id, which is the one identity a row and the player's selection share — a name
+         * is `nameOf`'s answer and an unknown id prints as itself, so matching on the drawn name
+         * would tag two rows on a build that had lost a profile.
+         */
+        standingTag: run.dispatcherId === standingDispatcherId ? RUSH_HOUSE_COPY.standingTag : undefined,
       };
     });
   return { kind: 'rows', note: RUSH_HOUSE_COPY.note, rows };

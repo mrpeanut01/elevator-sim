@@ -94,6 +94,7 @@ import {
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
   STAGE_SWITCH_PICKER_LABEL,
+  STAGE_SWITCH_PICKER_NOTE,
   STAGE_FLOOR_JUMP_PLACEHOLDER,
   stageAlarmOf,
   stageBarModelOf,
@@ -932,6 +933,17 @@ function mountStage(
     'max-width:100%',
   ].join(';');
   switchPicker.setAttribute('aria-label', STAGE_SWITCH_PICKER_LABEL);
+  /*
+   * **The picker says on its own face that choosing is not committing** — GitHub issue #565,
+   * § D856, whose argument is on `STAGE_SWITCH_PICKER_NOTE`. Drawn beside the control and pointed
+   * at by `aria-describedby`, so a screen reader meets it in the same breath as the list rather
+   * than after it; `id` is set here because the note is this mount's element and the words are the
+   * model's, which is this file's founding split.
+   */
+  const switchPickerNote = el(doc, 'span', 'everyday-stage-switch-note', STAGE_SWITCH_PICKER_NOTE);
+  switchPickerNote.id = 'everyday-stage-switch-note';
+  switchPickerNote.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.warmGrey};flex-basis:100%`;
+  switchPicker.setAttribute('aria-describedby', switchPickerNote.id);
   /**
    * The shelf, rebuilt only when it has moved — see the block comment above for why once is wrong.
    *
@@ -958,6 +970,8 @@ function mountStage(
     switchPicker.value = latest.some((profile) => profile.id === keep) ? keep : (latest[0]?.id ?? '');
     switchPicker.hidden = latest.length === 0;
     switchButton.hidden = latest.length === 0;
+    // The note is about the pair; with no shelf there is no control for it to be about.
+    switchPickerNote.hidden = latest.length === 0;
   }
   const switchButton = el(doc, 'button', 'everyday-stage-intervene');
   switchButton.type = 'button';
@@ -997,6 +1011,7 @@ function mountStage(
     ...interventionButtons,
     switchPicker,
     switchButton,
+    switchPickerNote,
     interventionStamp,
     interventionRefusal,
     interventionNote,

@@ -72,6 +72,8 @@ import {
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
   STAGE_SWITCH_NO_CHANGE,
+  STAGE_SWITCH_PICKER_LABEL,
+  STAGE_SWITCH_PICKER_NOTE,
   stageGoalsOf,
   STAGE_GOALS_COPY,
   type StageGoalsView,
@@ -701,6 +703,37 @@ describe('§ 7.6 — the intervention control', () => {
     /* And the direction that matters more: a moved lever makes the *standing name* a real change. */
     const moved = armsFor({ target: PLAIN, driving: profile('plain', 'Steady hand', 9) });
     expect(moved.rows.at(-1)?.refusal).toBeUndefined();
+  });
+
+  /**
+   * **The picker says what it does not do** — GitHub issue **#565**, first defect, § D856.
+   *
+   * An assessor selected a dispatcher here, watched `DRIVING` go on naming the old one, and lost a
+   * forty-one-minute sitting to a run that came back bit-identical. The wiring was right; the
+   * control's own words were not, because `STAGE_SWITCH_PICKER_LABEL` read *"Who drives the rest of
+   * the day"*, which is a statement of **effect** over a control of **intent**.
+   *
+   * `CLAUDE.md`'s standing requirement, in the polarity § D227 added: *a control that writes nothing
+   * must say so*. Both strings are asserted for what they claim rather than for their shape — a
+   * case that pinned the note's length would pass for exactly as long as the note was wrong, which
+   * is what `rushScreenModel.test.ts`'s own driving-line case learned twice.
+   *
+   * The browser half is `stageScreen.browser.test.ts`, which selects and requires the run to be
+   * byte-identical, then presses and requires it to move.
+   */
+  it('says on the picker’s own face that choosing is not committing — GitHub issue #565', () => {
+    /* The label names the act the player is *about* to take, not one it has taken. */
+    expect(STAGE_SWITCH_PICKER_LABEL).toContain('Choose');
+    expect(STAGE_SWITCH_PICKER_LABEL).not.toMatch(/^Who drives/u);
+    /* And the drawn note says the two halves a lost sitting would have needed. */
+    expect(STAGE_SWITCH_PICKER_NOTE).toContain('changes nothing by itself');
+    expect(STAGE_SWITCH_PICKER_NOTE).toContain('press the button beside it');
+    /*
+     * It points at the button by what the button *is*, never by a colour or a position: a note
+     * reading *the one on the right* is a note that is wrong on a wrapped row and silent to a
+     * screen reader.
+     */
+    expect(STAGE_SWITCH_PICKER_NOTE).not.toMatch(/right|left|below|above/iu);
   });
 
   it('treats a handover already on the log as the pin it is', () => {
