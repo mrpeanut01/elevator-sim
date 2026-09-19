@@ -54,6 +54,29 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The locator’s two vocabularies and the function that returns them — `shift/trouble.ts`, ' +
+        'GitHub issue L7’s shape. `TROUBLE_SOURCES` is `held-landing`/`hold`/`deepest-queue`/' +
+        '`worst-wait` and `LOCATED_FIGURE_IDS` is `standing-here`/`past-band-here`/' +
+        '`past-band-everywhere`/`held-for`/`waited`; both are derived only because the ' +
+        'two-adjacent-words scanner reads a hyphenated id as prose. **This module ships no words ' +
+        'at all** — it returns `LocatedMoment`s carrying a `floorId`, a simulated second, a band ' +
+        'and counts, and it deliberately had its `troubleLinesOf` deleted before landing so that ' +
+        'no renderer here could go uncalled. An id is a contract, not a string a player reads, ' +
+        'which is the same ground `MoodSegment.bandId` stands on in `live/bands.ts`. What a ' +
+        'player actually reads from this arithmetic is the rush result’s *where* beat, ' +
+        '`everyday/rush.ts#RUSH_RESULT_COPY.beatWhere`, and it **is** seeded — ' +
+        '`honesty/surfaces.ts`’ rush-result adapter renders both arms and gives the synthesised ' +
+        '`broke` arm a `where` for exactly that reason. `troubleOf` is derived transitively ' +
+        'through those two constants and carries no literal of its own.',
+      ids: [
+        'shift/trouble.ts#TROUBLE_SOURCES',
+        'shift/trouble.ts#LOCATED_FIGURE_IDS',
+        'shift/trouble.ts#troubleOf',
+        'everyday/rush.ts#rushOutcomeOf',
+      ],
+    },
+    {
+      reason:
         'A CSS colour with an alpha composed into it, derived only because the two-adjacent-words ' +
         'scanner reads the `${String(` / `Number.parseInt` line break inside its own `rgba()` template ' +
         'as prose. `withAlpha` returns a value for `fillStyle` and `strokeStyle`; no string it ' +

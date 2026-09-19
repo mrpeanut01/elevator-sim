@@ -645,7 +645,14 @@ export const RUSH_RESULT_COPY = Object.freeze({
     const parts = named.map((place) => `${String(place.pastTheLine)} of the ${String(place.standing)} standing at ${place.label}`);
     const rest = places.length - named.length;
     const tail = rest === 0 ? '' : `, and ${String(rest)} more ${rest === 1 ? 'landing' : 'landings'} holding the remainder`;
-    return `They were not in one place: ${parts.join(', ')}${tail} — of ${String(overLine)} past two minutes across the building.`;
+    /*
+     * **One landing is not "not in one place"**, and the singular arm exists because the plural
+     * sentence contradicts itself there: a hold entirely on the lobby would have read *They were
+     * not in one place: 40 of the 43 standing at G*. A run that breaks on a single landing is the
+     * clearest case this beat has to report, so it is the last one that may be worded wrongly.
+     */
+    const opening = places.length === 1 ? 'They were all in one place' : 'They were not in one place';
+    return `${opening}: ${parts.join(', ')}${tail} — of ${String(overLine)} past two minutes across the building.`;
   },
   beatStopped: (over: number): string =>
     `${String(over)} people were past two minutes when it stopped, against a line of ${String(RUSH_HOLD_LINE.people)}. Where this building breaks is not yet known.`,

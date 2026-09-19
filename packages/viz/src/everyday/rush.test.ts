@@ -169,13 +169,26 @@ describe('the hold line — forty past two minutes at once, read at the stream�
 
     const beat = rushResultViewOf(broke, undefined).account[3];
     expect(beat).toBeDefined();
-    expect(beat).toContain('not in one place');
+    expect(beat).toContain(broke.where.length === 1 ? 'all in one place' : 'not in one place');
     expect(beat).toContain(broke.where[0]?.label ?? '');
     expect(beat).toContain(`of ${String(broke.overLine)} past two minutes across the building`);
     /* Where and when, never why — charter non-goal 4 — and no mean anywhere near it (R3). */
     for (const word of ['because', 'due to', 'caused', 'mean', 'average']) {
       expect(beat?.toLowerCase()).not.toContain(word);
     }
+    /*
+     * A hold on a single landing may not be worded as *not in one place*, which is the clearest
+     * case this beat reports and so the last one that may contradict itself.
+     */
+    const one = rushResultViewOf({ ...broke, where: broke.where.slice(0, 1) }, undefined).account[3];
+    expect(one).toContain('They were all in one place');
+    expect(one).not.toContain('not in one place');
+    const two = rushResultViewOf(
+      { ...broke, where: [...broke.where.slice(0, 1), ...broke.where.slice(0, 1)] },
+      undefined,
+    ).account[3];
+    expect(two).toContain('They were not in one place');
+
     /* A hand stop crossed no line, so there is no place to name and no fourth beat. */
     const stopped = rushOutcomeOf(rush, (rushHoldAt(rush) ?? 0) - 60);
     expect(stopped.where).toEqual([]);
