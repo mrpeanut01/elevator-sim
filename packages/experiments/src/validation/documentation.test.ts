@@ -2069,7 +2069,7 @@ type DecisionReservation = {
  * place that rule forbids one to sit. `CHARTER_PROGRAMME.md`'s row moves to **D738** on this
  * commit, per the remedy the guard below names.
  */
-const OPEN_RESERVATION = { wave: 'AD', from: 738, to: 800 } as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'AD', from: 738, to: 860 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
