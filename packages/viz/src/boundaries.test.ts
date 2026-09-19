@@ -290,6 +290,19 @@ const EVERYDAY_SHELL_FILES = new Set([
    * are the model's, pinned by `stageScreen.test.ts` against this file.
    */
   'everyday/cutaway.ts',
+  /*
+   * The fix-case stage's mount — `asBuiltStage.ts` until § D644 renamed it, because it stopped
+   * being only the as-built one. It builds the block, owns the transport and takes one pane or
+   * two: the as-built run alone when a case opens, and the pair at one playhead once the player
+   * has run their own change. Its words are `fixitScreenModel.ts`'s and its painting is
+   * `cutaway.ts`'s directly above; what is here is the document.
+   *
+   * It is listed separately rather than folded into `fixitScreen.ts` because the tutorial mounts
+   * it too (§ D529's second screen), so it is a shared mount rather than one screen's DOM half —
+   * and a rename is exactly how a file arrives on this list unannounced. This entry is owed
+   * because the old name never needed one.
+   */
+  'everyday/caseStage.ts',
   /* The brief's elevation painter, shared with the campaign's tower screen since GitHub issue #353; it sizes a canvas. */
   'everyday/elevation.ts',
   /* The § 11 workshop's DOM half — its words and decisions stay pure in workshopModel.ts. */
