@@ -17,10 +17,12 @@
  * - **It redraws when the path arrives.** The shell mounts before that boot finishes, so a player
  *   who opens Scenario early would otherwise keep the absence for the rest of the session. The
  *   subscription is torn down in `destroy`, and a redraw re-reads the port rather than caching it.
- * - **A held row is not a control at all.** An offered stage is a `<button>`; a held one is a
- *   `<div>` with its refusal in it. Drawing a disabled button there would be GAMEPLAY § 20.12's
- *   dead control, and `viewportGates.browser.test.ts`'s clause 3 counts what a player can reach —
- *   a held stage must not be in that count.
+ * - **A held row is not a control at all.** An offered stage's head is a `<button>`; a held one's
+ *   is a `<div>`, and its refusal is drawn under it either way. Drawing a disabled button there
+ *   would be GAMEPLAY § 20.12's dead control, and `viewportGates.browser.test.ts`'s clause 3 counts
+ *   what a player can reach — a held stage must not be in that count. **The head rather than the
+ *   whole card**, since `smallScreen.browser.test.ts` measured a card at 620–788 px against a
+ *   250 px scrollport at 360 px: see the mount site for the measurement.
  *
  * Where the offered stages open is `context.enterEngineer()`, the seam the shell already provides
  * and `reportScreen.ts`'s lever button already uses. The row says so on its own face; it is not a
@@ -147,10 +149,11 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
 /**
  * The ordered path, drawn — § D649.
  *
- * **An offered stage is a `<button>` and a held one is not a control at all.** A disabled button
- * is GAMEPLAY § 20.12's dead control, and `viewportGates.browser.test.ts`'s clause 3 counts the
- * controls a player can reach: a held stage must not be in that count. Every word on both comes
- * from `scenarioModel.ts`; the only decision here is which element carries it.
+ * **An offered stage's head is a `<button>` and a held one is not a control at all.** A disabled
+ * button is GAMEPLAY § 20.12's dead control, and `viewportGates.browser.test.ts`'s clause 3 counts
+ * the controls a player can reach: a held stage must not be in that count. Every word on both comes
+ * from `scenarioModel.ts`; the only decisions here are which element carries it and — since the
+ * measurement in the loop below — how much of the card the control is.
  */
 function pathBlock(
   doc: Document,
@@ -172,7 +175,7 @@ function pathBlock(
   rows.style.cssText = 'list-style:none;margin:16px 0 0;padding:0;display:grid;gap:12px';
 
   /*
-   * Every cell inside a card is a `div`, never a `p`. An offered row's card **is** the button, and
+   * Every cell inside a card is a `div`, never a `p`. An offered row's head **is** a button, and
    * `<p>` inside `<button>` is outside that element's content model — the two entry cards above
    * have used `div` for the same reason since they were written. Held rows follow so that the two
    * shapes are one stylesheet rather than two.
@@ -181,16 +184,40 @@ function pathBlock(
     const item = el(doc, 'li', 'everyday-scenario-path-row');
     item.style.cssText = 'margin:0;padding:0;min-width:0';
 
-    const card = el(doc, row.playable ? 'button' : 'div', 'everyday-scenario-path-card');
+    const card = el(doc, 'div', 'everyday-scenario-path-card');
     card.dataset.stage = row.id;
     card.dataset.playable = row.playable ? 'yes' : 'no';
     card.style.cssText =
       `display:block;width:100%;text-align:left;padding:16px 18px 17px;border:1px solid ${C.rule};` +
-      `border-radius:${R.card};background:${row.playable ? C.paper : 'transparent'};min-width:0` +
-      (row.playable ? ';cursor:pointer' : '');
-    if (card instanceof HTMLButtonElement) {
-      card.type = 'button';
-      card.addEventListener('click', () => {
+      `border-radius:${R.card};background:${row.playable ? C.paper : 'transparent'};min-width:0`;
+
+    /*
+     * **The control is the row's head, not the whole card, and that is a measurement rather than a
+     * preference.** The card was the `<button>` until `smallScreen.browser.test.ts` measured it at
+     * 360 px: a stage's card runs **620 to 788 px tall** there, because eight stacked paragraphs
+     * wrap hard at 268 px, and the shell leaves `main.everyday-screen` a **250 px** scrollport at
+     * that width — the consent ask takes 408 px of the 750 px under the narrow header and the
+     * pinned bar takes 92. So no gesture could bring a whole card inside the viewport, and § 2's
+     * clause 3 reported three controls out of reach: stages 1, 3 and 5, the three offered ones.
+     * The held rows were invisible to it for the reason below — they are not controls.
+     *
+     * A control cannot be made reachable by scrolling when it is taller than the box it scrolls in,
+     * so the fix is the one the two entry cards above already demonstrate: **a control the size of
+     * the row's identity**, with the rest of the words beside it rather than inside it. The head is
+     * ~140 px, every word the row had is still drawn, in the same order, and the invariant this
+     * block was written for is untouched — an offered stage has exactly one button and a held one
+     * has none, so `viewportGates.browser.test.ts`'s clause 3 counts what it counted before.
+     *
+     * Borderless and transparent on purpose: the card keeps the frame, so the head is a control
+     * without being a second box drawn inside a box.
+     */
+    const head = el(doc, row.playable ? 'button' : 'div', 'everyday-scenario-path-head');
+    head.style.cssText =
+      'display:block;width:100%;text-align:left;padding:0;border:none;background:transparent;' +
+      `color:${C.ink};min-width:0` + (row.playable ? ';cursor:pointer' : '');
+    if (head instanceof HTMLButtonElement) {
+      head.type = 'button';
+      head.addEventListener('click', () => {
         context.enterEngineer();
       });
     }
@@ -216,7 +243,8 @@ function pathBlock(
     const ways = el(doc, 'div', 'everyday-scenario-path-ways', row.waysThrough);
     ways.style.cssText = `font-size:13px;line-height:1.5;color:${C.inkSoft};margin:7px 0 0;max-width:58ch;text-wrap:pretty`;
 
-    card.append(position, name, teaches, opening, shape, budget, ways);
+    head.append(position, name, teaches);
+    card.append(head, opening, shape, budget, ways);
 
     const tail = row.playable ? row.note : row.refusal;
     if (tail !== undefined) {
