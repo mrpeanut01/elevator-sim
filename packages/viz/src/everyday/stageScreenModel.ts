@@ -476,6 +476,49 @@ export function stageHeaderOf(input: StageHeaderInput): StageHeaderView {
 export const STAGE_AWAITING_RUN = 'simulating today’s day — the stage draws the moment it lands';
 
 /**
+ * **Whether the stage may take the recording the host is publishing** — GitHub issue **#548**.
+ *
+ * Extracted from `everyday/stageScreen.ts`'s `onHostChange`, which asked it inline as
+ * `recording !== undefined && recording !== adopted`. It is here for `stageScreenModel.ts`'s own
+ * stated reason — the mount needs a document and this decision does not — and because the answer is
+ * the one a player notices when it is wrong: adopting rebuilds the transport at the start of the
+ * run and resets the speed chip, so a wrong `true` here is a day thrown away mid-play.
+ *
+ * Identity and nothing else. `runId` is not the signal (§ 1.4's re-simulation keeps it) and neither
+ * is the seed — `EverydayHost.recording` says outright that *"identity is the signal a screen
+ * watches"*, and this function watches exactly that.
+ */
+export function stageMayAdopt(input: {
+  /** What `EverydayHost.recording()` answers now. */
+  readonly incoming: VizRecording | undefined;
+  /** What this mount is already playing, or `undefined` before the first one lands. */
+  readonly adopted: VizRecording | undefined;
+  /** `EverydayHost.runPending()`, read live on the notification rather than latched. */
+  readonly runPending: boolean;
+  /** What stood on the host when this mount began waiting — see the third clause. */
+  readonly standingAtEntry: VizRecording | undefined;
+}): boolean {
+  const { incoming, adopted, runPending, standingAtEntry } = input;
+  if (incoming === undefined) return false;
+  if (incoming === adopted) return false;
+  /*
+   * **The third clause is GitHub issue #548**, and it is the only one that is not about identity
+   * alone. A day the player has asked for is simulating, and what the host is publishing is the run
+   * that day will replace — so this recording is not the player's day and playing it is the revert
+   * the issue reports, seen from the far end: the stage shows a day nobody chose, the player starts
+   * it, and 15–60 s later the real one lands and takes it away.
+   *
+   * `standingAtEntry` and not *"anything older than the pending run"*, because the two cases that
+   * must survive are both cases where a run is pending over a recording that **is** the player's:
+   * § 1.4's intervention re-simulates the day this stage is playing, and the rival's run in
+   * `dev/main.ts#scheduleGhost` is in flight over a primary that has already landed. Both publish a
+   * recording this mount never saw standing, so both pass.
+   */
+  if (runPending && incoming === standingAtEntry) return false;
+  return true;
+}
+
+/**
  * The sentence under § 7.3's single centred `Start` — `docs/28-art-direction.md` AD-S5.
  *
  * *"The centred `Start` is the moment to say the day's shape once, because it is the last moment the

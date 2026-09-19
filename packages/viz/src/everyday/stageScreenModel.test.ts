@@ -59,6 +59,7 @@ import {
   stageInkFor,
   stageInterventionsOf,
   stageLegend,
+  stageMayAdopt,
   stageNextStretchOf,
   stageOpeningLineOf,
   stageSpeedAt,
@@ -1843,5 +1844,84 @@ describe('the camera, measured per tower — GitHub issue #324', () => {
         lobby,
       );
     });
+  });
+});
+
+/**
+ * **GitHub issue #548 — the stage reverts mid-play and discards the shift.**
+ *
+ * The reported route is *Brief → Start the day → the stage*, and the two presses either side of the
+ * navigation are the whole of it: `everyday/briefScreen.ts`'s primary is
+ * `host.startRun(); context.go('stage');`, and `startRun` *"returns before the run lands (the
+ * simulation is on a worker)"*. `dev/main.ts` deliberately leaves the **previous** recording on
+ * `state.recording` while a run is in flight — *"the recording on screen is the one from before, it
+ * is complete, and it plays"* — which is right for the Engineer workbench and is what the Everyday
+ * stage then adopted: yesterday's day, played as today's, until today's landed 15–60 s later and
+ * rebuilt the transport at the start of the run with the speed chip back at its default.
+ *
+ * The decision is {@link stageMayAdopt}'s, and the fact it was missing is *is a run the player asked
+ * for still simulating*. These cases are the issue as a rule; `everyday/stageScreen.test.ts` pins
+ * the call site, because a rule the mount has stopped asking passes its own test while the product
+ * does the old thing.
+ */
+describe('what the stage may adopt — GitHub issue #548', () => {
+  const yesterday = syntheticRecording();
+  const today = syntheticRecording();
+
+  it('takes the first recording that lands', () => {
+    expect(stageMayAdopt({ incoming: today, adopted: undefined, runPending: false, standingAtEntry: undefined })).toBe(
+      true,
+    );
+  });
+
+  it('takes nothing when there is nothing to take', () => {
+    expect(
+      stageMayAdopt({ incoming: undefined, adopted: undefined, runPending: true, standingAtEntry: undefined }),
+    ).toBe(false);
+  });
+
+  it('does not re-adopt what it is already playing', () => {
+    expect(stageMayAdopt({ incoming: today, adopted: today, runPending: false, standingAtEntry: undefined })).toBe(
+      false,
+    );
+  });
+
+  /**
+   * **The defect, as a rule.** The stage is entered the instant the press is made, so what stands on
+   * the host is the run the pending one is about to replace. Adopting it is the mid-play revert:
+   * the player watches somebody else's day and has it taken away when theirs arrives.
+   */
+  it('refuses the run that is standing while the day the player asked for is still simulating', () => {
+    expect(
+      stageMayAdopt({ incoming: yesterday, adopted: undefined, runPending: true, standingAtEntry: yesterday }),
+    ).toBe(false);
+  });
+
+  /** And takes it the moment it lands — a *different* object is today's, whatever else is in flight. */
+  it('takes the day when it lands, even with another run already in flight behind it', () => {
+    expect(stageMayAdopt({ incoming: today, adopted: undefined, runPending: true, standingAtEntry: yesterday })).toBe(
+      true,
+    );
+  });
+
+  /**
+   * § 1.4's re-simulation is not this case and must not be caught by it: an intervention re-runs the
+   * day, so a run is pending over a recording this stage is already playing, and the new one has to
+   * be adopted (`stageScreen.ts#adopt` resumes at the same playhead).
+   */
+  it('still adopts a re-simulated day pressed from the stage itself', () => {
+    expect(stageMayAdopt({ incoming: today, adopted: yesterday, runPending: true, standingAtEntry: undefined })).toBe(
+      true,
+    );
+  });
+
+  /**
+   * The gate is the *pending run*, not the recording's age. With nothing in flight the run that
+   * stands is the run that stands, and the stage plays it — that is walking back onto a day.
+   */
+  it('adopts the standing run once nothing is in flight to replace it', () => {
+    expect(
+      stageMayAdopt({ incoming: yesterday, adopted: undefined, runPending: false, standingAtEntry: yesterday }),
+    ).toBe(true);
   });
 });

@@ -1092,6 +1092,26 @@ export interface EverydayHost {
   recording(): VizRecording | undefined;
 
   /**
+   * **Whether a day the player has asked for is still being simulated** — GitHub issue **#548**.
+   *
+   * {@link startRun} *"returns before the run lands (the simulation is on a worker)"*, and
+   * `dev/main.ts` deliberately leaves the **previous** recording on the state while it does: the
+   * Engineer workbench says outright that *"the recording on screen is the one from before, it is
+   * complete, and it plays"*, and that is the right answer for a surface whose status line names the
+   * run in flight. The Everyday product has no such line, and § 7.3 says entering the stage is
+   * entering **the player's** day — so the stage needs to be able to tell *this is today's run*
+   * from *this is what today's run is about to replace*, and {@link recording} alone cannot.
+   *
+   * It is `dev/main.ts`'s shift runner's own fact, bound rather than re-derived: a second answer to
+   * *is a run in flight* is exactly the divergence `CLAUDE.md`'s standing requirement is about, and
+   * it would be invisible — both halves would agree on every ordinary run and disagree on a cancel.
+   *
+   * `false` where the binding is not supplied, on {@link EverydayHostBindings.cancelRun}'s ground:
+   * a shell that starts no run has none pending.
+   */
+  runPending(): boolean;
+
+  /**
    * The run on the stage as a **pointer** — GitHub issue #340, `docs/26` § 2.1.
    *
    * *"A run is fully reconstructible from a small tuple of ids, a rate, a duration, a window and a
@@ -1597,6 +1617,13 @@ export interface EverydayHostBindings {
    * field, and a shell that omits it cancels nothing.
    */
   cancelRun?(): void;
+  /**
+   * Whether the shift runner has a run of the player's in flight — `dev/main.ts`'s own flag, read
+   * where it lives. See {@link EverydayHost.runPending} for what reads it and why. **Optional** on
+   * {@link cancelRun}'s ground: a binding literal that starts no run has nothing pending, and
+   * `false` is the honest answer for one.
+   */
+  runPending?(): boolean;
   /**
    * Stop the run in flight **and** refuse to file the run that stands — `dev/main.ts`'s shift runner's
    * `cancel`, then `shift/banking.ts#LEFT_UNFINISHED_CANNOT_BANK` on that recording at every filing press.
@@ -2138,6 +2165,7 @@ export function createEverydayHost(
     careerNotice: () => careerLoadNotice,
     savedDispatchers: () => b.state().savedDispatchers,
     recording: () => b.state().recording,
+    runPending: () => b.runPending?.() ?? false,
     /*
      * GitHub issue #340. Built from the two bindings that already exist rather than from a new one:
      * `resources` and `state()` are what `runSubmissionOf` takes, and `runIsOwn()` is the shell's

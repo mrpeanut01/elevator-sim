@@ -3110,6 +3110,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let ghostRefusal: string | undefined;
   /** Whether the job in flight on {@link shiftRunner} is the rival's — see {@link scheduleGhost}. */
   let ghostInFlight = false;
+  /**
+   * Whether a **shift** — the player's own day — is in flight on {@link shiftRunner}, for
+   * `everyday/host.ts#runPending` — GitHub issue **#548**.
+   *
+   * Separate from `shiftRunner.isRunning()` because that is true of three different jobs and the
+   * question is about one: the rival's race ({@link scheduleGhost}) and {@link verifyCurrent}'s
+   * replay check both run on this runner and neither replaces `state.recording`, so a screen that
+   * read `isRunning()` would wait for a run that was never coming.
+   *
+   * Raised by {@link runShift} and taken down in the runner's `onRunning(false)`, which is the one
+   * hook that sees a success, a cancel and a failure alike — `ghostInFlight` and the recompute beat
+   * are settled there for exactly that reason. On the success path it falls **before**
+   * {@link applyShift} runs, and that ordering is load-bearing rather than incidental: nothing is
+   * notified between the two (subscribers hear {@link renderAll}, which `applyShift` calls after it
+   * has written the new recording), so no screen can observe *nothing pending* beside the old run.
+   */
+  let shiftInFlight = false;
   /** The plan behind the run on screen, held so a pick change can re-race without re-planning. */
   let lastShiftPlan: ShiftRunConfig | undefined;
   /** What the strip geometry was last drawn for — see {@link drawRaceStrip}'s keying. */
@@ -3259,6 +3276,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       if (!running) {
         ghostInFlight = false;
+        /* And no shift is pending either, however this one ended — GitHub issue #548. */
+        shiftInFlight = false;
         /*
          * And neither can the intervention strip's `recomputing` beat — review finding 4. The
          * success path settles it in its own `runShift` callback; a failed or cancelled re-run
@@ -4249,6 +4268,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
     startRun: () => {
       context.runShift();
     },
+    /*
+     * Whether a shift the player asked for is still simulating — {@link shiftInFlight}, which is the
+     * one flag that means *this runner is producing the recording that will replace the one on
+     * screen*. `everyday/stageScreen.ts` is the caller — GitHub issue #548.
+     */
+    runPending: () => shiftInFlight,
     /*
      * The runner's own cancel, the Run button's cancel face: the result is dropped unread, and
      * `onRunning(false)` takes the rival's flag and the recompute beat down with it. A no-op with
@@ -5634,6 +5659,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       // so the flag follows the runner rather than trailing it.
       lastShiftPlan = plan;
       ghostInFlight = false;
+      // GitHub issue #548 — what the Everyday stage reads to tell today's day from what it replaces.
+      shiftInFlight = true;
       shiftRunner.start({
         label: 'shift',
         config: plan.config,
@@ -5673,6 +5700,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
         },
       });
     } catch (error) {
+      /* `shiftRunner.start` threw or was never reached, so `onRunning(false)` will not fire. */
+      shiftInFlight = false;
       failRun(error);
     }
   }

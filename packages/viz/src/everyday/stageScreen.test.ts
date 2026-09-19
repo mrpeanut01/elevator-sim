@@ -250,3 +250,45 @@ describe('what the goal strip is read at', () => {
     expect(source).toContain('endedAt: recording.endedAt,');
   });
 });
+
+/**
+ * **What the mount adopts, pinned to the rule that decides it** — GitHub issue **#548**.
+ *
+ * `stageScreenModel.test.ts` says the rule is right; this says the mount asks it, and asks it with
+ * the two facts that make it more than an identity test. The hinge is the entry rule's own, one
+ * screen over: a mount that went back to `recording !== adopted` would leave
+ * {@link stageMayAdopt}'s cases green while the product played yesterday's day as today's.
+ *
+ * The **order** is asserted too, and it is the half that is easy to lose. `standingAtEntry` is
+ * latched before the entry press, because the press is what makes what stands stale — latched after
+ * it, the mount would remember a recording that was already superseded and refuse nothing.
+ */
+describe('what the stage adopts on the way in — GitHub issue #548', () => {
+  const source = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
+
+  it('asks the model, with the pending run and what stood at entry', () => {
+    expect(source).toContain('stageMayAdopt({');
+    expect(source).toContain('runPending: host.runPending(),');
+    expect(source).toContain('standingAtEntry,');
+    /* The unguarded shape this replaced, by its own text. */
+    expect(source).not.toContain('if (recording !== undefined && recording !== adopted) adopt(recording);');
+  });
+
+  it('latches what stood at entry before the press that supersedes it', () => {
+    const latch = source.indexOf("if (context.ctx !== 'watch') standingAtEntry = host.recording();");
+    const press = source.indexOf("stageEntryStartsARun(host.runState())) host.startRun();");
+    expect(latch).toBeGreaterThan(-1);
+    expect(press).toBeGreaterThan(-1);
+    expect(latch).toBeLessThan(press);
+  });
+
+  /**
+   * § 3.3's row follows the picture. While the stage is holding for today's day there is nothing on
+   * it, so the primary may not offer *Close the day* — `closeDay` would file the run the stage is
+   * refusing to draw, which is issue #548's defect turned into a filed record.
+   */
+  it('tells the bar there is no run while it is holding for today’s', () => {
+    expect(source).toContain('barFacts.hasRun = runState.hasRun && !awaitingToday;');
+    expect(source).not.toContain('barFacts.hasRun = runState.hasRun;');
+  });
+});

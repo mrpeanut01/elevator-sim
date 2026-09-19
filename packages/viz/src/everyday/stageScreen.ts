@@ -110,6 +110,7 @@ import {
   stageInterventionsOf,
   type StageInterventionView,
   stageLegend,
+  stageMayAdopt,
   stageOpeningLineOf,
   stageSkipViewOf,
   stageSpeedAt,
@@ -327,6 +328,32 @@ function mountStage(
   /** Display time of the last live-region write — see {@link STAGE_ANNOUNCE_MS}. */
   let lastAnnouncedMs = Number.NEGATIVE_INFINITY;
   let adopted: VizRecording | undefined;
+  /**
+   * **What stood on the host when this mount began** — GitHub issue **#548**, and it is latched
+   * before the entry press below rather than after it.
+   *
+   * § 7.3 says entering the stage is entering *the player's* day, and both routes onto it press for
+   * one: `everyday/briefScreen.ts`'s primary is `host.startRun(); context.go('stage');`, and the
+   * mount's own {@link stageEntryStartsARun} presses when nothing of the player's is standing.
+   * `startRun` returns before the run lands — the simulation is on a worker and takes 15–60 s on the
+   * towers this product ships — and `dev/main.ts` leaves the **previous** recording on the state
+   * while it runs, on purpose (*"the recording on screen is the one from before, it is complete, and
+   * it plays"*). That is right for the Engineer workbench, whose status line names the run in
+   * flight. Here it put **yesterday's day on today's stage**: the player pressed Start, watched the
+   * clock advance for a minute, and had the whole thing taken away when their own day landed and
+   * {@link adopt} rebuilt the transport at the start of the run with the speed chip back at its
+   * default. That is issue #548's *"reverts to the pre-Start paused screen"*, from the other end.
+   *
+   * So this mount remembers the one recording it may **not** take, and {@link stageMayAdopt} refuses
+   * it for exactly as long as `host.runPending()` says the day that replaces it is still simulating.
+   * The stage sits on {@link STAGE_AWAITING_RUN} until then, which is what `briefScreen.ts`'s own
+   * docstring already promised it did.
+   *
+   * **Not on a watch**, on the guard below's ground: `enterWatch` puts somebody else's recording on
+   * the state synchronously and navigates, so on that route what stands at entry **is** the thing to
+   * play — and a shift left in flight behind it would otherwise refuse the spectator's own record.
+   */
+  let standingAtEntry: VizRecording | undefined;
   let speedIndex = defaultSpeedIndex();
   /* ---- § D344's sound — GitHub issue #258. Four cells, none of which a leg can read. ---- */
   /** The synthesised sink, built on the first frame that has something to play. */
@@ -1531,11 +1558,25 @@ function mountStage(
   function onHostChange(): void {
     if (!alive) return;
     const runState = host.runState();
-    barFacts.hasRun = runState.hasRun;
     barFacts.dayClosed = runState.dayClosed;
     context.setRunOpen(runState.open);
     const recording = host.recording();
-    if (recording !== undefined && recording !== adopted) adopt(recording);
+    const mayAdopt = stageMayAdopt({
+      incoming: recording,
+      adopted,
+      runPending: host.runPending(),
+      standingAtEntry,
+    });
+    if (mayAdopt && recording !== undefined) adopt(recording);
+    /*
+     * § 3.3's row asks *this* stage what it has, and while the third clause of {@link stageMayAdopt}
+     * is holding, what it has is nothing — GitHub issue #548. Unguarded, `runState().hasRun` is true
+     * of the recording the stage is refusing to draw, so the primary would offer *Close the day* over
+     * a day that is not on screen and `closeDay` would file it. `stageBarModelOf` says the honest
+     * thing instead: *the day has not started yet — there is nothing to file*.
+     */
+    const awaitingToday = adopted === undefined && recording !== undefined && !mayAdopt;
+    barFacts.hasRun = runState.hasRun && !awaitingToday;
     /*
      * § 20.15's withdrawal, re-read on every notification rather than latched at mount — GitHub
      * issue #182. The record does not move within one watch, but the **week** does: closing a day
@@ -2411,6 +2452,8 @@ function mountStage(
    * *the player's day* and this is about *which flow the screen is serving* — § 18's own split, and
    * the reason `ctx` is a parameter of the screen rather than a field of the run.
    */
+  /* GitHub issue #548 — latched *before* the press below, which is the press that makes it stale. */
+  if (context.ctx !== 'watch') standingAtEntry = host.recording();
   if (context.ctx !== 'watch' && context.ctx !== 'rush' && stageEntryStartsARun(host.runState())) host.startRun();
   /*
    * The handover arm is drawn from inside this call, before any frame — `draw` returns early with
