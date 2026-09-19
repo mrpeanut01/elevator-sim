@@ -113,13 +113,62 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave AC-2's, measured 2026-09-19 on the integrated tree**; the paragraph above
+  below are wave AD's, measured 2026-09-19 on the integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **765 545** | **606** | **62** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **952 182** | **4 710** | **63** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **765 741** | **606** | **62** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **952 422** | **4 710** | **63** | **0** | **green**, and the register is empty |
+
+  **Wave AD's move is exactly 4.00 strings a case in both tiers, every one of them on one surface,
+  and this is the first time this column has scored three forecasts and had all three come out
+  right with the attribution measured rather than divided.** Measured on the integrated tree after
+  wave AD, both tiers in one sitting, on a head CI had already reported green in every project —
+  which is § D487's rule obeyed in the order it was written rather than repaired afterwards.
+
+  **The base reproduced to the string in both tiers**, at `74c586d`: always-on 765 545 / 62
+  surfaces / 0 failing, deep 952 182 / 63 / 0, identical to wave AC-2's published row. That is the
+  habit § D442 set, and it is the only thing that tells a correction apart from a move.
+
+  | | base `74c586d` | wave AD | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 765 545 | **765 741** | **+196** | **4.00** |
+  | deep strings | 952 182 | **952 422** | **+240** | **4.00** |
+  | surfaces | 62 / 63 | **62 / 63** | **0** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **4 × 49 = 196 and 4 × 60 = 240**, both exact, with no conditional remainder in either tier —
+  which is what a constant seeded once per case looks like and is a different shape from wave AC-2's
+  638-plus-a-remainder directly above.
+
+  **The move is attributed by a probe rather than by a quotient, and the probe says one surface.**
+  The first corpus case was rendered on each tree and its strings tallied by producer:
+  `everyday/settingsView.ts#settingsScreenViewOf` goes **708 → 712**, and *nothing else in the tree
+  moves at all* — the whole-case total goes 14 088 → 14 092. That is GitHub issue #557's career
+  purse reaching the Settings chime panel, which now knows whether a top-up has a tower to land in.
+  A division would have produced the same 4 and licensed no claim about which lane earned it, which
+  is what [§ D256](DECISIONS.md) refuses.
+
+  **Three lanes forecast and all three were right**, the second time this column has managed that
+  (wave R was the first). AD-A predicted *non-zero, small, and no new surface* for the purse work,
+  and its own surface is the entire move. AD-D predicted **0 strings and 0 surfaces in both tiers**
+  for the Scenario copy on the ground that every change is a substitution on an existing seed, and
+  AD-F predicted **0** for two test files and a `DECISIONS.md` append. Neither appears anywhere in
+  the producer diff. The forecasts sum to the measurement, so there is no remainder to argue about
+  and none is invented.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers and against both
+  bases: identical, nothing added, nothing removed — on a wave that made three Parameters-tab
+  schemas reach the run, rebuilt the Scenario hub's budget offer, taught a stage row to open its
+  own stage, and gave the kernel a resume. Every one of them entered an adapter that already
+  existed. **The deep tier's one-surface lead survives and the diff names it**:
+  `campaign/judge.ts#judgeStage` is the only surface in deep and not in always-on, and nothing is
+  in always-on and not in deep.
+
+  **Both tiers exited 0 with the verdict matching the figures** — always-on 96 110 ms, deep
+  1 324 421 ms, on a box whose load average was under 2 for the whole sitting. That is said because
+  a figure taken under contention measures the box, which this column has recorded twice.
 
   **Wave AC-2's move is 638 strings a case in both tiers, and the base had drifted in both — which
   is the half worth reading.** The playability wave: ten build lanes and six decision agents, people
