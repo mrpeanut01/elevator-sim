@@ -216,6 +216,7 @@ import {
   SHELL_SKIP_LABEL,
 } from '../everyday/types.js';
 import { scenarioHubViewOf } from '../everyday/scenarioModel.js';
+import type { ScenarioLadderRung } from '../scenario/ladder.js';
 import {
   TUTORIAL_ABSENCES,
   TUTORIAL_COPY,
@@ -720,6 +721,15 @@ export interface HonestyContext {
   readonly bundleAt: (at: number) => FrameBundle;
   /** `data/scenario-survivors.json` — GitHub issue #367's published counts. See `run.ts`. */
   readonly survivors: PublishedSurvivors;
+  /**
+   * The ordered path the Scenario hub lists — `scenario/ladder.ts`, [§ D649](../../../../DECISIONS.md).
+   *
+   * Joined in `run.ts` rather than here, and **empty** where no stage table was handed in. Both
+   * arms matter to the sweep: a populated path draws ten stages' worth of words, and an empty one
+   * draws the hub's own sentence about the path being absent, which is a refusal a player can meet
+   * on a slow boot.
+   */
+  readonly scenarioPath: readonly ScenarioLadderRung[];
 }
 
 /** Just enough of `SearchSpace` for the controls surfaces, so the type does not cross a barrel. */
@@ -11710,6 +11720,16 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/scenarioModel.ts#scenarioHubViewOf',
     'everyday/scenarioModel.ts#SCENARIO_COPY',
     'everyday/scenarioModel.ts#SCENARIO_ABSENCES',
+    /*
+     * § D649's ordered path. The hub is the only reader of both: `scenarioLadderOf` produces every
+     * row this adapter seeds, and `SCENARIO_LADDER_COPY` is the small set of sentences it writes
+     * that `survivorSentenceFor` does not — the held-back refusal, the *opens on the Engineer
+     * surface* note, and the line saying which rung the count is taken at. Covered here rather
+     * than given an adapter of its own because a ladder rendered on its own would be a second
+     * rendering of words only this screen draws, and `derive.test.ts` reads this list.
+     */
+    'scenario/ladder.ts#scenarioLadderOf',
+    'scenario/ladder.ts#SCENARIO_LADDER_COPY',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
     /* GitHub issue #211: the handle on a folded card note, seeded once — the note itself is the producer's whole string. */
@@ -11865,7 +11885,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         }
 
         /* ---- Scenario: § D525's hub, the first tile's whole surface (issue #364) ---- */
-        const hub = scenarioHubViewOf();
+        const hub = scenarioHubViewOf(context.scenarioPath);
         seeds.push({ field: `${arm}.scenario.eyebrow`, text: hub.eyebrow, role: 'prose' });
         seeds.push({ field: `${arm}.scenario.title`, text: hub.title, role: 'prose' });
         seeds.push({ field: `${arm}.scenario.lede`, text: hub.lede, role: 'prose' });
@@ -11874,6 +11894,53 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           seeds.push({ field: `${at}.title`, text: scenarioEntry.title, role: 'prose' });
           seeds.push({ field: `${at}.blurb`, text: scenarioEntry.blurb, role: 'prose' });
           seeds.push({ field: `${at}.shape`, text: scenarioEntry.shape, role: 'observation' });
+        }
+        /*
+         * The ordered path — § D649. Every row, held or offered, and the count on each one's face.
+         *
+         * `waysThrough` is seeded `role: 'observation'` with `declaredCount` set to the `k` it is a
+         * count over, for `SURVIVORS`' own stated reason: R13 wants the estimate to carry its own
+         * `n` in its own box, and `survivorSentenceFor` names `examined` before `survivors` so the
+         * denominator arrives first. It is deliberately **not** `role: 'goal'` — a survivor count
+         * has no across-seed pass rate and R12's own words make it *a statement about the
+         * configuration, not a goal*.
+         *
+         * A held row's `refusal` is `role: 'reason'`, which is the half of this surface most worth
+         * sweeping: it is the sentence that says a listed scenario cannot be played, and R3's shape
+         * is that a refusal replaces the figure rather than hiding it. The figure is beside it.
+         */
+        if (hub.path !== undefined) {
+          const path = hub.path;
+          seeds.push({ field: `${arm}.scenario.path.heading`, text: path.heading, role: 'label' });
+          seeds.push({ field: `${arm}.scenario.path.lede`, text: path.lede, role: 'prose' });
+          seeds.push({
+            field: `${arm}.scenario.path.offer`,
+            text: path.offerLine,
+            role: 'observation',
+            declaredCount: path.rows.length,
+            countShown: path.offerLine.includes(String(path.rows.length)),
+          });
+          for (const row of path.rows) {
+            const at = `${arm}.scenario.path.${row.id}`;
+            seeds.push({ field: `${at}.title`, text: row.title, role: 'prose' });
+            seeds.push({ field: `${at}.teaches`, text: row.teaches, role: 'prose' });
+            seeds.push({ field: `${at}.opening`, text: row.openingLine, role: 'prose' });
+            seeds.push({ field: `${at}.shape`, text: row.shape, role: 'observation' });
+            seeds.push({ field: `${at}.budget`, text: row.budgetLine, role: 'observation' });
+            seeds.push({
+              field: `${at}.ways`,
+              text: row.waysThrough,
+              role: 'observation',
+              declaredCount: examinedFor(context, row.id),
+              countShown: row.waysThrough.includes(String(examinedFor(context, row.id))),
+            });
+            if (row.note !== undefined) {
+              seeds.push({ field: `${at}.note`, text: row.note, role: 'prose' });
+            }
+            if (row.refusal !== undefined) {
+              seeds.push({ field: `${at}.refusal`, text: row.refusal, role: 'reason' });
+            }
+          }
         }
         /*
          * The note and the absences are `reason`, not `prose`: each one says why the list is short.
@@ -13274,6 +13341,18 @@ const EVERYDAY_WATCHING: SurfaceAdapter = {
  * refusal — *nothing gets through this one as it stands* — and R3's shape is that a refusal
  * replaces the number rather than hiding it.
  */
+/**
+ * The `k` a scenario's base-rung count is taken over, for R13's *the estimate carries its own `n`*.
+ *
+ * Read off `context.survivors` rather than carried on the row, because the row carries the
+ * **sentence** and the sentence is `survivorSentenceFor`'s. A count re-derived from the table is a
+ * count that cannot disagree with the words beside it; a count copied onto the row could.
+ */
+function examinedFor(context: HonestyContext, scenarioId: string): number {
+  const scenario = context.survivors.scenarios.find((entry) => entry.id === scenarioId);
+  return scenario?.steps.find((step) => step.stepId === null)?.examined ?? 0;
+}
+
 const SURVIVORS: SurfaceAdapter = {
   id: 'scenario/survivors.ts#survivorSentenceFor',
   covers: ['scenario/survivors.ts#survivorSentenceFor', 'scenario/survivors.ts#SURVIVOR_COPY'],

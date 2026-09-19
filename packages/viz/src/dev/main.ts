@@ -63,6 +63,7 @@ import { publishEverydayAccount } from '../everyday/accountPort.js';
 // The success sentence both shells say after a 201 — see `submitScore`.
 import { POST_RUN_COPY } from '../everyday/postRun.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
+import { provideScenarioLadderFrom } from '../everyday/scenarioLadderPort.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
   ENGINEER_RETURN_LABEL,
@@ -3942,6 +3943,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let campaign: CampaignPanelHandle | undefined;
   void loadCampaign(resources)
     .then((loaded) => {
+      /* § D649: the Everyday Scenario hub draws the same stages, with their measured counts. */
+      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors);
       campaign = mountCampaignPanel({
         elements: ui.campaign,
         resources,

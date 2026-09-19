@@ -43,6 +43,7 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { recordRun } from '../record/recordRun.js';
 import type { PublishedScenario } from '../scenario/published.js';
+import { scenarioLadderOf } from '../scenario/ladder.js';
 import type { PublishedSurvivors } from '../scenario/survivors.js';
 import type { CampaignFitOut } from '../campaign/fitOut.js';
 import { fitOutForCase, fittedBuildingFor, fittedProfileFor } from './fitOut.js';
@@ -460,6 +461,21 @@ export function contextFor(honestyCase: HonestyCase, resources: HonestyResources
     trafficProfiles: resources.trafficProfiles,
     dispatcherProfiles: resources.dispatcherProfiles,
     survivors: resources.survivors,
+    /*
+     * The ordered path the Scenario hub draws — § D649, GitHub issue #364.
+     *
+     * Derived here rather than in the adapter for `bundleAt`'s reason one step down: it is the
+     * same list on every case, and a join re-run per arm is a join re-run for nothing. Empty where
+     * `stagesById` is absent, which is the state the hub words as the path's own absence — so both
+     * arms of that branch are reachable by the sweep rather than only the populated one.
+     */
+    scenarioPath:
+      resources.stagesById === undefined
+        ? []
+        : scenarioLadderOf({
+            stages: [...resources.stagesById.values()].map((entry) => entry.stage),
+            survivors: resources.survivors,
+          }),
     bundleAt: memoisedBundles(recording, access),
   };
 }
