@@ -247,6 +247,22 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * playing day: **#367**, the survivor count per budget step, which is the first thing that has to
    * know what rung a scenario is on.
    */
+  /*
+   * **The shell's register is not empty any more, and the row arrived with a fix rather than with
+   * a gap** — [§ D730](../../../../DECISIONS.md). § D729 made the day's crowd the UTC date, so
+   * half of `docs/38` § 2.1's daily puzzle ships. The half that does not is the **reach**: a week
+   * runs one contract, so nothing moves a returning player to the day's tower, and that is a thing
+   * the player cannot see from where they stand — which is this register's own test for what
+   * belongs in it.
+   *
+   * The owner is **#159**, the wrinkle library and the daily generator, because that is the issue
+   * that gives the daily door a tower a day. `docs/37` § 4.3 already scopes the rotation rules to
+   * it and requires its generator to assert non-exhaustion over a simulated year; § D732 measured
+   * what the current draw does and declined to build a rotation nothing can observe, and left the
+   * figures as that generator's first input. Inventing a new number would split one thing across
+   * two queues, which is the rush row's own reasoning below.
+   */
+  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'your week’s after that', issue: 159 },
   { register: 'STAGE_ABSENCES', fragment: 'no works to buy while the day plays', issue: 367 },
   /*
    * **The rush's register is not empty any more, and the entry that refilled it came in with the
