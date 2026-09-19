@@ -8157,8 +8157,11 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     /*
      * Where a session shape is composed — GitHub issue #559, [§ D753](../../../../DECISIONS.md).
      * Three of the five strings it produces are this adapter's, seeded below as `mode.shape`; the
-     * other two are the Scenario hub's and reach the corpus through `EVERYDAY_SCENARIO_HUB`, which
-     * claims `SCENARIO_ENTRY_SHAPES` for the same reason. The declaration is claimed here because
+     * other two are the Scenario hub's and reach the corpus through `EVERYDAY_SCENARIO_HUB`,
+     * which renders them through `scenarioHubViewOf` rather than through a claimed projection —
+     * `SCENARIO_ENTRY_SHAPES` was deleted when the dead-code audit found it had a test importer
+     * and a `covers` entry and no caller, which is wave T's lesson one level over: being in
+     * `covers` is not being called. The declaration is claimed here because
      * this is the surface that draws most of it, and `derive.test.ts` asks for one home per
      * declaration rather than one per string.
      */
@@ -11969,7 +11972,6 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      * against the one module allowed to compose a session shape. Claimed here rather than excluded
      * because the words **are** drawn on this screen, which is what a `covers` entry says.
      */
-    'everyday/scenarioModel.ts#SCENARIO_ENTRY_SHAPES',
     /*
      * § D649's ordered path. The hub is the only reader of both: `scenarioLadderOf` produces every
      * row this adapter seeds, and `SCENARIO_LADDER_COPY` is the small set of sentences it writes

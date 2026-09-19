@@ -186,6 +186,16 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'sample size: 932 s over 480 judgements on a quiet ten-core box',
     scheduled: true,
   },
+  'packages/viz/src/everyday/sittingClock.measure.test.ts': {
+    gates: ['SITTING_OUT'],
+    reason:
+      'GitHub issue #559 and § D753: the wall-clock instrument that settled the five session ' +
+      'shapes. It plays each mode’s real recording end to end through the shipped Playback at the ' +
+      'default rung, against a system clock — 45.3 real minutes and 164 005 frames for one ' +
+      'reading, which is why it is gated rather than run. The figures it produced are derived ' +
+      'from the rung by everyday/sittingShape.ts, so the ordinary suite checks the derivation ' +
+      'and this file checks the derivation against a clock.',
+  },
   'packages/viz/src/everyday/rushHouseSweep.test.ts': {
     gates: ['ELEVATOR_SIM_RUSH_HOUSE'],
     reason:

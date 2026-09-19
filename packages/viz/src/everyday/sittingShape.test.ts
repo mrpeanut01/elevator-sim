@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 
 import { EVERYDAY_MODES } from './modes.js';
-import { SCENARIO_ENTRY_SHAPES } from './scenarioModel.js';
+import { scenarioHubViewOf } from './scenarioModel.js';
 import {
   SITTING_SHAPES,
   SITTING_SPANS,
@@ -154,7 +154,9 @@ describe('the two player modules compose no figure of their own', () => {
 
   it('every scenario hub entry carries a string from sittingShape.ts', () => {
     const shipped = new Set<string>(Object.values(SITTING_SHAPES));
-    for (const shape of SCENARIO_ENTRY_SHAPES) {
+    // Read off the shipped view rather than a sibling projection: this asserts what the hub
+    // actually draws, and it is why SCENARIO_ENTRY_SHAPES could be deleted rather than registered.
+    for (const shape of scenarioHubViewOf().entries.map((entry) => entry.shape)) {
       expect(shipped.has(shape), shape).toBe(true);
     }
   });

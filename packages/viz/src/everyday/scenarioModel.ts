@@ -177,10 +177,6 @@ const ENTRIES: readonly ScenarioEntry[] = Object.freeze([
  * allowed to compose one. Exported rather than re-derived in the test, because a test that rebuilt
  * the list would go on passing when a row was added carrying a figure of its own.
  */
-export const SCENARIO_ENTRY_SHAPES: readonly string[] = Object.freeze(
-  ENTRIES.map((entry) => entry.shape),
-);
-
 /**
  * What this hub does not reach yet, in the player's words.
  *
