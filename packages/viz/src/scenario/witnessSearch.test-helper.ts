@@ -38,6 +38,17 @@
  * witness at index 30 is a configuration the published draw never reached rather than one it
  * reached and judged differently.
  *
+ * ## The shipped sweep was reproduced first, and that is what makes the widening a finding
+ *
+ * Before anything was widened, `measureScenarioSurvivors` was re-run on `stage-1-first-call` at the
+ * published `sampleSize` of 12 on this tree and **reproduced the published cell to the string**:
+ * base `1/18` (dropdown 1/6, dials 0/12, suppressed 3), equipment `1/24`, building `1/24`
+ * (suppressed 4), `zoned-uppeak` the survivor at every rung. 28 s.
+ *
+ * That ordering is the whole argument. `CLAUDE.md`'s oldest lesson about a published number is that
+ * only a re-measurement tells a **correction** apart from a **move**; without it, three witnesses
+ * at k = 200 would be indistinguishable from a judge that had drifted since the table was pinned.
+ *
  * ## Not a `*.test.ts`
  *
  * vitest's `include` is `src/**\/*.test.ts`, and this reads `data/` from Node, which
