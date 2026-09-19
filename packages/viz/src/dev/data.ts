@@ -40,7 +40,11 @@ import type { PriceSchedule } from '../pricing/types.js';
 import type { FixitCases } from '../fixit/types.js';
 import { parseProofCases, type ProofCaseSet } from '../gauntlet/proofCases.js';
 import { validatePublishedGoalRates, type PublishedGoalRates } from '../scenario/published.js';
-import { validatePublishedSurvivors, type PublishedSurvivors } from '../scenario/survivors.js';
+import {
+  isContentFinding,
+  validatePublishedSurvivors,
+  type PublishedSurvivors,
+} from '../scenario/survivors.js';
 import { parseReferenceRuns } from '../watch/reference.js';
 import type { WatchableRun } from '../watch/types.js';
 
@@ -352,10 +356,27 @@ export async function loadCampaign(resources: BrowserResources): Promise<LoadedC
     stages: campaign.stages,
     schedule: resources.priceSchedule,
   });
-  if (survivorViolations.length > 0) {
+  /*
+   * **Only a malformed table refuses the load, and #381's first-hour floor is not one.**
+   *
+   * The first shape of this check threw on every violation, and the shipped table carries the
+   * floor's finding for `stage-1-first-call` — so `loadCampaign` threw on a well-formed table,
+   * `#campaign-profile` rendered with zero options, and the Lab's campaign tab was dead for every
+   * player. `savedDispatcher.browser.test.ts` caught it against a select that resolved empty, and
+   * the browser leg was green at the base commit, so it was this wave's to fix.
+   *
+   * The distinction is `scenario/survivors.ts#isContentFinding`, and it is the reason the
+   * predicate lives there rather than here: a finding that the *content* is too narrow is a true
+   * thing a working table reported, while a missing provenance field or a step keyed to no stage
+   * means no figure on the table can be trusted. The second is worth denying a screen over; the
+   * first is a measurement doing its job, and it is registered in
+   * `scenario/survivors.test.ts#FIRST_HOUR_SINGLE_SURVIVOR` where a reader can act on it.
+   */
+  const malformed = survivorViolations.filter((line) => !isContentFinding(line));
+  if (malformed.length > 0) {
     throw new Error(
       `data/scenario-survivors.json is not a valid survivor table, so no scenario can publish a ` +
-        `count from it:\n  ${survivorViolations.join('\n  ')}`,
+        `count from it:\n  ${malformed.join('\n  ')}`,
     );
   }
 
