@@ -86,6 +86,13 @@ import { shiftObservationsOf } from '../shift/observations.js';
  * § 4.6 — the transport
  * -------------------------------------------------------------------------- */
 
+/**
+ * A hall-call door cycle, in simulated seconds — `docs/28` § 6's own figure, which is what its
+ * motion table divides by each rung to say what a boarding looks like at that speed. Here so the
+ * opening rung's case can make the same division rather than quote its answer.
+ */
+const DOOR_CYCLE_S = 9.8;
+
 describe('§ 4.6 — the speed table', () => {
   /**
    * **The label is a claim, and this is the parser that holds it to account** — GitHub issue #257's
@@ -196,25 +203,49 @@ describe('§ 4.6 — the speed table', () => {
   });
 
   /**
-   * **#257's AC3 — the default is a decision, and these are the three reasons it gives.**
+   * **The default is a decision, and these are the reasons it gives** — #257's AC3, re-argued for
+   * [§ D641](../../../../DECISIONS.md) after [§ D525](../../../../DECISIONS.md) clause 4 moved the
+   * rung.
    *
-   * Asserted as properties rather than as the number 30, so the case says *why* rather than *what*:
-   * a lane that moves the default has to break one of these three arguments, not edit a literal.
+   * Asserted as properties rather than as the number 4, so the case says *why* rather than *what*: a
+   * lane that moves the default again has to break one of these arguments, not edit a literal. The
+   * case that used to stand here asserted *the fastest rung inside the budget*, which is § D354's
+   * reason 2 — the one the owner's ruling overturned — and it is replaced rather than loosened.
    */
-  it('opens at the fastest rung inside the § D344 budget, and not at 1:1', () => {
+  it('opens at a watching rung: inside § D344’s budget, above 1:1, and with the ladder open both ways', () => {
     const opening = stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX);
     const discrete = STAGE_SPEEDS.filter((speed) => speed.simPerRealS <= 39);
     /* Inside the budget, so the discrete-cue tier is what a player meets rather than something
-       they have to go looking for. */
+       they have to go looking for. § D354's reason 2 survives as a bound; what it lost is the
+       *fastest* half. */
     expect(opening.simPerRealS).toBeLessThanOrEqual(39);
-    /* The fastest such rung — the most day per minute that still clears the bound. */
-    expect(opening.simPerRealS).toBe(Math.max(...discrete.map((speed) => speed.simPerRealS)));
     /*
-     * And not the honest 1×. `rise-and-fall` is thirty simulated minutes, so 1:1 opens a
-     * half-hour sitting; `office-day` is ten simulated hours. § 4.6's rule is that a day must
-     * never vanish in three seconds, and a day that never ends is that rule from the other side.
+     * And not the honest 1× — § D354's reason 1, which § D525 did not touch. `rise-and-fall` is
+     * thirty simulated minutes, so 1:1 opens a half-hour sitting; `office-day` is ten simulated
+     * hours. § 4.6's rule is that a day must never vanish in three seconds, and a day that never
+     * ends is that rule from the other side.
      */
     expect(opening.simPerRealS).toBeGreaterThan(1);
+    /*
+     * **A watching rung rather than the fastest one** — § D525 clause 4 permits `1×` or `4×` and
+     * nothing else, so the default may not be the top of the discrete tier. Stated as *not the
+     * maximum*, which is the exact claim the superseded case made in the other direction.
+     */
+    expect(opening.simPerRealS).toBeLessThan(Math.max(...discrete.map((speed) => speed.simPerRealS)));
+    /*
+     * **The ladder is open in both directions from the opening rung**, which is § D641's third
+     * reason and the one a bottom-rung default would lose: a player who wants more day per minute
+     * has somewhere to go that is still inside the budget, and a player who wants one car has
+     * somewhere below.
+     */
+    expect(discrete.some((speed) => speed.simPerRealS > opening.simPerRealS)).toBe(true);
+    expect(STAGE_SPEEDS.some((speed) => speed.simPerRealS < opening.simPerRealS)).toBe(true);
+    /*
+     * **And a door cycle is an event at it** — `docs/28` § 6's 9.8 s hall-call cycle, which is the
+     * measurement § D641 decides on. Two real seconds is the floor for *a thing that happened*
+     * rather than a flicker; at the superseded 30 it was 0.33 s.
+     */
+    expect(DOOR_CYCLE_S / opening.simPerRealS).toBeGreaterThanOrEqual(2);
   });
 });
 

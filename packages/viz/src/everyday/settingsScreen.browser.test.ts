@@ -25,6 +25,8 @@ import {
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
+/* The opening rung is read through the ladder rather than written down here — § D641. */
+import { DEFAULT_STAGE_SPEED_INDEX, stageSpeedAt } from './stageScreenModel.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -189,10 +191,11 @@ describe.skipIf(!HAS_BROWSER)('the Everyday settings screen', () => {
     const page = await coldLoad();
     await openSettings(page);
 
-    expect(await page.textContent('.everyday-settings-default-speed')).toBe('30×');
+    const opening = stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX).label;
+    expect(await page.textContent('.everyday-settings-default-speed')).toBe(opening);
     await page.click('.everyday-settings-default-speed');
     const stepped = await page.textContent('.everyday-settings-default-speed');
-    expect(stepped).not.toBe('30×');
+    expect(stepped).not.toBe(opening);
 
     const stored = await page.evaluate(() => {
       const raw = window.localStorage.getItem('elevator-sim.everyday-profile');

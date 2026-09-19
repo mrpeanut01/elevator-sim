@@ -29,7 +29,7 @@ import {
   type SettingsSignInStage,
   type SettingsToggleView,
 } from './settingsView.js';
-import { STAGE_SPEEDS } from './stageScreenModel.js';
+import { DEFAULT_STAGE_SPEED_INDEX, STAGE_SPEEDS, stageSpeedAt } from './stageScreenModel.js';
 
 const BASE = { profile: undefined, reduceMotion: false } as const;
 
@@ -241,7 +241,9 @@ describe('Playing — two wired rows, never a dead toggle (§ 20.12)', () => {
       id: 'default-speed',
       label: 'Default speed',
       note: 'the speed every run opens at — the chips on the stage still change it for the day',
-      value: '30×',
+      /* The opening rung's own label, read through the one accessor — a literal here would be a
+         second place the default is written down, which is #257's defect one level up. */
+      value: stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX).label,
       on: false,
     });
     const moved = settingsScreenViewOf({ ...BASE, defaultSpeedSimPerRealS: 90 }).playing.rows.find(

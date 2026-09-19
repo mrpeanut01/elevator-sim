@@ -224,9 +224,12 @@ reference, which bounds every kind at once.
 
 **Speed.** The stage ships seven rungs from `1×`, which is real time, to `600×`, and four of them
 sit inside the range where a door cycle is still a cue ([§ D344](../DECISIONS.md)). **Settings now carries a
-*Default speed* row** (GitHub issue #229), and it defaults to `30×` ([§ D354](../DECISIONS.md)), a rung for
-watching a day rather than a car. The ruling that watching is the point moves that default to a
-watching rung, `1×` or `4×`, and a playtest picks which. A *skip to the end* control does not exist and is new.
+*Default speed* row** (GitHub issue #229). It defaulted to `30×` ([§ D354](../DECISIONS.md)), a rung for
+watching a day rather than a car; **§ 2.3's ruling has been implemented and it now defaults to `4×`**
+([§ D641](../DECISIONS.md)), where a 9.8 s door cycle is 2.45 real seconds rather than 0.33. The rung
+between the two the ruling permits was taken on arithmetic rather than by playtest, and § D641 gives
+it: `1×` puts a 900 s scenario at fifteen real minutes against a tile that promises three to five.
+A *skip to the end* control exists (GitHub issue #369).
 
 **What is settled, and built.** [§ D477](../DECISIONS.md): the run ends when the lobby overfills, and
 the ramp is traffic and/or breakdowns. [§ D515](../DECISIONS.md) built it: the rush is a week of its own on

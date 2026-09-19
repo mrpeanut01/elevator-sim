@@ -219,43 +219,68 @@ export const STAGE_SPEEDS: readonly [StageSpeed, ...StageSpeed[]] = Object.freez
 ]);
 
 /**
- * **The speed every run opens at: 30 simulated seconds per real second.** A decision, argued below,
- * rather than a constant standing in for one.
+ * **The speed every run opens at: 4 simulated seconds per real second.** A decision, argued below,
+ * rather than a constant standing in for one — [§ D641](../../../../DECISIONS.md).
  *
  * § 4.6 and § 7.3 say *"speed is not inherited: it resets to the player's `Default speed` setting at
- * the start of each run"*. **The setting exists now** (GitHub issue #229): `everyday/profile.ts`
- * carries it beside Units, `everyday/settingsView.ts` draws the row, and `stageScreen.ts#adopt`
- * reads `everydayProfileStore().defaultSpeed()` at the one place speed resets — exactly the
- * replacement this paragraph promised when it said *the lane that builds the setting replaces this
- * constant with a store read and changes nothing else*. This value is what that setting
- * **defaults** to, and what the stage opens at for a player who has never touched the row; it is
- * chosen, for three reasons, rather than a stand-in (GitHub issue **#257**).
+ * the start of each run"*. The setting exists (GitHub issue #229): `everyday/profile.ts` carries it
+ * beside Units, `everyday/settingsView.ts` draws the row, and `stageScreen.ts#adopt` reads
+ * `everydayProfileStore().defaultSpeed()` at the one place speed resets. This value is what that
+ * setting **defaults** to, and what the stage opens at for a player who has never touched the row.
  *
- * **1. It cannot be the honest `1×`, and that is the reason the default needed deciding at all.**
- * At 1:1 the shipped default day — `rise-and-fall`, thirty simulated minutes — is thirty real
- * minutes, and `office-day` is **ten real hours**. The contract's own rule is that *a day must never
- * vanish in three seconds because the previous one ended at 30×*; a day that never ends is the same
- * rule seen from the other side, and a ladder that added a true 1:1 rung and opened on it would have
- * fixed a lying label by shipping an unwatchable product.
+ * ## Why it moved off 30, which is a ruling rather than a preference
  *
- * **2. It is the fastest rung inside [§ D344](../../../../DECISIONS.md)'s `S ≤ 39` budget.** That
- * ruling ships discrete 1:1 cues below the bound and a continuous bed above it. A default above 39
- * would mean every player meets the bed first and reaches the discrete tier only by going to look
- * for it — the top tier of an audio design nobody hears by default. 30 is the largest rung that
- * clears the bound, so it buys the most day per minute while staying inside it.
+ * [§ D354](../../../../DECISIONS.md) chose 30 and gave three reasons. [§ D525](../../../../DECISIONS.md)
+ * clause 4 — the product owner's, 2026-09-06 — overturned the second of them: *"every scenario and
+ * every rush plays live, meaning the stage plays at a watching speed … the opening speed moves from
+ * § D354's `30×` to a watching rung, `1×` or `4×`"*. § D354's reason 2 was *the fastest rung inside
+ * § D344's `S ≤ 39` budget*, which buys the most day per minute; the ruling says the default is for
+ * **watching the people**, and buying day per minute is what the chips and § 2.3's skip control are
+ * for. Reason 3 — *it moves no picture* — was an argument for not moving, and the ruling moves it.
+ * Reason 1 survives untouched and is why this is not `1×`.
  *
- * **3. It moves no picture.** 30 is the multiplier this build has always opened at; only its name
- * changed. Every screenshot, every row of `docs/28-art-direction.md` § 6's table and every browser
- * case taken at the opening speed is still about the same pacing, so the label repair costs nothing
- * that would have to be re-measured — which is the whole reason the default was not moved to a rung
- * that reads more nicely.
+ * ## Why `4×` and not `1×`, which is the half § D525 left to a playtest and § D641 takes on arithmetic
+ *
+ * **1. The door cycle is the thing a watching speed has to make visible.** `docs/28` § 6's own table,
+ * measured rather than restated here: a 9.8 s hall-call door cycle is **2.45 real seconds at `4×`**,
+ * 0.33 s at `30×` and 9.8 s at `1×`. At `30×` a boarding is a flicker — twenty frames, below what a
+ * player can attend to — which is the defect the ruling is about. At `1×` it is a ten-second dwell,
+ * and the whole of what § 7 asks a player to read is *which landing is backing up*, not how long one
+ * pair of doors takes.
+ *
+ * **2. The content census, counted rather than estimated.** `data/campaign.json` is ten stages of
+ * **900 s**; `data/scenario-goals.json` twelve of **900 s**; `data/fixit-cases.json` one of 1 500 s,
+ * fifteen of **1 800 s** and two of 2 700 s. So the mode § D525 puts first is 900 s, which is
+ * **3 min 45 s at `4×`** and **15 minutes at `1×`**. `everyday/modes.ts`'s Scenario tile publishes
+ * *"~3-5 min a case"* on the player's own screen: `4×` lands inside that promise and `1×` is three
+ * to four times outside it.
+ *
+ * **3. The ladder stays usable in both directions.** A default on the bottom rung can only be
+ * adjusted one way. At `4×` a player who wants more day per minute has `8×` and `30×` still inside
+ * § D344's `S ≤ 39` budget above them, and `1×` below for a single car.
+ *
+ * ## What this costs, stated rather than glossed
+ *
+ * `docs/28` AD-S6 measured `office-day`'s quiet head — 08:00–08:30 at one twentieth of nominal — at
+ * **60 real seconds** under `30×`. At `4×` it is **7.5 real minutes**, and that whole template is
+ * 2.5 real hours. It is the only one of the seven shipped templates with a phase schedule, it is not
+ * what the Everyday content runs (`rise-and-fall`, 1 800 s, ramps from its first second), and § 2.3's
+ * skip control and the chips are the answer to it — but it is a real move and AD-S6's arithmetic is
+ * corrected on the commit that makes it stale rather than left to age.
+ *
+ * **And one number this does not fix.** The session shapes on `everyday/modes.ts`' three tiles and
+ * `everyday/scenarioModel.ts`' two entries — *"~3-5 min a case"*, *"~2 min a building-day"*,
+ * *"~5 min a case"* — correspond to roughly **5–6 simulated seconds per real second**, which is no
+ * rung on this ladder. They are wrong by a factor of six at `30×` and by about 1.5 at `4×`: less
+ * wrong, and still wrong. Correcting five player-facing strings is not this constant's to do, and
+ * saying so here is better than a decomposition nobody measured.
  *
  * The index is **derived from the declared multiplier rather than written down beside it**, so a
  * rung inserted below the default cannot silently move it. That is #257's own defect class one level
  * up: a number and a name kept in two places drift, and the second place is always the one nobody
  * re-reads.
  */
-export const DEFAULT_STAGE_SIM_PER_REAL_S = 30;
+export const DEFAULT_STAGE_SIM_PER_REAL_S = 4;
 
 /** Where every run opens — the index of {@link DEFAULT_STAGE_SIM_PER_REAL_S} on the ladder. */
 export const DEFAULT_STAGE_SPEED_INDEX = STAGE_SPEEDS.findIndex(

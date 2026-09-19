@@ -486,11 +486,18 @@ transport.**
   measured answer moves the whole issue.** `data/traffic-profiles.json` ships seven demand templates.
   **`office-day` is the only one with a phase schedule** — 600 simulated minutes from 08:00, and its
   first phase is *08:00–08:30 at intensity `0.05`*, one twentieth of nominal, before the up-peak ramp
-  begins. At the default speed (`30×` — 30 simulated seconds per real second; the chip was called
-  `1×` before #257 renamed it and the multiplier did not move) that is **60 real
-  seconds** of a near-empty building at the head of a **20-minute** day. The shipped default,
-  `rise-and-fall`, is a 30-minute run from 08:30 whose intensity ramps from its first second — **60
-  real seconds end to end, with no quiet head at all.**
+  begins. At the default speed (`4×` — 4 simulated seconds per real second, [§ D641](../DECISIONS.md);
+  this paragraph read `30×` until that decision, and the chip was called `1×` before #257 renamed it
+  while the multiplier did not move) that is **7.5 real minutes** of a near-empty building at the
+  head of a **2.5-hour** day. The shipped default, `rise-and-fall`, is a 30-minute run from 08:30
+  whose intensity ramps from its first second — **7.5 real minutes end to end, with no quiet head at
+  all.**
+
+  **Both figures were sixfold smaller at `30×`** — 60 real seconds and a 20-minute day — and the
+  move is stated rather than absorbed, because it is the one real cost of the new opening rung.
+  `office-day` is the only one of the seven templates with a phase schedule, it is not what the
+  Everyday content runs, and § 2.3's skip control and the chips are the answer to it; none of which
+  makes 7.5 minutes of an empty lobby a thing to leave unsaid.
 
   So the empty opening is **template-shaped**, it is one minute rather than the several #212's
   wording implies, and on the most common shipped run it does not exist. **The fix, where one is
@@ -797,9 +804,9 @@ ruled on by [§ D344](../DECISIONS.md). `stageScreenModel.ts#STAGE_SPEEDS` ships
 | chip | `simPerRealS` | sim-seconds per frame at 60 Hz | a 9.8 s hall-call door cycle |
 |---|---|---|---|
 | `1×` | 1 | 0.017 | 9.8 s of wall time · ~588 frames |
-| `4×` | 4 | 0.067 | 2.45 s · ~147 frames |
+| `4×` *(default)* | 4 | 0.067 | **2.45 s** · ~147 frames |
 | `8×` | 8 | 0.13 | 1.23 s · ~74 frames |
-| `30×` *(default)* | 30 | 0.50 | **0.33 s** · ~20 frames |
+| `30×` | 30 | 0.50 | **0.33 s** · ~20 frames |
 | `90×` | 90 | 1.5 | 0.11 s · ~7 frames |
 | `240×` | 240 | 4.0 | 41 ms · ~2 frames |
 | `600×` | 600 | 10.0 | **16 ms · under one frame** |

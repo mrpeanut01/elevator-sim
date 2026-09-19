@@ -24619,7 +24619,7 @@ on an unhandled page error, which is the same disease.
 
 ## D354 — the stage speed ladder is honest, and the default is a decision rather than a constant
 
-> **Status 2026-09-06: AMENDED by [§ D525](#d525).** The ladder stands; the opening speed moves from `30×` to a watching rung, `1×` or `4×`, chosen by playtest. See [`docs/39`](docs/39-decisions-in-force.md).
+> **Status 2026-09-06: AMENDED by [§ D525](#d525) · implemented 2026-09-19 by [§ D641](#d641).** The ladder stands; the opening speed has moved from `30×` to `4×`. § D525 left the rung to a playtest and § D641 took it on the content arithmetic, saying so rather than claiming one. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-08-24 · Owner: orchestrator · Lane: FIX-257 · Closes: #257 · Unblocks: #258**
 
@@ -37971,3 +37971,74 @@ the daily board by a surface the adapter already drives, so § D489's ruling app
 existing surface moves the strings and not the surface count. `shareFactsOf` and `shareSlicesOf` are
 deliberately not in `covers` — the derivation finds no prose in either, and a `covers` entry for
 nothing is a coverage claim for nothing, which is wave T's lesson read in the other direction.
+
+## D641 — The stage opens at `4×`: § D525 clause 4's watching rung, chosen on the content arithmetic rather than by playtest
+
+**Date: 2026-09-19 · Owner: lane BUG-548 · Lane block: D641–D643 · Implements: [§ D525](#d525) clause 4 · Amends: [§ D354](#d354) · Closes the build half of: [#411](https://github.com/mrpeanut01/elevator-sim/issues/411)**
+
+**Decision.** `stageScreenModel.ts#DEFAULT_STAGE_SIM_PER_REAL_S` moves from `30` to `4`. The ladder
+is untouched — all seven rungs still ship and every label still equals its multiplier, which is
+§ D354's own result and is not reopened.
+
+**What ruled it, and what was left open.** [§ D525](#d525) clause 4, the product owner's, 2026-09-06:
+*"every scenario and every rush plays live, meaning the stage plays at a watching speed … the
+opening speed moves from § D354's `30×` to a watching rung, `1×` or `4×`"*. Its own closing section
+says *"what it does not decide: which watching rung opens a run, which is a playtest's."* **This
+decision takes that call on arithmetic instead, and says so rather than claiming a playtest.** A
+playtest is still the better instrument and is owed; what it would be choosing between is now `4×`
+and `1×` on a build where neither is `30×`, which is strictly more useful than deciding it on a
+build the ruling has already rejected. **The build half of #411 is closed and the playtest half is
+not.**
+
+**§ D354's three reasons, taken one at a time.** Reason 1 — *it cannot be the honest `1×`* — stands
+untouched and is half of why this is `4×`. Reason 2 — *the fastest rung inside [§ D344](#d344)'s
+`S ≤ 39` budget*, i.e. the most day per minute that still clears the bound — is what § D525
+overturned: the default is for watching the people, and buying day per minute is what the chips and
+§ 2.3's skip control are for. Reason 3 — *it moves no picture* — was an argument for not moving, and
+the ruling moves it. `stageScreenModel.test.ts`' property case is rewritten accordingly rather than
+loosened: it now asserts *inside the budget*, *above 1:1*, *not the maximum of the discrete tier*,
+*the ladder open in both directions*, and *a door cycle of at least two real seconds*.
+
+**Why `4×` and not `1×`, in three measurements.**
+
+1. **The door cycle, which is what a watching speed exists to make visible.** `docs/28` § 6's own
+   table: a 9.8 s hall-call cycle (open 1.8 s, dwell 5 s, close 3.0 s, from
+   `data/elevator-specs.json`) is **2.45 real seconds at `4×`**, **0.33 s** at `30×` and **9.8 s** at
+   `1×`. Twenty frames is a flicker; 588 frames for one pair of doors is not what § 7 asks a player
+   to read, which is *which landing is backing up*.
+2. **The content census, counted rather than estimated.** `data/campaign.json` — ten stages, all
+   **900 s**. `data/scenario-goals.json` — twelve, all **900 s**. `data/fixit-cases.json` — one at
+   1 500 s, **fifteen at 1 800 s**, two at 2 700 s. The mode § D525 puts first is 900 s, which is
+   **3 min 45 s at `4×`** and **15 minutes at `1×`**, against a tile that publishes *"~3-5 min a
+   case"* on the player's own screen.
+3. **The ladder stays open in both directions.** A default on the bottom rung can only be adjusted
+   one way. At `4×`, `8×` and `30×` remain above it and inside § D344's budget, and `1×` remains
+   below for a player who wants one car.
+
+**What it costs, stated rather than glossed.** `docs/28` AD-S6's measurement of `office-day`'s quiet
+head — 08:00–08:30 at one twentieth of nominal — was **60 real seconds** at `30×` and is **7.5 real
+minutes** at `4×`; that whole template is 2.5 real hours. It is the only one of the seven shipped
+templates with a phase schedule, it is not what the Everyday content runs, and § 2.3's skip control
+answers it — none of which makes 7.5 minutes of an empty lobby a thing to leave unsaid. AD-S6 is
+corrected on this commit.
+
+**A number this decision does not fix, and will not pretend to.** The session shapes on
+`everyday/modes.ts`' three tiles and `everyday/scenarioModel.ts`' two entries — *"~3-5 min a case"*,
+*"~2 min a building-day"*, *"~5 min a case"*, repeated in `docs/23` § 4, `docs/32` § 1.2 and
+`docs/12` § 4 — correspond to roughly **5–6 simulated seconds per real second**, which is no rung on
+this ladder. They are wrong by a factor of six at `30×` and by about 1.5 at `4×`: **less wrong, and
+still wrong.** The likely history is § D354's own defect one document over — before that decision the
+chip *labelled* `4×` ran at 8 — but that is a plausible sentence rather than a measurement, so it is
+offered as a guess and marked as one. Correcting five player-facing strings is not this constant's
+to do; it is filed rather than absorbed.
+
+**The stale sites this commit corrects**, on `CLAUDE.md`'s rule that a published number and a stated
+mechanism go stale the same way: `shift/legibility.ts`'s *"two simulated minutes are on the order of
+ten real seconds"* (thirty, at `4×` — and the window itself did not move, the speed under it did);
+`docs/28` § 6's motion table, whose *(default)* marker moves to the `4×` row, and AD-S6's arithmetic;
+`docs/29` § 4.1's *"0.33 s of wall time at the default"*, which is a change **in that section's
+favour** — the door material #196 names does not survive 0.33 s and fits 2.45 s comfortably, so the
+discrete tier is now what a player meets rather than one they reach by moving a chip; and `docs/38`
+§ 2.3. Three test literals reading `30×` are replaced by a read through
+`stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX).label` rather than by the new number, which is #257's defect
+class one level up — a rung that has now moved twice would have had to be re-transcribed twice.

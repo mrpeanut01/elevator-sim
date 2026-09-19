@@ -49,12 +49,20 @@ Three facts drive that, and each is checkable in one command:
 
    What survives unchanged is the arithmetic and the conclusion **for the fast rungs**: a hall-call
    door cycle taken from [`data/elevator-specs.json`](../data/elevator-specs.json) — open 1.8 s,
-   dwell 5 s, close 3.0 s — is **9.8 s** of simulated time, which is still **0.33 s** of wall time at
-   the default and **16 ms** at the top rung, now named `600×` rather than `30×`. Door chimes, motor
-   whine and the texture of a door closing are the material #196 names, and none of them survives
-   *that*. What no longer holds is *"at any speed the transport offers"*: at `1×` the same cycle is
-   **9.8 s** of wall time and a chime fits inside it with room to spare. § 4.1 does the arithmetic
-   and carries the same correction.
+   dwell 5 s, close 3.0 s — is **9.8 s** of simulated time, which is **0.33 s** of wall time at the
+   rung named `30×` and **16 ms** at the top rung, now named `600×` rather than `30×`. Door chimes,
+   motor whine and the texture of a door closing are the material #196 names, and none of them
+   survives *that*. What no longer holds is *"at any speed the transport offers"*: at `1×` the same
+   cycle is **9.8 s** of wall time and a chime fits inside it with room to spare. § 4.1 does the
+   arithmetic and carries the same correction.
+
+   **And *"at the default"* stopped naming the `30×` rung on 2026-09-19** — [§ D641](../DECISIONS.md),
+   implementing [§ D525](../DECISIONS.md) clause 4. The opening rung is `4×`, where the same cycle is
+   **2.45 s** of wall time. That is a material change *in this section's favour* and is recorded
+   rather than absorbed: the door material #196 names does not survive 0.33 s and comfortably fits
+   2.45 s, so the discrete tier is now what a player meets by default rather than a tier they reach
+   by moving a chip. Nothing in the design below moves; what moves is which rung the sentence
+   *"at the default"* is about.
 2. **Audio is forbidden from carrying information, by #196's own acceptance criterion** — *"no cue
    conveys information the screen does not also convey"*. That is the right rule and it caps the
    ceiling: whatever audio does here, it cannot be the thing that shows the player the trouble,
