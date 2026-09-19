@@ -1539,7 +1539,16 @@ function mountFixit(
          * Scenario content (`docs/38` § 2.1, § D525), and the badge this run just earned is the clear
          * being filed: `keepSolved` wrote it one line up. A run that did not fix the case files no
          * clear and posts nothing, and the server pays a scenario once per account however often one
-         * case is fixed again. Nothing is drawn and nothing is awaited, on `host.ts#closeDay`'s ground.
+         * case is fixed again. Nothing is awaited, on `host.ts#closeDay`'s ground.
+         *
+         * **The second half of that sentence used to read *"nothing is drawn"*, and it was the
+         * whole of the defect** ([§ D673](../../../../DECISIONS.md)): a player could clear all
+         * eighteen cases and never learn a currency existed, because the only surface drawing a
+         * balance was Settings. Something is drawn now, and **it is not drawn here** — the
+         * acknowledgement lands on the rail's `PLAYING AS` card, as `docs/32` § 3.4's tally of
+         * completed turns, and `docs/32` GD13 clause 2's *never on a results page* is why this
+         * screen is still the wrong place for it. `everyday/rail.ts#bankedLineOf` carries the
+         * argument; this call is unchanged and still answers nothing to this closure.
          */
         if (session.fixed) scenarioHost.bankScenarioClear(entry.id);
         // Through `live`, never through this mount: the player may have left and come back, and

@@ -69,7 +69,13 @@ import { EVERYDAY_MODES, isPlayable } from './modes.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { everydayProfileStore } from './profileStore.js';
 import { tutorialIsDue } from './tutorialModel.js';
-import { RAIL_DRAWER_COPY, railFooter, railModel } from './rail.js';
+import {
+  RAIL_DRAWER_COPY,
+  railFooter,
+  railModel,
+  type BankedAnswer,
+  type BankedTurnState,
+} from './rail.js';
 import type { RailModel } from './rail.js';
 import { routeFor, SCREEN_NAMES, screenModuleFor, unbuiltReasonFor } from './screens.js';
 import type { EverydayScreenContext, EverydayScreenHandle } from './screens.js';
@@ -1532,6 +1538,34 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   }
 
   /**
+   * The `PLAYING AS` card's banked line — `EverydayHost.chimeTally()`, read at draw time for
+   * {@link weekRailOptions}'s reason. GitHub issue #499, [§ D673](../../../../DECISIONS.md).
+   *
+   * **The `answer` is translated rather than passed through**, and the translation is one line
+   * because it is worth one: `everyday/rail.ts` is pure and must stay drivable by the honesty sweep
+   * without a host, so it speaks its own four-arm `BankedAnswer` and this maps the host's four onto
+   * it. The two vocabularies are deliberately not one import — a rail that named
+   * `EverydayChimeBalance` would be a rail that could not be rendered without the host module.
+   *
+   * No host is **no line at all**, not a pending one: a standalone mount keeps no ledger, and a
+   * card that said *banking…* over a build with nowhere to bank would be the claim
+   * {@link CAREER_PENDING} exists to avoid, one line down.
+   */
+  function bankedRailOptions(): { banked?: BankedTurnState } {
+    const tally = dataHost?.chimeTally();
+    if (tally === undefined) return {};
+    const answer: BankedAnswer =
+      tally.answer.kind === 'balance'
+        ? { kind: 'balance', chimes: tally.answer.chimes }
+        : tally.answer.kind === 'signed-out'
+          ? { kind: 'signed-out' }
+          : tally.answer.kind === 'no-server'
+            ? { kind: 'no-ledger' }
+            : { kind: 'unreachable' };
+    return { banked: { turn: tally.turn, answer } };
+  }
+
+  /**
    * What the `PLAYING AS` card's career line said the last time the rail was drawn.
    *
    * The guard on {@link connectDataHost}'s redraw, and it is a guard rather than an unconditional
@@ -1557,6 +1591,20 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   let nameDrawn: string | undefined;
 
   /**
+   * The banked line as it was last drawn — {@link careerLineDrawn}'s twin, and a guard for exactly
+   * its reason.
+   *
+   * `drawRail` calls `replaceChildren`, which takes the focus off whatever rail row a keyboard
+   * player is on, and the earn's answer lands on a network round trip after a clear. So the rail is
+   * repainted when this line **moves** and at no other time — which for a Scenario session is once
+   * per case cleared, and never while the player is reading an outcome.
+   *
+   * `undefined` on both sides is the untouched state, so a host that never banks anything never
+   * repaints the rail on this account.
+   */
+  let bankedLineDrawn: string | undefined;
+
+  /**
    * The career line as it would be drawn **now** — one derivation, asked without touching the DOM.
    *
    * Through {@link railFooter} rather than through `rail.ts`'s own `careerLineOf`, which is
@@ -1566,6 +1614,17 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    */
   function careerLineNow(): string {
     return railFooter(state, weekRailOptions()).identity.streak;
+  }
+
+  /**
+   * The banked line as it would be drawn **now** — {@link careerLineNow}'s twin.
+   *
+   * Through `railModel` rather than `railFooter`, because § D673's line is **not** on the footer's
+   * identity card: that card's third line carries a run figure and a currency beside one is
+   * `docs/32` GD13 clause 3. `rail.ts#RailModel.banked` carries the whole argument.
+   */
+  function bankedLineNow(): string | undefined {
+    return railModel(state, bankedRailOptions()).banked;
   }
 
   /**
@@ -1591,6 +1650,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     const model: RailModel = railModel(state, {
       ...campaignRailOptions(),
       ...weekRailOptions(),
+      ...bankedRailOptions(),
       ...(stored === undefined
         ? {}
         : { profile: { name: stored.name, avatarColor: stored.avatarColor } }),
@@ -1603,6 +1663,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     });
     careerLineDrawn = model.footer.identity.streak;
     nameDrawn = model.footer.identity.name;
+    bankedLineDrawn = model.banked;
 
     /* The brand block — the little lift glyph beside the two-line name, per the prototype. */
     const brand = el(doc, 'div');
@@ -1673,6 +1734,23 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     menuRow.append(home, menuText);
     menuRow.addEventListener('click', requestLeave);
     rail.append(menuRow);
+
+    /*
+     * § D673's acknowledgement — `rail.ts#RailModel.banked` carries why it is **here**, at the top
+     * of the rail where nothing numeric is drawn, rather than on the `PLAYING AS` card whose own
+     * third line is `3 days running · best 84%`.
+     *
+     * Classed for the streak line's reason: the browser tier has to be able to read exactly what a
+     * player reads, and selecting it positionally would pass over a rail that had stopped drawing
+     * it. Appended only when there is one, because an empty box is a line a screen reader
+     * announces, and outside the menu row rather than inside it because the row is a button and
+     * this is not part of what pressing it does.
+     */
+    if (model.banked !== undefined) {
+      const banked = el(doc, 'div', 'everyday-rail-banked', model.banked);
+      banked.style.cssText = `font:500 10px ${TYPE.mono};letter-spacing:.04em;color:${C.label};margin:7px 0 0 13px`;
+      rail.append(banked);
+    }
 
     for (const group of model.groups) {
       const block = el(doc, 'div');
@@ -2613,7 +2691,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     dataHost = next;
     const sync = (): void => {
       runOpen = next.runState().open;
-      if (careerLineNow() !== careerLineDrawn) drawRail();
+      /*
+       * Two guards rather than one `||` with a side effect in it: both readers are pure, and the
+       * second is § D673's — a clear banked while the player is still on the fix-it screen lands as
+       * a host notification and nothing else would repaint the rail, which is issue #214's defect
+       * with a different fact in it.
+       */
+      const bankedMoved = bankedLineNow() !== bankedLineDrawn;
+      if (careerLineNow() !== careerLineDrawn || bankedMoved) drawRail();
     };
     sync();
     dataHostUnsubscribe = next.subscribe(sync);

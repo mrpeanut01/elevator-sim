@@ -299,6 +299,11 @@ import {
   challengeTabViewOf,
   dailyBoardViewOf,
 } from '../everyday/boardScreen.js';
+import {
+  SHARE_COPY,
+  shareArtefactOf,
+  shareFactsOf,
+} from '../everyday/shareResult.js';
 // The challenge tab's own wire shapes, restated as fixtures — see `challengeStates`.
 import type { ChallengeBoardPage } from '../menu/challenge.js';
 import type { EverydayChallengeToday } from '../everyday/host.js';
@@ -11120,6 +11125,27 @@ const GAUNTLET: SurfaceAdapter = {
      * only its ranking is missing, which is what an upcoming challenge looks like from here.
      */
     'everyday/boardScreen.ts#challengeTabViewOf',
+    /*
+     * The result artefact, on the same tab and therefore in the same adapter — GitHub issue #553,
+     * [§ D685](../../../../DECISIONS.md).
+     *
+     * **Seeded below, not merely listed here.** Wave T's finding is one line long and it is this
+     * one: being in `covers` is not being swept, and a claim of seeding is not seeding. Every one
+     * of these is rendered from the case's own recording or iterated out of the copy table.
+     *
+     * It is not a new adapter because it is not a new screen: the artefact is drawn under the
+     * daily board, by the surface this adapter already drives, so § D489's ruling applies — a
+     * state on an existing surface moves the strings and not the surface count.
+     *
+     * **Two exports are deliberately not here**, and the derivation is what says so rather than a
+     * judgement: `shareFactsOf` and `shareSlicesOf` compose no sentence at all — one is the
+     * projection that decides what may leave a run and the other folds a wait into a band index —
+     * so the two-adjacent-words scanner does not reach them and a `covers` entry for either would
+     * be a coverage claim for nothing. Every word they lead to is `shareArtefactOf`'s or the copy
+     * table's, and both are driven below.
+     */
+    'everyday/shareResult.ts#SHARE_COPY',
+    'everyday/shareResult.ts#shareArtefactOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -11343,6 +11369,45 @@ const GAUNTLET: SurfaceAdapter = {
       seeds.push({ field: `board.copy.${key}`, text, role: 'label' });
     }
     seeds.push({ field: 'board.daily.absent', text: DAILY_BOARD_ABSENCE, role: 'reason' });
+
+    /*
+     * **The result artefact — what leaves the product about this run** (§ D685).
+     *
+     * Rendered from the case's **own** recording rather than from a fixture, which is the whole
+     * value of putting it here: the properties judge every line against the run it describes, so
+     * R3 asks whether this artefact published *this* run's refused mean and R13 asks whether the
+     * count beside the mean is *this* run's `waitCount`. A fixture would have been judged against
+     * a run nobody played.
+     *
+     * Both branches are reached across the corpus rather than manufactured, because the cases
+     * genuinely differ: `suppressed` is already the context's own field, and the arms it selects
+     * here are the same arms the player meets. The roles are the module's own `ShareLineRole`,
+     * whose members are spelled to match `TextRole` so this mapping is the identity and cannot
+     * quietly reclassify a refusal as prose.
+     *
+     * No `playhead` is seeded and that is correct rather than an omission: the artefact exists only
+     * for a finished run, so there is no instant short of the end at which it says anything, and a
+     * playhead here would put a whole-run figure on the temporal axis under a clock it never had.
+     */
+    for (const line of shareArtefactOf(shareFactsOf(context.recording)).lines) {
+      seeds.push({
+        field: `share.${line.field}`,
+        text: line.text,
+        role: line.role,
+        declaredCount: line.count,
+        countShown: line.count !== undefined,
+        /* The three quantities `awtIsValid` speaks for — only the mean is one of them here. */
+        gated: line.field === 'mean',
+      });
+    }
+    /*
+     * The artefact's own chrome and its two refusals, iterated generically on
+     * `BOARD_SCREEN_COPY`'s precedent — so a key added to the table is swept by existing, rather
+     * than by somebody remembering to list it here.
+     */
+    for (const [key, text] of Object.entries(SHARE_COPY)) {
+      seeds.push({ field: `share.copy.${key}`, text, role: 'label' });
+    }
     seeds.push({ field: 'ladder.world.absent', text: LADDER_WORLD_ABSENCE, role: 'reason' });
     seeds.push({ field: 'ladder.empty', text: LADDER_EMPTY, role: 'reason' });
     /*

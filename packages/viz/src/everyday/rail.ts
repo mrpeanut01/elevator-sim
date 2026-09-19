@@ -43,6 +43,7 @@ import type { AccountState } from '../menu/account.js';
 import type { WeekState } from '../shift/types.js';
 import { HISTORY_DAYS } from '../shift/week.js';
 
+import { CHIME_PRICES } from './chimesPanel.js';
 import { EM_DASH, percentFigure } from './figures.js';
 import { avatarInitialOf, DEFAULT_EVERYDAY_PROFILE, effectiveNameOf } from './profile.js';
 import { isScreenBuilt, UNBUILT_REASONS } from './screens.js';
@@ -54,6 +55,78 @@ import {
   ENGINEER_SWAP_WATCH_NOTE,
 } from './types.js';
 import type { EverydayScreen, EverydayState, RunContext } from './types.js';
+
+/* -------------------------------------------------------------------------- *
+ * The banked line — § 3.2's card, GitHub issue #499, § D673
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What a finished turn is called on the card, and **what it is deliberately not**.
+ *
+ * Each of these is a turn that either happened or did not, which is the whole of why this line is
+ * allowed to exist: `docs/32` § 3.4 licenses *a tally of completed turns* as distinct from *a
+ * statistic over a run*, and `docs/38` § 2.4 makes a chime exactly the first — a flat award for
+ * finishing something, never scaled by a wait figure or any quantity a run can suppress.
+ *
+ * **No figure the turn carries is drawn.** `rush-wave-survived` knows how many waves were
+ * outlasted and this says *rush waves banked*: a wave count is a run's own measurement and would
+ * put one on the rail, which is the line `docs/32` GD13 clause 3 draws. The completion is the
+ * player's vocabulary and never a **source** — § D526 clause 5, asserted for this whole package by
+ * `boundaries.test.ts`.
+ */
+const BANKED_TURN: Readonly<Record<BankedTurn, string>> = Object.freeze({
+  'scenario-cleared': 'scenario cleared',
+  'career-day-paid': 'contract day filed',
+  'rush-wave-survived': 'rush waves banked',
+});
+
+/** One member of `core`'s `CHIME_COMPLETIONS`, spelled here so this module imports no ledger type. */
+export type BankedTurn = 'scenario-cleared' | 'career-day-paid' | 'rush-wave-survived';
+
+/**
+ * What the ledger said when it was told — {@link RailOptions.banked}.
+ *
+ * Four arms because four things are true of four different players, and a card that collapsed them
+ * would tell at least one of them something false. `signed-out` is the one worth reading twice: a
+ * visitor earns **nothing** on this build — there is no device ledger, `everyday/chimesPanel.ts`
+ * says so at length — so the honest acknowledgement of their clear names the clear and says the
+ * chime went nowhere. Saying nothing at all would be § D227's rule in the half `CLAUDE.md` calls
+ * the more dangerous one.
+ */
+export type BankedAnswer =
+  /** The ledger answered. `chimes` is the account's balance — the one read, never an award or a delta. */
+  | { readonly kind: 'balance'; readonly chimes: number }
+  /** Nobody is signed in, so nothing was banked and nothing could be. */
+  | { readonly kind: 'signed-out' }
+  /** This build was served with no API origin: there is no ledger here to bank into. */
+  | { readonly kind: 'no-ledger' }
+  /** There is a server and it did not answer. The turn still happened. */
+  | { readonly kind: 'unreachable' };
+
+/** The banked half of the card's state, as the shell hands it over. */
+export interface BankedTurnState {
+  readonly turn: BankedTurn;
+  readonly answer: BankedAnswer;
+}
+
+/**
+ * The one screen this line is withheld on, and the argument for the list being one rather than
+ * seventeen or zero.
+ *
+ * `docs/32` GD13 clause 2: a currency *"may **never** appear on a results page"*, and `report` is
+ * the results page the clause names — the day's sheet, its goals, its deltas and the mean it
+ * sometimes withholds. The rail is chrome rather than part of that sheet, so this is the
+ * conservative reading taken deliberately: it costs nothing, because a player leaves the report,
+ * and it buys the reading a reviewer would take.
+ *
+ * **`fixit` is deliberately not on this list, and the reason is a navigation rather than a
+ * judgement.** § 3.3's primary after a clear is *Next building*, which picks the next case **on the
+ * same screen** — so a guard on `fixit` would withhold the acknowledgement for a whole Scenario
+ * session, from exactly the player this line exists for. What it is beside there is an outcome
+ * **card**, which is not a results page, and the rail's identity card is the length of a rail away
+ * from it rather than in its figure block (GD13 clause 3's *beside*).
+ */
+const OUTCOME_SCREENS: readonly EverydayScreen[] = Object.freeze(['report']);
 
 /**
  * **The two words the rail's small-screen drawer is worked by** — GitHub issue **#240**,
@@ -141,6 +214,31 @@ export interface RailModel {
   readonly mode: string;
   /** § 3.2's live subline under *Main menu* — where you are, in the rail's own voice. */
   readonly subline: string;
+  /**
+   * **The last turn the player finished, acknowledged** — GitHub issue #499,
+   * [§ D673](../../../../DECISIONS.md), `docs/32` § 3.4. `undefined` until something is finished,
+   * and on the results page ({@link OUTCOME_SCREENS}).
+   *
+   * ## Why it is here and **not** on the `PLAYING AS` card
+   *
+   * The card is where it was drafted, on the argument that it belongs beside the turn tally the
+   * card already draws. That argument is half right and the half it gets wrong is the one that
+   * matters: {@link careerLineOf} composes `3 days running · **best 84%**`, and `bestMinutePct` is
+   * a **run figure** — the share of a day's people away inside a minute. A chime count three pixels
+   * under it is a currency beside a wait figure, which is `docs/32` GD13 clause 3 and, underneath
+   * it, [§ D106](../../../../DECISIONS.md): *a currency beside a wait figure becomes a score.*
+   * Clearing the letter of a prohibition while landing exactly where its reason bites is not
+   * clearing it.
+   *
+   * ## What *beside* means here, calibrated against something that already shipped
+   *
+   * It cannot mean *anywhere on a page that also draws a figure*, or no surface in this product
+   * could ever draw a chime — the rail is on every screen, and `everyday/settingsView.ts` has drawn
+   * the balance beside it since GitHub issue #368. It means **the same block**: the identity card
+   * is one, and the top of the rail, where nothing numeric is drawn at all, is not. So the
+   * acknowledgement sits under the *Main menu* row and the figure stays where it is.
+   */
+  readonly banked: string | undefined;
   readonly groups: readonly RailGroup[];
   readonly footer: RailFooter;
 }
@@ -221,6 +319,16 @@ export interface RailOptions {
    * forgets the flag under-reports rather than publishing something no run produced.
    */
   readonly dayClosed?: boolean | undefined;
+  /**
+   * The last turn banked and what the ledger said — `EverydayHost.chimeTally()`, read at draw time
+   * like {@link week} and for the same reason.
+   *
+   * Absent with no host, which is the state every standalone mount is in, and absent before
+   * anything has been finished. There is no *pending* arm and there must not be one: the card is
+   * drawn from an answer this session already has, and a line saying *banking…* would be a promise
+   * the rail cannot keep when the request fails.
+   */
+  readonly banked?: BankedTurnState | undefined;
 }
 
 /**
@@ -442,6 +550,82 @@ function careerLineOf(
 }
 
 /**
+ * **The card's fourth line — the turn just finished, and the tally it went into.**
+ *
+ * GitHub issue #499, [§ D673](../../../../DECISIONS.md), `docs/32` § 3.4, `docs/38` § 2.4.
+ *
+ * ## Why there is a line here at all
+ *
+ * `everyday/fixitScreen.ts` banked a clear under a comment reading *"Nothing is drawn and nothing
+ * is awaited"*, and it was right about the build: the only surface that drew a balance was
+ * Settings. A player could clear all eighteen fix cases, earn the entire lifetime ceiling
+ * `data/chime-ledger.json` allows, and never find out the currency exists.
+ *
+ * ## Why it is here and not where the player wins
+ *
+ * `docs/32` GD13 clause 2 keeps a currency off a results page; clause 3 keeps it away from a wait
+ * figure. Neither is relaxed. `docs/32` § 3.4 licenses the honest form in terms — standing survives
+ * *"because it is a tally of completed turns, not a statistic over a run"* — and a chime is that by
+ * construction, so it goes beside the tally this card already draws.
+ *
+ * ## Where it is drawn, which is not where it was drafted
+ *
+ * {@link RailModel.banked} carries the argument in full: the `PLAYING AS` card's third line is
+ * `3 days running · best 84%` and the second of those is a run figure, so the acknowledgement sits
+ * at the top of the rail instead, where nothing numeric is drawn.
+ *
+ * ## The two figures this line will not carry, and each absence is a rule
+ *
+ * **Not the award.** `data/chime-ledger.json` prices a completion and `boundaries.test.ts` forbids
+ * any module here naming a **source**, so an award drawn on this card would be a second authority
+ * for a price this package may not read. {@link CHIME_PRICES} is the spend half precisely because
+ * the sources were projected out of it.
+ *
+ * **Not the delta.** *First time only* ([§ D533](../../../../DECISIONS.md)) means a scenario
+ * re-cleared pays nothing, so a `+6` drawn on a second clear would be false; and a first clear
+ * happens before anything has read the balance, so there is no *before* to subtract. A quotient of
+ * two reads taken at different moments is a figure nothing produced.
+ *
+ * What is left is the turn and **the one read** § D526 clause 5 licenses, which is exactly enough
+ * for a player to learn that finishing things pays something and that they have some.
+ *
+ * Module-private, for {@link careerLineOf}'s reason: exporting it would put a second text producer
+ * under `everyday/rail.ts` for `honesty/derive.ts` to classify, and the sweep already drives every
+ * arm of it through {@link railModel}, which `honesty/surfaces.ts`'s `EVERYDAY_MENU` covers.
+ */
+function bankedLineOf(
+  banked: BankedTurnState | undefined,
+  screen: EverydayScreen,
+): string | undefined {
+  if (banked === undefined || OUTCOME_SCREENS.includes(screen)) return undefined;
+  const turn = BANKED_TURN[banked.turn];
+  switch (banked.answer.kind) {
+    case 'balance': {
+      /*
+       * The currency's own words, from the shipped table rather than spelled here —
+       * [§ D530](../../../../DECISIONS.md) authors `one` and `many` in `data/` so that no screen
+       * decides what the currency is called, and the singular is a different string rather than the
+       * same one with a different number in it.
+       */
+      const chimes = Math.max(0, Math.trunc(banked.answer.chimes));
+      const unit = chimes === 1 ? CHIME_PRICES.currency.one : CHIME_PRICES.currency.many;
+      return `${turn} · ${String(chimes)} ${unit}`;
+    }
+    /*
+     * The turn still happened, and the chime did not. A visitor earns nothing on this build —
+     * there is no device ledger — so this names both halves rather than the comfortable one.
+     */
+    case 'signed-out':
+      return `${turn} · sign in to bank it`;
+    /* No API origin: this build has no ledger to bank into, so the turn is all there is to say. */
+    case 'no-ledger':
+      return turn;
+    case 'unreachable':
+      return `${turn} · the tally did not answer`;
+  }
+}
+
+/**
  * **What the swap row says it does, in the flow it is drawn in** — GitHub issue #533 item 1,
  * [§ D563](../../../../DECISIONS.md).
  *
@@ -516,6 +700,7 @@ export function railModel(state: EverydayState, options: RailOptions = {}): Rail
     brand: 'Elevator Sim',
     mode: 'EVERYDAY MODE',
     subline: sublineFor(state),
+    banked: bankedLineOf(options.banked, state.screen),
     groups: railGroups(state.ctx, options.inCampaign ?? false, options.openBuilding),
     footer: railFooter(state, options),
   };

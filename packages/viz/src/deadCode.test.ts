@@ -317,15 +317,15 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
   'scenario/measureScenario':
     'the instrument that produced data/scenario-goals.json; its caller is the regeneration driver',
   /*
-   * -- The legibility instrument (GitHub issue #354, § D512), the same shape one step along:
-   * legibility.sweep.test.ts under LEGIBILITY_SWEEP=1 is the driver that produced docs/33 § 6.4b's
-   * table over the 500 days of § 4.6 — 400 until GitHub issues #500 and #501 took the sweep from
-   * eight rows to ten — and legibility.test.ts's pinned ten-seed slice is the guard
-   * that re-derives a tenth of it on every run. What reads the verdict in the product is #208's
-   * build, which this scanner will see when it lands.
+   * -- The legibility instrument (GitHub issue #354, § D512) was here, and its own entry predicted
+   * how it would leave: "what reads the verdict in the product is #208's build, which this scanner
+   * will see when it lands." It has landed. `shift/trouble.ts` calls `legibilityOf` to locate the
+   * landings § D512 measures, and `everyday/rush.ts` reaches that locator for the rush result's
+   * *where* beat, so the instrument now has a caller in a shipped path and the entry stops being
+   * true. Deleted on the commit that made it stop reproducing, which is this register's own rule:
+   * a finding that has been repaired must stop being registered, or the register becomes
+   * decoration. The gated sweep and the pinned slice are unchanged and still its driver and guard.
    */
-  'shift/legibilityOf':
-    'the instrument behind docs/33 § 6.4b; its driver is the gated sweep and its guard the pinned slice',
   /*
    * -- GitHub issue #429 stage 2, § D631. `UNBANDED_SHAFT_CASES` names the two shipped cases whose
    * new-shaft repair cannot be priced by band — the coverage register `cases.test.ts` asserts

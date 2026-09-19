@@ -16,7 +16,8 @@ import { openWeek, outcomeOf } from '../shift/week.js';
 import type { WatchRecord } from '../watch/types.js';
 
 import { EM_DASH } from './figures.js';
-import { railFooter, railGroups, railModel, sublineFor } from './rail.js';
+import { CHIME_PRICES } from './chimesPanel.js';
+import { railFooter, railGroups, railModel, sublineFor, type BankedTurn } from './rail.js';
 import { EVERYDAY_SCREENS_BUILT, UNBUILT_REASONS } from './screens.js';
 import {
   ENGINEER_SWAP_NOTE,
@@ -520,5 +521,121 @@ describe('the whole model', () => {
     // entries into a campaign nobody started on the front door.
     expect(railModel({ screen: 'menu', ctx: 'campaign' }).groups.map((g) => g.title))
       .not.toContain('CAMPAIGN');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The banked line — GitHub issue #499, § D673
+ * -------------------------------------------------------------------------- */
+
+describe('the acknowledgement a finished turn gets', () => {
+  const TURNS: readonly BankedTurn[] = ['scenario-cleared', 'career-day-paid', 'rush-wave-survived'];
+
+  it('says nothing at all until something has been finished', () => {
+    /* Not an empty string and not a placeholder: a rail with nothing to acknowledge draws no line. */
+    expect(railModel({ screen: 'menu', ctx: 'daily' }).banked).toBeUndefined();
+  });
+
+  it('names the turn and the balance, in the currency\u2019s own singular and plural', () => {
+    /*
+     * The two words come from `data/chime-ledger.json` (§ D530) rather than from this file, so the
+     * assertion is that the panel's table decides them — a screen that spelled *chimes* would be a
+     * second authority for the name the owner ruled.
+     */
+    const one = railModel(
+      { screen: 'menu', ctx: 'daily' },
+      { banked: { turn: 'scenario-cleared', answer: { kind: 'balance', chimes: 1 } } },
+    ).banked;
+    const many = railModel(
+      { screen: 'menu', ctx: 'daily' },
+      { banked: { turn: 'scenario-cleared', answer: { kind: 'balance', chimes: 12 } } },
+    ).banked;
+    expect(one).toBe(`scenario cleared \u00b7 1 ${CHIME_PRICES.currency.one}`);
+    expect(many).toBe(`scenario cleared \u00b7 12 ${CHIME_PRICES.currency.many}`);
+  });
+
+  it('gives every completion its own words and never a figure the run measured', () => {
+    /*
+     * `rush-wave-survived` knows how many waves were outlasted and this line does not say. A wave
+     * count is the run's own measurement, and putting one here would be the currency standing
+     * beside a figure — `docs/32` GD13 clause 3, and § D106 underneath it.
+     */
+    const lines = TURNS.map(
+      (turn) =>
+        railModel({ screen: 'menu', ctx: 'daily' }, { banked: { turn, answer: { kind: 'no-ledger' } } })
+          .banked,
+    );
+    expect(new Set(lines).size).toBe(TURNS.length);
+    for (const line of lines) expect(line).not.toMatch(/\d/);
+  });
+
+  it('tells a signed-out player the turn happened and the chime did not', () => {
+    /*
+     * There is no device ledger — `everyday/chimesPanel.ts` says so at length — so a visitor earns
+     * nothing. Saying nothing to them would be § D227 in the half `CLAUDE.md` calls the more
+     * dangerous one: a screen silent about a mechanism that did not run.
+     */
+    const line = railModel(
+      { screen: 'menu', ctx: 'daily' },
+      { banked: { turn: 'scenario-cleared', answer: { kind: 'signed-out' } } },
+    ).banked;
+    expect(line).toContain('scenario cleared');
+    expect(line).toContain('sign in');
+  });
+
+  it('says only the turn where there is no ledger, and says the tally did not answer where there is one that did not', () => {
+    const noLedger = railModel(
+      { screen: 'menu', ctx: 'daily' },
+      { banked: { turn: 'career-day-paid', answer: { kind: 'no-ledger' } } },
+    ).banked;
+    const unreachable = railModel(
+      { screen: 'menu', ctx: 'daily' },
+      { banked: { turn: 'career-day-paid', answer: { kind: 'unreachable' } } },
+    ).banked;
+    /* Two different sentences, because *this build has no ledger* and *the server did not answer*
+       are two different things to tell a player about the same clear. */
+    expect(noLedger).toBe('contract day filed');
+    expect(unreachable).not.toBe(noLedger);
+    expect(unreachable).toContain('contract day filed');
+  });
+
+  it('is withheld on the report and drawn everywhere else', () => {
+    /*
+     * `docs/32` GD13 clause 2 — *never on a results page* — asserted rather than remembered, and
+     * asserted in **both** directions: a guard that withheld everywhere would satisfy the clause by
+     * deleting the feature, and a guard that withheld on `fixit` would withhold it for a whole
+     * Scenario session, because § 3.3's *Next building* picks the next case on the same screen.
+     */
+    const banked = { turn: 'scenario-cleared', answer: { kind: 'balance', chimes: 6 } } as const;
+    const drawn = EVERYDAY_SCREENS.filter(
+      (screen) => railModel({ screen, ctx: 'daily' }, { banked }).banked !== undefined,
+    );
+    expect(drawn).not.toContain('report');
+    expect(drawn).toContain('fixit');
+    expect(drawn).toContain('menu');
+    expect(drawn.length).toBe(EVERYDAY_SCREENS.length - 1);
+  });
+
+  it('keeps the currency off the card that carries a run figure', () => {
+    /*
+     * **The placement rule, mechanised.** `careerLineOf` composes `3 days running \u00b7 best 84%`
+     * and `bestMinutePct` is a run figure, so the `PLAYING AS` card is the one block in this rail a
+     * chime may not enter. The assertion is over the footer's whole JSON rather than over a named
+     * field, so a lane that adds a *second* currency line to the card fails here rather than on a
+     * player's screen.
+     */
+    const model = railModel(
+      { screen: 'menu', ctx: 'daily' },
+      {
+        banked: { turn: 'scenario-cleared', answer: { kind: 'balance', chimes: 6 } },
+        week: weekWith(3, [dayOf(1, MET), dayOf(2, MET)]),
+        dayClosed: true,
+      },
+    );
+    expect(model.footer.identity.streak).toBe('2 days running \u00b7 best 84%');
+    expect(JSON.stringify(model.footer)).not.toContain(CHIME_PRICES.currency.many);
+    expect(JSON.stringify(model.footer)).not.toContain(CHIME_PRICES.currency.one);
+    /* And it really is drawn, somewhere: a rule kept by not having the feature is not a rule. */
+    expect(model.banked).toContain(CHIME_PRICES.currency.many);
   });
 });

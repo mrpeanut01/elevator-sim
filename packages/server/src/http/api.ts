@@ -1109,21 +1109,61 @@ async function submit(
 /* --------------------------------------------------------------- the ledger */
 
 /**
- * The balance, and **nothing else on the wire** — GitHub issue **#368**,
- * [§ D526](../../../../DECISIONS.md) clause 5.
+ * The balance, and **what this account has bought** — GitHub issue **#368**,
+ * [§ D526](../../../../DECISIONS.md) clause 5, [§ D671](../../../../DECISIONS.md).
  *
- * One key. Not a list of entries, not a breakdown by source, not the last thing that was earned.
- * That is the whole of the play surface's read verb, and it is what makes an add from outside
- * invisible to play: a source the ledger gains changes this number and moves nothing else, because
- * there is nothing else here to move. `api.test.ts` asserts the key set rather than the value, so a
- * field added to this body fails a test instead of shipping.
+ * ## Two keys now, and the second one is a widening taken deliberately
+ *
+ * This read shipped with **one** key, under a docstring reading *"not a list of entries, not a
+ * breakdown by source, not the last thing that was earned"*. Every clause of that is still true and
+ * none of them is what changed. What changed is that a spend surface exists: a run claims a
+ * modifier by naming its sink, `chimes/ledger.ts#unbackedModifiers` refuses a claim the account
+ * never paid for, and **a play surface that cannot read what it bought cannot claim it**. The only
+ * other place that knowledge could live is the client, which is a second authority for a fact the
+ * ledger already holds — and one that a reload loses, so a player would pay fifteen chimes and
+ * then be refused the thing they paid for.
+ *
+ * **The property clause 5 exists for is untouched, and it is worth saying precisely which one.**
+ * Clause 5 is *the play surface … never knows a source*. A source is where a chime **came from**;
+ * {@link ChimeSpentModifier} is a sink the account **spent one on**, which the play surface chose
+ * by pressing. So an add from outside is still invisible to play: it is one more source, it moves
+ * the balance, and it cannot appear in `modifiers` because nothing but the spend verb writes one.
+ * `boundaries.test.ts`'s rule that no viewer module names a source is untouched, in both
+ * directions.
+ *
+ * **What is still not on this wire: a price, an entry, a date, a count of anything a run
+ * measured.** A modifier is `{sinkId, steps}` — the same pair `leaderboard/boardKey.ts` puts in a
+ * board key and for the same reason, and `chime-ledger.json`'s `priceChimes` stays on the server.
+ * `api.test.ts` asserts the key set of the body **and of each modifier**, so a third field fails a
+ * test instead of shipping.
  */
 async function chimeBalance(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
   const user = await authenticate(deps, request);
   if (user === undefined) {
     return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to see your balance.' } };
   }
-  return { status: 200, body: { balanceChimes: await deps.store.chimeBalance(user.id) } };
+  const [balanceChimes, spends] = await Promise.all([
+    deps.store.chimeBalance(user.id),
+    deps.store.chimeSpends(user.id),
+  ]);
+  /*
+   * Summed by sink before it goes out, because a spend is an **entry** and this read is not an
+   * entry list: two purchases of one sink are one thing owned twice, and shipping them as two rows
+   * would be the breakdown the paragraph above refuses, keyed by sink instead of by source.
+   * `unbackedModifiers` sums the same way on the way back in, so the client's claim and the
+   * server's check are counting one quantity.
+   */
+  const owned = new Map<string, number>();
+  for (const spend of spends) owned.set(spend.sinkId, (owned.get(spend.sinkId) ?? 0) + spend.steps);
+  return {
+    status: 200,
+    body: {
+      balanceChimes,
+      modifiers: [...owned]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([sinkId, steps]) => ({ sinkId, steps })),
+    },
+  };
 }
 
 /**
