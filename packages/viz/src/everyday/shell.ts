@@ -2462,8 +2462,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     consentAsk.append(row);
   }
 
-  function drawMenu(): void {
-    screenRegion.replaceChildren();
+  /**
+   * The front door's own heading and lede — drawn by **both** of its states.
+   *
+   * Shared rather than copied because the second state is the same screen with its tiles not yet
+   * offered (see {@link draw}'s `'menu'` arm), and a waiting room that did not look like the front
+   * door would be a second screen for one moment of one screen's life.
+   */
+  function frontDoorHead(): readonly HTMLElement[] {
     const h = el(doc, 'h1', undefined, 'Elevator Sim');
     h.style.cssText = `margin:0 0 4px;font:700 26px ${TYPE.heading};letter-spacing:-.02em`;
     const lede = el(
@@ -2473,7 +2479,30 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       'Pick a way to play. Every mode runs the same simulator on the same seeds — what changes is how long you are in it and what it asks of you.',
     );
     lede.style.cssText = `margin:0 0 22px;color:${C.inkSoft};max-width:62ch;font-size:13px;line-height:1.5`;
-    screenRegion.append(h, lede);
+    return [h, lede];
+  }
+
+  /**
+   * The front door before the first-arrival question has an answer — its own words, and the
+   * shell's standing sentence for a screen waiting on the host.
+   *
+   * {@link drawHostPending}'s shape rather than {@link drawHostPending} itself, and the difference
+   * is one line of copy: that function heads a screen with `SCREEN_NAMES`, which for this route is
+   * *Main menu*. The front door already has a name a stranger can read, and the first screen
+   * anybody sees is not the place to introduce the router's vocabulary. No sentence is invented —
+   * the heading, the lede and {@link HOST_PENDING_REASON} all ship today.
+   */
+  function drawFrontDoorPending(): void {
+    drewPending = true;
+    screenRegion.replaceChildren();
+    const waiting = el(doc, 'p', undefined, HOST_PENDING_REASON);
+    waiting.style.cssText = `color:${C.inkSoft};font-size:13px;max-width:60ch;line-height:1.5`;
+    screenRegion.append(...frontDoorHead(), waiting);
+  }
+
+  function drawMenu(): void {
+    screenRegion.replaceChildren();
+    screenRegion.append(...frontDoorHead());
 
     const list = el(doc, 'div');
     list.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.row + 2)}px;max-width:640px`;
@@ -2646,9 +2675,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
        * a test document makes, where the tiles are the whole product and draw at once.
        * {@link connectDataHost} draws the real front door the moment the host lands, which is the
        * same arm that has always covered a registered screen entered early.
+       *
+       * What the waiting state is, and why it is not a blank: {@link drawFrontDoorPending} draws
+       * this screen's own heading and lede with the shell's standing sentence for a screen waiting
+       * on the host under them. So a reload shows the front door and then its tiles, rather than a
+       * tile that is about to be withdrawn.
        */
       if (dataHost === undefined && options.host !== undefined) {
-        drawHostPending(state.screen);
+        drawFrontDoorPending();
         return;
       }
       drawMenu();
@@ -2719,11 +2753,12 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * reachable only in the first instants of a cold load. Drawn rather than blanked, in the refusal
    * screen's own shape; {@link connectDataHost} redraws the moment the host arrives.
    *
-   * **Two screens reach this, not one**, and the second is the front door: a registered screen
-   * entered early, and the `'menu'` route itself, whose tiles may not be offered before the
-   * first-arrival question has an answer (see {@link draw}'s `'menu'` arm for the § D227
-   * measurement that put it here). This docstring said *a registered screen* for as long as that
-   * was the whole of it.
+   * **The front door has a waiting state too, and it is {@link drawFrontDoorPending} rather than
+   * this** — its tiles may not be offered before the first-arrival question has an answer (see
+   * {@link draw}'s `'menu'` arm for the § D227 measurement that put it there), and it heads itself
+   * with its own name rather than with `SCREEN_NAMES`' *Main menu*. The two share the sentence and
+   * nothing else, which is the point: this one names a screen the player asked for, and that one
+   * is the screen nobody asks for and everybody lands on.
    */
   function drawHostPending(screen: EverydayScreen): void {
     drewPending = true;
