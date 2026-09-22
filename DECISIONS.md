@@ -41706,7 +41706,7 @@ and without the counterfactual run `shift/afterPress.ts#AFTER_PRESS_DISCLAIMER` 
 `live/interventions.ts#parkingChangesNothing` was that predicate, and the arm carried its own
 refusal on the stage.
 
-**It is false, and the measurement is lane AG-C's, landing beside this one in the same wave under its own decision D949** — written without the `§`, deliberately, because at the moment this entry is written that heading is on another lane's branch and a `§ Dnnn` in this repository means a heading in *this* file (`validation/citations.test.ts`). The integrator may make it a link on merge. Swept over two buildings ×
+**It is false, and the measurement is lane AG-C's, landing beside this one in the same wave under its own [§ D949](#d949)** — written bare on the lane's own branch, because at the moment this entry was written that heading was on another lane's branch and a `§ Dnnn` in this repository means a heading in *this* file (`validation/citations.test.ts`); the integrator made it a link on merge, which is the one edit this entry has taken since its lane closed. Swept over two buildings ×
 three shift lengths × three dispatchers × both arms and compared **on the legs**, two of
 thirty-six cells refute it: `garden-apartments` at 900 s and at 1 800 s under `zoned-uppeak`
 **do** move the legs when *spread the cars* is pressed. So a control saying *this press would change
@@ -42253,7 +42253,7 @@ Measured on the shipped path, `collective`, day 1, seed 20 260 824:
 
 **The two ratios are 4.19 and 3.36, which is why this is a second derivation rather than a factor.** § D468's sibling `WORST_WAIT_WHOLE_DAY_FACTOR` is a step of `2` because four buildings measured 1.84 to 2.07 — a spread of 12 % — and a step is honest there. These differ by 25 %, and a step fitted to them would claim a precision the measurement refuses ([§ D256](#d256)). `GOAL_BARS` deliberately holds **no** `energyWholeDayFactor`, and `goals.test.ts` asserts its absence.
 
-**And it is thirteen contracts of sixteen rather than five.** The briefing that raised #583 said five office contracts run a 36 000 s day; `shift/dayLength.ts#wholeDayFor` admits a building by its traffic profile's **directional mix** rather than by any list, and censused over `CONTRACTS` the answer is **thirteen** — only the residential, hotel and hospital crowds keep the slice. That census was taken independently by another lane in this wave and reproduced here by the sweep below, and it triples the blast radius of the defect. The cell is derived the same way, over `CONTRACTS`, because a list is what made the briefing wrong.
+**And it is thirteen contracts of sixteen rather than five.** The briefing that raised #583 said five office contracts run a 36 000 s day; `shift/dayLength.ts#wholeDayFor` admits a building by its traffic profile's **directional mix** rather than by any list, and censused over `CONTRACTS` the answer is **thirteen** — only the residential, hotel and hospital crowds keep the slice. That census was taken independently by another lane in this wave ([§ D946](#d946)) and reproduced here by the sweep below, and it triples the blast radius of the defect. The cell is derived the same way, over `CONTRACTS`, because a list is what made the briefing wrong.
 
 ### The alternative was measured and is unreachable, not merely unattractive
 

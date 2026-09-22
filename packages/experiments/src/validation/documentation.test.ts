@@ -2152,7 +2152,7 @@ type DecisionReservation = {
  * the first lane to write a heading hit a guard failure that looked like its own fault. Four lanes
  * had to be told to merge a commit before they could record a decision.
  */
-const OPEN_RESERVATION = { wave: 'AG', from: 912, to: 980 } as DecisionReservation | null;
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
@@ -3039,6 +3039,51 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [923, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
   [924, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
   [925, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
+  [
+    926,
+    "wave AG's lane AG-A held D912-D930 and spent D912, D913 and D914 — the tower control, the "
+      + "withdrawn parking refusal and the press ladder. D962 is this tree's highest heading, so "
+      + "these sit below it with entries written above them and are holes rather than free "
+      + "(§ D430). Registered under D404 and D430: ids here are names, so reissuing one would "
+      + "make it denote two things across time.",
+  ],
+  [927, "wave AG's lane AG-A's block; unspent for § 926's reason."],
+  [928, "wave AG's lane AG-A's block; unspent for § 926's reason."],
+  [929, "wave AG's lane AG-A's block; unspent for § 926's reason."],
+  [930, "wave AG's lane AG-A's block; unspent for § 926's reason."],
+  [
+    932,
+    "wave AG's lane AG-B held D931-D945 and spent only § D931, the day report's without-the-press "
+      + "pair. One issue closed end to end is one decision however many modules it touches. "
+      + "Registered under D404 and D430.",
+  ],
+  [933, "wave AG's lane AG-B's block; unspent for § 932's reason."],
+  [934, "wave AG's lane AG-B's block; unspent for § 932's reason."],
+  [935, "wave AG's lane AG-B's block; unspent for § 932's reason."],
+  [936, "wave AG's lane AG-B's block; unspent for § 932's reason."],
+  [937, "wave AG's lane AG-B's block; unspent for § 932's reason."],
+  [938, "wave AG's lane AG-B's block; unspent for § 932's reason."],
+  [939, "wave AG's lane AG-B's block; unspent for § 932's reason."],
+  [940, "wave AG's lane AG-B's block; unspent for § 932's reason."],
+  [941, "wave AG's lane AG-B's block; unspent for § 932's reason."],
+  [942, "wave AG's lane AG-B's block; unspent for § 932's reason."],
+  [943, "wave AG's lane AG-B's block; unspent for § 932's reason."],
+  [944, "wave AG's lane AG-B's block; unspent for § 932's reason."],
+  [945, "wave AG's lane AG-B's block; unspent for § 932's reason."],
+  [
+    950,
+    "wave AG's lane AG-C held D946-D960 and spent D946-D949. Registered under D404 and D430.",
+  ],
+  [951, "wave AG's lane AG-C's block; unspent for § 950's reason."],
+  [952, "wave AG's lane AG-C's block; unspent for § 950's reason."],
+  [953, "wave AG's lane AG-C's block; unspent for § 950's reason."],
+  [954, "wave AG's lane AG-C's block; unspent for § 950's reason."],
+  [955, "wave AG's lane AG-C's block; unspent for § 950's reason."],
+  [956, "wave AG's lane AG-C's block; unspent for § 950's reason."],
+  [957, "wave AG's lane AG-C's block; unspent for § 950's reason."],
+  [958, "wave AG's lane AG-C's block; unspent for § 950's reason."],
+  [959, "wave AG's lane AG-C's block; unspent for § 950's reason."],
+  [960, "wave AG's lane AG-C's block; unspent for § 950's reason."],
 ]);
 
 /**
