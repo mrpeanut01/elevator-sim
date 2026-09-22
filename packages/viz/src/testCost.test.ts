@@ -218,7 +218,26 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * summing to 128 400 000 — a difference of exactly 1 800 000 ms, which is 3 × 600 000 and no
      * more. Derived from the tree on both commits rather than subtracted from this entry.
      */
-    ['viz', { count: 108, totalMs: 128_400_000 }],
+    /*
+     * **108 → 109 and 128 400 000 → 142 800 000, and the one is named** — GitHub issue #583's
+     * `shift/energyBar.sweep.test.ts`, at **14 400 000 ms**, which is
+     * `shift/contractCurve.sweep.test.ts`'s own four hours and for the same reason.
+     *
+     * It is the energy bar's re-derivation over the horizon the day actually runs: thirteen
+     * contracts × fifty **ten-hour** days, each built through `dev/state.ts#shiftRunConfigOf` and
+     * recorded in full, plus a second arm over all thirteen shipped dispatchers for § D106's
+     * perverse-ranking check and a third at § D468's own 1 800 s horizon. A whole authored day is
+     * roughly **ten times** the legs of the thirty-minute slice the existing sweeps run
+     * (`shift/dayLength.ts` measures ×10.3 to ×10.7), and on the supertalls it is 30 000 to 68 000
+     * legs a run, so the annotation is longer than any single arm because the same instrument is
+     * re-run at larger seed counts and over dispatcher arms by hand.
+     *
+     * It is gated on `ENERGY_BAR_SWEEP` and registered in `deepTiers.test.ts`, so the ordinary
+     * suite pays nothing for it. Raised here with that reason on the commit that added it, which is
+     * what the ratchet's own message asks for; **nothing existing was raised to make room** — the
+     * difference is exactly 14 400 000 and no more.
+     */
+    ['viz', { count: 109, totalMs: 142_800_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this

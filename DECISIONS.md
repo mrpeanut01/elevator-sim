@@ -42159,3 +42159,153 @@ residential block**, and live on that same office tower under `collective`. The 
 that stops the first from being a building on which nothing ever repositions. A lane that makes the
 press derivable will find these three red or green in the right pattern; a lane that assumes the
 derivation without running it will find the second one red on its first try.
+
+---
+
+## D961 — the legibility sweep measured sixteen towers as built, and the set that decides a first session is re-derived
+
+**Date: 2026-09-22 · Owner: wave AG lane D · GitHub issue [#584](https://github.com/mrpeanut01/elevator-sim/issues/584) · Rules on: [§ D475](#d475)'s *eligible is a measurement*, [§ D512](#d512)'s table, [§ D514](#d514)'s line and [§ D572](#d572)'s reading of Harbour Point.**
+
+**Why an entry.** [§ D405](#d405)'s second and third grounds. It moves a measurement already recorded — § D512's sixteen-row table, which three consecutive waves reproduced to the second — and it moves the derived constant § D475 hands the first-session draw, which decides which tower a new player meets.
+
+### The defect
+
+`shift/legibility.test.ts`, `legibility.sweep.test.ts` and `firstSession.test.ts` each built their states as `{ ...baseState(), buildingId: contract.buildingId, … }`. `scope/probes.test-helper.ts#baseState` opens a week on **`c1`** and none of the three moved it.
+
+`shift/ladder.ts#rungFor` keys a rung on the contract **and** the building. That check is load-bearing and its own docstring says why: a `ViewerState` carries the two independently and they routinely disagree, so keyed on the contract alone *"Scenario 1's rung would have let Midtown Office at Garden Apartments' occupancy"*. A mismatched pair returns `undefined`, no rung reaches the run, and **every tower was swept as built rather than as its contract hands it over**.
+
+Seven of the sixteen contracts declare a rung that moves the run and not one was reaching the sweep: `c2` at 0.395 occupancy, `c9` at 0.6, `c6` at 1.06 with a five-shaft gearless bank and a declared rate of 16, `c3` at 12, `c7` at 11 **with a maintenance incident** ([§ D871](#d871)), `c8` at 8.5 and `c10` at 13.5. The three files also dropped `outOfServiceCarIds` — `shiftRunConfigOf` returns it beside `config` rather than inside it, which is the trap `probes.test-helper.ts#legsOf` already records — so `c7`'s booked-out car was running through a measurement of the contract that books it out.
+
+It was found because a rung that demonstrably moves 270 of 355 legs moved **nothing** in the sweep. The lane that found it wrote: *"Convenient for me, wrong as a measurement."*
+
+### What the sweep says with the pair consistent
+
+Re-measured on the same instrument at the same budget — sixteen contracts × 50 seeds = 800 days, `collective`, day 1, ordinary, seeds `20 260 824 + 7 919 n`:
+
+| contract | building | as built, of 50 | median (s) | **as handed over, of 50** | **median (s)** |
+|---|---|---|---|---|---|
+| c1 | `garden-apartments` | 0 | 0 | 0 | 0 |
+| c2 | `midtown-office` | **50** | 2 504 | **38** | **239** |
+| c3 | `secure-tower` | 20 | 108 | 20 | 108 |
+| c4 | `mixed-use-high-rise` | 32 | 136 | 32 | 136 |
+| c5 | `vertical-city` | 45 | 191 | 45 | 191 |
+| c6 | `chancery-house` | 2 | 28 | **14** | **91** |
+| c7 | `crown-hotel` | 40 | 161 | **30** | **147** |
+| c8 | `st-jude-hospital` | 1 | 38 | **3** | **52** |
+| c9 | `harbour-point` | **50** | 1 343 | **11** | **56** |
+| c10 | `ashgate` | 10 | 79 | **32** | **161** |
+| c11 | `ctf-class-reference` | 50 | 1 221 | 50 | 1 221 |
+| c12 | `shanghai-class-reference` | 50 | 729 | 50 | 729 |
+| c13 | `merdeka-class-reference` | 50 | 459 | 50 | 459 |
+| c14 | `one-wtc-class-reference` | 1 | 13 | 1 | 13 |
+| c15 | `empire-state-class-reference` | 45 | 472 | 45 | 472 |
+| c16 | `willis-class-reference` | 50 | 2 347 | 50 | 2 347 |
+
+**Every row that moved is a row whose contract declares a rung, and every row that did not move is one whose contract hands its tower over as built.** That is not a reading of the result, it is the result. Six of the seven rung-bearing contracts moved; the seventh, **`c3`**, reproduced to the second, because its rung declares the rate its profile already runs at — which is the control this re-measurement needed and did not have to arrange.
+
+### The eligible set: `c9` leaves, `c10` joins, and the size does not move
+
+| | members | count |
+|---|---|---|
+| before | `c2 c3 c4 c5 c7` **`c9`** `c11 c12 c13 c15 c16` | 11 |
+| after | `c2 c3 c4 c5 c7` **`c10`** `c11 c12 c13 c15 c16` | 11 |
+
+**Harbour Point is out.** It was the second-most legible contract in the catalogue by the old table and a first session will now never open on it. Ashgate, which the old table had below the threshold at 10 of 50, is in at 32.
+
+**Eleven before and eleven after**, so `firstSession.ts#FIRST_SESSION_LINE`'s own count does not move — the sentence a player reads is byte-identical — and neither do `shift/dailySeed.ts`'s published **42.2 %** and **56**, which are functions of the set's *length* rather than of its members (`dailySeed.test.ts` recomputes both and is green). That is the case a derived sentence exists for and the case a reader would otherwise miss entirely: **a set that governs first impressions changed membership without changing a single published figure.**
+
+### One published reading is refuted by its own correction
+
+[§ D572](#d572) and `legibility.ts` say Harbour Point holds a landing all day *"because the group cannot clear its crowd **even let at three fifths**"*. The three fifths is `c9`'s rung, and the measurement that sentence rests on **never applied it**: 50 of 50 is the tower at full letting. Let at three fifths, as the contract actually hands it over, the same day is legible on **11 of 50** at a median **56 s**. The letting works. What the old figure measured was a building nobody is given.
+
+**No mechanism is offered for why Ashgate rises** ([§ D256](#d256)); what is established is that both moves are a rung reaching a run it never used to reach.
+
+### The fix, and the guard
+
+`shift/contractDay.test-helper.ts#contractDayState` builds the pair together — `openWeek(contract.id)` beside `buildingId`, the contract's own shift length, and the plan's `outOfServiceCarIds` threaded at the call — and `assertContractPair` throws on a week whose contract does not name the state's building. A week on **no** shipped contract is left alone, because `rungFor` has a deliberate branch for it.
+
+`shift/contractDay.test.ts` holds three checks, and the third is what stops this returning in a file nobody has written yet: the refusal itself; that every state the helper builds takes its **own** rung, asserted over `CONTRACTS` rather than over a list; and a source guard **derived from the directory** — any file in `shift/` that calls `recordRun(` and mentions `CONTRACTS` may not write a building id off a contract row into a state unless it goes through the helper. The detector is asserted live against a synthetic line, because half the claim is that it is not simply off.
+
+### The rest of the tree was checked, and it is clean
+
+Every production site moves the week with the building: `everyday/host.ts` calls `switchWeek(state.week, parked, contract.id, …)` and writes `buildingId` in the same patch, `campaign/career.ts#freshTower` takes both from one contract, and `honesty/surfaces.ts` derives the contract **from** the building (`contractForBuilding`), which is the consistent direction. `shift/contractCurve.sweep.test.ts` and `shift/ladder.test.ts` both set `week: { …, contractId }` by hand and are correct — and `ladder.test.ts` builds mismatched pairs **on purpose**, because it is the file that tests `rungFor`. The mismatched states in `scope/probes.test-helper.ts` are sanctioned by `rungFor`'s own docstring and are untouched. **So this is one instrument's defect in three files rather than a class**, and the guard is scoped to the directory where it was found rather than to the tree.
+
+---
+
+## D962 — the energy bar is derived per horizon: 80 kJ on a shift slice, 350 kJ on a whole authored day
+
+**Date: 2026-09-22 · Owner: wave AG lane D · GitHub issue [#583](https://github.com/mrpeanut01/elevator-sim/issues/583) · Rules on: [§ D468](#d468)'s derivation, [§ D367](#d367)'s permission and [§ D106](#d106)'s rule that energy is an axis.**
+
+**Why an entry.** [§ D405](#d405)'s second and third grounds: it moves a constant § D468 pinned to a run, and it binds `shift/goals.ts`, `menu/screens.ts`'s guide and `docs/33` § 4.6, none of which one module owns.
+
+### A bar and a run that were not the same measurement
+
+§ D468 derived 80 kJ honestly and said, in its own *What the bar is true of* section, the thing that has since made it stale: `VizSummary.energy` is computed over the run's **reporting window**, and on seven of the eight contracts it measured that window is `peak-5min` — **three hundred seconds** of an 1 800 s run. What it could not say, because the Everyday day was thirty minutes of `rise-and-fall` on every building then, is that `shift/dayLength.ts#wholeDayRun` writes `windowStartS: 0` and the record's own period, so **a whole authored day's reporting window is the whole day**.
+
+Measured on the shipped path, `collective`, day 1, seed 20 260 824:
+
+| contract | run | reporting window | delivered legs | kJ per delivered leg |
+|---|---|---|---|---|
+| c2 `midtown-office` | the slice, 1 800 s | `peak-5min`, 750 → 1 050 s | 100 | **35.6** |
+| c2 `midtown-office` | the authored day, 36 000 s | `report-window`, 0 → 36 000 s | 2 857 | **149.2** |
+| c5 `vertical-city` | the slice, 1 800 s | `peak-5min`, 750 → 1 050 s | 905 | **86.8** |
+| c5 `vertical-city` | the authored day, 36 000 s | `report-window`, 0 → 36 000 s | 32 588 | **292.0** |
+
+**The two ratios are 4.19 and 3.36, which is why this is a second derivation rather than a factor.** § D468's sibling `WORST_WAIT_WHOLE_DAY_FACTOR` is a step of `2` because four buildings measured 1.84 to 2.07 — a spread of 12 % — and a step is honest there. These differ by 25 %, and a step fitted to them would claim a precision the measurement refuses ([§ D256](#d256)). `GOAL_BARS` deliberately holds **no** `energyWholeDayFactor`, and `goals.test.ts` asserts its absence.
+
+**And it is thirteen contracts of sixteen rather than five.** The briefing that raised #583 said five office contracts run a 36 000 s day; `shift/dayLength.ts#wholeDayFor` admits a building by its traffic profile's **directional mix** rather than by any list, and censused over `CONTRACTS` the answer is **thirteen** — only the residential, hotel and hospital crowds keep the slice. That census was taken independently by another lane in this wave and reproduced here by the sweep below, and it triples the blast radius of the defect. The cell is derived the same way, over `CONTRACTS`, because a list is what made the briefing wrong.
+
+### The alternative was measured and is unreachable, not merely unattractive
+
+Grading energy over a **fixed window** on every run makes 80 correct by construction. It is refused on three grounds, and the third settles it.
+
+1. It makes the inhomogeneity § D468 named **worse**: the energy goal would be the only one of five graded over three hundred seconds of a thirty-six-thousand-second day, while the other four grade the whole of it.
+2. The peak band is where the plant is most efficient per delivered leg, because many legs share each car trip — Midtown's peak figure is **a quarter** of its whole-day figure. A goal pinned there grades the easiest five minutes and is inert over the other nine hours and fifty-five.
+3. **The product has no such figure.** § D468 says so in terms: *"this is the only work-per-delivered-leg figure the product has"*. `VizSummary.energy` is one number `core` computes once over the reporting window, out of load-and-distance pairs the recording does not keep — which is also why `live/observations.ts#energyPerServedLegAt` refuses to cut it at a playhead. A second quantity is a change in `core`, not a bar.
+
+### The cell, and a reduced budget that is measured rather than asserted
+
+`shift/energyBar.sweep.test.ts`, gated on `ENERGY_BAR_SWEEP=1`: every contract `wholeDayFor` admits, day 1, `collective`, ordinary, seeds `20 260 824 + 7 919 n`, **25 seeds a contract, 325 runs, equal weight**. Every state carries a consistent `(buildingId, contractId)` pair, so each tower runs as its contract hands it over rather than as built ([§ D961](#d961)).
+
+**Twenty-five rather than § D468's fifty.** On the six contracts where both budgets were run, the pooled two-thirds point is **identical from n = 15 to n = 50** — 174.00 at 15, 20, 25, 30, 40 and 50, and 167.40 only at 10. Every one of the thirteen cells has p10 and p90 inside ±5 % of its median, so the pooled quantile is decided by *which* cluster it lands in rather than by any cluster's spread, and a per-contract budget above about fifteen cannot move it. A whole authored day is roughly ten times the legs of the slice § D468 measured, and 30 000 to 68 000 legs a run on the six reference towers.
+
+The distribution, the two constraints and the full tables are `docs/33` § 4.6b and `shift/goals.ts#ENERGY_PER_LEG_MAX_WHOLE_DAY_KJ`. The medians run from **97.6 kJ** on `ashgate` to **611.1** on `one-wtc-class-reference`, a factor of 6.3 — against § 4.6's 12.6 at the short horizon, so § D468's O2 finding is *weaker* here rather than stronger.
+
+### The threshold, and one of § D468's two constraints that cannot be met
+
+**Constraint 1, § D468's own: the pooled two-thirds point is 353.80 kJ.**
+
+**Constraint 2 — the lower bracket — is not satisfiable at this horizon, and it is reported rather than used.** It asks that the pooled five-goal miss rate stay inside `docs/33` DC-4's band. At the whole-day horizon **the other four goals already miss 252 of 325 = 77.5 %** on their own, above DC-4's 66.7 % top, so **no energy bar — not one at infinity — brings the day inside the band.** Decomposed it is not evenly spread: the **seven game contracts** miss 102 of 175 = **58.3 %**, inside the band, and the **six reference towers** miss **150 of 150**. The constraint therefore fails on exactly the towers `docs/33` § 4.7k and § 4.7l already record as tied at a 1.00 miss rate, at a horizon nobody had re-measured them over. **That is #234's and § 7's O2's**, and moving this bar to answer it would be buying difficulty by moving the mark.
+
+### 350 rather than 353.80, and it is deliberately the tighter rounding
+
+At `n = 325` the standard error on a one-third proportion is **2.6 points**. **350** refuses 117 of 325 (**36.0 %**) against the two-thirds point's 33.2 % — 2.8 points, about one standard error, and inside the 95 % interval on a one-third proportion (±5.1 points). A decimal would claim a precision 325 runs do not support, which is § D468's own refusal.
+
+**The better-conditioned figure is 360 and it is not taken.** The two-thirds point falls *inside* `shanghai-class-reference`'s own cluster — that contract's 25 runs span 344.5 to 357.2 — so the refused proportion swings **37.8 % → 30.8 % across ten kilojoules** there, all of it one contract crossing. Above **358** it is invariant at 30.8 % all the way to **377**, where Empire-State-class begins. A bar in that gap would be stable where 350 is steep, **and it is also the looser figure**. Where stability and strictness disagree the strict one is taken, because `CLAUDE.md`'s working agreements forbid moving a bar in the direction that makes content pass. **The cost is named rather than hidden**: a re-derivation after `shanghai-class-reference`'s fabric moves will move this proportion more than the others, and 17 of that contract's 25 runs sit above 350.
+
+### § D106's check, re-run at this horizon
+
+Thirteen shipped dispatchers × 25 seeds, day 1, whole authored day, on **two** contracts: `midtown-office`, the flagship, and `mixed-use-high-rise`, where this bar binds.
+
+| | `nearest-car` median | rank on energy | `nearest-car` clean days | best arm |
+|---|---|---|---|---|
+| c2 `midtown-office` | **81.2 kJ** | **lowest of thirteen** | **0/25** | `fairness-first`, `predictive-balanced` — 22/25 |
+| c4 `mixed-use-high-rise` | **216.4 kJ** | **lowest of thirteen** | **0/25** | `eta`, `fairness-first`, `capacity-aware`, `collective` — 3/25 |
+
+**`nearest-car` wins the energy figure at both and is strictly the worst arm at both.** So the perverse ranking § D106 measures is not reachable through this bar at the horizon it now grades, and that is a measurement rather than an inference from the arithmetic.
+
+**Two cells, not thirteen.** The other eleven contracts are unmeasured on the dispatcher axis and nothing is claimed about them: six of them are 30 000-to-68 000-leg towers and the full sweep is 4 225 whole days. A cell nobody measured is not a cell this entry may speak about.
+
+**And the bar is not inert.** At c4 it binds on two arms — `zoned-uppeak` goes from 3 clean days to **0** and `predictive-balanced` from 1 to **0** — and the best-to-worst median spans are **×2.12** at c2 and **×1.89** at c4, so a player moving the dispatcher moves this goal.
+
+### What the shipped bar was doing to the flagship day
+
+On the same two cells at **80 kJ**, clean days summed over all thirteen arms are **0 of 325** at `midtown-office` and **0 of 325** at `mixed-use-high-rise`. At **350** they are **209 of 325** and **19 of 325**. That reproduces GitHub issue [#578](https://github.com/mrpeanut01/elevator-sim/issues/578)'s *13 of 13 dispatchers miss* and closes the **energy half** of it: the day goes from undecidable to decided by the dispatcher, with the arm that drives least at the bottom. **The stack half of #578 is untouched and is a separate question**, exactly as #583 says.
+
+### What this deliberately does not move
+
+**The period bar is untouched at 80**, and `GOAL_BARS.energyPerLegMaxKJ` is byte-identical. Every figure this repository has published at a contract's own shift length is measured on a period run and is graded by 80 exactly as before: `docs/33` § 4.2, § 4.6's four hundred runs, § 4.7's whole table, and `shift/contracts.ts`'s eight-contract tie at 1.00 that § D581 and § D599 order by bank and car count. None of them is re-derived here.
+
+**No weight, no combined score, no ordering.** § D106's rule and `campaign/judge.ts`'s refusal are untouched; what ships is a second value of the same single, independent, unweighted bar § D367 permits, specified against `workPerServedLegKJ` and never raw `energyKJ` — the denominator is still the legs delivered, so a day that spends less by carrying fewer people still fails.
+
+**It is keyed on the horizon, never on a number of seconds.** A 7 200 s `constant-iso` is a longer *slice* whose reporting window is still the template's band, and it is graded by 80. `shift/dayLength.ts#runHorizonOf` is the one expression that answers *which kind of run is this*, and `goalsForDay` asks it once — which is also why `honesty/agreement.ts`'s `today-asks` pair now carries a second bar that must agree across the two shells, on § D359's own ground.

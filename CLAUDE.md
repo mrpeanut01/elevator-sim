@@ -1447,7 +1447,23 @@ letter or star, and no ordering two arms on energy. `campaign/judge.ts`'s refusa
 78.30 kJ and below about 70 kJ the day leaves `docs/33` DC-4's band at the top, so the bar is
 bracketed on both sides and 80 is the round figure 400 runs support. **It does not harden with the
 day**, because the quantity falls ×1.6 to ×15.6 over a twenty-day week as the building fills and no
-ladder tracks both ends. Two things the same measurement found and did not fix: the bar is dominated
+ladder tracks both ends.
+
+**There are two of it since 2026-09-22, one per horizon, and 80 is the one for a slice**
+([§ D962](DECISIONS.md), `docs/33` § 4.6b, GitHub issue #583). § D468's figure is computed over the
+run's **reporting window**, which is `peak-5min` — three hundred seconds — on seven of the eight
+contracts it measured; a **whole authored day** writes its own window, so the same quantity on the
+same building and seed reads 35.6 kJ over the slice and 149.2 over the day. One constant was grading
+both, and on the flagship day that meant **0 clean days of 325 across all thirteen shipped
+dispatchers**. The whole-day bar is **350 kJ**, derived on § D468's own protocol over the thirteen
+contracts `shift/dayLength.ts#wholeDayFor` admits × 25 seeds: pooled two-thirds point 353.80, and
+350 rather than 360 because where stability and strictness disagreed the **tighter** figure was
+taken. § D106's check was re-run at the new horizon and comes back clean on the two contracts
+measured — `nearest-car` has the lowest energy median at both and is strictly the worst arm at both
+— and **the other eleven are unmeasured on the dispatcher axis, so nothing is claimed about them**.
+One of § D468's two brackets **cannot be met at this horizon and is reported rather than used**: the
+four wait goals alone miss 77.5 % of whole days, above DC-4's top, which is #234's and `docs/33`
+O2's rather than this bar's. Two things the same measurement found and did not fix: the bar is dominated
 by building fabric rather than by play, which is `docs/33` O2 on a fifth goal, and
 `mixed-use-high-rise` day 1 stops clearing under every shipped dispatcher, which is #234's. The
 check § D106 most needed was run rather than argued: `nearest-car` wins the energy bar at all seven

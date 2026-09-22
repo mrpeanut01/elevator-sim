@@ -651,10 +651,25 @@ describe('the run actions', () => {
     };
     expect(worstBarOf(whole)).toBe(worstBarOf(slice) * GOAL_BARS.worstWholeDayFactor);
 
+    /*
+     * And the energy bar with it — GitHub issue #583, § D962. It is the second bar the horizon
+     * moves and the first that moves by selection rather than by a factor: a ten-hour run's
+     * reporting window is the ten hours, so the figure it grades is four times the one a
+     * thirty-minute slice's peak band produces. A host that stopped passing the horizon would draw
+     * a day's figure against the slice's ceiling and grade every whole day missed.
+     */
+    const energyBarOf = (state: ViewerState): number =>
+      createEverydayHost(harnessOf(state).bindings)
+        .goalsToday()
+        .find((reading) => reading.goal.id === 'energy')?.goal.bar ?? Number.NaN;
+    expect(energyBarOf(slice)).toBe(GOAL_BARS.energyPerLegMaxKJ);
+    expect(energyBarOf(whole)).toBe(GOAL_BARS.energyPerLegMaxWholeDayKJ);
+
     // And a crowd with no day is graded exactly as it was, whatever its window happens to say —
     // the horizon comes from the day the building has, never from the number of seconds.
     const residential: ViewerState = { ...base(), shiftLengthS: 36000, windowStartS: 0 };
     expect(worstBarOf(residential)).toBe(worstBarOf(base()));
+    expect(energyBarOf(residential)).toBe(energyBarOf(base()));
   });
 
   /**

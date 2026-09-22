@@ -9,17 +9,13 @@
  * `dev/reportPanel` already pin on the legs and is not re-pinned here.
  */
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-import { parseBuilding, resolveBuilding } from '@elevator-sim/core';
 import { describe, expect, it } from 'vitest';
 
-import type { BrowserResources } from '../dev/data.js';
-import { DATA_DIR } from '../fixtures.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
-import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
+import { RESOURCES } from '../scope/probes.test-helper.js';
 import { initialState, shiftLengthForContract, shiftRunConfigOf, withFirstSession } from '../dev/state.js';
+
+import { contractBuildings, contractDayState } from './contractDay.test-helper.js';
 
 import { CONTRACTS, FIRST_CONTRACT_ID, contractById } from './contracts.js';
 import {
@@ -32,15 +28,6 @@ import {
 } from './firstSession.js';
 import { LEGIBILITY_SWEEP, legibilityOf } from './legibility.js';
 import { openWeek } from './week.js';
-
-/** All eight shipped buildings — `legibility.sweep.test.ts`'s loader, since `RESOURCES` holds two. */
-function allBuildings(): BrowserResources {
-  const entries = LEGIBILITY_SWEEP.map((row) => row.buildingId).map((id) => {
-    const config = parseBuilding(JSON.parse(readFileSync(join(DATA_DIR, 'buildings', `${id}.json`), 'utf8')));
-    return { file: `${id}.json`, config, resolved: resolveBuilding(config, RESOURCES.elevatorSpecs) };
-  });
-  return { ...RESOURCES, buildings: entries.map((entry) => entry.resolved), entries };
-}
 
 describe('the eligible set — § D512’s table read by arithmetic', () => {
   it('is every contract legible on more than a third of fifty seeds, in contract order', () => {
@@ -72,15 +59,30 @@ describe('the eligible set — § D512’s table read by arithmetic', () => {
      * claim about size: these three span 4 810 to 9 200 occupants and span the whole range the
      * instrument reports. The threshold is still § D512's and is still not moved here.
      */
+    /*
+     * **`c9` left and `c10` joined on 2026-09-22** — GitHub issue #584,
+     * [§ D961](../../../../DECISIONS.md). The sweep this set is derived from had been measuring
+     * every tower **as built**: its states paired a contract's `buildingId` with `baseState()`'s
+     * `c1` week, and `shift/ladder.ts#rungFor` keys a rung on both, so no rung reached any run.
+     * Measured as the contracts hand their towers over, Harbour Point — let at the three fifths its
+     * own rung declares — is legible on **11 of 50** rather than 50 and drops below the threshold,
+     * and Ashgate, at the rate its rung declares, rises from 10 to **32** and clears it.
+     *
+     * **The set is the same size and not the same set**, which is the case worth stating out loud:
+     * eleven members before and eleven after, so {@link FIRST_SESSION_LINE}'s own count does not
+     * move and nothing downstream of the count does either. What moved is which tower a new player
+     * can be handed, and Harbour Point — the second-most legible contract in the catalogue by the
+     * old table — is now one a first session never opens on.
+     */
     expect(ELIGIBLE_FIRST_CONTRACT_IDS).toEqual([
-      'c2', 'c3', 'c4', 'c5', 'c7', 'c9', 'c11', 'c12', 'c13', 'c15', 'c16',
+      'c2', 'c3', 'c4', 'c5', 'c7', 'c10', 'c11', 'c12', 'c13', 'c15', 'c16',
     ]);
     for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) {
       const row = LEGIBILITY_SWEEP.find((entry) => entry.contractId === id);
       expect(row?.legibleOf50 ?? 0).toBeGreaterThan(50 / 3);
     }
     /* The five the instrument found never or rarely legible are out, the campaign's opener first. */
-    for (const id of ['c1', 'c6', 'c8', 'c10', 'c14'])
+    for (const id of ['c1', 'c6', 'c8', 'c9', 'c14'])
       expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(id);
     expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(FIRST_CONTRACT_ID);
   });
@@ -171,33 +173,33 @@ describe('the door’s line — derived from the week, never stored', () => {
 
 describe('AC1 and AC2, asked of every member of the set on the pinned seeds', () => {
   it('every eligible contract’s day 1 is legible on most of the first ten seeds, and says when', () => {
-    const resources = allBuildings();
+    const resources = contractBuildings();
     const legibleAt: Record<string, number[]> = {};
     for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) {
       const contract = contractById(id);
       if (contract === undefined) throw new Error(id);
       const moments: number[] = [];
       for (let n = 0; n < 10; n += 1) {
-        const state = {
-          ...baseState(),
-          buildingId: contract.buildingId,
-          dispatcherId: 'collective',
-          shiftLengthS: shiftLengthForContract(id),
-          seed: 20_260_824n + 7_919n * BigInt(n),
-          campaignEventId: 'ordinary' as const,
-        };
+        /* The pair, built together — GitHub issue #584, § D961; see `contractDay.test-helper.ts`. */
+        const state = contractDayState(id, { seed: 20_260_824n + 7_919n * BigInt(n) });
         const plan = shiftRunConfigOf(resources, state);
-        const day = legibilityOf(recordRun(plan.config, { recordDecisions: false }).recording);
+        const day = legibilityOf(
+          recordRun(plan.config, {
+            recordDecisions: false,
+            outOfServiceCarIds: plan.outOfServiceCarIds,
+          }).recording,
+        );
         if (day.legible) moments.push(day.legibleAtS ?? -1);
         expect(day.legible).toBe(day.legibleAtS !== undefined);
       }
       legibleAt[id] = moments;
     }
     /*
-     * The slice `legibility.test.ts` pins, read for the set: c3 is the two-fifths member, and `c9`
-     * joined it on 2026-09-14 at ten of ten (GitHub issue #500). Harbour Point's day 1 holds a
-     * landing past the band on every seed, which is what a group short of its own handling capacity
-     * looks like from this instrument even let at three fifths.
+     * The slice `legibility.test.ts` pins, read for the set: c3 is the two-fifths member, and `c10`
+     * replaced `c9` on 2026-09-22 (GitHub issue #584, § D961) when the sweep stopped measuring
+     * every tower as built. Ashgate's day 1 holds a landing past the band on seven of the ten
+     * pinned seeds at the rate its own rung declares; Harbour Point's, let at the three fifths its
+     * rung declares, holds one on **one**, which is why it is no longer in this walk at all.
      *
      * **`c15` and `c16` joined on 2026-09-15** (GitHub issues #427 and #426) at eight and ten of
      * ten. `c14` is absent from this walk because it is absent from the set — One-WTC-class is
@@ -206,12 +208,12 @@ describe('AC1 and AC2, asked of every member of the set on the pinned seeds', ()
      * second list.
      */
     expect(Object.fromEntries(Object.entries(legibleAt).map(([id, list]) => [id, list.length]))).toEqual({
-      c2: 10,
+      c2: 7,
       c3: 2,
       c4: 6,
       c5: 8,
-      c7: 8,
-      c9: 10,
+      c7: 7,
+      c10: 7,
       c11: 10,
       c12: 10,
       c13: 10,

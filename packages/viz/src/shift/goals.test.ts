@@ -530,6 +530,29 @@ describe('the energy bar is one bar, read alone', () => {
     expect(GOAL_OBSERVATION_IDS).not.toContain('energyKJ');
   });
 
+  it('is the horizon’s bar, and a whole authored day is graded against its own', () => {
+    /*
+     * GitHub issue #583, § D962. `goalsForDay`'s second argument decides which of two measured
+     * constants this goal reads, and forgetting it compiles and draws — which is exactly the defect
+     * § D359 recorded on `worst-wait` one bar over. The two are asserted against `GOAL_BARS` rather
+     * than against literals, so a re-derivation moves the constant and the label together.
+     */
+    const wholeDayEnergy = goalsForDay(1, 'whole-day').find((entry) => entry.id === 'energy');
+    expect(energyOf(1).bar).toBe(GOAL_BARS.energyPerLegMaxKJ);
+    expect(wholeDayEnergy?.bar).toBe(GOAL_BARS.energyPerLegMaxWholeDayKJ);
+    expect(wholeDayEnergy?.bar).toBeGreaterThan(energyOf(1).bar);
+    expect(wholeDayEnergy?.label).toContain(String(GOAL_BARS.energyPerLegMaxWholeDayKJ));
+    expect(wholeDayEnergy?.label).toContain('per ride delivered');
+    /*
+     * And it is a **second derivation rather than a factor**, which is the half a reader will
+     * assume wrong by analogy with `worstWholeDayFactor`. The two horizons' figures were measured
+     * at 4.19 on Midtown Office and 3.36 on Vertical City, so no integer or one-decimal factor
+     * carries them both, and `GOAL_BARS` deliberately holds no `energyWholeDayFactor` to multiply.
+     */
+    expect(GOAL_BARS).not.toHaveProperty('energyWholeDayFactor');
+    expect(wholeDayEnergy?.bar).not.toBe(energyOf(1).bar * GOAL_BARS.worstWholeDayFactor);
+  });
+
   it('does not harden with the day, and the constant is the one `GOAL_BARS` publishes', () => {
     // The other four bars move nightly; this one is measured flat. § D468 carries the reason: the
     // quantity itself falls as the building grows, by 1.6x over nineteen days on one contract and

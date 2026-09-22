@@ -326,9 +326,14 @@ describe('the figures the guide quotes are the figures the code computes', () =>
     expect(text, 'the queue floor moved').toContain(`${String(GOAL_BARS.queueMin)} people`);
     expect(text, 'the worst-wait floor moved').toContain(`${String(GOAL_BARS.worstMinS)} seconds`);
     // The fifth bar (§ D367, § D468). It is a ceiling and not a ladder, so unlike the four above it
-    // there is no floor or cap to quote beside it: the constant *is* what the day asks, every day.
+    // there is no floor or cap to quote beside it — but since GitHub issue #583 there are **two**
+    // of it, one per horizon (§ D962), and the guide has to quote both or it describes a product
+    // that grades a ten-hour day against a thirty-minute ceiling.
     expect(text, 'the energy ceiling moved').toContain(
       `${String(GOAL_BARS.energyPerLegMaxKJ)} kJ per ride delivered`,
+    );
+    expect(text, 'the whole-day energy ceiling moved').toContain(
+      `${String(GOAL_BARS.energyPerLegMaxWholeDayKJ)} kJ per ride delivered`,
     );
   });
 

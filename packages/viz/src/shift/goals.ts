@@ -219,6 +219,155 @@ const WORST_WAIT_WHOLE_DAY_FACTOR = 2;
 const ENERGY_PER_LEG_MAX_KJ = 80;
 
 /**
+ * The energy bar a **whole authored day** is graded against — GitHub issue #583,
+ * [§ D962](../../../../DECISIONS.md).
+ *
+ * ## Why there are two of these and not one
+ *
+ * {@link ENERGY_PER_LEG_MAX_KJ} is 80 and § D468 derived it honestly, over eight contracts × 50
+ * seeds at each contract's own `shiftLengthForContract`. Its own *What the bar is true of* section
+ * names the mechanism that has since made it stale and stops one step short of the consequence:
+ * `VizSummary.energy` is computed over the run's **reporting window**, and on seven of the eight
+ * contracts it measured that window is `peak-5min` — three hundred seconds of an 1 800 s run.
+ *
+ * `shift/dayLength.ts#wholeDayRun` writes `windowStartS: 0` and the record's own period, so a whole
+ * authored day's reporting window **is the whole day**. The same building, the same dispatcher and
+ * the same seed therefore produce two figures a factor of four apart, and one constant was grading
+ * both. Measured on the shipped path, `collective`, day 1, seed 20 260 824:
+ *
+ * | contract | run | reporting window | delivered legs | kJ per delivered leg |
+ * |---|---|---|---|---|
+ * | c2 `midtown-office` | the slice, 1 800 s | `peak-5min`, 750 → 1 050 s | 100 | **35.6** |
+ * | c2 `midtown-office` | the authored day, 36 000 s | `report-window`, 0 → 36 000 s | 2 857 | **149.2** |
+ * | c5 `vertical-city` | the slice, 1 800 s | `peak-5min`, 750 → 1 050 s | 905 | **86.8** |
+ * | c5 `vertical-city` | the authored day, 36 000 s | `report-window`, 0 → 36 000 s | 32 588 | **292.0** |
+ *
+ * **The two ratios are 4.19 and 3.36, which is why this is a second derivation rather than a factor
+ * on the first.** {@link WORST_WAIT_WHOLE_DAY_FACTOR} is a step of `2` because four buildings
+ * measured 1.84 to 2.07 — a spread of 12 % — and a step is honest there. These two differ by 25 %,
+ * and a step fitted to them would claim a precision the measurement refuses.
+ *
+ * ## The cell, derived rather than listed
+ *
+ * `shift/energyBar.sweep.test.ts`, gated on `ENERGY_BAR_SWEEP=1`: **every contract that can run a
+ * whole authored day**, which `shift/dayLength.ts#wholeDayFor` answers from the building's own
+ * traffic profile — **thirteen of sixteen**, the three residential, hotel and hospital crowds
+ * excepted. Derived over `CONTRACTS` rather than from a list of tower names, because a list is what
+ * made the briefing that raised this issue say *five*.
+ *
+ * Day 1, `collective`, ordinary, seeds `20 260 824 + 7 919 n` — § D468's cell with the horizon
+ * moved and one defect repaired: every state carries a consistent `(buildingId, contractId)` pair,
+ * so each tower runs **as its contract hands it over** rather than as built (GitHub issue #584,
+ * [§ D961](../../../../DECISIONS.md)). **25 seeds a contract, 325 runs**, equal weight.
+ *
+ * **Twenty-five rather than § D468's fifty, and the reduction is measured rather than asserted.**
+ * On the six contracts where both budgets were run, the pooled two-thirds point is **identical from
+ * n = 15 to n = 50** — 174.00 at 15, 20, 25, 30, 40 and 50, and 167.40 only at 10. The per-contract
+ * distributions are tight (p10 to p90 within ±5 % of the median on every one of the thirteen), so
+ * the pooled quantile is decided by *which contract's cluster it lands in* rather than by any
+ * contract's spread, and a per-contract budget above about fifteen cannot move it. A whole authored
+ * day is roughly ten times the legs of the slice § D468 measured, and 30 000 to 68 000 legs a run
+ * on the six reference towers; fifty seeds a contract is a measurement nobody would re-run.
+ *
+ * ## The distribution, and the two constraints
+ *
+ * | contract | building | median kJ | p10 | p90 | four-goal miss |
+ * |---|---|---|---|---|---|
+ * | c2 | `midtown-office` | 150.5 | 146.8 | 155.9 | 12/25 |
+ * | c3 | `secure-tower` | 231.2 | 225.4 | 235.8 | 10/25 |
+ * | c4 | `mixed-use-high-rise` | 328.3 | 320.1 | 333.9 | 22/25 |
+ * | c5 | `vertical-city` | 294.7 | 291.5 | 298.0 | 25/25 |
+ * | c6 | `chancery-house` | 166.3 | 163.6 | 171.7 | 10/25 |
+ * | c9 | `harbour-point` | 99.4 | 97.0 | 102.7 | 9/25 |
+ * | c10 | `ashgate` | 97.6 | 94.2 | 100.7 | 14/25 |
+ * | c11 | `ctf-class-reference` | 415.5 | 403.5 | 423.4 | 25/25 |
+ * | c12 | `shanghai-class-reference` | 352.3 | 348.3 | 355.4 | 25/25 |
+ * | c13 | `merdeka-class-reference` | 576.6 | 571.1 | 584.2 | 25/25 |
+ * | c14 | `one-wtc-class-reference` | 611.1 | 603.8 | 619.2 | 25/25 |
+ * | c15 | `empire-state-class-reference` | 382.3 | 378.5 | 384.7 | 25/25 |
+ * | c16 | `willis-class-reference` | 284.6 | 282.7 | 287.2 | 25/25 |
+ *
+ * **Constraint 1, § D468's own: the pooled two-thirds point is 353.80 kJ**, the value at which one
+ * day in three across the catalogue misses the bar.
+ *
+ * **Constraint 2, § D468's lower bracket, is not satisfiable at this horizon, and that is a finding
+ * rather than a licence.** It asks that the pooled five-goal miss rate stay inside `docs/33` DC-4's
+ * band. At the whole-day horizon the **other four goals already miss 252 of 325 = 77.5 %** on their
+ * own, above DC-4's 66.7 % top, so no energy bar — not one at infinity — can bring the day inside
+ * the band. Decomposed, it is not evenly spread: the seven game contracts miss **102 of 175 =
+ * 58.3 %**, inside the band, and the six reference towers miss **150 of 150**. So the constraint
+ * fails on the towers `docs/33` § 4.7k and § 4.7l already record as tied at a 1.00 miss rate, at a
+ * horizon nobody re-measured them over. **It is #234's and `docs/33` O2's, not this bar's**, and
+ * moving this bar to answer it would be buying difficulty by moving the mark.
+ *
+ * ## 350 rather than 353.80, and it is deliberately the tighter rounding
+ *
+ * At `n = 325` the standard error on a one-third proportion is **2.6 points**. **350** refuses 117
+ * of 325 (**36.0 %**) against the two-thirds point's 33.2 % — 2.8 points, about one standard error,
+ * and inside the 95 % interval on a one-third proportion (±5.1 points). A decimal would claim a
+ * precision 325 runs do not support, which is {@link ENERGY_PER_LEG_MAX_KJ}'s own refusal.
+ *
+ * **The better-conditioned figure is 360 and it is not taken.** The two-thirds point falls *inside*
+ * `shanghai-class-reference`'s own cluster (344.5 to 357.2 over its 25 runs), so the refused
+ * proportion swings 37.8 % → 30.8 % across ten kilojoules there, all of it that one contract
+ * crossing. Above 358 the proportion is **invariant at 30.8 % all the way to 377**, the gap before
+ * Empire-State-class begins. A bar in that gap would be stable where 350 is steep — and it is also
+ * the **looser** of the two. Where stability and strictness disagree the strict figure is taken,
+ * because `CLAUDE.md`'s working agreements forbid moving a bar in the direction that makes content
+ * pass. The cost is named rather than hidden: **a re-derivation after `shanghai-class-reference`'s
+ * fabric moves will move this proportion more than the others**, and 17 of that contract's 25 runs
+ * sit above 350.
+ *
+ * ## § D106's check, re-run at this bar and on this horizon
+ *
+ * § D106's measured objection is that `nearest-car` is on the Pareto front by being worst on wait,
+ * so a grade that folded energy in would rank the weakest dispatcher first. § D468 measured the
+ * answer at 1 800 s; it is measured again here, at 36 000 s, over **all thirteen shipped
+ * dispatchers × 25 seeds** on two contracts — `midtown-office`, the flagship day, and
+ * `mixed-use-high-rise`, where this bar binds.
+ *
+ * | | `nearest-car` median | rank on energy | clean days | best arm |
+ * |---|---|---|---|---|
+ * | c2 `midtown-office` | **81.2 kJ** | **lowest of thirteen** | **0/25** | `fairness-first` and `predictive-balanced`, 22/25 |
+ * | c4 `mixed-use-high-rise` | **216.4 kJ** | **lowest of thirteen** | **0/25** | `eta`, `fairness-first`, `capacity-aware` and `collective`, 3/25 |
+ *
+ * **`nearest-car` wins the energy figure at both and is strictly the worst arm at both.** So the
+ * perverse ranking is not reachable through this bar at the horizon it now grades, and that is a
+ * measurement rather than an inference from the arithmetic. **Two cells, not thirteen**: the other
+ * eleven contracts are unmeasured on the dispatcher axis and nothing is claimed about them.
+ *
+ * **And the bar is not inert.** At c4 it binds on two arms — `zoned-uppeak` goes from 3 clean days
+ * to 0 and `predictive-balanced` from 1 to 0 — and the best-to-worst median span is ×2.12 at c2 and
+ * ×1.89 at c4, so a player moving the dispatcher moves this goal.
+ *
+ * ## What the shipped bar was doing to the flagship day
+ *
+ * Measured on the same two cells at **80 kJ**: clean days summed over all thirteen arms are
+ * **0 of 325** at `midtown-office` and **0 of 325** at `mixed-use-high-rise`. At 350 they are
+ * **209 of 325** and **19 of 325**. That is GitHub issue #578's *"13 of 13 dispatchers miss"*
+ * reproduced, and it is the energy half of it closing: the day goes from undecidable to decided by
+ * the dispatcher, with the arm that drives least at the bottom.
+ *
+ * ## It is keyed on the horizon and never on a number of seconds
+ *
+ * {@link WORST_WAIT_WHOLE_DAY_FACTOR}'s rule exactly, and for its reason: a 7 200 s `constant-iso`
+ * is a longer *slice*, whose reporting window is still the template's band, so the period bar is
+ * the right one for it. `shift/dayLength.ts#runHorizonOf` is the one expression that answers *which
+ * of the two kinds of run is this*, and {@link goalsForDay} asks it once.
+ *
+ * ## The period bar is untouched, which is the whole of what this does not move
+ *
+ * Every figure this repository has published at a contract's own shift length is measured on a
+ * period run and is graded by 80 exactly as before — `docs/33` § 4.2, § 4.6's four hundred runs,
+ * § 4.7's whole table, and `shift/contracts.ts`'s eight-contract tie at 1.00. None of them is
+ * re-derived here.
+ *
+ * The derivation, the cell it was taken on, the two constraints that bracket it and § D106's
+ * re-run check are `docs/33` § 4.6b and § D962.
+ */
+const ENERGY_PER_LEG_MAX_WHOLE_DAY_KJ = 350;
+
+/**
  * The design's own hardening arithmetic (`design.html` :1428–1439), plus the worst-wait ceiling
  * the casual handoff's fourth test needs (`GAMEPLAY_AND_NAVIGATION.md` § 8.6, § 20.6).
  *
@@ -253,6 +402,9 @@ export const GOAL_BARS = Object.freeze({
   // and no `energyPerDay` beside it: a key that existed and was always zero would read as a ladder
   // somebody forgot to author rather than as one the measurement refused.
   energyPerLegMaxKJ: ENERGY_PER_LEG_MAX_KJ,
+  // The same bar over the other horizon, never a ladder either; see
+  // `ENERGY_PER_LEG_MAX_WHOLE_DAY_KJ` for why it is a second derivation and not a factor.
+  energyPerLegMaxWholeDayKJ: ENERGY_PER_LEG_MAX_WHOLE_DAY_KJ,
 });
 
 /**
@@ -485,14 +637,25 @@ export function goalsForDay(
    * the bar, and a label promising *under 80 kJ* about a day that spent exactly 80 would claim a
    * strictness the comparison does not have. § D227 at the scale of one preposition, twice.
    *
-   * The bar is `ENERGY_PER_LEG_MAX_KJ` on every day, not a rung of a ladder, and that constant
-   * carries the run it was derived from and the two measurements that fix it.
+   * **The bar is not a rung of a ladder on either horizon** — it is the same value on day 1 and day
+   * 20 — but since GitHub issue #583 there are **two** of it, one per horizon (§ D962). Each
+   * constant carries the run it was derived from and the measurements that fix it:
+   * `ENERGY_PER_LEG_MAX_KJ` for a slice and `ENERGY_PER_LEG_MAX_WHOLE_DAY_KJ` for a whole authored
+   * day. The label above is written against the bar this call selected rather than against either
+   * constant, so the two cannot come apart.
+   *
+   * The bar is chosen by the **horizon** and never by the day, which is the one place this goal
+   * reads its second argument. `worst-wait` above scales its ladder by a measured factor; this one
+   * selects between two measured constants, because the ratio between the two horizons is not one
+   * number — 4.19 on Midtown Office and 3.36 on Vertical City.
    */
+  const energyBar =
+    over === 'whole-day' ? GOAL_BARS.energyPerLegMaxWholeDayKJ : GOAL_BARS.energyPerLegMaxKJ;
   const energy: ShiftGoal = {
     id: 'energy',
-    label: `Keep the work inside ${String(GOAL_BARS.energyPerLegMaxKJ)} kJ per ride delivered`,
+    label: `Keep the work inside ${String(energyBar)} kJ per ride delivered`,
     unit: ' kJ',
-    bar: GOAL_BARS.energyPerLegMaxKJ,
+    bar: energyBar,
     compare: 'at-most',
     reads: 'workPerServedLegKJ',
   };

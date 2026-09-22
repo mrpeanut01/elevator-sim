@@ -53,7 +53,11 @@
  * and so do `c4` and `c5`, re-measured beside them. Five contracts tied at the ceiling is a
  * measurement that has stopped discriminating, and the reason is one this repository already
  * recorded: `shift/goals.ts`'s energy bar asks for 80 kJ per delivered ride, and a leg in a
- * supertall costs **86.8 to 242.6 kJ** measured across the five. § D468 found that the bar is
+ * supertall costs **86.8 to 242.6 kJ** measured across the five. *(That figure is the **period**
+ * bar and this measurement is a period run — § 4.7d's budget is each contract's own shift length —
+ * so [§ D962](../../../../DECISIONS.md)'s second bar, 350 kJ over a whole authored day, does not
+ * move it. What § D962 does establish is that the same five towers read 284.6 to 611.1 kJ over the
+ * day a player actually runs, where the tie is not at the energy bar at all.)* § D468 found that the bar is
  * dominated by building fabric rather than by play and left it as `docs/33` O2 and GitHub issue
  * #234; this is the same finding at three more towers, and no rung in `data/contract-ladder.json`
  * can move it, which is why all three are handed **as built**.
@@ -72,7 +76,8 @@
  * `c14` (One-WTC-class), `c15` (Empire-State-class) and `c16` (Willis-class) are GitHub issues
  * #428, #427 and #426. Measured on the shipped path at § 4.7d's budget and seeds, **every one reads
  * 1.00**, for the reason the three before them did: `shift/goals.ts`'s energy bar asks 80 kJ per
- * delivered ride and a ride in any of them costs more. So the tie at the ceiling is now **eight**
+ * delivered ride and a ride in any of them costs more. *(Again the **period** bar on a period run;
+ * see the note above and [§ D962](../../../../DECISIONS.md).)* So the tie at the ceiling is now **eight**
  * contracts, and ordering it by bank count alone is no longer a total order — `one-wtc-class-reference`
  * and `shanghai-class-reference` both have six banks, and `vertical-city` and `willis-class-reference`
  * both have seven.
