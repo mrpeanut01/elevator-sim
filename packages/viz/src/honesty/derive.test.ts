@@ -65,6 +65,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The after-press row’s id — GitHub issue #581, and `ENERGY_FIGURE_IDS` one entry up is the ' +
+        'precedent it is claimed on. `AFTER_PRESS_ROW_ID` is `after-press`, the `ReportDiagnosis.id` ' +
+        'a renderer or a test names the row by without matching on its words, and it is derived only ' +
+        'because the two-adjacent-words scanner reads a hyphenated id as prose. An id is a contract, ' +
+        'not a string a player reads: the row’s three drawn strings are `afterPressBeatOf`’s, which ' +
+        '`honesty/surfaces.ts#SHIFT_REPORT` claims and the `report.diagnosis` loop seeds by name on ' +
+        'the intervened day of every case.',
+      ids: ['shift/afterPress.ts#AFTER_PRESS_ROW_ID'],
+    },
+    {
+      reason:
         'The locator’s two vocabularies and the function that returns them — `shift/trouble.ts`, ' +
         'GitHub issue L7’s shape. `TROUBLE_SOURCES` is `held-landing`/`hold`/`deepest-queue`/' +
         '`worst-wait` and `LOCATED_FIGURE_IDS` is `standing-here`/`past-band-here`/' +

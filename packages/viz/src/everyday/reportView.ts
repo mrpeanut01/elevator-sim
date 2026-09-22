@@ -146,6 +146,62 @@ export interface EverydayLeverCard {
   readonly noSurfaceNote: string | undefined;
 }
 
+/**
+ * **§ 6.5's one button into tomorrow, and which tomorrow it opens** — GitHub issue **#577**.
+ *
+ * ## The defect
+ *
+ * This field had one arm. The sheet at the end of a **career** day drew *Open the doors on
+ * Tuesday* — the daily loop's label, computed from `WeekState` — and its press ran
+ * `EverydayHost.openTomorrow` and went to the daily brief. So the most prominent control on the
+ * sheet that closes a career day silently swapped the player into another mode: the crumbs went
+ * from *All buildings / ⟨building⟩ / Contract / The day / How it went* to *Front door / Brief /
+ * The day*, the leave button went from *⤺ Leave the career* to *⤺ Leave today's tower*, and the
+ * contract, the purse, the wear clock and the day ladder all stopped advancing with nothing
+ * saying so. **A playability assessor played thirteen days believing they were still in a career
+ * before checking.** Career days were advanced through the `Back to ⟨building⟩` crumb, which no
+ * copy pointed at.
+ *
+ * ## The § D227 question, settled by [§ D899](../../../../DECISIONS.md) rather than by implication
+ *
+ * #577 leaves it open on purpose: the button's words *"Open the doors on Tuesday"* name a day and
+ * not a mode, so either the press must stop leaving the career, or the label must say that it
+ * does. **It is settled the first way, and the reason is that the second repair fixes a
+ * navigation defect by describing it.** § D227 is a rule about a control's words matching what it
+ * does, and it is satisfiable in both directions — which is exactly why it cannot decide this on
+ * its own. What decides it is that the player chose the career and the sheet is the end of a
+ * career day: *the next day* has an unambiguous referent there, and it is this contract's day
+ * `n + 1`. A label reading *"Open the doors on Tuesday — this leaves the career"* would be honest
+ * and would still make the career's own onward step the least prominent thing on the screen, with
+ * the mode change as the default. So the words stay a promise about the next day and the press is
+ * made true of the career.
+ *
+ * **Nothing is lost by dropping the daily route from this sheet**, which is the clause #577 asks
+ * to be answered rather than assumed: the daily loop is one rail row away on every screen
+ * (`⌂ Modes`, then *today's scenario*), that row's label says where it goes, and no other control
+ * on the career sheet ever offered it. The `Back to ⟨building⟩` primary is untouched — #577's
+ * fourth criterion — and it is still the route to the desk where works and needs are decided.
+ *
+ * ## When the career draws no button at all
+ *
+ * A contract that has filed its last day (`tower.day > CONTRACT_DAYS`) has no next day to open —
+ * `campaign/career.ts#fileDay` refuses a twenty-first, and § 3.3's contract row becomes *Start the
+ * month again*. This step is then `undefined` rather than a button promising a day the record will
+ * refuse, and the bar's own primary carries the player to the desk that has the renewal.
+ */
+export interface EverydayOnwardStep {
+  readonly label: string;
+  readonly note: string;
+  /**
+   * Which day the press opens — read by `reportScreen.ts` to pick the host call.
+   *
+   * A discriminator rather than the label, for `reportScreen.ts#primary`'s stated reason one
+   * function down: the label is a *rendering* of this decision, and reading the destination back
+   * out of a string makes where a button goes depend on how it is worded.
+   */
+  readonly goes: 'daily-tomorrow' | 'career-day';
+}
+
 /** The whole screen, as data. */
 export interface EverydayReportView {
   /** Whether there is a sheet at all. `false` draws {@link emptyLede} and nothing else. */
@@ -181,7 +237,7 @@ export interface EverydayReportView {
     readonly pointer: { readonly label: string; readonly why: string } | undefined;
   };
   /** § 6.5's one button into tomorrow, or `undefined` when there is nothing to advance from. */
-  readonly tomorrow: { readonly label: string; readonly note: string } | undefined;
+  readonly tomorrow: EverydayOnwardStep | undefined;
   /**
    * Said when a **newer, unfiled** run stands on the stage — so a reader cannot take this sheet for
    * an account of the run they can currently see. `undefined` when the sheet and the stage agree.
@@ -214,6 +270,36 @@ export interface EverydayReportInput {
    * whose panel is not named says the narrower true thing instead of guessing at a name.
    */
   readonly panelNames?: Readonly<Partial<Record<TabName, string>>>;
+  /**
+   * The career this sheet is a day of, or `undefined` on every other flow — GitHub issue **#577**.
+   *
+   * Supplied by `reportScreen.ts` **only** where `context.ctx === 'campaign'`, because the run
+   * context is the shell's fact and not this function's to infer. An absent value is *this is not
+   * a career day*, so every existing caller — the daily loop, a replay, the honesty corpus,
+   * `reportView.test.ts` — keeps the daily arm it has always had without passing anything.
+   *
+   * `day` is `CampaignTower.day`, which `campaign/career.ts#fileDay` has already advanced by the
+   * time this sheet is drawn: closing the day is what moves it. So the number here is the day the
+   * press would **open**, read off the record rather than computed as *the one on the sheet plus
+   * one* — a second counter is the drift `runCampaignDay`'s own docstring refuses.
+   */
+  readonly career?: EverydayReportCareer | undefined;
+}
+
+/** What a career sheet's onward step is drawn from — {@link EverydayReportInput.career}. */
+export interface EverydayReportCareer {
+  /** The open tower's building, by its authored display name. */
+  readonly buildingName: string;
+  /** `CampaignTower.day` — the day the next press would run. */
+  readonly day: number;
+  /**
+   * Whether this contract still has a day to open, `campaign/career.ts#fileDay`'s own refusal.
+   *
+   * Passed in rather than derived here from `day` against `CONTRACT_DAYS`: the record's owner is
+   * `campaign/`, and a second copy of *when is a month over* in a view module is two answers to a
+   * question that decides whether a button lies.
+   */
+  readonly canRunAnother: boolean;
 }
 
 /**
@@ -450,6 +536,55 @@ function leverButtonLabel(panel: string | undefined): string {
     : `Open the simulator’s ${panel} panel`;
 }
 
+/**
+ * § 6.5's one button into tomorrow, in whichever flow this sheet belongs to — GitHub issue #577.
+ *
+ * The career arm wins where there is a career, and it does not consult `canAdvance`: that flag is
+ * the **week's** — `WeekFramingView.canAdvance` is *is there a day after this one in the seven* —
+ * and a contract's twenty days are not a week's seven. A career whose month is over draws nothing
+ * here, which is {@link EverydayReportCareer.canRunAnother} and is a different refusal for a
+ * different record.
+ *
+ * Both notes say what the press does **and** where it leaves you, because the whole of #577 is a
+ * player who could not tell those two apart. The career note names the career; the daily note says
+ * the week is where it stays.
+ */
+function onwardStepOf(
+  career: EverydayReportCareer | undefined,
+  filed: boolean,
+  canAdvance: boolean,
+  nextDayLabel: string,
+): EverydayOnwardStep | undefined {
+  /*
+   * An unfiled sheet advances from nothing, on either flow. The screen returns before this block
+   * is drawn, so this guard is the value being honest rather than the control being gated twice —
+   * an adapter that rendered the empty state would otherwise read a step off a sheet that is not
+   * there. `canAdvance` already carries it on the daily arm; the career arm does not consult
+   * `canAdvance`, so it has to carry it here.
+   */
+  if (!filed) return undefined;
+  if (career !== undefined) {
+    if (!career.canRunAnother) return undefined;
+    return {
+      /*
+       * The day and the building, both. *Open the doors on day 4* alone would be true and would
+       * still not say which of a career's buildings it is a day of, and the sheet a player is
+       * reading is a sheet about one tower.
+       */
+      label: `Open the doors on day ${String(career.day)} at ${career.buildingName}`,
+      note: 'Runs the next day of this contract. You stay in the career.',
+      goes: 'career-day',
+    };
+  }
+  return canAdvance
+    ? {
+        label: nextDayLabel,
+        note: 'Opens tomorrow’s day and starts it. Today stays in your week exactly as it is.',
+        goes: 'daily-tomorrow',
+      }
+    : undefined;
+}
+
 /** § 6.5, resolved. */
 export function everydayReportViewOf(input: EverydayReportInput): EverydayReportView {
   const sheet = reportViewOf(
@@ -505,12 +640,12 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
           ? undefined
           : { label: sheet.nextStep.label, why: sheet.nextStep.why },
     },
-    tomorrow: canAdvance
-      ? {
-          label: framing.kind === 'week-day' ? framing.nextDayLabel : '',
-          note: 'Opens tomorrow’s day and starts it. Today stays in your week exactly as it is.',
-        }
-      : undefined,
+    tomorrow: onwardStepOf(
+      input.career,
+      sheet.filed,
+      canAdvance,
+      framing.kind === 'week-day' ? framing.nextDayLabel : '',
+    ),
     staleNote: input.newerRunOnStage
       ? 'A newer run is standing on the stage and has not been closed. This sheet is the last day ' +
         'you closed, not that run — close the day to replace it.'

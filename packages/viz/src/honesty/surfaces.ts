@@ -3311,6 +3311,16 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * meta block is where its lines land, on the intervened day this bundle drives.
      */
     'live/interventions.ts#interventionLogOf',
+    /*
+     * The beat under that log — GitHub issue #581, `shift/afterPress.ts`. Claimed here on
+     * `gaveUpBesideOf`'s footing rather than as a way of being counted covered: the row is a
+     * `ReportDiagnosis` like the two above it, the `report.diagnosis` loop below seeds its `when`,
+     * `what` and `why` by name on the intervened day this bundle drives, and the disclaimer is
+     * inside the `why`. A day with no press produces no row, which is why the five sibling sheets
+     * and the single-run shape carry two rows and this one carries three.
+     */
+    'shift/afterPress.ts#afterPressBeatOf',
+    'shift/afterPress.ts#AFTER_PRESS_DISCLAIMER',
     'shift/goals.ts#goalsForDay',
     'shift/goals.ts#readGoal',
     'shift/goals.ts#readGoals',
