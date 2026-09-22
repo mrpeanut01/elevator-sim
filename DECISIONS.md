@@ -41820,3 +41820,79 @@ data/dispatcher-profiles.json does not ship it"* — is false for an id saved no
 § D227 defect in the refusal itself. It is reported rather than reworded here, because the string
 belongs to a module this lane is not otherwise touching and a one-word edit to a refusal is exactly
 the kind of change that should arrive with its own test.
+
+---
+
+## D949 — The stage's parking press is not told to say it does nothing, because the derivation that would have let it say so is false
+
+**Date: 2026-09-22 · Owner: lane AG-C · Lane block: D946–D960 · Under: [§ D227](#d227), [§ D177](#d177), [§ D256](#d256) · Cited by: `packages/viz/src/everyday/stageHandover.test.ts`**
+
+**Decision.** § 7.6's two parking arms are **left exactly as they are**. No refusal and no note is
+added to them, and `live/interventions.ts` gains no parking predicate. What is added is the
+measurement that refused the fix, in `stageHandover.test.ts`.
+
+**What was asked for.** A playability assessor pressed *spread the cars* on a day driven by
+`zoned-uppeak`, measured **0 of 355 legs** changed, and read nothing on the screen. That is § D227's
+first polarity — *a control that does nothing must say so* — and it is the same shape § D856 closed
+on the handover picker one arm over, so the obvious move is the same one: a predicate in
+`live/interventions.ts`, a `refusal` on the row, and the sentence a player reads.
+
+**Why it looked derivable, which is the part to read before anybody tries again.**
+`data/dispatcher-profiles.json` gives `zoned-uppeak` `idle.parkingStrategy: "zone-center"`.
+`sim/simulation.ts#idleOverrideAt` sets exactly `'zone-center'` for a `spread-cars` entry and
+nothing else — the deadband and the energy exchange rate stay authored, because the player said
+*where*, not *at what price*. `dispatch/lifecycle.ts#repositionDecisionFor` then reads **every**
+stage-7 setting off one `effective` config, which the override differs from in no value at all. So
+the press writes the value already in force, the kernel is handed the same numbers, and the run
+cannot move. The assessor's 0 of 355 is what the data predicts. That argument was written, the
+predicate was built against it, and the refusal fired on exactly the cell the assessor reported.
+
+**It is false, and it was caught by running it rather than by reading it further.** Swept over
+**two buildings × three shift lengths × three dispatchers × both arms**, 36 cells, each arm stamped
+at 28 % of the shift and compared **on the legs** — `(passengerId, carId, boardedAt)`, never a
+window statistic:
+
+| cell | driving profile's strategy | press | legs move? | the predicate said |
+|---|---|---|---|---|
+| `midtown-office` 1 800 s, `zoned-uppeak` | `zone-center` | spread | **no** | refuse — correct |
+| `midtown-office` 3 600 s, `zoned-uppeak` | `zone-center` | spread | **no** | refuse — correct |
+| `garden-apartments` **900 s**, `zoned-uppeak` | `zone-center` | spread | **yes** | refuse — **false refusal** |
+| `garden-apartments` **1 800 s**, `zoned-uppeak` | `zone-center` | spread | **yes** | refuse — **false refusal** |
+| `garden-apartments` 3 600 s, `zoned-uppeak` | `zone-center` | spread | no | refuse — correct |
+
+**Two false refusals in thirty-six cells.** A refusal on a live control tells a player the product
+is smaller than it is, which is § D177's inert-control class with its polarity reversed — the exact
+failure the refusal existed to prevent, arriving as the fix for it. So it is not shipped.
+
+**No mechanism is offered for the two cells**, on § D256's rule. The override is value-identical to
+the config it replaces and every read goes through one `effective` object, so the run *should* be
+byte-identical and is not; establishing why means measuring inside `core`, which is not this lane's
+module and not this lane's budget. A plausible sentence in place of that measurement is what § D256
+refuses. What is measured and stated is the **negative**: the press's inertness is **not** a
+function of the driving profile's declared parking strategy, so nothing on the stage can read that
+profile and say in advance what the press will do.
+
+**The three things this rules out for whoever takes it next**, so the afternoon is not spent twice:
+
+1. **A refusal derived from `idle.parkingStrategy` is wrong.** Measured above.
+2. **A `note` instead of a refusal has nowhere to go.** `everyday/stageScreen.ts:1784` draws
+   `StageInterventionRow.note` for the **handover row only** — `interventionNote.textContent =
+   switchRow?.note ?? ''`. A note on a parking row is a string no surface renders, which is the dead
+   seam `CLAUDE.md` names eleven times. Saying it costs a DOM element per arm and a browser-tier
+   case, which is a mount change rather than a model one.
+3. **Simulating both arms to decide is not available**, because `stageInterventionsOf` is asked on
+   frames and the answer would cost a whole run per arm per frame.
+
+**What would actually close #565's third defect** is a measurement inside `core` of why a
+value-identical `idleOverride` moves a run at all. If the answer is *it should not*, the press
+becomes genuinely derivable and the predicate above is correct as written. If the answer is *it
+legitimately can*, then the screen's honest move is a note drawn **after** the press — the stamp
+already says what was pressed, and what is missing is the sheet saying it changed nothing, which is
+a claim about a run that has happened and therefore one the product can make truthfully.
+
+**What is kept.** `stageHandover.test.ts` carries three cells of the sweep as a standing pin: the
+press is inert under `zoned-uppeak` on the office tower, **live under the same dispatcher on the
+residential block**, and live on that same office tower under `collective`. The third is the control
+that stops the first from being a building on which nothing ever repositions. A lane that makes the
+press derivable will find these three red or green in the right pattern; a lane that assumes the
+derivation without running it will find the second one red on its first try.
