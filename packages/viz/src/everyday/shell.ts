@@ -2642,7 +2642,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     if (route === 'menu') {
       /**
        * **The front door waits for the host, and [§ D227](../../../../DECISIONS.md) is why** —
-       * recorded here under [§ D405](../../../../DECISIONS.md).
+       * [§ D844](../../../../DECISIONS.md).
        *
        * ## What the tiles were doing before this, measured on the built bundle
        *

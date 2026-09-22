@@ -440,8 +440,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
 
   /**
    * **The morning landing repaints the block it is about, and nothing else on the page** — the
-   * fix for the accessibility defect below, recorded here under
-   * [§ D405](../../../../DECISIONS.md).
+   * fix for the accessibility defect below, [§ D844](../../../../DECISIONS.md).
    *
    * ## What was wrong, measured rather than reasoned about
    *
