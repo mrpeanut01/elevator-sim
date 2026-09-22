@@ -58,8 +58,21 @@
  * the one span that is **not** an authored duration, because each recording runs past its own
  * `durationS` while the building drains.
  *
+ * ## The clock leg's two building-day cells are **slices**, and no longer the day the press runs
+ *
+ * Said here so the next person to run this measures what they think they are measuring
+ * ([§ D946](../../../../DECISIONS.md)). Both cells below build their state from `initialState` and
+ * a length, so they watch 3 600 s and 1 800 s. `everyday/host.ts#startRun` spreads
+ * `shift/dayLength.ts#wholeDayRun` into the patch for any building with an authored day, which is
+ * **thirteen of the sixteen contracts**, and those days are 36 000 s. That does not weaken the
+ * clock leg — what it establishes is a **rate**, and a rate measured over 1 800 s of watching is
+ * the same rate — but a reader who takes these cells for *the sitting a player gets* would be
+ * reading a slice for a day. The span the tiles publish is `sittingShape.test.ts`' census, not
+ * these four cells.
+ *
  * Recorded under [§ D405](../../../../DECISIONS.md) for what binds only this file; the figures it
- * produced and what they did to five player-facing strings are [§ D753](../../../../DECISIONS.md).
+ * produced and what they did to five player-facing strings are [§ D753](../../../../DECISIONS.md),
+ * and the day-length axis they left out is [§ D946](../../../../DECISIONS.md).
  */
 
 import { writeFileSync } from 'node:fs';
