@@ -113,13 +113,69 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave AD's, measured 2026-09-19 on the integrated tree**; the paragraph above
+  below are wave AE's, measured 2026-09-22 on the integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **765 741** | **606** | **62** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **952 422** | **4 710** | **63** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **767 064** | **606** | **62** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **954 042** | **4 710** | **63** | **0** | **green**, and the register is empty |
+
+  **Wave AE's move is exactly 27.00 strings a case in both tiers, and four lanes each published a
+  figure before the measurement that sums to it precisely.** That has never happened here. § D454's
+  precedent is four forecasts that each verified against their own branch and still came up one
+  string a case short once integrated, with no honest way to say which lane owned the gap; § D487's
+  is three lanes forecasting and all three right. This is four, summing to the string, with no
+  remainder to argue about.
+
+  | | base `918bc64` | wave AE | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 765 741 | **767 064** | **+1 323** | **27.00** |
+  | deep strings | 952 422 | **954 042** | **+1 620** | **27.00** |
+  | surfaces | 62 / 63 | **62 / 63** | **0** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  27 × 49 = 1 323 and 27 × 60 = 1 620, both exact, with **no conditional remainder in either
+  tier**. The forecasts: **AE-A +1** (`CAMPAIGN_ABSENCES` going 1 → 2, its first growth ever — the
+  register had only shrunk), **AE-B +13** (decomposed to the string across five terms), **AE-C 0**,
+  **AE-D +13** (one `STAGE_GOALS_COPY` key plus twelve from four seeded campaign states).
+
+  **AE-C's zero is the one to read, because it was right for the reason it gave.** That lane deleted
+  or rewrote **22 player-facing sentences** in `data/fixit-cases.json` and forecast no corpus
+  movement, because `honesty/surfaces.ts`'s fix-it adapters drive their own synthetic
+  `fixitSearchCase` and **not the shipped file**. So every sentence in the fix-it content a player
+  actually meets is rendered by nothing the search reads, and always has been — found by a null
+  result rather than by a violation, which is § D437's shape one mode across. It is GitHub issue
+  **#570**, and **#233 authors sixteen more cases to the same shape**, so the unswept area roughly
+  doubles before anything narrows it. Three false promises in shipped repair copy were measured in
+  that lane — two *the worst wait shortens* claims that measure 77 → 79 s and 79 → 82 s — and no
+  property could ever have seen them.
+
+  **The base reproduced to the string in both tiers**, at `918bc64`, which is the habit § D442 set.
+
+  **And this row was measured twice, on the head rather than on the base, which is the newer
+  habit.** The first reading was taken on `88c8a6e`; five commits then landed — a spectator-facing
+  fix and the front-door pair — and the structural argument said none could move it, because
+  `honesty/surfaces.ts:9991` states that `everyday/stageScreen.ts#STAGE_SCREEN` is not driven and
+  `:8161` excludes `shell.ts#mountEverydayShell` by name, both asserted in `derive.test.ts`. That
+  argument was correct **and it is the kind § D487's own row was wrong about**, so the measurement
+  was run again on the final head: **both tiers reproduced exactly**, 767 064 and 954 042, with the
+  surface sets, the building histograms and the fit-out draws unmoved.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers and against both
+  readings: identical, nothing added, nothing removed — on a wave that made a career day a
+  different day, gave the rush's dispatcher pick a route, retired a printed answer from eighteen fix
+  cases and made two goal sets legible. Every one entered an adapter that already existed. **The
+  deep tier's one-surface lead survives and the diff names it**: `campaign/judge.ts#judgeStage` is
+  the only surface in deep and not in always-on, and nothing is in always-on and not in deep.
+
+  **The tree was green in every project before the row was published, and the integrator got that
+  wrong once first.** The `viz` project **excludes** `*.browser.test.ts`; `viz-browser` is a
+  separate project at its own 120 000 ms ceiling, and it had not been run this wave. Called green on
+  the strength of five suites while a sixth existed, it was then found red in three files — which is
+  § D487's trap arriving one wave after the row that records it. Final state, all six: viz 319 files
+  / 7 147 cases, **viz-browser 51 / 349**, core 143 / 2 989, experiments 115 / 1 526, cli 12 / 179,
+  server 29 / 649.
 
   **Wave AD's move is exactly 4.00 strings a case in both tiers, every one of them on one surface,
   and this is the first time this column has scored three forecasts and had all three come out
