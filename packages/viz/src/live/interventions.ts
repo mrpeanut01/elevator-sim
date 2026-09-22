@@ -22,7 +22,6 @@
 
 import {
   bankRangeIsFixed,
-  DISPATCH_DEFAULTS,
   isServiceRangeEvent,
   RULE_ACTION_WORDS,
   type DispatcherProfile,
@@ -138,83 +137,6 @@ export function switchChangesNothing(input: SwitchNoopInput): boolean {
     vectorOf(driving.weights) === vectorOf(input.target.weights) &&
     (driving.selection?.policy ?? 'off') === 'off'
   );
-}
-
-/**
- * Which parking strategy is **in force** at a playhead, and why this can be decided at all.
- *
- * ## The finding
- *
- * A playability assessor swept the one shipped day whose verdict turns on a press
- * ([§ D871](../../../../DECISIONS.md)) across all thirteen dispatchers and found that under
- * `zoned-uppeak` the *spread the cars* press changed **0 of 355 legs and said nothing**. That is
- * [§ D227](../../../../DECISIONS.md)'s first polarity — *a control that writes nothing must say
- * so* — arriving on a button rather than on a slider, and it is the class `CLAUDE.md` names as
- * worse than a dead seam: a live-looking control that does nothing teaches a player that the
- * mechanism does not work.
- *
- * ## Why it is decidable without re-running the day, which is the whole of why it is here
- *
- * `sim/simulation.ts#idleOverrideAt` is explicit: the **latest** parking intervention at or before
- * an instant is the one in force, and with none the profile's own `idle.parkingStrategy` (or
- * `DISPATCH_DEFAULTS.parkingStrategy`) stands. So *what would this press set, and what is set now*
- * is a question about **configuration**, answered before the press — never a counterfactual run.
- * That matters because `shift/afterPress.ts#AFTER_PRESS_DISCLAIMER` refuses the counterfactual
- * route by name, on `CLAUDE.md`'s statistical discipline: one run either way settles nothing. This
- * predicate makes no comparative claim at all. It says the two settings are the same string.
- *
- * `zoned-uppeak` authors `zone-center` and is therefore the one shipped profile on which *spread
- * the cars* is a no-op from the first frame; `energy-aware` authors `stay`, and the ten profiles
- * that author no idle block inherit `stay`, so **on no shipped profile is *park in the lobby* a
- * no-op before any press** — which is what makes the refusal a measurement of the configuration
- * rather than a blanket.
- */
-export const PARKING_PRESS_STRATEGY: Readonly<Record<'park-cars-lobby' | 'spread-cars', string>> =
-  Object.freeze({ 'park-cars-lobby': 'lobby', 'spread-cars': 'zone-center' });
-
-/** What {@link parkingChangesNothing} needs: the log, the playhead, and the vector driving. */
-export interface ParkingNoopInput {
-  /** Today's log, in press order — the same array the stamp reads. */
-  readonly interventions: readonly RunInterventionConfig[];
-  /** The playhead the press would be stamped at, in simulated seconds. */
-  readonly atS: number;
-  /**
-   * The profile **actually driving**, derived — a thunk for {@link SwitchNoopInput.driving}'s own
-   * reason, and for a second one here: an earlier parking press answers without it.
-   */
-  readonly driving: () => DispatcherProfile;
-}
-
-/**
- * Whether one of the two parking presses would set the strategy already in force.
- *
- * Two grounds, in the order they are decided, mirroring {@link switchChangesNothing}:
- *
- * 1. **A parking press already on the log at or before the playhead pins the answer.** It is the
- *    override in force, so pressing the same verb again writes the same string.
- * 2. **Otherwise the driving profile's own idle stage decides it** — `zoned-uppeak`'s
- *    `zone-center`, `energy-aware`'s `stay`, and `DISPATCH_DEFAULTS.parkingStrategy` for a profile
- *    that authors no idle block.
- *
- * **Not** a claim that the press would change no leg: a press that moves where the idle cars wait
- * can still leave a particular day's legs untouched, and saying otherwise would be the
- * counterfactual claim this file is careful not to make. What it says is narrower and checkable —
- * *this control would write the value it already has*.
- */
-export function parkingChangesNothing(
-  kind: 'park-cars-lobby' | 'spread-cars',
-  input: ParkingNoopInput,
-): boolean {
-  let inForce: string | undefined;
-  for (const entry of input.interventions) {
-    if (entry.atS > input.atS) continue;
-    if (entry.change.kind === 'park-cars-lobby' || entry.change.kind === 'spread-cars') {
-      inForce = PARKING_PRESS_STRATEGY[entry.change.kind];
-    }
-  }
-  const standing =
-    inForce ?? input.driving().idle?.parkingStrategy ?? DISPATCH_DEFAULTS.parkingStrategy;
-  return standing === PARKING_PRESS_STRATEGY[kind];
 }
 
 /** A profile's vector, canonically — key order is authoring noise, not a difference. */

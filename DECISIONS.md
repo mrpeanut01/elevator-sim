@@ -41684,49 +41684,57 @@ selection fails. A pure test of the rows would have passed on the day the picker
 
 ---
 
-## D913 — a parking press that would set what is already set says so, and it is decided from configuration rather than from a second run
+## D913 — WITHDRAWN: a parking press is not inert because the strategy it would set is already in force, and the mechanism was refuted by a run
 
-**Date: 2026-09-22 · Owner: build lane AG-A (wave AG) · GitHub issue [#588](https://github.com/mrpeanut01/elevator-sim/issues/588) · Binds `packages/viz/src/live/interventions.ts`, `packages/viz/src/everyday/stageScreenModel.ts` and `packages/viz/src/everyday/stageScreen.ts`, so it is an entry rather than a docstring ([§ D405](#d405)).**
+**Date: 2026-09-22 · Owner: build lane AG-A (wave AG) · GitHub issue [#588](https://github.com/mrpeanut01/elevator-sim/issues/588) · Binds nothing: every line of code this entry described has been reverted on the same wave. It is an entry rather than a docstring ([§ D405](#d405)) because it withdraws a claim, and a withdrawal that lives only in a deleted file is a claim nobody can find again.**
 
-**Decision.** `live/interventions.ts#parkingChangesNothing` answers whether one of the two parking
-presses would write the strategy already in force at the playhead;
-`stageScreenModel.ts#parkingRowsOf` gives that arm `STAGE_PARKING_NO_CHANGE` as its own refusal, and
-`stageScreen.ts#applyParkingRows` draws the sentence and disables that button alone.
+**Decision. This lane built a refusal, another lane refuted it by measurement, and the code is
+gone.** What stands is the finding and the reason it is a finding rather than a fix.
 
-**The finding.** The same assessor swept § D871's pinned day across all thirteen shipped dispatchers
-and found that under **`zoned-uppeak` the *spread the cars* press changed 0 of 355 legs and said
-nothing**. `data/dispatcher-profiles.json` authors `idle.parkingStrategy: 'zone-center'` on that
-profile, which is exactly what the press sets — so the control was live-looking and inert. That is
-[§ D227](#d227)'s first polarity arriving on a **button** rather than on a slider, and `CLAUDE.md`
-ranks it below no control at all: a dead seam merely does nothing, while a live-looking control that
-does nothing teaches a player the mechanism does not work.
+**The defect it was written for is real and is not withdrawn.** A playability assessor swept
+[§ D871](#d871)'s pinned day across all thirteen shipped dispatchers and found that under
+`zoned-uppeak` the *spread the cars* press **changed 0 of 355 legs and said nothing**. That is
+[§ D227](#d227)'s first polarity arriving on a button, and `CLAUDE.md` ranks it below no control at
+all: a live-looking control that does nothing teaches a player the mechanism does not work.
 
-**Why it is decidable without re-running the day, which is the whole of why this is cheap and
-honest.** `sim/simulation.ts#idleOverrideAt` is explicit that the **latest** parking intervention at
-or before an instant is the one in force, and with none the profile's own `idle.parkingStrategy` —
-or `DISPATCH_DEFAULTS.parkingStrategy`, which is `stay` — stands. So *what would this press set, and
-what is set now* is a question about **configuration**, answered before the press. That matters
-because `shift/afterPress.ts#AFTER_PRESS_DISCLAIMER` refuses the counterfactual route **by name**, on
-this repository's statistical discipline: one run either way settles nothing. This predicate makes no
-comparative claim at all — it says two settings are the same string.
+**The mechanism this entry proposed.** `data/dispatcher-profiles.json` authors
+`idle.parkingStrategy: 'zone-center'` on `zoned-uppeak`, which is exactly what *spread the cars*
+sets; `sim/simulation.ts#idleOverrideAt` says the latest parking intervention at or before an
+instant is the one in force, and with none the profile's own strategy stands. So *would this press
+set what is already set* looked like a question about **configuration**, answerable before the press
+and without the counterfactual run `shift/afterPress.ts#AFTER_PRESS_DISCLAIMER` refuses by name.
+`live/interventions.ts#parkingChangesNothing` was that predicate, and the arm carried its own
+refusal on the stage.
 
-**What it deliberately does not claim.** Not that the press would change no leg. A press that moves
-where idle cars wait can still leave a particular day's legs untouched, and saying otherwise would be
-the counterfactual claim § D900 declined to make. The refusal is narrower and checkable.
+**It is false, and the measurement is lane AG-C's, landing beside this one in the same wave under its own decision D949** — written without the `§`, deliberately, because at the moment this entry is written that heading is on another lane's branch and a `§ Dnnn` in this repository means a heading in *this* file (`validation/citations.test.ts`). The integrator may make it a link on merge. Swept over two buildings ×
+three shift lengths × three dispatchers × both arms and compared **on the legs**, two of
+thirty-six cells refute it: `garden-apartments` at 900 s and at 1 800 s under `zoned-uppeak`
+**do** move the legs when *spread the cars* is pressed. So a control saying *this press would change
+nothing here* would have been lying on exactly those cells — a **false refusal**, which is the
+worse half of § D227's pair, because a stale refusal tells a player not to touch a control that
+works.
 
-**Measured on the shipped shelf, in both directions.** `zoned-uppeak` is the **only** profile on
-which *spread the cars* is inert from the first frame; `energy-aware` authors `stay` and the other
-eleven author no idle block, so **on no shipped profile is *park the cars in the lobby* inert before
-any press**. `interventions.test.ts` asserts both, which is what makes the refusal a measurement of
-one configuration rather than a blanket that happens to be off — and it asserts the dial behaviour
-too: a spread press at 50 s makes a second spread inert and the lobby press live, and past a lobby
-press at 300 s the two swap over.
+**Why the argument was wrong, stated rather than guessed at.** `sim/events.ts` already says it:
+*"For `park-cars-lobby` and `spread-cars` the event exists for the already-parked fleet"* — the
+scheduled event walks the idle cars through stage 7 whether or not the strategy string changed, so
+a fleet that had stopped where it last served is repositioned by the press even under a profile
+that already authors the destination. Equal strategy is not equal behaviour. **No replacement
+mechanism is offered**, because a second plausible sentence in place of a measurement is what
+[§ D256](#d256) refuses; what would settle it is the counterfactual pair, and that is the claim
+§ D900 declined to make on one replication.
 
-**Its own line on the screen, not a share of the handover's.** Both refusals can be true at once —
-under `zoned-uppeak` the spread arm would set what is set **and** a handover to the vector already
-driving would move nothing — and one line would silently drop whichever was written second. § 7.6's
-fourth rule is that a control which cannot act *says so*, and a disabled button with a `title` is not
-saying so.
+**What this costs and what it buys.** It costs the fix for the assessor's finding: the inert press
+under `zoned-uppeak` on § D871's day is **still silent**, and GitHub issue #588 stays open. It buys
+the knowledge that the cheap answer is wrong, pinned by thirty-six cells rather than by an
+argument — and three of those cells are kept in `everyday/stageHandover.test.ts` by that lane, so the
+next lane that reaches for this reasoning meets the refutation before it writes the predicate.
+
+**Two lanes of one wave built the same wrong thing independently and one of them measured it.**
+That is worth a sentence: this lane derived the refusal from the configuration and shipped it, lane
+AG-C derived the same refusal, swept it, and reverted byte-for-byte. The difference between the two
+is a run, which is this repository's oldest rule about a refusal — *pinned by a run, never by
+another sentence* — applied to the lane that wrote the sentence.
+
 
 ---
 

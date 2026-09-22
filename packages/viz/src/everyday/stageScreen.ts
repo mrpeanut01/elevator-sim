@@ -1012,17 +1012,6 @@ function mountStage(
   interventionStamp.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey}`;
   const interventionRefusal = el(doc, 'span', 'everyday-stage-intervene-refusal');
   interventionRefusal.style.cssText = `font-size:11.5px;color:${C.label}`;
-  /*
-   * **The parking arms' own refusal, on its own line** — GitHub issue #588, § D913.
-   *
-   * A span of its own rather than a share of `interventionRefusal`, because both can be true at the
-   * same moment: under `zoned-uppeak` *spread the cars* would set what is already set **and** a
-   * handover to the vector already driving would move nothing, and one line would silently drop
-   * whichever was written second. § 7.6's fourth rule is that a control which cannot act says so —
-   * a disabled button with a tooltip is not saying so — so each arm's reason gets somewhere to be.
-   */
-  const parkingRefusal = el(doc, 'span', 'everyday-stage-parking-refusal');
-  parkingRefusal.style.cssText = `font-size:11.5px;color:${C.label};flex-basis:100%`;
   /* The handover arm's note — drawn, not a title, because a reason a player cannot see is not one. */
   const interventionNote = el(doc, 'span', 'everyday-stage-intervene-note');
   interventionNote.style.cssText = `font-size:11.5px;color:${C.warmGrey};flex-basis:100%`;
@@ -1033,7 +1022,6 @@ function mountStage(
     switchPickerNote,
     interventionStamp,
     interventionRefusal,
-    parkingRefusal,
     interventionNote,
   );
 
@@ -1795,30 +1783,6 @@ function mountStage(
     switchPickerNote.textContent = sharedRefusal === undefined ? STAGE_SWITCH_PICKER_NOTE : '';
   }
 
-  /**
-   * The two parking arms, from the rows the model built for them — GitHub issue #588, § D913.
-   *
-   * {@link applySwitchRow}'s shape one arm over, and it has the same two callers for the same
-   * reason: the arms must be right before a frame exists and after the picker moves. The shared
-   * refusal still wins — a filed day parks nothing either — and the arm's own refusal is the
-   * narrower fact that this press would set what is already set, which leaves the *other* parking
-   * verb pressable and says so on its own line.
-   */
-  function applyParkingRows(view: StageInterventionView, sharedRefusal: string | undefined): void {
-    const reasons: string[] = [];
-    for (const button of interventionButtons) {
-      const kind = button.dataset['interventionKind'];
-      const row = view.rows.find((candidate) => candidate.change.kind === kind);
-      const own = row?.refusal;
-      button.disabled = sharedRefusal !== undefined || own !== undefined;
-      button.title = own ?? row?.explains ?? button.title;
-      if (own !== undefined && sharedRefusal === undefined) {
-        reasons.push(`${row?.label ?? ''}: ${own}`);
-      }
-    }
-    parkingRefusal.textContent = reasons.join(' · ');
-  }
-
   /** The handover arm re-asked from the live facts — for the picker, and for the mount. */
   function syncSwitchArm(): void {
     refreshSwitchOptions();
@@ -1830,12 +1794,9 @@ function mountStage(
       hasRun: adopted !== undefined,
       dayClosed: barFacts.dayClosed,
       recomputing: recomputingOver !== undefined,
-      driving: () => host.drivingProfile(),
       ...(target === undefined ? {} : { switchTo: target }),
     });
-    const shared = sharedRefusalOf(view, watchingNow());
-    applySwitchRow(view, shared);
-    applyParkingRows(view, shared);
+    applySwitchRow(view, sharedRefusalOf(view, watchingNow()));
   }
 
   /**
@@ -2135,7 +2096,6 @@ function mountStage(
       hasRun: true,
       dayClosed: barFacts.dayClosed,
       recomputing: recomputingOver !== undefined,
-      driving: () => host.drivingProfile(),
       ...(target === undefined ? {} : { switchTo: target }),
     });
     /* Written only when the stamp changes — {@link stampSaid}, `AX-3`. */
@@ -2155,13 +2115,7 @@ function mountStage(
      * is a true statement about the run on screen and hiding it would misdescribe the replay.
      */
     const refusal = sharedRefusalOf(intervention, watching);
-    /*
-     * **And each parking arm's own refusal** — GitHub issue #588, § D913. This line was
-     * `button.disabled = refusal !== undefined` alone, so a press that would set the strategy
-     * already in force drew live and did nothing: measured on Scenario 6's pinned day under
-     * `zoned-uppeak`, *spread the cars* changed 0 of 355 legs and said nothing.
-     */
-    applyParkingRows(intervention, refusal);
+    for (const button of interventionButtons) button.disabled = refusal !== undefined;
     /*
      * The handover arm has a refusal of its own — a hand-over to the vector already driving moves
      * nothing — and it is drawn beside the control rather than in the shared line, because the park
