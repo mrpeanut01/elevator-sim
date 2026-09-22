@@ -637,14 +637,17 @@ export function goalsForDay(
    * the bar, and a label promising *under 80 kJ* about a day that spent exactly 80 would claim a
    * strictness the comparison does not have. § D227 at the scale of one preposition, twice.
    *
-   * The bar is `ENERGY_PER_LEG_MAX_KJ` on every day, not a rung of a ladder, and that constant
-   * carries the run it was derived from and the two measurements that fix it.
-   */
-  /*
+   * **The bar is not a rung of a ladder on either horizon** — it is the same value on day 1 and day
+   * 20 — but since GitHub issue #583 there are **two** of it, one per horizon (§ D962). Each
+   * constant carries the run it was derived from and the measurements that fix it:
+   * `ENERGY_PER_LEG_MAX_KJ` for a slice and `ENERGY_PER_LEG_MAX_WHOLE_DAY_KJ` for a whole authored
+   * day. The label above is written against the bar this call selected rather than against either
+   * constant, so the two cannot come apart.
+   *
    * The bar is chosen by the **horizon** and never by the day, which is the one place this goal
    * reads its second argument. `worst-wait` above scales its ladder by a measured factor; this one
    * selects between two measured constants, because the ratio between the two horizons is not one
-   * number — `ENERGY_PER_LEG_MAX_WHOLE_DAY_KJ` carries the pair it was measured on.
+   * number — 4.19 on Midtown Office and 3.36 on Vertical City.
    */
   const energyBar =
     over === 'whole-day' ? GOAL_BARS.energyPerLegMaxWholeDayKJ : GOAL_BARS.energyPerLegMaxKJ;
