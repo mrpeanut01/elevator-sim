@@ -822,20 +822,40 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
      * below is unchanged and is **stronger** for this — it now compares against a clock that was
      * genuinely at rest.
      */
-    const before = await page
-      .waitForFunction(
-        () => {
-          const read = (): string =>
-            document.querySelector('.everyday-stage-clock')?.textContent ?? '';
-          const first = read();
-          return new Promise<string | false>((resolve) => {
-            setTimeout(() => resolve(read() === first && first !== '' ? first : false), 300);
-          });
-        },
-        undefined,
-        { timeout: 30_000 },
-      )
-      .then(async (handle) => (await handle.jsonValue()) as string);
+    /*
+     * **The settle is done in node, and the reason is a trap that made the version above it look
+     * like it waited when it did not.** That version passed the predicate a function returning a
+     * `Promise<string | false>`. `waitForFunction` resolves on the first **truthy** return — and a
+     * Promise object is always truthy, so it accepted the very first evaluation, never polled
+     * again, and handed back a handle to that one promise. `jsonValue()` then awaited it and
+     * produced whatever that single 300 ms sample gave: the clock string when it happened to be at
+     * rest, and `false` whenever the transport had moved.
+     *
+     * So `before` was `false` under load, and the assertion at the end of this case read
+     * *expected '08:32' to be false* — which is what `browser` reported on GitHub PR #574 while
+     * the same case passed on an idle box. The defect is older than that wave; what the wave added
+     * is a second browser and a preview server to this tier, which is enough contention to lose
+     * the coin flip.
+     *
+     * Comparing the two reads **here** removes the trap entirely: the loop is ordinary `await`, a
+     * disagreement retries rather than resolving falsy, and a clock that never comes to rest
+     * throws a sentence saying so instead of silently yielding `false`. 300 ms is still chosen
+     * against the speed rather than picked — at 600× it is three simulated minutes, so a running
+     * transport cannot produce two equal reads across it.
+     */
+    const settledClock = async (): Promise<string> => {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const first = (await page.textContent('.everyday-stage-clock')) ?? '';
+        await page.waitForTimeout(300);
+        const second = (await page.textContent('.everyday-stage-clock')) ?? '';
+        if (first !== '' && first === second) return first;
+      }
+      throw new Error(
+        'the stage clock never held the same reading across 300 ms in 100 attempts, so this ' +
+          'case has no stable playhead to compare against',
+      );
+    };
+    const before = await settledClock();
 
     await page.click('.everyday-stage-intervene[data-intervention-kind="park-cars-lobby"]');
     /*
