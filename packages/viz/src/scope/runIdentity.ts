@@ -144,7 +144,7 @@ import {
   interventionKindRefusal,
 } from '@elevator-sim/core/browser';
 
-import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
+import { DEFAULT_LEVERS, specIsDirty } from '../authoring/dispatcherSpec.js';
 import { fitOutIsAsBuilt } from '../campaign/fitOut.js';
 import { commissionedBuilding } from '../commissioning/building.js';
 import { commissionableClasses } from '../commissioning/types.js';
@@ -153,6 +153,8 @@ import {
   buildingConfigOf,
   calendarAskInputOf,
   declaredSelectorSpecOf,
+  drivingDispatcherSpecOf,
+  profileById,
   specsWithSaved,
   type ViewerState,
 } from '../dev/state.js';
@@ -709,6 +711,63 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
       `the weight-set selector is set to “${state.selectorSpec.policy}”, which is not what the ` +
       `dispatcher “${state.dispatcherId}” declares, and a submission carries a dispatcher id rather ` +
       'than a selector — so the server would replay this seed under the profile’s own policy'
+    );
+  },
+
+  /**
+   * The dispatcher working copy — `selectorSpec`'s shape one field over, and new here because
+   * § D886 made the field a control (GitHub issue #575).
+   *
+   * Until that decision `viewer.dispatcherSpec` was `latent`, so {@link fieldsAnsweredFor} did not
+   * ask about it and this table did not answer. `dev/state.ts#drivingProfileOf` composes the run's
+   * weights, behaviour flags and family moves out of it now, and **a submission carries a dispatcher
+   * id rather than a weight vector** — so a tuned run replayed from its ids would be replayed under
+   * the shipped profile's own weights and come back `metrics-do-not-reproduce`. That is the
+   * accusation this module exists to keep off an honest player.
+   *
+   * **The baseline is the profile the run names, not a constant**, exactly as the selector's arm
+   * argues: `specIsDirty` compares against `specFromProfile` of whatever `dispatcherId` resolves to,
+   * which is what the server reconstructs from the id. So a player who has moved nothing posts, a
+   * player who picked a different dispatcher and left the draft to follow it posts, and only a moved
+   * weight, flag or family control refuses. `viewer.savedDispatchers`' own profiles resolve through
+   * `profileById` on the same call, so a saved dispatcher the player selected is its own baseline —
+   * the *saved on this device alone* refusal that would keep it off a board is `dispatcherId`'s, and
+   * duplicating it here would be two answers to one question.
+   */
+  dispatcherSpec: (state, resources) => {
+    const source = profileById(resources, state.savedDispatchers, state.dispatcherId);
+    if (!specIsDirty(drivingDispatcherSpecOf(source, state), source)) return undefined;
+    return (
+      `the dispatcher working copy has been moved off “${source.name}” — a weight, a behaviour ` +
+      'flag or a family control — and a submission carries a dispatcher id rather than a weight ' +
+      'vector, so the server would replay this seed under the profile the data ships'
+    );
+  },
+
+  /**
+   * The pointer that decides whether the working copy above reaches the run — § D886.
+   *
+   * **It fires on the same state `dispatcherSpec` does, and that is deliberate rather than a
+   * stutter.** The two fields are one fact with two handles: a run is unreproducible when the copy
+   * has been moved *and* it is pointed at the dispatcher that is driving, and a player can make it
+   * reproducible by undoing either. `dispatcherSpec`'s sentence names the edit; this one names the
+   * pointing, and each says the remedy that belongs to its own field, which is what
+   * `runIdentityIssues` keying issues by field is for — `provenanceLineOf` and the submit path both
+   * show the key beside the message.
+   *
+   * The alternative was an arm that always answers `undefined` on the ground that the entry above
+   * covers it. It was written and rejected: `runIdentity.test.ts` drives **both** arms of every
+   * control's probe and requires the moved one to be refused *naming that key*, which is the
+   * property that stops a control being quietly exempted — and the exemption would have been on the
+   * field that decides whether the other one bites.
+   */
+  editingDispatcherId: (state, resources) => {
+    const source = profileById(resources, state.savedDispatchers, state.dispatcherId);
+    if (!specIsDirty(drivingDispatcherSpecOf(source, state), source)) return undefined;
+    return (
+      'the dispatcher working copy is pointed at the dispatcher that is driving, so the run is ' +
+      `built with the moved copy rather than with “${source.name}” as the data ships it — point ` +
+      'the editor somewhere else, or put the copy back, and this run posts'
     );
   },
 });

@@ -1398,18 +1398,28 @@ export interface EverydayHost {
    * Write one plain lever — `mode/plainLevers.ts`'s seam, the identical route the Engineer
    * editor's `pullPlainLever` takes, so the two drawers stay two renderings of one vector.
    *
-   * **Only one of the four reaches a run, and this said all four did** — GitHub issue #296. The
-   * ownership table in `mode/plainLevers.ts` is the reason, read one column further along than it
-   * used to be: *lobby* owns `GroupLevers.parking`, which `dev/state.ts#drivingProfileOf` reads, so
-   * it takes effect on the next run exactly as the editor's group levers do. *patience*, *room* and
-   * *spread* own `weights.starvation`, `weights.loadFactor` and `flags.zone` — all three on
-   * `viewer.dispatcherSpec`, which `scope/surface.ts` declares `latent` and `drivingProfileOf` does
-   * not read. Measured on the legs at `midtown-office`, 900 s, seed 20260827, `collective`, the
-   * three are byte-identical at either end of their travel and *lobby* is not.
+   * **All four reach a run, and three of them stopped being drafts on § D886** — GitHub issue #575.
    *
-   * That is a true statement about this seam and not a defect in it: the lever writes the field it
-   * says it writes, and the field is a draft. `everyday/workshopScreen.ts`'s § 3.3 note is where a
-   * player is told, and `workshopTravel.test.ts` is what stops this sentence going stale again.
+   * This paragraph said the opposite for every wave between issue #296 and that decision, correctly:
+   * *lobby* owned `GroupLevers.parking`, which `dev/state.ts#drivingProfileOf` read, and *patience*,
+   * *room* and *spread* owned `weights.starvation`, `weights.loadFactor` and `flags.zone` on
+   * `viewer.dispatcherSpec`, which it did not. `drivingProfileOf` composes the run's profile out of
+   * that field now, so the ownership table in `mode/plainLevers.ts` reads all the way across: every
+   * lever writes a field the next run is built from.
+   *
+   * **The sentence left on the commit that made it false**, which is § D227's rule rather than
+   * tidiness — a claim that a control is inert is the more dangerous half, because it tells a
+   * player not to bother. `workshopTravel.test.ts` is what pins the replacement: it drives every
+   * lever through `shiftRunConfigOf` → `recordRun` and compares the legs, and it requires the
+   * sentence the screen draws to agree with what it measured, so neither half can go stale alone.
+   *
+   * **What is still true and is not this method's to promise**: a weight that reaches the run is
+   * not a weight that must move every run. Measured at `midtown-office`, 900 s, seed 20260804,
+   * *room* moves the legs under all eleven shipped dispatchers and *patience* under nine, the two
+   * exceptions being the profiles that declare `hardConstraints: ["noDirectionReversal"]` — a hard
+   * eligibility filter narrowing the candidate set, isolated on `eta` with and without that one
+   * field. That is a measurement at one cell and no refusal is drawn from it, because *no weight
+   * can make this bite* is a claim nothing here has established.
    */
   setPlainLever(id: PlainLeverId, value: number | boolean): void;
 

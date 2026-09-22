@@ -397,10 +397,88 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
     states: [(s) => ({ ...s, drawerOpen: false }), (s) => ({ ...s, drawerOpen: true })],
     sink: [() => drawerStateFor(1000, false), () => drawerStateFor(1000, true)],
   },
+  /**
+   * **The pointer that says whose copy this is** — a control since § D886, GitHub issue #575.
+   *
+   * It was `presentation`, with two arms naming two dispatchers and nothing else, and it passed
+   * because the working copy reached no run at either end. `dev/state.ts#drivingDispatcherSpecOf`
+   * applies the copy exactly while this names the driving profile, so the arms have to carry a
+   * **moved** copy for the pointer to decide anything — a pristine copy composes to the profile it
+   * was seeded from either way, which is the whole reason the old probe was quiet rather than wrong.
+   *
+   * Both arms therefore hold one moved weight and differ only in where the copy is pointed. The
+   * **first** arm points at `eta`, which `baseState` is not driving, so the moved copy is somebody
+   * else's and the run is `collective` as the data ships it — that is the arm `runIdentity.test.ts`
+   * requires to post, and it is genuinely the reproducible one. The **second** points at
+   * `collective`, the dispatcher that is driving, so the move reaches the run. Midtown Office for
+   * `viewer.dispatcherSpec`'s stated reason directly above.
+   */
   'viewer.editingDispatcherId': {
     states: [
-      (s) => ({ ...s, editingDispatcherId: 'collective' }),
-      (s) => ({ ...s, editingDispatcherId: 'eta' }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        dispatcherSpec: {
+          ...s.dispatcherSpec,
+          weights: { ...s.dispatcherSpec.weights, loadFactor: 100 },
+        },
+        editingDispatcherId: 'eta',
+      }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        dispatcherSpec: {
+          ...s.dispatcherSpec,
+          weights: { ...s.dispatcherSpec.weights, loadFactor: 100 },
+        },
+        editingDispatcherId: 'collective',
+      }),
+    ],
+  },
+  /**
+   * **The dispatcher working copy, which stopped being a draft on § D886** — GitHub issue #575.
+   *
+   * It was `latent` until this row existed, so `scope.test.ts` — which drives `control` rows only —
+   * had never run it at either end, and the claim *shiftRunConfigOf never reads it* was a sentence
+   * in a table with nothing behind it. `drivingProfileOf` reads it now, and this is the both-arm
+   * measurement that says so.
+   *
+   * **On Midtown Office**, for `viewer.selectorSpec`'s stated reason one block down and a measured
+   * one of its own: Garden Apartments' two cars leave every weight in the library byte-identical at
+   * both stops, so a probe there would report a live control dead.
+   *
+   * **`loadFactor` rather than `starvation`**, and the choice is measured rather than aesthetic.
+   * Both are plain-lever terms; at this cell the base state's dispatcher is `collective`, which
+   * declares `hardConstraints: ["noDirectionReversal"]`, and with that one field the only
+   * difference the starvation arm is byte-identical while without it it moves — isolated on `eta`
+   * with and against the constraint, and reproduced across the two shipped profiles that declare it
+   * and the nine that do not. That is a fact about a hard eligibility filter narrowing the candidate
+   * set at this cell, **not** a structural claim that no weight can make the term bite, which is
+   * why no refusal is drawn from it anywhere and why the probe simply uses the arm that is live
+   * here.
+   *
+   * 0 against 100 is the plain lever's own travel — `mode/plainLevers.ts#applyPlainLever` writes
+   * this same field for *How much room to leave in a car*, so the two arms are the two ends of a
+   * control a player can actually reach.
+   */
+  'viewer.dispatcherSpec': {
+    states: [
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        dispatcherSpec: {
+          ...s.dispatcherSpec,
+          weights: { ...s.dispatcherSpec.weights, loadFactor: 0 },
+        },
+      }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        dispatcherSpec: {
+          ...s.dispatcherSpec,
+          weights: { ...s.dispatcherSpec.weights, loadFactor: 100 },
+        },
+      }),
     ],
   },
   'viewer.editingPatternId': {
@@ -924,12 +1002,18 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
 /**
  * Presentation controls whose only consumer is a DOM mount.
  *
- * `docs/16` S9: a model walk may not be cited as having driven a document. These four name which
+ * `docs/16` S9: a model walk may not be cited as having driven a document. These name which
  * artifact an editor is pointed at, and the only thing that reads them is the mount that draws its
  * title — so the honest statement is *"unreachable at this evidence tier"*, not *"inert"*.
+ *
+ * **`viewer.editingDispatcherId` left this register on § D886** (GitHub issue #575) and the
+ * departure is the register working rather than shrinking. It is no longer a presentation row: the
+ * dispatcher working copy reaches the run, `dev/state.ts#drivingDispatcherSpecOf` applies it only
+ * while this pointer names the driving profile, and a row here is a statement about a control that
+ * *cannot* move a leg. It has a two-arm probe above instead, which is the stronger evidence tier
+ * this note says it could not reach.
  */
 export const SINK_IS_A_MOUNT: Readonly<Record<string, string>> = Object.freeze({
-  'viewer.editingDispatcherId': 'read by mountDispatcherEditor to title its own panel; no pure sink exists to call',
   'viewer.editingPatternId': 'read by mountTrafficEditor to title its own panel; no pure sink exists to call',
   /*
    * Corrected in issue #114, and it was wrong in both halves. It named a *title* the editor does
@@ -1047,25 +1131,22 @@ const RIVAL_BUILDING = RESOURCES.buildings.find((entry) => entry.id === 'midtown
  */
 const BUSY = 'midtown-office';
 
-/**
- * The two dispatcher drafts the latent arm moves between, and **why these two**.
+/*
+ * **Two dispatcher drafts used to be built here, and their lesson outlived them** — § D886.
  *
- * The first arm written here moved every weight by `+1`, which passed the vacuity guard — the states
- * really did differ — and **could not have detected the wiring it exists to detect**. Found by the
- * mutation rather than by review: pointing `drivingProfileOf` at `state.dispatcherSpec` reddened
- * three neighbouring cases and left this row green, because `profileFromSpec` maps a slider position
- * through `position / 100`, so `+1` is a 0.01 move in a cost term and changes no decision on a
- * four-car building over 900 s.
+ * They were the latent arm's two ends, and the docstring on them recorded a near miss worth keeping
+ * after the row moved: the first arm written moved every weight by `+1`, passed the vacuity guard
+ * because the states really did differ, and **could not have detected the wiring it existed to
+ * detect** — `profileFromSpec` maps a slider position through `position / 100`, so `+1` is a 0.01
+ * move in a cost term and changes no decision on a four-car building over 900 s. It was found by
+ * mutation rather than by review, and the mutation was this one: *pointing `drivingProfileOf` at
+ * `state.dispatcherSpec` reddened three neighbouring cases and left this row green*. Those three
+ * cases are `viewer.dispatcherId`, `free-play.dispatcherProfileId` and `viewer.savedDispatchers`,
+ * and they are exactly what reported the ungated first attempt at § D886 within the minute.
  *
- * These are `collective` and `nearest-car` instead — the same two profiles `viewer.dispatcherId`'s
- * own probe moves between, and that case asserts they produce **different legs**. So the arm's
- * decisiveness is not argued here; it is held by a neighbouring assertion that would go red first.
+ * `PROBES['viewer.dispatcherSpec']` moves one weight from 0 to **100**, a full-scale move rather
+ * than a `+1`, for that reason.
  */
-const COLLECTIVE_SPEC = (() => {
-  const profile = RESOURCES.dispatcherProfiles.profiles.find((p) => p.id === 'collective');
-  return profile === undefined ? undefined : specFromProfile(profile, profile.name);
-})();
-const RIVAL_SPEC = RIVAL_PROFILE === undefined ? undefined : specFromProfile(RIVAL_PROFILE, RIVAL_PROFILE.name);
 
 export const LATENT_PROBES: Readonly<Record<SurfaceKey, LatentProbe>> = Object.freeze({
   'viewer.parkedWeeks': {
@@ -1135,17 +1216,17 @@ export const LATENT_PROBES: Readonly<Record<SurfaceKey, LatentProbe>> = Object.f
       }),
     ],
   },
-  'viewer.dispatcherSpec': {
-    field: 'dispatcherSpec',
-    /*
-     * The thirteen sliders issue #296 drove, moved together rather than one at a time: this asks
-     * whether the draft reaches a run at all, and #296 already established that no single term does.
-     */
-    states: [
-      (s) => (COLLECTIVE_SPEC === undefined ? s : { ...s, buildingId: BUSY, dispatcherSpec: COLLECTIVE_SPEC }),
-      (s) => (RIVAL_SPEC === undefined ? s : { ...s, buildingId: BUSY, dispatcherSpec: RIVAL_SPEC }),
-    ],
-  },
+  /*
+   * **`viewer.dispatcherSpec` left this table on § D886** — GitHub issue #575.
+   *
+   * It held the thirteen sliders issue #296 drove, moved together, and asserted that the draft
+   * reached no run at all. `dev/state.ts#drivingProfileOf` reads the working copy now, so the row is
+   * a `control` and its two-arm probe is in {@link PROBES} above, where the requirement is inverted:
+   * the legs must **differ**. The entry is deleted rather than kept with a note, because
+   * `surface.test.ts` asserts this table covers exactly the `latent` rows in both directions — a
+   * stale entry here is a refusal nothing checks, which is the shape this whole directory exists to
+   * catch.
+   */
   'viewer.patternSpec': {
     field: 'patternSpec',
     states: [

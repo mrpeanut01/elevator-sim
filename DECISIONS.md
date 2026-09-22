@@ -41400,3 +41400,72 @@ somebody else's box.
 **The pinned argument is kept and narrowed rather than deleted.** `stageScreen.browser.test.ts` says *"a stage that entered playing would be a day the player never chose to start."* Measured, **nine** primaries reach the stage and on seven of them the player did choose. The sentence's real content is that the stage cannot tell *who asked* at the moment it builds the transport — true of the report's back arrow and of a watch — and the handoff removed the need for it to know. That scope belongs in its docstring; the assertion does not move.
 
 **What is left open, and it is not this.** The assessor's actual complaint was a collision of **words**: the brief's primary says `Start the day` and the overlay's button says `Start`. AE-D moved the other word, on one row of nine. The copy question — whether the stage-reaching primaries return to the guide's verbs and the overlay takes a playback verb instead — is **GitHub issue #573**, and it is deliberately not ruled here: it is a copy change with a corpus cost, and this wave's row was already measured. **D843 was drafted for it and is deliberately unspent**, because a ruling recorded and not implemented is its own defect — `CLAUDE.md` names a case that sat ruled-and-unimplemented for thirteen days.
+
+---
+
+## D886 — the dispatcher working copy reaches the run, and § D386's disclosure is superseded by wiring
+
+**Date: 2026-09-22 · Owner: lane AF-B (wave AF) · GitHub issue [#575](https://github.com/mrpeanut01/elevator-sim/issues/575) · Supersedes [§ D386](#d386)'s *"stay latent"* clause and nothing else in it · Binds `packages/viz/src/dev/state.ts`, `packages/viz/src/scope/surface.ts`, `packages/viz/src/scope/runIdentity.ts`, `packages/viz/src/everyday/rush.ts` and `packages/viz/src/dev/dispatcherEditor.ts`, so it is an entry rather than a docstring.**
+
+**Decision.** `dev/state.ts#drivingProfileOf` composes the run's profile from `state.dispatcherSpec` — the thirteen weights, the three behaviour flags and the family moves — over the base `dispatcherId` names, while `state.editingDispatcherId` names that base. `scope/surface.ts` declares `viewer.dispatcherSpec` a **`within-day` control** and `viewer.editingDispatcherId` a `within-day` control with it. Every sentence the product draws about either field is derived through `scope/commitment.ts#commitmentOf`, so all of them changed themselves.
+
+### The cause was established by a run, because the issue named two candidates and forbade guessing
+
+Issue #575 measured *that* the Workshop's two weight-backed plain levers do not act and said explicitly that it had not established *why*: either the override never travels from `everyday/` into the run, or it travels and the terms are not consulted. Its own reading of `data/dispatcher-profiles.json` favoured the first and called that an inference.
+
+Traced through the shipped path at `midtown-office`, 900 s, seed 20 260 804, `collective`, with *How long anyone should wait* and *How much room to leave in a car* both at 100:
+
+```
+state.dispatcherSpec.weights        {waitTime: 100, starvation: 100, loadFactor: 100}
+drivingProfileOf(...).weights       {waitTime: 1}          ← identical at both ends
+config.dispatcherProfile.weights    {waitTime: 1}          ← identical at both ends
+legs                                433, byte-identical
+```
+
+**Candidate 1.** And candidate 2 is refuted on the same sitting rather than argued away: the same `loadFactor` weight put onto the profile through `savedDispatchers`, so that it reaches `SimulationConfig`, **does** move the legs. The term was being consulted all along; nothing was giving it a weight.
+
+### Why wiring now, when § D386 chose disclosure — its three grounds, answered in its own order
+
+1. **"It is the save path, which is separately owned (#228, #167)."** That ground has expired: **#228 is closed**. And the wiring needs no save — the working copy reaches the run as a *working copy*, exactly as `viewer.levers` reaches it without forking a profile. What a save is still for is giving the vector an **id**, which is what Compare, the gauntlet and the leaderboard resolve against; none of that moves here.
+2. **"It would make the Engineer surface's disclosure false."** It would have, because `DRAFT_NOTE` and `FAMILY_SCOPE_NOTE` were ternaries against `'draft'` with `''` as the other arm — so re-scoping emptied them. Both now have a `next-run` arm, in wording of their own rather than the levers' (`viewer.ruleRows`' note already made that argument: *§ D227 asks for true, not uniform*). The panel says *These weights take effect on your next run … over whichever dispatcher is driving*, and `runThisDispatcherStateOf`'s `select` / `saveFirst` affordance still describes something real: it asks for the run, and it files the vector.
+3. **"It would silently swap the running dispatcher."** **This one was right, and the run proved it inside a minute.** The first wiring had no gate, and `scope/scope.test.ts` — which moves each control and compares the legs — immediately reported `viewer.dispatcherId` and `free-play.dispatcherProfileId` as **inert controls**: the working copy's weights had overwritten the profile the player had just picked. A control that stops working because another one started is the defect this change is fixing, arriving from the other side.
+
+   So the gate § D386 rejected is the one that ships: the copy reaches the run exactly while `editingDispatcherId` names the driving profile. § D386's objection to it was *"the same edit would then travel or not according to a pointer the player cannot see"*, and that is the weakest joint in this decision, so it is answered in parts rather than waved at.
+
+   - **The pointer is drawn.** The Engineer editor's profile list marks the profile the panel is pointed at (`dispatcherEditor.ts`, `selected: profile.id === state.editingDispatcherId`), and the Workshop reports the open dispatcher and whether it is dirty through `EverydayHost.editedDispatcher()`.
+   - **It is no longer unstated.** `viewer.editingDispatcherId` was `presentation` with the words *"reaches no run"* on it; it is a control now, `commitmentOf` answers `next-run` for it, and `scope/probes.test-helper.ts` drives both arms and requires the legs to differ. The claim § D386 worried about being invisible is now a claim a run decides.
+   - **The behaviour is the one a player would describe.** `withDispatcher` already syncs the pointer when the copy is pristine and deliberately leaves it alone when it is not. So: tune the dispatcher you are running and the next run is tuned; pick a different one with edits standing and you get that one as the data ships it, with your edits still on the panel when you point back at their subject.
+   - **What is not established** is that a player reads the pointer that way in front of the product. No browser-tier case asserts it, and one that drives the Engineer profile list with a dirty copy and reads the note back is what would settle it.
+
+### The identity is the base's and the content is the copy's
+
+`profileFromSpec` already took `id: base.id`; the **name** is pinned to the base's too, because `dispatcherId` is what the brief, the report, the board and `scope/runIdentity.ts` all answer *who is driving* from, and a copy whose name field a player typed into would otherwise put a second answer beside it. A renamed copy runs under the name it is a copy **of**; *Save it and run it* is what makes a new name a dispatcher.
+
+### Invariant 5, which the wiring reaches and the wire does not
+
+A submission carries a dispatcher **id**, never a weight vector, so a tuned run replayed from its ids would come back `metrics-do-not-reproduce` — the accusation `scope/runIdentity.ts` exists to keep off an honest player. Both fields therefore gain a `CARRY_CHECKS` answer, and they fire together on purpose: they are one fact with two handles, and each names the remedy belonging to its own field. The baseline is the profile the run names rather than a constant, on the `selectorSpec` arm's stated ground.
+
+A **rush** is the same question with a shorter fuse, because it posts to a board the server verifies by replay. `dispatcherSpec` and `editingDispatcherId` move from `'surface'` to `'fresh'` on `everyday/rush.ts#RUSH_FIELD_ROLES`, with the same exception `selectorSpec` already carries: seeded from the dispatcher the player *brings*, not from the one a session opens on (GitHub issue #523 item 2). `rushCrowd.test.ts` reads that back off the run rather than taking this paragraph's word for it.
+
+### What this does not promise, and the measurement that bounds it
+
+A weight that reaches the run is not a weight that must turn every decision. Swept at `midtown-office`, 900 s, seed 20 260 804, every term driven to 100 one at a time: **six of the fourteen move the legs under `collective`, nine under `eta`**, and two of the three behaviour flags move under both.
+
+The difference between the two dispatchers is **one field**, isolated rather than inferred: `collective` declares `hardConstraints: ["noDirectionReversal"]` and `eta` ships the identical weight vector with none. Adding that one field to `eta` makes the *patience* lever byte-identical; removing it makes it move. Reproduced across the library — the two shipped profiles that declare the constraint are quiet on `starvation`, the nine that do not all move.
+
+**No refusal is drawn from that anywhere**, and the restraint is the point. *No weight can make this term bite under this constraint* is a claim about the engine that nothing here has established: `core` says the constraint is *"a hard filter: no weight vector can buy past it"* about **eligibility**, which is not the same as saying an argmin over the survivors cannot turn on `starvation`. A sentence on a player's screen asserting the wider thing would be a stated mechanism in place of a measured one ([§ D256](#d256)), and a stale refusal aimed at a live control is the half [§ D227](#d227) rates worse. What would license it is a run across the operating space; it is **GitHub issue #575's remaining half** and is filed as measured rather than fixed.
+
+The rest of the sweep, for the same reason — reported either way, because a null bounds the defect:
+
+| quiet at the cells tried | why, where a reason is established |
+|---|---|
+| `waitTime` at 20 and 200 | scaling the only weighted term cannot move an `argmin`; at **0** it does move the legs |
+| `rideTime` | `authoring/dispatcherSpec.ts#inertTerms` already draws the refusal — inert until the call carries a destination ([§ D112](#d112)) |
+| `dutyMismatch` | already drawn — no car on this building declares a duty ([§ D549](#d549)) |
+| `flags.pool` alone | byte-identical; **with `rideTime` weighted it moves.** § D112's pairing seen from the flag's side, and the screen draws the refusal on the weight rather than on the flag |
+| `diversionDetour` | **unexplained.** Quiet at 900 s day 1 and at 1 800 s day 10, under both dispatchers. No mechanism is offered |
+| `crowding` | quiet at day 1; **moves at day 10 / 1 800 s**, so it is an operating point rather than a seam |
+
+### What pins it
+
+`everyday/workshopTravel.test.ts` is the standing requirement's own instrument and is unchanged in shape: it asserts the **agreement** between the scope classification, the note the screen selects and the legs a run produces, never the outcome. Its one structural change is that a lever is now driven under **two** dispatchers rather than one — a declaration is about a field, not about one weight on one profile — and its recorded split moved from `travels: ['lobby']` to all four. Remove the binding from `drivingDispatcherSpecOf` and three of the four levers go quiet at both cells and the file is red, which is the property issue #575 asks for in as many words.

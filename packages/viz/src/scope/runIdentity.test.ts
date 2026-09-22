@@ -318,6 +318,13 @@ describe('every field the module is asked about has an answer, and no answer is 
     // fifteenth — wave AD's § D761–§ D763, the Parameters tab's three new applied sources. They
     // arrived here on the day the fields landed, by the same walk over `SCOPE_OF` that forced
     // `patience` in, which is the fourth time this list has recorded that.
+    // `dispatcherSpec` and `editingDispatcherId` are the sixteenth and seventeenth — GitHub issue
+    // #575, § D886: the dispatcher working copy, which `drivingProfileOf` composes the run's weights
+    // out of since that decision, and the pointer that decides whether it is applied. They arrived
+    // here the day the scope row moved, by the same walk over `SCOPE_OF`, which is the fifth time
+    // this list has recorded that — and they are a **pair** rather than one field twice: a run is
+    // unreproducible when the copy has been moved *and* it is pointed at the profile that drives,
+    // and either handle is a remedy a player can reach for.
     expect(sorted(fieldsAnsweredFor('ranked').map(({ field }) => field))).toEqual([
       'calendar',
       // `campaignEventId` is the twelfth — GitHub issues #171 and #169 item 1, § D507: the
@@ -325,6 +332,8 @@ describe('every field the module is asked about has an answer, and no answer is 
       'campaignEventId',
       'campaignFitOut',
       'commissioning',
+      'dispatcherSpec',
+      'editingDispatcherId',
       'interventions',
       'levers',
       'lobbyCrowding',

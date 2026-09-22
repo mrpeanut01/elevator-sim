@@ -141,48 +141,147 @@ const ENDS: Readonly<Record<PlainLeverId, readonly [number | boolean, number | b
  * 1 — the standing requirement, per control, in both of its directions
  * -------------------------------------------------------------------------- */
 
+/**
+ * The dispatchers each lever is driven under, and **why there are two of them since § D886**.
+ *
+ * There was one — `collective`, the cell issue #296 measured at — and one was enough while the
+ * question was *does this field reach a run at all*: every weight-backed lever was byte-identical
+ * everywhere, so any cell settled it. The field reaches the run now, and a cell can be quiet for a
+ * reason that is not the seam: `collective` declares `hardConstraints: ["noDirectionReversal"]`, a
+ * hard eligibility filter that narrows the candidate set before a weight is scored, and the
+ * *patience* lever's `weights.starvation` does not turn the argmin over the survivors at this
+ * operating point. `eta` ships the identical weight vector and declares no constraint, which is
+ * what makes the pair an isolation rather than a comparison of two dispatchers.
+ *
+ * So a lever whose write reaches the run must move the legs **somewhere in this set**, and a lever
+ * whose write is latent must move them **nowhere in it**. That is the declaration's own scope — it
+ * is about a field, not about one weight on one profile — and it is still a decisive instrument:
+ * take the binding out of `dev/state.ts#drivingDispatcherSpecOf` and all three draft-backed levers
+ * go quiet at both cells.
+ */
+const UNDER: readonly string[] = [AT.dispatcherId, 'eta'];
+
+function stateUnder(dispatcherId: string): ViewerState {
+  const profile = profileById(RESOURCES, [], dispatcherId);
+  return {
+    ...workshopState(),
+    dispatcherId,
+    editingDispatcherId: dispatcherId,
+    dispatcherSpec: specFromProfile(profile, profile.name),
+  };
+}
+
 describe('every plain lever’s scope declaration agrees with the legs it produces', () => {
   for (const id of LEVER_IDS) {
     it(`${id}: what scope/surface.ts says it reaches is what the run does`, () => {
-      const base = workshopState();
       const [low, high] = ENDS[id];
-      const atLow = withLever(base, id, low);
-      const atHigh = withLever(base, id, high);
-      const key = keyMovedBy(base, atHigh);
+      // One base, so `keyMovedBy`'s reference comparison is reading `applyPlainLever`'s ownership
+      // rather than two independently built states differing everywhere by identity.
+      const base = workshopState();
+      const key = keyMovedBy(base, withLever(base, id, high));
 
-      const movesTheRun = legsOf(atLow) !== legsOf(atHigh);
+      const moved = UNDER.filter((dispatcherId) => {
+        const at = stateUnder(dispatcherId);
+        return legsOf(withLever(at, id, low)) !== legsOf(withLever(at, id, high));
+      });
+      const movesTheRun = moved.length > 0;
       expect(
         movesTheRun,
         `the ${id} lever writes ${key}, which scope/surface.ts declares ` +
           `${workshopWriteReachesRun(key) ? 'as reaching a run' : 'latent'} — and the legs say ` +
-          `${movesTheRun ? 'it moved the run' : 'the run is byte-identical'}. One of the two is ` +
+          `${movesTheRun ? `it moved the run under ${moved.join(', ')}` : 'the run is byte-identical under ' + UNDER.join(', ')}. One of the two is ` +
           'wrong, and the note everyday/workshopScreen.ts draws above the primary is derived from ' +
-          'the first, so the player is being told the wrong thing either way (GitHub issue #296)',
+          'the first, so the player is being told the wrong thing either way (GitHub issue #575)',
       ).toBe(workshopWriteReachesRun(key));
     });
   }
 
   /**
-   * The measurement issue #296 filed, kept as a fact rather than as a property.
+   * The measurement, kept as a fact rather than as a property — **and it has moved once.**
    *
-   * The case above would pass if every lever reached the run and every declaration said so — which
-   * is what fixing #228 might produce, and is a state this file deliberately does not forbid. This
-   * one records what is true **today**, so that a wave which changes it has to come here and say so
-   * rather than changing it silently: three of the four write the draft, one writes the levers, and
-   * they are not the same lever the guide's footer used to describe.
+   * The case above would pass if every lever reached the run and every declaration said so, and
+   * this one records which of those states the tree is actually in, so that a wave changing it has
+   * to come here and say so rather than changing it silently.
+   *
+   * It said `travels: ['lobby'], stays: ['patience', 'room', 'spread']` from GitHub issue #296 until
+   * § D886, and the sentence beside it predicted its own next state: *"issues #228 and #167 are open
+   * and either could give the draft a way across, at which point the right answer flips."* What
+   * flipped it was **neither** — it was issue #575, the same seam found again on the screen where a
+   * player is taught to tune, and the fix was to wire `dev/state.ts#drivingProfileOf` to the working
+   * copy rather than to give the draft a save verb.
+   *
+   * **All four travel now, and this is the standing requirement's own instrument**: each lever is
+   * driven end to end through `shiftRunConfigOf` → `recordRun`, and the legs are compared. Remove
+   * the binding — put `specFromProfile(base, base.name)` back in `drivingDispatcherSpecOf` — and
+   * three of these four go back to `stays` and this case is red, which is the property issue #575
+   * asks for in as many words.
    */
-  it('is the split the issue measured — one lever travels and three do not', () => {
-    const base = workshopState();
+  it('is the split as § D886 left it — every lever travels', () => {
     const travels: PlainLeverId[] = [];
     const stays: PlainLeverId[] = [];
     for (const id of LEVER_IDS) {
       const [, high] = ENDS[id];
-      (legsOf(withLever(base, id, high)) === legsOf(base) ? stays : travels).push(id);
+      const anywhere = UNDER.some((dispatcherId) => {
+        const at = stateUnder(dispatcherId);
+        return legsOf(withLever(at, id, high)) !== legsOf(at);
+      });
+      (anywhere ? travels : stays).push(id);
     }
     expect({ travels: [...travels].sort(), stays: [...stays].sort() }).toEqual({
-      travels: ['lobby'],
-      stays: ['patience', 'room', 'spread'],
+      travels: ['lobby', 'patience', 'room', 'spread'],
+      stays: [],
     });
+  });
+
+  /**
+   * **The one lever that reaches the run and does not move it here, measured rather than asserted.**
+   *
+   * `patience` writes `weights.starvation`, which `drivingProfileOf` now carries into the run — the
+   * case above proves the field travels for `room` and `spread` on the same write — and at this
+   * cell it still leaves the legs byte-identical. That is not the seam: it is `collective`, whose
+   * profile declares `hardConstraints: ["noDirectionReversal"]`, a hard eligibility filter narrowing
+   * the candidate set before any weight is scored.
+   *
+   * **Isolated on that one field**, which is the only way to say it honestly: the same `eta` profile
+   * with the constraint added and with it absent, nothing else differing. Without it the lever moves
+   * the legs; with it the run is byte-identical. Reproduced across the library — the two shipped
+   * profiles that declare the constraint (`collective`, `collective-enroute`) are byte-identical and
+   * the nine that do not all move.
+   *
+   * **No refusal is drawn from this anywhere, and that is the finding's own limit.** *No weight can
+   * make this term bite under this constraint* is a claim about the engine that nothing here has
+   * established — `core`'s own words for the constraint are *"a hard filter: no weight vector can
+   * buy past it"*, about eligibility, not about whether an argmin over the survivors can still turn
+   * on `starvation`. A sentence on the player's screen asserting the wider thing would be a stated
+   * mechanism in place of a measured one (§ D256), and a stale refusal aimed at a live control is
+   * the half § D227 rates worse. So this is a pinned measurement at one cell and nothing more; what
+   * would license the sentence is a run that shows the term inert across the operating space.
+   */
+  it('names why patience is quiet here, by isolating the one field that makes it so', () => {
+    const base = workshopState();
+    const [, high] = ENDS.patience;
+
+    const withConstraint = legsOf(withLever(base, 'patience', high)) === legsOf(base);
+    expect(withConstraint, 'collective declares noDirectionReversal and the lever is quiet').toBe(true);
+
+    /*
+     * `eta` and `collective` ship the identical weight vector — `{waitTime: 1.0}` — and differ in
+     * `hardConstraints` alone, which is what makes this pair the isolation rather than a comparison
+     * of two dispatchers. `profileById` resolves both out of `data/`, so the contrast is the shipped
+     * file's own.
+     */
+    const eta = profileById(RESOURCES, [], 'eta');
+    const free: ViewerState = {
+      ...base,
+      dispatcherId: eta.id,
+      editingDispatcherId: eta.id,
+      dispatcherSpec: specFromProfile(eta, eta.name),
+    };
+    expect(
+      legsOf(withLever(free, 'patience', high)) === legsOf(free),
+      'the same weight on a profile with no hard constraint must move the run — otherwise this ' +
+        'case is measuring the seam rather than the constraint',
+    ).toBe(false);
   });
 });
 

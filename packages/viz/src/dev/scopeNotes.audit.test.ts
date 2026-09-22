@@ -174,13 +174,21 @@ const NOTE_SITES: readonly NoteSite[] = [
   },
   {
     key: 'viewer.dispatcherSpec',
+    /*
+     * **The fourth draft left this group on § D886** — GitHub issue #575. It read
+     * `commitment: 'draft'` with the other three and `phrase: 'reaches a run yet'`, which the three
+     * remaining editors still share; `dev/state.ts#drivingProfileOf` composes the run's weights out
+     * of this working copy now, so the block says *next run* and says it in wording of its own —
+     * see `draftNoteFor`, and `viewer.ruleRows` below for why a third `next-run` block does not
+     * borrow the levers' sentence.
+     */
     wiring: 'writes-only',
-    commitment: 'draft',
+    commitment: 'next-run',
     module: './dispatcherEditor.ts',
     mount: (elements, context) => mountDispatcherEditor(elements.dispatcherEditor, context),
     block: (elements) => elements.dispatcherEditor.terms,
-    phrase: 'reaches a run yet',
-    count: 4,
+    phrase: 'These weights take effect on your next run',
+    count: 1,
   },
   {
     key: 'viewer.patternSpec',
@@ -190,7 +198,7 @@ const NOTE_SITES: readonly NoteSite[] = [
     mount: (elements, context) => mountTrafficEditor(elements.trafficEditor, context),
     block: (elements) => elements.trafficEditor.orderChips,
     phrase: 'reaches a run yet',
-    count: 4,
+    count: 3,
   },
   {
     key: 'viewer.machineSpec',
@@ -200,7 +208,7 @@ const NOTE_SITES: readonly NoteSite[] = [
     mount: (elements, context) => mountMachinesEditor(elements.machinesEditor, context),
     block: (elements) => elements.machinesEditor.rows,
     phrase: 'reaches a run yet',
-    count: 4,
+    count: 3,
   },
   {
     key: 'viewer.buildingSpec',
@@ -210,7 +218,7 @@ const NOTE_SITES: readonly NoteSite[] = [
     mount: (elements, context) => mountBuildingEditor(elements.buildingEditor, context),
     block: (elements) => elements.buildingEditor.rows,
     phrase: 'reaches a run yet',
-    count: 4,
+    count: 3,
   },
 ];
 
@@ -291,8 +299,20 @@ const WITHOUT_A_NOTE: Readonly<Record<string, string>> = Object.freeze({
   'viewer.savedClasses':
     'realised elsewhere — the machines editor’s Save verb. Its note is on viewer.machineSpec, ' +
     'and it is the one save that then reaches a run with no further selection, which that note says.',
+  'viewer.editingDispatcherId':
+    'no block of its own — the profile list inside the dispatcher editor, which moves the pointer ' +
+    'and the working copy together. It became a control on § D886 (GitHub issue #575): ' +
+    'drivingProfileOf applies the working copy only while this names the driving profile, so this ' +
+    'field reaches a run and needs an answer here. The note it would carry is the one already ' +
+    'above the weights block — they are one control from the reader’s chair, and a second ' +
+    'paragraph on the list saying the same thing is the second voice viewer.lobbyCrowding’s row ' +
+    'refuses.',
   'viewer.savedDispatchers':
-    'realised elsewhere — the dispatcher editor’s Save verb, named in viewer.dispatcherSpec’s note.',
+    'the dispatcher library. Latent, realised by viewer.dispatcherId, whose note is on the rail’s ' +
+    'dispatcher list — so the field a save reaches a run through does carry one. It said “realised ' +
+    'elsewhere — the dispatcher editor’s Save verb, named in viewer.dispatcherSpec’s note” until ' +
+    '§ D886, and that stopped being checkable when the working copy stopped being a draft: the ' +
+    'clause below requires a NOTE_SITES entry that is latent and names this key, and none is.',
   'viewer.savedPatterns':
     'realised elsewhere — the traffic editor’s Save verb, named in viewer.patternSpec’s note.',
   'viewer.savedBuildings':
@@ -374,7 +394,9 @@ describe('every commitment the table declares has a note, or a reason it has non
     // nothing.
     const needed = keysNeedingANote();
     expect(needed.length).toBeGreaterThan(20);
-    expect(needed.filter((key) => commitmentOf(key, 'writes-only') === 'draft').length).toBe(8);
+    // Eight until § D886 (GitHub issue #575), when `viewer.dispatcherSpec` became a control and
+    // the dispatcher editor's weights block started drawing a `next-run` note instead of a draft.
+    expect(needed.filter((key) => commitmentOf(key, 'writes-only') === 'draft').length).toBe(7);
   });
 
   it('excuses nothing that a note-carrying mount actually writes', () => {

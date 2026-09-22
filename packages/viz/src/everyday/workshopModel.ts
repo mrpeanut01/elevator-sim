@@ -944,12 +944,23 @@ export type WorkshopWrite = (typeof WORKSHOP_WRITES)[number];
  * Four answers rather than the guide's two, because § 3.3's table was transcribed from a prototype
  * whose workshop had no draft: every control on it reached its toy simulator, so *unsaved changes
  * travel with the run* and *nothing changed yet* were the only two states that existed. This build
- * has a third field class — `viewer.dispatcherSpec` is `latent`, and `dev/state.ts#drivingProfileOf`
- * composes the run from the other three and never from it — so the two-cell table cannot describe
- * two of the four states a player can actually produce. That is `WORKSHOP_COPY.libraryHeading`'s
+ * had a third field class — `viewer.dispatcherSpec` was `latent`, and `dev/state.ts#drivingProfileOf`
+ * composed the run from the other three and never from it — so the two-cell table could not describe
+ * two of the four states a player could actually produce. That is `WORKSHOP_COPY.libraryHeading`'s
  * situation exactly (the prototype's panel offers six styles, this build ships thirteen), and it is
  * answered the same way: the guide's own sentences are kept and drawn where they are true, and this
  * build adds the ones its own shape needs.
+ *
+ * **Since § D886 (GitHub issue #575) all four writes reach the run, so two of these four answers are
+ * unreachable in the shipped product — and they are kept rather than deleted.** `draft-only` and
+ * `split` are decided by {@link workshopWriteReachesRun}, which asks `scope/surface.ts` rather than
+ * this module; the day a fifth write lands latent, or the day the working copy goes back to being a
+ * draft, the bar has the sentence for it already and does not fall back to the guide's two-cell
+ * table. `workshopTravel.test.ts` drives all sixteen subsets of the four writes against the
+ * classification, so the two quiet answers are exercised by every run of the suite rather than
+ * waiting unexercised for the state that needs them — which is the difference between a dead branch
+ * and a register kept honest, and the same argument `probes.test-helper.ts#SINK_MISSING` makes about
+ * an empty register one directory over.
  *
  * - `nothing` — no write is standing. The guide's *Nothing changed yet.*
  * - `travels` — every standing write reaches the run. The guide's *Unsaved changes travel with the

@@ -473,6 +473,20 @@ describe('the drawn block', () => {
  * `shiftRunConfigOf` — which re-derives the profile through `drivingProfileOf`, the step that
  * clobbers `selection` and would clobber anything else that had a second writer. A fixture that
  * handed `recordRun` a profile directly would route past exactly the seam this lane is about.
+ *
+ * ## The working copy has to come with it since § D886 — GitHub issue #575
+ *
+ * `drivingProfileOf` reads `state.dispatcherSpec` now, over the base `dispatcherId` names, while
+ * `editingDispatcherId` points at that base. This fixture used to file the profile, point both ids
+ * at it and leave `dispatcherSpec` holding whatever `baseState()` opened on — a state no press in
+ * the product can produce, because every writer of `editingDispatcherId` re-seeds the copy in the
+ * same patch (`dispatcherEditor.ts`'s profile picker and its save; `dev/state.ts#withDispatcher`).
+ * Left as it was, the stale copy's weights won and **two families reported as inert that are not**:
+ * `panel` and `normalization`, which is the false accusation this file is most dangerous for.
+ *
+ * So the copy is seeded from the filed profile, which is exactly the state a reader is in the
+ * instant after *Save as new*: the draft on the panel and the profile on the shelf are the same
+ * vector, and the three ids agree.
  */
 function legsOf(
   baseId: string,
@@ -492,6 +506,7 @@ function legsOf(
     savedDispatchers: [{ id: 'yours-1', profile }],
     dispatcherId: 'yours-1',
     editingDispatcherId: 'yours-1',
+    dispatcherSpec: specFromProfile(profile, profile.name),
   };
   return JSON.stringify(
     recordRun(shiftRunConfigOf(resources, at).config, { recordDecisions: false }).recording.legs.map(
