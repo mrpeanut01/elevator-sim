@@ -1,5 +1,5 @@
 {
-  "$comment": "Fix-a-building cases — docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md §10, scored per ENGINE_CONTRACT.md §9 with the closed-form inputs replaced by two real single runs sharing the traffic seed (the spec's own basis line, §10.4). Each case names a shipped building and carries the as-built deltas that make the fault real, a complaint whose measure is computed from the runs and never authored, four repairs whose patches are real config changes, and the authored success copy. Every case was validated against a real run pair before shipping (§10.6 rule 6); packages/viz/src/fixit/cases.test.ts pins the measured numbers, so an effect line's quoted figure that stops reproducing turns the suite red rather than going quietly stale. Player-facing copy carries no engine identifier (GAMEPLAY §16 rule 11) — buildings are named by their display names, dispatch changes by what they do. The seeds and demand levels are choices, not measurements: each was picked so the authored fault is visible in one run at that operating point, and the validation test is what says the diagnosed fix clears the contract's two bars there.  PRICES LIVE IN data/price-schedule.json — GitHub issue #366. A repair's cost is the sum of the schedule prices of the changes its patch buys; a costUnits here is refused at load.",
+  "$comment": "Fix-a-building cases — docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md §10, scored per ENGINE_CONTRACT.md §9 with the closed-form inputs replaced by two real single runs sharing the traffic seed (the spec's own basis line, §10.4). Each case names a shipped building and carries the as-built deltas that make the fault real, a complaint whose measure is computed from the runs and never authored, four repairs whose patches are real config changes, and the authored success copy. Every case was validated against a real run pair before shipping (§10.6 rule 6); packages/viz/src/fixit/cases.test.ts pins the measured numbers, so an effect line's quoted figure that stops reproducing turns the suite red rather than going quietly stale. Player-facing copy carries no engine identifier (GAMEPLAY §16 rule 11) — buildings are named by their display names, dispatch changes by what they do. The seeds and demand levels are choices, not measurements: each was picked so the authored fault is visible in one run at that operating point, and the validation test is what says the diagnosed fix clears the contract's two bars there.  PRICES LIVE IN data/price-schedule.json — GitHub issue #366. A repair's cost is the sum of the schedule prices of the changes its patch buys; a costUnits here is refused at load.  NO CASE SAYS WHICH REPAIR IS THE ANSWER — GitHub issue #566, DECISIONS.md § D869. Every diagnosed repair's effect line used to end 'The 9 waits over a minute are the target', seven of them followed by 'and it is a setting', which is docs/38 § 2.1's printed kind-of-fix line and an answer key besides. Those eighteen sentences are gone. Two things follow for anyone authoring a case here. An effect line says what the change does and what it costs the building, and never that this is the one; packages/viz/src/fixit/theAnswerIsNotPrinted.test.ts refuses the retired phrases and, more usefully, measures whether any turn of phrase appears on many cases' diagnosed repairs and on no decoy anywhere — a formula is a tell whatever words it uses. And repairs[] is still authored in role order, which is convenient for an author and is not what the player sees: fixit/engine.ts#repairsInDrawOrder shuffles the rows deterministically per case, because the answer sitting in row one on all eighteen cases was the role reaching the screen without anything rendering the word. § D706 still governs the menu's own retirement, which waits on the editor; this is only the answer key.",
   "version": 1,
   "cases": [
     {
@@ -79,7 +79,7 @@
           "id": "spread-the-idle-fleet",
           "role": "diagnosed",
           "name": "Let the idle fleet wait along its stops",
-          "effect": "Spreads waiting cars through the floors they serve — a shuttle at each lobby instead of eight at the street. The 9 waits over a minute are the target, and it is a setting.",
+          "effect": "Spreads waiting cars through the floors they serve — a shuttle at each lobby instead of eight at the street.",
           "patch": {
             "dispatcher": {
               "idle": {
@@ -94,7 +94,7 @@
           "id": "regear-the-shuttles",
           "role": "costly-fix",
           "name": "Re-gear the shuttles for another half metre per second",
-          "effect": "Every shuttle covers its three hundred metres sooner, so the 70 s worst wait shortens — but the cars still start from the street, and you are buying machinery to race a parking rule.",
+          "effect": "Every shuttle climbs its three hundred metres sooner. Coming down it does not: past three hundred metres of travel a sealed cabin may shed pressure only as fast as the ears of the people inside allow, and that limit rather than the machine sets the descent. The letter is about coming down.",
           "patch": {
             "building": {
               "cars": [
@@ -334,7 +334,7 @@
           "id": "redraw-by-headcount",
           "role": "diagnosed",
           "name": "Redraw the split by headcount — move one car across",
-          "effect": "Two cars a side puts 585 people on each upper car instead of 1,170. The 341 s mean upstairs is the target; downstairs keeps the slack its own figures show.",
+          "effect": "Two cars a side puts 585 people on each upper car instead of 1,170.",
           "patch": {
             "building": {
               "banks": [
@@ -547,7 +547,7 @@
           "id": "push-the-idle-cars-apart",
           "role": "diagnosed",
           "name": "Push the idle cars apart",
-          "effect": "Parks one idle car per stretch of the building instead of three together. The 7 waits over a minute from the flats are the target, and it is a setting.",
+          "effect": "Parks one idle car per stretch of the building instead of three together.",
           "patch": {
             "dispatcher": {
               "idle": {
@@ -701,7 +701,7 @@
           "id": "dwell-that-reacts",
           "role": "diagnosed",
           "name": "A dwell that reacts to what is boarding",
-          "effect": "Standard timing at every stop, extending only while people are still stepping aboard — the eleven-second hold survives only where a trolley is loading. The 28 waits over a minute are the target.",
+          "effect": "Standard timing at every stop, extending only while people are still stepping aboard — the eleven-second hold survives only where a trolley is loading.",
           "patch": {
             "building": {
               "cars": [
@@ -873,7 +873,7 @@
           "id": "wait-where-they-finish",
           "role": "diagnosed",
           "name": "Let a car wait where it finishes the trip",
-          "effect": "A car that ends its run among the flats stays among them until the next call. The 6 waits over a minute are the target, and it is a setting.",
+          "effect": "A car that ends its run among the flats stays among them until the next call.",
           "patch": {
             "dispatcher": {
               "idle": {
@@ -1095,7 +1095,7 @@
           "id": "extend-a-second-car",
           "role": "diagnosed",
           "name": "Fit garage landing doors to a second shaft",
-          "effect": "The second shaft already has the hoistway depth; two landing doors and a controller change split the garage crowd in half. The 21 waits over a minute are the target.",
+          "effect": "The second shaft already has the hoistway depth; two landing doors and a controller change split the garage crowd in half.",
           "patch": {
             "building": {
               "banks": [
@@ -1436,7 +1436,7 @@
           "id": "blank-the-low-landings",
           "role": "diagnosed",
           "name": "Blank the low-zone landings on the express cars",
-          "effect": "The upper three cars pass the low floors without stopping — the run they were built for. The 4 waits over a minute are the target, and it is a setting.",
+          "effect": "The upper three cars pass the low floors without stopping — the run they were built for.",
           "patch": {
             "building": {
               "banks": [
@@ -1679,7 +1679,7 @@
           "id": "delivery-window",
           "role": "diagnosed",
           "name": "A delivery window in the porters' rota",
-          "effect": "The cages move before the clinics open, and the two big cars return to standard door timing for the day. The 15 waits over a minute are the target, and the price is a rota.",
+          "effect": "The cages move before the clinics open, and the two big cars return to standard door timing for the day.",
           "patch": {
             "building": {
               "cars": [
@@ -1883,7 +1883,7 @@
           "id": "stagger-the-starts",
           "role": "diagnosed",
           "name": "Stagger the tenancy start times",
-          "effect": "The nine upper-floor tenants spread their starts across the half hour, and this run watches the first cohort arrive into the same four cars. The 21 waits over a minute are the target, and the price is a memo.",
+          "effect": "The nine upper-floor tenants spread their starts across the half hour, and this run watches the first cohort arrive into the same four cars.",
           "patch": {
             "building": {
               "floorPopulations": [
@@ -2036,7 +2036,7 @@
           "id": "reprint-the-letters",
           "role": "diagnosed",
           "name": "List half the clinics for half past nine",
-          "effect": "Three hundred keep the nine o'clock slot and the rest move to the later one; this run watches the nine o'clock cohort. The 10 waits over a minute are the target, and the price is a print run.",
+          "effect": "Three hundred keep the nine o'clock slot and the rest move to the later one; this run watches the nine o'clock cohort.",
           "patch": {
             "building": {
               "floorPopulations": [
@@ -2184,7 +2184,7 @@
           "id": "key-a-car-to-the-ballroom",
           "role": "diagnosed",
           "name": "Key one car to the ballroom run",
-          "effect": "One car serves the street and the ballroom and nothing else while the conference is in. The 12 waits over a minute are the target, and it is a setting.",
+          "effect": "One car serves the street and the ballroom and nothing else while the conference is in.",
           "patch": {
             "building": {
               "banks": [
@@ -2273,7 +2273,7 @@
           "id": "destination-panels",
           "role": "costly-fix",
           "name": "Destination panels at reception",
-          "effect": "Panels sort the reception crowd by floor before boarding. The letter is the 117 s worst wait coming down, and panels stand on the wrong side of that ride.",
+          "effect": "Panels sort the reception crowd by floor before boarding, and on this morning they do reach the letter — nearly every wait over a minute goes. What they do not do is fit inside a repair budget.",
           "patch": {
             "dispatcher": {
               "dispatch": {
@@ -2469,7 +2469,7 @@
           "id": "lift-the-lockout",
           "role": "diagnosed",
           "name": "Lift the refurbishment lockout",
-          "effect": "The surgical landing doors are re-certified and the bed cars serve their floors again. The 11 waits over a minute at the surgical floors are the target.",
+          "effect": "The surgical landing doors are re-certified and the bed cars serve their floors again.",
           "patch": {
             "building": {
               "banks": [
@@ -2835,7 +2835,7 @@
           "id": "rephase-the-works",
           "role": "diagnosed",
           "name": "Re-phase the refit — one car out at a time",
-          "effect": "The same works, twice the duration, two cars in service throughout. The 19 waits over a minute are the target, and the price is the contractor's re-mobilisation.",
+          "effect": "The same works, twice the duration, two cars in service throughout.",
           "patch": {
             "building": {
               "banks": [
@@ -3700,7 +3700,7 @@
           "id": "recommission-the-weighing",
           "role": "diagnosed",
           "name": "Re-commission the load weighing to the plate",
-          "effect": "Every deck weighs against its own plated figure and boards its design load. The 8 waits over a minute are the target.",
+          "effect": "Every deck weighs against its own plated figure and boards its design load.",
           "patch": {
             "building": {
               "banks": [
@@ -4200,7 +4200,7 @@
           "id": "regear-the-shuttles",
           "role": "costly-fix",
           "name": "Re-gear the shuttles for another half metre per second",
-          "effect": "Each climb is quicker, so the 77 s worst shortens — but the decks still close their doors at five hundred pounds, and the queue is at the doors.",
+          "effect": "Each climb is quicker and the worst wait does not shorten: the decks still close their doors at five hundred pounds, and the queue is at the doors rather than on the climb.",
           "patch": {
             "building": {
               "cars": [
@@ -4347,7 +4347,7 @@
           "id": "key-the-service-car",
           "role": "diagnosed",
           "name": "Key the service car to the restaurant run",
-          "effect": "The trolley car serves reception, the ballroom and the restaurant and nothing else over service. The 6 waits over a minute are the target.",
+          "effect": "The trolley car serves reception, the ballroom and the restaurant and nothing else over service.",
           "patch": {
             "building": {
               "banks": [
@@ -4437,7 +4437,7 @@
           "id": "regear-guest-cars",
           "role": "costly-fix",
           "name": "Re-gear the four guest cars for another half metre per second",
-          "effect": "Every trip is quicker, so the 79 s worst shortens — but the restaurant still queues behind the whole house for every car.",
+          "effect": "Every trip is quicker and the worst wait does not shorten: the restaurant still queues behind the whole house for every car.",
           "patch": {
             "building": {
               "cars": [
@@ -4596,7 +4596,7 @@
           "id": "one-car-per-call",
           "role": "diagnosed",
           "name": "One car per landing call",
-          "effect": "The controller sends the best-placed car and keeps the rest for the next button. The 4 waits over a minute are the target, and it is a setting the controller always had.",
+          "effect": "The controller sends the best-placed car and keeps the rest for the next button.",
           "patch": {
             "dispatcher": {
               "dispatch": {
@@ -4796,7 +4796,7 @@
           "id": "invoke-staggered-starts",
           "role": "diagnosed",
           "name": "Invoke the staggered-starts clause",
-          "effect": "The new tenants take the later start their leases already allow, and this run watches the original population's morning. The 32 waits over a minute are the target.",
+          "effect": "The new tenants take the later start their leases already allow, and this run watches the original population's morning.",
           "patch": {
             "building": {
               "floorPopulations": [
@@ -4988,7 +4988,7 @@
           "id": "park-at-the-top",
           "role": "diagnosed",
           "name": "Park the idle cars at the top floor",
-          "effect": "An idle car waits at the gym floor and meets the morning where it starts. The 3 waits over a minute are the target, and it is a setting.",
+          "effect": "An idle car waits at the gym floor and meets the morning where it starts.",
           "patch": {
             "dispatcher": {
               "idle": {

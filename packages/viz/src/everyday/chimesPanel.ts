@@ -289,7 +289,7 @@ export const CHIMES_PANEL_COPY = Object.freeze({
    * what a step buys, and a copy of it here would be a second.
    */
   purseOffer:
-    'into the purse of the tower your campaign desk is open on, to spend on works there like any ' +
+    'into the purse of the tower your Career desk is open on, to spend on works there like any ' +
     'other unit. Works still take the nights they take, and nothing here buys back a missed day.',
   /** And what it did, which is the same thing in the past tense. */
   purseOwned:
@@ -303,7 +303,7 @@ export const CHIMES_PANEL_COPY = Object.freeze({
    * a second cause: a purchase that reaches no run.
    */
   purseNoTower:
-    'Open a building on the Campaign screen first — this tops up that tower\u2019s purse, so there ' +
+    'Open a building on the Career screen first — this tops up that tower\u2019s purse, so there ' +
     'has to be one.',
   /** No account: there is no tally to spend, which is {@link signedOutHome} pointed at a row. */
   rowSignedOut: 'Sign in and there is a tally to spend this from.',

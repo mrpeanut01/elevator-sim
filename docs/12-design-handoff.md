@@ -870,6 +870,38 @@ And the whole retirement is **conditioned rather than dated**: it lands on the c
 editor the six priced change families those answers live behind, measured at **1 of 18** reachable
 today.
 
+**Corrected again 2026-09-19, by a run rather than by a reading, and the answer key went with it**
+([§ D869](../DECISIONS.md), [GitHub issue #566](https://github.com/mrpeanut01/elevator-sim/issues/566)).
+Two things moved.
+
+*The count is two counts.* § D706 § 1's **1 of 18** is the share of cases whose **authored answer's
+own patch** the editor can write. The question § D525 clause 3 actually asks is how many affordable
+configurations clear, and measured that way — a role-blind enumeration of the editor's five control
+families, singly and in pairs, run against both bars — it is **12 of 18**
+(`fixit/theAnswerIsNotPrinted.test.ts` solves each one rather than asserting it). Both figures are
+right about their own question, and the twelve is a **floor**: the enumeration is a sample and stops
+at the first route that clears, so the six that fall through to a repair row have not been shown to
+need one. § D706 § 6's precondition is unmoved — six cases still have no editor route this search
+can find — but it is six rather than seventeen.
+
+*The kind-of-fix line was two lines, and one of them is not what § D706 clause 4 named.* Clause 4
+identified `asBuilt.note`'s closing sentence and held it back with the menu, on the ground that
+above an open editor it is the only thing narrowing forty-seven priced dimensions to one tier. That
+argument is good and it **does not reach** the second line: every diagnosed repair's `effect` ended
+by naming the complaint as *the target*, seven of them adding *"and it is a setting"*, which
+narrows nothing and marks the row. So the eighteen sentences leave now, with two tells the ruling
+had not named — `repairRowOf`'s `free — configuration` price line, which is *it is a setting* in a
+price's clothes and appeared on the correct repair and on nothing else in the four cases whose
+answer is free; and the **draw order**, since `data/fixit-cases.json` authors every case's repairs
+in role order and both surfaces drew them in it, putting the answer in row one eighteen times out of
+eighteen. `fixit/engine.ts#repairsInDrawOrder` shuffles the rows deterministically per case.
+
+**The deviation this creates, stated where deviations go.** The handoff's § 10 words the free price
+as *"Door dwell is free — configuration"*, and the product now draws `free`. `CLAUDE.md` keeps the
+handoff canonical for the interface, so this is a departure and it is recorded rather than quiet:
+the word `configuration` is the retired kind-of-fix line, and `docs/38` § 2.1 is a later ruling of
+the owner's about exactly that sentence.
+
 
 ### 4.16 The stage cannot draw a 165-floor tower, and its camera is not yet a way round that
 

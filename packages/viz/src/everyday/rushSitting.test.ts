@@ -36,9 +36,11 @@ const outcome = (kind: RushOutcome['kind'], heldS: number): RushOutcome => ({
 });
 
 function round(over: Partial<RushRoundRecord> = {}): RushRoundRecord {
-  return {
+  const record: RushRoundRecord = {
     dispatcherProfileId: 'collective',
     dispatcherName: 'Collective',
+    drivers: [],
+    changes: [],
     ruleRows: [],
     wireInterventions: [],
     interventionCount: 0,
@@ -47,6 +49,12 @@ function round(over: Partial<RushRoundRecord> = {}): RushRoundRecord {
     unpostable: [],
     ...over,
   };
+  /*
+   * `drivers` follows the round's own name unless a case names its own — GitHub issue #565, § D859.
+   * A default of `['Collective']` would have made every override's driver line read *Collective*
+   * over a round driven by somebody else, which is the defect this field exists to close.
+   */
+  return record.drivers.length === 0 ? { ...record, drivers: [record.dispatcherName] } : record;
 }
 
 describe('a sitting is every round since the as-shipped start — GitHub issue #372', () => {

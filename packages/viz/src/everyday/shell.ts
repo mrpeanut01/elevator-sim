@@ -367,6 +367,18 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   /** The registered screen currently mounted in the region, so navigation can unmount it. */
   let mounted: MountedEverydayScreen | undefined;
 
+  /**
+   * Whether the last paint of the screen region was one of the two waiting states —
+   * {@link drawFrontDoorPending}'s or {@link drawHostPending}'s — so {@link connectDataHost}
+   * redraws exactly what the arriving host unblocks and nothing else.
+   *
+   * A flag rather than re-deriving the condition, because the condition is *what was drawn* and
+   * that is not recoverable from {@link state}: both pending states leave `mounted` undefined and
+   * so does a refusal, and redrawing a refusal — or a front door that is already correct — would
+   * take the page out from under whatever a keyboard player had focused on it for no gain.
+   */
+  let drewPending = false;
+
   /*
    * § 20.15: the rail card and the settings screen read the name and avatar colour from one
    * place. This is that place's one page-wide instance; the subscription below is what makes a
@@ -2450,8 +2462,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     consentAsk.append(row);
   }
 
-  function drawMenu(): void {
-    screenRegion.replaceChildren();
+  /**
+   * The front door's own heading and lede — drawn by **both** of its states.
+   *
+   * Shared rather than copied because the second state is the same screen with its tiles not yet
+   * offered (see {@link draw}'s `'menu'` arm), and a waiting room that did not look like the front
+   * door would be a second screen for one moment of one screen's life.
+   */
+  function frontDoorHead(): readonly HTMLElement[] {
     const h = el(doc, 'h1', undefined, 'Elevator Sim');
     h.style.cssText = `margin:0 0 4px;font:700 26px ${TYPE.heading};letter-spacing:-.02em`;
     const lede = el(
@@ -2461,7 +2479,30 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       'Pick a way to play. Every mode runs the same simulator on the same seeds — what changes is how long you are in it and what it asks of you.',
     );
     lede.style.cssText = `margin:0 0 22px;color:${C.inkSoft};max-width:62ch;font-size:13px;line-height:1.5`;
-    screenRegion.append(h, lede);
+    return [h, lede];
+  }
+
+  /**
+   * The front door before the first-arrival question has an answer — its own words, and the
+   * shell's standing sentence for a screen waiting on the host.
+   *
+   * {@link drawHostPending}'s shape rather than {@link drawHostPending} itself, and the difference
+   * is one line of copy: that function heads a screen with `SCREEN_NAMES`, which for this route is
+   * *Main menu*. The front door already has a name a stranger can read, and the first screen
+   * anybody sees is not the place to introduce the router's vocabulary. No sentence is invented —
+   * the heading, the lede and {@link HOST_PENDING_REASON} all ship today.
+   */
+  function drawFrontDoorPending(): void {
+    drewPending = true;
+    screenRegion.replaceChildren();
+    const waiting = el(doc, 'p', undefined, HOST_PENDING_REASON);
+    waiting.style.cssText = `color:${C.inkSoft};font-size:13px;max-width:60ch;line-height:1.5`;
+    screenRegion.append(...frontDoorHead(), waiting);
+  }
+
+  function drawMenu(): void {
+    screenRegion.replaceChildren();
+    screenRegion.append(...frontDoorHead());
 
     const list = el(doc, 'div');
     list.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.row + 2)}px;max-width:640px`;
@@ -2573,6 +2614,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   }
 
   function draw(): void {
+    drewPending = false;
     unmountCurrent();
     drawRail();
     const route = routeFor(state.screen);
@@ -2598,6 +2640,51 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     coverEngineer();
     drawBar();
     if (route === 'menu') {
+      /**
+       * **The front door waits for the host, and [§ D227](../../../../DECISIONS.md) is why** —
+       * [§ D844](../../../../DECISIONS.md).
+       *
+       * ## What the tiles were doing before this, measured on the built bundle
+       *
+       * This mount runs synchronously while `dev/main.ts`'s async `main()` is still fetching
+       * `data/`, so the three mode tiles were drawn from no host at all. Driven at 1280 × 800: the
+       * region and the tiles paint at **t ≈ 190 ms** and the host publishes at **t ≈ 430 ms**, and
+       * a *Scenario* press inside that window opens a screen reading
+       * {@link HOST_PENDING_REASON} — *the simulation host has not finished booting* — because
+       * {@link drawHostPending} below is what a registered screen gets with no host. So for a
+       * quarter of a second the front door offered three controls that could not act and said
+       * nothing about it, which is § D227's first direction on the first screen anybody sees.
+       *
+       * **And the press was not merely early; it was eaten.** The same drive, pressing the tile the
+       * way a player does: the offer replaces the front door at t ≈ 430 ms, so a press aimed at a
+       * tile in that window lands on an element the shell has already removed — reproduced as a
+       * `locator.click` timing out on a detached node while the page moved to the landing page
+       * underneath it. A control that is about to be taken away is a worse offer than no control.
+       *
+       * ## Why this is not a time-to-interactive regression
+       *
+       * `docs/31` § 3 defines interactive as a control *with its handler bound*, and
+       * `dev/recordTti.ts`'s header already names presence and an enabled state as the two things
+       * that cannot prove it. A tile that opens *the simulation host has not finished booting* was
+       * never interactive; it only looked it. What this changes is which of those two the number
+       * measures — `builtBundle.browser.test.ts`'s `charter S9` B1 waits for the offer to be left
+       * before it reads the tile either way.
+       *
+       * The discriminator is {@link weekRailOptions}': a **slot** with no host in it is a host on
+       * its way, and **no slot at all** is a build that keeps no simulation — the standalone mount
+       * a test document makes, where the tiles are the whole product and draw at once.
+       * {@link connectDataHost} draws the real front door the moment the host lands, which is the
+       * same arm that has always covered a registered screen entered early.
+       *
+       * What the waiting state is, and why it is not a blank: {@link drawFrontDoorPending} draws
+       * this screen's own heading and lede with the shell's standing sentence for a screen waiting
+       * on the host under them. So a reload shows the front door and then its tiles, rather than a
+       * tile that is about to be withdrawn.
+       */
+      if (dataHost === undefined && options.host !== undefined) {
+        drawFrontDoorPending();
+        return;
+      }
       drawMenu();
       return;
     }
@@ -2662,11 +2749,19 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   }
 
   /**
-   * A registered screen entered before `dev/main.ts` published the host — reachable only in the
-   * first instants of a cold load. Drawn rather than blanked, in the refusal screen's own shape;
-   * {@link connectDataHost} redraws the moment the host arrives.
+   * A screen the shell cannot yet draw because `dev/main.ts` has not published the host —
+   * reachable only in the first instants of a cold load. Drawn rather than blanked, in the refusal
+   * screen's own shape; {@link connectDataHost} redraws the moment the host arrives.
+   *
+   * **The front door has a waiting state too, and it is {@link drawFrontDoorPending} rather than
+   * this** — its tiles may not be offered before the first-arrival question has an answer (see
+   * {@link draw}'s `'menu'` arm for the § D227 measurement that put it there), and it heads itself
+   * with its own name rather than with `SCREEN_NAMES`' *Main menu*. The two share the sentence and
+   * nothing else, which is the point: this one names a screen the player asked for, and that one
+   * is the screen nobody asks for and everybody lands on.
    */
   function drawHostPending(screen: EverydayScreen): void {
+    drewPending = true;
     screenRegion.replaceChildren();
     const h = el(doc, 'h1', undefined, SCREEN_NAMES[screen]);
     h.style.cssText = `margin:0 0 8px;font:700 22px ${TYPE.heading}`;
@@ -2680,14 +2775,29 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    *
    * The run-open latch is synced immediately and on every host notification, so the strip arms
    * when a run the player started lands on the stage and disarms when the day files. The redraw
-   * arm covers the one early state {@link drawHostPending} draws: a registered screen mounted
-   * before the host existed gets its real mount the moment it does.
+   * arm covers **both** early states {@link drawHostPending} draws: a registered screen mounted
+   * before the host existed gets its real mount the moment it does, and the front door gets its
+   * tiles. It read *the one early state* while the second did not exist.
+   *
+   * **{@link offerTutorial} runs before that redraw, and the order is the whole of why the front
+   * door can no longer move under a reader.** The offer navigates, and navigating draws — so a
+   * menu drawn first and replaced a line later would put the front door on the page for exactly
+   * as long as it took the offer to answer. Both happen inside this one synchronous call, so
+   * nothing paints between them and there is no state anybody, player or driver, can observe and
+   * act on. The redraw is therefore guarded on there being no mount rather than on the route: the
+   * offer's own `go` has already mounted a screen when it fired. The redraw is guarded on
+   * {@link drewPending} — *what was last drawn* — rather than on the route or on there being no
+   * mount, because a refusal and a front door that is already right both leave `mounted`
+   * undefined and neither wants repainting.
    *
    * **The rail is the second thing synced, and it is issue #214's other half.** The `PLAYING AS`
    * card's career line is the week's, and the week arrives here — so a rail painted before this
    * ran is a rail drawn from no week at all. The front door is where that bit: a `'menu'` route
-   * mounts no screen, so the redraw arm above never fires there and the cold paint stood. Guarded
-   * by {@link careerLineDrawn} rather than unconditional, for the reason that field carries.
+   * mounts no screen, so the redraw arm above fired on no cold paint of it at all and the rail's
+   * stood. (The arm reaches the front door now, and this sync is not therefore surplus: the
+   * *arrival* is one of the notifications it covers and **Close the day** is the rest of them,
+   * which is the paragraph below.) Guarded by {@link careerLineDrawn} rather than unconditional,
+   * for the reason that field carries.
    *
    * It is not only the arrival. *Close the day* moves the week through this same notification, so
    * the card's *2 days running · best 84%* lands without a reload — the wiring
@@ -2710,8 +2820,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     };
     sync();
     dataHostUnsubscribe = next.subscribe(sync);
-    if (routeFor(state.screen) === 'screen' && mounted === undefined) draw();
     offerTutorial(next);
+    if (drewPending) draw();
   }
 
   /**

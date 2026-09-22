@@ -108,7 +108,8 @@ import {
   wearOf,
   worksDayLine,
 } from '../campaign/economy.js';
-import { calendarDaysOf } from '../campaign/calendar.js';
+import { calendarDaysOf, calendarEventIdFor } from '../campaign/calendar.js';
+import { SHIFT_EVENTS } from '../shift/events.js';
 import { CONTRACTS } from '../shift/contracts.js';
 import {
   BUILD_IDS,
@@ -208,6 +209,58 @@ export function units(value: number): string {
 /* -------------------------------------------------------------------------- *
  * The four daily tests — § 7 and § 8.6
  * -------------------------------------------------------------------------- */
+
+/**
+ * **The one heading over {@link campaignTestGoals}' bars, and the one sentence saying what they
+ * decide** — GitHub issue **#567**, recorded here under [§ D405](../../../../DECISIONS.md).
+ *
+ * ## What was wrong
+ *
+ * The desk and the contract sheet headed these four `WHAT DAY n ASKS`. One click later the § 7
+ * stage heads a **different** five bars `WHAT TODAY ASKS`. Four against five, no shared value, two
+ * headings differing by one word, and a playability assessor could not tell which decided the day.
+ * A third literal of the *other* heading sat in {@link BUILDING_COPY} as `testsEyebrow` and was read
+ * by **no screen at all** — a dead copy constant, deleted on the commit that made these two
+ * distinct rather than left to look like a third opinion.
+ *
+ * ## What is true, which is not what the issue assumed
+ *
+ * Both sets are graded. They grade different things, and that is the whole of the fix:
+ *
+ * - **These four** are `campaign/economy.ts#DIFFICULTIES[tower.difficultyId].tests` — fixed for the
+ *   tier, the same on day 1 and day 20 — and {@link campaignDayVerdict} folds them into the
+ *   `cleared` / `missed` mark `campaign/career.ts#fileDay` writes against the contract. Miss enough
+ *   and the contract ends.
+ * - **The other five** are `shift/goals.ts#goalsForDay` — a ladder that hardens with the week's day
+ *   — and they decide the day report's verdict, the streak and whether a clean day is banked.
+ *
+ * So the day number stays in the eyebrow (these bars *are* asked on day n, and the sheet beside them
+ * counts days), and the subject changes from *the day* to *the contract*, which is the noun the
+ * screen this sits on already uses everywhere else. `everyday/goalSets.test.ts` fails if the two
+ * sets diverge and the two screens stop saying so.
+ *
+ * **No bar moved for this**, in either set. Reconciling them by choosing numbers would need a
+ * derivation pinned to a run, and lowering either to make them agree is weakening a goal to make a
+ * day pass.
+ */
+export const CONTRACT_ASKS_HEADING = 'WHAT THE CONTRACT ASKS';
+
+/** `WHAT THE CONTRACT ASKS ON DAY 6` — {@link CONTRACT_ASKS_HEADING} with the tower's own day. */
+export function contractAsksEyebrow(day: number): string {
+  return `${CONTRACT_ASKS_HEADING} ON DAY ${String(day)}`;
+}
+
+/**
+ * What {@link CONTRACT_ASKS_HEADING}'s bars decide, and what the other set decides, in the player's
+ * words. `shift/goals.ts#TODAY_ASKS_DECIDES` is its mirror on the stage.
+ *
+ * Its own key rather than an extension of {@link BUILDING_COPY.testsNote}: that line is about
+ * *whether today can be read at all* and carries its own § D227 correction, and welding a second
+ * subject onto it would put two arguments in one sentence for the next lane to separate again.
+ */
+export const CONTRACT_ASKS_DECIDES =
+  'These four are the contract’s, and they are what files a day cleared or missed against it. The ' +
+  'day’s own report grades a separate five, under WHAT TODAY ASKS, and those decide your streak.';
 
 /**
  * **All four** of § 8.6's tests, as `ShiftGoal`s.
@@ -427,7 +480,7 @@ export function testsHeldLine(rows: readonly CampaignTestRow[]): string {
 
 /** The authored chrome of the triage screen, one frozen object so the sweep renders every line. */
 export const TOWERS_COPY = Object.freeze({
-  title: 'Campaign',
+  title: 'Career',
   lede:
     'You are the supervisor, not the operator. Each building runs on the standing order you gave it ' +
     'and maintenance gets on with the rest — you hear from them when a lift fails, a crowd is booked, ' +
@@ -492,7 +545,9 @@ export const CALENDAR_LEGEND: readonly { readonly glyph: string; readonly label:
     Object.freeze({ glyph: '×', label: 'missed' }),
     Object.freeze({ glyph: '!', label: 'decision due' }),
     Object.freeze({ glyph: '⚒', label: 'works' }),
-    Object.freeze({ glyph: '⚑', label: 'crowd booked' }),
+    /* Not *crowd booked* since GitHub issue #564 — a contract books what its own building does,
+       and half the shipped bookings take a car rather than bring people. */
+    Object.freeze({ glyph: '⚑', label: 'booked day' }),
     Object.freeze({ glyph: '▢', label: 'today' }),
     Object.freeze({ glyph: '', label: 'blank = not yours yet, or the contract has finished' }),
   ]);
@@ -778,9 +833,17 @@ export function calendarView(input: CampaignInput): CalendarView {
       const facts = factsFor(input, tower);
       const need = needOf(tower);
       /*
-       * A calendared crowd is a flagged day the player can read before it comes — GitHub issue
+       * A calendared day is a flagged day the player can read before it comes — GitHub issue
        * #169 item 1, § D507: `campaign/calendar.ts` books it, the design's Crown Hotel fixture marks
        * it `bad`, and § 8.6's grid already has the glyph for that.
+       *
+       * **It used to say *crowd* here and in the tip, and that stopped being true on the commit
+       * that gave every contract a calendar** — GitHub issue #564, § D227. While `c7` was the only
+       * contract with an entry, every flagged day *was* a coach party; now a block of flats books a
+       * move-in, which takes a car and brings no crowd at all. A tip reading *a crowd is booked*
+       * over a day whose run has the same arrival rate as any other is the caption defect this
+       * repository keeps finding, so the tip names **what** is booked, read off the same table the
+       * mark came from.
        */
       const marks = {
         dueDays: need === undefined ? [] : [tower.day],
@@ -795,12 +858,25 @@ export function calendarView(input: CampaignInput): CalendarView {
           tip:
             cell.towerDay === undefined
               ? `${facts.name} · not yours on working day ${String(cell.careerDay)}`
-              : `${facts.name} · its day ${String(cell.towerDay)} of ${String(CONTRACT_DAYS)}${tipSuffix(cell.mark)}`,
+              : `${facts.name} · its day ${String(cell.towerDay)} of ${String(CONTRACT_DAYS)}${tipSuffix(cell.mark, bookedNameFor(tower.id, cell.towerDay))}`,
         })),
       };
     }),
     legend: CALENDAR_LEGEND,
   };
+}
+
+/**
+ * The name of whatever this contract books on this day, or `undefined` for a day it leaves alone.
+ *
+ * GitHub issue **#564**. One lookup, through `campaign/calendar.ts` and `shift/events.ts`, so the
+ * grid's tip cannot disagree with the day the run is built from — the two used to agree by
+ * coincidence, because `c7` was the only contract with an entry and everything it booked was a
+ * crowd.
+ */
+function bookedNameFor(contractId: string, towerDay: number): string | undefined {
+  const booked = calendarEventIdFor(contractId, towerDay);
+  return booked === undefined ? undefined : SHIFT_EVENTS[booked].name;
 }
 
 /**
@@ -818,7 +894,7 @@ export function calendarView(input: CampaignInput): CalendarView {
  * claim with more words. What is left is the part `economy.test.ts` and `campaignModel.test.ts`
  * already hold: the money is gone, and the nights are spoken for.
  */
-function tipSuffix(mark: CalendarCell['mark']): string {
+function tipSuffix(mark: CalendarCell['mark'], booked?: string): string {
   switch (mark) {
     case 'today':
       return ' · today';
@@ -827,7 +903,14 @@ function tipSuffix(mark: CalendarCell['mark']): string {
     case 'works':
       return ' · works are booked, one car out for the day';
     case 'flagged':
-      return ' · a crowd is booked';
+      /*
+       * **The event's own name, not a category** — GitHub issue #564. Every contract books
+       * something now and they are not all crowds, so this reads the booking off
+       * `campaign/calendar.ts` rather than asserting what kind of day it is. `undefined` is the
+       * honest fallback for a flag `CampaignTower.flaggedDays` carries rather than the calendar;
+       * that array is empty in this build, so the arm is there for the day it is not.
+       */
+      return booked === undefined ? ' · something is booked' : ` · booked: ${booked}`;
     case 'cleared':
       return ' · cleared';
     case 'missed':
@@ -960,7 +1043,6 @@ export const BUILDING_COPY = Object.freeze({
     'Nothing temporary in place. Anything you set for an incident reverts on its own when the incident ' +
     'closes, so a bad week cannot quietly become your standing order.',
   monthHeading: 'THIS MONTH',
-  testsEyebrow: 'WHAT TODAY ASKS',
   /*
    * **This read *"all four, or the day is missed"* when the fourth graded nothing**, and it is left
    * exactly as the correction wrote it now that all four do — § D227's first direction, on the line
@@ -1075,6 +1157,8 @@ export interface BuildingView {
   };
   readonly tests: {
     readonly eyebrow: string;
+    /** {@link CONTRACT_ASKS_DECIDES} — which of the career flow's two goal sets this is. */
+    readonly decides: string;
     readonly note: string;
     readonly held: string;
     readonly rows: readonly CampaignTestRow[];
@@ -1265,7 +1349,8 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
       missed: String(tower.missed),
     },
     tests: {
-      eyebrow: `WHAT DAY ${String(tower.day)} ASKS`,
+      eyebrow: contractAsksEyebrow(tower.day),
+      decides: CONTRACT_ASKS_DECIDES,
       note: BUILDING_COPY.testsNote,
       held: testsHeldLine(rows),
       rows,
@@ -1413,6 +1498,8 @@ export interface ContractView {
   };
   readonly tests: {
     readonly eyebrow: string;
+    /** {@link CONTRACT_ASKS_DECIDES} — which of the career flow's two goal sets this is. */
+    readonly decides: string;
     readonly note: string;
     readonly held: string;
     readonly rows: readonly CampaignTestRow[];
@@ -1642,7 +1729,8 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       kitNote: CONTRACT_COPY.purseKitNote,
     },
     tests: {
-      eyebrow: `WHAT DAY ${String(tower.day)} ASKS`,
+      eyebrow: contractAsksEyebrow(tower.day),
+      decides: CONTRACT_ASKS_DECIDES,
       note: BUILDING_COPY.testsNote,
       held: testsHeldLine(rows),
       rows,

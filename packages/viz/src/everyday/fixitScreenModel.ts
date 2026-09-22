@@ -36,6 +36,16 @@
  * player reads here says it has. When it lands, these three keys go and this paragraph goes with
  * them.
  *
+ * **One part of it has landed early, deliberately, and it is not any of the three keys above** —
+ * GitHub issue **#566**, [§ D869](../../../../DECISIONS.md). The *answer key* is gone: the
+ * sentence on every diagnosed repair naming the complaint as its target, the *"and it is a
+ * setting"* tail on seven of them, the `free — configuration` price line, and the draw order that
+ * put the correct row first on all eighteen cases. § D706 clause 6 conditions the **menu** on an
+ * editor that can write the answers, and none of its reasons reach a sentence whose only job is to
+ * say which of four rows is right — so that sentence leaves on the commit that makes it false,
+ * which is § D227 run forwards. The grid below still draws four rows; what it no longer does is
+ * mark one of them.
+ *
  * ## The copy is the prototype's
  *
  * Every sentence in {@link FIXIT_SCREEN_COPY} is transcribed from

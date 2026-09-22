@@ -46,6 +46,8 @@
  * gate), so this card prints `ShiftGoal.label` and never a value.
  */
 
+import { TODAY_ASKS_HEADING } from '../shift/goals.js';
+
 import type { ActionBarModel } from './actionBar.js';
 import { isScreenBuilt, unbuiltReasonFor } from './screens.js';
 import type { TodayRecord } from './today.js';
@@ -336,7 +338,8 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
       shared: 'Everyone playing today gets the same one, at the same point in the day.',
     },
     asks: {
-      heading: 'WHAT TODAY ASKS',
+      /* One constant over these five bars — GitHub issue #567. `shift/goals.ts` owns it. */
+      heading: TODAY_ASKS_HEADING,
       rows: today.asks,
       note:
         'Nothing is graded until twenty people have turned up, so a quiet morning is read rather ' +

@@ -287,6 +287,87 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
     }
   });
 
+  /**
+   * **The rush's own dispatcher pick, before the run** — GitHub issue **#565**, second defect,
+   * [§ D857](../../../../DECISIONS.md).
+   *
+   * The setup screen advertised `data/rush-house-runs.json`'s figures under *furthest anyone has
+   * held* and offered no way to reach them: every house row is a dispatcher **set before the run**,
+   * and the only dispatcher control a player could find inside this mode was § 7.6's mid-run
+   * handover, which is a different object — `everyday/rushHandover.test.ts` measures how different
+   * (2 766 s against 2 364 s on Harbour Point, and bit-identical on the legs to a weights-only
+   * substitution).
+   *
+   * What this case can say that no model test can: the select is **on the page**, it writes through
+   * the host, and the three things on the screen that depend on who is standing move with it — the
+   * driving line, the picker's own value, and which house row wears *yours next*. The run it
+   * produces is `rushHandover.test.ts`'s to pin; what is pinned here is that the control reaches
+   * the same `setDispatcher` that test's arm A goes through, and the standing tag is how the screen
+   * says so.
+   *
+   * `garden-apartments` throughout, this file's own cold load: the house has run it, so the
+   * standings draw rows rather than the *unrun* refusal, and the assertion about which row is
+   * tagged has something to be about.
+   */
+  it('picks the dispatcher before the rush starts, and the board says which row that is — GitHub issue #565', async () => {
+    const page = await coldLoad();
+    try {
+      await leaveTutorialIfOffered(page);
+      await page.locator('.everyday-mode[data-screen="rush"]').click();
+      await page.waitForSelector('.everyday-rush-picker', { timeout: 15_000 });
+
+      const before = await page.evaluate(() => ({
+        picker: document.querySelector<HTMLSelectElement>('.everyday-rush-picker')?.value ?? '',
+        driving: document.querySelector('.everyday-rush-driving')?.textContent ?? '',
+        tagged: [...document.querySelectorAll('.everyday-rush-best')]
+          .filter((row) => row.querySelector('.everyday-rush-best-standing') !== null)
+          .map((row) => row.textContent ?? ''),
+        note: document.querySelector('.everyday-rush-pick-note')?.textContent ?? '',
+        houseNote: document.querySelector('.everyday-rush-house-note')?.textContent ?? '',
+      }));
+      expect(before.picker).toBe('collective');
+      expect(before.driving).toContain('Conventional collective');
+      /* Exactly one row is the player's, and it is the one they are standing on. */
+      expect(before.tagged).toHaveLength(1);
+      expect(before.tagged[0]).toContain('Conventional collective');
+      /* § D227, the polarity that says what a control writes: this one writes the daily driver too. */
+      expect(before.note).toContain('who drives your next day');
+      /*
+       * And the board says what its rows are runs *of* — the sentence § D858 added, which is the
+       * half that stays true however a player reaches the figures.
+       */
+      expect(before.houseNote).toContain('first second');
+      expect(before.houseNote).toContain('handing the day over part-way through');
+
+      await page.selectOption('.everyday-rush-picker', 'nearest-car');
+      const after = await page.evaluate(() => ({
+        picker: document.querySelector<HTMLSelectElement>('.everyday-rush-picker')?.value ?? '',
+        driving: document.querySelector('.everyday-rush-driving')?.textContent ?? '',
+        tagged: [...document.querySelectorAll('.everyday-rush-best')]
+          .filter((row) => row.querySelector('.everyday-rush-best-standing') !== null)
+          .map((row) => row.textContent ?? ''),
+      }));
+      expect(after.picker).toBe('nearest-car');
+      /* Soft, so a run that fails names which of the two stood still. */
+      expect.soft(after.driving).toContain('Nearest car');
+      expect.soft(after.driving).not.toContain('Conventional collective');
+      expect(after.tagged).toHaveLength(1);
+      expect(after.tagged[0]).toContain('Nearest car');
+
+      /*
+       * **The write reached the state and not only the screen**, and it is read back through the
+       * host rather than off a second surface: `everyday/rushScreen.ts#syncDriver` re-reads
+       * `EverydayHost.selection()` after the press, so a line naming *Nearest car* is that field
+       * having moved. A hop to the front door would have said the same thing and needed the rush
+       * left first — which is a different case's subject (`#523`) and would have put its failure
+       * modes inside this one.
+       */
+      expect(after.picker).toBe('nearest-car');
+    } finally {
+      await page.close();
+    }
+  });
+
   it('comes back from Engineer naming what the panel wrote there, not what stood at the swap — GitHub PR #530', async () => {
     const page = await coldLoad();
     try {

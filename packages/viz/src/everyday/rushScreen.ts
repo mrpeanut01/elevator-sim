@@ -7,12 +7,20 @@
  * paper column carries the title, the three facts and the five bands; the ink column carries the
  * hold rule, the house’s standings under the note that says what they are, and who would drive.
  *
- * It wires **no control**. § 3.3 gives the screen one primary (`Start the rush`) and the shell owns
- * it; the prototype's dispatcher select is not drawn for the reason `rushDrivingLine`'s docstring
- * gives. So this mount has nothing to listen to and nothing to redraw — which is why it takes no
- * host subscription. What it reads can still move under it, because the Engineer surface writes the
- * player's settings while this screen stands covered, so the shell draws it again on the way back
- * (`shell.ts#returnToEveryday`, GitHub PR #530's review, finding 1).
+ * It wires **one control**, and this paragraph said *no control* until GitHub issue **#565**
+ * (§ D857). § 3.3 still gives the screen one primary (`Start the rush`) and the shell still owns
+ * it; what has been added is the prototype's own dispatcher select, in the driving block, refused
+ * here for as long as `rushDrivingLine`'s docstring argued it could only reach another mode's run.
+ * It reaches this one — `everyday/rush.ts#RUSH_FIELD_ROLES` records `dispatcherId` as the
+ * dispatcher a rush brings — and without it `data/rush-house-runs.json`'s top row was a figure
+ * advertised on a path no screen in this mode offered.
+ *
+ * So this mount now has exactly one thing to listen to and exactly one thing to redraw
+ * ({@link syncDriver}), and it still takes **no host subscription**: the only writer of
+ * `dispatcherId` reachable while this screen holds the page is that select. What it reads can still
+ * move under it, because the Engineer surface writes the player's settings while this screen stands
+ * covered, so the shell draws it again on the way back (`shell.ts#returnToEveryday`, GitHub PR
+ * #530's review, finding 1).
  *
  * **This paragraph also said the model *"marks it inert because the climbing stream is not built"*,
  * and it had been false since GitHub issue #220** (§ D515). `rushScreenModel.ts#rushBarModel` is
@@ -187,39 +195,14 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
    *
    * A building the house never ran — anything drawn in the designer — and a table measured on a
    * different climb both draw the view's refusal in the rows' place, never another tower's rows.
+   *
+   * **The body is rebuilt by {@link syncDriver} rather than drawn once** — GitHub issue #565, § D858.
+   * One row carries {@link RushHouseRowView.standingTag}, and which row that is moves when the
+   * picker below moves, so a table drawn once would tag the dispatcher the player arrived with for
+   * the rest of the sitting. It is the only thing on this screen a control changes.
    */
-  const standings = rushStandingsOf(context.host.selection().buildingId, (id) => context.host.dispatcherById(id)?.name);
-  if (standings.kind === 'withheld') {
-    const refusal = el(doc, 'p', 'everyday-rush-house-refusal', standings.refusal);
-    refusal.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.label};margin:0;text-wrap:pretty`;
-    bestsBlock.append(refusal);
-  } else {
-    const houseNote = el(doc, 'p', 'everyday-rush-house-note', standings.note);
-    houseNote.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.label};margin:0 0 11px;text-wrap:pretty`;
-    const bestsList = el(doc, 'div', 'everyday-rush-bests');
-    bestsList.style.cssText = 'display:grid;gap:5px';
-    for (const standing of standings.rows) {
-      const row = el(doc, 'div', 'everyday-rush-best');
-      row.style.cssText = `display:flex;align-items:baseline;gap:10px;padding:6px 11px;border-radius:${String(R.row)}px;background:${standing.heldThrough ? '#2A2620' : RAIL_SURFACE.card}`;
-      const left = el(doc, 'span');
-      left.style.cssText = 'min-width:0;display:flex;align-items:baseline;gap:8px';
-      const name = el(doc, 'span', undefined, standing.name);
-      name.style.cssText = 'font-size:12.5px;font-weight:600;min-width:0';
-      const tag = el(doc, 'span', 'everyday-rush-best-house', standing.tag);
-      tag.style.cssText = `flex:none;font:600 9.5px ${TYPE.mono};letter-spacing:.12em;text-transform:uppercase;color:${C.label};border:1px solid ${INK_RULE};border-radius:${String(R.row)}px;padding:0 5px`;
-      left.append(name, tag);
-      const right = el(doc, 'span');
-      right.style.cssText = 'margin-left:auto;text-align:right;flex:none';
-      const wave = el(doc, 'span', undefined, standing.wave);
-      wave.style.cssText = `display:block;font:500 12.5px ${TYPE.mono};color:${C.sun}`;
-      const held = el(doc, 'span', undefined, standing.held);
-      held.style.cssText = `display:block;font:500 11px ${TYPE.mono};color:${C.label};margin-top:1px`;
-      right.append(wave, held);
-      row.append(left, right);
-      bestsList.append(row);
-    }
-    bestsBlock.append(houseNote, bestsList);
-  }
+  const standingsBody = el(doc, 'div');
+  bestsBlock.append(standingsBody);
   ink.append(bestsBlock);
 
   const drivingBlock = el(doc, 'div');
@@ -231,34 +214,72 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
    * is printed as the id rather than substituted for the first shipped profile, which is
    * `dispatcherById`'s own rule one level down.
    */
-  const selection = context.host.selection();
-  const driver = context.host.dispatcherById(selection.dispatcherId);
-  const driving = el(
-    doc,
-    'div',
-    'everyday-rush-driving',
-    rushDrivingLine(driver?.name ?? selection.dispatcherId),
-  );
+  const driving = el(doc, 'div', 'everyday-rush-driving');
   driving.style.cssText = 'font-size:13.5px;font-weight:600;line-height:1.5';
   drivingBlock.append(drivingEyebrow, driving);
+
+  /*
+   * **The pick, before the run rather than during it** — GitHub issue #565's second defect,
+   * § D857, and the end of *"it wires no control"* one paragraph up in this file's own docstring.
+   *
+   * It is the brief's control (`everyday/briefScreen.ts:360`), deliberately: the same
+   * `EverydayHost.setDispatcher`, the same `dev/state.ts#withDispatcher` behind it, and the same
+   * `change` listener — a select that writes standing state on `change` costs a state write and is
+   * reversible, which is exactly why § 7's stage picker is the *other* shape and says so on its own
+   * face (`stageScreenModel.ts#STAGE_SWITCH_PICKER_NOTE`). Two selects, two behaviours, and each
+   * one states which it is.
+   *
+   * It is what makes `data/rush-house-runs.json`'s figures reachable: the table's own
+   * `provenance.path` opens `withBuilding → withDispatcher → rushPatchOf`, and until this listener
+   * existed no screen inside the rush took that route. What a mid-run handover reaches instead is
+   * measured in `rushHandover.test.ts` and said on the board's note.
+   */
+  const pickRow = el(doc, 'div');
+  pickRow.style.cssText = `display:flex;align-items:center;gap:10px;margin-top:11px;flex-wrap:wrap`;
+  const pickLabel = el(doc, 'label', undefined, COPY.driverPickLabel);
+  pickLabel.htmlFor = 'everyday-rush-dispatcher';
+  pickLabel.style.cssText = `font-size:12px;color:${C.label}`;
+  const pickSelect = el(doc, 'select', 'everyday-rush-picker');
+  pickSelect.id = 'everyday-rush-dispatcher';
+  pickSelect.style.cssText = [
+    `border:1px solid ${INK_RULE}`,
+    `border-radius:${String(R.control)}px`,
+    `background:${RAIL_SURFACE.card}`,
+    `color:${C.paper}`,
+    'padding:6px 9px',
+    `font-family:${TYPE.body}`,
+    'font-size:12.5px',
+    'max-width:100%',
+  ].join(';');
+  for (const profile of context.host.dispatchers()) {
+    const option = doc.createElement('option');
+    option.value = profile.id;
+    option.textContent = profile.name;
+    pickSelect.append(option);
+  }
+  pickRow.append(pickLabel, pickSelect);
+  const pickNote = el(doc, 'p', 'everyday-rush-pick-note', COPY.driverPickNote);
+  pickNote.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:8px 0 0`;
+  pickSelect.setAttribute('aria-describedby', 'everyday-rush-pick-note');
+  pickNote.id = 'everyday-rush-pick-note';
+  drivingBlock.append(pickRow, pickNote);
+
   /*
    * What a rush does not run of the player's settings, under the driver it names — GitHub issue #523,
    * item 3. This screen is drawn with no rush standing (every way onto it leaves one, `shell.ts#go`),
    * so the levers, the selector, patience and the pattern read here are the player's own. The last two
    * are GitHub PR #530's review, finding 2: a rush runs a fresh session's, which `dev/state.ts#initialState`
    * seeds as no patience and the building's own pattern.
+   *
+   * Built once and **put into the page only when it has something to say**, because
+   * {@link syncDriver} has to be able to take it away again and bring it back: one of the four
+   * things it names — a dirty weight-set selector — is a fact about *which* dispatcher is standing,
+   * so picking another can make an absent line appear or an present one go. Absent rather than
+   * empty, because an empty paragraph is a line a reader's cursor can land on and a screen reader
+   * announces as nothing at all.
    */
-  const leftBehindLine = rushLeftBehindLine(context.host.groupLevers(), {
-    switching:
-      driver !== undefined && specIsDirty(context.host.selectorSpec(), driver, context.host.selectorContext()),
-    patience: context.host.patience() !== null,
-    pattern: selection.pattern !== 'building',
-  });
-  if (leftBehindLine !== undefined) {
-    const leftBehind = el(doc, 'p', 'everyday-rush-left-behind', leftBehindLine);
-    leftBehind.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:9px 0 0`;
-    drivingBlock.append(leftBehind);
-  }
+  const leftBehind = el(doc, 'p', 'everyday-rush-left-behind');
+  leftBehind.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:9px 0 0`;
   const drivingNote = el(doc, 'p', undefined, COPY.drivingNote);
   drivingNote.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:9px 0 0`;
   drivingBlock.append(drivingNote);
@@ -280,6 +301,85 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     drivingBlock.append(disclosure);
   }
   ink.append(drivingBlock);
+
+  /**
+   * Everything on this screen that depends on **who is standing**, re-read from the host.
+   *
+   * Called once at mount and again after each press, so nothing here composes state: the picker
+   * writes through `setDispatcher` and this reads the answer back, which is the arrangement that
+   * keeps the drawn name a fact about the state rather than about the last press. This mount takes
+   * no host subscription (see the file docstring) and does not need one — the only writer of
+   * `dispatcherId` reachable while this screen holds the page is the select two blocks up, and the
+   * shell redraws the screen on the way back from the Engineer world.
+   */
+  function syncDriver(): void {
+    const selection = context.host.selection();
+    const driver = context.host.dispatcherById(selection.dispatcherId);
+    driving.textContent = rushDrivingLine(driver?.name ?? selection.dispatcherId);
+    pickSelect.value = selection.dispatcherId;
+    const leftBehindLine = rushLeftBehindLine(context.host.groupLevers(), {
+      switching:
+        driver !== undefined && specIsDirty(context.host.selectorSpec(), driver, context.host.selectorContext()),
+      patience: context.host.patience() !== null,
+      pattern: selection.pattern !== 'building',
+    });
+    if (leftBehindLine === undefined) {
+      leftBehind.remove();
+    } else {
+      leftBehind.textContent = leftBehindLine;
+      drivingBlock.insertBefore(leftBehind, drivingNote);
+    }
+
+    const standings = rushStandingsOf(
+      selection.buildingId,
+      (id) => context.host.dispatcherById(id)?.name,
+      undefined,
+      selection.dispatcherId,
+    );
+    standingsBody.replaceChildren();
+    if (standings.kind === 'withheld') {
+      const refusal = el(doc, 'p', 'everyday-rush-house-refusal', standings.refusal);
+      refusal.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.label};margin:0;text-wrap:pretty`;
+      standingsBody.append(refusal);
+      return;
+    }
+    const houseNote = el(doc, 'p', 'everyday-rush-house-note', standings.note);
+    houseNote.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.label};margin:0 0 11px;text-wrap:pretty`;
+    const bestsList = el(doc, 'div', 'everyday-rush-bests');
+    bestsList.style.cssText = 'display:grid;gap:5px';
+    for (const standing of standings.rows) {
+      const row = el(doc, 'div', 'everyday-rush-best');
+      row.style.cssText = `display:flex;align-items:baseline;gap:10px;padding:6px 11px;border-radius:${String(R.row)}px;background:${standing.heldThrough ? '#2A2620' : RAIL_SURFACE.card}`;
+      const left = el(doc, 'span');
+      left.style.cssText = 'min-width:0;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap';
+      const name = el(doc, 'span', undefined, standing.name);
+      name.style.cssText = 'font-size:12.5px;font-weight:600;min-width:0';
+      const tag = el(doc, 'span', 'everyday-rush-best-house', standing.tag);
+      tag.style.cssText = `flex:none;font:600 9.5px ${TYPE.mono};letter-spacing:.12em;text-transform:uppercase;color:${C.label};border:1px solid ${INK_RULE};border-radius:${String(R.row)}px;padding:0 5px`;
+      left.append(name, tag);
+      if (standing.standingTag !== undefined) {
+        const mine = el(doc, 'span', 'everyday-rush-best-standing', standing.standingTag);
+        mine.style.cssText = `flex:none;font:600 9.5px ${TYPE.mono};letter-spacing:.12em;text-transform:uppercase;color:${C.sun};border:1px solid ${C.sun};border-radius:${String(R.row)}px;padding:0 5px`;
+        left.append(mine);
+      }
+      const right = el(doc, 'span');
+      right.style.cssText = 'margin-left:auto;text-align:right;flex:none';
+      const wave = el(doc, 'span', undefined, standing.wave);
+      wave.style.cssText = `display:block;font:500 12.5px ${TYPE.mono};color:${C.sun}`;
+      const held = el(doc, 'span', undefined, standing.held);
+      held.style.cssText = `display:block;font:500 11px ${TYPE.mono};color:${C.label};margin-top:1px`;
+      right.append(wave, held);
+      row.append(left, right);
+      bestsList.append(row);
+    }
+    standingsBody.append(houseNote, bestsList);
+  }
+
+  pickSelect.addEventListener('change', () => {
+    context.host.setDispatcher(pickSelect.value);
+    syncDriver();
+  });
+  syncDriver();
 
   root.append(paper, ink);
   host.append(root);

@@ -39,6 +39,16 @@
  * **week's** closed days by day number (`shift/goals.ts:621`, `entry.day === day - 1`). They are
  * coupled in the presentation, and `host.ts`'s `take-offer` writes both on one player action.
  *
+ * **There is a second such writer since GitHub issue #563, and it narrows the disagreement rather
+ * than widening it.** `host.ts#runCampaignDay` now sets `week.day` from `CampaignTower.day` on the
+ * press that starts a contract day, because `dev/state.ts#shiftRunConfigOf` grows the building with
+ * `grownBuilding(fabric, state.week.day)` and a career that never advanced the week re-ran day 1
+ * for a month. The join above is therefore *satisfied* on every day a career actually plays — the
+ * `was` column finds the week entry it looks for — and the withholding below is what still happens
+ * on a restored career whose week was reset, which is the case this rule was written for. Nothing
+ * here writes the career from the week or the week from the save; the day number travels one way,
+ * on one press, from the record that owns it.
+ *
  * Before persistence that coupling was harmless, because a reload reset both together. It is not
  * harmless now: the two slots carry independent versions and independent refusals, and
  * `dev/main.ts` **clears** the session slot on a refused restore while this one deliberately does

@@ -15,10 +15,15 @@ import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf } from '../dev/state.js';
 import { BREAKDOWN_AT_FRACTION, SHIFT_EVENTS } from '../shift/events.js';
 
+import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
+import { poolFor } from '../wrinkles/draw.js';
+import { CAMPAIGN_DAY_EVENT_SHARE } from '../wrinkles/parse.js';
+
 import { CONTRACT_CALENDAR, calendarDaysOf, calendarEventIdFor } from './calendar.js';
 import { freshTower } from './career.js';
 import { failureOddsPct } from './economy.js';
 import {
+  CAMPAIGN_DAY_EVENT_SHARE_PCT,
   TECHNICIAN_CALLOUT_S,
   TECHNICIAN_RETURN_LOAD_FRACTION,
   TECHNICIAN_UNITS,
@@ -34,12 +39,40 @@ function tower(overrides: Partial<ReturnType<typeof freshTower>> = {}) {
 }
 
 describe('the contract calendar — § 8.11’s authored schedule', () => {
-  it('books the coach party on Crown Hotel’s contract and on no other', () => {
-    expect(Object.keys(CONTRACT_CALENDAR)).toEqual(['c7']);
+  /*
+   * **Widened by GitHub issue #564, and the narrow half is asserted in both directions.** This read
+   * `Object.keys(CONTRACT_CALENDAR)).toEqual(['c7'])`, which was true and was the defect: nine of
+   * the ten shipped contracts booked nothing, so the one channel a player can *see coming* was dark
+   * for everybody who had not reached the hotel. What has not moved is which contract books a
+   * **crowd** — the constraint `calendar.ts` argues for is about what a building may honestly
+   * announce, and the coach party is still Crown Hotel's alone.
+   */
+  it('gives every shipped contract a schedule, and books the coach party on Crown Hotel’s alone', () => {
+    const contracts = Object.keys(CONTRACT_CALENDAR);
+    expect(contracts).toContain('c1');
+    expect(contracts.length).toBeGreaterThan(1);
+    /* Unchanged, verbatim: the design file's own fixture. */
     expect(calendarDaysOf('c7')).toEqual([5, 10, 15, 20]);
     expect(calendarEventIdFor('c7', 5)).toBe('coach-party');
     expect(calendarEventIdFor('c7', 6)).toBeUndefined();
-    expect(calendarEventIdFor('c1', 5)).toBeUndefined();
+    for (const contractId of contracts) {
+      for (const day of calendarDaysOf(contractId)) {
+        if (calendarEventIdFor(contractId, day) === 'coach-party') expect(contractId).toBe('c7');
+      }
+    }
+  });
+
+  it('books nothing before day 3 and never two bookings inside four days', () => {
+    for (const contractId of Object.keys(CONTRACT_CALENDAR)) {
+      const days = calendarDaysOf(contractId);
+      expect(days.length).toBeGreaterThan(0);
+      /* `docs/33` § 20.13 — day one must be gradeable, and a player has not met a car yet. */
+      expect(Math.min(...days)).toBeGreaterThanOrEqual(3);
+      expect(Math.max(...days)).toBeLessThanOrEqual(20);
+      for (let i = 1; i < days.length; i += 1) {
+        expect((days[i] as number) - (days[i - 1] as number)).toBeGreaterThanOrEqual(4);
+      }
+    }
   });
 
   it('wins over the draw: a calendared day is never overwritten', () => {
@@ -80,11 +113,111 @@ describe('the breakdown draw — § 8.3’s odds on a named stream', () => {
     for (let day = 1; day <= 20; day += 1) {
       days.add(campaignEventFor({ tower: tower({ day, trips: 120_000 }), seed: 11n }).id);
     }
-    expect(days.size).toBe(2);
+    expect(days.size).toBeGreaterThan(1);
   });
 
-  it('never reaches the week’s rota: an undrawn day is ordinary', () => {
-    expect(campaignEventFor({ tower: tower({ day: 3 }), seed: 1n }).id).toBe('ordinary');
+  /*
+   * **This test used to read *an undrawn day is ordinary*, and that sentence is GitHub issue
+   * #564.** It was true, and it meant a fresh contract with no calendar entry met nothing for a
+   * hundred-odd days. What it was protecting is still protected and is asserted directly: the
+   * campaign never consults `shift/events.ts#eventFor`, so a contract day's event is never the
+   * *week's* day 3. The draw is the campaign's own, over the library's weekday pool.
+   */
+  it('never reaches the week’s rota: a contract day draws from the weekday pool or nothing', () => {
+    const weekday = new Set(poolFor(WRINKLE_LIBRARY, 'weekday').map((template) => template.id));
+    for (let day = 1; day <= 60; day += 1) {
+      for (const seed of [1n, 2n, 3n, 20260919n]) {
+        const id = campaignEventFor({ tower: tower({ day }), seed }).id;
+        /* `breakdown` is the wear clock's, and `coach-party` is the calendar's — c1 books neither. */
+        expect(id === 'breakdown' || weekday.has(id)).toBe(true);
+        expect(id).not.toBe('coach-party');
+      }
+    }
+  });
+});
+
+/**
+ * **The building's own day — GitHub issue #564's rate, priced rather than picked.**
+ *
+ * The issue's criterion is that the rate is declared as data and that the probability of at least
+ * one event in a twenty-day contract is *stated*. Both are asserted here against the shipped
+ * document rather than against a literal, so a rebalance moves this test's arithmetic with it.
+ */
+describe('the building’s own day — § #564’s third stage', () => {
+  it('reads its share from data/wrinkles.json and never from a literal here', () => {
+    expect(CAMPAIGN_DAY_EVENT_SHARE_PCT).toBe(WRINKLE_LIBRARY.campaignDay.eventSharePct);
+    expect(CAMPAIGN_DAY_EVENT_SHARE_PCT).toBeGreaterThanOrEqual(CAMPAIGN_DAY_EVENT_SHARE.minPct);
+    expect(CAMPAIGN_DAY_EVENT_SHARE_PCT).toBeLessThanOrEqual(CAMPAIGN_DAY_EVENT_SHARE.maxPct);
+  });
+
+  /*
+   * Measured rather than asserted from the share: `ordinary` is in the weekday pool, so the rate a
+   * player actually meets is the share times `(pool − 1)/pool` and the two are not the same number.
+   * A thousand contracts of twenty days on a fresh tower — the cell the issue was filed about.
+   */
+  /**
+   * The price the issue's criterion asks for, **re-derived rather than quoted**.
+   *
+   * Both arms, because they are different numbers and the docstring on
+   * `CAMPAIGN_DAY_EVENT_SHARE_PCT` publishes both: a contract with no authored day meets only the
+   * draw, and every shipped contract now has an authored day as well.
+   */
+  const monthsOf = (contractId: string): { readonly mean: number; readonly withAny: number } => {
+    let eventDays = 0;
+    let withAny = 0;
+    for (let contract = 0; contract < 500; contract += 1) {
+      let any = false;
+      for (let day = 1; day <= 20; day += 1) {
+        const at = tower({ day, id: contractId });
+        if (campaignEventFor({ tower: at, seed: BigInt(20260919 + contract) }).id !== 'ordinary') {
+          any = true;
+          eventDays += 1;
+        }
+      }
+      if (any) withAny += 1;
+    }
+    return { mean: eventDays / 500, withAny: withAny / 500 };
+  };
+
+  it('gives a contract with no authored day about four events in twenty, and almost never none', () => {
+    /* `c99` is no contract — `calendarEventIdFor` answers `undefined`, which is the draw alone. */
+    const drawn = monthsOf('c99');
+    /* `1 − (1 − 0.20 × 17/18)^20` = 98.5 %, and `20 × 0.189` = 3.78. */
+    expect(drawn.mean).toBeGreaterThan(3);
+    expect(drawn.mean).toBeLessThan(5);
+    expect(drawn.withAny).toBeGreaterThan(0.95);
+    /* And not so common it stops being an event: most contract days are still the building alone. */
+    expect(drawn.mean).toBeLessThan(8);
+  });
+
+  it('gives the opening contract more, because three of its twenty days are authored', () => {
+    const opening = monthsOf('c1');
+    expect(calendarDaysOf('c1').length).toBe(3);
+    expect(opening.withAny).toBe(1);
+    expect(opening.mean).toBeGreaterThan(monthsOf('c99').mean + 2);
+  });
+
+  it('is byte-identical to the shipped behaviour at a share of zero, which is what makes it a setting', () => {
+    /*
+     * Not reachable through `campaignEventFor`, which reads the shipped document — so the identity
+     * is asserted on the pool arithmetic the share gates: at 0 no draw can land, and the stage
+     * returns the same `ordinary` object the two stages above fall through to.
+     */
+    expect(SHIFT_EVENTS.ordinary.effect.changesNothing).toBe(true);
+    expect(CAMPAIGN_DAY_EVENT_SHARE.minPct).toBe(0);
+  });
+
+  it('makes the career blurb’s three promises reachable — a lift fails, a crowd is booked, a tenant moves in', () => {
+    const seen = new Set<string>();
+    for (let day = 1; day <= 20; day += 1) {
+      for (let seed = 1; seed <= 300; seed += 1) {
+        seen.add(campaignEventFor({ tower: tower({ day, trips: 120_000 }), seed }).id);
+      }
+    }
+    /* `TOWERS_COPY.lede` promises all three. Two are c1's own; the crowd is the third. */
+    expect(seen.has('breakdown')).toBe(true);
+    expect(seen.has('move-in')).toBe(true);
+    expect([...seen].some((id) => (SHIFT_EVENTS[id as keyof typeof SHIFT_EVENTS]?.effect.arrivalRateMultiplier ?? 0) > 1)).toBe(true);
   });
 });
 
@@ -111,9 +244,67 @@ describe('the incident for the dock', () => {
     expect(alone?.atS).toBe(0);
   });
 
-  it('is nothing on an ordinary day', () => {
+  /*
+   * **The second assertion here was inverted by GitHub issue #564, and that is the point of it.**
+   * It read that a fire drill draws no dock — correct while a career day could only ever be a
+   * breakdown, a coach party or nothing, and a lie the moment a contract day could draw one. A
+   * dock answering *NOTHING HAPPENING* over a morning the run is genuinely different on is the
+   * caption defect `shift/events.ts` is written about.
+   */
+  it('is nothing on an ordinary day, and something on every day that changes the run', () => {
     expect(campaignIncidentOf({ event: SHIFT_EVENTS.ordinary, building: GARDEN, runLengthS: 1800, heldCars: [] })).toBeUndefined();
-    expect(campaignIncidentOf({ event: SHIFT_EVENTS['fire-drill'], building: GARDEN, runLengthS: 1800, heldCars: [] })).toBeUndefined();
+    const drill = campaignIncidentOf({ event: SHIFT_EVENTS['fire-drill'], building: GARDEN, runLengthS: 1800, heldCars: [] });
+    expect(drill?.eventId).toBe('fire-drill');
+    expect(drill?.title).toBe(SHIFT_EVENTS['fire-drill'].name);
+    /* Nothing to buy, and it says so with one row rather than by pretending the day is quiet. */
+    expect(drill?.options.map((option) => option.id)).toEqual(['leave']);
+  });
+
+  it('names the car a move-in takes and does not sell a technician for a car that comes back by itself', () => {
+    const moveIn = SHIFT_EVENTS['move-in'];
+    const incident = campaignIncidentOf({ event: moveIn, building: GARDEN, runLengthS: 3600, heldCars: [] });
+    expect(incident?.eventId).toBe('move-in');
+    expect(incident?.car).toBeDefined();
+    expect(incident?.note).toContain(incident?.car?.carId);
+    /*
+     * `move-in` returns its car at two thirds of the run on its own, so three units for a
+     * twenty-minute call-out would be paying for something already happening — the marshal-in-the-
+     * lobby defect wearing a price. The player is told when it comes back instead.
+     */
+    expect(incident?.options.map((option) => option.id)).toEqual(['leave']);
+    expect(incident?.note).toContain('back at');
+    expect(incident?.atS).toBe(Math.round((moveIn.effect.derate?.fromFraction ?? 0) * 3600));
+  });
+
+  /*
+   * **The deleted branch, held in both directions.** `buildingsDayIncident` had a technician row
+   * for a car out `derate.toFraction >= 1`, and no weekday template declares one — a behaviour
+   * unit-tested in isolation and reachable from no shipped path, which is the standing
+   * requirement's own defect, so it went rather than staying. This is what makes the deletion safe
+   * to have made: the first half says the premise still holds, and the second says the one
+   * template that *is* out all day still gets its offer from the arm that keeps it.
+   */
+  it('has no weekday template out for the whole day, and the one that is still gets a technician', () => {
+    for (const template of poolFor(WRINKLE_LIBRARY, 'weekday')) {
+      const derate = template.effect.derate;
+      if (derate === null) continue;
+      expect(
+        derate.toFraction,
+        `${template.id} takes a car for the rest of the day, and the dock offers no way back — ` +
+          'restore the technician row in `buildingsDayIncident`, which was deleted for having no ' +
+          'shipped template to reach it.',
+      ).toBeLessThan(1);
+    }
+    expect(SHIFT_EVENTS.breakdown.effect.derate?.toFraction).toBeGreaterThanOrEqual(1);
+    const red = campaignIncidentOf({ event: SHIFT_EVENTS.breakdown, building: GARDEN, runLengthS: 3600, heldCars: [] });
+    expect(red?.options.map((option) => option.id)).toContain('technician');
+  });
+
+  it('brings a held car back for any crowd, not only for the coach party', () => {
+    const held = { bankId: 'main', carId: 'B' };
+    const crowd = campaignIncidentOf({ event: SHIFT_EVENTS['fire-drill'], building: GARDEN, runLengthS: 1800, heldCars: [held] });
+    expect(SHIFT_EVENTS['fire-drill'].effect.arrivalRateMultiplier).toBeGreaterThan(1);
+    expect(crowd?.options.map((option) => option.id)).toEqual(['bring-back', 'leave']);
   });
 });
 

@@ -256,7 +256,27 @@ export const CAMPAIGN_ABSENCES: readonly string[] = Object.freeze([
    * The entry's own three sentences are untouched and still true, which is why nothing here moved
    * into or out of the player-facing list.
    */
-  'A day is run from here and scored by the day itself; the month grid marks a day cleared or missed when the campaign day is filed, and nothing files one automatically.',
+  'A day is run from here and scored by the day itself; the month grid marks a day cleared or missed when the career day is filed, and nothing files one automatically.',
+  /*
+   * **A new entry, added on the commit that made it true** — GitHub issue #563, § D227's rule read
+   * in the direction it is usually not: a register owes a sentence back when a change *creates* an
+   * honest absence, not only when one stops being true.
+   *
+   * `everyday/host.ts#runCampaignDay` now derives each contract day's crowd from a base seed the
+   * host captures once per session (`careerSeedBase`), so day 5 and day 6 are different questions
+   * and a retry of day 5 is the same one. What is **not** kept is that base:
+   * `campaign/careerPersist.ts` restores the month — the day, the purse, the bookings, the wear —
+   * and the seed is born again from the device's date on every load (§ D729). So a contract day
+   * played after a reload is a different morning from the one it would have been before, and a day
+   * already recorded still replays exactly, because `watch/record.ts` persists the derived seed the
+   * run was built from.
+   *
+   * It is an absence rather than a defect: keeping it costs a `CAREER_SCHEMA_VERSION` bump, and
+   * this build's own rule is that a version it does not read is quarantined rather than patched —
+   * every career already saved would be set aside for a property nobody has asked for. Said here
+   * because a player who reloads mid-month and finds a different crowd is owed the reason.
+   */
+  'The month is remembered and the mornings are not: a contract day picked up after a reload meets a crowd of its own, and a day you recorded still replays exactly as you played it.',
   /*
    * **The session-only entry is deleted, not reworded** — GitHub issue #375, § D227, and the same
    * rule the incidents entry above came out under. It read *"The career is this session's. Nothing

@@ -97,11 +97,30 @@ export interface UnexpressibleWrinkle {
   readonly needs: string;
 }
 
+/**
+ * How often a **contract** day is a day of its own — GitHub issue **#564**.
+ *
+ * A career day asks three questions in order: does the contract's calendar book one
+ * (`campaign/calendar.ts`), has the wear clock rolled a failure (`campaign/economy.ts`), and — on
+ * the days neither claims — does the building have a day of its own. This is the share that
+ * answers the third, and it is data for `CLAUDE.md` invariant 7's reason: the rate a career meets
+ * an event at is game balance, so it is a row rather than a literal in a reducer.
+ *
+ * Its type, range and default are declared beside the parser
+ * (`parse.ts#CAMPAIGN_DAY_EVENT_SHARE`) rather than only in the document, which is invariant 8's
+ * shape for a tunable — a value out of range is a load-time refusal with the bound named.
+ */
+export interface CampaignDayRules {
+  /** Per cent of otherwise-unclaimed contract days that draw a wrinkle. `0`–`100`. */
+  readonly eventSharePct: number;
+}
+
 /** The whole document. */
 export interface WrinkleLibrary {
   readonly version: number;
   readonly templates: readonly WrinkleTemplate[];
   readonly unexpressible: readonly UnexpressibleWrinkle[];
+  readonly campaignDay: CampaignDayRules;
 }
 
 /**

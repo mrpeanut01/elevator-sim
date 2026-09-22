@@ -183,6 +183,25 @@ export const RUSH_SCREEN_COPY = Object.freeze({
     'The waves are identical for everyone, so a further run is a better dispatcher — or a luckier ' +
     'morning. The bench knows which.',
   /*
+   * **The pre-run pick's two strings** — GitHub issue **#565**, second defect,
+   * [§ D857](../../../../DECISIONS.md). See {@link rushDrivingLine} for why the control the
+   * prototype draws here is drawn now and was not before.
+   */
+  driverPickLabel: 'or pick another for this rush',
+  /**
+   * What else the pick writes, said before it is pressed rather than discovered afterwards.
+   *
+   * There is one standing dispatcher and a rush runs it (`everyday/rush.ts#RUSH_FIELD_ROLES`
+   * records `dispatcherId` as *the dispatcher they bring*), so this control cannot be rush-scoped
+   * without a second field and a second thing to restore on the way out. It writes the same field
+   * the brief's picker writes, through the same `EverydayHost.setDispatcher`, and says so — which
+   * is the honest half of § D219's shape reversed: not a control that writes nothing, but one that
+   * writes somewhere else as well.
+   */
+  driverPickNote:
+    'This is the dispatcher you are standing with, so picking here also changes who drives your ' +
+    'next day.',
+  /*
    * **`absencesEyebrow` left this table on the merge that closed GitHub issue #207.** It read
    * `WHAT THIS BUILD DOES NOT DO YET` — literal shouted caps, in source — and headed
    * {@link RUSH_ABSENCES} on this screen. The register is drawn on the build-information panel now
@@ -523,30 +542,47 @@ export function rushFactViews(): readonly RushFactView[] {
  */
 
 /**
- * § 9.1's *driving* block, as a **statement rather than a control**.
+ * § 9.1's *driving* block — the standing dispatcher, named, above the control that changes it.
  *
- * The prototype puts a dispatcher `<select>` here and it is deliberately not drawn. The only thing
- * such a select could write in this build is `ViewerState.dispatcherId`, which is who drives the
- * next **daily** run — so a player who changed it on the rush setup would have altered a different
- * mode's run from a screen whose own run does not exist. That is § D219's shape with the polarity
- * reversed: not a control that writes nothing, but one that writes somewhere else. The block states
- * who is standing and says the select is absent, which is the honest half of the same widget.
+ * ## This docstring argued the opposite, and a measurement is what moved it
+ *
+ * It read: *"The prototype puts a dispatcher `<select>` here and it is deliberately not drawn. The
+ * only thing such a select could write in this build is `ViewerState.dispatcherId`, which is who
+ * drives the next **daily** run — so a player who changed it on the rush setup would have altered a
+ * different mode's run from a screen whose own run does not exist."* Both halves of that had gone
+ * wrong in different directions. The screen's own run exists — GitHub issue #220 built the engine
+ * and `rushBarModel` is `return base` — and the field the select writes is the field **a rush
+ * reads**: `everyday/rush.ts#RUSH_FIELD_ROLES` records `dispatcherId` as `dispatcher`, *the
+ * dispatcher they bring, the rush tests it*. So the control was refused on the ground that it would
+ * reach only another mode, when in fact it is the one control that reaches this one.
+ *
+ * The cost of that refusal is GitHub issue **#565**'s second defect, and it is measured rather than
+ * argued ([§ D857](../../../../DECISIONS.md), `everyday/rushHandover.test.ts`). On Harbour Point at
+ * the rush's own seed, `predictive-balanced` **set before the run** holds **2 766 s**, which is the
+ * figure `data/rush-house-runs.json` publishes and the board ranks first. A player who could not
+ * find that route did the only thing the product offered — handed the day over from the stage at
+ * 0:00 — and held **2 364 s**, four hundred seconds short of the row they were aiming at and a
+ * hundred and sixteen short of touching nothing (`collective`, **2 480 s**). The board was
+ * advertising a result on a path no screen in the rush offered.
+ *
+ * **The sentence this function returns lost its second clause on the commit that built the
+ * control** (§ D227). It read *"Picking another is on the brief, which today's tower opens"*, which
+ * was true and was the whole problem: the route was two screens away in another mode, and the
+ * assessor's lost-count item 7 is *"I never found where to choose a dispatcher before a rush
+ * starts."* What the line says now is when the named dispatcher starts driving, because that is the
+ * fact the board's figures turn on.
  *
  * `name` is the standing dispatcher's display name, or the id when this build does not know it —
  * `buildingById`'s honest-lookup rule, one screen up.
  *
- * **The sentence used to end *"on the front door, which is not built either"*, and both halves were
- * wrong** — § D227's stale refusal, on a shipped player string. The front door is a registered
- * screen (`screens.ts`, and `UNBUILT_REASONS` is empty), and the picker was never on it: `doorView`
- * draws *DRIVING TODAY* as a fact and says *"Change it on the brief, which is the next screen."*
- * So the line now points where the control actually is.
- *
- * Its test asserted `/not built/`, which is how the drift survived: a case that pins the shape of a
- * refusal rather than its subject passes for exactly as long as the sentence is wrong. It now names
- * the screen the copy names.
+ * **An earlier ending, *"on the front door, which is not built either"*, was wrong in both halves
+ * too**, and its test asserted `/not built/` — which is how that drift survived: a case that pins
+ * the shape of a refusal rather than its subject passes for exactly as long as the sentence is
+ * wrong. That is the second time this one sentence has taught it, and `rushScreenModel.test.ts`
+ * now asserts what the line claims rather than how it is shaped.
  */
 export function rushDrivingLine(name: string): string {
-  return `${name} would drive it. Picking another is on the brief, which today's tower opens.`;
+  return `${name} would drive it, from the rush’s first second.`;
 }
 
 /**

@@ -247,9 +247,58 @@ interface HostWindow {
       | {
           runState(): { readonly hasRun: boolean; readonly dayClosed: boolean };
           week(): { readonly attempt: number };
+          /* GitHub issue #565 — see {@link runFingerprint}. */
+          recording(): { readonly legs: readonly unknown[] } | undefined;
+          interventions(): readonly unknown[];
         }
       | undefined;
   };
+}
+
+/** One reading of the run the page is holding — {@link runFingerprint}. */
+interface RunFingerprint {
+  /** How many entries the record's log holds. */
+  readonly presses: number;
+  readonly legs: number;
+  /** A 32-bit hash over every leg, as hex — the identity two readings are compared on. */
+  readonly hash: string;
+}
+
+/**
+ * **The run on the page, fingerprinted on its legs** — GitHub issue **#565**, first criterion.
+ *
+ * `CLAUDE.md`'s standing requirement is *move the control and require the run to change, compared
+ * on the legs rather than on a window statistic*, and #565's first defect is the half of it that
+ * needs the **negative**: a `<select>` that appears to bind and does not. Two readings either side
+ * of a selection have to be identical and two either side of the press have to differ, and neither
+ * claim can be made from a stamp — a stamp is a caption, and a caption is exactly what this control
+ * had instead of an effect.
+ *
+ * The legs are hashed in the page rather than shipped out of it: a `midtown-office` day carries
+ * thousands, and serialising them across the CDP boundary twice a case is a cost with no assertion
+ * behind it. `JSON.stringify(...).length` alone would not do — two different runs can serialise to
+ * the same number of characters — so the hash is over the whole string.
+ */
+async function runFingerprint(page: Page): Promise<RunFingerprint | null> {
+  await page.evaluate(
+    "window.__everydayHost ? true : import('/src/everyday/host.ts').then((module) => { window.__everydayHost = module.EVERYDAY_HOST; return true; })",
+  );
+  return page.evaluate(() => {
+    const host = (window as unknown as HostWindow).__everydayHost?.current();
+    if (host === undefined) return null;
+    const recording = host.recording();
+    if (recording === undefined) return null;
+    const text = JSON.stringify(recording.legs);
+    let hash = 0;
+    for (let index = 0; index < text.length; index += 1) {
+      hash = (Math.imul(hash, 31) + text.charCodeAt(index)) | 0;
+    }
+    return {
+      presses: host.interventions().length,
+      legs: recording.legs.length,
+      hash: (hash >>> 0).toString(16),
+    };
+  });
 }
 
 /**
@@ -265,6 +314,31 @@ interface HostFacts {
   readonly hasRun: boolean;
   readonly dayClosed: boolean;
   readonly attempt: number;
+}
+
+/**
+ * Poll {@link runFingerprint} until `wanted` holds, and hand back the last reading either way.
+ *
+ * The re-simulation a press starts lands on a worker, so the stamp is drawn before the run it is
+ * about exists. A reading taken on the stamp alone would race it, and `page.waitForFunction` would
+ * report a bare `TimeoutError` where what the assertion needs is *the reading that was actually on
+ * the page* — {@link untilHost}'s own argument, on the other thing this file polls for.
+ */
+async function untilRun(
+  page: Page,
+  wanted: (run: RunFingerprint) => boolean,
+  timeoutMs: number,
+): Promise<RunFingerprint | null> {
+  const deadline = Date.now() + timeoutMs;
+  let last: RunFingerprint | null = null;
+  for (;;) {
+    last = await runFingerprint(page);
+    if (last !== null && wanted(last)) return last;
+    if (Date.now() >= deadline) return last;
+    await new Promise((resolve) => {
+      setTimeout(resolve, 500);
+    });
+  }
 }
 
 /**
@@ -748,20 +822,40 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
      * below is unchanged and is **stronger** for this — it now compares against a clock that was
      * genuinely at rest.
      */
-    const before = await page
-      .waitForFunction(
-        () => {
-          const read = (): string =>
-            document.querySelector('.everyday-stage-clock')?.textContent ?? '';
-          const first = read();
-          return new Promise<string | false>((resolve) => {
-            setTimeout(() => resolve(read() === first && first !== '' ? first : false), 300);
-          });
-        },
-        undefined,
-        { timeout: 30_000 },
-      )
-      .then(async (handle) => (await handle.jsonValue()) as string);
+    /*
+     * **The settle is done in node, and the reason is a trap that made the version above it look
+     * like it waited when it did not.** That version passed the predicate a function returning a
+     * `Promise<string | false>`. `waitForFunction` resolves on the first **truthy** return — and a
+     * Promise object is always truthy, so it accepted the very first evaluation, never polled
+     * again, and handed back a handle to that one promise. `jsonValue()` then awaited it and
+     * produced whatever that single 300 ms sample gave: the clock string when it happened to be at
+     * rest, and `false` whenever the transport had moved.
+     *
+     * So `before` was `false` under load, and the assertion at the end of this case read
+     * *expected '08:32' to be false* — which is what `browser` reported on GitHub PR #574 while
+     * the same case passed on an idle box. The defect is older than that wave; what the wave added
+     * is a second browser and a preview server to this tier, which is enough contention to lose
+     * the coin flip.
+     *
+     * Comparing the two reads **here** removes the trap entirely: the loop is ordinary `await`, a
+     * disagreement retries rather than resolving falsy, and a clock that never comes to rest
+     * throws a sentence saying so instead of silently yielding `false`. 300 ms is still chosen
+     * against the speed rather than picked — at 600× it is three simulated minutes, so a running
+     * transport cannot produce two equal reads across it.
+     */
+    const settledClock = async (): Promise<string> => {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const first = (await page.textContent('.everyday-stage-clock')) ?? '';
+        await page.waitForTimeout(300);
+        const second = (await page.textContent('.everyday-stage-clock')) ?? '';
+        if (first !== '' && first === second) return first;
+      }
+      throw new Error(
+        'the stage clock never held the same reading across 300 ms in 100 attempts, so this ' +
+          'case has no stable playhead to compare against',
+      );
+    };
+    const before = await settledClock();
 
     await page.click('.everyday-stage-intervene[data-intervention-kind="park-cars-lobby"]');
     /*
@@ -798,7 +892,20 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
    * not reaching the model.
    */
   it('hands the day to another dispatcher, and stamps who took it', async () => {
-    const page = await coldLoad();
+    /*
+     * **`midtown-office` rather than this file's default, and the reason is a measurement** —
+     * GitHub issue #565. The case asserts that the press moves the **run**, and on the default
+     * `garden-apartments` day it cannot: that day is **29 legs** on two cars, and a handover from
+     * `collective` to `nearest-car` at 0.7 s reproduces it byte for byte. Measured beside it in
+     * node, on a full garden-apartments day, **ten of the twelve** other shipped dispatchers change
+     * no leg either — only `nearest-car` and `zoned-uppeak` move it at all.
+     *
+     * That is a finding about the product rather than about this case and it is not repaired here:
+     * `docs/43` P1's dominance check is the place for *the first tower is too small for the choice
+     * to matter*, and a browser case is the wrong instrument to establish it. What it costs here is
+     * one building id: on `midtown-office` the same press moves 2 927 legs' worth of run.
+     */
+    const page = await coldLoad('midtown-office');
     await enterEverydayStage(page);
 
     const SWITCH = '.everyday-stage-intervene[data-intervention-kind="switch-dispatcher"]';
@@ -810,7 +917,26 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     const other = (await page.evaluate(
       "Array.from(document.querySelectorAll('.everyday-stage-switch-pick option')).map((o) => o.value)",
     )) as readonly string[];
-    const handTo = other.find((value) => value !== standing) ?? '';
+    /*
+     * **Not simply the first option that is not the standing one** — GitHub issue #565, and it is
+     * `stageHandover.test.ts`'s lesson arriving on the page: *a handover at a moment when the two
+     * dispatchers would decide identically proves nothing.* This case now asserts that the press
+     * moves the **run**, so a target that agrees with the incumbent would make that assertion a
+     * coin toss dressed as a gate.
+     *
+     * The day this walk lands on is `garden-apartments` day 1 under `collective`, and it was
+     * measured rather than guessed: handing it to any of the other eleven shipped dispatchers at
+     * 0 s or 60 s produces byte-identical legs, and only `nearest-car` and `zoned-uppeak` move it.
+     * `nearest-car` scores on `distanceTravelled` alone against `collective`'s `waitTime` alone —
+     * not a re-weighting of one question but a different question, which is the pair
+     * `stageHandover.test.ts` chose for the same reason. The fallbacks keep the case honest rather
+     * than green if the shelf ever loses one of the two: the last of them is the old behaviour, and
+     * a cell where it proves nothing will show up as this case failing rather than as a silent pass.
+     */
+    const handTo =
+      ['nearest-car', 'zoned-uppeak'].find((value) => value !== standing && other.includes(value)) ??
+      other.find((value) => value !== standing) ??
+      '';
     expect(handTo).not.toBe('');
 
     /*
@@ -824,6 +950,19 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
       'already running',
     );
 
+    /*
+     * **The picker says on its own face that choosing is not committing** — GitHub issue #565,
+     * § D856. Asserted before the selection, because it is the sentence that has to be there for a
+     * player who has not yet found out the hard way.
+     */
+    expect(await page.textContent('.everyday-stage-switch-note')).toContain('changes nothing by itself');
+    expect(await page.getAttribute('.everyday-stage-switch-pick', 'aria-describedby')).toBe(
+      'everyday-stage-switch-note',
+    );
+
+    const beforePick = await runFingerprint(page);
+    expect(beforePick).not.toBeNull();
+
     await page.selectOption('.everyday-stage-switch-pick', handTo);
     await page.waitForFunction(
       (selector) => document.querySelector(selector)?.hasAttribute('disabled') === false,
@@ -834,6 +973,17 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     expect(await page.textContent('.everyday-stage-intervene-refusal')).toBe('');
     const label = (await page.textContent(SWITCH)) ?? '';
     expect(label.startsWith('Switch to ')).toBe(true);
+
+    /*
+     * **Selecting changed no run** — the half #565 exists for, and the half a stamp cannot say.
+     * The record's log is still empty and the legs are the identical legs, so the picker named a
+     * target and did nothing else. The stamp is checked too, because the two together are what a
+     * player actually sees: an unchanged run *and* nothing claiming one happened.
+     */
+    const afterPick = await runFingerprint(page);
+    expect(afterPick).toEqual(beforePick);
+    expect(afterPick?.presses).toBe(0);
+    expect(await page.textContent('.everyday-stage-stamp')).toBe('');
 
     await page.click('.everyday-stage-play');
     await page.click(SWITCH);
@@ -852,6 +1002,22 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     const stamp = (await page.textContent('.everyday-stage-stamp')) ?? '';
     expect(stamp).toContain(label.replace('Switch to ', 'switched to '));
     expect(stamp).not.toContain(handTo);
+
+    /*
+     * **And pressing did change the run, on the legs** — the other half of #565's first criterion.
+     * The record grew by one and the legs are different legs; `stageHandover.test.ts` is the node
+     * case that says *which* legs and that the prefix is byte-identical, and this one says the two
+     * controls on the page are wired to that at all. The wait is for the recording rather than for
+     * the stamp: the stamp is drawn at the press and the re-simulated run arrives on a worker, so a
+     * reading taken on the stamp alone would race the run it is about.
+     */
+    const afterPress = await untilRun(
+      page,
+      (run) => run.presses === 1 && run.hash !== beforePick?.hash,
+      60_000,
+    );
+    expect(afterPress?.presses).toBe(1);
+    expect(afterPress?.hash).not.toBe(beforePick?.hash);
     await page.close();
   });
 

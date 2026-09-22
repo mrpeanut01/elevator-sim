@@ -172,6 +172,7 @@ import {
   answerChangeOf,
   campaignEventFor,
   campaignIncidentOf,
+  careerDaySeedFor,
   type CampaignIncident,
 } from '../campaign/incidents.js';
 import { worksHeldCarRefsOf, worksHeldCarsOf } from '../campaign/works.js';
@@ -564,7 +565,7 @@ export const POST_RUN_NO_SERVER =
  * one step before the sentence goes stale rather than one step after.
  */
 export const CAREER_TOP_UP_NO_TOWER =
-  'This tops up a tower\u2019s purse, and you have no building on the Campaign screen with a month ' +
+  'This tops up a tower\u2019s purse, and you have no building on the Career screen with a month ' +
   'still running \u2014 so there is nowhere for the units to go. Nothing was spent; open one and ' +
   'press it again.';
 
@@ -2325,6 +2326,36 @@ export function createEverydayHost(
   /** The day's incident for the dock — `campaignIncidentOf`'s answer, held beside the latch. */
   let campaignDayIncident: CampaignIncident | undefined;
 
+  /**
+   * The seed every career day is **derived from** — GitHub issue **#563**.
+   *
+   * ## Why a local, and why it is captured once
+   *
+   * `runCampaignDay` writes `ViewerState.seed`, so it may not also *read* it as the base: the
+   * derivation would chain, and chaining breaks the one property that makes a career day a day
+   * rather than a slot machine. A second press of *run day 5* — which is what
+   * `WeekState.attempt` counts and what `docs/16` calls the product's most-used verb — would
+   * derive from the seed the first press had already written and hand the player a different
+   * crowd. A player could re-roll until the morning was easy, and the sheet would still be honest
+   * about a day nobody could reproduce.
+   *
+   * So the base is captured on the **first** career day of this session and never re-read. It is
+   * `ViewerState.seed` as the page was opened, which is § D729's UTC-date seed (or a `?seed=`
+   * deep link, which is a player asking for a crowd of their own and gets one here too). Two
+   * consequences, stated rather than discovered:
+   *
+   * - **A day replays exactly**, because `watch/record.ts` persists the *derived* seed the run was
+   *   built from, not this base. Invariant 5 is untouched and no schema moved — see
+   *   `campaign/incidents.ts#careerDaySeedFor` for why that decides between the two candidate
+   *   seams.
+   * - **A career resumed after a reload meets a different crowd on the day it resumes**, because
+   *   `campaign/careerPersist.ts` restores `CampaignTower.day` and nothing restores this. That is
+   *   honest rather than ideal — the crowd is the day you played it — and the alternative costs a
+   *   `CAREER_SCHEMA_VERSION` bump that quarantines every save. It is recorded here so the next
+   *   reader finds a decision rather than an accident.
+   */
+  let careerSeedBase: bigint | undefined;
+
   /** {@link EverydayHost.campaignDay}, as a local so `answerIncident` reads the same fold. */
   const campaignDayFacts = (): CampaignDayFacts | undefined => {
     const towerId = campaignDayTowerId;
@@ -2832,10 +2863,59 @@ export function createEverydayHost(
       if (tower === undefined) return;
       const towerBuilding = b.resources.buildings.find((building) => building.id === tower.buildingId);
       if (towerBuilding === undefined) return;
-      const event = campaignEventFor({ tower, seed: b.state().seed });
+      /* Captured once, never re-read — see {@link careerSeedBase} for why that is the whole fix. */
+      careerSeedBase ??= b.state().seed;
+      const base = careerSeedBase;
+      const event = campaignEventFor({ tower, seed: base });
       b.applyPatch({
         buildingId: tower.buildingId,
         dispatcherId: tower.dispatcherId,
+        /*
+         * **And the crowd this day meets** — GitHub issue **#563**, the defect this patch had at
+         * its centre: it wrote seven fields and not this one, so every career day on a tower was
+         * the same seed on the same configuration and therefore the same question. Ten sittings at
+         * Garden Apartments were byte-identical, 44 of 44 carried, 52 s worst wait, every day.
+         *
+         * Derived rather than re-rolled: `careerDaySeedFor` is pure in the base, the contract and
+         * the day, so day *n* and day *n + 1* are different questions and a **retry of day n is
+         * the same question**. `deviceNowMs()` does not appear on this path — a seed that read a
+         * clock would make the day a player replays a different day from the day they played,
+         * which is invariant 5 broken from the far end.
+         *
+         * Written on **this** press and no other, for the same reason the kit and the length are:
+         * a setter for it would be a control that re-rolled a tower's crowd without running the
+         * day the crowd belongs to.
+         */
+        seed: careerDaySeedFor(base, tower.id, tower.day),
+        /*
+         * **And the day the building has grown to** — GitHub issue **#563**'s second half.
+         *
+         * `dev/state.ts#shiftRunConfigOf` grows the fabric with `grownBuilding(fabric,
+         * state.week.day)` and `tomorrowFactsOf` announces next morning's tenants from the same
+         * chain one day on. The career advanced `CampaignTower.day` through
+         * `campaign/career.ts#fileDay` and touched `week` never, so the report's `TENANTS 120 →
+         * 135` was literally `week.day 1 → 2` and the contract re-ran day 1 for a month: a promise
+         * the product made every night and never kept.
+         *
+         * **Set from the tower rather than incremented**, which is the difference between a
+         * derived figure and a second counter. `fileDay` is the one writer of `tower.day`; this
+         * reads it. An `ownWeekDay`-style increment here would drift the moment a day was run and
+         * not filed, and § 8's *cleared = day − 1 − missed* arithmetic would then be true of a
+         * different day from the one the building was grown to.
+         *
+         * `dayIdx` follows the same day so the week's own weekday label tracks it. It reaches no
+         * campaign run — `campaignEventId` below overrides `scheduledEventFor`, and Everyday ships
+         * `calendar: null` — but leaving it where it was would have printed one weekday name over
+         * twenty different days.
+         *
+         * What else this moves, said rather than found later: the streak card counts the days it
+         * has actually seen (`shift/week.ts#closeDay` keys a retry on `closedDay === outcome.day`,
+         * so twenty career days on one frozen day *replaced* each other and a ninth clean day read
+         * `1 clean day`), `WeekState.attempt` stops reading `2` on a first sitting, and
+         * `shift/goals.ts#goalsForDay` hardens the rail's bars with the day — which is the same
+         * ladder a § 6 week climbs, over a building that is now genuinely bigger.
+         */
+        week: { ...b.state().week, day: tower.day, dayIdx: (tower.day - 1) % 7 },
         /*
          * **And the car today's works hold** — GitHub issue #353, `docs/32` GD11's first half,
          * § D504. `campaign/works.ts` is the one derivation; the tower's screen draws the same

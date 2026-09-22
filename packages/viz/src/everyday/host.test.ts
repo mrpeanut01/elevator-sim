@@ -1930,6 +1930,55 @@ describe('a rush sitting — GitHub issue #372', () => {
     expect(host.rush()?.rounds).toHaveLength(2);
   });
 
+  /**
+   * **The round records what drove it and what was changed** — GitHub issue **#565**, third defect,
+   * § D859.
+   *
+   * The sheet credited the sitting to the dispatcher it **opened** on and reported the presses as a
+   * bare count, so a round that ran on somebody else for most of its length said so nowhere. The
+   * record is where that has to be fixed, because `everyday/rushPost.ts` can only draw what
+   * `rushRoundRecordOf` put on the round — and this is the one moment the live state, the recording
+   * and the end are in hand together.
+   *
+   * Driven here rather than in `rushSitting.test.ts` for that reason: the log this reads is
+   * `ViewerState.interventions` as the host holds it, not one composed beside the assertion.
+   */
+  it('records who drove it and what was pressed, in time order — GitHub issue #565', () => {
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    host.startRush();
+    const handedTo = resources.dispatcherProfiles.profiles.find(
+      (profile) => profile.id !== base().dispatcherId,
+    );
+    if (handedTo === undefined) throw new Error('the shelf holds one dispatcher');
+    /*
+     * Authored out of order on purpose. The log is written in press order, which is time order for
+     * a control that appends at the playhead — but the sheet's claim is *in time order*, and a
+     * record that inherited the array's order rather than sorting it would pass every case that
+     * never tried this.
+     */
+    h.state = {
+      ...h.state,
+      recording: rush,
+      interventions: [
+        { atS: 600, change: { kind: 'switch-dispatcher', profile: handedTo } },
+        { atS: 120, change: { kind: 'park-cars-lobby' } },
+      ],
+    };
+    const holdAtS = host.rush()?.holdAtS ?? 0;
+    host.endRush(holdAtS);
+
+    const [round] = host.rush()?.rounds ?? [];
+    expect(round?.changes.map((change) => change.atS)).toEqual([120, 600]);
+    expect(round?.changes.map((change) => change.verb)).toEqual([
+      'parked the cars in the lobby',
+      `switched to ${handedTo.name}`,
+    ]);
+    /* Both drivers, opening one first — the count beside them is unchanged. */
+    expect(round?.drivers).toEqual([round?.dispatcherName, handedTo.name]);
+    expect(round?.interventionCount).toBe(2);
+  });
+
   it('ends the sitting when the rush is left, because a sitting is runs from an as-shipped start', () => {
     const h = harnessOf(base());
     const host = createEverydayHost(h.bindings);

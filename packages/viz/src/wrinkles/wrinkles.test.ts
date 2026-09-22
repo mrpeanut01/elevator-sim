@@ -18,7 +18,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { WRINKLE_LIBRARY } from './library.js';
-import { REQUIRED_TEMPLATE_IDS, WrinkleLibraryError, parseWrinkleLibrary } from './parse.js';
+import {
+  CAMPAIGN_DAY_EVENT_SHARE,
+  REQUIRED_TEMPLATE_IDS,
+  WrinkleLibraryError,
+  parseWrinkleLibrary,
+} from './parse.js';
 import {
   TEMPLATE_ROTATION_DAYS,
   composeWrinkle,
@@ -31,6 +36,8 @@ import {
 /** A minimal library that parses, so each refusal below can break exactly one thing. */
 const wellFormed = (): Record<string, unknown> => ({
   version: 1,
+  /* GitHub issue #564's block, required rather than defaulted — see `parse.ts`'s own reason. */
+  campaignDay: { eventSharePct: CAMPAIGN_DAY_EVENT_SHARE.defaultPct },
   unexpressible: [{ kind: 'doors slowed on one car', needs: 'a per-car door-timing override' }],
   templates: [
     ...REQUIRED_TEMPLATE_IDS.map((id) => ({
@@ -189,6 +196,35 @@ describe('the parser refuses a library it cannot trust', () => {
     refuses((doc) => {
       doc['unexpressible'] = [];
     }, /claims every kind § 17 names is reachable/);
+  });
+
+  /*
+   * GitHub issue #564: the rate a contract day meets an event at is authored data, so a rebalance
+   * outside the declared range is a load-time refusal naming the bound rather than a career that
+   * meets something every day. `CLAUDE.md` invariant 8's shape pointed at content.
+   */
+  it('the contract-day share is outside the range its schema declares', () => {
+    refuses((doc) => {
+      doc['campaignDay'] = { eventSharePct: CAMPAIGN_DAY_EVENT_SHARE.maxPct + 1 };
+    }, /campaignDay\.eventSharePct/);
+    refuses((doc) => {
+      doc['campaignDay'] = { eventSharePct: CAMPAIGN_DAY_EVENT_SHARE.minPct - 1 };
+    }, /campaignDay\.eventSharePct/);
+  });
+
+  it('the contract-day block is missing entirely, rather than being read as a default', () => {
+    refuses((doc) => {
+      delete doc['campaignDay'];
+    }, /campaignDay/);
+  });
+
+  it('the shipped document carries a share inside that range', () => {
+    expect(WRINKLE_LIBRARY.campaignDay.eventSharePct).toBeGreaterThanOrEqual(
+      CAMPAIGN_DAY_EVENT_SHARE.minPct,
+    );
+    expect(WRINKLE_LIBRARY.campaignDay.eventSharePct).toBeLessThanOrEqual(
+      CAMPAIGN_DAY_EVENT_SHARE.maxPct,
+    );
   });
 });
 

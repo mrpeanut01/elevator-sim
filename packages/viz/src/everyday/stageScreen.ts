@@ -94,6 +94,7 @@ import {
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
   STAGE_SWITCH_PICKER_LABEL,
+  STAGE_SWITCH_PICKER_NOTE,
   STAGE_FLOOR_JUMP_PLACEHOLDER,
   stageAlarmOf,
   stageBarModelOf,
@@ -654,7 +655,15 @@ function mountStage(
   goalRows.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.tight)}px`;
   const goalNote = el(doc, 'span', 'everyday-stage-goals-note');
   goalNote.style.cssText = `font-size:11px;line-height:1.4;color:${C.label}`;
-  goals.append(goalHeading, goalRows, goalNote);
+  /*
+   * **Which of a career player's two goal sets this strip is** — GitHub issue #567. Under the
+   * heading rather than under the rows, and above {@link goalNote}: a reader who cannot tell these
+   * five from the contract's four has that question before they have the one about playheads. Empty
+   * on every other flow, and the element is hidden rather than left as a blank line.
+   */
+  const goalContract = el(doc, 'span', 'everyday-stage-goals-contract');
+  goalContract.style.cssText = `font-size:11px;line-height:1.4;color:${C.inkSoft}`;
+  goals.append(goalHeading, goalContract, goalRows, goalNote);
 
   /**
    * **The alarm strip is a picture again, and its announcement moved to {@link alarmSay}** —
@@ -932,6 +941,17 @@ function mountStage(
     'max-width:100%',
   ].join(';');
   switchPicker.setAttribute('aria-label', STAGE_SWITCH_PICKER_LABEL);
+  /*
+   * **The picker says on its own face that choosing is not committing** — GitHub issue #565,
+   * § D856, whose argument is on `STAGE_SWITCH_PICKER_NOTE`. Drawn beside the control and pointed
+   * at by `aria-describedby`, so a screen reader meets it in the same breath as the list rather
+   * than after it; `id` is set here because the note is this mount's element and the words are the
+   * model's, which is this file's founding split.
+   */
+  const switchPickerNote = el(doc, 'span', 'everyday-stage-switch-note');
+  switchPickerNote.id = 'everyday-stage-switch-note';
+  switchPickerNote.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.warmGrey};flex-basis:100%`;
+  switchPicker.setAttribute('aria-describedby', switchPickerNote.id);
   /**
    * The shelf, rebuilt only when it has moved — see the block comment above for why once is wrong.
    *
@@ -958,6 +978,8 @@ function mountStage(
     switchPicker.value = latest.some((profile) => profile.id === keep) ? keep : (latest[0]?.id ?? '');
     switchPicker.hidden = latest.length === 0;
     switchButton.hidden = latest.length === 0;
+    // The note is about the pair; with no shelf there is no control for it to be about.
+    switchPickerNote.hidden = latest.length === 0;
   }
   const switchButton = el(doc, 'button', 'everyday-stage-intervene');
   switchButton.type = 'button';
@@ -997,6 +1019,7 @@ function mountStage(
     ...interventionButtons,
     switchPicker,
     switchButton,
+    switchPickerNote,
     interventionStamp,
     interventionRefusal,
     interventionNote,
@@ -1744,6 +1767,20 @@ function mountStage(
     }
     interventionRefusal.textContent = sharedRefusal ?? switchRow?.refusal ?? '';
     interventionNote.textContent = switchRow?.note ?? '';
+    /*
+     * **The picker's note is withheld wherever the picker cannot act**, and the note is written
+     * here rather than at creation so that one function decides it — the same reason the refusal
+     * above has one writer.
+     *
+     * `STAGE_SWITCH_PICKER_NOTE` ends *"until you press the button beside it"*, which is true of a
+     * player and false of a spectator: while watching somebody else's run the picker is disabled on
+     * this very line and `interventionRefusal` already says *spectator*. A second sentence telling
+     * that reader how to commit a change they cannot make is § 14.1's own defect condition, and
+     * `watchStage.browser.test.ts` sweeps `.everyday-screen` for the first person to catch exactly
+     * this. § 7.6's fourth rule is that a control which cannot act says so; the standing refusal is
+     * that sentence, and this one is the instructions for a control that can.
+     */
+    switchPickerNote.textContent = sharedRefusal === undefined ? STAGE_SWITCH_PICKER_NOTE : '';
   }
 
   /** The handover arm re-asked from the live facts — for the picker, and for the mount. */
@@ -2198,9 +2235,13 @@ function mountStage(
       endedAt: recording.endedAt,
       history: week.history,
       day: week.day,
+      /* The screen's own flow, never the recording's — GitHub issue #567. */
+      contract: context.ctx === 'campaign',
     });
     goals.style.display = 'flex';
     goalHeading.textContent = strip.heading;
+    goalContract.textContent = strip.contract;
+    goalContract.style.display = strip.contract === '' ? 'none' : '';
     goalNote.textContent = strip.note;
     goalRows.replaceChildren();
     for (const row of strip.rows) {

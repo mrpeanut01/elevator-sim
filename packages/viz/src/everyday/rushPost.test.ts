@@ -29,9 +29,11 @@ const outcome = (kind: RushOutcome['kind'], heldS: number): RushOutcome => ({
 });
 
 function round(over: Partial<RushRoundRecord> = {}): RushRoundRecord {
-  return {
+  const record: RushRoundRecord = {
     dispatcherProfileId: 'collective',
     dispatcherName: 'Collective',
+    drivers: [],
+    changes: [],
     ruleRows: [],
     wireInterventions: [],
     interventionCount: 0,
@@ -40,6 +42,12 @@ function round(over: Partial<RushRoundRecord> = {}): RushRoundRecord {
     unpostable: [],
     ...over,
   };
+  /*
+   * `drivers` follows the round's own name unless a case names its own — GitHub issue #565, § D859.
+   * A default of `['Collective']` would have made every override's driver line read *Collective*
+   * over a round driven by somebody else, which is the defect this field exists to close.
+   */
+  return record.drivers.length === 0 ? { ...record, drivers: [record.dispatcherName] } : record;
 }
 
 const ROUNDS = [round({ dispatcherProfileId: 'eta', dispatcherName: 'ETA', interventionCount: 1 }), round()];
@@ -116,6 +124,66 @@ describe('the sitting’s post block — GitHub issue #372', () => {
     expect(view.roundsEmpty).toBeUndefined();
     /* Nothing is pressed, and *nothing* is a fact about the round rather than an absent field. */
     expect(view.rounds[1]?.presses.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * **GitHub issue #565's third defect** — the sheet said `1 change while it played` and named the
+   * dispatcher the round *opened* on.
+   *
+   * The round below is the assessor's own: opened on *Conventional collective*, handed to *Capacity
+   * aware* at 26:31, ended at 41:02 in wave 14. Four claims, and each was missing:
+   *
+   * 1. the driver line names **both**, in the order they drove;
+   * 2. the change carries its **clock**;
+   * 3. it carries **what it was**, in the stage stamp's own words;
+   * 4. it carries **what followed** — the stretch the round went on to play, which is a
+   *    subtraction over two moments the round already holds and not a claim about what the press
+   *    was worth.
+   *
+   * And the fifth is the one that keeps the other four honest: the note saying what was **not**
+   * measured. A sheet that put *drove the remaining 14:31* beside *held 41:02* and said nothing
+   * else invites the reader to subtract a counterfactual that was never run.
+   */
+  it('names every driver and every change, with its clock and what followed — GitHub issue #565', () => {
+    const handed = round({
+      dispatcherName: 'Conventional collective',
+      drivers: ['Conventional collective', 'Capacity aware'],
+      changes: [{ atS: 1591, verb: 'switched to Capacity aware' }],
+      interventionCount: 1,
+      outcome: outcome('broke', 2462),
+    });
+    const [line] = rushPostViewOf({ ...ready, rounds: [handed] }).rounds;
+    expect(line?.driver).toBe('driven by Conventional collective, then Capacity aware');
+    expect(line?.changes).toEqual(['26:31 · switched to Capacity aware — drove the remaining 14:31, to wave 14']);
+    expect(line?.changesNote).toBe(RUSH_POST_COPY.changesNote);
+    /* Not measured is said in those words — CLAUDE.md's rule about a mechanism nobody ran. */
+    expect(line?.changesNote).toContain('not measured');
+  });
+
+  it('draws no change list and no note on a round nobody touched', () => {
+    const [line] = rushPostViewOf({ ...ready, rounds: [round()] }).rounds;
+    expect(line?.changes).toEqual([]);
+    /* A caption over an empty list is a caption over nothing — `docs/10` R3. */
+    expect(line?.changesNote).toBeUndefined();
+    /* And one driver still reads exactly as it always did. */
+    expect(line?.driver).toBe('driven by Collective');
+  });
+
+  /**
+   * A press stamped past the end draws its clock and stops there.
+   *
+   * `core` warns about an entry past a run's deadline rather than refusing it, so a record can hold
+   * one; *drove the remaining −0:09* is what a subtraction with no guard would print, and it would
+   * be the only negative duration anywhere in this product.
+   */
+  it('says nothing about what followed a press stamped past the round’s end', () => {
+    const late = round({
+      changes: [{ atS: 1700, verb: 'parked the cars in the lobby' }],
+      interventionCount: 1,
+      outcome: outcome('broke', 1640),
+    });
+    const [line] = rushPostViewOf({ ...ready, rounds: [late] }).rounds;
+    expect(line?.changes).toEqual(['28:20 · parked the cars in the lobby']);
   });
 
   it('tells a round that broke from one the player stopped, on the round’s own line', () => {

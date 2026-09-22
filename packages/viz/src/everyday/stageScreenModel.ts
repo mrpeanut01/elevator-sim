@@ -112,7 +112,7 @@ import type { LiveObservations, WaitBandId } from '../live/types.js';
  */
 import type { PriceSchedule } from '../pricing/types.js';
 import { goalRowsOf } from '../dev/leftRail.js';
-import { GOAL_GLYPHS } from '../shift/goals.js';
+import { GOAL_GLYPHS, TODAY_ASKS_DECIDES, TODAY_ASKS_HEADING } from '../shift/goals.js';
 import type { DayOutcome, GoalObservations, GoalReading, GoalState } from '../shift/types.js';
 // AD-S17's length rule, shared with the Engineer stage. The *derivation* — what counts as standing
 // still, and why the word is not *parked* — is that module's docstring and is deliberately one home.
@@ -651,17 +651,34 @@ function secondsWord(seconds: number): string {
  */
 export const STAGE_GOALS_COPY = Object.freeze({
   /**
-   * The strip's eyebrow, and **the brief's own phrase rather than a third one**.
-   * `everyday/briefView.ts` heads the same five bars `WHAT TODAY ASKS` before the run and
-   * `everyday/campaignModel.ts` does it again on the tower card, so a stage that invented a
-   * synonym would give one thing three names on three screens a player walks between.
+   * The strip's eyebrow — **`shift/goals.ts#TODAY_ASKS_HEADING`, not a literal**, GitHub issue #567.
    *
-   * It is a third **literal** all the same, and that is worth saying rather than glossing: neither
-   * of the other two is an exported constant, so there is nothing here to import. Extracting one
-   * means editing both of those files, which is a wider change than this issue owns. Named here so
-   * the next lane in `everyday/` can take it rather than discovering it.
+   * This docstring used to name the three-literal problem and leave it for the next lane: the brief
+   * headed the same five bars with its own copy, the tower card with a third, and none of the three
+   * was an exported constant. That is closed. The heading now lives beside the goal set it heads,
+   * this is one of its two readers, and the third copy — `campaignModel.ts`'s `testsEyebrow`, which
+   * **no screen ever read** — was deleted on the same commit.
+   *
+   * The larger problem underneath it is closed by {@link STAGE_GOALS_COPY.contract} rather than by
+   * the extraction, which on its own would have made a career player's two goal sets *more* alike.
    */
-  heading: 'WHAT TODAY ASKS',
+  heading: TODAY_ASKS_HEADING,
+  /**
+   * **Which of a career player's two goal sets these five are** — GitHub issue **#567**, drawn on
+   * the stage of a career run and nowhere else.
+   *
+   * A career player reads the contract's four bars on the building desk, presses the primary, and
+   * meets these five one click later. Both sets are graded and they grade different things — the
+   * contract's four decide whether the day is filed cleared against the contract, these five decide
+   * the report, the streak and the banked clean day — so the strip says which it is rather than
+   * leaving a reader to tell four bars from five by counting them.
+   *
+   * `shift/goals.ts#TODAY_ASKS_DECIDES` is the sentence, authored beside the goals it is about, and
+   * `everyday/campaignModel.ts#CONTRACT_ASKS_DECIDES` is its mirror on the desk. Drawn only on
+   * `ctx === 'campaign'`: outside a career there is no second set, and a screen disclaiming a rival
+   * a player has never seen would be an absence dressed as a warning.
+   */
+  contract: TODAY_ASKS_DECIDES,
   /** Under the rows while the playhead is short of the run's end. */
   reading:
     'these are readings at the clock above, not results · no goal is judged until the day ends',
@@ -714,6 +731,11 @@ export interface StageGoalsView {
   readonly heading: string;
   /** {@link STAGE_GOALS_COPY}'s `reading` or `graded`, whichever the playhead earns. */
   readonly note: string;
+  /**
+   * {@link STAGE_GOALS_COPY.contract} inside a career run, and `''` everywhere else — issue #567.
+   * Empty rather than `undefined` so the mount has one branch and the corpus one string.
+   */
+  readonly contract: string;
   /** Whether any verdict is being drawn — `false` at every playhead short of `endedAt`. */
   readonly judged: boolean;
   readonly rows: readonly StageGoalRow[];
@@ -736,6 +758,14 @@ export interface StageGoalsInput {
   readonly history: readonly DayOutcome[];
   /** `WeekState.day`, for the same slot. */
   readonly day: number;
+  /**
+   * Whether this stage is serving a career run — `context.ctx === 'campaign'`, GitHub issue #567.
+   *
+   * The screen's own question rather than the run's, which is § 18's split and the reason it is a
+   * flag here rather than something read off the recording: what decides whether the contract's
+   * four bars are one click away is which flow the player walked in on.
+   */
+  readonly contract?: boolean | undefined;
 }
 
 /**
@@ -846,6 +876,7 @@ export function stageGoalsOf(input: StageGoalsInput): StageGoalsView {
   return {
     heading: STAGE_GOALS_COPY.heading,
     note: judged ? STAGE_GOALS_COPY.graded : STAGE_GOALS_COPY.reading,
+    contract: input.contract === true ? STAGE_GOALS_COPY.contract : '',
     judged,
     rows: goalRowsOf(
       readings,
@@ -993,7 +1024,37 @@ export const STAGE_SWITCH_EXPLAINS =
  * player-facing string, and one authored in the mount would reach the static sweep and none of the
  * ten properties — which is exactly what § D347 moved three of the cutaway's captions here for.
  */
-export const STAGE_SWITCH_PICKER_LABEL = 'Who drives the rest of the day';
+export const STAGE_SWITCH_PICKER_LABEL = 'Choose who to hand the day to — the button beside it hands over';
+
+/**
+ * **What the picker does on its own, which is nothing** — GitHub issue **#565**, first defect,
+ * [§ D856](../../../../DECISIONS.md).
+ *
+ * A playability assessor selected *Predictive balanced* here, watched `DRIVING` go on reading
+ * *Conventional collective*, and played a forty-one-minute sitting that came back bit-identical to
+ * the untouched baseline. The wiring was right and is unchanged — `stageScreen.ts`'s `change`
+ * listener calls `syncSwitchArm()` and appends nothing, and the button beside it is the sole caller
+ * of `intervene` — so `DRIVING` was the product being honest. What was missing was any statement of
+ * it on the control, and `STAGE_SWITCH_PICKER_LABEL` read *"Who drives the rest of the day"*, which
+ * is a claim of **effect** over a control of **intent**. That is `CLAUDE.md`'s standing requirement
+ * read from the polarity § D227 added: a control that writes nothing must say so.
+ *
+ * ## Why the picker was not simply made to act instead
+ *
+ * Because the two controls cost different things. The brief's dispatcher `<select>`
+ * (`everyday/briefScreen.ts:360`) *does* act on `change`, and should: it writes standing state, it
+ * is reversible, and nothing is running. This one appends to the run record, which re-simulates the
+ * whole day from t = 0 — so binding it to `change` would fire a full re-simulation on every arrow
+ * key a keyboard user passes through the list, and each one would land on the record as a handover
+ * the player never asked for. `RunInterventionConfig`'s log is append-only and a press is stamped
+ * at the playhead; there is no undo to spend those on. So the two-step stays and says so.
+ *
+ * Drawn text rather than a `title`, for `STAGE_RACE_WATCHING`'s recorded reason one constant over:
+ * a reason a player cannot see is not a reason.
+ */
+export const STAGE_SWITCH_PICKER_NOTE =
+  'Choosing here changes nothing by itself — the day keeps running on whoever is driving until you ' +
+  'press the button beside it.';
 
 /**
  * Why the handover arm cannot act — it would hand the day to the vector already driving.
