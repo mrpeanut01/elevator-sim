@@ -1500,7 +1500,7 @@ export function drivingDispatcherSpecOf(
  * name it is a draft **of**, and the Engineer editor's *Save it and run it* is what makes a new name
  * a dispatcher.
  *
- * Everything else on the draft — the thirteen weights, the three behaviour flags and the family
+ * Everything else on the draft — every weight, the three behaviour flags and the family
  * moves — now composes exactly as `viewer.levers` already did: applied over whichever profile
  * `dispatcherId` names, without forking it. That symmetry is the reason `scope/surface.ts` scopes
  * the field `within-day` beside the levers rather than `between-games` beside `dispatcherId`, and

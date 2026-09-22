@@ -30,7 +30,7 @@
  *
  * **What the bar still does not promise, because no cost function could.** A weight that reaches
  * the run is not a weight that must turn every decision: measured at `midtown-office`, 900 s, seed
- * 20260804, six of the fourteen terms move the legs under `collective` and nine under `eta`, the
+ * 20260804, six of the shipped terms move the legs under `collective` and nine under `eta`, the
  * difference being `collective`'s `hardConstraints: ["noDirectionReversal"]`. The bar says the edit
  * travels, which is a claim about the seam and is true; it says nothing about the size of the
  * effect, which would be a claim about the run and is `shift/report.ts`'s to make afterwards.

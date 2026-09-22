@@ -41407,7 +41407,7 @@ somebody else's box.
 
 **Date: 2026-09-22 · Owner: lane AF-B (wave AF) · GitHub issue [#575](https://github.com/mrpeanut01/elevator-sim/issues/575) · Supersedes [§ D386](#d386)'s *"stay latent"* clause and nothing else in it · Binds `packages/viz/src/dev/state.ts`, `packages/viz/src/scope/surface.ts`, `packages/viz/src/scope/runIdentity.ts`, `packages/viz/src/everyday/rush.ts` and `packages/viz/src/dev/dispatcherEditor.ts`, so it is an entry rather than a docstring.**
 
-**Decision.** `dev/state.ts#drivingProfileOf` composes the run's profile from `state.dispatcherSpec` — the thirteen weights, the three behaviour flags and the family moves — over the base `dispatcherId` names, while `state.editingDispatcherId` names that base. `scope/surface.ts` declares `viewer.dispatcherSpec` a **`within-day` control** and `viewer.editingDispatcherId` a `within-day` control with it. Every sentence the product draws about either field is derived through `scope/commitment.ts#commitmentOf`, so all of them changed themselves.
+**Decision.** `dev/state.ts#drivingProfileOf` composes the run's profile from `state.dispatcherSpec` — every weight the term library declares, the three behaviour flags and the family moves — over the base `dispatcherId` names, while `state.editingDispatcherId` names that base. `scope/surface.ts` declares `viewer.dispatcherSpec` a **`within-day` control** and `viewer.editingDispatcherId` a `within-day` control with it. Every sentence the product draws about either field is derived through `scope/commitment.ts#commitmentOf`, so all of them changed themselves.
 
 ### The cause was established by a run, because the issue named two candidates and forbade guessing
 
@@ -41449,7 +41449,7 @@ A **rush** is the same question with a shorter fuse, because it posts to a board
 
 ### What this does not promise, and the measurement that bounds it
 
-A weight that reaches the run is not a weight that must turn every decision. Swept at `midtown-office`, 900 s, seed 20 260 804, every term driven to 100 one at a time: **six of the fourteen move the legs under `collective`, nine under `eta`**, and two of the three behaviour flags move under both.
+A weight that reaches the run is not a weight that must turn every decision. Swept at `midtown-office`, 900 s, seed 20 260 804, every term driven to 100 one at a time: **six move the legs under `collective` and nine under `eta`, of the fourteen `data/dispatcher-profiles.json` declares at the time of writing**, and two of the three behaviour flags move under both.
 
 The difference between the two dispatchers is **one field**, isolated rather than inferred: `collective` declares `hardConstraints: ["noDirectionReversal"]` and `eta` ships the identical weight vector with none. Adding that one field to `eta` makes the *patience* lever byte-identical; removing it makes it move. Reproduced across the library — the two shipped profiles that declare the constraint are quiet on `starvation`, the nine that do not all move.
 

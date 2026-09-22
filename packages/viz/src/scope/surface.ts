@@ -340,7 +340,7 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
   /* ------------------------------------------- viewer: the four editors’ working copies */
   'viewer.dispatcherSpec': control(
     'within-day',
-    'The dispatcher working copy — thirteen weights, three behaviour flags and the family moves. ' +
+    'The dispatcher working copy — the term weights, the three behaviour flags and the family moves. ' +
       'drivingProfileOf composes the run’s profile from it over the base dispatcherId names, so a ' +
       'weight moved in the Workshop or the Engineer editor is a weight the next run is simulated ' +
       'with (GitHub issue #575, § D886). within-day on viewer.levers’ ground and not between-games ' +

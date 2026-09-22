@@ -1419,7 +1419,7 @@ export interface EverydayHost {
    *
    * **What is still true and is not this method's to promise**: a weight that reaches the run is
    * not a weight that must move every run. Measured at `midtown-office`, 900 s, seed 20260804,
-   * *room* moves the legs under all eleven shipped dispatchers and *patience* under nine, the two
+   * *room* moves the legs under every shipped dispatcher and *patience* under all but two, the two
    * exceptions being the profiles that declare `hardConstraints: ["noDirectionReversal"]` — a hard
    * eligibility filter narrowing the candidate set, isolated on `eta` with and without that one
    * field. That is a measurement at one cell and no refusal is drawn from it, because *no weight

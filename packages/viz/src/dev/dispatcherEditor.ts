@@ -1024,7 +1024,7 @@ const FAMILY_SCOPE_NOTE =
       `nothing here reaches a run until ${RUN_THIS_COPY.select.label} or ` +
       `${RUN_THIS_COPY.saveFirst.label} hands the whole draft over.`
     : commitmentOf('viewer.dispatcherSpec', 'writes-only') === 'next-run'
-      ? 'These write the same working copy the thirteen weights do, and the same note above ' +
+      ? 'These write the same working copy the weight sliders do, and the same note above ' +
         'applies to them: the next run is built with them, and moving one asks for no run of its ' +
         'own.'
       : '';
