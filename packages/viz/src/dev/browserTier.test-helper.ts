@@ -507,8 +507,25 @@ export async function openEverydayRail(page: Page): Promise<void> {
  *
  * The offer is a race against the host arriving, so *the menu is up* is not evidence that the
  * tutorial is not coming. Waiting for **either** the walkthrough or a mode tile settles it in one
- * wait with no timeout burned on the common path; and the losing arm of that race is harmless,
- * because `offerTutorial`'s other guard refuses to move a player who has already left the menu.
+ * wait with no timeout burned on the common path.
+ *
+ * **This paragraph used to end with a reason the losing arm of that race was harmless, and the
+ * reason was wrong.** It said `offerTutorial`'s other guard *"refuses to move a player who has
+ * already left the menu"* — which is true and is not this case: a helper that has just **observed**
+ * the menu has not left it, so the guard passes and the offer takes the front door away behind the
+ * return. Driven on the built bundle at 1280 × 800: `.everyday-screen` exists at **t ≈ 190 ms** and
+ * the host published at **t ≈ 430 ms**, so a caller that reached this wait inside that window took
+ * the mode-tile arm and returned on a front door with a quarter of a second left to live.
+ * `builtBundle.browser.test.ts`'s `charter S9` B1 then waited thirty seconds for a tile that had
+ * been replaced — green whenever the tier was quiet enough to finish inside the window, red under
+ * load. The green was the race being **won**, not absent.
+ *
+ * **The race is closed in the shell rather than narrowed here**, because a driver cannot see the
+ * host arrive and any bound it guessed would be a bound on somebody else's box:
+ * `everyday/shell.ts`'s `'menu'` arm holds the front door until the first-arrival question has an
+ * answer, on § D227's ground that the tiles could not act before then either. So the mode-tile arm
+ * of this wait is now reached only on a visit that is genuinely not offered anything, and
+ * `landingScreen.browser.test.ts` asserts the ordering from the first frame the shell paints.
  *
  * Idempotent, so a caller may run it twice, and a no-op on a visit that is not a first one.
  */

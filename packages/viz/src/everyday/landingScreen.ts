@@ -355,6 +355,14 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
 
   const stop: { current: (() => void) | undefined } = { current: undefined };
 
+  /**
+   * The motion block as it currently stands on the page — {@link paintMotion}'s subject.
+   *
+   * Held rather than re-queried, so the narrow repaint cannot land on a block belonging to an
+   * earlier {@link render}.
+   */
+  let motion: HTMLElement | undefined;
+
   const render = (): void => {
     stop.current?.();
     stop.current = undefined;
@@ -375,7 +383,8 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     root.append(eyebrow, headline, lede);
 
     /* -------------------------------------------------------------- motion */
-    root.append(motionBlock(doc, view, stop));
+    motion = motionBlock(doc, view, stop);
+    root.append(motion);
 
     /* ----------------------------------------------------------- the way in */
     const cta = el(doc, 'button', 'everyday-landing-cta', view.callToAction.label);
@@ -429,8 +438,63 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     host.append(root);
   };
 
+  /**
+   * **The morning landing repaints the block it is about, and nothing else on the page** — the
+   * fix for the accessibility defect below, recorded here under
+   * [§ D405](../../../../DECISIONS.md).
+   *
+   * ## What was wrong, measured rather than reasoned about
+   *
+   * {@link askForTheMorning}'s three callbacks are the only writers of {@link recording} and
+   * {@link unavailable}, and every one of them called {@link render} — which opens
+   * `host.replaceChildren()` and rebuilds all nine elements of this screen, the call to action
+   * among them. So the arrival of the run **destroyed the one control on the page**, and a
+   * keyboard player who had reached it lost focus to the top of the document with nothing said.
+   *
+   * Driven on the built bundle at 1440 × 900: the landing page draws at **t ≈ 435 ms** and its
+   * whole subtree is replaced at **t ≈ 775 ms** — a new `.everyday-landing`, a new canvas and a
+   * new `.everyday-landing-cta` node in the same frame. A tab to the button inside that window
+   * and a read after it reports focus on `body`. That is `docs/36`'s `AX-11` from the other end:
+   * the question there is whether a player can *see* where focus went, and this took focus away
+   * from them for a reason they had no part in.
+   *
+   * It was found as a **browser-tier flake** rather than as a complaint —
+   * `keyboardJourneys.browser.test.ts`'s `AX-15` measures how deep the first control inside the
+   * screen region sits and read **2** instead of 1 under load, because the button it had just
+   * reached stopped existing between the press and the read.
+   *
+   * ## Why replacing one block is the same answer and not a smaller one
+   *
+   * The state these callbacks move is `motionState()`, and `landingView.ts#landingViewOf` feeds
+   * `input.motion` to `motionViewOf` and to nothing else — so the eyebrow, the note and the canvas
+   * are the whole of what a landed run can change. Re-deriving the view here keeps that a fact
+   * about the model rather than a list kept in this file.
+   *
+   * One behaviour goes with it, said rather than left to be discovered: a full render also
+   * re-asked {@link firstSessionFor}, so a day filed during the run's 340 ms would have moved the
+   * call to action's label. That was incidental — {@link MountedEverydayScreen.reread} is the
+   * documented path for a host read that can move this page (§ D566, GitHub issue #535) and the
+   * only one the Engineer door goes through.
+   *
+   * {@link render} is the fallback rather than a refusal: a block with no parent cannot be
+   * replaced in place, and a mount whose subtree somebody else has taken should be rebuilt rather
+   * than silently left in its pending arm.
+   */
+  const paintMotion = (): void => {
+    const standing = motion;
+    if (standing === undefined || standing.parentNode === null) {
+      render();
+      return;
+    }
+    stop.current?.();
+    stop.current = undefined;
+    const next = motionBlock(doc, viewFor(context), stop);
+    standing.replaceWith(next);
+    motion = next;
+  };
+
   render();
-  live = { redraw: render };
+  live = { redraw: paintMotion };
 
   return {
     primary: () => {
@@ -439,7 +503,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     unmount: () => {
       stop.current?.();
       stop.current = undefined;
-      if (live?.redraw === render) live = undefined;
+      if (live?.redraw === paintMotion) live = undefined;
     },
     /**
      * **Read the host again on the way back from the Engineer surface** — GitHub issue #535,
