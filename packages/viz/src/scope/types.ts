@@ -26,10 +26,17 @@
  * ## Three kinds of entry, because two would lie
  *
  * A first draft had `control` and `output`. It could not describe the four editor working copies:
- * `dispatcherSpec` is written by a slider a player drags, so it is not an output — and moving it
+ * `patternSpec` is written by a slider a player drags, so it is not an output — and moving it
  * changes **no leg**, because `shiftRunConfigOf` never reads it. Under a two-kind table it would
  * have had to be declared `presentation`, which is false in the way that matters: it is not that
  * this control cannot change a run, it is that it changes one *later*, through a save and a select.
+ *
+ * **The example used to be `dispatcherSpec` and could not stay one** — § D886, GitHub issue #575.
+ * `dev/state.ts#drivingProfileOf` composes the run's weights out of the dispatcher working copy
+ * now, so that field is a `within-day` **control** and three working copies are left for this
+ * paragraph to be about. The kind itself is untouched, and the row moving out of it while the kind
+ * stayed is the argument for having three: a two-kind table would have had to call the dispatcher
+ * copy `presentation` yesterday and a control today, with nothing in between to say which.
  *
  * {@link LatentEntry} is that third answer, and it carries {@link LatentEntry.realisedBy} — the
  * field that turns it into a run — so the claim is checkable rather than a shrug. An absence is

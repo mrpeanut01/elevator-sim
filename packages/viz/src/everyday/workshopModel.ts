@@ -997,9 +997,17 @@ export type WorkshopReach = (typeof WORKSHOP_REACHES)[number];
  * for every wave after the seam went live. `scope/surface.ts` is the one table that answers *what
  * does moving this reach*, `scope.test.ts` decides its `control` rows by running both arms and
  * comparing the legs, and `scope/commitment.ts#commitmentOf` is the reader. So a note indexed
- * through here inherits that pinning: the day GitHub issue #228 gives the draft a way across and
- * `viewer.dispatcherSpec` stops being `latent`, this answer changes itself and the bar stops saying
- * the weights stay behind.
+ * through here inherits that pinning.
+ *
+ * **That sentence used to end with a prediction, and the prediction came true by another route.**
+ * It read *"the day GitHub issue #228 gives the draft a way across and `viewer.dispatcherSpec`
+ * stops being `latent`, this answer changes itself and the bar stops saying the weights stay
+ * behind"*. The field stopped being latent on § D886 and #228 is not what did it — GitHub issue
+ * #575 wired `dev/state.ts#drivingProfileOf` to the working copy, so the copy reaches the run as a
+ * copy and needs no way across. **The mechanism was right about itself**: this function now answers
+ * `true` for `viewer.dispatcherSpec`, the bar says the edit travels, and not one sentence was
+ * edited to make that happen. The prediction is kept as the dated record it is, because a claim
+ * about a derivation that survived its own subject moving is worth more than a tidy paragraph.
  *
  * `undefined` — an `output`, or a key the table does not carry — counts as **not reaching**, and
  * the direction is chosen rather than defaulted. The failure being guarded is a bar that promises

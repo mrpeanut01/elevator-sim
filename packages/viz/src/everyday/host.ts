@@ -1385,9 +1385,13 @@ export interface EverydayHost {
    * there is no mid-day change (`docs/16` § 0; true of the product rather than of the simulator
    * since § D802) and the control that changes the
    * driver is a control that changes tomorrow's question rather than today's answer. This used to
-   * say *exactly as {@link setPlainLever} does*, and that comparison was withdrawn rather than
-   * reworded: three of that method's four levers reach no run at all, so it is not a thing another
-   * method can be *exactly as*. See its own docstring, and GitHub issue #296.
+   * say *exactly as {@link setPlainLever} does*; that comparison was withdrawn rather than reworded
+   * on GitHub issue #296, because three of that method's four levers reached no run at all and it
+   * was not a thing another method could be *exactly as*. **All four reach one since § D886**
+   * (issue #575), so the two methods really are alike again — and the comparison is deliberately
+   * **not** restored, because it would now be carrying a claim about a second method's wiring in a
+   * sentence nothing re-derives. See {@link setPlainLever}'s own docstring, which says what its
+   * levers reach and names the run that decided it.
    *
    * An id no profile carries writes nothing: `withDispatcher` leaves the spec alone, so the run is
    * built from a dispatcher that exists rather than from a name that does not.
