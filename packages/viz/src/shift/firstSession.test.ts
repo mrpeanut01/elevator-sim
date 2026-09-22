@@ -74,16 +74,36 @@ describe('the eligible set — § D512’s table read by arithmetic', () => {
      * can be handed, and Harbour Point — the second-most legible contract in the catalogue by the
      * old table — is now one a first session never opens on.
      */
+    /*
+     * **The set gains three members on the integrated tree, and its published count moves for the
+     * first time since it was derived** — [§ D963](../../../../DECISIONS.md). GitHub issue #587's
+     * lane booked a car out of seven contracts' day 1 and rebalanced six of their rungs
+     * ([§ D914](../../../../DECISIONS.md)); the sweep above was pinned before that landed. Measured
+     * on the merged tree at the same 800-day budget, `c6` goes 14 of 50 → **25**, `c8` **3 → 43**
+     * and `c9` 11 → **20**, so all three cross § D512's threshold from below. `c10` stays in at 27.
+     *
+     * **The threshold is not moved and neither is any rung.** Eleven members → **fourteen**, and
+     * only `c1` and `c14` of the sixteen are now out. That does move a player-facing sentence —
+     * {@link FIRST_SESSION_LINE} reads *fourteen towers* — and it moves `shift/dailySeed.ts`'s two
+     * published rotation figures with it, because those are functions of this set's **length**.
+     *
+     * **Two long-standing readings stop being true, and they are named rather than dropped.**
+     * *Chancery House and St Jude's are legible rarely, which is the same verdict for a first
+     * session as never* was measured on days with every car in service. Both now book cars out —
+     * St Jude's books two — and both are eligible. A first session can now open on the hospital.
+     */
     expect(ELIGIBLE_FIRST_CONTRACT_IDS).toEqual([
-      'c2', 'c3', 'c4', 'c5', 'c7', 'c10', 'c11', 'c12', 'c13', 'c15', 'c16',
+      'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10', 'c11', 'c12', 'c13', 'c15', 'c16',
     ]);
     for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) {
       const row = LEGIBILITY_SWEEP.find((entry) => entry.contractId === id);
       expect(row?.legibleOf50 ?? 0).toBeGreaterThan(50 / 3);
     }
-    /* The five the instrument found never or rarely legible are out, the campaign's opener first. */
-    for (const id of ['c1', 'c6', 'c8', 'c9', 'c14'])
-      expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(id);
+    /* The two the instrument still finds never or rarely legible are out, the campaign's opener
+     * first. It was five until the rungs moved; `c6`, `c8` and `c9` are in now, and shrinking this
+     * list is the measurement rather than a concession — every one of the three is above the
+     * threshold § D512 set and nothing here moved that threshold. */
+    for (const id of ['c1', 'c14']) expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(id);
     expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(FIRST_CONTRACT_ID);
   });
 
@@ -207,13 +227,23 @@ describe('AC1 and AC2, asked of every member of the set on the pinned seeds', ()
      * measurement the row above records, arriving through the derivation rather than through a
      * second list.
      */
+    /*
+     * **Re-measured on the integrated tree** — § D963. The walk is three members longer, because
+     * `c6`, `c8` and `c9` crossed the threshold when their rungs booked a car out; six of the
+     * eleven earlier members moved with their own rungs and five are unmoved. `c9` at **5 of 10**
+     * is below half and this case's own heading says *most* — the count is the measurement, and
+     * neither it nor the heading is adjusted to flatter the other.
+     */
     expect(Object.fromEntries(Object.entries(legibleAt).map(([id, list]) => [id, list.length]))).toEqual({
-      c2: 7,
-      c3: 2,
+      c2: 8,
+      c3: 7,
       c4: 6,
       c5: 8,
+      c6: 6,
       c7: 7,
-      c10: 7,
+      c8: 8,
+      c9: 5,
+      c10: 6,
       c11: 10,
       c12: 10,
       c13: 10,

@@ -57,8 +57,9 @@ import { buildingConfigOf, shiftLengthForContract, shiftRunConfigOf } from '../d
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { observationsAt } from '../live/observations.js';
 import { recordRun } from '../record/recordRun.js';
-import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
+import { RESOURCES } from '../scope/probes.test-helper.js';
 
+import { contractDayState } from './contractDay.test-helper.js';
 import { contractById, CONTRACTS } from './contracts.js';
 import { runHorizonOf } from './dayLength.js';
 import { SHIFT_EVENTS } from './events.js';
@@ -105,21 +106,23 @@ function armOf(
 ): Arm {
   const contract = contractById(contractId);
   if (contract === undefined) throw new Error(`no contract ${contractId}`);
-  const base = baseState();
   const shiftLengthS = shiftLengthForContract(contractId);
-  const state = {
-    ...base,
-    buildingId: contract.buildingId,
-    dispatcherId,
-    shiftLengthS,
-    /*
-     * The day's *wrinkle* is a separate axis from the contract's own fabric, and a file about the
-     * rung must not be measuring a drawn event — `contractCurve.sweep.test.ts`'s own idiom.
-     */
-    campaignEventId: 'ordinary' as const,
-    week: { ...base.week, contractId, day: 1 },
-    seed,
-  };
+  /*
+   * **The pair, built together** — GitHub issue #584, § D961, [§ D963](../../../../DECISIONS.md).
+   *
+   * This file used to build the state by hand — `{ ...baseState(), buildingId: contract.buildingId,
+   * …, week: { ...base.week, contractId, day: 1 } }` — and, unlike the three sweeps #584 was filed
+   * about, it *did* move the week, so the pair agreed and the rung reached the run. What it did not
+   * have was the refusal: a state one edit away from the silent wrong answer, in the file whose
+   * whole subject is a rung. `contractDayState` builds the same state and throws on a mismatched
+   * pair, and the two were compared field for field over all seven pinned contracts before the
+   * swap — deep-equal, same keys — so no verdict, leg or census below moved with it.
+   *
+   * The day's *wrinkle* is a separate axis from the contract's own fabric, and a file about the
+   * rung must not be measuring a drawn event; the helper pins `campaignEventId: 'ordinary'` for
+   * that reason, which is `contractCurve.sweep.test.ts`'s own idiom kept in one place.
+   */
+  const state = contractDayState(contractId, { seed, dispatcherId });
   const plan = shiftRunConfigOf(RESOURCES_WITH_TOWERS, state);
   const { recording } = recordRun(
     { ...plan.config, interventions },
@@ -157,16 +160,8 @@ function armOf(
 function missesAsBuilt(contractId: string, seed: bigint, dispatcherId: string): boolean {
   const contract = contractById(contractId);
   if (contract === undefined) throw new Error(`no contract ${contractId}`);
-  const base = baseState();
-  const state = {
-    ...base,
-    buildingId: contract.buildingId,
-    dispatcherId,
-    shiftLengthS: shiftLengthForContract(contractId),
-    campaignEventId: 'ordinary' as const,
-    week: { ...base.week, contractId, day: 1 },
-    seed,
-  };
+  /* The pair, built together — issue #584, § D961; see {@link armOf} for why it is not by hand. */
+  const state = contractDayState(contractId, { seed, dispatcherId });
   const plan = shiftRunConfigOf(RESOURCES_WITH_TOWERS, state);
   const { recording } = recordRun(plan.config, {
     recordDecisions: false,

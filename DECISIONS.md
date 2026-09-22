@@ -42309,3 +42309,82 @@ On the same two cells at **80 kJ**, clean days summed over all thirteen arms are
 **No weight, no combined score, no ordering.** § D106's rule and `campaign/judge.ts`'s refusal are untouched; what ships is a second value of the same single, independent, unweighted bar § D367 permits, specified against `workPerServedLegKJ` and never raw `energyKJ` — the denominator is still the legs delivered, so a day that spends less by carrying fewer people still fails.
 
 **It is keyed on the horizon, never on a number of seconds.** A 7 200 s `constant-iso` is a longer *slice* whose reporting window is still the template's band, and it is graded by 80. `shift/dayLength.ts#runHorizonOf` is the one expression that answers *which kind of run is this*, and `goalsForDay` asks it once — which is also why `honesty/agreement.ts`'s `today-asks` pair now carries a second bar that must agree across the two shells, on § D359's own ground.
+
+---
+
+## D963 — the legibility sweep is re-measured over the rungs that moved under it, and the first-session set grows from eleven towers to fourteen
+
+**Date: 2026-09-22 · Owner: wave AG fix lane 2 · GitHub issues [#584](https://github.com/mrpeanut01/elevator-sim/issues/584) and [#587](https://github.com/mrpeanut01/elevator-sim/issues/587) · Rules on: [§ D961](#d961)'s table, [§ D512](#d512)'s threshold, [§ D514](#d514)'s line, [§ D729](#d729)'s rotation figures.**
+
+**Why an entry.** [§ D405](#d405)'s second and third grounds. It moves a measurement recorded one commit earlier (§ D961's sixteen-row table), and it moves the derived constant § D475 hands the first-session draw — which this time also moves a **player-facing sentence** and two published figures in a module neither lane owns.
+
+### The collision, which is the part worth reading
+
+Wave AG merged four lanes, each green alone.
+
+- **Lane AG-D** closed #584: three sweep files paired each contract's `buildingId` with `baseState()`'s `c1` week, so `shift/ladder.ts#rungFor` returned nothing and sixteen towers were swept **as built**. It re-measured at the published budget and wrote the result into `shift/legibility.ts#LEGIBILITY_SWEEP` (§ D961).
+- **Lane AG-A** closed #587: it booked a car out of passenger service on seven contracts' day 1 and **rebalanced six of the seven rungs** to keep `docs/33` DC-4 (§ D914) — `c2` let 0.395 → 0.34, `c3` crowd 12 → 11, `c6` 16 → 15, `c8` 8.5 → **10.5** with **two** cars out, `c10` 13.5 → 12, and `c9` a car out at an unchanged letting.
+
+So § D961 pinned a sweep **over rungs that § D914 then moved**. Neither lane was wrong; the pin was stale the instant the wave integrated, and three cases in `packages/viz/src/shift` went red. **Lane AG-D flagged this exact risk in its own report** — *"The 50-seed legibility sweep was NOT re-run after I wrote its output into LEGIBILITY_SWEEP"* — which is why it was a re-measurement rather than an investigation.
+
+**The constant was not edited to match the failure.** The gated instrument was re-run on the merged tree at its own published budget: `LEGIBILITY_SWEEP=1 LEGIBILITY_SEEDS=50`, sixteen contracts × 50 seeds = **800 days**, `collective`, day 1, ordinary, seeds `20 260 824 + 7 919 n`, exit 0 with the table written.
+
+### What the sweep says on the merged tree
+
+| contract | building | § D961, of 50 | median (s) | **merged tree, of 50** | **median (s)** |
+|---|---|---|---|---|---|
+| c1 | `garden-apartments` | 0 | 0 | 0 | 0 |
+| c2 | `midtown-office` | 38 | 239 | **35** | **165** |
+| c3 | `secure-tower` | 20 | 108 | **30** | **134** |
+| c4 | `mixed-use-high-rise` | 32 | 136 | 32 | 136 |
+| c5 | `vertical-city` | 45 | 191 | 45 | 191 |
+| c6 | `chancery-house` | 14 | 91 | **25** | **119** |
+| c7 | `crown-hotel` | 30 | 147 | 30 | 147 |
+| c8 | `st-jude-hospital` | 3 | 52 | **43** | **197** |
+| c9 | `harbour-point` | 11 | 56 | **20** | **96** |
+| c10 | `ashgate` | 32 | 161 | **27** | **125** |
+| c11 | `ctf-class-reference` | 50 | 1 221 | 50 | 1 221 |
+| c12 | `shanghai-class-reference` | 50 | 729 | 50 | 729 |
+| c13 | `merdeka-class-reference` | 50 | 459 | 50 | 459 |
+| c14 | `one-wtc-class-reference` | 1 | 13 | 1 | 13 |
+| c15 | `empire-state-class-reference` | 45 | 472 | 45 | 472 |
+| c16 | `willis-class-reference` | 50 | 2 347 | 50 | 2 347 |
+
+**Exactly the six rows whose rung moved moved, and the seventh rung-bearing row is the control — which nobody had to arrange, for the second wave running.** `c7` is the one contract of the seven the rebalance did not touch, its incident predating it (§ D871), and it reproduces **to the second**: 30 of 50, median 147 s, and all ten of the per-seed stretches `legibility.test.ts` pins are byte-identical. The nine rung-less contracts reproduce to the second as well. **Ten of sixteen rows are a reproduction and six are a move**, and no row moved that had no reason to. § D961 got its control from `c3` by luck; this one got it from `c7` the same way.
+
+**A second, independent run agrees with it.** The ten-seed slice `legibility.test.ts` holds was run separately on the same tree, and the first-ten legible counts derived from the 50-seed table match it on **all sixteen** contracts. Two runs of two instruments, and no value in either first ten lands on the window exactly, so nothing here turns on a rounding.
+
+**`c8` is the largest single move this table has recorded.** St Jude's goes **3 of 50 → 43** at a median stretch of 52 → **197 s**, on the only rung that books out two cars and with its crowd raised from 8.5 to 10.5 %. It is now the third-most legible game contract, above Midtown Office.
+
+### The eligible set: three members join, and the published count moves for the first time
+
+| | members | count |
+|---|---|---|
+| § D961 | `c2 c3 c4 c5 c7 c10 c11 c12 c13 c15 c16` | 11 |
+| merged tree | `c2 c3 c4 c5` **`c6`** `c7` **`c8` `c9`** `c10 c11 c12 c13 c15 c16` | **14** |
+
+§ D512's threshold is **untouched** — more than a third of fifty seeds — and `c6` (14 → 25), `c8` (3 → 43) and `c9` (11 → 20) all cross it from below. Only `c1` and `c14` of the sixteen are now out.
+
+**This is the first time the set's *length* has moved with no contract added to the table**, and the consequences are published rather than derived-and-forgotten:
+
+- `firstSession.ts#FIRST_SESSION_LINE` reads **fourteen towers** where it read eleven. That is a player-facing sentence, and it moved on its own because the count is derived — `docs/37` § 6's rule paying for itself in the case it was written for, since the table's own size did not move and nobody editing a contract list would have looked.
+- `shift/dailySeed.ts`'s two rotation figures are functions of the set's **length**, and both moved: a tower repeats inside seven days on **34.4 %** of 730 dates rather than 42.2 %, and on consecutive days **50** times rather than 56. Re-derived from the shipped draw, not scaled. `docs/37` § 4.3's rule 1 is still not satisfied, and it is *closer* to satisfied with nobody aiming at it.
+- The corpus does not move. `FIRST_SESSION_LINE` is one seeded string in one adapter and this is a substitution, so the honesty sweep's forecast is **0 strings and 0 surfaces in both tiers**.
+
+### Two published readings stop being true, and they stop for one reason
+
+**`legibility.ts` and § D512 say Chancery House and St Jude's are legible *"on 2 and 1 seeds, which is rarely rather than never and is the same verdict for a first session"*.** That was measured on a day with every car in service. Both towers book cars out now, and both are eligible: **a first session can open on the hospital.** Whether it *should* is a design question this instrument cannot answer, and it is not answered by moving the threshold — which `CLAUDE.md`'s working agreements forbid in either direction.
+
+**§ D961's own correction of [§ D572](#d572) is half retired by this.** *The letting works — Harbour Point reads 11 of 50 rather than 50* is still true **of the letting** and no longer true of the contract, because the contract now takes a car away as well: **20 of 50**. The correction was right about what it corrected and is superseded as a statement about `c9`.
+
+**No mechanism is offered for the size of any of these moves** ([§ D256](#d256)). What is established is the direction: a car booked out of passenger service is a change this instrument can see, and it moved every contract it was declared on the same way.
+
+### The source guard, and why the file it caught was not the file that broke it
+
+§ D961's third check refuses any file in `shift/` that calls `recordRun(` and mentions `CONTRACTS` and writes `buildingId: <x>.buildingId` into a state without `contractDay.test-helper.ts#contractDayState`. The wave's third failure was that guard going red, and **`pressLadder.sweep.test.ts` — the file the collision was blamed on — does not trip it at all**: it takes the building id as a function parameter. The file that trips it is **`pressLadder.test.ts`**, and its pair was **correct**: it wrote `week: { ...base.week, contractId, day: 1 }` beside the building, so the rung did reach the run and every verdict it pins was measured on the right tower.
+
+**The guard is kept and the file is routed through the helper, and the swap is proved rather than asserted.** What the file lacked was the *refusal*: a state one edit away from the silent wrong answer, in the file whose whole subject is a rung. The two states were compared **field for field on all seven pinned contracts** before the change — deep-equal, same keys, because `baseState().week` *is* `openWeek('c1')` and so the spread and `openWeek(contractId)` agree — and the file's thirteen cases pass unchanged afterwards, verdicts, legs, prefixes and the thirteen-dispatcher census alike. **No assertion was weakened and no sanction was invented**, which was the other way this could have gone: an exemption at the site would have been correct about this file and would have left the next one unguarded.
+
+### What this deliberately does not move
+
+**No rung, no bar and no threshold.** § D914's rebalance is measured and deliberate; this entry makes the measurement *of* it current. `shift/goals.ts#GOAL_BARS` is untouched, `data/contract-ladder.json` is untouched, and § D512's *more than a third of fifty seeds* is untouched. The band, the window and the union in `legibilityOf` are untouched. **§ D961 is not rewritten**: its table is a dated record of the tree it was taken on, and `legibility.ts` carries both columns for the same reason.
