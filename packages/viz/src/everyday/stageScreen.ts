@@ -948,7 +948,7 @@ function mountStage(
    * than after it; `id` is set here because the note is this mount's element and the words are the
    * model's, which is this file's founding split.
    */
-  const switchPickerNote = el(doc, 'span', 'everyday-stage-switch-note', STAGE_SWITCH_PICKER_NOTE);
+  const switchPickerNote = el(doc, 'span', 'everyday-stage-switch-note');
   switchPickerNote.id = 'everyday-stage-switch-note';
   switchPickerNote.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.warmGrey};flex-basis:100%`;
   switchPicker.setAttribute('aria-describedby', switchPickerNote.id);
@@ -1767,6 +1767,20 @@ function mountStage(
     }
     interventionRefusal.textContent = sharedRefusal ?? switchRow?.refusal ?? '';
     interventionNote.textContent = switchRow?.note ?? '';
+    /*
+     * **The picker's note is withheld wherever the picker cannot act**, and the note is written
+     * here rather than at creation so that one function decides it — the same reason the refusal
+     * above has one writer.
+     *
+     * `STAGE_SWITCH_PICKER_NOTE` ends *"until you press the button beside it"*, which is true of a
+     * player and false of a spectator: while watching somebody else's run the picker is disabled on
+     * this very line and `interventionRefusal` already says *spectator*. A second sentence telling
+     * that reader how to commit a change they cannot make is § 14.1's own defect condition, and
+     * `watchStage.browser.test.ts` sweeps `.everyday-screen` for the first person to catch exactly
+     * this. § 7.6's fourth rule is that a control which cannot act says so; the standing refusal is
+     * that sentence, and this one is the instructions for a control that can.
+     */
+    switchPickerNote.textContent = sharedRefusal === undefined ? STAGE_SWITCH_PICKER_NOTE : '';
   }
 
   /** The handover arm re-asked from the live facts — for the picker, and for the mount. */
