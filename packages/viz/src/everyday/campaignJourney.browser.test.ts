@@ -332,4 +332,98 @@ describe.skipIf(!HAS_BROWSER)('a campaign day, filed — issue #223', () => {
 
     await page.close();
   }, 300_000);
+
+  /**
+   * **The sheet's most prominent press stays in the career** — GitHub issue **#577**.
+   *
+   * ## Why this is a browser case and cannot be a unit
+   *
+   * The defect was not in any one module. `everyday/reportView.ts` composed a correct daily label,
+   * `everyday/host.ts#openTomorrow` advanced the week correctly, and `everyday/actionBar.ts` had
+   * no `brief` row for the campaign context — three correct pieces whose composition swapped the
+   * player's mode. Every unit passed. What is asserted here is what the assessor read: **the
+   * crumbs and the leave button after the press**, which is #577's third criterion in as many
+   * words (*a test fails if a career sheet's primary lands on a screen whose rail reads `⤺ Leave
+   * today's tower`*).
+   *
+   * ## The two halves, and neither is enough alone
+   *
+   * The label is asserted **before** the press and the destination **after** it, because § D227
+   * is a relation between the two: a case that pressed and checked the crumbs would pass on a
+   * build whose button said *Open the doors on Tuesday*, and a case that read only the label would
+   * pass on the build this issue was filed against.
+   */
+  it('advances the career from the sheet’s own button, and stays in the career — issue #577', async () => {
+    const page = await coldLoad();
+    await enterCampaign(page);
+    const building = (await page.textContent('.everyday-towers-name')) ?? '';
+    expect(building.length).toBeGreaterThan(0);
+    await openDesk(page);
+    await openContract(page);
+    await runAndCloseTheDay(page);
+
+    /*
+     * The label first. `fileDay` advanced the tower's day on the close that drew this sheet, so the
+     * day named here is the day the press will **open** — read off the record rather than computed
+     * as *the sheet's day plus one*, which is `runCampaignDay`'s own argument against a second
+     * counter.
+     */
+    const onward = page.locator('.everyday-report-tomorrow');
+    expect(await onward.textContent()).toBe(`Open the doors on day 2 at ${building}`);
+    /* And the daily loop's label is not on this sheet at all — the defect, stated as an absence. */
+    expect(await onward.textContent()).not.toContain('Open the doors on Tue');
+
+    await onward.click();
+    await page.waitForSelector('.everyday-stage-canvas', { timeout: 60_000 });
+
+    /*
+     * § 3.3's campaign timeline, all five stops. The defect drew the daily four — *Front door /
+     * Brief / The day / How it went* — and the two crumbs a career player loses are the two
+     * asserted here by name.
+     */
+    const crumbs = (await page.textContent('.everyday-bar-timeline')) ?? '';
+    expect(crumbs).toContain('All buildings');
+    expect(crumbs).toContain('Contract');
+    expect(crumbs).toContain(building);
+    expect(crumbs).not.toContain('Front door');
+
+    /* #577's third criterion, literally. */
+    expect(await page.textContent('.everyday-bar-leave')).toBe('⤺ Leave the career');
+    expect(await page.textContent('.everyday-bar-leave')).not.toBe("⤺ Leave today's tower");
+
+    /* And the day counter moved, which is the progression the press promised. */
+    await page.waitForSelector('.everyday-stage-dock', { timeout: 60_000 });
+    expect(await page.textContent('.everyday-stage-dock-day')).toBe('day 2 of 20');
+
+    await page.close();
+  }, 300_000);
+
+  /**
+   * The other half of § D227 on the same control — the daily loop's sheet is untouched.
+   *
+   * #577's repair is scoped by run context, and a repair that quietly took the daily button's
+   * behaviour with it would be a second defect wearing the first one's fix. So the same press is
+   * walked on § 6's own loop, where it must still open tomorrow's brief.
+   */
+  it('leaves Today’s tower’s own button opening tomorrow — issue #577’s other polarity', async () => {
+    const page = await coldLoad();
+    await leaveTutorialIfOffered(page);
+    await enterEverydayStage(page);
+    await closeTheDayOnStage(page);
+
+    const onward = page.locator('.everyday-report-tomorrow');
+    const label = (await onward.textContent()) ?? '';
+    expect(label.startsWith('Open the doors on ')).toBe(true);
+    /* A weekday, not a contract day: the daily sheet knows nothing about a career. */
+    expect(label).not.toContain(' at ');
+    expect(label).not.toContain('day 2');
+
+    await onward.click();
+    await page.waitForSelector('.everyday-brief', { timeout: 30_000 });
+    const crumbs = (await page.textContent('.everyday-bar-timeline')) ?? '';
+    expect(crumbs).toContain('Front door');
+    expect(crumbs).not.toContain('All buildings');
+
+    await page.close();
+  }, 300_000);
 });

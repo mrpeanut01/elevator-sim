@@ -40,6 +40,8 @@ import {
   ladderRowFor,
   ladderTowersOf,
   OCCUPANCY_BOUNDS,
+  rungIncidents,
+  type ContractIncident,
   type LadderValidationInput,
 } from './ladder.js';
 
@@ -65,6 +67,11 @@ function validationInput(): LadderValidationInput {
       return { min: profile.arrivalRatePctPop5min.min, max: profile.arrivalRatePctPop5min.max };
     },
     bankIdsFor: (buildingId) => config.buildingsById.get(buildingId)?.banks.map((bank) => bank.id),
+    carIdsFor: (buildingId, bankId) =>
+      config.buildingsById
+        .get(buildingId)
+        ?.banks.find((bank) => bank.id === bankId)
+        ?.cars.map((car) => car.id),
     mixedBankIdsFor: (buildingId) => mixedFleetBanks(authoredBuilding(buildingId)),
     speedBandFor: (machineClassId) => {
       const entry = config.specsById.get(machineClassId);
@@ -124,8 +131,83 @@ describe('the shipped ladder is legal against the shipped data', () => {
       expect(Object.keys(row['demand'] as object).sort()).toEqual(
         Object.keys(row['demand'] as object).length === 0 ? [] : ['arrivalRatePctPop5min'],
       );
-      expect(Object.keys(row['fabric'] as object).sort()).toEqual(['banks', 'occupancy']);
+      const fabric = row['fabric'] as Record<string, unknown>;
+      /*
+       * `incidents` is optional and the other two are not, so the expectation is a **subset** rather
+       * than a fixed list — and the point of the check survives that: the set is closed, so a key
+       * this table does not name still fails. § D871 added the third; `docs/33` DC-R1's fabric
+       * substrate is what admits it (*availability — a car out of service*).
+       */
+      expect(Object.keys(fabric).sort().filter((key) => key !== 'incidents')).toEqual([
+        'banks',
+        'occupancy',
+      ]);
+      for (const incident of (fabric['incidents'] as readonly Record<string, unknown>[] | undefined) ?? []) {
+        expect(Object.keys(incident).sort()).toEqual([
+          'bankId',
+          'carId',
+          'fromFraction',
+          'kind',
+          'toFraction',
+        ]);
+      }
     }
+  });
+});
+
+describe('a rung’s booked absence reaches the run, and no other rung’s does — § D871', () => {
+  /**
+   * The seam is `dev/state.ts#shiftRunConfigOf` handing {@link rungIncidents} to
+   * `shift/incidents.ts#withIncidents`, which is the same call a drawn wrinkle's derate goes
+   * through. What this case asserts is the pair the standing requirement asks for: the declaration
+   * reaches the building the kernel is handed, and a rung that declares nothing leaves that
+   * building byte-identical to what it was before the field existed.
+   *
+   * It is **not** a leg comparison, and that is deliberate rather than a shortcut: the only rung
+   * that declares an absence runs `crown-hotel`, which `scope/probes.test-helper.ts` does not load,
+   * and the leg-level proof in both directions is `pressDecidesTheDay.test.ts` — which also quotes
+   * the two verdicts, because a leg difference is not yet a day a player won or lost.
+   */
+  it('declares exactly one absence, and it is a window strictly inside the run', () => {
+    const declaring = CONTRACT_LADDER.rows.filter((row) => row.fabric.incidents.length > 0);
+    expect(declaring.length, 'some rung declares an absence, or this case checks nothing').toBe(1);
+    for (const row of declaring) {
+      for (const incident of rungIncidents(row)) {
+        expect(incident.fromFraction).toBeGreaterThan(0);
+        expect(incident.toFraction).toBeGreaterThan(incident.fromFraction);
+      }
+    }
+  });
+
+  it('leaves every other rung declaring none, which is the negative control', () => {
+    for (const row of CONTRACT_LADDER.rows) {
+      if (row.fabric.incidents.length > 0) continue;
+      expect(rungIncidents(row), row.contractId).toEqual([]);
+    }
+  });
+
+  it('refuses an absence that names a car the building does not have', () => {
+    /*
+     * The refusal, exercised rather than described. `contractLadderIssues` is where a content
+     * author's mistake is caught, and a check nobody has seen fail is a check nobody knows works.
+     */
+    const broken = {
+      ...CONTRACT_LADDER,
+      rows: CONTRACT_LADDER.rows.map((row) =>
+        row.fabric.incidents.length === 0
+          ? row
+          : {
+              ...row,
+              fabric: {
+                ...row.fabric,
+                incidents: [{ ...(row.fabric.incidents[0] as ContractIncident), carId: 'Z' }],
+              },
+            },
+      ),
+    };
+    const issues = contractLadderIssues(broken, validationInput());
+    expect(issues.length).toBe(1);
+    expect(issues[0]).toContain('takes car Z out of');
   });
 });
 
@@ -161,14 +243,22 @@ describe('every rung’s tower resolves through the loader’s own door', () => 
       })[0];
       const carsOf = (building: typeof asBuilt): readonly number[] =>
         building.banks.map((bank) => bank.cars.length);
-      const declaresFabric =
+      /*
+       * The two fabric fields that move the **tower document**, which is what `ladderTowersOf`
+       * returns. `fabric.incidents` is deliberately not one of them (§ D871): a booked absence is
+       * written onto the run's building by `shiftRunConfigOf`, after the tower is handed over, so a
+       * rung that declares one and nothing else hands back the tower as built — which is correct
+       * and is why this predicate names the two rather than asking whether the rung declares any
+       * fabric at all.
+       */
+      const declaresTowerFabric =
         (rung?.fabric.occupancy ?? 1) !== 1 || (rung?.fabric.banks.length ?? 0) > 0;
       const moved =
         tower?.totalPopulation !== asBuilt.totalPopulation ||
         JSON.stringify(carsOf(tower)) !== JSON.stringify(carsOf(asBuilt)) ||
         tower.banks[0]?.cars[0]?.ratedSpeedMps !== asBuilt.banks[0]?.cars[0]?.ratedSpeedMps;
-      expect(moved, `${contract.id} declares fabric: ${String(declaresFabric)}`).toBe(
-        declaresFabric,
+      expect(moved, `${contract.id} declares tower fabric: ${String(declaresTowerFabric)}`).toBe(
+        declaresTowerFabric,
       );
     }
   });

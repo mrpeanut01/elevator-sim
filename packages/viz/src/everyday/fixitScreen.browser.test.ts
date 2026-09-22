@@ -771,8 +771,30 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
         const classesOf = (node: Element): string => node.className;
         return [...(root?.querySelectorAll('button') ?? [])].map(classesOf);
       });
-      const allowed = /everyday-fixit-(case|repair|extra|step-up|step-down)/;
+      const allowed = /everyday-fixit-(case|repair|extra|step-up|step-down|budget-buy)/;
       expect(controls.filter((className) => !allowed.test(className))).toEqual([]);
+
+      /*
+       * **`budget-buy` is on that list from wave AF, and the clause it joins is a proxy rather
+       * than a whitelist.** § 20.9's subject is *Delete the dead quiz* — `fixGuess` and the
+       * rendered candidate list — and its check was written when the quiz was the only thing that
+       * could have been clickable besides the three it names. GitHub issue #579's budget rung is a
+       * purchase, not a candidate, so it breaks the check's letter and not its intent.
+       *
+       * Rather than widen a proxy and leave the clause inferred, the clause's **own** content is
+       * asserted directly below: no control on this screen offers a diagnosis to pick. That is
+       * stronger than the allowlist, because a future quiz named `everyday-fixit-repair-guess`
+       * would pass the regex above and fail this.
+       */
+      const quizLike = await page.evaluate(() => {
+        const root = document.querySelector('.everyday-fixit');
+        return [...(root?.querySelectorAll('button, input, select') ?? [])]
+          .map((node) => `${node.className} ${node.getAttribute('name') ?? ''}`)
+          .filter((face) => /guess|candidate|which-|cause-pick|diagnos/iu.test(face));
+      });
+      expect(quizLike, 'a control offering the diagnosis to pick is back on the fix screen').toEqual(
+        [],
+      );
 
       // And the way out is the bar's, not an Escape and not a close button on the screen.
       await page.keyboard.press('Escape');

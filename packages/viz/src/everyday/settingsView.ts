@@ -755,6 +755,18 @@ export interface SettingsScreenInput {
    * Absent defaults to `false` at the panel, which is the arm that promises least.
    */
   readonly careerTowerOpen?: boolean | undefined;
+  /**
+   * **What this device has banked**, derived from its own turns — `everyday/chimeStore.ts`,
+   * [§ D711](../../../../DECISIONS.md) clause 2, GitHub issue #579.
+   *
+   * Read off the store by `settingsScreen.ts` and passed in, because this module is pure and the
+   * store is `localStorage`. It is drawn **only where the account is not holding the tally**, which
+   * is {@link settingsScreenViewOf}'s one chooser — § D711 clause 5 asks for exactly one expression
+   * answering *whose tally is this*, and two surfaces reading two slots is § D359's signature.
+   */
+  readonly deviceChimes?: number | undefined;
+  /** Whether this device will keep that tally past the tab. Never claimed — see the panel's field. */
+  readonly deviceDurable?: boolean | undefined;
 }
 
 /** § 15.1's screen for this state. Total; every sentence a player can meet starts here. */
@@ -807,9 +819,18 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
        * guessed at, because telling a player their tally is device-only and then moving it is worse
        * than saying nothing for a moment.
        */
+      /*
+       * **One chooser, and this is it** — [§ D711](../../../../DECISIONS.md) clause 5, GitHub issue
+       * #579. Signed in, the account holds the tally and the balance is the server's; signed out,
+       * this device holds it and the balance is the one derived from its own turns; while the
+       * bridge has not answered, neither is claimed. The two slots both persist — § D490's shape,
+       * *the device-local value is kept, not overwritten* — so signing out gives the device tally
+       * back, exactly as the display name answers again when a session ends.
+       */
       chimes: chimesPanelViewOf({
-        balanceChimes: input.chimeBalance ?? 0,
-        home: signedIn ? 'account' : account === undefined ? 'booting' : 'signed-out',
+        balanceChimes: (signedIn ? input.chimeBalance : input.deviceChimes) ?? 0,
+        home: signedIn ? 'account' : account === undefined ? 'booting' : 'device',
+        ...(input.deviceDurable === undefined ? {} : { deviceDurable: input.deviceDurable }),
         /*
          * Spread rather than assigned, because `exactOptionalPropertyTypes` is on and an explicit
          * `undefined` is a different type from an absent key — and here the difference is the

@@ -11,10 +11,18 @@
  * **The sentence above used to end differently, and it was the reason issue #296 shipped.** It said
  * the printed cost line was *"composed by `costFunctionLine` from the same `weights` map
  * `profileFromSpec` writes into the next run"*, and the case below asserted on that line alone. The
- * clause is false: `dev/state.ts#drivingProfileOf` composes the run from `levers`, `selectorSpec`
- * and `ruleRows` and never from `dispatcherSpec`, so the printed expression moves for a run that
- * does not. An assertion on it was an assertion on a window statistic wearing a control's clothes —
- * green through every wave in which thirteen sliders and three flags reached nothing.
+ * clause was false on the tree it was written for: `dev/state.ts#drivingProfileOf` composed the run
+ * from `levers`, `selectorSpec` and `ruleRows` and never from `dispatcherSpec`, so the printed
+ * expression moved for a run that did not. An assertion on it was an assertion on a window
+ * statistic wearing a control's clothes — green through every wave in which thirteen sliders and
+ * three flags reached nothing.
+ *
+ * **The clause is true again as of § D886** (GitHub issue #575), and it is deliberately **not**
+ * restored as the assertion. `drivingProfileOf` reads the working copy now, so the printed
+ * expression and the run really are composed from one map — and an assertion on the printed line
+ * would be exactly as green if somebody took the binding out again tomorrow. A sentence being true
+ * is not what makes it an instrument; what makes the note below one is that
+ * `workshopTravel.test.ts` decides it on the legs and this file only checks the page agrees.
  *
  * The two drawers agreeing is still asserted, because it is still true and still worth keeping: a
  * lever and a term slider are two renderings of one vector. What is asserted **beside** it now is
@@ -101,7 +109,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
   }, 120_000);
 
   /**
-   * The standing requirement, on the page — the disclosure half, GitHub issue #296.
+   * The standing requirement, on the page — GitHub issues #296 and #575.
    *
    * The lever is moved by writing the range input and dispatching `input`, which is what a drag
    * produces. Three things then have to be true at once, and the third is the one this case exists
@@ -109,17 +117,25 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
    *
    * 1. the printed expression moves — the drawers are two renderings of one vector;
    * 2. the term slider in the drawer below holds the same number — the same fact, from the model;
-   * 3. **the § 3.3 note says the weights stay behind**, because they do. `workshopTravel.test.ts`
-   *    measured that on the legs at `midtown-office`, 900 s, seed 20260827, `collective`: the
-   *    patience lever writes `weights.starvation` on `viewer.dispatcherSpec`, and the run is
-   *    byte-identical at either end of its travel.
+   * 3. **the § 3.3 note says the edit travels**, because it does.
    *
-   * Only 1 and 2 were asserted before, and both were green while the footer read *Unsaved changes
-   * travel with the run.* — which is exactly how a printed artefact composed from an ignored field
-   * passes for a control. A screen that bound the lever to a local copy still fails 1 and 2; a
-   * screen that told the truth about neither now fails 3.
+   * ## Clause 3 has been asserted both ways round, and that is the point of it
+   *
+   * Only 1 and 2 were asserted before issue #296, and both were green while the footer read
+   * *Unsaved changes travel with the run.* — which is exactly how a printed artefact composed from
+   * an ignored field passes for a control. #296 added clause 3 pointing the other way: the note had
+   * to say the weights *stayed behind*, because `workshopTravel.test.ts` measured them staying,
+   * byte-identical at either end of the lever's travel.
+   *
+   * **§ D886 (issue #575) made them travel**, so this clause is inverted rather than dropped.
+   * `dev/state.ts#drivingProfileOf` composes the run's weights out of the working copy now, and the
+   * note is derived through `scope/commitment.ts` rather than written on this screen — so the
+   * sentence changed itself and this file had to follow it. What the case still holds is that the
+   * page's footer and the measured legs are one statement: a screen that bound the lever to a local
+   * copy fails 1 and 2, and a screen whose footer disagreed with `workshopTravel.test.ts`'s
+   * measurement fails 3, whichever way the measurement came out.
    */
-  it('moves the printed cost line when a plain lever moves, and says the weights stay behind', async () => {
+  it('moves the printed cost line when a plain lever moves, and says the edit travels', async () => {
     const page = await openWorkshop();
     await disclose(page, 'show me the maths', '.everyday-workshop-cost-line');
     const before = await page.textContent('.everyday-workshop-cost-line');
@@ -145,15 +161,18 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     expect(await slider.inputValue()).toBe('64');
 
     /*
-     * And the footer, which is the half that was missing. The assertion is on the claim rather than
-     * on the exact sentence — a lane rewording the note must not have to edit this file, and a lane
-     * that made it claim travel again must fail here whatever words it used.
+     * And the footer. The assertion is on the claim rather than on the exact sentence — a lane
+     * rewording the note must not have to edit this file, and a lane that broke the binding and
+     * left the note claiming travel must fail here whatever words it used.
      */
     const note = (await page.textContent('.everyday-bar-note')) ?? '';
-    expect(note, 'a weights-only edit is still being described as travelling with the run').not.toContain(
+    expect(note, 'a weights-only edit reaches the run and the footer does not say so').toContain(
       'travel with the run',
     );
-    expect(note.toLowerCase()).toContain('draft');
+    expect(
+      note.toLowerCase(),
+      'the weights are not a draft since § D886 — drivingProfileOf builds the run from them',
+    ).not.toContain('draft');
     await page.close();
   }, 120_000);
 

@@ -264,7 +264,33 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * 18 300 000 ms against head 19 320 000 — a difference of 1 020 000, which is
      * 180 000 + 240 000 + 300 000 + 300 000 exactly.
      */
-    ['viz-browser', { count: 77, totalMs: 19_320_000 }],
+    /*
+     * **77 → 79, and the two are named** — both are lane AF-C's, in
+     * `everyday/campaignJourney.browser.test.ts` at 300 000 ms each: *advances the career from the
+     * sheet's own button, and stays in the career*, and *leaves Today's tower's own button opening
+     * tomorrow*. GitHub issue #577's two polarities.
+     *
+     * **They earn the annotation because the defect they hold is invisible to every other tier, and
+     * that is the finding rather than the cost.** The career's onward press landed the player on
+     * Today's tower with the career's crumbs gone, and **nobody's module was wrong**: `reportView.ts`
+     * composed a correct daily label, `host.ts#openTomorrow` advanced the week correctly and cleared
+     * the campaign latch by name, and `actionBar.ts` has no `brief` row for the campaign context so
+     * the bar fell back to the daily one. Three correct pieces whose *composition* swapped the mode.
+     * Every unit passed while a player could spend thirteen days in the wrong mode, so the only
+     * instrument that can see it is a case that drives the shipped bundle and reads the crumbs and
+     * the rail back. That costs a bundle build.
+     *
+     * **Nothing existing was raised to make room**, and the arithmetic says so exactly: the base at
+     * `495aabf` reads 77 above the ceiling summing to 19 320 000 ms, the head reads 79 summing to
+     * 19 920 000 — a difference of 600 000, which is 2 × 300 000 and no more. The `viz` project's
+     * own row is **unmoved at 108** across a wave of four lanes, which is worth one clause: three of
+     * them added no annotated case at all.
+     *
+     * Derived from the tree on both commits, keyed on file and case name rather than on line,
+     * because a lane that edits above an existing case shifts its line number and a line-keyed diff
+     * reports a move as an addition.
+     */
+    ['viz-browser', { count: 79, totalMs: 19_920_000 }],
   ]);
 
 /**

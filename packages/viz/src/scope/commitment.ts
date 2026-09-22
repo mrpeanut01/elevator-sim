@@ -27,10 +27,12 @@
  *    comment on the selector mount says *"an edit takes effect on the next Run rather than re-running
  *    under the reader."* **Here the reporter's wording is exactly right**, and it is drawn in their
  *    words.
- * 3. **It is a draft.** The four editors' working copies reach no run at all until a named verb
- *    files or selects them. That is the control the report describes touching — *"nudge a weight
- *    while watching a queue build"* — and the one whose silence reads as a broken control rather
- *    than as a rule.
+ * 3. **It is a draft.** An editor's working copy reaches no run at all until a named verb files or
+ *    selects it. This said *the four* and now covers three: § D886 (GitHub issue #575) made
+ *    `viewer.dispatcherSpec` a control, so the dispatcher editor's weights block answers `next-run`
+ *    and moved into case 2 above. The report's own example — *"nudge a weight while watching a
+ *    queue build"* — is therefore the one this function's answer has **changed** for, which is the
+ *    whole of what deriving the note rather than writing it beside the panel was for.
  *
  * ## Why this is derived from `SCOPE_OF` rather than written next to each panel
  *

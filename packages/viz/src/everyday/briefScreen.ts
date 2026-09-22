@@ -10,9 +10,11 @@
  * out-of-service well dashed in terracotta with a lettered badge, an entrance canopy, floor
  * numbers at top, middle and ground."* {@link drawElevation} draws exactly that, and **every**
  * quantity in it comes from the resolved building: the storey count is `floors.length`, the wells
- * are the building's own cars in bank order, and the dashed well is the car
- * `shift/incidents.ts#carsToDerate` actually holds today — the same call the run makes, so the
- * badge on this drawing and the car the kernel stands down are one decision (§ 16 rule 14).
+ * are the building's own cars in bank order, and the dashed wells are the cars
+ * `everyday/today.ts#TodayRecord.heldCarIds` says the day holds — `carsToDerate`'s own choice,
+ * taken once on the day record, so the badge on this drawing and the car the kernel stands down are
+ * one decision (§ 16 rule 14) rather than two calls that agree by habit
+ * ([§ D871](../../../../DECISIONS.md) is the wave in which they stopped agreeing).
  *
  * ENGINE_CONTRACT § 14's canvas rules are followed: the bounding rect is read and multiplied by
  * `min(2, devicePixelRatio)`, the transform is set rather than the CSS scaled, the drawing is
@@ -22,8 +24,6 @@
  */
 
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
-
-import { carsToDerate } from '../shift/incidents.js';
 
 import {
   briefBarModel,
@@ -457,21 +457,21 @@ function mountBrief(
 }
 
 /**
- * The elevation with today's held cars — `carsToDerate`'s own choice, which is the same call the
- * run makes. The painter is `elevation.ts`'s, shared with the campaign's tower screen.
+ * The elevation with today's held cars — the day record's own list. The painter is
+ * `elevation.ts`'s, shared with the campaign's tower screen.
  */
 function drawTodaysElevation(canvas: HTMLCanvasElement, building: ResolvedBuilding | undefined, today: TodayRecord): void {
-  drawElevation(
-    canvas,
-    building,
-    building === undefined ? [] : carsToDerate(building, heldCountOf(today)).held.map((ref) => ref.carId),
-  );
+  /*
+   * `today.heldCarIds` rather than a second `carsToDerate` over a count recovered from the badge —
+   * [§ D871](../../../../DECISIONS.md), and the field's own docstring carries the defect that
+   * moved it. Two things changed at once: the badge can now also name a car the **tower** books out
+   * part-way through the day, so counting it fed `carsToDerate` a number that named a different
+   * lift; and such a car is **running when this picture is drawn**, so it must not be greyed here
+   * at all.
+   */
+  drawElevation(canvas, building, today.heldCarIds);
 }
 
-/** How many cars today holds — read off the day record's own strip rather than recomputed. */
-function heldCountOf(today: TodayRecord): number {
-  return today.outOfService === undefined ? 0 : today.outOfService.badge.split(' · ').length;
-}
 
 /** The registry row — GAMEPLAY § 6.2's screen, mounted by `shell.ts` through `screens.ts`. */
 /**

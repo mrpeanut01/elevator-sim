@@ -148,13 +148,20 @@ describe('the row’s face matches what the press does', () => {
     expect(SCENARIO_LADDER_COPY.openNote).toContain('Opens this stage');
   });
 
-  it('sells nothing on the budget line — § D786', () => {
+  it('sells nothing on the budget line, and says so of these ten rather than of the build — § D786, § D911', () => {
     /*
      * `scenario/ladder.test.ts` holds the full both-directions check over the shipped stages. This
      * is the constant on its own, so a lane editing the copy table meets the rule in the file that
      * owns the screen as well as in the one that owns the reading.
+     *
+     * **The blanket half of that sentence was narrowed on the commit that made it false** — GitHub
+     * issue #579, § D911, § D227. It read *"No screen in this build sells a wider budget"*, and the
+     * fix-a-building screen now sells one out of the device tally. It is still exactly true of
+     * these ten, which are played on the Engineer surface and have no budget control there, so the
+     * row says *these ten*. The old wording is asserted **absent** so it cannot creep back.
      */
     expect(SCENARIO_LADDER_COPY.baseRungNote).not.toMatch(/\bbought\b|\bchimes?\b|\bcan be bought\b/iu);
-    expect(SCENARIO_LADDER_COPY.baseRungNote).toContain('No screen in this build sells');
+    expect(SCENARIO_LADDER_COPY.baseRungNote).not.toContain('No screen in this build sells');
+    expect(SCENARIO_LADDER_COPY.baseRungNote).toContain('for these ten');
   });
 });

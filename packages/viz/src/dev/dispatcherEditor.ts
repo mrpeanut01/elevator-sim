@@ -960,14 +960,53 @@ const UNAUTHORABLE_COPY: Readonly<Record<UnauthorableBlock, string>> = Object.fr
  * Both are empty when `scope/surface.ts` stops declaring what they claim. See
  * `scope/commitment.ts` for why the failure direction is silence rather than a stale sentence.
  */
-const DRAFT_NOTE =
-  commitmentOf('viewer.dispatcherSpec', 'writes-only') === 'draft'
-    ? 'Nothing you move here reaches a run yet — this panel holds a draft, and the shift on ' +
+const DRAFT_NOTE = draftNoteFor(commitmentOf('viewer.dispatcherSpec', 'writes-only'));
+
+/**
+ * The note, by what the scope table now says — GitHub issue #575, § D886.
+ *
+ * This was one ternary against `'draft'` and an empty string otherwise, which was right while the
+ * field could only be one of the two and is the wrong failure now that it has become the other.
+ * `scope/commitment.ts`'s stated rule is that a caller draws nothing rather than a false sentence
+ * when the answer moves — so an answer this panel has copy for is drawn, and an answer it does not
+ * is still silence.
+ *
+ * The `next-run` arm is `LEVERS_NOTE`'s wording on the block below it, and deliberately so: these
+ * weights now reach a run in exactly the way the group levers always did, and § D227 asks for true
+ * rather than for a second vocabulary. It does not restate what the run verbs do — they carry their
+ * own titles, and a claim written twice is two claims.
+ */
+function draftNoteFor(commitment: ReturnType<typeof commitmentOf>): string {
+  if (commitment === 'draft') {
+    return (
+      'Nothing you move here reaches a run yet — this panel holds a draft, and the shift on ' +
       `screen keeps the dispatcher it was simulated with. ${RUN_THIS_COPY.select.label} is what ` +
       `hands it over, or ${RUN_THIS_COPY.saveFirst.label} while the draft is still unfiled; ` +
       'either one re-runs the whole day from the start rather than steering the one you are ' +
       'watching.'
-    : '';
+    );
+  }
+  if (commitment === 'next-run') {
+    /*
+     * **Not the levers' wording**, deliberately, and the `viewer.ruleRows` note two blocks down
+     * already made this argument: *§ D227 asks for true, not uniform.* *Locked for this shift* is
+     * exactly right about a lever and would be a second copy of one sentence here, and
+     * `scopeNotes.test.ts` is what holds the two blocks apart — a page on which the same paragraph
+     * sits over two different controls tells a reader nothing about either.
+     *
+     * It also names the *over* clause, which the levers' note does not need: these weights are
+     * applied over whichever dispatcher is driving, so a reader who moves one and then picks another
+     * dispatcher has to know which of the two the run obeys.
+     */
+    return (
+      'These weights take effect on your next run: the day is simulated with them, over whichever ' +
+      'dispatcher is driving. Moving one asks for no run of its own, so the shift on screen keeps ' +
+      `the vector it was simulated under until something else runs one — ${RUN_THIS_COPY.select.label} ` +
+      'is the shortest way to ask for one.'
+    );
+  }
+  return '';
+}
 
 /**
  * The family block's own scope line — the same commitment as {@link DRAFT_NOTE}, said once for a
@@ -984,7 +1023,11 @@ const FAMILY_SCOPE_NOTE =
     ? 'These write the same draft the thirteen weights do, and the same note above applies to them: ' +
       `nothing here reaches a run until ${RUN_THIS_COPY.select.label} or ` +
       `${RUN_THIS_COPY.saveFirst.label} hands the whole draft over.`
-    : '';
+    : commitmentOf('viewer.dispatcherSpec', 'writes-only') === 'next-run'
+      ? 'These write the same working copy the weight sliders do, and the same note above ' +
+        'applies to them: the next run is built with them, and moving one asks for no run of its ' +
+        'own.'
+      : '';
 
 const LEVERS_NOTE =
   commitmentOf('viewer.levers', 'writes-only') === 'next-run'

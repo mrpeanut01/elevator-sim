@@ -605,7 +605,7 @@ export function decodeScenarioBudget(
   }
   const steps: BoughtBudgetStep[] = [];
   for (const [index, entry] of stepsRaw.entries()) {
-    const step = decodeStep(entry, `${where}: budget step ${String(index + 1)}`, violations);
+    const step = decodeBudgetStep(entry, `${where}: budget step ${String(index + 1)}`, violations);
     if (step !== undefined) steps.push(step);
   }
   return {
@@ -616,7 +616,16 @@ export function decodeScenarioBudget(
   };
 }
 
-function decodeStep(raw: unknown, at: string, violations: string[]): BoughtBudgetStep | undefined {
+/**
+ * One rung, decoded — exported since GitHub issue **#579** because a **second** of `docs/38`
+ * § 2.1's four scenario sources now authors a ladder.
+ *
+ * `data/fixit-cases.json` carries one for the eighteen fix cases and `fixit/parse.ts` reads it
+ * through this function rather than through a decoder of its own. Two step decoders would be two
+ * answers to *what a bought rung may carry*, which is the authority defect this module's unknown-key
+ * refusal exists to prevent, arriving one level down.
+ */
+export function decodeBudgetStep(raw: unknown, at: string, violations: string[]): BoughtBudgetStep | undefined {
   if (!isRecord(raw)) {
     violations.push(`${at}: is not an object.`);
     return undefined;

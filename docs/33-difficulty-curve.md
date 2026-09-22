@@ -1820,7 +1820,7 @@ packages/viz/src/shift/contractCurve.sweep.test.ts`, on the branch head of #382,
 | 2 | c6 | `chancery-house` | five shafts at 3.5 m/s, let at 1.06 | 18 | 50 | **0.36** | **yes** |
 | 3 | c8 | `st-jude-hospital` | 8.5 % of population per 5 min | 20 | 50 | **0.40** | **yes** |
 | 4 | c2 | `midtown-office` | let at 0.395 | 23 | 50 | **0.46** | **yes** |
-| 5 | c7 | `crown-hotel` | nothing — already in band | 25 | 50 | **0.50** | **yes** |
+| 5 | c7 | `crown-hotel` | ~~nothing — already in band~~ **a car booked out mid-shift, at 11 % — see § 4.7m** | ~~25~~ **22** | 50 | ~~0.50~~ **0.44** | **yes** |
 | 6 | c3 | `secure-tower` | nothing — already in band | 26 | 50 | **0.52** | **yes** |
 | 7 | c4 | `mixed-use-high-rise` | **nothing reaches the band** — § 4.7e | 50 | 50 | 1.00 | **no** |
 | 8 | c5 | `vertical-city` | **nothing reaches the band** — § 4.7e | 50 | 50 | 1.00 | **no** |
@@ -1834,6 +1834,15 @@ envelope on each and report what closes it.
 `secure-tower` and `crown-hotel` were **already inside the band** on the shipped five-goal set, which
 § 4.2's four-goal table could not show and which #382 therefore does not say. Their rows exist so
 that a later change to a traffic profile's `typical` shows up as a change to a scenario.
+
+**That is now true of one of the two**, and the correction is § 4.7m's: `crown-hotel`'s rung
+declares a car out of passenger service between a quarter and a half of the way through the shift
+and a rate of 11 %, and its measured rate moved 0.50 → 0.44. It is still in band, and this table's
+row carries both figures rather than only the current one, because a row that quietly replaced 25
+with 22 would read as a measurement nobody had taken. **Both sides were re-measured on the tree that
+made the change** — the row reverted reads 25 of 50, exactly what this table published — so the
+0.50 → 0.44 is a move rather than a correction, which is the only thing a re-measured base can
+tell you.
 
 **Say what DC-6 can and cannot mean at this seed count**, because the rule's own wording says *up to
 the resolution of the sweep* and this is the first time anybody has had to cash that in. A proportion
@@ -1976,6 +1985,60 @@ candidate day**. Run at 50–200 replications per contract building, it turns th
 designer's guess into a measurement, and it will discard some of these rows — § 17's own word for a
 day that does not shuffle the ranking is *cosmetic*. The run is a study rather than a suite
 (`gate.test.ts` drives it at a small budget), and it is the first thing the follow-up lane should do.
+
+#### 4.7m The one day whose verdict turns on a press — `c7`, and the fourth substrate row
+
+**Status 2026-09-22.** GitHub issues [#576](https://github.com/mrpeanut01/elevator-sim/issues/576)
+and [#578](https://github.com/mrpeanut01/elevator-sim/issues/578);
+[§ D871](../DECISIONS.md#d871), which carries the whole argument and is the record this section
+points at rather than restates.
+
+**What was measured, and it is not a difficulty finding.** A playability panel drove the built
+bundle and scored `docs/43` P1 **4 of 10**: *no day's verdict turns on what the player does while
+watching it.* Today's scenario read **Shift missed** under 13 of 13 arms, career day 1 met every
+goal under 5 of 5, and a decision census at the shipped `4×` found **282 s of nothing**.
+
+**DC-4 could not have caught any of it, and that is the finding for this section rather than for
+the issue.** DC-4 is a proportion over *seeds*, measured on the **as-built** arm at each contract's
+own shift length. It is silent on the question P1 asks — *at a seed this contract misses, does any
+press a player can reach clear it?* — so a contract can sit in the middle of the band with a verdict
+no press moves, which is what `c7` was before this row. The two rules are about different axes and
+neither replaces the other; § 4.7m's table below is the first time both have been measured on one
+contract.
+
+**The fourth substrate row.** `shift/ladder.ts#ContractFabric.incidents` lets a rung name a car its
+tower takes out of passenger service part-way through the day, by `(bankId, carId)` and by fraction
+of the run. It is **DC-R1's own fabric line** — *availability: a car out of service, a bank derated*
+— arriving in the one place that could express it per contract: a drawn wrinkle is pure in
+`(day, dayIdx)`, so a car booked out on day 1 is booked out on every contract's day 1.
+
+**`c7` is the first and only user.** Car `D` of Crown Hotel's main bank leaves at `0.25` of the
+shift and returns at `0.5` — 450 s to 900 s of the 1 800 s day — and the declared rate goes **12 to
+11**, inside the hotel profile's own `10–15`, to keep DC-4. Measured at § 4.6's cell exactly, with
+the mid-run press stamped at 504 s:
+
+| arm | missed | of | rescued | broken |
+|---|---|---|---|---|
+| as-built, no press | **22** | 50 | — | — |
+| *spread the cars* | 20 | 50 | 6 | 4 |
+| hand to `predictive-balanced` | **15** | 50 | 12 | 5 |
+| *park the cars in the lobby* | **23** | 50 | 3 | 4 |
+
+**The fourth row is the one that makes this a choice.** The other setting of the same control is
+*worse than pressing nothing*, which is `docs/43` P1's dominance check answered on this contract's
+own lesson: a hotel has no dominant direction, so sending the idle cars to the front door is the
+wrong verb. **No bar moved** — `GOAL_BARS` is byte-identical and `goalsForDay` is untouched.
+
+**The pinned day.** Seed **20 268 743**: as-built worst wait **303 s** against a 230 s bar and the
+sheet reads **Shift missed**; *park in the lobby* **311 s**, still missed; *spread the cars*
+**215 s**, and the sheet reads **Shift cleared**.
+`packages/viz/src/shift/pressDecidesTheDay.test.ts` runs all three and fails if either direction
+stops holding.
+
+**What this section still cannot say.** One contract of sixteen has this property, and nothing here
+measures the other fifteen for it. A **press-sensitivity** column beside the miss rate — *on how
+many of the seeds this contract misses does some reachable press clear it* — is the instrument that
+would turn § 4.7d's table into an answer to P1 as well as to DC-4, and it does not exist.
 
 #### 4.7h Where the ninth contract goes
 

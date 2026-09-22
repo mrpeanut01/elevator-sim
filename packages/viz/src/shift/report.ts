@@ -114,6 +114,8 @@ import type { VizRecording, VizSummary } from '../contract/types.js';
 import { fallbackLineOf, readbackOf, type RuleRow } from '../authoring/ruleSpec.js';
 import { interventionLogOf } from '../live/interventions.js';
 
+import { afterPressBeatOf } from './afterPress.js';
+
 import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
 import { contractStatus } from './contracts.js';
 import { gaveUpBesideOf, horizonLabelOf, readGoals, wasDisplayOf } from './goals.js';
@@ -963,7 +965,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
        */
       beside: gaveUpBesideOf(reading.goal, observations, 'whole-run'),
     })),
-    diagnosis: diagnosisFor(recording, observations, dayStartS, judgement.verdict),
+    diagnosis: diagnosisFor(recording, observations, dayStartS, judgement.verdict, input.interventions ?? []),
     levers: leversFor(recording, observations, summary, readings),
     smallPrint: smallPrintFor(dispatcherName, summary, dayStartS),
   };
@@ -1805,11 +1807,11 @@ function energyFigures(summary: VizSummary): readonly ReportFigure[] {
 }
 
 /* -------------------------------------------------------------------------- *
- * Where it went wrong — two rows, both of them events
+ * Where it went wrong — two rows the run always has, and a third it earns
  * -------------------------------------------------------------------------- */
 
 /**
- * The two moments this run actually had, and nothing else.
+ * The moments this run actually had, and nothing else.
  *
  * The mockup's `08:30` and `17:20` are gone. What replaces them is the instant the deepest queue
  * actually stood and the demand phase that instant actually fell in — and where the run does not
@@ -1826,6 +1828,17 @@ function energyFigures(summary: VizSummary): readonly ReportFigure[] {
  * load-bearing information, so it was moved rather than dropped — {@link smallPrintFor} now carries
  * it, beside the other caveat about what one day can be read to mean.
  *
+ * ## A third row that **is** an event — GitHub issue #581, [§ D900](../../../../DECISIONS.md)
+ *
+ * `shift/afterPress.ts` appends one, and it passes issue #56's own test rather than being exempted
+ * from it: something did happen at the clock it carries — the player pressed a control, and the run
+ * record holds the second they pressed it — and the row is absent, not blank, on the many days
+ * nobody touched. It reports **when** and **how much** and explicitly claims no cause; that
+ * module's docstring holds the argument for which of #581's two routes it is and why. It is last
+ * because the two rows above are readings of the run and this one is a reading of the **player**,
+ * and because `render/reportCard.ts` draws `diagnosis[0]` — a row inserted above would silently
+ * change what that card is a card of.
+ *
  * ## The tones follow the verdict, because a colour is a claim
  *
  * `diagnosisRowsOf` in `dev/reportPanel.ts` says it: *a row with nothing to flag gets the ordinary
@@ -1839,6 +1852,7 @@ function diagnosisFor(
   observations: Observations,
   dayStartS: SimTime,
   verdict: ShiftVerdict,
+  interventions: readonly RunInterventionConfig[],
 ): readonly ReportDiagnosis[] {
   const at = observations.peakQueueAtS;
   const floorId = observations.peakQueueFloorId;
@@ -1908,7 +1922,14 @@ function diagnosisFor(
           tone: phaseTone,
         };
 
-  return [queueRow, phaseRow];
+  /*
+   * GitHub issue #581. `undefined` on an untouched day, which is most of them, so the section keeps
+   * exactly the shape it has always had where there is nothing of the player's to report.
+   */
+  const afterPress = afterPressBeatOf(recording, interventions, (startS, endS) =>
+    clockRange(startS, endS, dayStartS),
+  );
+  return afterPress === undefined ? [queueRow, phaseRow] : [queueRow, phaseRow, afterPress];
 }
 
 /**

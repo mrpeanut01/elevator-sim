@@ -130,11 +130,26 @@ describe('the right rail says a pick discards the day', () => {
 });
 
 describe('the dispatcher editor tells its two blocks apart', () => {
-  it('calls the weights a draft and names the verb that files them', () => {
+  it('says the weights take effect on the next run, and names the verb that asks for one', () => {
+    /*
+     * **This said *reaches a run yet* until § D886** — GitHub issue #575 — and it was right about
+     * the tree it was written on: `drivingProfileOf` composed the run from the base profile and
+     * never from the working copy, so the honest note above these sliders was a draft's. The copy
+     * reaches the run now, and the note changed itself: `draftNoteFor` is indexed by
+     * `scope/commitment.ts#commitmentOf`, which reads the scope table, which `scope.test.ts` decides
+     * by running both arms and comparing the legs. So the sentence over these sliders is pinned by a
+     * run rather than by this expectation.
+     *
+     * What this case still holds is the half a derivation cannot: that the note is **drawn** on this
+     * block and says the right one of the four things `commitmentOf` can answer.
+     */
     const made = mountRecorder();
     mountDispatcherEditor(made.elements.dispatcherEditor, inertContext());
     const note = noteBeside(made.around, made.elements.dispatcherEditor.terms);
-    expect(note).toContain('reaches a run yet');
+    expect(note).toContain('These weights take effect on your next run');
+    expect(note, 'the weights were called a draft, and they have not been one since § D886').not.toContain(
+      'reaches a run yet',
+    );
     /*
      * Pinned to the module that authors the label rather than to a copy of it — `rightRail.ts`'s
      * machines refusal makes the same move: a refusal is worth what the door it points at is worth.

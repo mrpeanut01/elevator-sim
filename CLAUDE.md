@@ -113,13 +113,68 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave AE's, measured 2026-09-22 on the integrated tree**; the paragraph above
+  below are wave AF's, measured 2026-09-22 on the integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **767 064** | **606** | **62** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **954 042** | **4 710** | **63** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **773 336** | **606** | **62** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **961 722** | **4 710** | **63** | **0** | **green**, and the register is empty |
+
+  **Wave AF's move is exactly 128.00 strings a case in both tiers, it decomposes to the string
+  across five producers, and all four lanes' forecasts are right — including one that was right to
+  refuse to publish a figure at all.** Measured on the integrated tree, both tiers in one sitting,
+  on a head green in **all six** projects.
+
+  **The base reproduced to the string in both tiers**, at `495aabf` — 767 064 / 62 / 0 and
+  954 042 / 63 / 0, identical to wave AE's published row. Third consecutive wave it has held.
+
+  | | base `495aabf` | wave AF | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 767 064 | **773 336** | **+6 272** | **128.00** |
+  | deep strings | 954 042 | **961 722** | **+7 680** | **128.00** |
+  | surfaces | 62 / 63 | **62 / 63** | **0** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **The probe attributes every one of the 128**, rendered on each tree and tallied by producer:
+  `everyday/settingsView.ts#settingsScreenViewOf` **+97**, `dev/reportPanel.ts#reportViewOf`
+  **+16**, `fixit/engine.ts#classifyOutcome` **+15**, `shift/report.ts#dayReportOf` **+6**, and
+  `everyday/modes.ts#EVERYDAY_MODES` **−6**. 97 + 16 + 15 + 6 − 6 = 128, and 128 × 49 = 6 272,
+  128 × 60 = 7 680.
+
+  **AF-C's forecast is exact term by term**, which this column has not seen before. It published
+  **+22** decomposed as +6 from `SHIFT_REPORT` and +8 and +8 from the report panel's two seeding
+  paths, *and* published a range — *"if the panel adapter's loop nesting is not what I read, the 22
+  is wrong and the true figure is between 6 and 22"*. Measured: `dayReportOf` +6 and `reportViewOf`
+  +16. Its reading was right and its own stated doubt was unfounded, which is a forecast carrying
+  its own error bar and then not needing it.
+
+  **AF-D's forecast is the one to read, because it refused to divide.** It counted what it could
+  exactly — one `CHIMES_PANEL_COPY` key, **−6** for three rail completions × two deleted arms,
+  **+15** for the fix-it rung block's four arms — and for the two whole Settings cases it added it
+  said: *"not derivable without measuring … I do not claim a per-case integer — dividing to get one
+  would be the quotient § D256 refuses"*, publishing a **floor of ≈ 90** instead. Measured, those
+  cases are **96**. The floor was right and conservative by six strings, and the lane that could
+  have guessed a figure and been nearly right chose not to. That is § D256 applied by a lane to its
+  own forecast.
+
+  **AF-A and AF-B both forecast 0 and neither appears in the producer diff.** AF-A's ground was
+  that `honesty/run.ts#buildingFor` never goes through `shiftRunConfigOf`, so no corpus case carries
+  a contract rung; AF-B's was that every string whose text changed sits inside a DOM mount the
+  corpus excludes. Both hold.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: identical,
+  nothing added, nothing removed — on a wave that made a day's verdict turn on a press, wired two
+  workshop levers into the run, kept the career in the career and closed the chimes loop. Every
+  string entered an adapter that already existed. **The deep tier's one-surface lead survives**:
+  `campaign/judge.ts#judgeStage` is the only surface in deep and not in always-on, and nothing is in
+  always-on and not in deep.
+
+  **Green in all six projects before the row was published**, and the count is what was checked
+  rather than the word *passed*: viz **323 / 7 222**, viz-browser **51 / 351**, core **143 / 2 989**,
+  experiments **115 / 1 526**, cli **12 / 179**, server **29 / 649**. The browser tier needs
+  `ELEVATOR_SIM_CHROMIUM` set or every case skips silently and reports success — which is why the
+  file and case counts are quoted here and not a verdict word.
 
   **Wave AE's move is exactly 27.00 strings a case in both tiers, and four lanes each published a
   figure before the measurement that sums to it precisely.** That has never happened here. § D454's

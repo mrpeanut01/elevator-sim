@@ -6,22 +6,34 @@
  * `tokens.ts`'s § 19 values and wires the controls to `host.ts`. It authors no sentence about a
  * dispatcher, a weight or a run.
  *
- * ## Every control writes, three of the four writes reach a run, and the bar says which
+ * ## Every control writes, every write reaches a run, and the bar says so
  *
- * The workshop writes `dispatcherSpec`, `levers`, `selectorSpec` and `ruleRows`. **Three of those
- * four are what `dev/state.ts#shiftRunConfigOf` builds the run from**, and the sentence here used
- * to say four — GitHub issue #296. `drivingProfileOf` composes the run's profile from
- * `state.levers`, `state.selectorSpec` and `state.ruleRows` and never from `state.dispatcherSpec`,
- * which `scope/surface.ts` declares `latent` and which no verb in `everyday/` can hand over
- * (issues #228 and #167 are that gap). Measured on the legs at `midtown-office`, 900 s, seed
- * 20260827, `collective`: all thirteen cost terms driven to 100 and all three behaviour flags
- * inverted leave the run byte-identical, while *lobby* — a `levers.parking` write — changes it.
+ * The workshop writes `dispatcherSpec`, `levers`, `selectorSpec` and `ruleRows`, and
+ * `dev/state.ts#shiftRunConfigOf` builds the run from **all four** — since
+ * [§ D886](../../../../DECISIONS.md), GitHub issue #575.
+ *
+ * **This paragraph said three, and before that four, and each was right about its own tree.**
+ * Issue #296 found the footer claiming four when `drivingProfileOf` read three; the correction was
+ * disclosure (§ D386), and it left the screen where a player is taught to tune with two live cost
+ * terms behind sliders that moved nothing. Issue #575 is that arriving in a playability score: an
+ * assessor set *How long anyone should wait* and *How much room to leave in a car* to 100, ran the
+ * day, got a byte-identical result, and read an echo line naming the field the lever had written.
+ * § D886 answers it by wiring rather than by wording — `drivingProfileOf` composes the run's
+ * weights, behaviour flags and family moves out of the working copy, over the base `dispatcherId`
+ * names, while `editingDispatcherId` points at it.
  *
  * So the standing requirement is met one level down and in **both** of its directions: a control
  * that writes something may not claim it writes nothing, and one that writes nothing may not claim
  * it writes something (§ D227). `workshopTravel.test.ts` is where that is asserted, by measuring
  * each control on the legs and requiring the § 3.3 note this screen selects to agree with the
  * measurement; `workshopScreen.browser.test.ts` drives the page for what a node test cannot reach.
+ *
+ * **What the bar still does not promise, because no cost function could.** A weight that reaches
+ * the run is not a weight that must turn every decision: measured at `midtown-office`, 900 s, seed
+ * 20260804, six of the shipped terms move the legs under `collective` and nine under `eta`, the
+ * difference being `collective`'s `hardConstraints: ["noDirectionReversal"]`. The bar says the edit
+ * travels, which is a claim about the seam and is true; it says nothing about the size of the
+ * effect, which would be a claim about the run and is `shift/report.ts`'s to make afterwards.
  *
  * There is no workshop-local copy of anything: `host.workingSpec()` is the object the Engineer
  * editor edits, so a weight moved here is moved there, and § D219's five-select editor that bound
@@ -871,13 +883,14 @@ function mountWorkshop(
      * Engineer shell's **Run this shift** makes, through the host — so the run it produces may
      * file.
      *
-     * **Three of the four fields this screen writes travel with it, and this comment used to say
-     * four** (GitHub issue #296). `shiftRunConfigOf` builds the run through `drivingProfileOf`,
-     * which reads `levers`, `selectorSpec` and `ruleRows` and never `dispatcherSpec` — so the
-     * weights and the behaviour flags are a draft this press does not carry, and the run resolves
-     * the dispatcher `dispatcherId` names. The § 3.3 note above the button says which is which
-     * before it is pressed; see {@link workshopBar}, and `workshopTravel.test.ts` for the
-     * measurement that keeps the note and the legs agreeing.
+     * **All four fields this screen writes travel with it, and this comment has said four, then
+     * three, then four again** (GitHub issues #296 and #575, § D386 and § D886). `shiftRunConfigOf`
+     * builds the run through `drivingProfileOf`, which reads `levers`, `selectorSpec`, `ruleRows`
+     * **and** `dispatcherSpec` — so the weights and the behaviour flags are carried by this press,
+     * over the profile `dispatcherId` names. The § 3.3 note above the button is derived from
+     * `scope/surface.ts` rather than written here, which is why it changed itself when the seam
+     * did; see {@link workshopBar}, and `workshopTravel.test.ts` for the measurement that keeps the
+     * note and the legs agreeing.
      */
     primary: () => {
       api.startRun();
@@ -976,6 +989,28 @@ function standingWrites(): readonly WorkshopWrite[] {
  *
  * Both are empty when `scope/surface.ts` stops declaring what they claim, which is
  * `scope/commitment.ts`'s stated failure direction — an absent sentence is not a false one.
+ *
+ * ## **Both are empty today** — § D886, GitHub issue #575
+ *
+ * `viewer.dispatcherSpec` is a control since that decision, so `workshopWriteReachesRun` answers
+ * `true`, both constants resolve to `''`, and {@link noteForReach} falls through to the guide's own
+ * *Unsaved changes travel with the run.* on every reach a player can now produce. **Nothing was
+ * edited to achieve that**, which is the whole of what the derivation bought: the sentence that had
+ * to stop being drawn stopped being drawn on the commit that made it false, without anybody
+ * remembering it was here.
+ *
+ * The paragraph above is kept as the dated record it is. One clause of it has stopped being true —
+ * *"GitHub issues #228 and #167 are that gap, and until one of them lands the Engineer editor's
+ * Save it and run it is the only verb in the product that hands a draft over"* — and it was neither
+ * of them that closed it: the working copy reaches the run as a working copy, so there is no
+ * hand-over left to be the only verb for. #228 is closed and what a save is still for is giving the
+ * vector an **id**, which Compare, the gauntlet and the leaderboard resolve against.
+ *
+ * They are kept rather than deleted, for {@link WORKSHOP_REACHES}' own stated reason: the day a
+ * fifth write lands latent, or the day the working copy goes back to being a draft, the bar has the
+ * sentence for it already and does not fall back to a two-cell table that cannot describe the
+ * state. `workshopTravel.test.ts` drives all sixteen subsets of the four writes, so the branches
+ * that select them are exercised on every run of the suite.
  */
 const DRAFT_STAYS_NOTE = !workshopWriteReachesRun('viewer.dispatcherSpec')
   ? 'The weights and the flags stay here — they are a draft, and the run uses the dispatcher you ' +

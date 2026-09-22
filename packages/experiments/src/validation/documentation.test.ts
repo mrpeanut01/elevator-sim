@@ -2112,6 +2112,31 @@ type DecisionReservation = {
  * timid — the rule exists so that a decision reaching past nothing does not consume an id, and a
  * lane that closes two issues on no numbers is the shape it was written for.
  */
+/*
+ * **Wave AF is OPEN and reserves D871-D940.** Five lanes against the wave AE playability re-score,
+ * which scored the game P1 4, P2 6, P3 6, P4 5 against a bar of 8 and answered the termination
+ * question **no**. The charter row reads D871 from wave AE's closure, so the floor assertion below
+ * is satisfied by that commit rather than by this one.
+ *
+ * **Blocks are sized to the issues each lane closes**, which is wave AD's lesson kept: its kernel
+ * lane held thirty-five numbers and spent two, and wave AE's lane AE-D spent none of twelve because
+ * every decision it took was local to its own module under § D405. A lane that needs more asks.
+ */
+/*
+ * **Wave AF's reservation is CLOSED.** Four blocks went out across D871-D940, the wave's highest
+ * heading is **D911**, and fifty numbers came back registered as holes below.
+ *
+ * **D926-D940 are free rather than holed**: nothing is written past D911, so on § D430's own
+ * distinction a number the wave never reached with nothing above it is free. The charter row moves
+ * to **D912**, which is the first number past the highest heading — and D912-D925 are registered
+ * holes precisely so that row does not come to rest on one, which § D430 forbids.
+ *
+ * **The sizing is steady now and worth one line.** Four lanes, four issues closed end to end,
+ * five headings: one ruling each except the career lane's two, which are two genuinely separate
+ * rulings on one screen. Wave AD's kernel lane held thirty-five and spent two; wave AE's lane AE-D
+ * held twelve and spent none because every decision it took was local under § D405. Blocks sized
+ * to the issues a lane closes produce this shape, and § D404's ask covers the rest.
+ */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
@@ -2892,6 +2917,100 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
       "already measured, and one half of it is a judgement rather than a citation. " +
       "Registered under D404 and D430.",
   ],
+  /*
+   * Wave AF. Four lanes, five headings spent of D871-D940, and thirty-five returned below the
+   * highest written (D911). D912-D940 are FREE rather than holed on § D430's distinction:
+   * nothing is written past D911.
+   *
+   * **D871 is the entry to read, because it was nearly a hole and is not.** Wave AE's fixit
+   * lane wrote that D871-D878 would "become permanent holes once a later lane writes above
+   * them". When AE closed, those numbers sat ABOVE its highest heading (D870), so under
+   * § D430 they were free, not holed - and wave AF's reservation then opened at D871 and lane
+   * AF-A spent it. Lane AF-A found that collision itself, reported it, and declined to edit
+   * another lane's entry after the fact; the integrator added the correction beneath the
+   * original rather than rewriting it. So D872-D878 are the holes that paragraph describes.
+   */
+  [
+    872,
+    "wave AF's day-calibration lane held D871-D885 and spent only § D871 \u2014 the contract " +
+      "ladder's fourth authorable fact, the rung that takes a car out of passenger service " +
+      "mid-shift, which is one ruling however many seams it crosses. D872-D878 are ALSO the " +
+      "numbers wave AE's fixit lane expected to become holes; they are holes now, by this lane " +
+      "writing D871 above them rather than by that lane returning them. Registered under D404 " +
+      "and D430.",
+  ],
+  [873, "wave AF's day-calibration lane's block; unspent for § 872's reason."],
+  [874, "wave AF's day-calibration lane's block; unspent for § 872's reason."],
+  [875, "wave AF's day-calibration lane's block; unspent for § 872's reason."],
+  [876, "wave AF's day-calibration lane's block; unspent for § 872's reason."],
+  [877, "wave AF's day-calibration lane's block; unspent for § 872's reason."],
+  [878, "wave AF's day-calibration lane's block; unspent for § 872's reason."],
+  [879, "wave AF's day-calibration lane's block; unspent for § 872's reason."],
+  [880, "wave AF's day-calibration lane's block; unspent for § 872's reason."],
+  [881, "wave AF's day-calibration lane's block; unspent for § 872's reason."],
+  [882, "wave AF's day-calibration lane's block; unspent for § 872's reason."],
+  [883, "wave AF's day-calibration lane's block; unspent for § 872's reason."],
+  [884, "wave AF's day-calibration lane's block; unspent for § 872's reason."],
+  [885, "wave AF's day-calibration lane's block; unspent for § 872's reason."],
+  [
+    887,
+    "wave AF's inert-levers lane held D886-D898 and spent only § D886 \u2014 the dispatcher " +
+      "working copy reaching the run, the gate that keeps it from overwriting a dispatcher the " +
+      "player has just picked, and every note that was derived through commitmentOf and so " +
+      "corrected itself. One seam, one decision. Registered under D404 and D430.",
+  ],
+  [888, "wave AF's inert-levers lane's block; unspent for § 887's reason."],
+  [889, "wave AF's inert-levers lane's block; unspent for § 887's reason."],
+  [890, "wave AF's inert-levers lane's block; unspent for § 887's reason."],
+  [891, "wave AF's inert-levers lane's block; unspent for § 887's reason."],
+  [892, "wave AF's inert-levers lane's block; unspent for § 887's reason."],
+  [893, "wave AF's inert-levers lane's block; unspent for § 887's reason."],
+  [894, "wave AF's inert-levers lane's block; unspent for § 887's reason."],
+  [895, "wave AF's inert-levers lane's block; unspent for § 887's reason."],
+  [896, "wave AF's inert-levers lane's block; unspent for § 887's reason."],
+  [897, "wave AF's inert-levers lane's block; unspent for § 887's reason."],
+  [898, "wave AF's inert-levers lane's block; unspent for § 887's reason."],
+  [
+    901,
+    "wave AF's career lane held D899-D910 and spent § D899 and § D900 \u2014 the onward press " +
+      "advancing the career rather than announcing that it leaves, and the day report's causal " +
+      "line declaring in the player's own string that it is co-occurrence and not cause. " +
+      "Registered under D404 and D430.",
+  ],
+  [902, "wave AF's career lane's block; unspent for § 901's reason."],
+  [903, "wave AF's career lane's block; unspent for § 901's reason."],
+  [904, "wave AF's career lane's block; unspent for § 901's reason."],
+  [905, "wave AF's career lane's block; unspent for § 901's reason."],
+  [906, "wave AF's career lane's block; unspent for § 901's reason."],
+  [907, "wave AF's career lane's block; unspent for § 901's reason."],
+  [908, "wave AF's career lane's block; unspent for § 901's reason."],
+  [909, "wave AF's career lane's block; unspent for § 901's reason."],
+  [910, "wave AF's career lane's block; unspent for § 901's reason."],
+  [
+    912,
+    "wave AF's chimes lane held D911-D925 and spent only § D911 \u2014 the loop closing on the " +
+      "device: earn on a cleared fix case, spend on another case's budget rung, with no " +
+      "apiOrigin and no account. **These fourteen are registered as holes although they sit " +
+      "above D911 only within this lane's own block**: D911 is the wave's highest heading, so " +
+      "D912-D925 have nothing written above them and are free by § D430's letter. They are " +
+      "registered anyway because the reservation ran to D940 and the charter row moves to D912, " +
+      "which would otherwise point at the first of them \u2014 and § D430 forbids the row's " +
+      "highest+1 sitting on a hole. Registering them and moving the row past them is the " +
+      "resolution wave AC-2 used for the same shape.",
+  ],
+  [913, "wave AF's chimes lane's block; unspent for § 912's reason."],
+  [914, "wave AF's chimes lane's block; unspent for § 912's reason."],
+  [915, "wave AF's chimes lane's block; unspent for § 912's reason."],
+  [916, "wave AF's chimes lane's block; unspent for § 912's reason."],
+  [917, "wave AF's chimes lane's block; unspent for § 912's reason."],
+  [918, "wave AF's chimes lane's block; unspent for § 912's reason."],
+  [919, "wave AF's chimes lane's block; unspent for § 912's reason."],
+  [920, "wave AF's chimes lane's block; unspent for § 912's reason."],
+  [921, "wave AF's chimes lane's block; unspent for § 912's reason."],
+  [922, "wave AF's chimes lane's block; unspent for § 912's reason."],
+  [923, "wave AF's chimes lane's block; unspent for § 912's reason."],
+  [924, "wave AF's chimes lane's block; unspent for § 912's reason."],
+  [925, "wave AF's chimes lane's block; unspent for § 912's reason."],
 ]);
 
 /**

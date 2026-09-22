@@ -68,36 +68,49 @@ describe('the balance line', () => {
   });
 });
 
-describe('what the panel says off an account — the review of PR #485, blocking 2', () => {
-  it('does not tell a visitor their tally is kept on this device', async () => {
+describe('what the panel says off an account — the review of PR #485, and now GitHub issue #579', () => {
+  it('tells a visitor their tally is on this device, because now it is', () => {
     /*
-     * **The sentence that shipped**: *"You are not signed in, so this tally is kept on this device
-     * alone. Anything you spend it on is yours to play."* Nothing in this package stored or spent a
-     * chime on the device, so both halves described a store that did not exist — and the second
-     * half invited a player to spend against it.
+     * **Two sentences have stood here and both are recorded.** The first shipped as *"this tally is
+     * kept on this device alone. Anything you spend it on is yours to play"* over no store at all,
+     * which the review of PR #485 named as § D227 in its more dangerous polarity. The second, its
+     * correction, said *"there is no tally yet — chimes are kept with an account and this build
+     * keeps none on this device"*, and its second half stopped being true on the commit that built
+     * `everyday/deviceChimes.ts`.
+     *
+     * So the assertion is in **both** directions: the device is named, and the old refusal is
+     * asserted absent so a reworded version of it cannot creep back.
      */
-    const note = chimesPanelViewOf({ balanceChimes: 0, home: 'signed-out' }).homeNote;
-    expect(note).not.toMatch(/on this device alone/u);
-    expect(note).not.toMatch(/spend/u);
-    expect(note, 'a visitor is not told that there is no tally yet').toMatch(/no tally yet/u);
+    const note = chimesPanelViewOf({ balanceChimes: 6, home: 'device' }).homeNote;
+    expect(note).toBe(CHIMES_PANEL_COPY.deviceHome);
+    expect(note, 'the deleted refusal came back').not.toMatch(/no tally yet/u);
+    expect(note).toMatch(/kept on this device/u);
+    expect(Object.hasOwn(CHIMES_PANEL_COPY, 'signedOutHome')).toBe(false);
   });
 
-  it('positive control: there really is no chime anywhere in the device store', async () => {
+  it('says what that tally does and does not buy, so neither half is guessed at', () => {
+    const note = chimesPanelViewOf({ balanceChimes: 6, home: 'device' }).homeNote;
+    expect(note, 'the device tally buys a scenario budget').toMatch(/wider budget/u);
+    expect(note, 'and the three sinks below need an account').toMatch(/signing in/u);
+  });
+
+  it('adds the durability caveat only where the browser will not keep it', () => {
     /*
-     * The claim the sentence above rests on, checked against the tree rather than remembered.
-     * `everyday/profile.ts` is `localStorage`'s owner here; if a chime field ever lands in it, this
-     * goes red and the sentence has to be rewritten on the same commit — which is § D227's rule in
-     * the direction that bites *after* a lane lands.
+     * `careerStore.ts`' rule on the screen that draws a tally: *the player is never told a save
+     * happened that did not*. Absent and `true` say nothing extra, because a caller that has not
+     * asked has nothing to report.
      */
-    const profile = await readFile(join(EVERYDAY_SRC, 'profile.ts'), 'utf8');
-    const code = profile.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/(^|\s)\/\/.*$/gmu, '$1');
-    expect(code).not.toMatch(/chime/iu);
+    const kept = chimesPanelViewOf({ balanceChimes: 6, home: 'device', deviceDurable: true }).homeNote;
+    const lost = chimesPanelViewOf({ balanceChimes: 6, home: 'device', deviceDurable: false }).homeNote;
+    expect(kept).toBe(CHIMES_PANEL_COPY.deviceHome);
+    expect(chimesPanelViewOf({ balanceChimes: 6, home: 'device' }).homeNote).toBe(kept);
+    expect(lost).toContain(CHIMES_PANEL_COPY.deviceNotDurable);
   });
 
   it('keeps the booting window apart from both, because guessing is what misleads', () => {
     const booting = chimesPanelViewOf({ balanceChimes: 0, home: 'booting' }).homeNote;
     expect(booting).toBe(CHIMES_PANEL_COPY.bootingHome);
-    expect(booting).not.toBe(CHIMES_PANEL_COPY.signedOutHome);
+    expect(booting).not.toBe(CHIMES_PANEL_COPY.deviceHome);
     expect(booting).not.toBe(CHIMES_PANEL_COPY.accountHome);
   });
 });
@@ -280,7 +293,7 @@ describe('what the panel says about spending — § D227 and § D672, a reason p
     const cases = [
       [{ balanceChimes: 40, home: 'account' as const }, CHIMES_PANEL_COPY.rowNoLedger],
       [{ balanceChimes: 0, home: 'booting' as const, spendable: true }, CHIMES_PANEL_COPY.rowBooting],
-      [{ balanceChimes: 0, home: 'signed-out' as const, spendable: true }, CHIMES_PANEL_COPY.rowSignedOut],
+      [{ balanceChimes: 40, home: 'device' as const, spendable: true }, CHIMES_PANEL_COPY.rowSignedOut],
       [{ balanceChimes: 40, home: 'account' as const, spendable: true }, CHIMES_PANEL_COPY.rowBooting],
     ] as const;
     const notes = new Set<string>();

@@ -59,6 +59,8 @@ import type { FixitSpend } from '../fixit/engine.js';
 import { EDITOR_PARKING_STRATEGIES } from '../fixit/types.js';
 import type { EditorParkingStrategy, FixitCase, FixitState } from '../fixit/types.js';
 import type { ActionBarModel } from './actionBar.js';
+/* The currency's own words, from `data/chime-ledger.json` — § D530 authors them and no screen may. */
+import { CHIME_PRICES } from './chimesPanel.js';
 
 /**
  * The screen's authored chrome, one frozen object so the honesty sweep renders every sentence.
@@ -167,6 +169,34 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   elevationNone: 'as the building draws it',
   elevationAtCeiling: 'This is as far as a repair budget moves a floor; a bigger rise is a capital project.',
   elevationPriced: 'once, however far it moves',
+  /*
+   * **The one thing on this screen bought with chimes rather than units** — GitHub issue **#579**,
+   * [§ D911](../../../../DECISIONS.md), `docs/38` § 2.1's *"A wider budget can be bought … in steps
+   * the scenario authors"*.
+   *
+   * Four sentences and a label, and the care in them is about **which currency is which**. Units
+   * are the owner's money inside this case and chimes are what finishing turns pays; a row that
+   * blurred them would be the one thing [§ D530](../../../../DECISIONS.md) picked the name against.
+   * So the label says *the owner will stretch to*, the price says *chimes*, and no sentence here
+   * puts the two on one side of an equals sign.
+   *
+   * **No figure is written into any of these strings.** The units and the price are composed beside
+   * them from `data/fixit-cases.json`'s own rung, for `chimesPanel.ts#purseOffer`'s reason: one
+   * authority for what a step buys, and a copy of it in prose would be a second.
+   */
+  budgetRungLabel: 'What the owner will stretch to',
+  /** What buying it does, said before the press. */
+  budgetRungOffer:
+    'Ask the owner for more, out of what finishing things has paid you. The building does not ' +
+    'change and neither does what counts as fixed \u2014 you can just afford more of it.',
+  /** And once it is bought, which is the same sentence in the past tense. */
+  budgetRungOwned: 'The owner stretched. This is as far as this case goes.',
+  /** The tally will not cover it. The shortfall is composed beside this, never inside it. */
+  budgetRungShortLead: 'Short by',
+  /** Nothing has paid a chime yet, so there is nothing to ask with. */
+  budgetRungNone:
+    'Finish something \u2014 a case like this one, a contract day, a rush \u2014 and this is what ' +
+    'the chimes it pays are for.',
 } as const);
 
 /** One case rail row, worded. `towerLine` comes through {@link buildingLineOf}. */
@@ -514,6 +544,83 @@ export function fixitElevationRow(
         : undefined,
     canStepDown: state.topFloorRaiseM > 0,
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The bought budget rung — GitHub issue #579
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The one row on this screen priced in **chimes**, or `null` where the case file authors no rung.
+ *
+ * `null` rather than a disabled row, on `fixitZoneRow`'s precedent and for its reason: a control
+ * over a ladder that does not exist is a press that writes nothing, and `data/fixit-cases.json`
+ * authoring an empty `budgetSteps` is a statement the screen should honour by drawing nothing.
+ */
+export interface FixitBudgetRungRow {
+  readonly key: 'budget';
+  readonly label: string;
+  /** What the case's budget is **now**, in units — the base, or the base plus what was bought. */
+  readonly readout: string;
+  /** What the next rung costs, in the currency's own words. Absent once there is no next rung. */
+  readonly priced: string | undefined;
+  /** Whether the press is live. It is live exactly when this is `buy`. */
+  readonly offer: 'buy' | 'short' | 'none' | 'owned';
+  /** The one sentence this row owes on every arm, including `buy`. Never empty. */
+  readonly note: string;
+}
+
+/**
+ * The rung row for this case and this device's tally.
+ *
+ * **Every figure is the caller's**, and that is the same division `fixitMachineryRows` keeps
+ * against the budget: this module holds no second opinion about what a rung costs, what a case's
+ * budget is now, or what has been banked. What it decides is which of the four sentences a player
+ * is owed, and the order of the tests is the order they are worth saying in — **owned first**,
+ * because *there is no rung above this* is true whatever the tally holds; then *nothing banked*,
+ * because a player with nothing is not *short by six*, they have not started; then the shortfall.
+ */
+export function fixitBudgetRungRow(input: {
+  /** The case's budget now, in units — base plus anything already bought. */
+  readonly unitsNow: number;
+  /** What the next rung costs in chimes, or `undefined` where there is none. */
+  readonly nextChimes: number | undefined;
+  /** What this device has banked. */
+  readonly balanceChimes: number;
+  /** Whether this file authors any rung at all. */
+  readonly laddered: boolean;
+  /**
+   * The currency's own singular and plural — `data/chime-ledger.json`, never spelled here.
+   *
+   * **Defaulted rather than required**, and the default is the shipped table's: § D530 authors
+   * `one` and `many` in `data/`, so a caller that had to pass them would be a second place the
+   * currency's name could be got wrong. It stays injectable because a test that drove the shipped
+   * words could pass by accident — `fixitScreenModel.test.ts` invents a currency for exactly that.
+   */
+  readonly currency?: { readonly one: string; readonly many: string } | undefined;
+}): FixitBudgetRungRow | null {
+  if (!input.laddered) return null;
+  const currency = input.currency ?? CHIME_PRICES.currency;
+  const readout = `${String(input.unitsNow)} u`;
+  const base = { key: 'budget' as const, label: FIXIT_SCREEN_COPY.budgetRungLabel, readout };
+  if (input.nextChimes === undefined) {
+    return { ...base, priced: undefined, offer: 'owned', note: FIXIT_SCREEN_COPY.budgetRungOwned };
+  }
+  const priced = `${String(input.nextChimes)} ${input.nextChimes === 1 ? currency.one : currency.many}`;
+  if (input.balanceChimes <= 0) {
+    return { ...base, priced, offer: 'none', note: FIXIT_SCREEN_COPY.budgetRungNone };
+  }
+  if (input.balanceChimes < input.nextChimes) {
+    const short = input.nextChimes - input.balanceChimes;
+    const unit = short === 1 ? currency.one : currency.many;
+    return {
+      ...base,
+      priced,
+      offer: 'short',
+      note: `${FIXIT_SCREEN_COPY.budgetRungShortLead} ${String(short)} ${unit}.`,
+    };
+  }
+  return { ...base, priced, offer: 'buy', note: FIXIT_SCREEN_COPY.budgetRungOffer };
 }
 
 /**

@@ -65,6 +65,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The after-press row’s id — GitHub issue #581, and `ENERGY_FIGURE_IDS` one entry up is the ' +
+        'precedent it is claimed on. `AFTER_PRESS_ROW_ID` is `after-press`, the `ReportDiagnosis.id` ' +
+        'a renderer or a test names the row by without matching on its words, and it is derived only ' +
+        'because the two-adjacent-words scanner reads a hyphenated id as prose. An id is a contract, ' +
+        'not a string a player reads: the row’s three drawn strings are `afterPressBeatOf`’s, which ' +
+        '`honesty/surfaces.ts#SHIFT_REPORT` claims and the `report.diagnosis` loop seeds by name on ' +
+        'the intervened day of every case.',
+      ids: ['shift/afterPress.ts#AFTER_PRESS_ROW_ID'],
+    },
+    {
+      reason:
         'The locator’s two vocabularies and the function that returns them — `shift/trouble.ts`, ' +
         'GitHub issue L7’s shape. `TROUBLE_SOURCES` is `held-landing`/`hold`/`deepest-queue`/' +
         '`worst-wait` and `LOCATED_FIGURE_IDS` is `standing-here`/`past-band-here`/' +
@@ -1899,6 +1910,39 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'quietly reverted the menu to four tiles goes red rather than passing by matching an old ' +
         'transcription.',
       ids: ['everyday/actionBar.ts#GUIDE_MENU_PRIMARY'],
+    },
+    {
+      reason:
+        'The device chime ledger\u2019s record, its two storage keys and its reducers \u2014 GitHub ' +
+        'issue #579, DECISIONS.md \u00a7 D911, \u00a7 D711 clauses 1\u20136. None of them authors a ' +
+        'string a player reads. `DEVICE_CHIMES_KEY` and `DEVICE_CHIMES_QUARANTINE_KEY` are the ' +
+        '`localStorage` slots, on `campaign/careerPersist.ts`\u2019 two keys\u2019 own ground one ' +
+        'entry below; `withTurn`, `turnKeyOf`, `boughtStepIdOf` and `decodeDeviceChimes` are the ' +
+        'record\u2019s arithmetic and its envelope, and the deriver collected them because ' +
+        '`literalsIn` scans comments and these carry long ones. **What a player actually reads off ' +
+        'this tally is driven rather than excluded**: the balance line and the home note through ' +
+        '`everyday/chimesPanel.ts` on the Settings surface, and the rung\u2019s four sentences ' +
+        'through `everyday/fixitScreenModel.ts#fixitBudgetRungRow` on the fix-it one. This module ' +
+        'decides what the number is; it decides no sentence about it.',
+      ids: [
+        'everyday/deviceChimes.ts#DEVICE_CHIMES_KEY',
+        'everyday/deviceChimes.ts#DEVICE_CHIMES_QUARANTINE_KEY',
+        'everyday/deviceChimes.ts#withTurn',
+        'everyday/deviceChimes.ts#turnKeyOf',
+        'everyday/deviceChimes.ts#boughtStepIdOf',
+        'everyday/deviceChimes.ts#decodeDeviceChimes',
+      ],
+    },
+    {
+      reason:
+        'One rung of a scenario budget, decoded \u2014 GitHub issue #579. It is ' +
+        '`scenario/budget.ts#decodeScenarioBudget`\u2019s own exclusion three lines up, narrowed to ' +
+        'the step: the violations it collects are **author-facing**, printed at load for whoever is ' +
+        'editing `data/campaign.json` or `data/fixit-cases.json`, and no player ever meets one ' +
+        'because a file that fails them does not ship. It became its own export when the fix cases ' +
+        'authored a ladder of their own, so that two documents could not grow two answers to what a ' +
+        'rung may carry.',
+      ids: ['scenario/budget.ts#decodeBudgetStep'],
     },
     {
       reason:

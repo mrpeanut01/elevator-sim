@@ -179,7 +179,17 @@ describe.skipIf(!HAS_BROWSER)('the Scenario hub opens the stage that was pressed
       expect(budgets.length).toBeGreaterThanOrEqual(2);
       for (const line of budgets) {
         expect(line).not.toMatch(/\bcan be bought\b|\bchimes?\b/iu);
-        expect(line).toContain('No screen in this build sells a wider budget');
+        /*
+         * **The literal narrowed in wave AF and the claim did not weaken** — GitHub issue #579,
+         * § D911. It read *No screen in this build sells a wider budget*, which stopped being true
+         * when the fix cases got a rung: a cleared case now earns, and the earning buys a wider
+         * budget there. It is still exactly true of **these ten**, which are played on the Engineer
+         * surface and have no budget control at all, so the sentence narrowed rather than went.
+         *
+         * The line above is the half that matters and is unchanged: these rows may not promise a
+         * purchase, in `can be bought` or `chimes`, that the Scenario hub cannot deliver.
+         */
+        expect(line).toContain('Nothing sells a wider budget for these ten');
       }
     } finally {
       await page.close();

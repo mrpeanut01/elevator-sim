@@ -457,7 +457,16 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
 
   /* --- the four editors’ working copies ---------------------------------- */
   'viewer.dispatcherSpec':
-    'a working copy is a diff against something in data/, and data/ is free to change between the save and the load — a restored draft of a different profile is worse than no draft',
+    'a working copy is a diff against something in data/, and data/ is free to change between the '
+    + 'save and the load — a restored draft of a different profile is worse than no draft. **And '
+    + 'since § D886 (GitHub issue #575) it is viewer.levers’ case as well**, which is the stronger '
+    + 'of the two grounds now that it is the weaker one that has a caveat: drivingProfileOf composes '
+    + 'the run’s weights out of this copy, so moved off the profile it names it makes a run '
+    + 'unreproducible elsewhere (runIdentity.ts refuses it by name, with editingDispatcherId beside '
+    + 'it), and a reload is not the moment to inherit that silently. The cost is stated rather than '
+    + 'hidden: a player who tunes and reloads loses the tuning, exactly as a player who moves a '
+    + 'group lever and reloads does, and the verb that keeps a vector is Save as new — which is '
+    + 'what gives it an id the reload can resolve',
   'viewer.editingDispatcherId': 'names which profile that working copy is a diff against; it goes with it',
   'viewer.patternSpec': 'a working copy, excluded on the ground the dispatcher spec is',
   'viewer.editingPatternId': 'names what the pattern working copy is a diff against; it goes with it',

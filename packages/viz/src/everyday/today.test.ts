@@ -30,7 +30,7 @@ import type { ShiftEvent } from '../shift/types.js';
 import { carsToDerate } from '../shift/incidents.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { GoalReading, WeekState } from '../shift/types.js';
-import { ladderTowerConfig, rungFor } from '../shift/ladder.js';
+import { ladderRowFor, ladderTowerConfig, rungFor } from '../shift/ladder.js';
 import { openWeek } from '../shift/week.js';
 
 import { EM_DASH, groupThousands } from './figures.js';
@@ -157,6 +157,83 @@ describe('the badge names the car the run actually holds', () => {
     expect(record.outOfService?.sentence).toContain(
       scheduledEventFor(NO_CALENDAR, busy.day, busy.dayIdx).note,
     );
+  });
+});
+
+/**
+ * One more building beside the three {@link resources300} loads, resolved the way `dev/data.ts`
+ * resolves them. Named by the caller rather than listed, so a case that needs a fourth tower does
+ * not widen the fixture every other case runs against.
+ */
+function resourcesWith(id: string): BrowserResources {
+  const config = parseBuilding(read(`buildings/${id}.json`));
+  const resolved = resolveBuilding(config, RESOURCES_300.elevatorSpecs);
+  return {
+    ...RESOURCES_300,
+    buildings: [...RESOURCES_300.buildings, resolved],
+    entries: [...RESOURCES_300.entries, { file: `${id}.json`, config, resolved }],
+  };
+}
+
+describe('the tower’s own booked absence reaches the strip — issue #576, § D871', () => {
+  /**
+   * The run's building rather than the authored one, which is the whole of what makes the strip
+   * true: `resolvedBuildingOf` is `shiftRunConfigOf(...).building`, so a rung that books a car out
+   * is already on the document this record reads. A fixture built from `buildings/crown-hotel.json`
+   * would have described a tower the player is not running.
+   */
+  function crownDayOne(): ReturnType<typeof todayOf> {
+    const resources = resourcesWith('crown-hotel');
+    const state: ViewerState = {
+      ...initialState(resources, 424_242n),
+      buildingId: 'crown-hotel',
+      dispatcherId: 'collective',
+      shiftLengthS: 1800,
+      campaignEventId: 'ordinary',
+      week: { ...openWeek('c7'), day: 1, dayIdx: 0 },
+    };
+    const building = resolvedBuildingOf(resources, state);
+    if (building === undefined) throw new Error('crown-hotel did not resolve');
+    return todayOf({
+      week: state.week,
+      calendar: NO_CALENDAR,
+      building,
+      buildingId: 'crown-hotel',
+      dispatcherName: 'Steady hand',
+      goals: pendingGoals(1),
+      seed: state.seed,
+      crowdIsToday: true,
+      firstSession: false,
+      units: 'metric',
+    });
+  }
+
+  it('names the car the rung books out, on a day whose wrinkle holds none', () => {
+    const record = crownDayOne();
+    const declared = ladderRowFor('c7')?.fabric.incidents[0];
+    expect(declared, 'c7 declares the absence this case is about').toBeDefined();
+    expect(record.outOfService?.badge).toBe(declared?.carId);
+    expect(record.outOfService?.sentence).toContain(`Car ${declared?.carId ?? ''} is booked out`);
+  });
+
+  it('says it comes back, because this one does — and publishes no figure for when', () => {
+    const record = crownDayOne();
+    const sentence = record.outOfService?.sentence ?? '';
+    expect(sentence).toContain('comes back before the end');
+    expect(sentence).not.toContain('does not come back');
+    /*
+     * No digit anywhere in it. The strip is drawn before the run, so an instant printed here would
+     * be a figure whose only source is a schedule the reader cannot see — `landingView.test.ts`'s
+     * rule, applied to the one sentence on this screen that describes something the run has not
+     * done yet.
+     */
+    expect(/\d/u.test(sentence), sentence).toBe(false);
+  });
+
+  it('is silent on a tower whose rung books nothing', () => {
+    // The negative control: the same code path, a contract with no declared absence, no strip.
+    const quiet = weekdayWhere((event) => holdOf(event) === 0);
+    expect(recordFor(midtown, quiet.day, quiet.dayIdx).outOfService).toBeUndefined();
   });
 });
 

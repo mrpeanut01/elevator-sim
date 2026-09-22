@@ -41079,6 +41079,8 @@ The effect-line tail narrows nothing. It names the row. A hint that says *look a
 
 This lane holds **D869–D878** and spends **D869 and D870**. D871 to D878 are unspent and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
 
+**Integrator's note, added on wave AF's integration and not by this lane's author.** That last sentence is now wrong about **D871**, and the correction belongs here rather than in a silent edit. When wave AE closed, D871–D910 sat *above* the highest heading written (D870), so under § D430 they were **free rather than holed** — a number a wave never reaches, with nothing above it, is free. Wave AF's reservation then opened at D871 and lane AF-A spent it (§ D871). So D872–D878 are the holes this paragraph describes; D871 is a heading. Lane AF-A found the collision, reported it, and correctly declined to edit another lane's entry after the fact — `CLAUDE.md`'s rule — which is why this note is signed by the integrator instead.
+
 ---
 
 ## D870 — the 10 u shuttle re-gear buys ascent on a complaint measured in descent, and the machinery figure counts what the patch buys rather than what the role is
@@ -41400,3 +41402,233 @@ somebody else's box.
 **The pinned argument is kept and narrowed rather than deleted.** `stageScreen.browser.test.ts` says *"a stage that entered playing would be a day the player never chose to start."* Measured, **nine** primaries reach the stage and on seven of them the player did choose. The sentence's real content is that the stage cannot tell *who asked* at the moment it builds the transport — true of the report's back arrow and of a watch — and the handoff removed the need for it to know. That scope belongs in its docstring; the assertion does not move.
 
 **What is left open, and it is not this.** The assessor's actual complaint was a collision of **words**: the brief's primary says `Start the day` and the overlay's button says `Start`. AE-D moved the other word, on one row of nine. The copy question — whether the stage-reaching primaries return to the guide's verbs and the overlay takes a playback verb instead — is **GitHub issue #573**, and it is deliberately not ruled here: it is a copy change with a corpus cost, and this wave's row was already measured. **D843 was drafted for it and is deliberately unspent**, because a ruling recorded and not implemented is its own defect — `CLAUDE.md` names a case that sat ruled-and-unimplemented for thirteen days.
+
+---
+
+## D886 — the dispatcher working copy reaches the run, and § D386's disclosure is superseded by wiring
+
+**Date: 2026-09-22 · Owner: lane AF-B (wave AF) · GitHub issue [#575](https://github.com/mrpeanut01/elevator-sim/issues/575) · Supersedes [§ D386](#d386)'s *"stay latent"* clause and nothing else in it · Binds `packages/viz/src/dev/state.ts`, `packages/viz/src/scope/surface.ts`, `packages/viz/src/scope/runIdentity.ts`, `packages/viz/src/everyday/rush.ts` and `packages/viz/src/dev/dispatcherEditor.ts`, so it is an entry rather than a docstring.**
+
+**Decision.** `dev/state.ts#drivingProfileOf` composes the run's profile from `state.dispatcherSpec` — every weight the term library declares, the three behaviour flags and the family moves — over the base `dispatcherId` names, while `state.editingDispatcherId` names that base. `scope/surface.ts` declares `viewer.dispatcherSpec` a **`within-day` control** and `viewer.editingDispatcherId` a `within-day` control with it. Every sentence the product draws about either field is derived through `scope/commitment.ts#commitmentOf`, so all of them changed themselves.
+
+### The cause was established by a run, because the issue named two candidates and forbade guessing
+
+Issue #575 measured *that* the Workshop's two weight-backed plain levers do not act and said explicitly that it had not established *why*: either the override never travels from `everyday/` into the run, or it travels and the terms are not consulted. Its own reading of `data/dispatcher-profiles.json` favoured the first and called that an inference.
+
+Traced through the shipped path at `midtown-office`, 900 s, seed 20 260 804, `collective`, with *How long anyone should wait* and *How much room to leave in a car* both at 100:
+
+```
+state.dispatcherSpec.weights        {waitTime: 100, starvation: 100, loadFactor: 100}
+drivingProfileOf(...).weights       {waitTime: 1}          ← identical at both ends
+config.dispatcherProfile.weights    {waitTime: 1}          ← identical at both ends
+legs                                433, byte-identical
+```
+
+**Candidate 1.** And candidate 2 is refuted on the same sitting rather than argued away: the same `loadFactor` weight put onto the profile through `savedDispatchers`, so that it reaches `SimulationConfig`, **does** move the legs. The term was being consulted all along; nothing was giving it a weight.
+
+### Why wiring now, when § D386 chose disclosure — its three grounds, answered in its own order
+
+1. **"It is the save path, which is separately owned (#228, #167)."** That ground has expired: **#228 is closed**. And the wiring needs no save — the working copy reaches the run as a *working copy*, exactly as `viewer.levers` reaches it without forking a profile. What a save is still for is giving the vector an **id**, which is what Compare, the gauntlet and the leaderboard resolve against; none of that moves here.
+2. **"It would make the Engineer surface's disclosure false."** It would have, because `DRAFT_NOTE` and `FAMILY_SCOPE_NOTE` were ternaries against `'draft'` with `''` as the other arm — so re-scoping emptied them. Both now have a `next-run` arm, in wording of their own rather than the levers' (`viewer.ruleRows`' note already made that argument: *§ D227 asks for true, not uniform*). The panel says *These weights take effect on your next run … over whichever dispatcher is driving*, and `runThisDispatcherStateOf`'s `select` / `saveFirst` affordance still describes something real: it asks for the run, and it files the vector.
+3. **"It would silently swap the running dispatcher."** **This one was right, and the run proved it inside a minute.** The first wiring had no gate, and `scope/scope.test.ts` — which moves each control and compares the legs — immediately reported `viewer.dispatcherId` and `free-play.dispatcherProfileId` as **inert controls**: the working copy's weights had overwritten the profile the player had just picked. A control that stops working because another one started is the defect this change is fixing, arriving from the other side.
+
+   So the gate § D386 rejected is the one that ships: the copy reaches the run exactly while `editingDispatcherId` names the driving profile. § D386's objection to it was *"the same edit would then travel or not according to a pointer the player cannot see"*, and that is the weakest joint in this decision, so it is answered in parts rather than waved at.
+
+   - **The pointer is drawn.** The Engineer editor's profile list marks the profile the panel is pointed at (`dispatcherEditor.ts`, `selected: profile.id === state.editingDispatcherId`), and the Workshop reports the open dispatcher and whether it is dirty through `EverydayHost.editedDispatcher()`.
+   - **It is no longer unstated.** `viewer.editingDispatcherId` was `presentation` with the words *"reaches no run"* on it; it is a control now, `commitmentOf` answers `next-run` for it, and `scope/probes.test-helper.ts` drives both arms and requires the legs to differ. The claim § D386 worried about being invisible is now a claim a run decides.
+   - **The behaviour is the one a player would describe.** `withDispatcher` already syncs the pointer when the copy is pristine and deliberately leaves it alone when it is not. So: tune the dispatcher you are running and the next run is tuned; pick a different one with edits standing and you get that one as the data ships it, with your edits still on the panel when you point back at their subject.
+   - **What is not established** is that a player reads the pointer that way in front of the product. No browser-tier case asserts it, and one that drives the Engineer profile list with a dirty copy and reads the note back is what would settle it.
+
+### The identity is the base's and the content is the copy's
+
+`profileFromSpec` already took `id: base.id`; the **name** is pinned to the base's too, because `dispatcherId` is what the brief, the report, the board and `scope/runIdentity.ts` all answer *who is driving* from, and a copy whose name field a player typed into would otherwise put a second answer beside it. A renamed copy runs under the name it is a copy **of**; *Save it and run it* is what makes a new name a dispatcher.
+
+### Invariant 5, which the wiring reaches and the wire does not
+
+A submission carries a dispatcher **id**, never a weight vector, so a tuned run replayed from its ids would come back `metrics-do-not-reproduce` — the accusation `scope/runIdentity.ts` exists to keep off an honest player. Both fields therefore gain a `CARRY_CHECKS` answer, and they fire together on purpose: they are one fact with two handles, and each names the remedy belonging to its own field. The baseline is the profile the run names rather than a constant, on the `selectorSpec` arm's stated ground.
+
+A **rush** is the same question with a shorter fuse, because it posts to a board the server verifies by replay. `dispatcherSpec` and `editingDispatcherId` move from `'surface'` to `'fresh'` on `everyday/rush.ts#RUSH_FIELD_ROLES`, with the same exception `selectorSpec` already carries: seeded from the dispatcher the player *brings*, not from the one a session opens on (GitHub issue #523 item 2). `rushCrowd.test.ts` reads that back off the run rather than taking this paragraph's word for it.
+
+### What this does not promise, and the measurement that bounds it
+
+A weight that reaches the run is not a weight that must turn every decision. Swept at `midtown-office`, 900 s, seed 20 260 804, every term driven to 100 one at a time: **six move the legs under `collective` and nine under `eta`, of the fourteen `data/dispatcher-profiles.json` declares at the time of writing**, and two of the three behaviour flags move under both.
+
+The difference between the two dispatchers is **one field**, isolated rather than inferred: `collective` declares `hardConstraints: ["noDirectionReversal"]` and `eta` ships the identical weight vector with none. Adding that one field to `eta` makes the *patience* lever byte-identical; removing it makes it move. Reproduced across the library — the two shipped profiles that declare the constraint are quiet on `starvation`, the nine that do not all move.
+
+**No refusal is drawn from that anywhere**, and the restraint is the point. *No weight can make this term bite under this constraint* is a claim about the engine that nothing here has established: `core` says the constraint is *"a hard filter: no weight vector can buy past it"* about **eligibility**, which is not the same as saying an argmin over the survivors cannot turn on `starvation`. A sentence on a player's screen asserting the wider thing would be a stated mechanism in place of a measured one ([§ D256](#d256)), and a stale refusal aimed at a live control is the half [§ D227](#d227) rates worse. What would license it is a run across the operating space; it is **GitHub issue #575's remaining half** and is filed as measured rather than fixed.
+
+The rest of the sweep, for the same reason — reported either way, because a null bounds the defect:
+
+| quiet at the cells tried | why, where a reason is established |
+|---|---|
+| `waitTime` at 20 and 200 | scaling the only weighted term cannot move an `argmin`; at **0** it does move the legs |
+| `rideTime` | `authoring/dispatcherSpec.ts#inertTerms` already draws the refusal — inert until the call carries a destination ([§ D112](#d112)) |
+| `dutyMismatch` | already drawn — no car on this building declares a duty ([§ D549](#d549)) |
+| `flags.pool` alone | byte-identical; **with `rideTime` weighted it moves.** § D112's pairing seen from the flag's side, and the screen draws the refusal on the weight rather than on the flag |
+| `diversionDetour` | **unexplained.** Quiet at 900 s day 1 and at 1 800 s day 10, under both dispatchers. No mechanism is offered |
+| `crowding` | quiet at day 1; **moves at day 10 / 1 800 s**, so it is an operating point rather than a seam |
+
+### What pins it
+
+`everyday/workshopTravel.test.ts` is the standing requirement's own instrument and is unchanged in shape: it asserts the **agreement** between the scope classification, the note the screen selects and the legs a run produces, never the outcome. Its one structural change is that a lever is now driven under **two** dispatchers rather than one — a declaration is about a field, not about one weight on one profile — and its recorded split moved from `travels: ['lobby']` to all four. Remove the binding from `drivingDispatcherSpecOf` and three of the four levers go quiet at both cells and the file is red, which is the property issue #575 asks for in as many words.
+
+---
+
+## D899 — a career day's onward press advances the career, rather than saying that it leaves it
+
+**Date: 2026-09-22 · Owner: LANE-AF-C (wave AF) · GitHub issue [#577](https://github.com/mrpeanut01/elevator-sim/issues/577) · Settles a [§ D227](#d227) reading the issue deliberately left open · Rules on: `packages/viz/src/everyday/reportView.ts`, `packages/viz/src/everyday/reportScreen.ts`, `packages/viz/src/everyday/campaignJourney.browser.test.ts`.**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds. #577 states the question and explicitly refuses to answer it — *"whether that is a § D227 violation or a navigation defect is a judgement this issue does not make, and whoever takes it should make it explicitly rather than by implication"* — so the answer is a ruling rather than a module's own note; and it binds a view module, a mount and a browser case, none of which owns the others.
+
+**The defect.** The sheet that closes a **career** day drew *Open the doors on Tuesday* as its most prominent control. The press ran `EverydayHost.openTomorrow` and went to the daily brief: the crumbs went from *All buildings / ⟨building⟩ / Contract / The day / How it went* to *Front door / Brief / The day*, the leave button went from *⤺ Leave the career* to *⤺ Leave today's tower*, and the contract, the purse, the wear clock and the day ladder stopped advancing. **A playability assessor played thirteen days believing they were still in a career before checking.** Career days were advanced through the `Back to ⟨building⟩` crumb, which no copy pointed at.
+
+**Nobody's module was wrong.** `reportView.ts` composed a correct daily label from `WeekState`; `host.ts#openTomorrow` advanced the week correctly and clears the campaign latch **by name**; `actionBar.ts` has no `brief` row for the `campaign` context, so the bar fell back to the daily one. Three correct pieces whose composition swapped the player's mode, which is why no unit caught it and why the case that pins the fix is a browser case.
+
+**The decision, and why this direction.** § D227 binds a control's words to what it does, and it is satisfiable from **either** end — which is exactly why it cannot settle this alone. What settles it is that the player chose the career and the sheet is the end of a career day: *the next day* has an unambiguous referent there, and it is this contract's day `n + 1`. A label reading *"Open the doors on Tuesday — this leaves the career"* would be honest **and** would leave the career's own onward step the least prominent thing on the screen with the mode change as the default, which is fixing a navigation defect by describing it. So the words stay a promise about the next day and the press is made true of the career: `Open the doors on day ⟨n⟩ at ⟨building⟩`, pressing `EverydayHost.runCampaignDay` and landing on § 7's stage with the campaign timeline intact.
+
+**What is deliberately not offered, answering #577's second criterion.** The daily route is **not** kept on this sheet as a secondary. Nothing is lost: `⌂ Modes` is one rail row away on every screen and says where it goes, and no other control on the career sheet ever offered the daily loop. #577's fourth criterion is met by leaving `Back to ⟨building⟩` exactly where it is — it is still the route to the desk where works, needs and a renewal are decided, and the new press is deliberately the **same pair of calls** the contract sheet's own primary makes, so a day started from the sheet and a day started at the desk cannot differ.
+
+**One refusal comes with it.** A contract that has filed its last day draws **no** onward button at all, rather than one promising a day `campaign/career.ts#fileDay` will refuse: `tower.day` runs 1…`CONTRACT_DAYS` and reaches 21 when the twentieth is filed, past which the next press is § 8.9's renewal on the desk. An absent control is the honest state; a present one with a reason would be a button offering a day that does not exist.
+
+**Pinned by a run rather than by this entry.** `campaignJourney.browser.test.ts` reads the **label before the press and the crumbs and the leave button after it**, because § D227 is a relation between the two and either half alone passes on a build this issue was filed against. A second case walks the same control on § 6's daily loop and requires it to still open tomorrow's brief — the other polarity, so a repair cannot take the daily button's behaviour with it.
+
+---
+
+## D900 — the day report's line about a press states co-occurrence, and says so in the copy a player reads
+
+**Date: 2026-09-22 · Owner: LANE-AF-C (wave AF) · GitHub issue [#581](https://github.com/mrpeanut01/elevator-sim/issues/581) · Applies [§ D256](#d256) to a player surface · Rules on: `packages/viz/src/shift/afterPress.ts`, `packages/viz/src/shift/report.ts`, and through `dayReportOf` the three renderers that draw a `ReportDiagnosis`.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: the row is authored in `shift/afterPress.ts` and binds `shift/report.ts`'s diagnosis section — whose own docstring had said *two rows, both of them events* since issue #56 — and reaches `dev/reportPanel.ts`, `everyday/reportScreen.ts` and `render/reportCard.ts` without any of them being asked.
+
+**The finding.** `docs/43` P3 scored understandability **6 / 10** against a bar of 8, and the assessor named the missing link: nothing on the career day report says which press moved which figure. The figures are on the sheet and the presses are on it — `metaLinesFor` prints `09:14 · parked the cars in the lobby` for every entry in the run record's log — and the relation is drawn nowhere. The **rush** sheet is the product's own proof that the sentence is writable here, and the assessor quoted it.
+
+**The decision: #581's route 2, and the copy says which route it is.** The row names the **last** press inside the run, its clock, the standing count at that instant, the standing count at the end and the deliveries between the two, and then says, in the string a player reads: *"This is what the day did after the press, not what the press did: the day was not run again without it, so nothing here measures the change. One run either way would not settle it — the bench is where a difference is shown, over many runs of the same crowd."*
+
+**Route 1 was rejected on this repository's own statistical rule rather than on cost.** #581 offers the counterfactual — the same day, same seed, with the press removed — and it is genuinely obtainable: the day re-simulates in under two seconds. What is not obtainable is the **claim**. A with/without pair on one seed is **one replication**, and `CLAUDE.md`'s discipline is that no difference is declared without a paired-t interval excluding zero at 50–200 replications, because ten produced a 12 % error against the converged mean in the reference study. Publishing that single pair under the word *moved* would be precisely the confident nonsense the rule exists to stop, on the surface a player trusts most. A day report is not a bench, and the sheet already points at the bench for the question it may not answer.
+
+**Four properties the row keeps, and the last is the one pinned by a run.** No mean of anything, so R3's `suppressed-mean` class has nothing to sit beside and R13 has no estimate to catch — every figure is a count of people or a clock. Every figure carries the cohort it is over, in the sentence rather than by position. The window runs from the last press to the end, so **no other press falls inside it**, and the count of earlier presses is stated so a reader cannot take the window for the day's. And **no causal verb appears anywhere in the row** — `afterPress.test.ts` fails on *moved*, *because*, *caused*, *led to*, *resulted in*, *thanks to*, *improved* and five more, which is `CLAUDE.md`'s rule that a stated refusal goes stale exactly the way a stated mechanism does, met by a run rather than by this paragraph.
+
+**A day nobody touched draws nothing**, which is #581's fourth criterion and is the same shape `interventionLogOf` already has: `[]` for an empty log, never a placeholder line. Three states return no row — an untouched day, a press stamped at or past the run's end (there is no window to read), and a record whose presses fall outside its own span.
+
+**It passes issue #56's own test rather than being exempted from it.** That issue removed a third diagnosis row for being a methodology footnote wearing a timestamp — identical on a flawless day and a collapsed one, with nothing happening at the clock it carried. Something did happen at this row's clock: the player pressed a control, and the record holds the second. It is appended **last** because the two rows above are readings of the run and this is a reading of the player, and because `render/reportCard.ts` draws `diagnosis[0]`.
+
+**No record moved and no version was bumped.** The row is derived at draw time from `VizRecording.legs` and the `interventions` log, both already in the persisted record at its current version; `ViewerState.report` is deliberately not persisted (`persist/types.ts` § *what is deliberately not here*, item 2). Invariant 5 is untouched.
+
+---
+
+
+---
+
+## D911 — the chimes loop closes for one sink in one mode with no account and no server: a device ledger that spends, and a scenario budget rung priced by the scenario
+
+**Date: 2026-09-22 · GitHub issue [#579](https://github.com/mrpeanut01/elevator-sim/issues/579) · Rules on: [`docs/38`](docs/38-what-the-game-is.md) §§ 2.1 and 2.4, [§ D711](#d711) clause 7 and its § 5, [§ D227](#d227), `packages/viz/src/everyday/deviceChimes.ts`, `packages/viz/src/everyday/chimeStore.ts`, `packages/viz/src/fixit/budgetRungs.ts`, `packages/viz/src/everyday/chimesPanel.ts`, `packages/viz/src/everyday/rail.ts`, `packages/core/src/config/chimeLedger.ts`, `data/fixit-cases.json`. Cites [§ D526](#d526), [§ D530](#d530), [§ D533](#d533), [§ D490](#d490), [§ D672](#d672), [§ D738](#d738), [§ D606](#d606), [§ D256](#d256), [§ D343](#d343), [§ D405](#d405).**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds. It binds modules in two packages that no one of them owns — `core`'s table projections, the viewer's device ledger, the fix-it screen, the Settings panel and the rail; it **moves something already recorded**, because [§ D711](#d711) clause 7 says in terms that the device ledger *does not spend*; and it answers a question two documents refuse to close without one.
+
+### 1. What was wrong, measured rather than described
+
+A playability assessor drove the built bundle for roughly forty sittings and asked `docs/43` P4's tomorrow question unprompted. Its second answer was the rush board, which reports *"This site has no leaderboard server behind it."* Its first was the career's day-19 renewal. And Settings read *"You have no chimes yet… this build keeps none on this device"* with **all three listed purchases refused**. P4 entertainment scored **5 / 10** against a bar of 8.
+
+Every one of those sentences was true. `docs/38` § 2.4 makes chimes **the one currency earned by playing** and § D526 makes them the thing that carries a player between sittings, and as served the currency could be neither earned nor spent. **The cause is one line**: `dev/main.ts` builds no ledger client without an `apiOrigin`, so `bankCompletion` was `undefined`, and **the deployed bundle is built that way**. A stranger who cleared three fix cases had finished eighteen chimes' worth of turns and was shown a hard zero.
+
+### 2. The ruling
+
+1. **[§ D711](#d711) clauses 1–6 are built.** `everyday/deviceChimes.ts` is the pure half and `everyday/chimeStore.ts` the `localStorage` half, on the split `campaign/careerPersist.ts` / `everyday/careerStore.ts` already keeps: its own versioned slot, memory-only where storage is denied **with the player never told it saved**, quarantine-on-corrupt, and a one-way seal on clear.
+2. **Turns, never a balance**, and the balance derived on every read. `core`'s new `chimeEarnTableOf` is the crossing, exactly as `chimeSpendTableOf` is: what comes over is a map from **completion** to figure, so no binding in `packages/viz` holds a table with `sources` on it and `boundaries.test.ts`' rule is untouched.
+3. **[§ D711](#d711) clause 7 is amended: the device ledger spends, on exactly one thing.** That clause was a *measurement* and said so — *"the day a device-reachable sink exists is the day this clause is revisited, by a decision that cites a run rather than a plan."* One exists, and it is a sink the clause could not have counted because it is **not a sink**: a scenario's budget rung is priced **by the scenario** (`docs/38` § 2.1 and § 2.4, and `core/config/chimeLedger.ts#REFUSED_MODIFIER_KINDS` refuses a second price for it by name), so it needs no ledger sink, no route, no token and no account.
+4. **The fix cases author that ladder in their own file.** `data/fixit-cases.json` gains one `budgetSteps` rung — **+6 units for 6 chimes** — at `data/campaign.json`'s own one-chime-per-unit rate. **One ladder for all eighteen cases**, because a fix case's base budget is drawn from § 10.2's single 10–16 u band, so the rung is a property of the band rather than of a case. Both figures are **CHOSEN and neither is measured**, on `data/chime-ledger.json`'s standing provenance ruling, and the file says so at length.
+5. **A bought rung is the same case with a bigger `budgetUnits`.** `fixit/budgetRungs.ts#caseAtRung`, applied once in `fixitScreen.ts#currentEntry`, so every consumer that already reads that field — `affordabilityOf`, `spendOf`, `budgetNoteOf`, `fixitSpendSummary`, `classifyOutcome` — reaches it without learning a new concept. A `FixitState` field was the alternative and would have needed each of those call sites to consult it, or to go on quietly charging against the base.
+6. **The three ledger sinks are untouched and stay refused off an account**, each on its own row with its own cause. A scenario rung is not one of them and may not become one.
+
+### 3. The run that earns clause 3, and what it measured
+
+`packages/viz/src/fixit/budgetRungReachesTheRun.test.ts`, in the shape [§ D427](#d427) uses and `scenario/budgetReachesTheRun.test.ts` sets: three arms, the third making the second mean anything. The subject is **searched for in the shipped file rather than named**, so a rebalance turns the file red instead of vacuous.
+
+Measured on `zoning-starves-the-top`, base **12 u**, rung **+6 u for 6 chimes** → **18 u**:
+
+| arm | selection | what the budget does | legs |
+|---|---|---|---|
+| 1 | `redraw-by-headcount` (6 u) | admitted at base | move off the as-built run |
+| 2 | `+ regear-the-upper-car` (10 u, total 16 u) | **refused** at 12 u — `toggleRepair` returns the state unchanged | identical to arm 1's, to the boarding |
+| 3 | the same pair at the bought rung | **admitted** at 18 u | **129 of 200 boarding legs differ** from arm 1's |
+
+And the bar does not move with the budget: `fixitRunPlanOf` reads the patches and the seed and never `budgetUnits`, so the two run plans for one selection are deep-equal at both rungs. `charter` non-goal 6 holds by construction rather than by a bound, and the test asserts it rather than arguing it.
+
+### 4. What is deleted on this commit, and what is kept — § D227 in both directions
+
+**Deleted, because it stopped being true:**
+
+- `chimesPanel.ts#CHIMES_PANEL_COPY.signedOutHome` — *"there is no tally yet … this build keeps none on this device"* — and with it the `signed-out` `ChimesHome` arm. The name `device` is **taken back** from the arm PR #485's review renamed, on that review's own condition: *"a future `device` ledger has to introduce its own name rather than inherit a sentence."* This is that ledger.
+- `chimesPanel.ts#CHIMES_PANEL_COPY.rowSignedOut` — *"Sign in and there is a tally to spend this from"*, which told a player off an account that there was no tally at all.
+- `rail.ts#BankedAnswer`'s `signed-out` and `no-ledger` arms and the two lines they drew — *"sign in to bank it"* and the bare turn. `dev/main.ts#bankCompletion` now banks on this device with no server and no account, so both told a player who had already been paid that they had not been.
+
+**Kept, because it is still true:**
+
+- `chimesPanel.ts#SPEND_ABSENCES['rush-purse-top-up']` — no between-round rebuild travels for the rush ([§ D606](#d606) § 2). Unchanged, and issue #557 is explicit that it must not be folded in with anything.
+- `scenarioModel.ts#SCENARIO_ABSENCES`' first row — the ten campaign stages are played on the Engineer surface and a clear there banks no chime.
+- `scenario/ladder.ts#SCENARIO_LADDER_COPY.openNote` — the same fact on the stage row itself.
+
+**Narrowed, because half of it stopped being true:** `scenario/ladder.ts#SCENARIO_LADDER_COPY.baseRungNote` read *"No screen in this build sells a wider budget"*. One does now, for the fix cases. It is still exactly true of **these ten stages**, and for a reason nothing here changed — they are played on the Engineer surface, which has no budget control at all — so the sentence says *these ten* rather than *no screen*. That is the difference between a refusal a reader can check and one that has quietly stopped being true somewhere else.
+
+### 5. What this does **not** claim
+
+**The loop closes for one sink in one mode.** Clearing a fix case pays, and that payment buys a wider budget on a fix case. Nothing here says the currency is finished: the three ledger sinks still need an account, no rush rebuild travels, the ten campaign stages sell no rung, and `docs/43` P4's tomorrow question is **not** declared answered — issue #579 makes an assessor who plays the acceptance test, and that has not been re-run. Wave AC-2's roadmap row claimed the chimes loop *"closes at both ends"* and had to be corrected; no such sentence is written here.
+
+**No retention claim is made in either direction.** That a visible tally brings a player back is `charter S4` and is unmeasured; no copy and no docstring says it, and no plausible replacement sentence goes in its place ([§ D256](#d256), [§ D280](#d280)).
+
+**No invariant 5 bump.** A bought rung enters no persisted run record: `watch/record.ts#watchRecordOf` is derived from `ViewerState`, the fix-it pair is built by `fixitRunPlanOf` from the case's own seed and patches, and the budget is not a field of either. `WATCH_RECORD_VERSION` is unmoved and every saved recording still replays — which is worth saying because a bump invalidates every one of them and would have been a real cost quietly paid. **No `ViewerState` field is added**, so `dev/scopeNotes.audit.test.ts`, `persist/persist.test.ts` and `scope/runIdentity.ts` are untouched.
+
+**GD11–GD14 hold.** Units stay money and chimes stay a tally of completed turns; a rung buys **a limit on a configuration**, which is GD13 clause 1's one permission. No slot opens, no missed day is bought back, no verdict or retry is for sale, and no chime figure appears on a results page — the fix-it row sits on the editor card, above the run, and the outcome card is untouched.
+
+**What is unmeasured and is not guessed at.** Whether 6 units is the right rung and 6 chimes the right price is **game feel**, and `data/fixit-cases.json`'s own block says so: there is no run behind either figure, no seed set and no interval. What *is* measured is what 6 units reaches, which is a different claim and is § 3 above.
+
+### 6. Numbers spent
+
+This lane held **D911–D925** and spent **D911 only**. **D912 to D925 are unspent** and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+---
+
+## D871 — a contract may book one of its own cars out part-way through the day, and Scenario 6's verdict turns on the answer
+
+**Date: 2026-09-22 · Owner: build lane AF-A (wave AF) · GitHub issues [#576](https://github.com/mrpeanut01/elevator-sim/issues/576) and [#578](https://github.com/mrpeanut01/elevator-sim/issues/578) · Binds `packages/viz/src/shift/ladder.ts`, `packages/viz/src/dev/state.ts`, `packages/viz/src/dev/data.ts`, `packages/viz/src/everyday/today.ts`, `packages/viz/src/everyday/briefScreen.ts` and `data/contract-ladder.json`, so it is an entry rather than a docstring ([§ D405](#d405)).**
+
+**Decision.** `ContractFabric` gains `incidents`: a list of cars the contract's tower takes out of passenger service, each named by `(bankId, carId)` with the fractions of the run it leaves and returns at. `dev/state.ts#shiftRunConfigOf` hands them to `shift/incidents.ts#withIncidents` beside the day's drawn wrinkle, so they arrive on the building the kernel is handed rather than beside it. `data/contract-ladder.json`'s **`c7`** row is the first and only user, and Scenario 6's day 1 is now a day whose verdict turns on a press.
+
+**The defect this answers, in the assessor's own measurements.** A playability panel drove the built bundle across roughly forty sittings and scored `docs/43` P1 **4 of 10** against a bar of 8, on one sentence: *no day's verdict turns on what the player does while watching it.* Today's scenario at Midtown Office read **Shift missed** under all twelve shipped dispatchers plus a handover — **13 of 13**. Career day 1 met every goal under **5 of 5** arms while the mean wait moved 16.6 → 12.7 → 20.4 s. And a decision census at the shipped `4×` found **0 people standing for 282 s and no prompt of any kind**. The figures moved in all three; the verdict did not, and the longest gap between decisions that mattered was **eighteen days**.
+
+**Why a rung and not a wrinkle, which is the whole of why a new field exists.** `shift/events.ts#eventFor` is pure in `(day, dayIdx)`. Every contract's day 1 is the *same* `(1, 0)`, so booking a car out on day 1 to give one tower a decision books one out on all sixteen — and re-derives every figure this repository has pinned at day 1, including `docs/33` § 4.7's whole table and § 4.6's four hundred energy runs. A rung is per contract by construction. `shift/calendar.ts` was the other candidate and is refused for the reason its own module note gives: *which event is today* has one answer with five non-test callers and every surface that captions a day, and a field read by `shiftRunConfigOf` alone would build a run one way and caption it another.
+
+**It is DC-R1's own line rather than a widening of it.** `docs/33` DC-R1's fabric substrate reads *availability — a car out of service, a bank derated*, and names `shift/incidents.ts` and `shift/events.ts` as where it is declared. What was missing was not permission but a **home**: a contract could say how many people were in its tower and could not say that one of its lifts leaves at half past eight. **No bar moved.** `shift/goals.ts#GOAL_BARS` is byte-identical, `goalsForDay` is untouched, and the schema still has no place to author one — `ladder.test.ts` reads the authored document and fails a key it does not name.
+
+**The measurement, at `docs/33` § 4.6's own cell** — day 1, `collective`, seeds `20 260 824 + 7 919 n`, `n = 0…49`, Crown Hotel's own 1 800 s, the mid-run press stamped at 504 s:
+
+| arm | misses | seeds rescued | seeds broken |
+|---|---|---|---|
+| as-built, no press | **22 / 50** | — | — |
+| *spread the cars* | 20 / 50 | 6 | 4 |
+| hand to `predictive-balanced` | **15 / 50** | 12 | 5 |
+| *park the cars in the lobby* | **23 / 50** | 3 | 4 |
+
+**Read the last row twice: the second setting of the same control is worse than pressing nothing.** That is the dominance check `docs/43` P1 asks for, answered in the affirmative on this contract's own lesson — a hotel has no dominant direction, so sending the idle cars to the front door is the wrong verb, and this is the one building in the set where that is true from the first minute to the last.
+
+**DC-4 holds either side, and that is why the rate moved too.** The car coming out took the as-built miss rate above the band, so the declared arrival rate goes **12 → 11**, inside the hotel profile's own `10–15`. Measured at the cell above, **both sides re-measured on this tree rather than one of them quoted**: **22 of 50 with the change and 25 of 50 with the row reverted** — and the 25 is exactly what `docs/33` § 4.7d published, so the base reproduces and the move is a move rather than a correction. `c7` sits inside `[1/3, 2/3]` on both sides of this entry and the target of 0.50 is unmoved. Two substrates moved and both are DC-R1's; **no third kind of knob was reached for**, which is the thing the ladder's schema exists to make unrepresentable.
+
+**The pinned day, proved by running both arms rather than by inspection.** Seed **20 268 743**, the same sequence at `n = 1`. As-built: worst wait **303 s** against the day's 230 s bar, and the sheet reads **Shift missed**. *Park the cars in the lobby* at 504 s: **311 s**, still **Shift missed**. *Spread the cars* at 504 s: **215 s**, and the sheet reads **Shift cleared**. `packages/viz/src/shift/pressDecidesTheDay.test.ts` runs all three, quotes the verdict lines off `dayReportOf` rather than off a goal predicate, asserts the legs differ and asserts the prefix before the press is identical — `CLAUDE.md`'s standing requirement, compared on the legs, in both directions. A second pinned seed (`20 316 257`, `n = 7`) carries the other half of the same criterion: **two distinct presses clear it**, so neither parking verb is *the* answer to this contract.
+
+**One caption defect found on the way, and it is the reason this entry binds a mount.** `briefScreen.ts` drew the tower's elevation with `carsToDerate(building, today.outOfService.badge.split(' · ').length)` — a count recovered from a sentence. That was right while the badge held exactly the wrinkle's cars and wrong the moment it could hold one the *tower* books out: on Crown Hotel the strip names car `D` and `carsToDerate(building, 1)` answers car `S`, so the picture would have greyed a lift the sentence beside it does not name. And the deeper half, which would have been wrong even with the right car: a lift booked out at half past eight **is running when that picture is drawn**. `TodayRecord.heldCarIds` carries the whole-day holds as a list and the brief reads it, so there is one `carsToDerate` per day record rather than one per reader.
+
+**What the player is told, and where.** `everyday/today.ts#outOfServiceOf` now draws two kinds of absence in one strip — the day's wrinkle holding a car for the whole morning, and the tower's own booking — read off `building.serviceEvents` on the **run's** building (`resolvedBuildingOf` is `shiftRunConfigOf(...).building`), so the strip cannot name a lift the kernel does not stand down. The sentence carries **no clock and no fraction**: the strip is drawn before the run, an instant printed there would be a figure whose only source is a schedule the reader cannot reach, and `today.test.ts` fails on a digit anywhere in it. What it does owe, and says, is the decision — *what the cars that are left do while it is away is yours to change*.
+
+**The census, re-taken on the pinned day at the shipped speed — and it is sampled off the run rather than played.** Said plainly, because the figure it is compared against was taken by driving the built bundle with Playwright. Sampled every 20 s of wall clock at `DEFAULT_STAGE_SIM_PER_REAL_S`, exactly the assessor's cadence, over the whole 450 s sitting Crown Hotel's 1 800 s day is at `4×`:
+
+| | the assessor's census (career day 2) | this day, seed 20 268 743 |
+|---|---|---|
+| first sample with anybody standing | **302 s** (1 person) | **40 s** |
+| longest stretch with nobody standing anywhere | **282 s** | **80 s** |
+| prompts to answer | **none** | the car leaves at **112.5 s** real and returns at **225 s** |
+
+So the **longest gap between moments that decide the day is 112.5 s** — the dispatcher pick before Run, the answer when the car goes, the tower whole again — against eighteen days for the first consequential choice the panel could find. `pressDecidesTheDay.test.ts` pins both census figures a sample either side of what was measured, so a change that emptied the screen for two and a half minutes fails rather than passing quietly.
+
+**What it is not**: a sitting. Nobody played this day in a browser to take these numbers; they are `observationsAt` over the recording at the same instants a player's screen would be showing. A Playwright census on the built bundle is what would make the two rows of that table the same kind of measurement, and until one is run the comparison is a derivation standing next to a sitting.
+
+**What is deliberately not fixed here, and it is the bigger half of #578.** Today's scenario at **Midtown Office** is still unclearable, and this lane measured why rather than moving anything: on the whole authored office day the energy goal's **80 kJ per ride delivered** is met by **one of thirteen arms** — `nearest-car`, at a 1 638 s worst wait — while the other twelve sit at **123–175 kJ**. `ENERGY_PER_LEG_MAX_KJ` was derived ([§ D468](#d468)) over day-1 runs at each contract's own `shiftLengthForContract`, which is **1 800 s** for Midtown; the Everyday day runs the authored **36 000 s** record, where the same building under the same dispatcher reads **151.9** against **35.6** over the peak half-hour. That is a bar and a run that are not the same measurement, and it is **§ D106's perverse ranking drawn on the flagship day**. Moving the bar is what `CLAUDE.md`'s working agreements forbid, so it is reported and not touched; what would settle it is a per-horizon or per-building derivation pinned to its own four hundred runs, which is GitHub issue #555's.

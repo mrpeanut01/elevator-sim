@@ -100,29 +100,53 @@ describe('the three behaviours the report treats as one — GitHub issue #104', 
     expect(commitmentOf('viewer.selectorSpec', 'writes-only')).toBe('next-run');
   });
 
-  it('has all four editor working copies stay drafts', () => {
+  it('has three of the four editor working copies stay drafts', () => {
     // The control the reporter describes moving. A draft is not an inert control and the note beside
     // each editor may not say it is one — `scope/types.ts#LatentEntry` makes that distinction, and
     // `realisedBy` is what stops a draft being indistinguishable from a dead seam.
-    expect(commitmentOf('viewer.dispatcherSpec', 'writes-only')).toBe('draft');
     expect(commitmentOf('viewer.patternSpec', 'writes-only')).toBe('draft');
     expect(commitmentOf('viewer.machineSpec', 'writes-only')).toBe('draft');
     expect(commitmentOf('viewer.buildingSpec', 'writes-only')).toBe('draft');
   });
 
-  it('keeps the four editor pointers out of every note', () => {
+  it('has the dispatcher working copy apply to the next run, which it did not until § D886', () => {
+    /*
+     * **The fourth, and it left this group rather than being dropped from it** — GitHub issue #575.
+     *
+     * It read `toBe('draft')` beside the other three for every wave between issue #296 and § D886,
+     * and that was the right assertion about the tree it was written on: `drivingProfileOf` composed
+     * the run from the base profile and never from the working copy. It reads the copy now, so the
+     * three panels that draw a note about this field — the Engineer editor's weights block, its
+     * family block, and the Workshop's action bar — each say *next run* instead of *draft*, and they
+     * say it because `commitmentOf` answers it rather than because anybody edited three sentences.
+     *
+     * Asserted rather than deleted, for the reason the group above exists: this is the one
+     * distinction `scope/commitment.ts` was built to make, and a working copy that silently went
+     * back to being a draft would put § D219's defect back on the screen a player is taught to tune
+     * on.
+     */
+    expect(commitmentOf('viewer.dispatcherSpec', 'writes-only')).toBe('next-run');
+  });
+
+  it('keeps three of the four editor pointers out of every note', () => {
     /*
      * The negative control. `editing*Id` sits next to `*Spec` in the table and is `presentation` —
      * issue #114's whole subject — so a panel that reached for the pointer instead of the draft
      * would draw a note about the wrong field and still be green. Here it is not.
+     *
+     * **`viewer.editingDispatcherId` is not among them since § D886.** The dispatcher working copy
+     * reaches the run exactly while that pointer names the driving profile
+     * (`dev/state.ts#drivingDispatcherSpecOf`), so it is the one pointer of the four a run reads,
+     * and calling it `shown-only` would be this file asserting the false half of the very
+     * distinction it is here to keep.
      */
     for (const key of [
-      'viewer.editingDispatcherId',
       'viewer.editingPatternId',
       'viewer.editingClassId',
       'viewer.editingBuildingId',
     ] as const) {
       expect(commitmentOf(key, 'writes-only'), key).toBe('shown-only');
     }
+    expect(commitmentOf('viewer.editingDispatcherId', 'writes-only')).toBe('next-run');
   });
 });
