@@ -179,6 +179,33 @@ describe.runIf(process.env['PRESS_LADDER_SWEEP'] === '1')('the press ladder swee
 });
 
 describe.runIf(process.env['PRESS_LADDER_CENSUS'] === '1')('the dispatcher census', () => {
+  /**
+   * **Fifteen minutes rather than the sweep's four hours, and the difference is measured.**
+   *
+   * This case landed annotated at the same `14_400_000` as the sweep above it, and lane AG-FIX-1's
+   * re-derivation of `testCost.test.ts`'s above-ceiling ratchet is what asked whether it earned
+   * one. It does not, by a factor that is not close: the register's own standard is that *an
+   * annotation shorter than the job it holds is an annotation that fails for a reason that is not
+   * the code*, and the converse has to hold too or the census counts bounds that say nothing about
+   * their jobs.
+   *
+   * Measured 2026-09-22 on this container at load average 3.3, `PRESS_LADDER_PINNED` set to the
+   * shipped ladder's seven press days: **91 runs in 10.18 s**. Four hours is 1 414× that.
+   *
+   * The bound has to cover the largest census anybody can ask for rather than the shipped one, and
+   * that set is bounded by the data: `PRESS_LADDER_PINNED` is one seed per contract, so the most
+   * that can ever run is sixteen contracts × thirteen shipped profiles = **208 runs**. Priced from
+   * the same sitting — the six supertall contracts cost 63.72 s over 18 runs (3.54 s a run) and the
+   * other ten cost 4.25 s over 30 (0.142 s) — that worst case is **295 s**. Fifteen minutes is
+   * 3.05× it, and reproduces the shipped map's measurement to within 27 % from the same two rates,
+   * which is what says the model is the job rather than a curve fitted to it.
+   *
+   * The sweep above keeps its four hours and earns them on the opposite arithmetic: at the default
+   * `PRESS_LADDER_SEEDS=20` it is 20 × 67.97 s = **22.7 minutes** measured in the same sitting, and
+   * the same instrument is re-run by hand at larger seed counts — `SEEDS=200` is **3.78 h**, which
+   * is what four hours brackets. That is `contractCurve.sweep.test.ts`'s own argument, and it is an
+   * argument about *this* case's job rather than a bound copied from the one above it.
+   */
   it('writes which standing orders clear each pinned day with no press', () => {
     const out = process.env['PRESS_LADDER_OUT'];
     expect(out, 'PRESS_LADDER_OUT names the file').toBeTypeOf('string');
@@ -203,5 +230,5 @@ describe.runIf(process.env['PRESS_LADDER_CENSUS'] === '1')('the dispatcher censu
         writeFileSync(String(out), `${lines.join('\n')}\n`);
       }
     }
-  }, 14_400_000);
+  }, 900_000);
 });

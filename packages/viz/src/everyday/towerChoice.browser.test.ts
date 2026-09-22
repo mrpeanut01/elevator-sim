@@ -15,14 +15,28 @@
  * `CLAUDE.md`'s standing requirement in the form a navigation control can take it: move the
  * control and require the state to change, read where a player reads it.
  *
- * Pattern and gate are `shell.browser.test.ts`'s: without `ELEVATOR_SIM_CHROMIUM` every case here
- * skips and the file reports a pass, which is why the tier is run with it set.
+ * Gate: without `ELEVATOR_SIM_CHROMIUM` every case here skips and the file reports a pass, which
+ * is why the tier is run with it set — `describe.skipIf(!HAS_BROWSER)`, which is the one spelling
+ * `dev/browserTier.test.ts` reads, and the other fifty-one files of the tier use.
+ *
+ * ## What it drives, and why not `shell.browser.test.ts`'s server
+ *
+ * **The shipped bundle**, through {@link startShippedSite} — GitHub issue #281, § D425. This file
+ * landed driving a `vite dev` server on `shell.browser.test.ts`'s pattern, and that pattern is the
+ * exception rather than the rule: `browserTier.test-helper.ts#DEV_SERVER_FILES` names four files
+ * that may, and the one reason any of them may is that each reaches into the module graph **by
+ * URL** — `page.evaluate("import('/src/everyday/host.ts')…")` — to drive `EVERYDAY_HOST`
+ * directly, a path that exists on a dev server and not in `dist-web/`.
+ *
+ * Nothing here does that. Every one of the three cases below goes to an origin, clicks a row and
+ * reads an attribute or a string back, so there was never anything to exempt: what it certified
+ * was an artifact nobody receives, which is exactly the defect #281 is about — and a scroll-reset
+ * bug had already lived in that difference. Converted by lane AG-FIX-1 rather than registered as a
+ * fifth exception, because the registry is *a floor and not a ceiling*: every file that **can**
+ * drive the bundle does.
  */
 
-import { fileURLToPath } from 'node:url';
-
 import { chromium, type Browser, type Page } from 'playwright-core';
-import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
@@ -31,30 +45,30 @@ import {
   leaveTutorialIfOffered,
   openEverydayDoor,
   openPage,
+  startShippedSite,
+  type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
 
-let server: ViteDevServer;
+let site: ShippedSite;
 let browser: Browser;
 let origin: string;
 
 beforeAll(async () => {
   if (!HAS_BROWSER) return;
-  server = await createServer({
-    configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
-    root: fileURLToPath(new URL('../..', import.meta.url)),
-    /* A port of its own — `strictPort: false` fails silently on a collision, so no file shares one. */
-    server: { port: 5331, strictPort: false },
-    logLevel: 'error',
-  });
-  await server.listen();
-  origin = (server.resolvedUrls?.local[0] ?? '').replace(/\/$/, '');
-  if (origin === '') throw new Error('the dev server did not report a URL');
+  /*
+   * The artifact players load, and not a `vite dev` server — GitHub issue #281, § D425. A port of
+   * its own, kept at this file's original 5331 so the tier's distinct-port clause still reads one
+   * number here; `strictPort: false` because files in one project run concurrently and a busy port
+   * should move rather than fail the case.
+   */
+  site = await startShippedSite({ preview: { port: 5331, strictPort: false } });
+  origin = site.origin;
   browser = await chromium.launch({ executablePath: CHROMIUM });
 }, 120_000);
 
 afterAll(async () => {
   await browser?.close();
-  await server?.close();
+  await site?.close();
 });
 
 /** A cold load with the Engineer menu dismissed, the tutorial left, and the front door open. */
@@ -77,7 +91,7 @@ async function selectedContract(page: Page): Promise<string | null> {
   return page.getAttribute('.everyday-door-tower[data-selected="true"]', 'data-contract');
 }
 
-describe.runIf(HAS_BROWSER)('the week’s tower is a control a player can press', () => {
+describe.skipIf(!HAS_BROWSER)('the week’s tower is a control a player can press', () => {
   it('opens the front door with a row per shipped tower and exactly one marked', async () => {
     const page = await atTheDoor();
     try {

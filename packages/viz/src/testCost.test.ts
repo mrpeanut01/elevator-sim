@@ -237,7 +237,60 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * what the ratchet's own message asks for; **nothing existing was raised to make room** — the
      * difference is exactly 14 400 000 and no more.
      */
-    ['viz', { count: 109, totalMs: 142_800_000 }],
+    /*
+     * **109 → 111 and 142 800 000 → 158 100 000, both are one file, and one of the two was
+     * brought *down* before it was registered** — § D871's `shift/pressLadder.sweep.test.ts`,
+     * integrated in wave AG and registered here by lane AG-FIX-1.
+     *
+     * **The entry above it was correct and incomplete, which is the useful half.** Lane AG-D
+     * derived 109 / 142 800 000 on its own branch, where its `energyBar.sweep.test.ts` was the only
+     * new gated instrument in the tree; lane AG-A's two landed in the same wave and neither lane
+     * could see the other's. The merged tree read **111 / 171 600 000** against a ratchet of 109,
+     * and the ratchet went red — which is it working rather than failing. Derived on both trees
+     * with `censusOf`, keyed on file and case name rather than on line:
+     *
+     * | | base `9db3528` | merged head | move |
+     * |---|---|---|---|
+     * | viz above ceiling | 108 | 111 | **+3** |
+     * | viz above-ceiling sum | 128 400 000 | 171 600 000 | **+43 200 000** |
+     * | viz-browser | 79 / 19 920 000 | 79 / 19 920 000 | **0** |
+     *
+     * **Zero removals and zero raises on either project**, measured as a set difference rather
+     * than inferred from the totals: the added set is exactly three sites, all at 14 400 000 —
+     * `energyBar.sweep.test.ts`'s one and `pressLadder.sweep.test.ts`'s two — and
+     * 3 × 14 400 000 = 43 200 000 exactly. So AG-D's *nothing existing was raised to make room*
+     * is confirmed on the integrated tree and not only on its branch, and AG-A's two were never
+     * annotated upward either: both were written on the commit that added the file.
+     *
+     * **The two are not registered on the same footing, and that is the finding rather than the
+     * bookkeeping.** They arrived carrying the same four-hour bound and only one of them holds a
+     * four-hour job. Measured 2026-09-22 on this container at load average 3.3:
+     *
+     * - *writes each contract's day as built and under each parking press* — sixteen contracts
+     *   × three runs is **67.97 s** at one seed, so the default `PRESS_LADDER_SEEDS=20` is
+     *   **22.7 minutes** and the hand-run `SEEDS=200` the file's own knobs exist for is **3.78 h**.
+     *   Four hours brackets that, which is `contractCurve.sweep.test.ts`'s argument applied to this
+     *   case's own job. **Registered at 14 400 000.**
+     * - *writes which standing orders clear each pinned day with no press* — **91 runs in 10.18 s**
+     *   at the shipped ladder's seven press days, and **295 s** for the largest census the data
+     *   permits (sixteen contracts × thirteen profiles, priced off the same sitting's two per-run
+     *   rates). Four hours is 1 414× the job and 48× the worst case. **Lowered at the site to
+     *   900 000** rather than registered, with the measurement in its own docstring — § D405.
+     *
+     * So the sum registered here is 128 400 000 + 14 400 000 + 14 400 000 + 900 000 =
+     * **158 100 000**, which is **13 500 000 less than the tree carried when this ratchet went
+     * red**. A raise that lands below the measured tree is the only kind this entry's own rule
+     * asks for: *raising a number here is a decision, not a fix*, and the decision available on a
+     * bound 1 414× its job was to fix the bound.
+     *
+     * **What this ratchet cannot see, said once rather than implied.** It counts annotations and
+     * sums them; it has no way to ask whether a bound is proportionate to the case it governs.
+     * `annotationCosts` is the instrument for exactly that and it needs a `--reporter=json` run,
+     * which nothing produces — the same missing wiring this file's own `scheduled: false` entry in
+     * `deepTiers.test.ts` names. A four-hour bound on a ten-second job passes every check in this
+     * repository, and the only reason this one was caught is that it happened to push a count.
+     */
+    ['viz', { count: 111, totalMs: 158_100_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this
@@ -575,12 +628,36 @@ describe('the annotation census is derived from the tree, not transcribed', () =
     const aboveSimulatingCeiling = (project: string): number =>
       census.annotations.filter((one) => one.project === project && one.ms > 300_000).length;
 
+    /*
+     * The fifth and sixth rows, added 2026-09-22 — **the two figures in that docstring this loop
+     * did not cover, and therefore the only two that were wrong.**
+     *
+     * The prose two lines under the table said the *above 300 000 ms* row *"sees four browser cases
+     * and misses the 63 that sit above the tier's own ceiling, including twenty annotated at
+     * exactly this file's constant"*. Measured on this tree the two are **75** and **31**, and
+     * measured on wave AG's base at `9db3528` they are **75** and **31** as well — so neither had
+     * been true for some number of waves and no wave moved them. Every figure this loop asserted
+     * was correct or went red on the commit that moved it; the two it did not assert drifted
+     * silently, in the paragraph whose own argument is that a census must ask each project about
+     * its own ceiling rather than about a number.
+     *
+     * That is the whole case for a claim list rather than a careful author, so they are in it.
+     * `browser?.above - aboveSimulatingCeiling('viz-browser')` is the difference the sentence is
+     * *about*, derived rather than subtracted by the reader, and the second is the browser tier's
+     * population at exactly this file's own constant — which is a different predicate from `at its
+     * own ceiling` above it, because that tier's ceiling is 120 000 and not 300 000.
+     */
+    const atSimulatingCeilingIn = (project: string): number =>
+      census.annotations.filter((one) => one.project === project && one.ms === 300_000).length;
+
     for (const claim of [
       `| annotations | ${viz?.total ?? 0} | ${browser?.total ?? 0} |`,
       `| above its own ceiling | **${viz?.above ?? 0}** | **${browser?.above ?? 0}** |`,
       `| at its own ceiling | ${viz?.at ?? 0} | ${browser?.at ?? 0} |`,
       `| above 300 000 ms | ${aboveSimulatingCeiling('viz')} | ${aboveSimulatingCeiling('viz-browser')} |`,
       `**${directory.length}** timeout annotations in all, of which **${atSimulatingCeiling}**`,
+      `misses the **${(browser?.above ?? 0) - aboveSimulatingCeiling('viz-browser')}** that sit ` +
+        `above the tier's own ceiling, including **${atSimulatingCeilingIn('viz-browser')}**`,
     ]) {
       expect(
         config,
