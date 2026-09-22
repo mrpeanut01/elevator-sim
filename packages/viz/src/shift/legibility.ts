@@ -206,6 +206,71 @@ import { isWaitingAt } from '../frame/overlay.js';
  * rises** ([§ D256](../../../../DECISIONS.md)); what is established is that both moves are a rung
  * reaching a run that it never used to reach.
  *
+ * ## Re-measured 2026-09-22, a second time the same day — six rungs moved under it
+ *
+ * **The table directly above is the shipped one no longer; this one is.** The re-measurement above
+ * ([§ D961](../../../../DECISIONS.md)) was taken on a branch, and a sibling lane in the same wave
+ * **rebalanced six of the seven rungs** to keep `docs/33` DC-4 after booking a car out of each of
+ * their days ([§ D914](../../../../DECISIONS.md)). So § D961 pinned a sweep over rungs that had
+ * moved by the time the wave integrated: `c2` let 0.395 → 0.34 plus a car out, `c3` crowd 12 → 11
+ * plus a car out, `c6` 16 → 15 plus a car out, `c8` 8.5 → **10.5** plus **two** cars out, `c10`
+ * 13.5 → 12 plus a car out, and `c9` a car out with its letting unchanged. Both lanes were right
+ * alone; the pin was stale on the merged tree. Re-measured on the same instrument at the same
+ * budget — sixteen contracts × 50 seeds = **800 days**, `collective`, day 1, ordinary, seeds
+ * `20 260 824 + 7 919 n` — [§ D963](../../../../DECISIONS.md):
+ *
+ * | contract | building | § D961, of 50 | median (s) | **merged tree, of 50** | **median (s)** |
+ * |---|---|---|---|---|---|
+ * | c1 | garden-apartments | 0 | 0 | 0 | 0 |
+ * | c2 | midtown-office | 38 | 239 | **35** | **165** |
+ * | c3 | secure-tower | 20 | 108 | **30** | **134** |
+ * | c4 | mixed-use-high-rise | 32 | 136 | 32 | 136 |
+ * | c5 | vertical-city | 45 | 191 | 45 | 191 |
+ * | c6 | chancery-house | 14 | 91 | **25** | **119** |
+ * | c7 | crown-hotel | 30 | 147 | 30 | 147 |
+ * | c8 | st-jude-hospital | 3 | 52 | **43** | **197** |
+ * | c9 | harbour-point | 11 | 56 | **20** | **96** |
+ * | c10 | ashgate | 32 | 161 | **27** | **125** |
+ * | c11 | ctf-class-reference | 50 | 1 221 | 50 | 1 221 |
+ * | c12 | shanghai-class-reference | 50 | 729 | 50 | 729 |
+ * | c13 | merdeka-class-reference | 50 | 459 | 50 | 459 |
+ * | c14 | one-wtc-class-reference | 1 | 13 | 1 | 13 |
+ * | c15 | empire-state-class-reference | 45 | 472 | 45 | 472 |
+ * | c16 | willis-class-reference | 50 | 2 347 | 50 | 2 347 |
+ *
+ * **Exactly the six rows whose rung moved moved, and the seventh rung-bearing row is the control
+ * — which nobody had to arrange for the second wave running.** `c7` is the one contract of the
+ * seven the rebalance did not touch, its incident predating it (§ D871), and it reproduces **to
+ * the second**: 30 of 50 at 147 s, and its first ten per-seed stretches are byte-identical to the
+ * pin `legibility.test.ts` already carried. The nine rung-less contracts reproduce to the second
+ * as well, counts and medians alike. So **ten of sixteen rows are a reproduction and six are a
+ * move**, and no row moved that had no reason to.
+ *
+ * **`c8` is the largest single move this table has ever recorded, and it is not a near miss.**
+ * St Jude's goes **3 of 50 → 43**, a median stretch of 52 s → **197**, on a rung that takes **two**
+ * of its cars out of passenger service for three tenths of the shift and raises its crowd from 8.5
+ * to 10.5 %. It is now the third-most legible game contract, above Midtown Office.
+ *
+ * **The eligible set gains three members and its published count moves for the first time since it
+ * was derived.** § D512's threshold is untouched — more than a third of fifty seeds, `> 16.67`, so
+ * seventeen — and under it `c6` (14 → **25**), `c8` (3 → **43**) and `c9` (11 → **20**) all cross
+ * from below to above. The set goes from **eleven** members to **fourteen**, and `c10`, which
+ * § D961 had just put in, stays in at 27. Only `c1` and `c14` are now out of sixteen.
+ *
+ * **Two readings this docstring has published for as long as it has existed stop being true, and
+ * both stop for the same reason.** *Chancery House and St Jude's are legible on 2 and 1 seeds,
+ * which is rarely rather than never and is the same verdict for a first session* was measured on a
+ * day with every car in service; both towers now book cars out, and both are eligible. *Harbour
+ * Point's letting works* — § D961's own correction, 11 of 50 — is still true of the letting and no
+ * longer true of the contract, because the contract now takes a car away as well: 20 of 50. **No
+ * mechanism is offered for the size of any of these moves** ([§ D256](../../../../DECISIONS.md));
+ * what is established is that a car out of passenger service is a rung this instrument can see,
+ * and that it moves every contract it is declared on in the same direction.
+ *
+ * **What this does not touch.** The threshold, the band, the window and the union are unmoved, and
+ * so is every rung — this is the measurement of somebody else's rebalance catching up with it, not
+ * a second rebalance. `c1` at 0 of 50 is unmoved and Garden Apartments is still not eligible.
+ *
  * The proportion carries its `n`, the stretch is a median, and there is no interval: no arms are
  * compared (`docs/33` § 6.5). `legibility.test.ts` pins the first ten seeds of every contract so
  * a change to the crowd, the bands or the union is red before this table is stale.
@@ -229,15 +294,15 @@ export interface LegibilitySweepRow {
  */
 export const LEGIBILITY_SWEEP: readonly LegibilitySweepRow[] = Object.freeze([
   { contractId: 'c1', buildingId: 'garden-apartments', legibleOf50: 0, medianStretchS: 0 },
-  { contractId: 'c2', buildingId: 'midtown-office', legibleOf50: 38, medianStretchS: 239 },
-  { contractId: 'c3', buildingId: 'secure-tower', legibleOf50: 20, medianStretchS: 108 },
+  { contractId: 'c2', buildingId: 'midtown-office', legibleOf50: 35, medianStretchS: 165 },
+  { contractId: 'c3', buildingId: 'secure-tower', legibleOf50: 30, medianStretchS: 134 },
   { contractId: 'c4', buildingId: 'mixed-use-high-rise', legibleOf50: 32, medianStretchS: 136 },
   { contractId: 'c5', buildingId: 'vertical-city', legibleOf50: 45, medianStretchS: 191 },
-  { contractId: 'c6', buildingId: 'chancery-house', legibleOf50: 14, medianStretchS: 91 },
+  { contractId: 'c6', buildingId: 'chancery-house', legibleOf50: 25, medianStretchS: 119 },
   { contractId: 'c7', buildingId: 'crown-hotel', legibleOf50: 30, medianStretchS: 147 },
-  { contractId: 'c8', buildingId: 'st-jude-hospital', legibleOf50: 3, medianStretchS: 52 },
-  { contractId: 'c9', buildingId: 'harbour-point', legibleOf50: 11, medianStretchS: 56 },
-  { contractId: 'c10', buildingId: 'ashgate', legibleOf50: 32, medianStretchS: 161 },
+  { contractId: 'c8', buildingId: 'st-jude-hospital', legibleOf50: 43, medianStretchS: 197 },
+  { contractId: 'c9', buildingId: 'harbour-point', legibleOf50: 20, medianStretchS: 96 },
+  { contractId: 'c10', buildingId: 'ashgate', legibleOf50: 27, medianStretchS: 125 },
   { contractId: 'c11', buildingId: 'ctf-class-reference', legibleOf50: 50, medianStretchS: 1221 },
   { contractId: 'c12', buildingId: 'shanghai-class-reference', legibleOf50: 50, medianStretchS: 729 },
   { contractId: 'c13', buildingId: 'merdeka-class-reference', legibleOf50: 50, medianStretchS: 459 },

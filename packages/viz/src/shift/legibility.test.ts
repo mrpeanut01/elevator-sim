@@ -106,33 +106,58 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
      */
     /*
      * **Re-measured 2026-09-22 with the pair consistent** — GitHub issue #584, § D961. Six of the
-     * sixteen keys moved, and they are exactly six of the seven contracts that declare a ladder
-     * rung: `c2` 10 → **7**, `c6` 0 → **2**, `c7` 8 → **7**, `c8` 0 → **2**, `c9` 10 → **1** and
-     * `c10` 2 → **7**. The seventh rung-bearing contract, `c3`, is unmoved at 2, because its rung
-     * declares the rate its profile already runs — which is the control this re-measurement needed
-     * and did not have to arrange. The nine contracts handed over as built are unmoved to the
-     * second, counts and per-seed stretches alike.
+     * sixteen keys moved, and they were exactly six of the seven contracts that declare a ladder
+     * rung: `c2` 10 → 7, `c6` 0 → 2, `c7` 8 → 7, `c8` 0 → 2, `c9` 10 → 1 and `c10` 2 → 7, with
+     * `c3` unmoved at 2. **That row is a dated record and the paragraph below replaces it**: it was
+     * measured on a branch, and a sibling lane in the same wave moved the rungs under it.
+     */
+    /*
+     * **Re-measured again the same day, on the integrated tree** —
+     * [§ D963](../../../../DECISIONS.md). GitHub issue #587's lane rebalanced six of the seven
+     * rungs and booked a car out of passenger service on each of their days
+     * ([§ D914](../../../../DECISIONS.md)), so the slice above was pinned over rungs that had moved
+     * by the time the wave merged. Six keys move again, and they are exactly the six rungs that
+     * lane touched: `c2` 7 → **8**, `c3` 2 → **7**, `c6` 2 → **6**, `c8` 2 → **8**, `c9` 1 → **5**
+     * and `c10` 7 → **6**.
+     *
+     * **`c7` is the control and nobody had to arrange it, for the second wave running.** It is the
+     * one rung-bearing contract that rebalance did not touch — its incident predates it — and it is
+     * unmoved at 7 of 10 with its ten stretches byte-identical below. The nine rung-less contracts
+     * are unmoved to the second as well. So the sentence above holds one wave on: every key that
+     * moved is a key whose rung moved, and no key moved that had no reason to.
+     *
+     * **`c9` at 5 of 10 is below half, and the heading on this block says *most*.** The count is the
+     * measurement and the heading is older than it — `c3` sat in the eligible set at 2 of 10 before
+     * this. Whether *most* is still the right word is § D512's threshold question, and neither the
+     * threshold nor the heading is moved to make the other read better.
      */
     expect(counts).toEqual({
-      c1: 0, c2: 7, c3: 2, c4: 6, c5: 8, c6: 2, c7: 7, c8: 2, c9: 1, c10: 7,
+      c1: 0, c2: 8, c3: 7, c4: 6, c5: 8, c6: 6, c7: 7, c8: 8, c9: 5, c10: 6,
       c11: 10, c12: 10, c13: 10, c14: 1, c15: 8, c16: 10,
     });
     expect(stretches['c1']).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    expect(stretches['c3']).toEqual([163, 72, 143, 65, 77, 90, 103, 106, 97, 51]);
-    expect(stretches['c6']).toEqual([57, 52, 130, 186, 112, 116, 47, 106, 91, 92]);
-    expect(stretches['c8']).toEqual([52, 47, 20, 88, 39, 48, 134, 145, 40, 79]);
-    // **These two changed places on 2026-09-22 and the pair is pinned for that reason.** As built,
-    // Harbour Point held a landing past the band for most of the day on every seed and Ashgate did
-    // it on two of ten. Let at the three fifths its own contract declares, Harbour Point holds one
-    // on **one** seed of ten; Ashgate, at the rate its contract declares, holds one on **seven**.
-    // The old reading — a crowd that cannot be cleared against a journey that takes two legs — was
-    // taken on a tower nobody is handed.
-    expect(stretches['c9']).toEqual([109, 54, 42, 98, 158, 102, 42, 30, 31, 68]);
-    expect(stretches['c10']).toEqual([161, 106, 37, 693, 229, 310, 196, 101, 284, 122]);
-    // Midtown Office at 0.395 occupancy, which is its own rung: seven of ten rather than ten, and
-    // the three that miss are 96, 84 and 84 s — held landings that do not reach the window, not
-    // quiet days. Pinned because this is the contract whose figure moved furthest.
-    expect(stretches['c2']).toEqual([390, 96, 84, 385, 413, 495, 84, 207, 479, 153]);
+    // Secure Tower at 11 % with car C of the low bank out for three tenths of the shift: seven of
+    // ten rather than two, and the three that miss are 94, 89 and 77 s. The low bank rather than
+    // the high one is the rung's own choice, because it is the bank the lobby crowd meets.
+    expect(stretches['c3']).toEqual([147, 94, 133, 89, 173, 173, 187, 77, 217, 129]);
+    expect(stretches['c6']).toEqual([178, 16, 132, 101, 121, 272, 92, 180, 217, 104]);
+    // **St Jude's is the largest move this slice has recorded**: two of ten to eight, on the only
+    // rung that books out **two** cars, with its crowd raised from 8.5 % to 10.5 %. Seed 9's 119 s
+    // is one second under the window and is pinned for that: a change to either would move it
+    // first, and nothing here rounds it up.
+    expect(stretches['c8']).toEqual([139, 173, 182, 179, 161, 261, 147, 91, 119, 272]);
+    // **These two changed places on 2026-09-22 and then both moved again**, which is why the pair
+    // is still pinned. As built, Harbour Point held a landing past the band on every seed and
+    // Ashgate on two of ten; let as their contracts hand them over, it was one and seven. With a
+    // car booked out of each, it is **five** and **six** — the letting still works on Harbour Point
+    // and the absence is what the count is now reading.
+    expect(stretches['c9']).toEqual([125, 92, 198, 411, 129, 404, 67, 83, 50, 52]);
+    expect(stretches['c10']).toEqual([105, 213, 57, 271, 153, 64, 69, 165, 481, 150]);
+    // Midtown Office at 0.34 occupancy with car D out from a quarter of the shift: eight of ten,
+    // and the two that miss are 112 and 90 s — held landings that do not reach the window, not
+    // quiet days. Pinned because this is the flagship contract and the one a first session meets
+    // most often.
+    expect(stretches['c2']).toEqual([178, 213, 112, 179, 144, 415, 210, 133, 496, 90]);
     expect(stretches['c7']).toEqual([91, 243, 104, 208, 261, 68, 238, 180, 190, 123]);
     // One WTC is the first supertall this slice has found below the window on nine seeds of ten —
     // one landing reaches 128 s and the rest never hold anybody a full two minutes. Empire State is
@@ -143,6 +168,7 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
     // from 6.1 m/s to 6.0 (§ D600): eight of its ten stretches moved and the count did not, which is
     // what a timing change looks like against a threshold nobody crossed. **`c14` is unmoved** —
     // One WTC's speeds were already on the ladder — and that contrast is why both are pinned here.
+    // **Neither declares a rung, so neither moved again on 2026-09-22 or on the merged tree.**
     expect(stretches['c14']).toEqual([11, 1, 14, 28, 16, 128, 76, 6, 91, 0]);
     expect(stretches['c15']).toEqual([644, 601, 199, 568, 115, 738, 647, 99, 219, 683]);
   /*

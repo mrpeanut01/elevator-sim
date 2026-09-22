@@ -80,9 +80,18 @@
  * `docs/37` § 4.3 carries the gameplay guide's three rotation rules — no tower twice in seven
  * days, no wrinkle template twice in fourteen, the pair never inside a month — and they are the
  * obvious third candidate for this derivation. Measured over 730 consecutive dates against the
- * eleven eligible contracts, the draw below repeats a tower **inside seven days on 42.2 % of
- * days** and on **consecutive days 56 times**, so it plainly does not satisfy rule 1, and that is
+ * **fourteen** eligible contracts, the draw below repeats a tower **inside seven days on 34.4 % of
+ * days** and on **consecutive days 50 times**, so it plainly does not satisfy rule 1, and that is
  * stated here rather than glossed.
+ *
+ * **Both figures are functions of the set's *length* and both moved on 2026-09-22**
+ * ([§ D963](../../../../DECISIONS.md)). They read 42.2 % and 56 over **eleven** contracts until
+ * `shift/legibility.ts`'s sweep was re-measured on a tree where six ladder rungs had moved
+ * ([§ D914](../../../../DECISIONS.md)) and `c6`, `c8` and `c9` crossed the eligibility threshold.
+ * A larger set collides less often, which is why the rule gets closer to being satisfied without
+ * anybody aiming at it — and still does not satisfy it. `dailySeed.test.ts` recomputes both from
+ * the shipped draw rather than reading them here, so the day the set moves again this paragraph
+ * goes red rather than stale.
  *
  * It is not adopted anyway, for a reason that outranks the arithmetic: **a rotation would have no
  * observer.** `dev/state.ts#withFirstSession` runs once per device, on the load that restored

@@ -2834,6 +2834,65 @@ same day is legible on 11 of 50 at a median 56 s. The letting works; the figure 
 building nobody is given. **No mechanism is offered for why Ashgate rises** (§ D256); what is
 established is that both moves are a rung reaching a run it never used to reach.
 
+#### 6.4d The rungs moved under the sweep in the same wave, and the eligible set grew by three
+
+**Re-measured 2026-09-22, on the integrated tree** — [§ D963](../DECISIONS.md), GitHub issue
+[#587](https://github.com/mrpeanut01/elevator-sim/issues/587). § 6.4c's table was taken on a branch.
+A sibling lane in the same wave **booked a car out of passenger service on seven contracts' day 1**
+and rebalanced **six of the seven rungs** to keep DC-4 ([§ D914](../DECISIONS.md)): `c2` let
+0.395 → 0.34, `c3` crowd 12 → 11, `c6` 16 → 15, `c8` 8.5 → **10.5** with **two** cars out, `c10`
+13.5 → 12, and `c9` a car out at an unchanged letting. Both lanes were right alone and the pin was
+stale the moment they merged, which is `CLAUDE.md`'s oldest lesson about published figures arriving
+as a cross-lane collision rather than as neglect.
+
+| contract | building | § 6.4c, of 50 | median (s) | **merged tree, of 50** | **median (s)** |
+|---|---|---|---|---|---|
+| c1 | `garden-apartments` | 0 | 0 | 0 | 0 |
+| c2 | `midtown-office` | 38 | 239 | **35** | **165** |
+| c3 | `secure-tower` | 20 | 108 | **30** | **134** |
+| c4 | `mixed-use-high-rise` | 32 | 136 | 32 | 136 |
+| c5 | `vertical-city` | 45 | 191 | 45 | 191 |
+| c6 | `chancery-house` | 14 | 91 | **25** | **119** |
+| c7 | `crown-hotel` | 30 | 147 | 30 | 147 |
+| c8 | `st-jude-hospital` | 3 | 52 | **43** | **197** |
+| c9 | `harbour-point` | 11 | 56 | **20** | **96** |
+| c10 | `ashgate` | 32 | 161 | **27** | **125** |
+| c11 | `ctf-class-reference` | 50 | 1 221 | 50 | 1 221 |
+| c12 | `shanghai-class-reference` | 50 | 729 | 50 | 729 |
+| c13 | `merdeka-class-reference` | 50 | 459 | 50 | 459 |
+| c14 | `one-wtc-class-reference` | 1 | 13 | 1 | 13 |
+| c15 | `empire-state-class-reference` | 45 | 472 | 45 | 472 |
+| c16 | `willis-class-reference` | 50 | 2 347 | 50 | 2 347 |
+
+**Exactly the six rows whose rung moved moved, and the control arrived unarranged for the second
+wave running.** `c7` is the one rung-bearing contract that rebalance did not touch — its incident
+predates it — and it reproduces to the second, count **and** median **and** all ten of the per-seed
+stretches `legibility.test.ts` pins. The nine rung-less contracts reproduce to the second as well.
+Ten of sixteen rows are a reproduction and six are a move.
+
+**`c8` is the largest single move this table has recorded.** St Jude's goes **3 of 50 → 43** at a
+median stretch of 52 s → **197 s**, and is now the third-most legible game contract, above Midtown
+Office. It is also the only rung that books out two cars.
+
+**The eligible set goes from eleven members to fourteen, and its published count moves for the first
+time since it was derived.** § D512's threshold is untouched — more than a third of fifty seeds —
+and `c6`, `c8` and `c9` all cross it from below. Only `c1` and `c14` of the sixteen are out.
+`firstSession.ts#FIRST_SESSION_LINE` therefore reads **fourteen towers** where it read eleven, and
+`shift/dailySeed.ts`'s two rotation figures move with it because they are functions of the set's
+*length*: a tower repeats inside seven days on **34.4 %** of 730 dates rather than 42.2 %, and on
+consecutive days **50** times rather than 56. The rule `docs/37` § 4.3 states is still not satisfied,
+and it is closer to satisfied than it was with nobody aiming at it.
+
+**Two readings § 6.4b and § 6.4c publish stop being true, and both stop for one reason.** *Chancery
+House and St Jude's are legible on 2 and 1 seeds, which is rarely rather than never and is the same
+verdict for a first session* was measured on a day with every car in service. Both towers book cars
+out now and both are eligible, so **a first session can open on the hospital**. And § 6.4c's
+correction of § D572 — *the letting works, Harbour Point reads 11 of 50* — is still true of the
+letting and no longer true of the contract, which takes a car away as well: 20 of 50. **No mechanism
+is offered for the size of any of these moves** ([§ D256](../DECISIONS.md)); what is established is
+that a car out of passenger service is a change this instrument can see, in the same direction on
+every contract it is declared on.
+
 ### 6.5 Two things the sweep is not allowed to do
 
 **It may not report a mean.** Every figure it publishes is a count with its denominator — *3 of 10
