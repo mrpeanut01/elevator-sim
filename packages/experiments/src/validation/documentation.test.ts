@@ -2112,7 +2112,17 @@ type DecisionReservation = {
  * timid — the rule exists so that a decision reaching past nothing does not consume an id, and a
  * lane that closes two issues on no numbers is the shape it was written for.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/*
+ * **Wave AF is OPEN and reserves D871-D940.** Five lanes against the wave AE playability re-score,
+ * which scored the game P1 4, P2 6, P3 6, P4 5 against a bar of 8 and answered the termination
+ * question **no**. The charter row reads D871 from wave AE's closure, so the floor assertion below
+ * is satisfied by that commit rather than by this one.
+ *
+ * **Blocks are sized to the issues each lane closes**, which is wave AD's lesson kept: its kernel
+ * lane held thirty-five numbers and spent two, and wave AE's lane AE-D spent none of twelve because
+ * every decision it took was local to its own module under § D405. A lane that needs more asks.
+ */
+const OPEN_RESERVATION = { wave: 'AF', from: 871, to: 940 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
