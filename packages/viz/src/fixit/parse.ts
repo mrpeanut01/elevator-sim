@@ -44,6 +44,7 @@ import { shaftPlanAreaM2, type ShaftFootprintTable } from '@elevator-sim/core/br
 import { probabilityWordIn } from '../campaign/words.js';
 import { priceOf, purchaseUnits, shaftAreaBandOf } from '../pricing/parse.js';
 import { repairPriceUnits, unpricedPathsIn } from '../pricing/repairPrice.js';
+import { decodeBudgetStep, type BoughtBudgetStep } from '../scenario/budget.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type {
   BuildingPatch,
@@ -366,7 +367,12 @@ export function parseFixitCases(raw: unknown, context: FixitContext): FixitCases
     cases.push(entry);
   }
   if (violations.length > 0) throw new FixitCasesError(violations);
-  return { version: decoded.version, cases, schedule: context.schedule };
+  return {
+    version: decoded.version,
+    cases,
+    budgetSteps: decoded.budgetSteps,
+    schedule: context.schedule,
+  };
 }
 
 function checkCase(where: string, entry: FixitCase, context: FixitContext): readonly string[] {
@@ -571,7 +577,56 @@ function decodeFile(
     const one = decodeCase(entry, `cases[${String(index)}]`, violations, schedule, bandByBank);
     if (one !== undefined) decoded.push(one);
   }
-  return { version: num(raw['version']) ?? 0, cases: decoded, schedule };
+  return {
+    version: num(raw['version']) ?? 0,
+    cases: decoded,
+    budgetSteps: decodeBudgetSteps(raw['budgetSteps'], violations),
+    schedule,
+  };
+}
+
+/**
+ * The file's own bought-budget ladder — GitHub issue **#579**, [§ D911](../../../../DECISIONS.md).
+ *
+ * **Absent is an empty ladder and not a violation**, which is the opposite of
+ * `scenario/budget.ts#decodeScenarioBudget`'s rule about a *budget* and is deliberate: a scenario
+ * with no budget has no bounded space and therefore no difficulty, while a scenario whose budget
+ * cannot be widened is an ordinary scenario. What is refused is an authored `budgetSteps` that is
+ * not an array, because that is a ladder somebody meant to write and did not.
+ *
+ * Every step goes through `scenario/budget.ts#decodeBudgetStep` rather than through a decoder here
+ * — one answer to what a rung may carry, for that module's own stated reason.
+ */
+function decodeBudgetSteps(raw: unknown, violations: string[]): readonly BoughtBudgetStep[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    violations.push(
+      'the file authors a "budgetSteps" that is not an array. A ladder a scenario cannot be ' +
+        'widened along is an empty array, which is a statement; anything else is a file nobody ' +
+        'finished.',
+    );
+    return [];
+  }
+  const steps: BoughtBudgetStep[] = [];
+  for (const [index, entry] of raw.entries()) {
+    const step = decodeBudgetStep(entry, `budgetSteps[${String(index)}]`, violations);
+    if (step === undefined) continue;
+    if (step.addsUnits < 1 || step.chimes < 1) {
+      violations.push(
+        `budgetSteps[${String(index)}]: a rung adds at least one unit and costs at least one ` +
+          'chime. A free rung is a wider budget nobody has to play for, and a rung that adds ' +
+          'nothing is a chime spent on no change at all.',
+      );
+      continue;
+    }
+    steps.push(step);
+  }
+  const ids = new Set<string>();
+  for (const step of steps) {
+    if (ids.has(step.id)) violations.push(`budgetSteps: "${step.id}" is declared twice.`);
+    ids.add(step.id);
+  }
+  return steps;
 }
 
 function decodeCase(

@@ -319,6 +319,14 @@ const EVERYDAY_SHELL_FILES = new Set([
   'everyday/careerStore.ts',
   'everyday/profileStore.ts',
   /*
+   * The device chime ledger's storage half — GitHub issue #579, [§ D911](../../../DECISIONS.md),
+   * [§ D711](../../../DECISIONS.md) clause 1. Exactly the two above's arrangement and for their
+   * reason: `everyday/deviceChimes.ts` is the record, the balance and the two reducers, is
+   * storage-agnostic, and is driven in this node tier; this file is the `window.localStorage` it
+   * is kept in, and nothing else.
+   */
+  'everyday/chimeStore.ts',
+  /*
    * § 6's daily loop — four DOM halves and the vocabulary they share. Each one's words and
    * decisions stay pure in its `*View.ts` sibling (`doorView`, `briefView`, `reportView`,
    * `weekView`) plus `today.ts`, `figures.ts` and `world.ts`, none of which are exempt and all of

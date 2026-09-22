@@ -1563,9 +1563,15 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    *
    * **The `answer` is translated rather than passed through**, and the translation is one line
    * because it is worth one: `everyday/rail.ts` is pure and must stay drivable by the honesty sweep
-   * without a host, so it speaks its own four-arm `BankedAnswer` and this maps the host's four onto
-   * it. The two vocabularies are deliberately not one import — a rail that named
+   * without a host, so it speaks its own `BankedAnswer` and this maps the host's four arms onto it.
+   * The two vocabularies are deliberately not one import — a rail that named
    * `EverydayChimeBalance` would be a rail that could not be rendered without the host module.
+   *
+   * **The rail is down to two arms** — GitHub issue #579, § D911 — because
+   * `dev/main.ts#bankCompletion` banks on this device whether or not there is a server or a token,
+   * so *nobody is signed in* and *there is no ledger* are no longer things that happen to a turn.
+   * They map onto `unreachable` here rather than being spelled, which is what keeps this mapping
+   * total against a host type that still distinguishes them for the **read**.
    *
    * No host is **no line at all**, not a pending one: a standalone mount keeps no ledger, and a
    * card that said *banking…* over a build with nowhere to bank would be the claim
@@ -1577,11 +1583,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     const answer: BankedAnswer =
       tally.answer.kind === 'balance'
         ? { kind: 'balance', chimes: tally.answer.chimes }
-        : tally.answer.kind === 'signed-out'
-          ? { kind: 'signed-out' }
-          : tally.answer.kind === 'no-server'
-            ? { kind: 'no-ledger' }
-            : { kind: 'unreachable' };
+        : { kind: 'unreachable' };
     return { banked: { turn: tally.turn, answer } };
   }
 

@@ -8,6 +8,9 @@
  * or the failure is here rather than on a player's screen.
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { goalsForDay, readGoals } from '../shift/goals.js';
@@ -30,6 +33,9 @@ import {
   type RunContext,
 } from './types.js';
 import { weekScreenViewOf } from './weekView.js';
+
+/** This directory, for the one case that reads a module's own source. */
+const EVERYDAY_SRC = fileURLToPath(new URL('.', import.meta.url));
 
 const titlesOf = (ctx: RunContext, inCampaign: boolean): readonly string[] =>
   railGroups(ctx, inCampaign).map((group) => group.title);
@@ -562,41 +568,42 @@ describe('the acknowledgement a finished turn gets', () => {
      */
     const lines = TURNS.map(
       (turn) =>
-        railModel({ screen: 'menu', ctx: 'daily' }, { banked: { turn, answer: { kind: 'no-ledger' } } })
+        railModel({ screen: 'menu', ctx: 'daily' }, { banked: { turn, answer: { kind: 'unreachable' } } })
           .banked,
     );
     expect(new Set(lines).size).toBe(TURNS.length);
     for (const line of lines) expect(line).not.toMatch(/\d/);
   });
 
-  it('tells a signed-out player the turn happened and the chime did not', () => {
+  it('has no *sign in to bank it* and no *no ledger* arm left to draw — issue #579', () => {
     /*
-     * There is no device ledger — `everyday/chimesPanel.ts` says so at length — so a visitor earns
-     * nothing. Saying nothing to them would be § D227 in the half `CLAUDE.md` calls the more
-     * dangerous one: a screen silent about a mechanism that did not run.
+     * **Both arms are deleted rather than reworded** (§ D227, § D911), because
+     * `dev/main.ts#bankCompletion` now banks on this device with no server and no account. The
+     * sentences they drew — *"sign in to bank it"* and the bare turn — told a player who had
+     * already been paid that they had not been, which is the stale half of a refusal in the one
+     * direction they would have acted on.
+     *
+     * Asserted against the **module's source** rather than against a call, because a deleted type
+     * arm cannot be constructed to test: the point is that neither sentence is anywhere.
      */
-    const line = railModel(
-      { screen: 'menu', ctx: 'daily' },
-      { banked: { turn: 'scenario-cleared', answer: { kind: 'signed-out' } } },
-    ).banked;
-    expect(line).toContain('scenario cleared');
-    expect(line).toContain('sign in');
+    const code = readFileSync(`${EVERYDAY_SRC}rail.ts`, 'utf8');
+    const drawn = code.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/(^|\s)\/\/.*$/gmu, '$1');
+    expect(drawn).not.toMatch(/sign in to bank it/u);
+    expect(drawn).not.toMatch(/'no-ledger'/u);
   });
 
-  it('says only the turn where there is no ledger, and says the tally did not answer where there is one that did not', () => {
-    const noLedger = railModel(
-      { screen: 'menu', ctx: 'daily' },
-      { banked: { turn: 'career-day-paid', answer: { kind: 'no-ledger' } } },
-    ).banked;
+  it('says the tally did not answer where nothing answered, and names the turn either way', () => {
     const unreachable = railModel(
       { screen: 'menu', ctx: 'daily' },
       { banked: { turn: 'career-day-paid', answer: { kind: 'unreachable' } } },
     ).banked;
-    /* Two different sentences, because *this build has no ledger* and *the server did not answer*
-       are two different things to tell a player about the same clear. */
-    expect(noLedger).toBe('contract day filed');
-    expect(unreachable).not.toBe(noLedger);
+    const banked = railModel(
+      { screen: 'menu', ctx: 'daily' },
+      { banked: { turn: 'career-day-paid', answer: { kind: 'balance', chimes: 3 } } },
+    ).banked;
     expect(unreachable).toContain('contract day filed');
+    expect(banked).toContain('contract day filed');
+    expect(unreachable).not.toBe(banked);
   });
 
   it('is withheld on the report and drawn everywhere else', () => {

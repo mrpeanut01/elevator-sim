@@ -37,6 +37,20 @@
  *    ([§ D606](../../../../DECISIONS.md) § 2) — and `everyday/chimesPanel.ts#SPEND_ABSENCES` says
  *    which and why on the screen that lists the prices.
  *
+ * ## A fourth thing is sold now, and it is not a sink — GitHub issue **#579**
+ *
+ * [§ D911](../../../../DECISIONS.md). The fix cases author their **own** budget ladder in
+ * `data/fixit-cases.json`, the fix-it screen sells a rung on it out of a device tally
+ * (`everyday/deviceChimes.ts`), and `fixit/budgetRungReachesTheRun.test.ts` is the legs comparison
+ * that earns it — the same case at the same seed, a repair the base budget refuses and the bought
+ * rung admits, compared on the boarding identities.
+ *
+ * **Nothing about clause 1 moves**, and the fourth `describe` below is what says so mechanically: a
+ * budget is still priced by the scenario and by nothing else, the ledger still prices none, and the
+ * device spend still names no sink and no route. What is added is the second half of clause 1 for
+ * the new authority — **exactly one module may charge a device chime**, which is the same question
+ * *is there a second spend surface?* asked of the side of the wire that has no wire.
+ *
  * **Where the legs proof for the one sold sink lives, and why it is not here.** Point 2's rule,
  * applied to itself: `packages/server/src/leaderboard/rushHoldAgreement.test.ts` pairs every
  * pre-fit cell with the same cell unfitted and requires the two to differ, in `CLAUDE.md`'s own
@@ -300,5 +314,58 @@ describe('§ D219 on the spend verb — one sink is sold, and the rest say why n
      */
     expect(SPEND_ABSENCES['career-purse-top-up']).toBeUndefined();
     expect(SPEND_ABSENCES['rush-purse-top-up']).toMatch(/between rounds/u);
+  });
+});
+
+describe('the device tally spends on one thing, through one module — issue #579', () => {
+  it('lets exactly one non-test module take a chime off this device', async () => {
+    /*
+     * The route case's question, asked of the half of the seam that has no route. A module that
+     * calls `spend` on the device store is a module that can take a player's chimes, and a second
+     * one would be a second answer to *what does a rung cost* — the whole subject of this file.
+     *
+     * `everyday/chimeStore.ts` is excluded by name because it **is** the store: it declares the
+     * verb rather than calling it.
+     */
+    const charging = /\.spend\(\{\s*scenarioId/u;
+    const reaching = (await vizSourceFiles())
+      .filter((file) => !file.id.includes('.test.') && !file.id.includes('test-helper'))
+      .filter((file) => file.id !== 'everyday/chimeStore.ts')
+      .filter((file) => charging.test(file.code))
+      .map((file) => file.id);
+    expect(reaching, 'a second module can take a chime off this device').toEqual([
+      'everyday/fixitScreen.ts',
+    ]);
+  });
+
+  it('prices that rung in the scenario’s own file and nowhere else', () => {
+    /*
+     * Clause 1 of this file's docstring, pointed at the second of `docs/38` § 2.1's four scenario
+     * sources. Both halves read off disk: the fix-case file authors a rung with units and chimes,
+     * and the ledger still prices no budget at all.
+     */
+    const cases = dataFile('fixit-cases.json') as {
+      budgetSteps?: readonly { id?: string; addsUnits?: number; chimes?: number }[];
+    };
+    const steps = cases.budgetSteps ?? [];
+    expect(steps.length, 'the shipped fix cases author no bought rung').toBeGreaterThan(0);
+    for (const step of steps) {
+      expect(Number.isInteger(step.addsUnits) && (step.addsUnits ?? 0) > 0, step.id).toBe(true);
+      expect(Number.isInteger(step.chimes) && (step.chimes ?? 0) > 0, step.id).toBe(true);
+    }
+    expect(ledger().sinks.map((sink) => sink.modifier.kind)).not.toContain('budget-units');
+  });
+
+  it('names no sink and no source on the device side of the spend', async () => {
+    /*
+     * § D526 clause 5 and `boundaries.test.ts`' own rule, checked here because this is the one
+     * module that both records turns and takes money: a device ledger that learned a sink id would
+     * be the second price list this file exists to prevent, kept in `localStorage`.
+     */
+    const files = await vizSourceFiles();
+    const device = files.find((file) => file.id === 'everyday/deviceChimes.ts')?.code ?? '';
+    expect(device.length, 'the device ledger module was not found').toBeGreaterThan(0);
+    for (const sink of ledger().sinks) expect(device).not.toContain(sink.id);
+    expect(device).not.toMatch(/chimes\/spend/u);
   });
 });

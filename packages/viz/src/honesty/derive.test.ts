@@ -1902,6 +1902,39 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The device chime ledger\u2019s record, its two storage keys and its reducers \u2014 GitHub ' +
+        'issue #579, DECISIONS.md \u00a7 D911, \u00a7 D711 clauses 1\u20136. None of them authors a ' +
+        'string a player reads. `DEVICE_CHIMES_KEY` and `DEVICE_CHIMES_QUARANTINE_KEY` are the ' +
+        '`localStorage` slots, on `campaign/careerPersist.ts`\u2019 two keys\u2019 own ground one ' +
+        'entry below; `withTurn`, `turnKeyOf`, `boughtStepIdOf` and `decodeDeviceChimes` are the ' +
+        'record\u2019s arithmetic and its envelope, and the deriver collected them because ' +
+        '`literalsIn` scans comments and these carry long ones. **What a player actually reads off ' +
+        'this tally is driven rather than excluded**: the balance line and the home note through ' +
+        '`everyday/chimesPanel.ts` on the Settings surface, and the rung\u2019s four sentences ' +
+        'through `everyday/fixitScreenModel.ts#fixitBudgetRungRow` on the fix-it one. This module ' +
+        'decides what the number is; it decides no sentence about it.',
+      ids: [
+        'everyday/deviceChimes.ts#DEVICE_CHIMES_KEY',
+        'everyday/deviceChimes.ts#DEVICE_CHIMES_QUARANTINE_KEY',
+        'everyday/deviceChimes.ts#withTurn',
+        'everyday/deviceChimes.ts#turnKeyOf',
+        'everyday/deviceChimes.ts#boughtStepIdOf',
+        'everyday/deviceChimes.ts#decodeDeviceChimes',
+      ],
+    },
+    {
+      reason:
+        'One rung of a scenario budget, decoded \u2014 GitHub issue #579. It is ' +
+        '`scenario/budget.ts#decodeScenarioBudget`\u2019s own exclusion three lines up, narrowed to ' +
+        'the step: the violations it collects are **author-facing**, printed at load for whoever is ' +
+        'editing `data/campaign.json` or `data/fixit-cases.json`, and no player ever meets one ' +
+        'because a file that fails them does not ship. It became its own export when the fix cases ' +
+        'authored a ladder of their own, so that two documents could not grow two answers to what a ' +
+        'rung may carry.',
+      ids: ['scenario/budget.ts#decodeBudgetStep'],
+    },
+    {
+      reason:
         'Two storage keys — GitHub issue #375. `CAREER_STORAGE_KEY` is the `localStorage` slot the ' +
         'career is written under, and `CAREER_QUARANTINE_KEY` is where a *refused* career\u2019s bytes ' +
         'are set aside so the refusal\u2019s promise is kept. Neither is prose and no surface draws ' +

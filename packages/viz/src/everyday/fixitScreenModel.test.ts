@@ -35,6 +35,7 @@ import {
   buildingLineOf,
   FIXIT_SCREEN_COPY as COPY,
   fixitBarModel,
+  fixitBudgetRungRow,
   fixitCaseRailModel,
   fixitElevationRow,
   fixitMachineryRows,
@@ -377,5 +378,74 @@ describe('the parking row', () => {
     expect(row.options.find((option) => option.value === null)?.selected).toBe(false);
     expect(price).toBe(0);
     expect(row.priced).toBe(COPY.parkingFree);
+  });
+});
+
+describe('the wider budget, priced in chimes — GitHub issue #579', () => {
+  const currency = { one: 'chime', many: 'chimes' };
+  const row = (over: Partial<Parameters<typeof fixitBudgetRungRow>[0]>) =>
+    fixitBudgetRungRow({
+      unitsNow: 12,
+      nextChimes: 6,
+      balanceChimes: 6,
+      laddered: true,
+      currency,
+      ...over,
+    });
+
+  it('draws nothing at all where the case file authors no rung', () => {
+    /*
+     * `fixitZoneRow`'s precedent: a control over a ladder that does not exist is a press that
+     * writes nothing, and an empty `budgetSteps` is a statement rather than an omission.
+     */
+    expect(row({ laddered: false })).toBeNull();
+  });
+
+  it('offers the press where the tally covers it, and says what it does before it is pressed', () => {
+    const offered = row({});
+    expect(offered?.offer).toBe('buy');
+    expect(offered?.note).toBe(COPY.budgetRungOffer);
+    expect(offered?.priced).toBe('6 chimes');
+    expect(offered?.readout).toBe('12 u');
+  });
+
+  it('picks the singular out of the currency rather than spelling one', () => {
+    /*
+     * § D530 authors `one` and `many` in `data/chime-ledger.json`, and a screen that spelled either
+     * would be a second authority for the name the owner ruled. Driven with a currency this test
+     * invents, so a pass cannot come from the shipped words happening to match.
+     */
+    expect(row({ nextChimes: 1, currency: { one: 'bell', many: 'bells' } })?.priced).toBe('1 bell');
+    expect(row({ nextChimes: 2, currency: { one: 'bell', many: 'bells' } })?.priced).toBe('2 bells');
+  });
+
+  it('separates *you have nothing yet* from *you are short*, because they are different sentences', () => {
+    const nothing = row({ balanceChimes: 0 });
+    expect(nothing?.offer).toBe('none');
+    expect(nothing?.note).toBe(COPY.budgetRungNone);
+    const short = row({ balanceChimes: 2 });
+    expect(short?.offer).toBe('short');
+    expect(short?.note).toBe(`${COPY.budgetRungShortLead} 4 chimes.`);
+    expect(row({ balanceChimes: 5 })?.note).toBe(`${COPY.budgetRungShortLead} 1 chime.`);
+  });
+
+  it('says *bought* whatever the tally holds, once there is no rung above', () => {
+    /*
+     * The order of the tests is the decision: *there is no rung above this* is true of the case
+     * rather than of the player, so it outranks both the shortfall and the empty tally.
+     */
+    for (const balanceChimes of [0, 2, 40]) {
+      const owned = row({ nextChimes: undefined, balanceChimes, unitsNow: 18 });
+      expect(owned?.offer).toBe('owned');
+      expect(owned?.note).toBe(COPY.budgetRungOwned);
+      expect(owned?.priced).toBeUndefined();
+      expect(owned?.readout).toBe('18 u');
+    }
+  });
+
+  it('never leaves a row without a sentence, on any arm', () => {
+    for (const arm of [row({}), row({ balanceChimes: 0 }), row({ balanceChimes: 1 }), row({ nextChimes: undefined })]) {
+      expect(arm?.note.length ?? 0).toBeGreaterThan(0);
+    }
   });
 });

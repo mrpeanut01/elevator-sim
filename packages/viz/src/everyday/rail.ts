@@ -86,21 +86,30 @@ export type BankedTurn = 'scenario-cleared' | 'career-day-paid' | 'rush-wave-sur
 /**
  * What the ledger said when it was told — {@link RailOptions.banked}.
  *
- * Four arms because four things are true of four different players, and a card that collapsed them
- * would tell at least one of them something false. `signed-out` is the one worth reading twice: a
- * visitor earns **nothing** on this build — there is no device ledger, `everyday/chimesPanel.ts`
- * says so at length — so the honest acknowledgement of their clear names the clear and says the
- * chime went nowhere. Saying nothing at all would be § D227's rule in the half `CLAUDE.md` calls
- * the more dangerous one.
+ * **Two arms, and it was four** — GitHub issue **#579**, [§ D911](../../../../DECISIONS.md),
+ * [§ D227](../../../../DECISIONS.md). The two that are gone are `signed-out` and `no-ledger`, and
+ * they are **deleted rather than reworded** because the sentences they drew stopped being true on
+ * the commit that built `everyday/deviceChimes.ts`:
+ *
+ * - `signed-out` drew *"sign in to bank it"*, under a docstring saying *"a visitor earns
+ *   **nothing** on this build — there is no device ledger"*. There is one, it banks the turn, and
+ *   telling a player to sign in for something they have already been paid would be the stale half
+ *   of a refusal in exactly the direction they would act on.
+ * - `no-ledger` drew the turn alone, because *"this build was served with no API origin: there is
+ *   no ledger here to bank into."* The deployed bundle is built that way and now banks anyway.
+ *
+ * Neither is reachable from the shipped earn path any more: `dev/main.ts#bankCompletion` is defined
+ * on every build and records the turn on this device whether or not there is a server or a token,
+ * so what comes back is a balance — the device's, or the account's where one answered.
  */
 export type BankedAnswer =
-  /** The ledger answered. `chimes` is the account's balance — the one read, never an award or a delta. */
+  /**
+   * The ledger answered. `chimes` is **the balance of whichever tally is this player's** — the
+   * account's where one is signed in, this device's otherwise, which is § D711 clause 5's one
+   * chooser reaching the rail. The one read, never an award and never a delta.
+   */
   | { readonly kind: 'balance'; readonly chimes: number }
-  /** Nobody is signed in, so nothing was banked and nothing could be. */
-  | { readonly kind: 'signed-out' }
-  /** This build was served with no API origin: there is no ledger here to bank into. */
-  | { readonly kind: 'no-ledger' }
-  /** There is a server and it did not answer. The turn still happened. */
+  /** Nothing answered — a server that refused, or a mount with no ledger binding at all. */
   | { readonly kind: 'unreachable' };
 
 /** The banked half of the card's state, as the shell hands it over. */
@@ -612,14 +621,9 @@ function bankedLineOf(
       return `${turn} · ${String(chimes)} ${unit}`;
     }
     /*
-     * The turn still happened, and the chime did not. A visitor earns nothing on this build —
-     * there is no device ledger — so this names both halves rather than the comfortable one.
+     * The turn still happened and nothing answered about it. Two arms used to sit above this one
+     * and are deleted — see {@link BankedAnswer} for what they said and what stopped being true.
      */
-    case 'signed-out':
-      return `${turn} · sign in to bank it`;
-    /* No API origin: this build has no ledger to bank into, so the turn is all there is to say. */
-    case 'no-ledger':
-      return turn;
     case 'unreachable':
       return `${turn} · the tally did not answer`;
   }
