@@ -62,6 +62,8 @@ function weekWith(day: number, history: readonly DayOutcome[]): WeekState {
 const TODAY: TodayRecord = {
   day: 5,
   weekday: 'Friday',
+  /* § D871's whole-day holds; this fixture's day holds no car. */
+  heldCarIds: [],
   dayLabel: 'FRIDAY · DAY 5',
   towerName: 'Chancery House',
   lede: 'Fourteen floors and three lifts.',

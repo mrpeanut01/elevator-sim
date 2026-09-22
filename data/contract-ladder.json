@@ -101,16 +101,25 @@
       "contractId": "c7",
       "buildingId": "crown-hotel",
       "demand": {
-        "arrivalRatePctPop5min": 12
+        "arrivalRatePctPop5min": 11
       },
       "fabric": {
         "occupancy": 1,
-        "banks": []
+        "banks": [],
+        "incidents": [
+          {
+            "kind": "maintenance",
+            "bankId": "main",
+            "carId": "D",
+            "fromFraction": 0.25,
+            "toFraction": 0.5
+          }
+        ]
       },
       "intent": {
         "missRateTarget": 0.5,
-        "substrate": "demand",
-        "note": "Already inside the band as shipped, at 0.50 of 50 seeds, with the worst-wait ceiling doing the discriminating on 20 of them. Fabric untouched, and it could not be touched here anyway: the `main` bank mixes a 1.75 m/s service car with 3.0 m/s guest cars, and a BankChoice collapses class, speed and load to one value each, so commissioning it would delete the thing this scenario teaches. `commissioning/choices.ts#mixedFleetBanks` names that bank and `shift/ladder.ts` refuses a rung that commissions it."
+        "substrate": "demand+fabric",
+        "note": "THE ONE DAY IN THIS LADDER WHOSE VERDICT TURNS ON A PRESS — GitHub issue #576, DECISIONS.md § D871. Two substrates move and neither is a bar. FABRIC: car D of the main bank is booked out of passenger service between a quarter and a half of the way through the shift — 450 s to 900 s of the 1 800 s day, scheduled maintenance on one of the four guest cars — which is DC-R1's own fabric row (availability: a car out of service), declared here because a drawn wrinkle is pure in (day, dayIdx) and would have booked a car out on every contract's day 1 rather than on this one. DEMAND: the rate goes 12 to 11, inside the hotel profile's declared 10-15, to put the as-built miss rate back inside DC-4's band after the car came out. MEASURED, at docs/33 § 4.6's cell exactly — day 1, collective, seeds 20260824 + 7919n, n = 0..49, the building's own 1 800 s: the as-built configuration misses 22 of 50, against 25 of 50 with this row reverted — BOTH SIDES RE-MEASURED on the same tree rather than one of them quoted, and the 25 is exactly what docs/33 4.7d published, so the base reproduces and this is a move rather than a correction. DC-4 holds either side. WHAT IS NEW is the second column: with one mid-run press at 504 s, spread the cars misses 20 of 50 (6 seeds rescued, 4 broken), hand the day to predictive-balanced misses 15 of 50 (12 rescued, 5 broken), and park the cars in the lobby misses 23 of 50 (3 rescued, 4 broken) — WORSE THAN PRESSING NOTHING, which is this contract's own lesson (there is no dominant direction in a hotel, so the lobby is the wrong verb) and is what makes the choice a choice rather than a switch. THE PINNED DAY is seed 20268743: as-built worst wait 303 s against a 230 s bar and the shift is missed, park in the lobby 311 s and it is still missed, spread the cars 215 s and it is CLEARED. packages/viz/src/shift/pressDecidesTheDay.test.ts runs both arms and fails if either direction stops holding. PROVENANCE, per the owner's 2026-09-08 standing ruling: the miss rates and the pinned day are MEASURED at the run named above; that this contract should be the one whose day turns on a press, and that the lift should be a guest car rather than the service lift, are CHOSEN — game feel, not a measurement."
       }
     },
     {

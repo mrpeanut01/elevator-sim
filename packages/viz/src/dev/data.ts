@@ -226,6 +226,11 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
     },
     bankIdsFor: (buildingId) =>
       buildings.find((candidate) => candidate.id === buildingId)?.banks.map((bank) => bank.id),
+    carIdsFor: (buildingId, bankId) =>
+      buildings
+        .find((candidate) => candidate.id === buildingId)
+        ?.banks.find((bank) => bank.id === bankId)
+        ?.cars.map((car) => car.id),
     mixedBankIdsFor: (buildingId) => {
       const entry = entries.find((candidate) => candidate.config.id === buildingId);
       return entry === undefined ? undefined : mixedFleetBanks(entry.config);
