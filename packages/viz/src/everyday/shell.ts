@@ -368,9 +368,9 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   let mounted: MountedEverydayScreen | undefined;
 
   /**
-   * Whether the last paint of the screen region was {@link drawHostPending}'s — so
-   * {@link connectDataHost} redraws exactly the two states the arriving host unblocks and nothing
-   * else.
+   * Whether the last paint of the screen region was one of the two waiting states —
+   * {@link drawFrontDoorPending}'s or {@link drawHostPending}'s — so {@link connectDataHost}
+   * redraws exactly what the arriving host unblocks and nothing else.
    *
    * A flag rather than re-deriving the condition, because the condition is *what was drawn* and
    * that is not recoverable from {@link state}: both pending states leave `mounted` undefined and

@@ -41296,3 +41296,80 @@ played again without the press, and this sitting has only the round that was pla
 `RUSH_POST_COPY.changesNote` says so under the list, because two figures on adjacent lines invite a
 reader to subtract a counterfactual nobody ran — `CLAUDE.md`'s rule that a mechanism is measured or
 said to be unmeasured, and [§ D256](DECISIONS.md)'s refusal.
+
+
+## D844 — the front door is not offered before the shell can answer who is arriving, and the landing page's run does not rebuild the page it lands on
+
+**Date: 2026-09-22 · Owner: LANE-AE-FIX (wave AE integration) · Rules on:** nothing recorded is
+reversed. It moves what [§ D335](DECISIONS.md)'s front door paints in its first quarter second, it
+withdraws a mechanism `dev/browserTier.test-helper.ts` stated as fact, and it moves the figure
+`charter S9` B1 prints. Binds `everyday/shell.ts`, `everyday/landingScreen.ts`,
+`dev/browserTier.test-helper.ts` and `everyday/landingScreen.browser.test.ts`.
+
+**Why an entry rather than a docstring.** Both halves are [§ D405](DECISIONS.md)'s second ground —
+they move something already recorded. The first changes the first paint of the screen § D335 put on
+the page and corrects a claim in a module it does not own; the second moves a published measurement
+([§ D618](DECISIONS.md)'s B1) without moving its gate.
+
+**What was wrong, and both halves are timings that nothing waited for.** The Everyday shell mounts
+synchronously while `dev/main.ts`'s async `main()` is still fetching `data/`, and the landing page's
+morning crosses a worker. Driven on the built bundle, 1280 × 800 and 1440 × 900:
+
+| t | what the page does |
+|---|---|
+| ≈ 190 ms | the screen region and the three mode tiles paint, from no host |
+| ≈ 430 ms | `dev/main.ts` publishes the host; the first-arrival offer answers and replaces the front door with the landing page |
+| ≈ 775 ms | the simulated morning lands and the landing page rebuilds **all nine of its elements**, the call to action among them |
+
+Two defects fall out of that, and both were found as intermittent browser-tier red rather than as
+complaints.
+
+**One: the front door offered three controls that could not act, and then took them away.** A
+*Scenario* press inside the first window opens a screen reading `host.ts#HOST_PENDING_REASON` —
+*the simulation host has not finished booting* — because that is what a registered screen gets with
+no host. That is § D227's first direction on the first screen anybody sees. And a press aimed at a
+tile *as* the offer lands is not early but **lost**: it resolves against an element the shell has
+already removed, reproduced as a `locator.click` timing out on a detached tile while the page moved
+underneath it. It also took the browser tier's own front-door helper with it —
+`leaveTutorialIfOffered` sampled the front door, found the tiles, returned, and left `charter S9`
+B1 waiting thirty seconds for a tile the offer had since withdrawn. Green when the tier was quiet
+enough to finish inside the window, red under load: **the green was the race being won, not
+absent.**
+
+**Two: the morning arriving threw away the focus a keyboard player had taken.** All three of
+`landingScreen.ts`'s landing callbacks called the full `render`, which opens `host.replaceChildren()`
+— so the only button on the page stopped existing about a third of a second after it appeared.
+`keyboardJourneys.browser.test.ts`'s `AX-15` measured the first control inside the screen region at
+**two** presses instead of one for exactly that reason, and that is `docs/36`'s `AX-11` from the
+other end: the question there is whether a player can see where focus went, and this took focus off
+them for a reason they had no part in.
+
+**What ships.** `shell.ts`'s `'menu'` arm holds the tiles until the first-arrival question has an
+answer, drawing the front door's own heading and lede over the shell's standing sentence for a
+screen waiting on the host. The discriminator is `weekRailOptions`': a **slot** with no host in it
+is a host on its way, and **no slot at all** is a build that keeps no simulation and draws its tiles
+at once. `connectDataHost` answers the offer and draws in one synchronous call, so no state between
+the two is ever painted, and the redraw is guarded on *what was last drawn* rather than on the route.
+`landingScreen.ts` repaints the motion block alone: `landingView.ts` feeds `input.motion` to
+`motionViewOf` and to nothing else, so that is the whole of what a landed run can change.
+
+**Three things this does not claim.**
+
+*No sentence is invented.* The waiting front door reuses the heading, the lede and
+`HOST_PENDING_REASON`, all of which ship today; the corpus is unmoved in both tiers.
+
+*The B1 figure moves and that is the measurement becoming honest.* It printed ≈ 750 ms and prints
+≈ 1 360 ms on the same box, because the old number was reachable **only** by the helper returning
+inside the window and reading a tile that opened *the simulation host has not finished booting*.
+`docs/31` § 3 defines interactive as a control with its handler bound, and `dev/recordTti.ts`'s
+header already names presence and an enabled state as the two things that cannot prove it. The gate
+is untouched: `perf-history/tti-history.jsonl` holds no `main` run, so `evaluateTtiGate` returns
+`'advisory'` as it did before, and no history was fabricated to make it gate sooner.
+
+*Which wave caused the two red cases is not established.* Both windows measure the same on wave
+AE's base `918bc64` and on its head — 190/430/775 either side — and the whole browser tier is green
+on the head in an unloaded run. What wave AE added is tier load: a new browser file and two
+extended ones. So this entry records a latent race that wave AE's cases were the first to lose,
+rather than a regression wave AE introduced, and it is closed in the shell rather than narrowed in
+the driver because no driver can see the host arrive and any bound it guessed would be a bound on
+somebody else's box.
