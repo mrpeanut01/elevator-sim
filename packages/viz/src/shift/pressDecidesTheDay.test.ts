@@ -228,17 +228,26 @@ describe('Scenario 6 day 1 — the event the day asks to be answered', () => {
     expect(events[0]?.atS).toBeLessThan(SHIFT_LENGTH_S);
   });
 
-  it('is the only rung that declares one, so the negative control is the other fifteen', () => {
+  it('is one of several rungs that declare one, and some rung still declares none', () => {
     /*
      * Both directions. A field every row used would make the identity below untestable, and a field
      * no row used would make this whole file a description of nothing.
+     *
+     * **This case read `toEqual([CONTRACT_ID])` until GitHub issue #587**, which is a statement
+     * about wave AF rather than about the field: § D871 authored the first absence and § D914
+     * authored six more, so `c7` is no longer the only rung and asserting that it is would have
+     * turned a piece of content into a schema rule. What has to hold for the rest of this file to
+     * mean anything is narrower — this rung declares one, and *some* rung declares none, so the
+     * negative control still has somewhere to stand. `pressLadder.test.ts` owns the set.
      */
     const declaring = CONTRACT_LADDER.rows
       .filter((row) => row.fabric.incidents.length > 0)
       .map((row) => row.contractId);
-    expect(declaring).toEqual([CONTRACT_ID]);
-    for (const row of CONTRACT_LADDER.rows) {
-      if (row.contractId === CONTRACT_ID) continue;
+    expect(declaring).toContain(CONTRACT_ID);
+    const silent = CONTRACT_LADDER.rows.filter((row) => row.fabric.incidents.length === 0);
+    expect(silent.length, 'some rung declares no absence, or the negative control is empty')
+      .toBeGreaterThan(0);
+    for (const row of silent) {
       expect(rungIncidents(row), row.contractId).toEqual([]);
     }
   });

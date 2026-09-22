@@ -48,6 +48,7 @@ import type { CalendarPeriod } from '../shift/calendar.js';
 import { scheduledEventFor } from '../shift/calendar.js';
 import { FIRST_SESSION_LINE } from '../shift/firstSession.js';
 import { carsToDerate } from '../shift/incidents.js';
+import { pressDayFor } from '../shift/ladder.js';
 import type { GoalReading, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
@@ -64,6 +65,22 @@ export interface OutOfServiceStrip {
   readonly badge: string;
   /** One sentence per cause, joined. See {@link outOfServiceOf} for why they are not merged. */
   readonly sentence: string;
+  /**
+   * **Which standing orders make today's question go away** — GitHub issue #587,
+   * [§ D914](../../../../DECISIONS.md). `undefined` on every day that is not a pinned one.
+   *
+   * A playability assessor swept § D871's day across all thirteen shipped dispatchers and found
+   * **eight of them clear it as built, with no press at all**. Changing the standing order is a
+   * control on the brief, one screen from this strip, so a player could answer the day by moving a
+   * `<select>` and never learn that the day had a question in it — and the product said nothing.
+   *
+   * It is drawn **only on the day the census was measured on**: `ContractPressDay` pins a seed, and
+   * {@link mootSentenceOf} refuses to draw unless the week's contract, its day and its crowd are
+   * all that day's. A sentence about *this* day's dispatchers, drawn over a different crowd, would
+   * be a measurement quoted about a run it was not taken on — which is the class
+   * [§ D227](../../../../DECISIONS.md) is about, arriving through a cache of a different kind.
+   */
+  readonly mootUnder: string | undefined;
 }
 
 /** One row of § 6.2's five facts. */
@@ -170,6 +187,16 @@ export interface TodayInput {
   readonly buildingId: string;
   /** The standing dispatcher's display name, or `undefined`. */
   readonly dispatcherName: string | undefined;
+  /**
+   * Any shipped dispatcher's display name, by id — `host.dispatcherById(id)?.name`.
+   *
+   * Required rather than optional, {@link TodayInput.calendar}'s own reason one field over: an
+   * optional lookup would default to *no names*, every caller that forgot it would silently draw no
+   * moot sentence, and the one day whose question a standing order can erase would go back to
+   * saying nothing. A caller with no profile shelf passes `() => undefined`, which draws the ids —
+   * visibly wrong rather than invisibly absent.
+   */
+  readonly dispatcherNameOf: (id: string) => string | undefined;
   /** `host.goalsToday()` — pending before a run, which is what *what today asks* wants. */
   readonly goals: readonly GoalReading[];
   readonly seed: bigint;
@@ -274,6 +301,7 @@ function scheduledAwayOf(
 function outOfServiceOf(
   building: ResolvedBuilding | undefined,
   event: ShiftEvent,
+  moot: string | undefined,
 ): OutOfServiceStrip | undefined {
   if (building === undefined) return undefined;
   const held = carsHeldBy(event);
@@ -309,7 +337,48 @@ function outOfServiceOf(
           'not come back. What the cars that are left do after it goes is yours to change.',
     );
   }
-  return { badge, sentence: sentences.join(' ') };
+  return { badge, sentence: sentences.join(' '), mootUnder: moot };
+}
+
+/**
+ * The moot-dispatcher sentence for this exact day, or `undefined`.
+ *
+ * ## The three gates, and each one is the difference between a measurement and a claim
+ *
+ * `ContractPressDay` is measured on **one contract, on day 1, at one seed** — so the sentence is
+ * drawn when the week is on that contract, standing on day 1, with that crowd, and at no other
+ * moment. A player on day 4 of Crown Hotel is playing a different day; a player with a `?seed=`
+ * deep link is meeting a different crowd. Either would be this repository's oldest defect wearing
+ * new words: a figure quoted about a run it was not taken on.
+ *
+ * ## No digit, and that is mechanical rather than a habit
+ *
+ * The census is *eight of thirteen* and this sentence says neither number — it names the standing
+ * orders, which is the thing a player can act on, and `today.test.ts` fails on a digit anywhere in
+ * this strip. The honesty search asks whether a figure is licensed, and *eight of thirteen* would
+ * need a source a reader on this screen cannot reach.
+ *
+ * A pinned day whose census is **empty** draws no sentence at all rather than *"no dispatcher
+ * clears it"*, because that second sentence is a claim about thirteen runs the strip would be
+ * making on the census's behalf, and it is worth more said where the day is proved
+ * (`shift/pressLadder.test.ts`) than implied here.
+ */
+function mootSentenceOf(
+  week: WeekState,
+  seed: bigint,
+  nameOf: (id: string) => string | undefined,
+): string | undefined {
+  const press = pressDayFor(week.contractId);
+  if (press === undefined) return undefined;
+  if (week.day !== 1 || seed.toString() !== press.seedText) return undefined;
+  const names = press.mootUnder.map((id) => nameOf(id) ?? id);
+  if (names.length === 0) return undefined;
+  const last = names[names.length - 1] ?? '';
+  const list = names.length === 1 ? last : `${names.slice(0, -1).join(', ')} and ${last}`;
+  return (
+    `Measured on today’s crowd: ${list} clear this day with no press at all. Change who is ` +
+    'driving and the question this day is asking goes away with it.'
+  );
 }
 
 /** § 6.2's five rows, from the resolved building. Empty when there is no document to read. */
@@ -467,7 +536,11 @@ export function todayOf(input: TodayInput): TodayRecord {
     towerName: building?.name ?? input.buildingId,
     lede: ledeOf(building, event, held),
     wrinkle: event,
-    outOfService: outOfServiceOf(building, event),
+    outOfService: outOfServiceOf(
+      building,
+      event,
+      mootSentenceOf(week, input.seed, input.dispatcherNameOf),
+    ),
     /*
      * The same call the run makes, and the same call the strip's own badge half makes — one
      * `carsToDerate` per day record rather than one per reader. See the field's docstring for the

@@ -92,6 +92,7 @@ import { WAIT_BANDS } from '../live/bands.js';
 import {
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
+  parkingChangesNothing,
   SPREAD_CARS_LABEL,
   switchChangesNothing,
   switchDispatcherLabelOf,
@@ -1069,6 +1070,23 @@ export const STAGE_SWITCH_PICKER_NOTE =
 export const STAGE_SWITCH_NO_CHANGE =
   'that is what the building is already running — handing the day over would change nothing';
 
+/**
+ * Why a parking arm cannot act — it would set the strategy the idle cars are already keeping.
+ *
+ * **GitHub issue #588, [§ D913](../../../../DECISIONS.md)**, and the finding is a measurement: a
+ * playability assessor pressed *spread the cars* on Scenario 6's pinned day under `zoned-uppeak`
+ * and it **changed 0 of 355 legs and said nothing**. `zoned-uppeak` authors
+ * `idle.parkingStrategy: 'zone-center'`, which is exactly what that press sets, so the control was
+ * live-looking and inert — [§ D227](../../../../DECISIONS.md)'s first polarity on a button.
+ *
+ * The sentence names the *reason* rather than the comparison, `STAGE_SWITCH_NO_CHANGE`'s shape one
+ * arm over, and `live/interventions.ts#parkingChangesNothing` decides when it is true — off the
+ * configuration in force at the playhead, never off a counterfactual run, which is the distinction
+ * `shift/afterPress.ts` spends a section on.
+ */
+export const STAGE_PARKING_NO_CHANGE =
+  'that is where the idle cars are already waiting — this press would set what is already set';
+
 /** The intervention control, resolved for a run and a playhead. */
 export interface StageInterventionView {
   readonly rows: readonly StageInterventionRow[];
@@ -1099,6 +1117,16 @@ export interface StageInterventionInput {
    * offering none — which is every caller that draws no picker.
    */
   readonly switchTo?: StageSwitchTarget | undefined;
+  /**
+   * The vector **actually driving**, derived — supplied so the two parking arms can say when they
+   * would set what is already set (GitHub issue **#588**, [§ D913](../../../../DECISIONS.md)).
+   *
+   * A thunk for {@link StageSwitchTarget.driving}'s reason, and it falls back to that field when a
+   * caller supplies a handover target and nothing here: the two are the same derivation, and a
+   * screen that already holds one should not be made to pass it twice. `undefined` means *do not
+   * decide*, and {@link parkingRowsOf} draws the arms unrefused rather than guessing a default.
+   */
+  readonly driving?: (() => DispatcherProfile) | undefined;
   /**
    * The mid-run purchases the screen is offering, priced against a budget — GitHub issue **#370**,
    * `docs/38` § 2.3. `undefined` when the screen is offering none, which is every caller today.
@@ -1202,14 +1230,15 @@ export function stageInterventionsOf(input: StageInterventionInput): StageInterv
 function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] {
   const { switchTo } = input;
   const works = worksRowsOf(input);
-  if (switchTo === undefined) return Object.freeze([...STAGE_INTERVENTIONS, ...works]);
+  const parking = parkingRowsOf(input);
+  if (switchTo === undefined) return Object.freeze([...parking, ...works]);
   const changesNothing = switchChangesNothing({
     interventions: input.interventions,
     target: switchTo.target,
     driving: switchTo.driving,
   });
   return Object.freeze([
-    ...STAGE_INTERVENTIONS,
+    ...parking,
     Object.freeze({
       change: Object.freeze({ kind: 'switch-dispatcher' as const, profile: switchTo.target }),
       label: switchDispatcherLabelOf(switchTo.target.name),
@@ -1219,6 +1248,39 @@ function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] 
     }),
     ...works,
   ]);
+}
+
+/**
+ * The two parking arms, with the refusal each one earns at this playhead — GitHub issue **#588**,
+ * [§ D913](../../../../DECISIONS.md).
+ *
+ * {@link STAGE_INTERVENTIONS} is still the vocabulary — the label and the sentence are its, and a
+ * third parking verb would be added there — and this wraps it with the one fact the constant
+ * cannot know: whether *this* press would set the strategy already in force. The decision is
+ * `live/interventions.ts#parkingChangesNothing`'s, for `switchChangesNothing`'s reason one arm
+ * over: both shells ask the same question and a second answer would be a second rule.
+ *
+ * **A caller that supplies no {@link StageInterventionInput.driving} gets the unrefused rows**, and
+ * that is deliberate rather than a gap: without the driving vector the question has no answer, and
+ * guessing `stay` would be a refusal drawn from a default rather than from the run — the shape
+ * § D227 is about. Every shipped caller supplies it; `stageScreenModel.test.ts` fails if the
+ * Everyday stage stops.
+ */
+function parkingRowsOf(input: StageInterventionInput): readonly StageInterventionRow[] {
+  const driving = input.driving ?? input.switchTo?.driving;
+  if (driving === undefined) return STAGE_INTERVENTIONS;
+  return Object.freeze(
+    STAGE_INTERVENTIONS.map((row) => {
+      const kind = row.change.kind;
+      if (kind !== 'park-cars-lobby' && kind !== 'spread-cars') return row;
+      const inert = parkingChangesNothing(kind, {
+        interventions: input.interventions,
+        atS: input.simTimeS,
+        driving,
+      });
+      return inert ? Object.freeze({ ...row, refusal: STAGE_PARKING_NO_CHANGE }) : row;
+    }),
+  );
 }
 
 /**

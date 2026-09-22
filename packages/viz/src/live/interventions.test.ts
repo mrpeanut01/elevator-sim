@@ -32,6 +32,7 @@ import {
   RECOMPUTING_BEAT,
   SPREAD_CARS_LABEL,
   spentOnWorks,
+  parkingChangesNothing,
   switchChangesNothing,
   SWITCH_PINS_NOTE,
   switchDispatcherLabelOf,
@@ -675,5 +676,94 @@ describe('the bought kinds — stamp, price and refusal (GitHub issue #370)', ()
       serviceEvents: [],
     });
     expect(admission.admitted).toBe(true);
+  });
+});
+
+describe('parkingChangesNothing — § D227’s first polarity on a button (issue #588, § D913)', () => {
+  const profileOf = (id: string, parking?: string): DispatcherProfile =>
+    ({
+      id,
+      name: id,
+      weights: { waitTime: 1 },
+      ...(parking === undefined ? {} : { idle: { parkingStrategy: parking } }),
+    }) as DispatcherProfile;
+
+  /** The shipped profile the assessor found this on: it authors `zone-center` from the first frame. */
+  const ZONED = profileOf('zoned-uppeak', 'zone-center');
+  /** A profile that authors no idle block, so `DISPATCH_DEFAULTS.parkingStrategy` (`stay`) stands. */
+  const PLAIN = profileOf('collective');
+
+  it('refuses *spread the cars* under a profile that already parks at the zone centre', () => {
+    /*
+     * The finding, reproduced as a predicate: an assessor pressed this on Scenario 6's pinned day
+     * under `zoned-uppeak` and it changed **0 of 355 legs and said nothing**.
+     */
+    expect(
+      parkingChangesNothing('spread-cars', { interventions: [], atS: 100, driving: () => ZONED }),
+    ).toBe(true);
+  });
+
+  it('leaves the other verb pressable on the same profile, which is what makes it a refusal', () => {
+    /* Both directions. A predicate that refused both arms would be a disabled control, not a fact. */
+    expect(
+      parkingChangesNothing('park-cars-lobby', {
+        interventions: [],
+        atS: 100,
+        driving: () => ZONED,
+      }),
+    ).toBe(false);
+  });
+
+  it('refuses neither verb on a profile that authors no idle block', () => {
+    /*
+     * `DISPATCH_DEFAULTS.parkingStrategy` is `stay`, which is neither of the two settings, so on
+     * the ten shipped profiles that author no idle stage both presses are live from the first
+     * frame — which is what makes the refusal above a measurement of one configuration rather than
+     * a blanket that happens to be off.
+     */
+    for (const kind of ['park-cars-lobby', 'spread-cars'] as const) {
+      expect(
+        parkingChangesNothing(kind, { interventions: [], atS: 100, driving: () => PLAIN }),
+        kind,
+      ).toBe(false);
+    }
+  });
+
+  it('reads the latest press at or before the playhead, never a later one', () => {
+    const log: readonly RunInterventionConfig[] = [
+      { atS: 50, change: { kind: 'spread-cars' } },
+      { atS: 300, change: { kind: 'park-cars-lobby' } },
+    ];
+    /* At 100 s the spread is in force: pressing spread again writes what is already written… */
+    expect(
+      parkingChangesNothing('spread-cars', { interventions: log, atS: 100, driving: () => PLAIN }),
+    ).toBe(true);
+    /* …and the lobby press is live, because the entry that sets it has not happened yet. */
+    expect(
+      parkingChangesNothing('park-cars-lobby', {
+        interventions: log,
+        atS: 100,
+        driving: () => PLAIN,
+      }),
+    ).toBe(false);
+    /* Past the second entry the two swap over — the control is a dial, not two latches. */
+    expect(
+      parkingChangesNothing('park-cars-lobby', {
+        interventions: log,
+        atS: 400,
+        driving: () => PLAIN,
+      }),
+    ).toBe(true);
+    expect(
+      parkingChangesNothing('spread-cars', { interventions: log, atS: 400, driving: () => PLAIN }),
+    ).toBe(false);
+  });
+
+  it('lets a press already on the log outrank the profile’s own idle stage', () => {
+    /* A lobby press under `zoned-uppeak` makes the *spread* arm live again, which it was not at t=0. */
+    const log: readonly RunInterventionConfig[] = [{ atS: 10, change: { kind: 'park-cars-lobby' } }];
+    expect(
+      parkingChangesNothing('spread-cars', { interventions: log, atS: 100, driving: () => ZONED }),
+    ).toBe(false);
   });
 });

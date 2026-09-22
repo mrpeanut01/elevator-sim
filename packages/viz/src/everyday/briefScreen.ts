@@ -97,6 +97,8 @@ function mountBrief(
       building: data.resolvedBuilding(),
       buildingId: selection.buildingId,
       dispatcherName: data.dispatcherById(selection.dispatcherId)?.name,
+      /* Any profile's name, for the moot-dispatcher sentence — § D914. */
+      dispatcherNameOf: (id) => data.dispatcherById(id)?.name,
       goals: data.goalsToday(),
       seed: data.seed(),
       /* § D729, § D730 — per draw, `doorScreen.ts#viewOf`'s reason, and the same question so the
@@ -182,6 +184,23 @@ function mountBrief(
       sentence.style.cssText = `font-size:12.5px;line-height:1.45;color:${C.inkSoft}`;
       strip.append(badge, sentence);
       column.append(strip);
+      /*
+       * **Which standing orders make today's question go away** — GitHub issue #587, § D914.
+       *
+       * Under the strip rather than inside it, and drawn only on a pinned day: the strip says a
+       * lift is going and this says what the day is asking, which are two facts with two causes.
+       * The dispatcher `<select>` is a few rows down this same screen, which is why the sentence
+       * belongs here rather than on the stage — it is read at the moment the choice is made.
+       */
+      if (view.outOfService.mootUnder !== undefined) {
+        const moot = el(doc, 'p', 'everyday-brief-moot', view.outOfService.mootUnder);
+        moot.style.cssText = [
+          'margin:7px 0 0',
+          'padding:0 2px',
+          `font-size:12px;line-height:1.45;color:${C.warmGrey}`,
+        ].join(';');
+        column.append(moot);
+      }
     }
 
     const facts = el(doc, 'div', 'everyday-brief-facts');

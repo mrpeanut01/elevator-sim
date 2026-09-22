@@ -101,7 +101,14 @@ export interface BriefScreenView {
   readonly title: string;
   readonly seedLine: string;
   /** § 6.2's strip, or `undefined` on a day that holds no car. */
-  readonly outOfService: { readonly badge: string; readonly sentence: string } | undefined;
+  readonly outOfService:
+    | {
+        readonly badge: string;
+        readonly sentence: string;
+        /** § D914's moot-dispatcher sentence, or `undefined` on a day that is not a pinned one. */
+        readonly mootUnder: string | undefined;
+      }
+    | undefined;
   readonly facts: readonly { readonly label: string; readonly value: string }[];
   readonly load: { readonly heading: string; readonly word: string; readonly note: string } | undefined;
   readonly wrinkle: {

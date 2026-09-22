@@ -2040,6 +2040,76 @@ measures the other fifteen for it. A **press-sensitivity** column beside the mis
 many of the seeds this contract misses does some reachable press clear it* — is the instrument that
 would turn § 4.7d's table into an answer to P1 as well as to DC-4, and it does not exist.
 
+> **That stopped being true on 2026-09-22, and § 4.7n is the row.** The instrument exists
+> (`packages/viz/src/shift/pressLadder.sweep.test.ts`), **seven** contracts of sixteen carry the
+> property, and the other nine were measured rather than left unexamined. The paragraph above is
+> kept as the dated record it is: it asked for exactly the thing that was then built.
+
+#### 4.7n Seven days that turn on a press, and the five rungs that had to be rebalanced to keep them
+
+**Landed 2026-09-22, GitHub issue [#587](https://github.com/mrpeanut01/elevator-sim/issues/587),
+[§ D914](../DECISIONS.md).** § 4.7m's closing paragraph asked for exactly one thing — *a
+press-sensitivity column beside the miss rate* — and said the instrument did not exist. It does now:
+`packages/viz/src/shift/pressLadder.sweep.test.ts`, gated on `PRESS_LADDER_SWEEP=1`, runs each
+contract's day 1 three ways (as built, *spread the cars*, *park the cars in the lobby*, the press at
+0.28 of the shift) over a seed range of this section's own sequence. Its census mode
+(`PRESS_LADDER_CENSUS=1`) then runs a pinned day as built under **every** shipped dispatcher.
+
+**Seven of sixteen contracts carry the property**, and the other nine were measured rather than left
+unexamined. The table is § D914's and is not repeated here; what belongs in this section is the half
+that moves § 4.7d.
+
+**The absence costs DC-4 on five rungs, and each is brought back on the substrate that row has
+always moved.** Adding the mid-shift absence alone takes the measured day-1 miss rate to **0.80 of
+50** on `c2`, **0.78** on `c3`, **0.76** on `c6` and **0.72** on `c10` — outside the band at the top
+— and to **0.18** on `c8`, under it at the bottom. Rebalanced and re-measured:
+
+| contract | building | what moved | missed | of | rate | in band |
+|---|---|---|---|---|---|---|
+| c6 | `chancery-house` | 16 % → **15 %**, the office-prestige **minimum**; let unchanged at 1.06 | 14 | 30 | **0.47** | **yes** |
+| c8 | `st-jude-hospital` | 8.5 % → **10.5 %**, inside the hospital profile's 6–11 | 14 | 30 | **0.47** | **yes** |
+| c9 | `harbour-point` | **nothing** — in band with the absence as it stands | 28 | 50 | **0.56** | **yes** |
+| c2 | `midtown-office` | let 0.395 → **0.34** | 15 | 30 | **0.50** | **yes** |
+| c7 | `crown-hotel` | **nothing** — § 4.7m's row, unmoved | 22 | 50 | **0.44** | **yes** |
+| c3 | `secure-tower` | 12 % → **11 %**, the office-standard **minimum** | 16 | 30 | **0.53** | **yes** |
+| c10 | `ashgate` | 13.5 % → **12 %**, inside the office-standard 11–15 | 13 | 30 | **0.43** | **yes** |
+
+**Read the budget column.** Five of the seven are measured at **30** seeds and two at **50**, and
+that is stated rather than smoothed: § 4.7d's published budget is 50, so those five rows are a
+narrower measurement than the table they sit beside and a re-measurement at 50 is owed. They are
+published at 30 because the rebalance was bracketed at that budget — `c6` at 15 % on a 0.98 let
+reads **0.20 of 30**, under the floor, so the pair that ships is between two measured misses rather
+than at the first value that cleared, which is § 4.7j's own discipline.
+
+**DC-6 is untouched**, because no `missRateTarget` moved: the declared order still reads 0.36, 0.36,
+0.40, 0.42, 0.46, 0.50, 0.52, 0.52, 0.65 × 8 and never falls. What moved is the **measurement**, and
+two rows now sit further from their target than they did — `c9` at 0.56 against 0.42, `c10` at 0.43
+against 0.52. A target is design intent and a rate is a measurement; this section has never claimed
+they must meet.
+
+**`c8` is the row with a finding in it.** With **one** car booked out, every day-1 miss on that
+tower is on the **energy** bar, which no parking press moves — so the day missed and no reachable
+press could change it. With **two** out the binding goal becomes the worst wait, because fewer cars
+spend less work per delivered leg. That is § D106's perverse ranking arriving through a **fabric**
+change rather than through a dispatcher, and it is the mechanism that made the day answerable rather
+than a side effect of it.
+
+**Why nine contracts carry no such day**, measured:
+
+- **`c1` (Garden Apartments) never misses.** Over twenty seeds with one of its two cars booked out
+  from a quarter of the shift **to the end**, the worst wait peaks at **136 s** against a 230 s bar
+  and every seed reads *Shift cleared*. The only lever left is the crowd, which § 4.7f already
+  measured and which `c1`'s own rung refuses pending a playtest. It is F1 met from a new direction.
+- **`c4`, `c5` and `c11`–`c16` miss on `queue` and `energy` together** on effectively every seed as
+  built, and neither parking verb moves either past its bar — measured at twenty seeds on `c5`,
+  **20 of 20 miss under all three arms**. § 4.7e and § 4.7k already place these towers outside the
+  band; this is the same envelope read on a different axis.
+
+**So the press-sensitivity column § 4.7m asked for exists and reads seven of sixteen.** What it does
+not do is turn the other nine, and the obstruction on eight of them is the same one § 4.7m reported
+from the other side: `ENERGY_PER_LEG_MAX_KJ` is one number derived at each contract's own day-1
+horizon (§ 4.6), and on the towers where it binds it binds under every arm. GitHub issue #555.
+
 #### 4.7h Where the ninth contract goes
 
 A Burj-class building landed on 2026-09-06 (`data/buildings/burj-class-reference.json`, § D527) and

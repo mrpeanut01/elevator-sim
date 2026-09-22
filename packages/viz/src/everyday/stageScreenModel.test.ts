@@ -71,6 +71,7 @@ import {
   STAGE_NO_PHASE,
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
+  STAGE_PARKING_NO_CHANGE,
   STAGE_SWITCH_NO_CHANGE,
   STAGE_SWITCH_PICKER_LABEL,
   STAGE_SWITCH_PICKER_NOTE,
@@ -692,6 +693,39 @@ describe('§ 7.6 — the intervention control', () => {
     // about the fabric rather than about the row.
     expect(localRow?.refusal).toBeUndefined();
   }, 120_000);
+
+  it('refuses the parking arm that would set what is already set, and leaves the other live', () => {
+    /*
+     * **GitHub issue #588, § D913** — § D227's first polarity on a button. An assessor pressed
+     * *spread the cars* on Scenario 6's pinned day under `zoned-uppeak` and it changed **0 of 355
+     * legs and said nothing**; that profile authors `idle.parkingStrategy: 'zone-center'`, which is
+     * what the press sets. `live/interventions.ts#parkingChangesNothing` decides it and this is the
+     * row it lands on.
+     */
+    const zoned = { ...PLAIN, idle: { parkingStrategy: 'zone-center' } } as DispatcherProfile;
+    const view = stageInterventionsOf({
+      interventions: [],
+      simTimeS: 0,
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      driving: () => zoned,
+    });
+    const spread = view.rows.find((row) => row.change.kind === 'spread-cars');
+    const park = view.rows.find((row) => row.change.kind === 'park-cars-lobby');
+    expect(spread?.refusal).toBe(STAGE_PARKING_NO_CHANGE);
+    /* Both directions: a model that refused both arms would be a disabled control, not a fact. */
+    expect(park?.refusal).toBeUndefined();
+  });
+
+  it('draws both parking arms unrefused when no driving vector is supplied', () => {
+    /*
+     * The negative control the optional input owes. Without the driving vector the question has no
+     * answer, and guessing `stay` would be a refusal drawn from a default rather than from the run
+     * — which is the shape § D227 is about, arriving through the fix for it.
+     */
+    for (const row of armsFor(undefined).rows) expect(row.refusal, row.label).toBeUndefined();
+  });
 
   it('refuses a handover to the vector already driving, and says why', () => {
     /*

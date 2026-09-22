@@ -164,6 +164,8 @@ import {
 } from '../everyday/tunerModel.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { SIGN_IN_LINK_STAGES, signInNoticeViewOf } from '../everyday/signInLink.js';
+/* GitHub issue #587's week-tower picker — driven by `EVERYDAY_TOWER_CHOICE` at the end of this file. */
+import { towerChoiceViewOf } from '../everyday/towerChoice.js';
 /* GitHub issue #242's fault ceiling — the report line's *at least* arm is drawn at it. */
 import { MAX_FAULTS_COUNTED } from '../everyday/faults.js';
 /* GitHub issue #245's report block — driven by `EVERYDAY_SUPPORT` at the end of this file. */
@@ -12226,6 +12228,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         building: context.building,
         buildingId: context.building.id,
         dispatcherName: entry.report.metaLines[0],
+        /* Any profile's name, for the moot-dispatcher sentence — § D914. */
+        dispatcherNameOf: (id) =>
+          context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
         goals: entry.readings,
         seed: 424_242n,
         /*
@@ -12264,6 +12269,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           building: context.building,
           buildingId: context.building.id,
           dispatcherName: entry.report.metaLines[0],
+          /* Any profile's name, for the moot-dispatcher sentence — § D914. */
+          dispatcherNameOf: (id) =>
+            context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
           goals: entry.readings,
           seed: 424_242n,
           crowdIsToday: false,
@@ -12293,6 +12301,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         building: context.building,
         buildingId: context.building.id,
         dispatcherName: entry.report.metaLines[0],
+        /* Any profile's name, for the moot-dispatcher sentence — § D914. */
+        dispatcherNameOf: (id) =>
+          context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
         goals: entry.readings,
         seed: 424_242n,
         crowdIsToday: true,
@@ -12764,6 +12775,74 @@ const EVERYDAY_SIGN_IN_LINK: SurfaceAdapter = {
       }
       if (view.dismiss !== undefined) {
         seeds.push({ field: `signIn.${stage}.dismiss`, text: view.dismiss, role: 'label' });
+      }
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * **The week's tower picker** — GitHub issue **#587**, [§ D912](../../../../DECISIONS.md).
+ *
+ * ## Why it is swept, and what it is most likely to get wrong
+ *
+ * Every row on this surface is a **promise about what a press will do to a week a player cannot
+ * get back**: *you have a week going here — this picks it back up*, against *you have not played
+ * here — this opens a fresh week*. `shift/week.ts` spends a section on what a bare `takeContract`
+ * cost three callers before GitHub issue #107, so a row that promised a resume and restarted
+ * instead would be that loss with a label on it. The words are what this drives; that the press
+ * keeps them is `everyday/towerChoice.test.ts`'s and the browser tier's.
+ *
+ * ## Two states per case, and the second is the one worth seeding
+ *
+ * A week with **nothing parked** draws `open` on every row but its own; a week with two parked
+ * draws `resume` on those two. Both are ordinary states of the same screen, and seeding only the
+ * first would leave the sentence that carries the real promise unswept.
+ *
+ * **It seeds no figure, and mechanically so**: the only digits on the surface are inside the
+ * contracts' own `Scenario n` labels, which are names. The `covers` list names the copy record
+ * rather than the rows, because the rows are derived from `CONTRACTS` and a `covers` entry per
+ * tower would be a second list of the shipped set.
+ */
+const EVERYDAY_TOWER_CHOICE: SurfaceAdapter = {
+  id: 'everyday/towerChoice.ts#towerChoiceViewOf',
+  covers: ['everyday/towerChoice.ts#towerChoiceViewOf', 'everyday/towerChoice.ts#TOWER_CHOICE_COPY'],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    /*
+     * Every tower the corpus loaded, so a row draws the building's own name where this build has
+     * the document and its id where it does not — both are states the shipped picker reaches.
+     */
+    const nameOf = (buildingId: string): string | undefined =>
+      context.buildings.find((building) => building.id === buildingId)?.name;
+    /* The case's own week, `CAMPAIGN`'s idiom: the contract the corpus's building belongs to. */
+    const week = openWeek(contractForBuilding(context.case.buildingId)?.id);
+    const states: readonly (readonly [string, readonly WeekState[]])[] = [
+      ['fresh', []],
+      ['parked', [openWeek('c2'), openWeek('c7')]],
+    ];
+    for (const [state, parked] of states) {
+      const view = towerChoiceViewOf({ week, parked, nameOf });
+      seeds.push(
+        { field: `towers.${state}.heading`, text: view.heading, role: 'label' },
+        { field: `towers.${state}.lede`, text: view.lede, role: 'prose' },
+        { field: `towers.${state}.note`, text: view.note, role: 'prose' },
+        { field: `towers.${state}.incidentTag`, text: view.incidentTag, role: 'label' },
+      );
+      for (const row of view.rows) {
+        seeds.push(
+          {
+            field: `towers.${state}.${row.contractId}.name`,
+            text: `${row.label} · ${row.tower}`,
+            role: 'label',
+          },
+          { field: `towers.${state}.${row.contractId}.teaches`, text: row.teaches, role: 'prose' },
+          {
+            field: `towers.${state}.${row.contractId}.arrival`,
+            text: row.arrivalNote,
+            role: 'prose',
+          },
+        );
       }
     }
     return singleRun(this.id, seeds);
@@ -14342,6 +14421,14 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * wording whose fault it could take off a surface that exists to carry one.
    */
   EVERYDAY_LANDING,
+  /*
+   * And the week's tower picker — GitHub issue #587, § D912. Appended last in turn, and the
+   * fault-ordering rule is free here for the landing page's reason rather than the tutorial's: the
+   * surface publishes no figure at all (`towerChoice.test.ts` fails on a digit outside the
+   * contract's own `Scenario n` label), so there is no rate-shaped wording whose fault it could
+   * take off a surface that exists to carry one.
+   */
+  EVERYDAY_TOWER_CHOICE,
 ]);
 
 /* -------------------------------------------------------------------------- *

@@ -179,6 +179,7 @@ import { worksHeldCarRefsOf, worksHeldCarsOf } from '../campaign/works.js';
 import { everydayCareerStore, type CareerStore } from './careerStore.js';
 import { CAMPAIGN_DOCK_COPY, purseRefusalOf } from './campaignDock.js';
 import { switchWeek } from '../shift/week.js';
+import { towerChoiceViewOf, type TowerChoiceView } from './towerChoice.js';
 import type { VizRecording } from '../contract/types.js';
 import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -816,6 +817,16 @@ export interface EverydayHost {
 
   /** The contract the week is on, or `undefined` on a sandbox/free-play week. */
   contract(): ScenarioContract | undefined;
+
+  /**
+   * **The towers a player can move this week to** — GitHub issue #587,
+   * [§ D912](../../../../DECISIONS.md), `everyday/towerChoice.ts`.
+   *
+   * Derived per call from the live week and the parked ones, so a screen that holds the view across
+   * a move draws a stale selection rather than the host caching one — which is the same reason
+   * {@link EverydayHost.week} is a call and not a field.
+   */
+  towerChoice(): TowerChoiceView;
 
   /**
    * The calendar period the week is under, or `null` — `ViewerState.calendar`.
@@ -1739,6 +1750,22 @@ export interface EverydayHost {
    * cannot, or `undefined` when the replay week is standing.
    */
   startReplay(day: number): string | undefined;
+
+  /**
+   * **Move the week to another contract** — GitHub issue #587, § D912.
+   *
+   * `shift/week.ts#switchWeek` with the `resume` arrival, which is the whole of the decision and is
+   * argued in `everyday/towerChoice.ts`: the player is picking a week up, not taking an assignment,
+   * so a week they left on day 4 with a streak comes back as it was and the departing one is parked
+   * rather than ended. The identity arm is `switchWeek`'s own first line — moving to the contract
+   * already standing writes nothing.
+   *
+   * **The run in flight goes first**, `campaignAct`'s `take-offer` rule and for its reason: a run
+   * asked for the week being parked would otherwise land on the week that replaced it and be filed
+   * there. A day already filed is cancelled rather than marked unfinished (§ D565), which is the
+   * same gate that block carries.
+   */
+  chooseTower(contractId: string): void;
   /** The replay in progress, or `undefined`. */
   replay(): EverydayReplaySession | undefined;
   /** Leave the replay, putting the parked week and the run it interrupted back. A no-op outside one. */
@@ -3438,6 +3465,38 @@ export function createEverydayHost(
         notifyCampaign();
       }
       return outcome;
+    },
+    towerChoice: () => {
+      const state = b.state();
+      return towerChoiceViewOf({
+        week: state.week,
+        parked: state.parkedWeeks,
+        nameOf: (buildingId) =>
+          b.resources.buildings.find((building) => building.id === buildingId)?.name,
+      });
+    },
+    chooseTower: (contractId) => {
+      const contract = contractById(contractId);
+      if (contract === undefined) return;
+      const state = b.state();
+      if (state.week.contractId === contractId) return;
+      /*
+       * The day being left goes with the week being parked — `campaignAct`'s `take-offer` block,
+       * § D565's gate included: a filed day is cancelled and an unfiled one is marked as left
+       * unfinished, because telling a player their finished day was abandoned is an accusation the
+       * product has already spent a docstring on not making.
+       */
+      if (b.dayClosed()) b.cancelRun?.();
+      else b.abandonDay?.();
+      const moved = switchWeek(b.state().week, b.state().parkedWeeks, contractId, 'resume');
+      b.applyPatch({
+        week: moved.week,
+        parkedWeeks: moved.parked,
+        buildingId: contract.buildingId,
+        shiftLengthS: shiftLengthForContract(contractId),
+        windowStartS: null,
+      });
+      notifyCampaign();
     },
     startReplay: (day) => {
       const state = b.state();
