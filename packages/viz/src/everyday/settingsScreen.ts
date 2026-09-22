@@ -76,6 +76,7 @@ import { buildNotesSummaryOf, buildNotesViewOf } from './buildNotes.js';
 import { engineerSettings, onEngineerSettingsProvided } from './engineerBridge.js';
 import { DEFAULT_EVERYDAY_PROFILE } from './profile.js';
 import { everydayCareerStore } from './careerStore.js';
+import { everydayDeviceChimeStore } from './chimeStore.js';
 import { everydayProfileStore } from './profileStore.js';
 import { everydayTelemetry } from './telemetryPort.js';
 import { STAGE_SPEEDS } from './stageScreenModel.js';
@@ -188,6 +189,15 @@ function buildNotesPanel(doc: Document): HTMLElement {
 function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScreenHandle {
   const doc = host.ownerDocument;
   const store = everydayProfileStore();
+  /**
+   * **This device's own chime tally** — `everyday/chimeStore.ts`, GitHub issue #579.
+   *
+   * Read at draw time rather than latched, because a clear banked on the fix-it screen while this
+   * panel is open must be here when the player comes back to it — the same reason `campaign()` is
+   * read at draw time one field down. The store is a singleton where there is real storage, so
+   * this is the same tally the fix-it screen spends from and not a second copy of it.
+   */
+  const deviceChimes = everydayDeviceChimeStore();
 
   /** The field's uncommitted text — `undefined` while the field simply shows the stored name. */
   let draftName: string | undefined;
@@ -260,6 +270,8 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     settingsScreenViewOf({
       profile: store.current(),
       chimeBalance,
+      deviceChimes: deviceChimes.balance(),
+      deviceDurable: deviceChimes.durable(),
       chimeOwns,
       chimeSpendable,
       chimeNotice,

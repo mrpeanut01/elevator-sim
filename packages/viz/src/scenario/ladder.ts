@@ -84,6 +84,16 @@
  * still reads the same prices off disk and still asserts the scenario is their one authority. When a
  * spend surface ships, {@link budgetLineOf} takes the prices back on that commit.
  *
+ * **A spend surface has shipped and it is not this one** — GitHub issue #579,
+ * [§ D911](../../../../DECISIONS.md). The fix-a-building screen sells a rung on *its* ladder out of
+ * a device tally that needs no account and no server (`everyday/deviceChimes.ts`,
+ * `fixit/budgetRungs.ts`), and `fixit/budgetRungReachesTheRun.test.ts` is the legs comparison that
+ * earns it. **These ten stages are unaffected**: they are played on the Engineer surface, which has
+ * no budget control at all, so there is still nothing here to buy and the prices stay off these
+ * rows. What changed is one clause of {@link SCENARIO_LADDER_COPY.baseRungNote} — *these ten*
+ * rather than *no screen in this build* — because the blanket half of that sentence stopped being
+ * true.
+ *
  * Pure. No DOM, no host, no `data/` read — the caller supplies both documents, exactly as
  * `scenario/survivors.ts#validatePublishedSurvivors` takes its context rather than fetching one.
  */
@@ -200,8 +210,17 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    * price tag with no till. It stops being drawn on the commit that makes it false — see the module
    * docstring for what that commit has to contain.
    */
+  /*
+   * **Narrowed on the commit that made the blanket claim false** — GitHub issue #579, § D911,
+   * § D227. It read *"No screen in this build sells a wider budget"*, exactly true until the
+   * fix-a-building screen began selling one out of the device tally. It is **still true of these
+   * ten stages**, for a reason nothing in that wave changed: they are played on the Engineer
+   * surface, which has no budget control, so there is nowhere for a bought rung to be spent.
+   * Saying *these ten* rather than *no screen* is the difference between a refusal a reader can
+   * check and one that has quietly stopped being true somewhere else.
+   */
   baseRungNote:
-    'No screen in this build sells a wider budget, so the count below is the count at the budget it opens on.',
+    'Nothing sells a wider budget for these ten, so the count below is the count at the budget it opens on.',
 });
 
 /* -------------------------------------------------------------------------- *

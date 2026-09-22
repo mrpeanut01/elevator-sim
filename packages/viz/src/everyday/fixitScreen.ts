@@ -185,6 +185,7 @@ import {
   buildingLineOf,
   FIXIT_SCREEN_COPY as COPY,
   fixitBarModel,
+  fixitBudgetRungRow,
   fixitCaseRailModel,
   fixitElevationRow,
   fixitMachineryRows,
@@ -196,6 +197,10 @@ import {
   type FixitSpendSummary,
   type FixitZoneRow,
 } from './fixitScreenModel.js';
+import { caseAtRung, nextBudgetStepOf } from '../fixit/budgetRungs.js';
+import { everydayDeviceChimeStore } from './chimeStore.js';
+import { CHIME_PRICES } from './chimesPanel.js';
+import { boughtStepIdOf } from './deviceChimes.js';
 import { solvedCaseSetOf } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
@@ -439,9 +444,29 @@ function sessionOf(entry: FixitCase): CaseSession {
   return session;
 }
 
+/**
+ * The case the player is on, **as they meet it** — including a budget rung they have bought.
+ *
+ * GitHub issue **#579**, [§ D911](../../../../DECISIONS.md). `fixit/budgetRungs.ts#caseAtRung`
+ * returns the same case with a bigger `budgetUnits`, and widening it *here* is the whole of the
+ * wiring: every consumer on this screen already reads that field through `affordabilityOf`,
+ * `spendOf`, `budgetNoteOf`, `fixitSpendSummary` and `classifyOutcome`, so a bought rung reaches
+ * all of them at once and none of them learns a new concept. A `FixitState` field would have been
+ * the other design and would have needed every one of those call sites to consult it — or to go on
+ * quietly charging against the base, which is the defect rather than the alternative.
+ *
+ * The rung comes off **this device's** ledger rather than a session variable, so it survives a
+ * reload exactly as the solved set does, and the whole ladder is the case file's.
+ */
 function currentEntry(): FixitCase | undefined {
   if (loaded === undefined) return undefined;
-  return loaded.cases.cases.find((entry) => entry.id === selectedId) ?? loaded.cases.cases[0];
+  const entry = loaded.cases.cases.find((candidate) => candidate.id === selectedId) ?? loaded.cases.cases[0];
+  if (entry === undefined) return undefined;
+  return caseAtRung(
+    entry,
+    loaded.cases.budgetSteps,
+    boughtStepIdOf(everydayDeviceChimeStore().record(), entry.id),
+  );
 }
 
 function solvedIds(): ReadonlySet<string> {
@@ -1069,6 +1094,81 @@ function mountFixit(
     return button;
   }
 
+  /**
+   * **The wider budget, bought with chimes** — GitHub issue **#579**,
+   * [§ D911](../../../../DECISIONS.md), `docs/38` § 2.1.
+   *
+   * ## What the press does, in the order it does it
+   *
+   * It asks `everyday/chimeStore.ts` to spend, and the **store** decides: it holds the balance, it
+   * refuses a second purchase of the same rung, and it refuses a shortfall. Nothing here subtracts
+   * anything or checks anything a second time — that would be the second arithmetic
+   * `chimesPanel.ts` keeps out of the Settings panel for `docs/22` non-goal 3's reason, arriving on
+   * a different screen. A refused press redraws and the row says which refusal it met.
+   *
+   * ## Why the row is not disabled when it is unaffordable but still drawn
+   *
+   * GAMEPLAY § 20.12: an unavailable thing is a row with a reason and never a dead button. The
+   * button is out of the tab order on every arm but `buy` and carries the row's own sentence as its
+   * `title`, which is the shape the two steppers above it already take (GitHub issue #262 — three
+   * of this screen's forty-one buttons shipped disabled with no sentence).
+   *
+   * ## `null` where the case file authors no rung
+   *
+   * `fixitZoneRow`'s precedent: a control over a ladder that does not exist is a press that writes
+   * nothing, and an empty `budgetSteps` is a statement the screen honours by drawing nothing.
+   */
+  function budgetRungLine(entry: FixitCase): HTMLElement | null {
+    if (loaded === undefined) return null;
+    const steps = loaded.cases.budgetSteps;
+    const store = everydayDeviceChimeStore();
+    const bought = boughtStepIdOf(store.record(), entry.id);
+    const next = nextBudgetStepOf(steps, bought);
+    const row = fixitBudgetRungRow({
+      unitsNow: entry.budgetUnits,
+      nextChimes: next?.chimes,
+      balanceChimes: store.balance(),
+      laddered: steps.length > 0,
+      currency: CHIME_PRICES.currency,
+    });
+    if (row === null) return null;
+    const line = el(doc, 'div', 'everyday-fixit-budget-rung');
+    line.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+    const buy = el(doc, 'button', 'everyday-fixit-budget-buy', '+');
+    buy.type = 'button';
+    buy.disabled = row.offer !== 'buy';
+    buy.setAttribute('aria-label', `${row.label} — ${row.priced ?? row.note}`);
+    if (row.offer !== 'buy') buy.title = row.note;
+    buy.style.cssText = [
+      'width:26px',
+      'height:24px',
+      'padding:0',
+      `border:1px solid ${C.rule}`,
+      `border-radius:${String(R.control)}px`,
+      `background:${C.paper}`,
+      `color:${row.offer === 'buy' ? C.ink : C.faint}`,
+      `cursor:${row.offer === 'buy' ? 'pointer' : 'not-allowed'}`,
+      'font-size:14px',
+      'line-height:1',
+    ].join(';');
+    buy.addEventListener('click', () => {
+      if (running || next === undefined) return;
+      const outcome = store.spend({ scenarioId: entry.id, stepId: next.id, chimes: next.chimes });
+      if (outcome.kind === 'bought') {
+        everydayTelemetry().record({ name: 'change_made', controlKey: 'fixit-budget', screenKey: 'fixit' });
+      }
+      render();
+    });
+    const label = el(doc, 'span', undefined, row.label);
+    label.style.cssText = 'font-size:13px;font-weight:600';
+    const readout = el(doc, 'span', 'everyday-fixit-budget-readout', row.readout);
+    readout.style.cssText = MONO(12, C.terracotta);
+    const priced = el(doc, 'span', 'everyday-fixit-budget-priced', row.priced ?? row.note);
+    priced.style.cssText = `margin-left:auto;${MONO(10, C.label)}`;
+    line.append(buy, label, readout, priced);
+    return line;
+  }
+
   function machinesCard(
     loadedFixit: LoadedFixit,
     entry: FixitCase,
@@ -1106,6 +1206,10 @@ function mountFixit(
 
     const body = el(doc, 'div');
     body.style.cssText = `display:grid;gap:${String(GAP.block)}px;padding:14px 16px`;
+    /* The one row on this card priced in chimes — GitHub issue #579, § D911. First, because it is
+     * what the rest of the card is spent against. */
+    const rung = budgetRungLine(entry);
+    if (rung !== null) body.append(rung);
     const pricing = editorPricingFrom(scheduleNow());
     const rows = fixitMachineryRows(
       session.state,

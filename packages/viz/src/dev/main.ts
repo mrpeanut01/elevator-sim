@@ -60,6 +60,7 @@ import {
   type EverydayPostOutcome,
 } from '../everyday/host.js';
 import { publishEverydayAccount } from '../everyday/accountPort.js';
+import { everydayDeviceChimeStore } from '../everyday/chimeStore.js';
 // The success sentence both shells say after a 201 — see `submitScore`.
 import { POST_RUN_COPY } from '../everyday/postRun.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
@@ -4246,28 +4247,46 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * same reason: *signed in and it did not bank* and *nobody is signed in* are different
      * sentences, and the second is the one a signed-out player is owed.
      *
-     * The token is read at call time, on {@link chimeBalance}'s rule. **No token is `signed-out`
-     * rather than silence**, which is the state the old binding simply returned from: a visitor
-     * earns nothing at all on this build (there is no device ledger — `everyday/chimesPanel.ts`
-     * says so), and telling them that is § D227 in the half that binds hardest.
+     * The token is read at call time, on {@link chimeBalance}'s rule. That paragraph used to end
+     * *"a visitor earns nothing at all on this build (there is no device ledger …), and telling
+     * them that is § D227 in the half that binds hardest."* **It stopped being true on the commit
+     * below**: a visitor earns, on this device, and the arm that told them otherwise is gone with
+     * the sentence — GitHub issue #579, [§ D911](../../../../DECISIONS.md).
      */
-    bankCompletion:
-      client === undefined
-        ? undefined
-        : async (turn) => {
-            const token = accountState.token;
-            if (token === undefined) return { kind: 'signed-out' };
-            const answer = await client.bankCompletion(token, turn);
-            /*
-             * The earn answers the balance alone — § D671 widened the **read**, not the two verbs —
-             * so `owns` is left off rather than filled in. `everyday/host.ts#EverydayChimeBalance`
-             * makes it optional for exactly this: `owns: []` here would tell the host the account
-             * bought nothing, and the next clear after a purchase would silently erase it.
-             */
-            return answer.ok
-              ? { kind: 'balance', chimes: answer.value }
-              : { kind: 'unreachable', detail: answer.detail };
-          },
+    /*
+     * **Always defined now, and that is GitHub issue #579** — [§ D911](../../../../DECISIONS.md),
+     * [§ D711](../../../../DECISIONS.md) clauses 1–4. It was `client === undefined ? undefined`,
+     * so a bundle served with no API origin — **which is how the deployed bundle is built** —
+     * banked nothing at all and `everyday/host.ts#bankTurn` answered `no-server` on every clear. A
+     * stranger who cleared three fix cases had finished eighteen chimes' worth of turns and was
+     * shown a hard zero.
+     *
+     * The device record is written **first and unconditionally**, on § D711 clause 4's *the
+     * device-local record is kept, not consumed*: a signed-in player's turns are recorded here too,
+     * so signing out gives that tally back rather than taking it away. The server stays the
+     * authority for the **account's** balance and § D533's first-time-only record stays the
+     * server's; nothing here names an amount or asks for one.
+     *
+     * What comes back is the balance of **whichever tally is this player's** — the account's where
+     * one answered, this device's otherwise. That is § D711 clause 5's chooser, and
+     * `everyday/settingsView.ts` makes the same choice for the Settings panel, so the rail and the
+     * panel cannot draw two different numbers at one moment.
+     */
+    bankCompletion: async (turn) => {
+      const banked = everydayDeviceChimeStore().bank(turn);
+      const token = client === undefined ? undefined : accountState.token;
+      if (client === undefined || token === undefined) return { kind: 'balance', chimes: banked };
+      const answer = await client.bankCompletion(token, turn);
+      /*
+       * The earn answers the balance alone — § D671 widened the **read**, not the two verbs — so
+       * `owns` is left off rather than filled in. `everyday/host.ts#EverydayChimeBalance` makes it
+       * optional for exactly this: `owns: []` here would tell the host the account bought nothing,
+       * and the next clear after a purchase would silently erase it.
+       */
+      return answer.ok
+        ? { kind: 'balance', chimes: answer.value }
+        : { kind: 'unreachable', detail: answer.detail };
+    },
     /*
      * The spend verb — GitHub issue **#372**, [§ D672](../../../../DECISIONS.md). The body carries a
      * sink and a number of steps and never a price; `data/chime-ledger.json` prices it on the

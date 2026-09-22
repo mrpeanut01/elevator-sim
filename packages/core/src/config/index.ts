@@ -83,6 +83,7 @@ export {
   CHIME_MODIFIER_KINDS,
   ChimeLedgerError,
   chimeAwardFor,
+  chimeEarnTableOf,
   chimeGiftSource,
   chimeGrantUnits,
   chimeSinkById,
@@ -119,6 +120,7 @@ export type { RushPrefitClaim, RushPrefitKit, RushPrefitRung } from './rushPrefi
 export type {
   ChimeCompletion,
   ChimeCurrency,
+  ChimeEarnTable,
   ChimeEarnedBy,
   ChimeLedgerTable,
   ChimeModifier,

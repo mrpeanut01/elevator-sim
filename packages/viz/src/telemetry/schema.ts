@@ -194,6 +194,16 @@ export const CONTROL_KEYS = [
   'fixit-parking',
   /** The top-floor-raise stepper — § 10.3's elevation control, issue #422. */
   'fixit-elevation',
+  /**
+   * The wider-budget press — GitHub issue **#579**, [§ D911](../../../../DECISIONS.md).
+   *
+   * The only control in the product that spends a **chime**, and the key says only that a change
+   * was made on the fix-it screen. **No amount and no balance travels with it**, which is
+   * `docs/26` § 10 non-goal 1 as amended by [§ D526](../../../../DECISIONS.md) clause 6: no
+   * telemetry exists to support a conversion, now or later, so the event is the same
+   * `change_made` beat 3 the two steppers above already record and carries nothing they do not.
+   */
+  'fixit-budget',
 ] as const;
 export type TelemetryControlKey = (typeof CONTROL_KEYS)[number];
 

@@ -1,6 +1,23 @@
 {
   "$comment": "Fix-a-building cases — docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md §10, scored per ENGINE_CONTRACT.md §9 with the closed-form inputs replaced by two real single runs sharing the traffic seed (the spec's own basis line, §10.4). Each case names a shipped building and carries the as-built deltas that make the fault real, a complaint whose measure is computed from the runs and never authored, four repairs whose patches are real config changes, and the authored success copy. Every case was validated against a real run pair before shipping (§10.6 rule 6); packages/viz/src/fixit/cases.test.ts pins the measured numbers, so an effect line's quoted figure that stops reproducing turns the suite red rather than going quietly stale. Player-facing copy carries no engine identifier (GAMEPLAY §16 rule 11) — buildings are named by their display names, dispatch changes by what they do. The seeds and demand levels are choices, not measurements: each was picked so the authored fault is visible in one run at that operating point, and the validation test is what says the diagnosed fix clears the contract's two bars there.  PRICES LIVE IN data/price-schedule.json — GitHub issue #366. A repair's cost is the sum of the schedule prices of the changes its patch buys; a costUnits here is refused at load.  NO CASE SAYS WHICH REPAIR IS THE ANSWER — GitHub issue #566, DECISIONS.md § D869. Every diagnosed repair's effect line used to end 'The 9 waits over a minute are the target', seven of them followed by 'and it is a setting', which is docs/38 § 2.1's printed kind-of-fix line and an answer key besides. Those eighteen sentences are gone. Two things follow for anyone authoring a case here. An effect line says what the change does and what it costs the building, and never that this is the one; packages/viz/src/fixit/theAnswerIsNotPrinted.test.ts refuses the retired phrases and, more usefully, measures whether any turn of phrase appears on many cases' diagnosed repairs and on no decoy anywhere — a formula is a tell whatever words it uses. And repairs[] is still authored in role order, which is convenient for an author and is not what the player sees: fixit/engine.ts#repairsInDrawOrder shuffles the rows deterministically per case, because the answer sitting in row one on all eighteen cases was the role reaching the screen without anything rendering the word. § D706 still governs the menu's own retirement, which waits on the editor; this is only the answer key.",
   "version": 1,
+  "budgetSteps": [
+    {
+      "id": "a-wider-order",
+      "name": "A wider order",
+      "addsUnits": 6,
+      "chimes": 6,
+      "note": "THE ONE RUNG A FIX CASE'S BUDGET CAN BE BOUGHT UP TO, and it is authored HERE because a scenario's budget is priced BY THE SCENARIO (docs/38 § 2.1 and § 2.4, DECISIONS.md § D911). data/chime-ledger.json prices the other sinks and refuses a budget one by name — packages/core/src/config/chimeLedger.ts#REFUSED_MODIFIER_KINDS — because two documents pricing one act is a player paying a different amount depending on which screen they stand on. ONE LADDER FOR ALL EIGHTEEN CASES, deliberately: a fix case's budget is drawn from § 10.2's single 10-16 u band (packages/viz/src/fixit/parse.ts#BUDGET_MIN_UNITS), so the rung is a property of that band rather than of a case, and eighteen copies of one figure is eighteen places for it to go stale. PROVENANCE, on data/chime-ledger.json's own standing ruling for governed values: BOTH FIGURES ARE CHOSEN AND NEITHER IS MEASURED. There is no run behind either, no seed set and no interval, and none is claimed. What is CHOSEN: 6 units, and 6 chimes at data/campaign.json's own one-chime-per-unit rate, which that file's rungs already charge and which data/chime-ledger.json's $comment cites as the scenario rate. 6 chimes is exactly what one cleared scenario pays (earn-scenario-clear), so the loop a player meets is: clear one case, widen the next. What 6 units REACHES was measured and is a different claim from the figures being right: at the shipped prices, a case whose budget cannot take the diagnosed fix beside the costly one at 10-13 u can take it at +6 — packages/viz/src/fixit/budgetRungReachesTheRun.test.ts finds such a case from the shipped file rather than naming one, and compares the two runs on the boarding legs. A reader who disagrees with either number is disagreeing with a judgement rather than correcting an error, and the lever is this block.",
+      "schema": {
+        "type": "integer",
+        "unit": "units",
+        "min": 1,
+        "max": 24,
+        "default": 6,
+        "activeWhen": null
+      }
+    }
+  ],
   "cases": [
     {
       "id": "sleeping-sky-lobby",

@@ -41511,3 +41511,75 @@ The rest of the sweep, for the same reason — reported either way, because a nu
 **It passes issue #56's own test rather than being exempted from it.** That issue removed a third diagnosis row for being a methodology footnote wearing a timestamp — identical on a flawless day and a collapsed one, with nothing happening at the clock it carried. Something did happen at this row's clock: the player pressed a control, and the record holds the second. It is appended **last** because the two rows above are readings of the run and this is a reading of the player, and because `render/reportCard.ts` draws `diagnosis[0]`.
 
 **No record moved and no version was bumped.** The row is derived at draw time from `VizRecording.legs` and the `interventions` log, both already in the persisted record at its current version; `ViewerState.report` is deliberately not persisted (`persist/types.ts` § *what is deliberately not here*, item 2). Invariant 5 is untouched.
+
+---
+
+
+---
+
+## D911 — the chimes loop closes for one sink in one mode with no account and no server: a device ledger that spends, and a scenario budget rung priced by the scenario
+
+**Date: 2026-09-22 · GitHub issue [#579](https://github.com/mrpeanut01/elevator-sim/issues/579) · Rules on: [`docs/38`](docs/38-what-the-game-is.md) §§ 2.1 and 2.4, [§ D711](#d711) clause 7 and its § 5, [§ D227](#d227), `packages/viz/src/everyday/deviceChimes.ts`, `packages/viz/src/everyday/chimeStore.ts`, `packages/viz/src/fixit/budgetRungs.ts`, `packages/viz/src/everyday/chimesPanel.ts`, `packages/viz/src/everyday/rail.ts`, `packages/core/src/config/chimeLedger.ts`, `data/fixit-cases.json`. Cites [§ D526](#d526), [§ D530](#d530), [§ D533](#d533), [§ D490](#d490), [§ D672](#d672), [§ D738](#d738), [§ D606](#d606), [§ D256](#d256), [§ D343](#d343), [§ D405](#d405).**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds. It binds modules in two packages that no one of them owns — `core`'s table projections, the viewer's device ledger, the fix-it screen, the Settings panel and the rail; it **moves something already recorded**, because [§ D711](#d711) clause 7 says in terms that the device ledger *does not spend*; and it answers a question two documents refuse to close without one.
+
+### 1. What was wrong, measured rather than described
+
+A playability assessor drove the built bundle for roughly forty sittings and asked `docs/43` P4's tomorrow question unprompted. Its second answer was the rush board, which reports *"This site has no leaderboard server behind it."* Its first was the career's day-19 renewal. And Settings read *"You have no chimes yet… this build keeps none on this device"* with **all three listed purchases refused**. P4 entertainment scored **5 / 10** against a bar of 8.
+
+Every one of those sentences was true. `docs/38` § 2.4 makes chimes **the one currency earned by playing** and § D526 makes them the thing that carries a player between sittings, and as served the currency could be neither earned nor spent. **The cause is one line**: `dev/main.ts` builds no ledger client without an `apiOrigin`, so `bankCompletion` was `undefined`, and **the deployed bundle is built that way**. A stranger who cleared three fix cases had finished eighteen chimes' worth of turns and was shown a hard zero.
+
+### 2. The ruling
+
+1. **[§ D711](#d711) clauses 1–6 are built.** `everyday/deviceChimes.ts` is the pure half and `everyday/chimeStore.ts` the `localStorage` half, on the split `campaign/careerPersist.ts` / `everyday/careerStore.ts` already keeps: its own versioned slot, memory-only where storage is denied **with the player never told it saved**, quarantine-on-corrupt, and a one-way seal on clear.
+2. **Turns, never a balance**, and the balance derived on every read. `core`'s new `chimeEarnTableOf` is the crossing, exactly as `chimeSpendTableOf` is: what comes over is a map from **completion** to figure, so no binding in `packages/viz` holds a table with `sources` on it and `boundaries.test.ts`' rule is untouched.
+3. **[§ D711](#d711) clause 7 is amended: the device ledger spends, on exactly one thing.** That clause was a *measurement* and said so — *"the day a device-reachable sink exists is the day this clause is revisited, by a decision that cites a run rather than a plan."* One exists, and it is a sink the clause could not have counted because it is **not a sink**: a scenario's budget rung is priced **by the scenario** (`docs/38` § 2.1 and § 2.4, and `core/config/chimeLedger.ts#REFUSED_MODIFIER_KINDS` refuses a second price for it by name), so it needs no ledger sink, no route, no token and no account.
+4. **The fix cases author that ladder in their own file.** `data/fixit-cases.json` gains one `budgetSteps` rung — **+6 units for 6 chimes** — at `data/campaign.json`'s own one-chime-per-unit rate. **One ladder for all eighteen cases**, because a fix case's base budget is drawn from § 10.2's single 10–16 u band, so the rung is a property of the band rather than of a case. Both figures are **CHOSEN and neither is measured**, on `data/chime-ledger.json`'s standing provenance ruling, and the file says so at length.
+5. **A bought rung is the same case with a bigger `budgetUnits`.** `fixit/budgetRungs.ts#caseAtRung`, applied once in `fixitScreen.ts#currentEntry`, so every consumer that already reads that field — `affordabilityOf`, `spendOf`, `budgetNoteOf`, `fixitSpendSummary`, `classifyOutcome` — reaches it without learning a new concept. A `FixitState` field was the alternative and would have needed each of those call sites to consult it, or to go on quietly charging against the base.
+6. **The three ledger sinks are untouched and stay refused off an account**, each on its own row with its own cause. A scenario rung is not one of them and may not become one.
+
+### 3. The run that earns clause 3, and what it measured
+
+`packages/viz/src/fixit/budgetRungReachesTheRun.test.ts`, in the shape [§ D427](#d427) uses and `scenario/budgetReachesTheRun.test.ts` sets: three arms, the third making the second mean anything. The subject is **searched for in the shipped file rather than named**, so a rebalance turns the file red instead of vacuous.
+
+Measured on `zoning-starves-the-top`, base **12 u**, rung **+6 u for 6 chimes** → **18 u**:
+
+| arm | selection | what the budget does | legs |
+|---|---|---|---|
+| 1 | `redraw-by-headcount` (6 u) | admitted at base | move off the as-built run |
+| 2 | `+ regear-the-upper-car` (10 u, total 16 u) | **refused** at 12 u — `toggleRepair` returns the state unchanged | identical to arm 1's, to the boarding |
+| 3 | the same pair at the bought rung | **admitted** at 18 u | **129 of 200 boarding legs differ** from arm 1's |
+
+And the bar does not move with the budget: `fixitRunPlanOf` reads the patches and the seed and never `budgetUnits`, so the two run plans for one selection are deep-equal at both rungs. `charter` non-goal 6 holds by construction rather than by a bound, and the test asserts it rather than arguing it.
+
+### 4. What is deleted on this commit, and what is kept — § D227 in both directions
+
+**Deleted, because it stopped being true:**
+
+- `chimesPanel.ts#CHIMES_PANEL_COPY.signedOutHome` — *"there is no tally yet … this build keeps none on this device"* — and with it the `signed-out` `ChimesHome` arm. The name `device` is **taken back** from the arm PR #485's review renamed, on that review's own condition: *"a future `device` ledger has to introduce its own name rather than inherit a sentence."* This is that ledger.
+- `chimesPanel.ts#CHIMES_PANEL_COPY.rowSignedOut` — *"Sign in and there is a tally to spend this from"*, which told a player off an account that there was no tally at all.
+- `rail.ts#BankedAnswer`'s `signed-out` and `no-ledger` arms and the two lines they drew — *"sign in to bank it"* and the bare turn. `dev/main.ts#bankCompletion` now banks on this device with no server and no account, so both told a player who had already been paid that they had not been.
+
+**Kept, because it is still true:**
+
+- `chimesPanel.ts#SPEND_ABSENCES['rush-purse-top-up']` — no between-round rebuild travels for the rush ([§ D606](#d606) § 2). Unchanged, and issue #557 is explicit that it must not be folded in with anything.
+- `scenarioModel.ts#SCENARIO_ABSENCES`' first row — the ten campaign stages are played on the Engineer surface and a clear there banks no chime.
+- `scenario/ladder.ts#SCENARIO_LADDER_COPY.openNote` — the same fact on the stage row itself.
+
+**Narrowed, because half of it stopped being true:** `scenario/ladder.ts#SCENARIO_LADDER_COPY.baseRungNote` read *"No screen in this build sells a wider budget"*. One does now, for the fix cases. It is still exactly true of **these ten stages**, and for a reason nothing here changed — they are played on the Engineer surface, which has no budget control at all — so the sentence says *these ten* rather than *no screen*. That is the difference between a refusal a reader can check and one that has quietly stopped being true somewhere else.
+
+### 5. What this does **not** claim
+
+**The loop closes for one sink in one mode.** Clearing a fix case pays, and that payment buys a wider budget on a fix case. Nothing here says the currency is finished: the three ledger sinks still need an account, no rush rebuild travels, the ten campaign stages sell no rung, and `docs/43` P4's tomorrow question is **not** declared answered — issue #579 makes an assessor who plays the acceptance test, and that has not been re-run. Wave AC-2's roadmap row claimed the chimes loop *"closes at both ends"* and had to be corrected; no such sentence is written here.
+
+**No retention claim is made in either direction.** That a visible tally brings a player back is `charter S4` and is unmeasured; no copy and no docstring says it, and no plausible replacement sentence goes in its place ([§ D256](#d256), [§ D280](#d280)).
+
+**No invariant 5 bump.** A bought rung enters no persisted run record: `watch/record.ts#watchRecordOf` is derived from `ViewerState`, the fix-it pair is built by `fixitRunPlanOf` from the case's own seed and patches, and the budget is not a field of either. `WATCH_RECORD_VERSION` is unmoved and every saved recording still replays — which is worth saying because a bump invalidates every one of them and would have been a real cost quietly paid. **No `ViewerState` field is added**, so `dev/scopeNotes.audit.test.ts`, `persist/persist.test.ts` and `scope/runIdentity.ts` are untouched.
+
+**GD11–GD14 hold.** Units stay money and chimes stay a tally of completed turns; a rung buys **a limit on a configuration**, which is GD13 clause 1's one permission. No slot opens, no missed day is bought back, no verdict or retry is for sale, and no chime figure appears on a results page — the fix-it row sits on the editor card, above the run, and the outcome card is untouched.
+
+**What is unmeasured and is not guessed at.** Whether 6 units is the right rung and 6 chimes the right price is **game feel**, and `data/fixit-cases.json`'s own block says so: there is no run behind either figure, no seed set and no interval. What *is* measured is what 6 units reaches, which is a different claim and is § 3 above.
+
+### 6. Numbers spent
+
+This lane held **D911–D925** and spent **D911 only**. **D912 to D925 are unspent** and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.

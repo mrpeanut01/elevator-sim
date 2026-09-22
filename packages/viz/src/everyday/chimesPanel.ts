@@ -16,7 +16,19 @@
  * from*, no *earned today*, no streak, no next reward. A screen that could draw any of those would
  * have had to be handed a source.
  *
- * ## Without an account there is no tally, and the panel says **that** rather than the opposite
+ * ## Off an account there **is** a tally now, and this section is the record of what was wrong
+ *
+ * GitHub issue **#579**, [§ D911](../../../../DECISIONS.md). The paragraph below ends *"the panel
+ * now says there is no tally until you sign in, which is true today and stops being drawn the
+ * moment a device ledger exists."* This is that moment: `everyday/deviceChimes.ts` records the
+ * turns and derives the balance, `everyday/chimeStore.ts` keeps them, and the `signed-out` arm and
+ * its sentence are **deleted rather than reworded** ([§ D227](../../../../DECISIONS.md)) in favour
+ * of `device`. What the device tally buys is a scenario's own budget rung, which the scenario
+ * prices — **not** one of the three sinks below, which are the account ledger's and stay refused
+ * off an account, each with its own reason on its own row.
+ *
+ * The rest of this section is left standing as the dated record it is, because the defect it
+ * describes is the one a reader most needs to have met before touching this file.
  *
  * `docs/38` § 2.4 asks for a device-only ledger that *"says so in the tree's existing device-only
  * shape"*. **The face shipped and the ledger did not.** The panel told a signed-out player their
@@ -127,7 +139,18 @@ export type ChimesHome =
   /** Signed in: the account holds it, and runs widened with it can be posted. */
   | 'account'
   /**
-   * Not signed in — **and therefore there is no tally at all**.
+   * Not signed in, so **this device holds the tally** — [§ D711](../../../../DECISIONS.md) clause 1,
+   * [§ D911](../../../../DECISIONS.md), GitHub issue #579.
+   *
+   * **The arm this replaces was called `signed-out`, and its sentence is deleted rather than
+   * reworded** ([§ D227](../../../../DECISIONS.md)). It read *"there is no tally yet — chimes are
+   * kept with an account and this build keeps none on this device"*, which was exactly true of
+   * every build before `everyday/deviceChimes.ts` and is false of this one: turns are recorded and
+   * a balance is derived from them with no server, no account and no route.
+   *
+   * There was a `device` arm before **that**, and the paragraph below is why it was renamed. The
+   * name is taken back here with a store under it — `everyday/chimeStore.ts` — which is the
+   * condition that paragraph itself set.
    *
    * It was called `device` and the panel told a player their tally was *"kept on this device
    * alone"*. Nothing in `packages/viz/src` stores or spends a chime on the device: `profile.ts`
@@ -137,7 +160,7 @@ export type ChimesHome =
    * the arm is renamed as well as reworded so that a future `device` ledger has to introduce its
    * own name rather than inherit a sentence.
    */
-  | 'signed-out'
+  | 'device'
   /** The account bridge has not answered yet, which is a real window a player can meet. */
   | 'booting';
 
@@ -263,7 +286,7 @@ export const CHIMES_PANEL_COPY = Object.freeze({
   spendNote:
     'A wider budget for a scenario is the fourth thing chimes are for, and it is not on this list ' +
     'because each scenario sets its own price for it rather than this table \u2014 so nothing here ' +
-    'charges one.',
+    'charges one. The fix-a-building screen does, on the case in front of you.',
   /** What the one offered row does, said before the press rather than after it. */
   prefitOffer:
     'Your next rush starts with the doors, the control and the tenancies already fitted, and it is ' +
@@ -305,8 +328,17 @@ export const CHIMES_PANEL_COPY = Object.freeze({
   purseNoTower:
     'Open a building on the Career screen first — this tops up that tower\u2019s purse, so there ' +
     'has to be one.',
-  /** No account: there is no tally to spend, which is {@link signedOutHome} pointed at a row. */
-  rowSignedOut: 'Sign in and there is a tally to spend this from.',
+  /**
+   * These three are the **ledger's** sinks and the ledger is on the account — GitHub issue #579.
+   *
+   * It read *"Sign in and there is a tally to spend this from"*, which told a player off an account
+   * that there was no tally at all. There is one now and it buys something else, so the row says
+   * which: § D227 in the direction that matters here, where the stale half of a refusal is the half
+   * a player would have acted on.
+   */
+  rowSignedOut:
+    'These are bought against your account, so signing in is what makes this one spendable. What ' +
+    'this device has banked is spent on a wider budget instead, on the case in front of you.',
   /** The account bridge has not answered, so whether this can be pressed is not yet known. */
   rowBooting: 'Still finding out whether you are signed in, so this is not offered for a moment.',
   /** Served with no API origin: there is no ledger on this build to spend out of. */
@@ -314,9 +346,24 @@ export const CHIMES_PANEL_COPY = Object.freeze({
   accountHome:
     'Your tally lives with your account, so it follows you to whatever you sign in on next, and a ' +
     'run you widened can be posted like any other.',
-  signedOutHome:
-    'You are not signed in, so there is no tally yet — chimes are kept with an account and this ' +
-    'build keeps none on this device. Sign in above and finishing something starts paying them.',
+  /**
+   * **The sentence this replaced is deleted rather than reworded** — § D227, GitHub issue #579. It
+   * said *"there is no tally yet — chimes are kept with an account and this build keeps none on
+   * this device"*, and its second half stopped being true on the commit that built
+   * `everyday/deviceChimes.ts`.
+   *
+   * What it says now is bounded by what is built, and the bound is the second clause: this tally
+   * pays for a scenario's own budget, which the scenario prices and which needs no route, and it
+   * does not pay for the three rows below, which are the account ledger's.
+   */
+  deviceHome:
+    'You are not signed in, so this tally is kept on this device. It pays for a wider budget on a ' +
+    'scenario you are playing; the three below are bought against an account, so signing in is ' +
+    'what opens those.',
+  /** And where the browser will not keep it — `settingsView.ts#saveNotice`'s shape, one block down. */
+  deviceNotDurable:
+    'This device is not keeping storage, so anything finished here is counted until this tab ' +
+    'closes and no longer.',
   bootingHome: 'Still finding out whether you are signed in, so this tally may yet change hands.',
   none: 'You have no chimes yet. Finishing anything is what pays them.',
 });
@@ -370,6 +417,13 @@ export const SPEND_OFFERS: Readonly<Record<string, ChimesSpendCopy>> = Object.fr
 const UNDESCRIBED_SINK =
   'Not offered. This build has nothing to say about this one, which is a fault rather than a price.';
 
+/** The device home's sentence, with the durability caveat only where it is owed. */
+function deviceHomeNoteOf(durable: boolean | undefined): string {
+  return durable === false
+    ? `${CHIMES_PANEL_COPY.deviceHome} ${CHIMES_PANEL_COPY.deviceNotDurable}`
+    : CHIMES_PANEL_COPY.deviceHome;
+}
+
 /** *You have 40 chimes.* Singular where it should be, because a player meets this sentence often. */
 function balanceLineOf(table: ChimeSpendTable, balanceChimes: number): string {
   if (balanceChimes <= 0) return CHIMES_PANEL_COPY.none;
@@ -421,6 +475,14 @@ export interface ChimesPanelInput {
   readonly spendable?: boolean | undefined;
   /** The server's own sentence about the last press, carried unrewritten. */
   readonly notice?: string | undefined;
+  /**
+   * Whether this device will keep the tally past the tab — `chimeStore.ts#DeviceChimeStore.durable`.
+   *
+   * Drawn only on the `device` home, and **never claimed**: absent or `true` says nothing extra,
+   * and `false` adds {@link CHIMES_PANEL_COPY.deviceNotDurable}. `careerStore.ts`' rule — *the
+   * player is never told a save happened that did not* — pointed at the screen that draws a tally.
+   */
+  readonly deviceDurable?: boolean | undefined;
   /** Overridden by the corpus and by tests; the shipped table otherwise. */
   readonly table?: ChimeSpendTable | undefined;
 }
@@ -522,8 +584,8 @@ export function chimesPanelViewOf(input: ChimesPanelInput): ChimesPanelView {
   const homeNote =
     input.home === 'account'
       ? CHIMES_PANEL_COPY.accountHome
-      : input.home === 'signed-out'
-        ? CHIMES_PANEL_COPY.signedOutHome
+      : input.home === 'device'
+        ? deviceHomeNoteOf(input.deviceDurable)
         : CHIMES_PANEL_COPY.bootingHome;
   return {
     heading: CHIMES_PANEL_COPY.heading,

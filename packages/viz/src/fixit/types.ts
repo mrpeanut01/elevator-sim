@@ -24,6 +24,7 @@
  */
 
 import type { PriceSchedule } from '../pricing/types.js';
+import type { BoughtBudgetStep } from '../scenario/budget.js';
 
 /** Which legs the complaint is measured over. */
 export interface ComplaintScope {
@@ -219,6 +220,24 @@ export interface FixitCase {
 export interface FixitCases {
   readonly version: number;
   readonly cases: readonly FixitCase[];
+  /**
+   * **The rungs a case's budget can be bought up to, with chimes** — `docs/38` § 2.1's *"in steps
+   * the scenario authors"*, [§ D911](../../../../DECISIONS.md), GitHub issue **#579**.
+   *
+   * `BoughtBudgetStep` is `scenario/budget.ts`' own type rather than a fix-it copy of it, because
+   * `docs/38` § 2.1 makes a fix case and a campaign stage two **sources** of one scenario schema
+   * and not two schemas. A second step shape here would be the authority defect this ladder exists
+   * to avoid, one level down from the one it avoids against `data/chime-ledger.json`.
+   *
+   * **On the set rather than on the case**, and that is a claim about what the ladder is: a fix
+   * case's base budget is drawn from § 10.2's single 10–16 u band (`parse.ts#BUDGET_MIN_UNITS`),
+   * so the rung above it is a property of the band and not of a case. `data/fixit-cases.json`'s
+   * own block says the same thing and carries the provenance.
+   *
+   * Empty is a legitimate state and is not defaulted away: a file that authors no rung is a file
+   * whose cases cannot be widened, which the screen says on its own face.
+   */
+  readonly budgetSteps: readonly BoughtBudgetStep[];
   /**
    * The schedule these cases were priced with — GitHub issue **#366**.
    *

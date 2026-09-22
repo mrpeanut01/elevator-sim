@@ -71,6 +71,7 @@ import {
   buildingLineOf,
   FIXIT_SCREEN_COPY,
   fixitBarModel,
+  fixitBudgetRungRow,
   fixitCaseRailModel,
   fixitElevationRow,
   fixitMachineryRows,
@@ -6929,6 +6930,8 @@ const FIXIT_COVERS: readonly string[] = [
   'everyday/fixitScreenModel.ts#fixitMachineryRows',
   'everyday/fixitScreenModel.ts#fixitZoneRow',
   'everyday/fixitScreenModel.ts#fixitParkingRow',
+  /* The wider budget's row — GitHub issue #579, § D911. Driven over its four arms below. */
+  'everyday/fixitScreenModel.ts#fixitBudgetRungRow',
   'everyday/fixitScreenModel.ts#fixitElevationRow',
   'everyday/fixitScreenModel.ts#fixitSpendSummary',
   'everyday/fixitScreenModel.ts#fixitRepairStateLine',
@@ -7163,6 +7166,51 @@ const FIXIT: SurfaceAdapter = {
     seeds.push({ field: 'pair.skip', text: FIXIT_SCREEN_COPY.pairStageSkip, role: 'label', provenance: 'authored' });
     seeds.push({ field: 'pair.before', text: FIXIT_SCREEN_COPY.pairStageBeforeCaption, role: 'label', provenance: 'authored' });
     seeds.push({ field: 'pair.after', text: FIXIT_SCREEN_COPY.pairStageAfterCaption, role: 'label', provenance: 'authored' });
+
+    /*
+     * **The wider budget, in all four states its row can be in** — GitHub issue #579,
+     * [§ D911](../../../../DECISIONS.md). Seeded here for the reason the eight above are: the
+     * row's only reader is `everyday/fixitScreen.ts`, a mount the search cannot drive, so its five
+     * copy keys would be in `covers` and in nothing's output — wave T's finding in one line, *a
+     * claim of seeding is not seeding*.
+     *
+     * Four cases rather than one, because four different things are true of four different players
+     * standing in front of the same row and each draws its own sentence. The **shortfall** is the
+     * one worth a property looking at: it is a subtraction of two counts of completed turns rather
+     * than anything a run measured, which is what keeps a figure on this screen on the right side
+     * of `docs/22` non-goal 2 — so it is declared an observation and the others are not.
+     *
+     * The figures are invented here rather than read off the shipped file **on purpose**: this
+     * adapter drives its own synthetic case throughout (`fixitSearchCase`), and a rung read off
+     * `data/fixit-cases.json` would make one seed disagree with every other seed on this surface.
+     * The **currency's own words** are the one thing not invented: the row defaults them to the
+     * shipped table, so nothing here names them and this adapter claims no coverage of it.
+     */
+    for (const [where, balanceChimes, nextChimes] of [
+      ['offered', 12, 6],
+      ['short', 2, 6],
+      ['none', 0, 6],
+      ['owned', 12, undefined],
+    ] as const) {
+      const row = fixitBudgetRungRow({
+        unitsNow: entry.budgetUnits,
+        nextChimes,
+        balanceChimes,
+        laddered: true,
+      });
+      if (row === null) continue;
+      seeds.push({ field: `budget.${where}.label`, text: row.label, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `budget.${where}.readout`, text: row.readout, role: 'label' });
+      if (row.priced !== undefined) {
+        seeds.push({ field: `budget.${where}.priced`, text: row.priced, role: 'label' });
+      }
+      seeds.push({
+        field: `budget.${where}.note`,
+        text: row.note,
+        role: row.offer === 'short' ? 'observation' : 'prose',
+        ...(row.offer === 'short' ? {} : { provenance: 'authored' as const }),
+      });
+    }
 
     /* ---- the case rail: both tags, and the derived {fixed}/{total} on both sides of solved ---- */
     for (const [where, solvedIds] of [
@@ -8393,7 +8441,10 @@ const EVERYDAY_MENU: SurfaceAdapter = {
       });
     }
     /*
-     * § D673's acknowledgement, in all four states the card can draw it in — GitHub issue #499.
+     * § D673's acknowledgement, in every state the card can draw it in — GitHub issue #499, and
+     * **three states rather than five since GitHub issue #579**: the rail's `signed-out` and
+     * `no-ledger` arms are deleted with the sentences they drew (§ D227, § D911), because
+     * `dev/main.ts#bankCompletion` banks on this device with no server and no account.
      *
      * A **label**, on `chimesPanel.ts`'s own ground one surface over: the balance in it is a count
      * of completed turns rather than a figure any run produced, so seeding it as an observation
@@ -8411,8 +8462,6 @@ const EVERYDAY_MENU: SurfaceAdapter = {
       for (const [arm, answer] of [
         ['one', { kind: 'balance', chimes: 1 }],
         ['many', { kind: 'balance', chimes: 40 }],
-        ['signed-out', { kind: 'signed-out' }],
-        ['no-ledger', { kind: 'no-ledger' }],
         ['unreachable', { kind: 'unreachable' }],
       ] as const) {
         const line = railModel({ screen: 'menu', ctx: 'daily' }, { banked: { turn, answer } }).banked;
@@ -9016,20 +9065,24 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
     'everyday/chimesPanel.ts#chimesPanelViewOf',
     'everyday/chimesPanel.ts#CHIMES_PANEL_COPY',
     /*
-     * The shipped price table's **spend half**, whose player-facing strings are the sink names and
-     * the prices drawn from them — both seeded per row below, out of `chimesPanelViewOf`'s own
-     * answer rather than off this constant, so what is swept is what the screen actually renders.
+     * **`CHIME_PRICES` was claimed here and the claim is deleted** — GitHub issue #579,
+     * [§ D911](../../../../DECISIONS.md), and it is worth four lines because the reason is a
+     * finding about this instrument rather than about that constant.
      *
-     * It is `covers` rather than a seed of its own for that reason, and being here is deliberately
-     * **not** a claim that it is checked: wave T's lesson is that being in `covers` is not being
-     * swept, and what checks these words is the row loop below plus `chimesPanel.test.ts`, which
-     * asserts every price reads as a whole number of the currency's own singular or plural.
+     * The entry read *"the shipped price table's spend half, whose player-facing strings are the
+     * sink names and the prices drawn from them"*, and said in terms that being in `covers` was
+     * **not** a claim it was checked. It was also not a producer. Its whole declaration is
+     * `chimeSpendTableOf(parseChimeLedger(document))` — no literal at all — and the deriver only
+     * ever collected it because `derive.test-helper.ts` runs a declaration's span up to the **next**
+     * declaration, so the neighbouring `ChimesHome` union's `'signed-out'` arm fell inside it and
+     * `PROSE` read the hyphen as two adjacent words. Renaming that arm to `'device'` on this commit
+     * took the literal away and the deriver stopped finding it — which is how a stale coverage
+     * claim announces itself, and is the over-collection `host.ts#dailyBoardOf`'s own exclusion
+     * describes one file over.
      *
-     * There is no `sources` on it to reach — `core`'s `chimeSpendTableOf` projects them away before
-     * this package holds anything (§ D526 clause 5, and `boundaries.test.ts` forbids the property
-     * access that walked round the id grep).
+     * Nothing about what is swept changes: the sink names and the prices were already seeded **per
+     * row**, out of `chimesPanelViewOf`'s own answer, and still are.
      */
-    'everyday/chimesPanel.ts#CHIME_PRICES',
     /*
      * Why each sink this build lists is not one it sells — § D672,
      * `screens.ts#UNBUILT_REASONS`' shape. Player-facing prose, drawn under its own row.
@@ -9193,6 +9246,23 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
        */
       ['banked-one', { profile: stored, reduceMotion: false, account: named, accountServer: true, chimeBalance: 1 }],
       ['banked-many', { profile: stored, reduceMotion: false, account: named, accountServer: true, chimeBalance: 40 }],
+      /*
+       * **The device home, in both the states a signed-out player can be in** — GitHub issue #579,
+       * [§ D911](../../../../DECISIONS.md), and [§ D711](../../../../DECISIONS.md) § 7's own
+       * forecast: *"a fourth home that no settings arm constructs would ship unswept."*
+       *
+       * The two cases are the sentence and its caveat: a device that will keep the tally, and one
+       * that will not. Both carry a **non-zero** balance, on the two cases above this comment's own
+       * argument — a signed-out case with nothing banked would draw *you have no chimes yet*, which
+       * every case above already draws, and the device arm's own balance line would ship unswept.
+       * `account: undefined` is what makes the home `device` rather than `booting`: the bridge has
+       * answered and there is nobody signed in.
+       */
+      ['device-tally', { profile: stored, reduceMotion: false, account: SIGNED_OUT, deviceChimes: 6 }],
+      [
+        'device-not-durable',
+        { profile: stored, reduceMotion: false, account: SIGNED_OUT, deviceChimes: 1, deviceDurable: false },
+      ],
       /*
        * § D672's spend, in the arms a balance and an account alone cannot reach. Every case above
        * leaves `chimeSpendable` unset, so every row draws its *there is no ledger on this build*

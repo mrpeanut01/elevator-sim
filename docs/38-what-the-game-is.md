@@ -329,9 +329,17 @@ turns rather than a statistic over a run, and it is what keeps chimes outside ch
 up, a rush's between-round purse up or a pre-fitted start. **A scenario's budget is priced by the
 scenario** — § 2.1's *"in steps the scenario authors"* — so `data/campaign.json` holds that ladder
 and `data/chime-ledger.json` holds the other three; a price for one act in both documents is an
-authority defect, and the ledger's parser refuses one. **No screen spends a chime yet**: the tally
+authority defect, and the ledger's parser refuses one. ~~**No screen spends a chime yet**: the tally
 is banked and shown, the prices are listed, and the panel that lists them says on its own face that
-nothing buys them, which is GitHub issues #371 and #372. That is GD13 clause 1's one permission, a
+nothing buys them, which is GitHub issues #371 and #372.~~ *Superseded three times, and struck
+rather than deleted so the record stands. [§ D672](../DECISIONS.md) built the first spend
+(`rush-prefit`) and [§ D738](../DECISIONS.md) the second (`career-purse-top-up`), both against an
+account. **[§ D911](../DECISIONS.md) built the third, and it is the one that needs no account and
+no server** — GitHub issue #579: a scenario's budget rung, priced by the scenario in
+`data/fixit-cases.json`, bought from a device tally on the fix-a-building screen, with
+`packages/viz/src/fixit/budgetRungReachesTheRun.test.ts` as the legs comparison behind it. The ten
+campaign stages still sell no rung, because they are played on the Engineer surface, which has no
+budget control — `packages/viz/src/scenario/ladder.ts` says so on its own rows.* That is GD13 clause 1's one permission, a
 limit on a configuration. Everything else in GD13 holds and is restated here so nobody reads the
 currency as relaxing it: chimes never open a mode, a screen, a building, a dispatcher, a case or a
 figure (GD9); they never buy a verdict, a retry the mode declares free, or relief on a measurement,
@@ -352,9 +360,15 @@ is in the account and lets the player spend or earn against it, and that is the 
 contract. Without an account the ledger is on this device alone and says
 so, in the shape the tree already uses for device-only artefacts. *Amended by
 [§ D711](../DECISIONS.md) on 2026-09-19:* the device ledger records **turns** — a case cleared, a day
-paid, a wave outlasted — and never a balance, which it derives; and it **earns and reads without
+paid, a wave outlasted — and never a balance, which it derives; ~~and it **earns and reads without
 spending**, because no sink in this build reaches a run except through what the server says the
-account owns, so a device spend would buy nothing. A signed-out run stays playable and unpostable, as
+account owns, so a device spend would buy nothing.~~ *That second half is amended by
+[§ D911](../DECISIONS.md) on 2026-09-22 (GitHub issue #579), on the condition § D711 § 5 set for
+itself — "the day a device-reachable sink exists is the day this clause is revisited, by a decision
+that cites a run rather than a plan." One exists: a **scenario's budget rung** is priced by the
+scenario rather than by the ledger, so it needs no sink, no route and no account, and it is bought
+from the device tally. The three ledger sinks are unchanged and still need an account, each saying
+so on its own row.* A signed-out run stays playable and unpostable, as
 it already is.
 
 **What happens when an account arrives no longer needs an answer, because nothing crosses but a

@@ -12,10 +12,14 @@
  * `data/price-schedule.json` is parsed in `packages/viz`, because only the viewer reads it. The
  * chime ledger has **two** readers that must agree: the server, which holds the balance and is the
  * only thing allowed to decide what an entry is worth, and the viewer, which draws a sink's price.
- * (This sentence used to add *"and keeps a device-only ledger when there is no account"*. **There is
- * no device ledger** — `everyday/profile.ts` owns `localStorage` and holds no chime — and that
- * clause was the same false mechanism the panel's own copy was corrected for. The module still
- * belongs here for the rest of the argument: the viewer really does draw prices.)
+ * (This sentence used to add *"and keeps a device-only ledger when there is no account"*, then had
+ * that clause removed because **there was no device ledger** — the same false mechanism the panel's
+ * own copy was corrected for. **There is one now**: `packages/viz/src/everyday/deviceChimes.ts`,
+ * GitHub issue #579, [§ D911](../../../../DECISIONS.md), built on [§ D711](../../../../DECISIONS.md)
+ * clauses 1–6. It reaches this module through {@link chimeEarnTableOf}, which projects the sources
+ * away exactly as {@link chimeSpendTableOf} does, so the clause is back and the boundary is not
+ * weakened to carry it. The module still belongs here for the rest of the argument too: the viewer
+ * really does draw prices.)
  * `packages/server` cannot import
  * `packages/viz`, so a table parsed on the play side would have to be transcribed on the server —
  * and `pricing/types.ts` documents at length what happens when one price lives in six places: a
@@ -739,6 +743,45 @@ export interface ChimeSpendTable {
  */
 export function chimeSpendTableOf(table: ChimeLedgerTable): ChimeSpendTable {
   return Object.freeze({ currency: table.currency, sinks: table.sinks });
+}
+
+/**
+ * The earn half **without its sources** — {@link ChimeSpendTable}'s counterpart, and it exists for
+ * exactly the reason that one does.
+ *
+ * [§ D526](../../../../DECISIONS.md) clause 5 says the play surface never learns a source, and
+ * `packages/viz/src/boundaries.test.ts` forbids a `.sources` anywhere in that package. A device
+ * ledger has to turn a **completion** into a number to derive a balance ([§ D711](../../../../DECISIONS.md)
+ * clause 2), and the only shipped way to do that was {@link chimeAwardFor}, which takes a table
+ * that has sources on it. Handing the viewer such a table to call it would have put the data back
+ * one import below the grep — the review of PR #485's own defect with a helper in front of it.
+ *
+ * So the projection is the crossing, exactly as {@link chimeSpendTableOf} is: what comes across is
+ * a map from the play surface's **own vocabulary** ({@link CHIME_COMPLETIONS}) to a figure, and
+ * there is no source id in it to name. A completion that nothing claims is absent rather than zero
+ * — a missing key is a table that did not author an award, and a zero would be an award of nothing.
+ */
+export interface ChimeEarnTable {
+  readonly currency: ChimeCurrency;
+  /** Keyed by completion. A completion the table pays nothing for is **absent**, never `0`. */
+  readonly awards: Readonly<Partial<Record<ChimeCompletion, number>>>;
+}
+
+/**
+ * Project a parsed table down to {@link ChimeEarnTable}.
+ *
+ * Deliberately the only way across, on {@link chimeSpendTableOf}'s rule: a play-side module calls
+ * this on the parse expression itself, so no binding on that side ever holds a table with sources
+ * on it. The gift source has no completion and therefore cannot appear here at all, which is
+ * `data/chime-ledger.json`'s own structural claim about it arriving as a type.
+ */
+export function chimeEarnTableOf(table: ChimeLedgerTable): ChimeEarnTable {
+  const awards: Partial<Record<ChimeCompletion, number>> = {};
+  for (const completion of CHIME_COMPLETIONS) {
+    const award = chimeAwardFor(table, completion);
+    if (award !== undefined) awards[completion] = award;
+  }
+  return Object.freeze({ currency: table.currency, awards: Object.freeze(awards) });
 }
 
 /** The gift source, or `undefined` if this table ships none. Server-only: a gift has no completion. */
