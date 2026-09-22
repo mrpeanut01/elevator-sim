@@ -74,10 +74,13 @@ import {
   FIGURE_NOTE_HANDLE,
   everydayReportViewOf,
   figureNotePartsOf,
+  type EverydayReportCareer,
   type EverydayReportView,
   type HonestyPart,
 } from './reportView.js';
 import { openTowerOf } from '../campaign/career.js';
+/* GitHub issue #577: `fileDay`'s twenty-day month, read rather than restated. */
+import { CONTRACT_DAYS } from '../campaign/economy.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { postRunViewOf } from './postRun.js';
 import { RUSH_POST_COPY, rushPostViewOf } from './rushPost.js';
@@ -211,7 +214,36 @@ function mountReportScreen(
       overnight: data.tomorrowBriefing(),
       newerRunOnStage: report !== undefined && run.hasRun && !run.dayClosed,
       panelNames: panelNamesOf(doc),
+      career: careerOnwardOf(),
     });
+  }
+
+  /**
+   * The career behind this sheet, or `undefined` — GitHub issue **#577**,
+   * [§ D899](../../../../DECISIONS.md), and the run context is the whole of the gate.
+   *
+   * `context.ctx` rather than *is a career open?*, because a career is open while a player plays
+   * the daily loop and this sheet would otherwise offer a contract's day at the end of somebody
+   * else's morning. It is the same discriminator {@link mountReportScreen}'s `primary` already
+   * uses to pick between `building` and `week`, for the reason recorded there: § 3.3's own row is
+   * where the pairing lives, so a sixth run context answers by being in that table.
+   */
+  function careerOnwardOf(): EverydayReportCareer | undefined {
+    if (context.ctx !== 'campaign') return undefined;
+    const tower = openTowerOf(context.host.campaign());
+    if (tower === undefined) return undefined;
+    const name = context.host.buildingById(tower.buildingId)?.name;
+    if (name === undefined) return undefined;
+    return {
+      buildingName: name,
+      day: tower.day,
+      /*
+       * `fileDay`'s own refusal, read the way that function states it: `tower.day` runs 1…
+       * `CONTRACT_DAYS` while the contract does and reaches `CONTRACT_DAYS + 1` when the last day
+       * is filed. Past that the next press is § 8.9's renewal, which lives on the desk.
+       */
+      canRunAnother: tower.day <= CONTRACT_DAYS,
+    };
   }
 
   function render(): void {
@@ -617,7 +649,14 @@ function mountReportScreen(
       root.append(goals.root);
     }
 
-    /* ---- three beats ---- */
+    /*
+     * ---- the beats ----
+     *
+     * § 6.5 calls this section *three beats* and the sheet has shipped **two** since issue #56 took
+     * the methodology footnote out of it. A day the player pressed something on draws a third —
+     * `shift/afterPress.ts`, GitHub issue #581 — so the count is the run's rather than the guide's,
+     * and this loop has always drawn what the sheet holds. Nothing here decides how many there are.
+     */
     if (sheet.diagnosis.length > 0) {
       const beats = section(doc, view.headings.beats);
       beats.body.className = 'everyday-report-beats';
@@ -803,7 +842,29 @@ function mountReportScreen(
         'font-size:14px',
         'font-weight:600',
       ].join(';');
+      /*
+       * **Two destinations, keyed on the step's own discriminator** — GitHub issue #577.
+       *
+       * This handler was `openTomorrow()` and `go('brief')` unconditionally, on a sheet whose
+       * label already said *Open the doors on Tuesday* at the end of a **career** day. Both halves
+       * of that press are § 6's: `openTomorrow` advances `ViewerState.week` and clears the
+       * campaign latch by name (`host.ts`' own comment — *§ 6's tomorrow, for the same reason
+       * `startRun` clears it*), and `brief` has no campaign row in § 3.3's table, so the bar fell
+       * back to the daily one. The career kept its `ctx` and lost every affordance that said so.
+       *
+       * The career arm is the **same** pair of calls the contract sheet's own primary makes
+       * (`campaignScreens.ts`), rather than a second way to start a career day: one run press per
+       * flow, so a day started here and a day started at the desk cannot differ.
+       */
+      const step = view.tomorrow;
       button.addEventListener('click', () => {
+        if (step.goes === 'career-day') {
+          const tower = openTowerOf(context.host.campaign());
+          if (tower === undefined) return;
+          context.host.runCampaignDay(tower.id);
+          context.go('stage');
+          return;
+        }
         context.host.openTomorrow();
         context.go('brief');
       });

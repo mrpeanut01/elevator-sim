@@ -290,7 +290,42 @@ describe('what this screen adds on top of the sheet', () => {
 
   it('offers one button into tomorrow on a filed week-day sheet, and none on an empty one', () => {
     expect(viewOf().tomorrow?.label).toBe('Open the doors on Wednesday');
+    expect(viewOf().tomorrow?.goes).toBe('daily-tomorrow');
     expect(viewOf({ report: undefined }).tomorrow).toBeUndefined();
+  });
+
+  /*
+   * GitHub issue #577. The unit half of the fix — `campaignJourney.browser.test.ts` holds the half
+   * that matters, because the defect was a composition of three correct modules and only the crumbs
+   * after the press can show it. What is worth pinning here is that the **daily arm is reached by
+   * every caller that does not say otherwise**, which is what keeps the honesty corpus, the replay
+   * and the daily loop on the label they have always had.
+   */
+  const CAREER = Object.freeze({ buildingName: 'Garden Apartments', day: 4, canRunAnother: true });
+
+  it('opens the career’s own next day from a career sheet, naming the day and the building — #577', () => {
+    const view = viewOf({ career: CAREER });
+    expect(view.tomorrow?.label).toBe('Open the doors on day 4 at Garden Apartments');
+    expect(view.tomorrow?.goes).toBe('career-day');
+    // The words say where the press leaves you, because the whole of #577 is a player who could
+    // not tell a career day from a daily one.
+    expect(view.tomorrow?.note).toContain('You stay in the career');
+    // And the daily loop's own label is not reachable from a career sheet at all.
+    expect(view.tomorrow?.label).not.toContain('Wednesday');
+  });
+
+  it('offers no button once the contract has filed its last day — #577', () => {
+    // `campaign/career.ts#fileDay` refuses a twenty-first day, so a button promising one would be a
+    // control that cannot do what it says. An absent control is the honest state; the bar's own
+    // `Back to ⟨building⟩` carries the player to the desk that has the renewal.
+    expect(viewOf({ career: { ...CAREER, canRunAnother: false } }).tomorrow).toBeUndefined();
+  });
+
+  it('leaves every non-career caller on the daily arm — #577’s other polarity', () => {
+    // Passing nothing is *this is not a career day*, which is what the corpus, the replay and the
+    // daily loop all do. A repair that had made the career arm the default would fail here.
+    expect(viewOf({ career: undefined }).tomorrow?.label).toBe('Open the doors on Wednesday');
+    expect(viewOf({ career: undefined }).tomorrow?.goes).toBe('daily-tomorrow');
   });
 
   it('warns when a newer unfiled run is on the stage, so the sheet is not read as that run', () => {
