@@ -41632,3 +41632,202 @@ So the **longest gap between moments that decide the day is 112.5 s** — the di
 **What it is not**: a sitting. Nobody played this day in a browser to take these numbers; they are `observationsAt` over the recording at the same instants a player's screen would be showing. A Playwright census on the built bundle is what would make the two rows of that table the same kind of measurement, and until one is run the comparison is a derivation standing next to a sitting.
 
 **What is deliberately not fixed here, and it is the bigger half of #578.** Today's scenario at **Midtown Office** is still unclearable, and this lane measured why rather than moving anything: on the whole authored office day the energy goal's **80 kJ per ride delivered** is met by **one of thirteen arms** — `nearest-car`, at a 1 638 s worst wait — while the other twelve sit at **123–175 kJ**. `ENERGY_PER_LEG_MAX_KJ` was derived ([§ D468](#d468)) over day-1 runs at each contract's own `shiftLengthForContract`, which is **1 800 s** for Midtown; the Everyday day runs the authored **36 000 s** record, where the same building under the same dispatcher reads **151.9** against **35.6** over the peak half-hour. That is a bar and a run that are not the same measurement, and it is **§ D106's perverse ranking drawn on the flagship day**. Moving the bar is what `CLAUDE.md`'s working agreements forbid, so it is reported and not touched; what would settle it is a per-horizon or per-building derivation pinned to its own four hundred runs, which is GitHub issue #555's.
+
+---
+
+## D912 — the week's tower is a control, so the day whose verdict turns on a press is reachable on purpose
+
+**Date: 2026-09-22 · Owner: build lane AG-A (wave AG) · GitHub issue [#587](https://github.com/mrpeanut01/elevator-sim/issues/587) · Binds `packages/viz/src/everyday/towerChoice.ts`, `packages/viz/src/everyday/host.ts` and `packages/viz/src/everyday/doorScreen.ts`, so it is an entry rather than a docstring ([§ D405](#d405)).**
+
+**Decision.** `everyday/towerChoice.ts` composes the picker; `EverydayHost.chooseTower` moves the
+week through `shift/week.ts#switchWeek` with the **`resume`** arrival; `doorScreen.ts` draws it on
+§ 6.1's front door, one row per shipped contract, the standing row selected and inert.
+
+**The defect, in the assessor's own measurement.** [§ D871](#d871) built the first day in the
+product whose verdict turns on a press — Crown Hotel, `c7`, day 1 — and a playability panel then
+reproduced it on its **own independent harness**: seed 20 268 743, `collective`, press at 0.28 of
+the shift, as-built **303.0 s worst wait / Shift missed**, *park the cars in the lobby* **311.0 s /
+missed**, *spread the cars* **215.0 s / Shift cleared**, 270 of 355 legs differing. And then it
+found the thing that stopped that counting: **no player action reaches the day**. `c7` enters a
+week in exactly two ways — `shift/firstSession.ts`'s draw, measured at **37 of 365 dates** and taken
+**once per device** by `dev/state.ts#withFirstSession`; or the campaign, where it is Scenario 6
+behind roughly fifteen clean days and a standing gate. Reachability fell from 7 to 6 on that alone.
+
+**It was never a missing mechanism, which is the part worth reading.** `switchWeek` has parked and
+resumed a week per assignment since GitHub issue #107, and `everyday/host.ts` already drove it from
+the campaign's *take an offer*. What was missing was a **control in the daily loop**: this
+repository's signature defect one layer up from a dead seam — everything wired, validated and
+tested, and nothing a player can press. `CLAUDE.md` names eleven instances in code and two in
+`data/`; this is the same shape in the navigation graph.
+
+**`resume`, not `restart`, and that is the one real decision here.** `shift/week.ts#WeekArrival`'s
+two arms are not interchangeable: *taking an assignment* restarts the destination, which is what the
+scenarios card promises and what the campaign's offer card presses. This control promises nothing of
+the sort — a player picking today's tower has not accepted a contract — so the departing week is
+parked under its own id and a week left on day 4 with a streak comes back as it was. Each row says
+which of the two it will do **before** the press (`TowerChoiceRow.arrivalNote`), because a control
+that silently restarted a week would be worse than no control: it would destroy something a player
+cannot get back, which is exactly what a bare `takeContract` cost three callers before issue #107.
+
+**No gate, and that is a decision rather than an omission.** Every shipped contract is listed and
+every one is pressable. `campaign/career.ts#offerRefusalOf`'s slot, standing and fee are facts about
+the **career**, a different record from the daily loop's week, and re-using them here would make the
+daily loop a second career — gating the one control that exists to make a day reachable.
+
+**No figure on the surface**, mechanically: `towerChoice.test.ts` fails on a digit in any drawn
+string except the contract's own `Scenario n` label, which is a name rather than a measurement.
+
+**Proved by pressing it.** `everyday/towerChoice.browser.test.ts` loads the built bundle, opens the
+front door, presses `c7`'s row and reads the week back off the product — including the door's own
+lede, which is composed from the building the week now runs, so a picker that wrote only its own
+selection fails. A pure test of the rows would have passed on the day the picker wrote nothing.
+
+---
+
+## D913 — WITHDRAWN: a parking press is not inert because the strategy it would set is already in force, and the mechanism was refuted by a run
+
+**Date: 2026-09-22 · Owner: build lane AG-A (wave AG) · GitHub issue [#588](https://github.com/mrpeanut01/elevator-sim/issues/588) · Binds nothing: every line of code this entry described has been reverted on the same wave. It is an entry rather than a docstring ([§ D405](#d405)) because it withdraws a claim, and a withdrawal that lives only in a deleted file is a claim nobody can find again.**
+
+**Decision. This lane built a refusal, another lane refuted it by measurement, and the code is
+gone.** What stands is the finding and the reason it is a finding rather than a fix.
+
+**The defect it was written for is real and is not withdrawn.** A playability assessor swept
+[§ D871](#d871)'s pinned day across all thirteen shipped dispatchers and found that under
+`zoned-uppeak` the *spread the cars* press **changed 0 of 355 legs and said nothing**. That is
+[§ D227](#d227)'s first polarity arriving on a button, and `CLAUDE.md` ranks it below no control at
+all: a live-looking control that does nothing teaches a player the mechanism does not work.
+
+**The mechanism this entry proposed.** `data/dispatcher-profiles.json` authors
+`idle.parkingStrategy: 'zone-center'` on `zoned-uppeak`, which is exactly what *spread the cars*
+sets; `sim/simulation.ts#idleOverrideAt` says the latest parking intervention at or before an
+instant is the one in force, and with none the profile's own strategy stands. So *would this press
+set what is already set* looked like a question about **configuration**, answerable before the press
+and without the counterfactual run `shift/afterPress.ts#AFTER_PRESS_DISCLAIMER` refuses by name.
+`live/interventions.ts#parkingChangesNothing` was that predicate, and the arm carried its own
+refusal on the stage.
+
+**It is false, and the measurement is lane AG-C's, landing beside this one in the same wave under its own decision D949** — written without the `§`, deliberately, because at the moment this entry is written that heading is on another lane's branch and a `§ Dnnn` in this repository means a heading in *this* file (`validation/citations.test.ts`). The integrator may make it a link on merge. Swept over two buildings ×
+three shift lengths × three dispatchers × both arms and compared **on the legs**, two of
+thirty-six cells refute it: `garden-apartments` at 900 s and at 1 800 s under `zoned-uppeak`
+**do** move the legs when *spread the cars* is pressed. So a control saying *this press would change
+nothing here* would have been lying on exactly those cells — a **false refusal**, which is the
+worse half of § D227's pair, because a stale refusal tells a player not to touch a control that
+works.
+
+**Why the argument was wrong, stated rather than guessed at.** `sim/events.ts` already says it:
+*"For `park-cars-lobby` and `spread-cars` the event exists for the already-parked fleet"* — the
+scheduled event walks the idle cars through stage 7 whether or not the strategy string changed, so
+a fleet that had stopped where it last served is repositioned by the press even under a profile
+that already authors the destination. Equal strategy is not equal behaviour. **No replacement
+mechanism is offered**, because a second plausible sentence in place of a measurement is what
+[§ D256](#d256) refuses; what would settle it is the counterfactual pair, and that is the claim
+§ D900 declined to make on one replication.
+
+**What this costs and what it buys.** It costs the fix for the assessor's finding: the inert press
+under `zoned-uppeak` on § D871's day is **still silent**, and GitHub issue #588 stays open. It buys
+the knowledge that the cheap answer is wrong, pinned by thirty-six cells rather than by an
+argument — and three of those cells are kept in `everyday/stageHandover.test.ts` by that lane, so the
+next lane that reaches for this reasoning meets the refutation before it writes the predicate.
+
+**Two lanes of one wave built the same wrong thing independently and one of them measured it.**
+That is worth a sentence: this lane derived the refusal from the configuration and shipped it, lane
+AG-C derived the same refusal, swept it, and reverted byte-for-byte. The difference between the two
+is a run, which is this repository's oldest rule about a refusal — *pinned by a run, never by
+another sentence* — applied to the lane that wrote the sentence.
+
+
+---
+
+## D914 — seven contracts carry a day whose verdict turns on a press, and the day says which standing orders make it moot
+
+**Date: 2026-09-22 · Owner: build lane AG-A (wave AG) · GitHub issue [#587](https://github.com/mrpeanut01/elevator-sim/issues/587) · Binds `data/contract-ladder.json`, `packages/viz/src/shift/ladder.ts`, `packages/viz/src/dev/data.ts`, `packages/viz/src/everyday/today.ts`, `packages/viz/src/everyday/briefView.ts` and `packages/viz/src/everyday/briefScreen.ts`, so it is an entry rather than a docstring ([§ D405](#d405)).**
+
+**Decision.** Six more rungs declare a `ContractFabric.incidents` absence, taking the count from one
+to seven, and every declaring rung pins a `ContractPressDay`: the seed, the standing order, the verb
+that clears the day, the verb that does not, where the press falls, and **which shipped dispatchers
+clear that exact day as built with no press at all**. `everyday/today.ts` draws the last of those on
+the brief, beside the `<select>` that does it.
+
+**The second half of the assessor's finding.** The tension on § D871's day was **conditional on
+leaving the standing order alone**: swept over all thirteen shipped dispatchers, **8 of 13 clear it
+as built** — energy-aware 161 s, fairness-first 104, capacity-aware 111, predictive-balanced 132,
+destination-eta 119, zoned-uppeak 158, auction 177, auction-multi-round 180 — and only `collective`
+(the contract's standing order), `nearest-car` 232, `eta` 236, `collective-enroute` 240 and
+`destination-panel` 241 miss. Switching dispatcher is a control on the same stage, so a player who
+changes it makes the day moot and is told nothing.
+
+**Which of the two remedies, and why.** Authoring days that survive every standing order was the
+other option and is refused on a measurement: it would need the day to miss under all thirteen
+profiles *and* clear on one press under one of them, which is a search over 13 × n runs per contract
+against a bar that four of the seven towers already clear on seven-plus profiles. What ships instead
+is the census, **measured and published where the choice is made**. The sentence is drawn only on the
+day it was taken — the rung's contract, day 1, that seed — because a census quoted over a different
+crowd is a figure about a run it was not taken on, which is the class § D227 exists to refuse.
+
+**The measured table**, every cell a run: day 1 under `collective`, the press at 0.28 of the shift,
+seeds from `docs/33` § 4.6's own sequence `20 260 824 + 7 919 n`, verdicts quoted off
+`shift/report.ts#dayReportOf`.
+
+| contract | tower | seed | as built | the press that clears | the press that does not | clear as built |
+|---|---|---|---|---|---|---|
+| `c2` | Midtown Office | 20 411 285 | **missed**, 295 s | *spread the cars* — **cleared**, 202 s | *park in the lobby* — missed, 273 s | 8 of 13 |
+| `c3` | Secure Tower | 20 276 662 | **missed**, 193 s | *spread the cars* — **cleared**, 120 s | *park in the lobby* — missed, 197 s | 7 of 13 |
+| `c6` | Chancery House | 20 316 257 | **missed**, 132 s | *park in the lobby* — **cleared**, 131 s | *spread the cars* — missed, 121 s | 2 of 13 |
+| `c7` | Crown Hotel | 20 268 743 | **missed**, 303 s | *spread the cars* — **cleared**, 215 s | *park in the lobby* — missed, 311 s | 8 of 13 |
+| `c8` | St Jude Hospital | 20 276 662 | **missed**, 237 s | *park in the lobby* — **cleared**, 181 s | *spread the cars* — missed, 237 s | 9 of 13 |
+| `c9` | Harbour Point | 20 395 447 | **missed**, 154 s | *park in the lobby* — **cleared**, 115 s | *spread the cars* — missed, 135 s | 2 of 13 |
+| `c10` | Ashgate Mixed-Use | 20 347 933 | **missed**, 164 s | *park in the lobby* — **cleared**, 143 s | *spread the cars* — missed, 156 s | 5 of 13 |
+
+**Read the `c6` and `c9` rows against their own worst waits before reading the verdicts.** On both,
+the arm that *clears* has a **higher** worst wait than the arm that misses — 131 s against 121 s on
+`c6`, 115 s against 135 s on `c9` — because on those days the goal doing the deciding is the landing
+**queue** rather than the worst wait. A reader who scanned the seconds column alone would conclude
+the table was wrong. It is the reason the verdicts are quoted off the sheet rather than derived from
+a figure.
+
+**Four of the seven clear on *park in the lobby* and three on *spread the cars*, and that is the
+content rather than a coincidence.** The right verb is a property of the building, which is what
+§ D871 argued for one tower (*a hotel has no dominant direction*) and what this ladder now
+demonstrates across seven. `pressLadder.test.ts` asserts the two-sided claim on every one of them:
+the named press clears, **the other parking verb still misses**, the legs differ from the untouched
+run, and the prefix before the press is byte-identical.
+
+**No bar moved.** `shift/goals.ts#GOAL_BARS` is byte-identical and `goalsForDay` is untouched. Five
+rungs had to be **rebalanced on their own DC-R1 substrates** to keep `docs/33` DC-4 after the absence
+was added — the absence alone takes `c2` to 0.80 of 50, `c3` to 0.78, `c6` to 0.76 and `c10` to 0.72,
+outside the band at the top, and `c8` to 0.18, under it at the bottom. Each is brought back on the
+substrate that row has always moved: `c2`'s let 0.395 → 0.34, `c3`'s crowd 12 → 11 (the
+office-standard **minimum**), `c6`'s 16 → 15 (the office-prestige **minimum**), `c10`'s 13.5 → 12,
+`c8`'s 8.5 → 10.5. `c7` and `c9` needed nothing. Every one of those is a number `data/`'s own note
+now carries with the measurement beside it.
+
+**`c8` is the row to read, because the fix changed which goal decides the day.** With **one** car out
+its day-1 misses are all on the **energy** bar, which no parking press moves — so the day missed and
+nothing a player could press would have changed that. With **two** cars out the binding goal becomes
+the worst wait, because fewer cars spend less work per delivered leg. That is [§ D106](#d106)'s
+perverse ranking appearing on a fabric change rather than on a dispatcher, and it is the mechanism
+that made the day answerable.
+
+**Nine contracts carry no pinned day, and the refusal is measured rather than left as an absence.**
+`c1` (Garden Apartments) **never misses at all**: over twenty seeds with one of its two cars booked
+out from a quarter of the shift **to the end**, the worst wait peaks at 136 s against a 230 s bar and
+every seed reads *Shift cleared*. The only lever left is the crowd, which `c1`'s own rung note
+refuses pending a playtest — so a pinned day there would mean moving the mark. `c4`, `c5` and
+`c11`–`c16` miss on **`queue` and `energy` together** on effectively every seed as built, and neither
+parking verb moves either past its bar: measured at twenty seeds on `c5`, **20 of 20 miss under all
+three arms**. A day nobody can clear is GitHub issue #578, and pinning one would be authoring that
+defect eight more times. `pressLadder.test.ts` holds the **count** of both sets, so authoring an
+eighth pinned day fails the case and this paragraph gets revisited rather than quietly ageing.
+
+**So the brief asked for eight and the measurement supports seven.** That is stated here rather than
+rounded up, and what would move it is a per-horizon or per-building derivation of
+`ENERGY_PER_LEG_MAX_KJ` (GitHub issue #555) — which is the same obstruction § D871 reported on
+Midtown Office's Everyday day, met a second time from the other side.
+
+**The instrument, and why the census is not re-derived in full on every run.**
+`shift/pressLadder.sweep.test.ts` produces all seven rows and the thirteen-dispatcher census behind
+each, gated on `PRESS_LADDER_SWEEP=1` / `PRESS_LADDER_CENSUS=1` and writing to a file, because vitest
+intercepts `console.log`. `shift/pressLadder.test.ts` is the always-on half: it runs every pinned day
+three ways, and re-derives **one** contract's whole census every run — ninety-one day-long
+simulations in the always-on tier is a compute job rather than a check, which is
+`contractCurve.sweep.test.ts`'s own reason for living behind a variable.

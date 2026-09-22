@@ -2131,6 +2131,11 @@ type DecisionReservation = {
  * to **D912**, which is the first number past the highest heading — and D912-D925 are registered
  * holes precisely so that row does not come to rest on one, which § D430 forbids.
  *
+ * > **Wave AG's reservation then opened at 912 and the first three were spent** — § D912, § D913
+ * > and § D914, build lane AG-A. So the paragraph above is a dated record: D912-D914 are headings,
+ * > and the registry entry that held them is gone with the note beside `[915, …]` saying why. The
+ * > sentence *"D912-D925 are registered holes"* is true of eleven of them now, not fourteen.
+ *
  * **The sizing is steady now and worth one line.** Four lanes, four issues closed end to end,
  * five headings: one ruling each except the career lane's two, which are two genuinely separate
  * rulings on one screen. Wave AD's kernel lane held thirty-five and spent two; wave AE's lane AE-D
@@ -2996,31 +3001,44 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [908, "wave AF's career lane's block; unspent for § 901's reason."],
   [909, "wave AF's career lane's block; unspent for § 901's reason."],
   [910, "wave AF's career lane's block; unspent for § 901's reason."],
-  [
-    912,
-    "wave AF's chimes lane held D911-D925 and spent only § D911 \u2014 the loop closing on the " +
-      "device: earn on a cleared fix case, spend on another case's budget rung, with no " +
-      "apiOrigin and no account. **These fourteen are registered as holes although they sit " +
-      "above D911 only within this lane's own block**: D911 is the wave's highest heading, so " +
-      "D912-D925 have nothing written above them and are free by § D430's letter. They are " +
-      "registered anyway because the reservation ran to D940 and the charter row moves to D912, " +
-      "which would otherwise point at the first of them \u2014 and § D430 forbids the row's " +
-      "highest+1 sitting on a hole. Registering them and moving the row past them is the " +
-      "resolution wave AC-2 used for the same shape.",
-  ],
-  [913, "wave AF's chimes lane's block; unspent for § 912's reason."],
-  [914, "wave AF's chimes lane's block; unspent for § 912's reason."],
-  [915, "wave AF's chimes lane's block; unspent for § 912's reason."],
-  [916, "wave AF's chimes lane's block; unspent for § 912's reason."],
-  [917, "wave AF's chimes lane's block; unspent for § 912's reason."],
-  [918, "wave AF's chimes lane's block; unspent for § 912's reason."],
-  [919, "wave AF's chimes lane's block; unspent for § 912's reason."],
-  [920, "wave AF's chimes lane's block; unspent for § 912's reason."],
-  [921, "wave AF's chimes lane's block; unspent for § 912's reason."],
-  [922, "wave AF's chimes lane's block; unspent for § 912's reason."],
-  [923, "wave AF's chimes lane's block; unspent for § 912's reason."],
-  [924, "wave AF's chimes lane's block; unspent for § 912's reason."],
-  [925, "wave AF's chimes lane's block; unspent for § 912's reason."],
+  /*
+   * **D912, D913 and D914 were registered here and are headings now, and the contradiction is
+   * recorded rather than silently repaired** — build lane AG-A, wave AG, GitHub issues #587 and
+   * #588.
+   *
+   * The entry that stood here said wave AF's chimes lane held D911–D925, spent only § D911, and
+   * that D912–D925 were *"registered as holes although they sit above D911 only within this lane's
+   * own block"* — conceding in its own words that **D911 is that wave's highest heading, so
+   * D912–D925 had nothing written above them and were free by § D430's letter**. It registered
+   * them anyway to keep `CHARTER_PROGRAMME.md`'s next-free row off a hole. Wave AG's reservation
+   * then opened at **912** ({@link OPEN_RESERVATION} above, and this lane's dispatch brief assigns
+   * D912–D930), so the registration and the reservation contradicted each other and this lane
+   * could not write its first heading without one of them giving way.
+   *
+   * **§ D430's letter is what gives way, because it is the rule and the registration was a
+   * convenience.** A number with nothing written above it is free, and registering it as a hole to
+   * tidy a row is the same mistake the integrator's own signed note under § D871 records: *"when
+   * wave AE closed, D871–D910 sat above the highest heading written (D870), so under § D430 they
+   * were free rather than holed."* Second time this exact shape has arrived, which is why it is
+   * written out rather than deleted quietly.
+   *
+   * **Only the three this lane spent are removed.** D915–D925 stay exactly as that entry left
+   * them; whether they are holes or free is the integrator's to settle, and a lane deleting eleven
+   * of another lane's declarations while spending none of them would be bookkeeping it has no
+   * standing for. § D911's own entry is untouched — a decision entry is not rewritten after the
+   * fact (`CLAUDE.md`).
+   */
+  [915, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
+  [916, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
+  [917, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
+  [918, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
+  [919, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
+  [920, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
+  [921, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
+  [922, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
+  [923, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
+  [924, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
+  [925, "wave AF's chimes lane's block; unspent for § 911's reason — see the note above."],
 ]);
 
 /**

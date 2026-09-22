@@ -29,6 +29,7 @@ import {
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
 import type { EverydayState } from './types.js';
+import type { TowerChoiceView } from './towerChoice.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 
 /**
@@ -56,6 +57,8 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
       building: host.resolvedBuilding(),
       buildingId: selection.buildingId,
       dispatcherName: host.dispatcherById(selection.dispatcherId)?.name,
+      /* Any profile's name, for the moot-dispatcher sentence — § D914. */
+      dispatcherNameOf: (id) => host.dispatcherById(id)?.name,
       goals: host.goalsToday(),
       seed: host.seed(),
       /*
@@ -294,6 +297,8 @@ function mountDoor(
      * that says why the primary cannot act, and the bar's note column is 44ch wide and right
      * aligned. § 16 rule 6: it always says what it is short by, and it says it where the reader is.
      */
+    column.append(towerChoiceCard(document_, context.host.towerChoice()));
+
     const primaryNote = el(document_, 'p', 'everyday-door-primary-note', view.primary.note);
     primaryNote.style.cssText = [
       QUIET,
@@ -305,6 +310,87 @@ function mountDoor(
     ].join(';');
     column.append(primaryNote);
     return column;
+  }
+
+  /**
+   * **This week's tower, as a control** — GitHub issue #587, § D912, `everyday/towerChoice.ts`.
+   *
+   * On the front door rather than on the week screen or behind the campaign, because this is the
+   * screen that says *today's tower* and the assessor's finding was that the tower could not be
+   * chosen at all: `c7` entered a week only through a once-per-device draw, so the one day whose
+   * verdict turns on a press was unreachable on purpose.
+   *
+   * Every word is `towerChoice.ts`'s and this decides only which element it goes in — the split
+   * every screen in this directory keeps. The row the week is standing on is drawn **selected and
+   * inert** rather than hidden, § 16 rule 6's shape: a control that cannot act says what it is,
+   * and a picker missing its own answer is a picker a player cannot read their state off.
+   */
+  function towerChoiceCard(document_: Document, choice: TowerChoiceView): HTMLElement {
+    const card = el(document_, 'div', 'everyday-door-towers');
+    card.style.cssText = CARD;
+    const heading = el(document_, 'div', undefined, choice.heading);
+    heading.style.cssText = EYEBROW;
+    const lede = el(document_, 'p', undefined, choice.lede);
+    lede.style.cssText = `${BODY};margin:7px 0 0`;
+    const note = el(document_, 'p', 'everyday-door-towers-note', choice.note);
+    note.style.cssText = `${QUIET};margin:5px 0 0`;
+    card.append(heading, lede, note);
+    const list = el(document_, 'div');
+    list.style.cssText = 'display:grid;gap:6px;margin-top:11px';
+    for (const row of choice.rows) {
+      const button = el(document_, 'button', 'everyday-door-tower');
+      button.type = 'button';
+      button.dataset['contract'] = row.contractId;
+      button.dataset['selected'] = row.selected ? 'true' : 'false';
+      button.disabled = row.selected;
+      button.setAttribute('aria-pressed', row.selected ? 'true' : 'false');
+      button.style.cssText = [
+        'display:block',
+        'width:100%',
+        'text-align:left',
+        'padding:8px 10px',
+        `border:1px solid ${row.selected ? C.terracotta : C.ruleLight}`,
+        `border-radius:${String(R.row)}px`,
+        `background:${row.selected ? C.amberWash : C.card}`,
+        `color:${C.ink}`,
+        `cursor:${row.selected ? 'default' : 'pointer'}`,
+      ].join(';');
+      const name = el(document_, 'span', 'everyday-door-tower-name', `${row.label} · ${row.tower}`);
+      name.style.cssText = 'display:block;font-size:12.5px;font-weight:600';
+      const why = el(
+        document_,
+        'span',
+        'everyday-door-tower-note',
+        row.booksACarOut ? `${row.teaches} · ${choice.incidentTag}` : row.teaches,
+      );
+      why.style.cssText = `display:block;${QUIET};margin-top:2px`;
+      const arrival = el(document_, 'span', 'everyday-door-tower-arrival', row.arrivalNote);
+      arrival.style.cssText = `display:block;${QUIET};margin-top:2px`;
+      /*
+       * **The selected row is disabled, so it owes a reason where a reason can be found** — GitHub
+       * issue #262's rule, which `deadControls.browser.test.ts` sweeps: a disabled button carries an
+       * accessible name *and* a `title` or an `aria-describedby` that resolves. The sentence is
+       * drawn inside the button either way, because a reason a player cannot see is not a reason
+       * (`stageScreenModel.ts#STAGE_SWITCH_PICKER_NOTE`'s own ground); the id and the `title` are
+       * what make the same sentence reachable to a reader who is not looking at it.
+       */
+      arrival.id = `everyday-door-tower-${row.contractId}-arrival`;
+      button.setAttribute('aria-describedby', arrival.id);
+      if (row.selected) button.title = row.arrivalNote;
+      button.append(name, why, arrival);
+      if (!row.selected) {
+        button.addEventListener('click', () => {
+          context.host.chooseTower(row.contractId);
+          /* The strip is a stepper, not a memory of one — a new week opens on its own today. */
+          dayOffset = 0;
+          render();
+          context.refreshBar();
+        });
+      }
+      list.append(button);
+    }
+    card.append(list);
+    return card;
   }
 
   /**

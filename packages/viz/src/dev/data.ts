@@ -240,6 +240,8 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
       if (entry === undefined) return undefined;
       return { min: entry.ratedSpeedMps.min, max: entry.ratedSpeedMps.max };
     },
+    /* Every shipped profile id, for a rung's pinned press day to name — § D914. */
+    dispatcherIds: () => dispatchers.profiles.map((profile) => profile.id),
     floorProfilesFor: (buildingId) => {
       const entry = entries.find((candidate) => candidate.config.id === buildingId);
       if (entry === undefined) return undefined;

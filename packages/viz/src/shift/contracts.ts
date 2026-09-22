@@ -98,7 +98,7 @@
  * A scenario's **crowd** and the **tower it hands over** are declared per contract in
  * `data/contract-ladder.json` and applied by `shift/ladder.ts`. That is why three briefs below
  * describe a building `data/buildings/` does not hold: `c1` runs its block with one car and 234
- * residents, `c2` runs its tower four tenths let, and `c6` runs five cars at 3.5 m/s. The stat line
+ * residents, `c2` runs its tower about a third let, and `c6` runs five cars at 3.5 m/s. The stat line
  * beside each card is drawn from `ladderTowersOf`, the same derivation the run is built from, so
  * the card and the run cannot disagree about the tower.
  *
@@ -217,7 +217,9 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
      * profiles × five seeds give 64 of 65 runs a diverging queue and a suppressed mean, which is
      * the role `docs/37` § 7.2 authors it for and is **not** a scenario, because a day nobody can
      * pass teaches nothing. The rung lets it at 0.60 — 930 desks rather than 1 560 — exactly as
-     * `c2` lets Midtown Office at 0.395, and the stat line beside this card is drawn from
+     * `c2` lets Midtown Office at **0.34** (it was 0.395 until § D914 booked one of its four
+     * cars out mid-shift and the let came back to keep DC-4), and the stat line beside this card
+     * is drawn from
      * `ladderTowersOf`, so the card and the run cannot disagree about which tower this is.
      */
     brief:
@@ -232,7 +234,7 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     title: 'The morning rush',
     teaches: 'up-peak, and the gap between demand offered and carried',
     brief:
-      'A twenty-floor tower four tenths let — 675 tenants — on four geared cars. At the peak they all want the same thing at the same time, and the queue in the lobby is where you find out whether your dispatcher is any good. The floors above are empty for now, which is the only reason this is winnable.',
+      'A twenty-floor tower about a third let, on four geared cars — and one of the four is booked out for part of the morning. At the peak they all want the same thing at the same time, and the queue in the lobby is where you find out whether your dispatcher is any good. The floors above are empty for now, which is the only reason this is winnable.',
     needClean: 2,
     reward: 'Operational zoning · Capacity aware · one spare shaft',
   }),
