@@ -2098,7 +2098,21 @@ type DecisionReservation = {
  * will take, so these are sized to the issues each lane closes, and a lane that needs more asks
  * under § D404 rather than taking the number above its block.
  */
-const OPEN_RESERVATION = { wave: 'AE', from: 840, to: 910 } as DecisionReservation | null;
+/*
+ * **Wave AE's reservation is CLOSED.** Six blocks went out across D840-D910 — four build lanes, a
+ * front-door fix lane and a decision agent — and the wave's highest heading is **D870**.
+ *
+ * **D871-D910 are free rather than holed**, on § D430's distinction: nothing is written past D870.
+ * Registering them would point the charter row's `highest + 1` at a hole, which is the one place
+ * that rule forbids one to sit. The row moves to **D871** on this commit.
+ *
+ * **Lane AE-D is the entry worth reading, and it spent nothing.** Its whole block, D879-D890, came
+ * back unused, because every decision it took was local to the module that took it and is recorded
+ * in its own docstring citing § D405. That is § D405 working as designed rather than a lane being
+ * timid — the rule exists so that a decision reaching past nothing does not consume an id, and a
+ * lane that closes two issues on no numbers is the shape it was written for.
+ */
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
@@ -2818,6 +2832,66 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [833, "wave AD AD-E's block; unspent for § 803's reason."],
   [834, "wave AD AD-E's block; unspent for § 803's reason."],
   [835, "wave AD AD-E's block; unspent for § 803's reason."],
+  /*
+   * Wave AE. Twenty-one numbers returned below the highest written (D870); D871-D910 are
+   * FREE rather than holed, on § D430's distinction and wave AD's worked example above -
+   * nothing is written past D870, so those were never reached.
+   *
+   * The blocks were sized narrower than wave AD's, which was AD's own lesson applied, and
+   * four of the five build lanes spent one or two numbers on an issue closed end to end.
+   * Lane AE-D spent NONE of D879-D890: every decision it took was local to the module that
+   * took it and is recorded in its own docstring under § D405, which is that rule working
+   * rather than a lane being shy. Those twelve are free, not holed.
+   */
+  [
+    845,
+    "wave AE's front-door fix lane held D844-D850 and spent only § D844 — the landing " +
+      "page's narrow repaint and the front door's wait, which are one class with two " +
+      "instances and were recorded as one entry rather than two. Registered under D404 and D430.",
+  ],
+  [846, "wave AE's front-door lane's block; unspent for § 845's reason."],
+  [847, "wave AE's front-door lane's block; unspent for § 845's reason."],
+  [848, "wave AE's front-door lane's block; unspent for § 845's reason."],
+  [849, "wave AE's front-door lane's block; unspent for § 845's reason."],
+  [850, "wave AE's front-door lane's block; unspent for § 845's reason."],
+  [
+    851,
+    "wave AE's paused-stage decision agent held D842-D855 and spent only § D842, because " +
+      "the answer turned out to be a citation rather than a judgement — four handoff documents " +
+      "rule it, so one entry records the citation and nothing else needed a number. " +
+      "Registered under D404 and D430.",
+  ],
+  [852, "wave AE's paused-stage agent's block; unspent for § 851's reason."],
+  [853, "wave AE's paused-stage agent's block; unspent for § 851's reason."],
+  [854, "wave AE's paused-stage agent's block; unspent for § 851's reason."],
+  [855, "wave AE's paused-stage agent's block; unspent for § 851's reason."],
+  [
+    860,
+    "wave AE's rush-dispatcher lane held D856-D868 and spent § D856 to § D859 on GitHub " +
+      "issue #565's three defects and the measurement that decided the house board. " +
+      "Registered under D404 and D430.",
+  ],
+  [861, "wave AE's rush lane's block; unspent for § 860's reason."],
+  [862, "wave AE's rush lane's block; unspent for § 860's reason."],
+  [863, "wave AE's rush lane's block; unspent for § 860's reason."],
+  [864, "wave AE's rush lane's block; unspent for § 860's reason."],
+  [865, "wave AE's rush lane's block; unspent for § 860's reason."],
+  [866, "wave AE's rush lane's block; unspent for § 860's reason."],
+  [867, "wave AE's rush lane's block; unspent for § 860's reason."],
+  [868, "wave AE's rush lane's block; unspent for § 860's reason."],
+  [
+    843,
+    "drafted in full by wave AE's paused-stage decision agent for the copy residue " +
+      "§ D842 names — the stage-reaching primaries returning to the guide's verbs while " +
+      "the overlay takes a playback one — and DELIBERATELY left unspent. A ruling recorded " +
+      "and not implemented is its own defect class, and § D842 exists because a different " +
+      "ruling had gone that way; landing this one while the change was not made would have " +
+      "reproduced the defect inside the entry documenting it. The analysis is GitHub issue " +
+      "#573 instead, where whoever picks it up will find it. Two reasons the wave could not " +
+      "carry it: the change moves player-facing strings after the wave's corpus row was " +
+      "already measured, and one half of it is a judgement rather than a citation. " +
+      "Registered under D404 and D430.",
+  ],
 ]);
 
 /**
