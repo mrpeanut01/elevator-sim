@@ -44,6 +44,7 @@ import {
   type DispatcherProfiles,
   type ElevatorSpecs,
   type ResolvedBuilding,
+  type RunInterventionConfig,
   type TrafficProfiles,
 } from '@elevator-sim/core/browser';
 
@@ -556,6 +557,7 @@ import { everyWrinkle } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
+import { pressCounterfactualOf } from '../shift/counterfactual.js';
 import {
   averageWaitFigure,
   clockRange,
@@ -3089,6 +3091,31 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       dispatcherName,
       dayStartS: DAY_START_S,
     };
+    /*
+     * The day's press log, named once — § D931. The sheet and the pair beside it both need it, and
+     * two copies of *which presses happened* is exactly the divergence that would make the paired
+     * row fall silently back to § D900's arm the first time somebody edited one of them. One
+     * array, two readers.
+     */
+    const interventions: readonly RunInterventionConfig[] = [
+      { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } },
+      /*
+       * And a bought change beside it — GitHub issue #370. Two presses rather than one, because
+       * the sheet's claim is *in time order* and a single line cannot show an ordering; and this
+       * kind rather than a third parking press, because its stamp is the one the sweep has never
+       * read. Effects are `[]`: this bundle renders a filed sheet from a recording it did not
+       * re-simulate, so an effect here would describe a day the numbers above it do not.
+       */
+      {
+        atS: (recording.startedAt + recording.endedAt) * 0.6,
+        change: {
+          kind: 'building-change',
+          changeId: 'rezone-bank',
+          name: 'Re-zone a bank',
+          serviceEvents: [],
+        },
+      },
+    ];
     const report = dayReportOf({
       ...common,
       subject: { kind: 'week-day' },
@@ -3101,25 +3128,24 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
        * log on purpose: an untouched day printing nothing is the other arm, and both are shipped
        * states.
        */
-      interventions: [
-        { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } },
-        /*
-         * And a bought change beside it — GitHub issue #370. Two presses rather than one, because
-         * the sheet's claim is *in time order* and a single line cannot show an ordering; and this
-         * kind rather than a third parking press, because its stamp is the one the sweep has never
-         * read. Effects are `[]`: this bundle renders a filed sheet from a recording it did not
-         * re-simulate, so an effect here would describe a day the numbers above it do not.
-         */
-        {
-          atS: (recording.startedAt + recording.endedAt) * 0.6,
-          change: {
-            kind: 'building-change',
-            changeId: 'rezone-bank',
-            name: 'Re-zone a bank',
-            serviceEvents: [],
-          },
-        },
-      ],
+      interventions,
+      /*
+       * **And the pair beside that log** — § D931, GitHub issue #581 route 1. Without this the
+       * paired arm of `shift/afterPress.ts` would render on no case at all, and a whole set of
+       * player-facing sentences — the three figures off the run without the press, and
+       * `shift/afterPress.ts#AFTER_PRESS_PAIR_NOTE` — would ship unswept. That is wave AE-C's finding pointed at
+       * a row rather than at a file, and the cheapest moment to avoid it is the commit that adds
+       * the arm.
+       *
+       * The partner is **this recording against itself**, derived through the shipped function
+       * rather than hand-written, so every ground it refuses on is exercised and the counts are
+       * the product's own. It is a fixture and says so: the corpus holds one recording per case,
+       * so there is no second run of this day to pair with, and the two sides therefore read the
+       * same figures. What is being swept is the **strings**, exactly as the seeded interventions
+       * above carry `effects: []` for the same reason. `counterfactual.test.ts` is where the pair
+       * is a real pair.
+       */
+      pressCounterfactual: pressCounterfactualOf(recording, recording, interventions),
       /*
        * And a **ruled** day, so the sheet's rule lines and its fallback sentence are in the corpus
        * — `docs/20` defect 2, on `shift/report.ts#ruleLines`. Two rows rather than one, because the
@@ -3324,6 +3350,17 @@ const SHIFT_REPORT: SurfaceAdapter = {
      */
     'shift/afterPress.ts#afterPressBeatOf',
     'shift/afterPress.ts#AFTER_PRESS_DISCLAIMER',
+    /*
+     * The paired arm's closing note — § D931. Seeded on this bundle's intervened sheet, which
+     * carries a `pressCounterfactual` for exactly that reason; the five sibling sheets and the
+     * single-run shape pass none, so § D900's unpaired arm is swept beside it.
+     *
+     * `shift/counterfactual.ts#pressCounterfactualOf` is **not** listed beside it, and the attempt
+     * was refused by a run rather than by review: `derive.test.ts`' *"a `covers` entry for nothing
+     * is a coverage claim for nothing"* case fails on a declaration that produces no prose, and
+     * that function produces three counts. The strings it feeds are `shift/afterPress.ts`'s.
+     */
+    'shift/afterPress.ts#AFTER_PRESS_PAIR_NOTE',
     'shift/goals.ts#goalsForDay',
     'shift/goals.ts#readGoal',
     'shift/goals.ts#readGoals',
