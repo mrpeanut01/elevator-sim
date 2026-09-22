@@ -989,6 +989,28 @@ function standingWrites(): readonly WorkshopWrite[] {
  *
  * Both are empty when `scope/surface.ts` stops declaring what they claim, which is
  * `scope/commitment.ts`'s stated failure direction — an absent sentence is not a false one.
+ *
+ * ## **Both are empty today** — § D886, GitHub issue #575
+ *
+ * `viewer.dispatcherSpec` is a control since that decision, so `workshopWriteReachesRun` answers
+ * `true`, both constants resolve to `''`, and {@link noteForReach} falls through to the guide's own
+ * *Unsaved changes travel with the run.* on every reach a player can now produce. **Nothing was
+ * edited to achieve that**, which is the whole of what the derivation bought: the sentence that had
+ * to stop being drawn stopped being drawn on the commit that made it false, without anybody
+ * remembering it was here.
+ *
+ * The paragraph above is kept as the dated record it is. One clause of it has stopped being true —
+ * *"GitHub issues #228 and #167 are that gap, and until one of them lands the Engineer editor's
+ * Save it and run it is the only verb in the product that hands a draft over"* — and it was neither
+ * of them that closed it: the working copy reaches the run as a working copy, so there is no
+ * hand-over left to be the only verb for. #228 is closed and what a save is still for is giving the
+ * vector an **id**, which Compare, the gauntlet and the leaderboard resolve against.
+ *
+ * They are kept rather than deleted, for {@link WORKSHOP_REACHES}' own stated reason: the day a
+ * fifth write lands latent, or the day the working copy goes back to being a draft, the bar has the
+ * sentence for it already and does not fall back to a two-cell table that cannot describe the
+ * state. `workshopTravel.test.ts` drives all sixteen subsets of the four writes, so the branches
+ * that select them are exercised on every run of the suite.
  */
 const DRAFT_STAYS_NOTE = !workshopWriteReachesRun('viewer.dispatcherSpec')
   ? 'The weights and the flags stay here — they are a draft, and the run uses the dispatcher you ' +
