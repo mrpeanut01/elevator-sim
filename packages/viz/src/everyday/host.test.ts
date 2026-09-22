@@ -486,8 +486,13 @@ describe('drivingProfile — what the building is obeying', () => {
     const h = harnessOf(base());
     const host = createEverydayHost(h.bindings);
     /*
-     * *Keep a car downstairs* is the one plain lever `drivingProfileOf` reads (issue #296), so it
-     * is the one that can make this method disagree with the base profile without the id moving.
+     * *Keep a car downstairs* was the **one** plain lever `drivingProfileOf` read (issue #296);
+     * since § D886 (issue #575) it reads all four, and this case keeps it because it is the one
+     * whose write lands outside the weight vector — `idle.parkingStrategy`, which is what the
+     * assertion below reads. A lever that made this method disagree with the base profile through
+     * `weights` would be measuring the working copy's own seam, which `workshopTravel.test.ts`
+     * measures on the legs; this case is about the host answering with the vector that is actually
+     * driving rather than with the id's profile.
      */
     host.setPlainLever('lobby', true);
     const moved = createEverydayHost(harnessOf({ ...base(), ...h.patches[0] }).bindings);
