@@ -41895,3 +41895,267 @@ What separates the arms is **how long people stood**: **4** people picked up aft
 ### 9. Numbers spent
 
 This lane held **D931–D945** and spent **D931 only**. **D932 to D945 are unspent** and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+---
+
+## D946 — The session-length figures get a second axis, because the rung was pinned and the day was not
+
+**Date: 2026-09-22 · Owner: lane AG-C · Lane block: D946–D960 · Extends: [§ D753](#d753) under [§ D227](#d227) · Cited by: `packages/viz/src/everyday/sittingShape.ts`, `docs/12-design-handoff.md`, `docs/23-audiences-and-core-loop.md`, `docs/32-game-design.md`**
+
+**Decision.** Every session-length figure a player reads is derived from **the day the tile it sits
+on actually opens**, censused over all sixteen contracts, rather than from a span constant that
+happened to be right for some of them. `SITTING_SPANS.campaignStage` is gone and
+`SITTING_SPANS.careerDay` replaces it; `SITTING_SPANS.contractDay` becomes the union of every
+contract's own run length and the authored day's period. The contract half is read **live** from
+`shift/contracts.ts#CONTRACTS`; the `data/` half is declared once and censused by
+`sittingShape.test.ts` through the shipped derivations, `dev/state.ts#shiftLengthForContract` and
+`shift/dayLength.ts#wholeDayFor` / `#wholeDayRun`.
+
+**Why.** § D753 fixed these five strings by composing them from the **rung**, so a rung move carries
+them, and it was right about the axis it chose. It left the **day** a constant, and a playability
+assessor measured what that cost on the one screen whose whole job is to let a player decide how to
+spend an evening. The rate was not the problem: the assessor played Midtown Office and the playhead
+advanced **4 019 s in 975 s of wall clock**, which is **4.12×** against a tile quoting `4×`. The
+span was.
+
+| tile | it said | the day it opens | at `4×` | out by |
+|---|---|---|---|---|
+| Career | `~4 min a building-day at 4×` | `c1`'s 3 600 s (§ D234) | 15 min | ×3.75 |
+| hub · Today's scenario | `8-15 min a day at 4×` | Midtown's 36 000 s `office-day` | 150 min | ×10 |
+
+**Both spans named a day the tile does not open**, which is the part worth reading twice — this was
+not a stale figure about the right run, it was a current figure about the wrong one.
+`campaignStage` was `data/campaign.json`'s 900 s stage; the Career tile opens
+`host.ts#runCampaignDay`, which writes `shiftLengthS: shiftLengthForContract(tower.id)` over a
+`CampaignTower.id` that **is** a contract id, so a career day is a contract day and never a stage.
+`contractDay` was the 1 800–3 600 s slice; `host.ts#startRun` spreads `wholeDayRun(day)` into the
+patch for any building `wholeDayFor` answers for.
+
+**The census, all sixteen, before and after.** `career` is `shiftLengthForContract(id)`; `scenario`
+is the authored day where the building's own directional mix matches a day record's peak, else the
+slice.
+
+| contract | building | career s | scenario s | advertised before (career · scenario) | advertised now (career · scenario) |
+|---|---|---|---|---|---|
+| `c1` | garden-apartments | 3 600 | 3 600 | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c6` | chancery-house | 1 800 | **36 000** | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c8` | st-jude-hospital | 1 800 | 1 800 | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c9` | harbour-point | 1 800 | **36 000** | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c2` | midtown-office | 1 800 | **36 000** | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c7` | crown-hotel | 1 800 | 1 800 | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c3` | secure-tower | 1 800 | **36 000** | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c10` | ashgate | 1 800 | **36 000** | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c4` | mixed-use-high-rise | 1 800 | **36 000** | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c13` | merdeka-class-reference | 1 800 | **36 000** | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c11` | ctf-class-reference | 1 800 | **36 000** | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c14` | one-wtc-class-reference | 1 800 | **36 000** | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c12` | shanghai-class-reference | 1 800 | **36 000** | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c5` | vertical-city | 1 800 | **36 000** | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c16` | willis-class-reference | 1 800 | **36 000** | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+| `c15` | empire-state-class-reference | 1 800 | **36 000** | ~4 min · 8-15 min | 8-15 min · 8 min-2 h 30 |
+
+**Thirteen of sixteen, not five.** The brief this lane was given said five office contracts run
+36 000 s, which was true when it was written and had been overtaken by the six reference towers
+that landed on 2026-09-15 and by `c9`/`c10`. That is the same defect one level up — a count in
+prose about a set that grows — and it is the reason this entry states the derivation rather than
+the number: `wholeDayFor` admits a building structurally, by its profile's own directional mix, so
+a tower authored tomorrow joins or does not join without a line moving.
+
+**The strings.**
+
+| surface | was | is |
+|---|---|---|
+| Scenario tile | `8-23 min at 4×, skippable · …` | ``8 min-2 h 30 at 4×, skippable · …`` |
+| Career tile | `~4 min a building-day at 4× · …` | ``8-15 min a building-day at 4× · …`` |
+| hub · Today's scenario | `8-15 min a day at 4× · …` | ``8 min-2 h 30 a day at 4× · …`` |
+| Rush tile, hub · Fix a building | unchanged | unchanged |
+
+**A third constant that happened to be right, found on the way.** `SCENARIO_HUB_SPAN` was written
+as `contractDay.lowSimS` to `fixCase.highSimS` — a union spelled out by naming the two fields that
+were then the extremes. The moment the contract day passed the fix case it became a figure
+advertising the shorter of what the tile reaches, which is exactly the class this entry is about.
+It is `unionOf(contractDay, fixCase)` now.
+
+**Hours, and where the boundary is.** 150 minutes is true and is the wrong size of unit for a
+decision about an evening, so a figure of ninety minutes or more is drawn as `2 h 30`. The minutes
+are computed first and then formatted, so `sittingMinutes`' `Math.ceil` remains the only rounding
+in the module — an hours form that divided the seconds again would have a second one, and § D753's
+rule 2 is about there being exactly one.
+
+**What is derived live and what is pinned, said precisely.** The contract's own length is read from
+`CONTRACTS` at module load, so a contract authored at a new length moves these strings on its own
+commit with no document to remember. The authored day's period **cannot** be: it lives in
+`data/traffic-profiles.json` behind an async load, and `SITTING_SHAPES` is a frozen module constant
+that `honesty/surfaces.ts` sweeps without resources. So it is declared with its source and
+`sittingShape.test.ts` censuses `wholeDayFor` over all sixteen contracts' buildings, asserting the
+published span brackets every one **exactly** — both ends attained, no contract outside — plus a
+negative control that the two tiles really do open different days in both directions. A day record
+authored at a new period, a building that gains or loses a day, and a contract authored at a new
+length are each a red test on the commit that lands them.
+
+**Three documents follow the derivation rather than the other way round**, which is this
+repository's rule about which of the two is canonical. `docs/23` § 4.1's *"by a factor of four"*
+becomes *three at the bottom and fifty at the top*; `docs/32` § 7.2's first session *"ends its
+second turn between minute 21 and minute 38"* becomes **minute 173**; `docs/12` § 5's *"out by
+roughly a factor of four"* is corrected the same way. Each keeps its old figure beside the new one
+with the reason, under § D227 — a corrected number with its predecessor deleted reads as a number
+nobody has ever had to check.
+
+**What this does not settle.** Whether a two-and-a-half-hour *Today's scenario* is the right
+content is a design question and is not this entry's; what is fixed is that the tile says so. The
+lane's own reading is that the figure now argues for a windowed day rather than for a reworded
+tile, and `shift/dayLength.ts` already has the seam for one — but changing what a press runs is not
+a correction to a string, and doing it inside this change would have hidden a content decision
+inside a typography fix.
+
+---
+
+## D947 — The stage's opening overlay is gated on the playhead, not on a latch, because *Skip to the end* left it claiming the day had not begun
+
+**Date: 2026-09-22 · Owner: lane AG-C · Lane block: D946–D960 · Under: [§ D227](#d227) · Cited by: `packages/viz/src/everyday/stageScreenModel.ts`, `packages/viz/src/everyday/stageScreen.ts`, `packages/viz/src/everyday/stageSkip.test.ts`**
+
+**Decision.** `stageScreenModel.ts#stageShowsOpening` decides whether § 7.3's opening overlay is up:
+`!started && simTimeS <= recording.startedAt`. `stageScreen.ts#syncTransport` asks it instead of
+reading `!started`, and `skipToEnd` sets `started = true` as its first line.
+
+**Why.** A playability assessor pressed *Skip to the end*, watched the day's closing figures arrive,
+and read — twice — *"at 0:00 of 10:00:00 … Paused at 18:00, the start of the day. Nothing has
+happened yet"* over them. Every clause was false about the run standing on the screen. The
+mechanism is three lines long: `started` was latched in `togglePlay` and nowhere else, and
+`skipToEnd` calls `play()` and `seekTo(endedAt)` on the transport and touched no flag, so the
+overlay stayed up over a finished day.
+
+**It is `AX` as well as § D227**, which is why the fix is a predicate and not a fourth line. The
+stage canvas's accessible name and its polite live region both carry this surface, so a
+screen-reader user who arrives after a skip is *told* the day has not begun, with no picture to
+contradict it. A latch records an **intent**; the sentence is a claim about a **position**. Setting
+the flag closes the reported press and leaves the class open — any later control that moves the
+playhead without going through *Play* brings the defect back in the same words — so the mount now
+asks the position, and the flag is belt to the predicate's braces.
+
+`simTimeS <= startedAt` rather than `=== startedAt`: a transport clamped to its own first frame may
+report a hair under it, and an overlay that flickered off at the start would be this defect with
+its sign flipped.
+
+**Pinned by a run rather than by this paragraph.** `stageSkip.test.ts` asserts the overlay is up
+before the first press, gone after the skip, gone on a moved playhead **with the latch left where
+the defect left it**, and that the sentence it guards is still word for word the one the assessor
+read — a reword that left it reachable fails there rather than passing as a test about nothing. One
+source read holds the mount to the two lines, `stageScreen.test.ts`' own idiom.
+
+---
+
+## D948 — An unknown dispatcher id keeps its silent fallback, and the refusal that makes that honest is pinned
+
+**Date: 2026-09-22 · Owner: lane AG-C · Lane block: D946–D960 · Under: [§ D227](#d227) · Cited by: `packages/viz/src/dev/state.ts`, `packages/viz/src/scope/runIdentity.test.ts`**
+
+**Decision.** `dev/state.ts#profileById` keeps resolving an id nothing ships and nothing saved to
+the **first shipped profile**. It is not made to throw. The reasoning is in its docstring, and the
+one thing that keeps it from being a false claim is asserted by a run.
+
+**Why it is not a lie, and why that was checked rather than assumed.** A playability assessor put
+four ids that do not exist through this seam and got four runs whose legs hashed identically to
+`nearest-car`'s — `data/dispatcher-profiles.json`'s first row — and said plainly that nothing
+surfaces the substitution to a player. That is right, and the reason is that no shipped path can
+produce an unknown id: `deepLinkStateOf` drops a `?dispatcher` the file does not ship rather than
+coercing it, `withDispatcher` writes from the list the player picked from, and `initialState` seeds
+`preferredDispatcher`. What is left is **persisted state that has aged** — a profile renamed or
+withdrawn from `data/` under a saved `viewer.dispatcherId`.
+
+**So the two candidate behaviours are: substitute, or throw on a load path.** Throwing hands a
+player a blank page for a tower they have a week saved on, over a state they did not create and
+cannot see. That is the worse failure, so the fallback stays — a robustness decision taken on its
+merits rather than a defect left standing.
+
+**What would make it dishonest is already refused, and now has a test.** `runSubmissionOf` sends
+`state.dispatcherId`, **not** the profile that drove, so a posted run on a substituted dispatcher
+would name one that did not drive it. `scope/runIdentity.ts` gives `viewer.dispatcherId` an issue
+for exactly this state, so the run cannot reach a board or a share link; `runIdentity.test.ts` now
+asserts that in both directions — the unknown id refused and named, the shipped id accepted —
+because a docstring asserting a mechanism with no run behind it is this repository's stale refusal
+one level up.
+
+**The line to watch, stated so it is not rediscovered.** A surface that names today's driver from
+`state.dispatcherId` rather than from the resolved profile turns this decision into a false
+statement on the screen. Every shipped one reads the resolved profile's `name`. **One thing found
+and deliberately not fixed:** that refusal's wording — *"saved on this device alone and
+data/dispatcher-profiles.json does not ship it"* — is false for an id saved nowhere, which is a
+§ D227 defect in the refusal itself. It is reported rather than reworded here, because the string
+belongs to a module this lane is not otherwise touching and a one-word edit to a refusal is exactly
+the kind of change that should arrive with its own test.
+
+---
+
+## D949 — The stage's parking press is not told to say it does nothing, because the derivation that would have let it say so is false
+
+**Date: 2026-09-22 · Owner: lane AG-C · Lane block: D946–D960 · Under: [§ D227](#d227), [§ D177](#d177), [§ D256](#d256) · Cited by: `packages/viz/src/everyday/stageHandover.test.ts`**
+
+**Decision.** § 7.6's two parking arms are **left exactly as they are**. No refusal and no note is
+added to them, and `live/interventions.ts` gains no parking predicate. What is added is the
+measurement that refused the fix, in `stageHandover.test.ts`.
+
+**What was asked for.** A playability assessor pressed *spread the cars* on a day driven by
+`zoned-uppeak`, measured **0 of 355 legs** changed, and read nothing on the screen. That is § D227's
+first polarity — *a control that does nothing must say so* — and it is the same shape § D856 closed
+on the handover picker one arm over, so the obvious move is the same one: a predicate in
+`live/interventions.ts`, a `refusal` on the row, and the sentence a player reads.
+
+**Why it looked derivable, which is the part to read before anybody tries again.**
+`data/dispatcher-profiles.json` gives `zoned-uppeak` `idle.parkingStrategy: "zone-center"`.
+`sim/simulation.ts#idleOverrideAt` sets exactly `'zone-center'` for a `spread-cars` entry and
+nothing else — the deadband and the energy exchange rate stay authored, because the player said
+*where*, not *at what price*. `dispatch/lifecycle.ts#repositionDecisionFor` then reads **every**
+stage-7 setting off one `effective` config, which the override differs from in no value at all. So
+the press writes the value already in force, the kernel is handed the same numbers, and the run
+cannot move. The assessor's 0 of 355 is what the data predicts. That argument was written, the
+predicate was built against it, and the refusal fired on exactly the cell the assessor reported.
+
+**It is false, and it was caught by running it rather than by reading it further.** Swept over
+**two buildings × three shift lengths × three dispatchers × both arms**, 36 cells, each arm stamped
+at 28 % of the shift and compared **on the legs** — `(passengerId, carId, boardedAt)`, never a
+window statistic:
+
+| cell | driving profile's strategy | press | legs move? | the predicate said |
+|---|---|---|---|---|
+| `midtown-office` 1 800 s, `zoned-uppeak` | `zone-center` | spread | **no** | refuse — correct |
+| `midtown-office` 3 600 s, `zoned-uppeak` | `zone-center` | spread | **no** | refuse — correct |
+| `garden-apartments` **900 s**, `zoned-uppeak` | `zone-center` | spread | **yes** | refuse — **false refusal** |
+| `garden-apartments` **1 800 s**, `zoned-uppeak` | `zone-center` | spread | **yes** | refuse — **false refusal** |
+| `garden-apartments` 3 600 s, `zoned-uppeak` | `zone-center` | spread | no | refuse — correct |
+
+**Two false refusals in thirty-six cells.** A refusal on a live control tells a player the product
+is smaller than it is, which is § D177's inert-control class with its polarity reversed — the exact
+failure the refusal existed to prevent, arriving as the fix for it. So it is not shipped.
+
+**No mechanism is offered for the two cells**, on § D256's rule. The override is value-identical to
+the config it replaces and every read goes through one `effective` object, so the run *should* be
+byte-identical and is not; establishing why means measuring inside `core`, which is not this lane's
+module and not this lane's budget. A plausible sentence in place of that measurement is what § D256
+refuses. What is measured and stated is the **negative**: the press's inertness is **not** a
+function of the driving profile's declared parking strategy, so nothing on the stage can read that
+profile and say in advance what the press will do.
+
+**The three things this rules out for whoever takes it next**, so the afternoon is not spent twice:
+
+1. **A refusal derived from `idle.parkingStrategy` is wrong.** Measured above.
+2. **A `note` instead of a refusal has nowhere to go.** `everyday/stageScreen.ts:1784` draws
+   `StageInterventionRow.note` for the **handover row only** — `interventionNote.textContent =
+   switchRow?.note ?? ''`. A note on a parking row is a string no surface renders, which is the dead
+   seam `CLAUDE.md` names eleven times. Saying it costs a DOM element per arm and a browser-tier
+   case, which is a mount change rather than a model one.
+3. **Simulating both arms to decide is not available**, because `stageInterventionsOf` is asked on
+   frames and the answer would cost a whole run per arm per frame.
+
+**What would actually close #565's third defect** is a measurement inside `core` of why a
+value-identical `idleOverride` moves a run at all. If the answer is *it should not*, the press
+becomes genuinely derivable and the predicate above is correct as written. If the answer is *it
+legitimately can*, then the screen's honest move is a note drawn **after** the press — the stamp
+already says what was pressed, and what is missing is the sheet saying it changed nothing, which is
+a claim about a run that has happened and therefore one the product can make truthfully.
+
+**What is kept.** `stageHandover.test.ts` carries three cells of the sweep as a standing pin: the
+press is inert under `zoned-uppeak` on the office tower, **live under the same dispatcher on the
+residential block**, and live on that same office tower under `collective`. The third is the control
+that stops the first from being a building on which nothing ever repositions. A lane that makes the
+press derivable will find these three red or green in the right pattern; a lane that assumes the
+derivation without running it will find the second one red on its first try.

@@ -567,6 +567,44 @@ export function stageMayAdopt(input: {
  *
  * Its one non-test caller is `everyday/stageScreen.ts`'s `syncTransport`.
  */
+/**
+ * **Whether § 7.3's opening overlay may still be up** — GitHub issue #565's third defect,
+ * [§ D947](../../../../DECISIONS.md).
+ *
+ * A playability assessor pressed *Skip to the end*, watched the day's finished figures arrive, and
+ * read — twice — an overlay saying *"Paused at 18:00, the start of the day. Nothing has happened
+ * yet"* over them. Every word of it was false, and it was false on the stage's **accessible**
+ * surface as well as its visible one: a screen-reader user who arrives at the canvas after a skip
+ * is told the day has not begun.
+ *
+ * ## Why a predicate and not just a flag
+ *
+ * `stageScreen.ts` latched a `started` boolean on *Play* and nothing else, so `skipToEnd` — which
+ * calls `play()` and `seekTo(endedAt)` on the transport and touches no flag — left the overlay up.
+ * Setting the flag there too is half the fix and is done; it is not the whole of it, because a
+ * flag records an **intent** and the overlay is a claim about a **position**. Any future control
+ * that moves the playhead without going through *Play* would reintroduce exactly this defect, and
+ * the sentence it draws would be wrong in the same words. So the mount asks this instead: the
+ * opening is up only while the day has not been started *and* the playhead is still standing at
+ * the first instant of it.
+ *
+ * `simTimeS <= startedAt` rather than `=== startedAt`, because a transport clamped to its own
+ * first frame may report a hair under it and an overlay that flickered off at the start would be
+ * this defect with its sign flipped.
+ *
+ * Its one non-test caller is `everyday/stageScreen.ts#syncTransport`.
+ */
+export function stageShowsOpening(input: {
+  /** Whether a player has pressed *Play* on this recording. */
+  readonly started: boolean;
+  /** The transport's playhead now. */
+  readonly simTimeS: number;
+  /** The recording on the stage — `startedAt` is the instant the opening line describes. */
+  readonly recording: { readonly startedAt: number };
+}): boolean {
+  return !input.started && input.simTimeS <= input.recording.startedAt;
+}
+
 export function stageOpeningLineOf(input: {
   readonly recording: VizRecording;
   readonly simTimeS: number;

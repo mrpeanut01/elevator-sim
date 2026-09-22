@@ -1381,6 +1381,35 @@ export function allDispatchers(
   return [...resources.dispatcherProfiles.profiles, ...saved.map((entry) => entry.profile)];
 }
 
+/**
+ * The dispatcher an id names, or — for an id nothing ships and nothing saved — **the first shipped
+ * profile**, silently.
+ *
+ * ## The fallback is deliberate, and this is the reasoning rather than an apology — § D948
+ *
+ * A playability assessor put four ids that do not exist into this seam and got four runs whose
+ * legs hashed identically to `nearest-car`'s, which is `data/dispatcher-profiles.json`'s first
+ * row. They were right to say it is **not a lie to a player**: nothing in either shell shows the
+ * substitution, because nothing in either shell can produce an unknown id in the first place.
+ * `deepLinkStateOf` drops a `?dispatcher` the file does not ship rather than coercing it,
+ * `withDispatcher` writes from the list the player picked from, and `initialState` seeds
+ * `preferredDispatcher`. What is left is **persisted state that has aged** — a profile renamed or
+ * withdrawn from `data/` under a saved `viewer.dispatcherId` — and on that state the two
+ * candidate behaviours are: substitute a dispatcher, or throw on the load path and hand the player
+ * a blank page for a tower they have a week saved on.
+ *
+ * Throwing is the worse of the two, so the fallback stays. **What would make it dishonest is
+ * already refused**: `scope/runIdentity.ts` gives `viewer.dispatcherId` an issue for exactly this
+ * state, so a run built on a substituted dispatcher cannot reach a board or a share link, where
+ * the submission's `dispatcherProfileId` — which is `state.dispatcherId`, not this function's
+ * answer — would name a dispatcher that did not drive it. `runIdentity.test.ts` pins that, because
+ * a docstring asserting a mechanism and no run asserting it is what `CLAUDE.md` calls the stale
+ * refusal one level up.
+ *
+ * **The line to watch**, stated so the next reader has it: a surface that names today's driver
+ * from `state.dispatcherId` rather than from what this function returns turns a robustness
+ * decision into a false statement. Every shipped one reads the resolved profile's `name`.
+ */
 export function profileById(
   resources: BrowserResources,
   saved: readonly SavedDispatcher[],
