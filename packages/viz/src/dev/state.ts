@@ -91,7 +91,7 @@ import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts
 import { firstSessionContractFor } from '../shift/firstSession.js';
 import { runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
 import { SHIFT_EVENTS, eventById, shiftRunPatch, baseDemandOf } from '../shift/events.js';
-import { ladderTowerConfig, rungFor } from '../shift/ladder.js';
+import { ladderTowerConfig, rungFor, rungIncidents } from '../shift/ladder.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
 import { shiftReportWindowFor } from '../shift/reportWindow.js';
@@ -1977,7 +1977,24 @@ export function shiftRunConfigOf(
    * check written here. `grownBuilding` already established that pattern: a building edit goes back
    * through the loader like any other.
    */
-  const withEvents = withIncidents(calendar.building, patch.incidents, state.shiftLengthS);
+  const withEvents = withIncidents(
+    calendar.building,
+    /*
+     * **The rung's own absences first, then the day's** — [§ D871](../../../../DECISIONS.md),
+     * `shift/ladder.ts#ContractFabric.incidents`. A contract may declare a car that leaves
+     * passenger service part-way through every day it runs; a drawn wrinkle may take another. The
+     * order decides nothing about the run — `serviceEventsFor` sorts what it emits by
+     * `(atS, bankId, carId)` — and is written this way so the list reads the way a reader meets the
+     * two facts: what this tower is, then what happened today.
+     *
+     * Two entries naming the same car would schedule two `out-of-service` events on it, which
+     * `core` handles as a mode set twice; nothing here dedupes, because a rung naming a car is a
+     * declaration the contract's brief carries and silently dropping the day's draw over it would
+     * be the caption-that-does-not-describe-the-picture defect one field over.
+     */
+    [...rungIncidents(rung), ...patch.incidents],
+    state.shiftLengthS,
+  );
   const finalBuilding =
     withEvents === grown ? building : resolveBuilding(parseBuilding(withEvents as unknown), specs);
 

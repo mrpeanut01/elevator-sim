@@ -42,7 +42,7 @@
  * own words that whether the crowd is comfortable is the day's to show. GitHub issue #208.
  */
 
-import type { ResolvedBuilding } from '@elevator-sim/core/browser';
+import { isServiceModeEvent, type ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { scheduledEventFor } from '../shift/calendar.js';
@@ -56,8 +56,13 @@ import { speedFigure, type EverydayUnits } from './units.js';
 
 /** § 6.2's out-of-service strip: the lettered badge, and the sentence beside it. */
 export interface OutOfServiceStrip {
-  /** The car the run actually holds — `carsToDerate`'s choice, not a guess. */
+  /**
+   * The cars the run actually loses, joined — `carsToDerate`'s choice for the day's wrinkle and the
+   * tower's own booked absences beside it ([§ D871](../../../../DECISIONS.md)), never a guess at
+   * either.
+   */
   readonly badge: string;
+  /** One sentence per cause, joined. See {@link outOfServiceOf} for why they are not merged. */
   readonly sentence: string;
 }
 
@@ -95,6 +100,22 @@ export interface TodayRecord {
   readonly wrinkle: ShiftEvent;
   /** § 6.2's strip, or `undefined` on a day that holds no car. */
   readonly outOfService: OutOfServiceStrip | undefined;
+  /**
+   * The cars that are **not in the building at all today** — the day's wrinkle's holds, and only
+   * those ([§ D871](../../../../DECISIONS.md)).
+   *
+   * A field rather than a count recovered from {@link OutOfServiceStrip.badge}, and the correction
+   * is the reason it exists. `briefScreen.ts` drew the tower's elevation with
+   * `carsToDerate(building, badge.split(' · ').length)` — which was right while the badge held
+   * exactly the wrinkle's cars and became wrong the moment it could also hold one the *tower* books
+   * out mid-shift: on Crown Hotel the strip names car `D` and `carsToDerate(building, 1)` answers
+   * car `S`, so the picture would have greyed a lift the sentence beside it does not name.
+   *
+   * And the deeper half: a car booked out at half past eight **is running when the day opens**, so
+   * an elevation drawn for the first frame must not grey it at all. This field is *whole-day*
+   * holds by construction, which is the question that picture is asking.
+   */
+  readonly heldCarIds: readonly string[];
   /** § 6.2's five rows. Shorter when the building document could not be resolved. */
   readonly facts: readonly TodayFact[];
   /** § 6.2's tinted panel, or `undefined` with no building to divide. */
@@ -198,27 +219,97 @@ function carsHeldBy(event: ShiftEvent): number {
 }
 
 /**
+ * Cars this **tower's own schedule** takes out of passenger service after the day has started —
+ * `shift/ladder.ts#ContractFabric.incidents`, [§ D871](../../../../DECISIONS.md).
+ *
+ * Read off `building.serviceEvents` rather than off the rung, and that is the whole reason this
+ * sentence can be trusted: the building handed back here is the run's own
+ * (`dev/state.ts#resolvedBuildingOf` is `shiftRunConfigOf(...).building`), so the strip names the
+ * car the kernel will actually stand down. A second reading of the ladder would be two answers to
+ * *which lift is away* — the caption-that-does-not-describe-the-picture defect this file's
+ * neighbours have recorded a dozen times.
+ *
+ * `atS > 0` is what makes this *part-way through today* rather than *not in the building*: a car
+ * stood down at the first instant is the second thing, and `carsOutOfService` is where that lives.
+ *
+ * Returns each car once, with whether the same schedule brings it back, so the sentence can say the
+ * true one of two things rather than the safe one of one.
+ */
+function scheduledAwayOf(
+  building: ResolvedBuilding | undefined,
+): readonly { readonly carId: string; readonly returns: boolean }[] {
+  /*
+   * `isServiceModeEvent` rather than a field test: `ResolvedServiceEvent` is a union of a mode
+   * change, a derate and a range change (§ D523), and only the first has a `mode` and a `carId` at
+   * all. `core` exports the predicate for exactly this, and `shift/incidents.test.ts` narrows the
+   * same way.
+   */
+  const events = (building?.serviceEvents ?? []).filter(isServiceModeEvent);
+  const leaves = events.filter((entry) => entry.mode === 'out-of-service' && entry.atS > 0);
+  const seen = new Map<string, { carId: string; returns: boolean }>();
+  for (const leaving of leaves) {
+    if (seen.has(leaving.carId)) continue;
+    seen.set(leaving.carId, {
+      carId: leaving.carId,
+      returns: events.some(
+        (entry) =>
+          entry.carId === leaving.carId && entry.mode === 'in-service' && entry.atS > leaving.atS,
+      ),
+    });
+  }
+  return [...seen.values()].sort((a, b) => a.carId.localeCompare(b.carId));
+}
+
+/**
  * The strip, or nothing. The badge is the held car's own id — `carsToDerate`'s first choice, which
  * is the same car the run holds, because it is the same call.
+ *
+ * **Two kinds of absence, one strip** — [§ D871](../../../../DECISIONS.md). The day's wrinkle may
+ * hold a car for the whole morning, and the *tower* may book one out part-way through every day it
+ * runs ({@link scheduledAwayOf}). They are separate facts with separate causes, and a player meets
+ * them as one question — *which lifts will I not have?* — so they share the badge and get a
+ * sentence each. A strip that drew only the first would have gone quiet on the one absence the
+ * player can still do something about.
  */
 function outOfServiceOf(
   building: ResolvedBuilding | undefined,
   event: ShiftEvent,
 ): OutOfServiceStrip | undefined {
+  if (building === undefined) return undefined;
   const held = carsHeldBy(event);
-  if (held === 0 || building === undefined) return undefined;
-  const choice = carsToDerate(building, held);
-  const first = choice.held[0];
-  if (first === undefined) return undefined;
-  const names = choice.held.map((car) => car.carId);
+  const heldNames = held === 0 ? [] : carsToDerate(building, held).held.map((car) => car.carId);
+  const scheduled = scheduledAwayOf(building);
+  const names = [...new Set([...heldNames, ...scheduled.map((entry) => entry.carId)])];
+  if (names.length === 0) return undefined;
   const badge = names.join(' · ');
-  /*
-   * The event's note says *when* — *"for the first two thirds of the shift"*, *"for the whole
-   * shift"* — and it says it in the design's words. This sentence names the car and defers to that
-   * note rather than restating a duration it would then own a second copy of.
-   */
-  const which = names.length === 1 ? `Car ${first.carId} is` : `Cars ${badge} are`;
-  return { badge, sentence: `${which} out of service today. ${event.note}` };
+  const sentences: string[] = [];
+  if (heldNames.length > 0) {
+    /*
+     * The event's note says *when* — *"for the first two thirds of the shift"*, *"for the whole
+     * shift"* — and it says it in the design's words. This sentence names the car and defers to that
+     * note rather than restating a duration it would then own a second copy of.
+     */
+    const first = heldNames[0] ?? '';
+    const which = heldNames.length === 1 ? `Car ${first} is` : `Cars ${heldNames.join(' · ')} are`;
+    sentences.push(`${which} out of service today. ${event.note}`);
+  }
+  for (const entry of scheduled) {
+    /*
+     * No clock and no fraction. The strip is drawn before the run, and the instant is the run's to
+     * show — a time printed here would be a figure whose only source is a schedule the reader
+     * cannot see, and this file's neighbours already carry the rule that a figure needs a source a
+     * reader can reach. What the sentence owes is the *decision*: the cars that are left are the
+     * ones the stage's own arms move.
+     */
+    sentences.push(
+      entry.returns
+        ? `Car ${entry.carId} is booked out of passenger service part-way through today and comes ` +
+          'back before the end. What the cars that are left do while it is away is yours to change.'
+        : `Car ${entry.carId} is booked out of passenger service part-way through today and does ` +
+          'not come back. What the cars that are left do after it goes is yours to change.',
+    );
+  }
+  return { badge, sentence: sentences.join(' ') };
 }
 
 /** § 6.2's five rows, from the resolved building. Empty when there is no document to read. */
@@ -377,6 +468,15 @@ export function todayOf(input: TodayInput): TodayRecord {
     lede: ledeOf(building, event, held),
     wrinkle: event,
     outOfService: outOfServiceOf(building, event),
+    /*
+     * The same call the run makes, and the same call the strip's own badge half makes — one
+     * `carsToDerate` per day record rather than one per reader. See the field's docstring for the
+     * defect that made it a field.
+     */
+    heldCarIds:
+      building === undefined || carsHeldBy(event) === 0
+        ? []
+        : carsToDerate(building, carsHeldBy(event)).held.map((car) => car.carId),
     facts: factsOf(building, held, input.units),
     load: loadOf(building, held),
     asks: input.goals.map((reading) => reading.goal.label),

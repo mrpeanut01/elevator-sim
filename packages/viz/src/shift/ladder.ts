@@ -28,6 +28,17 @@
  * | {@link ContractLadderRow.arrivalRatePctPop5min} | **demand** | `dev/state.ts#shiftRunConfigOf` writes it into the run's `demand`, where Free Play's own rate would go |
  * | {@link ContractFabric.occupancy} | **fabric** | `shift/growth.ts#scaledBuilding`, the same seam the overnight fill runs through |
  * | {@link ContractFabric.banks} | **fabric** | `commissioning/building.ts#commissionedBuilding`, the seam the player's own shaft and machine choices already run through |
+ * | {@link ContractFabric.incidents} | **fabric** | `shift/incidents.ts#withIncidents`, the seam a drawn wrinkle's derate already runs through |
+ *
+ * **The fourth row is [§ D871](../../../../DECISIONS.md) and it is DC-R1's own line**, not a
+ * widening of it: `docs/33` DC-R1's fabric substrate lists *availability — a car out of service, a
+ * bank derated* and names `shift/incidents.ts` and `shift/events.ts` as where it is declared. Until
+ * this row the only thing that could declare one was a **drawn wrinkle**, which is chosen by
+ * `(day, dayIdx)` and is therefore the same on every contract's day 1. A contract could say how
+ * many people were in its tower and could not say that one of its cars leaves passenger service at
+ * half past eight — which is the one fabric fact a player can still do something about while the
+ * day is running. See {@link ContractFabric.incidents} for why that matters and
+ * `data/contract-ladder.json`'s `c7` row for the measurement.
  *
  * **There is deliberately no bar here, and no goal, and no tier.** `docs/33` § 4.3 and `CLAUDE.md`
  * both forbid buying difficulty by moving the mark, and the schema is where that refusal is cheapest
@@ -84,11 +95,17 @@
  * expressible here until `scheduledEventFor` carries the contract. Naming it is what stops the next
  * reader assuming it was overlooked.
  *
- * ## No `DECISIONS.md` number
+ * ## The `DECISIONS.md` numbers
  *
- * [§ D405](../../../../DECISIONS.md): a number is allocated to a lane before it starts, and this
- * lane has no block. The decisions here are local to this module and to `docs/33` § 4.7, which is
- * the document that governs them; this docstring is the record § D405 says it is.
+ * This module shipped without one and said so: [§ D405](../../../../DECISIONS.md) allocates a
+ * number to a lane before it starts, the lane that wrote this file had no block, and every decision
+ * it took was local to this module and to `docs/33` § 4.7. That paragraph is kept as the record it
+ * was.
+ *
+ * {@link ContractFabric.incidents} is the first thing here that reaches past this module — it binds
+ * `dev/state.ts#shiftRunConfigOf` to hand a rung's absences to `shift/incidents.ts#withIncidents`,
+ * and it gives `data/contract-ladder.json` a fourth authorable fact — so it carries
+ * [§ D871](../../../../DECISIONS.md), which is what § D405 asks for in exactly that case.
  */
 
 // Named `ladderDocument` rather than `document`: `boundaries.test.ts` confines the DOM to the dev
@@ -110,6 +127,7 @@ import { commissionableClasses, type BankChoice } from '../commissioning/types.j
 
 import { contractForBuilding, CONTRACTS } from './contracts.js';
 import { scaledBuilding } from './growth.js';
+import { INCIDENT_KINDS, type Incident, type IncidentKind } from './incidents.js';
 
 /** What the design intends a contract to be, so the measurement has something to disagree with. */
 export interface ContractIntent {
@@ -166,6 +184,53 @@ export interface ContractFabric {
    */
   readonly occupancy: number;
   readonly banks: readonly BankChoice[];
+  /**
+   * Cars this contract's tower loses for part of every day it runs — **fabric, and the only one of
+   * the three substrates that arrives while the player is watching** ([§ D871](../../../../DECISIONS.md)).
+   *
+   * ## Why a contract needs one and a wrinkle would not do
+   *
+   * A drawn wrinkle (`shift/events.ts#eventFor`) is pure in `(day, dayIdx)`, so *the day 1 that
+   * every contract's opening day is* draws the same wrinkle on all sixteen towers. Booking a car
+   * out on day 1 to give one tower a decision would give it to every tower, and would re-derive
+   * every figure this repository has pinned at day 1. A rung is per contract by construction, so
+   * this is the narrow declaration the broad one could not be.
+   *
+   * ## What it is not
+   *
+   * Not a hidden bar. The building is a real `BuildingConfig` with real `serviceEvents` on it,
+   * written through `shift/incidents.ts#withIncidents` — the seam a wrinkle's derate already uses —
+   * and re-parsed and re-resolved like every other edit, so a car this names that no bank declares
+   * is refused by `core`'s own service-event codes. Nothing about any goal moves.
+   *
+   * ## Fractions, not clocks
+   *
+   * `shift/incidents.ts#Incident`'s own units and its own reason: a shift is fifteen minutes to a
+   * whole authored day long, and an absolute hour would be false at most of them.
+   *
+   * **A contract that declares none runs the building it always ran** — `withIncidents` returns its
+   * input object for an empty list, so the identity is structural rather than promised.
+   */
+  readonly incidents: readonly ContractIncident[];
+}
+
+/**
+ * One car this contract's tower loses, and when.
+ *
+ * The same four facts `shift/incidents.ts#Incident` carries, with the car named as a `(bankId,
+ * carId)` pair rather than chosen by `carsToDerate`. **Named rather than counted**, and that is the
+ * difference between a fabric declaration and a draw: `carsToDerate` picks whichever car it picks,
+ * and a contract whose brief tells the player *which* lift is away has to be able to say which.
+ */
+export interface ContractIncident {
+  /** `shift/incidents.ts#INCIDENT_KINDS` — what kind of absence this is, in the report's words. */
+  readonly kind: IncidentKind;
+  readonly bankId: string;
+  readonly carId: string;
+  /** Fraction of the run's own length at which the car leaves passenger service, `0`–`1`. */
+  readonly fromFraction: number;
+  /** When it comes back. At or beyond `1` it does not — see `shift/incidents.ts#Incident`. */
+  readonly toFraction: number;
 }
 
 /**
@@ -229,10 +294,47 @@ function asNumber(value: unknown): number | undefined {
 function fabricOf(value: unknown): ContractFabric {
   const record = asRecord(value);
   const banks = Array.isArray(record['banks']) ? (record['banks'] as unknown[]) : [];
+  const incidents = Array.isArray(record['incidents']) ? (record['incidents'] as unknown[]) : [];
   return Object.freeze({
     occupancy: asNumber(record['occupancy']) ?? 1,
     banks: Object.freeze(banks.map(bankChoiceOf)),
+    incidents: Object.freeze(incidents.map(contractIncidentOf)),
   });
+}
+
+/*
+ * Structure only, `bankChoiceOf`'s footing exactly. A kind this table does not know becomes the
+ * empty string rather than a default member, so `contractLadderIssues` reports it by name instead
+ * of a rung silently running a `breakdown` somebody spelled wrong.
+ */
+function contractIncidentOf(value: unknown): ContractIncident {
+  const record = asRecord(value);
+  const kind = asString(record['kind']);
+  return Object.freeze({
+    kind: kind as IncidentKind,
+    bankId: asString(record['bankId']),
+    carId: asString(record['carId']),
+    fromFraction: asNumber(record['fromFraction']) ?? -1,
+    toFraction: asNumber(record['toFraction']) ?? -1,
+  });
+}
+
+/**
+ * A rung's declared absences as the shape the run's own seam takes.
+ *
+ * One expression rather than a mapping at the call site, for `ladderTowerConfig`'s reason: the
+ * thing `dev/state.ts#shiftRunConfigOf` hands `withIncidents` and the thing this file validates
+ * have to be the same list, or a rung could pass `contractLadderIssues` and reach the kernel as
+ * something else.
+ */
+export function rungIncidents(rung: ContractLadderRow | undefined): readonly Incident[] {
+  if (rung === undefined) return [];
+  return rung.fabric.incidents.map((entry) => ({
+    kind: entry.kind,
+    car: { bankId: entry.bankId, carId: entry.carId },
+    fromFraction: entry.fromFraction,
+    toFraction: entry.toFraction,
+  }));
 }
 
 function bankChoiceOf(value: unknown): BankChoice {
@@ -355,6 +457,14 @@ export interface LadderValidationInput {
    * moves by fabric instead.
    */
   readonly floorProfilesFor: (buildingId: string) => readonly string[] | undefined;
+  /**
+   * Car ids of one bank of the building **as authored**, for {@link ContractIncident} to name one.
+   *
+   * Keyed on the pair rather than on the car alone because two banks may both have a car `A`, and a
+   * rung that took `A` out of the wrong bank would be a legal-looking declaration that removed a
+   * different lift from the one its brief names.
+   */
+  readonly carIdsFor: (buildingId: string, bankId: string) => readonly string[] | undefined;
   /** `id → speed band` from `data/elevator-specs.json`. */
   readonly speedBandFor: (
     machineClassId: string,
@@ -458,6 +568,60 @@ export function contractLadderIssues(
           `ladder row ${row.contractId} runs ${choice.machineClassId} at ` +
             `${String(choice.ratedSpeedMps)} m/s, outside its declared ` +
             `${String(band.min)}–${String(band.max)} m/s`,
+        );
+      }
+    }
+
+    /*
+     * A declared absence names a real car of a real bank, leaves a window that is a window, and
+     * never empties its bank — `carsToDerate`'s own rule (*a bank with no in-service car is a set of
+     * floors nobody can reach, which is a different scenario rather than a busier one*) applied to
+     * the half of the vocabulary that names its car instead of counting.
+     */
+    for (const incident of row.fabric.incidents) {
+      if (!(INCIDENT_KINDS as readonly string[]).includes(incident.kind)) {
+        issues.push(
+          `ladder row ${row.contractId} declares an absence of kind ${JSON.stringify(incident.kind)}, ` +
+            `which is none of ${INCIDENT_KINDS.join(', ')}`,
+        );
+      }
+      const carIds = input.carIdsFor(row.buildingId, incident.bankId);
+      if (carIds === undefined) {
+        issues.push(
+          `ladder row ${row.contractId} takes a car out of bank ${incident.bankId}, which ` +
+            `${row.buildingId} does not have`,
+        );
+      } else if (!carIds.includes(incident.carId)) {
+        issues.push(
+          `ladder row ${row.contractId} takes car ${incident.carId} out of ${row.buildingId}'s ` +
+            `${incident.bankId}, which has ${carIds.join(', ')}`,
+        );
+      } else if (
+        carIds.length <=
+        row.fabric.incidents.filter((other) => other.bankId === incident.bankId).length
+      ) {
+        /*
+         * Counted over the **whole rung**, not one row at a time. A bank of two with two declared
+         * absences empties even though neither entry takes its only car, and a check that asked
+         * about one entry would have passed it — the shape `carsToDerate` avoids by construction
+         * and this vocabulary can express because it names its cars.
+         */
+        issues.push(
+          `ladder row ${row.contractId} takes every car in ${row.buildingId}'s ` +
+            `${incident.bankId}; a bank with none is floors nobody can reach`,
+        );
+      }
+      if (incident.fromFraction < 0 || incident.fromFraction >= 1) {
+        issues.push(
+          `ladder row ${row.contractId} takes ${incident.carId} out at ` +
+            `${String(incident.fromFraction)} of the run, outside [0, 1)`,
+        );
+      }
+      if (incident.toFraction <= incident.fromFraction) {
+        issues.push(
+          `ladder row ${row.contractId} returns ${incident.carId} at ` +
+            `${String(incident.toFraction)}, at or before it leaves at ` +
+            `${String(incident.fromFraction)}; that is an absence that never happened`,
         );
       }
     }

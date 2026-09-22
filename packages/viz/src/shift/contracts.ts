@@ -243,7 +243,7 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     title: 'Both ways at once',
     teaches: 'demand with no dominant direction, and a car unlike its neighbours',
     brief:
-      'Guests arrive and leave all day, so there is no rush hour to point a dispatcher at. Four guest cars share the shaft group with one service lift at 1.75 m/s — less than two thirds their speed. Send it to the wrong call and the guest waits for the slowest car in the building.',
+      'Guests arrive and leave all day, so there is no rush hour to point a dispatcher at. Four guest cars share the shaft group with one service lift at 1.75 m/s — less than two thirds their speed. Send it to the wrong call and the guest waits for the slowest car in the building. And one of the four is booked out for scheduled maintenance for part of every day here and comes back before the end, so for a stretch of the morning the tower is three guest cars and the slow one.',
     needClean: 3,
     reward: 'Split demand · Capacity aware · one spare shaft',
   }),

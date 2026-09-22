@@ -21,6 +21,8 @@ import type { TodayRecord } from './today.js';
 const TODAY: TodayRecord = {
   day: 3,
   weekday: 'Wednesday',
+  /* § D871's whole-day holds; this fixture's day holds no car. */
+  heldCarIds: [],
   dayLabel: 'WEDNESDAY · DAY 3',
   towerName: 'Chancery House',
   lede: 'Fourteen floors and three lifts.',
