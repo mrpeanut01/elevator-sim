@@ -197,7 +197,28 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * on `SITTING_OUT` and registered in `deepTiers.test.ts`, so the ordinary suite never pays for
      * it — which is what makes the annotation honest rather than a budget being satisfied upward.
      */
-    ['viz', { count: 105, totalMs: 126_600_000 }],
+    /*
+     * **105 → 108, and the three are named** — all three are wave AE's
+     * `fixit/theAnswerIsNotPrinted.test.ts`, GitHub issue #566's guard, each at 600 000 ms: the
+     * `beforeAll` that loads `data/`, the role-blind solvability enumeration, and the measurement
+     * that checks every *the worst wait shortens* claim against its own run.
+     *
+     * **They earn the annotation because each one runs simulations rather than reading strings.**
+     * The enumeration plays five editor families singly and then in pairs over parking, then the
+     * repair rows in draw order, on every one of the eighteen shipped fix cases, and stops at the
+     * first route that clears both measured bars — which is how that lane established 12 of 18 are
+     * solvable from the editor alone and corrected § D706 § 1's 1-of-18 to a different question.
+     * The claim measurement plays each repair that promises a shorter worst wait and compares the
+     * legs; it found three shipped promises false. Neither can be done by inspection, and an
+     * annotation shorter than the job it holds is an annotation that fails for a reason that is not
+     * the code.
+     *
+     * **Nothing existing was raised to make room**, which is the ratchet's own condition: the base
+     * at `918bc64` reads 105 above the ceiling summing to 126 600 000 ms, and the head reads 108
+     * summing to 128 400 000 — a difference of exactly 1 800 000 ms, which is 3 × 600 000 and no
+     * more. Derived from the tree on both commits rather than subtracted from this entry.
+     */
+    ['viz', { count: 108, totalMs: 128_400_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this
@@ -222,7 +243,28 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * and only across rows: pressing one row passes against the defect, because the picker opens
      * on stage 1.
      */
-    ['viz-browser', { count: 73, totalMs: 18_300_000 }],
+    /*
+     * **73 → 77, and the four are named** — all four are wave AE's
+     * `everyday/firstTwoMinutes.browser.test.ts`, GitHub issue #569's instrument: the `beforeAll`
+     * that builds and serves the bundle (180 000 ms), and three cases at 240 000–300 000 ms that
+     * drive the shipped bundle at 1440 × 900 for the tutorial footer, the control below the fold
+     * and the primary's own label.
+     *
+     * **They earn it because the three defects they hold were invisible to every other tier.** Each
+     * is a claim about what a first-time player sees in a real viewport — a footer promising two
+     * runs are coming while both are on screen, a control whose bottom edge sat at y ≈ 889 in a
+     * 900 px window, and a button whose words disagreed with the screen it opened. A hit test at a
+     * declared viewport is the only instrument that can see any of them, and it costs a bundle
+     * build.
+     *
+     * **Nothing existing was raised**, and the line-number diff overstates the change if you read
+     * it carelessly: `everyday/stageScreen.browser.test.ts` shows five annotations at new line
+     * numbers, and all five are the **same cases moved** by that lane's edits above them. Keyed on
+     * file and case name rather than on line, the added set is exactly these four. Base
+     * 18 300 000 ms against head 19 320 000 — a difference of 1 020 000, which is
+     * 180 000 + 240 000 + 300 000 + 300 000 exactly.
+     */
+    ['viz-browser', { count: 77, totalMs: 19_320_000 }],
   ]);
 
 /**
