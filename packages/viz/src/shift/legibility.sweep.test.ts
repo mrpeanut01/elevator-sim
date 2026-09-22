@@ -3,67 +3,49 @@
  * on** — GitHub issue #354. Gated on `LEGIBILITY_SWEEP=1`, because ten contracts × fifty seeds is
  * a compute job rather than a check; the table it prints is what `shift/legibility.ts`'s docstring
  * publishes, and `legibility.test.ts` pins a ten-seed slice of it on every run.
+ *
+ * ## It measured the wrong towers until 2026-09-22 — GitHub issue #584, § D961
+ *
+ * Every state here was `{ ...baseState(), buildingId: contract.buildingId, … }`, and `baseState()`'s
+ * week stands on **`c1`**. `shift/ladder.ts#rungFor` keys a rung on the contract *and* the building,
+ * so a mismatched pair took no rung and **every tower was swept as built rather than as its
+ * contract hands it over** — and two rungs that plainly move a run, Midtown Office's 0.395 occupancy
+ * and Harbour Point's 0.6, were reaching nothing. The fix is one call:
+ * `contractDay.test-helper.ts#contractDayState` builds the pair together and refuses a mismatched
+ * one. The same call also threads `outOfServiceCarIds`, which this sweep dropped — `c7`'s rung
+ * declares a maintenance incident, so Crown Hotel was swept with a car the scenario takes away.
  */
 
 import { writeFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import { shiftLengthForContract, shiftRunConfigOf } from '../dev/state.js';
+import { shiftRunConfigOf } from '../dev/state.js';
 import { recordRun } from '../record/recordRun.js';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
-import { parseBuilding, resolveBuilding } from '@elevator-sim/core';
-
-import { DATA_DIR } from '../fixtures.test-helper.js';
-import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
-import type { BrowserResources } from '../dev/data.js';
-
+import { contractBuildings, contractDayState } from './contractDay.test-helper.js';
 import { CONTRACTS } from './contracts.js';
 import { LEGIBILITY_SWEEP, legibilityOf } from './legibility.js';
 
 const SEEDS = Number(process.env['LEGIBILITY_SEEDS'] ?? '50');
 
-/**
- * Every building the contracts name, not `probes.test-helper.ts`'s two, and **derived rather than
- * transcribed**.
- *
- * This was a hand-written list of eight ids. It was correct when it was typed and it is the shape
- * `DECISIONS.md` § D213 spent a commit on: a guard that can no longer see what it is guarding. The
- * loop below iterates `CONTRACTS`, so a contract that moves to a new building or a new contract that
- * lands brings its building with it — which is what `legibility.test.ts#allBuildings` already did
- * one file away, and the two are now the same derivation.
- */
-function allBuildings(): BrowserResources {
-  const entries = [...new Set(CONTRACTS.map((contract) => contract.buildingId))].sort().map((id) => {
-    const config = parseBuilding(JSON.parse(readFileSync(join(DATA_DIR, 'buildings', `${id}.json`), 'utf8')));
-    return { file: `${id}.json`, config, resolved: resolveBuilding(config, RESOURCES.elevatorSpecs) };
-  });
-  return { ...RESOURCES, buildings: entries.map((entry) => entry.resolved), entries };
-}
-
 const seedAt = (n: number): bigint => 20_260_824n + 7_919n * BigInt(n);
 
 describe.runIf(process.env['LEGIBILITY_SWEEP'] === '1')('the legibility sweep — docs/33 § 6, issue #354', () => {
   it('publishes the fraction of seeds with a legible landing per contract, day 1, collective', () => {
-    const resources = allBuildings();
+    const resources = contractBuildings();
     const lines: string[] = ['| contract | building | legible seeds | of | median longest stretch (s) | per seed |', '|---|---|---|---|---|---|'];
     const measured: Record<string, { legibleOf50: number; medianStretchS: number }> = {};
     for (const contract of CONTRACTS) {
       const longest: number[] = [];
       let legible = 0;
       for (let n = 0; n < SEEDS; n += 1) {
-        const state = {
-          ...baseState(),
-          buildingId: contract.buildingId,
-          dispatcherId: 'collective',
-          shiftLengthS: shiftLengthForContract(contract.id),
-          seed: seedAt(n),
-          campaignEventId: 'ordinary' as const,
-        };
+        const state = contractDayState(contract.id, { seed: seedAt(n) });
         const plan = shiftRunConfigOf(resources, state);
-        const recording = recordRun(plan.config, { recordDecisions: false }).recording;
+        const recording = recordRun(plan.config, {
+          recordDecisions: false,
+          outOfServiceCarIds: plan.outOfServiceCarIds,
+        }).recording;
         const day = legibilityOf(recording);
         longest.push(day.longestS);
         if (day.legible) legible += 1;

@@ -9,17 +9,13 @@
  * `dev/reportPanel` already pin on the legs and is not re-pinned here.
  */
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-import { parseBuilding, resolveBuilding } from '@elevator-sim/core';
 import { describe, expect, it } from 'vitest';
 
-import type { BrowserResources } from '../dev/data.js';
-import { DATA_DIR } from '../fixtures.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
-import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
+import { RESOURCES } from '../scope/probes.test-helper.js';
 import { initialState, shiftLengthForContract, shiftRunConfigOf, withFirstSession } from '../dev/state.js';
+
+import { contractBuildings, contractDayState } from './contractDay.test-helper.js';
 
 import { CONTRACTS, FIRST_CONTRACT_ID, contractById } from './contracts.js';
 import {
@@ -32,15 +28,6 @@ import {
 } from './firstSession.js';
 import { LEGIBILITY_SWEEP, legibilityOf } from './legibility.js';
 import { openWeek } from './week.js';
-
-/** All eight shipped buildings — `legibility.sweep.test.ts`'s loader, since `RESOURCES` holds two. */
-function allBuildings(): BrowserResources {
-  const entries = LEGIBILITY_SWEEP.map((row) => row.buildingId).map((id) => {
-    const config = parseBuilding(JSON.parse(readFileSync(join(DATA_DIR, 'buildings', `${id}.json`), 'utf8')));
-    return { file: `${id}.json`, config, resolved: resolveBuilding(config, RESOURCES.elevatorSpecs) };
-  });
-  return { ...RESOURCES, buildings: entries.map((entry) => entry.resolved), entries };
-}
 
 describe('the eligible set — § D512’s table read by arithmetic', () => {
   it('is every contract legible on more than a third of fifty seeds, in contract order', () => {
@@ -171,23 +158,22 @@ describe('the door’s line — derived from the week, never stored', () => {
 
 describe('AC1 and AC2, asked of every member of the set on the pinned seeds', () => {
   it('every eligible contract’s day 1 is legible on most of the first ten seeds, and says when', () => {
-    const resources = allBuildings();
+    const resources = contractBuildings();
     const legibleAt: Record<string, number[]> = {};
     for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) {
       const contract = contractById(id);
       if (contract === undefined) throw new Error(id);
       const moments: number[] = [];
       for (let n = 0; n < 10; n += 1) {
-        const state = {
-          ...baseState(),
-          buildingId: contract.buildingId,
-          dispatcherId: 'collective',
-          shiftLengthS: shiftLengthForContract(id),
-          seed: 20_260_824n + 7_919n * BigInt(n),
-          campaignEventId: 'ordinary' as const,
-        };
+        /* The pair, built together — GitHub issue #584, § D961; see `contractDay.test-helper.ts`. */
+        const state = contractDayState(id, { seed: 20_260_824n + 7_919n * BigInt(n) });
         const plan = shiftRunConfigOf(resources, state);
-        const day = legibilityOf(recordRun(plan.config, { recordDecisions: false }).recording);
+        const day = legibilityOf(
+          recordRun(plan.config, {
+            recordDecisions: false,
+            outOfServiceCarIds: plan.outOfServiceCarIds,
+          }).recording,
+        );
         if (day.legible) moments.push(day.legibleAtS ?? -1);
         expect(day.legible).toBe(day.legibleAtS !== undefined);
       }

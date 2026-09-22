@@ -545,6 +545,18 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'a building or a goal bar moves — which is exactly when § 4.7’s table has to be regenerated',
     scheduled: false,
   },
+  'packages/viz/src/shift/energyBar.sweep.test.ts': {
+    gates: ['ENERGY_BAR_SWEEP'],
+    reason:
+      'GitHub issue #583’s instrument — the energy bar re-derived over the horizon the day actually ' +
+      'runs: thirteen contracts by fifty whole authored days at day 1, plus § D106’s ' +
+      'perverse-ranking arm over all thirteen shipped dispatchers and a third arm at § D468’s own ' +
+      '1 800 s horizon. Not scheduled because it is a compute job rather than a check: the two ' +
+      'constants it produces are pinned by `shift/goals.test.ts` on every run, and a nightly ' +
+      're-derivation would write a figure nothing reads. It is re-run by hand when a rung, a ' +
+      'building, a demand template or the day’s length moves',
+    scheduled: false,
+  },
   'packages/viz/src/testCost.test.ts': {
     gates: ['TEST_COST_OUT'],
     reason:
