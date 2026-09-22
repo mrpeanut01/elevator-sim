@@ -1415,6 +1415,46 @@ export function declaredSelectorSpecOf(
 }
 
 /**
+ * **The spec the run is built from** — the player's working copy where it is a working copy *of the
+ * dispatcher that is driving*, and the driving profile's own otherwise. GitHub issue #575,
+ * [§ D886](../../../../DECISIONS.md).
+ *
+ * A named function rather than an inline object for {@link declaredSelectorSpecOf}'s reason one
+ * block up: `everyday/rush.ts` and `scope/runIdentity.ts` both have to ask *what does the run read*,
+ * and two expressions of that is the disagreement this whole seam exists to have one answer to.
+ *
+ * ## The gate is `editingDispatcherId`, and it was put here by a run rather than by taste
+ *
+ * The first wiring had no gate: the working copy went in whatever it was a copy of. `scope.test.ts`
+ * reported **`viewer.dispatcherId` inert within the minute** — pick a different dispatcher and the
+ * legs do not move, because the copy's weights had overwritten the profile the player just chose —
+ * and `free-play.dispatcherProfileId` with it. A control that stops working because another one
+ * started is the defect this change is fixing, arriving from the other side; § D227 rates it above
+ * the gap it would have closed.
+ *
+ * So the working copy reaches the run exactly while it is pointed at the profile that is driving.
+ * `withDispatcher` already keeps that pointer in step when the copy is pristine and deliberately
+ * leaves it alone when it is not, which is what makes the gated behaviour the one a player would
+ * describe: tune the dispatcher you are running and the next run is tuned; pick a different one
+ * with edits standing and you get that one as the data ships it, with your edits still on the panel
+ * when you point back at their subject.
+ *
+ * {@link ViewerState.editingDispatcherId} is therefore a field a run reads, and `scope/surface.ts`
+ * says so rather than still calling it presentation.
+ *
+ * See {@link drivingProfileOf} for why the name comes from the base and everything else from the
+ * copy.
+ */
+export function drivingDispatcherSpecOf(
+  base: DispatcherProfile,
+  state: Pick<ViewerState, 'dispatcherSpec' | 'editingDispatcherId'>,
+): DispatcherSpec {
+  const spec =
+    state.editingDispatcherId === base.id ? state.dispatcherSpec : specFromProfile(base, base.name);
+  return { ...spec, name: base.name };
+}
+
+/**
  * The profile this state actually drives — the base by id, then the levers, then the selector,
  * then the rules, in {@link shiftRunConfigOf}'s own order and extracted from it so there is one
  * derivation rather than two (review finding 2: the stage's switch-dispatcher control must
@@ -1429,6 +1469,43 @@ export function declaredSelectorSpecOf(
  * ordering argument the selector makes against the levers one step up. With no rows
  * `profileWithRules` is the identity (the same object), so a reader who has written nothing runs
  * exactly the profile the two writes above produced.
+ *
+ * ## The draft is the bottom of that chain now — GitHub issue #575, [§ D886](../../../../DECISIONS.md)
+ *
+ * This function read `specFromProfile(base, base.name)` — the base profile round-tripped through the
+ * editor's shape and straight back out — so **`state.dispatcherSpec` was read by nothing that builds
+ * a run**. GitHub issue #296 measured that and § D386 answered it with disclosure; issue #575 is the
+ * same seam arriving on the screen where a player is taught to tune, and it is answered by wiring.
+ *
+ * The cause was established by a run rather than inferred, and the trace is worth keeping because
+ * the issue named two candidates and the wrong one is the plausible-sounding one. At
+ * `midtown-office`, 900 s, seed 20260804, `collective`, with both weight-backed plain levers at 100:
+ *
+ * ```
+ * state.dispatcherSpec.weights   {waitTime: 100, starvation: 100, loadFactor: 100}
+ * drivingProfileOf(...).weights  {waitTime: 1}          ← both ends
+ * config.dispatcherProfile.weights {waitTime: 1}        ← both ends, 433 legs byte-identical
+ * ```
+ *
+ * So it was candidate 1, *the override never travels*, and candidate 2 is refuted at the same
+ * operating point: the same weight put on the profile through `savedDispatchers` **does** move the
+ * legs. `everyday/workshopTravel.test.ts` is the standing instrument and holds both halves.
+ *
+ * ## The identity is the base's and the content is the draft's
+ *
+ * `options.id` was already `base.id`; the **name** is pinned to the base's too, which is the one
+ * thing the draft is not allowed to supply. `dispatcherId` is what the brief, the report, the board
+ * and `scope/runIdentity.ts` all answer *who is driving* from, and a draft whose name field a player
+ * typed into would otherwise put a second answer beside it. A renamed draft reaches a run under the
+ * name it is a draft **of**, and the Engineer editor's *Save it and run it* is what makes a new name
+ * a dispatcher.
+ *
+ * Everything else on the draft — every weight, the three behaviour flags and the family
+ * moves — now composes exactly as `viewer.levers` already did: applied over whichever profile
+ * `dispatcherId` names, without forking it. That symmetry is the reason `scope/surface.ts` scopes
+ * the field `within-day` beside the levers rather than `between-games` beside `dispatcherId`, and
+ * it is why a player who moves a lever and then picks a different dispatcher keeps the lever: the
+ * two drawers were always one vector, and now the vector is the one the run reads.
  */
 export function drivingProfileOf(
   resources: BrowserResources,
@@ -1447,7 +1524,7 @@ export function drivingProfileOf(
   return profileWithKit(
     profileWithRules(
       profileWithSelector(
-        profileFromSpec(specFromProfile(base, base.name), {
+        profileFromSpec(drivingDispatcherSpecOf(base, state), {
           id: base.id,
           base,
           levers: leversWithKit(state.levers, state.campaignFitOut),

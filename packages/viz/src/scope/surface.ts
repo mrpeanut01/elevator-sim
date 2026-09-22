@@ -338,14 +338,23 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
   ),
 
   /* ------------------------------------------- viewer: the four editors’ working copies */
-  'viewer.dispatcherSpec': latent(
-    'viewer.savedDispatchers',
-    'The dispatcher editor’s draft. shiftRunConfigOf never reads it; Save as new is what turns it ' +
-      'into something dispatcherId can select.',
+  'viewer.dispatcherSpec': control(
+    'within-day',
+    'The dispatcher working copy — the term weights, the three behaviour flags and the family moves. ' +
+      'drivingProfileOf composes the run’s profile from it over the base dispatcherId names, so a ' +
+      'weight moved in the Workshop or the Engineer editor is a weight the next run is simulated ' +
+      'with (GitHub issue #575, § D886). within-day on viewer.levers’ ground and not between-games ' +
+      'on dispatcherId’s: it is applied over a shipped profile without forking it, so it changes ' +
+      'what the run costs rather than naming the run. Latent until § D886, which is why every note ' +
+      'about it is derived through scope/commitment.ts rather than written beside a panel.',
   ),
   'viewer.editingDispatcherId': control(
-    'presentation',
-    'Which profile the dispatcher editor is pointed at. Names the draft’s subject and reaches no run.',
+    'within-day',
+    'Which profile the dispatcher working copy is a copy of. It said “names the draft’s subject and ' +
+      'reaches no run” until § D886, and the first half is still the whole of what it is: ' +
+      'drivingProfileOf applies the working copy only while this pointer names the dispatcher that ' +
+      'is driving, so on a copy that has been moved this field decides whether the copy reaches the ' +
+      'run. within-day, because that is dispatcherSpec’s scope and this is the switch on it.',
   ),
   'viewer.patternSpec': latent('viewer.savedPatterns', 'The traffic editor’s draft — the peak order, the intensity and the shape of the period. ' +
       'shiftRunConfigOf never reads it; Save as new is what turns it into something pattern can select.'),

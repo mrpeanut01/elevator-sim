@@ -61,10 +61,17 @@ import {
   type RushPrefitClaim,
 } from '@elevator-sim/core/browser';
 
+import { specFromProfile } from '../authoring/dispatcherSpec.js';
 import { AS_BUILT, type CampaignFitOut } from '../campaign/fitOut.js';
 import type { VizRecording, VizSaturation } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
-import { declaredSelectorSpecOf, initialState, resolvedBuildingOf, type ViewerState } from '../dev/state.js';
+import {
+  declaredSelectorSpecOf,
+  initialState,
+  profileById,
+  resolvedBuildingOf,
+  type ViewerState,
+} from '../dev/state.js';
 import { demandDisclosureOf, type DemandBand } from '../fixit/parse.js';
 import { waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
@@ -212,8 +219,8 @@ const RUSH_FIELD_ROLES = Object.freeze({
   savedPatterns: 'surface',
   savedClasses: 'building',
   savedBuildings: 'building',
-  dispatcherSpec: 'surface',
-  editingDispatcherId: 'surface',
+  dispatcherSpec: 'fresh',
+  editingDispatcherId: 'fresh',
   patternSpec: 'surface',
   editingPatternId: 'surface',
   machineSpec: 'surface',
@@ -338,6 +345,7 @@ function rushStandingOf(
   modifiers: readonly RushPrefitClaim[],
 ): RushPatch {
   const moved = switchWeek(state.week, state.parkedWeeks, RUSH_CONTRACT_ID, 'restart');
+  const brought = profileById(resources, state.savedDispatchers, state.dispatcherId);
   return {
     /*
      * Every `fresh` field at a fresh session's value, read off the session a player opens rather than
@@ -350,6 +358,28 @@ function rushStandingOf(
      * GitHub issue #523, item 2.
      */
     selectorSpec: declaredSelectorSpecOf(resources, state),
+    /*
+     * And the dispatcher working copy, on the selector's exact ground — GitHub issue #575, § D886.
+     *
+     * It was `'surface'` on this table while `drivingProfileOf` read nothing from it; now the run's
+     * weights, behaviour flags and family moves come out of it, so a sitting that let it ride in
+     * would post a board score run under a weight vector the submission does not carry and the
+     * server's replay cannot reconstruct — the crowding-block worry {@link RUSH_FIELD_ROLES} states
+     * about `paramDemand`, arriving on the dispatcher. `'fresh'` alone would seed it from the
+     * dispatcher a *session opens on* rather than the one the player brings, which is issue #523
+     * item 2 exactly; so it is seeded here from the brought profile, through the same function
+     * `dev/state.ts#drivingProfileOf` reads it with.
+     */
+    dispatcherSpec: specFromProfile(brought, brought.name),
+    /*
+     * And the pointer with it, because the pair is what decides whether the copy is applied.
+     * `drivingDispatcherSpecOf` uses the copy only while this names the driving profile; a rush that
+     * seeded the copy and left the player's pointer where it was would be relying on *both* branches
+     * landing on the same profile, which is true here and is the kind of thing that stops being true
+     * quietly. Writing both makes the sitting's dispatcher state one statement rather than two that
+     * happen to agree, and `rushCrowd.test.ts` reads it back off the run.
+     */
+    editingDispatcherId: brought.id,
     /*
      * And except the kit, when the sitting says the building started fitted. `campaignFitOut` is a
      * `fresh` field, so a rush otherwise runs the tower as shipped and a campaign day's bookings

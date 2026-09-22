@@ -944,12 +944,23 @@ export type WorkshopWrite = (typeof WORKSHOP_WRITES)[number];
  * Four answers rather than the guide's two, because § 3.3's table was transcribed from a prototype
  * whose workshop had no draft: every control on it reached its toy simulator, so *unsaved changes
  * travel with the run* and *nothing changed yet* were the only two states that existed. This build
- * has a third field class — `viewer.dispatcherSpec` is `latent`, and `dev/state.ts#drivingProfileOf`
- * composes the run from the other three and never from it — so the two-cell table cannot describe
- * two of the four states a player can actually produce. That is `WORKSHOP_COPY.libraryHeading`'s
+ * had a third field class — `viewer.dispatcherSpec` was `latent`, and `dev/state.ts#drivingProfileOf`
+ * composed the run from the other three and never from it — so the two-cell table could not describe
+ * two of the four states a player could actually produce. That is `WORKSHOP_COPY.libraryHeading`'s
  * situation exactly (the prototype's panel offers six styles, this build ships thirteen), and it is
  * answered the same way: the guide's own sentences are kept and drawn where they are true, and this
  * build adds the ones its own shape needs.
+ *
+ * **Since § D886 (GitHub issue #575) all four writes reach the run, so two of these four answers are
+ * unreachable in the shipped product — and they are kept rather than deleted.** `draft-only` and
+ * `split` are decided by {@link workshopWriteReachesRun}, which asks `scope/surface.ts` rather than
+ * this module; the day a fifth write lands latent, or the day the working copy goes back to being a
+ * draft, the bar has the sentence for it already and does not fall back to the guide's two-cell
+ * table. `workshopTravel.test.ts` drives all sixteen subsets of the four writes against the
+ * classification, so the two quiet answers are exercised by every run of the suite rather than
+ * waiting unexercised for the state that needs them — which is the difference between a dead branch
+ * and a register kept honest, and the same argument `probes.test-helper.ts#SINK_MISSING` makes about
+ * an empty register one directory over.
  *
  * - `nothing` — no write is standing. The guide's *Nothing changed yet.*
  * - `travels` — every standing write reaches the run. The guide's *Unsaved changes travel with the
@@ -986,9 +997,17 @@ export type WorkshopReach = (typeof WORKSHOP_REACHES)[number];
  * for every wave after the seam went live. `scope/surface.ts` is the one table that answers *what
  * does moving this reach*, `scope.test.ts` decides its `control` rows by running both arms and
  * comparing the legs, and `scope/commitment.ts#commitmentOf` is the reader. So a note indexed
- * through here inherits that pinning: the day GitHub issue #228 gives the draft a way across and
- * `viewer.dispatcherSpec` stops being `latent`, this answer changes itself and the bar stops saying
- * the weights stay behind.
+ * through here inherits that pinning.
+ *
+ * **That sentence used to end with a prediction, and the prediction came true by another route.**
+ * It read *"the day GitHub issue #228 gives the draft a way across and `viewer.dispatcherSpec`
+ * stops being `latent`, this answer changes itself and the bar stops saying the weights stay
+ * behind"*. The field stopped being latent on § D886 and #228 is not what did it — GitHub issue
+ * #575 wired `dev/state.ts#drivingProfileOf` to the working copy, so the copy reaches the run as a
+ * copy and needs no way across. **The mechanism was right about itself**: this function now answers
+ * `true` for `viewer.dispatcherSpec`, the bar says the edit travels, and not one sentence was
+ * edited to make that happen. The prediction is kept as the dated record it is, because a claim
+ * about a derivation that survived its own subject moving is worth more than a tidy paragraph.
  *
  * `undefined` — an `output`, or a key the table does not carry — counts as **not reaching**, and
  * the direction is chosen rather than defaulted. The failure being guarded is a bar that promises
