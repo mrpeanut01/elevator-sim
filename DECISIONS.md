@@ -41079,6 +41079,8 @@ The effect-line tail narrows nothing. It names the row. A hint that says *look a
 
 This lane holds **D869–D878** and spends **D869 and D870**. D871 to D878 are unspent and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
 
+**Integrator's note, added on wave AF's integration and not by this lane's author.** That last sentence is now wrong about **D871**, and the correction belongs here rather than in a silent edit. When wave AE closed, D871–D910 sat *above* the highest heading written (D870), so under § D430 they were **free rather than holed** — a number a wave never reaches, with nothing above it, is free. Wave AF's reservation then opened at D871 and lane AF-A spent it (§ D871). So D872–D878 are the holes this paragraph describes; D871 is a heading. Lane AF-A found the collision, reported it, and correctly declined to edit another lane's entry after the fact — `CLAUDE.md`'s rule — which is why this note is signed by the integrator instead.
+
 ---
 
 ## D870 — the 10 u shuttle re-gear buys ascent on a complaint measured in descent, and the machinery figure counts what the patch buys rather than what the role is
