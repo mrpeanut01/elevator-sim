@@ -2564,6 +2564,59 @@ sentence about the fabric here would be a plausible story standing where a run b
 `c15` and `c16` joining and `c14` staying out, and it is still derived from this table rather than
 chosen.
 
+#### 6.4c The sweep was measuring towers nobody is handed, and six rows moved
+
+**Re-measured 2026-09-22** — GitHub issue
+[#584](https://github.com/mrpeanut01/elevator-sim/issues/584), [§ D961](../DECISIONS.md). Every
+sweep above built its states as `{ ...baseState(), buildingId: contract.buildingId, … }`, and
+`baseState()`'s week stands on **`c1`**. `shift/ladder.ts#rungFor` keys a rung on the contract
+**and** the building — deliberately, so that a scenario's fabric cannot arrive on a building the
+scenario does not run — so the pair disagreed, **no rung reached any run**, and the three
+reproductions recorded above are three reproductions of *sixteen towers as built*. The instrument
+was right and deterministic throughout; the question it was asked was the wrong one. It also dropped
+`outOfServiceCarIds`, so `c7`'s booked-out car ([§ D871](../DECISIONS.md)) was running through a
+measurement of the contract that books it out.
+
+| contract | building | as built, of 50 | median (s) | **as handed over, of 50** | **median (s)** |
+|---|---|---|---|---|---|
+| c1 | `garden-apartments` | 0 | 0 | 0 | 0 |
+| c2 | `midtown-office` | **50** | 2 504 | **38** | **239** |
+| c3 | `secure-tower` | 20 | 108 | 20 | 108 |
+| c4 | `mixed-use-high-rise` | 32 | 136 | 32 | 136 |
+| c5 | `vertical-city` | 45 | 191 | 45 | 191 |
+| c6 | `chancery-house` | 2 | 28 | **14** | **91** |
+| c7 | `crown-hotel` | 40 | 161 | **30** | **147** |
+| c8 | `st-jude-hospital` | 1 | 38 | **3** | **52** |
+| c9 | `harbour-point` | **50** | 1 343 | **11** | **56** |
+| c10 | `ashgate` | 10 | 79 | **32** | **161** |
+| c11 | `ctf-class-reference` | 50 | 1 221 | 50 | 1 221 |
+| c12 | `shanghai-class-reference` | 50 | 729 | 50 | 729 |
+| c13 | `merdeka-class-reference` | 50 | 459 | 50 | 459 |
+| c14 | `one-wtc-class-reference` | 1 | 13 | 1 | 13 |
+| c15 | `empire-state-class-reference` | 45 | 472 | 45 | 472 |
+| c16 | `willis-class-reference` | 50 | 2 347 | 50 | 2 347 |
+
+**Every row that moved is a row whose contract declares a rung, and every row that did not move is
+one whose contract hands its tower over as built.** Seven contracts declare a rung and six of the
+seven moved. The seventh, **`c3`**, reproduced to the second — its rung declares the rate its
+profile already runs at, so the identity is what a correct instrument must report there, and it is
+the control this re-measurement did not have to arrange.
+
+**The eligible set is the same size and not the same set: `c9` leaves and `c10` joins.** Harbour
+Point drops from 50 of 50 to 11 and below the threshold; Ashgate rises from 10 to 32 and above it.
+Eleven members before and eleven after, so `firstSession.ts#FIRST_SESSION_LINE`'s derived count does
+not move and neither do `shift/dailySeed.ts`'s 42.2 % and 56, which are functions of the set's
+length. **What moved is which tower a new player can be handed**, and that is the finding rather
+than the constant.
+
+**One published reading is refuted by its own correction.** § 6.4b says Harbour Point holds a
+landing all day *"because the group cannot clear its crowd even let at three fifths"*
+([§ D572](../DECISIONS.md)). The three fifths is `c9`'s rung and the measurement never applied it:
+50 of 50 is the tower at **full** letting. Let at three fifths, as the contract hands it over, the
+same day is legible on 11 of 50 at a median 56 s. The letting works; the figure was taken on a
+building nobody is given. **No mechanism is offered for why Ashgate rises** (§ D256); what is
+established is that both moves are a rung reaching a run it never used to reach.
+
 ### 6.5 Two things the sweep is not allowed to do
 
 **It may not report a mean.** Every figure it publishes is a count with its denominator — *3 of 10

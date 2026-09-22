@@ -79,24 +79,59 @@ import { isWaitingAt } from '../frame/overlay.js';
  * sixteen is the strongest thing this instrument can say about itself: every row that has ever moved
  * in it is a row somebody added.
  *
- * | contract | building | legible seeds of 50 | median longest stretch (s) |
- * |---|---|---|---|
- * | c1 | garden-apartments | **0** | 0 |
- * | c2 | midtown-office | **50** | 2 504 |
- * | c3 | secure-tower | 20 | 108 |
- * | c4 | mixed-use-high-rise | 32 | 136 |
- * | c5 | vertical-city | 45 | 191 |
- * | c6 | chancery-house | **2** | 28 |
- * | c7 | crown-hotel | 40 | 161 |
- * | c8 | st-jude-hospital | **1** | 38 |
- * | c9 | harbour-point | **50** | 1 343 |
- * | c10 | ashgate | 10 | 79 |
- * | c11 | ctf-class-reference | **50** | 1 221 |
- * | c12 | shanghai-class-reference | **50** | 729 |
- * | c13 | merdeka-class-reference | **50** | 459 |
- * | c14 | one-wtc-class-reference | **1** | 13 |
- * | c15 | empire-state-class-reference | 45 | 472 |
- * | c16 | willis-class-reference | **50** | 2 347 |
+ * **Re-measured 2026-09-22, and six rows moved — the first time a row in this table has moved for a
+ * reason that was not somebody adding a contract** (GitHub issue #584,
+ * [§ D961](../../../../DECISIONS.md)). Every sweep before this one built its states as
+ * `{ ...baseState(), buildingId: contract.buildingId, … }`, and `baseState()`'s week stands on
+ * **`c1`**; `shift/ladder.ts#rungFor` keys a rung on the contract **and** the building, so the pair
+ * disagreed, **no rung reached any run**, and the three waves of reproduction above were three
+ * reproductions of *sixteen towers as built*. The instrument was right and deterministic the whole
+ * time; the question it was asked was the wrong one.
+ *
+ * The as-built table is the one directly below, kept as the dated record it is. The shipped
+ * constant is the one after it, which is what the same instrument says about the towers a player is
+ * handed.
+ *
+ * | contract | building | as built, of 50 | median (s) | **as handed over, of 50** | **median (s)** |
+ * |---|---|---|---|---|---|
+ * | c1 | garden-apartments | **0** | 0 | **0** | 0 |
+ * | c2 | midtown-office | **50** | 2 504 | **38** | **239** |
+ * | c3 | secure-tower | 20 | 108 | 20 | 108 |
+ * | c4 | mixed-use-high-rise | 32 | 136 | 32 | 136 |
+ * | c5 | vertical-city | 45 | 191 | 45 | 191 |
+ * | c6 | chancery-house | **2** | 28 | **14** | **91** |
+ * | c7 | crown-hotel | 40 | 161 | **30** | **147** |
+ * | c8 | st-jude-hospital | **1** | 38 | **3** | **52** |
+ * | c9 | harbour-point | **50** | 1 343 | **11** | **56** |
+ * | c10 | ashgate | 10 | 79 | **32** | **161** |
+ * | c11 | ctf-class-reference | **50** | 1 221 | **50** | 1 221 |
+ * | c12 | shanghai-class-reference | **50** | 729 | **50** | 729 |
+ * | c13 | merdeka-class-reference | **50** | 459 | **50** | 459 |
+ * | c14 | one-wtc-class-reference | **1** | 13 | **1** | 13 |
+ * | c15 | empire-state-class-reference | 45 | 472 | 45 | 472 |
+ * | c16 | willis-class-reference | **50** | 2 347 | **50** | 2 347 |
+ *
+ * **Every row that moved is a row whose contract declares a rung, and every row that did not move
+ * is one whose contract hands its tower over as built.** That is not an interpretation of the
+ * result; it is the result. Seven contracts declare a rung — c2 at 0.395 occupancy, c9 at 0.6, c6
+ * at 1.06 with a five-shaft gearless bank and a rate of 16, c3 at 12, c7 at 11 with a maintenance
+ * incident, c8 at 8.5 and c10 at 13.5 — and six of the seven moved. The seventh, **c3**, reproduced
+ * to the second, and that is the check rather than an exception: its rung declares the rate its
+ * profile already runs at, so the identity is what a correct instrument must report there.
+ *
+ * **The set § D475 draws from is the same size and not the same set: `c9` leaves and `c10`
+ * joins.** Harbour Point goes from 50 of 50 to **11**, which takes it below the threshold, and
+ * Ashgate from 10 to **32**, which takes it above. Eleven members before and eleven after, so
+ * `firstSession.ts#FIRST_SESSION_LINE`'s own count does not move — which is exactly the case a
+ * derived sentence is for and exactly the case a reader would otherwise miss.
+ *
+ * **One published reading is refuted by its own correction, and it is the one worth reading twice.**
+ * The paragraph below says Harbour Point holds a landing all day *"because the group cannot clear
+ * its crowd even let at three fifths ([§ D572](../../../../DECISIONS.md))"*. The three fifths is
+ * `c9`'s rung, and the measurement that sentence rests on **never applied it**: 50 of 50 is the
+ * tower at full letting. Let at three fifths, as the contract actually hands it over, the same day
+ * is legible on 11 of 50 at a median 56 s. The letting works. What the old figure measured was a
+ * building nobody is given.
  *
  * **The three reference towers are legible on every seed, and the reading is not flattering.** A day
  * is legible when somebody stays past a minute on some landing for two contiguous minutes, and on a
@@ -137,12 +172,15 @@ import { isWaitingAt } from '../frame/overlay.js';
  * Apartments never once holds a landing in the third band for two minutes — nobody on it waits
  * sixty seconds, so *"the first session presents no problem to solve"* is the instrument's own
  * finding at 0 of 50, and the building is **not eligible** as a first session under § D475 until
- * something about its day changes. Chancery House and St Jude's are legible on 2 and 1 seeds, which
- * is *rarely* rather than *never* and is the same verdict for a first session. Midtown Office is
- * legible on every seed with a stretch longer than the shift, which is a building whose problem a
- * player cannot miss. The five that were legible on more than a third of seeds when this paragraph
- * was written — c2, c4, c5, c7 and c3 at two fifths — were the eligible set this table handed
- * § D475's draw.
+ * something about its day changes. Chancery House and St Jude's were legible on 2 and 1 seeds, which
+ * is *rarely* rather than *never* and is the same verdict for a first session — and as handed over
+ * they read 14 and 3, which is still *rarely* and still the same verdict, so the reading survives
+ * its own re-measurement. Midtown Office was legible on every seed with a stretch longer than the
+ * shift, which read as a building whose problem a player cannot miss; as handed over, at 0.395
+ * occupancy, it is legible on **38 of 50** at a median **239 s**, which is a building whose problem
+ * a player usually meets and sometimes does not. The five that were legible on more than a third of
+ * seeds when this paragraph was written — c2, c4, c5, c7 and c3 at two fifths — were the eligible
+ * set this table handed § D475's draw.
  *
  * **That sentence is in the past tense now and was not when it needed to be**, which is worth one
  * line rather than a silent edit. It named five members and read as a present-tense fact about a
@@ -152,16 +190,21 @@ import { isWaitingAt } from '../frame/overlay.js';
  * time and only the sentence went stale. Re-tensed rather than refreshed with today's members,
  * because a list of eleven typed here would go stale on exactly the same schedule.
  *
- * **The two that landed with the content plan say opposite things, and both are the building doing
- * what it was authored to do.** Harbour Point is legible on **50 of 50** at a median 1 343 s — a
- * landing holds somebody past a minute for twenty-two minutes of a thirty-minute day — because the
- * group cannot clear its crowd even let at three fifths ([§ D572](../../../../DECISIONS.md)); only
- * Midtown Office is more legible, and it is the second contract whose problem a player cannot miss.
- * Ashgate is legible on **10 of 50** at a median 79 s, **below the eligible threshold**, and that is
- * consistent rather than disappointing: its problem is that a car-park arrival rides twice, which is
- * a fact about *time to destination* and not about a landing holding a crowd — the very case
- * `docs/35` `PM-TT2` exists to distinguish. A tower can present a real problem and present it
- * somewhere this instrument does not look, and this is the first shipped example.
+ * **The two that landed with the content plan said opposite things, and 2026-09-22 swapped which
+ * said which.** As built, Harbour Point was legible on **50 of 50** at a median 1 343 s and Ashgate
+ * on **10 of 50** at 79 s — and the reading offered for the pair was that Harbour Point's group
+ * cannot clear its crowd *"even let at three fifths"* ([§ D572](../../../../DECISIONS.md)) while
+ * Ashgate's problem is a car-park arrival riding twice, which is a fact about *time to destination*
+ * rather than about a landing holding a crowd. **As their contracts hand them over the two have
+ * changed places**: Harbour Point reads **11 of 50** at 56 s and Ashgate **32 of 50** at 161 s.
+ * Half of that reading survives and half does not. The half about Ashgate stands, and gains a
+ * qualification rather than losing one — it is above the threshold now on a rate its rung declares,
+ * and `docs/35` `PM-TT2`'s point that a tower can present a real problem somewhere this instrument
+ * does not look is unaffected by where the count lands. The half about Harbour Point does not: the
+ * three fifths was never applied, so what was measured was the group at full letting, and the
+ * letting is exactly what the contract gives the player. **No mechanism is offered for why Ashgate
+ * rises** ([§ D256](../../../../DECISIONS.md)); what is established is that both moves are a rung
+ * reaching a run that it never used to reach.
  *
  * The proportion carries its `n`, the stretch is a median, and there is no interval: no arms are
  * compared (`docs/33` § 6.5). `legibility.test.ts` pins the first ten seeds of every contract so
@@ -186,15 +229,15 @@ export interface LegibilitySweepRow {
  */
 export const LEGIBILITY_SWEEP: readonly LegibilitySweepRow[] = Object.freeze([
   { contractId: 'c1', buildingId: 'garden-apartments', legibleOf50: 0, medianStretchS: 0 },
-  { contractId: 'c2', buildingId: 'midtown-office', legibleOf50: 50, medianStretchS: 2504 },
+  { contractId: 'c2', buildingId: 'midtown-office', legibleOf50: 38, medianStretchS: 239 },
   { contractId: 'c3', buildingId: 'secure-tower', legibleOf50: 20, medianStretchS: 108 },
   { contractId: 'c4', buildingId: 'mixed-use-high-rise', legibleOf50: 32, medianStretchS: 136 },
   { contractId: 'c5', buildingId: 'vertical-city', legibleOf50: 45, medianStretchS: 191 },
-  { contractId: 'c6', buildingId: 'chancery-house', legibleOf50: 2, medianStretchS: 28 },
-  { contractId: 'c7', buildingId: 'crown-hotel', legibleOf50: 40, medianStretchS: 161 },
-  { contractId: 'c8', buildingId: 'st-jude-hospital', legibleOf50: 1, medianStretchS: 38 },
-  { contractId: 'c9', buildingId: 'harbour-point', legibleOf50: 50, medianStretchS: 1343 },
-  { contractId: 'c10', buildingId: 'ashgate', legibleOf50: 10, medianStretchS: 79 },
+  { contractId: 'c6', buildingId: 'chancery-house', legibleOf50: 14, medianStretchS: 91 },
+  { contractId: 'c7', buildingId: 'crown-hotel', legibleOf50: 30, medianStretchS: 147 },
+  { contractId: 'c8', buildingId: 'st-jude-hospital', legibleOf50: 3, medianStretchS: 52 },
+  { contractId: 'c9', buildingId: 'harbour-point', legibleOf50: 11, medianStretchS: 56 },
+  { contractId: 'c10', buildingId: 'ashgate', legibleOf50: 32, medianStretchS: 161 },
   { contractId: 'c11', buildingId: 'ctf-class-reference', legibleOf50: 50, medianStretchS: 1221 },
   { contractId: 'c12', buildingId: 'shanghai-class-reference', legibleOf50: 50, medianStretchS: 729 },
   { contractId: 'c13', buildingId: 'merdeka-class-reference', legibleOf50: 50, medianStretchS: 459 },

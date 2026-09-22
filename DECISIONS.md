@@ -41632,3 +41632,73 @@ So the **longest gap between moments that decide the day is 112.5 s** — the di
 **What it is not**: a sitting. Nobody played this day in a browser to take these numbers; they are `observationsAt` over the recording at the same instants a player's screen would be showing. A Playwright census on the built bundle is what would make the two rows of that table the same kind of measurement, and until one is run the comparison is a derivation standing next to a sitting.
 
 **What is deliberately not fixed here, and it is the bigger half of #578.** Today's scenario at **Midtown Office** is still unclearable, and this lane measured why rather than moving anything: on the whole authored office day the energy goal's **80 kJ per ride delivered** is met by **one of thirteen arms** — `nearest-car`, at a 1 638 s worst wait — while the other twelve sit at **123–175 kJ**. `ENERGY_PER_LEG_MAX_KJ` was derived ([§ D468](#d468)) over day-1 runs at each contract's own `shiftLengthForContract`, which is **1 800 s** for Midtown; the Everyday day runs the authored **36 000 s** record, where the same building under the same dispatcher reads **151.9** against **35.6** over the peak half-hour. That is a bar and a run that are not the same measurement, and it is **§ D106's perverse ranking drawn on the flagship day**. Moving the bar is what `CLAUDE.md`'s working agreements forbid, so it is reported and not touched; what would settle it is a per-horizon or per-building derivation pinned to its own four hundred runs, which is GitHub issue #555's.
+
+---
+
+## D961 — the legibility sweep measured sixteen towers as built, and the set that decides a first session is re-derived
+
+**Date: 2026-09-22 · Owner: wave AG lane D · GitHub issue [#584](https://github.com/mrpeanut01/elevator-sim/issues/584) · Rules on: [§ D475](#d475)'s *eligible is a measurement*, [§ D512](#d512)'s table, [§ D514](#d514)'s line and [§ D572](#d572)'s reading of Harbour Point.**
+
+**Why an entry.** [§ D405](#d405)'s second and third grounds. It moves a measurement already recorded — § D512's sixteen-row table, which three consecutive waves reproduced to the second — and it moves the derived constant § D475 hands the first-session draw, which decides which tower a new player meets.
+
+### The defect
+
+`shift/legibility.test.ts`, `legibility.sweep.test.ts` and `firstSession.test.ts` each built their states as `{ ...baseState(), buildingId: contract.buildingId, … }`. `scope/probes.test-helper.ts#baseState` opens a week on **`c1`** and none of the three moved it.
+
+`shift/ladder.ts#rungFor` keys a rung on the contract **and** the building. That check is load-bearing and its own docstring says why: a `ViewerState` carries the two independently and they routinely disagree, so keyed on the contract alone *"Scenario 1's rung would have let Midtown Office at Garden Apartments' occupancy"*. A mismatched pair returns `undefined`, no rung reaches the run, and **every tower was swept as built rather than as its contract hands it over**.
+
+Seven of the sixteen contracts declare a rung that moves the run and not one was reaching the sweep: `c2` at 0.395 occupancy, `c9` at 0.6, `c6` at 1.06 with a five-shaft gearless bank and a declared rate of 16, `c3` at 12, `c7` at 11 **with a maintenance incident** ([§ D871](#d871)), `c8` at 8.5 and `c10` at 13.5. The three files also dropped `outOfServiceCarIds` — `shiftRunConfigOf` returns it beside `config` rather than inside it, which is the trap `probes.test-helper.ts#legsOf` already records — so `c7`'s booked-out car was running through a measurement of the contract that books it out.
+
+It was found because a rung that demonstrably moves 270 of 355 legs moved **nothing** in the sweep. The lane that found it wrote: *"Convenient for me, wrong as a measurement."*
+
+### What the sweep says with the pair consistent
+
+Re-measured on the same instrument at the same budget — sixteen contracts × 50 seeds = 800 days, `collective`, day 1, ordinary, seeds `20 260 824 + 7 919 n`:
+
+| contract | building | as built, of 50 | median (s) | **as handed over, of 50** | **median (s)** |
+|---|---|---|---|---|---|
+| c1 | `garden-apartments` | 0 | 0 | 0 | 0 |
+| c2 | `midtown-office` | **50** | 2 504 | **38** | **239** |
+| c3 | `secure-tower` | 20 | 108 | 20 | 108 |
+| c4 | `mixed-use-high-rise` | 32 | 136 | 32 | 136 |
+| c5 | `vertical-city` | 45 | 191 | 45 | 191 |
+| c6 | `chancery-house` | 2 | 28 | **14** | **91** |
+| c7 | `crown-hotel` | 40 | 161 | **30** | **147** |
+| c8 | `st-jude-hospital` | 1 | 38 | **3** | **52** |
+| c9 | `harbour-point` | **50** | 1 343 | **11** | **56** |
+| c10 | `ashgate` | 10 | 79 | **32** | **161** |
+| c11 | `ctf-class-reference` | 50 | 1 221 | 50 | 1 221 |
+| c12 | `shanghai-class-reference` | 50 | 729 | 50 | 729 |
+| c13 | `merdeka-class-reference` | 50 | 459 | 50 | 459 |
+| c14 | `one-wtc-class-reference` | 1 | 13 | 1 | 13 |
+| c15 | `empire-state-class-reference` | 45 | 472 | 45 | 472 |
+| c16 | `willis-class-reference` | 50 | 2 347 | 50 | 2 347 |
+
+**Every row that moved is a row whose contract declares a rung, and every row that did not move is one whose contract hands its tower over as built.** That is not a reading of the result, it is the result. Six of the seven rung-bearing contracts moved; the seventh, **`c3`**, reproduced to the second, because its rung declares the rate its profile already runs at — which is the control this re-measurement needed and did not have to arrange.
+
+### The eligible set: `c9` leaves, `c10` joins, and the size does not move
+
+| | members | count |
+|---|---|---|
+| before | `c2 c3 c4 c5 c7` **`c9`** `c11 c12 c13 c15 c16` | 11 |
+| after | `c2 c3 c4 c5 c7` **`c10`** `c11 c12 c13 c15 c16` | 11 |
+
+**Harbour Point is out.** It was the second-most legible contract in the catalogue by the old table and a first session will now never open on it. Ashgate, which the old table had below the threshold at 10 of 50, is in at 32.
+
+**Eleven before and eleven after**, so `firstSession.ts#FIRST_SESSION_LINE`'s own count does not move — the sentence a player reads is byte-identical — and neither do `shift/dailySeed.ts`'s published **42.2 %** and **56**, which are functions of the set's *length* rather than of its members (`dailySeed.test.ts` recomputes both and is green). That is the case a derived sentence exists for and the case a reader would otherwise miss entirely: **a set that governs first impressions changed membership without changing a single published figure.**
+
+### One published reading is refuted by its own correction
+
+[§ D572](#d572) and `legibility.ts` say Harbour Point holds a landing all day *"because the group cannot clear its crowd **even let at three fifths**"*. The three fifths is `c9`'s rung, and the measurement that sentence rests on **never applied it**: 50 of 50 is the tower at full letting. Let at three fifths, as the contract actually hands it over, the same day is legible on **11 of 50** at a median **56 s**. The letting works. What the old figure measured was a building nobody is given.
+
+**No mechanism is offered for why Ashgate rises** ([§ D256](#d256)); what is established is that both moves are a rung reaching a run it never used to reach.
+
+### The fix, and the guard
+
+`shift/contractDay.test-helper.ts#contractDayState` builds the pair together — `openWeek(contract.id)` beside `buildingId`, the contract's own shift length, and the plan's `outOfServiceCarIds` threaded at the call — and `assertContractPair` throws on a week whose contract does not name the state's building. A week on **no** shipped contract is left alone, because `rungFor` has a deliberate branch for it.
+
+`shift/contractDay.test.ts` holds three checks, and the third is what stops this returning in a file nobody has written yet: the refusal itself; that every state the helper builds takes its **own** rung, asserted over `CONTRACTS` rather than over a list; and a source guard **derived from the directory** — any file in `shift/` that calls `recordRun(` and mentions `CONTRACTS` may not write a building id off a contract row into a state unless it goes through the helper. The detector is asserted live against a synthetic line, because half the claim is that it is not simply off.
+
+### The rest of the tree was checked, and it is clean
+
+Every production site moves the week with the building: `everyday/host.ts` calls `switchWeek(state.week, parked, contract.id, …)` and writes `buildingId` in the same patch, `campaign/career.ts#freshTower` takes both from one contract, and `honesty/surfaces.ts` derives the contract **from** the building (`contractForBuilding`), which is the consistent direction. `shift/contractCurve.sweep.test.ts` and `shift/ladder.test.ts` both set `week: { …, contractId }` by hand and are correct — and `ladder.test.ts` builds mismatched pairs **on purpose**, because it is the file that tests `rungFor`. The mismatched states in `scope/probes.test-helper.ts` are sanctioned by `rungFor`'s own docstring and are untouched. **So this is one instrument's defect in three files rather than a class**, and the guard is scoped to the directory where it was found rather than to the tree.
