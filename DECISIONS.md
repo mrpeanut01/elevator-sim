@@ -41632,3 +41632,67 @@ So the **longest gap between moments that decide the day is 112.5 s** — the di
 **What it is not**: a sitting. Nobody played this day in a browser to take these numbers; they are `observationsAt` over the recording at the same instants a player's screen would be showing. A Playwright census on the built bundle is what would make the two rows of that table the same kind of measurement, and until one is run the comparison is a derivation standing next to a sitting.
 
 **What is deliberately not fixed here, and it is the bigger half of #578.** Today's scenario at **Midtown Office** is still unclearable, and this lane measured why rather than moving anything: on the whole authored office day the energy goal's **80 kJ per ride delivered** is met by **one of thirteen arms** — `nearest-car`, at a 1 638 s worst wait — while the other twelve sit at **123–175 kJ**. `ENERGY_PER_LEG_MAX_KJ` was derived ([§ D468](#d468)) over day-1 runs at each contract's own `shiftLengthForContract`, which is **1 800 s** for Midtown; the Everyday day runs the authored **36 000 s** record, where the same building under the same dispatcher reads **151.9** against **35.6** over the peak half-hour. That is a bar and a run that are not the same measurement, and it is **§ D106's perverse ranking drawn on the flagship day**. Moving the bar is what `CLAUDE.md`'s working agreements forbid, so it is reported and not touched; what would settle it is a per-horizon or per-building derivation pinned to its own four hundred runs, which is GitHub issue #555's.
+
+---
+
+## D931 — the career day report shows the day run without the press, and the copy says that two runs are two runs rather than a measurement
+
+**Date: 2026-09-22 · Owner: LANE-AG-B (wave AG) · GitHub issue [#581](https://github.com/mrpeanut01/elevator-sim/issues/581) route 1 · Amends [§ D900](#d900) rather than replacing it · Rules on `packages/viz/src/shift/counterfactual.ts`, `packages/viz/src/shift/afterPress.ts`, `packages/viz/src/shift/report.ts`, `packages/viz/src/dev/main.ts` and `packages/viz/src/honesty/surfaces.ts`. Cites [§ D227](#d227), [§ D256](#d256), [§ D871](#d871), [§ D343](#d343), [§ D405](#d405).**
+
+**Why an entry.** Two of [§ D405](#d405)'s three grounds. It **moves something already recorded** — § D900 rejected #581's route 1 outright and wrote that rejection into copy a player reads — and it binds `dev/main.ts`, `shift/report.ts` and the honesty corpus, none of which `shift/counterfactual.ts` owns.
+
+### 1. What § D900 settled, and the half it did not
+
+§ D900 refused the counterfactual **on this repository's statistical rule rather than on cost**: a with-and-without pair on one seed is one replication, and `CLAUDE.md` forbids declaring a difference without a paired-t interval excluding zero at 50–200 replications. **That reasoning is correct and it is not touched here.** What it did not weigh is that two shipped screens already draw a single-seed pair and are honest doing it — the tutorial's two arms at one seed (*7 over-minute waits → 0*), and `fixit/run.ts`'s as-built and repaired recordings at one playhead. Neither needs fifty replications, because a pair of runs is a **fact about two runs**. It becomes an estimate when a sentence turns it into one.
+
+| claim | what it needs |
+|---|---|
+| *spreading the cars is worth 88 s* | a paired-t interval excluding zero, 50–200 replications |
+| *this run picked up 4 people after a long wait; the run without that press picked up 1* | two runs |
+
+The first is forbidden. The second is what the row now shows.
+
+### 2. The decision
+
+1. `shift/afterPress.ts` has **two arms**. With no pair it draws § D900's row **word for word**, including `AFTER_PRESS_DISCLAIMER`. With a pair it draws both runs and closes with `AFTER_PRESS_PAIR_NOTE` instead.
+2. **The disclaimer is replaced rather than joined**, because two of its three clauses stop being true beside a figure off the unpressed run — *the day was not run again without it* and *nothing here measures the change*. Leaving it standing would be [§ D227](#d227)'s stale refusal manufactured on purpose, which this repository holds to be worse than a stale seam.
+3. **No difference is computed anywhere** — not in the module, not in the copy. The two runs are printed; the reader may subtract. A difference is a quantity, and a quantity off one replication is the estimate the rule above refuses. **No verdict either**: both runs' `Shift cleared` / `Shift missed` lines are available (§ D871 quotes exactly that pair for one seed) and are the shortest route from a true pair to *my press decides the day*.
+4. **Every figure stays a count of people.** No mean, no duration, no ranking word. `counterfactual.test.ts` bans § D900's eleven causal verbs **unchanged** and adds sixteen words of *estimation* — `better`, `worse`, `worth`, `saves`, `improves`, `would have`, `on average` and the rest — matched on word boundaries over the whole row.
+
+### 3. Nothing is re-simulated, because the run already exists
+
+#581 and this lane's brief both assume a re-run. `dev/main.ts#runShift` re-simulates the **whole day from t = 0** on every mid-run press, with the log grown by one entry, so the recording being replaced at that instant *is* the same day, same seed, same crowd, one press short. It was discarded; `dev/main.ts` now holds it (`unpressedRecording`) and `closeShift` hands it to the sheet. **Cost: one retained reference.** `dayReportOf` stays pure — it is re-entered on a Settings toggle (issue #70), and a two-second simulation behind that call would put a shift's work behind a preference.
+
+`unpressedRecording` is closure state beside `ghostRecording` and is **deliberately not a `ViewerState` field**: it is an input to no run, nothing persists it, and a fourth register would claim it was. It never reaches `state.recording` or `simulatedRecording`, so `bankingRefusalFor`'s identity gate refuses it by construction.
+
+### 4. Six grounds, and two of them were written by a measurement
+
+`pressCounterfactualOf` answers `undefined` unless the two runs share a **seed**, a **building** and a **start**, met the **same crowd** (`record/crowd.ts#sameCrowd`), have a **bit-identical prefix** before the press, and the press is **inside the run**. A refusal draws § D900's row, so a day that cannot show a pair loses nothing.
+
+**Ground 3 is the start and not the end, and the first draft had it wrong.** A run stops when the day has drained rather than at a fixed second. Measured on `crown-hotel`, 900 s, 14 %: the unpressed day ends at **981.725 s**, the same day with *park the cars in the lobby* at 360 s ends at **970.319 s**. Requiring `endedAt` equality would have refused that pair and every pair like it. It would also have looked safe written off one arm — *spread the cars* on the same day ends at the **same** instant — so both arms are run in the test.
+
+**The window is therefore one run's.** Both readings are taken at the pressed run's press instant and its own end, so *the same two clock times* is literally true rather than nearly true.
+
+### 5. The third figure was chosen by measurement, and the first two could not do the job
+
+The first draft mirrored § D900's own sentence: people standing at the end, people delivered in the window. Measured on the pinned pair, **both are identical in the two arms** — `0 standing / 155 delivered` with the press and without it. The reason is structural: on a day that drains, everybody is served and nobody is left standing whatever the cars do. A row carrying only those two would have printed one day twice.
+
+What separates the arms is **how long people stood**: **4** people picked up after a wait past the run's own long-wait mark with the press, **1** without it. That count is carried, it is the tutorial's own figure in this row's vocabulary, and it is a **headcount** rather than a duration — the longest single wait moves the same way (123.3 s against 82.4 s) and is not published, because a duration would be the first figure on this row whose cohort is not people. The mark is `summary.longWaitThresholdS`, the run's own, **named and never printed**, so no digit on the row lacks a `people` after it.
+
+**Read the measured pair the right way round**: on that seed the player's press is the arm with *more* long waits. The row does not flatter the press, and nothing in the copy suggests it should.
+
+### 6. What this does **not** claim
+
+**No general effect, in either direction.** The row says nothing about what the press does on another day, another crowd or another tower, and `AFTER_PRESS_PAIR_NOTE` says so on its own face. `docs/43` P3's understandability score is **not declared moved**: no assessor has played this build since the change, and a score is a reading of a sitting ([§ D343](#d343)'s habit applied to a different column). **No mechanism is offered** for why spreading the cars produced more long waits on that seed — it is unmeasured, and a plausible sentence in place of a measurement is what [§ D256](#d256) refuses.
+
+### 7. Invariant 5 and the registers
+
+**No record moved and no version was bumped.** The pair is derived at close from two recordings and reaches no persisted record: `watch/record.ts#watchRecordOf` is built from `ViewerState`, `ViewerState.report` is deliberately outside the session (`persist/types.ts` § *what is deliberately not here*, item 2), and `DayReportInput.pressCounterfactual` is an input to a pure function. `WATCH_RECORD_VERSION` is unmoved and every saved recording still replays — worth saying because a bump would invalidate all of them. **No `ViewerState` field is added**, so `dev/scopeNotes.audit.test.ts`, `persist/persist.test.ts` and `scope/runIdentity.ts` are untouched and no register is owed.
+
+### 8. The corpus
+
+`honesty/surfaces.ts` seeds the paired arm on its intervened sheet, through the shipped function, with the case's own recording as its own partner — the corpus holds one recording per case, so the two sides read the same figures and the fixture says so, on the same footing as the seeded interventions' `effects: []`. Without it the whole paired arm would ship unswept, which is wave AE-C's finding pointed at a row rather than at a file.
+
+### 9. Numbers spent
+
+This lane held **D931–D945** and spent **D931 only**. **D932 to D945 are unspent** and, under [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.

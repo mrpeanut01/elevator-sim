@@ -206,6 +206,7 @@ import { demandFromSpec, specFromTrafficProfile } from '../authoring/patternSpec
 import { contractById, statLineOf } from '../shift/contracts.js';
 import { bankingRefusalFor, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { shiftObservationsOf } from '../shift/observations.js';
+import { pressCounterfactualOf } from '../shift/counterfactual.js';
 import { readGoals } from '../shift/goals.js';
 import {
   clockOf,
@@ -3138,6 +3139,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let ghostRecording: VizRecording | undefined;
   /** Why the pick produced no run (`ghostPlanOf`'s `refused` arm), for the verdict slot. */
   let ghostRefusal: string | undefined;
+  /**
+   * **The day as it ran before the player's last press** — § D931, GitHub issue #581.
+   *
+   * A mid-run intervention re-simulates the whole day from t = 0 with the log grown by one entry
+   * (`ENGINE_CONTRACT` § 1.4), so the recording being replaced at that moment *is* the same day,
+   * the same seed and the same crowd with that press taken out. It was discarded three lines below
+   * for as long as nothing wanted it; the Day report does, and the alternative — re-simulating in
+   * `closeShift` — would buy an identical recording for a second shift's worth of work.
+   *
+   * Held as closure state beside {@link ghostRecording} and **deliberately not a `ViewerState`
+   * field**, on that field's own precedent: it is not an input to any run, nothing persists it, and
+   * a fourth register would claim it was. It never reaches `state.recording` or
+   * {@link simulatedRecording}, so `bankingRefusalFor`'s identity gate refuses it by construction
+   * and it can neither file a day nor bank one.
+   *
+   * Cleared whenever the pair would stop being a pair — a run the player asked for afresh, or a
+   * watched run. `pressCounterfactualOf` then re-checks all six of its own grounds, so a stale
+   * value here produces no row rather than a wrong one.
+   *
+   * **What it costs is one retained recording**, which on the worst cell the menu offers is the
+   * 57.3 MB `shiftRunner`'s header measures. That is the same bill {@link ghostRecording} already
+   * pays, it is held only between a press and the next fresh run, and it buys the alternative's
+   * whole simulation — so it is stated rather than hidden, not argued away.
+   */
+  let unpressedRecording: VizRecording | undefined;
   /** Whether the job in flight on {@link shiftRunner} is the rival's — see {@link scheduleGhost}. */
   let ghostInFlight = false;
   /**
@@ -5876,6 +5902,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
       state.recording.buildingId === recording.buildingId
     ) {
       assertSameCrowd(state.recording, recording, 'the intervention pair');
+      /*
+       * § D931 — and this line is the whole of the counterfactual's cost. The run being replaced
+       * is the day without the press that is about to land, so it is kept rather than dropped; the
+       * Day report prints the two side by side and `shift/counterfactual.ts` re-checks every
+       * ground before it does. On a second press this becomes the run carrying the *first* press,
+       * which is exactly right: the row names the last press and the earlier ones stay in.
+       */
+      unpressedRecording = state.recording;
+    } else {
+      /*
+       * Any run the player asked for afresh — a new seed, a new day, a new dispatcher — ends the
+       * pairing. Keeping it would hand the sheet two runs of different days, which is the one
+       * thing a paired figure may not be, and is `ghostRecording`'s own reason three lines down.
+       */
+      unpressedRecording = undefined;
     }
     // The run this shell simulated — GitHub issue #136, and the only place it is written. See
     // {@link simulatedRecording}.
@@ -5964,9 +6005,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * The rival's line goes down for the run it raced. Leaving it standing beside somebody else's
      * day would be two different crowds on one scale, which `applyShift` already refuses for the
      * same reason when a new primary lands.
+     *
+     * The counterfactual goes with it, and for the same sentence: the day on screen is now
+     * somebody else's and the run held beside it is not a run of it. A spectator's sheet draws
+     * § D900's unpaired row, which is the honest state rather than a degraded one.
      */
     ghostRecording = undefined;
     ghostRefusal = undefined;
+    unpressedRecording = undefined;
     lastRaceKey = '';
     /*
      * The watched run's own start-of-day hour is not known here — the record carries the
@@ -6511,6 +6557,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * true across day and building changes is `ViewerState.interventions`' own docstring.
        */
       interventions: state.interventions,
+      /*
+       * **The same day without that last press** — § D931, GitHub issue #581 route 1, and the one
+       * caller in the product that can supply it.
+       *
+       * {@link unpressedRecording} is the run this shell replaced when the player pressed, so no
+       * simulation happens on this path: `pressCounterfactualOf` reads two recordings that both
+       * already exist, re-checks the seed, the building, the start, the crowd and the whole prefix
+       * before the press, and answers `undefined` on any of them. A day with nothing to pair —
+       * most days — draws § D900's row unchanged, which is why this is passed rather than guarded
+       * here.
+       *
+       * `state.interventions` for `interventions`' own reason directly above: it is the log the
+       * legs on screen were simulated under, so the press this pairs against is the press the row
+       * names.
+       */
+      pressCounterfactual:
+        unpressedRecording === undefined
+          ? undefined
+          : pressCounterfactualOf(recording, unpressedRecording, state.interventions),
       /*
        * The rules the run was driven by — `docs/20` defect 2. From `state` for `interventions`'
        * reason exactly: `shiftRunConfigOf` applies `profileWithRules(profile, state.ruleRows)` when

@@ -115,6 +115,7 @@ import { fallbackLineOf, readbackOf, type RuleRow } from '../authoring/ruleSpec.
 import { interventionLogOf } from '../live/interventions.js';
 
 import { afterPressBeatOf } from './afterPress.js';
+import type { PressCounterfactual } from './counterfactual.js';
 
 import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
 import { contractStatus } from './contracts.js';
@@ -603,6 +604,30 @@ export interface DayReportInput {
    */
   readonly interventions?: readonly RunInterventionConfig[] | undefined;
   /**
+   * The same day run **without** the last of those presses — § D931, GitHub issue #581 route 1.
+   *
+   * Three counts of people off a second complete recording of this day, from this seed, with the
+   * log one entry shorter. `shift/afterPress.ts` prints both runs when it is here and § D900's
+   * unpaired row when it is not, so an absent value is a **state** rather than a degradation: the
+   * honesty corpus, the acceptance suites and a day restored from a session all legitimately have
+   * no second run to offer.
+   *
+   * ## Why this is a value rather than a recording, and why nothing here simulates
+   *
+   * `dayReportOf` is pure and is re-entered on a *preference* change (`dev/main.ts`'s own
+   * `filedReportInput` path, GitHub issue #70) — a two-second simulation behind that call would
+   * put a shift's worth of work behind a Settings toggle. So the pair is computed once, by the one
+   * caller that holds both recordings, and arrives as three numbers. `shift/counterfactual.ts`
+   * owns the six grounds on which it refuses to exist at all.
+   *
+   * It is **not persisted and reaches no record**: `ViewerState.report` is deliberately outside
+   * the session (`persist/types.ts` § *what is deliberately not here*, item 2), and
+   * `watch/record.ts#watchRecordOf` is derived from `ViewerState` rather than from a sheet. So
+   * `WATCH_RECORD_VERSION` is unmoved and invariant 5 is untouched — a bump would invalidate every
+   * saved recording, which is a real cost that would have been paid quietly.
+   */
+  readonly pressCounterfactual?: PressCounterfactual | undefined;
+  /**
    * The Everyday rules the run's dispatcher was driven by, in first-match order — `docs/20`
    * defect 2, and {@link DayReportInput.interventions}' exact shape one mechanism over.
    *
@@ -965,7 +990,14 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
        */
       beside: gaveUpBesideOf(reading.goal, observations, 'whole-run'),
     })),
-    diagnosis: diagnosisFor(recording, observations, dayStartS, judgement.verdict, input.interventions ?? []),
+    diagnosis: diagnosisFor(
+      recording,
+      observations,
+      dayStartS,
+      judgement.verdict,
+      input.interventions ?? [],
+      input.pressCounterfactual,
+    ),
     levers: leversFor(recording, observations, summary, readings),
     smallPrint: smallPrintFor(dispatcherName, summary, dayStartS),
   };
@@ -1853,6 +1885,7 @@ function diagnosisFor(
   dayStartS: SimTime,
   verdict: ShiftVerdict,
   interventions: readonly RunInterventionConfig[],
+  counterfactual: PressCounterfactual | undefined,
 ): readonly ReportDiagnosis[] {
   const at = observations.peakQueueAtS;
   const floorId = observations.peakQueueFloorId;
@@ -1926,8 +1959,11 @@ function diagnosisFor(
    * GitHub issue #581. `undefined` on an untouched day, which is most of them, so the section keeps
    * exactly the shape it has always had where there is nothing of the player's to report.
    */
-  const afterPress = afterPressBeatOf(recording, interventions, (startS, endS) =>
-    clockRange(startS, endS, dayStartS),
+  const afterPress = afterPressBeatOf(
+    recording,
+    interventions,
+    (startS, endS) => clockRange(startS, endS, dayStartS),
+    counterfactual,
   );
   return afterPress === undefined ? [queueRow, phaseRow] : [queueRow, phaseRow, afterPress];
 }
