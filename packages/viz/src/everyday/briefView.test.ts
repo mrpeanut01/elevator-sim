@@ -31,7 +31,7 @@ const TODAY: TodayRecord = {
     name: 'Move-in day',
     note: 'One car is tied up for the first two thirds of the shift.',
   } as TodayRecord['wrinkle'],
-  outOfService: { badge: 'car-c', sentence: 'Car car-c is out of service today.' },
+  outOfService: { mootUnder: undefined, badge: 'car-c', sentence: 'Car car-c is out of service today.' },
   facts: [{ label: 'Floors', value: '14 above ground' }],
   load: { word: '590 per working car', note: '1,180 people and 2 working cars today, as the building is configured. The day shows whether that is comfortable; this plate does not grade it.' },
   asks: ['Carry 90% of the people who turn up', 'Nobody waits longer than 120 s'],

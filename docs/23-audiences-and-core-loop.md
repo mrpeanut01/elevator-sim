@@ -390,9 +390,14 @@ five when asking a mode what it serves.
 2. #191's list names five beats and no time budget. The handoff supplies one — *~5 min a case*
    and *~3 min* for a tower day
    (`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md`:249-254) — and **the
-   shipped build does not meet it, by a factor of four**. Measured against a wall clock rather than
-   divided ([§ D753](../DECISIONS.md), GitHub issue #559): a fix-a-building case is
-   **13-23 min a case at 4×** and a tower day is **8-15 min a day at 4×**. A
+   shipped build does not meet it, by a factor of three at the bottom and fifty at the top**.
+   Measured against a wall clock rather than divided ([§ D753](../DECISIONS.md), GitHub issue
+   #559): a fix-a-building case is **13-23 min a case at 4×** and a tower day is
+   **8 min-2 h 30 a day at 4×**. **The tower-day figure read *8-15 min* until
+   [§ D946](../DECISIONS.md)**, and the factor read *four*: thirteen of the sixteen contracts run
+   the authored ten-hour `office-day` rather than a thirty-minute slice, so the top of that range
+   is 150 minutes against the handoff's three, and the old figure was right for the three
+   contracts whose crowd `data/` ships no day for. A
    *session* is several turns; a *turn* is one pass through the five beats. **This is a finding
    about the build, not a correction of the handoff** — `CLAUDE.md`'s division is that the handoff
    wins every disagreement about what the screen looks like and the simulator wins every
@@ -478,8 +483,8 @@ the handoff it is named in § 4.1 rather than smoothed over.
 
 | Mode | Length (**measured**, handoff's in brackets) | The loop (handoff) | Beats emphasised | Why it exists separately | Retry costs |
 |---|---|---|---|---|---|
-| **Today's tower** | 8-15 min a day at 4× (~3 min) | one day, one score, once a day | **1 and 5** | It is the only container where the verdict is against *other people's* runs on the same seed rather than against your own previous attempt. It makes the loop social | one per day |
-| **Campaign** | ongoing, ~4 min a building-day at 4× (~2 min) | clear days, spend units, keep contracts | **3**, by pricing it | The only container that makes a change *cost* something and persist past the day. It turns the retry from free into a decision | units, and a works night |
+| **Today's tower** | 8 min-2 h 30 a day at 4× (~3 min) | one day, one score, once a day | **1 and 5** | It is the only container where the verdict is against *other people's* runs on the same seed rather than against your own previous attempt. It makes the loop social | one per day |
+| **Campaign** | ongoing, 8-15 min a building-day at 4× (~2 min) | clear days, spend units, keep contracts | **3**, by pricing it | The only container that makes a change *cost* something and persist past the day. It turns the retry from free into a decision | units, and a works night |
 | **Endless rush** | 4-23 min at 4× (~5 min) | one climbing day until it stops draining | **1 only** — see § 3.4 | It answers *where does this configuration break*, which no other mode asks. A calibration instrument, not a turn of the loop | nothing — no retry exists |
 | **Fix a building** | 13-23 min a case at 4× (~5 min) | diagnose, reconfigure, re-run, pass or retry | **all five, on one screen** | The only container where the diagnosis is given and the play is what to do about it — and the only one that closes without navigating | free, and it says so |
 

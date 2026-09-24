@@ -1124,10 +1124,13 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
           'this product, and no two dispatchers are ever ranked on energy.',
         'The first four bars harden as the week goes on, and then they stop. Away-inside-a-minute ' +
           'tops out at 84 %, carried tops out at 96 %, the queue bar bottoms out at 12 people, and ' +
-          'the worst-wait ceiling bottoms out at 150 seconds. The energy ceiling is 80 kJ per ride ' +
-          'delivered and it does not move at all: work per ride falls on its own as a building ' +
-          'fills up, so a ceiling that tightened nightly would be chasing a number already going ' +
-          'the right way. There is no losing here. There is a line you are trying to bend upward.',
+          'the worst-wait ceiling bottoms out at 150 seconds. The energy ceiling does not move with ' +
+          'the week at all: work per ride falls on its own as a building fills up, so a ceiling ' +
+          'that tightened nightly would be chasing a number already going the right way. What it ' +
+          'does depend on is how much of the day you run — 80 kJ per ride delivered over a part of ' +
+          'a day, and 350 kJ per ride delivered over a whole authored one, because a ' +
+          'whole day includes the quiet hours where the same travel carries far fewer people. ' +
+          'There is no losing here. There is a line you are trying to bend upward.',
         'Nothing is graded before the building wakes up: under 20 arrivals every goal reads a ' +
           'dash instead of a verdict, because a carried share over three riders is arithmetic ' +
           'rather than competence. The energy goal reads a dash until the day is over, because ' +

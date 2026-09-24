@@ -53,7 +53,11 @@
  * and so do `c4` and `c5`, re-measured beside them. Five contracts tied at the ceiling is a
  * measurement that has stopped discriminating, and the reason is one this repository already
  * recorded: `shift/goals.ts`'s energy bar asks for 80 kJ per delivered ride, and a leg in a
- * supertall costs **86.8 to 242.6 kJ** measured across the five. § D468 found that the bar is
+ * supertall costs **86.8 to 242.6 kJ** measured across the five. *(That figure is the **period**
+ * bar and this measurement is a period run — § 4.7d's budget is each contract's own shift length —
+ * so [§ D962](../../../../DECISIONS.md)'s second bar, 350 kJ over a whole authored day, does not
+ * move it. What § D962 does establish is that the same five towers read 284.6 to 611.1 kJ over the
+ * day a player actually runs, where the tie is not at the energy bar at all.)* § D468 found that the bar is
  * dominated by building fabric rather than by play and left it as `docs/33` O2 and GitHub issue
  * #234; this is the same finding at three more towers, and no rung in `data/contract-ladder.json`
  * can move it, which is why all three are handed **as built**.
@@ -72,7 +76,8 @@
  * `c14` (One-WTC-class), `c15` (Empire-State-class) and `c16` (Willis-class) are GitHub issues
  * #428, #427 and #426. Measured on the shipped path at § 4.7d's budget and seeds, **every one reads
  * 1.00**, for the reason the three before them did: `shift/goals.ts`'s energy bar asks 80 kJ per
- * delivered ride and a ride in any of them costs more. So the tie at the ceiling is now **eight**
+ * delivered ride and a ride in any of them costs more. *(Again the **period** bar on a period run;
+ * see the note above and [§ D962](../../../../DECISIONS.md).)* So the tie at the ceiling is now **eight**
  * contracts, and ordering it by bank count alone is no longer a total order — `one-wtc-class-reference`
  * and `shanghai-class-reference` both have six banks, and `vertical-city` and `willis-class-reference`
  * both have seven.
@@ -98,7 +103,7 @@
  * A scenario's **crowd** and the **tower it hands over** are declared per contract in
  * `data/contract-ladder.json` and applied by `shift/ladder.ts`. That is why three briefs below
  * describe a building `data/buildings/` does not hold: `c1` runs its block with one car and 234
- * residents, `c2` runs its tower four tenths let, and `c6` runs five cars at 3.5 m/s. The stat line
+ * residents, `c2` runs its tower about a third let, and `c6` runs five cars at 3.5 m/s. The stat line
  * beside each card is drawn from `ladderTowersOf`, the same derivation the run is built from, so
  * the card and the run cannot disagree about the tower.
  *
@@ -217,7 +222,9 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
      * profiles × five seeds give 64 of 65 runs a diverging queue and a suppressed mean, which is
      * the role `docs/37` § 7.2 authors it for and is **not** a scenario, because a day nobody can
      * pass teaches nothing. The rung lets it at 0.60 — 930 desks rather than 1 560 — exactly as
-     * `c2` lets Midtown Office at 0.395, and the stat line beside this card is drawn from
+     * `c2` lets Midtown Office at **0.34** (it was 0.395 until § D914 booked one of its four
+     * cars out mid-shift and the let came back to keep DC-4), and the stat line beside this card
+     * is drawn from
      * `ladderTowersOf`, so the card and the run cannot disagree about which tower this is.
      */
     brief:
@@ -232,7 +239,7 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     title: 'The morning rush',
     teaches: 'up-peak, and the gap between demand offered and carried',
     brief:
-      'A twenty-floor tower four tenths let — 675 tenants — on four geared cars. At the peak they all want the same thing at the same time, and the queue in the lobby is where you find out whether your dispatcher is any good. The floors above are empty for now, which is the only reason this is winnable.',
+      'A twenty-floor tower about a third let, on four geared cars — and one of the four is booked out for part of the morning. At the peak they all want the same thing at the same time, and the queue in the lobby is where you find out whether your dispatcher is any good. The floors above are empty for now, which is the only reason this is winnable.',
     needClean: 2,
     reward: 'Operational zoning · Capacity aware · one spare shaft',
   }),

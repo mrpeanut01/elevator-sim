@@ -505,8 +505,9 @@ describe('every browser-tier file names a port of its own — the trap this tier
    * `server: { port: <n>, ... }` as the tier actually writes it, across line breaks — **and
    * `preview: { … }` beside it**, which is the tier's second server kind.
    *
-   * The `preview` arm landed with GitHub issue #281 and is now **the tier's common case**: 29 of
-   * its 33 files serve the built `dist-web/` rather than source modules. It needs a port for
+   * The `preview` arm landed with GitHub issue #281 and is now **the tier's common case** — every
+   * file but the four in `DEV_SERVER_FILES` serves the built `dist-web/` rather than source
+   * modules, which the suite below asserts rather than counts here. It needs a port for
    * exactly the same reason and collides in exactly the same way, so it is read by the same guard
    * rather than excused from it. `startShippedSite` takes Vite's own `preview` options as an object
    * for this reason: a port passed as a bare number would be invisible here, and a guard that
@@ -678,13 +679,24 @@ describe('the tier collects page errors in one place — GitHub issue #268', () 
  *
  * ## What was wrong
  *
- * 32 of the tier's 33 files started a `vite dev` server. Players load `dist-web/`, produced by
- * `npm run build:web` and served as static files. Everything the tier certified was therefore true
- * of an artifact nobody receives, and a defect had already lived in the difference — the Everyday
- * shell's missing scroll reset, whose two pinning cases were both deleted for asserting nothing.
+ * When wave I opened, **32 of the tier's then 33 files** started a `vite dev` server — a dated
+ * figure about that tree, kept as one. Players load `dist-web/`, produced by `npm run build:web`
+ * and served as static files. Everything the tier certified was therefore true of an artifact
+ * nobody receives, and a defect had already lived in the difference — the Everyday shell's
+ * missing scroll reset, whose two pinning cases were both deleted for asserting nothing.
  *
- * 29 files now serve the shipped bundle through `startShippedSite`. Four cannot, and this suite is
- * what stops that four from becoming five by accident.
+ * **Every file that can serve the shipped bundle through `startShippedSite` now does, and the
+ * exceptions are exactly `browserTier.test-helper.ts#DEV_SERVER_FILES`** — which the two cases
+ * below assert against the tier's own sources in both directions. This suite is what stops that
+ * set growing by accident.
+ *
+ * **How many files are on each side is deliberately not written here.** The sentence that was —
+ * *"29 files now serve the shipped bundle… Four cannot"* — was a present-tense count of a tree,
+ * and it was wrong by the time lane AG-FIX-1 read it: the tier had grown to 52 files and nothing
+ * had re-derived the 29. `CLAUDE.md`'s own remedy for that class is the one applied here — a
+ * figure a reader can regenerate in one command does not need a copy of itself in prose, and
+ * this one proved it goes stale faster than anybody re-reads it. The set is `DEV_SERVER_FILES`;
+ * the derivation is the case below; the count is neither's business.
  *
  * ## Why both directions
  *

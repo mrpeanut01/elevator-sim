@@ -73,6 +73,8 @@ function validationInput(): LadderValidationInput {
         ?.banks.find((bank) => bank.id === bankId)
         ?.cars.map((car) => car.id),
     mixedBankIdsFor: (buildingId) => mixedFleetBanks(authoredBuilding(buildingId)),
+    /* Every shipped profile id, for a rung's pinned press day to name — § D914. */
+    dispatcherIds: () => config.dispatcherProfiles.profiles.map((profile) => profile.id),
     speedBandFor: (machineClassId) => {
       const entry = config.specsById.get(machineClassId);
       if (entry === undefined) return undefined;
@@ -121,13 +123,31 @@ describe('the shipped ladder is legal against the shipped data', () => {
       readFileSync(join(DATA_DIR, 'contract-ladder.json'), 'utf8'),
     ) as { readonly contracts: readonly Record<string, unknown>[] };
     for (const row of authored.contracts) {
-      expect(Object.keys(row).sort()).toEqual([
+      /*
+       * `pressDay` is optional and the other four are not, so the expectation drops it before
+       * comparing — the fabric's `incidents` two blocks below has read this way since § D871, and
+       * the point of the check survives either way: the set is closed, so a key this table does not
+       * name still fails. § D914 added the fifth, and it declares no bar either: a seed, two
+       * `InterventionChange` kinds, a fraction and a list of shipped dispatcher ids.
+       */
+      expect(Object.keys(row).sort().filter((key) => key !== 'pressDay')).toEqual([
         'buildingId',
         'contractId',
         'demand',
         'fabric',
         'intent',
       ]);
+      const press = row['pressDay'] as Record<string, unknown> | undefined;
+      if (press !== undefined) {
+        expect(Object.keys(press).sort()).toEqual([
+          'clearedBy',
+          'missedBy',
+          'mootUnder',
+          'pressAtFraction',
+          'seedText',
+          'standingOrder',
+        ]);
+      }
       expect(Object.keys(row['demand'] as object).sort()).toEqual(
         Object.keys(row['demand'] as object).length === 0 ? [] : ['arrivalRatePctPop5min'],
       );
@@ -170,7 +190,14 @@ describe('a rung’s booked absence reaches the run, and no other rung’s does 
    */
   it('declares exactly one absence, and it is a window strictly inside the run', () => {
     const declaring = CONTRACT_LADDER.rows.filter((row) => row.fabric.incidents.length > 0);
-    expect(declaring.length, 'some rung declares an absence, or this case checks nothing').toBe(1);
+    /*
+     * **Seven rungs now, not one** — GitHub issue #587, § D914. § D871 authored the first and this
+     * case read `toBe(1)`, which was a statement about that wave rather than about the schema. The
+     * bound that matters is that *some* rung declares one, or the loop below checks nothing; the
+     * exact count is `pressLadder.test.ts`'s, where it is derived from the rows that carry a pinned
+     * day rather than written as an integer.
+     */
+    expect(declaring.length, 'some rung declares an absence, or this case checks nothing').toBeGreaterThan(0);
     for (const row of declaring) {
       for (const incident of rungIncidents(row)) {
         expect(incident.fromFraction).toBeGreaterThan(0);
@@ -206,8 +233,13 @@ describe('a rung’s booked absence reaches the run, and no other rung’s does 
       ),
     };
     const issues = contractLadderIssues(broken, validationInput());
-    expect(issues.length).toBe(1);
-    expect(issues[0]).toContain('takes car Z out of');
+    /*
+     * One issue **per declaring rung** — seven since § D914, and counted off the ladder rather
+     * than written down, so authoring an eighth press day does not silently weaken this case.
+     */
+    const declaring = CONTRACT_LADDER.rows.filter((row) => row.fabric.incidents.length > 0).length;
+    expect(issues.length).toBe(declaring);
+    for (const issue of issues) expect(issue).toContain('takes car Z out of');
   });
 });
 

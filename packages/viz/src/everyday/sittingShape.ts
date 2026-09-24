@@ -59,9 +59,39 @@
  * satisfy the honesty rule and fail the player, who came to the tile to find out whether they have
  * time. So the two modules disagree on purpose, and each says so.
  *
+ * ## The second axis, and the defect that made it necessary — [§ D946](../../../../DECISIONS.md)
+ *
+ * § D753 composed every figure from the **rung**, so a rung move carries them. It left the other
+ * factor a constant, and an assessor measured what that cost on the screen a player uses to decide
+ * how to spend their evening:
+ *
+ * | tile | it said | it played | out by |
+ * |---|---|---|---|
+ * | Career | *~4 min a building-day at 4×* | Garden Apartments' 3 600 s (§ D234) | ×3.75 |
+ * | Today's scenario | *8-15 min a day at 4×* | Midtown Office's 36 000 s `office-day` | ×10 |
+ *
+ * The scenario figure was measured by playing rather than by reading: the playhead advanced
+ * **4 019 s in 975 s of wall clock**, a rate of **4.12×**, so the rung was right and the span was
+ * wrong. Both spans named the wrong day outright — `campaignStage` was `data/campaign.json`'s
+ * 900 s stage, which the Career tile does not open at all, and `contractDay` was the 1 800–3 600 s
+ * slice, which thirteen of the sixteen contracts no longer run.
+ *
+ * So the day length is now the second axis of the same derivation, and it enters in two ways
+ * because the two halves have different reach. **The contract's own length is read live** from
+ * `CONTRACTS`, so a contract authored at a new length moves these strings on its own commit.
+ * **The authored day's period cannot be**, because it lives in `data/` behind an async load and
+ * these are frozen module constants — so it is declared once, with its source, and
+ * `sittingShape.test.ts` censuses `shift/dayLength.ts#wholeDayFor` over all sixteen contracts and
+ * fails unless the published span brackets every one of them exactly. Rule 3 below is what makes
+ * that a pin rather than a promise.
+ *
  * Recorded under [§ D753](../../../../DECISIONS.md), which carries the measurement, the five
- * strings it moved and the four documents that repeated them.
+ * strings it moved and the four documents that repeated them, and under
+ * [§ D946](../../../../DECISIONS.md), which is the day-length axis and the assessment above.
  */
+
+import { DEFAULT_SHIFT_LENGTH_S } from '../dev/state.js';
+import { CONTRACTS } from '../shift/contracts.js';
 
 import { DEFAULT_STAGE_SPEED_INDEX, stageSpeedAt } from './stageScreenModel.js';
 
@@ -81,6 +111,58 @@ export interface SittingSpan {
 }
 
 /**
+ * **How long one contract's run is, in simulated seconds** — the same expression the press uses.
+ *
+ * `dev/state.ts#shiftLengthForContract` is what `scenariosPanel`'s *take*, `initialState` and
+ * `host.ts#runCampaignDay` all write, and this is its fold over `CONTRACTS` rather than a second
+ * reading of it: a contract that authors a length uses it, and a contract that authors none uses
+ * `DEFAULT_SHIFT_LENGTH_S`. Imported rather than copied — 1 800 is the horizon every figure in
+ * `docs/05-roadmap.md` was measured over, and a second copy of it here is how a session-shape
+ * figure comes to describe a day the product does not run.
+ */
+function contractRunLengthS(contract: { readonly shiftLengthS?: number | undefined }): number {
+  return contract.shiftLengthS ?? DEFAULT_SHIFT_LENGTH_S;
+}
+
+/** The smallest and largest of a non-empty list, as a span, with the file the list came from. */
+function spanOf(values: readonly number[], source: string): SittingSpan {
+  if (values.length === 0) throw new Error(`sittingShape: ${source} produced no length`);
+  return Object.freeze({
+    lowSimS: Math.min(...values),
+    highSimS: Math.max(...values),
+    source,
+  });
+}
+
+/** The union of two spans — the shortest sitting either offers to the longest either offers. */
+function unionOf(left: SittingSpan, right: SittingSpan): SittingSpan {
+  return Object.freeze({
+    lowSimS: Math.min(left.lowSimS, right.lowSimS),
+    highSimS: Math.max(left.highSimS, right.highSimS),
+    source: `${left.source}; ${right.source}`,
+  });
+}
+
+/**
+ * **The period of the whole authored day a building may run**, in simulated seconds.
+ *
+ * This is the one number on this page that **cannot** be derived where it is used, and saying so
+ * is better than pretending otherwise. `shift/dayLength.ts#wholeDayFor` answers it from
+ * `data/traffic-profiles.json` — a record's `durationMin × 60`, offered to a building whose own
+ * directional mix some phase of it declares at its peak — and `data/` is loaded asynchronously by
+ * the shell. `SITTING_SHAPES` is a frozen module constant read by `EVERYDAY_MODES`, which
+ * `honesty/surfaces.ts` sweeps without a document and without resources, so a figure composed here
+ * cannot await a fetch.
+ *
+ * So it is **declared here and censused by the test**: `sittingShape.test.ts` runs `wholeDayFor`
+ * over every one of the sixteen contracts' buildings and fails unless the span below brackets
+ * every length exactly. A day record authored at a new period, a building that gains or loses a
+ * day, and a contract authored at a new length are each a red test on the commit that lands them.
+ * That is rule 3 of this module's docstring applied to the axis § D753 left out.
+ */
+const AUTHORED_DAY_PERIOD_S = 36000;
+
+/**
  * Every span a shipped sitting can have, in simulated seconds.
  *
  * **`fixCase` is the one entry that is not an authored duration**, and the difference is the point:
@@ -89,18 +171,42 @@ export interface SittingSpan {
  * all eighteen cases by `sittingClock.measure.test.ts`' span leg, not `2 × durationS`.
  */
 export const SITTING_SPANS = Object.freeze({
-  /** One campaign stage — Career's building-day. */
-  campaignStage: Object.freeze({
-    lowSimS: 900,
-    highSimS: 900,
-    source: 'data/campaign.json',
-  }),
-  /** One contract day — the Scenario hub's *Today's scenario*, which opens § 6.1's front door. */
-  contractDay: Object.freeze({
-    lowSimS: 1800,
-    highSimS: 3600,
-    source: 'packages/viz/src/dev/state.ts#DEFAULT_SHIFT_LENGTH_S and shift/contracts.ts',
-  }),
+  /**
+   * **One career building-day** — what the Career tile opens on to.
+   *
+   * This entry read `campaignStage`, 900 s, `data/campaign.json`, and it was the wrong day
+   * entirely: a career day is not a campaign stage. `host.ts#runCampaignDay` writes
+   * `shiftLengthS: shiftLengthForContract(tower.id)` and `windowStartS: null`, and a
+   * `CampaignTower.id` **is** a contract id — so the day the Career tile plays is the signed
+   * contract's own run length, over any of the sixteen. An assessor measured the opening tower
+   * (Garden Apartments, `c1`, an hour by § D234) and got fifteen minutes of watching against a
+   * tile promising four.
+   *
+   * Derived live over `CONTRACTS`, so a contract authored at a new length moves this string on
+   * that contract's own commit. `data/campaign.json`'s 900 s stages are still 900 s and are still
+   * what `scenario/ladder.ts` draws — they are simply not this.
+   */
+  careerDay: spanOf(CONTRACTS.map(contractRunLengthS), 'packages/viz/src/shift/contracts.ts'),
+  /**
+   * **One contract day** — the Scenario hub's *Today's scenario*, which opens § 6.1's front door.
+   *
+   * This entry read 1 800–3 600 s, and it was right for three of the sixteen contracts and out by
+   * a factor of ten for thirteen. `host.ts#startRun` spreads `wholeDayRun(day)` into the patch for
+   * any building `wholeDayFor` answers for, which is every office crowd — thirteen of the sixteen
+   * contracts on the day this was written, and a number `sittingShape.test.ts` censuses rather
+   * than this sentence, because a count in prose about a set that grows is the defect this entry
+   * is about one level up. `office-day` declares a **ten-hour** period. An assessor watched Midtown Office advance
+   * 4 019 s in 975 s of wall clock and worked out that the tile promising 8–15 minutes had sold
+   * them two and a half hours.
+   *
+   * The union rather than either half, because *Today's scenario* is one press that reaches both:
+   * a contract with an authored day runs the day, and a contract without one keeps its slice.
+   * Quoting the slice alone is what shipped.
+   */
+  contractDay: unionOf(
+    spanOf(CONTRACTS.map(contractRunLengthS), 'packages/viz/src/shift/contracts.ts'),
+    spanOf([AUTHORED_DAY_PERIOD_S], 'data/traffic-profiles.json, through shift/dayLength.ts#wholeDayFor'),
+  ),
   /** One fix-a-building case — the as-built run watched, then the pair. */
   fixCase: Object.freeze({
     lowSimS: 3085.1,
@@ -140,6 +246,31 @@ export function sittingMinutes(
 }
 
 /**
+ * **Where a figure stops being minutes and starts being hours** — ninety.
+ *
+ * An office contract's day is 150 minutes at the shipped rung, and *150 min* is true, legible and
+ * the wrong size of unit for a decision about an evening: a reader parses two and a half hours
+ * faster than they parse a hundred and fifty minutes, and this string's whole job is to be parsed
+ * before an evening is committed. Ninety rather than sixty so that the common cases stay in the
+ * unit they were authored in — nothing shipped lands between 60 and 89 — and so that a range whose
+ * ends straddle the boundary is the exception rather than the rule.
+ *
+ * The minutes are computed first and **then** formatted, so {@link sittingMinutes}' `Math.ceil` is
+ * the only rounding anywhere in this module. An hours form that divided the seconds again would
+ * have a second rounding in it, and rule 2 of this module's docstring is about there being exactly
+ * one.
+ */
+const HOURS_FROM_MINUTES = 90;
+
+/** Whole minutes as a player reads them — `23 min`, or `2 h 30` once past {@link HOURS_FROM_MINUTES}. */
+function sittingWord(minutes: number): string {
+  if (minutes < HOURS_FROM_MINUTES) return `${String(minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${String(hours)} h` : `${String(hours)} h ${String(rest).padStart(2, '0')}`;
+}
+
+/**
  * The length clause of a shape string — *"8-15 min a day at 4×"*, or *"~4 min a building-day at 4×"*
  * where the shipped content is one length.
  *
@@ -163,7 +294,12 @@ export function sittingLengthPhrase(span: SittingSpan, noun = ''): string {
   if (span.highSimS / rung.simPerRealS < 60) return `under a minute${of} at ${rung.label}`;
   const low = sittingMinutes(span.lowSimS, rung.simPerRealS);
   const high = sittingMinutes(span.highSimS, rung.simPerRealS);
-  const figure = low === high ? `~${String(high)} min` : `${String(low)}-${String(high)} min`;
+  const figure =
+    low === high
+      ? `~${sittingWord(high)}`
+      : low < HOURS_FROM_MINUTES && high < HOURS_FROM_MINUTES
+        ? `${String(low)}-${String(high)} min`
+        : `${sittingWord(low)}-${sittingWord(high)}`;
   return `${figure}${of} at ${rung.label}`;
 }
 
@@ -172,12 +308,14 @@ export function sittingLengthPhrase(span: SittingSpan, noun = ''): string {
  *
  * It is the union of the hub's two entries rather than either of them, because the tile is the
  * press that reaches both and a figure quoting one would be advertising the shorter.
+ *
+ * **Taken through {@link unionOf} rather than written out, and that is this module's own defect
+ * caught one field over.** It read `contractDay.lowSimS` to `fixCase.highSimS` — correct only
+ * while the fix case was the longer of the two, which it was and is no longer. A hand-built union
+ * that happens to name the right two fields is exactly the *constant that happens to be right*
+ * this rewrite is about.
  */
-const SCENARIO_HUB_SPAN: SittingSpan = Object.freeze({
-  lowSimS: SITTING_SPANS.contractDay.lowSimS,
-  highSimS: SITTING_SPANS.fixCase.highSimS,
-  source: `${SITTING_SPANS.contractDay.source}; ${SITTING_SPANS.fixCase.source}`,
-});
+const SCENARIO_HUB_SPAN: SittingSpan = unionOf(SITTING_SPANS.contractDay, SITTING_SPANS.fixCase);
 
 /**
  * The five session-shape strings, composed once.
@@ -203,7 +341,7 @@ export const SITTING_SHAPES = Object.freeze({
    */
   scenarioMode: `${sittingLengthPhrase(SCENARIO_HUB_SPAN)}, skippable · retry as often as you like`,
   /** The Career tile. The lose condition is the handoff's and is kept word for word. */
-  careerMode: `${sittingLengthPhrase(SITTING_SPANS.campaignStage, 'a building-day')} · three lost contracts ends the career`,
+  careerMode: `${sittingLengthPhrase(SITTING_SPANS.careerDay, 'a building-day')} · three lost contracts ends the career`,
   /**
    * The Rush tile. The range **is** the mode, which is what its second clause has always said and
    * has never until now had a figure agreeing with: 95 of the 221 measured cells never hold at all.

@@ -194,9 +194,9 @@ describe('the rotation rules `docs/37` § 4.3 states, measured rather than assum
   it('does not satisfy *no tower twice in seven days*, and the figures are the docstring’s', () => {
     expect(
       ELIGIBLE_FIRST_CONTRACT_IDS.length,
-      'dailySeed.ts publishes 42.2 % and 56 measured over these eleven contracts — re-measure ' +
+      'dailySeed.ts publishes 34.4 % and 50 measured over these fourteen contracts — re-measure ' +
         'and move both figures if the legible set has changed',
-    ).toBe(11);
+    ).toBe(14);
 
     const draws = twoYearsOfDraws();
     const lastSeenAt = new Map<string, number>();
@@ -212,10 +212,17 @@ describe('the rotation rules `docs/37` § 4.3 states, measured rather than assum
     });
 
     expect(draws).toHaveLength(730);
-    expect(insideSeven).toBe(308);
-    expect(consecutive).toBe(56);
-    // 308 / 730 = 42.2 %, the figure `dailySeed.ts`'s docstring publishes.
-    expect(Math.round((1000 * insideSeven) / draws.length) / 10).toBe(42.2);
+    /*
+     * **Both figures moved on 2026-09-22 and the guard above is what caught it** —
+     * [§ D963](../../../../DECISIONS.md). They were 308 and 56 over an eleven-member set; the
+     * legibility sweep was re-measured on a tree where six ladder rungs had moved and the set grew
+     * to fourteen. A set that is three members wider collides less, so the rotation rule gets
+     * closer to satisfied without anybody aiming at it — 42.2 % → **34.4 %** — and still fails it.
+     */
+    expect(insideSeven).toBe(251);
+    expect(consecutive).toBe(50);
+    // 251 / 730 = 34.4 %, the figure `dailySeed.ts`'s docstring publishes.
+    expect(Math.round((1000 * insideSeven) / draws.length) / 10).toBe(34.4);
   });
 
   it('draws only from the legible set, whatever the date', () => {

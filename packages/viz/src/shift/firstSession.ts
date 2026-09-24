@@ -124,6 +124,13 @@ const NUMBER_WORDS: readonly string[] = Object.freeze([
  * three times, and a literal would have had to be remembered on each. The count is the
  * eligible set's own length and the days are `rows × n`, so a contract entering or leaving the
  * legible set moves the sentence on the same commit that moves the table.
+ *
+ * **And on 2026-09-22 it moved for the first time with no contract added at all** —
+ * [§ D963](../../../../DECISIONS.md). Six ladder rungs moved under the sweep
+ * ([§ D914](../../../../DECISIONS.md)), `c6`, `c8` and `c9` crossed § D512's threshold from below,
+ * and the set went **eleven → fourteen** with sixteen rows in the table either side. That is the
+ * case this derivation was written for and the one a literal would certainly have missed: the
+ * table's own size did not move, so nobody editing a contract list would have looked here.
  */
 export const FIRST_SESSION_LINE =
   `A first day opens on one of the ${NUMBER_WORDS[ELIGIBLE_FIRST_CONTRACT_IDS.length] ?? String(ELIGIBLE_FIRST_CONTRACT_IDS.length)} towers whose day 1 puts somebody past a minute on a landing ` +

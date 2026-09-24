@@ -216,3 +216,74 @@ describe('the stage’s handover reaches the run — GitHub issue #171', () => {
     expect(pressed).toEqual(baseline);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * What the parking press actually does — GitHub issue #565, § D949
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The measurement that refused a fix**, kept because it is worth more than the fix would have
+ * been — [§ D949](../../../../DECISIONS.md).
+ *
+ * A playability assessor pressed *spread the cars* on a day driven by `zoned-uppeak`, measured
+ * **0 of 355 legs** changed, and read nothing on the screen. § D227's first polarity says a control
+ * that does nothing must say so, and the refusal looked derivable without simulating anything:
+ * `data/dispatcher-profiles.json` gives `zoned-uppeak` `idle.parkingStrategy: "zone-center"`, and
+ * `sim/simulation.ts#idleOverrideAt` sets exactly `'zone-center'` for a `spread-cars` entry. The
+ * press writes the value already in force, so — the argument goes — it cannot move a leg, and the
+ * row can say so before anybody presses it.
+ *
+ * **That argument is false, and this file is where it was caught.** Swept over two buildings ×
+ * three shift lengths × three dispatchers × both arms, with the press stamped at 28 % of the shift:
+ * under `zoned-uppeak` at `garden-apartments`, *spread the cars* **does** move the legs at 900 s
+ * and at 1 800 s, while writing the strategy that profile already declares. A refusal derived from
+ * the profile would have told those players a live control was dead, which is § D177's
+ * inert-control class with its polarity reversed — the failure the refusal existed to prevent,
+ * arriving as the fix for it.
+ *
+ * **No mechanism is offered**, on [§ D256](../../../../DECISIONS.md)'s rule. `repositionDecisionFor`
+ * reads every stage-7 setting off one `effective` config and the override is value-identical, so
+ * the run *should* be identical and is not; establishing why means measuring inside `core`, and a
+ * plausible sentence in place of that measurement is what § D256 refuses.
+ *
+ * So the two cells below are the claim this file makes and the whole of it: the press is **inert at
+ * some operating points and live at others under the same dispatcher**, which is why nothing on the
+ * stage may say in advance what it will do.
+ */
+describe('the parking press is operating-point dependent, not dispatcher dependent — issue #565', () => {
+  const PRESS_AT_S = Math.round(AT.shiftLengthS * 0.28);
+  const SPREAD: RunInterventionConfig = { atS: PRESS_AT_S, change: { kind: 'spread-cars' } };
+
+  const spreadMoves = (buildingId: string, shiftLengthS: number, dispatcherId: string): boolean => {
+    const at: ViewerState = { ...stageState(), buildingId, shiftLengthS, dispatcherId };
+    const baseline = legsOf(at);
+    expect(baseline.length, `${buildingId}/${dispatcherId} carried nobody`).toBeGreaterThan(0);
+    return JSON.stringify(legsOf({ ...at, interventions: [SPREAD] })) !== JSON.stringify(baseline);
+  };
+
+  /*
+   * The assessor's own cell, reproduced: the press writes the strategy `zoned-uppeak` already
+   * declares and the legs do not move. This is the half that made the refusal look derivable.
+   */
+  it('moves no leg under zoned-uppeak on the office tower', () => {
+    expect(spreadMoves('midtown-office', 1800, 'zoned-uppeak')).toBe(false);
+  });
+
+  /*
+   * And the half that refutes it. Same dispatcher, same press, same 28 % stamp — a different
+   * building, and the legs move. Whatever makes the press bite is not the profile's declared
+   * parking strategy, so no screen reading that profile can say in advance that the press is inert.
+   */
+  it('and moves legs under the same dispatcher on the residential block', () => {
+    expect(spreadMoves('garden-apartments', 1800, 'zoned-uppeak')).toBe(true);
+  });
+
+  /*
+   * The control that keeps the pair from being a statement about `zoned-uppeak` at all: on the
+   * office tower the press is live under `collective`, so the office cell above is not simply a
+   * building on which nothing ever repositions.
+   */
+  it('and is live on that same office tower under a dispatcher that parks nowhere in particular', () => {
+    expect(spreadMoves('midtown-office', 1800, 'collective')).toBe(true);
+  });
+});

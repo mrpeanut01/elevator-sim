@@ -4,19 +4,13 @@
  * sweep pinned per contract so the table in `legibility.ts` cannot go stale in silence.
  */
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-import { parseBuilding, resolveBuilding } from '@elevator-sim/core';
 import { describe, expect, it } from 'vitest';
 
 import type { VizLeg } from '../contract/types.js';
-import type { BrowserResources } from '../dev/data.js';
-import { shiftLengthForContract, shiftRunConfigOf } from '../dev/state.js';
-import { DATA_DIR } from '../fixtures.test-helper.js';
+import { shiftRunConfigOf } from '../dev/state.js';
 import { recordRun } from '../record/recordRun.js';
-import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 
+import { contractBuildings, contractDayState } from './contractDay.test-helper.js';
 import { CONTRACTS } from './contracts.js';
 import { LEGIBILITY_WINDOW_S, legibilityBandFromS, legibilityOf } from './legibility.js';
 
@@ -64,33 +58,32 @@ describe('the arithmetic', () => {
   });
 });
 
-/** Every shipped building, resolved through the loader `probes.test-helper.ts` uses for its two. */
-function allBuildings(): BrowserResources {
-  const entries = CONTRACTS.map((contract) => {
-    const config = parseBuilding(JSON.parse(readFileSync(join(DATA_DIR, 'buildings', `${contract.buildingId}.json`), 'utf8')));
-    return { file: `${contract.buildingId}.json`, config, resolved: resolveBuilding(config, RESOURCES.elevatorSpecs) };
-  });
-  return { ...RESOURCES, buildings: entries.map((entry) => entry.resolved), entries };
-}
-
 describe('the sweep, pinned on its first ten seeds per contract', () => {
   it('reproduces the table’s slice: the same seeds, the same band, the same window', () => {
-    const resources = allBuildings();
+    const resources = contractBuildings();
     const counts: Record<string, number> = {};
     const stretches: Record<string, number[]> = {};
     for (const contract of CONTRACTS) {
       let legible = 0;
       const longest: number[] = [];
       for (let n = 0; n < 10; n += 1) {
-        const plan = shiftRunConfigOf(resources, {
-          ...baseState(),
-          buildingId: contract.buildingId,
-          dispatcherId: 'collective',
-          shiftLengthS: shiftLengthForContract(contract.id),
-          seed: 20_260_824n + 7_919n * BigInt(n),
-          campaignEventId: 'ordinary',
-        });
-        const day = legibilityOf(recordRun(plan.config, { recordDecisions: false }).recording);
+        /*
+         * **The pair, built together** — GitHub issue #584, § D961. This read
+         * `{ ...baseState(), buildingId: contract.buildingId, … }`, whose week stands on `c1`, so
+         * `rungFor` returned nothing and every tower was measured as built rather than as its
+         * contract hands it over. `contractDayState` refuses a mismatched pair, and it threads
+         * `outOfServiceCarIds`, which this call also dropped.
+         */
+        const plan = shiftRunConfigOf(
+          resources,
+          contractDayState(contract.id, { seed: 20_260_824n + 7_919n * BigInt(n) }),
+        );
+        const day = legibilityOf(
+          recordRun(plan.config, {
+            recordDecisions: false,
+            outOfServiceCarIds: plan.outOfServiceCarIds,
+          }).recording,
+        );
         if (day.legible) legible += 1;
         longest.push(Math.round(day.longestS));
       }
@@ -111,19 +104,61 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
      * people the building holds; {@link LEGIBILITY_WINDOW_S}'s docstring carries the fifty-seed
      * figures and declines to offer a mechanism for the spread.
      */
+    /*
+     * **Re-measured 2026-09-22 with the pair consistent** — GitHub issue #584, § D961. Six of the
+     * sixteen keys moved, and they were exactly six of the seven contracts that declare a ladder
+     * rung: `c2` 10 → 7, `c6` 0 → 2, `c7` 8 → 7, `c8` 0 → 2, `c9` 10 → 1 and `c10` 2 → 7, with
+     * `c3` unmoved at 2. **That row is a dated record and the paragraph below replaces it**: it was
+     * measured on a branch, and a sibling lane in the same wave moved the rungs under it.
+     */
+    /*
+     * **Re-measured again the same day, on the integrated tree** —
+     * [§ D963](../../../../DECISIONS.md). GitHub issue #587's lane rebalanced six of the seven
+     * rungs and booked a car out of passenger service on each of their days
+     * ([§ D914](../../../../DECISIONS.md)), so the slice above was pinned over rungs that had moved
+     * by the time the wave merged. Six keys move again, and they are exactly the six rungs that
+     * lane touched: `c2` 7 → **8**, `c3` 2 → **7**, `c6` 2 → **6**, `c8` 2 → **8**, `c9` 1 → **5**
+     * and `c10` 7 → **6**.
+     *
+     * **`c7` is the control and nobody had to arrange it, for the second wave running.** It is the
+     * one rung-bearing contract that rebalance did not touch — its incident predates it — and it is
+     * unmoved at 7 of 10 with its ten stretches byte-identical below. The nine rung-less contracts
+     * are unmoved to the second as well. So the sentence above holds one wave on: every key that
+     * moved is a key whose rung moved, and no key moved that had no reason to.
+     *
+     * **`c9` at 5 of 10 is below half, and the heading on this block says *most*.** The count is the
+     * measurement and the heading is older than it — `c3` sat in the eligible set at 2 of 10 before
+     * this. Whether *most* is still the right word is § D512's threshold question, and neither the
+     * threshold nor the heading is moved to make the other read better.
+     */
     expect(counts).toEqual({
-      c1: 0, c2: 10, c3: 2, c4: 6, c5: 8, c6: 0, c7: 8, c8: 0, c9: 10, c10: 2,
+      c1: 0, c2: 8, c3: 7, c4: 6, c5: 8, c6: 6, c7: 7, c8: 8, c9: 5, c10: 6,
       c11: 10, c12: 10, c13: 10, c14: 1, c15: 8, c16: 10,
     });
     expect(stretches['c1']).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    expect(stretches['c3']).toEqual([163, 72, 143, 65, 77, 90, 103, 106, 97, 51]);
-    expect(stretches['c6']).toEqual([0, 0, 60, 0, 28, 69, 10, 3, 70, 19]);
-    expect(stretches['c8']).toEqual([35, 8, 18, 38, 31, 35, 36, 91, 19, 42]);
-    // Harbour Point holds a landing past the band for most of the day on every seed; Ashgate does
-    // it on two of ten, which is the difference between a crowd that cannot be cleared and a
-    // journey that takes two legs.
-    expect(stretches['c9']).toEqual([1026, 1373, 1665, 1255, 1321, 1474, 1462, 1512, 1126, 1133]);
-    expect(stretches['c10']).toEqual([121, 73, 68, 104, 57, 67, 95, 76, 276, 61]);
+    // Secure Tower at 11 % with car C of the low bank out for three tenths of the shift: seven of
+    // ten rather than two, and the three that miss are 94, 89 and 77 s. The low bank rather than
+    // the high one is the rung's own choice, because it is the bank the lobby crowd meets.
+    expect(stretches['c3']).toEqual([147, 94, 133, 89, 173, 173, 187, 77, 217, 129]);
+    expect(stretches['c6']).toEqual([178, 16, 132, 101, 121, 272, 92, 180, 217, 104]);
+    // **St Jude's is the largest move this slice has recorded**: two of ten to eight, on the only
+    // rung that books out **two** cars, with its crowd raised from 8.5 % to 10.5 %. Seed 9's 119 s
+    // is one second under the window and is pinned for that: a change to either would move it
+    // first, and nothing here rounds it up.
+    expect(stretches['c8']).toEqual([139, 173, 182, 179, 161, 261, 147, 91, 119, 272]);
+    // **These two changed places on 2026-09-22 and then both moved again**, which is why the pair
+    // is still pinned. As built, Harbour Point held a landing past the band on every seed and
+    // Ashgate on two of ten; let as their contracts hand them over, it was one and seven. With a
+    // car booked out of each, it is **five** and **six** — the letting still works on Harbour Point
+    // and the absence is what the count is now reading.
+    expect(stretches['c9']).toEqual([125, 92, 198, 411, 129, 404, 67, 83, 50, 52]);
+    expect(stretches['c10']).toEqual([105, 213, 57, 271, 153, 64, 69, 165, 481, 150]);
+    // Midtown Office at 0.34 occupancy with car D out from a quarter of the shift: eight of ten,
+    // and the two that miss are 112 and 90 s — held landings that do not reach the window, not
+    // quiet days. Pinned because this is the flagship contract and the one a first session meets
+    // most often.
+    expect(stretches['c2']).toEqual([178, 213, 112, 179, 144, 415, 210, 133, 496, 90]);
+    expect(stretches['c7']).toEqual([91, 243, 104, 208, 261, 68, 238, 180, 190, 123]);
     // One WTC is the first supertall this slice has found below the window on nine seeds of ten —
     // one landing reaches 128 s and the rest never hold anybody a full two minutes. Empire State is
     // above it on eight, and the two seeds it misses on (115 s and 99 s) are the ones worth pinning:
@@ -133,6 +168,7 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
     // from 6.1 m/s to 6.0 (§ D600): eight of its ten stretches moved and the count did not, which is
     // what a timing change looks like against a threshold nobody crossed. **`c14` is unmoved** —
     // One WTC's speeds were already on the ladder — and that contrast is why both are pinned here.
+    // **Neither declares a rung, so neither moved again on 2026-09-22 or on the merged tree.**
     expect(stretches['c14']).toEqual([11, 1, 14, 28, 16, 128, 76, 6, 91, 0]);
     expect(stretches['c15']).toEqual([644, 601, 199, 568, 115, 738, 647, 99, 219, 683]);
   /*

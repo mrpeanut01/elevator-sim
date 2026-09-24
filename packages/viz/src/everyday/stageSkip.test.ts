@@ -12,6 +12,9 @@
  * `stageScreen.browser.test.ts`'s.
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { VIZ_SCHEMA_VERSION, type VizRecording } from '../contract/types.js';
@@ -19,7 +22,13 @@ import { constantSeries } from '../contract/series.js';
 import { FIXTURE_DOOR_CONFIG, fixtureSummary } from '../fixtures.test-helper.js';
 import { ManualClock } from '../playback/clock.js';
 import { Playback } from '../playback/playback.js';
-import { STAGE_SKIP_COPY, STAGE_SPEEDS, stageSkipViewOf } from './stageScreenModel.js';
+import {
+  STAGE_SKIP_COPY,
+  STAGE_SPEEDS,
+  stageOpeningLineOf,
+  stageShowsOpening,
+  stageSkipViewOf,
+} from './stageScreenModel.js';
 
 const RECORDING: VizRecording = {
   schemaVersion: VIZ_SCHEMA_VERSION,
@@ -83,11 +92,16 @@ function transport(): { readonly playback: Playback; readonly clock: ManualClock
 }
 
 /**
- * `stageScreen.ts#skipToEnd`, in the three lines the mount runs. Kept here rather than exported
+ * `stageScreen.ts#skipToEnd`, in the four lines the mount runs. Kept here rather than exported
  * from the mount because the mount needs a document to exist at all; the claim under test is what
- * those three lines do to a transport, which is a fact about `Playback`.
+ * those four lines do to a transport, which is a fact about `Playback`.
+ *
+ * **It was three lines until § D947.** `stage.started` is the mount's own latch, modelled here as
+ * the one field of it this action touches, because the defect the fourth line closes is invisible
+ * to a transport: the playhead was right and the overlay drawn over it said the day had not begun.
  */
-function skipToEnd(playback: Playback): void {
+function skipToEnd(playback: Playback, stage: { started: boolean } = { started: false }): void {
+  stage.started = true;
   playback.play();
   playback.seekTo(playback.recording.endedAt);
 }
@@ -208,5 +222,78 @@ describe('§ 2.3’s skip control — issue #369', () => {
       expect(speed.label).toBe(`${String(speed.simPerRealS)}×`);
     }
     expect(STAGE_SPEEDS.some((speed) => speed.label === STAGE_SKIP_COPY.label)).toBe(false);
+  });
+});
+
+/**
+ * **The overlay a skip used to leave standing** — GitHub issue #565's third defect,
+ * [§ D947](../../../../DECISIONS.md).
+ *
+ * A playability assessor pressed *Skip to the end* and read, twice, *"at 0:00 of 10:00:00 …
+ * Paused at 18:00, the start of the day. Nothing has happened yet"* beside a finished day's own
+ * figures. Every clause of it was false, and the canvas's accessible name carried it too, so a
+ * screen-reader user was told the day had not begun after watching it end.
+ *
+ * Both halves are asserted, because either alone would have closed the report and only the pair
+ * closes the class: the mount now sets its latch on this press, **and** the sentence is gated on
+ * the playhead rather than on the latch, so a control added later that moves the playhead without
+ * going through *Play* cannot bring it back in the same words.
+ */
+describe('§ 7.3’s opening overlay after a skip — issue #565', () => {
+  it('is up before the first press, which is the half that must survive the fix', () => {
+    const { playback } = transport();
+    expect(
+      stageShowsOpening({ started: false, simTimeS: playback.simTimeS, recording: RECORDING }),
+    ).toBe(true);
+  });
+
+  it('is gone once the skip has run, latch and playhead together', () => {
+    const { playback } = transport();
+    const stage = { started: false };
+
+    skipToEnd(playback, stage);
+
+    expect(stage.started).toBe(true);
+    expect(
+      stageShowsOpening({ started: stage.started, simTimeS: playback.simTimeS, recording: RECORDING }),
+    ).toBe(false);
+  });
+
+  /*
+   * The derivation on its own, with the latch left where the defect left it. This is the assertion
+   * that makes the fix a rule rather than a patch on one press.
+   */
+  it('is gone on a moved playhead even when nothing set the latch', () => {
+    expect(
+      stageShowsOpening({ started: false, simTimeS: RECORDING.endedAt, recording: RECORDING }),
+    ).toBe(false);
+  });
+
+  /*
+   * § D227's more dangerous polarity, pinned to the words rather than to a boolean: the sentence
+   * the assessor read is still exactly the sentence this gate exists to keep off a finished day,
+   * so a reword that left it reachable would fail here rather than read as a passing test about
+   * nothing.
+   */
+  it('the sentence it guards is still the false one, and is unreachable at the end', () => {
+    const line = stageOpeningLineOf({ recording: RECORDING, simTimeS: RECORDING.endedAt });
+    expect(line).toContain('the start of the day');
+    expect(line).toContain('Nothing has happened yet');
+    expect(
+      stageShowsOpening({ started: false, simTimeS: RECORDING.endedAt, recording: RECORDING }),
+    ).toBe(false);
+  });
+
+  /*
+   * And the mount really asks. The two files above are pure; `stageScreen.ts` needs a document, so
+   * what is checked here is that its two lines are the ones under test — `stageScreen.test.ts`'s
+   * own idiom for a claim that only a source read can make.
+   */
+  it('the mount sets the latch on this press and gates the overlay on the playhead', () => {
+    const mount = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
+    const skip = mount.slice(mount.indexOf('function skipToEnd('), mount.indexOf('function intervene('));
+    expect(skip).toContain('started = true;');
+    expect(mount).toContain('if (stageShowsOpening({');
+    expect(mount).not.toContain('    if (!started) {');
   });
 });

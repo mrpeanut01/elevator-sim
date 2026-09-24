@@ -44,6 +44,7 @@ import {
   type DispatcherProfiles,
   type ElevatorSpecs,
   type ResolvedBuilding,
+  type RunInterventionConfig,
   type TrafficProfiles,
 } from '@elevator-sim/core/browser';
 
@@ -164,6 +165,8 @@ import {
 } from '../everyday/tunerModel.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { SIGN_IN_LINK_STAGES, signInNoticeViewOf } from '../everyday/signInLink.js';
+/* GitHub issue #587's week-tower picker — driven by `EVERYDAY_TOWER_CHOICE` at the end of this file. */
+import { towerChoiceViewOf } from '../everyday/towerChoice.js';
 /* GitHub issue #242's fault ceiling — the report line's *at least* arm is drawn at it. */
 import { MAX_FAULTS_COUNTED } from '../everyday/faults.js';
 /* GitHub issue #245's report block — driven by `EVERYDAY_SUPPORT` at the end of this file. */
@@ -554,6 +557,7 @@ import { everyWrinkle } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
+import { pressCounterfactualOf } from '../shift/counterfactual.js';
 import {
   averageWaitFigure,
   clockRange,
@@ -3087,6 +3091,31 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       dispatcherName,
       dayStartS: DAY_START_S,
     };
+    /*
+     * The day's press log, named once — § D931. The sheet and the pair beside it both need it, and
+     * two copies of *which presses happened* is exactly the divergence that would make the paired
+     * row fall silently back to § D900's arm the first time somebody edited one of them. One
+     * array, two readers.
+     */
+    const interventions: readonly RunInterventionConfig[] = [
+      { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } },
+      /*
+       * And a bought change beside it — GitHub issue #370. Two presses rather than one, because
+       * the sheet's claim is *in time order* and a single line cannot show an ordering; and this
+       * kind rather than a third parking press, because its stamp is the one the sweep has never
+       * read. Effects are `[]`: this bundle renders a filed sheet from a recording it did not
+       * re-simulate, so an effect here would describe a day the numbers above it do not.
+       */
+      {
+        atS: (recording.startedAt + recording.endedAt) * 0.6,
+        change: {
+          kind: 'building-change',
+          changeId: 'rezone-bank',
+          name: 'Re-zone a bank',
+          serviceEvents: [],
+        },
+      },
+    ];
     const report = dayReportOf({
       ...common,
       subject: { kind: 'week-day' },
@@ -3099,25 +3128,24 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
        * log on purpose: an untouched day printing nothing is the other arm, and both are shipped
        * states.
        */
-      interventions: [
-        { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } },
-        /*
-         * And a bought change beside it — GitHub issue #370. Two presses rather than one, because
-         * the sheet's claim is *in time order* and a single line cannot show an ordering; and this
-         * kind rather than a third parking press, because its stamp is the one the sweep has never
-         * read. Effects are `[]`: this bundle renders a filed sheet from a recording it did not
-         * re-simulate, so an effect here would describe a day the numbers above it do not.
-         */
-        {
-          atS: (recording.startedAt + recording.endedAt) * 0.6,
-          change: {
-            kind: 'building-change',
-            changeId: 'rezone-bank',
-            name: 'Re-zone a bank',
-            serviceEvents: [],
-          },
-        },
-      ],
+      interventions,
+      /*
+       * **And the pair beside that log** — § D931, GitHub issue #581 route 1. Without this the
+       * paired arm of `shift/afterPress.ts` would render on no case at all, and a whole set of
+       * player-facing sentences — the three figures off the run without the press, and
+       * `shift/afterPress.ts#AFTER_PRESS_PAIR_NOTE` — would ship unswept. That is wave AE-C's finding pointed at
+       * a row rather than at a file, and the cheapest moment to avoid it is the commit that adds
+       * the arm.
+       *
+       * The partner is **this recording against itself**, derived through the shipped function
+       * rather than hand-written, so every ground it refuses on is exercised and the counts are
+       * the product's own. It is a fixture and says so: the corpus holds one recording per case,
+       * so there is no second run of this day to pair with, and the two sides therefore read the
+       * same figures. What is being swept is the **strings**, exactly as the seeded interventions
+       * above carry `effects: []` for the same reason. `counterfactual.test.ts` is where the pair
+       * is a real pair.
+       */
+      pressCounterfactual: pressCounterfactualOf(recording, recording, interventions),
       /*
        * And a **ruled** day, so the sheet's rule lines and its fallback sentence are in the corpus
        * — `docs/20` defect 2, on `shift/report.ts#ruleLines`. Two rows rather than one, because the
@@ -3322,6 +3350,17 @@ const SHIFT_REPORT: SurfaceAdapter = {
      */
     'shift/afterPress.ts#afterPressBeatOf',
     'shift/afterPress.ts#AFTER_PRESS_DISCLAIMER',
+    /*
+     * The paired arm's closing note — § D931. Seeded on this bundle's intervened sheet, which
+     * carries a `pressCounterfactual` for exactly that reason; the five sibling sheets and the
+     * single-run shape pass none, so § D900's unpaired arm is swept beside it.
+     *
+     * `shift/counterfactual.ts#pressCounterfactualOf` is **not** listed beside it, and the attempt
+     * was refused by a run rather than by review: `derive.test.ts`' *"a `covers` entry for nothing
+     * is a coverage claim for nothing"* case fails on a declaration that produces no prose, and
+     * that function produces three counts. The strings it feeds are `shift/afterPress.ts`'s.
+     */
+    'shift/afterPress.ts#AFTER_PRESS_PAIR_NOTE',
     'shift/goals.ts#goalsForDay',
     'shift/goals.ts#readGoal',
     'shift/goals.ts#readGoals',
@@ -12226,6 +12265,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         building: context.building,
         buildingId: context.building.id,
         dispatcherName: entry.report.metaLines[0],
+        /* Any profile's name, for the moot-dispatcher sentence — § D914. */
+        dispatcherNameOf: (id) =>
+          context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
         goals: entry.readings,
         seed: 424_242n,
         /*
@@ -12264,6 +12306,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           building: context.building,
           buildingId: context.building.id,
           dispatcherName: entry.report.metaLines[0],
+          /* Any profile's name, for the moot-dispatcher sentence — § D914. */
+          dispatcherNameOf: (id) =>
+            context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
           goals: entry.readings,
           seed: 424_242n,
           crowdIsToday: false,
@@ -12293,6 +12338,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         building: context.building,
         buildingId: context.building.id,
         dispatcherName: entry.report.metaLines[0],
+        /* Any profile's name, for the moot-dispatcher sentence — § D914. */
+        dispatcherNameOf: (id) =>
+          context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
         goals: entry.readings,
         seed: 424_242n,
         crowdIsToday: true,
@@ -12764,6 +12812,74 @@ const EVERYDAY_SIGN_IN_LINK: SurfaceAdapter = {
       }
       if (view.dismiss !== undefined) {
         seeds.push({ field: `signIn.${stage}.dismiss`, text: view.dismiss, role: 'label' });
+      }
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * **The week's tower picker** — GitHub issue **#587**, [§ D912](../../../../DECISIONS.md).
+ *
+ * ## Why it is swept, and what it is most likely to get wrong
+ *
+ * Every row on this surface is a **promise about what a press will do to a week a player cannot
+ * get back**: *you have a week going here — this picks it back up*, against *you have not played
+ * here — this opens a fresh week*. `shift/week.ts` spends a section on what a bare `takeContract`
+ * cost three callers before GitHub issue #107, so a row that promised a resume and restarted
+ * instead would be that loss with a label on it. The words are what this drives; that the press
+ * keeps them is `everyday/towerChoice.test.ts`'s and the browser tier's.
+ *
+ * ## Two states per case, and the second is the one worth seeding
+ *
+ * A week with **nothing parked** draws `open` on every row but its own; a week with two parked
+ * draws `resume` on those two. Both are ordinary states of the same screen, and seeding only the
+ * first would leave the sentence that carries the real promise unswept.
+ *
+ * **It seeds no figure, and mechanically so**: the only digits on the surface are inside the
+ * contracts' own `Scenario n` labels, which are names. The `covers` list names the copy record
+ * rather than the rows, because the rows are derived from `CONTRACTS` and a `covers` entry per
+ * tower would be a second list of the shipped set.
+ */
+const EVERYDAY_TOWER_CHOICE: SurfaceAdapter = {
+  id: 'everyday/towerChoice.ts#towerChoiceViewOf',
+  covers: ['everyday/towerChoice.ts#towerChoiceViewOf', 'everyday/towerChoice.ts#TOWER_CHOICE_COPY'],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    /*
+     * Every tower the corpus loaded, so a row draws the building's own name where this build has
+     * the document and its id where it does not — both are states the shipped picker reaches.
+     */
+    const nameOf = (buildingId: string): string | undefined =>
+      context.buildings.find((building) => building.id === buildingId)?.name;
+    /* The case's own week, `CAMPAIGN`'s idiom: the contract the corpus's building belongs to. */
+    const week = openWeek(contractForBuilding(context.case.buildingId)?.id);
+    const states: readonly (readonly [string, readonly WeekState[]])[] = [
+      ['fresh', []],
+      ['parked', [openWeek('c2'), openWeek('c7')]],
+    ];
+    for (const [state, parked] of states) {
+      const view = towerChoiceViewOf({ week, parked, nameOf });
+      seeds.push(
+        { field: `towers.${state}.heading`, text: view.heading, role: 'label' },
+        { field: `towers.${state}.lede`, text: view.lede, role: 'prose' },
+        { field: `towers.${state}.note`, text: view.note, role: 'prose' },
+        { field: `towers.${state}.incidentTag`, text: view.incidentTag, role: 'label' },
+      );
+      for (const row of view.rows) {
+        seeds.push(
+          {
+            field: `towers.${state}.${row.contractId}.name`,
+            text: `${row.label} · ${row.tower}`,
+            role: 'label',
+          },
+          { field: `towers.${state}.${row.contractId}.teaches`, text: row.teaches, role: 'prose' },
+          {
+            field: `towers.${state}.${row.contractId}.arrival`,
+            text: row.arrivalNote,
+            role: 'prose',
+          },
+        );
       }
     }
     return singleRun(this.id, seeds);
@@ -14342,6 +14458,14 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * wording whose fault it could take off a surface that exists to carry one.
    */
   EVERYDAY_LANDING,
+  /*
+   * And the week's tower picker — GitHub issue #587, § D912. Appended last in turn, and the
+   * fault-ordering rule is free here for the landing page's reason rather than the tutorial's: the
+   * surface publishes no figure at all (`towerChoice.test.ts` fails on a digit outside the
+   * contract's own `Scenario n` label), so there is no rate-shaped wording whose fault it could
+   * take off a surface that exists to carry one.
+   */
+  EVERYDAY_TOWER_CHOICE,
 ]);
 
 /* -------------------------------------------------------------------------- *

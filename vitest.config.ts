@@ -112,17 +112,26 @@ const alias = {
  * | | `viz` | `viz-browser` |
  * |---|---|---|
  * | ceiling | 300 000 ms | 120 000 ms |
- * | annotations | 503 | 188 |
- * | above its own ceiling | **108** | **79** |
- * | at its own ceiling | 206 | 106 |
- * | above 300 000 ms | 108 | 4 |
+ * | annotations | 509 | 192 |
+ * | above its own ceiling | **111** | **79** |
+ * | at its own ceiling | 207 | 110 |
+ * | above 300 000 ms | 111 | 4 |
  *
  * **The last two rows disagree for the browser tier, and that disagreement is a second finding.**
  * Counting *above 300 000 ms* is counting against a number rather than against a budget: it sees
- * four browser cases and misses the **63** that sit above the tier's own ceiling, including twenty
+ * four browser cases and misses the **75** that sit above the tier's own ceiling, including **31**
  * annotated at exactly this file's constant — 2.5× what the project they run in allows. A census
  * that asks each project about its own ceiling finds them; one that asks the tree about a number
  * does not.
+ *
+ * **Those two figures read 63 and *twenty* until 2026-09-22, and no wave had moved them — they
+ * were already stale at wave AG's base and at the published rows before it.** They were the only
+ * numbers in this census `testCost.test.ts` did not assert, which is the whole of why they are
+ * the only ones that drifted: the four table rows above go red the moment the tree moves and are
+ * corrected in the same commit, while these two sat wrong inside the paragraph arguing that a
+ * census must ask each project about its own ceiling rather than about a number. `RISKS.md` R38
+ * inside the docstring written against R38, on this file, again. Both are now in the asserted
+ * list, so the next move reddens rather than accumulates.
  *
  * **The annotations are not this leg's wall clock, and that is the finding rather than the
  * correction.** Measured 2026-09-05 on one `--project viz --reporter=json` run — 223 files, 5 065
@@ -150,7 +159,7 @@ const alias = {
  * had drifted within a day of being written: it read *"`packages/viz` carries **555** timeout
  * annotations in all, of which **182** sit exactly at 300 000 ms"*, which was exact on `13e7b93`
  * and is not exact here. Derived on this tree, and re-derived on every run of `testCost.test.ts`
- * rather than typed: `packages/viz` carries **691** timeout annotations in all, of which **237**
+ * rather than typed: `packages/viz` carries **701** timeout annotations in all, of which **238**
  * sit exactly at 300 000 ms. Removing them would be 185 edits whose only effect is to make those
  * sites depend silently on a line in another file. A site that knows it runs a simulation is
  * allowed to say so.

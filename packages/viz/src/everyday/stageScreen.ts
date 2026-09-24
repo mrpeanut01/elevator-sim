@@ -113,6 +113,7 @@ import {
   stageLegend,
   stageMayAdopt,
   stageOpeningLineOf,
+  stageShowsOpening,
   stageSkipViewOf,
   stageSpeedAt,
   type StageSwitchTarget,
@@ -1297,6 +1298,18 @@ function mountStage(
    */
   function skipToEnd(): void {
     if (playback === undefined) return;
+    /*
+     * **And the day has been started** — GitHub issue #565's third defect, § D947.
+     *
+     * This line was missing, and what it cost was a false sentence on the one surface that has no
+     * picture to contradict it: § 7.3's overlay stayed up over a finished day, reading *"Paused at
+     * 18:00, the start of the day. Nothing has happened yet"* beside the day's own closing
+     * figures, on the canvas's accessible name as well as on the glass. A player who skips has
+     * committed to the day exactly as a player who presses *Play* has, so the flag belongs here
+     * too — and `stageShowsOpening` is the derivation that makes the next control that forgets it
+     * harmless.
+     */
+    started = true;
     playback.play();
     playback.seekTo(playback.recording.endedAt);
     syncTransport();
@@ -1724,9 +1737,11 @@ function mountStage(
       status.style.display = 'flex';
       return;
     }
-    if (!started) {
+    if (stageShowsOpening({ started, simTimeS: playback?.simTimeS ?? adopted.startedAt, recording: adopted })) {
       /* AD-S5: the last moment the player is not watching anything is the moment to say what the
-         schedule is about to do. `stageOpeningLineOf` composes it; nothing is authored here. */
+         schedule is about to do. `stageOpeningLineOf` composes it; nothing is authored here.
+         The condition is `stageShowsOpening`'s rather than a bare `!started` — § D947: a playhead
+         that has moved makes every word of that sentence false, whatever any flag says. */
       statusText.textContent = stageOpeningLineOf({
         recording: adopted,
         simTimeS: playback?.simTimeS ?? adopted.startedAt,

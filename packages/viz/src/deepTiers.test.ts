@@ -545,6 +545,48 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'a building or a goal bar moves — which is exactly when § 4.7’s table has to be regenerated',
     scheduled: false,
   },
+  'packages/viz/src/shift/energyBar.sweep.test.ts': {
+    gates: ['ENERGY_BAR_SWEEP'],
+    reason:
+      'GitHub issue #583’s instrument — the energy bar re-derived over the horizon the day actually ' +
+      'runs: thirteen contracts by fifty whole authored days at day 1, plus § D106’s ' +
+      'perverse-ranking arm over all thirteen shipped dispatchers and a third arm at § D468’s own ' +
+      '1 800 s horizon. Not scheduled because it is a compute job rather than a check: the two ' +
+      'constants it produces are pinned by `shift/goals.test.ts` on every run, and a nightly ' +
+      're-derivation would write a figure nothing reads. It is re-run by hand when a rung, a ' +
+      'building, a demand template or the day’s length moves',
+    scheduled: false,
+  },
+  /*
+   * The first entry in this table whose file carries **two** gates opening **two different**
+   * blocks, which is why `gates` is read here as a list of names rather than as a conjunction.
+   *
+   * `PRESS_LADDER_SWEEP=1` opens the ladder sweep and `PRESS_LADDER_CENSUS=1` opens the dispatcher
+   * census; they are separate `describe.runIf`s and neither needs the other. Every other entry
+   * above lists the variables a step must set **together** — `measure.corpus.test.ts`'s three are
+   * the type case — and § 2's `sets every gate variable each tier needs` asserts exactly that
+   * conjunction. That assertion does not run here, because this tier is `scheduled: false`, and if
+   * a later wave schedules it the two blocks want two steps rather than one step setting both.
+   * Said here rather than discovered there.
+   *
+   * The other `PRESS_LADDER_*` names in that file — `SEEDS`, `FROM`, `PRESS_AT`, `OUT`, `ONLY`,
+   * `DISPATCHER`, `PINNED` — are **not** gates and are deliberately absent: each has a default or
+   * is read inside an already-open block, so none of them opens or shuts one. A variable a gated
+   * file reads is not a gate; only the two the `runIf`s test are.
+   */
+  'packages/viz/src/shift/pressLadder.sweep.test.ts': {
+    gates: ['PRESS_LADDER_SWEEP', 'PRESS_LADDER_CENSUS'],
+    reason:
+      '§ D871’s instrument — every contract’s day 1 as built and under each of the two parking ' +
+      'presses over n seeds of docs/33 § 4.6’s sequence, plus the census that runs each pinned day ' +
+      'as built under every shipped dispatcher and produces the `mootUnder` row the stage shows a ' +
+      'player. Not scheduled because it is a compute job rather than a check, on the same argument ' +
+      'as the three sweeps above: `shift/pressLadder.test.ts` re-derives one contract’s whole ' +
+      'census from the run on every run and pins every rung that books a car out in both ' +
+      'directions, so a profile that moved reddens the ordinary suite. It is re-run by hand when a ' +
+      'rung, a building or a dispatcher profile moves',
+    scheduled: false,
+  },
   'packages/viz/src/testCost.test.ts': {
     gates: ['TEST_COST_OUT'],
     reason:

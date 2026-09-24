@@ -268,6 +268,60 @@ export interface ContractLadderRow {
    */
   readonly fabric: ContractFabric;
   readonly intent: ContractIntent;
+  /**
+   * The pinned day whose verdict turns on a press, or `undefined` for a rung that has none.
+   *
+   * GitHub issue **#587**, [§ D914](../../../../DECISIONS.md). See {@link ContractPressDay}.
+   */
+  readonly pressDay: ContractPressDay | undefined;
+}
+
+/**
+ * **One day on this contract whose verdict the standing order misses and a reachable press
+ * clears** — the measurement, authored so the product can say it.
+ *
+ * ## Why this is data rather than a test's private constant
+ *
+ * [§ D871](../../../../DECISIONS.md) pinned one such day inside
+ * `shift/pressDecidesTheDay.test.ts`, which is the right home for one. Seven of them are a
+ * **property of the ladder** — they are what the rung's `incidents` were authored *for*, and the
+ * product has two things to say about them that a test cannot: the picker tags the towers that
+ * have one ({@link ContractFabric.incidents}), and the brief names the standing orders under which
+ * the day comes out the same with no press at all ({@link ContractPressDay.mootUnder}).
+ *
+ * ## `mootUnder` is the assessor's finding turned into something the player is told
+ *
+ * The same panel that found § D871's day unreachable also swept it across all thirteen shipped
+ * dispatchers and found **eight of them clear it as built, with no press at all**. Switching
+ * dispatcher is a control on the same screen, so a player who changes it makes the day moot — and
+ * discovers that by accident, having been told nothing. This field is that sweep, per pinned day,
+ * and `everyday/today.ts` draws it before the run, where the dispatcher is chosen.
+ *
+ * It is **measured, never chosen**: `shift/pressLadder.sweep.test.ts`'s census mode produces it and
+ * `shift/pressLadder.test.ts` re-derives one contract's row in full on every run, so a profile that
+ * moved would fail rather than leave a sentence that had quietly stopped being true — which is
+ * exactly the stale-refusal class [§ D227](../../../../DECISIONS.md) is about.
+ */
+export interface ContractPressDay {
+  /**
+   * The seed, as its decimal digits — a string because `JSON.parse` has no `bigint` and a seed past
+   * 2^53 read as a `number` is a different day. `shift/pressLadder.test.ts` turns it back.
+   */
+  readonly seedText: string;
+  /** The dispatcher the day is graded under — the contract's standing order. */
+  readonly standingOrder: string;
+  /** The press that clears it: one of the two parking verbs, by `InterventionChange` kind. */
+  readonly clearedBy: string;
+  /** The other parking verb, which must still miss — the two-sided half of the claim. */
+  readonly missedBy: string;
+  /** Where the press falls, as a fraction of the shift. `shift/incidents.ts`'s own units. */
+  readonly pressAtFraction: number;
+  /**
+   * The shipped dispatcher ids that clear this day **as built, with no press**, in profile order.
+   * Never contains {@link ContractPressDay.standingOrder} — a standing order that cleared its own
+   * day would mean the day does not turn on anything.
+   */
+  readonly mootUnder: readonly string[];
 }
 
 export interface ContractLadder {
@@ -327,6 +381,19 @@ function contractIncidentOf(value: unknown): ContractIncident {
  * have to be the same list, or a rung could pass `contractLadderIssues` and reach the kernel as
  * something else.
  */
+/**
+ * The contract's pinned press day, or `undefined` — GitHub issue #587, § D914.
+ *
+ * Keyed on the contract alone rather than on `(contractId, buildingId)` like {@link rungFor},
+ * because a press day is a fact about **the day this contract hands you** rather than about a run:
+ * it names its own seed and its own standing order, and a reader looking at another building is
+ * not on it. The two callers are `everyday/today.ts`, which draws the moot sentence before the
+ * run, and `shift/pressLadder.test.ts`, which proves every row of it.
+ */
+export function pressDayFor(contractId: string | undefined): ContractPressDay | undefined {
+  return ladderRowFor(contractId)?.pressDay;
+}
+
 export function rungIncidents(rung: ContractLadderRow | undefined): readonly Incident[] {
   if (rung === undefined) return [];
   return rung.fabric.incidents.map((entry) => ({
@@ -335,6 +402,28 @@ export function rungIncidents(rung: ContractLadderRow | undefined): readonly Inc
     fromFraction: entry.fromFraction,
     toFraction: entry.toFraction,
   }));
+}
+
+/**
+ * A rung's pinned press day, or `undefined` when it declares none.
+ *
+ * Structure only, `contractIncidentOf`'s footing: a field this table does not understand becomes
+ * the empty string rather than a default, so {@link contractLadderIssues} reports it by name. A
+ * row with no `pressDay` key is the common case and is not an error — nine of the sixteen shipped
+ * contracts have no such day, and `shift/pressLadder.test.ts` measures why for each.
+ */
+function pressDayOf(value: unknown): ContractPressDay | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const record = asRecord(value);
+  const moot = Array.isArray(record['mootUnder']) ? (record['mootUnder'] as unknown[]) : [];
+  return Object.freeze({
+    seedText: asString(record['seedText']),
+    standingOrder: asString(record['standingOrder']),
+    clearedBy: asString(record['clearedBy']),
+    missedBy: asString(record['missedBy']),
+    pressAtFraction: asNumber(record['pressAtFraction']) ?? -1,
+    mootUnder: Object.freeze(moot.map((id) => asString(id))),
+  });
 }
 
 function bankChoiceOf(value: unknown): BankChoice {
@@ -376,6 +465,7 @@ export function parseContractLadder(input: unknown): ContractLadder {
             substrate: asString(intent['substrate'], 'demand') as ContractIntent['substrate'],
             note: asString(intent['note']),
           }),
+          pressDay: pressDayOf(entry['pressDay']),
         });
       }),
     ),
@@ -469,7 +559,19 @@ export interface LadderValidationInput {
   readonly speedBandFor: (
     machineClassId: string,
   ) => { readonly min: number; readonly max: number } | undefined;
+  /**
+   * Every shipped dispatcher id, from `data/dispatcher-profiles.json` — so a
+   * {@link ContractPressDay} that names a standing order or a moot dispatcher this build does not
+   * ship is refused here rather than drawn on the brief as a name nobody can select.
+   *
+   * Threaded like every other accessor on this interface: the profiles reach the viewer through
+   * `dev/data.ts`'s fetch and are not available at module-init time.
+   */
+  readonly dispatcherIds: () => readonly string[];
 }
+
+/** The two parking verbs a {@link ContractPressDay} may name — `core`'s own kinds, not new ones. */
+const PRESS_DAY_VERBS: readonly string[] = Object.freeze(['park-cars-lobby', 'spread-cars']);
 
 /**
  * Every way the authored ladder can be wrong, collected rather than thrown one at a time.
@@ -636,6 +738,72 @@ export function contractLadderIssues(
     }
     if (row.intent.note.trim() === '') {
       issues.push(`ladder row ${row.contractId} carries no reasoning; data/ figures state theirs`);
+    }
+
+    /*
+     * A pinned press day names a real seed, two different real verbs, a shipped standing order and
+     * shipped moot dispatchers — and the standing order is never among them. The **verdicts** are
+     * `shift/pressLadder.test.ts`'s to prove by running the day; this refuses a declaration that
+     * could not be right even if every run agreed with it.
+     */
+    const press = row.pressDay;
+    if (press !== undefined) {
+      if (!/^\d+$/.test(press.seedText)) {
+        issues.push(
+          `ladder row ${row.contractId} pins a press day at seed ${JSON.stringify(press.seedText)}, ` +
+            'which is not a decimal seed',
+        );
+      }
+      if (row.fabric.incidents.length === 0) {
+        issues.push(
+          `ladder row ${row.contractId} pins a press day on a rung that books no car out; the ` +
+            'absence is the event the day asks to be answered',
+        );
+      }
+      for (const [field, verb] of [
+        ['clearedBy', press.clearedBy],
+        ['missedBy', press.missedBy],
+      ] as const) {
+        if (!PRESS_DAY_VERBS.includes(verb)) {
+          issues.push(
+            `ladder row ${row.contractId} pins ${field} ${JSON.stringify(verb)}, which is none of ` +
+              PRESS_DAY_VERBS.join(', '),
+          );
+        }
+      }
+      if (press.clearedBy === press.missedBy) {
+        issues.push(
+          `ladder row ${row.contractId} pins the same verb as clearing and missing; a day with ` +
+            'one button that always works is a switch rather than a choice',
+        );
+      }
+      if (press.pressAtFraction <= 0 || press.pressAtFraction >= 1) {
+        issues.push(
+          `ladder row ${row.contractId} presses at ${String(press.pressAtFraction)} of the run, ` +
+            'outside (0, 1)',
+        );
+      }
+      const shipped = input.dispatcherIds();
+      if (!shipped.includes(press.standingOrder)) {
+        issues.push(
+          `ladder row ${row.contractId} grades its press day under ${press.standingOrder}, which ` +
+            'no shipped dispatcher profile declares',
+        );
+      }
+      for (const id of press.mootUnder) {
+        if (!shipped.includes(id)) {
+          issues.push(
+            `ladder row ${row.contractId} says ${id} makes its day moot, and no shipped ` +
+              'dispatcher profile declares that id',
+          );
+        }
+      }
+      if (press.mootUnder.includes(press.standingOrder)) {
+        issues.push(
+          `ladder row ${row.contractId} lists its own standing order ${press.standingOrder} as ` +
+            'making the day moot; then the day turns on nothing',
+        );
+      }
     }
   }
 

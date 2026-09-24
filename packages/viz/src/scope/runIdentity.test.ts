@@ -222,6 +222,29 @@ describe('the predicate answers the question it claims to', () => {
     expect(runIdentityIssues(bad, RESOURCES).length).toBe(3);
   });
 
+  /*
+   * **An id `data/` does not ship cannot reach a board** — [§ D948](../../../../DECISIONS.md), and
+   * this is the pin `dev/state.ts#profileById`'s docstring stands on.
+   *
+   * That function resolves an unknown dispatcher id to the **first shipped profile**, silently: a
+   * playability assessor drove four ids that do not exist through it and got four runs whose legs
+   * hashed identically to `nearest-car`'s. The substitution is deliberate — the alternative is a
+   * blank page on a load path, and its docstring has the argument — and what keeps it from being
+   * a claim rather than a fallback is this refusal, because `runSubmissionOf` sends
+   * `state.dispatcherId` rather than the profile that drove, so a posted run would name a
+   * dispatcher that did not.
+   *
+   * Asserted here rather than in a sentence over there, because a docstring claiming a mechanism
+   * with no run behind it is `CLAUDE.md`'s stale refusal one level up.
+   */
+  it('refuses a dispatcher id no shipped profile carries, naming that field', () => {
+    const unknown: ViewerState = { ...baseState(), dispatcherId: 'not-a-dispatcher' };
+    const issues = runIdentityIssues(unknown, RESOURCES);
+    expect(issues.map((issue) => issue.key)).toContain('viewer.dispatcherId');
+    // And the polarity that says the gate is not simply on: the shipped id passes.
+    expect(runIdentityIssues(baseState(), RESOURCES)).toEqual([]);
+  });
+
   it('names the field each refusal is about', () => {
     for (const { name, state } of matrix()) {
       for (const issue of runIdentityIssues(state, RESOURCES)) {

@@ -1,22 +1,35 @@
 /**
- * **The five session-shape figures, checked against the content and against the rung** — GitHub
- * issue **#559**, [§ D753](../../../../DECISIONS.md).
+ * **The five session-shape figures, checked against the day, the content and the rung** — GitHub
+ * issue **#559**, [§ D753](../../../../DECISIONS.md) and [§ D946](../../../../DECISIONS.md).
  *
  * Every assertion here exists because the defect it guards has already shipped. The five strings
  * `everyday/sittingShape.ts` composes went stale silently for two rung moves and four documents,
- * and nothing in the repository read any of them. So the checks are, in order: the spans are the
- * shipped content's, the figures are derived from the ladder rather than typed, the rounding goes
- * up, the two player modules compose none of their own, and the four documents that repeat the
- * figures agree with the strings a player actually reads.
+ * and nothing in the repository read any of them. So the checks are, in order: **every advertised
+ * length is the day the tile actually opens**, censused over all sixteen contracts through the
+ * shipped derivations; the spans are the shipped content's; the figures are derived from the
+ * ladder rather than typed; the rounding goes up; the two player modules compose none of their
+ * own; and the four documents that repeat the figures agree with the strings a player reads.
+ *
+ * **The first block is § D946's and is the one that was missing.** § D753 pinned the rung and left
+ * the day a constant, so the Career tile advertised `data/campaign.json`'s 900 s stage — a run
+ * that tile does not open — and *Today's scenario* advertised a thirty-minute slice over a
+ * ten-hour authored day. Both were correct for some contracts, which is precisely why no test
+ * caught them: a check against *a* piece of content passes, and only a census over *every*
+ * contract fails.
  */
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { parseBuilding, parseTrafficProfiles } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
 import { DATA_DIR } from '../fixtures.test-helper.js';
+
+import { shiftLengthForContract } from '../dev/state.js';
+import { CONTRACTS } from '../shift/contracts.js';
+import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 
 import { EVERYDAY_MODES } from './modes.js';
 import { scenarioHubViewOf } from './scenarioModel.js';
@@ -41,14 +54,104 @@ function data<T>(file: string): T {
   return JSON.parse(readFileSync(join(DATA_DIR, file), 'utf8')) as T;
 }
 
-describe('the spans are the shipped content, not an estimate', () => {
-  it('campaignStage is every authored campaign stage', () => {
-    const campaign = data<{ stages: readonly { durationS: number }[] }>('campaign.json');
-    const lengths = campaign.stages.map((stage) => stage.durationS);
-    expect(lengths.length).toBeGreaterThan(0);
-    expect(SITTING_SPANS.campaignStage.lowSimS).toBe(Math.min(...lengths));
-    expect(SITTING_SPANS.campaignStage.highSimS).toBe(Math.max(...lengths));
+/**
+ * **The day each tile opens, per contract, through the shipped derivations** — [§ D946](../../../../DECISIONS.md).
+ *
+ * Nothing here restates a length. `shiftLengthForContract` is the expression `initialState`,
+ * `scenariosPanel`'s *take* and `host.ts#runCampaignDay` all write, and `wholeDayFor` /
+ * `wholeDayRun` are the pair `host.ts#startRun` spreads into the patch for § 6's day. So a
+ * contract authored at a new length, a building whose crowd starts or stops matching a day
+ * record's peak, and a day record authored at a new period each move this census — and the spans
+ * `sittingShape.ts` publishes have to move with it or the assertions below fail.
+ */
+function dayCensus(): readonly {
+  readonly id: string;
+  readonly buildingId: string;
+  /** What the Career tile plays: `runCampaignDay` writes this length and `windowStartS: null`. */
+  readonly careerS: number;
+  /** What *Today's scenario* plays: the authored day where there is one, else the slice. */
+  readonly scenarioS: number;
+}[] {
+  const trafficProfiles = parseTrafficProfiles(data('traffic-profiles.json'));
+  return CONTRACTS.map((contract) => {
+    const careerS = shiftLengthForContract(contract.id);
+    const day = wholeDayFor(trafficProfiles, parseBuilding(data(`buildings/${contract.buildingId}.json`)));
+    return {
+      id: contract.id,
+      buildingId: contract.buildingId,
+      careerS,
+      scenarioS: day === undefined ? careerS : wholeDayRun(day).shiftLengthS,
+    };
   });
+}
+
+describe('every advertised length is the day the tile actually opens', () => {
+  /*
+   * The check this file was rebuilt for. `campaignStage` quoted `data/campaign.json`'s 900 s stage
+   * at a tile that opens a **career day**, and `contractDay` quoted the 1 800–3 600 s slice at a
+   * press that runs a ten-hour authored day on thirteen of sixteen contracts. Both were constants
+   * that happened to be right for some of the content, which is the shape § D753 fixed on the rung
+   * axis and left standing on this one.
+   */
+  it('careerDay brackets every contract a career can sign, exactly', () => {
+    const lengths = dayCensus().map((row) => row.careerS);
+    expect(lengths.length).toBe(CONTRACTS.length);
+    expect(SITTING_SPANS.careerDay.lowSimS).toBe(Math.min(...lengths));
+    expect(SITTING_SPANS.careerDay.highSimS).toBe(Math.max(...lengths));
+  });
+
+  it('contractDay brackets every contract’s Today’s-scenario day, exactly', () => {
+    const lengths = dayCensus().map((row) => row.scenarioS);
+    expect(SITTING_SPANS.contractDay.lowSimS).toBe(Math.min(...lengths));
+    expect(SITTING_SPANS.contractDay.highSimS).toBe(Math.max(...lengths));
+  });
+
+  /*
+   * Both directions, per contract. The two above would pass on a span that brackets the census and
+   * is wider than it — which is what the union in `sittingShape.ts` would silently become if every
+   * contract gained an authored day. This says each end is *attained* by some contract and no
+   * contract falls outside, so a wrong span fails whichever way it is wrong.
+   */
+  it('no contract runs outside the span its tile advertises, and both ends are reached', () => {
+    for (const row of dayCensus()) {
+      expect(row.careerS, `${row.id} career`).toBeGreaterThanOrEqual(SITTING_SPANS.careerDay.lowSimS);
+      expect(row.careerS, `${row.id} career`).toBeLessThanOrEqual(SITTING_SPANS.careerDay.highSimS);
+      expect(row.scenarioS, `${row.id} scenario`).toBeGreaterThanOrEqual(SITTING_SPANS.contractDay.lowSimS);
+      expect(row.scenarioS, `${row.id} scenario`).toBeLessThanOrEqual(SITTING_SPANS.contractDay.highSimS);
+    }
+  });
+
+  /*
+   * The negative control, and it is what makes the two censuses mean different things. If no
+   * contract ran an authored day the two spans would coincide and this file would be checking one
+   * fact twice; if every contract ran one, `contractDay`'s union would be wider than the truth at
+   * its low end. Measured today: thirteen offices run the ten-hour day and three crowds —
+   * residential, hotel, hospital — keep their slice, because `data/` ships no day for them.
+   */
+  it('the two tiles really do open different days, in both directions', () => {
+    const census = dayCensus();
+    expect(census.some((row) => row.scenarioS !== row.careerS)).toBe(true);
+    expect(census.some((row) => row.scenarioS === row.careerS)).toBe(true);
+  });
+
+  /*
+   * The assessment's own two readings, as regressions rather than as prose. An assessor played the
+   * opening career tower and got fifteen minutes against a tile promising four, and played Midtown
+   * and got two and a half hours against a tile promising eight to fifteen minutes.
+   */
+  it('the two days the assessor measured are inside the figures a player now reads', () => {
+    const census = dayCensus();
+    const garden = census.find((row) => row.buildingId === 'garden-apartments');
+    const midtown = census.find((row) => row.buildingId === 'midtown-office');
+    if (garden === undefined || midtown === undefined) throw new Error('a measured contract left the ladder');
+    expect(sittingMinutes(garden.careerS, RUNG.simPerRealS)).toBe(15);
+    expect(sittingMinutes(midtown.scenarioS, RUNG.simPerRealS)).toBe(150);
+    expect(SITTING_SHAPES.careerMode).toContain('15 min');
+    expect(SITTING_SHAPES.contractDay).toContain('2 h 30');
+  });
+});
+
+describe('the spans are the shipped content, not an estimate', () => {
 
   /*
    * The rush's span is an **outcome**, so it is censused rather than authored: a cell that holds is
@@ -82,16 +185,6 @@ describe('the spans are the shipped content, not an estimate', () => {
     expect(SITTING_SPANS.fixCase.lowSimS).toBeLessThan(SITTING_SPANS.fixCase.highSimS);
   });
 
-  it('contractDay is the default shift and the one contract that names its own', () => {
-    const state = readFileSync(`${SRC}dev/state.ts`, 'utf8');
-    const contracts = readFileSync(`${SRC}shift/contracts.ts`, 'utf8');
-    expect(state).toContain(
-      `export const DEFAULT_SHIFT_LENGTH_S = ${String(SITTING_SPANS.contractDay.lowSimS)};`,
-    );
-    expect(contracts).toContain(
-      `shiftLengthS: ${String(SITTING_SPANS.contractDay.highSimS)},`,
-    );
-  });
 
   it('every span names a file, and the file exists', () => {
     for (const span of Object.values(SITTING_SPANS) as readonly SittingSpan[]) {
@@ -134,13 +227,29 @@ describe('the figures are derived from the rung, never typed against it', () => 
     }
   });
 
+  /*
+   * The hours form, both polarities. Ninety minutes is where `sittingShape.ts` switches units, and
+   * a figure that read `2 h` for 150 minutes would be this module's rounding rule broken in the
+   * direction it exists to forbid. So this asserts the boundary from underneath as well as over
+   * it: nothing shorter may wear an `h`, and nothing longer may still be quoted in minutes.
+   */
+  it('quotes hours only past the boundary, and never rounds an hours figure down', () => {
+    const short: SittingSpan = { lowSimS: 900, highSimS: 900, source: 'synthetic' };
+    expect(sittingLengthPhrase(short)).toContain('min');
+    expect(sittingLengthPhrase(short)).not.toContain(' h');
+    // The office day, at the shipped rung: 150 minutes, so `2 h 30` and not `2 h`.
+    const day: SittingSpan = { lowSimS: 36000, highSimS: 36000, source: 'synthetic' };
+    expect(sittingLengthPhrase(day)).toContain('2 h 30');
+    expect(sittingMinutes(36000, RUNG.simPerRealS) * 60 * RUNG.simPerRealS).toBeGreaterThanOrEqual(36000);
+  });
+
   it('says "under a minute" rather than "1 min" where the ladder makes it true', () => {
     // At the ladder's top rung a 900 s stage is fifteen real seconds; `1 min` there would be this
     // module's own defect with its sign flipped.
     const top = STAGE_SPEEDS[STAGE_SPEEDS.length - 1];
     if (top === undefined) throw new Error('empty ladder');
     expect(sittingMinutes(900, top.simPerRealS)).toBe(1);
-    expect(sittingLengthPhrase(SITTING_SPANS.campaignStage)).toContain('min');
+    expect(sittingLengthPhrase(SITTING_SPANS.careerDay)).toContain('min');
   });
 });
 
@@ -189,7 +298,7 @@ describe('the documents that repeat the figures agree with the strings a player 
       doc: 'docs/23-audiences-and-core-loop.md',
       phrases: [
         sittingLengthPhrase(SITTING_SPANS.contractDay, 'a day'),
-        sittingLengthPhrase(SITTING_SPANS.campaignStage, 'a building-day'),
+        sittingLengthPhrase(SITTING_SPANS.careerDay, 'a building-day'),
         sittingLengthPhrase(SITTING_SPANS.rush),
         sittingLengthPhrase(SITTING_SPANS.fixCase, 'a case'),
       ],
@@ -198,7 +307,7 @@ describe('the documents that repeat the figures agree with the strings a player 
       doc: 'docs/32-game-design.md',
       phrases: [
         sittingLengthPhrase(SITTING_SPANS.contractDay, 'a day'),
-        sittingLengthPhrase(SITTING_SPANS.campaignStage, 'a building-day'),
+        sittingLengthPhrase(SITTING_SPANS.careerDay, 'a building-day'),
         sittingLengthPhrase(SITTING_SPANS.rush),
         sittingLengthPhrase(SITTING_SPANS.fixCase, 'a case'),
       ],
