@@ -148,7 +148,8 @@ function sameSplit(left: DirectionalSplit, right: DirectionalSplit): boolean {
  */
 export function wholeDayFor(
   trafficProfiles: TrafficProfiles,
-  building: BuildingConfig | undefined,
+  /* Only the profile id is read, so a resolved building answers as well as an authored one. */
+  building: Pick<BuildingConfig, 'trafficProfile'> | undefined,
 ): WholeDay | undefined {
   if (building === undefined) return undefined;
   const profile = trafficProfiles.profiles.find(
@@ -188,6 +189,37 @@ export function wholeDayFor(
     });
   }
   return undefined;
+}
+
+/**
+ * A pin's authored horizon, read off `data/` — GitHub issue #595, [§ D973](../../../../DECISIONS.md).
+ *
+ * Absent is `'period'`, because every pin authored before the field existed was measured by § D914
+ * on the contract's slice; anything that is not one of {@link RunHorizon}'s two members is the empty
+ * string, so `shift/ladder.ts#contractLadderIssues` can name it. Here rather than in `ladder.ts` so
+ * the horizon's two spellings stay in the one module that already owns them.
+ */
+export function parseRunHorizon(value: unknown): RunHorizon | '' {
+  if (value === undefined) return 'period';
+  return value === 'period' || value === 'whole-day' ? value : '';
+}
+
+/**
+ * **The horizon the Scenario run press will run `building` on** — before the press, which is when a
+ * brief, a picker or a pinned day has to know it. GitHub issue #595, [§ D973](../../../../DECISIONS.md).
+ *
+ * {@link runHorizonOf} answers what a *state* is running, and until `everyday/host.ts#startRun` has
+ * spread {@link wholeDayRun} in, a state whose tower has a day is still a slice. So a surface drawn
+ * before the press that asked `runHorizonOf` would describe the slice the press is about to replace.
+ * This is the press's own condition — `startRun` writes the whole day exactly when
+ * {@link wholeDayFor} answers — kept beside it so the two cannot disagree.
+ */
+export function scenarioHorizonFor(
+  trafficProfiles: TrafficProfiles,
+  building: Pick<BuildingConfig, 'trafficProfile'> | undefined,
+): RunHorizon | undefined {
+  if (building === undefined) return undefined;
+  return wholeDayFor(trafficProfiles, building) === undefined ? 'period' : 'whole-day';
 }
 
 /**

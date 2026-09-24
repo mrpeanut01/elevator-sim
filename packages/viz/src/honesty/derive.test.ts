@@ -1671,6 +1671,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The same union tag as `runHorizonOf` above, and for its reason: both return a member of ' +
+        '`shift/types.ts#RunHorizon` (or, for a malformed `data/` value, the empty string a loader ' +
+        'check names), and are derived only because `whole-day` reads to the two-adjacent-words ' +
+        'scanner as a phrase. GitHub issue #595, § D973. `scenarioHorizonFor` answers which horizon ' +
+        'the Scenario press will run a tower on; `parseRunHorizon` reads a pinned day’s declared ' +
+        'horizon off `data/contract-ladder.json`. Neither is shown to anybody: what a player reads ' +
+        'is whether a pinned-day row is offered and whether the moot sentence is drawn, and both ' +
+        'of those are driven — `everyday/towerChoice.ts#towerChoiceViewOf` and ' +
+        '`everyday/today.ts#todayOf`. That the answers are right is asserted in ' +
+        '`everyday/towerChoice.test.ts` over the shipped data and in `everyday/today.test.ts`.',
+      ids: ['shift/dayLength.ts#scenarioHorizonFor', 'shift/dayLength.ts#parseRunHorizon'],
+    },
+    {
+      reason:
         'Refuses an illegal rung in `data/contract-ladder.json` — a rate outside its profile’s ' +
         'declared range, a bank the building does not have, a machine at a speed its class ' +
         'forbids — and every string it returns is addressed to a **content author**, not to a ' +

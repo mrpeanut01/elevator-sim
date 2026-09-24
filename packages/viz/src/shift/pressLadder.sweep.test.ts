@@ -64,10 +64,13 @@ import { observationsAt } from '../live/observations.js';
 import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 
-import { CONTRACTS } from './contracts.js';
-import { runHorizonOf } from './dayLength.js';
+import { CONTRACTS, contractById } from './contracts.js';
+import { runHorizonOf, wholeDayFor, wholeDayRun } from './dayLength.js';
 import { goalsForDay, readGoals } from './goals.js';
+import { SHIFT_EVENTS } from './events.js';
 import { shiftObservationsOf } from './observations.js';
+import { dayReportOf } from './report.js';
+import { openWeek } from './week.js';
 
 const SEEDS = Number(process.env['PRESS_LADDER_SEEDS'] ?? '20');
 const FROM_N = Number(process.env['PRESS_LADDER_FROM'] ?? '0');
@@ -76,6 +79,29 @@ const FROM_N = Number(process.env['PRESS_LADDER_FROM'] ?? '0');
 const PRESS_FRACTION = Number(process.env['PRESS_LADDER_PRESS_AT'] ?? '0.28');
 
 const seedAt = (n: number): bigint => 20_260_824n + 7_919n * BigInt(n);
+
+/**
+ * **Which horizon the day is run on** — GitHub issue #595, [§ D973](../../../../DECISIONS.md).
+ *
+ * `period` (the default) is the contract's own `shiftLengthForContract` slice, which is what every
+ * row of § D914's table was measured on. `whole-day` is what the Everyday run press actually runs
+ * for any building `wholeDayFor` answers — `everyday/host.ts#startRun` spreads `wholeDayRun(day)`
+ * into the state before the press — and a building with no authored day keeps its slice under
+ * either setting, because that is also what the press does there.
+ */
+const HORIZON = process.env['PRESS_LADDER_HORIZON'] === 'whole-day' ? 'whole-day' : 'period';
+
+/** The two window fields the day runs at, under {@link HORIZON} — `startRun`'s own patch. */
+function horizonFields(
+  resources: BrowserResources,
+  contractId: string,
+  buildingId: string,
+): { readonly shiftLengthS: number; readonly windowStartS: number | null } {
+  const slice = { shiftLengthS: shiftLengthForContract(contractId), windowStartS: null };
+  if (HORIZON === 'period') return slice;
+  const day = wholeDayFor(resources.trafficProfiles, buildingConfigOf(resources, [], buildingId));
+  return day === undefined ? slice : wholeDayRun(day);
+}
 
 function allBuildings(): BrowserResources {
   const ids = [...new Set(CONTRACTS.map((contract) => contract.buildingId))];
@@ -108,7 +134,7 @@ function runOne(
     ...base,
     buildingId,
     dispatcherId,
-    shiftLengthS: shiftLengthForContract(contractId),
+    ...horizonFields(resources, contractId, buildingId),
     seed,
     campaignEventId: 'ordinary' as const,
     week: { ...base.week, contractId, day: 1 },
@@ -147,7 +173,7 @@ describe.runIf(process.env['PRESS_LADDER_SWEEP'] === '1')('the press ladder swee
     const dispatcherId = process.env['PRESS_LADDER_DISPATCHER'] ?? 'collective';
     const lines: string[] = ['contract\tn\tseed\tbuilt\tspread\tpark\tw_built\tw_spread\tw_park\tlegs_spread\tlegs_park\tfail_built'];
     for (const contract of wanted) {
-      const lengthS = shiftLengthForContract(contract.id);
+      const lengthS = horizonFields(resources, contract.id, contract.buildingId).shiftLengthS;
       const at = lengthS * PRESS_FRACTION;
       const spread: RunInterventionConfig = { atS: at, change: { kind: 'spread-cars' } };
       const park: RunInterventionConfig = { atS: at, change: { kind: 'park-cars-lobby' } };
@@ -229,6 +255,119 @@ describe.runIf(process.env['PRESS_LADDER_CENSUS'] === '1')('the dispatcher censu
         );
         writeFileSync(String(out), `${lines.join('\n')}\n`);
       }
+    }
+  }, 900_000);
+});
+
+describe.runIf(process.env['PRESS_LADDER_VERIFY'] === '1')('a candidate pin, on the report', () => {
+  /**
+   * **A pin checked the way `pressLadder.test.ts` checks a shipped one, before it is shipped** —
+   * GitHub issue #595, [§ D973](../../../../DECISIONS.md).
+   *
+   * The sweep above reads a goal predicate; the always-on file reads the verdict line off
+   * `dayReportOf`, which is what a player sees. A candidate pin taken from the sweep is re-run here
+   * three ways on the report, with the prefix before the press compared on the legs and the longest
+   * standing wait at the press instant recorded — the second is what a stage that crosses quiet
+   * hours fast decides its pace by, so a pin between peaks can be judged on whether a player could
+   * make the press at their own speed. `PRESS_LADDER_PINNED` carries
+   * `{ contractId: { seed, clearedBy, missedBy, at } }` and `PRESS_LADDER_HORIZON` the horizon.
+   */
+  it('writes each candidate’s three verdict lines and its prefix check', () => {
+    const out = process.env['PRESS_LADDER_OUT'];
+    expect(out, 'PRESS_LADDER_OUT names the file').toBeTypeOf('string');
+    const pins = JSON.parse(process.env['PRESS_LADDER_PINNED'] ?? '{}') as Record<
+      string,
+      { seed: string; clearedBy: string; missedBy: string; at: number }
+    >;
+    const resources = allBuildings();
+    const lines: string[] = [
+      'contract\tseed\tatS\tbuilt\tcleared_arm\tmissed_arm\tw_built\tw_cleared\tw_missed\tprefix_same\tlegs_moved\tlongest_standing_at_press',
+    ];
+    for (const [contractId, pin] of Object.entries(pins)) {
+      const contract = contractById(contractId);
+      if (contract === undefined) continue;
+      const fields = horizonFields(resources, contractId, contract.buildingId);
+      const atS = fields.shiftLengthS * pin.at;
+      const arm = (
+        interventions: readonly RunInterventionConfig[],
+      ): {
+        readonly verdict: string;
+        readonly worst: number;
+        readonly legs: string;
+        readonly prefix: string;
+        readonly standing: number;
+      } => {
+        const base = baseState();
+        const state = {
+          ...base,
+          buildingId: contract.buildingId,
+          dispatcherId: 'collective',
+          ...fields,
+          seed: BigInt(pin.seed),
+          campaignEventId: 'ordinary' as const,
+          week: openWeek(contractId),
+        };
+        const plan = shiftRunConfigOf(resources, state);
+        const { recording } = recordRun(
+          { ...plan.config, interventions },
+          { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds },
+        );
+        const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+        const horizon = runHorizonOf(
+          resources.trafficProfiles,
+          buildingConfigOf(resources, state.savedBuildings, contract.buildingId),
+          state,
+        );
+        const report = dayReportOf({
+          recording,
+          observations,
+          goals: goalsForDay(1, horizon),
+          week: openWeek(contractId),
+          contract,
+          event: SHIFT_EVENTS.ordinary,
+          plan: {
+            shiftLengthS: fields.shiftLengthS,
+            windowStartS: fields.windowStartS,
+            patternId: 'building',
+          },
+          calendar: null,
+          subject: { kind: 'week-day' },
+        });
+        const legs = recording.legs.map(
+          (leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1] as const,
+        );
+        return {
+          verdict: report.verdictLine,
+          worst: observations.worstWaitS,
+          legs: JSON.stringify(legs),
+          prefix: JSON.stringify(legs.filter((leg) => leg[2] >= 0 && leg[2] < atS)),
+          /* Nobody standing reads as zero, which is below every hold threshold. */
+          standing: observationsAt(recording, atS).longestCurrentWaitS ?? 0,
+        };
+      };
+      const change = (kind: string): RunInterventionConfig[] => [
+        { atS, change: { kind } as RunInterventionConfig['change'] },
+      ];
+      const built = arm([]);
+      const cleared = arm(change(pin.clearedBy));
+      const missed = arm(change(pin.missedBy));
+      lines.push(
+        [
+          contractId,
+          pin.seed,
+          String(atS),
+          built.verdict,
+          cleared.verdict,
+          missed.verdict,
+          built.worst.toFixed(1),
+          cleared.worst.toFixed(1),
+          missed.worst.toFixed(1),
+          String(cleared.prefix === built.prefix && missed.prefix === built.prefix),
+          String(cleared.legs !== built.legs && missed.legs !== built.legs),
+          built.standing.toFixed(1),
+        ].join('\t'),
+      );
+      writeFileSync(String(out), `${lines.join('\n')}\n`);
     }
   }, 900_000);
 });

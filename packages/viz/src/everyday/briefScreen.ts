@@ -101,6 +101,8 @@ function mountBrief(
       dispatcherNameOf: (id) => data.dispatcherById(id)?.name,
       goals: data.goalsToday(),
       seed: data.seed(),
+      /* The horizon the next press runs — the moot sentence's fourth gate, GitHub issue #595. */
+      horizon: data.scenarioHorizon(),
       /* § D729, § D730 — per draw, `doorScreen.ts#viewOf`'s reason, and the same question so the
          two screens cannot disagree about one run (§ 16 rule 14). */
       crowdIsToday: isDailySeed(data.seed(), deviceNowMs()),

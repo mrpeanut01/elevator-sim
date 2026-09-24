@@ -342,7 +342,14 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
       heading: 'TODAY’S WRINKLE',
       title: today.wrinkle.name,
       body: today.wrinkle.note,
-      shared: 'Everyone playing today gets the same one, at the same point in the day.',
+      /*
+       * GitHub issue #595, § D973. This read *"Everyone playing today gets the same one"*, and the
+       * wrinkle is drawn from the day **of the week** (`shift/events.ts#eventFor(day, dayIdx)`), not
+       * from the date — so two players today on different days of their weeks meet different
+       * wrinkles, and the front door's picker (§ D912) resumes weeks at any day. What is shared is
+       * the day of the week, whatever the tower.
+       */
+      shared: 'Anyone on this day of their week meets the same one, at the same point in the day, whatever the tower.',
     },
     asks: {
       /* One constant over these five bars — GitHub issue #567. `shift/goals.ts` owns it. */
