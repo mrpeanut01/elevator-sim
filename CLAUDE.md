@@ -113,13 +113,58 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave AF's, measured 2026-09-22 on the integrated tree**; the paragraph above
+  below are wave AG's, measured 2026-09-22 and 2026-09-24 on the integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **773 336** | **606** | **62** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **961 722** | **4 710** | **63** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **778 432** | **606** | **63** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **967 962** | **4 710** | **64** | **0** | **green**, and the register is empty |
+
+  **Wave AG's move is exactly 104.00 strings a case and one surface in both tiers, four lanes
+  forecast it before the measurement, and the forecasts sum to it to the string.** Measured on the
+  integrated tree at `dacb8ef`, on a head green in **all six** projects and in CI.
+
+  **The base reproduced to the string in both tiers**, at `9db3528` — 773 336 / 62 / 0 and
+  961 722 / 63 / 0, identical to wave AF's published row. Fourth consecutive wave it has held.
+
+  | | base `9db3528` | wave AG | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 773 336 | **778 432** | **+5 096** | **104.00** |
+  | deep strings | 961 722 | **967 962** | **+6 240** | **104.00** |
+  | surfaces | 62 / 63 | **63 / 64** | **+1 / +1** | — |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | — |
+
+  **AG-A forecast +104 and +1 surface, and named both.** Its decomposition had no conditional term:
+  the new `everyday/towerChoice.ts#towerChoiceViewOf` adapter renders two states, and each state is
+  four header strings plus three strings for each of `CONTRACTS`' sixteen rows, so 2 × (4 + 48) =
+  104. The one assumption a reader could check was that `singleRun` maps seeds one to one, and it
+  does. **AG-B, AG-C and AG-D each forecast 0**, each on a stated ground: a row present in both arms
+  of the day report is a substitution, a copy change inside `EVERYDAY_MODES` is a substitution, and
+  the corpus calls `goalsForDay` with the default `'period'` horizon so it never renders the new
+  whole-day bar's label. All three hold.
+
+  **Both fix lanes contributed zero, and one of them moved a player-facing sentence.** Integration
+  found nine failures in `viz` from four lanes each green alone, and two fix lanes closed them.
+  AG-FIX-2's re-measurement of the legibility sweep grew the first-session set from eleven towers to
+  fourteen, so `shift/firstSession.ts#FIRST_SESSION_LINE` now reads *fourteen towers*. That is one
+  string in and one string out, and the measurement agrees.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: exactly one added
+  in each, `everyday/towerChoice.ts#towerChoiceViewOf`, and nothing removed. **The deep tier's
+  one-surface lead survives and the diff names it**: `campaign/judge.ts#judgeStage` is the only
+  surface in deep and not in always-on, and nothing is in always-on and not in deep.
+
+  **The two tiers were measured two days apart, on the same commit.** Work was paused after the
+  always-on reading on 2026-09-22 and the deep reading was taken on 2026-09-24, at `dacb8ef` both
+  times. The deep run took 1 402 s on an idle box; the base deep run took 3 452 s under load 50,
+  which is the box and not the corpus.
+
+  **Green in all six projects before the row was published**, counts rather than the word *passed*:
+  viz **328 / 7 290**, viz-browser **52 / 354**, core **143 / 2 989**, experiments **115 / 1 526**,
+  cli **12 / 179**, server **29 / 649**, and CI green on the same head. The browser tier is now 52
+  files rather than 51, because AG-A added a contract-picker journey that runs against the shipped
+  bundle.
 
   **Wave AF's move is exactly 128.00 strings a case in both tiers, it decomposes to the string
   across five producers, and all four lanes' forecasts are right — including one that was right to
