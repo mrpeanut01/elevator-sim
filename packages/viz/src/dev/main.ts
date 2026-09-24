@@ -207,6 +207,7 @@ import { contractById, statLineOf } from '../shift/contracts.js';
 import { bankingRefusalFor, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { pressCounterfactualOf } from '../shift/counterfactual.js';
+import { bookedOutCarsOf } from '../shift/bookedOut.js';
 import { readGoals } from '../shift/goals.js';
 import {
   clockOf,
@@ -6583,6 +6584,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * than whatever the editor happens to be holding now.
        */
       ruleRows: state.ruleRows,
+      /*
+       * The cars the tower's own schedule took out part-way through this run — GitHub issue #596
+       * item 3, § D983. Off the run's own resolved building (`resolvedBuildingOf` is
+       * `shiftRunConfigOf(...).building`), from `state` for `interventions`' reason: it is the
+       * building the legs on screen were simulated in, so the car the header names is the car the
+       * kernel stood down. A recording carries no mid-run schedule, which is why this is passed.
+       */
+      bookedOut: bookedOutCarsOf(resolvedBuildingOf(resources, state)),
       /*
        * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
        * one-field-and-one-caller fix.

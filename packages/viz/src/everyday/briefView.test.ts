@@ -31,6 +31,7 @@ const TODAY: TodayRecord = {
     name: 'Move-in day',
     note: 'One car is tied up for the first two thirds of the shift.',
   } as TodayRecord['wrinkle'],
+  wrinkleNote: 'One car is tied up for the first two thirds of the shift.',
   outOfService: { mootUnder: undefined, badge: 'car-c', sentence: 'Car car-c is out of service today.' },
   facts: [{ label: 'Floors', value: '14 above ground' }],
   load: { word: '590 per working car', note: '1,180 people and 2 working cars today, as the building is configured. The day shows whether that is comfortable; this plate does not grade it.' },
@@ -220,6 +221,9 @@ describe('everything else on the card is the day record’s, unedited', () => {
   it('quotes the wrinkle rather than re-wording it, and says everyone gets the same one', () => {
     const view = viewOf();
     expect(view.wrinkle.title).toBe(TODAY.wrinkle.name);
+    // The day record's note as the brief prints it — `wrinkleNoteOf`, § D983 — which is the event's
+    // own note on a day the tower books nothing.
+    expect(view.wrinkle.body).toBe(TODAY.wrinkleNote);
     expect(view.wrinkle.body).toBe(TODAY.wrinkle.note);
     expect(view.wrinkle.shared).toMatch(/same one, at the same point/);
   });

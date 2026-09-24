@@ -672,6 +672,36 @@ describe('the run actions', () => {
     expect(energyBarOf(residential)).toBe(energyBarOf(base()));
   });
 
+  it('asks on the brief what the press will grade — the goals ahead are the goals after it (#597)', () => {
+    /*
+     * GitHub issue #597, § D984. The brief is drawn **before** *Start the day*, while the state is
+     * still a slice; the press writes the whole-day window. So the brief read 230 s / 80 kJ over a
+     * day the stage then graded against 460 s / 350 kJ. `goalsAhead` must equal what `goalsToday`
+     * reads once the press's **own** patch has landed — taken from the press through the harness,
+     * not rebuilt here, so a press that changed its patch moves this case with it.
+     */
+    for (const buildingId of ['midtown-office', 'garden-apartments']) {
+      const slice: ViewerState = { ...base(), buildingId };
+      const harness = harnessOf(slice);
+      const host = createEverydayHost(harness.bindings);
+      const ahead = host.goalsAhead().map((reading) => reading.goal.label);
+      host.startRun();
+      const landed: ViewerState = { ...slice, ...(harness.patches.at(-1) ?? {}) };
+      const after = createEverydayHost(harnessOf(landed).bindings)
+        .goalsToday()
+        .map((reading) => reading.goal.label);
+      expect(ahead, buildingId).toEqual(after);
+      // Before the run, every ask is a question rather than a reading.
+      expect(host.goalsAhead().every((reading) => reading.state === 'pending')).toBe(true);
+    }
+    // And the case is not vacuous: on a tower with an authored day the slice's own asks differ.
+    const midtown: ViewerState = { ...base(), buildingId: 'midtown-office' };
+    const host = createEverydayHost(harnessOf(midtown).bindings);
+    expect(host.goalsAhead().map((r) => r.goal.label)).not.toEqual(
+      host.goalsToday().map((r) => r.goal.label),
+    );
+  });
+
   /**
    * § 7's stage reads the run and grows its record through these four, and each is worth a case for
    * a different reason: `recording` is what makes the stage possible at all, `dayStartS` is what

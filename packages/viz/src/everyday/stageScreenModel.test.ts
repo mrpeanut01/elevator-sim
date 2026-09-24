@@ -56,6 +56,7 @@ import {
   stageFilingLandsOn,
   stageGeometryOf,
   stageHeaderOf,
+  stageBookedOutOf,
   stageInkFor,
   stageInterventionsOf,
   stageLegend,
@@ -2022,5 +2023,31 @@ describe('what the stage may adopt — GitHub issue #548', () => {
     expect(
       stageMayAdopt({ incoming: yesterday, adopted: undefined, runPending: false, standingAtEntry: yesterday }),
     ).toBe(true);
+  });
+});
+
+describe('the booked-out car’s pill — GitHub issue #596 item 3, § D983', () => {
+  const bookings = [
+    { carId: 'D', awayAtS: 450, backAtS: 900 },
+    { carId: 'E', awayAtS: 600, backAtS: null },
+  ] as const;
+
+  it('names each car with its schedule, and where the playhead stands against it', () => {
+    expect(stageBookedOutOf({ bookedOut: bookings, simTimeS: 100, dayStartS: 0 })).toEqual([
+      'Car D booked out 00:07–00:15 · still running',
+      'Car E booked out from 00:10 · still running',
+    ]);
+    expect(stageBookedOutOf({ bookedOut: bookings, simTimeS: 700, dayStartS: 0 })).toEqual([
+      'Car D booked out 00:07–00:15 · out now',
+      'Car E booked out from 00:10 · out now',
+    ]);
+    expect(stageBookedOutOf({ bookedOut: bookings, simTimeS: 950, dayStartS: 0 })).toEqual([
+      'Car D booked out 00:07–00:15 · back',
+      'Car E booked out from 00:10 · out now',
+    ]);
+  });
+
+  it('draws nothing on a tower that books nothing', () => {
+    expect(stageBookedOutOf({ bookedOut: [], simTimeS: 700 })).toEqual([]);
   });
 });

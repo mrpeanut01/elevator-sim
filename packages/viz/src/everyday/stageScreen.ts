@@ -98,6 +98,7 @@ import {
   STAGE_FLOOR_JUMP_PLACEHOLDER,
   stageAlarmOf,
   stageBarModelOf,
+  stageBookedOutOf,
   stageCameraChipsOf,
   type StageCameraId,
   stageCameraWindowOf,
@@ -119,6 +120,7 @@ import {
   type StageSwitchTarget,
 } from './stageScreenModel.js';
 import { everydayProfileStore } from './profileStore.js';
+import { bookedOutCarsOf, type BookedOutCar } from '../shift/bookedOut.js';
 /* GitHub issue #340: the two beat-1 events. The recorder is a no-op until consent is granted. */
 import { everydayTelemetry } from './telemetryPort.js';
 import { telemetryRunPointerOf } from '../telemetry/schema.js';
@@ -472,6 +474,25 @@ function mountStage(
     'display:none',
   ].join(';');
 
+  /*
+   * The car the tower books out part-way through the day — GitHub issue #596 item 3, § D983. The
+   * words are `stageScreenModel.ts#stageBookedOutOf`'s; this is the pill. Down on a tower that books
+   * nothing, which is most of them.
+   */
+  const bookedPill = el(doc, 'span', 'everyday-stage-booked');
+  bookedPill.style.cssText = [
+    `border:1px dashed ${C.terracotta}`,
+    `border-radius:${String(R.pill)}px`,
+    'padding:3px 10px',
+    `font:500 10px ${TYPE.mono}`,
+    'letter-spacing:.08em',
+    `color:${C.terracotta}`,
+    'display:none',
+  ].join(';');
+  /* Read once per recording, not per frame — `resolvedBuilding()` resolves the whole run config. */
+  let bookedFor: VizRecording | undefined;
+  let bookedCars: readonly BookedOutCar[] = [];
+
   const driving = el(doc, 'span', 'everyday-stage-driving');
   driving.style.cssText = 'display:flex;align-items:center;gap:6px';
   /* The model's own word, here and on every draw from `stageHeaderOf`'s `drivingLabel` — the corpus
@@ -625,7 +646,7 @@ function mountStage(
   }
   syncCamera();
 
-  header.append(clock, phase, nextPhase, driving, figures, playButton, speeds, cameras, floorJump);
+  header.append(clock, phase, nextPhase, bookedPill, driving, figures, playButton, speeds, cameras, floorJump);
 
   /*
    * **Pillar 3's strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
@@ -1938,6 +1959,21 @@ function mountStage(
     /* Nothing rather than a placeholder: inside the last stretch there is no next one to name. */
     nextPhase.textContent = head.next ?? '';
     nextPhase.style.display = head.next === undefined ? 'none' : '';
+    /*
+     * § D983. The player's own building, and only on the player's own run: a watched record is
+     * somebody else's day in somebody else's tower, and a rush books nothing.
+     */
+    if (recording !== bookedFor) {
+      bookedFor = recording;
+      const building = host.resolvedBuilding();
+      bookedCars = building?.id === recording.buildingId ? bookedOutCarsOf(building) : [];
+    }
+    const booked =
+      watching === undefined && context.ctx !== 'rush'
+        ? stageBookedOutOf({ bookedOut: bookedCars, simTimeS, dayStartS: host.dayStartS() })
+        : [];
+    bookedPill.textContent = booked.join('   ');
+    bookedPill.style.display = booked.length === 0 ? 'none' : '';
     drivingName.textContent = watching?.dispatcherName ?? head.driverName;
     drawFigures(head.figures);
     drawGoals(recording, simTimeS, watching);

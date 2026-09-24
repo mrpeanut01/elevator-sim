@@ -20,7 +20,7 @@
  * | arm | what the row says | the note it closes with |
  * |---|---|---|
  * | no pair (§ D900, unchanged) | what the day did after the press | {@link AFTER_PRESS_DISCLAIMER} |
- * | a pair ([§ D931](../../../../DECISIONS.md)) | **both runs**, at the same two instants | {@link AFTER_PRESS_PAIR_NOTE} |
+ * | a pair ([§ D931](../../../../DECISIONS.md)) | **both runs**, at the same two instants, and both runs' verdicts ([§ D982](../../../../DECISIONS.md)) | {@link AFTER_PRESS_PAIR_NOTE}, and {@link AFTER_PRESS_VERDICT_NOTE} where the sheet grades |
  *
  * **Route 1 was rejected here and the rejection was half right**, which is why the second arm
  * exists. What § D900 settled is that a with-and-without pair on one seed cannot *declare a
@@ -144,6 +144,87 @@ export const AFTER_PRESS_PAIR_NOTE =
   'what that press does on another day, on another crowd, or on another tower. The bench is where ' +
   'a question like that is answered, over many runs of the same crowd.';
 
+/**
+ * **What kind of fact two verdicts are** — [§ D982](../../../../DECISIONS.md), the clause the
+ * decision agent's ruling adds to {@link AFTER_PRESS_PAIR_NOTE} on every row that prints them.
+ *
+ * Kept as its own constant and appended rather than spliced into the note, because the note also
+ * closes a paired row on a **single-run** sheet, which prints no verdict (its banner refuses to
+ * grade — `docs/19` defect 13), and a clause about *the two verdicts* under a row with none would
+ * be a caption over nothing.
+ *
+ * The clause is the half of the ruling that answers the selection effect: a player sent to a
+ * pinned day meets a flip every time, against 126 flips in 700 pairs across fifty crowds per
+ * pinned contract, so the row says on its own face that two verdicts from one crowd say nothing
+ * about another. `pressLadder.test.ts` pins that premise by a run — on `c7` the same press clears
+ * one crowd's missed day and misses another crowd's cleared one — which is § D227's rule that a
+ * refusal is pinned by a run and never by another sentence.
+ *
+ * No digit, no word from § D900's causal list or the estimation list, and no press as the subject
+ * of *clears* or *misses*.
+ */
+export const AFTER_PRESS_VERDICT_NOTE =
+  'The two verdicts are the same kind of fact as the counts: how this crowd’s day was graded with ' +
+  'that press and without it, and nothing about how a day is graded for any other crowd, even in ' +
+  'this tower.';
+
+/**
+ * Both runs' verdicts, graded by `shift/report.ts`'s own grader against the sheet's own goals —
+ * [§ D982](../../../../DECISIONS.md). Built there (this module grades nothing), carried here as
+ * words.
+ */
+export interface PairVerdicts {
+  /** This run: the banner's own line, and the goals it missed by name (empty unless it missed). */
+  readonly pressed: PairVerdictSide;
+  /** The run without the last press, graded over its own whole run. */
+  readonly unpressed: PairVerdictSide;
+}
+
+export interface PairVerdictSide {
+  /** `VERDICT_VOICE[verdict].line` — *Shift cleared*, *Shift missed*, *Too quiet to grade*. */
+  readonly line: string;
+  /** `shift/goals.ts#goalPlainNameOf` for each goal read `missed`, in the goal table's order. */
+  readonly missedGoals: readonly string[];
+}
+
+/** `a`, `a and b`, `a, b and c`. */
+function listOf(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts[0] ?? '';
+  return `${parts.slice(0, -1).join(', ')} and ${String(parts[parts.length - 1])}`;
+}
+
+/** *Shift missed on the worst-wait goal* / *Shift cleared*. */
+function verdictWords(side: PairVerdictSide): string {
+  return side.missedGoals.length === 0 ? side.line : `${side.line} on ${listOf(side.missedGoals)}`;
+}
+
+/**
+ * The sentence that prints both verdicts — [§ D982](../../../../DECISIONS.md).
+ *
+ * Four things about it are the ruling's constraints rather than phrasing, and each is pinned by
+ * `counterfactual.test.ts`:
+ *
+ * 1. **Always both, in the counts' order** — this run, then the run without the press — and the
+ *    words do not depend on whether the two agree. No flag, tone or ordering is keyed on
+ *    agreement, because a row that spoke up only on a flip would tell only the *my press decided
+ *    it* story and hide the four days in five that correct it.
+ * 2. **No word connects them.** Not *still*, *either way*, *turned*, *decided* or *would*: two
+ *    facts, side by side, and the reader draws the line if there is one to draw.
+ * 3. **The press is never the subject of the verdict.** *The run without that press, over its own
+ *    whole day, reads …* keeps five words between *press* and the verdict, so the sentence cannot be
+ *    read as *the press cleared*; `counterfactual.test.ts` holds that with a pattern.
+ * 4. **The unpressed verdict is its whole day's**, and the words say so, rather than attaching it
+ *    to *those same two clock times* the counts are read at. The two runs can end seconds apart and
+ *    a verdict is a property of a whole day.
+ */
+function verdictClause(verdicts: PairVerdicts | undefined): string {
+  if (verdicts === undefined) return '';
+  return (
+    ` Graded against the same goals, this run reads ${verdictWords(verdicts.pressed)}; the run` +
+    ` without that press, over its own whole day, reads ${verdictWords(verdicts.unpressed)}.`
+  );
+}
+
 /** Said when presses came before the one this row names, so its window is not read as the day's. */
 function earlierPressClause(earlier: number): string {
   if (earlier === 0) return '';
@@ -182,6 +263,9 @@ function people(count: number): string {
  *    subtract; the sheet may not, because a subtraction off one replication is an estimate and the
  *    row is not entitled to one. This is the single line that separates § D931 from the thing
  *    § D900 refused.
+ *
+ * The two runs' **verdicts** are not this clause's: {@link verdictClause} prints them after it,
+ * since [§ D982](../../../../DECISIONS.md) amended § D931 clause 3.
  */
 function pairClause(pair: PressCounterfactual | undefined, ourLongWaits: number): string {
   if (pair === undefined) return '';
@@ -212,6 +296,7 @@ export function afterPressBeatOf(
   interventions: readonly RunInterventionConfig[],
   clockRangeOf: (startS: SimTime, endS: SimTime) => string,
   counterfactual?: PressCounterfactual | undefined,
+  verdicts?: PairVerdicts | undefined,
 ): ReportDiagnosis | undefined {
   /*
    * Inside the run's own span, strictly before its end, and in time order — all three owned by
@@ -253,8 +338,17 @@ export function afterPressBeatOf(
       `${people(end.waitingNow)} were standing when the day ended, and ${people(delivered)} were ` +
       'delivered between those two clock times.' +
       pairClause(pair, Math.max(0, end.servedCount - end.servedUnderThresholdCount)) +
+      /*
+       * § D982. Only beside a pair — the unpaired row is § D900's, byte for byte, and carries no
+       * verdict word — and only when the sheet graded (a single-run sheet passes none).
+       */
+      (pair === undefined ? '' : verdictClause(verdicts)) +
       `${earlierPressClause(ordered.length - 1)} ` +
-      (pair === undefined ? AFTER_PRESS_DISCLAIMER : AFTER_PRESS_PAIR_NOTE),
+      (pair === undefined
+        ? AFTER_PRESS_DISCLAIMER
+        : verdicts === undefined
+          ? AFTER_PRESS_PAIR_NOTE
+          : `${AFTER_PRESS_PAIR_NOTE} ${AFTER_PRESS_VERDICT_NOTE}`),
     /*
      * **Never toned.** A press is not a fault, and `diagnosisRowsOf` paints `bad` and `caution`
      * from this field: a red edge under a sentence that explicitly claims no cause would say, in

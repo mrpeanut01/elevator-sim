@@ -854,6 +854,24 @@ export interface EverydayHost {
   goalsToday(): readonly GoalReading[];
 
   /**
+   * **The goals the next *Start the day* will grade** — GitHub issue **#597**,
+   * [§ D984](../../../../DECISIONS.md). What the brief prints under *What today asks*.
+   *
+   * {@link goalsToday} reads the horizon off the **state**, and that is right for everything that
+   * grades a run: until the press lands the day is still a slice. It is wrong for the one screen
+   * that previews the press. `startRun` writes {@link dayPatchFor}'s whole-day window *on the
+   * press*, so on a tower with an authored day the brief — drawn before it — read the slice's bars
+   * (230 s, 80 kJ on day 1) while the stage and the report graded the day it opened against the
+   * whole day's (460 s, 350 kJ). A player agreed to one set of goals and was graded on another.
+   *
+   * This is the same fold over the state **the press will produce**: the state with the same patch
+   * `startRun` applies, through the same `runHorizonOf`. No second rule about which horizon a day
+   * is — the patch is the rule, read one step early. Readings are against no run (every one
+   * `pending`), because the brief prints the asks and never a reading.
+   */
+  goalsAhead(): readonly GoalReading[];
+
+  /**
    * The same goals read at **an instant the caller names** — GitHub issue **#277**,
    * [§ D470](../../../../DECISIONS.md).
    *
@@ -2150,6 +2168,22 @@ function horizonOf(b: EverydayHostBindings): RunHorizon {
 }
 
 /**
+ * {@link horizonOf} over the state `startRun` is about to produce — [§ D984](../../../../DECISIONS.md).
+ *
+ * `{ ...state, ...dayPatchFor(b) }` is the state after the press's own patch, so this and the
+ * horizon the stage reads after the press are one expression one step apart rather than two rules
+ * that agree today. See {@link EverydayHost.goalsAhead}.
+ */
+function horizonAheadOf(b: EverydayHostBindings): RunHorizon {
+  const state = b.state();
+  return runHorizonOf(
+    b.resources.trafficProfiles,
+    buildingConfigOf(b.resources, state.savedBuildings, state.buildingId),
+    { ...state, ...dayPatchFor(b) },
+  );
+}
+
+/**
  * Build the host over the closure's bindings. Pure over its input: every derivation reads
  * `bindings.state()` fresh, so the host never holds a stale copy of anything.
  */
@@ -2476,6 +2510,8 @@ export function createEverydayHost(
     goalsAt,
     goalFactsAt,
     goalsToday: () => goalsAt(b.playheadS()),
+    goalsAhead: () =>
+      readGoals(goalsForDay(b.state().week.day, horizonAheadOf(b)), NO_RUN_OBSERVATIONS),
     lastReport: () => b.state().report,
     lastOutcome: () => b.state().week.history.at(-1),
     selection: () => {

@@ -114,12 +114,13 @@ import type { VizRecording, VizSummary } from '../contract/types.js';
 import { fallbackLineOf, readbackOf, type RuleRow } from '../authoring/ruleSpec.js';
 import { interventionLogOf } from '../live/interventions.js';
 
-import { afterPressBeatOf } from './afterPress.js';
+import { afterPressBeatOf, type PairVerdicts } from './afterPress.js';
+import { wrinkleNoteOf, type BookedOutCar } from './bookedOut.js';
 import type { PressCounterfactual } from './counterfactual.js';
 
 import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
 import { contractStatus } from './contracts.js';
-import { gaveUpBesideOf, horizonLabelOf, readGoals, wasDisplayOf } from './goals.js';
+import { gaveUpBesideOf, goalPlainNameOf, horizonLabelOf, readGoals, wasDisplayOf } from './goals.js';
 import { growthFactor } from './growth.js';
 import { ENDLESS_CONTRACT_ID, wasGraded } from './week.js';
 import {
@@ -617,8 +618,10 @@ export interface DayReportInput {
    * `dayReportOf` is pure and is re-entered on a *preference* change (`dev/main.ts`'s own
    * `filedReportInput` path, GitHub issue #70) — a two-second simulation behind that call would
    * put a shift's worth of work behind a Settings toggle. So the pair is computed once, by the one
-   * caller that holds both recordings, and arrives as three numbers. `shift/counterfactual.ts`
-   * owns the six grounds on which it refuses to exist at all.
+   * caller that holds both recordings, and arrives as three numbers and the unpressed run's
+   * whole-run fold, which {@link dayReportOf} grades against {@link goals} with this module's own
+   * grader ([§ D982](../../../../DECISIONS.md)). `shift/counterfactual.ts` owns the six grounds on
+   * which it refuses to exist at all.
    *
    * It is **not persisted and reaches no record**: `ViewerState.report` is deliberately outside
    * the session (`persist/types.ts` § *what is deliberately not here*, item 2), and
@@ -661,6 +664,22 @@ export interface DayReportInput {
    * dispatcher id already implies. Every caller that passes nothing is describing exactly that.
    */
   readonly ruleRows?: readonly RuleRow[] | undefined;
+  /**
+   * The cars the tower's own schedule took out of passenger service part-way through this run —
+   * `shift/bookedOut.ts#bookedOutCarsOf` over the run's resolved building, GitHub issue #596 item 3,
+   * [§ D983](../../../../DECISIONS.md).
+   *
+   * **Not derivable from {@link recording}**: a recording carries the cars held for the whole run
+   * (`outOfServiceCarIds`) and not a mid-run schedule, which is why the header printed *Nothing
+   * booked* on days a car went. The one caller with a building (`dev/main.ts#closeShift`) passes it;
+   * `undefined` is the empty list, for {@link interventions}' reason — the callers that pass nothing
+   * are describing runs whose tower books nothing, or runs this sheet cannot see the schedule of.
+   *
+   * Read twice on the sheet and nowhere else: the header names each car and its two clock times
+   * ({@link bookedLine}), and a missed worst-wait row says whether one of those cars was away for
+   * that wait ({@link missedGoalRowsOf}).
+   */
+  readonly bookedOut?: readonly BookedOutCar[] | undefined;
 }
 
 /**
@@ -704,7 +723,7 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
     `${recording.buildingName} · ${dispatcherName}`,
     `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
     ...(subject.kind === 'single-run' ? selectionLines(subject.selection) : []),
-    ...bookedLine(input.event, subject),
+    ...bookedLine(input.event, subject, input.bookedOut ?? [], dayStartS),
     /*
      * The rules in force, before the attempt count and well before the intervention log —
      * `docs/20` defect 2. Config, so it belongs with what was asked for; see
@@ -775,12 +794,30 @@ function ruleLines(rows: readonly RuleRow[], dispatcherName: string): readonly s
  * a single-run sheet that named an event would be claiming the run had one, and `enterFreePlay`
  * resets the week precisely so it does not.
  */
-function bookedLine(event: ShiftEvent, subject: ReportSubject): readonly string[] {
+function bookedLine(
+  event: ShiftEvent,
+  subject: ReportSubject,
+  bookedOut: readonly BookedOutCar[],
+  dayStartS: SimTime,
+): readonly string[] {
   if (subject.kind !== 'week-day') return [];
   // Printed on an ordinary day too. *"Nothing booked"* is an answer to the question, and a line that
   // appeared only on eventful days would make its absence mean two things at once — no event, or a
   // sheet built before this line existed.
-  return [`${event.name} — ${event.note}`];
+  //
+  // **And it is only an answer when it is true** — GitHub issue #596 item 3, § D983. On a day the
+  // tower books a car out, the ordinary day's *Nothing booked* sat beside a brief whose plate said a
+  // car was booked; `shift/bookedOut.ts#wrinkleNoteOf` is the sentence the brief prints too, and each
+  // car then gets a line of its own with the two clock times the run had — after the run, so the
+  // schedule is the run's rather than a preview (`bookedOut.ts`' module docstring).
+  return [
+    `${event.name} — ${wrinkleNoteOf(event, bookedOut)}`,
+    ...bookedOut.map((car) =>
+      car.backAtS === null
+        ? `car ${car.carId} · out of passenger service from ${clockOf(car.awayAtS, dayStartS)}, not back before the end`
+        : `car ${car.carId} · out of passenger service ${clockRange(car.awayAtS, car.backAtS, dayStartS)}`,
+    ),
+  ];
 }
 
 /**
@@ -997,6 +1034,9 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
       judgement.verdict,
       input.interventions ?? [],
       input.pressCounterfactual,
+      pairVerdictsOf(input, readings),
+      readings,
+      input.bookedOut ?? [],
     ),
     levers: leversFor(recording, observations, summary, readings),
     smallPrint: smallPrintFor(dispatcherName, summary, dayStartS),
@@ -1188,17 +1228,62 @@ function judgementOf(
    * two-way expression guarded that with its own `readings.length > 0`; the guard now lives in the
    * predicate the week reads, where there is one of it.
    */
-  const verdict: ShiftVerdict = !wasGraded(readings)
-    ? 'ungraded'
-    : readings.every((reading) => reading.state === 'met')
-      ? 'cleared'
-      : 'missed';
+  const verdict = verdictOf(readings);
   const voice = VERDICT_VOICE[verdict];
   return {
     verdict,
     verdictLine: voice.line,
     diagnosisHeading: voice.heading,
     lede: voice.lede(summary, observations, readings),
+  };
+}
+
+/**
+ * The verdict alone — {@link judgementOf}'s first line, lifted out so a **second** run can be graded
+ * by the same predicate rather than by a copy of it ([§ D982](../../../../DECISIONS.md)). The
+ * ordering argument in {@link judgementOf} is this function's: `wasGraded` is asked first.
+ */
+function verdictOf(readings: readonly GoalReading[]): ShiftVerdict {
+  return !wasGraded(readings)
+    ? 'ungraded'
+    : readings.every((reading) => reading.state === 'met')
+      ? 'cleared'
+      : 'missed';
+}
+
+/**
+ * **Both runs of a paired day, graded by this sheet's grader against this sheet's goals** —
+ * [§ D982](../../../../DECISIONS.md), amending § D931 clause 3.
+ *
+ * Each side is `VERDICT_VOICE[verdict].line` — *Shift cleared*, *Shift missed*, *Too quiet to
+ * grade* — and, for a run that missed, the goals it missed by {@link goalPlainNameOf}'s digit-free
+ * names. There is no second predicate and no second vocabulary: the pressed side is built from the
+ * very readings the banner is, so the two cannot disagree, and `counterfactual.test.ts` asserts it.
+ *
+ * `undefined` on a single-run sheet. That sheet's banner refuses to grade — *no scenario asked for
+ * this run* (`docs/19` defect 13) — and a row printing *Shift cleared* under it would grade twice
+ * what the banner declined to grade once. The pair's counts still draw there.
+ */
+function pairVerdictsOf(
+  input: DayReportInput,
+  readings: readonly GoalReading[],
+): PairVerdicts | undefined {
+  const pair = input.pressCounterfactual;
+  if (pair === undefined || input.subject.kind !== 'week-day') return undefined;
+  return {
+    pressed: verdictSideOf(readings),
+    unpressed: verdictSideOf(readGoals(input.goals, pair.wholeRunObservations)),
+  };
+}
+
+function verdictSideOf(readings: readonly GoalReading[]): PairVerdicts['pressed'] {
+  const verdict = verdictOf(readings);
+  return {
+    line: VERDICT_VOICE[verdict].line,
+    missedGoals:
+      verdict === 'missed'
+        ? readings.filter((reading) => reading.state === 'missed').map((r) => goalPlainNameOf(r.goal))
+        : [],
   };
 }
 
@@ -1878,6 +1963,30 @@ function energyFigures(summary: VizSummary): readonly ReportFigure[] {
  * landing on a day that met every bar was drawn in the same red as an 892-deep one that did not.
  * The verdict is the same value the heading and the headline come from, so the section cannot flag
  * a fault on a sheet whose banner says there was none.
+ *
+ * ## *Where it went wrong* names the goal that went wrong — GitHub issue #596 item 2, [§ D983](../../../../DECISIONS.md)
+ *
+ * On a missed day this section used to open on the deepest queue whatever had been missed. An
+ * assessor's Crown Hotel day missed on a **311 s worst wait**, and the heading *Where it went wrong*
+ * sat over *Floor G stacked 14 deep* — a landing that had passed its bar of 32, drawn red. A Midtown
+ * day lost to a 929 s wait at lunch, with car D booked out, was headed by 08:48's queue, and the
+ * booked-out car appeared nowhere on the sheet.
+ *
+ * So a missed day now opens on {@link missedGoalRowsOf}: one row per goal read `missed`, in the goal
+ * table's order, each carrying the goal's own evidence from this run — the worst wait's floor and
+ * its two clock times and whether a booked-out car was away for it; the carry and inside-a-minute
+ * shares with the count each is over; the energy ratio with its legs. The landing-queue goal's row
+ * **is** the queue row, placed where that goal falls in the order, so the deepest queue leads only
+ * when it is what was missed. The queue row's tone follows **its own goal** rather than the day's
+ * verdict — red only when the landing-queue goal was missed — and its fixed sentence, *every car was
+ * committed elsewhere when the calls landed together*, printed on every run whatever the run did,
+ * is replaced by a count this run produced: how many people had called from that floor in the
+ * minute before it peaked, and where the peak stood against the landing-queue goal's bar.
+ *
+ * A cleared day is untouched in shape: it has no missed goal, so it opens on the tightest moment as
+ * it always has, and `render/reportCard.ts`' `diagnosis[0]` is the same row it was there. On a
+ * missed day that card now carries the goal that was missed, which is the thing a shared card of a
+ * missed day ought to say.
  */
 function diagnosisFor(
   recording: VizRecording,
@@ -1886,13 +1995,22 @@ function diagnosisFor(
   verdict: ShiftVerdict,
   interventions: readonly RunInterventionConfig[],
   counterfactual: PressCounterfactual | undefined,
+  pairVerdicts: PairVerdicts | undefined,
+  readings: readonly GoalReading[],
+  bookedOut: readonly BookedOutCar[],
 ): readonly ReportDiagnosis[] {
   const at = observations.peakQueueAtS;
   const floorId = observations.peakQueueFloorId;
   const phase = at === null ? undefined : recording.demandPhases.find((p) => at >= p.startS && at < p.endS);
   const missed = verdict === 'missed';
-  const queueTone: FigureTone = missed ? 'bad' : 'plain';
-  const phaseTone: FigureTone = missed ? 'caution' : 'plain';
+  /*
+   * The queue row's colour is **its own goal's**, § D983 — see the docstring. On a missed day whose
+   * landing-queue goal passed, a red queue row said in colour that the queue lost the day.
+   */
+  const queueReading = readings.find((reading) => reading.goal.reads === 'peakQueue');
+  const queueMissed = missed && queueReading?.state === 'missed';
+  const queueTone: FigureTone = queueMissed ? 'bad' : 'plain';
+  const phaseTone: FigureTone = queueMissed ? 'caution' : 'plain';
   /*
    * Built once and appended to both populated rows, because both are readings of the **same
    * instant** — see {@link windowRelationClause}. `''` when there is no such instant, which is
@@ -1915,8 +2033,15 @@ function diagnosisFor(
           when: clockOf(at, dayStartS),
           what: `Floor ${floorId} stacked ${String(observations.peakQueue)} deep`,
           why:
-            'Every car was committed elsewhere when the calls landed together. Batch arrivals are ' +
-            'the normal case, not the unlucky one — people travel in groups.' +
+            /*
+             * Measured, where a fixed cause used to stand — § D983. *Every car was committed
+             * elsewhere* was printed on every run whatever its cars were doing; how many people had
+             * just called from that floor is a count this run produced, and it is the half of the
+             * old sentence that was ever about the run: calls land together.
+             */
+            `${peoplePhrase(calledBefore(recording, floorId, at))} had called from that floor in ` +
+            'the minute before.' +
+            queueBarClause(queueReading) +
             windowRelation,
           tone: queueTone,
         };
@@ -1940,7 +2065,11 @@ function diagnosisFor(
       : {
           id: 'peak-phase',
           when: clockRange(phase.startS, phase.endS, dayStartS),
-          what: `The worst of it landed in ${phase.label}${rateClause(phase.ratePctPop5min)}`,
+          /*
+           * *The deepest queue*, not *the worst of it* — § D983. With a missed worst wait now able
+           * to head this section, *the worst of it* would name two different moments on one sheet.
+           */
+          what: `The deepest queue stood in ${phase.label}${rateClause(phase.ratePctPop5min)}`,
           why:
             'Round-trip time is what limits you inside a peak, not car speed. A stop costs about ' +
             '10 s of door and transfer time however fast the motor is, so the way out of a peak is ' +
@@ -1964,8 +2093,171 @@ function diagnosisFor(
     interventions,
     (startS, endS) => clockRange(startS, endS, dayStartS),
     counterfactual,
+    pairVerdicts,
   );
-  return afterPress === undefined ? [queueRow, phaseRow] : [queueRow, phaseRow, afterPress];
+  /*
+   * A missed day opens on the goals it missed, in the goal table's order, with the queue row standing
+   * in for the landing-queue goal — § D983. A cleared or ungraded day has none, so its section keeps
+   * exactly the shape it always had.
+   */
+  const lead: ReportDiagnosis[] = [];
+  let queueLed = false;
+  if (missed) {
+    for (const reading of readings) {
+      if (reading.state !== 'missed') continue;
+      if (reading.goal.reads === 'peakQueue') {
+        lead.push(queueRow);
+        queueLed = true;
+        continue;
+      }
+      const row = missedGoalRowOf(reading, recording, observations, dayStartS, bookedOut);
+      if (row !== undefined) lead.push(row);
+    }
+  }
+  const rows = [...lead, ...(queueLed ? [] : [queueRow]), phaseRow];
+  return afterPress === undefined ? rows : [...rows, afterPress];
+}
+
+/** `1 person` / `5 people` — the diagnosis rows' cohort word. */
+function peoplePhrase(count: number): string {
+  return `${String(count)} ${count === 1 ? 'person' : 'people'}`;
+}
+
+/**
+ * How many people called from `floorId` in the sixty seconds up to and including `atS` — the queue
+ * row's measured half, § D983. A count of legs whose `arrivedAt` falls in that span, and nothing
+ * about whether they were still standing at the peak: the sentence says *had called*, which is what
+ * this counts.
+ */
+function calledBefore(recording: VizRecording, floorId: string, atS: SimTime): number {
+  return recording.legs.filter(
+    (leg) => leg.originFloorId === floorId && leg.arrivedAt <= atS && leg.arrivedAt > atS - 60,
+  ).length;
+}
+
+/** Where the day's deepest queue stood against the landing-queue goal, or `''` with none graded. */
+function queueBarClause(reading: GoalReading | undefined): string {
+  if (reading === undefined || reading.state === 'pending') return '';
+  const bar = String(reading.goal.bar);
+  return reading.state === 'missed'
+    ? ` That is past the landing-queue goal, which allowed ${bar}.`
+    : ` The landing-queue goal allowed ${bar}, so this stayed inside it.`;
+}
+
+/**
+ * The single longest wait the run had by its end, found by `live/observations.ts`'s own rule — a
+ * boarded or refused leg's wait ends at that instant, an unresolved one at `endedAt`, ties go to the
+ * first leg in record order — so the leg named is the one the worst-wait goal read. `undefined` when
+ * the run had no leg, or when the leg found does not round to the figure the goal graded (which
+ * would mean the two folds had parted, and a row naming a different wait from the goal's is worse
+ * than a row with no clock).
+ */
+function worstWaitLegOf(
+  recording: VizRecording,
+  graded: number,
+): { readonly floorId: string; readonly fromS: SimTime; readonly toS: SimTime } | undefined {
+  const t = recording.endedAt;
+  let best: { floorId: string; fromS: SimTime; toS: SimTime; waitS: number } | undefined;
+  for (const leg of recording.legs) {
+    if (leg.arrivedAt > t) break;
+    const resolvedAt = leg.boardedAt ?? leg.refusedAt;
+    const resolved = resolvedAt !== undefined && resolvedAt <= t;
+    const toS = resolved ? resolvedAt : t;
+    const waitS = Math.max(0, toS - leg.arrivedAt);
+    if (best === undefined || waitS > best.waitS) {
+      best = { floorId: leg.originFloorId, fromS: leg.arrivedAt, toS, waitS };
+    }
+  }
+  if (best === undefined || Math.round(best.waitS) !== graded) return undefined;
+  return best;
+}
+
+/**
+ * Which cars were away while `[fromS, toS]` was being waited through — the booked-out cars the
+ * tower's schedule took out, and the cars held for the whole run. `''` when none was.
+ */
+function awayDuringClause(
+  recording: VizRecording,
+  bookedOut: readonly BookedOutCar[],
+  fromS: SimTime,
+  toS: SimTime,
+): string {
+  const parts: string[] = [];
+  for (const car of bookedOut) {
+    const backS = car.backAtS ?? Number.POSITIVE_INFINITY;
+    if (car.awayAtS >= toS || backS <= fromS) continue;
+    const whole = car.awayAtS <= fromS && backS >= toS;
+    parts.push(
+      `Car ${car.carId} was booked out of passenger service for ${whole ? 'all' : 'part'} of that wait.`,
+    );
+  }
+  for (const carId of recording.outOfServiceCarIds) {
+    parts.push(`Car ${carId} was out of service for the whole run.`);
+  }
+  return parts.length === 0 ? '' : ` ${parts.join(' ')}`;
+}
+
+/**
+ * One missed goal's row — § D983. Each carries the goal's name, its bar, the figure this run read,
+ * and the count that figure is over, so no share on it lacks its cohort (R13). `undefined` for a goal
+ * this build does not write a row for, which is the landing-queue goal (its row is the queue row) and
+ * any goal a restored session carries that this table does not know.
+ */
+function missedGoalRowOf(
+  reading: GoalReading,
+  recording: VizRecording,
+  observations: Observations,
+  dayStartS: SimTime,
+  bookedOut: readonly BookedOutCar[],
+): ReportDiagnosis | undefined {
+  const { goal } = reading;
+  const bar = String(goal.bar);
+  const wholeRun = clockRange(recording.startedAt, recording.endedAt, dayStartS);
+  const id = `missed-${goal.id}`;
+  switch (goal.reads) {
+    case 'worstWaitS': {
+      const leg = worstWaitLegOf(recording, observations.worstWaitS);
+      return {
+        id,
+        when: leg === undefined ? '—' : clockRange(leg.fromS, leg.toS, dayStartS),
+        what:
+          `The worst wait reached ${reading.display}` +
+          (leg === undefined ? '' : ` on floor ${leg.floorId}`),
+        why:
+          `The worst-wait goal asked for every wait inside ${bar} s, and this one ran past it.` +
+          (leg === undefined ? '' : awayDuringClause(recording, bookedOut, leg.fromS, leg.toS)),
+        tone: 'bad',
+      };
+    }
+    case 'carryPct':
+      return {
+        id,
+        when: wholeRun,
+        what: `${String(observations.carried)} of ${String(observations.arrived)} people who called were carried, ${reading.display}`,
+        why: `The carry goal asked for ${bar}% of the people who turned up.`,
+        tone: 'bad',
+      };
+    case 'minutePct':
+      return {
+        id,
+        when: wholeRun,
+        what: `${reading.display} of the ${String(observations.servedLegs)} people picked up were away inside a minute`,
+        why: `The inside-a-minute goal asked for ${bar}%.`,
+        tone: 'bad',
+      };
+    case 'workPerServedLegKJ':
+      return {
+        id,
+        when: wholeRun,
+        what: `The work came to ${reading.display} for each of the ${String(recording.summary.energy.deliveredLegCount)} delivered legs`,
+        why:
+          `The energy goal asked for ${bar} kJ or less for each delivered leg. A day that spends ` +
+          'less by carrying fewer people has saved nothing, which is why the legs are the divisor.',
+        tone: 'bad',
+      };
+    default:
+      return undefined;
+  }
 }
 
 /**

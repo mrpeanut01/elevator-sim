@@ -48,10 +48,30 @@
 
 import { TODAY_ASKS_HEADING } from '../shift/goals.js';
 
+import type { GoalReading } from '../shift/types.js';
+
 import type { ActionBarModel } from './actionBar.js';
+import type { EverydayHost } from './host.js';
 import { isScreenBuilt, unbuiltReasonFor } from './screens.js';
 import type { TodayRecord } from './today.js';
 import type { EverydayScreen } from './types.js';
+
+/**
+ * **What the brief asks** — the goals *Start the day* will grade, GitHub issue #597,
+ * [§ D984](../../../../DECISIONS.md).
+ *
+ * `host.goalsAhead()` and not `host.goalsToday()`: the brief is drawn before the press that writes
+ * the whole-day window, so the state's own horizon is the slice's and the stage then graded a
+ * different set of bars (230 s / 80 kJ asked, 460 s / 350 kJ graded, on day 1 of a whole-day tower).
+ *
+ * A function rather than one argument in `briefScreen.ts`, because the choice between the two host
+ * methods is the defect and a DOM mount is the one place the honesty corpus cannot drive. Here it is
+ * a shipped expression `honesty/agreement.ts` declares a pair over, against the stage's asks after
+ * the press, so a mount that went back to `goalsToday()` would have to stop calling this to do it.
+ */
+export function briefAsksOf(host: Pick<EverydayHost, 'goalsAhead'>): readonly GoalReading[] {
+  return host.goalsAhead();
+}
 
 /** One dispatcher on offer — § 6.2's style card and the dropdown's option are one list. */
 export interface BriefDispatcherOption {
@@ -341,7 +361,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
     wrinkle: {
       heading: 'TODAY’S WRINKLE',
       title: today.wrinkle.name,
-      body: today.wrinkle.note,
+      body: today.wrinkleNote,
       shared: 'Everyone playing today gets the same one, at the same point in the day.',
     },
     asks: {

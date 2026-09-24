@@ -42388,3 +42388,106 @@ So § D961 pinned a sweep **over rungs that § D914 then moved**. Neither lane w
 ### What this deliberately does not move
 
 **No rung, no bar and no threshold.** § D914's rebalance is measured and deliberate; this entry makes the measurement *of* it current. `shift/goals.ts#GOAL_BARS` is untouched, `data/contract-ladder.json` is untouched, and § D512's *more than a third of fifty seeds* is untouched. The band, the window and the union in `legibilityOf` are untouched. **§ D961 is not rewritten**: its table is a dated record of the tree it was taken on, and `legibility.ts` carries both columns for the same reason.
+
+---
+
+## D982 — the paired after-press row prints both runs' verdicts, graded by the sheet's own grader, and amends § D931 clause 3
+
+**Date: 2026-09-24 · Owner: LANE-AH-C (wave AH) · GitHub issue [#596](https://github.com/mrpeanut01/elevator-sim/issues/596) item 1 · Amends [§ D931](#d931) clause 3 rather than editing it · Rules on `packages/viz/src/shift/afterPress.ts`, `shift/counterfactual.ts`, `shift/report.ts`, `shift/goals.ts` and `honesty/surfaces.ts`. Cites [§ D900](#d900), [§ D227](#d227), [§ D256](#d256), [§ D343](#d343), [§ D405](#d405).**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds: it **moves something already recorded** — § D931 clause 3 says in terms *"No verdict either"* — and it binds `shift/report.ts`'s grader and the honesty corpus, neither of which `shift/afterPress.ts` owns. § D931 is left exactly as written; this entry is what changed.
+
+### 1. The ruling this implements, and the measurement behind it
+
+A decision agent of wave AH ruled on this question with a measurement, and its ruling binds the lane. The measurement: **7 press-day contracts** (§ D914's c2, c3, c6, c7, c8, c9, c10) × seeds `20 260 824 + 7 919 n`, n = 0…49 × **3 arms** (as built, *spread the cars*, *park the cars in the lobby*), day 1 under each contract's standing order with the press at the pinned `pressAtFraction` — **1 050 day-long simulations**. Every pair passed all six of `pressCounterfactualOf`'s grounds, and all seven pinned days reproduced § D914's table.
+
+- The press changes the verdict in **126 of 700** pairs, in both directions: 72 missed days cleared, 54 cleared days missed.
+- When the pressed run **cleared**, the run without the press **also cleared in 296 of 368** (80 %). The sheet printed *Shift cleared* in the banner and nothing answering *would it have cleared anyway?*, so *my press cleared the day* — false four times in five — was left standing. That is `docs/43` P3's *a theory the game neither confirms nor denies*.
+- The pair's only moving figure, long waits, points **against** the verdict in 27 of the 126 flips, including c2's pinned day (82 → 96 on a day the press cleared).
+- No tower × verb cell's verdict effect is distinguishable from zero at 50 crowds (exact sign test on the discordant pairs, p ≥ 0.13). **That test is justification for this ruling only and is printed nowhere in the product**: it is a sign test over 50 seeds, not a paired-t interval over a metric, and no shipped surface is entitled to it.
+
+### 2. What the row now says
+
+On every **paired** row, after the three counts: *"Graded against the same goals, this run reads Shift cleared; the run without that press, over its own whole day, reads Shift missed on the worst-wait goal."* and the note gains one clause, `AFTER_PRESS_VERDICT_NOTE`: *"The two verdicts are the same kind of fact as the counts: how this crowd's day was graded with that press and without it, and nothing about how a day is graded for any other crowd, even in this tower."*
+
+1. **One grader, one vocabulary.** Both sides are `VERDICT_VOICE[verdict].line` through `shift/report.ts#verdictOf`, lifted out of `judgementOf` so a second run is graded by the same predicate rather than a copy, against **the same `input.goals`**. The pressed side is built from the readings the banner is; `counterfactual.test.ts` asserts it equals the sheet's `verdictLine`, and the unpressed side equals the banner of that recording's own sheet.
+2. **The unpressed run is graded over its own whole run**, `observationsAt(unpressed, unpressed.endedAt)` through `shiftObservationsOf`, carried on `PressCounterfactual.wholeRunObservations` — not at the pressed run's window end, because a verdict is a whole-day property and the two runs can end seconds apart. The words say *over its own whole day* rather than attaching it to the counts' two clock times.
+3. **Always both, whether they agree or not.** No sentence, tone, flag or order depends on agreement.
+4. **A missed run names its missed goals, with no digit** — `shift/goals.ts#GOAL_PLAIN_NAMES`, a `Record` over the shipped goal ids, so the row stays a row of headcounts (§ D931 rule 4) and a sixth goal is a compile error.
+5. **No word connects the two.** `counterfactual.test.ts` bans *decided, decides, decisive, rescued, rescue, flipped, turned, won, lost, either way, anyway, still, same verdict, changed the verdict, if you had, would, could have* on word boundaries over the whole paired row, and the pattern `\bpress(es)?\b(\W+\w+){0,3}\W+(clear|clears|cleared|miss|misses|missed)\b` — so no press is ever the subject of a verdict. The ruling's own draft sentence (*the run without that press reads Shift missed*) fails that pattern, which is why the implemented sentence puts *over its own whole day* between them. § D900's causal list and § D931's estimation list are unchanged.
+6. **The unpressed verdict never leaves the row.** Banner, lede, headline, goals, figures and every other diagnosis row are byte-identical with and without a pair (asserted); the row stays `tone: 'plain'` and stays **last**, so `render/reportCard.ts`'s `diagnosis[0]` never carries it; nothing reaches the week, the streak, `closeDay` or banking, because none of them reads a diagnosis row.
+7. **§ D900's unpaired row is byte-identical**, and `afterPress.test.ts` now asserts it carries none of *Shift cleared*, *Shift missed*, *Too quiet to grade*.
+
+### 3. One narrowing, stated rather than hidden
+
+A **single-run** sheet prints no verdict on the paired row. Its banner is `read, not graded — no scenario asked for this run` (`docs/19` defect 13), and a row printing *Shift cleared* under a banner that refused to grade would grade twice what the sheet declined to grade once. The counts and § D931's note still draw there; `AFTER_PRESS_VERDICT_NOTE` does not, since it would be a caption over no verdict. That is why the clause is its own constant appended to `AFTER_PRESS_PAIR_NOTE` rather than spliced into it.
+
+### 4. Pinned by runs, not by this paragraph
+
+`shift/pressLadder.test.ts` runs three `c7` crowds with *spread the cars* at the rung's own press second: **20 268 743** (the pinned day — this run reads *Shift cleared*, the other *Shift missed on the worst-wait goal*), **20 442 961** (the same press on the same tower turns a cleared day into a missed one — the row says so as plainly as it says a win, and this arm is the run that pins the note's *even in this tower*), and **20 260 824** (both cleared, nothing connecting them). All three reproduce the ruling's table.
+
+### 5. The corpus
+
+`honesty/surfaces.ts`'s intervened sheet pairs the recording with itself, so its two verdicts always agree. The ruling asked for one arm where they can differ: `ShiftDay.pairedAgainstCandidate` grades the unpressed side on the candidate dispatcher's fold of the same day and seeds that row's `why`. It is a fixture exactly as the self-pair is. The string count moves; the integrator measures it (§ D343).
+
+### 6. Stale text removed in the same change (§ D227)
+
+`shift/counterfactual.ts`' header no longer says *No verdict, either*; it says what § D931 withheld and why this entry reverses it.
+
+---
+
+## D983 — a missed day's report opens on the goal it missed, and a car the tower books out is named on the brief, the header and the stage
+
+**Date: 2026-09-24 · Owner: LANE-AH-C (wave AH) · GitHub issue [#596](https://github.com/mrpeanut01/elevator-sim/issues/596) items 2–4 · Rules on `packages/viz/src/shift/report.ts`, the new `shift/bookedOut.ts`, `shift/goals.ts`, `everyday/today.ts`, `everyday/briefView.ts`, `everyday/stageScreenModel.ts`, `everyday/stageScreen.ts`, `dev/main.ts`, `dev/reportPanel.ts`, `dev/leftRail.ts` and `honesty/surfaces.ts`. Cites [§ D871](#d871), [§ D227](#d227), [§ D256](#d256), [§ D343](#d343), [§ D405](#d405).**
+
+**Why an entry.** It binds a dozen modules in four directories and moves a spelling two of them agreed on (`was`), so it reaches past any one module (§ D405).
+
+### 1. *Where it went wrong* names the goal that went wrong
+
+On a missed day the section opened on the deepest queue whatever was missed. An assessor's Crown Hotel day missed on a **311 s worst wait** under a heading pointing at *Floor G stacked 14 deep*, a landing inside its bar of 32, drawn red. A Midtown day lost to a 929 s wait at lunch with car D out was headed by 08:48's queue.
+
+Now a missed day opens on one row per goal read `missed`, in the goal table's order (`shift/report.ts#missedGoalRowOf`): the worst wait's floor and its two clock times — the leg found by `live/observations.ts`'s own rule, and dropped to *no clock* if it does not round to the graded figure — and whether a booked-out car was away for any of it; the carry and inside-a-minute shares with the count each is over; the energy ratio with its legs. The landing-queue goal's row **is** the queue row, placed where that goal falls, so the queue leads only when it was missed. **The queue row's tone follows its own goal**, red only when the landing-queue goal was missed. A cleared day's section is unchanged in shape. Measured on `c7`'s pinned day as built: the sheet now opens *The worst wait reached 303 s on floor 8 — … Car D was booked out of passenger service for part of that wait*, and the 16-deep queue below it is plain (`shift/bookedOut.test.ts`).
+
+**The fixed cause is gone.** `report.ts` printed *"Every car was committed elsewhere when the calls landed together"* on every peak-queue row regardless of the run. It is replaced by a count this run produced — how many people called from that floor in the minute before — and where the peak stood against the landing-queue goal's bar. **No mechanism is offered in its place** ([§ D256](#d256)): the count is what calls landing together looks like, and why the cars were where they were is unmeasured.
+
+The phase row's *The worst of it landed in …* becomes *The deepest queue stood in …*, because with a worst-wait row able to head the section, *the worst of it* would name two moments on one sheet.
+
+### 2. *Nothing booked* stops being printed on a day a car is booked
+
+All four assessors saw the brief and the report header read *An ordinary day — Nothing booked* beside a plate saying car D is booked out. The calendar booked nothing and the tower's own schedule ([§ D871](#d871)) booked a car. `shift/bookedOut.ts` now owns the reading — `bookedOutCarsOf` over the **run's own** resolved building, moved out of `everyday/today.ts` so three surfaces read one expression — and `wrinkleNoteOf` is the one sentence the brief's wrinkle card and the report's header both print: the event's note verbatim when the tower books nothing, the ordinary day's *Nothing booked* **replaced** when it does, any other event's note followed by one sentence naming the car. No clock on the brief (`today.ts`' rule: a time before the run is a figure with no source the reader can see). The report header then gives each car its own line with the two clock times the run had (`DayReportInput.bookedOut`, passed by `dev/main.ts#closeShift`, because a `VizRecording` carries whole-run holds and not a mid-run schedule). The stage header carries a pill per car — *Car D booked out 06:07–06:15 · out now* — from `stageScreenModel.ts#stageBookedOutOf`, which names the schedule and never anything the run did; it is hidden while watching someone else's record and on a rush. The stage change is the header pill only: playback and the simulating state are untouched.
+
+### 3. The *was* column is visibly yesterday's
+
+The goal table's slot read `was 78%` a few rows above the after-press pair, and two assessors read *was* as *before my press*. It is the building's previous day, and it now reads `yesterday 78%` through `shift/goals.ts#yesterdayLabelOf`, which both the rail and the report call — they had agreed to spell it one way, and still do. The bare em dash is unchanged. The run-to-run delta block's `was → now` is a different claim (the previous sheet) and is not touched.
+
+### 4. The corpus
+
+The corpus builds towers without a contract rung (`run.ts#buildingFor`), so no case books a car out. Fixture bookings on the recording's own first two cars — one that comes back, one that does not — are seeded on `ShiftDay.pairedAgainstCandidate`'s header and on the stage pill at every sample playhead, so every arm of the new sentences is swept. The string count moves; the integrator measures it (§ D343).
+
+---
+
+## D984 — the brief asks the goals its own press will grade, and a declared pair across the press closes the gap `surfaces-disagree` had
+
+**Date: 2026-09-24 · Owner: LANE-AH-C (wave AH) · GitHub issue [#597](https://github.com/mrpeanut01/elevator-sim/issues/597) · Rules on `packages/viz/src/everyday/host.ts`, `everyday/briefView.ts`, `everyday/briefScreen.ts` and `honesty/agreement.ts`. Cites [§ D359](#d359), [§ D962](#d962), [§ D227](#d227), [§ D405](#d405).**
+
+**Why an entry.** It adds a pair to `honesty/agreement.ts`'s register and a method to the Everyday host, neither owned by the brief (§ D405).
+
+### 1. The defect, and why it was a timing rather than a derivation
+
+On day 1 of a whole-day tower the brief printed a 230 s worst wait and an 80 kJ energy bar; the stage and the report graded the same day against 460 s and 350 kJ (§ D962's bar and the whole-day factor). The replay brief printed 220 s against 440 s. **Every surface asked `runHorizonOf` correctly.** The brief asked it about the wrong state: `everyday/host.ts#startRun` writes the whole-day window **on the press**, and the brief is drawn before it, so `host.goalsToday()` read the slice the state still was.
+
+### 2. The repair
+
+`EverydayHost.goalsAhead()` — the same fold over the state the press will produce, `{ ...state, ...dayPatchFor(b) }` through the same `runHorizonOf`, read against no run. No second rule about which horizon a day is: the patch is the rule, read one step early. The brief reads it through `everyday/briefView.ts#briefAsksOf`, a shipped expression rather than an argument inside a DOM mount, so the corpus can drive it.
+
+### 3. Why `surfaces-disagree` did not catch it — both halves of the question #597 asked
+
+**The brief and the stage were not a declared pair**, and the one pair that compares goal asks could not have seen it anyway. `today-asks` compares the Engineer rail and the Everyday host **on one state**; its whole-day views are built with the press's patch already applied (`agreementViews` composes `wholeDayRun` the way `dayPatchFor` does), so the state the brief is drawn on — a whole-day tower **before** the press — was never a side of anything. And the brief's own corpus seeding took its asks off the report sheet's readings at the default `'period'` horizon, since no corpus case is a whole authored day (`goalsForDay`'s docstring says why). So both of #597's hypotheses were true at once.
+
+**What closes it** is a pair of a different shape — § D359's across time rather than across shells. `asks-before-the-press` gives both sides the **pre-press** state: the left is `briefAsksOf`, the right is the Everyday host after **its own** `startRun` has written **its own** patch (the harness lets that one binding write, into a copy, and simulates nothing), read the way the stage reads it. `agreement.test.ts` reverts the left to the brief as it shipped — `goalsToday()` — and the property fires on the slice views of towers with an authored day **and nowhere else**, quoting *inside 230 s* against *inside 460 s*. `everyday/host.test.ts` asserts `goalsAhead` equals `goalsToday` after the press's own patch on two towers, and that on Midtown the two differ before it, so the case is not vacuous.
+
+### 4. Not claimed
+
+Issue #597 also records that the 350 kJ whole-day energy bar never failed across one assessor's twenty days. That is a single sitting rather than a measurement and nothing here moves the bar; § D962's derivation stands.
+
+This lane held **D982–D990** and spent **D982–D984**. **D985 to D990 are unspent**, and under [§ D404](#d404) and [§ D430](#d430) they become permanent holes once a later number is written above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.

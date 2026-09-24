@@ -997,7 +997,7 @@ describe('the goal rows carry a second, non-colour signal — KB-15', () => {
     // One spelling of yesterday on both surfaces: `dev/leftRail.ts#goalRowsOf` makes the same
     // two-way choice, and a sheet that said `was —` would dress an absence as a measurement.
     expect(goalRowViewOf({ reading: reading('met'), was: '—', beside: '' }).was).toBe('—');
-    expect(goalRowViewOf({ reading: reading('met'), was: '91%', beside: '' }).was).toBe('was 91%');
+    expect(goalRowViewOf({ reading: reading('met'), was: '91%', beside: '' }).was).toBe('yesterday 91%');
   });
 });
 
