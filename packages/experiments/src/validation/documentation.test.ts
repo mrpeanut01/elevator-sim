@@ -2152,7 +2152,7 @@ type DecisionReservation = {
  * the first lane to write a heading hit a guard failure that looked like its own fault. Four lanes
  * had to be told to merge a commit before they could record a decision.
  */
-const OPEN_RESERVATION = { wave: 'AG-fix', from: 963, to: 970 } as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'AH', from: 964, to: 999 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
