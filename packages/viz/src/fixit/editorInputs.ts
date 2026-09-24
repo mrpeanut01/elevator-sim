@@ -155,8 +155,43 @@ function standingPointOf(
   }
 }
 
-/** Everything § D1000's five families draw for this case and this order. */
+/**
+ * Everything § D1000's five families draw for this case and this order — **remembered for the last
+ * order asked about**, because a surface redraws the whole card on every press, including the ones
+ * that change nothing here (a run starting, a run landing), and the answer plans the building twice.
+ * Keyed on the case, its budget and the order, never on object identity: the Everyday screen hands a
+ * fresh case object per read once a budget rung is bought.
+ */
 export function editorInputsOf(
+  entry: FixitCase,
+  state: FixitState,
+  resources: FixitResources,
+  schedule: PriceSchedule,
+): EditorInputs {
+  const key = `${entry.id}|${String(entry.budgetUnits)}|${JSON.stringify(state)}`;
+  if (
+    lastInputs !== undefined &&
+    lastInputs.key === key &&
+    lastInputs.resources === resources &&
+    lastInputs.schedule === schedule
+  ) {
+    return lastInputs.inputs;
+  }
+  const inputs = computeEditorInputs(entry, state, resources, schedule);
+  lastInputs = { key, resources, schedule, inputs };
+  return inputs;
+}
+
+let lastInputs:
+  | {
+      readonly key: string;
+      readonly resources: FixitResources;
+      readonly schedule: PriceSchedule;
+      readonly inputs: EditorInputs;
+    }
+  | undefined;
+
+function computeEditorInputs(
   entry: FixitCase,
   state: FixitState,
   resources: FixitResources,

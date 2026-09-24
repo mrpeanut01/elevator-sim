@@ -122,7 +122,9 @@ function applyBuildingPatch(doc: MutableBuildingDocument, patch: NonNullable<Fix
   const named = new Set((patch.floorPopulations ?? []).flatMap((population) => population.floorIds));
   const explicit = new Set((doc.floors ?? []).map((floor) => floor.id));
   if ([...named].some((id) => !explicit.has(id)) && doc['floorRanges'] !== undefined) {
-    doc.floors = expandFloors(doc as Parameters<typeof expandFloors>[0]) as unknown as MutableBuildingDocument['floors'];
+    doc.floors = expandFloors(doc as unknown as Parameters<typeof expandFloors>[0]) as unknown as NonNullable<
+      MutableBuildingDocument['floors']
+    >;
     delete doc['floorRanges'];
   }
   for (const population of patch.floorPopulations ?? []) {
@@ -633,13 +635,31 @@ export function fixitPlanRefusalOf(
   state: FixitState,
   resources: FixitResources,
 ): string | undefined {
+  /*
+   * **Remembered for the last order asked about.** Both surfaces ask twice for one order — the
+   * families card on the redraw, the Run press before it starts the pair — and planning resolves the
+   * whole building each time, which on `vertical-city` is tens of milliseconds on the thread that
+   * paints. Keyed on the case, its budget and the order itself, never on object identity: the
+   * Everyday screen hands a fresh case object per read once a budget rung is bought.
+   */
+  const key = `${entry.id}|${String(entry.budgetUnits)}|${JSON.stringify(state)}`;
+  if (lastRefusal !== undefined && lastRefusal.key === key && lastRefusal.resources === resources) {
+    return lastRefusal.answer;
+  }
+  let answer: string | undefined;
   try {
     fixitRunPlanOf(entry, state, resources);
-    return undefined;
+    answer = undefined;
   } catch (error) {
-    return error instanceof Error ? error.message : String(error);
+    answer = error instanceof Error ? error.message : String(error);
   }
+  lastRefusal = { key, resources, answer };
+  return answer;
 }
+
+let lastRefusal:
+  | { readonly key: string; readonly resources: FixitResources; readonly answer: string | undefined }
+  | undefined;
 
 /**
  * The editor's two fabric selections — the pair that cannot travel as a {@link FixitPatch}, because
