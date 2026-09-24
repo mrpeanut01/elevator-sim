@@ -2879,7 +2879,9 @@ export function createEverydayHost(
        * one turn the owner's first-time-only ruling does not reach, so it still pays on every post. It
        * is also the only turn a Career day posts: the week contract standing behind the shell is not
        * Scenario content, so its clear pays no scenario award (§ D533's second ruling), which
-       * `everyday/chimeTurns.browser.test.ts` asserts on the wire.
+       * `everyday/chimeTurns.browser.test.ts` asserts on the wire. Since § D964 that week is not even
+       * touched — the career day files into a week of its own that names no contract, so there is no
+       * clear to decline — and the same case asserts that too.
        *
        * Placed **after** `setCareer`, and gated on `next !== career` above, so it fires exactly
        * where a day is really filed: `fileDay` returns the record unchanged on a tower this career
