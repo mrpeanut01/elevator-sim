@@ -271,6 +271,10 @@ describe.runIf(process.env['PRESS_LADDER_VERIFY'] === '1')('a candidate pin, on 
    * hours fast decides its pace by, so a pin between peaks can be judged on whether a player could
    * make the press at their own speed. `PRESS_LADDER_PINNED` carries
    * `{ contractId: { seed, clearedBy, missedBy, at } }` and `PRESS_LADDER_HORIZON` the horizon.
+   *
+   * **It carries no timeout annotation, and is run with `--testTimeout`** on the command line: a
+   * handful of pins is minutes rather than hours, the ordinary suite never runs it, and an
+   * annotation here would be an above-ceiling budget `testCost.test.ts` counts as a claim.
    */
   it('writes each candidate’s three verdict lines and its prefix check', () => {
     const out = process.env['PRESS_LADDER_OUT'];
@@ -369,5 +373,5 @@ describe.runIf(process.env['PRESS_LADDER_VERIFY'] === '1')('a candidate pin, on 
       );
       writeFileSync(String(out), `${lines.join('\n')}\n`);
     }
-  }, 900_000);
+  });
 });

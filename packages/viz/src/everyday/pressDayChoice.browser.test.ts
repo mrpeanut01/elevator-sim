@@ -24,7 +24,8 @@
  * is run with it set and the case count is what is read (`describe.skipIf(!HAS_BROWSER)`).
  *
  * Port 5621, inside this lane's reserved 5621–5629, `strictPort: false` so a busy port moves rather
- * than fails the case.
+ * than fails the case. **No case or hook carries a timeout of its own**: the `viz-browser` project's
+ * 120 000 ms ceiling covers every one, and `testCost.test.ts` counts an annotation as a claim.
  */
 
 import { chromium, type Browser, type Page } from 'playwright-core';
@@ -50,7 +51,7 @@ beforeAll(async () => {
   site = await startShippedSite({ preview: { port: 5621, strictPort: false } });
   origin = site.origin;
   browser = await chromium.launch({ executablePath: CHROMIUM });
-}, 120_000);
+});
 
 afterAll(async () => {
   await browser?.close();
@@ -118,7 +119,7 @@ describe.skipIf(!HAS_BROWSER)('a day a press decides is reachable from the front
       } finally {
         await page.close();
       }
-    }, 180_000);
+    });
   }
 
   it('puts the crowd back when the player then chooses an ordinary tower', async () => {
@@ -141,5 +142,5 @@ describe.skipIf(!HAS_BROWSER)('a day a press decides is reachable from the front
     } finally {
       await page.close();
     }
-  }, 180_000);
+  });
 });
