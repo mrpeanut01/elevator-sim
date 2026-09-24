@@ -42388,3 +42388,66 @@ So § D961 pinned a sweep **over rungs that § D914 then moved**. Neither lane w
 ### What this deliberately does not move
 
 **No rung, no bar and no threshold.** § D914's rebalance is measured and deliberate; this entry makes the measurement *of* it current. `shift/goals.ts#GOAL_BARS` is untouched, `data/contract-ladder.json` is untouched, and § D512's *more than a third of fifty seeds* is untouched. The band, the window and the union in `legibilityOf` are untouched. **§ D961 is not rewritten**: its table is a dated record of the tree it was taken on, and `legibility.ts` carries both columns for the same reason.
+
+## D964 — a career day stands on a week of its own, and the Scenario record is parked behind it
+
+**Date: 2026-09-24 · Owner: wave AH lane A · GitHub issue [#594](https://github.com/mrpeanut01/elevator-sim/issues/594) · Rules on: `docs/38` § 2.2 (*the week and the career are separate records*), [§ D510](#d510)'s take-offer, and the career's run pipeline as [§ D507](#d507) and GitHub issue #563 left it.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: the decision is taken in `everyday/host.ts` and binds `shift/week.ts` (a new sentinel), `everyday/shell.ts` (the release on the way out), `everyday/stageScreen.ts` (the entry press), `everyday/campaignScreens.ts` (what the desk grades) and, through `shift/ladder.ts#rungFor`, which rung a career run is handed.
+
+### What was wrong, measured on the shipped bundle
+
+A Midtown Office week with Monday closed, then Career → *Look in* → *Lock it in and run day 1* → skip → *Close the day*, then back to Scenario's front door: the selected tower still read `c2`, and the seed line read **`tower garden-apartments · crowd 17929870023189047903`** over a week strip reading **`MON garden-apartments 100%`** where Midtown's 90 % had been. `runCampaignDay` wrote the tower's building, dispatcher, derived crowd and **the tower's day over `ViewerState.week`**; `dev/main.ts#closeShift` then filed the career's run into that week, replacing Monday. Nothing about the front door was wrong — it read the week it was given.
+
+From fresh storage the route was worse: the stage's entry rule found the boot run open to nobody's choice and pressed `host.startRun()` over the career run already in flight. That press is § 6's and disarms the career latch by design, so the career day filed into the Scenario week and **nothing** into the career — assessor D's *MON Garden Apartments 100 %* on a player who had never opened Scenario.
+
+### The ruling
+
+1. **A career day parks the Scenario week behind `shift/week.ts#CAREER_CONTRACT_ID`**, with `switchWeek`, exactly as a rush and a replay already park it. The career's own days are filed there and kept per tower for the page's life (`EverydayHost.campaignHistory`), which is what the desk's *was* column now reads instead of the Scenario week's Monday.
+2. **What the career press overwrites is held and put back** — building, dispatcher, crowd, held cars, kit, event, length, window, the intervention log, and the recording, report and tomorrow card a filed career day replaces. Taken on the first career press of a sitting, released by `EverydayHost.leaveCareer`, which the shell calls on any navigation out of § 8's five screens and on the leave strip; and every Scenario press on the host (`startRun`, `openTomorrow`, `chooseTower`, `startRush`, `startReplay`, take-offer) releases first, so a path that skips the shell cannot act on the career's state.
+3. **The stage never re-presses a day that is already coming**, and in the campaign context its entry press is `runCampaignDay` for the latched tower rather than `startRun`.
+4. **The desk grades only a career day's run** — the latched tower's, once it has landed. A rush just left read *1 of 4 holding* on a tower with no career day run; it now reads *nothing run yet today*.
+
+### What moves, said rather than found later
+
+**Which rung a career day is handed.** The career borrowed the Scenario week's contract id, so `rungFor` handed it a rung only when the player's Scenario tower happened to be the career tower's contract — on Garden Apartments with a Midtown week, the tower ran **as built**. A week on no contract borrows the building's own rung, so a career day is now handed over as its contract hands it over whichever Scenario tower the player is on. That is a change to career runs for every player whose Scenario week is on a different tower, and it is the direction `docs/38` § 2.2 asks for: a career day is a function of the career, not of an unrelated record.
+
+**The *was* column after a reload reads the em dash.** The career persists and its per-tower weeks do not — carrying them would need a `CAREER_SCHEMA_VERSION` bump that quarantines every save, the cost `careerSeedBase` already declines for the same reason. An em dash is no reading; the Scenario week's Monday was a wrong one.
+
+### What this deliberately does not move
+
+**[§ D510](#d510)'s take-offer still moves the Scenario week**, and it is the one Career action that does. The offer card says so in the player's words — *taking it starts a fresh week on this building; the week you are on is parked, not lost* — so it is an announced write rather than a silent one, and removing it is a ruling on § D510 that is the product owner's to make, not a lane's. What changed is only that it now releases a standing career day first, so the week it parks is the Scenario week and not the career's slot.
+
+## D965 — a mode's own week is never written to the saved session, and one found there is taken off
+
+**Date: 2026-09-24 · Owner: wave AH lane A · GitHub issue [#594](https://github.com/mrpeanut01/elevator-sim/issues/594) · Rules on: [§ D231](#d231)'s *a mode that does not own a week does not write one*, and `persist/validate.ts`'s closed set of ids a week may name.**
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it binds `persist/validate.ts`, `dev/state.ts#weeksForSession` and `dev/main.ts`'s restore, and it widens a set `validate.ts` documents as deliberately closed.
+
+### What was wrong, measured on the shipped bundle
+
+A Midtown week with Monday closed, a rush started, a reload: the front door opened on **`c1`, a fresh Garden Apartments Monday, on today's date's crowd**. The saved session held `{"contractId":"rush","day":1}` as the live week with Midtown parked behind it. A rush sets `playMode: 'endless'`, which `advancesTheWeek` answers `true` for, so the rush's week was written as the player's; and neither `rush` nor `replay` is in `validate.ts#namesSomething`, so the next load refused the whole session as *banked toward assignments this build no longer has* and cleared it — Midtown with it. A rush or replay **left** behind did the same from the parked list, which is how a player can lose a week without ever reloading mid-mode.
+
+### The ruling
+
+`shift/week.ts#MODE_WEEK_CONTRACT_IDS` names the three weeks a mode stands on — rush, replay, career — and `dev/state.ts#scenarioWeeksOf` takes them off a pair: a mode week parked is dropped, and a mode week live gives way to the last parked week that is not a mode's, which is the Scenario week `switchWeek` parked when the mode began. It runs on the way **out** (`weeksForSession`, both arms) and on the way **in** (`dev/main.ts`'s restore), and `validate.ts` now reads the three ids so that a session an earlier build wrote is repaired rather than refused. Identity-preserving when there is nothing to take off, so every ordinary save writes exactly the objects it did.
+
+**This does not rescue a week already lost.** The refusing load cleared the bytes, as `persist/` does on every non-`absent` failure; what a player lost before this commit is gone. What changes is that it cannot happen again, and that a session written mid-rush by the build still deployed today comes back as the week rather than as a refusal.
+
+## D966 — whether a demand template varies the mix is `core`'s answer on both paths, and a day that cannot simulate says so
+
+**Date: 2026-09-24 · Owner: wave AH lane A · GitHub issue [#593](https://github.com/mrpeanut01/elevator-sim/issues/593) · Rules on: `shift/calendar.ts`'s bias refusal and `shift/events.ts`'s mix refusal, both written for `lunch-two-way`.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: one predicate now decides for `dev/state.ts`, `shift/calendar.ts` and `shift/events.ts`, and the failure it could cause reaches `dev/main.ts`, `everyday/host.ts` and the stage.
+
+### What was wrong
+
+`core`'s `planDemand` refuses an explicit `directionalSplit` beside a template whose resolved form carries a `meanDirectionalSplit`. The event path asked `demandTemplate === 'lunch-two-way'` and the calendar asked whether the record declares `directionalSplitAtStart`, which is how a shape template varies the mix and not how a phase list does. `office-day` — the whole day thirteen of sixteen contracts run in Scenario — declares a mix on every phase, so both said *no*, and every day that drew a wrinkle with a mix of its own sent `core` a config it refused. The worker's refusal went to the Engineer transport's error line under the Everyday cover, and the stage said *simulating today's day* indefinitely. Reproduced on Midtown Office at day 3 on the built bundle, as the assessors found it.
+
+**It was not only the fire drill, and it was not only the event path.** Swept over every contract × days 1–21 × every starting weekday (2 352 cells) and handed to `core`'s own `planDemand`, the old predicates built **1 157 refused configs, every one on a whole-day tower**: the week's own draw produced fifteen wrinkles that set a mix — fire-drill, conference, caterers, goods-inward, evacuation-drill, shift-change, contractors, all-hands, audit-day, flu-day, open-day, late-finish, and the three weekend events — and every one of the fifteen hit it. (`coach-party` sets a mix too and is drawn only by a career's calendar, which runs no whole day.) And the **period path** was wrong too, measured with only its predicate reverted: `moving-week` and `vacation` built **182** refused configs through `calendarPatch`'s own bias alone — every one of their seven days on all thirteen whole-day towers — in the guard the issue believed was right. (With both reverted the calendar sweep read 208; the other 26, on `public-holiday`, are the event path under a period.)
+
+### The ruling
+
+`shift/events.ts#demandTemplateVariesMix` asks `resolveDemandTemplate(id, templates).meanDirectionalSplit` — the expression `planDemand` branches on — and both paths call it. `shift/wholeDayEvents.test.ts` holds the sweep against `core` rather than against the predicate, so it is not circular. And a failure is no longer silent: `EverydayHost.runFailure` carries the engine's sentence for a failed run of the player's own, and the stage draws `stageScreenModel.ts#stageRunFailedViewOf` — the day could not be simulated, the fault is the game's, *Try the day again* or back to the flow's own set-up screen — instead of waiting.
+
+**What it does not do.** A day that genuinely cannot simulate does not advance the week: *back* returns to the front door on the same day. Letting a player file a day nobody watched would be a ruling on the week's arithmetic, and with the cause fixed the sweep says no shipped Scenario day reaches that state.

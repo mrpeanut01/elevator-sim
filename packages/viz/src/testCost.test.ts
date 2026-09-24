@@ -362,7 +362,24 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * because a lane that edits above an existing case shifts its line number and a line-keyed diff
      * reports a move as an addition.
      */
-    ['viz-browser', { count: 79, totalMs: 19_920_000 }],
+    /*
+     * **79 → 82, and the three are named** — all three are wave AH lane A's
+     * `everyday/weekSurvives.browser.test.ts` at 600 000 ms each: *plays seven days on …* (one
+     * annotation, two cases, because the case is written once inside a loop over a whole-day tower
+     * and a slice tower), *closes a Scenario day, plays every other mode …*, and *a reload taken
+     * while a rush is standing …*. GitHub issues #593 and #594.
+     *
+     * **They earn it because both defects lived where no case went.** No case played past day 1 of a
+     * Scenario week, so a day 3 that `core` refused on thirteen towers reached assessors first; and
+     * no case left Scenario and came back, so a career day filed into the week and a rush's week was
+     * written to disk and refused on the next load. Each case plays a real week or a real round
+     * trip on the shipped bundle, several runs a case, which is why none can honestly sit at this
+     * tier's ceiling.
+     *
+     * Nothing existing was raised: 19 920 000 + 3 × 600 000 = 21 720 000, keyed on file and case
+     * name. If another lane of the same wave moved this row, the two moves add.
+     */
+    ['viz-browser', { count: 82, totalMs: 21_720_000 }],
   ]);
 
 /**

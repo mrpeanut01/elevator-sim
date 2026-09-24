@@ -198,6 +198,7 @@ import {
   STAGE_SWITCH_PICKER_NOTE,
   stageAlarmOf,
   stageBarModelOf,
+  stageRunFailedViewOf,
   stageCarReadoutOf,
   stageCrowdCapOf,
   stageGoalsOf,
@@ -10485,6 +10486,13 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stageScreenModel.ts#STAGE_OUT_OF_SERVICE',
     'everyday/stageScreenModel.ts#STAGE_AWAITING_RUN',
+    /*
+     * The overlay's third no-run state — GitHub issue #593: a day that could not be simulated, and
+     * the two ways on. Driven below over every run context, because *back* names each flow's own
+     * set-up screen.
+     */
+    'everyday/stageScreenModel.ts#stageRunFailedViewOf',
+    'everyday/stageScreenModel.ts#STAGE_RUN_FAILED_COPY',
     'everyday/stageScreenModel.ts#STAGE_DAY_OVER',
     'everyday/stageScreenModel.ts#stageOpeningLineOf',
     'everyday/stageScreenModel.ts#stageNextStretchOf',
@@ -10844,6 +10852,22 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     /* § 7.2's dashed well, and the overlay's two states that have no run to be early against. */
     seeds.push({ field: 'stage.well.outOfService', text: STAGE_OUT_OF_SERVICE, role: 'label' });
     seeds.push({ field: 'stage.overlay.awaitingRun', text: STAGE_AWAITING_RUN, role: 'prose' });
+    /*
+     * GitHub issue #593's failed state: the line and the retry once, since every context draws the
+     * same two, and *back* per context, since each names its own flow's screen.
+     */
+    {
+      const failed = stageRunFailedViewOf('daily');
+      seeds.push({ field: 'stage.overlay.runFailed', text: failed.line, role: 'prose' });
+      seeds.push({ field: 'stage.overlay.runFailed.retry', text: failed.retry, role: 'label' });
+      for (const ctx of RUN_CONTEXTS) {
+        seeds.push({
+          field: `stage.overlay.runFailed.back(${ctx})`,
+          text: stageRunFailedViewOf(ctx).back.label,
+          role: 'label',
+        });
+      }
+    }
     /*
      * AD-S5's opening sentence, at the one playhead it is ever drawn at — the overlay is up before
      * the first press and gone after it, so `startedAt` is not a sample among five here, it is the

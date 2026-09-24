@@ -73,7 +73,12 @@ describe('the stage’s entry rule', () => {
    */
   it('is what the mount asks, and the bare `open` test it replaced is gone', () => {
     const source = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
-    expect(source).toContain('stageEntryStartsARun(host.runState())) host.startRun();');
+    /*
+     * `pressTheDay` rather than `host.startRun()` since GitHub issue #594: in the campaign context
+     * the entry press is `runCampaignDay` for the latched tower, because `startRun` is § 6's and a
+     * career day re-pressed through it was filed into the Scenario week.
+     */
+    expect(source).toContain('stageEntryStartsARun(host.runState())) pressTheDay();');
     expect(source).not.toContain('if (!host.runState().open) host.startRun();');
   });
 
@@ -93,11 +98,17 @@ describe('the stage’s entry rule', () => {
    */
   it('does not ask for a day on the way into a watch', () => {
     const source = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
+    /*
+     * With `!host.runPending()` beside the two context guards since GitHub issue #594: a day the
+     * player has already pressed for is on its way, and re-pressing over it is what turned a career
+     * day into a Scenario one.
+     */
     expect(source).toContain(
-      "if (context.ctx !== 'watch' && context.ctx !== 'rush' && stageEntryStartsARun(host.runState())) host.startRun();",
+      "if (context.ctx !== 'watch' && context.ctx !== 'rush' && !host.runPending() && stageEntryStartsARun(host.runState())) pressTheDay();",
     );
     /* The unguarded shape, by its own text — either half alone passes over a file that does both. */
     expect(source).not.toContain('if (stageEntryStartsARun(host.runState())) host.startRun();');
+    expect(source).not.toContain('if (stageEntryStartsARun(host.runState())) pressTheDay();');
   });
 });
 
@@ -276,7 +287,7 @@ describe('what the stage adopts on the way in — GitHub issue #548', () => {
 
   it('latches what stood at entry before the press that supersedes it', () => {
     const latch = source.indexOf("if (context.ctx !== 'watch') standingAtEntry = host.recording();");
-    const press = source.indexOf("stageEntryStartsARun(host.runState())) host.startRun();");
+    const press = source.indexOf("stageEntryStartsARun(host.runState())) pressTheDay();");
     expect(latch).toBeGreaterThan(-1);
     expect(press).toBeGreaterThan(-1);
     expect(latch).toBeLessThan(press);

@@ -178,7 +178,7 @@ import {
 import { worksHeldCarRefsOf, worksHeldCarsOf } from '../campaign/works.js';
 import { everydayCareerStore, type CareerStore } from './careerStore.js';
 import { CAMPAIGN_DOCK_COPY, purseRefusalOf } from './campaignDock.js';
-import { switchWeek } from '../shift/week.js';
+import { CAREER_CONTRACT_ID, openCareer, switchWeek } from '../shift/week.js';
 import { towerChoiceViewOf, type TowerChoiceView } from './towerChoice.js';
 import type { VizRecording } from '../contract/types.js';
 import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
@@ -1260,6 +1260,56 @@ export interface EverydayHost {
   runPending(): boolean;
 
   /**
+   * **Why the last day the player asked for did not arrive, or `undefined`** — GitHub issue #593.
+   *
+   * {@link runPending} answers *is today's run still coming?*, and on a worker failure it went
+   * `false` with nothing beside it: the runner posted `failed`, `dev/main.ts#failRun` wrote the
+   * engine's sentence on the Engineer transport's error line — under the Everyday cover, where no
+   * player of this product can read it — and the stage went on saying *simulating today's day* for
+   * as long as anybody waited. Two assessors waited more than seven minutes.
+   *
+   * So the fact is bound here, where the stage can ask it: set when a run of the player's own ends
+   * in a failure (the rival's race and the replay check are not the player's day and do not set
+   * it), cleared the moment the next run of theirs starts. The value is the engine's own sentence,
+   * for a bug report; what a player reads is `stageScreenModel.ts#stageRunFailedViewOf`'s.
+   *
+   * **Optional**, on {@link cancelRun}'s ground: a host whose shell starts no run has none that
+   * failed, and every fake in the suite would otherwise have to grow a field that answers nothing.
+   */
+  runFailure?(): string | undefined;
+
+  /**
+   * **Put the Scenario record back after a career day** — GitHub issue #594,
+   * [§ D964](../../../../DECISIONS.md).
+   *
+   * {@link runCampaignDay} parks the Scenario week behind a career week and writes the tower's
+   * building, dispatcher, crowd, length, kit and event over the state, because the run pipeline has
+   * one state to build from. This is the inverse, and the shell calls it on the way out of the
+   * campaign context — every rail row, the main-menu row and the leave strip — so the front door a
+   * player walks back to is the week, tower and crowd they left, and never the career's.
+   *
+   * Every Scenario press on this host ({@link startRun}, {@link openTomorrow}, {@link chooseTower},
+   * {@link startRush}, {@link startReplay}) calls the same release first, so a path that reaches
+   * one without passing the shell's hook still cannot act on the career's state. Idempotent: a
+   * no-op with no career day standing. **Optional** on {@link runFailure}'s ground.
+   */
+  leaveCareer?(): void;
+
+  /**
+   * **The career's own filed days for one tower, newest last** — GitHub issue #594.
+   *
+   * The desk's *was* column read `week().history`, which was the Scenario week's — so a Midtown
+   * Monday stood in as *yesterday* on a Garden Apartments contract. A career day now files into a
+   * week of its own ({@link leaveCareer}), and this is that week's history. It lives as long as the
+   * page does, on the career seed base's ground: the career itself persists and this cannot
+   * without a `CAREER_SCHEMA_VERSION` bump, so after a reload the column reads the em dash — no
+   * reading — rather than a figure from another record.
+   *
+   * **Optional** on {@link runFailure}'s ground.
+   */
+  campaignHistory?(towerId: string): readonly DayOutcome[];
+
+  /**
    * The run on the stage as a **pointer** — GitHub issue #340, `docs/26` § 2.1.
    *
    * *"A run is fully reconstructible from a small tuple of ids, a rate, a duration, a window and a
@@ -1841,6 +1891,12 @@ export interface EverydayHostBindings {
    */
   runPending?(): boolean;
   /**
+   * The engine's sentence for the player's last run that failed, or `undefined` — `dev/main.ts`'s
+   * own record, read where it lives. See {@link EverydayHost.runFailure}. **Optional** on
+   * {@link cancelRun}'s ground.
+   */
+  runFailure?(): string | undefined;
+  /**
    * Stop the run in flight **and** refuse to file the run that stands — `dev/main.ts`'s shift runner's
    * `cancel`, then `shift/banking.ts#LEFT_UNFINISHED_CANNOT_BANK` on that recording at every filing press.
    * {@link EverydayHost.leaveDayUnfinished} and a campaign `take-offer` call it (GitHub issue #526 items 1
@@ -2397,6 +2453,60 @@ export function createEverydayHost(
    */
   let careerSeedBase: bigint | undefined;
 
+  /**
+   * **What a career day parked, to be put back** — GitHub issue #594, [§ D964](../../../../DECISIONS.md).
+   *
+   * `undefined` while the Scenario record is the one on the state. Taken on the **first** career
+   * press after that, never re-taken inside one sitting — a second career day would otherwise
+   * capture the first one's building and crowd as *the player's*. Every field is one
+   * {@link EverydayHost.runCampaignDay} writes, plus the three a filed day replaces (the recording,
+   * its report and the tomorrow card), because a front door drawn from the career's report would
+   * be the defect this exists to end one screen later.
+   */
+  let careerHold:
+    | {
+        readonly contractId: string;
+        readonly patch: Pick<
+          ViewerState,
+          | 'buildingId'
+          | 'dispatcherId'
+          | 'seed'
+          | 'outOfServiceCarIds'
+          | 'campaignFitOut'
+          | 'campaignEventId'
+          | 'shiftLengthS'
+          | 'windowStartS'
+          | 'interventions'
+          | 'recording'
+          | 'report'
+          | 'tomorrow'
+        >;
+      }
+    | undefined;
+  /**
+   * Each career tower's own week — its filed days and nothing else's. Page-lifetime: see
+   * {@link EverydayHost.campaignHistory} for why, and what that costs after a reload.
+   */
+  const careerWeeks = new Map<string, WeekState>();
+  /** {@link EverydayHost.leaveCareer}, as a local so every Scenario press can call it first. */
+  const releaseCareer = (): void => {
+    const hold = careerHold;
+    if (hold === undefined) return;
+    careerHold = undefined;
+    /*
+     * A run in flight while a career day holds the state was asked for the career — the day's own
+     * press, a re-run over an answered incident, or the rival raced after one — and would land on
+     * the Scenario record this puts back, where the Scenario's filing presses would take it as the
+     * player's day. `leaveRush`'s #518 item 4, on the career.
+     */
+    if (b.runPending?.() === true) b.cancelRun?.();
+    campaignDayTowerId = undefined;
+    campaignDayIncident = undefined;
+    const state = b.state();
+    const moved = switchWeek(state.week, state.parkedWeeks, hold.contractId, 'resume');
+    b.applyPatch({ ...hold.patch, week: moved.week, parkedWeeks: moved.parked });
+  };
+
   /** {@link EverydayHost.campaignDay}, as a local so `answerIncident` reads the same fold. */
   const campaignDayFacts = (): CampaignDayFacts | undefined => {
     const towerId = campaignDayTowerId;
@@ -2520,6 +2630,7 @@ export function createEverydayHost(
     savedDispatchers: () => b.state().savedDispatchers,
     recording: () => b.state().recording,
     runPending: () => b.runPending?.() ?? false,
+    runFailure: () => b.runFailure?.(),
     /*
      * GitHub issue #340. Built from the two bindings that already exist rather than from a new one:
      * `resources` and `state()` are what `runSubmissionOf` takes, and `runIsOwn()` is the shell's
@@ -2644,6 +2755,8 @@ export function createEverydayHost(
       b.state().recording === undefined ||
       runIdentityIssues(b.state(), b.resources, 'ranked').length === 0,
     startRun: () => {
+      /* § 6's day runs on § 6's record — GitHub issue #594, {@link careerHold}. */
+      releaseCareer();
       /*
        * The day is set up on the press rather than on a mount — § AB, and {@link dayPatchFor} for
        * why the Everyday product's own press is the right owner. On the press, because it is the
@@ -2720,6 +2833,8 @@ export function createEverydayHost(
       campaignDayTowerId = undefined;
       campaignDayIncident = undefined;
       const state = b.state();
+      /* The career's day went into the career's week; kept for the desk's *was* column (#594). */
+      if (state.week.contractId === CAREER_CONTRACT_ID) careerWeeks.set(towerId, state.week);
       const tower = towerById(career, towerId);
       const recording = state.recording;
       if (tower === undefined || recording === undefined) return;
@@ -2792,6 +2907,7 @@ export function createEverydayHost(
       b.intervene(atS, change);
     },
     openTomorrow: () => {
+      releaseCareer();
       const state = b.state();
       // Nothing to advance from — see the interface docstring. The screen gates its primary on
       // the same fact, so this early return is the API refusing what the control never offers.
@@ -2886,6 +3002,8 @@ export function createEverydayHost(
            */
           if (b.dayClosed()) b.cancelRun?.();
           else b.abandonDay?.();
+          /* The offer's promise is about the Scenario week, so that is the week it moves (#594). */
+          releaseCareer();
           const state = b.state();
           const moved = switchWeek(state.week, state.parkedWeeks, contract.id, 'restart');
           b.applyPatch({
@@ -2908,7 +3026,38 @@ export function createEverydayHost(
       careerSeedBase ??= b.state().seed;
       const base = careerSeedBase;
       const event = campaignEventFor({ tower, seed: base });
+      /*
+       * **The Scenario record is parked, not written over** — GitHub issue #594, § D964. Taken on
+       * the first career press only; see {@link careerHold}. The interventions go with it: they are
+       * a log stamped against one day's run, and a Scenario day's would otherwise ride into the
+       * career's first day, which is the field `RUSH_FIELD_ROLES` already runs fresh for a rush.
+       */
+      const entering = careerHold === undefined;
+      if (entering) {
+        const held = b.state();
+        careerHold = {
+          contractId: held.week.contractId,
+          patch: {
+            buildingId: held.buildingId,
+            dispatcherId: held.dispatcherId,
+            seed: held.seed,
+            outOfServiceCarIds: held.outOfServiceCarIds,
+            campaignFitOut: held.campaignFitOut,
+            campaignEventId: held.campaignEventId,
+            shiftLengthS: held.shiftLengthS,
+            windowStartS: held.windowStartS,
+            interventions: held.interventions,
+            recording: held.recording,
+            report: held.report,
+            tomorrow: held.tomorrow,
+          },
+        };
+      }
+      const parking = switchWeek(b.state().week, b.state().parkedWeeks, CAREER_CONTRACT_ID, 'restart');
+      const careerWeek = careerWeeks.get(tower.id) ?? openCareer();
       b.applyPatch({
+        ...(entering ? { interventions: [] } : {}),
+        parkedWeeks: parking.parked,
         buildingId: tower.buildingId,
         dispatcherId: tower.dispatcherId,
         /*
@@ -2956,7 +3105,17 @@ export function createEverydayHost(
          * `shift/goals.ts#goalsForDay` hardens the rail's bars with the day — which is the same
          * ladder a § 6 week climbs, over a building that is now genuinely bigger.
          */
-        week: { ...b.state().week, day: tower.day, dayIdx: (tower.day - 1) % 7 },
+        /*
+         * **On the career's own week** — GitHub issue #594, § D964. This spread `b.state().week`,
+         * the Scenario week, and wrote the tower's day over it: the day filed into the Scenario
+         * week's history and the front door read the career's tower on the player's Monday.
+         */
+        week: {
+          ...careerWeek,
+          completed: parking.week.completed,
+          day: tower.day,
+          dayIdx: (tower.day - 1) % 7,
+        },
         /*
          * **And the car today's works hold** — GitHub issue #353, `docs/32` GD11's first half,
          * § D504. `campaign/works.ts` is the one derivation; the tower's screen draws the same
@@ -3030,6 +3189,8 @@ export function createEverydayHost(
       b.startRun();
     },
     campaignDay: campaignDayFacts,
+    leaveCareer: releaseCareer,
+    campaignHistory: (towerId) => careerWeeks.get(towerId)?.history ?? [],
     answerIncident: (atS, optionId) => {
       const facts = campaignDayFacts();
       if (facts === undefined || facts.incident === undefined) return CAMPAIGN_DOCK_COPY.refusedNoIncident;
@@ -3230,6 +3391,8 @@ export function createEverydayHost(
       b.stopWatching();
     },
     startRush: () => {
+      /* The rush parks what it stands on, so the Scenario record has to be what it stands on (#594). */
+      releaseCareer();
       const state = b.state();
       /*
        * **The rush's building, never the standing week's** — PR #513's review, finding 1. This read
@@ -3478,6 +3641,7 @@ export function createEverydayHost(
     chooseTower: (contractId) => {
       const contract = contractById(contractId);
       if (contract === undefined) return;
+      releaseCareer();
       const state = b.state();
       if (state.week.contractId === contractId) return;
       /*
@@ -3499,6 +3663,7 @@ export function createEverydayHost(
       notifyCampaign();
     },
     startReplay: (day) => {
+      releaseCareer();
       const state = b.state();
       if (replaySession !== undefined) return 'a replay is already standing; leave it before opening another';
       if (!replayableDay(state.week, day)) return REPLAY_COPY.beforeTheWeek;

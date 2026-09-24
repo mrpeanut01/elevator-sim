@@ -1336,6 +1336,9 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * Recorded here rather than in `DECISIONS.md`, under § D405 — the disarm is one function's interaction
    * with § D388's keeper, and the browser tier drives it.
    */
+  /** § 8's own screens — the ones a career day's state may stand behind (GitHub issue #594). */
+  const CAREER_FLOW_SCREENS: readonly EverydayScreen[] = ['towers', 'building', 'contract', 'stage', 'report'];
+
   function go(screen: EverydayScreen): void {
     /*
      * **A watch ends when the stage stops showing it** — GitHub issue #182, § D436.
@@ -1353,6 +1356,13 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     if (state.ctx === 'watch' && screen !== 'stage') leaveWatch();
     if (state.ctx === 'rush' && screen !== 'stage' && screen !== 'report') leaveRush();
     if (state.ctx === 'replay' && screen !== 'brief' && screen !== 'stage' && screen !== 'report') leaveReplay();
+    /*
+     * **A career day's state goes when the career's screens do** — GitHub issue #594, § D964. The
+     * host parked the Scenario record behind the career day; any screen outside § 8's own five is
+     * a screen that reads the Scenario record, so the record comes back first. The host's release
+     * is idempotent, so a row pressed with no career day standing costs nothing.
+     */
+    if (state.ctx === 'campaign' && !CAREER_FLOW_SCREENS.includes(screen)) dataHost?.leaveCareer?.();
     /*
      * § 7.3 E8 — the beat-drop profile's only source, and it is here for {@link leaveWatch}'s own
      * reason: every rail row, every bar button and every screen's own hand-off calls {@link go},
@@ -1496,6 +1506,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     if (state.ctx === 'watch') leaveWatch();
     if (state.ctx === 'rush') leaveRush();
     if (state.ctx === 'replay') leaveReplay();
+    if (state.ctx === 'campaign') dataHost?.leaveCareer?.();
     state = { ...state, ctx: 'daily' };
     go(EVERYDAY_ROOT);
   }
