@@ -272,6 +272,12 @@ const EVERYDAY_SHELL_FILES = new Set([
   'everyday/shell.ts',
   /* The fixit screen's DOM half — its words and decisions stay pure in fixitScreenModel.ts. */
   'everyday/fixitScreen.ts',
+  /*
+   * § D1000's five families, mounted by both fix-it surfaces — the dials, the door hold and the
+   * banks. Its words are fixitScreenModel.ts's and its decisions fixit/'s; what is here is selects
+   * and chips.
+   */
+  'everyday/fixitFamilies.ts',
   /* The settings screen's DOM half — its words and decisions stay pure in settingsView.ts. */
   'everyday/settingsScreen.ts',
   /* GAMEPLAY § 8's three campaign screens — their words stay pure in campaignModel.ts. */

@@ -415,7 +415,7 @@
       "name": "Move or stagger a tenancy",
       "priceUnits": 2,
       "nights": 4,
-      "note": "Three fix cases price a floor-population change at 2 or 3 units as a diagnosis; the shop prices moving a tenant floor at 20 with four nights. 2 is taken for the fix-case row and the shop's own row is kept separately below, because they are not the same act: staggering start times is a letter, and moving a tenant is a lease.",
+      "note": "Three fix cases price a floor-population change at 2 or 3 units as a diagnosis; the shop prices moving a tenant floor at 20 with four nights. 2 is taken for the fix-case row and the shop's own row is kept separately below, because they are not the same act: staggering start times is a letter, and moving a tenant is a lease. In a fix case the reach of this row is case data rather than a dial (DECISIONS.md § D1001, taken under delegated authority): it moves only the tenancy cohorts the case authors, to positions the case authors, charged at this figure once per cohort moved, and a case that authors no cohort draws the row inert. Measured on the shipped cases, a free per-floor cut to a third of every floor cleared seventeen of eighteen, fourteen of them cases whose fault is not the crowd, and no flat or rated price separated the answers from the wrong clears.",
       "covers": [
         "building.floorPopulations[]"
       ],

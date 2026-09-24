@@ -54,7 +54,7 @@ beforeAll(async () => {
   if (!HAS_BROWSER) return;
   // The artifact players load, and not a `vite dev` server — GitHub issue #281, § D425.
   // A port of its own, `strictPort: false` — files in one project run concurrently.
-  site = await startShippedSite({ preview: { port: 5197, strictPort: false } });
+  site = await startShippedSite({ preview: { port: 5651, strictPort: false } });
   origin = site.origin;
   browser = await chromium.launch({ executablePath: CHROMIUM });
 }, 120_000);
@@ -406,6 +406,51 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       // Not `aria-pressed` alone — a sighted reader gets the tick, and a colour change was both.
       expect(after.marks).toBe(1);
       expect(after.committed).not.toBe(before.committed);
+    } finally {
+      await page.close();
+    }
+  });
+
+  /**
+   * **§ D1000's five families and § D1001's tenancy row, on the shipped bundle.** The legs are
+   * proved in `fixit/families.test.ts`; what only this tier can show is that the shared mount is on
+   * the screen a player opens, that its presses reach the order the Run button spends, and that the
+   * tenancy row is drawn on a case with no movable crowd — with its sentence, and nothing to press.
+   */
+  it('draws the dials, the door hold, the banks and the tenancy row, and a door press moves the spend', async () => {
+    const page = await coldLoad();
+    try {
+      await openFixit(page);
+      const drawn = await page.evaluate(() => ({
+        groups: document.querySelectorAll('.everyday-fixit-dial-group').length,
+        dials: document.querySelectorAll('.everyday-fixit-dial select').length,
+        door: document.querySelectorAll('.everyday-fixit-door select').length,
+        cars: document.querySelectorAll('.everyday-fixit-car select').length,
+        tenancy: document.querySelectorAll('.everyday-fixit-tenancy').length,
+        none: document.querySelector('.everyday-fixit-tenancy-none')?.textContent ?? '',
+        committed: document.querySelector('.everyday-fixit-committed')?.textContent ?? '',
+      }));
+      expect(drawn.groups).toBe(3);
+      expect(drawn.dials).toBeGreaterThan(10);
+      /* The target and both sides of the door. */
+      expect(drawn.door).toBe(3);
+      expect(drawn.cars).toBeGreaterThan(0);
+      expect(drawn.tenancy).toBe(1);
+      /* The case the screen opens on authors no tenancy, so the row says so and offers nothing. */
+      expect(drawn.none.length).toBeGreaterThan(0);
+      expect(await page.locator('.everyday-fixit-tenancy select').count()).toBe(0);
+
+      const hall = page.locator('.everyday-fixit-door-hall select');
+      await hall.selectOption({ index: 1 });
+      await page.waitForFunction(
+        (before) => (document.querySelector('.everyday-fixit-committed')?.textContent ?? '') !== before,
+        drawn.committed,
+        { timeout: 15_000 },
+      );
+      const committed = await page.evaluate(
+        () => document.querySelector('.everyday-fixit-committed')?.textContent ?? '',
+      );
+      expect(committed).not.toBe(drawn.committed);
     } finally {
       await page.close();
     }
@@ -771,7 +816,12 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
         const classesOf = (node: Element): string => node.className;
         return [...(root?.querySelectorAll('button') ?? [])].map(classesOf);
       });
-      const allowed = /everyday-fixit-(case|repair|extra|step-up|step-down|budget-buy)/;
+      /*
+       * `floor-chip` joins from § D1000: the rezone's floor toggles are **the editor** — the
+       * clause's own second word — and they offer a floor to serve, not a cause to pick, which the
+       * direct check below holds.
+       */
+      const allowed = /everyday-fixit-(case|repair|extra|step-up|step-down|budget-buy|floor-chip)/;
       expect(controls.filter((className) => !allowed.test(className))).toEqual([]);
 
       /*

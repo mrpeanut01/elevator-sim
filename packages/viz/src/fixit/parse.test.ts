@@ -34,6 +34,12 @@ const CONTEXT: FixitContext = {
    * the two cases in `UNBANDED_SHAFT_CASES` get and why the two states must not be conflated.
    */
   shaftAreaBandByBank: new Map(),
+  /* Ninety on each upper floor — the figure § D1001's refusal of a raised headcount reads. */
+  populationByFloor: new Map([
+    ['tower/2', 90],
+    ['tower/3', 90],
+    ['tower/4', 90],
+  ]),
 };
 
 /** A minimal valid case, cloned per test. */
@@ -71,6 +77,44 @@ function validCase(): Record<string, unknown> {
       { id: 'r-shaft', role: 'new-shaft', name: 'A new shaft · beyond a repair budget', effect: 'A capital conversation with the owner.', patch: { building: { addCars: [{ bankId: 'main', copyCarId: 'A', id: 'B' }] } } },
     ],
     result: { head: 'Fixed.', body: 'Nothing was bought.' },
+  };
+}
+
+interface Tenancy {
+  cohorts: {
+    id: string;
+    name: string;
+    reason: string;
+    floorIds: string[];
+    positions: { id: string; name: string; watched: { floorIds: string[]; population: number }[] }[];
+  }[];
+}
+
+/** § D1001's tenancy for the fixture: floor 3's tenants, two positions, the witness the second. */
+function tenancyFixture(): Tenancy {
+  return {
+    cohorts: [
+      {
+        id: 'floor-three',
+        name: 'The tenants on floor three',
+        reason: 'Their lease lets the landlord set a later start.',
+        floorIds: ['3'],
+        positions: [
+          { id: 'half', name: 'Two start times', watched: [{ floorIds: ['3'], population: 45 }] },
+          { id: 'third', name: 'Three start times', watched: [{ floorIds: ['3'], population: 10 }] },
+        ],
+      },
+    ],
+  };
+}
+
+/** The fixture as a crowd case: a diagnosed repair that moves people, and the tenancy that can. */
+function withTenancy(): (entry: Record<string, unknown>) => void {
+  return (entry) => {
+    ((entry['repairs'] as { patch: unknown }[])[0] as { patch: unknown }).patch = {
+      building: { floorPopulations: [{ floorIds: ['3'], population: 10 }] },
+    };
+    (entry['asBuilt'] as Record<string, unknown>)['tenancy'] = tenancyFixture();
   };
 }
 
@@ -255,15 +299,74 @@ describe('parseFixitCases', () => {
   });
 
   it('lets the diagnosed repair change the crowd — three shipped cases diagnose the crowd, not the kit', () => {
-    const parsed = parseFixitCases(
-      fileWith((entry) => {
-        ((entry['repairs'] as { patch: unknown }[])[0] as { patch: unknown }).patch = {
-          building: { floorPopulations: [{ floorIds: ['3'], population: 10 }] },
-        };
-      }),
-      CONTEXT,
-    );
+    const parsed = parseFixitCases(fileWith(withTenancy()), CONTEXT);
     expect(parsed.cases[0]?.repairs[0]?.patch.building?.floorPopulations).toHaveLength(1);
+    expect(parsed.cases[0]?.asBuilt.tenancy?.cohorts[0]?.positions).toHaveLength(2);
+  });
+
+  /**
+   * **§ D1001's tenancy rules**, each one refused at load. The accepting arm is the test above; every
+   * arm below is that valid file with one thing wrong, so a refusal names what is wrong and nothing
+   * else.
+   */
+  describe('the tenancy', () => {
+    const violationsWith = (mutate: (tenancy: Tenancy, entry: Record<string, unknown>) => void): string =>
+      violationsOf(
+        fileWith((entry) => {
+          withTenancy()(entry);
+          mutate((entry['asBuilt'] as { tenancy: Tenancy }).tenancy, entry);
+        }),
+      ).join('\n');
+
+    it('is refused on a case whose answer moves nobody, and required on one whose answer moves people', () => {
+      const orphan = violationsOf(
+        fileWith((entry) => {
+          (entry['asBuilt'] as Record<string, unknown>)['tenancy'] = tenancyFixture();
+        }),
+      ).join('\n');
+      expect(orphan).toContain('its diagnosed repair moves nobody');
+      const missing = violationsWith((_tenancy, entry) => {
+        delete (entry['asBuilt'] as Record<string, unknown>)['tenancy'];
+      });
+      expect(missing).toContain('authors no tenancy');
+    });
+
+    it('requires the witness to be one of the positions, exactly', () => {
+      expect(
+        violationsWith((tenancy) => {
+          tenancy.cohorts[0]!.positions = tenancy.cohorts[0]!.positions.filter((p) => p.id !== 'third');
+        }),
+      ).toContain('not one of the authored tenancy positions');
+    });
+
+    it('refuses a position that raises a headcount, or moves nobody', () => {
+      expect(
+        violationsWith((tenancy) => {
+          tenancy.cohorts[0]!.positions[0]!.watched = [{ floorIds: ['3'], population: 91 }];
+        }),
+      ).toContain('cannot raise a headcount');
+      expect(
+        violationsWith((tenancy) => {
+          tenancy.cohorts[0]!.positions[0]!.watched = [{ floorIds: ['3'], population: 90 }];
+        }),
+      ).toContain('moves nobody');
+    });
+
+    it('refuses a cohort with no reason, and a floor that is not the cohort’s or the building’s', () => {
+      expect(violationsWith((tenancy) => { tenancy.cohorts[0]!.reason = ''; })).toContain('has no reason');
+      expect(
+        violationsWith((tenancy) => {
+          tenancy.cohorts[0]!.positions[0]!.watched = [{ floorIds: ['2'], population: 10 }];
+        }),
+      ).toContain("not one of the cohort's floors");
+      expect(violationsWith((tenancy) => { tenancy.cohorts[0]!.floorIds = ['3', '99']; })).toContain('floor "99"');
+    });
+
+    it('sweeps the tenancy’s words with every other string a player reads', () => {
+      expect(violationsWith((tenancy) => { tenancy.cohorts[0]!.name = 'The standing-order tenants'; })).toContain(
+        'engine identifier "standing-order"',
+      );
+    });
   });
 
   it('lets the as-built patch shape the population, because both runs share it', () => {

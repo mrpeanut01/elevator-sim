@@ -74,9 +74,13 @@ import {
   fixitBarModel,
   fixitBudgetRungRow,
   fixitCaseRailModel,
+  fixitDialGroupsView,
+  fixitDoorView,
   fixitElevationRow,
   fixitMachineryRows,
   fixitParkingRow,
+  fixitRezoneView,
+  fixitTenancyView,
   fixitZoneRow,
   fixitRepairStateLine,
   fixitSpendSummary,
@@ -298,6 +302,19 @@ import { demandDisclosureOf } from '../fixit/parse.js';
 import { switchUnpostableReasonOf } from '../scope/switchWire.js';
 import { figureValuesOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase } from '../fixit/types.js';
+import { EVERY_CAR, KEYED_BANK } from '../fixit/types.js';
+import type { DialGroupInput, DoorInput, RezoneInput, RowPurchase } from '../fixit/editorInputs.js';
+import {
+  dialGroupsOf,
+  dialOptionsOf,
+  dialValueText,
+  doorDwellOptionsOf,
+  keyedBankIdOf,
+  keyedBankNameOf,
+  playerWordsOfDimension,
+  rezoneFabricOf,
+} from '../fixit/families.js';
+import { purchaseUnits } from '../pricing/parse.js';
 import { frameAt } from '../frame/frameAt.js';
 import {
   BOARD_SCREEN_COPY,
@@ -6974,6 +6991,17 @@ const FIXIT_COVERS: readonly string[] = [
   'everyday/fixitScreenModel.ts#fixitElevationRow',
   'everyday/fixitScreenModel.ts#fixitSpendSummary',
   'everyday/fixitScreenModel.ts#fixitRepairStateLine',
+  /* § D1000's five families — the dials, the door hold and the banks, and the words under them. */
+  'everyday/fixitScreenModel.ts#fixitDialGroupsView',
+  'everyday/fixitScreenModel.ts#fixitDoorView',
+  'everyday/fixitScreenModel.ts#fixitRezoneView',
+  'everyday/fixitScreenModel.ts#fixitGroupHeader',
+  'everyday/fixitScreenModel.ts#fixitTenancyView',
+  'fixit/families.ts#dialGroupsOf',
+  'fixit/families.ts#dialOptionsOf',
+  'fixit/families.ts#dialValueText',
+  'fixit/families.ts#doorDwellOptionsOf',
+  'fixit/families.ts#keyedBankNameOf',
 ];
 
 function fixitSearchCase(context: HonestyContext): FixitCase {
@@ -7389,6 +7417,180 @@ const FIXIT: SurfaceAdapter = {
           role: 'label',
           provenance: 'authored',
         });
+      }
+    }
+
+    /*
+     * ---- § D1000's five families: the dials, the door hold and the banks ----
+     *
+     * Every dial the editor can draw, each with every option it offers on this case's building,
+     * over the declared space the context carries — so a dial's words and every value it names are
+     * read, not just the ones a shipped case happens to reach. Each group is seeded twice, bought
+     * and at the budget, because the header says a different thing on each. The door hold is seeded
+     * on every car and on one car; the banks with nothing moved and with a car keyed to a bank of
+     * its own, which is the one arm that draws a bank the building never had. The plate arm is
+     * forced on the first bank, because no corpus building weighs against anything but its plate
+     * and a sentence nothing renders is a sentence nothing has read.
+     */
+    {
+      const rowOf = (changeId: string, affordable: boolean): RowPurchase => {
+        const change = schedule.changes.find((candidate) => candidate.id === changeId)!;
+        return { changeId, name: change.name, units: purchaseUnits(change), bought: false, affordable };
+      };
+      const standing = new Map(context.space.parameters.map((parameter) => [parameter.id, parameter.default]));
+      for (const affordable of [true, false]) {
+        const groups: DialGroupInput[] = dialGroupsOf(schedule, context.space).map((group) => ({
+          row: rowOf(group.changeId, affordable),
+          dials: group.parameters.map((parameter) => {
+            const words = playerWordsOfDimension(parameter.id);
+            const standingValue = standing.get(parameter.id);
+            return {
+              id: parameter.id,
+              name: words?.name ?? parameter.key,
+              effect: words?.effect ?? '',
+              standingText: standingValue === undefined ? '' : dialValueText(parameter, standingValue, context.building),
+              options: dialOptionsOf(parameter, standingValue, context.building),
+              selected: undefined,
+            };
+          }),
+        }));
+        for (const group of fixitDialGroupsView(groups)) {
+          const where = `dials.${affordable ? 'open' : 'at-budget'}.${group.key}`;
+          seeds.push({ field: `${where}.heading`, text: group.header.heading, role: 'label', provenance: 'authored' });
+          seeds.push({ field: `${where}.priced`, text: group.header.priced, role: 'label' });
+          if (!affordable) continue;
+          for (const dial of group.dials) {
+            seeds.push({ field: `${where}.${dial.key}.label`, text: dial.label, role: 'label', provenance: 'authored' });
+            if (dial.effect !== '') {
+              seeds.push({ field: `${where}.${dial.key}.effect`, text: dial.effect, role: 'prose', provenance: 'authored' });
+            }
+            for (const option of dial.options) {
+              seeds.push({ field: `${where}.${dial.key}.option(${option.value})`, text: option.label, role: 'label' });
+            }
+          }
+        }
+      }
+      const fabric = rezoneFabricOf(context.building, context.building.config);
+      const doorInput: DoorInput = {
+        row: rowOf('door-dwell', true),
+        targets: [
+          { key: EVERY_CAR, carId: undefined, bankName: undefined },
+          ...fabric.cars.map((car) => ({
+            key: car.id,
+            carId: car.id,
+            bankName: fabric.banks.find((bank) => bank.id === car.standingBankId)?.name,
+          })),
+        ],
+        hallOptions: doorDwellOptionsOf('hall'),
+        carOptions: doorDwellOptionsOf('car'),
+      };
+      const firstCar = fabric.cars[0]?.id;
+      for (const target of [EVERY_CAR, ...(firstCar === undefined ? [] : [firstCar])]) {
+        const door = fixitDoorView(doorInput, { [target]: { hallCallS: 5 } }, target);
+        seeds.push({ field: `door(${target}).label`, text: door.label, role: 'label', provenance: 'authored' });
+        for (const option of door.targets) {
+          seeds.push({ field: `door(${target}).target(${option.value})`, text: option.label, role: 'label' });
+        }
+        for (const side of door.sides) {
+          seeds.push({ field: `door(${target}).${side.key}.label`, text: side.label, role: 'label', provenance: 'authored' });
+          for (const option of side.options) {
+            seeds.push({ field: `door(${target}).${side.key}.option(${option.value})`, text: option.label, role: 'label' });
+          }
+        }
+      }
+      /*
+       * The tenancy row, § D1001, in both of its shapes: the synthetic case authors no cohort, which
+       * is the fifteen shipped cases' shape and draws the inert sentence; and one seeded cohort over
+       * the searched half's floors, with a position that watches a third of each, bought and at the
+       * budget — the shape the three demand cases draw.
+       */
+      const tenancyRow = (affordable: boolean): RowPurchase => rowOf('tenant-floors', affordable);
+      const seededCohort = {
+        id: 'searched-half',
+        name: 'The tenancies in the searched half',
+        reason: 'Their leases let the landlord set a later start.',
+        floorIds: entry.complaint.measure.scope.floorIds,
+        positions: [
+          {
+            id: 'a-third-watched',
+            name: 'Three start times, and this run watches the first',
+            watched: [{ floorIds: entry.complaint.measure.scope.floorIds, population: 1 }],
+          },
+        ],
+      };
+      for (const [where, input] of [
+        ['none', { row: tenancyRow(true), cohorts: [], chosen: {} }],
+        ['cohort', { row: tenancyRow(true), cohorts: [seededCohort], chosen: { [seededCohort.id]: 'a-third-watched' } }],
+        ['at-budget', { row: tenancyRow(false), cohorts: [seededCohort], chosen: {} }],
+      ] as const) {
+        const view = fixitTenancyView(input);
+        seeds.push({ field: `tenancy.${where}.heading`, text: view.heading, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `tenancy.${where}.priced`, text: view.priced, role: 'label' });
+        if (view.none !== undefined) {
+          seeds.push({ field: `tenancy.${where}.none`, text: view.none, role: 'reason', provenance: 'authored' });
+        }
+        for (const cohort of view.cohorts) {
+          seeds.push({ field: `tenancy.${where}.${cohort.key}.name`, text: cohort.name, role: 'label', provenance: 'authored' });
+          seeds.push({ field: `tenancy.${where}.${cohort.key}.reason`, text: cohort.reason, role: 'prose', provenance: 'authored' });
+          for (const option of cohort.options) {
+            seeds.push({ field: `tenancy.${where}.${cohort.key}.option(${option.value})`, text: option.label, role: 'label', provenance: 'authored' });
+          }
+        }
+      }
+      for (const [where, keyedCar] of [['as-drawn', undefined], ['keyed', firstCar]] as const) {
+        const banks: RezoneInput['banks'] = fabric.banks.map((bank, index) => ({
+          ...bank,
+          offPlate: index === 0,
+          standingFloors: bank.servesFloors,
+          floors: bank.servesFloors,
+          keyed: false,
+          plated: false,
+        }));
+        const cars = fabric.cars.map((car) => ({
+          ...car,
+          target: car.id === keyedCar ? KEYED_BANK : car.standingBankId,
+        }));
+        const keyed = cars.find((car) => car.target === KEYED_BANK);
+        const view = fixitRezoneView({
+          row: rowOf('rezone-bank', true),
+          floorOrder: fabric.floorOrder,
+          cars,
+          banks:
+            keyed === undefined
+              ? banks
+              : [
+                  ...banks,
+                  {
+                    id: keyedBankIdOf(keyed.id),
+                    name: keyedBankNameOf(keyed.id),
+                    servesFloors: keyed.homeFloors,
+                    paired: false,
+                    offPlate: false,
+                    standingFloors: keyed.homeFloors,
+                    floors: keyed.homeFloors,
+                    keyed: true,
+                    plated: false,
+                  },
+                ],
+        });
+        for (const car of view.cars) {
+          seeds.push({ field: `banks.${where}.car(${car.key}).label`, text: car.label, role: 'label' });
+          for (const option of car.options) {
+            seeds.push({ field: `banks.${where}.car(${car.key}).option(${option.value})`, text: option.label, role: 'label' });
+          }
+        }
+        for (const bank of view.banks) {
+          seeds.push({ field: `banks.${where}.bank(${bank.key}).name`, text: bank.name, role: 'label' });
+          for (const floor of bank.floors ?? []) {
+            seeds.push({ field: `banks.${where}.bank(${bank.key}).floor(${floor.id})`, text: floor.label, role: 'label' });
+          }
+          if (bank.pairedNote !== undefined) {
+            seeds.push({ field: `banks.${where}.bank(${bank.key}).paired`, text: bank.pairedNote, role: 'reason', provenance: 'authored' });
+          }
+          for (const option of bank.plate?.options ?? []) {
+            seeds.push({ field: `banks.${where}.bank(${bank.key}).plate(${option.value})`, text: option.label, role: 'label', provenance: 'authored' });
+          }
+        }
       }
     }
 

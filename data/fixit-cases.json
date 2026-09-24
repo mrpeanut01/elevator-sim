@@ -1850,7 +1850,69 @@
       },
       "asBuilt": {
         "note": "Seventeen hundred desks, four cars, and one contractual start time for every tenant in the tower. The fault is in how it is configured, not in what it is made of.",
-        "patch": {}
+        "patch": {},
+        "tenancy": {
+          "cohorts": [
+            {
+              "id": "upper-tenancies",
+              "name": "The nine upper-floor tenancies",
+              "reason": "Their leases give every tenant one contractual start time, and the landlord sets it — a memo can move it.",
+              "floorIds": [
+                "12",
+                "13",
+                "14",
+                "15",
+                "16",
+                "17",
+                "18",
+                "19",
+                "20"
+              ],
+              "positions": [
+                {
+                  "id": "two-start-times",
+                  "name": "Two start times, and this run watches the first",
+                  "watched": [
+                    {
+                      "floorIds": [
+                        "12",
+                        "13",
+                        "14",
+                        "15",
+                        "16",
+                        "17",
+                        "18",
+                        "19",
+                        "20"
+                      ],
+                      "population": 45
+                    }
+                  ]
+                },
+                {
+                  "id": "three-start-times",
+                  "name": "Three start times, and this run watches the first",
+                  "watched": [
+                    {
+                      "floorIds": [
+                        "12",
+                        "13",
+                        "14",
+                        "15",
+                        "16",
+                        "17",
+                        "18",
+                        "19",
+                        "20"
+                      ],
+                      "population": 30
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
       },
       "complaint": {
         "text": "If you are not through the doors by ten to nine you are late, whatever time you left home. The lobby at nine is the whole building arriving at once.",
@@ -2003,6 +2065,44 @@
               }
             ]
           }
+        },
+        "tenancy": {
+          "cohorts": [
+            {
+              "id": "outpatient-letters",
+              "name": "Outpatients' appointment letters",
+              "reason": "The hospital prints the letters, and the time printed on them is the clinics’ to choose.",
+              "floorIds": [
+                "1"
+              ],
+              "positions": [
+                {
+                  "id": "half-say-half-past",
+                  "name": "Half the letters say half past nine, and this run watches nine o’clock",
+                  "watched": [
+                    {
+                      "floorIds": [
+                        "1"
+                      ],
+                      "population": 350
+                    }
+                  ]
+                },
+                {
+                  "id": "four-hundred-say-half-past",
+                  "name": "Four hundred letters say half past nine, and this run watches the three hundred left at nine",
+                  "watched": [
+                    {
+                      "floorIds": [
+                        "1"
+                      ],
+                      "population": 300
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
         }
       },
       "complaint": {
@@ -2045,7 +2145,7 @@
       ],
       "diagnosis": {
         "text": "Every clinic lists for nine o'clock, so seven hundred people pass through outpatients in the same short window — and the landing pays for the print run.",
-        "reasoning": "The group carries the rest of the hospital well: 95.5 % of 264 other journeys are away inside a minute. Outpatients is another story — 10 of the 91 journeys leaving it waited over a minute, one of them 114 s — because the lifts are meeting a surge the letters invented. Print half the letters with half past nine on them, and the surge halves with the paper."
+        "reasoning": "The group carries the rest of the hospital well: 95.5 % of 264 other journeys are away inside a minute. Outpatients is another story — 10 of the 91 journeys leaving it waited over a minute, one of them 114 s — because the lifts are meeting a surge the letters invented. Move the clinics on four hundred of the letters to half past nine, and the nine o’clock surge is the three hundred left on the old time rather than all seven hundred."
       },
       "budgetUnits": 13,
       "repairs": [
@@ -2121,8 +2221,8 @@
         }
       ],
       "result": {
-        "head": "Half the letters now say half past.",
-        "body": "The same clinics, two sittings. The landing clears between them, and the group that lost to a print run beats the reprint without a bolt turned."
+        "head": "Four hundred letters now say half past.",
+        "body": "The same clinics, two sittings. This run watches the nine o’clock one, and the group that lost to a print run keeps up with it without a bolt turned. The half past sitting is not in this run, and nothing here says how it goes."
       }
     },
     {
@@ -4763,6 +4863,168 @@
               }
             ]
           }
+        },
+        "tenancy": {
+          "cohorts": [
+            {
+              "id": "new-lettings",
+              "name": "The year's new lettings",
+              "reason": "Their leases carry a staggered-starts clause the landlord may invoke.",
+              "floorIds": [
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "7",
+                "8",
+                "9",
+                "10",
+                "11",
+                "12",
+                "13",
+                "14",
+                "15",
+                "16",
+                "17",
+                "18",
+                "19",
+                "20",
+                "21",
+                "22",
+                "23",
+                "24",
+                "25",
+                "26",
+                "27",
+                "28",
+                "29",
+                "30"
+              ],
+              "positions": [
+                {
+                  "id": "invoke-for-half",
+                  "name": "Invoke the clause for half the new tenants, and this run watches the rest",
+                  "watched": [
+                    {
+                      "floorIds": [
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8"
+                      ],
+                      "population": 58
+                    },
+                    {
+                      "floorIds": [
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                        "13",
+                        "14",
+                        "15"
+                      ],
+                      "population": 45
+                    },
+                    {
+                      "floorIds": [
+                        "16",
+                        "17",
+                        "18",
+                        "19",
+                        "20",
+                        "21",
+                        "22"
+                      ],
+                      "population": 47
+                    },
+                    {
+                      "floorIds": [
+                        "23",
+                        "24",
+                        "25",
+                        "26",
+                        "27",
+                        "28",
+                        "29"
+                      ],
+                      "population": 34
+                    },
+                    {
+                      "floorIds": [
+                        "30"
+                      ],
+                      "population": 16
+                    }
+                  ]
+                },
+                {
+                  "id": "invoke-for-all",
+                  "name": "Invoke the clause for every new tenant, and this run watches the building it was sized for",
+                  "watched": [
+                    {
+                      "floorIds": [
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8"
+                      ],
+                      "population": 44
+                    },
+                    {
+                      "floorIds": [
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                        "13",
+                        "14",
+                        "15"
+                      ],
+                      "population": 34
+                    },
+                    {
+                      "floorIds": [
+                        "16",
+                        "17",
+                        "18",
+                        "19",
+                        "20",
+                        "21",
+                        "22"
+                      ],
+                      "population": 36
+                    },
+                    {
+                      "floorIds": [
+                        "23",
+                        "24",
+                        "25",
+                        "26",
+                        "27",
+                        "28",
+                        "29"
+                      ],
+                      "population": 26
+                    },
+                    {
+                      "floorIds": [
+                        "30"
+                      ],
+                      "population": 12
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
         }
       },
       "complaint": {

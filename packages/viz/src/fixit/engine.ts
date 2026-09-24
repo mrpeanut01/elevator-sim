@@ -23,6 +23,7 @@
  */
 
 import type {
+  DialValue,
   EditorParkingStrategy,
   FixitCase,
   FixitExtra,
@@ -37,6 +38,14 @@ import {
   steppedPurchaseUnits,
 } from '../pricing/parse.js';
 import { changesAtPaths, changesBought } from '../pricing/repairPrice.js';
+import {
+  dialPathsOf,
+  doorDwellPathsOf,
+  keyedBankIdOf,
+  rezonePathsOf,
+  tenancyCohortsMovedOf,
+} from './families.js';
+import { KEYED_BANK } from './types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 
 /**
@@ -161,6 +170,12 @@ export function emptyFixitState(): FixitState {
     zoneOverlapFloors: 0,
     parkingStrategy: null,
     topFloorRaiseM: 0,
+    dispatcherDials: {},
+    doorDwell: {},
+    carBanks: {},
+    bankFloors: {},
+    platedBankIds: [],
+    tenancyPositions: {},
   };
 }
 
@@ -186,6 +201,13 @@ export function editorPathsOf(state: FixitState): readonly string[] {
   if (state.zoneOverlapFloors > 0) paths.push('building.banks[]');
   if (state.parkingStrategy !== null) paths.push('dispatcher.idle.parkingStrategy');
   if (state.topFloorRaiseM > 0) paths.push('building.floors[].heightM');
+  /*
+   * § D1000's five families, each by the path a repair buying the same act names, so the schedule's
+   * dedupe charges an editor rezone and a zoning step once between them — the same rule #366 set.
+   */
+  paths.push(...dialPathsOf(state.dispatcherDials));
+  paths.push(...doorDwellPathsOf(state.doorDwell));
+  paths.push(...rezonePathsOf(state));
   return paths;
 }
 
@@ -308,10 +330,21 @@ export function spendOf(
   );
   const repairUnits = repairs.reduce((sum, repair) => sum + repair.costUnits, 0);
   const extraUnits = extras.reduce((sum, extra) => sum + extra.costUnits, 0);
-  const settingUnits = changesAtPaths(schedule, editorPathsOf(state)).reduce(
-    (sum, change) => sum + purchaseUnits(change),
-    0,
+  /*
+   * **The tenancy is charged per cohort moved, at the `tenant-floors` row's own flat figure** —
+   * § D1001. Not through `editorPathsOf`'s dedupe, which would charge two cohorts once: the row's
+   * name is *move or stagger a tenancy*, singular, and a case that authored two would otherwise sell
+   * the second for nothing. It is a setting rather than steel, so it is in the settings total.
+   */
+  const tenancyUnits = steppedPurchaseUnits(
+    priceOf(schedule, 'tenant-floors'),
+    tenancyCohortsMovedOf(entry.asBuilt.tenancy, state.tenancyPositions),
   );
+  const settingUnits =
+    changesAtPaths(schedule, editorPathsOf(state)).reduce(
+      (sum, change) => sum + purchaseUnits(change),
+      0,
+    ) + tenancyUnits;
   const editorUnits =
     steppedPurchaseUnits(priceOf(schedule, 'faster-machines'), state.speedSteps) +
     steppedPurchaseUnits(priceOf(schedule, 'larger-car-step'), state.capacitySteps) +
@@ -561,6 +594,144 @@ export function setParkingStrategy(
 }
 
 /* -------------------------------------------------------------------------- *
+ * § D1000's five families — the reducers
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **One affordability rule for every family § D1000 adds**: a change is taken when the order it
+ * leaves is inside the budget, or when it costs no more than the order it replaces — so a press that
+ * gives something back is never refused, and a press that buys something is refused exactly when
+ * the schedule price it adds does not fit. Priced by {@link spendOf}, which prices through the
+ * schedule's `covers` paths, so a second press inside a row already bought costs nothing more.
+ */
+function withinBudget(
+  entry: FixitCase,
+  state: FixitState,
+  next: FixitState,
+  schedule: PriceSchedule,
+): FixitState {
+  const after = spendOf(entry, next, schedule).totalUnits;
+  if (after <= entry.budgetUnits) return next;
+  return after <= spendOf(entry, state, schedule).totalUnits ? next : state;
+}
+
+/**
+ * Set a dispatcher dial, or hand it back with `null`. **The value is not checked here** — the dial's
+ * select offers only values inside the declared range, and `fixit/run.ts` admits the whole edit
+ * through `controls/editedProfile.ts` when the run is planned, which is the check that knows the
+ * building. Gate-pruning is `fixit/families.ts#pruneDials`, called by the surfaces after this.
+ */
+export function setDial(
+  entry: FixitCase,
+  state: FixitState,
+  dimensionId: string,
+  value: DialValue | null,
+  schedule: PriceSchedule,
+): FixitState {
+  const { [dimensionId]: _previous, ...rest } = state.dispatcherDials;
+  const dispatcherDials = value === null ? rest : { ...rest, [dimensionId]: value };
+  return withinBudget(entry, state, { ...state, dispatcherDials }, schedule);
+}
+
+/** Set one side of one target's door hold, or hand it back with `null`. */
+export function setDoorDwell(
+  entry: FixitCase,
+  state: FixitState,
+  target: string,
+  side: 'hall' | 'car',
+  seconds: number | null,
+  schedule: PriceSchedule,
+): FixitState {
+  const current = state.doorDwell[target] ?? {};
+  const key = side === 'hall' ? 'hallCallS' : 'carCallS';
+  const { [key]: _previous, ...others } = current;
+  const setting = seconds === null ? others : { ...others, [key]: seconds };
+  const { [target]: _old, ...rest } = state.doorDwell;
+  const doorDwell = Object.keys(setting).length === 0 ? rest : { ...rest, [target]: setting };
+  return withinBudget(entry, state, { ...state, doorDwell }, schedule);
+}
+
+/**
+ * Put a car in a bank — an existing bank's id, `KEYED_BANK` or `OUT_OF_SERVICE` — or hand it back
+ * with `null`. Writing the car's `standing` bank is the same as handing it back, because a
+ * rezone that moves nothing is a price for nothing. Handing back a keyed car also drops the floors
+ * its own bank was drawn with, since that bank no longer exists.
+ */
+export function setCarBank(
+  entry: FixitCase,
+  state: FixitState,
+  carId: string,
+  target: string | null,
+  standing: string,
+  schedule: PriceSchedule,
+): FixitState {
+  const { [carId]: _previous, ...rest } = state.carBanks;
+  const carBanks = target === null || target === standing ? rest : { ...rest, [carId]: target };
+  const keyed = keyedBankIdOf(carId);
+  const { [keyed]: _keyedFloors, ...otherFloors } = state.bankFloors;
+  const bankFloors = carBanks[carId] === KEYED_BANK ? state.bankFloors : otherFloors;
+  return withinBudget(entry, state, { ...state, carBanks, bankFloors }, schedule);
+}
+
+/**
+ * Toggle whether a bank serves a floor. `standing` is what the bank serves with nothing set — the
+ * as-built floors, or for a keyed bank the floors of the bank its car came from — and a set equal
+ * to it is dropped rather than kept, for {@link setCarBank}'s reason.
+ */
+export function toggleBankFloor(
+  entry: FixitCase,
+  state: FixitState,
+  bankId: string,
+  floorId: string,
+  standing: readonly string[],
+  schedule: PriceSchedule,
+): FixitState {
+  const current = new Set(state.bankFloors[bankId] ?? standing);
+  if (current.has(floorId)) current.delete(floorId);
+  else current.add(floorId);
+  const same = current.size === standing.length && standing.every((id) => current.has(id));
+  const { [bankId]: _previous, ...rest } = state.bankFloors;
+  const bankFloors = same ? rest : { ...rest, [bankId]: [...current] };
+  return withinBudget(entry, state, { ...state, bankFloors }, schedule);
+}
+
+/**
+ * Move a tenancy cohort to one of its authored positions, or hand it back with `null` —
+ * [§ D1001](../../../../DECISIONS.md).
+ *
+ * **A cohort or position the case does not author returns the state unchanged.** That is the whole
+ * of what makes the row inert on the fifteen cases that author no tenancy: the surface draws the row
+ * and its sentence there, and nothing a press can send reaches the run.
+ */
+export function setTenancyPosition(
+  entry: FixitCase,
+  state: FixitState,
+  cohortId: string,
+  positionId: string | null,
+  schedule: PriceSchedule,
+): FixitState {
+  const cohort = entry.asBuilt.tenancy?.cohorts.find((candidate) => candidate.id === cohortId);
+  if (cohort === undefined) return state;
+  const { [cohortId]: _previous, ...rest } = state.tenancyPositions;
+  if (positionId === null) return { ...state, tenancyPositions: rest };
+  if (!cohort.positions.some((position) => position.id === positionId)) return state;
+  return withinBudget(entry, state, { ...state, tenancyPositions: { ...rest, [cohortId]: positionId } }, schedule);
+}
+
+/** Toggle whether a bank's cars weigh against their own plate. */
+export function togglePlate(
+  entry: FixitCase,
+  state: FixitState,
+  bankId: string,
+  schedule: PriceSchedule,
+): FixitState {
+  const platedBankIds = state.platedBankIds.includes(bankId)
+    ? state.platedBankIds.filter((id) => id !== bankId)
+    : [...state.platedBankIds, bankId];
+  return withinBudget(entry, state, { ...state, platedBankIds }, schedule);
+}
+
+/* -------------------------------------------------------------------------- *
  * The four outcomes — § 10.4, copy verbatim
  * -------------------------------------------------------------------------- */
 
@@ -597,6 +768,8 @@ export function repairChangesTheCrowd(repair: FixitRepair): boolean {
 
 /** Whether the repairs a state has selected leave the crowd alone — what the pair *claims*. */
 export function selectionKeepsTheCrowd(entry: FixitCase, state: FixitState): boolean {
+  /* A moved tenancy cohort changes who arrives exactly as a crowd-changing repair does — § D1001. */
+  if (tenancyCohortsMovedOf(entry.asBuilt.tenancy, state.tenancyPositions) > 0) return false;
   return !entry.repairs.some(
     (repair) => state.selectedRepairIds.includes(repair.id) && repairChangesTheCrowd(repair),
   );

@@ -17,6 +17,7 @@
  */
 
 import { DWELL_POLICIES, type DwellPolicy } from '../../config/types.js';
+import type { PlayerControlWords } from '../../dispatch/types.js';
 import type { SimTime } from '../../kernel/types.js';
 
 // ---------------------------------------------------------------------------
@@ -552,6 +553,12 @@ export interface DoorParameterSpec {
   readonly description: string;
   /** Parameter id to the values that make this parameter live. */
   readonly activeWhen?: Readonly<Record<string, readonly string[]>> | undefined;
+  /**
+   * The player-facing name and effect, on a row an Everyday surface reaches — the dispatch schema's
+   * own {@link PlayerControlWords}, for the same reason (GitHub issue #147): the words live beside
+   * the row, never in a screen. The fix-it editor's dwell dials are the reader; § D1000.
+   */
+  readonly player?: PlayerControlWords | undefined;
 }
 
 /**
@@ -700,6 +707,14 @@ export const DOOR_PARAMETERS: readonly DoorParameterSpec[] = [
     default: DOOR_DEFAULTS.dwellPolicy,
     description:
       'Fixed dwell, or dwell extended by the hall queue. Dwell is the one physical parameter that is also a control decision.',
+    player: {
+      name: 'how long doors hold',
+      effect: 'the same hold at every stop, or a hold that lengthens with the queue at the landing',
+      values: {
+        fixed: 'the same at every stop',
+        adaptive: 'longer when more people are waiting',
+      },
+    },
   },
   {
     id: 'answer.dwellAdaptationGain',
@@ -710,6 +725,12 @@ export const DOOR_PARAMETERS: readonly DoorParameterSpec[] = [
     unit: 's/passenger',
     description: 'Extra dwell granted per passenger waiting in the hall.',
     activeWhen: { 'answer.dwellPolicy': ['adaptive'] },
+    player: {
+      name: 'extra hold for each person waiting',
+      effect: 'how much longer the doors hold for every person still queueing at the landing',
+      atZero: 'no extra hold at all',
+      atFull: 'two more seconds for every person waiting',
+    },
   },
   {
     id: 'answer.maxDwellS',
@@ -721,6 +742,12 @@ export const DOOR_PARAMETERS: readonly DoorParameterSpec[] = [
     description:
       'Ceiling on adaptive dwell. Must be at least the larger base dwell, or adaptive dwell would be shorter than fixed dwell.',
     activeWhen: { 'answer.dwellPolicy': ['adaptive'] },
+    player: {
+      name: 'longest the doors will hold',
+      effect: 'the ceiling on a hold that lengthens with the queue',
+      atZero: 'a short ceiling, a few seconds',
+      atFull: 'half a minute at a busy landing',
+    },
   },
   {
     id: 'answer.reopenOnLateArrival',

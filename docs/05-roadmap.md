@@ -2020,9 +2020,9 @@ re-drive is owed in the drive phase.)*
 
 **Named limits on clause 1, in the same breath as the verdict.** The sweep's `mode` axis has **one
 value** — it plugs in at a tuple in `packages/viz/src/honesty/types.ts`, and the corpus assertion
-tightens automatically when it does. The **40 statically swept DOM entry points** are **not
-driven**, so a sentence assembled at runtime there is invisible to the search — **19** mounts and
-**20** screen-registry rows, whose pure halves *are* driven, so what goes unswept in both groups is
+tightens automatically when it does. The **41 statically swept DOM entry points** are **not
+driven**, so a sentence assembled at runtime there is invisible to the search — **20** mounts and
+**21** screen-registry rows, whose pure halves *are* driven, so what goes unswept in both groups is
 only what the entry point authors inline. **That figure is derived by
 `packages/viz/src/honesty/derive.test.ts` rather than transcribed here**, and this verdict published
 *three* from wave 12 until [§ D421](../DECISIONS.md) measured it: a named gap is part of the

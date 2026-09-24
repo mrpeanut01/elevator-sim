@@ -57,7 +57,10 @@ import type {
   FixitCases,
   FixitPatch,
   FixitRepair,
+  FixitTenancy,
   RepairRole,
+  TenancyCohort,
+  TenancyPosition,
 } from './types.js';
 
 /**
@@ -120,6 +123,12 @@ export interface FixitContext {
    * priced at the base rather than at the cheapest band — see {@link UNBANDED_SHAFT_CASES}.
    */
   readonly shaftAreaBandByBank: ReadonlyMap<string, number>;
+  /**
+   * **Each shipped floor's authored headcount**, keyed `"buildingId/floorId"` — § D1001's refusal of
+   * a tenancy position that *raises* a headcount needs the figure it is compared against. A floor
+   * that authors none is absent, and reads as zero.
+   */
+  readonly populationByFloor: ReadonlyMap<string, number>;
 }
 
 /**
@@ -134,7 +143,7 @@ export function fixitContextOf(input: {
   readonly buildings: readonly {
     readonly id: string;
     readonly trafficProfile: string;
-    readonly floors: readonly { readonly id: string; readonly index?: number }[];
+    readonly floors: readonly { readonly id: string; readonly index?: number; readonly population?: number | undefined }[];
     /**
      * The banks, when the caller holds resolved buildings — GitHub issue #429 stage 2, § D631. The
      * shipped loader does; a fixture that states none simply bands no shaft, and its cases keep the
@@ -186,6 +195,13 @@ export function fixitContextOf(input: {
       ...input.dispatcherProfiles.profiles.map((profile) => profile.id),
     ],
     shaftAreaBandByBank,
+    populationByFloor: new Map(
+      input.buildings.flatMap((building) =>
+        building.floors
+          .filter((floor) => typeof floor.population === 'number')
+          .map((floor) => [`${building.id}/${floor.id}`, floor.population as number] as const),
+      ),
+    ),
   };
 }
 
@@ -333,6 +349,11 @@ export function playerFacingStringsOf(entry: FixitCase): readonly (readonly [str
     ['its reasoning', entry.diagnosis.reasoning],
     ['the result head', entry.result.head],
     ['the result body', entry.result.body],
+    ...(entry.asBuilt.tenancy?.cohorts ?? []).flatMap((cohort) => [
+      [`tenancy "${cohort.id}" name`, cohort.name] as const,
+      [`tenancy "${cohort.id}" reason`, cohort.reason] as const,
+      ...cohort.positions.map((position) => [`tenancy "${cohort.id}" position "${position.id}"`, position.name] as const),
+    ]),
     ...entry.figures.map((figure, index) => [`figure ${String(index + 1)}`, figure.label] as const),
     ...entry.repairs.flatMap((repair) => [
       [`repair "${repair.id}" name`, repair.name] as const,
@@ -460,6 +481,8 @@ function checkCase(where: string, entry: FixitCase, context: FixitContext): read
     }
   }
 
+  violations.push(...checkTenancy(where, entry, context));
+
   // The symptom is a sight, not a figure (PM-FB2).
   const figure = symptomFigureIn(entry.symptom);
   if (figure !== null) {
@@ -515,6 +538,108 @@ function checkCase(where: string, entry: FixitCase, context: FixitContext): read
         );
       }
     }
+  }
+  return violations;
+}
+
+/**
+ * **§ D1001's rules for a case's tenancy**, every one of them a refusal at load rather than a
+ * surprise at a press:
+ *
+ * 1. **A tenancy belongs to the tenancy family and nowhere else.** A case whose diagnosed repair
+ *    buys `building.floorPopulations[]` must author one, and a case whose diagnosed repair buys
+ *    anything else must not. That is the mechanical form of *the fifteen author none*, read off
+ *    the row the witness buys (§ D706 § 5) rather than off a list of ids.
+ * 2. **The witness is one of the positions, exactly.** The diagnosed repair's headcounts must equal
+ *    one authored position's, floor for floor. Nothing derives a position *from* the witness at
+ *    run time — that would be § D869's answer key again — so this is the check that the authored
+ *    space contains the answer.
+ * 3. **Every cohort has a reason and moves somebody**, and **no position raises a headcount**: each
+ *    watched figure is at or below the floor's as-built population, and each position lowers at least
+ *    one floor. A position that moves nobody is § D219's inert press; a raised one is a crowd the
+ *    owner cannot conjure by memo.
+ * 4. **Every floor is the building's and the cohort's**: a watched floor must exist and be one of
+ *    its cohort's `floorIds`, and ids are unique.
+ */
+function checkTenancy(where: string, entry: FixitCase, context: FixitContext): readonly string[] {
+  const violations: string[] = [];
+  const cohorts = entry.asBuilt.tenancy?.cohorts ?? [];
+  const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed');
+  const witness = diagnosed?.patch.building?.floorPopulations ?? [];
+  if (witness.length > 0 && cohorts.length === 0) {
+    violations.push(
+      `${where}: the diagnosed repair moves people, and the case authors no tenancy the editor can ` +
+        'move them with. § D1001: a crowd-changing answer is reachable only through an authored cohort.',
+    );
+  }
+  if (witness.length === 0 && cohorts.length > 0) {
+    violations.push(
+      `${where}: authors a tenancy, and its diagnosed repair moves nobody. § D1001: a movable crowd ` +
+        'belongs to a case whose fault is the crowd, and nowhere else — elsewhere it is a universal answer.',
+    );
+  }
+  const floors = new Set(context.floorIdsByBuilding.get(entry.buildingId) ?? []);
+  const asBuiltPopulation = (floorId: string): number => {
+    let population = context.populationByFloor.get(`${entry.buildingId}/${floorId}`) ?? 0;
+    for (const row of entry.asBuilt.patch.building?.floorPopulations ?? []) {
+      if (row.floorIds.includes(floorId)) population = row.population;
+    }
+    return population;
+  };
+  const flatten = (rows: readonly { readonly floorIds: readonly string[]; readonly population: number }[]): Map<string, number> => {
+    const map = new Map<string, number>();
+    for (const row of rows) for (const floorId of row.floorIds) map.set(floorId, row.population);
+    return map;
+  };
+  const sameMap = (a: Map<string, number>, b: Map<string, number>): boolean =>
+    a.size === b.size && [...a].every(([floorId, population]) => b.get(floorId) === population);
+
+  const cohortIds = new Set<string>();
+  let witnessFound = false;
+  const witnessMap = flatten(witness);
+  for (const cohort of cohorts) {
+    const here = `${where}: tenancy cohort "${cohort.id}"`;
+    if (cohort.id === '' || cohortIds.has(cohort.id)) violations.push(`${here}: needs a unique id.`);
+    cohortIds.add(cohort.id);
+    if (cohort.name.trim() === '') violations.push(`${here}: has no name.`);
+    if (cohort.reason.trim() === '') {
+      violations.push(`${here}: has no reason. § D1001 — a crowd the owner can move says why the owner can move it.`);
+    }
+    if (cohort.positions.length === 0) violations.push(`${here}: has no positions, so it moves nobody.`);
+    const own = new Set(cohort.floorIds);
+    for (const floorId of cohort.floorIds) {
+      if (!floors.has(floorId)) violations.push(`${here}: names floor "${floorId}", which "${entry.buildingId}" does not have.`);
+    }
+    const positionIds = new Set<string>();
+    for (const position of cohort.positions) {
+      const there = `${here}, position "${position.id}"`;
+      if (position.id === '' || positionIds.has(position.id)) violations.push(`${there}: needs a unique id.`);
+      positionIds.add(position.id);
+      if (position.name.trim() === '') violations.push(`${there}: has no name.`);
+      let lowers = false;
+      for (const row of position.watched) {
+        for (const floorId of row.floorIds) {
+          if (!own.has(floorId)) violations.push(`${there}: sets floor "${floorId}", which is not one of the cohort's floors.`);
+          const asBuilt = asBuiltPopulation(floorId);
+          if (row.population > asBuilt) {
+            violations.push(
+              `${there}: keeps ${String(row.population)} on floor "${floorId}", above the ${String(asBuilt)} ` +
+                'the as-built building has there. A stagger moves a start time; it cannot raise a headcount.',
+            );
+          }
+          if (row.population < asBuilt) lowers = true;
+        }
+      }
+      if (!lowers) violations.push(`${there}: moves nobody — every floor keeps its as-built headcount (§ D219).`);
+      if (witness.length > 0 && sameMap(flatten(position.watched), witnessMap)) witnessFound = true;
+    }
+  }
+  if (witness.length > 0 && cohorts.length > 0 && !witnessFound) {
+    violations.push(
+      `${where}: the diagnosed repair's headcounts are not one of the authored tenancy positions. ` +
+        '§ D706 clause 1 keeps it as the witness that an affordable configuration clears, so the ' +
+        'editor must be able to write it exactly.',
+    );
   }
   return violations;
 }
@@ -684,6 +809,9 @@ function decodeCase(
     asBuilt: {
       note: str(asBuilt['note']) ?? '',
       patch: decodePatch(asBuilt['patch'], `${where}: asBuilt`, violations),
+      ...(asBuilt['tenancy'] === undefined
+        ? {}
+        : { tenancy: decodeTenancy(asBuilt['tenancy'], `${where}: asBuilt.tenancy`, violations) }),
     },
     complaint: {
       text: str(complaint['text']) ?? '',
@@ -699,6 +827,49 @@ function decodeCase(
     ),
     result: { head: str(result['head']) ?? '', body: str(result['body']) ?? '' },
   };
+}
+
+/** § D1001's tenancy block: cohorts, each with named positions. Shape only; the rules are in `checkTenancy`. */
+function decodeTenancy(raw: unknown, at: string, violations: string[]): FixitTenancy {
+  if (!isRecord(raw) || !Array.isArray(raw['cohorts'])) {
+    violations.push(`${at}: a tenancy is an object with a "cohorts" array.`);
+    return { cohorts: [] };
+  }
+  const cohorts: TenancyCohort[] = [];
+  for (const [index, entry] of raw['cohorts'].entries()) {
+    const here = `${at}.cohorts[${String(index)}]`;
+    if (!isRecord(entry) || !Array.isArray(entry['positions'])) {
+      violations.push(`${here}: a cohort is an object with a "positions" array.`);
+      continue;
+    }
+    const positions: TenancyPosition[] = [];
+    for (const [p, position] of entry['positions'].entries()) {
+      const there = `${here}.positions[${String(p)}]`;
+      if (!isRecord(position) || !Array.isArray(position['watched'])) {
+        violations.push(`${there}: a position is an object with a "watched" array.`);
+        continue;
+      }
+      const watched: { floorIds: readonly string[]; population: number }[] = [];
+      for (const row of position['watched']) {
+        const population = isRecord(row) ? num(row['population']) : undefined;
+        const floorIds = isRecord(row) ? strings(row['floorIds']) : [];
+        if (population === undefined || floorIds.length === 0) {
+          violations.push(`${there}: a watched entry needs floorIds and a population.`);
+          continue;
+        }
+        watched.push({ floorIds, population });
+      }
+      positions.push({ id: str(position['id']) ?? '', name: str(position['name']) ?? '', watched });
+    }
+    cohorts.push({
+      id: str(entry['id']) ?? '',
+      name: str(entry['name']) ?? '',
+      reason: str(entry['reason']) ?? '',
+      floorIds: strings(entry['floorIds']),
+      positions,
+    });
+  }
+  return { cohorts };
 }
 
 function decodeMeasure(raw: Record_, where: string, violations: string[]): ComplaintMeasure | undefined {

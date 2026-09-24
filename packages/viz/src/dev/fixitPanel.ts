@@ -82,13 +82,16 @@ import {
   FIXIT_RUN_SWITCHES,
   assertPairMatchesRepairs,
   figureValuesOf,
+  fixitPlanRefusalOf,
   fixitRunPlanOf,
   measuredOf,
   standingParkingOf,
   topFloorRaiseCeilingOf,
   zoneOverlapCeilingOf,
 } from '../fixit/run.js';
-import { EDITOR_PARKING_STRATEGIES } from '../fixit/types.js';
+import { DEFAULT_DOOR_TARGET, mountFixitFamilies } from '../everyday/fixitFamilies.js';
+import { FIXIT_SCREEN_COPY, fixitParkingRow } from '../everyday/fixitScreenModel.js';
+import { withPrunedDials } from '../fixit/editorInputs.js';
 import type { EditorParkingStrategy, FixitCase, FixitCases, FixitState } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type { VizRecording } from '../contract/types.js';
@@ -124,6 +127,8 @@ interface CaseSession {
   outcome: FixitOutcome | undefined;
   /** The as-built run the figures are measurements of. `undefined` until the worker answers. */
   asBuilt: VizRecording | undefined;
+  /** Which door-hold target the door selects edit — view state, § D1000. */
+  doorTarget: string;
 }
 
 /*
@@ -195,7 +200,13 @@ function scheduleNow(): PriceSchedule {
   const sessionOf = (entry: FixitCase): CaseSession => {
     let session = sessions.get(entry.id);
     if (session === undefined) {
-      session = { state: emptyFixitState(), fixed: false, outcome: undefined, asBuilt: undefined };
+      session = {
+        state: emptyFixitState(),
+        fixed: false,
+        outcome: undefined,
+        asBuilt: undefined,
+        doorTarget: DEFAULT_DOOR_TARGET,
+      };
       sessions.set(entry.id, session);
     }
     return session;
@@ -422,6 +433,37 @@ function scheduleNow(): PriceSchedule {
         zoneRow(entry, session),
         parkingRow(entry, session),
         elevationRow(entry, session),
+        /* § D1000's five families — the same mount the Everyday screen draws, in this theme. */
+        mountFixitFamilies({
+          doc,
+          entry,
+          state: session.state,
+          resources: host.resources,
+          schedule: scheduleNow(),
+          running: ask === `${entry.id}:press`,
+          doorTarget: session.doorTarget,
+          setDoorTarget: (target) => {
+            session.doorTarget = target;
+            render();
+          },
+          commit: (next) => {
+            session.state = next;
+            render();
+          },
+          palette: {
+            ink: INK,
+            soft: MUTED,
+            faint: MUTED,
+            rule: 'var(--edge)',
+            paper: CARD_BG,
+            label: MUTED,
+            alarm: BAD,
+            accent: GOOD,
+            radius: 6,
+            mono: 'ui-monospace, monospace',
+          },
+          prefix: 'fixit',
+        }),
         el(doc, 'p', {
           text: `${String(spend.totalUnits)} of ${String(entry.budgetUnits)} u committed, ${String(spend.machineryUnits)} u of it machinery — ${budgetNoteOf(entry, spend)}`,
           style: { color: MUTED },
@@ -682,30 +724,25 @@ function scheduleNow(): PriceSchedule {
     const price = parkingPriceUnits(scheduleNow());
     const select = el(doc, 'select', { style: { padding: '0.2rem' } }) as HTMLSelectElement;
     select.setAttribute('aria-label', 'Where idle cars wait');
-    const choices: readonly (readonly [string, string])[] = [
-      ['', 'as the standing order has it'],
-      ...EDITOR_PARKING_STRATEGIES.filter((strategy) => strategy !== standing).map(
-        (strategy) =>
-          [
-            strategy,
-            strategy === 'lobby'
-              ? 'back down at the lobby'
-              : strategy === 'stay'
-                ? 'where each one last stopped'
-                : 'in the middle of its own zone',
-          ] as const,
-      ),
-    ];
-    for (const [value, label] of choices) {
+    /*
+     * The options and their words are `fixitScreenModel.ts#fixitParkingRow`'s — the Everyday
+     * screen's own — since § D1000 took the list to all five strategies: a second hand-written
+     * ternary here would have named `predicted-demand` *in the middle of its own zone*.
+     */
+    for (const choice of fixitParkingRow(session.state, standing, price).options) {
       const option = doc.createElement('option');
-      option.value = value;
-      option.textContent = label;
-      option.selected = value === (session.state.parkingStrategy ?? '');
+      option.value = choice.value ?? '';
+      option.textContent = choice.label;
+      option.selected = choice.selected;
       select.append(option);
     }
     select.addEventListener('change', () => {
       const picked = select.value === '' ? null : (select.value as EditorParkingStrategy);
-      session.state = setParkingStrategy(entry, session.state, picked, scheduleNow());
+      session.state = withPrunedDials(
+        entry,
+        setParkingStrategy(entry, session.state, picked, scheduleNow()),
+        host.resources,
+      );
       render();
     });
     return el(doc, 'div', {
@@ -786,6 +823,12 @@ function scheduleNow(): PriceSchedule {
     button.disabled = busy;
     button.addEventListener('click', () => {
       if (busy) return;
+      /* An order the loader would refuse is said, never thrown from a click — § D1000. */
+      if (fixitPlanRefusalOf(entry, session.state, host.resources) !== undefined) {
+        runFailure = FIXIT_SCREEN_COPY.planRefused;
+        render();
+        return;
+      }
       ask = `${entry.id}:press`;
       runFailure = undefined;
       const plan = fixitRunPlanOf(entry, session.state, host.resources);

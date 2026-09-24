@@ -35,6 +35,7 @@
 
 import {
   DISPATCH_DEFAULTS,
+  expandFloors,
   parseBuilding,
   resolveBuilding,
   type BuildingConfig,
@@ -50,6 +51,7 @@ import {
 import type { VizLeg, VizRecording } from '../contract/types.js';
 import { assertSameCrowd, crowdDifferencesOf, sameCrowd } from '../record/crowd.js';
 import { selectionKeepsTheCrowd, type FixitMeasurement } from './engine.js';
+import { applyRezone, doorDwellPatchesOf, profileWithDials, tenancyWatchedOf } from './families.js';
 import type { ComplaintMeasure, ComplaintScope, FigureSpec, FixitCase, FixitPatch, FixitState } from './types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -108,6 +110,21 @@ function banksOf(doc: MutableBuildingDocument, bankIds: readonly string[]): Muta
 
 /** Apply one fabric patch to a cloned authored document. Throws on a name nothing matches. */
 function applyBuildingPatch(doc: MutableBuildingDocument, patch: NonNullable<FixitPatch['building']>): void {
+  /*
+   * **A population on a floor the document declares through `floorRanges`** — § D1001. The
+   * document is expanded into explicit floors first, by `core`'s own `expandFloors`, so a population
+   * can name any floor the building has rather than only the ones authored one by one. Done only
+   * when a patch needs it, so a document no population touches reaches the loader exactly as
+   * authored. The decision agents that measured the tenancy question had to add this to patch
+   * `vertical-city` and `mixed-use-high-rise` at all; it is kept so no case authored there later
+   * finds its tenancy silently unpatchable.
+   */
+  const named = new Set((patch.floorPopulations ?? []).flatMap((population) => population.floorIds));
+  const explicit = new Set((doc.floors ?? []).map((floor) => floor.id));
+  if ([...named].some((id) => !explicit.has(id)) && doc['floorRanges'] !== undefined) {
+    doc.floors = expandFloors(doc as Parameters<typeof expandFloors>[0]) as unknown as MutableBuildingDocument['floors'];
+    delete doc['floorRanges'];
+  }
   for (const population of patch.floorPopulations ?? []) {
     for (const floorId of population.floorIds) {
       const floor = (doc.floors ?? []).find((candidate) => candidate.id === floorId);
@@ -264,11 +281,30 @@ function applyDispatcherPatches(
  * refuses on its own next line anyway) — the raise is silently dropped rather than thrown here, so
  * the clearer error is the one `configOf` gives.
  */
-function editorPatchOf(state: FixitState, topFloorId: string | undefined): FixitPatch {
-  const buildingPatch: NonNullable<FixitPatch['building']> = {
+function editorPatchOf(
+  state: FixitState,
+  topFloorId: string | undefined,
+  tenancy: FixitCase['asBuilt']['tenancy'],
+): FixitPatch {
+  /*
+   * The tenancy positions — § D1001 — and only ever the positions the case authors, through
+   * `families.ts#tenancyWatchedOf`. A case with no tenancy contributes nothing here, whatever the
+   * state carries.
+   */
+  const watched = tenancyWatchedOf(tenancy, state.tenancyPositions);
+  /*
+   * The door hold travels as ordinary car patches, after the speed step, so a car's own hold wins
+   * over the every-car one — `fixit/families.ts#doorDwellPatchesOf` orders them. § D1000.
+   */
+  const carPatches = [
     ...(state.speedSteps === 0
-      ? {}
-      : { cars: [{ carIds: ['*'], set: { ratedSpeedDeltaMps: 0.5 * state.speedSteps } }] }),
+      ? []
+      : [{ carIds: ['*'], set: { ratedSpeedDeltaMps: 0.5 * state.speedSteps } }]),
+    ...doorDwellPatchesOf(state.doorDwell),
+  ];
+  const buildingPatch: NonNullable<FixitPatch['building']> = {
+    ...(carPatches.length === 0 ? {} : { cars: carPatches }),
+    ...(watched.length === 0 ? {} : { floorPopulations: watched }),
     ...(state.topFloorRaiseM <= 0 || topFloorId === undefined
       ? {}
       : { floors: [{ floorIds: [topFloorId], heightDeltaM: state.topFloorRaiseM }] }),
@@ -569,24 +605,61 @@ export function fixitRunPlanOf(
     asBuilt: configOf(entry, [entry.asBuilt.patch], NO_EDITOR, resources),
     asRepaired: configOf(
       entry,
-      [entry.asBuilt.patch, ...repairPatches, editorPatchOf(state, topFloorId)],
-      { capacitySteps: state.capacitySteps, zoneOverlapFloors: state.zoneOverlapFloors },
+      [entry.asBuilt.patch, ...repairPatches, editorPatchOf(state, topFloorId, entry.asBuilt.tenancy)],
+      {
+        capacitySteps: state.capacitySteps,
+        zoneOverlapFloors: state.zoneOverlapFloors,
+        carBanks: state.carBanks,
+        bankFloors: state.bankFloors,
+        platedBankIds: state.platedBankIds,
+        dispatcherDials: state.dispatcherDials,
+      },
       resources,
     ),
   };
 }
 
 /**
+ * **Why this selection cannot run, or `undefined` when it can** — § D1000.
+ *
+ * The five families write a banks array, car doors and a dispatcher the loader and core then have
+ * to accept: a bank left with no car, a keyed car drawn with one floor, an adaptive dwell ceiling
+ * below a door hold the same order just set. Each is refused by `parseBuilding`, `resolveBuilding`
+ * or `controls/editedProfile.ts` with its own message, and this is that message, taken **before**
+ * anything runs, so both surfaces can hold the Run press and say why rather than throwing on it.
+ */
+export function fixitPlanRefusalOf(
+  entry: FixitCase,
+  state: FixitState,
+  resources: FixitResources,
+): string | undefined {
+  try {
+    fixitRunPlanOf(entry, state, resources);
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+/**
  * The editor's two fabric selections — the pair that cannot travel as a {@link FixitPatch}, because
  * one edits every car's plated load and the other replaces an array it must first read.
  */
-interface EditorFabric {
+interface EditorFabric
+  extends Pick<FixitState, 'carBanks' | 'bankFloors' | 'platedBankIds' | 'dispatcherDials'> {
   readonly capacitySteps: number;
   readonly zoneOverlapFloors: number;
 }
 
-/** The as-built side buys nothing, and says so by name rather than by two zeroes at a call site. */
-const NO_EDITOR: EditorFabric = Object.freeze({ capacitySteps: 0, zoneOverlapFloors: 0 });
+/** The as-built side buys nothing, and says so by name rather than by zeroes at a call site. */
+const NO_EDITOR: EditorFabric = Object.freeze({
+  capacitySteps: 0,
+  zoneOverlapFloors: 0,
+  carBanks: {},
+  bankFloors: {},
+  platedBankIds: [],
+  dispatcherDials: {},
+});
 
 function configOf(
   entry: FixitCase,
@@ -609,16 +682,18 @@ function configOf(
   for (const patch of patches) {
     if (patch.building !== undefined) applyBuildingPatch(doc, patch.building);
   }
+  /*
+   * The rezone before the capacity step and the zoning overlap, so a car moved into a bank is
+   * widened with it and an overlap grows from the boundaries the player drew — § D1000.
+   */
+  const floorOrder = authored.resolved.floors.map((floor) => floor.id);
+  applyRezone(doc, editor, authored.config, floorOrder);
   applyCapacitySteps(doc, editor.capacitySteps);
   /*
    * After the repairs, deliberately: a rezone the player draws in the editor overlaps whatever
    * boundaries the selected repairs left, not the ones the case shipped with.
    */
-  applyZoneOverlap(
-    doc,
-    authored.resolved.floors.map((floor) => floor.id),
-    editor.zoneOverlapFloors,
-  );
+  applyZoneOverlap(doc, floorOrder, editor.zoneOverlapFloors);
   // The same door a shipped file enters by — parse, then resolve against the loaded specs.
   const file = `${entry.buildingId}.json`;
   const building: ResolvedBuilding = resolveBuilding(
@@ -629,7 +704,15 @@ function configOf(
 
   return {
     building,
-    dispatcherProfile: applyDispatcherPatches(baseProfile, patches),
+    /*
+     * The dials last and on the resolved building, because two of their dimensions are bounded by
+     * a car rather than by another dial (`controls/editedProfile.ts`, issue #475) — and the car
+     * they are bounded by is the one the door-hold setting above may just have changed.
+     */
+    dispatcherProfile: profileWithDials(applyDispatcherPatches(baseProfile, patches), editor.dispatcherDials, {
+      building,
+      elevatorSpecs: resources.elevatorSpecs,
+    }),
     trafficProfiles: resources.trafficProfiles,
     elevatorSpecs: resources.elevatorSpecs,
     dispatcherProfiles: resources.dispatcherProfiles,

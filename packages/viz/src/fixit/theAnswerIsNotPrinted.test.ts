@@ -21,8 +21,9 @@
  *    something.
  * 3. **Every case is solved, not asserted to be solvable.** A role-blind enumeration of the routes
  *    a player can actually take is run, case by case, and the first one that clears both measured
- *    bars is pinned. Twelve of the eighteen are cleared by the **editor alone** — no repair row
- *    touched — which is a larger number than § D706 § 1's *one of eighteen*, and the two figures
+ *    bars is pinned. Seventeen of the eighteen are cleared by the **editor alone** since § D1000's
+ *    families landed (twelve before them) — no repair row touched — which is a larger number than
+ *    § D706 § 1's *one of eighteen*, and the two figures
  *    answer different questions: § D706 asked whether the *authored answer's own patch* is
  *    reachable from the editor, and this asks whether *any affordable configuration* clears, which
  *    is [§ D525](../../../../DECISIONS.md) clause 3's own definition of a scenario's difficulty.
@@ -54,8 +55,16 @@ import {
 import { playerFacingStringsOf } from './parse.js';
 import { fixitResourcesFromDisk, shippedFixitCases } from './resources.test-helper.js';
 import {
+  dialGroupsOf,
+  dialOptionsOf,
+  liveDialIdsOf,
+  rezoneFabricOf,
+  standingDialValuesOf,
+} from './families.js';
+import {
   FIXIT_RUN_SWITCHES,
   figureValuesOf,
+  fixitPlanRefusalOf,
   fixitRunPlanOf,
   measuredOf,
   standingParkingOf,
@@ -63,8 +72,8 @@ import {
   zoneOverlapCeilingOf,
   type FixitResources,
 } from './run.js';
-import { EDITOR_PARKING_STRATEGIES } from './types.js';
-import type { FixitCase, FixitCases, FixitState } from './types.js';
+import { EVERY_CAR, OUT_OF_SERVICE } from './types.js';
+import type { EditorParkingStrategy, FixitCase, FixitCases, FixitState } from './types.js';
 
 const SUITE_TIMEOUT = 600_000;
 
@@ -269,6 +278,13 @@ interface Route {
 }
 
 /**
+ * The three strategies the parking select offered when the routes below were first pinned. The
+ * two § D1000 added are tried in {@link familyRoutesFor}, after every route pinned before them, so
+ * a newly offered strategy can only replace a `repair:` row rather than silently reorder the table.
+ */
+const SECTION_10_3_PARKING: readonly EditorParkingStrategy[] = Object.freeze(['stay', 'lobby', 'zone-center']);
+
+/**
  * Every route this suite will try, in one fixed order, **built without looking at any repair's
  * role**.
  *
@@ -284,7 +300,7 @@ function routesFor(entry: FixitCase, asBuilt: SimulationConfig): readonly Route[
   const zoneCeiling = zoneOverlapCeilingOf(asBuilt.building);
   const raiseCeiling = topFloorRaiseCeilingOf(asBuilt.building);
   const candidates: Route[] = [];
-  for (const strategy of EDITOR_PARKING_STRATEGIES) {
+  for (const strategy of SECTION_10_3_PARKING) {
     if (strategy === standing) continue;
     candidates.push({
       label: `parking:${strategy}`,
@@ -315,7 +331,7 @@ function routesFor(entry: FixitCase, asBuilt: SimulationConfig): readonly Route[
    * the case moves a second, and `one-start-time` is the case that needs it — no single control
    * clears it and `parking:lobby` with one speed step does.
    */
-  for (const strategy of EDITOR_PARKING_STRATEGIES) {
+  for (const strategy of SECTION_10_3_PARKING) {
     if (strategy === standing) continue;
     candidates.push({
       label: `parking:${strategy}+speed:1`,
@@ -328,6 +344,7 @@ function routesFor(entry: FixitCase, asBuilt: SimulationConfig): readonly Route[
       });
     }
   }
+  candidates.push(...familyRoutesFor(entry, asBuilt));
   for (const repair of repairsInDrawOrder(entry)) {
     candidates.push({
       label: `repair:${repair.id}`,
@@ -335,8 +352,86 @@ function routesFor(entry: FixitCase, asBuilt: SimulationConfig): readonly Route[
     });
   }
   return candidates.filter(
-    (route) => spendOf(entry, route.state, schedule).totalUnits <= entry.budgetUnits,
+    (route) =>
+      spendOf(entry, route.state, schedule).totalUnits <= entry.budgetUnits &&
+      fixitPlanRefusalOf(entry, route.state, resources) === undefined,
   );
+}
+
+/**
+ * **§ D1000's families, one move each** — appended after § 10.3's controls and before the menu, so
+ * the routes pinned before those families existed keep their place and a family can only replace a
+ * `repair:` row, never an earlier editor route.
+ *
+ * Role-blind and generic, and deliberately a **sample** of the space rather than all of it, which
+ * § D525 clause 3 requires the census to say: the two parking strategies the select gained (the
+ * fixed floor at the lowest and the highest floor any bank serves), the door hold for every car at
+ * the declared defaults and at the declared minimums, every **named** value of every categorical or
+ * switch dial of the three dispatcher rows (a numeric dial has no finite list to walk, so none is
+ * tried), every car moved into every other bank, a car out for works put back where the shipped
+ * building runs it, and every bank that weighs against something other than its plate re-plated.
+ * Keying a car and redrawing a bank's floors are not tried: each needs a floor set, and there is no
+ * role-blind way to choose one.
+ */
+function familyRoutesFor(entry: FixitCase, asBuilt: SimulationConfig): readonly Route[] {
+  const schedule = shippedPriceSchedule();
+  const empty = emptyFixitState();
+  const routes: Route[] = [];
+  routes.push({ label: 'parking:predicted-demand', state: { ...empty, parkingStrategy: 'predicted-demand' } });
+  const servedFloors = asBuilt.building.floors.filter((floor) =>
+    asBuilt.building.banks.some((bank) => bank.servesFloors.includes(floor.id)),
+  );
+  for (const floor of [servedFloors[0], servedFloors.at(-1)]) {
+    if (floor === undefined) continue;
+    routes.push({
+      label: `parking:fixed-floor@${floor.id}`,
+      state: { ...empty, parkingStrategy: 'fixed-floor', dispatcherDials: { 'idle.parkingFloorIndex': floor.index } },
+    });
+  }
+  routes.push({ label: 'doors:5/3', state: { ...empty, doorDwell: { [EVERY_CAR]: { hallCallS: 5, carCallS: 3 } } } });
+  routes.push({ label: 'doors:4/2', state: { ...empty, doorDwell: { [EVERY_CAR]: { hallCallS: 4, carCallS: 2 } } } });
+  const standing = standingDialValuesOf(asBuilt.dispatcherProfile);
+  const live = liveDialIdsOf(asBuilt.dispatcherProfile, {});
+  for (const group of dialGroupsOf(schedule)) {
+    for (const parameter of group.parameters) {
+      if (parameter.type !== 'categorical' && parameter.type !== 'boolean') continue;
+      if (!live.has(parameter.id)) continue;
+      for (const option of dialOptionsOf(parameter, standing.get(parameter.id), asBuilt.building)) {
+        routes.push({
+          label: `dial:${parameter.id}=${String(option.value)}`,
+          state: { ...empty, dispatcherDials: { [parameter.id]: option.value } },
+        });
+      }
+    }
+  }
+  const shipped = resources.entries.find((candidate) => candidate.resolved.id === entry.buildingId)!.config;
+  const fabric = rezoneFabricOf(asBuilt.building, shipped);
+  for (const car of fabric.cars) {
+    if (car.standingBankId === OUT_OF_SERVICE) {
+      const home = (shipped.banks ?? []).find((bank) => bank.cars.some((candidate) => candidate.id === car.id));
+      if (home !== undefined && fabric.banks.some((bank) => bank.id === home.id)) {
+        routes.push({ label: `car:${car.id}->${home.id}`, state: { ...empty, carBanks: { [car.id]: home.id } } });
+      }
+      continue;
+    }
+    for (const bank of fabric.banks) {
+      if (bank.id === car.standingBankId) continue;
+      routes.push({ label: `car:${car.id}->${bank.id}`, state: { ...empty, carBanks: { [car.id]: bank.id } } });
+    }
+  }
+  for (const bank of fabric.banks) {
+    if (bank.offPlate) routes.push({ label: `plate:${bank.id}`, state: { ...empty, platedBankIds: [bank.id] } });
+  }
+  /* § D1001: every authored tenancy position, which is none on fifteen of the eighteen. */
+  for (const cohort of entry.asBuilt.tenancy?.cohorts ?? []) {
+    for (const position of cohort.positions) {
+      routes.push({
+        label: `tenancy:${cohort.id}=${position.id}`,
+        state: { ...empty, tenancyPositions: { [cohort.id]: position.id } },
+      });
+    }
+  }
+  return routes;
 }
 
 /**
@@ -346,15 +441,23 @@ function routesFor(entry: FixitCase, asBuilt: SimulationConfig): readonly Route[
  * rather than the first — this is a survivor census and a census read one row at a time is a
  * census nobody finishes.
  *
- * The six rows reading `repair:` are the ones no editor route in {@link routesFor} clears —
- * `zoning-starves-the-top`, `doors-that-never-close`, `express-that-stops-everywhere`,
- * `deliveries-on-the-passenger-group`, `two-cars-out-wrong-month` and `let-faster-than-the-lifts`.
- * They are **not** a finding that a case is unsolvable: each is cleared by a repair the player can
- * select without being told anything about it, which is what this suite is for. What they are is
- * the measured size of § D706 § 6's precondition — six cases whose answer the shipped editor cannot
- * express, against twelve it can.
+ * **Seventeen of eighteen now clear on an editor route, and the one `repair:` row left is a
+ * limit of this sample rather than of the editor** — § D1000. It read six `repair:` rows — `zoning`,
+ * `doors`, `express`, `deliveries`, `two-cars` and `let-faster` — before § D1000's families landed;
+ * {@link familyRoutesFor} took five of them to an editor route. `express-that-stops-everywhere`'s
+ * answer is a bank's floors redrawn, which this role-blind sample does not try (there is no
+ * role-blind way to choose a floor set), and `families.test.ts` shows the editor writing that answer
+ * leg for leg. So what the row now measures is this enumeration's reach, not § D706 § 6's
+ * precondition, which `families.test.ts`'s eighteen of eighteen is.
  *
- * **The twelve is a floor and the search is a sample, which § D525 clause 3 requires this row to
+ * **Two wins are the single-pair judge's noise rather than the lesson, and they are named rather
+ * than tidied.** `let-faster-than-the-lifts` — a crowd case — first clears on a fixed-floor parking
+ * rule at the top floor, and `every-letter-says-nine` on a three-metre raise of the roof. Neither is
+ * a mechanism anybody would predict; both are the one-run-before, one-run-after judge reading a
+ * perturbed trace, which the § D1001 rulings measured and filed separately. The census is honest
+ * about what it counts, and it counts first clears on one seed.
+ *
+ * **The count is a floor and the search is a sample, which § D525 clause 3 requires this row to
  * say.** {@link routesFor} tries the five editor families one at a time and then two at a time
  * over parking, and stops at the first route that clears; the affordable space is far larger than
  * that, so a case that lands on `repair:` here has not been shown to need the menu — it has been
@@ -366,22 +469,22 @@ function routesFor(entry: FixitCase, asBuilt: SimulationConfig): readonly Route[
  */
 const SOLVED_BY: readonly (readonly [string, string])[] = Object.freeze([
   ['sleeping-sky-lobby', 'parking:stay'],
-  ['zoning-starves-the-top', 'repair:redraw-by-headcount'],
+  ['zoning-starves-the-top', 'car:A->high'],
   ['three-cars-one-cars-work', 'parking:zone-center'],
-  ['doors-that-never-close', 'repair:dwell-that-reacts'],
+  ['doors-that-never-close', 'doors:5/3'],
   ['cars-that-always-go-home', 'parking:stay'],
   ['car-park-nobody-serves', 'zone:1'],
   ['express-that-stops-everywhere', 'repair:blank-the-low-landings'],
-  ['deliveries-on-the-passenger-group', 'repair:delivery-window'],
+  ['deliveries-on-the-passenger-group', 'doors:5/3'],
   ['one-start-time', 'parking:lobby+speed:1'],
   ['every-letter-says-nine', 'raise:3'],
   ['everyone-leaves-at-once', 'parking:zone-center'],
   ['bed-cars-locked-out', 'zone:1'],
-  ['two-cars-out-wrong-month', 'repair:borrow-a-low-car'],
+  ['two-cars-out-wrong-month', 'car:A->high'],
   ['every-deck-calls-itself-full', 'parking:zone-center'],
   ['restaurant-above-the-ballroom', 'speed:1'],
   ['controller-sends-every-car', 'zone:2'],
-  ['let-faster-than-the-lifts', 'repair:invoke-staggered-starts'],
+  ['let-faster-than-the-lifts', 'parking:fixed-floor@30'],
   ['gym-on-the-top-floor', 'parking:zone-center'],
 ]);
 
@@ -427,14 +530,14 @@ describe('every case is solved without being told which repair is the answer', (
    *
    * **This reads {@link SOLVED_BY} rather than re-measuring it**, deliberately: the measurement is
    * the case above, which holds every row of that table against a run, and a second sweep here
-   * would cost another ninety runs to produce the same twelve. What this adds is that the split
+   * would cost another ninety runs to produce the same seventeen. What this adds is that the split
    * is written down as a figure a reader can fail, so a later change that quietly moves a case
    * from the editor's column to the menu's has to move this line too.
    */
   it('names how many cases the editor alone clears', () => {
     const editorOnly = SOLVED_BY.filter(([, route]) => !route.startsWith('repair:'));
-    expect(editorOnly).toHaveLength(12);
-    expect(SOLVED_BY.filter(([, route]) => route.startsWith('repair:'))).toHaveLength(6);
+    expect(editorOnly).toHaveLength(17);
+    expect(SOLVED_BY.filter(([, route]) => route.startsWith('repair:'))).toHaveLength(1);
   });
 });
 
