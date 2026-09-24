@@ -7433,6 +7433,28 @@ const FIXIT: SurfaceAdapter = {
      * and a sentence nothing renders is a sentence nothing has read.
      */
     {
+      /*
+       * The families card's own frame, seeded by name: `everyday/fixitFamilies.ts` is the only
+       * reader of these keys and it is a mount, so no model reaches them — wave T's finding that
+       * being in `covers` is not being swept, applied before rather than after a probe.
+       */
+      for (const key of [
+        'dialsEyebrow',
+        'dialsHint',
+        'doorTargetLabel',
+        'rezoneEyebrow',
+        'rezoneHint',
+        'rezoneFloorsLabel',
+        'tenancyEyebrow',
+        'planRefused',
+      ] as const) {
+        seeds.push({
+          field: `families.${key}`,
+          text: FIXIT_SCREEN_COPY[key],
+          role: key === 'planRefused' ? 'reason' : key.endsWith('Hint') ? 'prose' : 'label',
+          provenance: 'authored',
+        });
+      }
       const rowOf = (changeId: string, affordable: boolean): RowPurchase => {
         const change = schedule.changes.find((candidate) => candidate.id === changeId)!;
         return { changeId, name: change.name, units: purchaseUnits(change), bought: false, affordable };
