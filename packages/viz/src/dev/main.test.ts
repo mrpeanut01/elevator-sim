@@ -57,7 +57,10 @@ import type { DisclosureItem } from '../mode/types.js';
 
 import { FREE_PLAY_RATES, isSeedText, SEED_MAX_DIGITS } from '../menu/menu.js';
 
+import { MODE_WEEK_CONTRACT_IDS } from '../shift/week.js';
+
 import {
+  addressFollowsRun,
   deepLinkDefaultsOf,
   deepLinkSearchOf,
   deepLinkStateOf,
@@ -550,6 +553,19 @@ describe('the URL round-trips — SH-09', () => {
   it('omits defaults, so the first write after an untouched boot carries only the seed', () => {
     const untouched = initialState(resources, 42n);
     expect(deepLinkSearchOf(untouched, defaults)).toBe('?seed=42');
+  });
+
+  it('does not follow a mode’s run, and follows every other week — § D1003', () => {
+    /*
+     * The address is what a reload reads back, and a rush's or a career day's crowd read back was
+     * the Scenario week's next day. So while a mode's own week stands the bar is left describing
+     * the Scenario run the mode parked; on a contract week, a sandbox or Free Play it follows.
+     */
+    const untouched = initialState(resources, 42n);
+    expect(addressFollowsRun(untouched)).toBe(true);
+    for (const contractId of MODE_WEEK_CONTRACT_IDS) {
+      expect(addressFollowsRun({ week: { ...untouched.week, contractId } }), contractId).toBe(false);
+    }
   });
 
   it('always carries the seed — the one param without which the link is a different run', () => {

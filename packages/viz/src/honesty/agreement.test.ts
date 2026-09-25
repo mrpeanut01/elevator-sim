@@ -201,6 +201,15 @@ function readings(figures: readonly AgreedFigure[] = AGREED_FIGURES) {
   return contexts.flatMap((each) => renderAgreements(each.context, each.resources, figures));
 }
 
+/**
+ * The rail's career line under the gate it had before [§ D1004](../../../../DECISIONS.md): today's
+ * best figure withheld, as the em dash, until the sitting has filed the run. The negative control's
+ * regressed side — never a shipped expression.
+ */
+function sittingGated(line: string, dayClosed: boolean): string {
+  return dayClosed ? line : line.replace(/best .*$/u, 'best —');
+}
+
 describe('the tenth property goes red on § D359, which is the whole of its evidence', () => {
   it('names the disagreement, in the numbers the defect actually published', () => {
     /*
@@ -339,9 +348,10 @@ describe('the register is watching something', () => {
      * silent is byte-identical to agreeing.
      *
      * Both `dayClosed` arms are asserted, not just the interesting one. The two derivations gate
-     * today's figure through different expressions, and a corpus that only ever released it would
-     * go green on a rail that had dropped the gate — which is the defect `rail.test.ts`'s
-     * *withholds today's figure* case pins on five hand-written weeks and this pins on every case.
+     * today's figure through different expressions, and since § D1004 both read the week rather
+     * than the sitting — `rail.test.ts`'s *publishes today's figure once the week carries today*
+     * case pins that on hand-written weeks and this pins it on every case, with the regression the
+     * negative control below drives.
      */
     const career = readings().filter((text) => text.agreement?.pair === 'career-line');
     expect(
@@ -355,22 +365,25 @@ describe('the register is watching something', () => {
     expect([...arms].sort()).toEqual(['day4', 'day4-filed']);
 
     /*
-     * And the gate is **live** rather than merely present: the withheld arm and the released arm
-     * must be different strings, or both arms are testing one state under two names.
+     * And both arms **release** today's figure — [§ D1004](../../../../DECISIONS.md). This asserted
+     * the two arms were different strings while the card withheld today until the sitting filed it;
+     * both derivations now read the week, so a banked today publishes on both, and the arm that
+     * would part them is the negative control below.
      */
     const lineOn = (arm: string): string | undefined =>
       career.find((text) => text.agreement?.view.startsWith(`${arm}/`) === true)?.text;
     expect(lineOn('day4')).toBeDefined();
-    expect(lineOn('day4')).not.toBe(lineOn('day4-filed'));
+    expect(lineOn('day4')).toBe(lineOn('day4-filed'));
+    expect(lineOn('day4')).toMatch(/best \d+%/u);
   }, 600_000);
 
-  it('goes red when one career derivation forgets the day-closed gate', () => {
+  it('goes red when one career derivation goes back to asking the sitting rather than the week', () => {
     /*
      * **The non-vacuity proof for #214's pair, in the shape the § D359 case uses one describe
      * above.** The right side is left exactly as it ships; the left is replaced by the rail's own
-     * line computed as if the day were always filed — which is the shape of the mistake
-     * `RailOptions.dayClosed`'s *"defaults to `false`, which is the withholding arm"* exists to
-     * make impossible, written the other way round.
+     * line computed under the gate it had before [§ D1004](../../../../DECISIONS.md) — today's
+     * figure withheld until the sitting files the run — which is the regression the pair now exists
+     * to catch.
      *
      * The claim is not only *some violation appears*. It must appear on the arm where the gate
      * bites and **nowhere else**: a check that also fired on `day4-filed` would be firing for a
@@ -386,10 +399,10 @@ describe('the register is watching something', () => {
         read: (view) =>
           view.state.week.history.length === 0
             ? undefined
-            : railFooter(
-                { screen: 'menu', ctx: 'daily' },
-                { week: view.state.week, dayClosed: true },
-              ).identity.streak,
+            : sittingGated(
+                railFooter({ screen: 'menu', ctx: 'daily' }, { week: view.state.week }).identity.streak,
+                view.dayClosed,
+              ),
       },
     };
     const found = checkSurfacesAgree(
@@ -401,7 +414,7 @@ describe('the register is watching something', () => {
     const message = found.map((violation) => violation.message).join('\n');
     expect(message).toContain('everyday/rail.ts#railFooter');
     expect(message).toContain('everyday/weekView.ts#weekScreenViewOf');
-    // The em dash is § 13's only placeholder and it is what the honest side draws for a day this
+    // The em dash is § 13's only placeholder and it is what the regressed side draws for a day this
     // sitting has not filed. Quoting both sides is what makes the violation readable.
     expect(message).toContain('best —');
   }, 600_000);

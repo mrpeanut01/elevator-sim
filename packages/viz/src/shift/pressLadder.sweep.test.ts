@@ -65,6 +65,9 @@ import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 
 import { contractDayState } from './contractDay.test-helper.js';
+import { CONTRACT_LADDER, pressDayFor } from './ladder.js';
+import { pressDayArmOf, windowTries } from './pressDay.test-helper.js';
+import type { RunHorizon } from './types.js';
 import { CONTRACTS, contractById } from './contracts.js';
 import { runHorizonOf, wholeDayFor, wholeDayRun } from './dayLength.js';
 import { goalsForDay, readGoals } from './goals.js';
@@ -369,6 +372,173 @@ describe.runIf(process.env['PRESS_LADDER_VERIFY'] === '1')('a candidate pin, on 
         ].join('\t'),
       );
       writeFileSync(String(out), `${lines.join('\n')}\n`);
+    }
+  });
+});
+
+describe.runIf(process.env['PRESS_LADDER_CALL'] === '1')('the call window — wave AI, § D1029', () => {
+  /**
+   * **The admission criterion's instrument** — [§ D1029](../../../../DECISIONS.md).
+   *
+   * For each pin (the shipped ones, or `PRESS_LADDER_PINNED`), run the day as built, ask
+   * `shift/pressCall.ts#pressCallOf` for its call, then press each parking verb at every
+   * `PRESS_LADDER_STEP` seconds from the call to `PRESS_LADDER_SEARCH` seconds after it, plus
+   * `PRESS_LADDER_INTERIOR` seeded off-grid seconds inside the unbroken stretch the grid found. The
+   * **window** is the longest stretch from the call at which the clearing verb clears and the other
+   * misses at every tried moment; the **holes** are the tried offsets past it that fail. A pin is
+   * admitted when its window is at least `PRESS_CALL_MIN_WINDOW_S` long, and
+   * `data/contract-ladder.json`'s `call` block is this table's row for it.
+   *
+   * `PRESS_LADDER_CALL_SEARCH='c3:0-60'` searches crowds instead: seeds `20 260 824 + 7 919 n`,
+   * each missed as built screened at offsets 0, 60 and 120 in both orientations, and the full grid
+   * run only on a crowd that passes the screen. That is how a failing pin is re-pinned; nothing is
+   * written to the data by this file.
+   *
+   * No timeout annotation, `PRESS_LADDER_VERIFY`'s reason: run by hand with `--testTimeout`.
+   */
+  it('writes each pin’s call, window, tried count and holes', () => {
+    const out = process.env['PRESS_LADDER_OUT'];
+    expect(out, 'PRESS_LADDER_OUT names the file').toBeTypeOf('string');
+    const stepS = Number(process.env['PRESS_LADDER_STEP'] ?? '10');
+    const searchS = Number(process.env['PRESS_LADDER_SEARCH'] ?? '300');
+    const interior = Number(process.env['PRESS_LADDER_INTERIOR'] ?? '5');
+    const lines: string[] = [
+      'contract\tn\tseed\tcleared_by\tbuilt\trule\tcall_s\taway_s\tback_s\tact\twindow_s\ttried\tinterior_ok\tholes\tgrid',
+    ];
+    const write = (): void => writeFileSync(String(out), `${lines.join('\n')}\n`);
+
+    interface Candidate {
+      readonly contractId: string;
+      readonly n: string;
+      readonly seedText: string;
+      readonly horizon: RunHorizon;
+      readonly orientations: readonly (readonly [string, string])[];
+    }
+    const candidates: Candidate[] = [];
+    const search = process.env['PRESS_LADDER_CALL_SEARCH'];
+    if (search !== undefined) {
+      for (const clause of search.split(';')) {
+        const [contractId = '', range = '0-0'] = clause.split(':');
+        const [from = 0, to = 0] = range.split('-').map(Number);
+        const horizon = pressDayFor(contractId)?.horizon ?? 'period';
+        for (let n = from; n <= to; n += 1) {
+          candidates.push({
+            contractId,
+            n: String(n),
+            seedText: String(seedAt(n)),
+            horizon,
+            orientations: [
+              ['spread-cars', 'park-cars-lobby'],
+              ['park-cars-lobby', 'spread-cars'],
+            ],
+          });
+        }
+      }
+    } else {
+      const given = JSON.parse(process.env['PRESS_LADDER_PINNED'] ?? 'null') as Record<
+        string,
+        { seed: string; clearedBy: string; missedBy: string }
+      > | null;
+      for (const row of CONTRACT_LADDER.rows) {
+        const pin = row.pressDay;
+        if (pin === undefined) continue;
+        const chosen =
+          given === null
+            ? { seed: pin.seedText, clearedBy: pin.clearedBy, missedBy: pin.missedBy }
+            : given[row.contractId];
+        if (chosen === undefined) continue;
+        candidates.push({
+          contractId: row.contractId,
+          n: 'pin',
+          seedText: chosen.seed,
+          horizon: pin.horizon,
+          orientations: [[chosen.clearedBy, chosen.missedBy]],
+        });
+      }
+    }
+
+    for (const candidate of candidates) {
+      const seed = BigInt(candidate.seedText);
+      const built = pressDayArmOf(candidate.contractId, seed, 'collective', candidate.horizon, []);
+      const call = built.call;
+      const head = [candidate.contractId, candidate.n, candidate.seedText];
+      if (!built.missed || call === undefined) {
+        lines.push([...head, '', built.missed ? 'missed' : 'cleared', call?.rule ?? 'none'].join('\t'));
+        write();
+        continue;
+      }
+      const facts = [
+        call.rule,
+        String(call.atS),
+        String(call.awayAtS),
+        String(call.backAtS ?? ''),
+        call.act === undefined ? '' : `${String(call.act.startS)}-${String(call.act.endS)}`,
+      ];
+      for (const [clearedBy, missedBy] of candidate.orientations) {
+        const press = {
+          seedText: candidate.seedText,
+          standingOrder: 'collective',
+          clearedBy,
+          missedBy,
+          horizon: candidate.horizon,
+        };
+        if (search !== undefined) {
+          /* Short-circuit: the first failing offset settles the screen, and a search is mostly fails. */
+          let passes = true;
+          for (const offset of [0, 120, 60]) {
+            const [one] = windowTries(candidate.contractId, press, call.atS, [offset]);
+            if (one === undefined || !(one.clears && one.otherMisses)) {
+              passes = false;
+              break;
+            }
+          }
+          if (!passes) {
+            lines.push([...head, clearedBy, 'missed', ...facts, 'screen-failed'].join('\t'));
+            write();
+            continue;
+          }
+        }
+        const offsets: number[] = [];
+        for (let offset = 0; offset <= searchS; offset += stepS) offsets.push(offset);
+        const tries = windowTries(candidate.contractId, press, call.atS, offsets);
+        const firstFail = tries.findIndex((one) => !(one.clears && one.otherMisses));
+        const windowS =
+          firstFail === -1 ? searchS : firstFail === 0 ? -1 : (tries[firstFail - 1]?.offsetS ?? -1);
+        const holes = tries
+          .filter((one) => !(one.clears && one.otherMisses))
+          .map((one) => one.offsetS);
+        /* Seeded off-grid seconds inside the window: a hole between two grid points is what they are for. */
+        let interiorOk = 0;
+        let interiorTried = 0;
+        if (windowS > stepS) {
+          let lcg = Number(seed % 2_147_483_647n) || 1;
+          const offs: number[] = [];
+          for (let i = 0; i < interior; i += 1) {
+            lcg = (lcg * 48_271) % 2_147_483_647;
+            const at = 1 + (lcg % (windowS - 1));
+            offs.push(at % stepS === 0 ? at + 1 : at);
+          }
+          const extra = windowTries(candidate.contractId, press, call.atS, offs);
+          interiorTried = extra.length;
+          interiorOk = extra.filter((one) => one.clears && one.otherMisses).length;
+          lines.push(`# ${candidate.contractId} interior offsets ${offs.join(',')}`);
+        }
+        const tried = windowS < 0 ? 0 : Math.floor(windowS / stepS) + 1 + interiorTried;
+        lines.push(
+          [
+            ...head,
+            clearedBy,
+            'missed',
+            ...facts,
+            String(windowS),
+            String(tried),
+            `${String(interiorOk)}/${String(interiorTried)}`,
+            holes.join(','),
+            tries.map((one) => `${one.clears ? 'C' : 'm'}${one.otherMisses ? 'm' : 'C'}`).join(' '),
+          ].join('\t'),
+        );
+        write();
+      }
     }
   });
 });

@@ -84,7 +84,7 @@ function inputAt(recording: VizRecording, simTimeS: number, over: Partial<StageP
     watchingSimPerRealS: WATCHING,
     longestStandingS:
       'longestStandingS' in over ? over.longestStandingS : observationsAt(recording, simTimeS).longestCurrentWaitS,
-    playerChoseSpeed: false,
+    playerChoseSpeedAtS: undefined,
     ...over,
   };
 }
@@ -202,19 +202,64 @@ describe('only a whole day is paced', () => {
       simTimeS: 600,
       watchingSimPerRealS: WATCHING,
       longestStandingS: undefined,
-      playerChoseSpeed: false,
+      playerChoseSpeedAtS: undefined,
     };
     expect(stagePaceOf(base).simPerRealS).toBe(WATCHING);
     // Positive control: the same input under the whole-day horizon is not one rung.
     expect(stagePaceOf({ ...base, horizon: 'whole-day' }).simPerRealS).toBe(BETWEEN_PEAKS_SIM_PER_REAL_S);
   });
 
-  it('a chip press is the player’s for the rest of the day', () => {
-    for (let t = 0; t < day.endedAt; t += 600) {
-      const answer = stagePaceOf(inputAt(day, t, { playerChoseSpeed: true }));
+  it('a chip press is the player’s until the next act boundary, and the stage paces again after it — § D1029', () => {
+    /*
+     * § D1029 amends § D991 clause 2. Pressed at 10:00 (7 200 s, between the morning and lunch
+     * peaks), the chip stands to 12:15 (15 300 s), the lunch act's start, and not a second past it.
+     * Before the amendment it stood to the end of the day, and this case read `chosen` everywhere.
+     */
+    const pressedAt = 7200;
+    for (let t = pressedAt; t < 15300; t += 600) {
+      const answer = stagePaceOf(inputAt(day, t, { playerChoseSpeedAtS: pressedAt }));
       expect(answer.simPerRealS).toBe(WATCHING);
-      expect(answer.reason).toBe('chosen');
+      expect(answer.reason, String(t)).toBe('chosen');
     }
+    const after = stagePaceOf(inputAt(day, 15300, { playerChoseSpeedAtS: pressedAt }));
+    expect(after.reason).toBe('act');
+    /* Past the lunch act's end, back between peaks, the chip does not come back on its own. */
+    const later = stagePaceOf(inputAt(day, 18000, { playerChoseSpeedAtS: pressedAt, longestStandingS: undefined }));
+    expect(later.reason).toBe('between');
+    /* The note says until when, from the timetable. */
+    expect(
+      stagePaceNoteOf(stagePaceOf(inputAt(day, 9000, { playerChoseSpeedAtS: pressedAt })), {
+        acts: actsOf(day.demandPhases),
+        simTimeS: 9000,
+        dayStartS: 8 * 3600,
+      }),
+    ).toBe('your speed, 4×, until 12:15');
+    /* A chip pressed after the last boundary stands to the end of the day, and says so. */
+    const last = stagePaceOf(inputAt(day, 35500, { playerChoseSpeedAtS: 35400 }));
+    expect(last.reason).toBe('chosen');
+    expect(stagePaceNoteOf(last, { acts: actsOf(day.demandPhases), simTimeS: 35500 })).toBe(
+      'your speed, 4×, to the end of the day',
+    );
+  });
+
+  it('a pinned day’s call stops the stage at any rung, on either horizon, and outranks a chip — § D1029', () => {
+    const callAtS = 15700;
+    for (const horizon of ['whole-day', 'period'] as const) {
+      for (const over of [{}, { playerChoseSpeedAtS: 15600 }, { watchingSimPerRealS: 600 }]) {
+        const at = stagePaceOf(inputAt(day, callAtS, { horizon, callAtS, ...over }));
+        expect(at.reason, horizon).toBe('call');
+        const past = stagePaceOf(inputAt(day, callAtS + 30, { horizon, callAtS, ...over }));
+        expect(past.reason, horizon).toBe('call');
+      }
+      /* Before the call, and once it is answered (no `callAtS`), nothing stops. */
+      expect(stagePaceOf(inputAt(day, callAtS - 1, { horizon, callAtS })).reason).not.toBe('call');
+      expect(stagePaceOf(inputAt(day, callAtS + 30, { horizon })).reason).not.toBe('call');
+    }
+    const note = stagePaceNoteOf(stagePaceOf(inputAt(day, callAtS, { callAtS })), {
+      acts: actsOf(day.demandPhases),
+      simTimeS: callAtS,
+    });
+    expect(note).toBe('stopped for the day’s call');
   });
 
   it('inside an act, or while somebody has waited past a minute, the stage plays at the player’s rung', () => {

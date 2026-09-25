@@ -129,6 +129,7 @@ import { contractForBuilding, CONTRACTS } from './contracts.js';
 import { scaledBuilding } from './growth.js';
 import { INCIDENT_KINDS, type Incident, type IncidentKind } from './incidents.js';
 import { parseRunHorizon } from './dayLength.js';
+import { PRESS_CALL_MIN_WINDOW_S, PRESS_CALL_RULES, type PressCallRule } from './pressCall.js';
 import type { RunHorizon } from './types.js';
 
 /** What the design intends a contract to be, so the measurement has something to disagree with. */
@@ -316,8 +317,26 @@ export interface ContractPressDay {
   readonly clearedBy: string;
   /** The other parking verb, which must still miss — the two-sided half of the claim. */
   readonly missedBy: string;
-  /** Where the press falls, as a fraction of the shift. `shift/incidents.ts`'s own units. */
-  readonly pressAtFraction: number;
+  /**
+   * **Where the day calls for its press, and how far the claim holds from there** — wave AI's
+   * press-moment ruling, [§ D1029](../../../../DECISIONS.md). `undefined` only on a row that says
+   * why it is {@link ContractPressDay.refused}, and {@link contractLadderIssues} refuses the rest.
+   *
+   * This replaced `pressAtFraction`, a typed instant — 0.43 of a whole day, 0.28 of a slice — at
+   * which § D914 and § D974 proved the flip and a minute either side of which nothing was asked.
+   * The instant is now derived by `shift/pressCall.ts#pressCallOf` from the run itself, so no clock
+   * is authored anywhere, and what the data carries is the measurement over the window from it.
+   */
+  readonly call: ContractPressCall | undefined;
+  /**
+   * **Why this row is not offered**, or `undefined` for an admitted pin — § D1029's refusal arm.
+   *
+   * A pin whose window from its call is shorter than `PRESS_CALL_MIN_WINDOW_S`, and for which a
+   * search found no crowd that passes, is kept in the data with its reason rather than deleted: the
+   * picker draws it disabled with this sentence (§ D973's refused-row precedent), and the ladder's
+   * both-directions check still sees a rung that books a car out and says what became of it.
+   */
+  readonly refused: string | undefined;
   /**
    * **Which kind of run the day was measured on** — GitHub issue #595,
    * [§ D973](../../../../DECISIONS.md).
@@ -347,6 +366,34 @@ export interface ContractPressDay {
    * day would mean the day does not turn on anything.
    */
   readonly mootUnder: readonly string[];
+}
+
+/**
+ * **The measurement behind a pin's call** — `shift/pressLadder.sweep.test.ts`'s call mode, one row.
+ *
+ * The admission criterion, [§ D1029](../../../../DECISIONS.md): from the call instant, the clearing
+ * press clears and the other misses at **every** tried moment of a window at least
+ * `shift/pressCall.ts#PRESS_CALL_MIN_WINDOW_S` simulated seconds long. Every field is what the sweep
+ * found, and `shift/pressLadder.test.ts` re-runs the window's two edges and a point inside it on every
+ * suite run, so a figure here that stopped being true fails there rather than aging.
+ */
+export interface ContractPressCall {
+  /** Which rule produced the instant — re-derived always-on and required to agree. */
+  readonly rule: PressCallRule;
+  /**
+   * The unbroken stretch after the call, in simulated seconds, over which every tried moment held
+   * both halves of the claim. It ends at the last tried moment before the first one that failed,
+   * or at {@link searchedS} when none did — so a window equal to it is a floor rather than an edge.
+   */
+  readonly windowS: number;
+  /** The grid's spacing, in simulated seconds. */
+  readonly stepS: number;
+  /** How far past the call the grid was tried. */
+  readonly searchedS: number;
+  /** How many moments were tried **inside the window** — the grid's points plus the off-grid ones. */
+  readonly tried: number;
+  /** Tried offsets past the window that failed either half, within {@link searchedS}. */
+  readonly holes: readonly number[];
 }
 
 export interface ContractLadder {
@@ -462,6 +509,55 @@ export function pressDayStanding(run: PressDayRun): ContractPressDay | undefined
   return press;
 }
 
+/**
+ * **The run on the stage, as the facts a call is drawn under** — [§ D1029](../../../../DECISIONS.md).
+ *
+ * {@link PressDayRun}'s six, plus the two {@link pressDayStanding} never asked: who is driving, and
+ * what has been pressed. The ruling's honesty lens found that gap — a claim measured under
+ * `collective` could be drawn over a run somebody had handed to another dispatcher — and it is
+ * closed here rather than in `pressDayStanding`, because the moot census that predicate also serves
+ * is a fact about the as-built day under every profile and is true whoever is driving.
+ */
+export interface PressDayAttempt extends PressDayRun {
+  /** `ViewerState.dispatcherId`. */
+  readonly dispatcherId: string;
+  /** `ViewerState.interventions` — the log the run on screen was simulated under. */
+  readonly interventions: readonly { readonly atS: number; readonly change: { readonly kind: string } }[];
+}
+
+/**
+ * **The pinned day, exactly as it was measured**, or `undefined` — [§ D1029](../../../../DECISIONS.md).
+ *
+ * Four conditions, each one a way the run could differ from the one `pressLadder.test.ts` proves:
+ *
+ * 1. {@link pressDayStanding} holds — the contract, day 1, the ordinary wrinkle with no calendar,
+ *    the pinned seed, on the pinned horizon;
+ * 2. the pin is **admitted** ({@link admittedPressDayIds}) — a refused row draws no call;
+ * 3. the driver is the pin's standing order;
+ * 4. every press on record is this attempt's own answer to the call: none at all, or exactly one
+ *    parking press of the pin's two, stamped at the call second. `everyday/host.ts#startRun` clears
+ *    the log on every attempt since § D1002, so a press standing here was made on this attempt, and
+ *    a press at any other second — or a second press — is a day nobody measured.
+ *
+ * `callAtS` is `shift/pressCall.ts#pressCallOf`'s answer for the run, or `undefined` when it has
+ * none; with no call only the untouched day qualifies.
+ */
+export function pressDayMeasuredAs(
+  run: PressDayAttempt,
+  callAtS: number | undefined,
+): ContractPressDay | undefined {
+  const press = pressDayStanding(run);
+  if (press === undefined) return undefined;
+  if (!admittedPressDayIds().includes(run.contractId)) return undefined;
+  if (run.dispatcherId !== press.standingOrder) return undefined;
+  if (run.interventions.length > 1) return undefined;
+  for (const entry of run.interventions) {
+    if (callAtS === undefined || entry.atS !== callAtS) return undefined;
+    if (entry.change.kind !== press.clearedBy && entry.change.kind !== press.missedBy) return undefined;
+  }
+  return press;
+}
+
 export function rungIncidents(rung: ContractLadderRow | undefined): readonly Incident[] {
   if (rung === undefined) return [];
   return rung.fabric.incidents.map((entry) => ({
@@ -489,7 +585,8 @@ function pressDayOf(value: unknown): ContractPressDay | undefined {
     standingOrder: asString(record['standingOrder']),
     clearedBy: asString(record['clearedBy']),
     missedBy: asString(record['missedBy']),
-    pressAtFraction: asNumber(record['pressAtFraction']) ?? -1,
+    call: pressCallBlockOf(record['call']),
+    refused: typeof record['refused'] === 'string' ? record['refused'] : undefined,
     /*
      * Absent is `'period'` — § D914 measured every pin that predates the field on the slice — and
      * anything else that is not a horizon is the empty string, so {@link contractLadderIssues}
@@ -498,6 +595,81 @@ function pressDayOf(value: unknown): ContractPressDay | undefined {
     horizon: parseRunHorizon(record['horizon']) as RunHorizon,
     mootUnder: Object.freeze(moot.map((id) => asString(id))),
   });
+}
+
+/*
+ * Structure only, `pressDayOf`'s footing: a rule this table does not know becomes the empty string
+ * and a missing figure `-1`, so {@link contractLadderIssues} names it rather than admitting a pin
+ * on a default.
+ */
+function pressCallBlockOf(value: unknown): ContractPressCall | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const record = asRecord(value);
+  const rule = asString(record['rule']);
+  const holes = Array.isArray(record['holes']) ? (record['holes'] as unknown[]) : [];
+  return Object.freeze({
+    rule: ((PRESS_CALL_RULES as readonly string[]).includes(rule) ? rule : '') as PressCallRule,
+    windowS: asNumber(record['windowS']) ?? -1,
+    stepS: asNumber(record['stepS']) ?? -1,
+    searchedS: asNumber(record['searchedS']) ?? -1,
+    tried: asNumber(record['tried']) ?? -1,
+    holes: Object.freeze(holes.map((hole) => asNumber(hole) ?? -1)),
+  });
+}
+
+/**
+ * **Whether a call block meets the admission criterion** — [§ D1029](../../../../DECISIONS.md).
+ *
+ * The one reading, so {@link contractLadderIssues}, {@link admittedPressDayIds} and the picker cannot
+ * disagree about which pins are admitted. Every clause is a way the block could claim more than its
+ * sweep found: a window under the floor, a tried count smaller than the grid inside the window, a
+ * window longer than the search, a hole inside the window, or a window that stops short of the
+ * search with no hole to stop it.
+ */
+function pressCallIssues(call: ContractPressCall | undefined): readonly string[] {
+  if (call === undefined) return ['it carries no call measurement'];
+  const issues: string[] = [];
+  if ((call.rule as string) === '') {
+    issues.push(`its call names a rule that is none of ${PRESS_CALL_RULES.join(', ')}`);
+  }
+  if (!(call.stepS > 0)) issues.push(`its call grid steps ${String(call.stepS)} s`);
+  if (call.windowS < PRESS_CALL_MIN_WINDOW_S) {
+    issues.push(
+      `its call holds for ${String(call.windowS)} s, under the ${String(PRESS_CALL_MIN_WINDOW_S)} s ` +
+        'a pin needs from its call',
+    );
+  }
+  if (call.windowS > call.searchedS) {
+    issues.push(`its window of ${String(call.windowS)} s is longer than the ${String(call.searchedS)} s searched`);
+  }
+  if (call.stepS > 0 && call.tried < Math.floor(call.windowS / call.stepS) + 1) {
+    issues.push(`it states ${String(call.tried)} tried moments, fewer than its own grid inside the window`);
+  }
+  if (call.holes.some((hole) => hole <= call.windowS || hole > call.searchedS)) {
+    issues.push('it reports a hole inside its window or past its search');
+  }
+  if (call.windowS < call.searchedS && !call.holes.includes(call.windowS + call.stepS)) {
+    issues.push('its window stops short of the search with no hole at the next tried moment');
+  }
+  return issues;
+}
+
+/**
+ * **The pinned days the admission criterion admits** — derived from the data, never typed
+ * ([§ D1029](../../../../DECISIONS.md)). A row is admitted when it pins a day, is not
+ * {@link ContractPressDay.refused}, and its call block passes {@link pressCallIssues}.
+ */
+export function admittedPressDayIds(ladder: ContractLadder = CONTRACT_LADDER): readonly string[] {
+  return Object.freeze(
+    ladder.rows
+      .filter(
+        (row) =>
+          row.pressDay !== undefined &&
+          row.pressDay.refused === undefined &&
+          pressCallIssues(row.pressDay.call).length === 0,
+      )
+      .map((row) => row.contractId),
+  );
 }
 
 function bankChoiceOf(value: unknown): BankChoice {
@@ -860,11 +1032,19 @@ export function contractLadderIssues(
             'one button that always works is a switch rather than a choice',
         );
       }
-      if (press.pressAtFraction <= 0 || press.pressAtFraction >= 1) {
-        issues.push(
-          `ladder row ${row.contractId} presses at ${String(press.pressAtFraction)} of the run, ` +
-            'outside (0, 1)',
-        );
+      /*
+       * § D1029: an offered pin is an admitted one. A refused row says why in its own words; every
+       * other row's call block must meet the criterion, so a pin that fails it cannot reach the
+       * picker by being left in the data unmarked.
+       */
+      if (press.refused !== undefined) {
+        if (press.refused.trim() === '') {
+          issues.push(`ladder row ${row.contractId} refuses its press day and gives no reason`);
+        }
+      } else {
+        for (const issue of pressCallIssues(press.call)) {
+          issues.push(`ladder row ${row.contractId} pins a press day and ${issue}`);
+        }
       }
       const shipped = input.dispatcherIds();
       if (!shipped.includes(press.standingOrder)) {

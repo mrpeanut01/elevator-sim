@@ -38,6 +38,7 @@
 
 import { Pcg32, deriveStreamSeed } from '@elevator-sim/core/browser';
 
+import { admittedPressDayIds } from './ladder.js';
 import { LEGIBILITY_SWEEP } from './legibility.js';
 import type { WeekState } from './types.js';
 
@@ -53,6 +54,25 @@ export const LEGIBILITY_SWEEP_N = 50;
  */
 export const ELIGIBLE_FIRST_CONTRACT_IDS: readonly string[] = Object.freeze(
   LEGIBILITY_SWEEP.filter((row) => row.legibleOf50 * 3 > LEGIBILITY_SWEEP_N).map((row) => row.contractId),
+);
+
+/**
+ * **The first scored day's candidate set: legible and admitted** — wave AI,
+ * [§ D1029](../../../../DECISIONS.md), for the first-day ruling's lane.
+ *
+ * {@link ELIGIBLE_FIRST_CONTRACT_IDS} (§ D512's legibility) intersected with
+ * `shift/ladder.ts#admittedPressDayIds` (§ D1029's admission criterion), in contract order. Both
+ * halves are derived from data, so this is never typed: a pin that stops being admitted, or a tower
+ * that stops being legible, leaves the set on the same commit.
+ *
+ * **Exported and guarded, and deliberately wired to nothing.** The first-day ruling (wave AI's
+ * reconciliation, *FIRST DAY*) draws the first session from this set, and a later lane does that
+ * wiring; this lane's brief was to export it and hold it non-empty with no silent fallback to the
+ * legible set. `firstSession.test.ts` holds both; `deadCode.test.ts` names it as an export with no
+ * shipped caller yet, and its staleness rule is what will say so when the draw acquires one.
+ */
+export const FIRST_DAY_CONTRACT_IDS: readonly string[] = Object.freeze(
+  ELIGIBLE_FIRST_CONTRACT_IDS.filter((id) => admittedPressDayIds().includes(id)),
 );
 
 /** The contract a first session on `seed` opens on — one of {@link ELIGIBLE_FIRST_CONTRACT_IDS}. */

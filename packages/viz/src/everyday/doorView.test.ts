@@ -77,6 +77,7 @@ const TODAY: TodayRecord = {
   crowdIsToday: true,
   firstSessionLine: undefined,
   driver: 'Steady hand',
+  driverHeld: undefined,
 };
 
 const viewAt = (
@@ -168,10 +169,36 @@ describe('the § 3.3 primary, and the replay a past day earns — § D517', () =
     expect(view.primary.note).toBe('Pick who drives, then run it.');
   });
 
-  it('says what a second run of a closed day does to the week, rather than nothing', () => {
+  it('opens tomorrow once today is closed, and keeps today’s second attempt beside it — § D1004', () => {
+    /*
+     * The post-AH panel's *no route to tomorrow from the front door*: a closed Monday left from its
+     * report came back here as *Set up today* over a disabled `›`, and the press re-ran Monday.
+     */
     const view = viewAt(0, true);
     expect(view.primary.inert).toBe(false);
-    expect(view.primary.note).toMatch(/another attempt/);
+    expect(view.primary.goes).toBe('tomorrow');
+    // Day 5 of this fixture is a Friday, so the doors open on Saturday.
+    expect(view.primary.label).toBe('Open the doors on Saturday');
+    expect(view.primary.note).toMatch(/closed and banked/);
+    // The retry is not taken off the door: it is drawn beside the primary and says what it does.
+    expect(view.primary.again?.label).toBe('Run today again');
+    expect(view.primary.again?.note).toMatch(/another attempt/iu);
+    expect(view.primary.again?.note).toMatch(/no presses carried over/);
+  });
+
+  it('reads a closed today off the week as well as off the sitting — a reload keeps the day, not the run', () => {
+    const banked = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4), closedDay(5)]);
+    const view = viewAt(0, false, banked);
+    expect(view.primary.goes).toBe('tomorrow');
+    // And an open today is still today, with no second button.
+    expect(viewAt(0, false).primary.goes).toBe('today');
+    expect(viewAt(0, false).primary.again).toBeUndefined();
+  });
+
+  it('never offers tomorrow from a past chip — the replay is the only thing a past day hands back', () => {
+    const view = viewAt(-2, true);
+    expect(view.primary.goes).toBe('replay');
+    expect(view.primary.again).toBeUndefined();
   });
 
   it('is pressable on a past day inside the week, names the day, and says it never counts', () => {

@@ -23,8 +23,9 @@
  *    Issue #214: it came from a `profile` field no producer ever wrote, so *"no days saved yet"*
  *    was not stale — it was the **only** string that line could render, beside a week screen
  *    reading *1 day running*. The gate is {@link WeekState.history} rather than `streak`, because a
- *    player who missed every day has still saved days; today's figure waits on `dayClosed` for
- *    `weekView.ts`'s reason; and with an empty week the honest absence is still what is drawn —
+ *    player who missed every day has still saved days; today's figure is published once the week
+ *    carries it, which is `weekView.ts`'s rule since § D1004; and with an empty week the honest
+ *    absence is still what is drawn —
  *    a fix that made the refusal unreachable would be the same defect facing the other way.
  * 5. **The absence and the *not yet read* are two lines, not one.** Issue #214's last surviving
  *    path: on a cold load the shell has a host slot and no host, and the card said *no days saved
@@ -317,18 +318,6 @@ export interface RailOptions {
    */
   readonly weekPending?: boolean | undefined;
   /**
-   * Whether **today's** run has been filed — `EverydayHost.runState().dayClosed`.
-   *
-   * Load-bearing rather than decorative, for `weekView.ts`'s reason: a week restored from storage
-   * can carry today's outcome while the stage holds no filed run, and *Close the day* alone sets
-   * this. Publishing `bestMinutePct` on the week alone would put a figure for a day this sitting
-   * has not finished onto the rail — the cell § 14's card withholds two hundred pixels away.
-   *
-   * **Defaults to `false`, which is the withholding arm**: a caller that hands over a week and
-   * forgets the flag under-reports rather than publishing something no run produced.
-   */
-  readonly dayClosed?: boolean | undefined;
-  /**
    * The last turn banked and what the ledger said — `EverydayHost.chimeTally()`, read at draw time
    * like {@link week} and for the same reason.
    *
@@ -543,17 +532,19 @@ const CAREER_PENDING = 'reading your saved days…';
  * § 14 draws exactly that many cards and a card outside it is a figure with nothing to check it
  * against.
  */
-function careerLineOf(
-  week: WeekState | undefined,
-  dayClosed: boolean,
-  weekPending: boolean,
-): string {
+function careerLineOf(week: WeekState | undefined, weekPending: boolean): string {
   if (week === undefined) return weekPending ? CAREER_PENDING : NO_CAREER_YET;
   if (week.history.length === 0) return NO_CAREER_YET;
   const oldest = week.day - (HISTORY_DAYS - 1);
-  const publishable = week.history.some(
-    (day) => day.day >= oldest && (day.day < week.day || dayClosed),
-  );
+  /*
+   * **Any closed day in the window, today's included** — [§ D1004](../../../../DECISIONS.md). This
+   * waited on `RailOptions.dayClosed` for today's figure, *the run on the stage was filed this
+   * sitting*, on `weekView.ts`'s old ground; that file now reads a closed day off the week's
+   * history, because a day the report called banked read *not closed yet* there after a reload, and
+   * this line is held to that one's by `honesty/agreement.ts`'s `career-line` pair. The option went
+   * with the gate: a flag that no longer moved the line would be a control that writes nothing.
+   */
+  const publishable = week.history.some((day) => day.day >= oldest);
   const days = week.streak === 1 ? '1 day running' : `${String(week.streak)} days running`;
   return `${days} · best ${publishable ? percentFigure(week.bestMinutePct) : EM_DASH}`;
 }
@@ -674,11 +665,7 @@ function swapNoteFor(ctx: RunContext): string {
  */
 export function railFooter(state: EverydayState, options: RailOptions = {}): RailFooter {
   const name = effectiveNameOf(options.profile, options.account);
-  const streak = careerLineOf(
-    options.week,
-    options.dayClosed ?? false,
-    options.weekPending ?? false,
-  );
+  const streak = careerLineOf(options.week, options.weekPending ?? false);
   return {
     identity: {
       heading: 'PLAYING AS',

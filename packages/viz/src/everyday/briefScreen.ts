@@ -98,6 +98,8 @@ function mountBrief(
       building: data.resolvedBuilding(),
       buildingId: selection.buildingId,
       dispatcherName: data.dispatcherById(selection.dispatcherId)?.name,
+      /* § D1029: the driver is held on a pinned day only while it is the standing order. */
+      dispatcherId: selection.dispatcherId,
       /* Any profile's name, for the moot-dispatcher sentence — § D914. */
       dispatcherNameOf: (id) => data.dispatcherById(id)?.name,
       /*
@@ -352,7 +354,10 @@ function mountBrief(
       const meta = el(doc, 'span', 'everyday-brief-style-meta', option.meta);
       meta.style.cssText = MONO(10.5, option.selected ? C.terracotta : C.label);
       card.append(name, blurb, meta);
+      /* § D1029: held on a pinned day until the stage's call is answered — the reason is drawn below. */
+      card.disabled = view.drivers.held !== undefined;
       card.addEventListener('click', () => {
+        if (view.drivers.held !== undefined) return;
         context.host.setDispatcher(option.id);
       });
       cards.append(card);
@@ -383,13 +388,22 @@ function mountBrief(
       node.selected = option.selected;
       select.append(node);
     }
+    select.disabled = view.drivers.held !== undefined;
     select.addEventListener('change', () => {
+      if (view.drivers.held !== undefined) return;
       context.host.setDispatcher(select.value);
     });
     const count = el(doc, 'span', 'everyday-brief-count', view.drivers.count);
     count.style.cssText = MONO(11, C.label);
     pickerRow.append(pickerLabel, select, count);
     drivers.append(pickerRow);
+    if (view.drivers.held !== undefined) {
+      const held = el(doc, 'p', 'everyday-brief-driver-held', view.drivers.held);
+      held.style.cssText = `margin:9px 0 0;font-size:12px;line-height:1.45;color:${C.warmGrey}`;
+      select.setAttribute('aria-describedby', 'everyday-brief-driver-held');
+      held.id = 'everyday-brief-driver-held';
+      drivers.append(held);
+    }
     column.append(drivers);
 
     column.append(refusalCard(view.ghost, 'everyday-brief-ghost'));

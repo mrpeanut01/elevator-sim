@@ -144,14 +144,28 @@ describe('the shipped ladder is legal against the shipped data', () => {
       ]);
       const press = row['pressDay'] as Record<string, unknown> | undefined;
       if (press !== undefined) {
-        expect(Object.keys(press).sort()).toEqual([
+        /*
+         * § D1029 replaced `pressAtFraction` — a typed instant — with `call`, the measurement over
+         * the window from a derived one, and added the optional `refused`. Neither declares a bar:
+         * the call block is a rule name, a window, a grid and a tried count, and a refusal is a
+         * sentence.
+         */
+        expect(Object.keys(press).sort().filter((key) => key !== 'refused')).toEqual([
+          'call',
           'clearedBy',
           'horizon',
           'missedBy',
           'mootUnder',
-          'pressAtFraction',
           'seedText',
           'standingOrder',
+        ]);
+        expect(Object.keys(press['call'] as object).sort()).toEqual([
+          'holes',
+          'rule',
+          'searchedS',
+          'stepS',
+          'tried',
+          'windowS',
         ]);
       }
       expect(Object.keys(row['demand'] as object).sort()).toEqual(
