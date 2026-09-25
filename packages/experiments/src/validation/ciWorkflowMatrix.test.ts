@@ -151,7 +151,10 @@ describe('the reader', () => {
     expect(workflow.on, 'no trigger block').toBeTruthy();
     expect(workflow.concurrency, 'no concurrency block').toBeTruthy();
     const jobs = workflow.jobs as Record<string, Record<string, YamlValue>>;
-    expect(Object.keys(jobs).sort()).toEqual([MATRIX_JOB, 'suite'].sort());
+    // `guards` joined the matrix job and the aggregating `suite` under § D1084: the registry, census
+    // and document guards on a runner of their own, so their reds arrive in minutes. The set is still
+    // asserted whole, so a fourth job cannot arrive without this line moving with it.
+    expect(Object.keys(jobs).sort()).toEqual([MATRIX_JOB, 'guards', 'suite'].sort());
     const steps = jobs[MATRIX_JOB]?.steps;
     expect(Array.isArray(steps) && steps.length >= 5, 'the matrix job lost its steps').toBe(true);
   });

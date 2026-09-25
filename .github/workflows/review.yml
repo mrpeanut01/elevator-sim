@@ -1,8 +1,9 @@
 # Code review, in two halves that fail for different reasons.
 #
 # `ci.yml` answers "does it still work". This answers "should it land", and it is deliberately a
-# separate workflow: the suite takes ~35 minutes on the Linux leg, and a review that only arrives
-# after it has no chance of being read before the author has moved on. These jobs finish in
+# separate workflow: the suite took ~35 minutes on one leg when this was written (11 at the median
+# and 18 at p90 across its legs by 2026-09-25), and a review that only arrives after it has no
+# chance of being read before the author has moved on. These jobs finish in
 # seconds-to-minutes and post while the suite is still running.
 #
 # ## The two halves
@@ -18,15 +19,35 @@
 #
 # Keeping them separate is the point. A missing API key degrades the review to its mechanical half
 # and says so; it does not silently pass a pull request nobody read.
+#
+# ## Since § D1084 (the CI ruling of 2026-09-25)
+#
+# **`claude review` is opt-in, and a review that did not run shows as skipped rather than green.** It
+# was green in 116 of 116 runs in the measured fortnight and read nothing in any of them, because no
+# `ANTHROPIC_API_KEY` is set; its key-probe step exported a boolean, skipped the review step and let
+# the job pass. That is `RISKS.md` R40 on a required check. The job now runs only when the repository
+# variable `CLAUDE_REVIEW` is `true`, and when it runs without a key it fails and says why. A
+# skipped job still satisfies a required status check, so no pull request is blocked while the
+# ruleset still names it. It runs once per pull request (opened, reopened, ready for review) rather
+# than on every push, and it stays advisory.
+#
+# **`dependency review` is a third job, advisory.** GitHub's dependency-review action compares the
+# pull request's manifests with its base through the dependency graph and fails on a new dependency
+# with a known vulnerability of high severity or worse. It is free on a public repository and needs
+# no checkout. It is not a required check (2-1 in § D1084's swarm); the owner can make it one.
 name: Review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
+# A push cancels the previous push's run, and never the run the pull request opened with: that run
+# carries the one `claude review` a pull request gets, and a wave's first push usually lands within
+# the minute the review takes. So `synchronize` runs share one group and every other event gets its
+# own.
 concurrency:
-  group: review-${{ github.ref }}
+  group: review-${{ github.ref }}-${{ github.event.action == 'synchronize' && 'push' || github.event.action || 'dispatch' }}
   cancel-in-progress: true
 
 jobs:
@@ -36,9 +57,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
 
@@ -49,34 +70,42 @@ jobs:
 
   claude-review:
     name: claude review
+    # Opt-in by the repository variable, once per pull request, and never on a fork (a fork's run
+    # gets no secrets). Unset, the job is SKIPPED, which GitHub shows grey and which satisfies a
+    # required check without claiming a review happened.
+    if: >-
+      vars.CLAUDE_REVIEW == 'true' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.action == 'opened' ||
+       github.event.action == 'reopened' ||
+       github.event.action == 'ready_for_review')
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      # `secrets` is not available in a job-level `if`, so the presence check is a step that exports
-      # a boolean. Without this the job fails confusingly on every fork PR and on any clone that has
-      # not set the key — a review that cannot run should be skipped, visibly, not failed.
-      - name: Is a key configured?
-        id: key
+      # `secrets` is not available in a job-level `if`, so the key is checked here. Turned on and
+      # missing its key is a configuration error, and it FAILS rather than passing: the old version
+      # of this step skipped the review and let the job go green, which is how a required check
+      # reviewed nothing 116 times running. The job is advisory, so the red costs nobody a merge
+      # once the ruleset stops requiring it (§ D1084's owner list).
+      - name: A key is configured
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          if [ -n "$ANTHROPIC_API_KEY" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Claude review skipped::No ANTHROPIC_API_KEY secret is set. The mechanical gates still ran; the reading half did not."
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error title=Claude review is on and has no key::vars.CLAUDE_REVIEW is 'true' and no ANTHROPIC_API_KEY secret is set. Set the secret, or unset the variable to turn the review off."
+            exit 1
           fi
 
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
       - name: Review
-        if: steps.key.outputs.present == 'true'
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@9171db3e57d6a3140a37ddc2ba92788584e0ead6 # v1.0.234
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           # The prompt is repository-specific on purpose. A generic "review this PR" produces generic
@@ -132,3 +161,19 @@ jobs:
             specific lines. Only post GitHub comments — do not return the review as a message.
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"
+
+  # Advisory, § D1084. Compares this pull request's dependency manifests against its base through the
+  # dependency graph (which must be on: Settings, Advanced Security) and fails on a newly introduced
+  # dependency with a known vulnerability rated high or critical. No checkout: the action reads the
+  # diff from the API. Only on `pull_request`, because it has no base to compare on a dispatch.
+  dependency-review:
+    name: dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: never

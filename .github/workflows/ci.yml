@@ -54,25 +54,39 @@
 # so the job names — and therefore any required-status-check names — are stable.
 name: CI
 
+# **`main` is tested nightly, not on every push, since § D1084** (the CI ruling of 2026-09-25, 2-1).
+# Measured over 789 runs from 09-11 to 09-25: 41 push runs on `main` caught nothing a pull request
+# run had not already caught, and the one red among them was a browser-tier flake. A pull request
+# run already tests `refs/pull/N/merge`, which is `main` plus the branch, so the per-push run was
+# the same question asked a second time. The nightly run is what still tests a `main` nobody opens
+# a pull request against, and the next pull request's own run is what catches a defect sooner.
+# Restoring the per-push run is one line: put `push: branches: [main]` back above `pull_request:`.
 on:
-  push:
-    branches: [main]
   pull_request:
   # A merge queue batches several approved pull requests and tests the tree they WOULD produce
-  # together. That is the only mechanism here that makes the full suite cheaper per pull request
-  # rather than merely faster, because N branches cost one run instead of N. Nothing is required to
-  # use it; the trigger existing is what lets the repository turn one on without another edit here.
+  # together. **It is not available to this repository as it stands**: GitHub offers merge queues
+  # only to organisation-owned repositories and `mrpeanut01/elevator-sim` is owned by a user
+  # account (measured by all three members of § D1084's swarm; the trigger has fired 0 times in 723
+  # runs). The trigger is kept because it costs nothing and is what a move to an organisation would
+  # need; `review.yml` would need it too, or the required `invariant gates` stalls every entry.
   merge_group:
   workflow_dispatch:
+  # Nightly on `main`, at a minute past no hour: GitHub's scheduler delays top-of-the-hour crons by
+  # hours (the deep tiers' `0 3 * * 0` started at 08:10 and 08:27), and 20:00 UTC carried one CI
+  # run in the measured fortnight. `deep-tiers.yml` fires at 21:17, after this has finished, so the
+  # two never compete for the twenty concurrent jobs the account is allowed.
+  schedule:
+    - cron: '43 20 * * *'
 
-# **Cancelling is right for one of these three event kinds and wrong for the other two**, and this
-# file used to treat them the same.
+# **Cancelling is right for one of these event kinds and wrong for the others**, and this file used
+# to treat them the same.
 #
 # A pull request's own iterations supersede each other: push again and the older run is answering a
 # question nobody is asking, while holding a runner other branches want. Cancelling there protects
 # the shared pool, which is what lets several branches make progress at once.
 #
-# `main` and `merge_group` are the opposite. Those runs ARE the record, and a cancelled run is not a
+# `main` and `merge_group` are the opposite (on `main` that was a push run until § D1084 and is the
+# nightly `schedule` run now). Those runs ARE the record, and a cancelled run is not a
 # result at all: it is neither a pass nor a failure, and filing it as either is the mistake. Measured
 # on 2026-09-04, when this group cancelled ten of twelve runs on one branch and the only green suite
 # in the whole session was on a documentation-only commit. `RISKS.md` R46 carries that, together with
@@ -96,10 +110,12 @@ on:
 # one was true and incomplete: it protected the run that had started and said nothing about the one
 # that had not.
 #
-# So a push run is keyed on its COMMIT, and `main` runs execute side by side rather than queue: no
-# two groups share a member, so nothing is ever pending behind anything and nothing can be evicted.
-# The cost is runner slots — two merges close together run ten legs at once instead of five and
-# then five — and that is the cheaper side, because a slot is shared and a record is not.
+# So a run on `main` is keyed on its COMMIT, and such runs execute side by side rather than queue:
+# no two groups share a member, so nothing is ever pending behind anything and nothing can be
+# evicted. The cost is runner slots, and that is the cheaper side, because a slot is shared and a
+# record is not. Since § D1084 the run on `main` is the nightly `schedule` one, which has no push
+# to race, so the eviction above cannot happen on `main` at all today; `push` is kept in the
+# expression so that restoring the per-push trigger restores the protection with it.
 # `merge_group` is left on `github.ref` deliberately: the merge queue gives every entry its own
 # temporary branch, so that group is already unique per entry, and keying it on the sha would change
 # nothing while suggesting it had. `workflow_dispatch` stays on the ref it was asked for, so two
@@ -107,12 +123,14 @@ on:
 # its single `production` group on purpose: there, the newest deploy superseding a queued older one
 # is the right outcome, since a deploy is not a record.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || (github.event_name == 'push' && github.sha) || github.ref }}
+  group: ci-${{ github.event.pull_request.number || ((github.event_name == 'push' || github.event_name == 'schedule') && github.sha) || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # **One leg per vitest project, run concurrently.** This was a single job running `npm test`, which
-  # is every project in series: 49 minutes on the one run that completed on 2026-09-04.
+  # **One leg per vitest project, run concurrently, and two for `viz`.** This was a single job running
+  # `npm test`, which is every project in series: 49 minutes on the one run that completed on
+  # 2026-09-04. Since § D1084 the `viz` project is split across two legs by vitest's own `--shard`,
+  # because it had become the leg every pull request waited on; see the matrix entry.
   #
   # The arithmetic that decides it was measured on that run rather than estimated. Setup is
   # **35 seconds** end to end (checkout 3 s, setup-node 7 s, `npm ci` 2 s, `npm run build` 4 s,
@@ -139,13 +157,13 @@ jobs:
   # `packages/experiments/src/benchmark/` was 3 665 s of its 4 000 s of test time. A suite's wall
   # clock is its longest leg, so every pull request waited on studies whose numbers can move only
   # when `core`, `experiments` or `data/` do. Those studies now sit behind
-  # `ELEVATOR_SIM_BENCHMARK=1` and run in `deep-tiers.yml`'s four `benchmark-*` jobs — weekly, and
-  # on dispatch — and this leg is what was left: the validation, oracle, runner, fuzz and tuning
+  # `ELEVATOR_SIM_BENCHMARK=1` and run in `deep-tiers.yml`'s four `benchmark-*` jobs — nightly since
+  # § D1084, and on dispatch — and this leg is what was left: the validation, oracle, runner, fuzz and tuning
   # suites, plus the suites in those sixteen files that read no run. The matrix below is unchanged
   # on purpose: the gate is in the files, `packages/viz/src/deepTiers.test.ts` is what keeps it
   # wired, and a leg that had to know which files moved would be a second list to go stale. The
-  # trade — a moved pin is found on the next dispatch rather than on the pull request — is written
-  # where the jobs are.
+  # trade — a moved pin is found on the next night or dispatch rather than on the pull request — is
+  # written where the jobs are.
   legs:
     name: ${{ matrix.leg }}
     runs-on: ${{ matrix.runner }}
@@ -168,8 +186,19 @@ jobs:
             projects: --project core
             platform: linux
             runner: ubuntu-latest
+          # **`viz` is two shards, and the first keeps the leg's name on purpose** (§ D1084). The
+          # viz leg was the critical path on nearly every run and its median climbed from 10.2 to
+          # 18.8 minutes between 09-11 and 09-25. Sharding splits its files between two runners and
+          # skips none. The first shard reports as `viz` because the `main-baseline` ruleset
+          # requires a check of that name: a required check that no job reports blocks every pull
+          # request until the owner edits the ruleset, while a renamed shard costs nothing. Shard
+          # balance is unmeasured until the first run; three shards is the fallback.
           - leg: viz
-            projects: --project viz
+            projects: --project viz --shard=1/2
+            platform: linux
+            runner: ubuntu-latest
+          - leg: viz-2
+            projects: --project viz --shard=2/2
             platform: linux
             runner: ubuntu-latest
           - leg: experiments
@@ -187,9 +216,9 @@ jobs:
             runner: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # The floor package.json declares. Kept as one value — see the header on why there is no
           # Node axis.
@@ -337,27 +366,74 @@ jobs:
         # splitting one command into five is exactly the change that makes it reachable.
         run: npx vitest run ${{ matrix.projects }} --passWithNoTests=false
 
+  # **The repository's guards, on their own runner, so that their reds arrive in minutes** (§ D1084).
+  #
+  # Nineteen of the twenty-six red CI runs between 09-11 and 09-25 were one of the files below, and
+  # `testCost.test.ts` alone was eleven. Every one of them reads files and runs no simulation, yet
+  # their reds arrived at a median of 10.5 minutes because they sat inside legs that run for ten to
+  # nineteen. Here they run in parallel with the legs and report in about two.
+  #
+  # **Added, and nothing is taken from the legs.** Every file here still runs in its own project's
+  # leg, so a list that goes stale costs speed and never coverage, which is the property that makes
+  # a hand-written list acceptable here when `RISKS.md` R40 refuses one everywhere else. The list
+  # still has a guard of its own: `packages/viz/src/ciLegs.test.ts` fails if a path named here does
+  # not exist on disk, because vitest treats a filter that matches nothing as no filter at all when
+  # the other filters match, and a typo would otherwise drop a file from this job silently.
+  #
+  # `npm run build` stays, for the reason the legs give: it is the typecheck, and a red one arrives
+  # here first too. No Chromium, because no file here drives the browser tier and
+  # `dev/browserTier.test.ts`, which demands one in CI, is deliberately not on the list.
+  guards:
+    name: guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck and build
+        run: npm run build
+
+      - name: Registry, census, wiring and document guards (each also runs in its own leg)
+        run: npx vitest run --passWithNoTests=false --project viz --project experiments packages/viz/src/testCost.test.ts packages/viz/src/boundaries.test.ts packages/viz/src/deadCode.test.ts packages/viz/src/honesty/derive.test.ts packages/viz/src/deepTiers.test.ts packages/viz/src/ciLegs.test.ts packages/viz/src/ciNodeVersion.test.ts packages/viz/src/persist/persist.test.ts packages/viz/src/dev/data.test.ts packages/experiments/src/validation/documentation.test.ts packages/experiments/src/validation/citations.test.ts packages/experiments/src/validation/documentRouting.test.ts packages/experiments/src/validation/ciWorkflowMatrix.test.ts packages/experiments/src/validation/deepTierBuild.test.ts packages/experiments/src/validation/deepTierReport.test.ts packages/experiments/src/validation/blockedBy.test.ts
+
   # The single check a branch protection rule can point at, and the reason the leg names above are
-  # free to change. `suite (linux)` was one job and is now five, so a required status check naming it
-  # would have gone looking for a job that no longer exists. This job keeps that name, depends on
-  # every leg, and fails unless all of them succeeded.
+  # free to change. `suite (linux)` was one job, then five legs, and since § D1084 it is six legs
+  # (the `viz` leg is two shards) plus `guards`; a required status check naming it would have gone
+  # looking for a job that no longer exists. This job keeps that name, depends on every leg and on
+  # `guards`, and fails unless all of them succeeded.
+  #
+  # **The per-leg names are still required checks today**, in the `main-baseline` ruleset, which only
+  # the owner can edit. That is why the first `viz` shard keeps the name `viz`. § D1084 asks the owner
+  # to require `suite (linux)`, `invariant gates` and `guards` instead, after which a leg can be
+  # renamed or split without touching the settings.
   #
   # `if: always()` so that a cancelled or failed leg still produces a verdict here rather than
   # leaving the check pending forever, and the body treats anything other than `success` as a
   # failure — a cancelled leg included, because a cancelled run is not a pass.
   suite:
     name: suite (linux)
-    needs: legs
+    needs: [legs, guards]
     if: always()
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-      - name: Every leg is green, or this check is not
+      - name: Every leg and the guards are green, or this check is not
         run: |
-          result='${{ needs.legs.result }}'
-          echo "legs: $result"
-          if [ "$result" != "success" ]; then
-            echo "::error title=A suite leg did not pass::the legs job reports '$result'. A cancelled leg counts as a failure here on purpose: a cancelled run is neither a pass nor a failure, and this check may only be green on a run that finished."
+          legs='${{ needs.legs.result }}'
+          guards='${{ needs.guards.result }}'
+          echo "legs  : $legs"
+          echo "guards: $guards"
+          if [ "$legs" != "success" ] || [ "$guards" != "success" ]; then
+            echo "::error title=A suite leg did not pass::legs report '$legs' and guards report '$guards'. A cancelled job counts as a failure here on purpose: a cancelled run is neither a pass nor a failure, and this check may only be green on a run that finished."
             exit 1
           fi

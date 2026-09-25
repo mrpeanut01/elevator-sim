@@ -62,17 +62,35 @@
 # than on the kind of check being absent below it. The `perf-sweep` job is the one that discharges
 # #163's *"the seed-collision check has run at least once on `main`"*.
 #
-# ## Cadence: weekly, and dispatchable
+# ## Cadence: nightly since § D1084, and dispatchable
 #
-# Weekly rather than nightly. `collectiveAdoption.test.ts` documents its own invocation with
-# `--testTimeout=14400000` — four hours — and `perfSweep`'s deep arm carries a two-hour ceiling. A
-# nightly matrix of that is many runner-hours a week spent re-answering a question about a tree that
-# moves in waves rather than in commits, and the first thing a maintainer does with a nightly job
-# that costs that much is turn it off. Sunday 03:00 UTC, chosen to land after a week's merges rather
-# than in the middle of one.
+# **This section said weekly and argued against nightly, and the argument was a forecast that the
+# runs have since measured.** It read: *"`collectiveAdoption.test.ts` documents its own invocation
+# with `--testTimeout=14400000` — four hours — and `perfSweep`'s deep arm carries a two-hour ceiling.
+# A nightly matrix of that is many runner-hours a week spent re-answering a question about a tree
+# that moves in waves rather than in commits."* On the runner the two scheduled firings of 09-13 and
+# 09-20 took 22 and 31 minutes of wall clock and about 150 job-minutes each, with
+# `collective-adoption` at 3.6 and 2.7 minutes and the slowest job, `survivor-counts`, at 31.1 and
+# 21.7. The ceilings below are still ceilings; they were never the cost.
+#
+# What weekly cost instead was the finding's age. On 09-13 `honesty-deep` went red with ten real
+# violations (GitHub issue #537), up to six days after the change that caused them, and for that
+# whole stretch `CLAUDE.md` published a green verdict for the deep tier. And the working agreement
+# below, that a wave touching `core`, `experiments` or `data/` dispatches `benchmark` before it
+# integrates, went unfollowed: no dispatch between 09-07 and 09-25 while waves AA to AH changed both.
+# A nightly firing turns that agreement into a mechanism. Minutes cost nothing on a public
+# repository, so the trade is about 150 job-minutes a night for a finding that is at most a day old.
+#
+# 21:17 UTC, chosen by measurement: 03:00 UTC was the busiest hour for CI runs in the fortnight
+# measured and the Sunday 03:00 cron started five hours late both times, while 21:00 carried no run
+# at all. The minute is off the hour because GitHub's scheduler is most delayed on the hour.
+# `ci.yml`'s nightly run on `main` fires at 20:43 and is done before this starts, so the two do
+# not compete for the account's twenty concurrent jobs. `perf-scaling` is the one tier documented as
+# flaky under load; if nightly firings make it the usual red, `report` names it as such, and moving
+# that one job back to a weekly condition is the owner-reversible fallback § D1084 records.
 #
 # `workflow_dispatch` is not decoration here: it is how a wave that has just integrated asks for the
-# deep tiers without waiting for Sunday, and it is how the § D343 measurement gets taken on demand.
+# deep tiers without waiting for the night, and it is how the § D343 measurement gets taken on demand.
 # `tiers` selects one job or all of them, so re-running `perf-sweep` after a fix does not also cost
 # four hours of `collective-adoption`.
 #
@@ -186,7 +204,7 @@
 # is not evidence that it is stable — it is one draw from the distribution the note describes.
 #
 # **Two were not run: `collective-adoption` and `corpus-figures`.** The first documents a four-hour
-# invocation, which is a Sunday's work rather than a lane's. The second is § D343's measurement, and
+# invocation, which is a scheduled run's work rather than a lane's. The second is § D343's measurement, and
 # taking it was explicitly not this lane's job — building it somewhere to happen was.
 #
 # The sweep is the interesting row: its own `it` allows two hours and it finished in under five
@@ -195,7 +213,7 @@
 # has already cost the week it was meant to save.
 #
 # The other six are named in this file and were **not** run while writing it. That is stated rather
-# than implied: a tier nobody has measured is a tier whose first result arrives on a Sunday, and a
+# than implied: a tier nobody has measured is a tier whose first result arrives on a schedule, and a
 # ceiling nobody has tested is a guess with a number on it.
 #
 # **Every figure in that table was taken on a tree that had already been built, and the sweep's row
@@ -255,7 +273,7 @@
 # written here rather than left to be rediscovered:
 #
 # ```bash
-# gh run list --workflow=deep-tiers.yml --limit 5   # a gap wider than a week means it stopped
+# gh run list --workflow=deep-tiers.yml --limit 5   # a gap wider than two days means it stopped
 # ```
 #
 # `summary` runs on every firing, passes or fails, and writes the per-tier verdict table into the run
@@ -299,7 +317,7 @@
 # 48.5 s.
 #
 # What a pull request gives up: the pin table is no longer re-derived on the pull request that moves
-# a number. It is re-derived on Sunday and on dispatch, a moved pin is filed by `report`, and
+# a number. It is re-derived nightly and on dispatch, a moved pin is filed by `report`, and
 # attribution is a read back over the wave rather than a red check on one branch. That is the trade
 # `matrix-census` already made for the census the matrix's replication counts derive from, taken one
 # level up. The working agreement that keeps it honest: **a wave that touches `core`, `experiments`
@@ -316,8 +334,8 @@ name: Deep tiers
 
 on:
   schedule:
-    # Sunday 03:00 UTC. Weekly; see the header on why not nightly.
-    - cron: '0 3 * * 0'
+    # Nightly at 21:17 UTC since § D1084; the header's cadence section says why, and why not 03:00.
+    - cron: '17 21 * * *'
   workflow_dispatch:
     inputs:
       tiers:
@@ -346,7 +364,8 @@ on:
           - benchmark-studies
 
 # No `cancel-in-progress`. A four-hour job cancelled by the next firing produces no result at all,
-# and two overlapping weekly runs is not a state this schedule can reach.
+# and two overlapping nightly runs is not a state this schedule reaches: a firing has measured 22 to
+# 31 minutes, and a second one waits in the group rather than cancelling the first.
 concurrency:
   group: deep-tiers-${{ github.ref }}
 
@@ -366,14 +385,14 @@ jobs:
   fuzz-deep:
     name: fuzz — the deep campaign
     # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
-    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # context belongs to `workflow_dispatch`, and a job that runs nightly should not depend on
     # how a null coerces in an expression.
     if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'fuzz-deep'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -397,14 +416,14 @@ jobs:
   golden-runs:
     name: goldens — 6 of 6, and across a fresh process
     # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
-    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # context belongs to `workflow_dispatch`, and a job that runs nightly should not depend on
     # how a null coerces in an expression.
     if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'golden-runs'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -429,14 +448,14 @@ jobs:
   oracle-campaign:
     name: oracle — every measurable bank
     # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
-    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # context belongs to `workflow_dispatch`, and a job that runs nightly should not depend on
     # how a null coerces in an expression.
     if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'oracle-campaign'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -457,14 +476,14 @@ jobs:
   matrix-census:
     name: matrix — the 200-replication census
     # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
-    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # context belongs to `workflow_dispatch`, and a job that runs nightly should not depend on
     # how a null coerces in an expression.
     if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'matrix-census'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -485,14 +504,14 @@ jobs:
   collective-adoption:
     name: collective adoption — § D209 at the pre-registered count
     # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
-    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # context belongs to `workflow_dispatch`, and a job that runs nightly should not depend on
     # how a null coerces in an expression.
     if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'collective-adoption'
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -522,14 +541,14 @@ jobs:
   perf-sweep:
     name: perf — the 20 000-replication sweep
     # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
-    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # context belongs to `workflow_dispatch`, and a job that runs nightly should not depend on
     # how a null coerces in an expression.
     if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'perf-sweep'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -556,14 +575,14 @@ jobs:
   perf-scaling:
     name: perf — the wall-clock fits (noise-prone; see the job header)
     # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
-    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # context belongs to `workflow_dispatch`, and a job that runs nightly should not depend on
     # how a null coerces in an expression.
     if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'perf-scaling'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -626,8 +645,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -666,8 +685,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -694,8 +713,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -708,14 +727,14 @@ jobs:
   honesty-deep:
     name: honesty — the deep corpus
     # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
-    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # context belongs to `workflow_dispatch`, and a job that runs nightly should not depend on
     # how a null coerces in an expression.
     if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'honesty-deep'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -744,14 +763,14 @@ jobs:
   corpus-figures:
     name: corpus figures — § D343, both tiers, one sitting
     # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
-    # context belongs to `workflow_dispatch`, and a job that runs weekly should not depend on
+    # context belongs to `workflow_dispatch`, and a job that runs nightly should not depend on
     # how a null coerces in an expression.
     if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'corpus-figures'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -833,7 +852,7 @@ jobs:
             echo "workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           } > "${{ runner.temp }}/corpus-provenance.txt"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: corpus-figures
           path: |
@@ -862,8 +881,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -883,8 +902,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -904,8 +923,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -929,8 +948,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -1036,8 +1055,8 @@ jobs:
           '
           {
             echo
-            echo "Aliveness: \`gh run list --workflow=deep-tiers.yml --limit 5\`. A gap wider than a"
-            echo "week means the schedule stopped — GitHub disables cron after 60 days of repository"
+            echo "Aliveness: \`gh run list --workflow=deep-tiers.yml --limit 5\`. A gap wider than two"
+            echo "days means the schedule stopped — GitHub disables cron after 60 days of repository"
             echo "inactivity, and it does so silently."
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -1046,7 +1065,7 @@ jobs:
   #
   # Without this the workflow is the page-error probe again: green or red, seen by nobody, because
   # GitHub mails a scheduled failure only to whoever last touched the cron. One issue, reopened and
-  # commented rather than duplicated, so a tier that fails four weeks running is one thread.
+  # commented rather than duplicated, so a tier that fails four nights running is one thread.
   # ---------------------------------------------------------------------------
   report:
     name: report a failure
@@ -1080,7 +1099,7 @@ jobs:
           RESULTS: ${{ toJSON(needs) }}
           # No colon in the title. It is searched back with `in:title`, and a colon in a GitHub
           # search string reads as a qualifier — the lookup would miss and open a second issue
-          # every week, which is the opposite of one thread per finding.
+          # every night, which is the opposite of one thread per finding.
           TITLE: 'Deep tiers went red on a scheduled run'
         run: |
           failed="$(node -e '
@@ -1127,7 +1146,7 @@ jobs:
             process.stdout.write(head + " " + scope + "\n\n" + timing);
           ')"
           body="$(printf '%s\n\n%s\n\n%s\n\n%s\n' \
-            "The weekly deep-tier run failed. These jobs went red on \`${{ github.sha }}\`:" \
+            "The scheduled deep-tier run failed. These jobs went red on \`${{ github.sha }}\`:" \
             "$failed" \
             "Run: $RUN_URL" \
             "$guidance")"
