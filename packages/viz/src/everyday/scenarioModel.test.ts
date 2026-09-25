@@ -146,10 +146,17 @@ describe('the Scenario hub', () => {
   });
 
   it('keeps the half of that row which is still true, rather than emptying the register', () => {
-    // A stage cleared on the Engineer surface still banks nothing, so the clause survives. Deleting
-    // a true refusal to empty a register is § D227 pointed the other way.
-    expect(SCENARIO_ABSENCES.join(' ')).toMatch(/Engineer surface/u);
-    expect(SCENARIO_ABSENCES.join(' ')).toMatch(/banks no chimes/u);
+    /*
+     * § D1129 made the old half false — the stages play in the fix-it editor and a first clear pays
+     * — so it went on the commit that did that, and the half that stays true stays: a clear reaches
+     * no career, and nothing sells a stage a wider budget. Deleting a true refusal to empty a
+     * register is § D227 pointed the other way.
+     */
+    const joined = SCENARIO_ABSENCES.join(' ');
+    expect(joined).not.toMatch(/banks no chimes/u);
+    expect(joined).not.toMatch(/stages on the path are played on the Engineer surface/u);
+    expect(joined).toMatch(/pays its chimes once/u);
+    expect(joined).toMatch(/does not reach a career/u);
   });
 
   it('lists the whole ordered path when one is provided, in the campaign’s own order', () => {

@@ -697,7 +697,7 @@ jobs:
       - name: Re-run the survivor sweep and match the pinned counts
         env:
           ELEVATOR_SIM_SURVIVORS: deep
-        run: npx vitest run --passWithNoTests=false --project viz --testTimeout=10800000 src/scenario/survivorSweep.test.ts
+        run: npx vitest run --passWithNoTests=false --project viz --testTimeout=10800000 src/scenario/survivorSweep.test.ts src/scenario/survivorReplay.test.ts
 
   # ---------------------------------------------------------------------------
   # The house's rush rows — GitHub issue #418, § D547. Every shipped dispatcher on every shipped

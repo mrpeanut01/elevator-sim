@@ -135,9 +135,12 @@ export interface EverydayScreenShellContext extends EverydayScreenContext {
    * idempotent, and neither writes `inert` itself.
    *
    * Its non-test callers are `everyday/reportScreen.ts`'s lever button (GitHub issue #213) and,
-   * since [§ D787](../../../../DECISIONS.md), `everyday/scenarioScreen.ts`'s stage rows. The
-   * lever button's label names an Engineer panel, and until this seam existed its handler navigated
-   * *inside* this shell, so it named a surface it did not open.
+   * since [§ D1129](../../../../DECISIONS.md), `everyday/stagePlayScreen.ts`'s *open this stage on
+   * the Engineer surface* link. The stage rows on `everyday/scenarioScreen.ts` called it from
+   * [§ D787](../../../../DECISIONS.md) until § D1129 moved stage play into the fix-it editor, and the
+   * Lab stayed one press away from the stage's own page. The lever button's label names an Engineer
+   * panel, and until this seam existed its handler navigated *inside* this shell, so it named a
+   * surface it did not open.
    *
    * **This census read *"Its one non-test caller"* for a wave after the second one landed**, which
    * is `CLAUDE.md`'s *name the non-test caller* failing in the direction `deadCode.test.ts` has

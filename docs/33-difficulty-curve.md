@@ -336,6 +336,15 @@ Measured over the ten shipped stages, the two forms disagree on **three** of the
 > shows stages 8 and 10 admitting only their baseline and stage 9 admitting one other, so the
 > vacuity guard is still doing work. It leaves on the commit that makes it false, like every other
 > refusal in this repository.
+>
+> **Dated note, 2026-09-25 ([§ D1129](../DECISIONS.md)).** The stage's `editable` list no longer
+> decides admission anywhere: DC-2b's and DC-2's population is the one admission check at the base
+> rung, the census's price rule. Measured under it, every stage admits six shipped profiles (the
+> four-unit stages 1, 2, 3 and 8) or twelve (the rest), so `DC2B_SHORT` is empty and the gate passes
+> on all ten; the register is kept, empty, for its both-directions check. DC-2's deep tier re-run
+> over the 96 admitted cells found stage 8 meeting on the tuning seeds under `eta` and
+> `fairness-first` and refusing both on the holdout. § 3.1's table below is the record of the
+> editable-list reading and is not re-derived here.
 
 
 > **No stage may clear from the dispatcher dropdown alone.**

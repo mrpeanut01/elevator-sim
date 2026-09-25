@@ -16,14 +16,14 @@
  * `viz` leg's serial cost; the loaded campaign is `campaign.test-helper.ts`'s.
  */
 
+import { candidateFromProfile } from '@elevator-sim/experiments/browser';
 import { describe, expect, it } from 'vitest';
 
 import { useCampaignFixture } from './campaign.test-helper.js';
-import { admitProfile } from './dimensions.js';
 import { judgeStage } from './judge.js';
-import { editableIdsOf } from './parse.js';
+import { admitStageMove, stageUnitsAt } from './stagePress.js';
 import type { CampaignStage } from './types.js';
-import { resolveEditedProfile, type EditedVector } from '../controls/editedProfile.js';
+import type { EditedVector } from '../controls/editedProfile.js';
 
 const fixture = useCampaignFixture();
 const { stageAt, publishedFor, requireProfile, playStage, playToVerdict } = fixture;
@@ -227,32 +227,39 @@ describe('stage 2, played on an edited weight vector — the thing a dropdown co
     }
   }, 300_000);
 
-  it('refuses an edited vector that leaves the dimensions this stage opened', () => {
-    // `idle.parkingStrategy` is a real dimension and stage 2 does not declare it editable. The
-    // refusal is `admitProfile`'s, on the **resolved** dispatcher, so an edit is held to exactly
-    // the rule a shipped profile is.
+  /**
+   * **An edit is held to exactly the rule a shipped profile is** — the one admission check,
+   * [§ D1129](../../../../DECISIONS.md). This case refused `idle.parkingStrategy` because stage 2's
+   * legacy `editable` list did not open it; the check that decides now is the census's price, so
+   * the refusal is a move the base rung cannot pay for, named with its price, and the same edit is
+   * admitted at a rung that can. Asked of the **resolved** dispatcher, as before.
+   */
+  it('refuses an edited vector the stage’s budget cannot pay for, and names the price', () => {
     const { space } = fixture;
     const stage = stageAt(1);
-    const outOfScope = resolveEditedProfile(
+    const callType = candidateFromProfile(space, requireProfile('destination-eta')).get('dispatch.callType');
+    if (callType === undefined) throw new Error('destination-eta declares no call type');
+    const edit = {
+      baseProfileId: 'collective',
+      profileId: 'collective-edited',
+      values: { 'dispatch.callType': callType },
+    };
+    const context = {
       space,
-      requireProfile('collective'),
-      {
-        baseProfileId: 'collective',
-        profileId: 'collective-edited',
-        values: { 'idle.parkingStrategy': 'lobby' },
-      },
+      schedule: fixture.context.schedule,
+      baseline: requireProfile(stage.dispatcher.startingProfileId),
       /* The stage's own building — issue #475: an admission is about a vector *on* a building. */
-      targetOf(stage),
-    );
-    expect(outOfScope.ok, outOfScope.ok ? '' : outOfScope.reason).toBe(true);
-    if (!outOfScope.ok) return;
-    const admission = admitProfile(
-      space,
-      requireProfile(stage.dispatcher.startingProfileId),
-      outOfScope.profile,
-      editableIdsOf(stage.dispatcher.editable, space.ids, fixture.context.schedule),
-    );
-    expect(admission.admissible).toBe(false);
-    expect(admission.sentence).toContain('idle.parkingStrategy');
+      ...targetOf(stage),
+    };
+    const base = stageUnitsAt(stage, null);
+    const refused = admitStageMove(context, { profile: requireProfile('collective'), edit }, base);
+    expect(refused.admitted).toBe(false);
+    expect(refused.moved.map((dimension) => dimension.id)).toContain('dispatch.callType');
+    expect(refused.sentence).toContain(`against the ${String(base)} this budget holds`);
+    expect(refused.units).toBeGreaterThan(base);
+    expect(refused.reason).toContain(`the budget holds ${String(base)}`);
+    /* And the same edit at a budget that pays for it is admitted — the price, not the dial, refused it. */
+    const admitted = admitStageMove(context, { profile: requireProfile('collective'), edit }, refused.units);
+    expect(admitted.admitted, admitted.sentence).toBe(true);
   });
 });

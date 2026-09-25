@@ -280,6 +280,13 @@ export interface SurvivorProvenance {
    */
   readonly withheldDimensionCount: number;
   readonly declaredDimensionCount: number;
+  /**
+   * **The sha-256 of every input document the census read**, taken when it was measured —
+   * [§ D1129](../../../../DECISIONS.md) clause 5. `scenario/survivorInputs.test-helper.ts` says what
+   * is hashed and what is not, and `survivorInputs.test.ts` recomputes it on every run, so a table
+   * whose inputs moved is a red rather than a stale count a player reads.
+   */
+  readonly inputHash: string;
 }
 
 export interface PublishedSurvivors {
@@ -622,6 +629,7 @@ export function validatePublishedSurvivors(
     ['provenance.tree', table.provenance.tree],
     ['provenance.measuredAt', table.provenance.measuredAt],
     ['provenance.scope', table.provenance.scope],
+    ['provenance.inputHash', table.provenance.inputHash ?? ''],
   ] as const) {
     if (value.trim() === '') out.push(`the table's "${field}" is empty, so the run is not pinned.`);
   }

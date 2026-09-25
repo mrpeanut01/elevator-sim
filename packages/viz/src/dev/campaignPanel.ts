@@ -36,7 +36,7 @@
  */
 
 import type { ParameterValue } from '@elevator-sim/experiments/browser';
-import type { DispatcherProfile } from '@elevator-sim/core/browser';
+import type { DispatcherProfile, ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { restrictedFloorIds } from '../access/zoning.js';
@@ -54,7 +54,8 @@ import type {
 } from '../batch/types.js';
 import type { VizRecording } from '../contract/types.js';
 import { briefingFor, type StageBriefing } from '../campaign/brief.js';
-import { admitProfile, movedDimensions } from '../campaign/dimensions.js';
+import { movedDimensions } from '../campaign/dimensions.js';
+import { admitStageMove, stageUnitsAt, type StageAdmission } from '../campaign/stagePress.js';
 import {
   evidenceFrom,
   failStateCounts,
@@ -144,6 +145,14 @@ export interface CampaignPanelHandle {
    * which surface is in front.
    */
   openStage(stageId: string): boolean;
+  /**
+   * **The building the stage on screen runs** — [§ D1129](../../../../DECISIONS.md), the swarm's
+   * Q3 interim. The Engineer header described the Engineer run's building while this tab showed a
+   * stage set in another one, so stage 1, a Garden Apartments stage, opened under *St Jude Hospital
+   * 13 floors · 5 cars*. `dev/main.ts#drawHeader` reads this while the campaign tab is in front.
+   * `undefined` when no stage is selected or this build does not ship its building.
+   */
+  stageBuilding(): ResolvedBuilding | undefined;
 }
 
 /**
@@ -251,10 +260,10 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
    * what it does*. Rebuilt on every visit rather than at mount, off the same visibility signal
    * `dev/batchPanel.ts` uses and for the same reason.
    *
-   * **The stage's admission is unchanged and is what makes this safe.** `admitProfile` runs against
-   * the *resolved* dispatcher in {@link admitted}, so a saved profile that moves a dimension the
-   * stage did not open is refused with the dimension named — by the same function and the same
-   * sentence a shipped profile gets. Offering the option is not promising it clears; the contract
+   * **The stage's admission is what makes this safe.** `campaign/stagePress.ts#admitStageMove`
+   * runs against the *resolved* dispatcher in {@link admitted} (§ D1129), so a saved profile the
+   * stage's budget does not pay for is refused with the price named — by the same function and the
+   * same sentence a shipped profile gets. Offering the option is not promising it clears; the contract
    * asks for exactly that (*"refused by name, exactly as an edit is today"*).
    */
   function fillDispatcherOptions(): void {
@@ -330,9 +339,9 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
    *
    * The choice is **derived, not authored**, on two rules in order:
    *
-   * 1. `admitProfile` must admit it. A stage names the dimensions it opens, and a default that
-   *    moved one it did not would land the player on a refusal with Run disabled — a worse first
-   *    screen than the one this replaces.
+   * 1. The one admission check (`campaign/stagePress.ts#admitStageMove`, § D1129) must admit it at
+   *    the base rung, and it must move something. A default the budget did not pay for would land
+   *    the player on a refusal with Run disabled — a worse first screen than the one this replaces.
    * 2. Of those, the one that moves the **fewest declared dimensions**, ties going to the file's
    *    own order.
    *
@@ -365,6 +374,33 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   }
 
   /**
+   * **The one admission check** — `campaign/stagePress.ts#admitStageMove`, [§ D1129](../../../../DECISIONS.md).
+   *
+   * This panel admitted by the stage's legacy `editable` list through `dimensions.ts#admitProfile`
+   * while the survivor census admitted by price, so the Scenario hub named `zoned-uppeak` as stage
+   * 1's way through and `predictive-balanced` as stage 5's and this panel refused to run either. It
+   * now asks the census's question — does the stage's budget pay for what this dispatcher moves? —
+   * at the base rung, which is the rung the census publishes first. `undefined` only where this
+   * build's data lacks the stage's own starting profile.
+   */
+  function stageAdmissionOf(stage: CampaignStage, candidate: DispatcherProfile): StageAdmission | undefined {
+    const baseline = profileById(stage.dispatcher.startingProfileId);
+    if (baseline === undefined) return undefined;
+    const building = resources.buildings.find((entry) => entry.id === stage.building);
+    return admitStageMove(
+      {
+        space: loaded.space,
+        schedule: resources.priceSchedule,
+        baseline,
+        building,
+        elevatorSpecs: resources.elevatorSpecs,
+      },
+      { profile: candidate },
+      stageUnitsAt(stage, null),
+    );
+  }
+
+  /**
    * The admissible profile nearest the baseline, or `undefined` when there is none.
    *
    * **Two shipped stages have none**, which the walk over all ten found rather than assumed:
@@ -377,12 +413,13 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   function smallestAdmissibleChange(stage: CampaignStage): string | undefined {
     const baseline = profileById(stage.dispatcher.startingProfileId);
     if (baseline === undefined) return undefined;
-    const editable = editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage), resources.priceSchedule);
     let best: { readonly id: string; readonly moved: number } | undefined;
     for (const profile of resources.dispatcherProfiles.profiles) {
       if (profile.id === baseline.id) continue;
-      if (!admitProfile(loaded.space, baseline, profile, editable).admissible) continue;
-      const moved = movedDimensions(loaded.space, baseline, profile).length;
+      const admission = stageAdmissionOf(stage, profile);
+      if (admission === undefined || !admission.admitted) continue;
+      const moved = admission.moved.length;
+      if (moved === 0) continue;
       /* Strictly fewer, so a tie leaves the earlier profile in place — the file's own order. */
       if (best === undefined || moved < best.moved) best = { id: profile.id, moved };
     }
@@ -394,9 +431,8 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     if (smallestAdmissibleChange(stage) !== undefined) {
       return 'Change “your setting” for a stage you can clear.';
     }
-    const opened = editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage), resources.priceSchedule).length;
     return (
-      `No shipped dispatcher stays inside the ${String(opened)} dimensions this stage opens, so ` +
+      `No shipped dispatcher fits the ${String(stageUnitsAt(stage, null))} units this stage's budget holds, so ` +
       'the weight editor is the way to play it: tick “edit the weights”, move one of them, and ' +
       'run that against the baseline.'
     );
@@ -669,8 +705,8 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   /**
    * The *your setting* row, **and the words it used** — issue #22.
    *
-   * A pair rather than two functions, because the second would have to call `admitProfile` again to
-   * find out what the first said: `ProfileAdmission.glossary` is `glossaryFor` over *that*
+   * A pair rather than two functions, because the second would have to call the admission again to
+   * find out what the first said: `StageAdmission.glossary` is `glossaryFor` over *that*
    * admission's own sentence, so recomputing it means recomputing the sentence, and two calls are
    * two answers to *is this profile admissible* that could disagree on the day the space moves.
    */
@@ -700,20 +736,21 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       };
     }
     const candidate = outcome.profile;
-    const admission = admitProfile(
-      loaded.space,
-      baseline,
-      candidate,
-      editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage), resources.priceSchedule),
-    );
+    const admission = stageAdmissionOf(stage, candidate);
+    if (admission === undefined) {
+      return {
+        node: row('your setting', 'this build’s data/ does not carry the stage’s own starting profile.', undefined, 'figure-absent'),
+        glossary: [],
+      };
+    }
     return {
       node: row(
         'your setting',
         admission.sentence,
-        admission.admissible
+        admission.admitted
           ? undefined
-          : 'A stage names the dimensions it opens so that what it judges is what it offered. Pick a profile that stays inside them, or move to a stage that opens these.',
-        admission.admissible ? 'figure-observation' : 'figure-warning',
+          : 'A stage is judged at the budget it opens on, the same budget its published count of ways through was taken at. Pick a setting that budget pays for.',
+        admission.admitted ? 'figure-observation' : 'figure-warning',
       ),
       glossary: admission.glossary,
     };
@@ -793,18 +830,13 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     }
     /*
      * The admission is asked of the **resolved** dispatcher, edited or not. That is the point of
-     * routing an edit through a real `DispatcherProfile`: `admitProfile` diffs two systems that
-     * will run, so a vector that moves a dimension the stage did not open is refused with the
-     * dimension named, by the same function and the same sentence a shipped profile would be.
+     * routing an edit through a real `DispatcherProfile`: `admitStageMove` diffs two systems that
+     * will run, so a vector the stage's budget does not pay for is refused with the price named, by
+     * the same function and the same sentence a shipped profile would be — and the census's.
      */
-    const admission = admitProfile(
-      loaded.space,
-      baseline,
-      outcome.profile,
-      editableIdsOf(stage.dispatcher.editable, dimensionIdsFor(stage), resources.priceSchedule),
-    );
-    if (!admission.admissible) {
-      fail(admission.sentence);
+    const admission = stageAdmissionOf(stage, outcome.profile);
+    if (admission === undefined || !admission.admitted) {
+      fail(admission?.sentence ?? 'this build’s data/ does not carry the stage’s own starting profile.');
       return false;
     }
     return true;
@@ -1439,6 +1471,10 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       drawWeights();
       /* Only while nothing is on screen: a finished run's timing line is not to be overwritten. */
       if (ui.output.childElementCount === 0) drawIntent();
+    },
+    stageBuilding: () => {
+      const stage = currentStage();
+      return stage === undefined ? undefined : resources.buildings.find((entry) => entry.id === stage.building);
     },
     openStage: (stageId) => {
       /*

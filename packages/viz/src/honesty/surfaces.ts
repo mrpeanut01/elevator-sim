@@ -237,7 +237,7 @@ import {
   SHELL_SKIP_LABEL,
 } from '../everyday/types.js';
 import { scenarioHubViewOf } from '../everyday/scenarioModel.js';
-import type { ScenarioLadderRung } from '../scenario/ladder.js';
+import { SCENARIO_LADDER_COPY, type ScenarioLadderRung } from '../scenario/ladder.js';
 import {
   TUTORIAL_ABSENCES,
   TUTORIAL_COPY,
@@ -273,12 +273,22 @@ import {
   type CampaignTower,
 } from '../campaign/career.js';
 import { CAREER_LOAD_NOTICES } from '../campaign/careerPersist.js';
-import { admitProfile } from '../campaign/dimensions.js';
 import { failStateCounts, failStateReports, evidenceFrom, type DemonstrationEvidence } from '../campaign/failStates.js';
 import { judgeStage } from '../campaign/judge.js';
 import { playerFacingStrings } from '../campaign/parse.js';
+import { admitStageMove, stageUnitsAt } from '../campaign/stagePress.js';
 import { playerSafeDescription } from '../campaign/words.js';
 import type { CampaignStage } from '../campaign/types.js';
+import {
+  STAGE_PLAY_COPY,
+  stageFactsOf,
+  stagePlayViewOf,
+  verdictFactsOf,
+  type StagePlayChoice,
+  type StagePlayPhase,
+  type StagePlayVerdictFacts,
+} from '../everyday/stagePlay.js';
+import { CHIME_AWARDS } from '../everyday/deviceChimes.js';
 import type { VizRecording } from '../contract/types.js';
 import { applyControlEdit, controlsFor, defaultValues, resetControl } from '../controls/controls.js';
 import { admitEditedVector, resolveEditedProfile, type EditedVector } from '../controls/editedProfile.js';
@@ -825,6 +835,11 @@ export interface HonestyContext {
    * on a slow boot.
    */
   readonly scenarioPath: readonly ScenarioLadderRung[];
+  /**
+   * The campaign's stages, in path order — § D1129's stage page draws one. Empty where no stage
+   * table was handed in, which the stage-play adapter answers by drawing nothing.
+   */
+  readonly scenarioStages: readonly CampaignStage[];
   /**
    * **The shipped fix-it cases, and the resources their runs are planned against** — GitHub issue
    * #570, [§ D1011](../../../../DECISIONS.md).
@@ -2890,7 +2905,7 @@ const CAMPAIGN: SurfaceAdapter = {
     'campaign/failStates.ts#failStateReports',
     'campaign/failStates.ts#failStateCounts',
     'campaign/failStates.ts#evidenceFrom',
-    'campaign/dimensions.ts#admitProfile',
+    'campaign/stagePress.ts#admitStageMove',
     'campaign/parse.ts#playerFacingStrings',
     'campaign/words.ts#playerSafeDescription',
   ],
@@ -2939,6 +2954,24 @@ const CAMPAIGN: SurfaceAdapter = {
       if (dimension.help !== null) {
         seeds.push({ field: `briefing.editable.${dimension.id}.help`, text: dimension.help, role: 'prose' });
       }
+    }
+
+    /*
+     * **The one admission check's sentence, on the candidate arm the case played** — § D1129. This
+     * adapter listed `dimensions.ts#admitProfile` in its `covers` and never called it; its successor
+     * is called, at the stage's base rung, so the sentence a player reads above *Run this stage* is
+     * swept rather than claimed.
+     */
+    const baselineProfile = context.profiles.find((entry) => entry.id === stage.dispatcher.startingProfileId);
+    const candidateId = context.batch.arms[1]?.dispatcherProfileId;
+    const candidateProfile = context.profiles.find((entry) => entry.id === candidateId);
+    if (baselineProfile !== undefined && candidateProfile !== undefined) {
+      const admission = admitStageMove(
+        { space: context.space, schedule: shippedPriceSchedule(), baseline: baselineProfile },
+        { profile: candidateProfile },
+        stageUnitsAt(stage, null),
+      );
+      seeds.push({ field: 'admission.sentence', text: admission.sentence, role: 'prose' });
     }
 
     const verdict = judgeStage({ stage, published, result: context.batch, report: context.report });
@@ -13485,6 +13518,12 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      */
     'scenario/ladder.ts#scenarioLadderOf',
     'scenario/ladder.ts#SCENARIO_LADDER_COPY',
+    /*
+     * § D1129 clause 3: the refusal a held row carries when the census names only ways through the
+     * stage's own admission check refuses. `honesty/run.ts` hands it to `scenarioLadderOf` for the
+     * path this adapter seeds, so its sentence reaches `row.refusal` exactly as it would on screen.
+     */
+    'campaign/stagePress.ts#routeRefusalsOf',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
     /* GitHub issue #211: the handle on a folded card note, seeded once — the note itself is the producer's whole string. */
@@ -13878,6 +13917,15 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
             declaredCount: path.rows.length,
             countShown: path.offerLine.includes(String(path.rows.length)),
           });
+          /* § D1129 clause 4: a row's mark once this device has been paid its clear — one row, once. */
+          const firstId = path.rows[0]?.id;
+          const cleared =
+            firstId === undefined
+              ? undefined
+              : scenarioHubViewOf(context.scenarioPath, new Set([firstId])).path?.rows[0]?.cleared;
+          if (cleared !== undefined) {
+            seeds.push({ field: `${arm}.scenario.path.cleared`, text: cleared, role: 'prose' });
+          }
           for (const row of path.rows) {
             const at = `${arm}.scenario.path.${row.id}`;
             seeds.push({ field: `${at}.title`, text: row.title, role: 'prose' });
@@ -15740,6 +15788,126 @@ const EVERYDAY_LANDING: SurfaceAdapter = {
  * The consent ask and its settings row — `docs/26` §§ 4 and 15.2
  * -------------------------------------------------------------------------- */
 
+
+/* -------------------------------------------------------------------------- *
+ * A campaign stage in the fix-it editor — § D1129
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The stage page a Scenario-hub row opens** — `everyday/stagePlay.ts`, [§ D1129](../../../../DECISIONS.md),
+ * the swarm's Q3 ruling.
+ *
+ * One shipped stage per case — the one on the case's own building where there is one, else the
+ * first on the path — driven through every state its mount can reach: the building's own setting,
+ * a parking move, a setting its budget refuses, both halves of a run in flight, the four verdicts
+ * (cleared and paid, cleared and paid before, met on the stage's own crowds only, missed and gone
+ * stale), a run that failed, and the stage held back.
+ *
+ * **The judge's own sentences are not seeded here**: a verdict's headline and goal lines are
+ * `campaign/judge.ts#judgeStage`'s, which its own adapter drives on a real stage batch in the deep
+ * tier, and a stage verdict composed here over this case's batch would be a stage judged on a run
+ * it never made. What is seeded is every sentence this page writes around them.
+ */
+const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
+  id: 'everyday/stagePlay.ts#stagePlayViewOf',
+  covers: [
+    'everyday/stagePlay.ts#stagePlayViewOf',
+    'everyday/stagePlay.ts#STAGE_PLAY_COPY',
+    'everyday/stagePlay.ts#stageFactsOf',
+  ],
+  render(this: SurfaceAdapter, context) {
+    const seeds: TextSeed[] = [];
+    const stages = context.scenarioStages;
+    const stage = stages.find((entry) => entry.building === context.case.buildingId) ?? stages[0];
+    if (stage === undefined) return singleRun(this.id, seeds);
+    const building = context.buildings.find((entry) => entry.id === stage.building);
+    const baseline = context.profiles.find((entry) => entry.id === stage.dispatcher.startingProfileId);
+    if (building === undefined || baseline === undefined) return singleRun(this.id, seeds);
+    const admission = {
+      space: context.space,
+      schedule: shippedPriceSchedule(),
+      baseline,
+      building,
+      elevatorSpecs: context.elevatorSpecs,
+    };
+    const factsFor = (choice: StagePlayChoice, held?: string) =>
+      stageFactsOf({
+        stage,
+        position: stages.indexOf(stage) + 1,
+        total: stages.length,
+        building,
+        context: admission,
+        profiles: context.profiles,
+        schedule: shippedPriceSchedule(),
+        held,
+        award: CHIME_AWARDS.awards['scenario-cleared'] ?? 0,
+        choice,
+      });
+    const standing: StagePlayChoice = { profileId: baseline.id, parking: null };
+    const overBudget = factsFor(standing).profiles.find((profile) => !profile.admitted);
+    const verdict = (
+      cleared: boolean,
+      metOnTuningSeeds: boolean,
+      paid: 'first' | 'again' | undefined,
+    ): StagePlayVerdictFacts => ({ headline: '', goals: [], holdoutSentence: null, metOnTuningSeeds, cleared, paid });
+    const states: readonly (readonly [string, StagePlayChoice, StagePlayPhase, string | undefined])[] = [
+      ['standing', standing, { kind: 'idle' }, undefined],
+      ['parked', { profileId: baseline.id, parking: 'zone-center' }, { kind: 'idle' }, undefined],
+      ...(overBudget === undefined
+        ? []
+        : [['over-budget', { profileId: overBudget.id, parking: null }, { kind: 'idle' }, undefined] as const]),
+      ['running-tuning', standing, { kind: 'running', seedSet: 'tuning', completed: 12, total: 100 }, undefined],
+      ['running-holdout', standing, { kind: 'running', seedSet: 'holdout', completed: 50, total: 100 }, undefined],
+      ['cleared-first', standing, { kind: 'judged', verdict: verdict(true, true, 'first'), stale: false }, undefined],
+      ['cleared-again', standing, { kind: 'judged', verdict: verdict(true, true, 'again'), stale: false }, undefined],
+      ['met-not-held', standing, { kind: 'judged', verdict: verdict(false, true, undefined), stale: false }, undefined],
+      ['missed-stale', standing, { kind: 'judged', verdict: verdict(false, false, undefined), stale: true }, undefined],
+      ['failed', standing, { kind: 'failed' }, undefined],
+      ['held', standing, { kind: 'idle' }, `${SCENARIO_LADDER_COPY.heldLead} ${SCENARIO_LADDER_COPY.heldBody}`],
+    ];
+    for (const [state, choice, phase, held] of states) {
+      const view = stagePlayViewOf(factsFor(choice, held), phase);
+      const at = `stagePlay.${state}`;
+      seeds.push({ field: `${at}.eyebrow`, text: view.eyebrow, role: 'label' });
+      seeds.push({ field: `${at}.title`, text: view.title, role: 'prose' });
+      seeds.push({ field: `${at}.building`, text: view.buildingLine, role: 'label' });
+      seeds.push({ field: `${at}.teaches`, text: view.teaches, role: 'prose' });
+      for (const [index, line] of view.letter.entries()) {
+        seeds.push({ field: `${at}.letter[${String(index)}]`, text: line, role: 'prose' });
+      }
+      if (view.held !== undefined) seeds.push({ field: `${at}.held`, text: view.held, role: 'reason' });
+      seeds.push({ field: `${at}.budget`, text: view.budgetLine, role: 'observation' });
+      if (view.refusal !== undefined) seeds.push({ field: `${at}.refusal`, text: view.refusal, role: 'reason' });
+      seeds.push({ field: `${at}.setting.label`, text: view.settingLabel, role: 'label' });
+      for (const option of view.settingOptions) {
+        seeds.push({ field: `${at}.setting.${option.value}`, text: option.label, role: 'label' });
+      }
+      seeds.push({ field: `${at}.parking.label`, text: view.parking.label, role: 'label' });
+      seeds.push({ field: `${at}.parking.priced`, text: view.parking.priced, role: 'label' });
+      for (const option of view.parking.options) {
+        seeds.push({ field: `${at}.parking.${option.value ?? 'standing'}`, text: option.label, role: 'label' });
+      }
+      seeds.push({ field: `${at}.runNote`, text: view.runNote, role: 'prose' });
+      if (view.status !== undefined) seeds.push({ field: `${at}.status`, text: view.status, role: 'prose' });
+      if (view.verdict !== undefined) {
+        seeds.push({ field: `${at}.verdict.head`, text: view.verdict.head, role: 'prose' });
+        if (phase.kind === 'judged' && !phase.verdict.metOnTuningSeeds) {
+          seeds.push({ field: `${at}.verdict.holdout`, text: view.verdict.holdout, role: 'reason' });
+        }
+        if (view.verdict.pay !== undefined) seeds.push({ field: `${at}.verdict.pay`, text: view.verdict.pay, role: 'prose' });
+        if (view.verdict.unlock !== undefined) seeds.push({ field: `${at}.verdict.unlock`, text: view.verdict.unlock, role: 'prose' });
+        if (view.verdict.stale !== undefined) seeds.push({ field: `${at}.verdict.stale`, text: view.verdict.stale, role: 'reason' });
+      }
+      seeds.push({ field: `${at}.lab`, text: view.labLink, role: 'label' });
+      seeds.push({ field: `${at}.labNote`, text: view.labNote, role: 'prose' });
+    }
+    /* `verdictFactsOf` is the screen's only way to a verdict; touched so its claim is checked by compile. */
+    void verdictFactsOf;
+    void STAGE_PLAY_COPY.loading;
+    return singleRun(this.id, seeds);
+  },
+};
+
 /**
  * The words a player meets when they are asked whether the game may count how it is going — GitHub
  * issue #340, `telemetry/consentView.ts`.
@@ -16024,6 +16192,9 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * take off a surface that exists to carry one.
    */
   EVERYDAY_TOWER_CHOICE,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § D1129's stage page. Its
+  // budget and pay lines are its own words, and nothing here re-seeds another surface's.
+  EVERYDAY_STAGE_PLAY,
 ]);
 
 /* -------------------------------------------------------------------------- *

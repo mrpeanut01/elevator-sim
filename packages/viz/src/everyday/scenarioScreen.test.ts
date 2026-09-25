@@ -80,9 +80,10 @@ describe('the boot hands the opener over before the path', () => {
      * a live control. The opener's second half is `context.openTab('campaign')`, which focuses the
      * tab — a focus into an `inert` subtree goes nowhere and leaves no error behind it.
      */
-    const screen = source('everyday/scenarioScreen.ts');
+    /* Since § D1129 the swap and the opener are the stage page's Lab link rather than the hub row's. */
+    const screen = source('everyday/stagePlayScreen.ts');
     const swap = screen.indexOf('context.enterEngineer();');
-    const open = screen.indexOf('scenarioOpen()?.openStage(row.id);');
+    const open = screen.indexOf('scenarioOpen()?.openStage(stage.id);');
     expect(swap).toBeGreaterThan(-1);
     expect(open).toBeGreaterThan(-1);
     expect(swap).toBeLessThan(open);
@@ -114,7 +115,7 @@ describe('shell.ts names the callers of enterEngineer, in both directions', () =
   }
 
   it('has exactly the two callers its docstring names', () => {
-    expect(callers()).toEqual(['reportScreen.ts', 'scenarioScreen.ts']);
+    expect(callers()).toEqual(['reportScreen.ts', 'stagePlayScreen.ts']);
   });
 
   it('names each of them in the seam’s own docstring', () => {
@@ -157,7 +158,7 @@ describe('the row’s face matches what the press does', () => {
      * **The blanket half of that sentence was narrowed on the commit that made it false** — GitHub
      * issue #579, § D911, § D227. It read *"No screen in this build sells a wider budget"*, and the
      * fix-a-building screen now sells one out of the device tally. It is still exactly true of
-     * these ten, which are played on the Engineer surface and have no budget control there, so the
+     * these ten, whose stage page (§ D1129) presses at the base rung and has no budget control, so the
      * row says *these ten*. The old wording is asserted **absent** so it cannot creep back.
      */
     expect(SCENARIO_LADDER_COPY.baseRungNote).not.toMatch(/\bbought\b|\bchimes?\b|\bcan be bought\b/iu);

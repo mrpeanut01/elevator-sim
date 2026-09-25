@@ -26,7 +26,8 @@
  * assert — `failStatesFor`'s one `expect` was there before, pinning that the batch's replication-0
  * seed is the number the demonstration replays — and none of them is a second copy of what the
  * panel does: `playStage` goes through the shipped `batchRequestForStage`, and `playToVerdict`
- * through the shipped `runStageToVerdict`, for the reason both of those modules give at length. A
+ * through the shipped `stagePress.ts#pressStage` — the admission check, then `runStageToVerdict` —
+ * for the reason those modules give at length (§ D1129 added the admission half). A
  * suite that assembled its own request would keep passing while the panel drifted.
  *
  * ## Two rules this file is subject to that a `*.test.ts` file is not
@@ -65,7 +66,7 @@ import { evidenceFrom, failStateCounts, failStateReports, type FailStateReport }
 import { judgeStage, type StageReport } from './judge.js';
 import { parseCampaign, validateCampaign, type CampaignContext } from './parse.js';
 import { batchRequestForStage, demonstrationConfigFor, stageReplicationSeed } from './stageRun.js';
-import { runStageToVerdict } from './stageSequence.js';
+import { pressStage, stageUnitsAt, type StagePress } from './stagePress.js';
 import type { Campaign, CampaignStage } from './types.js';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
@@ -141,6 +142,22 @@ export interface CampaignFixture extends LoadedCampaign {
     candidateProfileId: string,
     edit?: EditedVector,
   ): Promise<PlayedStage>;
+  /**
+   * **The player's press, exactly** — `stagePress.ts#pressStage`, [§ D1129](../../../../DECISIONS.md):
+   * the one admission check at the rung `stepId` names (the base rung by default), and only if it
+   * admits, the sequence {@link playToVerdict} runs.
+   *
+   * **Every case that certifies a clear goes through this or through {@link playToVerdict}, which
+   * calls it and throws on a refusal.** `stageFiveClears.test.ts` played every profile through the
+   * sequence alone and certified a clear the surface refused; a suite that can reach a verdict
+   * without the admission question is certifying something no player can press.
+   */
+  pressToVerdict(
+    stage: CampaignStage,
+    candidateProfileId: string,
+    edit?: EditedVector,
+    stepId?: string | null,
+  ): Promise<StagePress>;
   /**
    * The fail-state path, exactly as the panel runs it: the batch's counts, and one replayed
    * demonstration replication diagnosed. Asserts — as it always has — that the batch's replication-0
@@ -276,18 +293,43 @@ export function useCampaignFixture(): CampaignFixture {
     return { result, report, verdict: judgeStage({ stage, published: publishedFor(stage), result, report }) };
   };
 
-  const playToVerdict = (
+  const pressToVerdict = (
     stage: CampaignStage,
     candidateProfileId: string,
     edit?: EditedVector,
-  ): Promise<PlayedStage> =>
-    runStageToVerdict({
+    stepId?: string | null,
+  ): Promise<StagePress> => {
+    const { config, space, context } = state();
+    return pressStage({
       stage,
       published: publishedFor(stage),
-      candidateProfileId,
-      edit,
+      context: {
+        space,
+        schedule: context.schedule,
+        baseline: requireProfile(stage.dispatcher.startingProfileId),
+        building: requireBuilding(config, stage.building),
+        elevatorSpecs: config.elevatorSpecs,
+      },
+      move: { profile: requireProfile(candidateProfileId), edit },
+      budgetUnits: stageUnitsAt(stage, stepId),
       run: (request) => runBatch(request, resourcesFor(stage)),
     });
+  };
+
+  const playToVerdict = async (
+    stage: CampaignStage,
+    candidateProfileId: string,
+    edit?: EditedVector,
+  ): Promise<PlayedStage> => {
+    const press = await pressToVerdict(stage, candidateProfileId, edit);
+    if (press.kind === 'refused') {
+      throw new Error(
+        `${stage.id}: "${candidateProfileId}" is refused by the stage's admission check, so no ` +
+          `verdict can certify it — ${press.admission.sentence}`,
+      );
+    }
+    return press.outcome;
+  };
 
   const failStatesFor = (
     stage: CampaignStage,
@@ -365,6 +407,7 @@ export function useCampaignFixture(): CampaignFixture {
     resourcesFor,
     requireProfile,
     playStage,
+    pressToVerdict,
     playToVerdict,
     failStatesFor,
     firstStageWithCountGoals(): CampaignStage {

@@ -43,6 +43,8 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { recordRun } from '../record/recordRun.js';
 import type { PublishedScenario } from '../scenario/published.js';
+import { routeRefusalsOf } from '../campaign/stagePress.js';
+import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { scenarioLadderOf } from '../scenario/ladder.js';
 import type { PublishedSurvivors } from '../scenario/survivors.js';
 import type { CampaignFitOut } from '../campaign/fitOut.js';
@@ -478,12 +480,25 @@ export function contextFor(honestyCase: HonestyCase, resources: HonestyResources
      * `stagesById` is absent, which is the state the hub words as the path's own absence — so both
      * arms of that branch are reachable by the sweep rather than only the populated one.
      */
+    scenarioStages:
+      resources.stagesById === undefined ? [] : [...resources.stagesById.values()].map((entry) => entry.stage),
     scenarioPath:
       resources.stagesById === undefined
         ? []
         : scenarioLadderOf({
             stages: [...resources.stagesById.values()].map((entry) => entry.stage),
             survivors: resources.survivors,
+            /* § D1129 clause 3: the one admission check's answer for each named way through. */
+            refusalOf: routeRefusalsOf(
+              [...resources.stagesById.values()].map((entry) => entry.stage),
+              {
+                space: resources.space,
+                schedule: shippedPriceSchedule(),
+                profiles: resources.dispatcherProfiles.profiles,
+                buildings: [...resources.buildingsById.values()],
+                elevatorSpecs: resources.elevatorSpecs,
+              },
+            ),
           }),
     bundleAt: memoisedBundles(recording, access),
   };

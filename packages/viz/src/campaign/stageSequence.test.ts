@@ -42,12 +42,13 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { runBatch } from '../batch/runBatch.js';
 import type { BatchRequest, BatchResources } from '../batch/types.js';
-import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
+import { DATA_DIR, requireBuilding, requireDispatcher } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 
 import { parseCampaign, type CampaignContext } from './parse.js';
-import { runStageToVerdict, type StageSequenceOutcome } from './stageSequence.js';
+import { pressStage, stageUnitsAt } from './stagePress.js';
+import type { StageSequenceOutcome } from './stageSequence.js';
 import type { StageSeedSet } from './stageRun.js';
 import type { Campaign, CampaignStage } from './types.js';
 
@@ -110,22 +111,37 @@ interface Asked {
   readonly request: BatchRequest;
 }
 
-/** Play a stage exactly as the panel plays it, and keep the ledger of what it ran. */
+/**
+ * Play a stage exactly as the panel plays it, and keep the ledger of what it ran.
+ *
+ * **Through the press** — `stagePress.ts#pressStage`, § D1129: the panel asks the one admission
+ * check before this sequence, so a clear found here is a clear the panel would run. A refusal
+ * throws; every shipped profile is admitted at stage 5's base rung, so none is expected.
+ */
 async function play(
   stage: CampaignStage,
   candidateProfileId: string,
 ): Promise<{ readonly outcome: StageSequenceOutcome; readonly asked: readonly Asked[] }> {
   const asked: Asked[] = [];
-  const outcome = await runStageToVerdict({
+  const press = await pressStage({
     stage,
     published: publishedFor(stage),
-    candidateProfileId,
+    context: {
+      space: collectSearchSpace(),
+      schedule: shippedPriceSchedule(),
+      baseline: requireDispatcher(config, stage.dispatcher.startingProfileId),
+      building: requireBuilding(config, stage.building),
+      elevatorSpecs: config.elevatorSpecs,
+    },
+    move: { profile: requireDispatcher(config, candidateProfileId) },
+    budgetUnits: stageUnitsAt(stage, null),
     run: (request, seedSet) => {
       asked.push({ seedSet, request });
       return runBatch(request, resourcesFor(stage));
     },
   });
-  return { outcome, asked };
+  if (press.kind === 'refused') throw new Error(`${candidateProfileId} refused: ${press.admission.sentence}`);
+  return { outcome: press.outcome, asked };
 }
 
 describe('the sequence the Campaign tab runs', () => {

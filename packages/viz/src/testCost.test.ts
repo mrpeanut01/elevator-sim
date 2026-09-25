@@ -342,7 +342,18 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      *
      * 215 700 000 + 21 600 000 + 7 200 000 = **244 500 000**. Nothing existing was raised.
      */
-    ['viz', { count: 116, totalMs: 244_500_000 }],
+    /*
+     * **116 → 117 and 244 500 000 → 248 100 000, one case** — wave AJ lane AJ-K's
+     * `scenario/survivorReplay.test.ts`, § D1129 clause 5: every way through the survivor census
+     * names, pressed once through `campaign/stagePress.ts#pressStage` and required to clear. Gated on
+     * the census's own `ELEVATOR_SIM_SURVIVORS` and registered in `deepTiers.test.ts`, so the default
+     * suite pays only its always-on admission half, which runs nothing. Measured 72.3 s on this lane's
+     * box (stage 1 1 s, stage 3 50 s, stage 5 21 s, beside a load of about five); **3 600 000 ms** is
+     * the tier's scale on a hosted four-core runner, where the census's own stage 3 took 1 360 s in
+     * this lane's regeneration against 389 s quiet. 244 500 000 + 3 600 000 = **248 100 000**.
+     * Nothing existing was raised.
+     */
+    ['viz', { count: 117, totalMs: 248_100_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this

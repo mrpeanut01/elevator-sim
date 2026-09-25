@@ -186,6 +186,16 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'sample size: 932 s over 480 judgements on a quiet ten-core box',
     scheduled: true,
   },
+  'packages/viz/src/scenario/survivorReplay.test.ts': {
+    gates: ['ELEVATOR_SIM_SURVIVORS'],
+    reason:
+      '§ D1129 clause 5, the swarm’s Q3 ruling (S3’s replay): every way through ' +
+      'data/scenario-survivors.json names, pressed once through campaign/stagePress.ts#pressStage — ' +
+      'the admission the Everyday stage page asks, then the stage’s own judge on both seed sets — ' +
+      'and required to clear. Its admission half runs always-on in the same file; the gate is the ' +
+      'census’s own, so the two share the survivors job and a stale name reds beside a moved count',
+    scheduled: true,
+  },
   'packages/viz/src/everyday/sittingClock.measure.test.ts': {
     gates: ['SITTING_OUT'],
     reason:

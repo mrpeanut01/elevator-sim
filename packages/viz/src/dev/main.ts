@@ -66,6 +66,7 @@ import { POST_RUN_COPY } from '../everyday/postRun.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
 import { provideScenarioLadderFrom } from '../everyday/scenarioLadderPort.js';
 import { provideScenarioOpen } from '../everyday/scenarioOpenPort.js';
+import { routeRefusalsOf } from '../campaign/stagePress.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
   ENGINEER_RETURN_LABEL,
@@ -4290,7 +4291,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * this line runs, so handing the path over only after the opener exists is what makes *a
        * drawn stage row always has a live opener* true by construction rather than by timing.
        */
-      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors);
+      /*
+       * With the one admission check's answer for each named way through (§ D1129 clause 3), so a
+       * stage whose census names only routes a press is refused is held with the refusal rather
+       * than offered.
+       */
+      const refusals = routeRefusalsOf(loaded.campaign.stages, {
+        space: loaded.space,
+        schedule: resources.priceSchedule,
+        profiles: resources.dispatcherProfiles.profiles,
+        buildings: resources.buildings,
+        elevatorSpecs: resources.elevatorSpecs,
+      });
+      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors, refusals);
     })
     .catch((error: unknown) => {
       setText(ui.campaign.error, error instanceof Error ? error.message : String(error));
@@ -5648,14 +5661,27 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * the reader was in.
      */
     if (ui.header.viewMode.value !== state.mode) ui.header.viewMode.value = state.mode;
-    setText(ui.header.buildingName, buildingNameOf(resources, state.savedBuildings, state.buildingId));
-    // `view.building`, not the boot-scope binding: the two differ exactly when there is no
-    // recording, which is the case § D234 is about. Reading the binding here is what put the
-    // tutorial's geometry under the next scenario's name.
-    setText(
-      ui.header.buildingSub,
-      view.building === undefined ? '' : statLineOf(view.building),
-    );
+    /*
+     * **A campaign stage is described by its own building** — [§ D1129](../../../../DECISIONS.md),
+     * the swarm's Q3 interim. With the campaign tab in front the page is about the stage on screen,
+     * which the Scenario hub opens by id, and a stage set in Garden Apartments was drawn under
+     * whatever building the Engineer run last held — *St Jude Hospital 13 floors · 5 cars*, seen by
+     * a post-wave-AI assessor. Every other tab describes the run, as before.
+     */
+    const stageBuilding = state.tab === 'campaign' ? campaign?.stageBuilding() : undefined;
+    if (stageBuilding !== undefined) {
+      setText(ui.header.buildingName, stageBuilding.name);
+      setText(ui.header.buildingSub, statLineOf(stageBuilding));
+    } else {
+      setText(ui.header.buildingName, buildingNameOf(resources, state.savedBuildings, state.buildingId));
+      // `view.building`, not the boot-scope binding: the two differ exactly when there is no
+      // recording, which is the case § D234 is about. Reading the binding here is what put the
+      // tutorial's geometry under the next scenario's name.
+      setText(
+        ui.header.buildingSub,
+        view.building === undefined ? '' : statLineOf(view.building),
+      );
+    }
     setText(
       ui.header.clock,
       view.recording === undefined

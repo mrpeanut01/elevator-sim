@@ -73,7 +73,7 @@ import type { ParameterValue } from '@elevator-sim/experiments/browser';
 import { collectSearchSpace } from '@elevator-sim/experiments/browser';
 
 import { runBatch } from '../batch/runBatch.js';
-import { runStageToVerdict } from '../campaign/stageSequence.js';
+import { pressStage } from '../campaign/stagePress.js';
 import type { CampaignStage } from '../campaign/types.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
@@ -212,17 +212,37 @@ export async function judgeDialDraws(input: {
   const { fixture, draws } = input;
   const out: DialVerdict[] = [];
   for (const draw of draws) {
-    const outcome = await runStageToVerdict({
+    /*
+     * Through the player's press (`campaign/stagePress.ts#pressStage`, § D1129), at the draw's own
+     * price: a witness is a clear a player can make, so the admission check is asked before the
+     * batches, and a draw it refuses at the price the sampler charged is a disagreement between the
+     * census and the press — thrown, with the check's sentence, for this function's stated reason.
+     */
+    const press = await pressStage({
       stage: fixture.stage,
       published: fixture.published,
-      candidateProfileId: fixture.baseline.id,
-      edit: {
-        baseProfileId: fixture.baseline.id,
-        profileId: `edit-${String(draw.index)}`,
-        values: draw.values,
+      context: {
+        space: collectSearchSpace(),
+        schedule: shippedPriceSchedule(),
+        baseline: fixture.baseline,
+        building: fixture.building,
+        elevatorSpecs: fixture.elevatorSpecs,
       },
+      move: {
+        profile: fixture.baseline,
+        edit: {
+          baseProfileId: fixture.baseline.id,
+          profileId: `edit-${String(draw.index)}`,
+          values: draw.values,
+        },
+      },
+      budgetUnits: draw.units,
       run: (request) => fixture.run(request),
     });
+    if (press.kind === 'refused') {
+      throw new Error(`edit-${String(draw.index)} is refused by the press: ${press.admission.sentence}`);
+    }
+    const outcome = press.outcome;
     const verdict: DialVerdict = {
       ...draw,
       cleared: outcome.verdict.cleared,

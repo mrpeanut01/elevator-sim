@@ -26,7 +26,7 @@ import { describe, expect, it } from 'vitest';
 import { useCampaignFixture } from './campaign.test-helper.js';
 
 const fixture = useCampaignFixture();
-const { stageAt, playToVerdict } = fixture;
+const { stageAt, pressToVerdict } = fixture;
 
 describe('stage 5, played — the credential is named, and the lesson is that it is not congestion', () => {
   /**
@@ -63,12 +63,32 @@ describe('stage 5, played — the credential is named, and the lesson is that it
    * Still a search with a floor, for the reason above, and still expressed as *at least one*. The
    * floor is what makes DC-3's question — *is this campaign winnable at all?* — a measurement.
    */
+  /*
+   * ## Every profile goes through the player's press, and a refusal is not a verdict
+   *
+   * [§ D1129](../../../../DECISIONS.md), the swarm's Q3 ruling. This sweep called `playToVerdict`
+   * over `runStageToVerdict`, which asks no admission question, while the Lab refused
+   * `predictive-balanced` on this stage by its legacy editable list — so the one clear this file
+   * certified was a clear no player could press. It now calls `pressToVerdict`, which is
+   * `stagePress.ts#pressStage` at the stage's base rung: the one admission check the Lab, the
+   * Everyday stage player and the census all ask, then the same sequence. A profile the check
+   * refuses runs nothing and is counted as refused, never as a miss.
+   */
   it('clears from the dropdown, on the holdout seeds too — whether a stage can be won', async () => {
     const stage = stageAt(4);
     const clears = [];
     const metOnTuning = [];
+    const refused = [];
     for (const profile of fixture.config.dispatcherProfiles.profiles) {
-      const attempt = await playToVerdict(stage, profile.id);
+      const press = await pressToVerdict(stage, profile.id);
+      if (press.kind === 'refused') {
+        refused.push(profile.id);
+        continue;
+      }
+      const attempt = press.outcome;
+      /* The press admitted it at the base rung, so a clear below is a clear a player can make. */
+      expect(press.admission.admitted, press.admission.sentence).toBe(true);
+      expect(press.admission.units).toBeLessThanOrEqual(press.admission.budgetUnits);
       const rows = attempt.report.comparisons[0]?.rows ?? [];
       if (attempt.verdict.metOnTuningSeeds) metOnTuning.push(profile.id);
       if (!attempt.verdict.cleared) continue;
@@ -86,7 +106,14 @@ describe('stage 5, played — the credential is named, and the lesson is that it
       /* R2 survives the good news: the headline still says what the number is about. */
       expect(attempt.verdict.headline).toContain('not a ranking of dispatchers');
     }
-    expect(clears.length, 'no shipped profile clears stage 5 from the dropdown').toBeGreaterThan(0);
+    expect(clears.length, 'no shipped profile the stage admits clears stage 5 from the dropdown').toBeGreaterThan(0);
+    /*
+     * Non-vacuity for the admission half: the sweep met the check on every profile and the check
+     * admitted most of them. A check that refused everything would make the floor above unreachable
+     * rather than meaningful, and one that refused nothing would not be a check.
+     */
+    expect(refused.length + clears.length).toBeGreaterThan(0);
+    expect(refused.length).toBeLessThan(fixture.config.dispatcherProfiles.profiles.length);
     /*
      * The gate is measured rather than asserted to be free: if the holdout ever stopped removing
      * anybody, the split would have become decoration on this stage and the sentence above would

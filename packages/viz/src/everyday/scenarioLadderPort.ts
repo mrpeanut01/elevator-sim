@@ -74,6 +74,7 @@ export function onScenarioLadderProvided(listener: () => void): () => void {
 export function provideScenarioLadderFrom(
   stages: readonly LadderStage[],
   survivors: PublishedSurvivors,
+  refusalOf?: (stageId: string, routeName: string) => string | undefined,
 ): void {
-  provideScenarioLadder(scenarioLadderOf({ stages, survivors }));
+  provideScenarioLadder(scenarioLadderOf({ stages, survivors, refusalOf }));
 }

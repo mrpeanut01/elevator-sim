@@ -34879,6 +34879,8 @@ indistinguishable from a genuine one.
 
 ## D533 — A scenario and a rush wave pay first time only, and the server keeps the record
 
+> **Status 2026-09-25: CARRIED OUT for campaign stages by [§ D1129](#d1129).** The stages the Scenario hub offers are played in Everyday and their ids are paid once through this entry's earn route. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-10 · Owner: product owner (both rulings); the lane that built GitHub issue #499 (the readings under them) · Rules on: [§ D526](#d526) clause 2, `data/chime-ledger.json`'s `earn-scenario-clear` and `earn-rush-wave`, [`docs/38`](docs/38-what-the-game-is.md) § 2.4, GitHub issue #499.**
 
 **Why an entry.** The rulings bind code no one module owns: the server's store schema and earn
@@ -35448,6 +35450,8 @@ chooses one is #437's too.
 ---
 
 ## D556 — `DROPDOWN_CLEARS` and the survivor table are two readings of the same runs: the two differences are registered, and the relationship is held in both directions
+
+> **Status 2026-09-25: AMENDED by [§ D1129](#d1129).** The population difference is gone: DC-2 and the survivor table both admit through the one check at the base rung, and `DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE` is empty. The reading difference stands. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-11 · GitHub issue #234 · The product owner's ruling of 2026-09-10, recorded in § D537 clause 7: which survivor got through stays `DROPDOWN_CLEARS`' question, and that register is to be reconciled against the survivor table.**
 
@@ -37469,6 +37473,8 @@ had been written past D640 — and this entry is what closes that window on D644
 ---
 
 ## D649 — The ten campaign stages reach the Scenario hub as the ordered path they were authored to be; a stage with no measured way through is **listed with its count and not offered**, and the register row saying the two schemas were separate is deleted as a correction
+
+> **Status 2026-09-25: AMENDED by [§ D1129](#d1129).** The stages play in the fix-it editor and a first clear pays, so the register half this entry kept (*played on the Engineer surface, a clear there banks nothing*) is gone; a stage is also held when the one admission check refuses every way through its count names. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-19 · Owner: this session, on the session principal's explicit delegated authority (recorded here rather than attributed to an unnamed "product owner", per [§ D227](#d227)'s stale-attribution class and the standing rule that an agent lane may not manufacture a human) · Rules on: `packages/viz/src/scenario/ladder.ts` (new), `packages/viz/src/everyday/scenarioLadderPort.ts` (new), `packages/viz/src/everyday/scenarioModel.ts`, `packages/viz/src/everyday/scenarioScreen.ts`, `packages/viz/src/dev/data.ts`, `packages/viz/src/dev/main.ts`, `packages/viz/src/honesty/run.ts`, `packages/viz/src/honesty/surfaces.ts`, `packages/viz/vite.config.ts`, `docs/39-decisions-in-force.md`.**
 
@@ -40176,6 +40182,8 @@ it points at [§ D706](#d706), which already rules that retirement and its seque
 explicit that a docstring is the record where a choice does not reach past its module.
 
 ## D787 — A Scenario stage row opens that stage: the identity travels through a provided port rather than through the shell's swap
+
+> **Status 2026-09-25: AMENDED by [§ D1129](#d1129).** A stage row opens its stage in the fix-it editor rather than on the Engineer surface; the Lab is one press further, from the stage page, and the identity still travels through this entry's port. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-19 · Owner: wave AD lane D · Rules on:** [§ D649](#d649)'s ladder,
 [§ D525](#d525) clause 1, [`docs/38`](docs/38-what-the-game-is.md) § 2.1,
@@ -45946,3 +45954,140 @@ ordinary calls on a pinned press day; practice retakes, whose reversal would bri
 
 No bar, goal, rate, occupancy or booked-out car. `data/` is unchanged. The career, the rush, a
 watched run and a replay raise no ordinary call, and the Engineer surface is unchanged.
+
+---
+
+## D1129 — a campaign stage has one admission check, shared by the census, the Lab and play; stages are played from the hub in the fix-it editor, and a clear pays once and unlocks nothing
+
+> **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: a
+> three-member decision swarm (the player, honesty and engineering lenses, S1 to S3, whose records
+> are the integrator's scratch notes `decide-ak/S1` to `-S3` and are not in this repository),
+> reconciled by wave AJ's integrator as the swarm's Q3 ruling and built and measured by wave AJ lane
+> AJ-K. A later reader weighing this against a product-owner ruling should treat it as an agent
+> ruling and say so; [§ D626](#d626) is the cautionary case. **It moves no bar and no price.** It
+> amends [§ D649](#d649), [§ D787](#d787) and [§ D556](#d556), carries out [§ D533](#d533) for the
+> campaign stages, and restates `docs/38`'s *nothing locked, ever* as the rule that settled a split.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it binds the Engineer Lab
+(`dev/campaignPanel.ts`), the survivor census (`scenario/`), the Everyday shell (`everyday/`), the
+server's earn route (`packages/server`) and the honesty corpus, none of which one module owns; and it
+moves three recorded decisions.
+
+### What was wrong
+
+A post-wave-AI assessor (seat C) played the campaign path from the Scenario hub and found four
+things, each confirmed on this tree before anything was changed.
+
+1. **Two admission rules.** The survivor census admitted a move by its price
+   (`scenario/budget.ts#admitPurchase`, § D525 clause 2), and the Lab by the stage's legacy
+   `editable` list (`campaign/dimensions.ts#admitProfile`). So the hub named `zoned-uppeak` as stage
+   1's way through and `predictive-balanced` as stage 5's, and the Lab refused both. Stage 5 had no
+   playable way through in the assessor's fifteen runs.
+2. **A test that went round the check.** `campaign/stageFiveClears.test.ts` certified stage 5
+   winnable by playing every profile through `stageSequence.ts#runStageToVerdict`, which asks no
+   admission question, so it certified the one clear the surface refused.
+3. **The wrong building.** A stage opened on the Lab under the Engineer run's building: stage 1, a
+   Garden Apartments stage, under *St Jude Hospital 13 floors · 5 cars*.
+4. **A clear paid nothing and changed nothing**, which the hub said in as many words.
+
+### The ruling, by clause and by split
+
+All three members rank this question third of three for P1 and P4, behind the call (Q1) and fix-it
+as a search (Q2).
+
+1. **One admission check, shared by the census and play: three of three.** Built as
+   `campaign/stagePress.ts#admitStageMove`: a move is a shipped profile with any dials on it, its
+   cost is the distinct priced changes covering every dimension on which it differs from the stage's
+   starting profile **on the stage's own building** (§ D549), a move that changes nothing is the
+   control at no cost, and a withheld dimension refuses it at any budget (§ D535). `pressStage` is
+   that check and then the shipped sequence. Callers: the Lab's pre-flight and opening profile, the
+   census's dropdown stratum and its per-rung affordability (both strata press through `pressStage`),
+   the Everyday stage page, and every test that certifies a clear (`stageFiveClears`,
+   `stageOneParking`, `judgeCleared`, `stageSequence`, the witness search, the fixture's
+   `playToVerdict`, which throws on a refusal). `admitProfile` is deleted: its one non-test caller
+   was the Lab. **S3's interim landed first**, as its own commit: the Lab on the census's rule and the
+   Engineer header on the stage's building while the campaign tab is in front.
+2. **Stages are played from the hub in the fix-it editor: three of three.** A hub row opens its
+   stage on the `fixit` screen (`everyday/stagePlayScreen.ts`, words in `everyday/stagePlay.ts`),
+   under its own building's name and statistics, with the budget it opens on, a standing order picked
+   by name and where idle cars wait (the fix-it editor's own parking row), and the stage's own
+   verdict. **The judge is the stage's own**, `campaign/judge.ts#judgeStage` over the tuning seeds and
+   then the holdout seeds through `pressStage`, which is S2's *tuning-plus-holdout form*; the fix-it
+   screen's fifty-morning judge answers a different question and does not stand in for it (S2's
+   words). The Lab is one press away, from the stage page's own link, and still opens that stage.
+3. **A stage with no admitted route under the shared check is held, with its reason: S1 and S2;
+   S3 measured stage 5 clearing.** `scenario/ladder.ts#scenarioLadderOf` takes the check's answer for
+   each named way through (`routeRefusalsOf`) and holds a stage whose every named route is refused,
+   with the first refusal as its reason; `dev/main.ts`, the stage page and the honesty corpus all
+   pass it. **Stage 5 is not held**: under the shared check `predictive-balanced` costs 9 of stage
+   5's 15 units, and pressed through the check it clears on both seed sets (below).
+4. **A clear pays flat chimes the first time and unlocks nothing: S1, with S2 and S3 dissenting.** S2 and
+   S3 wanted a clear to open the next stage in path order. **Settled by `docs/38`: *"Nothing locked,
+   ever"*.** The pay is the existing one: the stage page calls `host.bankScenarioClear(stage.id)`,
+   the device ledger records the `scenario-cleared` turn first time only, and the server's earn route
+   pays `data/chime-ledger.json`'s flat `earn-scenario-clear` award once per account, now for the
+   stage ids the hub offers as well as the fix cases (`chimes/ledger.ts#offeredStageIdsIn`: a held
+   stage's id is still refused). No second currency path. The page says which of the two happened
+   (*This clear pays 6 chimes, the first time only* or *A stage pays once, so this clear pays nothing*)
+   and that it unlocks nothing; the hub marks the row cleared. S2's condition that only a
+   holdout-confirmed clear pays is met by construction: `StageReport.cleared` needs the holdout.
+5. **CI replays every published survivor through the shared admission and judge (S3), with the
+   census input hash pinned always-on (S2).** `scenario/survivorReplay.test.ts` admits every named
+   survivor at every rung that names it, always on, and presses each once through `pressStage` in
+   the census's own nightly job; `scenario/survivorInputs.test.ts` recomputes the sha-256 of the
+   census's input documents and compares it with `provenance.inputHash`, always on.
+
+### Measurements
+
+- **The shared check, per stage, at the base rung** (the census's own question): six shipped profiles
+  admitted on the four-unit stages (1, 2, 3, 8) and twelve on the fifteen-unit ones. Under the
+  editable list the same rungs admitted between none (stages 8 and 10) and eleven. `zoned-uppeak`
+  costs 2 units, `predictive-balanced` 9, `destination-eta` and `destination-panel` 15.
+- **`stageFiveClears.test.ts` through the press**: green, at least one admitted profile clears on
+  both seed sets and fewer clear than meet on the tuning seeds, as before. S3 measured
+  `predictive-balanced` clearing stage 5 in 22.2 s CPU.
+- **DC-2's deep tier over the widened population** (`ELEVATOR_SIM_DEEP=1`, 96 admitted cells rather
+  than 45, 473.7 s on one worker beside the census regeneration): stage 1 `zoned-uppeak`, stage 3
+  `fairness-first`, stage 5 six profiles of which the holdout refuses five, and **stage 8 `eta` and
+  `fairness-first`, both refused on the holdout**, where the editable list admitted nothing. The
+  registers are updated to the measurement; stage 8's two are DC-2 breaches at position eight and
+  are recorded, not rebalanced.
+- **The census, regenerated through the press.** `data/scenario-survivors.json` re-taken with every configuration pressed through `pressStage` (2 915 s on one worker at load five to nine, `ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1`; taken on `9bbbaf4`, the interim commit, plus the input-hash helper, which is what `provenance.tree` names; the lane's later changes touch no census code). **Every count and every named survivor reproduces**: one way through at every rung of stages 1, 3 and 5 (`zoned-uppeak`, `fairness-first`, `predictive-balanced`) and none on the other seven. What moved is the denominator on three cells: one drawn dial configuration on each of stage 4's and stage 5's base rungs and stage 6's equipment rung is now **refused by the check** and recorded as unplayable rather than examined (`unbuildable` 0 → 1). Each is a draw that sets a destination call type: the sampler prices it at the destination-panels row alone, and the check also charges dispatch rules for the weight the call type brings live, 17 units against 15 (twice) and 25 against 24. That is the two admission rules disagreeing inside the census itself, found by sharing them; none of the three was a survivor, and the sampler's pricing of a gate-opened dimension is left as found.
+- **The survivor replay, deep.** `scenario/survivorReplay.test.ts` under `ELEVATOR_SIM_SURVIVORS=deep`: all three named routes admitted and **cleared through the press** on both seed sets, stage 1 in 1 s, stage 3 in 50 s and stage 5 in 21 s (72.3 s). The browser journey `everyday/stageClearPays.browser.test.ts` presses stage 1 from the hub on the built bundle, clears it with `zoned-uppeak` in the page's own worker, reads *This clear pays 6 chimes, the first time only*, finds one `scenario-cleared` turn on the device ledger, clears it again for nothing, and finds the path offering exactly what it offered before.
+
+### What it refuses
+
+- A census that counts a way through the press refuses, and a test that certifies a clear around
+  the press.
+- Unlocking the next stage on a clear (S2, S3), on `docs/38`'s rule.
+- A second pay path, a banded or rung-scaled award, and pay on a clear the holdout did not confirm.
+- Playing a stage in the Lab from the hub, and a stage page that names an engine identifier: the
+  admission's sentence names profiles and priced changes by their names, because it reaches the Lab,
+  the hub's held reason and the stage page, and the corpus's `internal-notation` property holds all
+  three.
+
+### The clauses the owner may reverse
+
+- **Unlocking** (S2, S3). The owner's own rule settled it; the owner may rule otherwise.
+- **The chime amount**, which is `data/chime-ledger.json`'s `earn-scenario-clear` (6, an agent's
+  proposal the file already marks as unmeasured), and whether a stage pays the same as a fix case.
+- **The fix-it shell rather than the Lab** as where a hub row plays, and **which controls the stage
+  page draws**: a standing order by name and where idle cars wait. The census's dial stratum reaches
+  every priced dispatcher dial, which the Lab still draws; a stage page with the fix-it editor's whole
+  dial family is the next step.
+- **The base rung only.** The stage page presses at the budget a stage opens on and sells no wider
+  one, so the ladder's *nothing sells a wider budget for these ten* stays true.
+- **Which stage ids the server pays**: the offered ones, read off the survivor table as the hub reads
+  it.
+- **Holding a stage whose named routes the check refuses** rather than re-authoring its editable
+  dimensions; no shipped stage is held on that ground today.
+
+### Not established
+
+- No mechanism is offered for why the widened population meets on stage 8's tuning seeds and not on
+  its holdout ([§ D256](#d256)).
+- The browser journey was run on this lane's tree only; the stage page's run time on a hosted
+  runner is not measured.
+
+**Bookkeeping.** This lane was reserved **D1129 to D1137** and spent **D1129**; D1130 to D1137 are returned
+unspent, and whether each is free or a hole is the integrator's call at close ([§ D430](#d430)).

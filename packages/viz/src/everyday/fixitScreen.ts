@@ -136,6 +136,7 @@
  */
 
 import { loadBrowserResources, loadFixitCases, type BrowserResources } from '../dev/data.js';
+import { mountStagePlay, stageOpenInFixit, stagePlayBar } from './stagePlayScreen.js';
 import {
   affordabilityOf,
   classifyOutcome,
@@ -2123,9 +2124,21 @@ function fixitBar(state: EverydayState): ActionBarModel {
   });
 }
 
-/** The registry row — GAMEPLAY § 10's screen, mounted by `shell.ts` through `screens.ts`. */
+/**
+ * The registry row — GAMEPLAY § 10's screen, mounted by `shell.ts` through `screens.ts`.
+ *
+ * **A campaign stage opened from the Scenario hub is played here too** —
+ * [§ D1129](../../../../DECISIONS.md), the swarm's Q3 ruling: *"stages are played from the hub in
+ * the fix-it editor"*. While `stagePlayScreen.ts#stageOpenInFixit` names one, this screen mounts
+ * that stage's body and bar instead of a case; the hub's *Fix a building* entry and leaving the
+ * screen both close it, so the cases are exactly where they were.
+ */
 export const FIXIT_SCREEN: EverydayScreenModule = {
   key: 'fixit',
-  mount: mountFixit,
-  bar: fixitBar,
+  mount: mountFixitOrStage,
+  bar: (state) => (stageOpenInFixit() === undefined ? fixitBar(state) : stagePlayBar(state)),
 };
+
+function mountFixitOrStage(host: HTMLElement, context: EverydayScreenShellContext): MountedEverydayScreen {
+  return stageOpenInFixit() === undefined ? mountFixit(host, context) : mountStagePlay(host, context);
+}

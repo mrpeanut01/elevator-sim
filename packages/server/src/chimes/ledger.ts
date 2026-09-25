@@ -118,8 +118,9 @@ const RUSH_TEMPLATE_ID = 'endless-rush';
  */
 export interface ChimeTurnBounds {
   /**
-   * Every scenario a shipped path can clear, by id — the fix cases, today. Scenario-mode clears only
-   * (the owner's ruling of 2026-09-10): {@link loadChimeTurnBounds} says why a week contract is not one.
+   * Every scenario a shipped path can clear, by id — the fix cases, and since § D1129 the campaign
+   * stages the Scenario hub offers. Scenario-mode clears only (the owner's ruling of 2026-09-10):
+   * {@link loadChimeTurnBounds} says why a week contract is not one.
    */
   readonly scenarioIds: ReadonlySet<string>;
   /** How many waves the rush's stream generates — the most a run can outlast before it breaks. */
@@ -147,9 +148,10 @@ export function rushWaveCountOf(profiles: TrafficProfiles): number | undefined {
  *
  * **Scenario-mode clears only**, the owner's ruling of 2026-09-10 after the review of PR #505. The
  * scenario ids are the fix cases' (`data/fixit-cases.json`, each keyed `id`), because a fix case is
- * the one kind of Scenario content a shipped path files a clear for today. Campaign stages and the
- * E1–E6 briefs join this set once they are playable in Everyday, and not before: an id for a clear
- * no shipped path can file is an id only a hand-built request would post.
+ * the first kind of Scenario content a shipped path filed a clear for. **Campaign stages joined on
+ * § D1129**, when the Scenario hub began playing them in Everyday — only the offered ones, see
+ * {@link offeredStageIdsIn}. The E1–E6 briefs join once they are playable in Everyday, and not
+ * before: an id for a clear no shipped path can file is an id only a hand-built request would post.
  *
  * **A daily-loop week contract (`data/contract-ladder.json`, `c1`–`c8`) is not here, and that is the
  * ruling rather than an omission.** A contract's days already pay `earn-career-day`, and `docs/38`
@@ -169,13 +171,58 @@ export function rushWaveCountOf(profiles: TrafficProfiles): number | undefined {
  */
 export async function loadChimeTurnBounds(dataDir: string, profiles: TrafficProfiles): Promise<ChimeTurnBounds> {
   const cases = await idsIn(join(dataDir, 'fixit-cases.json'), 'cases', 'id');
+  const stages = await offeredStageIdsIn(dataDir);
+  const shared = stages.filter((id) => cases.includes(id));
+  if (shared.length > 0) {
+    throw new Error(`chime turns: ${shared.join(', ')} names both a fix case and a campaign stage, so one clear could pay for the other.`);
+  }
   const rushWaves = rushWaveCountOf(profiles);
   if (rushWaves === undefined) {
     throw new Error(
       `chime turns: the traffic profiles carry no "${RUSH_TEMPLATE_ID}" template with waves in it, so no rush result can be bounded.`,
     );
   }
-  return Object.freeze({ scenarioIds: new Set(cases), rushWaves });
+  return Object.freeze({ scenarioIds: new Set([...cases, ...stages]), rushWaves });
+}
+
+/**
+ * **The campaign stages a player can clear in Everyday** — [§ D1129](../../../../DECISIONS.md)
+ * clause 4, the swarm's Q3 ruling: *"a clear pays flat chimes the first time and unlocks nothing"*.
+ *
+ * Since that ruling a stage is played from the Scenario hub, and the hub files its clear through
+ * this route under the stage's id, so the stages join the fix cases here exactly as this module's
+ * docstring said they would once they were playable in Everyday.
+ *
+ * **Only the stages the hub offers**, read the way `packages/viz/src/scenario/ladder.ts` reads them:
+ * a stage whose measured survivor table (`data/scenario-survivors.json`) counts a way through at the
+ * budget it opens on, or declares itself a diagnosis. A held stage cannot be pressed from any
+ * shipped path, so its id is one only a hand-built request would post, and this module's rule for
+ * such an id is to refuse it. The viewer's hold is narrower still (it also holds a stage whose every
+ * named route its admission check refuses); on a table regenerated since that check was shared the
+ * two readings agree, and where they could differ this one is the wider, so it never refuses a clear
+ * the viewer offers.
+ */
+async function offeredStageIdsIn(dataDir: string): Promise<readonly string[]> {
+  const stages = await idsIn(join(dataDir, 'campaign.json'), 'stages', 'id');
+  const table = JSON.parse(await readFile(join(dataDir, 'scenario-survivors.json'), 'utf8')) as {
+    readonly scenarios?: readonly {
+      readonly id?: unknown;
+      readonly diagnosis?: unknown;
+      readonly steps?: readonly { readonly stepId?: unknown; readonly survivors?: unknown }[];
+    }[];
+  } | null;
+  const offered = new Set(
+    (table?.scenarios ?? [])
+      .filter((scenario) => {
+        const base = scenario.steps?.find((step) => step.stepId === null);
+        return (
+          (typeof scenario.diagnosis === 'string' && scenario.diagnosis !== '') ||
+          (typeof base?.survivors === 'number' && base.survivors > 0)
+        );
+      })
+      .map((scenario) => scenario.id),
+  );
+  return stages.filter((id) => offered.has(id));
 }
 
 /** The `field` of every entry in one document's list, refusing the shapes {@link loadChimeTurnBounds} names. */

@@ -1,10 +1,12 @@
 /**
- * *Which dimensions the player may move* — § 5.2 — made mechanical rather than decorative.
+ * *What a player's choice moves* — the diff every stage admission is built on.
  *
- * A stage names an editable set. Without this module that set would be a caption: the player picks
- * a dispatcher profile, the batch runs, and nothing checks that the profile they picked differs
- * from the stage's own only in the ways the stage allows. With it, an off-spec profile is refused
- * **with the out-of-scope dimension named**, before a single replication runs.
+ * A stage run pits the player's dispatcher against the stage's own, and the honest question about
+ * that choice is *"what did it move?"*. This module answers it as a list of dimensions of the
+ * declared search space. **It no longer decides admission**: § 5.2's editable list used to, through
+ * an `admitProfile` that refused a profile moving a dimension the stage did not open, and
+ * [§ D1129](../../../../DECISIONS.md) retired it for `campaign/stagePress.ts#admitStageMove`, which
+ * prices the same diff against the stage's budget exactly as the survivor census does.
  *
  * ## Why a profile diff and not a form
  *
@@ -33,7 +35,6 @@ import { candidateFromProfile } from '@elevator-sim/experiments/browser';
 import type { Candidate, ParameterValue, SearchSpace } from '@elevator-sim/experiments/browser';
 import type { DispatcherProfile } from '@elevator-sim/core/browser';
 
-import { glossaryFor, type GlossaryTerm } from '../mode/glossary.js';
 
 /** One dimension on which two profiles run different systems. */
 export interface MovedDimension {
@@ -88,89 +89,12 @@ function sameValue(left: ParameterValue | null, right: ParameterValue | null): b
   return String(left) === String(right);
 }
 
-/** What a stage says about a profile the player picked. */
-export interface ProfileAdmission {
-  readonly admissible: boolean;
-  /** Dimensions the choice moves that the stage allows. Possibly empty. */
-  readonly withinScope: readonly MovedDimension[];
-  /** Dimensions the choice moves that the stage does not. Non-empty exactly when refused. */
-  readonly outOfScope: readonly MovedDimension[];
-  /** The reader's sentence — a fact about the choice, never a judgement of it. */
-  readonly sentence: string;
-  /**
-   * The words that sentence used, explained — issue #22.
-   *
-   * This is where the word *dimension* reaches a player from code this lane owns, and it reaches
-   * them inside a refusal — *"also moves 2 dimensions this stage does not open"* — which is the
-   * worst moment to meet an undefined word, because the reader is being told no and has to work
-   * out what was said no to.
-   */
-  readonly glossary: readonly GlossaryTerm[];
-}
-
-/**
- * Is this profile a legal move on this stage?
- *
- * The refusal names the dimension, because *"that profile is not allowed here"* is not actionable
- * and *"it also changes `idle.parkingStrategy`, which this stage does not open"* is. Nothing about
- * being admissible says a profile is **good**: R11's front is still a front, and this function
- * never orders two admissible choices.
+/*
+ * **`admitProfile` was here, and it is gone** — [§ D1129](../../../../DECISIONS.md), the swarm's Q3
+ * ruling. It admitted a stage move by the stage's legacy `editable` list while the survivor census
+ * admitted by price, so the Scenario hub named ways through stages 1 and 5 that the Engineer Lab
+ * refused. Its one non-test caller, `dev/campaignPanel.ts`, now asks
+ * `campaign/stagePress.ts#admitStageMove`, the census's own rule, and a function kept with no caller
+ * would be the dead seam `CLAUDE.md`'s standing requirement names. {@link movedDimensions} and
+ * {@link valueText} stay: the one check is built on them.
  */
-export function admitProfile(
-  space: SearchSpace,
-  baseline: DispatcherProfile,
-  candidate: DispatcherProfile,
-  editableIds: readonly string[],
-): ProfileAdmission {
-  const editable = new Set(editableIds);
-  const moved = movedDimensions(space, baseline, candidate);
-  const withinScope = moved.filter((dimension) => editable.has(dimension.id));
-  const outOfScope = moved.filter((dimension) => !editable.has(dimension.id));
-
-  if (outOfScope.length > 0) {
-    const named = outOfScope
-      .map((dimension) => `${dimension.id} (${valueText(dimension.from)} → ${valueText(dimension.to)})`)
-      .join(', ');
-    return {
-      admissible: false,
-      withinScope,
-      outOfScope,
-      ...admissionSentence(
-        `"${candidate.id}" also moves ${String(outOfScope.length)} dimension` +
-          `${outOfScope.length === 1 ? '' : 's'} this stage does not open: ${named}. The batch is ` +
-          'not run, because a stage that judges a change it did not offer is judging something else.',
-      ),
-    };
-  }
-  if (withinScope.length === 0) {
-    return {
-      admissible: true,
-      withinScope,
-      outOfScope,
-      ...admissionSentence(
-        `"${candidate.id}" runs the same system as "${baseline.id}" on every declared dimension, ` +
-          'so the two arms are identical by construction and no row can separate them. That is the ' +
-          'control this surface is meant to survive.',
-      ),
-    };
-  }
-  const named = withinScope
-    .map((dimension) => `${dimension.id} ${valueText(dimension.from)} → ${valueText(dimension.to)}`)
-    .join('; ');
-  return {
-    admissible: true,
-    withinScope,
-    outOfScope,
-    ...admissionSentence(
-      `"${candidate.id}" moves ${String(withinScope.length)} of this stage's dimensions: ${named}.`,
-    ),
-  };
-}
-
-/**
- * The sentence and the terms it used, in one place — so the three arms above cannot come to
- * disagree about which of them explains its words.
- */
-function admissionSentence(sentence: string): Pick<ProfileAdmission, 'sentence' | 'glossary'> {
-  return { sentence, glossary: glossaryFor([sentence]) };
-}

@@ -252,8 +252,8 @@ describe.skipIf(!HAS_BROWSER)('the Lab does not open on an unwinnable run', () =
      * list here would go stale silently.
      *
      * *Run enabled* is the other half, and the one a wrong default would break quietly: a profile
-     * the stage did not open is refused at the control, so an opening setting chosen without
-     * asking `admitProfile` would land a player on a disabled button and a refusal they did not
+     * the stage's budget does not pay for is refused at the control, so an opening setting chosen without
+     * asking the admission check (`stagePress.ts#admitStageMove`, § D1129) would land a player on a disabled button and a refusal they did not
      * cause.
      */
     await openTab('tab-campaign');

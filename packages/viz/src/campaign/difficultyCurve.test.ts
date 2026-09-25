@@ -59,8 +59,8 @@ import { collectSearchSpace } from '@elevator-sim/experiments/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { useCampaignFixture } from './campaign.test-helper.js';
-import { admitProfile } from './dimensions.js';
-import { editableIdsOf, parseCampaign, type CampaignContext } from './parse.js';
+import { parseCampaign, type CampaignContext } from './parse.js';
+import { admitStageMove, stageUnitsAt } from './stagePress.js';
 import type { Campaign, CampaignStage } from './types.js';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
@@ -70,7 +70,7 @@ import type { PublishedGoalRates, PublishedScenario } from '../scenario/publishe
 import { SCENARIO_SURVIVORS_PATH } from '../scenario/regenerateSurvivors.test-helper.js';
 import { dropdownConfigurationsOf } from '../scenario/survivorSpace.js';
 import type { PublishedSurvivors } from '../scenario/survivors.js';
-import { DATA_DIR } from '../fixtures.test-helper.js';
+import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 
 /**
  * Stages with no non-comparative goal a player could miss, each with the reason it has none.
@@ -322,7 +322,9 @@ describe('the derivation reads the rates it claims to read', () => {
 
 /**
  * § 6's campaign arm, the two dropdown rules. Both iterate `parseCampaign(data/campaign.json).stages`
- * × `data/dispatcher-profiles.json` through the shipped `admitProfile`, and neither list is written
+ * × `data/dispatcher-profiles.json` through the shipped admission check (`stagePress.ts#admitStageMove`
+ * at the base rung since [§ D1129](../../../../DECISIONS.md); `admitProfile` and the stage's own
+ * `editable` list before it), and neither list is written
  * down (§ 6.2). DC-2b is pure and always on; DC-2 plays every admitted cell through the shipped
  * `runStageToVerdict` and sits behind `ELEVATOR_SIM_DEEP=1` — § 6.4 measured the arm at 198 s on one
  * worker, which is far too slow for the suite somebody runs on every save and inside a CI job.
@@ -348,12 +350,17 @@ describe('the derivation reads the rates it claims to read', () => {
  */
 const fixture = useCampaignFixture();
 
-/** § 3.1's DC-2b column, measured 2026-09-06: two admit only their own baseline, one admits one other. */
-const DC2B_SHORT: ReadonlySet<string> = new Set([
-  'stage-8-the-headline-address',
-  'stage-9-both-ways-at-once',
-  'stage-10-the-bed-and-the-visitor',
-]);
+/**
+ * § 3.1's DC-2b column. Measured 2026-09-06 it held three stages — two admitting only their own
+ * baseline, one admitting one other — all three **under the stage's legacy `editable` list**.
+ *
+ * **Empty since [§ D1129](../../../../DECISIONS.md)**, and by the admission rule rather than by a
+ * rebalance: under the one admission check a stage admits whatever its base rung pays for, and
+ * measured on 2026-09-25 that is six shipped profiles on the four-unit stages (1, 2, 3 and 8) and
+ * twelve on the fifteen-unit ones. The register is kept, empty, for its both-directions check: a
+ * price or budget change that took a stage below two would fail here and have to be named.
+ */
+const DC2B_SHORT: ReadonlySet<string> = new Set<string>([]);
 
 /**
  * DC-2's measured breaches — the shipped profiles that meet every bar on the tuning seeds, per stage,
@@ -401,17 +408,34 @@ const DC2B_SHORT: ReadonlySet<string> = new Set([
  *    counts `cleared`, which needs the holdout batch as well. `eta` on stage 5 is here and not
  *    there — {@link DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT}. `destination-panel` on stage 7 was the
  *    second such row until § D611 emptied stage 7 outright.
- * 2. **The population.** This register plays only what the stage's own `editable` list admits
- *    (`admitProfile`); the table plays every shipped profile that runs a different system and that
- *    the rung affords (`survivorSpace.ts#dropdownConfigurationsOf`, which does not apply the list, on
- *    § D525 clause 2's ruling). `predictive-balanced` on stage 5 and `zoned-uppeak` on stage 1 are
- *    there and not here — {@link DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE}.
+ * 2. **The population — a difference no longer.** This register played only what the stage's own
+ *    `editable` list admitted (`admitProfile`) while the table played every shipped profile the rung
+ *    affords, so `predictive-balanced` on stage 5 and `zoned-uppeak` on stage 1 were there and not
+ *    here. Since [§ D1129](../../../../DECISIONS.md) both populations are the one admission check at
+ *    the base rung (`stagePress.ts#admitStageMove`), and {@link DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE}
+ *    is empty.
  *
- * Stage 3 is the one stage both name, and the only row that needs neither register.
+ * **The stage-1 row and `predictive-balanced` on stage 5 entered on 2026-09-25 from the table**, not
+ * from this file's deep tier: each is a base-rung survivor in `data/scenario-survivors.json`, a clear
+ * needs every bar met on the tuning seeds, and the two populations are one now, so each belongs here
+ * by the relationship {@link dropdownReconciliationIssues} holds.
+ *
+ * **Then the deep tier was re-run over the widened population, and it found six more rows.** Measured
+ * 2026-09-25 on `9bbbaf4` (`ELEVATOR_SIM_DEEP=1`, 96 admitted cells rather than 45, 473.7 s on one
+ * worker beside a census regeneration): on stage 5, `energy-aware`, `fairness-first`,
+ * `capacity-aware` and `auction` meet every bar on the tuning seeds, which `stageFiveClears.test.ts`
+ * already recorded of the whole library, and are now admitted; and **stage 8 gains two**, `eta` and
+ * `fairness-first`, where its legacy list admitted nothing at all. Every one of the six is refused
+ * on the holdout ({@link DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT}), so none is a way through and the
+ * survivor table counts none of them; they are DC-2 breaches all the same, and stage 8's two are at
+ * position eight, which § D528 clause 2 reaches. Recorded here as measured rather than rebalanced:
+ * the rebalance is `docs/33` C2's, by demand or fabric and never by a bar.
  */
 const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  'stage-1-first-call': ['zoned-uppeak'],
   'stage-3-overwhelmed': ['fairness-first'],
-  'stage-5-credentials': ['eta'],
+  'stage-5-credentials': ['auction', 'capacity-aware', 'energy-aware', 'eta', 'fairness-first', 'predictive-balanced'],
+  'stage-8-the-headline-address': ['eta', 'fairness-first'],
 });
 
 /**
@@ -436,16 +460,16 @@ const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.free
  * holdout too — and then the table has to count it, which the always-on case turns red until it does.
  */
 const DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  'stage-5-credentials': ['eta'],
+  'stage-5-credentials': ['auction', 'capacity-aware', 'energy-aware', 'eta', 'fairness-first'],
+  'stage-8-the-headline-address': ['eta', 'fairness-first'],
 });
 
 /**
  * Profiles the survivor table counts as a way through a stage from the dropdown, at the **base** rung,
- * that the stage's own `editable` list refuses — so DC-2 never plays them and {@link DROPDOWN_CLEARS}
- * cannot name them, however they score. `admitProfile` still applies the list and
- * `dev/campaignPanel.ts` still admits through it; `survivorSpace.ts#dropdownConfigurationsOf` does
- * not, and GitHub issue #233 re-authors the lists. Read off the table measured on `4159520`, and
- * reproduced for stage 5 on `f691a97a` 2026-09-11:
+ * that the stage's own `editable` list refused — so DC-2 never played them and {@link DROPDOWN_CLEARS}
+ * could not name them, however they scored. `admitProfile` applied the list and `dev/campaignPanel.ts`
+ * admitted through it; `survivorSpace.ts#dropdownConfigurationsOf` did not. Read off the table
+ * measured on `4159520`, and reproduced for stage 5 on `f691a97a` 2026-09-11, it held:
  *
  * - `predictive-balanced` on stage 5 — **position five, so a § D528 clause 2 breach that
  *   {@link DROPDOWN_CLEARS} cannot hold**: it meets every bar on both seed sets, and stage 5's
@@ -456,11 +480,14 @@ const DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT: Readonly<Record<string, readonly strin
  *
  * A row leaves when the table stops counting it, or when the stage's list starts admitting it — and
  * then DC-2 plays it and it belongs in {@link DROPDOWN_CLEARS}.
+ *
+ * **Both rows left on 2026-09-25, together, by the second route** — [§ D1129](../../../../DECISIONS.md).
+ * DC-2's population is the one admission check now, which is the census's own, so no profile can be
+ * in the table and outside the population, and both moved into {@link DROPDOWN_CLEARS}. The register
+ * is kept empty for its both-directions check: a future admission rule that split the two again
+ * would have to name what it splits here.
  */
-const DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  'stage-1-first-call': ['zoned-uppeak'],
-  'stage-5-credentials': ['predictive-balanced'],
-});
+const DROPDOWN_SURVIVORS_OUTSIDE_EDITABLE: Readonly<Record<string, readonly string[]>> = Object.freeze({});
 
 /** A register with each stage's profiles sorted, so two registers compare as sets. */
 function sortedRegister(
@@ -469,13 +496,31 @@ function sortedRegister(
   return Object.fromEntries(Object.entries(register).map(([id, ids]) => [id, [...ids].sort()]));
 }
 
-/** The shipped profiles a stage admits from its dropdown, its own baseline excluded. */
+/**
+ * The shipped profiles a stage admits from its dropdown at its **base rung**, its own baseline and
+ * anything that runs the baseline's system excluded.
+ *
+ * **Through the one admission check** — `campaign/stagePress.ts#admitStageMove`,
+ * [§ D1129](../../../../DECISIONS.md). This read the stage's legacy `editable` list through
+ * `dimensions.ts#admitProfile` until the swarm's Q3 ruling made the census's price rule the rule a
+ * player's press is asked; a DC-2 population the press does not share would be a register about a
+ * dropdown nobody plays.
+ */
 function admittedProfilesOf(stage: CampaignStage): readonly string[] {
   const baseline = fixture.requireProfile(stage.dispatcher.startingProfileId);
-  const editable = editableIdsOf(stage.dispatcher.editable, fixture.space.ids, fixture.context.schedule);
+  const context = {
+    space: fixture.space,
+    schedule: fixture.context.schedule,
+    baseline,
+    building: requireBuilding(fixture.config, stage.building),
+    elevatorSpecs: fixture.config.elevatorSpecs,
+  };
   return fixture.config.dispatcherProfiles.profiles
     .filter((candidate) => candidate.id !== baseline.id)
-    .filter((candidate) => admitProfile(fixture.space, baseline, candidate, editable).admissible)
+    .filter((candidate) => {
+      const admission = admitStageMove(context, { profile: candidate }, stageUnitsAt(stage, null));
+      return admission.admitted && admission.moved.length > 0;
+    })
     .map((candidate) => candidate.id);
 }
 
@@ -513,7 +558,7 @@ interface DropdownRegisters {
 /** One stage's two populations: what DC-2 plays, and what the survivor table's base rung plays. */
 interface DropdownPopulations {
   readonly stageId: string;
-  /** {@link admittedProfilesOf}: `admitProfile` over the stage's `editable` list, baseline excluded. */
+  /** {@link admittedProfilesOf}: the one admission check at the base rung, baseline excluded. */
   readonly admitted: ReadonlySet<string>;
   /** `dropdownConfigurationsOf`, affordable at the stage's starting units — the base rung's census. */
   readonly census: ReadonlySet<string>;
@@ -526,7 +571,8 @@ function dropdownPopulationsOf(): readonly DropdownPopulations[] {
     const baseline = fixture.requireProfile(stage.dispatcher.startingProfileId);
     const base = rungsOf(stage.budget).find((rung) => rung.stepId === null);
     if (base === undefined) throw new Error(`${stage.id} declares no base rung`);
-    const census = dropdownConfigurationsOf(fixture.space, fixture.context.schedule, baseline, profiles)
+    const building = requireBuilding(fixture.config, stage.building);
+    const census = dropdownConfigurationsOf(fixture.space, fixture.context.schedule, baseline, profiles, building)
       .filter((entry) => entry.units <= base.units)
       .map((entry) => entry.profileId);
     return { stageId: stage.id, admitted: new Set(admittedProfilesOf(stage)), census: new Set(census) };

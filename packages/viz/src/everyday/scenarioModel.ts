@@ -93,6 +93,12 @@ export interface ScenarioPathRow {
   readonly note: string | undefined;
   /** Present exactly when it is not — why it is listed and not offered. */
   readonly refusal: string | undefined;
+  /**
+   * **Cleared on this device, and what that means** — [§ D1129](../../../../DECISIONS.md) clause 4.
+   * Present exactly when the device ledger holds this stage's `scenario-cleared` turn. It marks the
+   * row and says the award has been paid; it opens nothing, because nothing on the path is locked.
+   */
+  readonly cleared: string | undefined;
 }
 
 /** The ordered path, drawn over the entries, or its absence. */
@@ -137,6 +143,8 @@ export const SCENARIO_COPY = Object.freeze({
   /** Drawn where nothing has provided the path — never an empty list, never a spinner. */
   pathAbsent:
     'The ten stages on the path are read from the campaign’s own file, and this page has not been handed it. Reload if it does not appear.',
+  /** § D1129 clause 4: a cleared stage's row. It pays once and unlocks nothing, and says both. */
+  cleared: 'Cleared on this device. Its chimes are paid, and clearing it again pays nothing.',
 });
 
 /**
@@ -214,6 +222,11 @@ const ENTRIES: readonly ScenarioEntry[] = Object.freeze([
  * figure from `data/scenario-survivors.json` into TypeScript, where a regeneration cannot reach
  * it, which is the defect `CLAUDE.md` records three published numbers committing.
  *
+ * **The first row was rewritten again by § D1129**, on the commit that made it false: it read
+ * *"The ten stages on the path are played on the Engineer surface. A stage cleared there banks no
+ * chimes …"*, and the path now plays in the fix-it editor and a clear pays once. What stays missing
+ * is said instead: a clear reaches no career, and nothing sells a stage a wider budget.
+ *
  * That is why this constant holds only the two **unconditional** rows: it is what
  * `everyday/buildNotes.ts` carries to the Settings panel and what
  * `everyday/refusalsAreCurrent.test.ts` sweeps for a screen wrongly called unbuilt, and neither
@@ -223,7 +236,7 @@ const ENTRIES: readonly ScenarioEntry[] = Object.freeze([
  * decoration.
  */
 export const SCENARIO_ABSENCES: readonly string[] = Object.freeze([
-  'The ten stages on the path are played on the Engineer surface. A stage cleared there banks no chimes and does not reach a career; that will count once a stage can be played from this list.',
+  'A stage cleared from the path pays its chimes once and does not reach a career, whose towers are a path of their own. Nothing here sells a stage a wider budget yet.',
   'Two of the six engineering challenges ship, and they are played on the Engineer surface rather than from this list. The other four ask for something a scenario run cannot do yet, and each says which.',
 ]);
 
@@ -249,7 +262,7 @@ function heldRegisterLine(rows: readonly ScenarioPathRow[]): string | undefined 
 }
 
 /** One path row, worded. The figures are the ladder's; this chooses only which of them are drawn. */
-function pathRowOf(rung: ScenarioLadderRung): ScenarioPathRow {
+function pathRowOf(rung: ScenarioLadderRung, clearedIds: ReadonlySet<string>): ScenarioPathRow {
   const playable = rung.offer === 'offered';
   return Object.freeze({
     id: rung.id,
@@ -263,12 +276,13 @@ function pathRowOf(rung: ScenarioLadderRung): ScenarioPathRow {
     playable,
     note: playable ? rung.openNote : undefined,
     refusal: playable ? undefined : rung.heldReason,
+    cleared: clearedIds.has(rung.id) ? SCENARIO_COPY.cleared : undefined,
   });
 }
 
 /** The path, worded — or `undefined` where none was provided. */
-function pathViewOf(rungs: readonly ScenarioLadderRung[]): ScenarioPathView {
-  const rows = rungs.map((rung) => pathRowOf(rung));
+function pathViewOf(rungs: readonly ScenarioLadderRung[], clearedIds: ReadonlySet<string>): ScenarioPathView {
+  const rows = rungs.map((rung) => pathRowOf(rung, clearedIds));
   const counts = ladderOfferCounts(rungs);
   return Object.freeze({
     heading: SCENARIO_LADDER_COPY.heading,
@@ -293,8 +307,12 @@ function pathViewOf(rungs: readonly ScenarioLadderRung[]): ScenarioPathView {
  * `scenarioLadderPort.ts` for the window that opens in, and {@link SCENARIO_COPY.pathAbsent} for
  * what is drawn instead.
  */
-export function scenarioHubViewOf(path?: readonly ScenarioLadderRung[]): ScenarioHubView {
-  const view = path === undefined ? undefined : pathViewOf(path);
+export function scenarioHubViewOf(
+  path?: readonly ScenarioLadderRung[],
+  /** Stage ids this device holds a `scenario-cleared` turn for — `everyday/deviceChimes.ts`'s record. */
+  clearedIds: ReadonlySet<string> = new Set(),
+): ScenarioHubView {
+  const view = path === undefined ? undefined : pathViewOf(path, clearedIds);
   const held = view === undefined ? undefined : heldRegisterLine(view.rows);
   return Object.freeze({
     eyebrow: SCENARIO_COPY.eyebrow,

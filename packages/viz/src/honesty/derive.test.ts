@@ -43,6 +43,26 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The stage press — wave AJ lane AJ-K, § D1129. `campaign/stagePress.ts#pressStage` is the one ' +
+        'admission check followed by the shipped sequence, and it is derived only through ' +
+        '`admitStageMove`, whose prose it returns inside `StagePress.admission` untouched. Every ' +
+        'sentence it can carry is that function’s, which `campaign/judge.ts#judgeStage`’s adapter ' +
+        'drives by name; its own throws are a mismatched edit and a building-less edit, programming ' +
+        'faults no surface draws.',
+      ids: ['campaign/stagePress.ts#pressStage'],
+    },
+    {
+      reason:
+        'The stage page’s move — wave AJ lane AJ-K, § D1129. `everyday/stagePlay.ts#stageMoveOf` ' +
+        'returns a `StageMove`, whose only composed string is the edit’s `profileId` ' +
+        '(`<profile>-parked-<strategy>`), a key the batch worker names the candidate arm’s resolved ' +
+        'dispatcher by. The stage page draws no profile id: its setting labels are each profile’s ' +
+        '`name` (asserted in `stagePlay.test.ts`), and the verdict lines it draws are the judge’s ' +
+        'headline and goal sentences, which name no arm.',
+      ids: ['everyday/stagePlay.ts#stageMoveOf'],
+    },
+    {
+      reason:
         'The whole-day splice — wave AJ lane AJ-B, § D1057. `shift/episode.ts#spliceEpisode` returns a ' +
         'derived phase-list record and, where a day cannot hold an episode, a refusal with its reason. ' +
         'The record’s `$comment` is a data comment nothing renders. The refusal reaches no screen: ' +
@@ -428,6 +448,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * drives, plus `FIXIT_SCREEN_COPY`, which it iterates.
          */
         'everyday/fixitFamilies.ts#mountFixitFamilies',
+        /*
+         * § D1129's stage page inside the fix-it screen. `mountStagePlay` builds selects and a
+         * verdict card and needs a document and a worker; every sentence it draws is
+         * `everyday/stagePlay.ts#stagePlayViewOf`'s, which the `EVERYDAY_STAGE_PLAY` adapter drives
+         * over every state the mount reaches, plus the judge's own sentences, which
+         * `campaign/judge.ts#judgeStage`'s adapter drives. What it authors itself is the load
+         * failure's detail. `stagePlayBar` is the fix-it row refined with `STAGE_PLAY_COPY`'s labels
+         * and reasons, every one of which that adapter seeds by name through the view; it is derived
+         * only because it reads the page's facts to pick among them.
+         */
+        'everyday/stagePlayScreen.ts#mountStagePlay',
+        'everyday/stagePlayScreen.ts#stagePlayBar',
         /*
          * The brief's elevation painter, shared with the campaign's tower screen since GitHub
          * issue #353. It paints wells and slabs onto a canvas and authors three floor marks and a
