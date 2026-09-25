@@ -51,6 +51,7 @@
  */
 
 import type { VizLeg, VizRecording } from '../contract/types.js';
+import type { RunHorizon } from './types.js';
 import { WAIT_BANDS } from '../live/bands.js';
 import { isWaitingAt } from '../frame/overlay.js';
 
@@ -271,6 +272,57 @@ import { isWaitingAt } from '../frame/overlay.js';
  * so is every rung — this is the measurement of somebody else's rebalance catching up with it, not
  * a second rebalance. `c1` at 0 of 50 is unmoved and Garden Apartments is still not eligible.
  *
+ * ## Re-measured 2026-09-24 on the day Today's scenario plays — and the table now says which day
+ *
+ * **Every row above was measured on the contract's slice** — `contractDayState`, at its own shift
+ * length — while Today's scenario has run the **whole authored day** on thirteen of sixteen contracts
+ * since § D356. The first session plays Today's scenario, so the set this table derives was being
+ * chosen on a day the first session never plays. That is the **third** figure in one cycle measured
+ * at one horizon and used at another, after § D962's energy bar and wave AH's press pins, so the fix
+ * is structural: every row carries its `horizon`, and `legibility.test.ts` refuses a row whose
+ * horizon is not the one `contractDay.test-helper.ts#todaysScenarioDayState` plays for that contract
+ * ([§ D991](../../../../DECISIONS.md), GitHub issue #592).
+ *
+ * Measured by `everyday/stagePace.sweep.test.ts` — the same band, window and union, `collective`,
+ * day 1, ordinary, seeds `20 260 824 + 7 919 n`, `n = 0…49` — on each contract's Today's-scenario
+ * day; `legibility.sweep.test.ts` builds the same states through the same helper and refuses this
+ * constant at budget:
+ *
+ * | contract | building | horizon | slice, of 50 | median (s) | **as played, of 50** | **median (s)** |
+ * |---|---|---|---|---|---|---|
+ * | c1 | garden-apartments | period | 0 | 0 | 0 | 0 |
+ * | c2 | midtown-office | whole-day | 35 | 165 | **50** | **602** |
+ * | c3 | secure-tower | whole-day | 30 | 134 | **50** | **385** |
+ * | c4 | mixed-use-high-rise | whole-day | 32 | 136 | **49** | **267** |
+ * | c5 | vertical-city | whole-day | 45 | 191 | **50** | **2069** |
+ * | c6 | chancery-house | whole-day | 25 | 119 | **50** | **264** |
+ * | c7 | crown-hotel | period | 30 | 147 | 30 | 147 |
+ * | c8 | st-jude-hospital | period | 43 | 197 | 43 | 197 |
+ * | c9 | harbour-point | whole-day | 20 | 96 | **46** | **228** |
+ * | c10 | ashgate | whole-day | 27 | 125 | **50** | **354** |
+ * | c11 | ctf-class-reference | whole-day | 50 | 1221 | **50** | **1503** |
+ * | c12 | shanghai-class-reference | whole-day | 50 | 729 | **50** | **1674** |
+ * | c13 | merdeka-class-reference | whole-day | 50 | 459 | **50** | **1144** |
+ * | c14 | one-wtc-class-reference | whole-day | 1 | 13 | **31** | **144** |
+ * | c15 | empire-state-class-reference | whole-day | 45 | 472 | **50** | **519** |
+ * | c16 | willis-class-reference | whole-day | 50 | 2347 | **50** | **3672** |
+ *
+ * **Legibility in real seconds under § D991's pacing is the same set, and that is arithmetic rather
+ * than luck.** A legible stretch is somebody past a minute on a landing for 120 contiguous
+ * simulated seconds, and the stage holds the player's rung while anybody on any landing is past a
+ * minute — so every legible stretch plays at the watching rung, and 120 simulated seconds is 30 real
+ * ones at `4×` on every one of the eight hundred days. The sweep computed it both ways and the two
+ * columns agree row for row. **What moved the set is the horizon, not the transport.**
+ *
+ * **The eligible set moves from fourteen to 15**: `c14` (One-WTC-class) goes 1 of 50 on its
+ * slice to **31** on its whole day, and nothing leaves. Only `c1`, which has no
+ * authored day and keeps its slice, is out. § D512's threshold is untouched, and
+ * `firstSession.ts#FIRST_SESSION_LINE` moves on its own because its count is derived.
+ *
+ * **No mechanism is offered for any row's move** ([§ D256](../../../../DECISIONS.md)). A whole day
+ * has three peaks where a slice has one or none, which makes more stretches *possible*; why a given
+ * tower holds a landing is unmeasured here.
+ *
  * The proportion carries its `n`, the stretch is a median, and there is no interval: no arms are
  * compared (`docs/33` § 6.5). `legibility.test.ts` pins the first ten seeds of every contract so
  * a change to the crowd, the bands or the union is red before this table is stale.
@@ -281,6 +333,18 @@ export const LEGIBILITY_WINDOW_S = 120;
 export interface LegibilitySweepRow {
   readonly contractId: string;
   readonly buildingId: string;
+  /**
+   * **Which run the row was measured on** — the day Today's scenario plays for this contract, and
+   * the only horizon a row may carry. GitHub issue #592, [§ D991](../../../../DECISIONS.md).
+   *
+   * The table was measured on every contract's **slice** while Today's scenario played the whole
+   * authored day on thirteen of sixteen, and that was the third figure in one cycle measured at one
+   * horizon and used at another — after the energy bar (§ D962) and the press pins (wave AH, lane
+   * AH-B). So the horizon is on the row, and `legibility.test.ts` refuses a row whose horizon is not
+   * the one `contractDay.test-helper.ts#todaysScenarioDayState` plays for that contract: the next
+   * contract added cannot be measured at the wrong one in silence.
+   */
+  readonly horizon: RunHorizon;
   /** Seeds of the fifty on which day 1 is legible. */
   readonly legibleOf50: number;
   /** The median, over the fifty seeds, of the longest third-band stretch on any landing. */
@@ -293,22 +357,22 @@ export interface LegibilitySweepRow {
  * `legibility.sweep.test.ts` can refuse this constant the day a fresh sweep disagrees with it.
  */
 export const LEGIBILITY_SWEEP: readonly LegibilitySweepRow[] = Object.freeze([
-  { contractId: 'c1', buildingId: 'garden-apartments', legibleOf50: 0, medianStretchS: 0 },
-  { contractId: 'c2', buildingId: 'midtown-office', legibleOf50: 35, medianStretchS: 165 },
-  { contractId: 'c3', buildingId: 'secure-tower', legibleOf50: 30, medianStretchS: 134 },
-  { contractId: 'c4', buildingId: 'mixed-use-high-rise', legibleOf50: 32, medianStretchS: 136 },
-  { contractId: 'c5', buildingId: 'vertical-city', legibleOf50: 45, medianStretchS: 191 },
-  { contractId: 'c6', buildingId: 'chancery-house', legibleOf50: 25, medianStretchS: 119 },
-  { contractId: 'c7', buildingId: 'crown-hotel', legibleOf50: 30, medianStretchS: 147 },
-  { contractId: 'c8', buildingId: 'st-jude-hospital', legibleOf50: 43, medianStretchS: 197 },
-  { contractId: 'c9', buildingId: 'harbour-point', legibleOf50: 20, medianStretchS: 96 },
-  { contractId: 'c10', buildingId: 'ashgate', legibleOf50: 27, medianStretchS: 125 },
-  { contractId: 'c11', buildingId: 'ctf-class-reference', legibleOf50: 50, medianStretchS: 1221 },
-  { contractId: 'c12', buildingId: 'shanghai-class-reference', legibleOf50: 50, medianStretchS: 729 },
-  { contractId: 'c13', buildingId: 'merdeka-class-reference', legibleOf50: 50, medianStretchS: 459 },
-  { contractId: 'c14', buildingId: 'one-wtc-class-reference', legibleOf50: 1, medianStretchS: 13 },
-  { contractId: 'c15', buildingId: 'empire-state-class-reference', legibleOf50: 45, medianStretchS: 472 },
-  { contractId: 'c16', buildingId: 'willis-class-reference', legibleOf50: 50, medianStretchS: 2347 },
+  { contractId: 'c1', horizon: 'period', buildingId: 'garden-apartments', legibleOf50: 0, medianStretchS: 0 },
+  { contractId: 'c2', horizon: 'whole-day', buildingId: 'midtown-office', legibleOf50: 50, medianStretchS: 602 },
+  { contractId: 'c3', horizon: 'whole-day', buildingId: 'secure-tower', legibleOf50: 50, medianStretchS: 385 },
+  { contractId: 'c4', horizon: 'whole-day', buildingId: 'mixed-use-high-rise', legibleOf50: 49, medianStretchS: 267 },
+  { contractId: 'c5', horizon: 'whole-day', buildingId: 'vertical-city', legibleOf50: 50, medianStretchS: 2069 },
+  { contractId: 'c6', horizon: 'whole-day', buildingId: 'chancery-house', legibleOf50: 50, medianStretchS: 264 },
+  { contractId: 'c7', horizon: 'period', buildingId: 'crown-hotel', legibleOf50: 30, medianStretchS: 147 },
+  { contractId: 'c8', horizon: 'period', buildingId: 'st-jude-hospital', legibleOf50: 43, medianStretchS: 197 },
+  { contractId: 'c9', horizon: 'whole-day', buildingId: 'harbour-point', legibleOf50: 46, medianStretchS: 228 },
+  { contractId: 'c10', horizon: 'whole-day', buildingId: 'ashgate', legibleOf50: 50, medianStretchS: 354 },
+  { contractId: 'c11', horizon: 'whole-day', buildingId: 'ctf-class-reference', legibleOf50: 50, medianStretchS: 1503 },
+  { contractId: 'c12', horizon: 'whole-day', buildingId: 'shanghai-class-reference', legibleOf50: 50, medianStretchS: 1674 },
+  { contractId: 'c13', horizon: 'whole-day', buildingId: 'merdeka-class-reference', legibleOf50: 50, medianStretchS: 1144 },
+  { contractId: 'c14', horizon: 'whole-day', buildingId: 'one-wtc-class-reference', legibleOf50: 31, medianStretchS: 144 },
+  { contractId: 'c15', horizon: 'whole-day', buildingId: 'empire-state-class-reference', legibleOf50: 50, medianStretchS: 519 },
+  { contractId: 'c16', horizon: 'whole-day', buildingId: 'willis-class-reference', legibleOf50: 50, medianStretchS: 3672 },
 ]);
 
 /** The third band's floor — `WAIT_BANDS[2].fromS`, read rather than retyped. */

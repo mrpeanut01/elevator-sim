@@ -524,6 +524,20 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'building moves',
     scheduled: false,
   },
+  'packages/viz/src/everyday/stagePace.sweep.test.ts': {
+    gates: ['STAGE_PACE_SWEEP'],
+    reason:
+      'GitHub issue #592’s instrument, § D991 — every contract’s day 1 as Today’s scenario plays it ' +
+      '(the whole authored day where the building has one), sixteen contracts by fifty seeds, read ' +
+      'for § D512 legibility in simulated and in real seconds under the stage’s pacing and for each ' +
+      'day’s paced real length at the default rung. It produced legibility.ts’s whole-day table and ' +
+      'sittingShape.ts’s longest paced day. Not scheduled because it is a compute job rather than a ' +
+      'check: stagePace.test.ts plays one of the same days through the real Playback on every run ' +
+      'and pins its length and its legibility, and a nightly re-derivation would write figures ' +
+      'nothing reads. It is re-run by hand when a rung, a building, a demand template or the pace ' +
+      'rule moves',
+    scheduled: false,
+  },
   'packages/viz/src/shift/legibility.sweep.test.ts': {
     gates: ['LEGIBILITY_SWEEP'],
     reason:

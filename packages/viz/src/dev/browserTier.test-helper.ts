@@ -736,9 +736,9 @@ export const EVERYDAY_SCREEN_ROUTES: Readonly<
   },
   /*
    * The walkthrough's own primary, *Show me a building losing*. Deliberately not the skip button and
-   * not the collapse screen's primary: both call `tutorialScreens.ts#leave`, which files a real day
-   * (§ D476), so pressing either would run a shift these instruments have no use for and hand the
-   * rest of the page a week that is not the fixture.
+   * not the collapse screen's primary: both call `tutorialScreens.ts#leave`, which leaves for the
+   * menu. It used to file a real day (§ D476) and files nothing since § D993, so pressing either would
+   * now merely leave the screen this route exists to reach.
    */
   collapse: async (page) => {
     await page.waitForSelector('.everyday-landing-cta', { timeout: 30_000 });

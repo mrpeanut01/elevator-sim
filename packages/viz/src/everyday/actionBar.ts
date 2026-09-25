@@ -297,8 +297,11 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
    * and the two replay rows rather than being compared against a transcription of the handoff.
    *
    * **Both primaries are live and neither is authored inert.** Screen one's advances to screen
-   * two; screen two's files the day and leaves, which is § D476's condition — *skipping must
-   * advance the derived state* — and its counterpart on the way out the front. The one refinement
+   * two; screen two's leaves for the main menu and **files nothing** — the same as the skip and as
+   * this pair's own leave rows. It used to file the day, as the cheapest form of § D476's condition,
+   * and that day was a scored day on a tower the player never saw; [§ D993](../../../../DECISIONS.md)
+   * withdrew it (GitHub issue #598), because a navigation is not a progression event (§ D232). The
+   * one refinement
    * either screen makes is `collapse`'s note while its pair of runs is still in flight, which
    * belongs in a `bar()` because the table cannot know it.
    */
@@ -307,7 +310,8 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     guide: false,
     leave: { label: MODES, inert: false },
     primary: primary(['Show me a building losing']),
-    note: 'Or skip the walkthrough — the day still runs and still gets filed.',
+    /* § D993: this read *"— the day still runs and still gets filed."* Nothing is filed now. */
+    note: 'Or skip the walkthrough. Nothing is filed; your week starts when you play a day.',
     inverted: false,
   }),
   row({
@@ -316,7 +320,8 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     leave: { label: MODES, inert: false },
     back: { label: 'How this works', screen: 'tutorial' },
     primary: primary(['Start playing']),
-    note: 'Files the day and opens the main menu.',
+    /* § D993: this read *"Files the day and opens the main menu."* Nothing is filed now. */
+    note: 'Opens the main menu. Nothing is filed; your week starts when you play a day.',
     /*
      * **Not inverted, although it is the last step of a sequence.** § 3.3 inverts the *report* and
      * nothing else, and `actionBar.test.ts` holds that as a rule over the data rather than a taste

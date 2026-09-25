@@ -10,9 +10,9 @@ import type { VizLeg } from '../contract/types.js';
 import { shiftRunConfigOf } from '../dev/state.js';
 import { recordRun } from '../record/recordRun.js';
 
-import { contractBuildings, contractDayState } from './contractDay.test-helper.js';
+import { contractBuildings, contractDayState, todaysScenarioDayState } from './contractDay.test-helper.js';
 import { CONTRACTS } from './contracts.js';
-import { LEGIBILITY_WINDOW_S, legibilityBandFromS, legibilityOf } from './legibility.js';
+import { LEGIBILITY_SWEEP, LEGIBILITY_WINDOW_S, legibilityBandFromS, legibilityOf } from './legibility.js';
 
 function leg(over: Partial<VizLeg> & Pick<VizLeg, 'passengerId' | 'arrivedAt'>): VizLeg {
   return {
@@ -58,7 +58,38 @@ describe('the arithmetic', () => {
   });
 });
 
+describe('every row is measured on the day Today’s scenario plays — § D991', () => {
+  /*
+   * The structural half of § D991. The table was measured on each contract's slice while Today's
+   * scenario played the whole authored day on thirteen of sixteen — the third figure in one cycle
+   * measured at one horizon and used at another, after § D962's energy bar and wave AH's press pins.
+   * So each row carries its horizon and this refuses a row whose horizon is not the one
+   * `todaysScenarioDayState` plays for that contract. No simulation: the horizon is a fact about
+   * the contract's building and `data/`, so a contract added tomorrow is checked on the commit that
+   * adds it.
+   */
+  it('refuses a row whose horizon is not the one Today’s scenario plays for that contract', () => {
+    const resources = contractBuildings();
+    expect(new Set(LEGIBILITY_SWEEP.map((entry) => entry.contractId))).toEqual(
+      new Set(CONTRACTS.map((contract) => contract.id)),
+    );
+    for (const contract of CONTRACTS) {
+      const row = LEGIBILITY_SWEEP.find((entry) => entry.contractId === contract.id);
+      const { horizon } = todaysScenarioDayState(resources, contract.id, { seed: 20_260_824n });
+      expect(row?.horizon, contract.id).toBe(horizon);
+    }
+  });
+});
+
 describe('the sweep, pinned on its first ten seeds per contract', () => {
+  /*
+   * **This pins each contract's slice, which is no longer what the table publishes for a contract
+   * with an authored day** (§ D991). It is kept, unchanged, as the instrument's regression pin — the
+   * crowd, the bands and the union — because running thirteen whole days × ten seeds here would cost
+   * an hour of the default suite. The whole-day rows are pinned at budget by
+   * `legibility.sweep.test.ts` and `everyday/stagePace.sweep.test.ts`, and one whole day is pinned
+   * per run by `everyday/stagePace.test.ts`.
+   */
   it('reproduces the table’s slice: the same seeds, the same band, the same window', () => {
     const resources = contractBuildings();
     const counts: Record<string, number> = {};

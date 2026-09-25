@@ -92,8 +92,16 @@ describe('the eligible set — § D512’s table read by arithmetic', () => {
      * session as never* was measured on days with every car in service. Both now book cars out —
      * St Jude's books two — and both are eligible. A first session can now open on the hospital.
      */
+    /*
+     * **Fourteen → fifteen on 2026-09-24, and it is the horizon that moved rather than a rung** —
+     * [§ D991](../../../../DECISIONS.md), GitHub issue #592. The table was measured on each
+     * contract's slice while the first session plays Today's scenario, which is the whole authored
+     * day on thirteen of sixteen contracts. Re-measured on the day actually played, `c14`
+     * (One-WTC-class) goes 1 of 50 → **31** and joins; nothing leaves, and only `c1` — no authored
+     * day, so its slice is its day — is out. The threshold is untouched.
+     */
     expect(ELIGIBLE_FIRST_CONTRACT_IDS).toEqual([
-      'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10', 'c11', 'c12', 'c13', 'c15', 'c16',
+      'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10', 'c11', 'c12', 'c13', 'c14', 'c15', 'c16',
     ]);
     for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) {
       const row = LEGIBILITY_SWEEP.find((entry) => entry.contractId === id);
@@ -103,7 +111,7 @@ describe('the eligible set — § D512’s table read by arithmetic', () => {
      * first. It was five until the rungs moved; `c6`, `c8` and `c9` are in now, and shrinking this
      * list is the measurement rather than a concession — every one of the three is above the
      * threshold § D512 set and nothing here moved that threshold. */
-    for (const id of ['c1', 'c14']) expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(id);
+    for (const id of ['c1']) expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(id);
     expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(FIRST_CONTRACT_ID);
   });
 
@@ -247,6 +255,17 @@ describe('AC1 and AC2, asked of every member of the set on the pinned seeds', ()
       c11: 10,
       c12: 10,
       c13: 10,
+      /*
+       * **`c14` joined the set on 2026-09-24 and reads one of ten here, and both are right** —
+       * [§ D991](../../../../DECISIONS.md). This walk builds each member's **slice**
+       * (`contractDayState`), and the set is now derived from the day Today's scenario plays, which
+       * for One-WTC-class is the whole authored day: 31 of 50 there, 1 of 50 on its slice. So this
+       * case reads the slice of a member admitted on its whole day. It is kept on the slice because
+       * walking fifteen whole days × ten seeds here would cost the default suite most of an hour;
+       * the whole-day rows are held at budget by `everyday/stagePace.sweep.test.ts` and
+       * `legibility.sweep.test.ts`, and one whole day is pinned per run by `stagePace.test.ts`.
+       */
+      c14: 1,
       c15: 8,
       c16: 10,
     });

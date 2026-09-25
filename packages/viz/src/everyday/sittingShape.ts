@@ -93,7 +93,8 @@
 import { DEFAULT_SHIFT_LENGTH_S } from '../dev/state.js';
 import { CONTRACTS } from '../shift/contracts.js';
 
-import { DEFAULT_STAGE_SPEED_INDEX, stageSpeedAt } from './stageScreenModel.js';
+import { DEFAULT_STAGE_SPEED_INDEX, STAGE_SPEEDS, stageSpeedAt } from './stageScreenModel.js';
+import { BETWEEN_PEAKS_SIM_PER_REAL_S } from './stagePace.js';
 
 /**
  * A sitting's watching, in simulated seconds, with the file that says so.
@@ -108,6 +109,41 @@ export interface SittingSpan {
   readonly highSimS: number;
   /** The file this span is read from — asserted by `sittingShape.test.ts`, never by a reader. */
   readonly source: string;
+  /**
+   * **Present when the span's long end is a whole authored day, which the stage paces** — GitHub
+   * issue #592, [§ D991](../../../../DECISIONS.md). A whole day is not watched at one rung: its
+   * acts play at the player's rung and the hours between them at
+   * `stagePace.ts#BETWEEN_PEAKS_SIM_PER_REAL_S`, so its watching is {@link pacedDayRealS} rather
+   * than `periodS / rung`. Absent on every span that plays at one rung, which is all the others.
+   */
+  readonly pacedDay?: PacedDay | undefined;
+}
+
+/**
+ * A whole authored day as the stage plays it — [§ D991](../../../../DECISIONS.md).
+ *
+ * `slowS` is the simulated seconds the stage plays at the **watching** rung: every act, plus every
+ * stretch between peaks with somebody on a landing past a minute. The rest of `recordedS` is crossed
+ * at the between-peaks rung. `recordedS` is the recording's own length, which a whole day overruns
+ * by the minutes its last riders take to drain; `periodS` is the authored day the span's end names.
+ */
+export interface PacedDay {
+  readonly periodS: number;
+  readonly recordedS: number;
+  readonly slowS: number;
+}
+
+/**
+ * **Real seconds of watching for a whole day under § D991's pacing** — the slow part at the
+ * watching rung, the rest at the between-peaks rung or the watching rung, whichever is faster.
+ *
+ * Exact for the day it is handed, and derivable from the rung — rule 1 — because a day's slow part
+ * is a property of its recording, not of the speed it is played at: the stage holds the watching
+ * rung while somebody has waited past a minute **whatever** that rung is.
+ */
+export function pacedDayRealS(day: PacedDay, watchingSimPerRealS: number): number {
+  const between = Math.max(watchingSimPerRealS, BETWEEN_PEAKS_SIM_PER_REAL_S);
+  return day.slowS / watchingSimPerRealS + (day.recordedS - day.slowS) / between;
 }
 
 /**
@@ -136,11 +172,23 @@ function spanOf(values: readonly number[], source: string): SittingSpan {
 
 /** The union of two spans — the shortest sitting either offers to the longest either offers. */
 function unionOf(left: SittingSpan, right: SittingSpan): SittingSpan {
+  const pacedDay = left.pacedDay ?? right.pacedDay;
   return Object.freeze({
     lowSimS: Math.min(left.lowSimS, right.lowSimS),
     highSimS: Math.max(left.highSimS, right.highSimS),
     source: `${left.source}; ${right.source}`,
+    ...(pacedDay === undefined ? {} : { pacedDay }),
   });
+}
+
+/**
+ * Real seconds of watching for one end of a span — `simS / rung`, except where that end is a whole
+ * day the stage paces, which is {@link pacedDayRealS}.
+ */
+export function watchedRealS(span: SittingSpan, simS: number, simPerRealS: number): number {
+  return span.pacedDay !== undefined && simS === span.pacedDay.periodS
+    ? pacedDayRealS(span.pacedDay, simPerRealS)
+    : simS / simPerRealS;
 }
 
 /**
@@ -161,6 +209,41 @@ function unionOf(left: SittingSpan, right: SittingSpan): SittingSpan {
  * That is rule 3 of this module's docstring applied to the axis § D753 left out.
  */
 const AUTHORED_DAY_PERIOD_S = 36000;
+
+/**
+ * **The longest whole day any contract plays under § D991's pacing** — measured, not estimated,
+ * and the long end of the Today's-scenario figure. GitHub issue #592,
+ * [§ D991](../../../../DECISIONS.md).
+ *
+ * `everyday/stagePace.sweep.test.ts` played every contract's day 1 as Today's scenario plays it —
+ * sixteen contracts × fifty seeds, `collective`, seeds `20 260 824 + 7 919 n` — and this is the day
+ * with the most seconds at the watching rung: `c16`, seed `n = 28`. It is a reference tower's,
+ * whose landings hold somebody past a minute for most of the day, so the stage seldom gets to cross
+ * anything fast. The game's own towers are the next constant, and the hub row names both.
+ *
+ * Measured rather than derived from the acts because the acts are a **floor** — 5 400 s of
+ * `office-day` gives 39.5 minutes — and the drain on top of it is an outcome of the run. The
+ * ruling's *about forty* is true of the game's towers and false of the reference towers, and a tile
+ * that published it would be § D946's defect one axis over. The sweep refuses this constant at the
+ * published budget the day a fresh measurement disagrees.
+ */
+export const WHOLE_DAY_LONGEST: PacedDay = Object.freeze({
+  periodS: AUTHORED_DAY_PERIOD_S,
+  recordedS: 36192.447,
+  slowS: 24602.458,
+});
+
+/**
+ * **The longest whole day on the game's own towers** — the contracts whose buildings are not
+ * `*-class-reference`: `c5` (Vertical City), seed `n = 39`, on the same sweep. Quoted on the hub row beside the
+ * long end, because the reference towers set that end and a player on a game tower would otherwise
+ * read a figure more than twice what they will watch.
+ */
+export const WHOLE_DAY_LONGEST_GAME_TOWER: PacedDay = Object.freeze({
+  periodS: AUTHORED_DAY_PERIOD_S,
+  recordedS: 36413.148,
+  slowS: 8486.048,
+});
 
 /**
  * Every span a shipped sitting can have, in simulated seconds.
@@ -205,7 +288,15 @@ export const SITTING_SPANS = Object.freeze({
    */
   contractDay: unionOf(
     spanOf(CONTRACTS.map(contractRunLengthS), 'packages/viz/src/shift/contracts.ts'),
-    spanOf([AUTHORED_DAY_PERIOD_S], 'data/traffic-profiles.json, through shift/dayLength.ts#wholeDayFor'),
+    Object.freeze({
+      ...spanOf([AUTHORED_DAY_PERIOD_S], 'data/traffic-profiles.json, through shift/dayLength.ts#wholeDayFor'),
+      /*
+       * § D991: the day is paced, so its watching is the slow part at the rung and the rest faster —
+       * and the long end is the longest day any contract plays, measured. This read *2 h 30* while
+       * the stage played every second at one rung.
+       */
+      pacedDay: WHOLE_DAY_LONGEST,
+    }),
   ),
   /** One fix-a-building case — the as-built run watched, then the pair. */
   fixCase: Object.freeze({
@@ -225,6 +316,13 @@ export const SITTING_SPANS = Object.freeze({
     source: 'data/rush-house-runs.json',
   }),
 } satisfies Readonly<Record<string, SittingSpan>>);
+
+/** The between-peaks rung's own chip label — § D354's rule that a label **is** its multiplier. */
+function betweenRungLabel(): string {
+  const rung = STAGE_SPEEDS.find((speed) => speed.simPerRealS === BETWEEN_PEAKS_SIM_PER_REAL_S);
+  if (rung === undefined) throw new Error('sittingShape: the between-peaks rung is not on the ladder');
+  return rung.label;
+}
 
 /** The rung every figure here is quoted at — the stage's shipped opening speed. */
 function openingRung(): { readonly label: string; readonly simPerRealS: number } {
@@ -248,8 +346,10 @@ export function sittingMinutes(
 /**
  * **Where a figure stops being minutes and starts being hours** — ninety.
  *
- * An office contract's day is 150 minutes at the shipped rung, and *150 min* is true, legible and
- * the wrong size of unit for a decision about an evening: a reader parses two and a half hours
+ * An office contract's day **was** 150 minutes at the shipped rung while the stage played every
+ * second of it at one speed (§ D991 paces it to about forty now, so no shipped figure crosses this
+ * boundary today; the rule stays because a rung move or a new day could bring one back), and
+ * *150 min* is true, legible and the wrong size of unit for a decision about an evening: a reader parses two and a half hours
  * faster than they parse a hundred and fifty minutes, and this string's whole job is to be parsed
  * before an evening is committed. Ninety rather than sixty so that the common cases stay in the
  * unit they were authored in — nothing shipped lands between 60 and 89 — and so that a range whose
@@ -291,9 +391,15 @@ function sittingWord(minutes: number): string {
 export function sittingLengthPhrase(span: SittingSpan, noun = ''): string {
   const rung = openingRung();
   const of = noun === '' ? '' : ` ${noun}`;
-  if (span.highSimS / rung.simPerRealS < 60) return `under a minute${of} at ${rung.label}`;
-  const low = sittingMinutes(span.lowSimS, rung.simPerRealS);
-  const high = sittingMinutes(span.highSimS, rung.simPerRealS);
+  const highRealS = watchedRealS(span, span.highSimS, rung.simPerRealS);
+  if (highRealS < 60) return `under a minute${of} at ${rung.label}`;
+  /* One rounding, up, whichever way the end is watched — rule 2. A paced whole day is § D991's. */
+  const minutesOf = (simS: number): number =>
+    span.pacedDay !== undefined && simS === span.pacedDay.periodS
+      ? Math.ceil(pacedDayRealS(span.pacedDay, rung.simPerRealS) / 60)
+      : sittingMinutes(simS, rung.simPerRealS);
+  const low = minutesOf(span.lowSimS);
+  const high = minutesOf(span.highSimS);
   const figure =
     low === high
       ? `~${sittingWord(high)}`
@@ -347,8 +453,18 @@ export const SITTING_SHAPES = Object.freeze({
    * has never until now had a figure agreeing with: 95 of the 221 measured cells never hold at all.
    */
   rushMode: `${sittingLengthPhrase(SITTING_SPANS.rush)} · the run always ends; the question is when`,
-  /** The hub's *Today's scenario* row. */
-  contractDay: `${sittingLengthPhrase(SITTING_SPANS.contractDay, 'a day')} · no losing — a day is a score, not a pass`,
+  /**
+   * The hub's *Today's scenario* row.
+   *
+   * It names the between-peaks rung as well as the watching one, because § D753 rule 2 is that a
+   * figure names the rung it was quoted at and this one was quoted at two (§ D991). It read
+   * *8 min-2 h 30 a day at 4×* while the stage played every second of a whole day at one rung.
+   *
+   * **The long end is a reference tower's and the row says so**, rather than letting a player on
+   * one of the game's own towers read a figure more than twice what they will watch: the second
+   * clause is {@link WHOLE_DAY_LONGEST_GAME_TOWER}, measured on the same sweep.
+   */
+  contractDay: `${sittingLengthPhrase(SITTING_SPANS.contractDay, 'a day')}, the hours between peaks at ${betweenRungLabel()}; ${String(Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST_GAME_TOWER, openingRung().simPerRealS) / 60))} min at most on the game’s own towers — the long end is a reference tower’s · no losing — a day is a score, not a pass`,
   /** The hub's *Fix a building* row. */
   fixCase: `${sittingLengthPhrase(SITTING_SPANS.fixCase, 'a case')}, skippable · retry as often as you like`,
 });

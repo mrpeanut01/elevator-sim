@@ -65,9 +65,16 @@ import { frameAt } from '../frame/frameAt.js';
 import { plainLeversOf } from '../mode/plainLevers.js';
 import { recordRun, type RecordedRun } from '../record/recordRun.js';
 import { rushTutorialWorkedAnswerOf } from './rushScreenModel.js';
+import { waitBandsAt } from '../live/bands.js';
+import { ManualClock } from '../playback/clock.js';
+import { Playback } from '../playback/playback.js';
+import { PACE_HOLD_WAIT_S } from './stagePace.js';
+import { DEFAULT_STAGE_SIM_PER_REAL_S as DEFAULT_WATCHING, STAGE_SPEEDS } from './stageScreenModel.js';
 import {
   TUTORIAL_CASE_ID,
+  TUTORIAL_QUIET_SIM_PER_REAL_S,
   TUTORIAL_STEPS,
+  tutorialPaceOf,
   tutorialWalkthroughViewOf,
   tutorialWorkedAnswerOf,
   workedAnswerFactsOf,
@@ -320,5 +327,76 @@ describe('the press on screen two is watched, not just measured — `charter S1`
       `the cars stand ${asBuilt.toFixed(2)} m apart as built and ${repaired.toFixed(2)} m apart repaired — ` +
         'the caption over the second pane says they spread out',
     ).toBeGreaterThan(2);
+  });
+});
+
+/*
+ * **Screen two builds its failure inside about twenty seconds** — GitHub issue #598, § D992.
+ *
+ * Played end to end through the shipped `Playback` over a `ManualClock`, with the tutorial's own
+ * pace rule asked once a frame from the present frame's longest wait — exactly what
+ * `caseStage.ts` does for the tutorial. The clock's reading when somebody first stands past a
+ * minute on a landing is the number the issue sets a bar on, and it is measured in simulated
+ * seconds per real second from the code path rather than from a wall clock on a shared box.
+ */
+describe('screen two shows the building breaking within about twenty seconds — GitHub issue #598', () => {
+  const FRAME_MS = 50;
+  const TWENTY_REAL_S = 20;
+
+  /** Real seconds until the canvas first shows somebody past a minute, crossing the quiet at `quiet`. */
+  function realSecondsToTrouble(
+    recording: VizRecording,
+    quiet: number,
+  ): { firstS: number; realS: number; totalRealS: number } {
+    const clock = new ManualClock();
+    const playback = new Playback(recording, clock, { speed: DEFAULT_WATCHING, autoplay: true });
+    let firstS: number | undefined;
+    let realS = Number.NaN;
+    while (playback.state !== 'ended') {
+      const t = playback.simTimeS;
+      const longest = waitBandsAt(recording, t).longestCurrentWaitS;
+      const held = longest !== undefined && longest >= PACE_HOLD_WAIT_S;
+      if (firstS === undefined && held) {
+        firstS = t;
+        realS = clock.now() / 1000;
+      }
+      const speed =
+        quiet === TUTORIAL_QUIET_SIM_PER_REAL_S
+          ? tutorialPaceOf({ longestStandingS: longest, watchingSimPerRealS: DEFAULT_WATCHING })
+          : held
+            ? DEFAULT_WATCHING
+            : Math.max(DEFAULT_WATCHING, quiet);
+      if (playback.speed !== speed) playback.setSpeed(speed);
+      clock.advance(FRAME_MS);
+    }
+    if (firstS === undefined) throw new Error('the as-built morning never put anybody past a minute');
+    return { firstS, realS, totalRealS: clock.now() / 1000 };
+  }
+
+  it('puts somebody past a minute on a landing inside twenty real seconds at the shipped speed', () => {
+    const measured = realSecondsToTrouble(before.recording, TUTORIAL_QUIET_SIM_PER_REAL_S);
+    // The run the constant was derived from: first trouble 1 448 s into the morning, read on the
+    // first frame at or after it — a frame at the quiet rung is 4.5 simulated seconds.
+    expect(measured.firstS).toBeGreaterThanOrEqual(1448);
+    expect(measured.firstS).toBeLessThan(1448 + (TUTORIAL_QUIET_SIM_PER_REAL_S * FRAME_MS) / 1000 + 1);
+    expect(measured.realS).toBeLessThanOrEqual(TWENTY_REAL_S);
+    // And the whole morning is about a minute of watching, against 11 min 15 s at one rung.
+    expect(measured.totalRealS).toBeLessThan(90);
+  });
+
+  it('90× is the slowest rung on the ladder that does it — 30× is not enough', () => {
+    expect(STAGE_SPEEDS.some((speed) => speed.simPerRealS === TUTORIAL_QUIET_SIM_PER_REAL_S)).toBe(true);
+    const slower = STAGE_SPEEDS.filter(
+      (speed) => speed.simPerRealS > DEFAULT_WATCHING && speed.simPerRealS < TUTORIAL_QUIET_SIM_PER_REAL_S,
+    );
+    expect(slower.length).toBeGreaterThan(0);
+    for (const rung of slower) {
+      expect(realSecondsToTrouble(before.recording, rung.simPerRealS).realS, rung.label).toBeGreaterThan(
+        TWENTY_REAL_S,
+      );
+    }
+    expect(realSecondsToTrouble(before.recording, TUTORIAL_QUIET_SIM_PER_REAL_S).realS).toBeLessThanOrEqual(
+      TWENTY_REAL_S,
+    );
   });
 });
