@@ -38,6 +38,7 @@ import {
   AFTER_PRESS_DISCLAIMER,
   AFTER_PRESS_PAIR_NOTE,
   AFTER_PRESS_ROW_ID,
+  AFTER_PRESS_VERDICT_NOTE,
   afterPressBeatOf,
 } from './afterPress.js';
 import { contractById } from './contracts.js';
@@ -422,13 +423,27 @@ describe('the paired row says what kind of claim it is', () => {
     expect(beat?.why).not.toContain('the day was not run again without it');
   });
 
-  it('carries the four clauses the note exists for, each asserted for what it says', () => {
+  it('carries the five clauses the note exists for, each asserted for what it says', () => {
     expect(AFTER_PRESS_PAIR_NOTE).toContain('two runs of one day');
     expect(AFTER_PRESS_PAIR_NOTE).toContain('a single replication');
     expect(AFTER_PRESS_PAIR_NOTE).toContain('on another day');
     expect(AFTER_PRESS_PAIR_NOTE).toContain('The bench is where');
+    /*
+     * The fifth — § D982. Two verdicts from one crowd say nothing about another crowd, **even in
+     * this tower**, which is the half a player on a pinned day most needs: that day was chosen for
+     * its flip, and `pressLadder.test.ts` runs a second crowd on the same tower where the same press
+     * does the opposite.
+     */
+    expect(AFTER_PRESS_VERDICT_NOTE).toContain('The two verdicts are the same kind of fact as the counts');
+    expect(AFTER_PRESS_VERDICT_NOTE).toContain('nothing about how a day is graded for any other crowd');
+    expect(AFTER_PRESS_VERDICT_NOTE).toContain('even in this tower');
     // And no figure at all, exactly as § D900's disclaimer carries none.
     expect(/\d/u.test(AFTER_PRESS_PAIR_NOTE)).toBe(false);
+    expect(/\d/u.test(AFTER_PRESS_VERDICT_NOTE)).toBe(false);
+    // Nor any word the no-difference case bans across the row, which the clause is part of.
+    for (const word of ['fewer', 'more', 'difference', 'instead', 'rather than', 'compared']) {
+      expect(says(AFTER_PRESS_VERDICT_NOTE.toLowerCase(), word), word).toBe(false);
+    }
   });
 
   it('uses no causal verb — § D900’s list, unchanged and unmoved', () => {
@@ -561,22 +576,185 @@ describe('a day with no pair draws § D900’s row, word for word', () => {
  * On the sheet — the half a unit cannot show
  * -------------------------------------------------------------------------- */
 
+/** The sheet a player reads for `run`, filed with `pair` — or without one. */
+function sheetOf(
+  run: VizRecording,
+  interventions: readonly RunInterventionConfig[],
+  pair: ReturnType<typeof pressCounterfactualOf>,
+  subject: 'week-day' | 'single-run' = 'week-day',
+): ShapedDayReport {
+  return dayReportOf({
+    recording: run,
+    observations: shiftObservationsOf(observationsAt(run, run.endedAt)),
+    goals: goalsForDay(4),
+    week: { ...openWeek('c2'), day: 4, dayIdx: 3 },
+    contract: contractById('c2'),
+    event: SHIFT_EVENTS.ordinary,
+    plan: { shiftLengthS: DURATION_S, windowStartS: null, patternId: 'building' },
+    calendar: null,
+    subject:
+      subject === 'week-day'
+        ? { kind: 'week-day' }
+        : {
+            kind: 'single-run',
+            selection: {
+              demandTemplateId: 'constant-iso',
+              arrivalRatePctPop5min: 14,
+              durationS: DURATION_S,
+            },
+          },
+    interventions,
+    pressCounterfactual: pair,
+  });
+}
+
+function afterPressRowOf(report: ShapedDayReport): ShapedDayReport['diagnosis'][number] | undefined {
+  return report.diagnosis.find((candidate) => candidate.id === AFTER_PRESS_ROW_ID);
+}
+
+/* -------------------------------------------------------------------------- *
+ * Both runs' verdicts — § D982, amending § D931 clause 3
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The vocabulary that connects two verdicts** — the decision agent's list, § D982.
+ *
+ * A pair of verdicts invites a third claim that neither the counts nor the note makes: that the
+ * press *decided*, *rescued* or *turned* the day, or that the day *would* have gone the other way.
+ * Each of these connects the two verdicts into a story about the press; the row prints two facts
+ * side by side and leaves any connection to the reader. § D900's causal list and § D931's
+ * estimation list stay exactly as they were beside it.
+ */
+const CONNECTS = [
+  'decided',
+  'decides',
+  'decisive',
+  'rescued',
+  'rescue',
+  'flipped',
+  'turned',
+  'won',
+  'lost',
+  'either way',
+  'anyway',
+  'still',
+  'same verdict',
+  'changed the verdict',
+  'if you had',
+  'would',
+  'could have',
+] as const;
+
+/** A press may never be the subject of *clears* or *misses* — within three words of it. */
+const PRESS_AS_SUBJECT =
+  /\bpress(es)?\b(\W+\w+){0,3}\W+(clear|clears|cleared|miss|misses|missed)\b/iu;
+
+describe('the paired row prints both runs’ verdicts, from the sheet’s own grader', () => {
+  it('prints this run’s banner and the unpressed run’s, each as that run’s own sheet words it', () => {
+    const pair = pressCounterfactualOf(pressed, unpressed, [PRESS]);
+    const ours = sheetOf(pressed, [PRESS], pair);
+    /*
+     * One source, both sides. The pressed side is the banner of the sheet the row sits on; the
+     * unpressed side is the banner the **unpressed run's own sheet** carries against the same goals
+     * — graded at its own end, over its own whole day — which is why it is read off a sheet of that
+     * recording rather than off the pair's window.
+     */
+    const theirs = sheetOf(unpressed, [], undefined);
+    const why = afterPressRowOf(ours)?.why ?? '';
+    expect(why).toContain(`this run reads ${ours.verdictLine}`);
+    expect(why).toContain(`the run without that press, over its own whole day, reads ${theirs.verdictLine}`);
+    expect(why).toContain(AFTER_PRESS_VERDICT_NOTE);
+  });
+
+  it('names a missed run’s missed goals with no digit, and names none for a run that did not miss', () => {
+    const pair = pressCounterfactualOf(pressed, unpressed, [PRESS]);
+    const ours = sheetOf(pressed, [PRESS], pair);
+    const theirs = sheetOf(unpressed, [], undefined);
+    const why = afterPressRowOf(ours)?.why ?? '';
+    for (const [sheet, lead] of [
+      [ours, 'this run reads '],
+      [theirs, 'over its own whole day, reads '],
+    ] as const) {
+      const missed = sheet.goals.filter((line) => line.reading.state === 'missed');
+      const clause = why.slice(why.indexOf(lead) + lead.length).split(/[;.]/u)[0] ?? '';
+      if (sheet.verdict === 'missed') {
+        expect(clause.startsWith(`${sheet.verdictLine} on the `), clause).toBe(true);
+        expect(clause.split(' goal').length - 1, clause).toBe(missed.length);
+      } else {
+        expect(clause).toBe(sheet.verdictLine);
+      }
+      // A goal's name carries no bar: no digit, no unit.
+      expect(/\d/u.test(clause), clause).toBe(false);
+    }
+  });
+
+  it('never states the unpressed verdict anywhere but on that row', () => {
+    /*
+     * The ruling's rule 5. With a pair and without one, the banner, the lede, the headline, the
+     * goals and every other diagnosis row are identical — only the after-press row moves, it stays
+     * untoned, and it stays last, because `render/reportCard.ts` draws `diagnosis[0]`.
+     */
+    const pair = pressCounterfactualOf(pressed, unpressed, [PRESS]);
+    const withPair = sheetOf(pressed, [PRESS], pair);
+    const without = sheetOf(pressed, [PRESS], undefined);
+    expect(withPair.verdictLine).toBe(without.verdictLine);
+    expect(withPair.lede).toBe(without.lede);
+    expect(withPair.headlineFigureId).toBe(without.headlineFigureId);
+    expect(withPair.goals).toEqual(without.goals);
+    expect(withPair.figures).toEqual(without.figures);
+    expect(withPair.diagnosis.filter((row) => row.id !== AFTER_PRESS_ROW_ID)).toEqual(
+      without.diagnosis.filter((row) => row.id !== AFTER_PRESS_ROW_ID),
+    );
+    expect(afterPressRowOf(withPair)?.tone).toBe('plain');
+    expect(withPair.diagnosis[withPair.diagnosis.length - 1]?.id).toBe(AFTER_PRESS_ROW_ID);
+  });
+
+  it('uses no word that connects the two verdicts, and never makes a press their subject', () => {
+    const pair = pressCounterfactualOf(pressed, unpressed, [PRESS]);
+    const parkedPair = pressCounterfactualOf(parked, unpressed, [PARK]);
+    const rows = [
+      afterPressRowOf(sheetOf(pressed, [PRESS], pair)),
+      afterPressRowOf(sheetOf(parked, [PARK], parkedPair)),
+      afterPressRowOf(sheetOf(pressed, [{ atS: 120, change: { kind: 'spread-cars' } }, PRESS], pair)),
+    ];
+    for (const row of rows) {
+      const whole = rowText(row).toLowerCase();
+      expect(whole).toContain('reads shift');
+      for (const word of CONNECTS) {
+        expect(says(whole, word), `the paired row says "${word}": ${whole}`).toBe(false);
+      }
+      expect(PRESS_AS_SUBJECT.test(whole), whole).toBe(false);
+      for (const word of CAUSAL) expect(whole.includes(word), word).toBe(false);
+      for (const word of ESTIMATE) expect(says(whole, word), word).toBe(false);
+      for (const cue of ['average', 'mean', 'typical', 'per ride', 'withheld', ' s ']) {
+        expect(whole.includes(cue), cue).toBe(false);
+      }
+    }
+  });
+
+  it('would catch a press made the subject of a verdict — the pattern is not vacuous', () => {
+    expect(PRESS_AS_SUBJECT.test('your press cleared the day')).toBe(true);
+    expect(PRESS_AS_SUBJECT.test('the press at nine missed it')).toBe(true);
+    expect(
+      PRESS_AS_SUBJECT.test('the run without that press, over its own whole day, reads Shift missed'),
+    ).toBe(false);
+  });
+
+  it('prints no verdict on a single-run sheet, whose banner refuses to grade', () => {
+    const pair = pressCounterfactualOf(pressed, unpressed, [PRESS]);
+    const why = afterPressRowOf(sheetOf(pressed, [PRESS], pair, 'single-run'))?.why ?? '';
+    expect(why).toContain('had also been run without that press');
+    expect(why).toContain(AFTER_PRESS_PAIR_NOTE);
+    expect(why).not.toContain(AFTER_PRESS_VERDICT_NOTE);
+    for (const line of ['Shift cleared', 'Shift missed', 'Too quiet to grade']) {
+      expect(why).not.toContain(line);
+    }
+  });
+});
+
 describe('the sheet', () => {
-  function sheet(pair: ReturnType<typeof pressCounterfactualOf>): ShapedDayReport {
-    return dayReportOf({
-      recording: pressed,
-      observations: shiftObservationsOf(observationsAt(pressed, pressed.endedAt)),
-      goals: goalsForDay(4),
-      week: { ...openWeek('c2'), day: 4, dayIdx: 3 },
-      contract: contractById('c2'),
-      event: SHIFT_EVENTS.ordinary,
-      plan: { shiftLengthS: DURATION_S, windowStartS: null, patternId: 'building' },
-      calendar: null,
-      subject: { kind: 'week-day' },
-      interventions: [PRESS],
-      pressCounterfactual: pair,
-    });
-  }
+  const sheet = (pair: ReturnType<typeof pressCounterfactualOf>): ShapedDayReport =>
+    sheetOf(pressed, [PRESS], pair);
 
   it('draws the pair on the row the log names, and the section keeps its shape', () => {
     const pair = pressCounterfactualOf(pressed, unpressed, [PRESS]);

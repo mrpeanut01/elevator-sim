@@ -119,12 +119,26 @@
  * **The difference.** Neither figure is subtracted from its partner, here or in the copy
  * `shift/afterPress.ts` builds from it. The two runs are printed and the reader may subtract; a
  * *difference* printed on a sheet is a quantity, and a quantity off one replication is the
- * estimate this repository refuses. **No verdict**, either: the two runs' `Shift cleared` /
- * `Shift missed` lines are available (§ D871 quotes exactly that pair for one seed) and are the
- * shortest route from a true pair to *my press decides the day*. **No mean and no duration**:
+ * estimate this repository refuses. **No mean and no duration**:
  * every figure here is a count of people, so R3's `suppressed-mean` class has nothing to sit
  * beside and R13 has no estimate to catch, which is `shift/afterPress.ts`' first rule kept rather
  * than re-argued.
+ *
+ * ## The verdicts are carried, and § D931's *no verdict* is amended rather than kept
+ *
+ * § D931 withheld the unpressed run's verdict as *the shortest route from a true pair to my press
+ * decides the day*. [§ D982](../../../../DECISIONS.md) implements a decision agent's measured
+ * ruling that reverses it: over 1 050 day-long runs on the seven pinned contracts, when a pressed
+ * day cleared the unpressed day **also** cleared in 296 of 368 cases, so a sheet that printed the
+ * pressed verdict in its banner and withheld the other one let *my press cleared the day* stand
+ * unanswered four times in five. So {@link PressCounterfactual.wholeRunObservations} carries what
+ * the sheet needs to grade the unpressed run with **its own** grader — `shift/report.ts` does the
+ * grading, against the same goals, and this module grades nothing.
+ *
+ * It is the unpressed run's **whole-run** fold, at that run's own `endedAt`, and deliberately not
+ * the window the three counts are read at: a verdict is a property of a whole day, the two runs can
+ * end eleven seconds apart (ground 3), and grading the unpressed run at the pressed run's end would
+ * grade a day that had not finished — or that had.
  */
 
 import type { RunInterventionConfig, SimTime } from '@elevator-sim/core/browser';
@@ -133,13 +147,16 @@ import type { VizLeg, VizRecording } from '../contract/types.js';
 import { observationsAt } from '../live/observations.js';
 import { sameCrowd } from '../record/crowd.js';
 
+import { shiftObservationsOf } from './observations.js';
+import type { Observations } from './types.js';
+
 /**
  * The readings of the run that was **not** pressed, taken at the same two instants the pressed
- * run's row reports.
+ * run's row reports — and that run's whole-run fold, which the sheet grades (§ D982).
  *
- * Three counts of people and nothing else — see the header for why the third one is carried, why
- * it is a headcount rather than the longest wait, and why no difference between the two runs is
- * computed anywhere.
+ * Three counts of people are printed and nothing else — see the header for why the third one is
+ * carried, why it is a headcount rather than the longest wait, and why no difference between the
+ * two runs is computed anywhere.
  */
 export interface PressCounterfactual {
   /** The press that was taken out, so a renderer and a test name the same second. */
@@ -155,6 +172,17 @@ export interface PressCounterfactual {
    * own `longWaitThresholdS` — the figure that tells the two arms apart. See the header.
    */
   readonly longWaitsByWindowEnd: number;
+  /**
+   * The unpressed run folded over **its own whole run** — `observationsAt(unpressed,
+   * unpressed.endedAt)` through `shiftObservationsOf`, exactly as `dev/main.ts#closeShift` folds the
+   * pressed run for its sheet — so `shift/report.ts` can grade it against the same goals with the
+   * same grader ([§ D982](../../../../DECISIONS.md)). Not the window the three counts are read at:
+   * see the header for why a verdict is read at the run's own end.
+   *
+   * Never printed as figures. The row names the unpressed run's verdict and, when it missed, which
+   * goals — by name, with no digit — so nothing on it becomes a second goal table.
+   */
+  readonly wholeRunObservations: Observations;
 }
 
 /** The part of a recording this module's span and identity grounds read. */
@@ -287,5 +315,6 @@ export function pressCounterfactualOf(
      * sheet reports a defect in a vocabulary the player cannot act on.
      */
     longWaitsByWindowEnd: Math.max(0, end.servedCount - end.servedUnderThresholdCount),
+    wholeRunObservations: shiftObservationsOf(observationsAt(unpressed, unpressed.endedAt)),
   };
 }

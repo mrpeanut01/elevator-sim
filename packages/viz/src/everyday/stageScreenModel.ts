@@ -112,6 +112,7 @@ import type { LiveObservations, WaitBandId } from '../live/types.js';
  */
 import type { PriceSchedule } from '../pricing/types.js';
 import { goalRowsOf } from '../dev/leftRail.js';
+import type { BookedOutCar } from '../shift/bookedOut.js';
 import { GOAL_GLYPHS, TODAY_ASKS_DECIDES, TODAY_ASKS_HEADING } from '../shift/goals.js';
 import type { DayOutcome, GoalObservations, GoalReading, GoalState } from '../shift/types.js';
 // AD-S17's length rule, shared with the Engineer stage. The *derivation* — what counts as standing
@@ -499,6 +500,45 @@ export function stageHeaderOf(input: StageHeaderInput): StageHeaderView {
     driverName: input.driverName,
     figures: [awayInsideOf(o), standingNowOf(o), longestSoFarOf(o)],
   };
+}
+
+/**
+ * **The car the tower books out, on the stage** — GitHub issue #596 item 3,
+ * [§ D983](../../../../DECISIONS.md).
+ *
+ * The dashed well (`STAGE_OUT_OF_SERVICE`) is drawn for a car held for the **whole** run, which is
+ * what `VizRecording.outOfServiceCarIds` carries. A car the tower's own schedule books out part-way
+ * through — Crown Hotel's car D, § D871 — had nothing on the stage: the brief's plate named it and
+ * the stage showed a lift that simply stopped. So the header carries one pill per booked car, with
+ * the two clock times from the run's own building (`shift/bookedOut.ts#bookedOutCarsOf`) and where
+ * the playhead stands against them.
+ *
+ * The clock times are the **schedule**, not the outcome, which is why they may be shown at a
+ * playhead short of the end: a booking is written into the building before the run starts, the way
+ * `stageNextStretchOf` names a demand segment ahead of the playhead. What it never says is anything
+ * the run did while the car was away.
+ *
+ * `[]` on a tower that books nothing, which is most of them, so the header is unchanged there.
+ */
+export function stageBookedOutOf(input: {
+  readonly bookedOut: readonly BookedOutCar[];
+  readonly simTimeS: number;
+  readonly dayStartS?: number | undefined;
+}): readonly string[] {
+  return input.bookedOut.map((car) => {
+    const away = clockAt(car.awayAtS, input.dayStartS);
+    const span =
+      car.backAtS === null
+        ? `booked out from ${away}`
+        : `booked out ${away}–${clockAt(car.backAtS, input.dayStartS)}`;
+    const where =
+      input.simTimeS < car.awayAtS
+        ? 'still running'
+        : car.backAtS === null || input.simTimeS < car.backAtS
+          ? 'out now'
+          : 'back';
+    return `Car ${car.carId} ${span} · ${where}`;
+  });
 }
 
 /**

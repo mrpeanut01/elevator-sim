@@ -417,7 +417,7 @@ describe('goalRowsOf — met, missed and pending', () => {
     });
     const rows = goalRowsOf(readGoals(goalsForDay(4), goalObservations()), [yesterday], 4, goalObservations(), 'whole-run');
     const carry = rows.find((row) => row.label.startsWith('Carry'));
-    expect(carry?.was).toBe('was 91%');
+    expect(carry?.was).toBe('yesterday 91%');
   });
 });
 

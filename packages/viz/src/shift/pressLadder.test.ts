@@ -59,8 +59,10 @@ import { observationsAt } from '../live/observations.js';
 import { recordRun } from '../record/recordRun.js';
 import { RESOURCES } from '../scope/probes.test-helper.js';
 
+import { AFTER_PRESS_ROW_ID, AFTER_PRESS_VERDICT_NOTE } from './afterPress.js';
 import { contractDayState } from './contractDay.test-helper.js';
 import { contractById, CONTRACTS } from './contracts.js';
+import { pressCounterfactualOf } from './counterfactual.js';
 import { runHorizonOf } from './dayLength.js';
 import { SHIFT_EVENTS } from './events.js';
 import { goalsForDay, readGoals } from './goals.js';
@@ -240,6 +242,100 @@ describe('the press ladder — every pinned day, in both directions', () => {
       });
     });
   }
+});
+
+/**
+ * **The row that prints both runs' verdicts, on three crowds of one tower** — § D982.
+ *
+ * The decision agent's ruling pins three arms on `c7`, all with *spread the cars* at the rung's own
+ * press second under the rung's standing order, and each is a clause of the ruling rather than a
+ * variation on one:
+ *
+ * - **20 268 743**, the pinned day: the press clears a day that missed as built. The row must say
+ *   so, naming the goal the unpressed run missed.
+ * - **20 442 961**: the **same press, the same tower**, and a cleared day becomes a missed one. The
+ *   row must say that as plainly as it says a win — and this arm is the run that pins
+ *   `AFTER_PRESS_VERDICT_NOTE`'s premise, that two verdicts from one crowd say nothing about another
+ *   crowd *even in this tower* (§ D227: a refusal is pinned by a run, never by another sentence).
+ * - **20 260 824**: both runs clear, and nothing on the row connects them.
+ *
+ * Measured by the ruling's instrument (`sweep50.tsv`, 1 050 runs) and re-derived here on every run.
+ */
+describe('the paired row’s verdicts — three crowds of c7, one press', () => {
+  const contractId = 'c7';
+  const press = pressDayFor(contractId);
+  const SPREAD_KIND = 'spread-cars';
+
+  function pairedRowOf(seed: bigint): string {
+    if (press === undefined) throw new Error('c7 pins no day');
+    const contract = contractById(contractId);
+    if (contract === undefined) throw new Error('no c7');
+    const atS = shiftLengthForContract(contractId) * press.pressAtFraction;
+    const presses: readonly RunInterventionConfig[] = [
+      { atS, change: { kind: SPREAD_KIND } as RunInterventionConfig['change'] },
+    ];
+    const state = contractDayState(contractId, { seed, dispatcherId: press.standingOrder });
+    const plan = shiftRunConfigOf(RESOURCES_WITH_TOWERS, state);
+    const run = (interventions: readonly RunInterventionConfig[]) =>
+      recordRun(
+        { ...plan.config, interventions },
+        { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds },
+      ).recording;
+    const unpressed = run([]);
+    const pressedRun = run(presses);
+    const horizon = runHorizonOf(
+      RESOURCES_WITH_TOWERS.trafficProfiles,
+      buildingConfigOf(RESOURCES_WITH_TOWERS, state.savedBuildings, contract.buildingId),
+      state,
+    );
+    const report = dayReportOf({
+      recording: pressedRun,
+      observations: shiftObservationsOf(observationsAt(pressedRun, pressedRun.endedAt)),
+      goals: goalsForDay(1, horizon),
+      week: openWeek(contractId),
+      contract,
+      event: SHIFT_EVENTS.ordinary,
+      plan: { shiftLengthS: shiftLengthForContract(contractId), windowStartS: null, patternId: 'building' },
+      calendar: null,
+      subject: { kind: 'week-day' },
+      interventions: presses,
+      pressCounterfactual: pressCounterfactualOf(pressedRun, unpressed, presses),
+    });
+    const row = report.diagnosis.find((entry) => entry.id === AFTER_PRESS_ROW_ID);
+    expect(row?.why, `seed ${seed.toString()} drew no paired row`).toContain('had also been run');
+    return row?.why ?? '';
+  }
+
+  const THIS = 'this run reads';
+  const OTHER = 'the run without that press, over its own whole day, reads';
+
+  it('pins the rung it is about — c7, spread the cars, the day this file already proves', () => {
+    expect(press?.seedText).toBe('20268743');
+    expect(press?.clearedBy).toBe(SPREAD_KIND);
+  });
+
+  it('clears a missed day: 20 268 743 reads cleared, and the run without it missed on the worst wait', () => {
+    const why = pairedRowOf(20_268_743n);
+    expect(why).toContain(`${THIS} Shift cleared;`);
+    expect(why).toContain(`${OTHER} Shift missed on the worst-wait goal.`);
+    expect(why).toContain(AFTER_PRESS_VERDICT_NOTE);
+  }, 60_000);
+
+  it('misses a cleared day: 20 442 961 reads missed, and the run without it cleared — as plainly', () => {
+    const why = pairedRowOf(20_442_961n);
+    expect(why).toContain(`${THIS} Shift missed on the worst-wait goal;`);
+    expect(why).toContain(`${OTHER} Shift cleared.`);
+    expect(why).toContain(AFTER_PRESS_VERDICT_NOTE);
+  }, 60_000);
+
+  it('agrees: 20 260 824 reads cleared twice, and nothing connects the two', () => {
+    const why = pairedRowOf(20_260_824n);
+    expect(why).toContain(`${THIS} Shift cleared;`);
+    expect(why).toContain(`${OTHER} Shift cleared.`);
+    for (const word of ['still', 'either way', 'anyway', 'same verdict', 'would']) {
+      expect(new RegExp(`\\b${word}\\b`, 'iu').test(why), word).toBe(false);
+    }
+  }, 60_000);
 });
 
 describe('the moot-dispatcher census — what the brief tells the player before the run', () => {

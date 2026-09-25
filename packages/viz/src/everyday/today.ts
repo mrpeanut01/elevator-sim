@@ -42,8 +42,9 @@
  * own words that whether the crowd is comfortable is the day's to show. GitHub issue #208.
  */
 
-import { isServiceModeEvent, type ResolvedBuilding } from '@elevator-sim/core/browser';
+import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
+import { bookedOutCarsOf, wrinkleNoteOf } from '../shift/bookedOut.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { scheduledEventFor } from '../shift/calendar.js';
 import { FIRST_SESSION_LINE } from '../shift/firstSession.js';
@@ -115,6 +116,17 @@ export interface TodayRecord {
   readonly lede: string;
   /** The day's event, quoted — total, because `scheduledEventFor` falls through to the schedule. */
   readonly wrinkle: ShiftEvent;
+  /**
+   * The wrinkle's note **as the brief prints it** — `shift/bookedOut.ts#wrinkleNoteOf`, GitHub issue
+   * #596 item 3, [§ D983](../../../../DECISIONS.md).
+   *
+   * `wrinkle.note` verbatim on a day the tower books nothing. On a day it does, the ordinary day's
+   * *Nothing booked* is replaced rather than printed beside {@link outOfService}'s strip saying a car
+   * is booked out — which is what all four assessors of the post-wave-AG panel saw — and any other
+   * event's note is followed by one sentence naming the car. The Day report's header prints the same
+   * sentence from the same function, so the brief and the sheet cannot disagree about the day.
+   */
+  readonly wrinkleNote: string;
   /** § 6.2's strip, or `undefined` on a day that holds no car. */
   readonly outOfService: OutOfServiceStrip | undefined;
   /**
@@ -249,42 +261,15 @@ function carsHeldBy(event: ShiftEvent): number {
  * Cars this **tower's own schedule** takes out of passenger service after the day has started —
  * `shift/ladder.ts#ContractFabric.incidents`, [§ D871](../../../../DECISIONS.md).
  *
- * Read off `building.serviceEvents` rather than off the rung, and that is the whole reason this
- * sentence can be trusted: the building handed back here is the run's own
- * (`dev/state.ts#resolvedBuildingOf` is `shiftRunConfigOf(...).building`), so the strip names the
- * car the kernel will actually stand down. A second reading of the ladder would be two answers to
- * *which lift is away* — the caption-that-does-not-describe-the-picture defect this file's
- * neighbours have recorded a dozen times.
- *
- * `atS > 0` is what makes this *part-way through today* rather than *not in the building*: a car
- * stood down at the first instant is the second thing, and `carsOutOfService` is where that lives.
- *
- * Returns each car once, with whether the same schedule brings it back, so the sentence can say the
- * true one of two things rather than the safe one of one.
+ * The reading is `shift/bookedOut.ts#bookedOutCarsOf` since [§ D983](../../../../DECISIONS.md),
+ * moved there so the wrinkle card, the Day report's header and the stage read one expression rather
+ * than three. Read off `building.serviceEvents` of the run's own building, which is what makes the
+ * strip name the car the kernel will actually stand down.
  */
 function scheduledAwayOf(
   building: ResolvedBuilding | undefined,
 ): readonly { readonly carId: string; readonly returns: boolean }[] {
-  /*
-   * `isServiceModeEvent` rather than a field test: `ResolvedServiceEvent` is a union of a mode
-   * change, a derate and a range change (§ D523), and only the first has a `mode` and a `carId` at
-   * all. `core` exports the predicate for exactly this, and `shift/incidents.test.ts` narrows the
-   * same way.
-   */
-  const events = (building?.serviceEvents ?? []).filter(isServiceModeEvent);
-  const leaves = events.filter((entry) => entry.mode === 'out-of-service' && entry.atS > 0);
-  const seen = new Map<string, { carId: string; returns: boolean }>();
-  for (const leaving of leaves) {
-    if (seen.has(leaving.carId)) continue;
-    seen.set(leaving.carId, {
-      carId: leaving.carId,
-      returns: events.some(
-        (entry) =>
-          entry.carId === leaving.carId && entry.mode === 'in-service' && entry.atS > leaving.atS,
-      ),
-    });
-  }
-  return [...seen.values()].sort((a, b) => a.carId.localeCompare(b.carId));
+  return bookedOutCarsOf(building).map((car) => ({ carId: car.carId, returns: car.backAtS !== null }));
 }
 
 /**
@@ -536,6 +521,7 @@ export function todayOf(input: TodayInput): TodayRecord {
     towerName: building?.name ?? input.buildingId,
     lede: ledeOf(building, event, held),
     wrinkle: event,
+    wrinkleNote: wrinkleNoteOf(event, bookedOutCarsOf(building)),
     outOfService: outOfServiceOf(
       building,
       event,

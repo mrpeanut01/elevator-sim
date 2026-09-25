@@ -91,6 +91,7 @@ import type { BrowserResources } from '../dev/data.js';
 import { SIGNED_OUT, signedIn, type AccountState } from '../menu/account.js';
 import { shiftGoalsOf } from '../dev/leftRail.js';
 import { buildingConfigOf, initialState, type ViewerState } from '../dev/state.js';
+import { briefAsksOf } from '../everyday/briefView.js';
 import { createEverydayHost, type EverydayHostBindings } from '../everyday/host.js';
 import { railFooter } from '../everyday/rail.js';
 import { settingsScreenViewOf } from '../everyday/settingsView.js';
@@ -239,6 +240,33 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze([
             .goalsToday()
             .map((reading) => reading.goal.label),
         ),
+    },
+  },
+  {
+    id: 'asks-before-the-press',
+    figure: 'what today asks — the goal bars the brief prints, and the ones the day is graded on',
+    why:
+      'GitHub issue **#597**, and § D984 is the repair. The brief is drawn **before** *Start the ' +
+      'day*, and `everyday/host.ts#startRun` writes the whole-day window **on** that press, so a ' +
+      'brief that asked `goalsToday()` read the slice this state still was: on day 1 of a whole-day ' +
+      'tower it printed a 230 s worst wait and an 80 kJ energy bar, and the stage and the report ' +
+      'then graded the same day against 460 s and 350 kJ. A player agreed to one set of goals and ' +
+      'was graded on another. The `today-asks` pair could not see it: both of its sides read one ' +
+      'state, and the whole-day views it compares are built with the press’s patch already applied, ' +
+      'so the state the brief is drawn on was never a side of anything. This pair gives both sides ' +
+      'the **pre-press** state: the left is the brief’s own expression, the right is the Everyday ' +
+      'host after its own `startRun` has written its own patch, read the way the stage reads it. ' +
+      'It is the § D359 shape across time rather than across shells.',
+    left: {
+      surfaceId: 'everyday/briefView.ts#briefAsksOf',
+      read: (view) =>
+        asksOf(
+          briefAsksOf(createEverydayHost(hostBindingsFor(view))).map((reading) => reading.goal.label),
+        ),
+    },
+    right: {
+      surfaceId: 'everyday/host.ts#createEverydayHost',
+      read: (view) => asksOf(askedAfterThePress(view)),
     },
   },
   {
@@ -419,6 +447,30 @@ function hostBindingsFor(view: AgreementView): EverydayHostBindings {
     dailyBoard: undefined,
     onChange: () => () => undefined,
   };
+}
+
+/**
+ * The asks the stage reads **after** the Everyday host's own *Start the day* — § D984's right side.
+ *
+ * The one binding this lets write is `applyPatch`, into a copy of the view's state, and `startRun`
+ * records nothing and runs nothing: the press's whole effect on what a day asks is the patch it
+ * writes, and this harness still does not simulate (the *Cost* section). Everything else refuses
+ * exactly as {@link hostBindingsFor} does. The patch is the host's own — nothing here rebuilds
+ * `dayPatchFor` — so a press that changed what it writes moves this side with it.
+ */
+function askedAfterThePress(view: AgreementView): readonly string[] {
+  let state = view.state;
+  const bindings: EverydayHostBindings = {
+    ...hostBindingsFor(view),
+    state: () => state,
+    applyPatch: (patch) => {
+      state = { ...state, ...patch };
+    },
+    startRun: () => undefined,
+  };
+  const host = createEverydayHost(bindings);
+  host.startRun();
+  return host.goalsToday().map((reading) => reading.goal.label);
 }
 
 /* -------------------------------------------------------------------------- *

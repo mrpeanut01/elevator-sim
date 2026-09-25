@@ -819,6 +819,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'shift/incidents.ts#serviceEventsFor',
         'shift/incidents.ts#withIncidents',
         /*
+         * `shift/bookedOut.ts#bookedOutCarsOf` is the same false positive a third time (§ D983): it
+         * filters `ResolvedServiceEvent`s on the hyphenated modes and returns a car id and two
+         * seconds per car. The sentences built from those are `wrinkleNoteOf`'s and `carsPhraseOf`'s
+         * in the same module, and `shift/report.ts#bookedLine`'s, which the corpus drives.
+         */
+        'shift/bookedOut.ts#bookedOutCarsOf',
+        /*
+         * And `shift/goals.ts#SHIFT_GOAL_IDS` is the goal ids as a tuple (§ D982) — `worst-wait` is
+         * hyphenated — which is the id-table case `shift/types.ts#GOAL_OBSERVATION_IDS` is excluded
+         * under. The words a reader meets for a goal are its label and `GOAL_PLAIN_NAMES`, both driven.
+         */
+        'shift/goals.ts#SHIFT_GOAL_IDS',
+        /*
          * `render/theme.ts` is the same false positive again, and the most clear-cut instance of it:
          * it returns a record of CSS custom-property names to hex values — `--edge-mid` to
          * `#26303d` — and the scanner reads the hyphenated token names as adjacent words. There is

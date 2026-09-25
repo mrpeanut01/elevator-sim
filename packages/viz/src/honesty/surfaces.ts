@@ -203,6 +203,7 @@ import {
   stageCrowdCapOf,
   stageGoalsOf,
   stageHeaderOf,
+  stageBookedOutOf,
   stageInkFor,
   stageInterventionsOf,
   stageLegend,
@@ -556,14 +557,16 @@ import {
 import { baseDemandOf, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { everyWrinkle } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
-import { bestLineFor, goalsForDay, readGoal, readGoals } from '../shift/goals.js';
+import { bestLineFor, goalsForDay, readGoal, readGoals, yesterdayLabelOf } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
+import { AFTER_PRESS_ROW_ID } from '../shift/afterPress.js';
 import { pressCounterfactualOf } from '../shift/counterfactual.js';
 import {
   averageWaitFigure,
   clockRange,
   dayReportOf,
   NOT_RECORDED,
+  type DayReportInput,
   type ShapedDayReport,
   type ShiftPlan,
   type SingleRunReport,
@@ -2980,6 +2983,20 @@ interface ShiftDay {
    * review finding L1. The one pairing that is neither drawn whole nor refused whole.
    */
   readonly otherEquipment: WeekDayReport;
+  /**
+   * {@link report}'s after-press row with the unpressed side graded on **another run's** whole-run
+   * fold — [§ D982](../../../../DECISIONS.md).
+   *
+   * {@link report}'s pair is the recording against itself, so its two verdicts always read the same
+   * and the row's disagreeing wording — *this run reads Shift missed on …; the run without that press
+   * … reads Shift cleared* — would ship unswept. The decision agent's ruling asked for one arm where
+   * they can differ. The fold is the candidate dispatcher's run on the same day and crowd
+   * (`comparisonObservations`), which is a fixture exactly as the self-pair is: what is swept is the
+   * **wording** the grader produces for whichever pair of verdicts this case lands on, not a claim
+   * that this is the unpressed run. Only the after-press row is seeded off this sheet; every other
+   * field is {@link report}'s by construction.
+   */
+  readonly pairedAgainstCandidate: WeekDayReport;
 }
 
 interface ShiftBundle {
@@ -3117,7 +3134,7 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
         },
       },
     ];
-    const report = dayReportOf({
+    const reportInput = {
       ...common,
       subject: { kind: 'week-day' },
       plan: shiftPlan,
@@ -3159,6 +3176,35 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
         { when: 'lobby-queue-passes', whenValue: 30, then: 'hold-at-lobby' },
         { when: 'call-waited', whenValue: 30, then: 'jump-queue' },
       ],
+    } satisfies DayReportInput;
+    const report = dayReportOf(reportInput) as WeekDayReport;
+    /*
+     * § D982's second arm — see {@link ShiftDay.pairedAgainstCandidate}. The self-pair above always
+     * grades both sides alike; this one grades the unpressed side on the candidate run's fold, so the
+     * wording for two verdicts that differ is in the corpus on the cases where they do.
+     */
+    const selfPair = reportInput.pressCounterfactual;
+    /*
+     * And a tower booking beside it — § D983. The corpus builds its towers without a contract rung
+     * (`run.ts#buildingFor`), so no case books a car out and the header's booked-car lines, the
+     * rewritten wrinkle note and a missed worst wait's *car … was booked out* clause would ship
+     * unswept. Two fixture bookings on the recording's own first two cars, one that comes back and
+     * one that does not, so both arms of each sentence are reached. A fixture exactly as the pair
+     * is: what is swept is the wording, not a claim that this run lost a car.
+     */
+    const span = recording.endedAt - recording.startedAt;
+    const fixtureBookings = recording.shafts.slice(0, 2).map((shaft, index) => ({
+      carId: shaft.carId,
+      awayAtS: recording.startedAt + span * 0.25,
+      backAtS: index === 0 ? recording.startedAt + span * 0.5 : null,
+    }));
+    const pairedAgainstCandidate = dayReportOf({
+      ...reportInput,
+      pressCounterfactual:
+        selfPair === undefined
+          ? undefined
+          : { ...selfPair, wholeRunObservations: comparisonObservations },
+      bookedOut: fixtureBookings,
     }) as WeekDayReport;
     /*
      * The four sheets a **pairing** needs — issue #127, and each is one axis away from `report`.
@@ -3264,6 +3310,7 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       shorterShift,
       otherPattern,
       otherEquipment,
+      pairedAgainstCandidate,
     };
   });
 
@@ -3362,6 +3409,21 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * that function produces three counts. The strings it feeds are `shift/afterPress.ts`'s.
      */
     'shift/afterPress.ts#AFTER_PRESS_PAIR_NOTE',
+    /*
+     * The paired arm's verdict clause and its missed-goal names — § D982. Seeded on this bundle's
+     * intervened sheet and on {@link ShiftDay.pairedAgainstCandidate}, whose unpressed side is
+     * graded on another fold so the wording for two verdicts that differ is reached.
+     */
+    'shift/afterPress.ts#AFTER_PRESS_VERDICT_NOTE',
+    'shift/goals.ts#GOAL_PLAIN_NAMES',
+    'shift/goals.ts#goalPlainNameOf',
+    /*
+     * The booked-car sentences — § D983. Reached through `dayReportOf`'s header on
+     * {@link ShiftDay.pairedAgainstCandidate}, whose fixture bookings are the only ones in the
+     * corpus; the brief's copy of the note is `today.ts#todayOf`'s, which the TODAY adapter drives.
+     */
+    'shift/bookedOut.ts#wrinkleNoteOf',
+    'shift/bookedOut.ts#carsPhraseOf',
     'shift/goals.ts#goalsForDay',
     'shift/goals.ts#readGoal',
     'shift/goals.ts#readGoals',
@@ -3480,7 +3542,7 @@ const SHIFT_REPORT: SurfaceAdapter = {
          */
         seeds.push({
           field: `${at}.goals(${reading.goal.id}).was`,
-          text: was === '—' ? was : `was ${was}`,
+          text: yesterdayLabelOf(was),
           role: 'observation',
         });
         /*
@@ -3510,6 +3572,44 @@ const SHIFT_REPORT: SurfaceAdapter = {
         seeds.push({ field: `${at}.diagnosis(${row.id}).when`, text: row.when, role: 'label' });
         seeds.push({ field: `${at}.diagnosis(${row.id}).what`, text: row.what, role: 'observation' });
         seeds.push({ field: `${at}.diagnosis(${row.id}).why`, text: row.why, role: 'prose' });
+      }
+      /*
+       * The after-press row with its two verdicts graded on two different folds — § D982. One
+       * string: the row's `why`, where the verdicts are printed. Its `when` and `what` are the
+       * pressed run's and identical to the row above.
+       */
+      const flipRow = entry.pairedAgainstCandidate.diagnosis.find(
+        (row) => row.id === AFTER_PRESS_ROW_ID,
+      );
+      if (flipRow !== undefined) {
+        seeds.push({
+          field: `${at}.pairedAgainstCandidate.diagnosis(${flipRow.id}).why`,
+          text: flipRow.why,
+          role: 'prose',
+        });
+      }
+      /*
+       * The same sheet's booked-car header lines and any diagnosis sentence the fixture bookings
+       * changed — § D983. Seeded by difference from {@link report}, so a line both sheets share is
+       * swept once rather than twice.
+       */
+      const sharedMeta = new Set(report.metaLines);
+      for (const [index, line] of entry.pairedAgainstCandidate.metaLines.entries()) {
+        if (sharedMeta.has(line)) continue;
+        seeds.push({
+          field: `${at}.pairedAgainstCandidate.metaLines[${String(index)}]`,
+          text: line,
+          role: 'label',
+        });
+      }
+      for (const row of entry.pairedAgainstCandidate.diagnosis) {
+        if (row.id === AFTER_PRESS_ROW_ID) continue;
+        if (report.diagnosis.some((other) => other.id === row.id && other.why === row.why)) continue;
+        seeds.push({
+          field: `${at}.pairedAgainstCandidate.diagnosis(${row.id}).why`,
+          text: row.why,
+          role: 'prose',
+        });
       }
       for (const lever of report.levers) {
         seeds.push({ field: `${at}.levers(${lever.id}).title`, text: lever.title, role: 'label' });
@@ -10426,6 +10526,13 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
   id: 'everyday/stageScreenModel.ts#stageHeaderOf',
   covers: [
     'everyday/stageScreenModel.ts#stageHeaderOf',
+    /*
+     * The booked-out car's pill — § D983. Seeded at every sample playhead below over two fixture
+     * bookings on the recording's own cars, because the corpus builds no contract rung and so no
+     * case books a car out: all three of its playhead arms (*still running*, *out now*, *back*) and
+     * both of its span arms are reached.
+     */
+    'everyday/stageScreenModel.ts#stageBookedOutOf',
     'everyday/stageScreenModel.ts#stageAlarmOf',
     'everyday/stageScreenModel.ts#stageInterventionsOf',
     'everyday/stageScreenModel.ts#stageBarModelOf',
@@ -10910,6 +11017,27 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         });
       }
       seeds.push({ field: `stage(@${stamp}s).driving`, text: head.drivingLabel, role: 'label' });
+      /*
+       * § D983's pill, over fixture bookings — see this adapter's `covers`. A schedule written into
+       * the building before the run, so it is on the temporal axis for the same reason `next` is:
+       * it names instants the playhead has not reached, and must name only the schedule there.
+       */
+      const stageSpan = recording.endedAt - recording.startedAt;
+      for (const [index, line] of stageBookedOutOf({
+        bookedOut: recording.shafts.slice(0, 2).map((shaft, which) => ({
+          carId: shaft.carId,
+          awayAtS: recording.startedAt + stageSpan * 0.25,
+          backAtS: which === 0 ? recording.startedAt + stageSpan * 0.5 : null,
+        })),
+        simTimeS: at,
+      }).entries()) {
+        seeds.push({
+          field: `stage(@${stamp}s).booked[${String(index)}]`,
+          text: line,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+      }
       /*
        * The car readouts — § D347's live figure, one per car. Counts at the playhead, both of
        * them: `frameAt` folds the occupancy and the shaft carries the capacity, so the pair is
