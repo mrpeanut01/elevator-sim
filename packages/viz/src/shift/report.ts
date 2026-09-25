@@ -2336,10 +2336,20 @@ const LEVERS: readonly ReportLever[] = Object.freeze([
     title: 'Weight fairness up',
     body: 'Rescue the forgotten floor rather than shaving seconds off the easy calls. Your worst wait falls; your average may not.',
   }),
+  /*
+   * **The mechanism clause is struck** — first-day swarm S2 item 5, point 2. This read *"…pools
+   * riders by destination in the lobby, which cuts stops per trip — the thing that actually costs
+   * time"*: a statement of *why* the control helps, which nothing in this tree measures for the goals
+   * this sheet grades, and which § D595 measured pointing the other way on waits at a supertall
+   * (AWT and WT95 **WORSE** on both destination arms at One-WTC-class). `CLAUDE.md` records seven
+   * sentences of this exact kind withdrawn from this repository; the rule is to measure it or say it
+   * is unmeasured. So the card says what the control **is** and states no effect, and the door
+   * § D503 licenses (`everyday/reportView.ts`'s workshop route) is unchanged.
+   */
   Object.freeze({
     id: 'ask-destination',
     title: 'Ask where they’re going',
-    body: 'Destination dispatch pools riders by destination in the lobby, which cuts stops per trip — the thing that actually costs time.',
+    body: 'Destination dispatch asks each rider for their floor before a car is chosen for them. What that does to the waits on this building is a question for paired runs, not for this card.',
   }),
 ]);
 
@@ -2500,24 +2510,18 @@ function leverPointersFor(
   }
 
   /*
-   * Ask where they're going — the card's own sentence says destination dispatch pools riders *in
-   * the lobby*, so the observation that points at it is a pile-up that stood on an entrance floor.
-   * `VizFloor.isEntrance` is the building's own answer; nothing here infers a lobby from a floor id.
-   *
-   * Deliberately **not** keyed on stops per trip, which is what the card actually claims to cut: no
-   * figure on this recording reports it, and pointing at the card with an observation that does not
-   * measure the thing named would be the caption-that-does-not-describe-the-picture failure again.
+   * **Ask where they're going is pointed at by nothing, and that is the ruling rather than a gap** —
+   * first-day swarm S2 item 5, which found the pointer unlicensed four ways. It fired on a deep
+   * queue at an entrance floor, and this comment's own previous paragraph said why that could not
+   * support it: *"Deliberately **not** keyed on stops per trip, which is what the card actually
+   * claims to cut: no figure on this recording reports it."* An observation that does not measure
+   * the thing named is the card pointing at itself. The measured evidence is the other way where
+   * there is any — § D595's supertall, AWT and WT95 worse on both destination arms — and the one
+   * recorded run of it on the day an assessor met it took the queue from 194 to 519 (Merdeka, one
+   * seed, two runs, a fact about those runs and not an estimate). So the card keeps its glossary
+   * place and its door, and no day promotes it; `report.test.ts` holds that on a run whose deepest
+   * queue stood on an entrance floor, which is the observation that used to fire.
    */
-  const entrance =
-    floorId === null
-      ? undefined
-      : recording.floors.find((floor) => floor.id === floorId && floor.isEntrance);
-  if (entrance !== undefined && deep) {
-    pointers.set(
-      'ask-destination',
-      `the deepest queue of the day stood at ${entrance.label ?? entrance.id}, an entrance floor`,
-    );
-  }
 
   return pointers;
 }

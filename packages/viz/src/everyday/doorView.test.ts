@@ -79,12 +79,21 @@ const TODAY: TodayRecord = {
   driver: 'Steady hand',
 };
 
+/** Building names by id, as the shipped documents carry them — the fixture for `nameOf` (GitHub issue #599). */
+const NAMES: Readonly<Record<string, string>> = {
+  'garden-apartments': 'Garden Apartments',
+  'crown-hotel': 'Crown Hotel',
+  'chancery-house': 'Chancery House',
+  'midtown-office': 'Midtown Office',
+};
+const NAME_OF = (buildingId: string): string | undefined => NAMES[buildingId];
+
 const viewAt = (
   dayOffset: number,
   dayClosed: boolean,
   week: WeekState = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4)]),
 ): ReturnType<typeof doorScreenViewOf> =>
-  doorScreenViewOf({ week, today: { ...TODAY, day: week.day }, dayOffset, dayClosed });
+  doorScreenViewOf({ week, today: { ...TODAY, day: week.day }, dayOffset, dayClosed, nameOf: NAME_OF });
 
 describe('§ 16 rule 1 — an unfinished day shows the em dash', () => {
   it('withholds today’s score until the day is closed, and never draws a zero', () => {
@@ -131,9 +140,27 @@ describe('the seven chips are matched to the week by day number', () => {
     const week = weekWith(3, [closedDay(1, 'garden-apartments'), closedDay(2, 'crown-hotel')]);
     const byDay = new Map(viewAt(0, false, week).chips.map((chip) => [chip.day, chip]));
     // Not the building standing selected now — two different claims on a week that changed tower.
-    expect(byDay.get(1)?.tower).toBe('garden-apartments');
-    expect(byDay.get(2)?.tower).toBe('crown-hotel');
+    expect(byDay.get(1)?.tower).toBe('Garden Apartments');
+    expect(byDay.get(2)?.tower).toBe('Crown Hotel');
     expect(byDay.get(3)?.tower).toBe('Chancery House');
+  });
+
+  it('names a closed day and today the same way — GitHub issue #599', () => {
+    /*
+     * The closed chip printed `record.buildingId` and today's printed the document's name, so one
+     * strip named one tower two ways: *midtown-office* on Thursday, *Midtown Office* beside it.
+     * Today closed on the same tower as yesterday is the case, and the id may appear on neither.
+     */
+    const week = weekWith(4, [closedDay(3, 'midtown-office'), closedDay(4, 'midtown-office')]);
+    const today: TodayRecord = { ...TODAY, day: 4, towerName: 'Midtown Office' };
+    const chips = doorScreenViewOf({ week, today, dayOffset: 0, dayClosed: true, nameOf: NAME_OF }).chips;
+    const byDay = new Map(chips.map((chip) => [chip.day, chip]));
+    expect(byDay.get(3)?.tower).toBe('Midtown Office');
+    expect(byDay.get(4)?.tower).toBe('Midtown Office');
+    expect(chips.map((chip) => chip.tower)).not.toContain('midtown-office');
+    /* An id this build has no document for is printed as itself, `todayOf`'s own fallback. */
+    const unknown = weekWith(2, [closedDay(1, 'no-such-tower')]);
+    expect(viewAt(0, false, unknown).chips.find((chip) => chip.day === 1)?.tower).toBe('no-such-tower');
   });
 });
 

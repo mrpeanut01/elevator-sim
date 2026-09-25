@@ -1719,8 +1719,13 @@ describe('the levers point at what this run showed — issue #55', () => {
   it('reorders and annotates on a day that was outrun, and leaves the glossary alone otherwise', () => {
     const outrun = reportOf(saturated);
     const quiet = reportOf(clean);
-    expect(outrun.levers.map((lever) => lever.id)).not.toEqual(
-      quiet.levers.map((lever) => lever.id),
+    /*
+     * Compared on the bodies rather than the order since first-day S2 item 5: the order moved on
+     * this fixture only because its lobby queue promoted *Ask where they're going*, which no
+     * observation does any more, and the two cards it does point at lead the glossary already.
+     */
+    expect(outrun.levers.map((lever) => lever.body)).not.toEqual(
+      quiet.levers.map((lever) => lever.body),
     );
     // The lever a day the building was outrun points at leads, and says why in the run's own counts.
     expect(outrun.levers[0]?.id).toBe('add-a-car');
@@ -1807,6 +1812,43 @@ describe('the levers point at what this run showed — issue #55', () => {
     expect(body).toContain(String(observations.peakQueue));
     // The handoff's own sentence survives underneath the clause this run added.
     expect(body).toContain('Split the floors between cars during the peak only');
+  });
+
+  it('never promotes destination dispatch, even on the queue that used to fire it — first-day S2 item 5', () => {
+    /*
+     * The pointer fired on a deep queue at an entrance floor, an observation its own comment said
+     * does not measure what the card claims to cut; § D595 measured destination arms worse on waits
+     * at a supertall; and the one run of it on the day an assessor met it made the queue worse. So
+     * the observation that used to fire is built here on purpose — the deepest queue at an entrance
+     * floor, far past the bar — and the card must not lead, must not say *Today points here*, and
+     * must state no mechanism. The door stays (§ D503): the card is still on the sheet.
+     */
+    const lobby = saturated.floors.find((floor) => floor.isEntrance);
+    if (lobby === undefined) throw new Error('the saturated fixture has no entrance floor');
+    const observations = { ...observationsOfRun(saturated), peakQueueFloorId: lobby.id, peakQueue: 519 };
+    const report = weekDay(
+      dayReportOf({
+        recording: saturated,
+        observations,
+        goals: goalsForDay(4),
+        week: openWeek('c2'),
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        calendar: null,
+        plan: PLAN,
+        subject: { kind: 'week-day' },
+      }),
+    );
+    const card = report.levers.find((lever) => lever.id === 'ask-destination');
+    expect(card, 'the card left the sheet; § D503 keeps its door').toBeDefined();
+    expect(card?.body).not.toContain('Today points here');
+    expect(report.levers[0]?.id).not.toBe('ask-destination');
+    /* No mechanism: the struck clause, and any *because/cuts/so that* standing in for it. */
+    expect(card?.body).not.toMatch(/stops per trip|actually costs|\bcuts?\b|\bbecause\b|\bpools?\b/iu);
+    for (const recording of [clean, saturated, missedWithoutSaturating]) {
+      const body = reportOf(recording).levers.find((lever) => lever.id === 'ask-destination')?.body ?? '';
+      expect(body).not.toContain('Today points here');
+    }
   });
 
   it('drops the lever the run has already pulled', () => {

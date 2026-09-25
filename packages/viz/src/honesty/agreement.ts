@@ -309,6 +309,7 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze([
                * in — and the next figure added to this pair might read it.
                */
               towerToday: view.state.buildingId,
+              nameOf: () => undefined,
               dayClosed: view.dayClosed,
               // The shipped pairing: a sheet stands exactly when the day is closed. The
               // two-can-disagree arm is `weekView.test.ts`'s, where it is a claim about a control.

@@ -28,6 +28,7 @@ import { RUSH_SEED, RUSH_TEMPLATE_ID, rushOutcomeOf, rushPatchOf } from './rush.
 import { REPLAY_COPY } from './replay.js';
 import { CAREER_CONTRACT_ID, RUSH_CONTRACT_ID, REPLAY_CONTRACT_ID, openWeek } from '../shift/week.js';
 import { CONTRACTS } from '../shift/contracts.js';
+import { pressDayFor } from '../shift/ladder.js';
 import type { CareerStore } from './careerStore.js';
 
 import { offerRefusalOf, openingCareer, towerById, type CampaignTower } from '../campaign/career.js';
@@ -2457,6 +2458,38 @@ describe('GitHub issue #594 — the career parks the Scenario record and gives i
     host.playPressDay('c7');
     expect(host.campaignDay()).toBeUndefined();
     expect(h.state.week.contractId).not.toBe(CAREER_CONTRACT_ID);
+  });
+
+  it('runs the day after a pinned day on the crowd the session had, not the pin — first-day S3 § 4.3', () => {
+    /*
+     * `openTomorrowPatch` never touches `seed`, and only `chooseTower` restored the one
+     * `playPressDay` captured. So Tuesday ran on a seed measured on somebody else's Monday, which
+     * the seed line then called *a crowd of this run's own* with nothing the player chose behind it.
+     */
+    const h = harnessOf({ ...base(), week: openWeek('c1'), buildingId: 'garden-apartments' });
+    const host = createEverydayHost({
+      ...h.bindings,
+      applyPatch: (patch) => {
+        h.calls.push('applyPatch');
+        h.patches.push(patch);
+        h.state = { ...h.state, ...patch };
+      },
+    });
+    const before = h.state.seed;
+    expect(host.playPressDay('c2')).toBeUndefined();
+    const pinned = pressDayFor('c2');
+    if (pinned === undefined) throw new Error('c2 pins no day');
+    expect(h.state.seed).toBe(BigInt(pinned.seedText));
+    expect(before).not.toBe(BigInt(pinned.seedText));
+    /* The pinned day closes. */
+    h.state = { ...h.state, recording: A_RECORDING, report: A_REPORT };
+    host.openTomorrow();
+    expect(h.state.week.day).toBe(2);
+    expect(h.state.seed).toBe(before);
+    /* Spent: a second tomorrow does not restore it again over a crowd the player since chose. */
+    h.state = { ...h.state, seed: 424_242n, recording: A_RECORDING, report: A_REPORT };
+    host.openTomorrow();
+    expect(h.state.seed).toBe(424_242n);
   });
 
   it('is a no-op with no career day standing', () => {

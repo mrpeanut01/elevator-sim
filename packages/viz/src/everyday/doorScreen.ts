@@ -79,6 +79,7 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
     }),
     dayOffset,
     dayClosed: host.runState().dayClosed,
+    nameOf: (buildingId) => host.buildingById(buildingId)?.name,
   });
 }
 

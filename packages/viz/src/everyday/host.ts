@@ -2608,6 +2608,25 @@ export function createEverydayHost(
    */
   let pressDaySeedBase: bigint | undefined;
 
+  /**
+   * **Every way off a pinned day puts the crowd back** — the patch that does it, or `{}`, and the
+   * base is spent either way.
+   *
+   * Two callers, and the second is the defect: {@link EverydayHost.chooseTower} restored the base
+   * and {@link EverydayHost.openTomorrow} did not, because `openTomorrowPatch` never touches `seed`.
+   * So after a pinned Monday, Tuesday ran on the pinned seed — a crowd measured on somebody else's
+   * first day, under a seed line that then called it *a crowd of this run's own* for no reason the
+   * player had given (first-day swarm S3 § 4.3). One function rather than the same three lines
+   * twice, so a third route off a pinned day has one thing to call and cannot restore half of it.
+   * Recorded here under [§ D405](../../../../DECISIONS.md): the decision is this host's.
+   */
+  const pressDaySeedRestore = (): { readonly seed?: bigint } => {
+    if (pressDaySeedBase === undefined) return {};
+    const base = pressDaySeedBase;
+    pressDaySeedBase = undefined;
+    return b.state().seed === base ? {} : { seed: base };
+  };
+
   /** The horizon the Scenario press runs `buildingId` on — `dayLength.ts#scenarioHorizonFor`. */
   const horizonForBuilding = (buildingId: string): RunHorizon | undefined =>
     scenarioHorizonFor(
@@ -3069,6 +3088,7 @@ export function createEverydayHost(
       b.applyPatch({
         ...openTomorrowPatch(state.week),
         ...dayPatchFor(b),
+        ...pressDaySeedRestore(),
         campaignFitOut: undefined,
         campaignEventId: undefined,
       });
@@ -3833,11 +3853,8 @@ export function createEverydayHost(
        * reason given. So it goes back to the one the session had — which is the day's, or a
        * `?seed=` deep link, and in either case what the seed line was saying before.
        */
-      if (pressDaySeedBase !== undefined) {
-        const base = pressDaySeedBase;
-        pressDaySeedBase = undefined;
-        if (b.state().seed !== base) b.applyPatch({ seed: base });
-      }
+      const restore = pressDaySeedRestore();
+      if (restore.seed !== undefined) b.applyPatch(restore);
       moveWeekTo(contractId);
       notifyCampaign();
     },

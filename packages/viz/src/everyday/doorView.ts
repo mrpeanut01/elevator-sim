@@ -135,6 +135,12 @@ export interface DoorScreenInput {
   readonly dayOffset: number;
   /** Whether the run standing on the stage has been filed — `host.runState().dayClosed`. */
   readonly dayClosed: boolean;
+  /**
+   * A building's own name, by id, for a closed chip — `weekView.ts#WeekScreenInput.nameOf`'s field
+   * and reason, GitHub issue #599: a closed chip printed the tower's id beside today's chip printing
+   * its name.
+   */
+  readonly nameOf: (buildingId: string) => string | undefined;
 }
 
 /**
@@ -263,7 +269,12 @@ function chipsOf(input: DoorScreenInput): readonly DoorDayChip[] {
       weekday: day < 1 ? EM_DASH : shortWeekday(week.dayIdx + offset),
       // The tower the day was **run on**, from its own record. A day with no record says so with
       // the placeholder rather than borrowing the building standing selected now.
-      tower: closed?.record?.buildingId ?? (isToday ? input.today.towerName : EM_DASH),
+      tower:
+        closed?.record == null
+          ? isToday
+            ? input.today.towerName
+            : EM_DASH
+          : (input.nameOf(closed.record.buildingId) ?? closed.record.buildingId),
       score: closed === undefined ? EM_DASH : percentFigure(closed.minutePct),
       note: noteFor({ isToday, selected, closed: closed !== undefined, exists: day >= 1 }),
       selected,

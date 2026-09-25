@@ -57,6 +57,15 @@ function dayOf(day: number, observed: GoalObservations): DayOutcome {
   });
 }
 
+/** Building names by id, as the shipped documents carry them — the fixture for `nameOf` (GitHub issue #599). */
+const NAMES: Readonly<Record<string, string>> = {
+  'garden-apartments': 'Garden Apartments',
+  'crown-hotel': 'Crown Hotel',
+  'chancery-house': 'Chancery House',
+  'midtown-office': 'Midtown Office',
+};
+const NAME_OF = (buildingId: string): string | undefined => NAMES[buildingId];
+
 const weekWith = (day: number, history: readonly DayOutcome[]): WeekState => ({
   ...openWeek(),
   day,
@@ -67,7 +76,25 @@ const weekWith = (day: number, history: readonly DayOutcome[]): WeekState => ({
 });
 
 const viewOf = (week: WeekState, dayClosed: boolean): ReturnType<typeof weekScreenViewOf> =>
-  weekScreenViewOf({ week, towerToday: 'Chancery House', dayClosed, sheetStanding: dayClosed });
+  weekScreenViewOf({ week, towerToday: 'Chancery House', nameOf: NAME_OF, dayClosed, sheetStanding: dayClosed });
+
+describe('the tower on a card — GitHub issue #599', () => {
+  it('names a closed day by the name today’s card uses, not by its id', () => {
+    /*
+     * A closed card printed `record.buildingId` — *chancery-house* — beside today's card printing
+     * the document's *Chancery House*, so one strip named one tower two ways. A closed yesterday and
+     * a closed today on the same tower, which is the pair a player meets every evening.
+     */
+    const week = weekWith(3, [dayOf(2, MET), dayOf(3, MET)]);
+    const cards = viewOf(week, true).cards;
+    const yesterday = cards.find((card) => card.day === 2);
+    const today = cards.find((card) => card.isToday);
+    expect(today?.day).toBe(3);
+    expect(yesterday?.tower).toBe('Chancery House');
+    expect(today?.tower).toBe('Chancery House');
+    expect(cards.map((card) => card.tower)).not.toContain('chancery-house');
+  });
+});
 
 describe('§ 16 rule 1 — today is withheld until *Close the day* has been pressed', () => {
   it('draws the em dash and *not closed yet*, never a `0%`', () => {
@@ -157,7 +184,7 @@ describe('the report’s one entrance — `WeekDayCard.readable`', () => {
   it('opens today’s card only once the day is closed **and** a sheet is standing', () => {
     const open = weekScreenViewOf({
       week,
-      towerToday: 'Chancery House',
+      towerToday: 'Chancery House', nameOf: NAME_OF,
       dayClosed: false,
       sheetStanding: false,
     });
@@ -168,7 +195,7 @@ describe('the report’s one entrance — `WeekDayCard.readable`', () => {
     // and a card that opened an empty sheet would be § 16 rule 4's defect.
     const cleared = weekScreenViewOf({
       week,
-      towerToday: 'Chancery House',
+      towerToday: 'Chancery House', nameOf: NAME_OF,
       dayClosed: true,
       sheetStanding: false,
     });
@@ -176,7 +203,7 @@ describe('the report’s one entrance — `WeekDayCard.readable`', () => {
 
     const filed = weekScreenViewOf({
       week,
-      towerToday: 'Chancery House',
+      towerToday: 'Chancery House', nameOf: NAME_OF,
       dayClosed: true,
       sheetStanding: true,
     });
@@ -188,7 +215,7 @@ describe('the report’s one entrance — `WeekDayCard.readable`', () => {
   it('never opens a past day, because this build keeps one sheet', () => {
     const filed = weekScreenViewOf({
       week,
-      towerToday: 'Chancery House',
+      towerToday: 'Chancery House', nameOf: NAME_OF,
       dayClosed: true,
       sheetStanding: true,
     });

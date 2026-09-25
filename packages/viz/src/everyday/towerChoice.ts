@@ -267,6 +267,11 @@ export function pressDayChoiceOf(
     : { available: false, standing, note: PRESS_DAY_CHOICE_COPY.notAsMeasured };
 }
 
+/** Whether a week holds anything a player did — a closed day, or a day past the first. */
+function weekHasBeenPlayed(week: WeekState): boolean {
+  return week.history.length > 0 || week.day > 1 || week.closedDay !== null;
+}
+
 /** What {@link towerChoiceViewOf} needs. Threaded rather than imported, `today.ts`'s own idiom. */
 export interface TowerChoiceInput extends PressDayChoiceInput {
   readonly week: WeekState;
@@ -285,7 +290,16 @@ export interface TowerChoiceInput extends PressDayChoiceInput {
  * picker does not list, and every listed tower is somewhere they can go.
  */
 export function towerChoiceViewOf(input: TowerChoiceInput): TowerChoiceView {
-  const parkedIds = new Set(input.parked.map((entry) => entry.contractId));
+  /*
+   * **Only a parked week somebody has played is *a week going here*** — the post-AH panel's B.md:
+   * a fresh profile read *"you have a week going here — this picks it back up"* on Garden
+   * Apartments before anything had been played, because the first-session draw parks the opening
+   * week it moves off. Picking that week back up lands on day 1 with no history, which is a fresh
+   * week in everything the player can see, so the row says `open`. The press is unchanged —
+   * `switchWeek` still resumes whatever is parked — and the sentence now describes it on both
+   * kinds of parked week. Recorded here under [§ D405](../../../../DECISIONS.md).
+   */
+  const parkedIds = new Set(input.parked.filter(weekHasBeenPlayed).map((entry) => entry.contractId));
   const rows = CONTRACTS.map((contract): TowerChoiceRow => {
     const selected = contract.id === input.week.contractId;
     const arrival: TowerChoiceArrival = selected

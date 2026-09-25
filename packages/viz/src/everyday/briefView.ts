@@ -295,7 +295,7 @@ export function raceAgainstCard(): BriefRefusalCard {
  */
 export const SANDBOX_DOOR_LABEL = 'Change it anyway — the day stops counting';
 
-export function lockedForScore(): BriefRefusalCard {
+export function lockedForScore(crowdIsToday: boolean): BriefRefusalCard {
   const built = isScreenBuilt('tuner');
   return {
     heading: 'LOCKED FOR SCORE',
@@ -310,9 +310,21 @@ export function lockedForScore(): BriefRefusalCard {
      * have two arms: this card says what LOCKED FOR SCORE *means* — which of the run’s inputs are
      * not the reader’s to pick here — rather than making a claim about who else is playing it.
      * The two lines that do make that claim are on the same screen and carry the condition.
+     *
+     * **And it carries the same condition now, because it was false on the days that do not have
+     * it** — the post-AH panel's D.md, *"LOCKED FOR SCORE — The crowd is the day's"* printed
+     * directly under the seed line's *"a crowd of this run's own, not the day's"*. A pinned press
+     * day plays the pin's crowd and a `?seed=` link plays the reader's, and on either this card was
+     * the one of three sentences that said otherwise. So the first clause is keyed on
+     * `TodayRecord.crowdIsToday`, the one field all three read (`today.ts`'s own docstring on it),
+     * and the rest — what is locked and what changing it costs — is unchanged in both arms.
+     * Recorded here under [§ D405](../../../../DECISIONS.md): nothing outside this card moved.
      */
     what:
-      'The crowd is the day’s and the tower is your week’s — neither is yours to pick from here. ' +
+      (crowdIsToday
+        ? 'The crowd is the day’s and the tower is your week’s — neither is yours to pick from here. '
+        : 'The crowd is this run’s own rather than the day’s, and the tower is your week’s — neither ' +
+          'is yours to pick from here. ') +
       'You can change all of it, the machines too — the run just stops counting.',
     /*
      * **The door names a state, never a destination** — GitHub issue #225,
@@ -391,7 +403,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
       count: `${String(options.length)} to choose from · ${String(mine)} of yours`,
     },
     ghost: raceAgainstCard(),
-    locked: lockedForScore(),
+    locked: lockedForScore(today.crowdIsToday),
     barNote: `${BRIEF_NOTE_LEAD}${today.driver}`,
   };
 }

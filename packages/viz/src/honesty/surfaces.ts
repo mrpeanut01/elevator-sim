@@ -12817,12 +12817,15 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
             today,
             dayOffset: offset,
             dayClosed: closed,
+            nameOf: () => context.buildingName,
           });
           const where = `${arm}.door${String(offset)}`;
           seeds.push({ field: `${where}.kind`, text: door.kindPill, role: 'label' });
           seeds.push({ field: `${where}.stepper`, text: door.stepper.label, role: 'label' });
           seeds.push({ field: `${where}.rule`, text: door.rule, role: 'prose' });
           for (const chip of door.chips) {
+            /* The tower a chip names — GitHub issue #599: an id on a closed chip, a name on today's. */
+            seeds.push({ field: `${where}.chip.tower`, text: chip.tower, role: 'label' });
             seeds.push({ field: `${where}.chip.score`, text: chip.score, role: 'observation' });
             seeds.push({ field: `${where}.chip.note`, text: chip.note, role: 'label' });
           }
@@ -12918,6 +12921,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         const week = weekScreenViewOf({
           week: entry.week,
           towerToday: context.buildingName,
+          nameOf: () => context.buildingName,
           dayClosed: closed,
           // A sheet stands exactly when the day is closed here, which is the shipped pairing; the
           // two-can-disagree arm is `weekView.test.ts`'s, where it is a claim about a control.
@@ -12925,6 +12929,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         });
         seeds.push({ field: `${arm}.week.streak`, text: week.streakLine, role: 'observation' });
         for (const card of week.cards) {
+          seeds.push({ field: `${arm}.week.card.tower`, text: card.tower, role: 'label' });
           seeds.push({ field: `${arm}.week.card.score`, text: card.score, role: 'observation' });
           seeds.push({ field: `${arm}.week.card.note`, text: card.note, role: 'label' });
         }
@@ -13104,7 +13109,14 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       role: 'label',
     });
     seeds.push({ field: 'brief.ghost.why', text: raceAgainstCard().why, role: 'reason' });
-    seeds.push({ field: 'brief.locked.why', text: lockedForScore().why, role: 'reason' });
+    seeds.push({ field: 'brief.locked.why', text: lockedForScore(true).why, role: 'reason' });
+    /*
+     * Both arms of the card's first clause, by name — the post-AH panel's *"The crowd is the day's"*
+     * under a seed line saying it was not. The case's own record draws one arm through
+     * `briefScreenViewOf`; the other is a pinned day or a `?seed=` link, which no case is.
+     */
+    seeds.push({ field: 'brief.locked.what.today', text: lockedForScore(true).what, role: 'reason' });
+    seeds.push({ field: 'brief.locked.what.own', text: lockedForScore(false).what, role: 'reason' });
 
     return singleRun(this.id, seeds);
   },
