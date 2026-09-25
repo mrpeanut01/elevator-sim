@@ -51,6 +51,7 @@ import {
   type ShiftPlan,
   type WeekDayReport,
 } from '../shift/report.js';
+import { reportWindowNameOf } from '../shift/reportWindow.js';
 import type { GoalReading, ReportFigure } from '../shift/types.js';
 import { closeDay, openWeek, outcomeOf } from '../shift/week.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
@@ -736,8 +737,12 @@ describe('the rest of the sheet', () => {
         report.levers.map((lever) => ({ title: lever.title, body: lever.body })),
       );
     }
-    expect(reportOf(clean).levers.map((lever) => lever.id)).not.toEqual(
-      reportOf(saturated).levers.map((lever) => lever.id),
+    /*
+     * On the bodies since first-day S2 item 5: the two runs' orders differed only because the
+     * saturated fixture's lobby queue promoted the destination card, which no observation does now.
+     */
+    expect(reportOf(clean).levers.map((lever) => lever.body)).not.toEqual(
+      reportOf(saturated).levers.map((lever) => lever.body),
     );
   });
 
@@ -1275,7 +1280,7 @@ describe('what moved since the run before this one — issue #38', () => {
     expect(wait?.afterCount).toContain(String(swapped.summary.waitCount));
     // And its window, because a mean over the peak five minutes is a different claim from a mean
     // over the day even when the two counts happen to agree.
-    expect(wait?.afterCount).toContain(swapped.summary.reportWindow.id);
+    expect(wait?.afterCount).toContain(reportWindowNameOf(swapped.summary.reportWindow.id));
   });
 
   it('gives the two runs two counts, and keeps them two when they differ', () => {
@@ -2239,7 +2244,7 @@ describe('Casual asks a different question of the same day — issues #110 and #
     const [casual, engineer] = both(reportOf(clean));
     const at = (view: ReportView, label: string): number =>
       view.figures.findIndex((cell) => cell.label === label);
-    for (const people of ['CARRIED', 'TOOK THE STAIRS', 'WORST WAIT', 'DEEPEST QUEUE']) {
+    for (const people of ['CARRIED', 'PAST THE GIVE-UP LINE', 'WORST WAIT', 'DEEPEST QUEUE']) {
       expect(at(casual, people), people).toBeLessThan(at(casual, 'AVERAGE WAIT'));
     }
     // Engineer's own order is untouched, which is the half that makes this a reframing rather than
@@ -2250,7 +2255,7 @@ describe('Casual asks a different question of the same day — issues #110 and #
       'AVERAGE WAIT',
       'WORST WAIT',
       'DEEPEST QUEUE',
-      'TOOK THE STAIRS',
+      'PAST THE GIVE-UP LINE',
       'WORK DONE',
       'WORK PER DELIVERED LEG',
     ]);
@@ -2306,11 +2311,18 @@ describe('Casual asks a different question of the same day — issues #110 and #
 
   it('translates the two engineer terms #100 names, without deleting either', () => {
     const [casual, engineer] = both(reportOf(clean));
-    for (const term of ['peak-5min', 'confidence interval']) {
+    /*
+     * The window is named in words on the sheet since the post-AH panel's L3, so the term both
+     * registers carry is its plain name; the engine's id is on neither, and Casual's gloss no
+     * longer calls a five-minute window *the busiest* (`report.ts#smallPrintFor`'s refusal).
+     */
+    const windowName = reportWindowNameOf(clean.summary.reportWindow.id);
+    for (const term of [`${windowName} window`, 'confidence interval']) {
       expect(engineer.smallPrint, term).toContain(term);
       expect(casual.smallPrint, term).toContain(term);
     }
-    expect(casual.smallPrint).toMatch(/busiest\s+five\s+minutes/);
+    expect(casual.smallPrint).not.toContain(`${clean.summary.reportWindow.id} window`);
+    expect(casual.smallPrint).not.toMatch(/busiest\s+five\s+minutes/);
   });
 
   it('heads the levers with the question in Casual and leaves the markup’s words in Engineer', () => {
@@ -2357,7 +2369,7 @@ describe('Casual asks a different question of the same day — issues #110 and #
     expect(engineer.figures[0]?.label).toBe('CARRIED');
     expect(casual.figures.map((cell) => cell.label)).toEqual([
       'CARRIED',
-      'TOOK THE STAIRS',
+      'PAST THE GIVE-UP LINE',
       'WORST WAIT',
       'DEEPEST QUEUE',
       'AWAY INSIDE A MINUTE',

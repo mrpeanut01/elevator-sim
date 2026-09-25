@@ -100,7 +100,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   /* the three facts */
   const facts = el(doc, 'div', 'everyday-rush-facts');
   facts.style.cssText = `display:flex;gap:26px;margin:24px 0 0;padding:18px 0;border-top:1px solid ${C.rule};border-bottom:1px solid ${C.rule};max-width:620px;flex-wrap:wrap`;
-  for (const fact of rushFactViews()) {
+  for (const fact of rushFactViews(context.host.rushBest())) {
     const cell = el(doc, 'div');
     cell.style.cssText = 'min-width:0';
     const value = el(doc, 'div', 'everyday-rush-fact-value', fact.value);

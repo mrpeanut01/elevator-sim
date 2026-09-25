@@ -92,10 +92,18 @@ function mountBrief(
     /* The reader's saved copies, by id — § D508's guard needs the shipped list without them. */
     const savedIds = new Set(data.savedDispatchers().map((entry) => entry.profile.id));
     const shipped = dispatchers.filter((profile) => !savedIds.has(profile.id));
+    const dayAhead = data.dayAhead();
     const today = todayOf({
       week: data.week(),
       calendar: data.calendarPeriod(),
-      building: data.resolvedBuilding(),
+      /*
+       * The run the press on this screen will produce, and its clock — § D1039. The strip prints the
+       * times a car is booked out, and they must be the stage's and the report's once it runs.
+       */
+      building: dayAhead.building,
+      dayStartS: dayAhead.startOfDayS,
+      templateVariesMix: dayAhead.templateVariesMix,
+      dayCars: dayAhead.dayCars,
       buildingId: selection.buildingId,
       dispatcherName: data.dispatcherById(selection.dispatcherId)?.name,
       /* § D1029: the driver is held on a pinned day only while it is the standing order. */

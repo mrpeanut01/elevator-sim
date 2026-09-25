@@ -216,7 +216,9 @@ describe('a refused cell stays refused, and the ground decides only the wording'
 
 describe('the sentences Casual adds are as true as the ones they lead', () => {
   it('translates both terms issue #100 names for this surface', () => {
-    expect(CASUAL_SMALL_PRINT_LEAD).toContain('peak-5min');
+    /* The window's printed names since the post-AH panel's L3 — the id itself is on no sheet now. */
+    expect(CASUAL_SMALL_PRINT_LEAD).toContain('five-minute');
+    expect(CASUAL_SMALL_PRINT_LEAD).not.toContain('peak-5min');
     expect(CASUAL_SMALL_PRINT_LEAD).toContain('confidence interval');
   });
 
@@ -437,8 +439,8 @@ describe('the Casual sheet names one window and only one — issue #291 AC3', ()
    * sheet rather than on one entry.
    */
   const WINDOW_VOICE: Readonly<Record<string, RegExp>> = Object.freeze({
-    'full-run': /\bfull-run\b|\bwhole shift\b|\bwhole day\b|\bover all of it\b/i,
-    'peak-5min': /\bpeak-5min\b|\bbusiest five minutes\b|\bpeak window\b/i,
+    'full-run': /\bfull-run\b|\bfull-shift\b|\bwhole shift\b|\bwhole day\b|\bover all of it\b/i,
+    'peak-5min': /\bpeak-5min\b|\bfive-minute\b|\bbusiest five minutes\b|\bpeak window\b/i,
   });
 
   const windowsNamedIn = (text: string): readonly string[] =>

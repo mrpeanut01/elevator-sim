@@ -94,6 +94,27 @@ describe('the wrinkle note stops saying *Nothing booked* on a day a car is booke
     expect(note.startsWith(other.note)).toBe(true);
     expect(note).toContain('car D');
   });
+
+  it('does not say the tower *also* books the car the day itself takes — § D1038, N5', () => {
+    /*
+     * On a day whose wrinkle takes a window of its own, the building's windows include the day's
+     * car, and the note read *the tower also books car D* about the move-in's own car — or, on a
+     * tower that books nothing, about a car only the day took. Marked through the day's own choice.
+     */
+    const moveIn = Object.values(SHIFT_EVENTS).find(
+      (event) => event.effect.derate !== null && event.effect.derate.fromFraction > 0,
+    );
+    if (moveIn === undefined) throw new Error('no wrinkle takes a car part-way through the day');
+    const garden = contractDayState('c1', { seed: 20_260_925n });
+    const run = shiftRunConfigOf(RES, { ...garden, campaignEventId: moveIn.id });
+    const unmarked = bookedOutCarsOf(run.building);
+    expect(unmarked.length, 'the day took no car, so this case tests nothing').toBeGreaterThan(0);
+    /* Unmarked, the day's car reads as the tower's — the defect. */
+    expect(wrinkleNoteOf(moveIn, unmarked)).toContain('also books');
+    const marked = bookedOutCarsOf(run.building, [...run.dayCars.holds, ...run.dayCars.windows]);
+    expect(marked.every((entry) => entry.ofTheDay === true)).toBe(true);
+    expect(wrinkleNoteOf(moveIn, marked)).toBe(moveIn.note);
+  });
 });
 
 describe('the Day report of Crown Hotel’s pinned day, as built', () => {

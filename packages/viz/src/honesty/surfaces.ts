@@ -595,7 +595,7 @@ import {
   LOADED_RUN_CANNOT_BANK,
   UNCHOSEN_RUN_CANNOT_BANK,
 } from '../shift/banking.js';
-import { baseDemandOf, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
+import { baseDemandOf, eventAsRun, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { everyWrinkle } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals, yesterdayLabelOf } from '../shift/goals.js';
@@ -3532,6 +3532,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * corpus; the brief's copy of the note is `today.ts#todayOf`'s, which the TODAY adapter drives.
      */
     'shift/bookedOut.ts#wrinkleNoteOf',
+    /* The window's name in words — the post-AH panel's L3; every window-naming sentence above reaches it. */
+    'shift/reportWindow.ts#reportWindowNameOf',
     'shift/bookedOut.ts#carsPhraseOf',
     'shift/goals.ts#goalsForDay',
     'shift/goals.ts#readGoal',
@@ -3550,6 +3552,9 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'wrinkles/draw.ts#composeWrinkle',
     'wrinkles/draw.ts#drawWrinkle',
     'shift/events.ts#shiftRunPatch',
+    /* § D1040's sentence for a wrinkle whose mix a day's template keeps — both callers seeded below. */
+    'shift/events.ts#eventAsRun',
+    'shift/events.ts#mixKeptSentenceOf',
     'shift/week.ts#closeDay',
     'shift/contracts.ts#CONTRACTS',
     'shift/contracts.ts#contractById',
@@ -4026,6 +4031,14 @@ const SHIFT_REPORT: SurfaceAdapter = {
     for (const event of Object.values(SHIFT_EVENTS)) {
       seeds.push({ field: `SHIFT_EVENTS.${event.id}.name`, text: event.name, role: 'label' });
       seeds.push({ field: `SHIFT_EVENTS.${event.id}.note`, text: event.note, role: 'prose' });
+      /*
+       * The note as a day whose template keeps its own mix quotes it — § D1040. A different sentence
+       * only for a wrinkle that asks for a mix; the brief and the report header draw it there.
+       */
+      const asRun = eventAsRun(event, true);
+      if (asRun.note !== event.note) {
+        seeds.push({ field: `SHIFT_EVENTS.${event.id}.note.mixKept`, text: asRun.note, role: 'prose' });
+      }
       if (trafficProfile === undefined) continue;
       /*
        * Both values of `templateVariesMix`, because the refusal only exists under the second: a
@@ -9446,13 +9459,21 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       seeds.push({ field: `rush.band.${band.waves}.perMinute`, text: band.perMinute, role: 'observation' });
       seeds.push({ field: `rush.band.${band.waves}.against`, text: band.against, role: 'observation' });
     }
-    for (const fact of rushFactViews()) {
-      seeds.push({
-        field: `rush.fact.${fact.label}`,
-        text: fact.value,
-        role: fact.withheld ? 'label' : 'observation',
-      });
-      seeds.push({ field: `rush.fact.${fact.label}.label`, text: fact.label, role: 'prose' });
+    /*
+     * Both arms of the kept figure — the post-AH panel's N7. Before any round of this visit the
+     * facts refuse; after one they carry the result sheet's own wave and held time, which is a
+     * state a player reaches by pressing *Leave the rush* once, so it is swept by name here with a
+     * fixture round rather than left to a case that never plays one.
+     */
+    for (const best of [undefined, { wave: 9, heldS: 1538, held: '25:38', driverName: 'Steady hand then Contract-net auction' }]) {
+      for (const fact of rushFactViews(best)) {
+        seeds.push({
+          field: `rush.fact.${fact.label}`,
+          text: fact.value,
+          role: fact.withheld ? 'label' : 'observation',
+        });
+        seeds.push({ field: `rush.fact.${fact.label}.label`, text: fact.label, role: 'prose' });
+      }
     }
     /*
      * The house's standings on this case's building, in the order the screen draws them — GitHub
@@ -12977,6 +12998,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
   id: 'everyday/today.ts#todayOf',
   covers: [
     'everyday/today.ts#todayOf',
+    /* The lede's closing sentence — H13; every seeded lede ends on it. */
+    'everyday/today.ts#TODAY_CHOICE_LINE',
     'shift/firstSession.ts#FIRST_SESSION_LINE',
     /* The line's second arm, for a first day the draw did not choose — GitHub issue #595, § D973. */
     'shift/firstSession.ts#FIRST_SESSION_LINE_CHOSEN',
@@ -13077,6 +13100,13 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         /* The horizon the case's tower is pressed on — the moot sentence's fourth gate, § D973. */
         horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
         /*
+         * No clock: the corpus's towers carry no service windows (`run.ts#buildingFor` builds them
+         * without a rung), so the strip's clock arm is swept on the fixture record below instead.
+         */
+        dayStartS: undefined,
+        templateVariesMix: false,
+        dayCars: undefined,
+        /*
          * The day's crowd — § D729, § D730. Seeded `true` here and `false` below, because the
          * seed line and the door's closing sentence both have two arms and the arm a developer
          * never sees is the one most likely to say something a run cannot support. A pinned
@@ -13118,6 +13148,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           goals: entry.readings,
           seed: 424_242n,
           horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
+          dayStartS: undefined,
+          templateVariesMix: false,
+          dayCars: undefined,
           crowdIsToday: false,
           firstSession: entry.week.day === 1 && entry.week.history.length === 0,
           units: 'metric',
@@ -13162,6 +13195,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         goals: entry.readings,
         seed: 424_242n,
         horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
+        dayStartS: undefined,
+        templateVariesMix: false,
+        dayCars: undefined,
         crowdIsToday: true,
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         units: 'imperial',
@@ -13185,6 +13221,60 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           role: 'observation',
         });
       }
+      /*
+       * **The strip with its clock, the plate and the lede over a booked tower** — § D1038 and
+       * § D1039. The corpus builds its towers with no service windows, so none of the three reaches a
+       * booked car on its own; the report adapter's fixture bookings are the precedent (§ D983). One
+       * record per case, on its first day: the case's first car comes back, its second does not,
+       * and its day's own wrinkle draws whatever car the run would take. A fixture as that one is —
+       * what is swept is the wording, not a claim that this run lost a car.
+       */
+      if (entry === bundle.days[0]) {
+        const cars = context.building.banks.flatMap((bank) => bank.cars.map((car) => ({ bankId: bank.id, carId: car.id })));
+        const [first, second] = cars;
+        const booked: ResolvedBuilding = {
+          ...context.building,
+          serviceEvents: [
+            ...(first === undefined
+              ? []
+              : [
+                  { atS: 450, bankId: first.bankId, carId: first.carId, mode: 'out-of-service' as const },
+                  { atS: 900, bankId: first.bankId, carId: first.carId, mode: 'in-service' as const },
+                ]),
+            ...(second === undefined
+              ? []
+              : [{ atS: 1080, bankId: second.bankId, carId: second.carId, mode: 'out-of-service' as const }]),
+          ],
+        };
+        const bookedToday = todayOf({
+          week: entry.week,
+          calendar: null,
+          building: booked,
+          buildingId: context.building.id,
+          dispatcherName: entry.report.metaLines[0],
+          dispatcherNameOf: () => undefined,
+          goals: entry.readings,
+          seed: 424_242n,
+          horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
+          dayStartS: 8 * 3600,
+          templateVariesMix: false,
+          dayCars: undefined,
+          crowdIsToday: true,
+          firstSession: false,
+          units: 'metric',
+        });
+        seeds.push({ field: `${at}.today.booked.lede`, text: bookedToday.lede, role: 'observation' });
+        seeds.push({ field: `${at}.today.booked.wrinkle`, text: bookedToday.wrinkleNote, role: 'observation' });
+        if (bookedToday.outOfService !== undefined) {
+          seeds.push({ field: `${at}.today.booked.outage`, text: bookedToday.outOfService.sentence, role: 'observation' });
+        }
+        for (const fact of bookedToday.facts) {
+          seeds.push({ field: `${at}.today.booked.fact.${fact.label}`, text: fact.value, role: 'observation' });
+        }
+        if (bookedToday.load !== undefined) {
+          seeds.push({ field: `${at}.today.booked.load.note`, text: bookedToday.load.note, role: 'observation' });
+        }
+      }
       for (const ask of today.asks) {
         seeds.push({ field: `${at}.today.asks`, text: ask, role: 'label' });
       }
@@ -13204,12 +13294,15 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
             today,
             dayOffset: offset,
             dayClosed: closed,
+            nameOf: () => context.buildingName,
           });
           const where = `${arm}.door${String(offset)}`;
           seeds.push({ field: `${where}.kind`, text: door.kindPill, role: 'label' });
           seeds.push({ field: `${where}.stepper`, text: door.stepper.label, role: 'label' });
           seeds.push({ field: `${where}.rule`, text: door.rule, role: 'prose' });
           for (const chip of door.chips) {
+            /* The tower a chip names — GitHub issue #599: an id on a closed chip, a name on today's. */
+            seeds.push({ field: `${where}.chip.tower`, text: chip.tower, role: 'label' });
             seeds.push({ field: `${where}.chip.score`, text: chip.score, role: 'observation' });
             seeds.push({ field: `${where}.chip.note`, text: chip.note, role: 'label' });
           }
@@ -13310,6 +13403,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         const week = weekScreenViewOf({
           week: entry.week,
           towerToday: context.buildingName,
+          nameOf: () => context.buildingName,
           dayClosed: closed,
           // A sheet stands exactly when the day is closed here, which is the shipped pairing; the
           // two-can-disagree arm is `weekView.test.ts`'s, where it is a claim about a control.
@@ -13317,6 +13411,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         });
         seeds.push({ field: `${arm}.week.streak`, text: week.streakLine, role: 'observation' });
         for (const card of week.cards) {
+          seeds.push({ field: `${arm}.week.card.tower`, text: card.tower, role: 'label' });
           seeds.push({ field: `${arm}.week.card.score`, text: card.score, role: 'observation' });
           seeds.push({ field: `${arm}.week.card.note`, text: card.note, role: 'label' });
         }
@@ -13496,7 +13591,14 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       role: 'label',
     });
     seeds.push({ field: 'brief.ghost.why', text: raceAgainstCard().why, role: 'reason' });
-    seeds.push({ field: 'brief.locked.why', text: lockedForScore().why, role: 'reason' });
+    seeds.push({ field: 'brief.locked.why', text: lockedForScore(true).why, role: 'reason' });
+    /*
+     * Both arms of the card's first clause, by name — the post-AH panel's *"The crowd is the day's"*
+     * under a seed line saying it was not. The case's own record draws one arm through
+     * `briefScreenViewOf`; the other is a pinned day or a `?seed=` link, which no case is.
+     */
+    seeds.push({ field: 'brief.locked.what.today', text: lockedForScore(true).what, role: 'reason' });
+    seeds.push({ field: 'brief.locked.what.own', text: lockedForScore(false).what, role: 'reason' });
 
     return singleRun(this.id, seeds);
   },

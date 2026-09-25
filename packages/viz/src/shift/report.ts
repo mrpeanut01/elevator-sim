@@ -120,6 +120,8 @@ import { wrinkleNoteOf, type BookedOutCar } from './bookedOut.js';
 import type { PressCounterfactual } from './counterfactual.js';
 
 import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
+import { eventAsRun } from './events.js';
+import { reportWindowNameOf } from './reportWindow.js';
 import { contractStatus } from './contracts.js';
 import { gaveUpBesideOf, goalPlainNameOf, horizonLabelOf, readGoals, wasDisplayOf } from './goals.js';
 import { growthFactor } from './growth.js';
@@ -689,6 +691,14 @@ export interface DayReportInput {
    * after § D982's pair; `undefined` on every other day, which draws nothing.
    */
   readonly pressCall?: Omit<PressCallRowInput, 'interventions'> | undefined;
+  /**
+   * Whether this run's demand template kept its own mix of trips — `dev/state.ts#plannedDayOf`'s
+   * `templateVariesMix` for the run's state. On such a run a wrinkle that asked for a mix did not
+   * get one, and the header's note and tomorrow's card quote `events.ts#eventAsRun`'s account of
+   * what the run did rather than the wrinkle's own ([§ D1040](../../../../DECISIONS.md)). Tomorrow
+   * is the same building on the same horizon, so it keeps the same mix. `undefined` is `false`.
+   */
+  readonly templateVariesMix?: boolean | undefined;
 }
 
 /**
@@ -732,7 +742,7 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
     `${recording.buildingName} · ${dispatcherName}`,
     `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
     ...(subject.kind === 'single-run' ? selectionLines(subject.selection) : []),
-    ...bookedLine(input.event, subject, input.bookedOut ?? [], dayStartS),
+    ...bookedLine(eventAsRun(input.event, input.templateVariesMix === true), subject, input.bookedOut ?? [], dayStartS),
     /*
      * The rules in force, before the attempt count and well before the intervention log —
      * `docs/20` defect 2. Config, so it belongs with what was asked for; see
@@ -1081,7 +1091,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     streakLine: streakLineFor(judgement.verdict, week.streak),
     contractLine: contractLineFor(contract, week),
     cleared: week.cleared,
-    forecast: forecastFor(input.calendar, week.day, nextIdx),
+    forecast: forecastFor(input.calendar, week.day, nextIdx, input.templateVariesMix === true),
     taught: taughtFor(contract, week),
     nextDayName: weekdayOf(nextIdx),
   };
@@ -1586,9 +1596,17 @@ function figuresFor(
       tone: observations.peakQueue > DEEP_QUEUE ? 'hot' : 'plain',
       axisOnly: false,
     },
+    /*
+     * *Past the give-up line*, not *took the stairs* — the post-AH panel's H11, and the panel before
+     * it. The cell counts every wait that crossed the give-up horizon, and on a run whose riders
+     * have no patience every one of them was still carried: the note beside it says so (*"every
+     * one of them is inside CARRIED too"*), under a label saying they had walked. The label now
+     * names the count, which is true on both kinds of run; whether any of them left is the note's.
+     * Recorded here under [§ D405](../../../../DECISIONS.md): the cell is this sheet's.
+     */
     {
       id: 'stairs',
-      label: 'TOOK THE STAIRS',
+      label: 'PAST THE GIVE-UP LINE',
       value: String(observations.abandoned),
       note: stairsNote(observations, summary),
       tone: observations.abandoned > 0 ? 'bad' : 'good',
@@ -1680,7 +1698,7 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
     label: 'AVERAGE WAIT',
     value: `${summary.meanWaitS.toFixed(1)} s`,
     // R13 and § 7.4: a mean is not a figure without its window and its `n`.
-    note: `over ${legCount(summary.waitCount, 'leg')} in the ${summary.reportWindow.id} window`,
+    note: `over ${legCount(summary.waitCount, 'leg')} in the ${reportWindowNameOf(summary.reportWindow.id)} window`,
     // The same denominator, structured, so it survives being carried off this grid. See above.
     count: summary.waitCount,
     tone: 'plain',
@@ -1730,7 +1748,7 @@ function stairsNote(observations: Observations, summary: VizSummary): string {
      * *peak-5min*, so a day whose window is the whole of it says so and a reader can see that the
      * two coincide.
      */
-    `counted over the whole shift, not the ${summary.reportWindow.id} window`,
+    `counted over the whole shift, not the ${reportWindowNameOf(summary.reportWindow.id)} window`,
     turnedAwayClause(observations),
   ];
   return clauses.filter((clause) => clause !== '').join('; ');
@@ -1828,7 +1846,7 @@ function worstWaitFigure(summary: VizSummary): ReportFigure {
       axisOnly: false,
     };
   }
-  const windowClause = `the ${summary.reportWindow.id} window’s worst — the goal row reads the whole shift`;
+  const windowClause = `the ${reportWindowNameOf(summary.reportWindow.id)} window’s worst — the goal row reads the whole shift`;
   return {
     id: 'worst-wait',
     label: 'WORST WAIT',
@@ -2308,15 +2326,25 @@ function missedGoalRowOf(
 function windowRelationClause(atS: SimTime, reportWindow: VizSummary['reportWindow']): string {
   const inside = atS >= reportWindow.startS && atS < reportWindow.endS;
   return inside
-    ? `That instant is inside the ${reportWindow.id} window the means above are read over.`
-    : `That instant is outside the ${reportWindow.id} window the means above are read over — the ` +
+    ? `That instant is inside the ${reportWindowNameOf(reportWindow.id)} window the means above are read over.`
+    : `That instant is outside the ${reportWindowNameOf(reportWindow.id)} window the means above are read over — the ` +
       'worst moment of the day and the waits quoted up there are two different parts of it, and ' +
       'both are true.';
 }
 
-/** ` at 12.4 %pop/5min`, or nothing when the record carried no population to divide by. */
+/**
+ * `, with 12.4 % of the building arriving every five minutes`, or nothing when the record carried no
+ * population to divide by.
+ *
+ * It read `, at 12.4 %pop/5min` — the engine's unit, on a Day report row a player reads (the
+ * post-AH panel's L3). The figure is unchanged; the unit is said in words. The single-run sheet's
+ * demand line keeps the unit, because that line is the Engineer surface's basis for comparing two
+ * sheets and is printed where the unit is the one the editor beside it speaks.
+ */
 function rateClause(ratePctPop5min: number | null): string {
-  return ratePctPop5min === null ? '' : `, at ${ratePctPop5min.toFixed(1)} %pop/5min`;
+  return ratePctPop5min === null
+    ? ''
+    : `, with ${ratePctPop5min.toFixed(1)} % of the building arriving every five minutes`;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -2352,10 +2380,20 @@ const LEVERS: readonly ReportLever[] = Object.freeze([
     title: 'Weight fairness up',
     body: 'Rescue the forgotten floor rather than shaving seconds off the easy calls. Your worst wait falls; your average may not.',
   }),
+  /*
+   * **The mechanism clause is struck** — first-day swarm S2 item 5, point 2. This read *"…pools
+   * riders by destination in the lobby, which cuts stops per trip — the thing that actually costs
+   * time"*: a statement of *why* the control helps, which nothing in this tree measures for the goals
+   * this sheet grades, and which § D595 measured pointing the other way on waits at a supertall
+   * (AWT and WT95 **WORSE** on both destination arms at One-WTC-class). `CLAUDE.md` records seven
+   * sentences of this exact kind withdrawn from this repository; the rule is to measure it or say it
+   * is unmeasured. So the card says what the control **is** and states no effect, and the door
+   * § D503 licenses (`everyday/reportView.ts`'s workshop route) is unchanged.
+   */
   Object.freeze({
     id: 'ask-destination',
     title: 'Ask where they’re going',
-    body: 'Destination dispatch pools riders by destination in the lobby, which cuts stops per trip — the thing that actually costs time.',
+    body: 'Destination dispatch asks each rider for their floor before a car is chosen for them. What that does to the waits on this building is a question for paired runs, not for this card.',
   }),
 ]);
 
@@ -2516,24 +2554,18 @@ function leverPointersFor(
   }
 
   /*
-   * Ask where they're going — the card's own sentence says destination dispatch pools riders *in
-   * the lobby*, so the observation that points at it is a pile-up that stood on an entrance floor.
-   * `VizFloor.isEntrance` is the building's own answer; nothing here infers a lobby from a floor id.
-   *
-   * Deliberately **not** keyed on stops per trip, which is what the card actually claims to cut: no
-   * figure on this recording reports it, and pointing at the card with an observation that does not
-   * measure the thing named would be the caption-that-does-not-describe-the-picture failure again.
+   * **Ask where they're going is pointed at by nothing, and that is the ruling rather than a gap** —
+   * first-day swarm S2 item 5, which found the pointer unlicensed four ways. It fired on a deep
+   * queue at an entrance floor, and this comment's own previous paragraph said why that could not
+   * support it: *"Deliberately **not** keyed on stops per trip, which is what the card actually
+   * claims to cut: no figure on this recording reports it."* An observation that does not measure
+   * the thing named is the card pointing at itself. The measured evidence is the other way where
+   * there is any — § D595's supertall, AWT and WT95 worse on both destination arms — and the one
+   * recorded run of it on the day an assessor met it took the queue from 194 to 519 (Merdeka, one
+   * seed, two runs, a fact about those runs and not an estimate). So the card keeps its glossary
+   * place and its door, and no day promotes it; `report.test.ts` holds that on a run whose deepest
+   * queue stood on an entrance floor, which is the observation that used to fire.
    */
-  const entrance =
-    floorId === null
-      ? undefined
-      : recording.floors.find((floor) => floor.id === floorId && floor.isEntrance);
-  if (entrance !== undefined && deep) {
-    pointers.set(
-      'ask-destination',
-      `the deepest queue of the day stood at ${entrance.label ?? entrance.id}, an entrance floor`,
-    );
-  }
 
   return pointers;
 }
@@ -2624,8 +2656,9 @@ function forecastFor(
   calendar: CalendarPeriod | null,
   day: number,
   nextIdx: number,
+  templateVariesMix: boolean,
 ): ReportForecast {
-  const event = scheduledEventFor(calendar, day + 1, nextIdx);
+  const event = eventAsRun(scheduledEventFor(calendar, day + 1, nextIdx), templateVariesMix);
   const increase = (growthFactor(day + 1) / growthFactor(day) - 1) * 100;
   return {
     name: event.name,
@@ -2718,11 +2751,11 @@ function smallPrintFor(
     `${dispatcherName.toLowerCase()} is better than anything — that needs 50 or more paired runs ` +
     'against the same passengers, and a confidence interval that excludes zero. What it can tell ' +
     'you is what happened today, and today is where the queue was. ' +
-    `Every cohort figure above is the ${reportWindow.id} window, ` +
+    `Every cohort figure above is the ${reportWindowNameOf(reportWindow.id)} window, ` +
     `${clockRange(reportWindow.startS, reportWindow.endS, dayStartS)}: “Riders waited twenty-five ` +
     `seconds on average” is false without “${windowQualifierOf(reportWindow)}”. ` +
     'The counts — carried, ' +
-    'took the stairs, the deepest queue, and every goal reading above, the worst-wait bar ' +
+    'past the give-up line, the deepest queue, and every goal reading above, the worst-wait bar ' +
     'included — are over the whole shift; the means and the WORST WAIT figure are over that ' +
     'window and nothing else. ' +
     /*

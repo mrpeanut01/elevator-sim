@@ -501,25 +501,71 @@ export interface RushFactView {
 }
 
 /**
+ * The furthest a round has got since this page opened — `everyday/host.ts#EverydayHost.rushBest`.
+ *
+ * `driverName` is every dispatcher that drove some part of that round, in order, joined — a round
+ * handed over part-way through did not run on its opening dispatcher alone (GitHub issue #565).
+ */
+export interface RushBest {
+  /** The wave the round reached — `RushOutcome.wave`, the result sheet's own figure. */
+  readonly wave: number;
+  /** Seconds held — `RushOutcome.heldS`, the result sheet's own figure. */
+  readonly heldS: number;
+  /**
+   * {@link heldS} as the result sheet prints it, `rush.ts#heldClock`'s — formatted by the host,
+   * because `rush.ts` imports this module and a second `m:ss` formatter here would be a second
+   * answer to how long a round held.
+   */
+  readonly held: string;
+  readonly driverName: string;
+}
+
+/**
  * § 9.1's three facts: your furthest wave and who drove it, how long that held, and the climb.
  *
- * The first two are `—` and stay `—` until a rush can run: this build has never measured a furthest
- * wave, and the prototype's *wave 14 · 42 min · with Two-lift Friday* is its fixture. The third is
- * real, because the climb is arithmetic rather than a measurement — and it is **computed**, off
- * {@link climbPerWavePct}, so the *+11 %* on screen is the contract's own coefficient.
+ * ## The first two said no rush had ever run, straight after one had — the post-AH panel's N7
+ *
+ * They read *"your furthest so far — no rush has run in this build"* over `—`, under a docstring
+ * saying they would stay `—` *until a rush can run*. Rushes run (GitHub issue #220, § D515), so the
+ * refusal was § D227's stale refusal: a sentence describing a build that no longer exists, read by a
+ * player who had finished a rush a minute earlier. What a rush keeps now is the host's
+ * {@link RushBest} for this visit — the result sheet's own wave and held time, never recomputed —
+ * and both arms say *this visit*, because that is the scope of what is kept: nothing survives a
+ * reload, and a label saying *so far* over a figure that had would be the next stale claim.
+ *
+ * The third is real in both arms, because the climb is arithmetic rather than a measurement — and it
+ * is **computed**, off {@link climbPerWavePct}, so the *+11 %* on screen is the contract's own
+ * coefficient.
  */
-export function rushFactViews(): readonly RushFactView[] {
+export function rushFactViews(best: RushBest | undefined): readonly RushFactView[] {
+  const kept: readonly RushFactView[] =
+    best === undefined
+      ? [
+          {
+            value: RUSH_SCREEN_COPY.noRun,
+            label: 'your furthest this visit — no round has finished since this page opened',
+            withheld: true,
+          },
+          {
+            value: RUSH_SCREEN_COPY.noRun,
+            label: 'how long that held',
+            withheld: true,
+          },
+        ]
+      : [
+          {
+            value: `wave ${String(best.wave)}`,
+            label: `your furthest this visit, driven by ${best.driverName}`,
+            withheld: false,
+          },
+          {
+            value: best.held,
+            label: 'how long that held',
+            withheld: false,
+          },
+        ];
   return [
-    {
-      value: RUSH_SCREEN_COPY.noRun,
-      label: 'your furthest so far — no rush has run in this build',
-      withheld: true,
-    },
-    {
-      value: RUSH_SCREEN_COPY.noRun,
-      label: 'how long that held',
-      withheld: true,
-    },
+    ...kept,
     {
       value: `+${climbPerWavePct().toFixed(0)}%`,
       label: 'more arrivals every wave, forever — of a normal morning’s rate',

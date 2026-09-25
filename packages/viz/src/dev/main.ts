@@ -297,6 +297,7 @@ import {
   withFirstSession,
   pressDayCallOf,
   profileById,
+  plannedDayOf,
   resolvedBuildingOf,
   shiftRunConfigOf,
   tomorrowFactsOf,
@@ -6500,6 +6501,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * one question — the exact comparison § D311 built the basis to refuse.
      */
     const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx);
+    /*
+     * The run this sheet reports, read back the way the brief read it before the press — its
+     * building's windows, the cars the day's event took and whether its template kept its mix
+     * (§ D1038–§ D1040). Once per closed day, never per frame.
+     */
+    const planned = plannedDayOf(resources, state);
     const outcome = outcomeOf({
       day: state.week.day,
       dayIdx: state.week.dayIdx,
@@ -6662,7 +6669,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * building the legs on screen were simulated in, so the car the header names is the car the
        * kernel stood down. A recording carries no mid-run schedule, which is why this is passed.
        */
-      bookedOut: bookedOutCarsOf(resolvedBuildingOf(resources, state)),
+      /*
+       * With the cars the day's event took, so the header's note says *the tower also books* only
+       * of the tower's — § D1038, the post-AH panel's N5.
+       */
+      bookedOut: bookedOutCarsOf(planned.building, [...planned.dayCars.holds, ...planned.dayCars.windows]),
+      /* § D1040 — so the header and tomorrow's card say what a mix-asking wrinkle did on this tower. */
+      templateVariesMix: planned.templateVariesMix,
       /*
        * **A pinned day's call** — wave AI, [§ D1029](../../../../DECISIONS.md). Asked of the day as
        * built where this shell kept it ({@link unpressedRecording}, the run the answer replaced) and

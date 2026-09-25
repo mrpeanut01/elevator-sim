@@ -93,10 +93,28 @@ describe('each row says what the press will do before it is pressed', () => {
      * exists under that id — a row promising to pick a week back up that `switchWeek` would
      * restart would be a small lie on the one control whose whole job is not to lose a week.
      */
-    const parked: readonly WeekState[] = [openWeek('c2'), openWeek('c3')];
+    const parked: readonly WeekState[] = [
+      { ...openWeek('c2'), day: 2 },
+      { ...openWeek('c3'), day: 3 },
+    ];
     const view = viewOn(openWeek('c1'), parked);
     const promising = view.rows.filter((row) => row.arrival === 'resume').map((r) => r.contractId);
     expect(promising).toEqual(['c2', 'c3']);
+  });
+
+  it('says *open* for a parked week nobody played — post-AH panel B.md', () => {
+    /*
+     * A fresh profile read *"you have a week going here"* on Garden Apartments, because the first
+     * session parks the opening week it moves off. That week is day 1 with no history, so picking
+     * it back up is a fresh week in everything a player sees, and the row says so.
+     */
+    const view = viewOn(openWeek('c14'), [openWeek('c1')]);
+    const garden = view.rows.find((row) => row.contractId === 'c1');
+    expect(garden?.arrival).toBe('open');
+    expect(garden?.arrivalNote).toBe(TOWER_CHOICE_COPY.open);
+    /* And the same week once a day of it has been closed is one going. */
+    const played = viewOn(openWeek('c14'), [{ ...openWeek('c1'), day: 2 }]);
+    expect(played.rows.find((row) => row.contractId === 'c1')?.arrival).toBe('resume');
   });
 });
 

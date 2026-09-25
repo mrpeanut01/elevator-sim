@@ -141,6 +141,17 @@ export interface WeekScreenInput {
   /** The building the standing selection points at, for today's card when it has no record yet. */
   readonly towerToday: string;
   /**
+   * A building's own name, by id — what a **closed** card names the tower it was run on with.
+   * GitHub issue #599.
+   *
+   * Required rather than optional, `today.ts#TodayInput.calendar`'s own reason: the card used to
+   * print `record.buildingId` for every closed day — *THU midtown-office* on the card beside
+   * *Midtown Office* on today's — so a closed day and an open one named one tower two ways. The
+   * source is the one {@link towerToday} is drawn from (the building document's `name`); the id is
+   * the fallback only where this build has no document for it, which is `todayOf`'s own rule.
+   */
+  readonly nameOf: (buildingId: string) => string | undefined;
+  /**
    * `host.runState().dayClosed` — *the run on the stage was filed this sitting*. Since
    * [§ D1004](../../../../DECISIONS.md) it is not the one authority for *today is finished*: an
    * outcome in the week's history is too, and a card reads that. This decides only what is about
@@ -212,7 +223,12 @@ function cardsOf(input: WeekScreenInput): readonly WeekDayCard[] {
     cards.push({
       weekday: day < 1 ? EM_DASH : shortWeekday(week.dayIdx + offset),
       day: day < 1 ? undefined : day,
-      tower: closed?.record?.buildingId ?? (isToday ? input.towerToday : EM_DASH),
+      tower:
+        closed?.record == null
+          ? isToday
+            ? input.towerToday
+            : EM_DASH
+          : (input.nameOf(closed.record.buildingId) ?? closed.record.buildingId),
       score: show && closed !== undefined ? percentFigure(closed.minutePct) : EM_DASH,
       note:
         day < 1

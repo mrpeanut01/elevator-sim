@@ -148,6 +148,12 @@ export interface DoorScreenInput {
   readonly dayOffset: number;
   /** Whether the run standing on the stage has been filed — `host.runState().dayClosed`. */
   readonly dayClosed: boolean;
+  /**
+   * A building's own name, by id, for a closed chip — `weekView.ts#WeekScreenInput.nameOf`'s field
+   * and reason, GitHub issue #599: a closed chip printed the tower's id beside today's chip printing
+   * its name.
+   */
+  readonly nameOf: (buildingId: string) => string | undefined;
 }
 
 /**
@@ -164,7 +170,13 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
   Object.freeze({
     n: '1',
     head: 'Pick who drives',
-    body: 'Ready-made styles, or one you built yourself. It is the only thing you choose.',
+    /*
+     * The post-AH panel's H13: *"It is the only thing you choose"*, on a page that lists days a press
+     * decides, above a stage that offers two parking presses and a handover on every day. The pick
+     * is the choice made before the day, which is what the step is about. `today.ts#TODAY_CHOICE_LINE`
+     * carries the same correction on the lede.
+     */
+    body: 'Ready-made styles, or one you built yourself. You pick before the day starts.',
   }),
   Object.freeze({
     n: '2',
@@ -176,9 +188,17 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
      * The peaks are still played at the speed they set, and a chip press still wins for the rest
      * of the day, so the sentence says both rather than dropping either.
      */
+    /*
+     * And H13's two halves, in the same step. *"A whole working day"* was false on the two towers
+     * with no authored day, both of them on the pinned-press list, whose day is a thirty-minute
+     * slice; *"the quiet hours between them faster"* is a whole day's pacing and a slice has none.
+     * *"You can speed it up, not steer it"* was false on every day: the stage parks the cars,
+     * spreads them and hands the day over while it plays. The step now names neither a length nor a
+     * pacing, and says what the controls on the stage do.
+     */
     body:
-      'A whole working day, its busy hours at the speed you set and the quiet hours between them ' +
-      'faster. You can speed it up, not steer it — the dispatcher is the decision you already made.',
+      'The day plays out at a speed you can change. While it plays you can park the cars, spread ' +
+      'them out, or hand the day to another dispatcher.',
   }),
   Object.freeze({
     n: '3',
@@ -276,7 +296,12 @@ function chipsOf(input: DoorScreenInput): readonly DoorDayChip[] {
       weekday: day < 1 ? EM_DASH : shortWeekday(week.dayIdx + offset),
       // The tower the day was **run on**, from its own record. A day with no record says so with
       // the placeholder rather than borrowing the building standing selected now.
-      tower: closed?.record?.buildingId ?? (isToday ? input.today.towerName : EM_DASH),
+      tower:
+        closed?.record == null
+          ? isToday
+            ? input.today.towerName
+            : EM_DASH
+          : (input.nameOf(closed.record.buildingId) ?? closed.record.buildingId),
       score: closed === undefined ? EM_DASH : percentFigure(closed.minutePct),
       note: noteFor({ isToday, selected, closed: closed !== undefined, exists: day >= 1 }),
       selected,

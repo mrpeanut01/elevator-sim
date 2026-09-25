@@ -43748,3 +43748,160 @@ its own decomposition. The always-on tier was run on this branch after the seedi
 This lane held **D1020–D1028** and spent **D1020 only**. D1021 to D1028 are unspent and, under
 [§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them; the
 integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+---
+
+## D1038 — a day's wrinkle does not take a car the tower already books over the same stretch, and a day's own car is never *also* the tower's
+
+> **Implements an agent ruling under delegated authority** — the week decision swarm's member S1,
+> § 1 (*"One defect found on the way is ruled here"*), relayed by the wave AI coordinator. It is not
+> a product-owner ruling.
+
+**Date: 2026-09-25 · Owner: lane AI-E (wave AI) · The post-AH panel's D.md N5 · Rules on
+`packages/viz/src/shift/events.ts#eventCarChoice` (a `booked` list, `derateSpokenFor`) and
+`#shiftRunPatch` (`booked`, the shortfall sentence), `shift/calendar.ts` (`booked` on both inputs),
+`dev/state.ts#shiftRunConfigOf` (`booked`, `ShiftRunConfig.dayCars`), `shift/bookedOut.ts`
+(`BookedOutCar.ofTheDay`, `wrinkleNoteOf`) and `dev/main.ts#closeShift`'s `bookedOut` argument.
+Cites [§ D871](#d871), [§ D983](#d983), [§ D227](#d227), [§ D405](#d405).**
+
+**Why an entry.** It changes what a run does on days a contract rung and the day's wrinkle would
+take the same car, which binds the kernel's input on every tower [§ D871](#d871) gave a rung — code
+this brief-side lane does not own — and it moves a recorded statement: `shiftRunConfigOf` said two
+entries naming one car were *a mode set twice*.
+
+**What the panel saw, and what was under it.** Midtown's Tuesday brief gave three accounts of car D:
+*"Car D is out of service today"*, *"one car is tied up through the middle of the shift, then
+rejoins"*, and *"the tower also books car D out of passenger service part-way through the day"*. The
+move-in derate and the rung both took car D (`incidents.ts#carsToDerate` picks the bank's last car,
+and the rung names it), and the building carried out at 9 000 s twice, **in at 18 000 s**, in at
+27 000 s. The rung's return fired first, so the movers' car came back at 13:00 of a window meant to
+run to 15:30 — and the swarm measured the run **identical to an ordinary Tuesday on all 95
+configurations** it swept. Friday's shaft-out had the same collision from the first instant.
+
+**The ruling.** `eventCarChoice` counts the tower's own bookings as **spoken for**, as
+`calendarPatch` already counts the player's holds: a whole-shift hold skips every booked car, and a
+window skips a booked car whose window overlaps its own. The rest is chosen by the same total order.
+Where the building cannot spare a car — a bank keeps one in service — the window is withheld with
+the shortfall sentence `shiftRunPatch` already had, plus one clause naming the booking.
+`calendarPatch` is handed the same list, so the goods car it reserves around the day's choice is
+reserved around the choice the run makes. On Midtown's Tuesday the move-in now takes car C, and
+`events.test.ts` requires that run to differ **on the legs** from the ordinary Tuesday.
+
+**Considered and not taken: a car in two windows is out for their union.** It keeps the number of
+cars the day takes at one and was implemented first in this lane; the swarm's ruling chose the
+spoken-for rule, which is the one the calendar already follows and the one under which the brief's
+*one car is tied up* and *the tower also books car D* describe two different cars, as they read.
+
+**The sentence half.** `ShiftRunConfig.dayCars` records the cars today's event took, as the run
+took them, and `BookedOutCar.ofTheDay` is set from it; `wrinkleNoteOf` names only cars it does not
+mark. Before, a wrinkle whose window starts after the first instant was read back from the
+building's windows as *the tower's* booking — on any tower, including one whose rung books nothing.
+
+**What it moves.** Nothing on day 1: a pinned press day is the ordinary day, which takes no car, so
+every pin and every legibility row, all day-1 measurements, are out of its reach. On days 2+ of a
+rung tower whose wrinkle would have taken the rung's car, the run now loses a second car over the
+overlap; those days carry no published figure, and the week swarm's DC-10 instrument is where their
+difficulty gets measured. `wholeDayEvents.test.ts` sweeps every contract × day × weekday and finds
+no day's window on a booked car that meets it.
+
+## D1039 — the brief prints the times a car is booked out, read off the run the next press produces
+
+**Date: 2026-09-25 · Owner: lane AI-E (wave AI) · The post-AH panel's D.md N4 and claim 8 ·
+Rules on `packages/viz/src/everyday/today.ts` (`TodayInput.dayStartS`, the strip, the plate, the
+lede), `shift/bookedOut.ts#carAbsencesOf`, `dev/state.ts#plannedDayOf`, `everyday/host.ts#dayAhead`,
+`everyday/briefScreen.ts`, `everyday/doorScreen.ts` and the TODAY adapter in `honesty/surfaces.ts`.
+Amends [§ D983](#d983)'s *before the run, no clock* clause. Cites [§ D984](#d984), [§ D405](#d405).**
+
+**Why an entry.** It moves something recorded: § D983 ruled that the brief names the car and prints
+no clock, on the ground that a time before the run is a figure whose only source is a schedule the
+reader cannot see. It also adds a method to the Everyday host and a field to a view every door and
+brief caller must supply.
+
+**Why the ground did not hold.** The stage's pill and the report's header print the times from that
+very schedule, so the brief was the one surface keeping back a fact the other two gave, and the
+reader's way to see the schedule is to be shown it. The panel read *"booked out part-way through
+today"* on the brief and *08:37–08:45* on the stage a click later.
+
+**Where the times come from, and why that is not a second derivation.** `plannedDayOf` builds the
+run the state would produce through `shiftRunConfigOf` — the building whose service windows the
+kernel will read — and asks `core`'s `planDemand` for the arrival plan's `template.startOfDayS`,
+which is the value the finished run reports as `trace.startOfDayS`. Measured equal on four
+contracts (`c1`, `c2`, `c7`, `c9`) against a recorded run. The host reads it over
+`{ ...state, ...dayPatchFor }`, [§ D984](#d984)'s ground: until *Start* is pressed a whole-day tower
+may still hold a slice's length, and a window's seconds are a fraction of the run's length. The
+times are printed with the report's own `clockRange`. With no known start the strip prints what it
+printed before, with no clock.
+
+**One reading of each car.** The strip, the badge, the *Lifts* fact, the load plate, the lede's count
+and the elevation's greyed cars now read one list built from the run's windows and the day's car
+choice — the choice the run makes, `ShiftRunConfig.dayCars`, rather than a second call — where
+they read three sources before (§ D1038 has the defect that made that visible). Two counting rules
+follow and are stated rather than implied: a car away for part of the day is counted **out of the
+working cars** on the plate and named as *away for part of the day*, so Midtown's Tuesday, where the
+movers take car C and the tower books car D, reads 2 cars working all day and 2 more for part of it
+rather than 4 (`today.test.ts` asserts it); and the opening frame
+greys only a car out at the first instant, where it used to grey every car the day's wrinkle takes,
+including one it takes at 10:30.
+
+## D1040 — a wrinkle's note says what the run does on a day whose template keeps its own mix
+
+**Date: 2026-09-25 · Owner: lane AI-E (wave AI) · The post-AH panel's A.md defect 5 · Rules on
+`data/wrinkles.json`'s `fire-drill` and `conference` notes and the `conference` axis labels,
+`packages/viz/src/shift/events.ts` (`mixKeptSentenceOf`, `eventAsRun`, the withheld line in
+`shiftRunPatch`), `everyday/today.ts`, `shift/report.ts` (`DayReportInput.templateVariesMix`) and
+`dev/main.ts`. Reads [§ D966](#d966). Cites [§ D227](#d227).**
+
+**Why an entry.** It binds a data file's copy, two surfaces and the report's input, and it
+deliberately **does not** take a decision that the same defect invites, which a later reader needs
+told.
+
+**What the run does.** `core` refuses an explicit directional split beside a template that varies
+the mix, so on a day whose template varies the mix itself — `office-day`, the whole authored day
+Midtown and the other whole-day towers run, is one — a wrinkle's mix is withheld and only its level
+applies, all day ([§ D966](#d966)). The fire drill therefore raises
+demand by its factor across the whole day on the day's own mix, and the conference, which moves only
+the mix, moves nothing. The fire drill's brief said *"Twenty minutes where the whole building wants
+to be in the lobby at once"*; the conference's said *"Interfloor traffic all afternoon"*; the only
+account of the difference was the previous day's report, in the engine's words.
+
+**The ruling.** On such a day the note the brief, the lede, the report header and tomorrow's card
+quote is `mixKeptSentenceOf`'s — the level moves and the mix does not, or, for a wrinkle that moves
+only the mix, the run is an ordinary day. The withheld line on the overnight beat is the same
+sentence. On a day whose template has no mix of its own the wrinkle's split applies for the whole
+run, and the authored notes are rewritten to say that: *"most trips all shift are on their way
+down"*, and *"Half the trips"* / *"Four trips in ten"* *"go floor to floor … all shift"*, the
+conference's two sizes named by their axis labels. Neither note names a duration the run does not
+have.
+
+**What this does not decide.** Whether a fire drill should reach the mix on a whole day. That is a
+behaviour change with a measurement owed before it — a phase-scoped split inside a template `core`
+treats as one schedule — and it is left for a decision of its own. `wholeDayEvents.test.ts` holds
+the copy against the run on both kinds of day.
+
+## D1041 — the report's destination card is pointed at by nothing and states no mechanism; its door stays
+
+**Date: 2026-09-25 · Owner: lane AI-E (wave AI), implementing part C of the first-day swarm's ruling
+S2 (item 5, §§ 2.5 and 4.C) · An agent ruling under delegated authority, not the product owner's ·
+Rules on `packages/viz/src/shift/report.ts#LEVERS` and `#leverPointersFor`. Reads [§ D503](#d503)
+and [§ D595](#d595). Names a tension with [§ D529](#d529) clause 4 for the owner.**
+
+**Why an entry.** S2 § 5 asks for one, and it reads an owner-adjacent ruling (§ D503) and names a
+tension with an owner ruling (§ D529) that this lane does not resolve.
+
+**What goes.** The *Ask where they're going* pointer, which promoted the card whenever the day's
+deepest queue stood on an entrance floor. Its own comment said the observation does not measure what
+the card claims to cut; § D595 measured both destination arms **worse** on AWT and WT95 at
+One-WTC-class; and the one recorded run of it on the day an assessor met it took the queue from 194
+to 519 (Merdeka-class, one seed — a fact about two runs, not an estimate). With it goes the card's
+mechanism clause, *"which cuts stops per trip — the thing that actually costs time"*, an unmeasured
+*why* of the kind `CLAUDE.md` records seven withdrawals of. The card now says what the control is and
+that its effect here is a question for paired runs.
+
+**What stays.** The card keeps its place in the glossary and its door to the workshop, which § D503
+licenses; it is still dropped on a run already on destination dispatch.
+
+**For the owner.** A *Today points here* card on a Scenario sheet sits in tension with § D529 clause
+4's *no suggested fix … in any scenario*, which is later than § D503. With this pointer gone no
+observation promotes the destination card, but the other three cards are still promoted by what the
+day showed. Whether that is the suggestion clause 4 forbids is the owner's reading, and this entry
+does not take it.

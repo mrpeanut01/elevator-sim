@@ -88,7 +88,7 @@
     {
       "id": "fire-drill",
       "name": "Fire drill",
-      "note": "Twenty minutes where the whole building wants to be in the lobby at once.",
+      "note": "The whole building wants the lobby: most trips all shift are on their way down, and more people are moving than on an ordinary day.",
       "days": "weekday",
       "effect": {
         "changesNothing": false,
@@ -122,7 +122,7 @@
     {
       "id": "conference",
       "name": "Conference on the middle floors",
-      "note": "Interfloor traffic all afternoon, which no up-peak strategy is tuned for.",
+      "note": "{size} go floor to floor rather than through the lobby, all shift, which no up-peak strategy is tuned for.",
       "days": "weekday",
       "effect": {
         "changesNothing": false,
@@ -141,7 +141,7 @@
           "values": [
             {
               "id": "full-floor",
-              "label": "",
+              "label": "Half the trips",
               "directionalSplit": {
                 "incoming": 0.25,
                 "outgoing": 0.25,
@@ -150,7 +150,7 @@
             },
             {
               "id": "half-floor",
-              "label": "",
+              "label": "Four trips in ten",
               "directionalSplit": {
                 "incoming": 0.3,
                 "outgoing": 0.3,

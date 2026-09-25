@@ -384,12 +384,21 @@ const weekWith = (day: number, history: readonly DayOutcome[]): WeekState => ({
   history,
 });
 
+/** Building names by id, as the shipped documents carry them — the fixture for `nameOf` (GitHub issue #599). */
+const NAMES: Readonly<Record<string, string>> = {
+  'garden-apartments': 'Garden Apartments',
+  'crown-hotel': 'Crown Hotel',
+  'chancery-house': 'Chancery House',
+  'midtown-office': 'Midtown Office',
+};
+const NAME_OF = (buildingId: string): string | undefined => NAMES[buildingId];
+
 const cardLineOf = (week: WeekState, _dayClosed: boolean): string =>
   railFooter({ screen: 'menu', ctx: 'daily' }, { week }).identity.streak;
 
 /** Your week's own line for the same week, drawn on the same frame — issue #214's other half. */
 const weekLineOf = (week: WeekState, dayClosed: boolean): string =>
-  weekScreenViewOf({ week, towerToday: 'Chancery House', dayClosed, sheetStanding: dayClosed })
+  weekScreenViewOf({ week, towerToday: 'Chancery House', nameOf: NAME_OF, dayClosed, sheetStanding: dayClosed })
     .streakLine;
 
 describe('the PLAYING AS card reports the week the host holds — issue #214', () => {

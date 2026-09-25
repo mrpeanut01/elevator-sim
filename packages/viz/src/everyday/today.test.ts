@@ -33,8 +33,15 @@ import type { GoalReading, WeekState } from '../shift/types.js';
 import { admittedPressDayIds, ladderRowFor, ladderTowerConfig, rungFor } from '../shift/ladder.js';
 import { openWeek } from '../shift/week.js';
 
+import { bookedOutCarsOf, carAbsencesOf } from '../shift/bookedOut.js';
+import { contractBuildings, todaysScenarioDayState } from '../shift/contractDay.test-helper.js';
+import { CONTRACTS } from '../shift/contracts.js';
+import { clockOf, clockRange } from '../shift/report.js';
+import { recordRun } from '../record/recordRun.js';
+import { plannedDayOf } from '../dev/state.js';
+
 import { EM_DASH, groupThousands } from './figures.js';
-import { PRESS_DAY_DRIVER_HELD, todayOf } from './today.js';
+import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE, todayOf } from './today.js';
 
 const DATA = new URL('../../../../data/', import.meta.url);
 const read = (path: string): unknown =>
@@ -72,6 +79,25 @@ const pendingGoals = (day: number): readonly GoalReading[] =>
 
 const weekOn = (day: number, dayIdx: number): WeekState => ({ ...openWeek(), day, dayIdx });
 
+/** A brief's input for a state, every field from the state or a stated fixture. */
+const inputOf = (state: ViewerState): Parameters<typeof todayOf>[0] => ({
+  week: state.week,
+  calendar: NO_CALENDAR,
+  building: undefined,
+  buildingId: state.buildingId,
+  dispatcherName: 'Steady hand',
+  dispatcherNameOf: () => undefined,
+  goals: pendingGoals(state.week.day),
+  seed: state.seed,
+  horizon: 'whole-day',
+  dayStartS: undefined,
+  templateVariesMix: false,
+  dayCars: undefined,
+  crowdIsToday: true,
+  firstSession: false,
+  units: 'metric',
+});
+
 const recordFor = (
   building: ResolvedBuilding,
   day: number,
@@ -88,6 +114,9 @@ const recordFor = (
     goals: pendingGoals(day),
     seed: 424_242n,
     horizon: 'period',
+    dayStartS: undefined,
+    templateVariesMix: false,
+    dayCars: undefined,
     crowdIsToday: true,
     firstSession: false,
     units: 'metric',
@@ -207,6 +236,9 @@ describe('the tower’s own booked absence reaches the strip — issue #576, § 
       goals: pendingGoals(1),
       seed: state.seed,
       horizon: 'period',
+      dayStartS: undefined,
+      templateVariesMix: false,
+      dayCars: undefined,
       crowdIsToday: true,
       firstSession: false,
       units: 'metric',
@@ -239,6 +271,130 @@ describe('the tower’s own booked absence reaches the strip — issue #576, § 
     // The negative control: the same code path, a contract with no declared absence, no strip.
     const quiet = weekdayWhere((event) => holdOf(event) === 0);
     expect(recordFor(midtown, quiet.day, quiet.dayIdx).outOfService).toBeUndefined();
+  });
+});
+
+/**
+ * **One reading of every car today's run loses** — the post-AH panel's N4 and N5, § D1038, § D1039.
+ *
+ * Built through the shipped chain on both sides: the brief's building is `plannedDayOf` over the
+ * state after the whole-day patch (what `host.dayAhead()` answers), and the run's is
+ * `shiftRunConfigOf` over the same state. The times the brief prints are then compared with the
+ * report header's own expression — `bookedOutCarsOf` over the run's building, on the clock the
+ * finished run carries — rather than with a transcription of either.
+ */
+describe('the day’s cars, as the run will have them — N4, N5, § D1038, § D1039', () => {
+  const RESOURCES = contractBuildings();
+
+  function briefFor(contractId: string, day: number): {
+    readonly record: ReturnType<typeof todayOf>;
+    readonly state: ViewerState;
+    readonly startOfDayS: number | undefined;
+  } {
+    const { state: first, horizon } = todaysScenarioDayState(RESOURCES, contractId, { seed: 20_260_925n });
+    const state: ViewerState = {
+      ...first,
+      campaignEventId: undefined,
+      week: { ...first.week, day, dayIdx: day - 1 },
+    };
+    const planned = plannedDayOf(RESOURCES, state);
+    const record = todayOf({
+      week: state.week,
+      calendar: NO_CALENDAR,
+      building: planned.building,
+      buildingId: state.buildingId,
+      dispatcherName: 'Steady hand',
+      dispatcherNameOf: () => undefined,
+      goals: pendingGoals(day),
+      seed: state.seed,
+      horizon,
+      dayStartS: planned.startOfDayS,
+      templateVariesMix: planned.templateVariesMix,
+      dayCars: planned.dayCars,
+      crowdIsToday: true,
+      firstSession: false,
+      units: 'metric',
+    });
+    return { record, state, startOfDayS: planned.startOfDayS };
+  }
+
+  it('never says *Nothing booked* on the door of a tower that books a car out — N4, every pinned day', () => {
+    /*
+     * The door's lede quoted `event.note` and printed *"An ordinary day: Nothing booked"* on every
+     * tower that books a car out, all seven pinned press days included, one screen before the brief
+     * said the car was booked. The lede and the wrinkle card now print one sentence.
+     */
+    const booking = CONTRACTS.filter((contract) => (ladderRowFor(contract.id)?.fabric.incidents.length ?? 0) > 0);
+    expect(booking.length, 'no contract books a car out, so this case tests nothing').toBeGreaterThan(0);
+    const pinned = CONTRACTS.filter((contract) => ladderRowFor(contract.id)?.pressDay !== undefined);
+    for (const contract of pinned) expect(booking).toContain(contract);
+    for (const contract of booking) {
+      const { record } = briefFor(contract.id, 1);
+      expect(record.wrinkle.id, contract.id).toBe('ordinary');
+      expect(record.lede, contract.id).not.toContain('Nothing booked');
+      expect(record.lede, contract.id).toContain(record.wrinkleNote);
+      expect(record.wrinkleNote, contract.id).toContain('books car');
+    }
+    /* The negative control: a tower that books nothing keeps the ordinary day's own words. */
+    const quiet = briefFor('c1', 1).record;
+    expect(quiet.lede).toContain('Nothing booked');
+  });
+
+  it('gives the brief the times the report’s header gives, from the same windows and clock', () => {
+    const { record, state } = briefFor('c2', 1);
+    const run = shiftRunConfigOf(RESOURCES, state);
+    const trace = recordRun(run.config, { recordDecisions: false }).result.trace;
+    const booked = bookedOutCarsOf(run.building);
+    expect(booked.length).toBeGreaterThan(0);
+    for (const car of booked) {
+      const times =
+        car.backAtS === null
+          ? `from ${clockOf(car.awayAtS, trace.startOfDayS)}`
+          : clockRange(car.awayAtS, car.backAtS, trace.startOfDayS);
+      expect(record.outOfService?.sentence).toContain(`Car ${car.carId} is booked out of passenger service ${times}`);
+    }
+    /* And without a known start of day the strip prints no clock at all, rather than a guessed one. */
+    const blind = todayOf({ ...inputOf(state), building: plannedDayOf(RESOURCES, state).building, dayStartS: undefined });
+    expect(/\d/u.test(blind.outOfService?.sentence ?? ''), blind.outOfService?.sentence).toBe(false);
+  }, 300_000);
+
+  it('gives one account of each car on Midtown’s Tuesday, where the day and the tower take two — N5', () => {
+    /*
+     * The move-in picked car D, which the rung already books out; the run collapsed into the rung's
+     * schedule and the brief gave three accounts of car D. Since § D1038 the day's choice skips the
+     * booked car, so the day takes another and each car has one sentence, with the run's window.
+     */
+    const { record, state, startOfDayS } = briefFor('c2', 2);
+    expect(record.wrinkle.id.startsWith('move-in')).toBe(true);
+    const run = shiftRunConfigOf(RESOURCES, state);
+    const [dayCar] = run.dayCars.windows;
+    expect(dayCar, 'the move-in took no car').toBeDefined();
+    expect(dayCar).not.toBe('D');
+    const spans = new Map(carAbsencesOf(run.building).map((entry) => [entry.carId, entry]));
+    const day = spans.get(dayCar ?? '');
+    const tower = spans.get('D');
+    if (day?.backAtS == null || tower?.backAtS == null || startOfDayS === undefined) {
+      throw new Error('both cars go and come back on this day');
+    }
+    const sentence = record.outOfService?.sentence ?? '';
+    expect(record.outOfService?.badge).toBe(`${String(dayCar)} · D`);
+    expect(sentence).not.toContain('out of service today');
+    expect(sentence.match(/Car D /gu)?.length, sentence).toBe(1);
+    expect(sentence.match(new RegExp(`Car ${String(dayCar)} `, 'gu'))?.length, sentence).toBe(1);
+    expect(sentence).toContain(
+      `Car ${String(dayCar)} is the car it takes, out of passenger service ${clockRange(day.awayAtS, day.backAtS, startOfDayS)}.`,
+    );
+    expect(sentence).toContain(
+      `Car D is booked out of passenger service ${clockRange(tower.awayAtS, tower.backAtS, startOfDayS)}.`,
+    );
+    /* The wrinkle's *also books* is now about a second car, which is what the run has. */
+    expect(record.wrinkleNote).toBe(`${record.wrinkle.note} The tower also books car D out of passenger service part-way through the day.`);
+    /* The plate counts both, as away for part of the day, and neither as out all day. */
+    const lifts = record.facts.find((fact) => fact.label === 'Lifts')?.value;
+    expect(lifts).toBe('4 · 2 away for part of the day');
+    expect(record.load?.note).toContain('2 cars working all day and 2 more for part of it');
+    /* Both are running when the day opens, so the opening frame greys nothing. */
+    expect(record.heldCarIds).toEqual([]);
   });
 });
 
@@ -276,6 +432,9 @@ describe('the facts come from the resolved building', () => {
       goals: [],
       seed: 1n,
       horizon: 'period',
+      dayStartS: undefined,
+      templateVariesMix: false,
+      dayCars: undefined,
       crowdIsToday: true,
       firstSession: false,
       units: 'metric',
@@ -347,6 +506,9 @@ describe('the rest of the record', () => {
       goals: pendingGoals(2),
       seed: 424_242n,
       horizon: 'period',
+      dayStartS: undefined,
+      templateVariesMix: false,
+      dayCars: undefined,
       crowdIsToday: false,
       firstSession: false,
       units: 'metric',
@@ -365,7 +527,12 @@ describe('the rest of the record', () => {
      * condition it; what is left here is the half that holds on every day and every tower.
      */
     const lede = recordFor(midtown, 2, 1).lede;
-    expect(lede).toContain('The only thing you choose is who drives.');
+    /*
+     * And off *only* — the post-AH panel's H13: *"The only thing you choose is who drives"* over a
+     * stage with two parking presses and a handover on every day.
+     */
+    expect(lede).toContain(TODAY_CHOICE_LINE);
+    expect(lede).not.toMatch(/\bonly thing you choose\b/u);
     expect(lede).not.toContain('Everyone');
     expect(lede).not.toContain('same crowd');
   });
@@ -446,6 +613,9 @@ function briefOn(state: ViewerState): ReturnType<typeof todayOf> {
     goals: pendingGoals(state.week.day),
     seed: state.seed,
     horizon: 'period',
+    dayStartS: undefined,
+    templateVariesMix: false,
+    dayCars: undefined,
     crowdIsToday: true,
     firstSession: false,
     units: 'metric',
@@ -607,6 +777,9 @@ describe('the moot sentence is drawn only over the run it was measured on — is
       goals: pendingGoals(day),
       seed: overrides.seed ?? BigInt(press.seedText),
       horizon: 'horizon' in overrides ? overrides.horizon : press.horizon,
+      dayStartS: undefined,
+      templateVariesMix: false,
+      dayCars: undefined,
       crowdIsToday: false,
       firstSession: false,
       units: 'metric',
@@ -657,6 +830,9 @@ describe('the brief holds the driver on an admitted pinned day under its standin
     return todayOf({
       week: state.week,
       calendar: NO_CALENDAR,
+      dayStartS: undefined,
+      templateVariesMix: false,
+      dayCars: undefined,
       building: resolvedBuildingOf(resources, state),
       buildingId: 'crown-hotel',
       dispatcherName: 'Steady hand',
