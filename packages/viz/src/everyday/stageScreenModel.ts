@@ -511,6 +511,57 @@ export function stageHeaderOf(input: StageHeaderInput): StageHeaderView {
 export const STAGE_AWAITING_RUN = 'simulating today’s day — the stage draws the moment it lands';
 
 /**
+ * **What the stage says when today's day could not be simulated, and where it lets the player go**
+ * — GitHub issue #593.
+ *
+ * The overlay used to have two states with no run behind them — waiting and recomputing — and a
+ * failed run fell into the first for good: the worker's refusal went to the Engineer transport's
+ * error line under the Everyday cover, and a player sat in front of *simulating today's day* for
+ * seven minutes before giving up on the week. A failure is a third state, and it has to do what the
+ * other two do not: say that nothing is coming, and give the player two ways on — try the same day
+ * again, or step back to the screen the day was set up from.
+ *
+ * **Player words, and no engine sentence.** The engine's own message is a bug report
+ * (`EverydayHost.runFailure` carries it, and the Engineer transport still prints it); it names
+ * templates and splits, which § 16 rule 11 keeps off a Casual surface. What the player is owed is
+ * the fact and the fault: the day did not run, and it is the game's doing rather than theirs.
+ *
+ * **Where *back* goes is the flow's own set-up screen**, so a career day returns to its building
+ * and a rush to its own screen rather than all of them to Scenario's front door. The shell's `go`
+ * already puts a rush's or a replay's parked week back on the way off the stage, so this decides a
+ * destination and nothing else.
+ *
+ * Its one non-test caller is `everyday/stageScreen.ts#syncTransport`.
+ */
+export function stageRunFailedViewOf(ctx: RunContext): {
+  readonly line: string;
+  readonly retry: string;
+  readonly back: { readonly label: string; readonly screen: EverydayScreen };
+} {
+  const back: { readonly label: string; readonly screen: EverydayScreen } =
+    ctx === 'campaign'
+      ? { label: STAGE_RUN_FAILED_COPY.backToBuilding, screen: 'building' }
+      : ctx === 'rush'
+        ? { label: STAGE_RUN_FAILED_COPY.backToRush, screen: 'rush' }
+        : ctx === 'watch'
+          ? { label: STAGE_RUN_FAILED_COPY.backToModes, screen: 'menu' }
+          : { label: STAGE_RUN_FAILED_COPY.backToDoor, screen: 'door' };
+  return { line: STAGE_RUN_FAILED_COPY.line, retry: STAGE_RUN_FAILED_COPY.retry, back };
+}
+
+/** {@link stageRunFailedViewOf}'s words, keyed so the corpus can sweep every one of them. */
+export const STAGE_RUN_FAILED_COPY = Object.freeze({
+  line:
+    'Today’s day could not be simulated, so there is nothing to watch. That is a fault in the ' +
+    'game, not in anything you chose.',
+  retry: 'Try the day again',
+  backToDoor: 'Back to the front door',
+  backToBuilding: 'Back to the building',
+  backToRush: 'Back to the rush',
+  backToModes: 'Back to the modes',
+});
+
+/**
  * **Whether the stage may take the recording the host is publishing** — GitHub issue **#548**.
  *
  * Extracted from `everyday/stageScreen.ts`'s `onHostChange`, which asked it inline as
@@ -532,6 +583,11 @@ export function stageMayAdopt(input: {
   readonly runPending: boolean;
   /** What stood on the host when this mount began waiting — see the third clause. */
   readonly standingAtEntry: VizRecording | undefined;
+  /**
+   * Whether the day this mount is waiting for **failed** — `EverydayHost.runFailure`, GitHub issue
+   * #593. Optional, and absent reads as *no failure*, which is every caller before the field existed.
+   */
+  readonly runFailed?: boolean | undefined;
 }): boolean {
   const { incoming, adopted, runPending, standingAtEntry } = input;
   if (incoming === undefined) return false;
@@ -550,6 +606,14 @@ export function stageMayAdopt(input: {
    * recording this mount never saw standing, so both pass.
    */
   if (runPending && incoming === standingAtEntry) return false;
+  /*
+   * **And the same refusal once the day has failed rather than while it is pending** — GitHub issue
+   * #593. The third clause holds exactly as long as the run is in flight; a failure takes
+   * `runPending` down, and without this the next notification would hand the stage yesterday's
+   * recording as today's — the revert #548 closed, arriving through the failure path. What stood
+   * at entry is still not the player's day, and the overlay says why there is none.
+   */
+  if (input.runFailed === true && incoming === standingAtEntry) return false;
   return true;
 }
 

@@ -195,8 +195,19 @@ export function campaignInputOf(host: EverydayHost): CampaignInput {
     buildings.set(id, { name: config.name, spec: host.buildingSpecLine(id) });
   }
   const run = host.runState();
+  const career = host.campaign();
+  /*
+   * **Only a career day's run is graded here** — GitHub issue #594. The desk folded whatever
+   * recording stood on the host, so a rush the player had just left read *1 of 4 holding* on a
+   * tower with no career day run, with ✓ and × marks against a stream no contract asked for. The
+   * readings are the latched career day's, for the tower the desk is drawing, once its own run
+   * has landed; anything else is *nothing run yet today*, which is true.
+   */
+  const careerDay = host.campaignDay();
+  const graded =
+    run.hasRun && careerDay !== undefined && careerDay.tower.id === career.openTowerId && !host.runPending();
   return {
-    career: host.campaign(),
+    career,
     schedule: host.priceSchedule(),
     careerNotice: host.careerNotice(),
     buildings,
@@ -216,7 +227,7 @@ export function campaignInputOf(host: EverydayHost): CampaignInput {
         saved: host.savedDispatchers().some((entry) => entry.id === profile.id),
       }),
     ),
-    observations: run.hasRun ? observationsOfHost(host) : undefined,
+    observations: graded ? observationsOfHost(host) : undefined,
     /*
      * **The playhead the fold above was taken at, classified** — [§ D557](../../../../DECISIONS.md).
      *
@@ -227,7 +238,14 @@ export function campaignInputOf(host: EverydayHost): CampaignInput {
      * its own way — and with no recording there is no shift to be over.
      */
     observationsBasis: observationsBasisOf(host),
-    history: host.week().history,
+    /*
+     * The career's own days — GitHub issue #594. `week()` is the Scenario week, and its Monday was
+     * standing in as *yesterday* on a career contract.
+     */
+    history:
+      career.openTowerId === undefined
+        ? []
+        : (host.campaignHistory?.(career.openTowerId) ?? host.week().history),
   };
 }
 

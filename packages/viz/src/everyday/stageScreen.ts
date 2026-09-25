@@ -98,6 +98,7 @@ import {
   STAGE_FLOOR_JUMP_PLACEHOLDER,
   stageAlarmOf,
   stageBarModelOf,
+  stageRunFailedViewOf,
   stageCameraChipsOf,
   type StageCameraId,
   stageCameraWindowOf,
@@ -853,7 +854,44 @@ function mountStage(
   startButton.addEventListener('click', () => {
     togglePlay();
   });
-  status.append(statusText, startButton);
+  /*
+   * **The failed state's two ways on** — GitHub issue #593, `stageRunFailedViewOf`. Hidden until a
+   * run of the player's own fails; then the overlay says so and these are the only two controls it
+   * offers, because a failure the player cannot act on is the endless spinner with better words.
+   */
+  const failedRow = el(doc, 'div', 'everyday-stage-failed');
+  failedRow.style.cssText = 'display:none;gap:10px;flex-wrap:wrap;justify-content:center';
+  const retryButton = el(doc, 'button', 'everyday-stage-failed-retry');
+  retryButton.type = 'button';
+  retryButton.style.cssText = startButton.style.cssText;
+  retryButton.addEventListener('click', () => {
+    /*
+     * The flow's own run press, not the daily one: `host.startRun` disarms a career day's latch by
+     * design (`host.ts#campaignDayTowerId`), so a career retry through it would come back as a
+     * Scenario day, and a rush's standing is written by `startRush` alone.
+     */
+    const careerDay = context.ctx === 'campaign' ? host.campaignDay() : undefined;
+    if (careerDay !== undefined) host.runCampaignDay(careerDay.tower.id);
+    else if (context.ctx === 'rush') host.startRush();
+    else host.startRun();
+    syncTransport();
+  });
+  const backButton = el(doc, 'button', 'everyday-stage-failed-back');
+  backButton.type = 'button';
+  backButton.style.cssText = [
+    'background:transparent',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.row)}px`,
+    'padding:10px 22px',
+    `color:${C.ink}`,
+    'font-size:14px',
+    'cursor:pointer',
+  ].join(';');
+  backButton.addEventListener('click', () => {
+    context.go(stageRunFailedViewOf(context.ctx).back.screen);
+  });
+  failedRow.append(retryButton, backButton);
+  status.append(statusText, startButton, failedRow);
   stageWrap.append(canvas, description, watchPill, status);
 
   const legend = el(doc, 'div', 'everyday-stage-legend');
@@ -1602,6 +1640,7 @@ function mountStage(
       adopted,
       runPending: host.runPending(),
       standingAtEntry,
+      runFailed: host.runFailure?.() !== undefined,
     });
     if (mayAdopt && recording !== undefined) adopt(recording);
     /*
@@ -1724,6 +1763,27 @@ function mountStage(
      * overlay never sits over a moving picture; a run that has not arrived says so in the same
      * place, because a blank stage with no sentence is the control-that-does-nothing shape.
      */
+    /*
+     * **A day that failed says so, and offers a way on** — GitHub issue #593. Only while nothing of
+     * today's is on the stage (or a re-run over it is what failed) and nothing newer is pending: a
+     * press of *Try the day again* clears the host's failure as it starts the next run, so the
+     * waiting line takes over on the same notification.
+     */
+    const failed =
+      context.ctx !== 'watch' &&
+      host.runFailure?.() !== undefined &&
+      !host.runPending() &&
+      (adopted === undefined || recomputingOver !== undefined);
+    failedRow.style.display = failed ? 'flex' : 'none';
+    if (failed) {
+      const failedView = stageRunFailedViewOf(context.ctx);
+      statusText.textContent = failedView.line;
+      retryButton.textContent = failedView.retry;
+      backButton.textContent = failedView.back.label;
+      startButton.style.display = 'none';
+      status.style.display = 'flex';
+      return;
+    }
     if (adopted === undefined) {
       statusText.textContent =
         recomputingOver !== undefined ? STAGE_RECOMPUTING : STAGE_AWAITING_RUN;
@@ -2510,7 +2570,21 @@ function mountStage(
    */
   /* GitHub issue #548 — latched *before* the press below, which is the press that makes it stale. */
   if (context.ctx !== 'watch') standingAtEntry = host.recording();
-  if (context.ctx !== 'watch' && context.ctx !== 'rush' && stageEntryStartsARun(host.runState())) host.startRun();
+  /*
+   * **Not while the day asked for is still coming, and a career day by the career's own press** —
+   * GitHub issue #594. From fresh storage the boot run is nobody's choice, so a career day's stage
+   * arrived here with `open` false and pressed `host.startRun()` over the career run already in
+   * flight: that press is § 6's, it disarms the career latch by design, and the career day was then
+   * filed into the Scenario week as a Monday nobody played. A pending run is the day the player
+   * pressed for, so the mount waits for it; and in the campaign context the re-press, when one is
+   * due, is `runCampaignDay` for the latched tower, which is the only press that files to a career.
+   */
+  const pressTheDay = (): void => {
+    const careerDay = context.ctx === 'campaign' ? host.campaignDay() : undefined;
+    if (careerDay !== undefined) host.runCampaignDay(careerDay.tower.id);
+    else if (context.ctx !== 'campaign') host.startRun();
+  };
+  if (context.ctx !== 'watch' && context.ctx !== 'rush' && !host.runPending() && stageEntryStartsARun(host.runState())) pressTheDay();
   /*
    * The handover arm is drawn from inside this call, before any frame — `draw` returns early with
    * no recording, so without it the button would sit on the awaiting-run stage with no words on it.

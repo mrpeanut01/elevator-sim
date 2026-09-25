@@ -291,7 +291,7 @@ describe.skipIf(!HAS_BROWSER)('what the chime ledger is told when a turn ends �
     }
   });
 
-  it('closes a Career day with a contract day paid and no scenario clear, though the week behind the shell counted its contract cleared', async () => {
+  it('closes a Career day with a contract day paid and no scenario clear, and the week behind the shell untouched', async () => {
     const { page, wire } = await signedInLoad('building=garden-apartments&seed=424242');
     try {
       /* The player's own path, as `campaignJourney.browser.test.ts` walks it: tile, triage row, desk, contract. */
@@ -315,24 +315,35 @@ describe.skipIf(!HAS_BROWSER)('what the chime ledger is told when a turn ends �
       await page.waitForSelector('.everyday-report', { timeout: 30_000 });
 
       /*
-       * **Precondition one: the week standing behind the shell counted this close as its contract's
-       * clear.** A Career day sets neither the week nor the play mode, so `closeShift` closes it into
-       * the week the page opened on, and on this seed that close clears the week's contract. That is
-       * exactly the state in which the wiring the review found posted a scenario clear. On a seed
-       * where the week did not clear, the case below would pass on that wiring too.
+       * **Precondition one: the week standing behind the shell was not touched by this close.**
+       *
+       * This precondition used to require the opposite — that the week *had* counted the career's
+       * close as its own contract's clear — because a Career day set neither the week nor the play
+       * mode, so `closeShift` closed it into the week the page opened on, and that was the state in
+       * which the wiring the review found posted a scenario clear. **That state was GitHub issue
+       * #594**: a career day filed into the Scenario week. Since § D964 a career day stands on a week
+       * of its own with the Scenario week parked behind it, so the tempting state cannot be reached,
+       * and what is asserted instead is that it was not — the saved week is the Scenario week, with
+       * no day filed and nothing cleared. The claim below is unchanged: a contract day is paid and
+       * nothing else is posted.
        */
       const week = await page.evaluate((key) => {
         const raw = window.localStorage.getItem(key);
         if (raw === null) return null;
         const envelope = JSON.parse(raw) as {
-          readonly session?: { readonly week?: { readonly contractId?: string; readonly completed?: readonly string[] } };
+          readonly session?: {
+            readonly week?: {
+              readonly contractId?: string;
+              readonly completed?: readonly string[];
+              readonly history?: readonly unknown[];
+            };
+          };
         };
         return envelope.session?.week ?? null;
       }, SESSION_KEY);
-      expect(
-        week?.completed ?? [],
-        `the standing week (${week?.contractId ?? 'none'}) did not count this close as its contract's clear, so this case tests nothing`,
-      ).toContain(week?.contractId);
+      expect(week?.contractId, 'the saved week is not the Scenario week the page opened on').toBe('c1');
+      expect(week?.history ?? [], 'a Career day was filed into the Scenario week (#594)').toEqual([]);
+      expect(week?.completed ?? [], 'a Career day cleared the Scenario week\'s contract (#594)').not.toContain('c1');
 
       /*
        * **Precondition two: the desk marked the day cleared**, so a contract day is owed. Read off the

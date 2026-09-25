@@ -98,7 +98,7 @@ import {
   type SimulationDemandOptions,
 } from '@elevator-sim/core/browser';
 
-import { SHIFT_EVENTS, eventCarChoice, eventFor } from './events.js';
+import { SHIFT_EVENTS, demandTemplateVariesMix, eventCarChoice, eventFor } from './events.js';
 import { scaledBuilding } from './growth.js';
 import { carsToDerate, type CarRef } from './incidents.js';
 import { weekdayOf, type ShiftEvent, type ShiftEventId, type Weekday } from './types.js';
@@ -926,7 +926,13 @@ function biasDecision(
   if (shift.splitBias === null) return { kind: 'none' };
   const record = templates.find((entry) => entry.id === runningTemplate);
   if (record === undefined) return { kind: 'noRecord' };
-  if (record.directionalSplitAtStart !== undefined) return { kind: 'variesMix' };
+  /*
+   * `core`'s answer rather than the record's `directionalSplitAtStart` — GitHub issue #593. That
+   * field is how a **shape** template varies the mix; a **phase list** varies it by declaring a
+   * mix on its phases, and `office-day` does, so this said `applied` over the whole day thirteen
+   * contracts run and built a config `core` refused. One expression with the event path now.
+   */
+  if (demandTemplateVariesMix(runningTemplate, templates)) return { kind: 'variesMix' };
   return { kind: 'applied' };
 }
 
