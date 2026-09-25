@@ -2196,7 +2196,12 @@ type DecisionReservation = {
  * post-AI playability panel's findings made necessary. Committed on `aj-base` before their worktrees
  * exist.
  */
-const OPEN_RESERVATION = { wave: 'AJ', from: 1048, to: 1119 } as DecisionReservation | null;
+/*
+ * Extended from D1119 to **D1137** on 2026-09-25 for two lanes, AJ-J and AJ-K, that build the post-AI
+ * directions swarm's rulings on fixing a building and on the campaign. Committed on the integration
+ * branch before their worktrees exist.
+ */
+const OPEN_RESERVATION = { wave: 'AJ', from: 1048, to: 1137 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
