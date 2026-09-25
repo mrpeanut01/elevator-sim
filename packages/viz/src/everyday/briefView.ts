@@ -391,7 +391,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
   const mine = options.filter((option) => option.mine).length;
   const { today } = input;
   return {
-    eyebrow: `${today.dayLabel} · ${today.wrinkle.name.toUpperCase()}`,
+    eyebrow: `${today.dayLabel} · ${today.wrinkleName.toUpperCase()}`,
     title: `Today at ${today.towerName}`,
     seedLine: today.seedLine,
     outOfService: today.outOfService,
@@ -403,7 +403,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
         : { heading: 'THE CROWD, AS CONFIGURED', word: today.load.word, note: today.load.note },
     wrinkle: {
       heading: 'TODAY’S WRINKLE',
-      title: today.wrinkle.name,
+      title: today.wrinkleName,
       body: today.wrinkleNote,
       /*
        * GitHub issue #595, § D973. This read *"Everyone playing today gets the same one"*, and the

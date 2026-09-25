@@ -31,6 +31,7 @@ const TODAY: TodayRecord = {
     name: 'Move-in day',
     note: 'One car is tied up for the first two thirds of the shift.',
   } as TodayRecord['wrinkle'],
+  wrinkleName: 'Move-in day',
   wrinkleNote: 'One car is tied up for the first two thirds of the shift.',
   outOfService: { mootUnder: undefined, badge: 'car-c', sentence: 'Car car-c is out of service today.' },
   facts: [{ label: 'Floors', value: '14 above ground' }],

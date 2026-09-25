@@ -16,7 +16,10 @@
 import { loadConfig, type DispatcherProfile, type LoadedConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { shiftRunConfigOf } from '../dev/state.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
+import { recordRun } from '../record/recordRun.js';
+import { contractBuildings, contractDayState } from '../shift/contractDay.test-helper.js';
 import {
   checkAccessCompatibility,
   credentialAwareProfileIds,
@@ -82,7 +85,8 @@ describe('Secure Tower, before Run', () => {
     expect(warning).toContain('Secure Tower has 5 access zones covering 29 of its 30 floors');
     expect(warning).toContain('nearest-car does not read credentials');
     expect(warning).toContain('up-down-buttons');
-    expect(warning).toContain('permanently unassignable');
+    expect(warning).not.toContain('unassignable');
+    expect(warning).toContain('does not stop a car collecting a call from those floors');
     // Named, in building order, as one run — every affected floor and no reader asked to parse
     // 29 comma-separated ids. The count is stated separately, so nothing is hidden.
     expect(warning).toContain('(2–30)');
@@ -161,7 +165,47 @@ describe('the message is derived from the profile list — W8’s liveness evide
     const blind = profiles.filter((profile) => !credentialCapabilityOf(profile).carriesCredential);
     const warning =
       checkAccessCompatibility({ ...secureTowerInput('nearest-car'), profiles: blind }).warning ?? '';
-    expect(warning).toContain('no dispatcher that can serve those floors');
+    expect(warning).toContain('None of the 11 dispatchers loaded here reads one.');
+    expect(warning).not.toContain('serve those floors');
+  });
+});
+
+/**
+ * The post-AI panel's seat D, D6: the Engineer panel told a player on St Jude that a call from LG, 2
+ * or 3 *"reaches every car as an unbadged request, every car refuses it on access grounds, and the
+ * call is permanently unassignable. This states what the run will do."* The same run carried riders
+ * from those floors. The warning is held against a run rather than against another sentence.
+ */
+describe('the warning is true of the run it sits beside', () => {
+  it('claims no refusal on floors the run collects from, under a profile that reads no credential', () => {
+    const resources = contractBuildings();
+    const state = contractDayState('c8', { seed: 20_276_662n, dispatcherId: 'collective' });
+    const plan = shiftRunConfigOf(resources, state);
+    const { recording } = recordRun(plan.config, {
+      recordDecisions: false,
+      outOfServiceCarIds: plan.outOfServiceCarIds,
+    });
+    const building = config.buildingsById.get('st-jude-hospital');
+    const profile = config.dispatcherProfilesById.get('collective');
+    if (building === undefined || profile === undefined) throw new Error('st-jude or collective missing');
+    const result = checkAccessCompatibility({
+      buildingName: building.name,
+      floorIds: building.floors.map((floor) => floor.id),
+      accessZones: building.accessZones,
+      profile,
+      profiles,
+    });
+    const collected = new Set(
+      recording.legs.filter((leg) => leg.boardedAt !== undefined).map((leg) => leg.originFloorId),
+    );
+    const restrictedAndCollected = result.restrictedFloorIds.filter((id) => collected.has(id));
+    /* Non-vacuity: the building restricts floors and the run collected riders on them. */
+    expect(restrictedAndCollected.length).toBeGreaterThan(0);
+    const warning = result.warning ?? '';
+    expect(warning).not.toBe('');
+    for (const claim of ['unassignable', 'refuses it', 'cannot serve', 'can serve those floors']) {
+      expect(warning, claim).not.toContain(claim);
+    }
   });
 });
 

@@ -411,6 +411,7 @@ import {
   RACE_WATCHING,
   raceSlotsOf,
   raceStripViewOf,
+  raceVerdictSlotAt,
   raceVerdictOf,
   type RaceSlots,
 } from '../live/raceStrip.js';
@@ -604,6 +605,7 @@ import {
   LOADED_RUN_CANNOT_BANK,
   UNCHOSEN_RUN_CANNOT_BANK,
 } from '../shift/banking.js';
+import { wrinkleNameOf } from '../shift/bookedOut.js';
 import { baseDemandOf, eventAsRun, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { everyWrinkle } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
@@ -3553,6 +3555,7 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * corpus; the brief's copy of the note is `today.ts#todayOf`'s, which the TODAY adapter drives.
      */
     'shift/bookedOut.ts#wrinkleNoteOf',
+    'shift/bookedOut.ts#wrinkleNameOf',
     /* The window's name in words — the post-AH panel's L3; every window-naming sentence above reaches it. */
     'shift/reportWindow.ts#reportWindowNameOf',
     'shift/bookedOut.ts#carsPhraseOf',
@@ -4057,6 +4060,12 @@ const SHIFT_REPORT: SurfaceAdapter = {
         seeds.push({ field: `WRINKLES.${wrinkle.id}.wholeDay.note`, text: placed.note, role: 'prose' });
       }
     }
+    /* The name a day the stage calls takes in place of the ordinary day's — § D1107. */
+    seeds.push({
+      field: 'SHIFT_EVENTS.ordinary.name.called',
+      text: wrinkleNameOf(SHIFT_EVENTS.ordinary, true),
+      role: 'label',
+    });
     for (const event of Object.values(SHIFT_EVENTS)) {
       seeds.push({ field: `SHIFT_EVENTS.${event.id}.name`, text: event.name, role: 'label' });
       seeds.push({ field: `SHIFT_EVENTS.${event.id}.note`, text: event.note, role: 'prose' });
@@ -7458,6 +7467,30 @@ function shippedFixitSeedsOf(shipped: ShippedFixit): readonly TextSeed[] {
       const at = `shipped(${entry.id}).${arm}`;
       seeds.push({ field: `${at}.head`, text: outcome.head, role: 'label', provenance: 'authored', attribution });
       seeds.push({ field: `${at}.body`, text: outcome.body, role: 'prose', provenance: 'authored', attribution });
+      /*
+       * **The rest line, both ways it can print** — § D1106. A case's `result.rest` prints only on the
+       * witness's own verdict once the fifty mornings are in: its authored words where the rest's
+       * interval contains zero, the measured sentence where it does not. Both bodies are what a
+       * player reads, so both are swept; the mornings are fabricated readings, this adapter's habit.
+       */
+      if (!witnessRun || entry.result.rest === undefined) continue;
+      const asBuilt = Array.from({ length: FIXIT_MORNINGS }, () => ({ complaint: 6, restAwayPct: 90, restBoarded: 120 }));
+      for (const [restArm, restAt] of [
+        ['agrees', (i: number) => 89 + (i % 2) * 2],
+        ['noticed', (i: number) => 89 - (i % 2) * 0.5],
+      ] as const) {
+        const replication = judgeReplication(
+          asBuilt,
+          Array.from({ length: FIXIT_MORNINGS }, (_, i) => ({ complaint: i % 2, restAwayPct: restAt(i), restBoarded: 120 })),
+        );
+        seeds.push({
+          field: `${at}.judged(${restArm}).body`,
+          text: judgedOutcomeOf(entry, outcome, replication).body,
+          role: 'prose',
+          provenance: 'authored',
+          attribution,
+        });
+      }
     }
   }
   shippedFixitSeeds.set(shipped, seeds);
@@ -7582,10 +7615,17 @@ const FIXIT: SurfaceAdapter = {
       totalUnits: 34,
       machineryUnits: 34,
     });
+    /* The complaint grew on the letter's morning — wave AJ's *Worse* arm (§ D1106). */
+    const grew = classifyOutcome(
+      entry,
+      { ...flat, complaintAfter: flat.complaintBefore + 5, complaintGonePct: flat.complaintBefore > 0 ? 0 : null },
+      spendOf(entry, empty, schedule),
+    );
     for (const [name, outcome] of [
       ['worse', worse],
       ['short', short],
       ['over', over],
+      ['grew', grew],
     ] as const) {
       const attribution = fixitOutcomeAttribution(outcome, undefined);
       seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored', attribution });
@@ -8272,6 +8312,7 @@ const RACE_STRIP: SurfaceAdapter = {
     'live/raceStrip.ts#raceVerdictOf',
     'live/raceStrip.ts#raceStripViewOf',
     'live/raceStrip.ts#raceSlotsOf',
+    'live/raceStrip.ts#raceVerdictSlotAt',
     'dev/ghostRun.ts#NO_SAVED_DISPATCHER',
     'dev/ghostRun.ts#ghostPlanOf',
   ],
@@ -8324,6 +8365,22 @@ const RACE_STRIP: SurfaceAdapter = {
      * sample would multiply rows without adding a state anything reads differently.
      */
     const endS = recording.endedAt;
+    /*
+     * The slot both shells now write on every frame — § D1103. At the run's end, once: the playheads
+     * across the run are `honesty/agreement.ts`'s `standing-now` pair, which reads this expression
+     * against the stage header at nine of them.
+     */
+    seeds.push({
+      field: 'race(slot, nobody, end).verdict',
+      text: raceVerdictSlotAt(
+        { verdict: '', note: '', rivalName: '' },
+        { pick: 'none', recording: undefined, refusal: undefined, pending: false, watching: false },
+        recording,
+        endS,
+      ),
+      role: 'observation',
+      playhead: atPlayhead(recording, endS),
+    });
     const ended = raceStripViewOf({ recording, ghost: comparisonRecording, simTimeS: endS });
     const alone = raceStripViewOf({ recording, ghost: undefined, simTimeS: endS });
     const sameRun = raceStripViewOf({ recording, ghost: recording, simTimeS: endS });
@@ -11739,8 +11796,14 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         { atS: recording.startedAt + span * 0.3, rule: 'first-minute-wait', carId, awayAtS, backAtS: recording.startedAt + span * 0.5, act },
         { atS: act.startS, rule: 'act-start', carId, awayAtS, backAtS: null, act },
       ];
+      /* Two cars out together where the building has two, so the plural line is swept too. */
+      const secondCarId = recording.shafts[1]?.carId;
+      const bookedOut = [
+        { carId, awayAtS, backAtS: recording.startedAt + span * 0.5 },
+        ...(secondCarId === undefined ? [] : [{ carId: secondCarId, awayAtS, backAtS: recording.startedAt + span * 0.5 }]),
+      ];
       for (const call of calls) {
-        const card = stageCallCardOf(call);
+        const card = stageCallCardOf(call, undefined, call.backAtS === null ? [] : bookedOut);
         const at = `stage.call(${call.rule})`;
         const playhead = atPlayhead(recording, call.atS);
         seeds.push({ field: `${at}.heading`, text: card.heading, role: 'label' });

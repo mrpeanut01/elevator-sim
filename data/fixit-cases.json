@@ -487,7 +487,8 @@
       ],
       "result": {
         "head": "The top floors are served like the rest.",
-        "body": "Two cars a side, drawn by headcount instead of floor count. The upper mean falls under a minute, and downstairs never noticed — the slack was theirs all along, and the figures on this page said so."
+        "body": "Two cars a side, drawn by headcount instead of floor count. The upper mean falls under a minute.",
+        "rest": "Downstairs never noticed — the slack was theirs all along, and the figures on this page said so."
       }
     },
     {
@@ -1615,7 +1616,8 @@
       ],
       "result": {
         "head": "The express passes the low zone again.",
-        "body": "Blanked landings restore the run the upper cars were built for. The low floors lose the cars they were borrowing, and their own three never notice the difference."
+        "body": "Blanked landings restore the run the upper cars were built for. The low floors lose the cars they were borrowing.",
+        "rest": "Their own three never notice the difference."
       }
     },
     {

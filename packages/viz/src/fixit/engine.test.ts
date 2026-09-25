@@ -417,6 +417,32 @@ describe('a verdict may not claim more than the run measured — docs/20 defect 
     expect(nothing.rows[0]?.verdict).toContain('0 % of it went away');
   });
 
+  /**
+   * The post-AI panel's seat C, D1: *"No change … Nothing you changed reached the thing the letter
+   * is about"* over a row reading *32 waits → 37 waits*. The complaint grew, and the head said
+   * nothing had moved. A worsening is a measurement too, and the head says it.
+   */
+  it('says Worse when the complaint grew, and the row says by how much', () => {
+    const grew = classifyOutcome(
+      CASE,
+      { ...MEASURED, complaintBefore: 32, complaintAfter: 37, complaintGonePct: 0 },
+      spendOf(CASE, emptyFixitState(), shippedPriceSchedule()),
+    );
+    expect(grew.kind).toBe('not-enough');
+    expect(grew.head).toBe('Worse, and the complaint still stands.');
+    expect(grew.head).not.toContain('No change');
+    expect(grew.body).not.toContain('Nothing you changed reached');
+    expect(grew.rows[0]?.verdict).toContain('it grew by 5 waits');
+    expect(grew.rows[0]?.verdict).not.toContain('0 % of it went away');
+    /* Equal is still no change: the arm above is for a measured rise and nothing else. */
+    const flat = classifyOutcome(
+      CASE,
+      { ...MEASURED, complaintBefore: 32, complaintAfter: 32, complaintGonePct: 0 },
+      spendOf(CASE, emptyFixitState(), shippedPriceSchedule()),
+    );
+    expect(flat.head).toBe('No change, and the complaint still stands.');
+  });
+
   it('says No change when the run showed none of the complaint to remove', () => {
     /*
      * `null` is *this run shows none of it*. A complaint that was never there cannot have been

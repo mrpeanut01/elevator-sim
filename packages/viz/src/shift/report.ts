@@ -116,7 +116,7 @@ import { interventionLogOf } from '../live/interventions.js';
 
 import { afterPressBeatOf, type PairVerdicts } from './afterPress.js';
 import { pressCallRowOf, type PressCallRowInput } from './callRow.js';
-import { wrinkleNoteOf, type BookedOutCar } from './bookedOut.js';
+import { wrinkleNameOf, wrinkleNoteOf, type BookedOutCar } from './bookedOut.js';
 import type { PressCounterfactual } from './counterfactual.js';
 
 import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
@@ -764,6 +764,7 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
       subject,
       input.bookedOut ?? [],
       dayStartS,
+      input.pressCall !== undefined,
     ),
     /*
      * The rules in force, before the attempt count and well before the intervention log —
@@ -840,6 +841,7 @@ function bookedLine(
   subject: ReportSubject,
   bookedOut: readonly BookedOutCar[],
   dayStartS: SimTime,
+  calls: boolean,
 ): readonly string[] {
   if (subject.kind !== 'week-day') return [];
   // Printed on an ordinary day too. *"Nothing booked"* is an answer to the question, and a line that
@@ -852,7 +854,10 @@ function bookedLine(
   // car then gets a line of its own with the two clock times the run had — after the run, so the
   // schedule is the run's rather than a preview (`bookedOut.ts`' module docstring).
   return [
-    `${event.name} — ${wrinkleNoteOf(event, bookedOut)}`,
+    // The day's name as the brief and the Engineer rail print it — a pinned day the stage called is
+    // not headlined *An ordinary day* (the post-AI panel's seat B, defect 4). `pressCall` is the
+    // run's own answer: present exactly when `dev/state.ts#pressDayCallOf` found the call.
+    `${wrinkleNameOf(event, calls)} — ${wrinkleNoteOf(event, bookedOut)}`,
     ...bookedOut.map((car) =>
       car.backAtS === null
         ? `car ${car.carId} · out of passenger service from ${clockOf(car.awayAtS, dayStartS)}, not back before the end`
@@ -1360,12 +1365,41 @@ function countsClause(observations: Observations): string {
 function clearedLede(summary: VizSummary, observations: Observations): string {
   if (summary.saturated) {
     return (
-      `Every goal met, on a day the queues never settled. ${countsClause(observations)}. The ` +
-      'backlog was still growing when the window closed, so the wait figure above is withheld ' +
-      'rather than published, and the cell says on which ground.'
+      `Every goal met, on a day the queues never settled. ${countsClause(observations)}.` +
+      `${accountClause(observations)} The backlog was still growing when the window closed, so the ` +
+      'wait figure above is withheld rather than published, and the cell says on which ground.'
     );
   }
-  return `A day it could handle. ${countsClause(observations)}.`;
+  return `A day it could handle. ${countsClause(observations)}.${accountClause(observations)}`;
+}
+
+/**
+ * **Where everybody who was not carried went** — the post-AI panel's seat D, top change 3.
+ *
+ * Every leg that arrived is in exactly one of four places when the day ends: carried, still in a car,
+ * still on a landing without having boarded, or turned away at a credential check (§ D265's fourth
+ * outcome). The lede printed the first and the arrivals, so *323 journeys of 329 offered* left six
+ * people nowhere, and the *Add a car* card then pointed at three of them — riders the building had
+ * turned away for their credential, whom no car could have carried. This names the other three
+ * places, in counts, and prints nothing when everybody was carried.
+ *
+ * *Had not boarded* rather than *were still waiting*: `VizLeg` carries no `abandonedAt`, so a rider
+ * who gave up and left is in the same count, and the words are true of both.
+ */
+function accountClause(observations: Observations): string {
+  const missing = observations.arrived - observations.carried;
+  if (missing <= 0) return '';
+  const parts = [
+    ...(observations.turnedAway === 0
+      ? []
+      : [`${String(observations.turnedAway)} ${observations.turnedAway === 1 ? 'was' : 'were'} turned away at a credential check`]),
+    ...(observations.aboard === 0
+      ? []
+      : [`${String(observations.aboard)} ${observations.aboard === 1 ? 'was' : 'were'} still in a car`]),
+    ...(observations.standing === 0 ? [] : [`${String(observations.standing)} had not boarded`]),
+  ];
+  if (parts.length === 0) return '';
+  return ` Of the ${String(missing)} not carried, ${listOf(parts)} when the day ended.`;
 }
 
 /**
@@ -1424,11 +1458,19 @@ function missedLede(
   readings: readonly GoalReading[],
 ): string {
   if (summary.saturated) {
+    /*
+     * It used to say *with N still standing when the window closed*, with N `summary.unservedCount`
+     * — legs of the window's cohort that had not boarded **when the run ended**, a different instant
+     * and a different population from the words. On the post-AI panel's seat D's Wednesday it read
+     * *0 still standing when the window closed* on a sheet whose worst wait ran on past the window
+     * and whose lever card said the backlog was still growing. The lede now says the growing backlog
+     * in the lever card's own words, and where the uncarried went through {@link accountClause}.
+     */
     return (
       `It did not cope. ${String(observations.arrived)} people asked for a lift and ` +
-      `${String(observations.carried)} got one, with ${String(summary.unservedCount)} still ` +
-      'standing when the window closed. That is a building being outrun, not a dispatcher having ' +
-      'a bad day — and it is fixable with the levers below.'
+      `${String(observations.carried)} got one, and the backlog was still growing when the window ` +
+      `closed.${accountClause(observations)} That is a building being outrun, not a dispatcher ` +
+      'having a bad day — and it is fixable with the levers below.'
     );
   }
   const unmet = readings.filter((reading) => reading.state === 'missed');
@@ -1444,8 +1486,8 @@ function missedLede(
    */
   const clause = unmet.length === 0 ? '' : ` — and ${listOf(unmet.map((reading) => `“${reading.goal.label}”`))} still went unmet`;
   return (
-    `Short of what the shift asked for. ${countsClause(observations)}${clause}. The banner below ` +
-    'is counting the same thing this sentence is.'
+    `Short of what the shift asked for. ${countsClause(observations)}${clause}.` +
+    `${accountClause(observations)} The banner below is counting the same thing this sentence is.`
   );
 }
 
@@ -1616,7 +1658,7 @@ function figuresFor(
       axisOnly: false,
     },
     averageWaitFigure(summary),
-    worstWaitFigure(summary),
+    worstWaitFigure(observations),
     {
       id: 'deepest-queue',
       label: 'DEEPEST QUEUE',
@@ -1848,42 +1890,43 @@ function turnedAwayClause(observations: Observations): string {
 }
 
 /**
- * The longest wait in the window, and the word that keeps it honest.
+ * The longest wait of the whole shift, and the word that keeps it honest.
  *
- * `longestWaitIsCensored` means the leg never boarded, so the number is a **lower bound** and the
- * sentence has to say *at least*. Drawing the censored and uncensored cases identically would put
- * the understatement precisely where the service is worst — `VizServiceLevel`'s own argument.
+ * `worstWaitIsCensored` means the rider had not boarded when the day ended, so the number is a
+ * **lower bound** and the sentence has to say *at least*. Drawing the censored and uncensored cases
+ * identically would put the understatement precisely where the service is worst —
+ * `VizServiceLevel`'s own argument.
  *
- * ## The window is named in the cell, not only in the small print — `docs/19` defect 3
+ * ## One worst wait on the sheet, the one the goal grades — § D1104
  *
- * This figure is `summary.serviceLevel.longestWaitS`, taken over the **reporting window**; the
- * goal row three blocks up grades `Observations.worstWaitS`, the **whole shift's** maximum. Every
- * shipped template narrows its window, so the two legitimately differ on the same sheet — 1 488 s
- * against 1 725 s on the audit's Midtown day — and the only reconciliation was the small print. A
- * reader who meets two “worst waits” four inches apart needs each labelled where it stands, so
- * the note carries the cell's own window inline and says which surface reads the whole shift.
+ * This cell used to read `summary.serviceLevel.longestWaitS`, the **reporting window's** maximum,
+ * while the goal row three blocks up graded `Observations.worstWaitS`, the **whole shift's**. Every
+ * shipped template narrows its window, so the two differed on one sheet — 1 488 s against 1 725 s on
+ * the audit's Midtown day, 178 s against 181 s on the post-AI panel's seat B's St Jude day — and
+ * `docs/19` defect 3's repair labelled each where it stood. The newcomer read two numbers anyway.
+ * The cell now reads the goal's own fold, rounded the goal's own way, so the two cannot differ; the
+ * window's worst is not published a second time. `honesty/agreement.ts`'s `worst-wait` pair holds it.
  */
-function worstWaitFigure(summary: VizSummary): ReportFigure {
-  const { longestWaitS, longestWaitIsCensored } = summary.serviceLevel;
-  if (longestWaitS === null) {
+function worstWaitFigure(observations: Observations): ReportFigure {
+  if (observations.arrived === 0) {
     return {
       id: 'worst-wait',
       label: 'WORST WAIT',
       value: NOT_RECORDED,
-      note: 'the reporting window held no arrivals',
+      note: 'nobody called a lift',
       tone: 'plain',
       axisOnly: false,
     };
   }
-  const windowClause = `the ${reportWindowNameOf(summary.reportWindow.id)} window’s worst — the goal row reads the whole shift`;
+  const shiftClause = 'the worst of the whole shift — the figure the goal row grades';
   return {
     id: 'worst-wait',
     label: 'WORST WAIT',
-    value: `${longestWaitIsCensored ? 'at least ' : ''}${longestWaitS.toFixed(0)} s`,
-    note: longestWaitIsCensored
-      ? `a rider who never boarded — a lower bound, not their wait; ${windowClause}`
-      : `one rider, and they remember it; ${windowClause}`,
-    tone: longestWaitS > LONG_WORST_WAIT_S ? 'bad' : 'plain',
+    value: `${observations.worstWaitIsCensored ? 'at least ' : ''}${observations.worstWaitS.toFixed(0)} s`,
+    note: observations.worstWaitIsCensored
+      ? `a rider who had not boarded when the day ended — a lower bound, not their wait; ${shiftClause}`
+      : `one rider, and they remember it; ${shiftClause}`,
+    tone: observations.worstWaitS > LONG_WORST_WAIT_S ? 'bad' : 'plain',
     axisOnly: false,
   };
 }
@@ -1973,7 +2016,11 @@ function energyFigures(summary: VizSummary): readonly ReportFigure[] {
         measured && energy.workPerServedLegKJ !== null
           ? `${energy.workPerServedLegKJ.toFixed(1)} kJ`
           : NOT_RECORDED,
-      note: `over ${legCount(energy.deliveredLegCount, 'delivered ride')} — a day that spends less by carrying fewer people has saved nothing`,
+      note:
+        `over ${legCount(energy.deliveredLegCount, 'delivered ride')} in the ` +
+        `${reportWindowNameOf(summary.reportWindow.id)} window — a count that small moves several-fold ` +
+        'from one day’s crowd to the next with nothing changed; a day that spends less by carrying ' +
+        'fewer people has saved nothing',
       tone: 'unranked',
       axisOnly: true,
     },
@@ -2524,9 +2571,18 @@ function leverPointersFor(
    * `campaign/judge.ts` had not done, and GitHub issue #295's F37 is the string a player read
    * because of it.
    */
-  if (summary.unservedCount > 0) {
-    const legs = summary.unservedCount;
-    outrun.push(`${String(legs)} ride${legs === 1 ? '' : 's'} never boarded at all`);
+  /*
+   * **Legs still on a landing at the end, and never the ones turned away** — the post-AI panel's
+   * seat D, D5. This read `summary.unservedCount`, which counts a leg the building **turned away at
+   * a credential check** as never boarded — it never did — so on St Jude's day 1 *Add a car* said
+   * *"Today points here: 3 legs never boarded at all"* about three riders no car could have
+   * carried, and the sheet never named them. `Observations.standing` is the landings at the end,
+   * with the refused taken out by `frame/overlay.ts#isWaitingAt`; the refused are named in the
+   * lede's account instead, where no lever points at them.
+   */
+  if (observations.standing > 0) {
+    const legs = observations.standing;
+    outrun.push(`${String(legs)} ride${legs === 1 ? '' : 's'} had not boarded when the day ended`);
   }
   if (observations.abandoned > 0) {
     /*

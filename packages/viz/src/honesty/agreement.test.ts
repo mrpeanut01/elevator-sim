@@ -27,12 +27,20 @@ import type { BrowserResources } from '../dev/data.js';
 import { createEverydayHost, type EverydayHostBindings } from '../everyday/host.js';
 import { railFooter } from '../everyday/rail.js';
 
+import { raceStripViewOf, RACE_SAMPLE_INTERVAL_S } from '../live/raceStrip.js';
+import { scheduledEventFor } from '../shift/calendar.js';
+import { contractBuildings, contractDayState } from '../shift/contractDay.test-helper.js';
+import { pressDayFor } from '../shift/ladder.js';
+import { clockOf } from '../shift/report.js';
+import { DAY_START_S } from '../shift/types.js';
+
 import {
   AGREED_FIGURES,
   agreementViews,
   checkSurfacesAgree,
   renderAgreements,
   type AgreedFigure,
+  type AgreementView,
 } from './agreement.js';
 import { deriveExportedDeclarations } from './derive.test-helper.js';
 import { caseFromSeed, contextFor, STANDARD_CORPUS, STANDARD_SPACE, type HonestyResources } from './index.js';
@@ -313,6 +321,98 @@ describe('the tenth property goes red on § D359, which is the whole of its evid
     expect(found[0]?.message).toContain('published by');
     expect(found[0]?.message).toContain('and by nothing on');
   }, 600_000);
+});
+
+/**
+ * **Wave AJ's four pairs, each reverted to the defect the post-AI panel met** — the same evidence
+ * the § D359 case above gives its pair: a property that has never been red is not evidence.
+ */
+describe('wave AJ’s pairs go red on the defects they were declared for', () => {
+  const pair = (id: string): AgreedFigure => {
+    const declared = AGREED_FIGURES.find((figure) => figure.id === id);
+    if (declared === undefined) throw new Error(`the ${id} pair is gone — this case is about nothing`);
+    return declared;
+  };
+
+  it('standing-now: a slot answered at the last grid line disagrees with the header', () => {
+    const declared = pair('standing-now');
+    const reverted: AgreedFigure = {
+      ...declared,
+      right: {
+        surfaceId: declared.right.surfaceId,
+        read: (view) => {
+          const recording = view.recording;
+          if (recording === undefined) return undefined;
+          const span = recording.endedAt - recording.startedAt;
+          const readings: string[] = [];
+          for (let k = 0; k < 9; k += 1) {
+            const t = recording.startedAt + (span * (k + 0.37)) / 9;
+            const gridT = recording.startedAt + Math.floor((t - recording.startedAt) / RACE_SAMPLE_INTERVAL_S) * RACE_SAMPLE_INTERVAL_S;
+            const verdict = raceStripViewOf({ recording, ghost: undefined, simTimeS: gridT }).verdict;
+            readings.push(`${clockOf(t, DAY_START_S)} ${/^(\d+) standing now$/u.exec(verdict)?.[1] ?? '?'}`);
+          }
+          return readings.join(' · ');
+        },
+      },
+    };
+    const found = contexts.flatMap((each) => checkSurfacesAgree(each.context, renderAgreements(each.context, each.resources, [reverted])));
+    expect(found.length).toBeGreaterThan(0);
+    expect(found[0]?.message).toContain('live/raceStrip.ts#raceVerdictSlotAt');
+    /* And the shipped pair holds over the same cases, with a run on the first view of each. */
+    const shipped = contexts.flatMap((each) => renderAgreements(each.context, each.resources, [declared]));
+    expect(shipped.length).toBe(contexts.length * 2);
+  });
+
+  it('worst-wait: a card that reads the reporting window disagrees with the goal row', () => {
+    const declared = pair('worst-wait');
+    const reverted: AgreedFigure = {
+      ...declared,
+      left: {
+        surfaceId: declared.left.surfaceId,
+        read: (view) => {
+          const right = declared.right.read(view);
+          const longest = view.recording?.summary.serviceLevel.longestWaitS;
+          return right === undefined || longest === null || longest === undefined ? undefined : `${longest.toFixed(0)} s`;
+        },
+      },
+    };
+    const found = contexts.flatMap((each) => checkSurfacesAgree(each.context, renderAgreements(each.context, each.resources, [reverted])));
+    expect(found.length).toBeGreaterThan(0);
+    expect(found[0]?.message).toContain('shift/goals.ts#readGoals');
+  });
+
+  it('todays-shift: a rail that reads the calendar says Nothing booked on St Jude’s pinned day', () => {
+    const declared = pair('todays-shift');
+    const stJude = contractBuildings();
+    const press = pressDayFor('c8');
+    if (press === undefined) throw new Error('c8 pins a day');
+    const view: AgreementView = {
+      id: 'c8-pinned/period',
+      state: contractDayState('c8', { seed: BigInt(press.seedText), dispatcherId: press.standingOrder }),
+      resources: stJude,
+      dayClosed: false,
+      account: undefined,
+    };
+    const shipped = [declared.left.read(view), declared.right.read(view)];
+    expect(shipped[0]).toBe(shipped[1]);
+    expect(shipped[0]).toContain('cars D and E');
+    expect(shipped[0]).not.toContain('An ordinary day');
+    const week = view.state.week;
+    const event = scheduledEventFor(view.state.calendar, week.day, week.dayIdx);
+    /* The rail as it shipped at `c9febbe`: the calendar's name and note, straight. */
+    expect(`${event.name} — ${event.note}`).not.toBe(shipped[1]);
+    expect(`${event.name} — ${event.note}`).toContain('Nothing booked');
+  });
+
+  it('standing-said: every fixture case’s run is read at nine playheads by both sides', () => {
+    const declared = pair('standing-said');
+    for (const each of contexts) {
+      const texts = renderAgreements(each.context, each.resources, [declared]);
+      expect(texts.map((text) => text.agreement?.side).sort(), each.context.case.caseId).toEqual(['left', 'right']);
+      for (const text of texts) expect(text.text.split(' · '), each.context.case.caseId).toHaveLength(9);
+      expect(checkSurfacesAgree(each.context, texts), each.context.case.caseId).toEqual([]);
+    }
+  });
 });
 
 describe('the register is watching something', () => {

@@ -79,7 +79,10 @@ import type {
 import type { ViewMode } from '../mode/types.js';
 import { MOOD_GLYPH, buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { contractById } from '../shift/contracts.js';
+import { bookedOutCarsOf, wrinkleNameOf, wrinkleNoteOf } from '../shift/bookedOut.js';
 import { scheduledEventFor } from '../shift/calendar.js';
+import { eventAsRun } from '../shift/events.js';
+import { admittedPressDayIds, pressDayStanding } from '../shift/ladder.js';
 import { runHorizonOf } from '../shift/dayLength.js';
 import {
   PENDING_DISPLAY,
@@ -104,7 +107,7 @@ import type { BrowserResources } from './data.js';
 import {el, fill, keyedFill, setHidden, setStyle, setText } from './dom.js';
 import type { HonestyElements, MoodElements, ShiftElements } from './elementMap.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
-import { buildingConfigOf, disclosureOf, type ViewerState } from './state.js';
+import { buildingConfigOf, disclosureOf, plannedDayOf, type ViewerState } from './state.js';
 
 /**
  * The elements this mount owns — a structural subset of `Elements`, so the shell passes its whole
@@ -662,6 +665,70 @@ function shareColor(pct: number): string {
  * Pure in its two arguments and exported for the reason every decision in this file is: there is no
  * jsdom here, so a decision made inside a DOM write is a decision no test can reach.
  */
+/** The Engineer rail's *today's shift* pair — the day's name and its note. */
+export interface TodaysShift {
+  readonly name: string;
+  readonly note: string;
+}
+
+/** The last answer, keyed on the two objects it is a function of; the rail redraws far more often. */
+let todaysShiftMemo:
+  | { readonly resources: BrowserResources; readonly state: ViewerState; readonly value: TodaysShift }
+  | undefined;
+
+/**
+ * **Today's shift, as the Everyday brief and the Day report name it** — the post-AI panel's seat C
+ * and seat D, D6, and seat B, defect 4.
+ *
+ * The rail printed `event.name` and `event.note` straight off the calendar, so on St Jude's day 1 —
+ * whose tower books cars D and E out at 08:37 — it read *An ordinary day — Nothing booked. The
+ * building is the only thing in the way.* one door away from a brief saying both cars were booked.
+ * Wave AI closed that sentence on the brief and the report (§ D983) and left this third reader.
+ *
+ * It now asks what the other two ask, over the same run: `dev/state.ts#plannedDayOf` for the building
+ * the next run is handed and the cars today's event takes, `shift/events.ts#eventAsRun` for what the
+ * day does, `shift/bookedOut.ts#wrinkleNoteOf` for the sentence and `wrinkleNameOf` for the name —
+ * an admitted pinned day, which the stage calls, is not headlined *An ordinary day*.
+ * `honesty/agreement.ts` declares this and the brief's record a pair.
+ */
+export function todaysShiftOf(resources: BrowserResources, state: ViewerState): TodaysShift {
+  const memo = todaysShiftMemo;
+  if (memo !== undefined && memo.resources === resources && memo.state === state) return memo.value;
+  const week = state.week;
+  const planned = plannedDayOf(resources, state);
+  const event = eventAsRun(
+    scheduledEventFor(
+      state.calendar,
+      week.day,
+      week.dayIdx,
+      planned.wholeDayRun ? 'whole-day' : 'period',
+    ),
+    planned.templateVariesMix,
+    planned.wholeDayRun,
+  );
+  const config = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
+  const pinned =
+    config === undefined
+      ? undefined
+      : pressDayStanding({
+          contractId: week.contractId,
+          day: week.day,
+          eventId: event.id,
+          hasCalendar: state.calendar !== null,
+          seed: state.seed,
+          horizon: runHorizonOf(resources.trafficProfiles, config, state),
+        });
+  const value: TodaysShift = {
+    name: wrinkleNameOf(event, pinned !== undefined && admittedPressDayIds().includes(week.contractId)),
+    note: wrinkleNoteOf(
+      event,
+      bookedOutCarsOf(planned.building, [...planned.dayCars.holds, ...planned.dayCars.windows]),
+    ),
+  };
+  todaysShiftMemo = { resources, state, value };
+  return value;
+}
+
 export function shiftGoalsOf(
   state: ViewerState,
   resources: BrowserResources,
@@ -1296,9 +1363,9 @@ function drawShift(
    * move-in. `shift/calendar.ts#scheduledEventFor` is the one answer to the question and this is
    * one of its four callers.
    */
-  const event = scheduledEventFor(state.calendar, week.day, week.dayIdx);
-  setText(ui.event, event.name);
-  setText(ui.note, event.note);
+  const shift = todaysShiftOf(view.resources, state);
+  setText(ui.event, shift.name);
+  setText(ui.note, shift.note);
 
   const goals = goalRowsOf(
     readGoals(shiftGoalsOf(state, view.resources), observations),

@@ -26,7 +26,7 @@ const CALLS: readonly PressCall[] = [
 
 /** Every string a card draws. */
 function wordsOf(call: PressCall): readonly string[] {
-  const card = stageCallCardOf(call, DAY_START_S);
+  const card = stageCallCardOf(call, DAY_START_S, []);
   return [card.heading, ...card.facts, card.question, ...card.options.map((option) => option.label)];
 }
 
@@ -51,7 +51,7 @@ describe('the card', () => {
 
   it('offers the two parking presses and leave them, in the stage’s fixed order whatever the pin', () => {
     for (const call of CALLS) {
-      const options = stageCallCardOf(call, DAY_START_S).options;
+      const options = stageCallCardOf(call, DAY_START_S, []).options;
       expect(options.map((option) => option.label)).toEqual([
         PARK_CARS_LOBBY_LABEL,
         SPREAD_CARS_LABEL,
@@ -62,12 +62,39 @@ describe('the card', () => {
   });
 
   it('says only the ruling’s three facts — the car, a minute’s wait, the peak — each where it is true', () => {
-    const [minute, act, slice, noReturn] = CALLS.map((call) => stageCallCardOf(call, DAY_START_S).facts);
+    const [minute, act, slice, noReturn] = CALLS.map((call) => stageCallCardOf(call, DAY_START_S, []).facts);
     expect(minute).toEqual(['Car D is out of passenger service until 13:00.', STAGE_CALL_COPY.minute]);
     expect(act).toEqual(['Car C is out of passenger service until 13:00.', 'The peak opened at 12:15.']);
     /* A slice's act-start is the car leaving, which the first line already says. */
     expect(slice).toEqual(['Car D is out of passenger service until 08:15.']);
     expect(noReturn?.[0]).toBe('Car D is out of passenger service for the rest of the day.');
+  });
+
+  /**
+   * The post-AI panel's seat B, defect 5: on St Jude's pinned day cars D and E are both out
+   * 08:37–08:46 and the card named only car D. Every booked-out car away at the call is named; a car
+   * back before the call, or not yet gone, is not.
+   */
+  it('names every booked-out car that is away at the call, one line per return time', () => {
+    const [minute] = CALLS;
+    if (minute === undefined) throw new Error('fixture');
+    const bookedOut = [
+      { carId: 'E', awayAtS: 9000, backAtS: 18000 },
+      { carId: 'D', awayAtS: 9000, backAtS: 18000 },
+      { carId: 'F', awayAtS: 9300, backAtS: null },
+      { carId: 'B', awayAtS: 7000, backAtS: 9500 },
+      { carId: 'C', awayAtS: 9700, backAtS: 12000 },
+    ];
+    const facts = stageCallCardOf(minute, DAY_START_S, bookedOut).facts;
+    expect(facts).toEqual([
+      'Cars D and E are out of passenger service until 13:00.',
+      'Car F is out of passenger service for the rest of the day.',
+      STAGE_CALL_COPY.minute,
+    ]);
+    /* The call's own car is named even when the list handed in omits it. */
+    expect(stageCallCardOf(minute, DAY_START_S, [{ carId: 'E', awayAtS: 9000, backAtS: 18000 }]).facts[0]).toBe(
+      'Cars D and E are out of passenger service until 13:00.',
+    );
   });
 
   it('the call’s minute is the stage’s held beat — one threshold', () => {

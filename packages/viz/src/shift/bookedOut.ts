@@ -156,3 +156,26 @@ export function wrinkleNoteOf(event: ShiftEvent, bookedOut: readonly BookedOutCa
   }
   return `${event.note} The tower also books ${which} out of passenger service part-way through the day.`;
 }
+
+/**
+ * The name of a day the stage will stop once to call — the post-AI panel's seat B, defect 4.
+ *
+ * A pinned press day is the calendar's ordinary day (`shift/ladder.ts#pressDayStanding` admits no
+ * other), so the brief's wrinkle card, the Day report's header and the Engineer rail all headlined
+ * it *An ordinary day*: the one day of the week that is not. The call is § D1029's, and this is its
+ * name, in the card's own word.
+ */
+const CALL_DAY_NAME = 'A day with a call';
+
+/**
+ * The day's name as the wrinkle card, the report header and the Engineer rail print it — the event's
+ * own, except on an ordinary day the stage will call, which is {@link CALL_DAY_NAME}.
+ *
+ * `calls` is the caller's answer to *will the stage call this day*, from the pin
+ * (`ladder.ts#pressDayStanding` over an admitted row) before a run and from the run
+ * (`dev/state.ts#pressDayCallOf`) after one. It is not derived here because this module reads a
+ * building and not a week.
+ */
+export function wrinkleNameOf(event: ShiftEvent, calls: boolean): string {
+  return calls && event.id === 'ordinary' ? CALL_DAY_NAME : event.name;
+}

@@ -296,7 +296,7 @@ export function judgedOutcomeOf(entry: FixitCase, gate: FixitOutcome, replicatio
   const [complaintRow, restRow, spentRow] = gate.rows;
   const rows = [complaintRow, restRow, spentRow, replicationRowOf(entry, replication)] as const;
   const basis = basisAfterReplication(gate);
-  if (replication.holds) return { ...gate, rows, basis };
+  if (replication.holds) return { ...gate, body: bodyWithRestOf(entry, gate, replication), rows, basis };
   const measure = entry.complaint.measure;
   const why = replication.complaintHolds
     ? `Over fifty mornings ${restClause(replication)}.`
@@ -309,6 +309,39 @@ export function judgedOutcomeOf(entry: FixitCase, gate: FixitOutcome, replicatio
     rows,
     basis,
   };
+}
+
+/**
+ * The authored body with its **rest** line, gated on the fifty mornings — `types.ts#FixitResultCopy`.
+ *
+ * Only on the authored arm (the witness's own run), and only when the case authors a `rest` line. The
+ * line is a claim that the rest of the building did not notice the fix, and it prints only when the
+ * rest's fifty-morning interval contains zero. Where the interval excludes zero the measured sentence
+ * prints in its place, in the row's own figures, so the card never says *never noticed* above a row
+ * that shows a change. Where nobody else rode on enough mornings there is no interval, and neither
+ * prints: a claim about nobody is not a claim.
+ *
+ * The line goes straight after the authored body and before anything the engine appended to it
+ * (`engine.ts#spentAnywayClause`), which is where the authored sentence stood before it was split out.
+ */
+function bodyWithRestOf(entry: FixitCase, gate: FixitOutcome, replication: FixitReplication): string {
+  const authored = entry.result.rest;
+  if (authored === undefined || gate.attribution !== 'diagnosis') return gate.body;
+  if (!gate.body.startsWith(entry.result.body)) return gate.body;
+  const sentence = restSentenceOf(authored, replication.rest);
+  if (sentence === '') return gate.body;
+  return `${entry.result.body} ${sentence}${gate.body.slice(entry.result.body.length)}`;
+}
+
+/** The authored rest line where the interval contains zero, the measured one where it does not. */
+function restSentenceOf(authored: string, rest: PairedInterval | null): string {
+  if (rest === null) return '';
+  if (rest.lower <= 0 && rest.upper >= 0) return authored;
+  return (
+    `The rest of the building did notice: its share away inside a minute moved ${signed(rest.mean, 1)} ` +
+    `points a morning over ${String(rest.n)} mornings (95 % interval ${signed(rest.lower, 1)} to ` +
+    `${signed(rest.upper, 1)}), which is not shown worse than the ${String(REST_DROP_LIMIT_POINTS)}-point floor.`
+  );
 }
 
 /* -------------------------------------------------------------------------- *

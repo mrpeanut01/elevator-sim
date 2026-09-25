@@ -541,6 +541,19 @@ export interface Observations extends GoalObservations {
    * building whose riders are all correctly badged.
    */
   readonly turnedAway: number;
+  /**
+   * Legs still standing at a landing at the fold's instant — neither boarded nor turned away.
+   * `LiveObservations.waitingNow`, copied. At the run's end it is the **fourth** part of the
+   * accounting `report.ts#accountClause` prints: every leg that arrived was carried, is still in a
+   * car ({@link aboard}), is standing here, or was turned away ({@link turnedAway}) — the post-AI
+   * panel's seat D, whose Everyday report said *323 of 329 carried* and never said where six went.
+   *
+   * A rider who gave up and left is in this count, because `VizLeg` carries no `abandonedAt`; the
+   * sentence that prints it says *had not boarded*, which is true of both.
+   */
+  readonly standing: number;
+  /** Legs that had boarded and not yet alighted at the fold's instant — still in a car. */
+  readonly aboard: number;
   /** Where the deepest queue stood. `null` when no landing ever held anybody. */
   readonly peakQueueFloorId: string | null;
   /**

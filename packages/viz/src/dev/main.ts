@@ -162,6 +162,8 @@ import {
   raceLaneOf,
   raceSlotsOf,
   raceStripViewOf,
+  raceVerdictSlotAt,
+  type RaceSlots,
   type GhostPick,
 } from '../live/raceStrip.js';
 import {
@@ -3270,6 +3272,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let lastShiftPlan: ShiftRunConfig | undefined;
   /** What the strip geometry was last drawn for — see {@link drawRaceStrip}'s keying. */
   let lastRaceKey = '';
+  /** The slots {@link lastRaceKey}'s drawing wrote — read by the per-frame verdict. */
+  let lastRaceSlots: RaceSlots = { verdict: '', note: '', rivalName: '' };
 
   /* ---------------------------------------------------------------------- *
    * Watching somebody else's run — GAMEPLAY § 14.1, ENGINE_CONTRACT § 1.5
@@ -5054,7 +5058,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       watching === undefined ? '' : 'watching',
     ].join('|');
-    if (key === lastRaceKey) return;
+    /*
+     * The *nobody* pick's slot is a live count, so it is written at the playhead on every frame
+     * rather than at the grid line — the post-AI panel's seat D, D7. See `raceVerdictSlotAt`.
+     */
+    const rival = {
+      pick: ghostPick,
+      recording: ghost,
+      refusal: ghostRefusal,
+      pending: ghostInFlight,
+      watching: watching !== undefined,
+    };
+    if (key === lastRaceKey) {
+      setText(ui.race.verdict, raceVerdictSlotAt(lastRaceSlots, rival, recording, view.simTimeS));
+      return;
+    }
     lastRaceKey = key;
 
     const stripView = raceStripViewOf({ recording, ghost, simTimeS: view.simTimeS });
@@ -5080,7 +5098,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       },
       recording,
     );
-    setText(ui.race.verdict, slots.verdict);
+    lastRaceSlots = slots;
+    setText(ui.race.verdict, raceVerdictSlotAt(slots, rival, recording, view.simTimeS));
     setText(ui.race.note, slots.note);
     setText(ui.race.footer, stripView.footer);
     setHidden(ui.race.ghostKey, stripView.ghost === undefined);

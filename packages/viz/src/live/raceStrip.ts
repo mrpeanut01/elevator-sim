@@ -326,7 +326,7 @@ export function raceStripViewOf(input: RaceStripInput): RaceStripView {
     return {
       yours,
       ghost: undefined,
-      verdict: `${String(tip?.standing ?? 0)} standing now`,
+      verdict: standingNowVerdictOf(tip?.standing ?? 0),
       note: '',
       footer: RACE_FOOTER,
     };
@@ -341,6 +341,49 @@ export function raceStripViewOf(input: RaceStripInput): RaceStripView {
     note: SAME_CROWD_NOTE,
     footer: RACE_FOOTER,
   };
+}
+
+/** The *nobody* pick's verdict — the standing count, in the slot's words. */
+function standingNowVerdictOf(standing: number): string {
+  return `${String(standing)} standing now`;
+}
+
+/**
+ * **The verdict slot at the playhead**, not at the last grid line — the post-AI panel's seat D, D7.
+ *
+ * Both shells re-derive {@link raceStripViewOf} only when the playhead crosses a
+ * {@link RACE_SAMPLE_INTERVAL_S} grid line, which is right for the lanes and was wrong for the one
+ * cell that is a live count: on the *nobody* pick the slot reads *N standing now*, and on a paused
+ * frame at St Jude's call it read **6** beside a header reading **10** — the header's figure at the
+ * playhead, the strip's at the grid line four minutes back. A frame may not carry two standing
+ * counts, so this answers the slot at the playhead on every draw.
+ *
+ * Only the *nobody* arm is re-derived. A drawn rival's verdict is a comparison of two shares at the
+ * same cadence as the lanes it summarises (`dev/main.ts#drawRaceStrip` states the cost), and a refusal,
+ * a pending rival and a watched day say what {@link raceSlotsOf} says. The count is one pass over the
+ * legs through `frame/overlay.ts#isWaitingAt` — the predicate the header's `waitingNow` folds — so it
+ * is the header's figure by a second derivation, which `honesty/agreement.ts`'s `standing-now` pair
+ * holds.
+ */
+export function raceVerdictSlotAt(
+  slots: RaceSlots,
+  rival: RaceRival,
+  recording: VizRecording,
+  simTimeS: SimTime,
+): string {
+  if (rival.watching || rival.refusal !== undefined || rival.pick !== 'none') return slots.verdict;
+  return standingNowVerdictOf(standingAt(recording, simTimeS));
+}
+
+/** People standing anywhere in the building at `simTimeS`, clamped into the run. */
+function standingAt(recording: VizRecording, simTimeS: SimTime): number {
+  const t = clamp(simTimeS, recording.startedAt, recording.endedAt);
+  let standing = 0;
+  for (const leg of recording.legs) {
+    if (leg.arrivedAt > t) break; // sorted by `(arrivedAt, passengerId)` — contract order
+    if (isWaitingAt(leg, t)) standing += 1;
+  }
+  return standing;
 }
 
 /* -------------------------------------------------------------------------- *

@@ -31,6 +31,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { fallbackLineOf, readbackOf, type RuleRow } from '../authoring/ruleSpec.js';
 import { DATA_DIR, fixtureConfig, fixtureSummary } from '../fixtures.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
+import { shiftRunConfigOf } from '../dev/state.js';
+import { contractBuildings, contractDayState } from './contractDay.test-helper.js';
 import type { VizRecording, VizSummary } from '../contract/types.js';
 import {
   CALENDAR_PERIODS,
@@ -563,7 +565,8 @@ describe('TOOK THE STAIRS names its true cohort, and the people can be totalled 
     expect(figure(report, 'stairs').note).toContain(
       `counted over the whole shift, not the ${windowName} window`,
     );
-    expect(figure(report, 'worst-wait').note).toContain(`${windowName} window`);
+    /* WORST WAIT reads the whole shift too since § D1104; it says so in its own words. */
+    expect(figure(report, 'worst-wait').note).toContain('whole shift');
   });
 
   it('names the riders the door turned away, and stays silent when there are none', () => {
@@ -640,28 +643,10 @@ describe('TOOK THE STAIRS names its true cohort, and the people can be totalled 
 });
 
 describe('WORST WAIT states its censoring', () => {
-  it('reports the run’s own longest wait', () => {
-    const longest = clean.summary.serviceLevel.longestWaitS;
-    expect(longest).not.toBeNull();
-    expect(figure(reportOf(clean), 'worst-wait').value).toContain(
-      (longest ?? 0).toFixed(0),
-    );
-  });
-
-  it('says "at least" when the longest wait belongs to a leg that never boarded', () => {
-    const censored = fixtureSummary({
-      serviceLevel: {
-        verdict: 'starved',
-        longestWaitS: 640,
-        longestWaitIsCensored: true,
-        overHorizonCount: 3,
-        arrivalCount: 90,
-        horizonS: 900,
-      },
-    });
-    const report = dayReportOf({
-      recording: { ...clean, summary: censored },
-      observations: observationsOfRun(clean),
+  function reportWith(observations: Observations): ShapedDayReport {
+    return dayReportOf({
+      recording: clean,
+      observations,
       goals: goalsForDay(4),
       week: openWeek('c2'),
       contract: contractById('c2'),
@@ -670,49 +655,48 @@ describe('WORST WAIT states its censoring', () => {
       calendar: null,
       subject: { kind: 'week-day' },
     });
-    const worst = figure(report, 'worst-wait');
+  }
+
+  it('reports the whole shift’s longest wait — the one the goal row grades', () => {
+    const observations = observationsOfRun(clean);
+    expect(figure(reportOf(clean), 'worst-wait').value).toBe(`${String(observations.worstWaitS)} s`);
+  });
+
+  it('says "at least" when the longest wait belongs to a rider who had not boarded', () => {
+    const worst = figure(
+      reportWith({ ...observationsOfRun(clean), worstWaitS: 640, worstWaitIsCensored: true }),
+      'worst-wait',
+    );
     expect(worst.value).toBe('at least 640 s');
     expect(worst.note).toContain('lower bound');
-    // The window rides inline on the censored branch too — docs/19 defect 3's second half.
-    expect(worst.note).toContain(`the ${reportWindowNameOf(censored.reportWindow.id)} window`);
+    expect(worst.note).toContain('whole shift');
   });
 
-  it('labels its window inline, and points at the whole-shift reading beside it — docs/19 defect 3', () => {
-    /*
-     * Two figures called “worst wait” share the sheet: this cell (the reporting window's) and the
-     * goal row (the whole shift's), 1 488 s against 1 725 s on the audit's Midtown day. Each now
-     * says which it is where it stands, not only in the small print.
-     */
-    const worst = figure(reportOf(clean), 'worst-wait');
-    expect(worst.note).toContain(`the ${reportWindowNameOf(clean.summary.reportWindow.id)} window`);
-    /* The engine's id stays off the player's sheet — the post-AH panel's L3, *the report-window window*. */
-    expect(worst.note).not.toContain(clean.summary.reportWindow.id);
-    expect(worst.note).toContain('the goal row reads the whole shift');
+  /**
+   * The post-AI panel's seat B, defect 6: the card read 178 s and the goal row 181 s on one sheet,
+   * because the card was the reporting window's maximum and the goal the whole shift's. `docs/19`
+   * defect 3 had labelled each where it stood; a newcomer still read two worst waits. § D1104: the
+   * card is the goal's figure, and it is asserted equal to the goal row's own display on a run whose
+   * window's worst differs from its shift's — or this would be watching nothing.
+   */
+  it('prints the goal row’s own figure, on a run whose window and shift disagree', () => {
+    const observations = observationsOfRun(saturated);
+    const windowWorst = saturated.summary.serviceLevel.longestWaitS;
+    expect(windowWorst).not.toBeNull();
+    expect(Math.round(windowWorst ?? 0)).not.toBe(observations.worstWaitS);
+    const report = reportOf(saturated);
+    const goal = readGoals(goalsForDay(4), observations).find((reading) => reading.goal.id === 'worst-wait');
+    const cell = figure(report, 'worst-wait');
+    expect(cell.value).toContain(String(observations.worstWaitS));
+    if (goal !== undefined && goal.state !== 'pending') expect(cell.value).toBe(goal.display);
+    expect(cell.note).not.toContain('window');
+    /* The engine's id stays off the player's sheet — the post-AH panel's L3. */
+    expect(cell.note).not.toContain(saturated.summary.reportWindow.id);
   });
 
-  it('reads "not recorded" — never 0 s — when the window held no arrivals', () => {
-    const none = fixtureSummary({
-      serviceLevel: {
-        verdict: 'served',
-        longestWaitS: null,
-        longestWaitIsCensored: false,
-        overHorizonCount: 0,
-        arrivalCount: 0,
-        horizonS: 900,
-      },
-    });
+  it('reads "not recorded" — never 0 s — when nobody called a lift', () => {
     expect(
-      dayReportOf({
-        recording: { ...clean, summary: none },
-        observations: observationsOfRun(clean),
-        goals: goalsForDay(4),
-        week: openWeek('c2'),
-        contract: contractById('c2'),
-        event: SHIFT_EVENTS.ordinary,
-        plan: PLAN,
-        calendar: null,
-        subject: { kind: 'week-day' },
-      }).figures.find((cell) => cell.id === 'worst-wait')?.value,
+      figure(reportWith({ ...observationsOfRun(clean), arrived: 0, carried: 0, worstWaitS: 0 }), 'worst-wait').value,
     ).toBe(NOT_RECORDED);
   });
 });
@@ -1754,8 +1738,8 @@ describe('the levers point at what this run showed — issue #55', () => {
      * reader that this line is boilerplate exactly when it is carrying a real and unusual fact.
      */
     const one = dayReportOf({
-      recording: { ...saturated, summary: fixtureSummary({ ...saturated.summary, unservedCount: 1 }) },
-      observations: { ...observationsOfRun(saturated), abandoned: 1 },
+      recording: saturated,
+      observations: { ...observationsOfRun(saturated), abandoned: 1, standing: 1 },
       goals: goalsForDay(4),
       week: openWeek('c2'),
       contract: contractById('c2'),
@@ -1765,7 +1749,7 @@ describe('the levers point at what this run showed — issue #55', () => {
       subject: { kind: 'week-day' },
     });
     const body = leverBody(weekDay(one), 'add-a-car');
-    expect(body).toContain('1 ride never boarded at all');
+    expect(body).toContain('1 ride had not boarded when the day ended');
     // *Waited past the give-up horizon*, not *gave up and took the stairs* — `docs/19` defect 3:
     // the count is an attribute of a wait, and these riders may all be inside CARRIED.
     expect(body).toContain('1 rider waited past the give-up horizon');
@@ -1776,8 +1760,8 @@ describe('the levers point at what this run showed — issue #55', () => {
 
   it('keeps the plural where the count is plural, so the fix did not trade one error for another', () => {
     const many = dayReportOf({
-      recording: { ...saturated, summary: fixtureSummary({ ...saturated.summary, unservedCount: 4 }) },
-      observations: { ...observationsOfRun(saturated), abandoned: 7 },
+      recording: saturated,
+      observations: { ...observationsOfRun(saturated), abandoned: 7, standing: 4 },
       goals: goalsForDay(4),
       week: openWeek('c2'),
       contract: contractById('c2'),
@@ -1787,9 +1771,47 @@ describe('the levers point at what this run showed — issue #55', () => {
       subject: { kind: 'week-day' },
     });
     const body = leverBody(weekDay(many), 'add-a-car');
-    expect(body).toContain('4 rides never boarded at all');
+    expect(body).toContain('4 rides had not boarded when the day ended');
     expect(body).toContain('7 riders waited past the give-up horizon');
   });
+
+  /**
+   * The post-AI panel's seat D, D5: on St Jude's day 1 *Add a car* read *"Today points here: 3 legs
+   * never boarded at all"*, and all three were riders the building turned away at a credential
+   * check, whom no car could have carried. `summary.unservedCount` counts a refused leg as never
+   * boarded. The lever now points only at legs still on a landing, and the refused are named in
+   * the lede instead.
+   */
+  it('does not point Add a car at riders the building turned away for their credential', () => {
+    const quiet = observationsOfRun(missedWithoutSaturating);
+    const refusedOnly = dayReportOf({
+      recording: {
+        ...missedWithoutSaturating,
+        summary: fixtureSummary({ ...missedWithoutSaturating.summary, saturated: false, unservedCount: 3 }),
+      },
+      observations: {
+        ...quiet,
+        carried: quiet.arrived - 3,
+        turnedAway: 3,
+        standing: 0,
+        aboard: 0,
+        abandoned: 0,
+        abandonedCarried: 0,
+      },
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      calendar: null,
+      plan: PLAN,
+      subject: { kind: 'week-day' },
+    });
+    const report = weekDay(refusedOnly);
+    expect(leverBody(report, 'add-a-car')).not.toContain('never boarded');
+    expect(leverBody(report, 'add-a-car')).not.toContain('3 legs');
+    expect(report.lede).toContain('Of the 3 not carried, 3 were turned away at a credential check when the day ended.');
+  });
+
 
   it('quotes counts, and never a figure the run refuses', () => {
     /*
@@ -2088,5 +2110,73 @@ describe('the shift clock', () => {
 
   it('wraps rather than printing a twenty-sixth hour', () => {
     expect(clockOf(19 * 3600)).toBe('01:00');
+  });
+});
+
+/**
+ * **Every rider accounted for, in the lede** — the post-AI panel's seat D, D4 and top change 3.
+ *
+ * The saturated lede read *"873 people asked for a lift and 871 got one, with 0 still standing when
+ * the window closed"* on a sheet whose lever card said the backlog was still growing when the window
+ * closed: the count was `summary.unservedCount`, legs that had not boarded when the **run** ended.
+ * The lede now says the growing backlog in the lever's own words, and says where the uncarried went
+ * in parts that sum to the shortfall.
+ */
+describe('the lede accounts for everybody it did not carry', () => {
+  it('says the backlog was growing, never a count at the window’s close it does not have', () => {
+    const report = reportOf(saturated);
+    expect(saturated.summary.saturated).toBe(true);
+    expect(report.lede).toContain('the backlog was still growing when the window closed');
+    expect(report.lede).not.toContain('still standing when the window closed');
+  });
+
+  it('names turned away, still in a car and not boarded, and the parts sum to the shortfall', () => {
+    let reached = 0;
+    /* St Jude's pinned day 1, whose tower turns riders away at a credential check. */
+    const resources = contractBuildings();
+    const plan = shiftRunConfigOf(resources, contractDayState('c8', { seed: 20_276_662n }));
+    const stJude = recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds }).recording;
+    expect(observationsOfRun(stJude).turnedAway).toBeGreaterThan(0);
+    for (const recording of [clean, saturated, missedWithoutSaturating, stJude]) {
+      const observations = observationsOfRun(recording);
+      const shortfall = observations.arrived - observations.carried;
+      expect(observations.turnedAway + observations.aboard + observations.standing, recording.buildingId).toBe(shortfall);
+      const clause = / Of the \d+ not carried, [^.]*\./u.exec(reportOf(recording).lede)?.[0] ?? '';
+      if (shortfall === 0) {
+        expect(clause).toBe('');
+        continue;
+      }
+      reached += 1;
+      expect(clause).toContain(`Of the ${String(shortfall)} not carried`);
+      const named = [...clause.matchAll(/(\d+) (?:was|were|had)/gu)].map((match) => Number(match[1]));
+      expect(named.reduce((sum, n) => sum + n, 0), recording.buildingId).toBe(shortfall);
+    }
+    /* Non-vacuity: at least one of the three runs left somebody uncarried. */
+    expect(reached).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * **The energy figure moves several-fold between crowds, and the sheet says so** — the post-AI
+ * panel's seat B: *"Tuesday's energy of 3.5 kJ/ride against Monday's 18.7 goes unexplained."*
+ *
+ * Measured rather than argued: the figure is work over the five-minute window divided by the legs
+ * delivered in it, about a hundred on St Jude, and eight day-1 crowds on that tower — nothing else
+ * changed — spread it past three to one. That spread is the licence for the note's *several-fold*,
+ * and this case is what pins it.
+ */
+describe('the energy-per-leg note says how far one crowd moves it', () => {
+  it('spreads past three to one over eight crowds of one day, and the note says several-fold', () => {
+    const resources = contractBuildings();
+    const perLeg: number[] = [];
+    for (let n = 0; n < 8; n += 1) {
+      const plan = shiftRunConfigOf(resources, contractDayState('c8', { seed: 20_260_824n + 7_919n * BigInt(n) }));
+      const { recording } = recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds });
+      const value = recording.summary.energy.workPerServedLegKJ;
+      if (value !== null) perLeg.push(value);
+      if (n === 0) expect(figure(reportOf(recording), 'energy-per-leg').note).toContain('several-fold');
+    }
+    expect(perLeg).toHaveLength(8);
+    expect(Math.max(...perLeg) / Math.min(...perLeg)).toBeGreaterThanOrEqual(3);
   });
 });

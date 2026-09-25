@@ -74,6 +74,7 @@ import {
   raceLaneOf,
   raceSlotsOf,
   raceStripViewOf,
+  raceVerdictSlotAt,
   type GhostPick,
   type RaceStripView,
 } from '../live/raceStrip.js';
@@ -339,6 +340,8 @@ function mountStage(
   let playback: Playback | undefined;
   /** Display time of the last live-region write — see {@link STAGE_ANNOUNCE_MS}. */
   let lastAnnouncedMs = Number.NEGATIVE_INFINITY;
+  /** A stopped frame's sentence, waiting for the rate limit to lift — see `announce`. */
+  let pendingSay: number | undefined;
   let adopted: VizRecording | undefined;
   /**
    * **What stood on the host when this mount began** — GitHub issue **#548**, and it is latched
@@ -1492,9 +1495,36 @@ function mountStage(
   function announce(recording: VizRecording, frame: Frame, dispatcherName: string): void {
     const sentence = describeFrame({ recording, frame, dispatcherName });
     canvas.setAttribute('aria-label', sentence);
-    const nowMs = systemClock().now();
-    if (nowMs - lastAnnouncedMs < STAGE_ANNOUNCE_MS) return;
-    lastAnnouncedMs = nowMs;
+    if (pendingSay !== undefined) {
+      view?.clearTimeout(pendingSay);
+      pendingSay = undefined;
+    }
+    if (description.textContent === sentence) return;
+    const waitMs = STAGE_ANNOUNCE_MS - (systemClock().now() - lastAnnouncedMs);
+    if (waitMs <= 0) {
+      say(sentence);
+      return;
+    }
+    /*
+     * **A stopped frame is said when the limit allows, not left for the next frame** — the post-AI
+     * panel's seat D, D7. A moving picture draws again inside the limit and the next frame past it
+     * says what is on screen then. A stopped one draws no next frame, so the region kept the last
+     * sentence it had been allowed to say: *7 legs waiting* on the paused frame of St Jude's call
+     * beside a header reading 10, and *at 23:42 of 30:00* on a day that had run out. So a stage that
+     * is not playing schedules the frame it stopped on for the moment the two-second limit lifts —
+     * the limit `screenReaderWalkthrough.browser.test.ts` holds, kept, and the stopped frame said
+     * within it. The next draw, or unmounting, cancels it.
+     */
+    if (playback?.state === 'playing') return;
+    pendingSay = view?.setTimeout(() => {
+      pendingSay = undefined;
+      if (alive) say(sentence);
+    }, waitMs);
+  }
+
+  /** One write to the live region, stamped for the rate limit. */
+  function say(sentence: string): void {
+    lastAnnouncedMs = systemClock().now();
     description.textContent = sentence;
   }
 
@@ -1581,7 +1611,7 @@ function mountStage(
     const key = `${String(call.atS)}|${call.rule}`;
     if (key !== callCardKey) {
       callCardKey = key;
-      const card = stageCallCardOf(call, host.dayStartS());
+      const card = stageCallCardOf(call, host.dayStartS(), bookedCars);
       const heading = el(doc, 'div', 'everyday-stage-call-heading', card.heading);
       heading.style.cssText = `font:600 11px ${TYPE.mono};letter-spacing:0.08em;color:${C.label}`;
       const facts = card.facts.map((fact) => {
@@ -2841,7 +2871,17 @@ function mountStage(
      * is the spectator's reading of somebody else's run in the cell § 14.1 reserves for identity,
      * and the same figure is already in the header two rows up.
      */
-    raceVerdict.textContent = watchingNow()?.eyebrow ?? raceSlotVerdict;
+    /*
+     * The slot at the playhead rather than at the last grid line — the post-AI panel's seat D, D7:
+     * the header read 10 standing and this read 6 on one paused frame. See `raceVerdictSlotAt`.
+     */
+    const liveVerdict = raceVerdictSlotAt(
+      { verdict: raceSlotVerdict, note: '', rivalName: '' },
+      { pick: race.pick, recording: race.rival, refusal: race.refusal, pending: race.pending, watching },
+      recording,
+      simTimeS,
+    );
+    raceVerdict.textContent = watchingNow()?.eyebrow ?? liveVerdict;
   }
 
   /* ------------------------------------------------------------------ wire */
@@ -2912,6 +2952,8 @@ function mountStage(
   return {
     unmount: () => {
       alive = false;
+      if (pendingSay !== undefined) view?.clearTimeout(pendingSay);
+      pendingSay = undefined;
       if (pendingFrame !== undefined && view !== null && view !== undefined) {
         view.cancelAnimationFrame(pendingFrame);
       }

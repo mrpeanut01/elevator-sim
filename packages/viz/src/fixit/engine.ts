@@ -1036,6 +1036,7 @@ export function fixedBadgeAfter(outcome: FixitOutcome): boolean {
  * | the run | head |
  * |---|---|
  * | some of the complaint went away, short of the bar | *Better, and the complaint still stands.* |
+ * | it grew — more of it after than before | *Worse, and the complaint still stands.* |
  * | none of it did, or the run showed none to remove | *No change, and the complaint still stands.* |
  *
  * The threshold is **greater than zero**, not a second bar: § 9's `COMPLAINT_GONE_PCT` is what
@@ -1116,8 +1117,18 @@ export function classifyOutcome(
       attribution: 'order',
     };
   }
-  // *Better* is a claim about the measurement in the row above it. See the docstring.
+  // *Better* and *Worse* are claims about the measurement in the row above them. See the docstring.
   const improved = measurement.complaintGonePct !== null && measurement.complaintGonePct > 0;
+  if (complaintGrew(measurement)) {
+    return {
+      kind: 'not-enough',
+      head: 'Worse, and the complaint still stands.',
+      body: 'The complaint grew on this run. Change something else and run it again.',
+      rows,
+      basis: basisOf(measurement),
+      attribution: 'order',
+    };
+  }
   return {
     kind: 'not-enough',
     head: improved
@@ -1131,6 +1142,19 @@ export function classifyOutcome(
     basis: basisOf(measurement),
     attribution: 'order',
   };
+}
+
+/**
+ * Whether the complaint measurably **grew** — the post-AI panel's seat C, D1.
+ *
+ * `complaintGonePct` is clamped at zero by `run.ts#measuredOf`, so a rise and no change both read
+ * `0 %` there, and the fall-through above printed *"No change … Nothing you changed reached the
+ * thing the letter is about"* over a row reading *32 waits → 37 waits*. The two raw figures the row
+ * already prints decide it instead. Only where the complaint was measured on both sides: a `null`
+ * gone share is *this run shows none of it*, and a complaint that was never there cannot have grown.
+ */
+function complaintGrew(measurement: FixitMeasurement): boolean {
+  return measurement.complaintGonePct !== null && measurement.complaintAfter > measurement.complaintBefore;
 }
 
 /**
@@ -1202,7 +1226,9 @@ function rowsOf(
     verdict:
       measurement.complaintGonePct === null
         ? 'this run shows none of it, so there is nothing to remove'
-        : `${measurement.complaintGonePct.toFixed(0)} % of it went away, against the 80 % bar`,
+        : complaintGrew(measurement)
+          ? `none of it went away: it grew by ${complaintDeltaText(measure.kind, measurement.complaintAfter - measurement.complaintBefore)}, against the 80 % bar`
+          : `${measurement.complaintGonePct.toFixed(0)} % of it went away, against the 80 % bar`,
     passed: complaintPassed,
   };
   const restPassed =
@@ -1228,6 +1254,13 @@ function rowsOf(
     passed: spentPassed,
   };
   return [complaint, rest, spent];
+}
+
+/** How much a complaint grew, in the measure's own unit — `5 waits`, `1 wait`, `12.3 s`. */
+function complaintDeltaText(kind: 'long-waits' | 'mean-wait', delta: number): string {
+  return kind === 'long-waits'
+    ? `${String(delta)} wait${delta === 1 ? '' : 's'}`
+    : `${delta.toFixed(1)} s`;
 }
 
 function complaintText(kind: 'long-waits' | 'mean-wait', value: number, boarded: number): string {

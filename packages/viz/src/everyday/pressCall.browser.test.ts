@@ -237,10 +237,18 @@ describe.skipIf(!HAS_BROWSER)('the stage calls a pinned day — § D1029', () =>
       const card = await textOf(page, '.everyday-stage-call');
       expect(card).toContain('out of passenger service');
       for (const word of [/\bnow\b/iu, /\bdecid/iu, /\bseconds? left\b/iu]) expect(card).not.toMatch(word);
-      /* Still stopped a moment later: the pause survives the rung the player chose. */
-      const clockAtCall = await textOf(page, '.everyday-stage');
+      /*
+       * Still stopped a moment later: the pause survives the rung the player chose. Read off the
+       * clock and the canvas's accessible name, which every drawn frame rewrites, rather than off the
+       * whole stage: since wave AJ (§ D1103) the screen reader's live region says the stopped frame
+       * once its two-second limit lifts, which is a write to the stage's text on a stage that has not
+       * moved.
+       */
+      const stoppedAt = async (): Promise<string> =>
+        `${await textOf(page, '.everyday-stage-clock')} | ${(await page.getAttribute('.everyday-stage-canvas', 'aria-label')) ?? ''}`;
+      const clockAtCall = await stoppedAt();
       await page.waitForTimeout(800);
-      expect(await textOf(page, '.everyday-stage'), 'the stage moved past an unanswered call').toBe(clockAtCall);
+      expect(await stoppedAt(), 'the stage moved past an unanswered call').toBe(clockAtCall);
 
       /* ---- the answer the pin clears on, then the report ---- */
       await page.locator(`.everyday-stage-call-answer[data-answer="${press?.clearedBy ?? ''}"]`).click();

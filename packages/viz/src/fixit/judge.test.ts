@@ -193,6 +193,43 @@ describe('the outcomes the judge adds', () => {
     expect(judged.basis).not.toBe(BASIS_LINE);
   });
 
+  /**
+   * The post-AI panel's seat C, D2 and seat D, D8: *"downstairs never noticed"* printed above the
+   * card's own fifty-morning row reading *−2.1 points a morning (−3.2 to −1.0)*. The authored line
+   * about the rest of the building now prints only where the fifty mornings agree with it.
+   */
+  it('prints an authored rest line only where the rest’s fifty-morning interval contains zero', () => {
+    const REST = 'Downstairs never noticed.';
+    const authored: FixitCase = { ...CASE, result: { ...CASE.result, rest: REST } };
+    const diagnosed: FixitOutcome = { ...GATE_FIXED, attribution: 'diagnosis' };
+    const before = Array.from({ length: 50 }, () => reading(6, 90));
+    /* The rest down a point or so every morning: an interval that excludes zero, inside the floor. */
+    const declined = judgeReplication(before, Array.from({ length: 50 }, (_, i) => reading(i % 2, 89 - (i % 2) * 0.5)));
+    expect(declined.holds).toBe(true);
+    expect(declined.rest?.upper).toBeLessThan(0);
+    const noticed = judgedOutcomeOf(authored, diagnosed, declined);
+    expect(noticed.body).not.toContain(REST);
+    expect(noticed.body).toContain('The rest of the building did notice');
+    expect(noticed.body).toContain('over 50 mornings');
+    expect(noticed.body.startsWith(CASE.result.body)).toBe(true);
+    /* The rest moving both ways around zero: the authored line is licensed, and prints. */
+    const mixed = judgeReplication(before, Array.from({ length: 50 }, (_, i) => reading(i % 2, 89 + (i % 2) * 2)));
+    expect(mixed.rest?.lower).toBeLessThanOrEqual(0);
+    expect(mixed.rest?.upper).toBeGreaterThanOrEqual(0);
+    expect(judgedOutcomeOf(authored, diagnosed, mixed).body).toBe(`${CASE.result.body} ${REST}`);
+    /* The composed arm never reads the authored line at all. */
+    expect(judgedOutcomeOf(authored, { ...GATE_FIXED, attribution: 'order' }, declined).body).toBe(GATE_FIXED.body);
+  });
+
+  it('refuses a result body that says the rest did not notice — that claim belongs in `rest`', () => {
+    const text = readFileSync(join(REPO_ROOT, 'data', 'fixit-cases.json'), 'utf8');
+    const file = JSON.parse(text) as { cases: { id: string; result: { head: string; body: string } }[] };
+    for (const entry of file.cases) {
+      expect(entry.result.body, entry.id).not.toMatch(/\bnotic(?:e|ed|es|ing)\b/iu);
+      expect(entry.result.head, entry.id).not.toMatch(/\bnotic(?:e|ed|es|ing)\b/iu);
+    }
+  });
+
   it('gives an order that changed the crowd the demand form of the replicated basis', () => {
     expect(judgedOutcomeOf(CASE, { ...GATE_FIXED, basis: DEMAND_BASIS_LINE }, holds).basis).toBe(
       REPLICATED_DEMAND_BASIS_LINE,

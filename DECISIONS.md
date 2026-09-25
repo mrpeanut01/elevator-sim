@@ -43158,6 +43158,8 @@ The door adapter seeds *Run today again* and its note on the four door renders a
 
 ## D1011 — a fixed fix-it verdict prints the diagnosis's words only over the diagnosis's own run, goes stale on an edit, and an eleventh honesty property holds every string that credits an act to the run that carried it
 
+> **Status 2026-09-25: AMENDED by [§ D1106](#d1106).** A claim about the rest of the building is held apart in `result.rest` and prints only where the fifty mornings agree with it. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner. The
 > session principal's standing instruction for this wave is that decisions about what the game is
 > and does go to a swarm of at least three independent lenses, on [§ D729](#d729)'s form. **The
@@ -43612,6 +43614,8 @@ This lane held **D1020–D1028** and spent **D1020 only**. D1021 to D1028 are un
 integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
 
 ## D1029 — the press becomes a call: the stage stops once at an instant it can name, a pin is admitted only over a window from it, and the day runs under its standing order until the call is answered
+
+> **Status 2026-09-25: AMENDED by [§ D1107](#d1107).** The card names every booked-out car away at the call, and the called day is named for the call. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: a
 > three-member decision swarm (the player, honesty and engineering lenses, whose records are the
@@ -45309,3 +45313,185 @@ their tests. Neither touches a figure, a bar, a run or `data/`.
 
 The front door's rule, the call card's words, what the report prints after a call and retake banking
 are unchanged; a decision swarm is ruling on those. No mechanic is renamed.
+
+---
+
+## D1102 — the honesty register gains four pairs, and the first view of each case carries the case's run
+
+> **Taken 2026-09-25 by agent sessions under delegated authority** (wave AJ, lane AJ-H), not by the
+> product owner. Owner-reversible clause: which figures are declared pairs. Deleting a pair moves its
+> reason to `agreement.test.ts#NOT_AGREED` rather than dropping it.
+
+**Date: 2026-09-25 · Owner: lane AJ-H (wave AJ) · The post-AI panel's seat D (D6, D7) and seat B
+(defects 4 and 6) · Rules on `packages/viz/src/honesty/agreement.ts` (`AgreementView.recording`,
+four entries in `AGREED_FIGURES`) and `agreement.test.ts`. Cites [§ D359](#d359), [§ D405](#d405).**
+
+**Why an entry.** [§ D405](#d405)'s first ground: the register binds the surfaces it names, and
+four of the eight expressions these pairs read belong to modules this lane did not otherwise touch.
+
+**What was missing.** Every pair in `AGREED_FIGURES` was a function of a `ViewerState`, so no pair
+could hold a figure of a run, and the panel's two sharpest contradictions were figures of a run: a
+paused frame whose header, race strip and screen-reader line read 10, 6 and 7 standing, and a sheet
+whose WORST WAIT card read 178 s under a goal row reading 181 s.
+
+**The ruling.** `AgreementView` carries `recording`, the case's own simulated run, on the first
+view of each case (`day1/period`) and on no other, because it is one run and six copies of one
+comparison would be one comparison six times. No simulation is added. Four pairs:
+
+| pair | left | right |
+|---|---|---|
+| `standing-now` | `everyday/stageScreenModel.ts#stageHeaderOf`, at nine off-grid playheads | `live/raceStrip.ts#raceVerdictSlotAt` |
+| `standing-said` | the same header | `render/describeFrame.ts#describeFrame` |
+| `worst-wait` | `shift/report.ts#dayReportOf`'s WORST WAIT card | `shift/goals.ts#readGoals`'s worst-wait row |
+| `todays-shift` | `dev/leftRail.ts#todaysShiftOf` | `everyday/today.ts#todayOf`'s name and note |
+
+Each is reverted to the defect the panel met in `agreement.test.ts`, and each reversion is reported.
+`todays-shift` is also driven on St Jude's pinned day directly, because the corpus's views pair a
+case's building with the first contract's week and so reach no tower booking.
+
+**What it does not do.** It compares nothing a case does not already render. The press row's
+standing count, which is stamped at the call second while the stage may stop a few simulated seconds
+later, is left alone: what the report prints after a call is under a decision swarm's ruling this
+wave, and this lane was told not to move it.
+
+## D1103 — a stopped frame carries one standing count
+
+> **Taken 2026-09-25 by agent sessions under delegated authority** (wave AJ, lane AJ-H), not by the
+> product owner. Owner-reversible clause: the live region's rate limit while the transport moves.
+
+**Date: 2026-09-25 · Owner: lane AJ-H (wave AJ) · The post-AI panel's seat D, D7 · Rules on
+`packages/viz/src/live/raceStrip.ts` (`raceVerdictSlotAt`, `standingNowVerdictOf`),
+`everyday/stageScreen.ts#drawRace` and `#announce`, and `dev/main.ts#drawRaceStrip`. Cites
+[§ D482](#d482), [§ D1102](#d1102).**
+
+**Why an entry.** It binds both shells and the live module, and it moves a stated cadence:
+`dev/main.ts#drawRaceStrip` said the verdict updates at the lanes' four-minute cadence.
+
+**What was wrong.** On the shipped build at `2cafceb`, St Jude's pinned day stopped at its call with
+the header reading 8 standing, the race strip *0 standing now* and the screen reader's live region
+*0 legs waiting* (measured 2026-09-25 against `http://localhost:5800/`). Both shells re-derived the
+strip only when the playhead crossed a 240 s grid line, and the *nobody* slot is a live count. The
+live region was held to one write in two seconds whatever the transport was doing, so a stage that
+stopped between writes kept an older sentence.
+
+**The ruling.** The *nobody* slot is answered at the playhead on every draw, by one pass over the
+legs through `frame/overlay.ts#isWaitingAt`; a drawn rival's verdict, a refusal, a pending rival and
+a watched day keep the cadence and wording [§ D482](#d482) gave them. The live region keeps its
+two-second limit in every state, and a stage that has stopped says the frame it stopped on as soon
+as the limit lifts, because a stopped stage draws no next frame to say it;
+`screenReaderWalkthrough.browser.test.ts`'s cadence floor is unchanged.
+`everyday/standingAgrees.browser.test.ts` holds the three counts and the canvas's accessible name
+equal on the frame the call stops on, and `live/raceStrip.test.ts` holds the slot against the
+header's fold at every instant of a recording on which the old cadence disagreed.
+
+## D1104 — the report's WORST WAIT card reads the whole shift, the figure the goal row grades
+
+> **Taken 2026-09-25 by agent sessions under delegated authority** (wave AJ, lane AJ-H), not by the
+> product owner. Owner-reversible clause: whether the reporting window's worst wait is published
+> anywhere on the sheet.
+
+**Date: 2026-09-25 · Owner: lane AJ-H (wave AJ) · The post-AI panel's seat B, defect 6 · Rules on
+`packages/viz/src/shift/report.ts#worstWaitFigure`. Cites [§ D1102](#d1102).**
+
+**Why an entry.** It withdraws `docs/19` defect 3's repair, which kept the card on the reporting
+window and labelled the two figures where each stood, and it changes what every sheet in both shells
+prints in one cell.
+
+**What was wrong.** The card read the reporting window's maximum and the goal row the whole shift's,
+so one sheet printed 178 s and 181 s as its worst wait; the audit's Midtown day printed 1 488 s and
+1 725 s. The labels were true and a newcomer read two numbers.
+
+**The ruling.** The card reads `Observations.worstWaitS` and `worstWaitIsCensored`, the goal's own
+fold and rounding, and says so in its note. A censored worst wait still reads *at least*; a run
+nobody called reads *not recorded*. The window's worst is not printed a second time. The
+`worst-wait` pair holds the card and the goal row equal wherever the goal is graded.
+
+## D1105 — the access warning says what the run does, and the refusal it described is withdrawn
+
+> **Taken 2026-09-25 by agent sessions under delegated authority** (wave AJ, lane AJ-H), not by the
+> product owner. Owner-reversible clause: whether a credential-blind profile on a zoned building
+> draws any warning at all.
+
+**Date: 2026-09-25 · Owner: lane AJ-H (wave AJ) · The post-AI panel's seat D, D6 · Rules on
+`packages/viz/src/access/dispatcherCredentials.ts#checkAccessCompatibility`. Cites
+[§ D254](#d254), [§ D256](#d256), [§ D279](#d279), [§ D137](#d137).**
+
+**Why an entry.** The function's own docstring said the honest correction was a product decision
+and left the clause standing until one was taken. This is that decision.
+
+**What was wrong.** The Engineer panel told a player on St Jude that a call from LG, 2 or 3 *reaches
+every car as an unbadged request, every car refuses it on access grounds, and the call is
+permanently unassignable. This states what the run will do.* The same run stacked floor 2 sixteen
+deep and drained it. The clause described [§ D254](#d254)'s pickup check, which is deleted, and the
+alternatives sentence said a building with no credential-aware profile has *no dispatcher that can
+serve those floors*.
+
+**The ruling.** For a credential-blind profile on a zoned building the warning names the zones and
+the floors as before, then says that a car still collects a call from those floors and that the run
+checks each rider's credential against where they are going and turns away a rider whose badge does
+not cover it. That is the code's own behaviour (`Simulation#bankCanCarry`, `#carCanCarry`) and no
+figure is offered for it. The alternatives sentence names the credential-aware profiles or says none
+is loaded, and claims nothing about serving. The bare kiosk keeps its own sentence
+([§ D137](#d137)). `dispatcherCredentials.test.ts` holds the warning against a St Jude run under
+`collective` that carries riders from the restricted floors.
+
+**What it does not claim.** That a credential-aware profile would carry more people. On every
+shipped building measured it does not ([§ D256](#d256), [§ D279](#d279)).
+
+## D1106 — an authored line about the rest of the building prints only where the fifty mornings agree, and a worse complaint is called worse
+
+> **Taken 2026-09-25 by agent sessions under delegated authority** (wave AJ, lane AJ-H), not by the
+> product owner. Owner-reversible clause: gating the authored line rather than deleting it.
+
+**Date: 2026-09-25 · Owner: lane AJ-H (wave AJ) · The post-AI panel's seat C (D1, D2) and seat D
+(D8) · Rules on `packages/viz/src/fixit/types.ts` (`FixitResultCopy.rest`), `fixit/parse.ts`,
+`fixit/judge.ts#judgedOutcomeOf`, `fixit/engine.ts#classifyOutcome` and `data/fixit-cases.json`.
+Amends [§ D1011](#d1011). Cites [§ D1020](#d1020).**
+
+**Why an entry.** It adds a field to the fix-it case schema in `data/`, and it narrows
+[§ D1011](#d1011): the authored result no longer prints whole on the witness's own run.
+
+**What was wrong.** Two authored results said the rest of the building did not notice the fix
+(*downstairs never noticed*, *their own three never notice the difference*) and printed above the
+card's own fifty-morning row reading a decline whose interval excluded zero: −2.1 points a morning
+(−3.2 to −1.0) on the zoning case and −0.5 (−0.9 to −0.1) on the express case. Separately, the
+verdict head read *No change … Nothing you changed reached the thing the letter is about* over a row
+reading *32 waits → 37 waits*, because the gone share is clamped at zero and a rise read as none.
+
+**The ruling.** A case may author `result.rest`, one claim about the rest of the building; a head or
+body that says anybody did not *notice* is refused at parse. On the authored arm the rest line
+prints after the body only when the rest's fifty-morning interval contains zero; where it excludes
+zero the measured sentence prints in its place, in the row's own figures; where nobody else rode on
+enough mornings neither prints. The two cases' claims moved into `rest` word for word. A complaint
+that grew on the letter's morning is headed *Worse, and the complaint still stands*, and its row says
+by how much it grew rather than *0 % of it went away*. Nothing else about the verdict changes, and
+the diagnosis shown before play is untouched.
+
+## D1107 — a day the stage will call is named for the call, every car out at the call is named on the card, and the Engineer rail reads the run
+
+> **Taken 2026-09-25 by agent sessions under delegated authority** (wave AJ, lane AJ-H), not by the
+> product owner. Owner-reversible clause: the name *A day with a call*.
+
+**Date: 2026-09-25 · Owner: lane AJ-H (wave AJ) · The post-AI panel's seat B (defects 4 and 5), seat
+C and seat D (D6) · Rules on `packages/viz/src/shift/bookedOut.ts` (`CALL_DAY_NAME`,
+`wrinkleNameOf`), `everyday/today.ts` (`TodayRecord.wrinkleName`), `everyday/briefView.ts`,
+`shift/report.ts#bookedLine`, `dev/leftRail.ts#todaysShiftOf` and
+`everyday/stageCall.ts#stageCallCardOf`. Amends [§ D1029](#d1029). Cites [§ D983](#d983),
+[§ D1047](#d1047).**
+
+**Why an entry.** It binds the brief, the report and the Engineer rail to one name, and it widens
+the call card's first fact, which [§ D1029](#d1029) wrote as *the car is out*.
+
+**What was wrong.** A pinned press day is the calendar's ordinary day, so the brief, the report and
+the Engineer rail headlined it *An ordinary day*. The Engineer rail also read the calendar's note
+straight, *Nothing booked*, on St Jude's day 1, whose tower books cars D and E out 08:37 to 08:46;
+[§ D983](#d983) had repaired the brief and the report and not this third reader. The call card said
+*Car D is out of passenger service until 08:46* with car E out over the same stretch.
+
+**The ruling.** An admitted pinned day, the one the stage calls, is named *A day with a call* on the
+brief and the Engineer rail from the pin, and on the report when the run carried the call; every
+other day keeps its event's name. The Engineer rail's note is `wrinkleNoteOf` over the building the
+next run is handed, the brief's own derivation, and `todays-shift` ([§ D1102](#d1102)) holds the two
+equal. The call card names every booked-out car away at the call, one line per return time, from the
+same reading the stage's pill draws. The card's placement, what it offers and what the report prints
+after it are unchanged.
