@@ -40,6 +40,7 @@ const TODAY: TodayRecord = {
   crowdIsToday: true,
   firstSessionLine: undefined,
   driver: 'Steady hand',
+  driverHeld: undefined,
 };
 
 const DISPATCHERS = [

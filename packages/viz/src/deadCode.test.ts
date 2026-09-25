@@ -246,6 +246,15 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    * not the fix. An `elevator-sim wrinkles` command is the closing move, and inventing one is
    * feature work rather than an allowlist edit; § D118 closed fuzz's the same way.
    */
+  /*
+   * -- § D1029's first-day set. Wave AI's press-moment lane exports it and guards it
+   * (`shift/firstSession.test.ts`: non-empty, every member legible and admitted, no fallback to
+   * the legible set) and was told in terms not to wire the first-session draw to it — the
+   * first-day lane does. This entry is the handover rather than a parking place: the staleness rule
+   * below fails the moment the draw calls it, and the entry goes on that commit.
+   */
+  'shift/FIRST_DAY_CONTRACT_IDS':
+    '§ D1029’s legible ∩ admitted set, guarded by firstSession.test.ts; the first-day lane wires it',
   'wrinkles/gateLibrary':
     '§ 17’s content gate, swept over a library; its consumer is gate.test.ts, which drives it',
   /*

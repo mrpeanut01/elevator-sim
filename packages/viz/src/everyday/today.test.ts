@@ -30,11 +30,11 @@ import type { ShiftEvent } from '../shift/types.js';
 import { carsToDerate } from '../shift/incidents.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { GoalReading, WeekState } from '../shift/types.js';
-import { ladderRowFor, ladderTowerConfig, rungFor } from '../shift/ladder.js';
+import { admittedPressDayIds, ladderRowFor, ladderTowerConfig, rungFor } from '../shift/ladder.js';
 import { openWeek } from '../shift/week.js';
 
 import { EM_DASH, groupThousands } from './figures.js';
-import { todayOf } from './today.js';
+import { PRESS_DAY_DRIVER_HELD, todayOf } from './today.js';
 
 const DATA = new URL('../../../../data/', import.meta.url);
 const read = (path: string): unknown =>
@@ -582,6 +582,7 @@ describe('the moot sentence is drawn only over the run it was measured on — is
     readonly seed?: bigint;
     readonly horizon?: 'period' | 'whole-day' | undefined;
     readonly calendar?: CalendarPeriod | null;
+    readonly dispatcherId?: string;
   }): ReturnType<typeof todayOf> {
     const press = ladderRowFor('c7')?.pressDay;
     if (press === undefined) throw new Error('c7 pins no day');
@@ -601,6 +602,7 @@ describe('the moot sentence is drawn only over the run it was measured on — is
       building,
       buildingId: 'crown-hotel',
       dispatcherName: 'Steady hand',
+      ...(overrides.dispatcherId === undefined ? {} : { dispatcherId: overrides.dispatcherId }),
       dispatcherNameOf: (id) => `name of ${id}`,
       goals: pendingGoals(day),
       seed: overrides.seed ?? BigInt(press.seedText),
@@ -613,9 +615,15 @@ describe('the moot sentence is drawn only over the run it was measured on — is
 
   it('draws on the pinned day, on its crowd and its horizon', () => {
     const sentence = crownOn({}).outOfService?.mootUnder ?? '';
-    expect(sentence).toContain('clear this day with no press at all');
-    /* Names, not ids — and no digit, the strip's own rule. */
-    expect(sentence).toContain('name of ');
+    /*
+     * § D1029: one derived sentence — whose order the day runs under, and how many others clear it
+     * with no press, in words. The names moved to the report's call row.
+     */
+    const press = ladderRowFor('c7')?.pressDay;
+    expect(sentence).toContain(`standing order, name of ${press?.standingOrder ?? ''}`);
+    expect(sentence).toContain('with no press at all; the day’s report names');
+    for (const id of press?.mootUnder ?? []) expect(sentence).not.toContain(`name of ${id}`);
+    /* No digit, the strip's own rule. */
     expect(/\d/u.test(sentence), sentence).toBe(false);
   });
 
@@ -632,5 +640,46 @@ describe('the moot sentence is drawn only over the run it was measured on — is
     const period = Object.values(CALENDAR_PERIODS)[0];
     if (period === undefined) throw new Error('no calendar period ships');
     expect(crownOn({ calendar: periodOnDays(period, 1, 7) }).outOfService?.mootUnder).toBeUndefined();
+  });
+});
+
+describe('the brief holds the driver on an admitted pinned day under its standing order — § D1029', () => {
+  function crownHeld(overrides: { readonly dispatcherId?: string; readonly seed?: bigint }): string | undefined {
+    const press = ladderRowFor('c7')?.pressDay;
+    if (press === undefined) throw new Error('c7 pins no day');
+    const resources = resourcesWith('crown-hotel');
+    const state: ViewerState = {
+      ...initialState(resources, BigInt(press.seedText)),
+      buildingId: 'crown-hotel',
+      shiftLengthS: 1800,
+      week: openWeek('c7'),
+    };
+    return todayOf({
+      week: state.week,
+      calendar: NO_CALENDAR,
+      building: resolvedBuildingOf(resources, state),
+      buildingId: 'crown-hotel',
+      dispatcherName: 'Steady hand',
+      ...(overrides.dispatcherId === undefined ? {} : { dispatcherId: overrides.dispatcherId }),
+      dispatcherNameOf: (id) => `name of ${id}`,
+      goals: pendingGoals(1),
+      seed: overrides.seed ?? BigInt(press.seedText),
+      horizon: press.horizon,
+      crowdIsToday: false,
+      firstSession: false,
+      units: 'metric',
+    }).driverHeld;
+  }
+
+  it('holds it, with the reason, exactly when the driver is the standing order on the day as measured', () => {
+    const standing = ladderRowFor('c7')?.pressDay?.standingOrder ?? '';
+    expect(admittedPressDayIds()).toContain('c7');
+    expect(crownHeld({ dispatcherId: standing })).toBe(PRESS_DAY_DRIVER_HELD);
+    /* Another driver is not held onto the wrong one; another crowd is not the pinned day. */
+    expect(crownHeld({ dispatcherId: 'eta' })).toBeUndefined();
+    expect(crownHeld({ dispatcherId: standing, seed: 424_242n })).toBeUndefined();
+    /* A caller that names no driver holds nothing. */
+    expect(crownHeld({})).toBeUndefined();
+    expect(/\d/u.test(PRESS_DAY_DRIVER_HELD)).toBe(false);
   });
 });

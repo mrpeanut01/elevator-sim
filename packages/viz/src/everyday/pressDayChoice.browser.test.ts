@@ -119,7 +119,9 @@ describe.skipIf(!HAS_BROWSER)('a day a press decides is reachable from the front
          */
         const moot = await briefMoot(page);
         expect(moot, `${contractId}: the brief draws the census over the pinned day`).not.toBeNull();
-        expect(moot ?? '').toContain('clear this day with no press at all');
+        /* § D1029: the brief keeps one derived sentence; the list of names is the report's now. */
+        expect(moot ?? '').toContain('This day runs under the tower’s standing order');
+        expect(moot ?? '').toContain('with no press at all');
       } finally {
         await page.close();
       }

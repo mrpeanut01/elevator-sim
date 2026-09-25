@@ -242,6 +242,11 @@ import {
   tutorialWorkedAnswerOf,
 } from '../everyday/tutorialModel.js';
 import { stagePaceNoteOf, stagePaceOf } from '../everyday/stagePace.js';
+import { STAGE_CALL_COPY, stageCallCardOf } from '../everyday/stageCall.js';
+import type { PressCall } from '../shift/pressCall.js';
+import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
+import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
+import { PRESS_DAY_DRIVER_HELD } from '../everyday/today.js';
 import { actsOf } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
@@ -589,6 +594,7 @@ import { CONTRACT_LADDER } from '../shift/ladder.js';
 import { FIRST_SESSION_LINE, FIRST_SESSION_LINE_CHOSEN } from '../shift/firstSession.js';
 import {
   averageWaitFigure,
+  clockOf,
   clockRange,
   dayReportOf,
   NOT_RECORDED,
@@ -3442,6 +3448,13 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * graded on another fold so the wording for two verdicts that differ is reached.
      */
     'shift/afterPress.ts#AFTER_PRESS_VERDICT_NOTE',
+    /*
+     * § D1029's call row and the report's *Take this call again* beside it. Seeded once per case
+     * below on the first admitted pin's own data, over a fixture call on this recording, on all
+     * three answers — the corpus runs no pinned day, so `dayReportOf` never draws it here.
+     */
+    'shift/callRow.ts#pressCallRowOf',
+    'shift/callRow.ts#PRESS_CALL_AGAIN',
     'shift/goals.ts#GOAL_PLAIN_NAMES',
     'shift/goals.ts#goalPlainNameOf',
     /*
@@ -3484,6 +3497,51 @@ const SHIFT_REPORT: SurfaceAdapter = {
     const { summary } = recording;
     const bundle = shiftBundleOf(context);
     const seeds: TextSeed[] = [];
+
+    /*
+     * ---- § D1029's call row, on its three answers ----
+     *
+     * The first admitted pin's own data — its window, tried count, holes and census — over a call
+     * on this recording's first car at a quarter of the run, so the clocks are this case's. What is
+     * swept is the wording and the pinned figures it quotes, which is the row's whole content.
+     */
+    {
+      const [pinId] = admittedPressDayIds();
+      const pin = pinId === undefined ? undefined : pressDayFor(pinId);
+      if (pin !== undefined) {
+        const span = recording.endedAt - recording.startedAt;
+        const call: PressCall = {
+          atS: recording.startedAt + span * 0.25,
+          rule: 'first-minute-wait',
+          carId: recording.shafts[0]?.carId ?? 'A',
+          awayAtS: recording.startedAt + span * 0.2,
+          backAtS: recording.startedAt + span * 0.5,
+          act: undefined,
+        };
+        const answers: readonly (readonly [string, readonly RunInterventionConfig[]])[] = [
+          ['none', []],
+          [pin.clearedBy, [{ atS: call.atS, change: { kind: pin.clearedBy } as RunInterventionConfig['change'] }]],
+          [pin.missedBy, [{ atS: call.atS, change: { kind: pin.missedBy } as RunInterventionConfig['change'] }]],
+        ];
+        for (const [answer, interventions] of answers) {
+          const row = pressCallRowOf(
+            {
+              press: pin,
+              call,
+              interventions,
+              nameOf: (id) => context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
+            },
+            (simTimeS) => clockOf(simTimeS, DAY_START_S),
+          );
+          if (row === undefined) continue;
+          seeds.push({ field: `callRow(${answer}).when`, text: row.when, role: 'label' });
+          seeds.push({ field: `callRow(${answer}).what`, text: row.what, role: 'observation' });
+          seeds.push({ field: `callRow(${answer}).why`, text: row.why, role: 'prose' });
+        }
+        seeds.push({ field: 'callRow.again.label', text: PRESS_CALL_AGAIN.label, role: 'label' });
+        seeds.push({ field: 'callRow.again.note', text: PRESS_CALL_AGAIN.note, role: 'prose' });
+      }
+    }
 
     /* ---- the sheet itself, on both days ---- */
     for (const entry of bundle.days) {
@@ -10845,6 +10903,13 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      * nothing after the playhead.
      */
     'everyday/stagePace.ts#stagePaceNoteOf',
+    /*
+     * § D1029's call — the card over both rules and the hold the parking presses carry before it.
+     * Seeded once per case below on fixture calls on the case's own first car, the corpus building
+     * no contract rung (`run.ts#buildingFor`), so no case plays a pinned day as measured.
+     */
+    'everyday/stageCall.ts#stageCallCardOf',
+    'everyday/stageCall.ts#STAGE_CALL_COPY',
     /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
     'everyday/stageScreenModel.ts#stageGoalsOf',
     /*
@@ -11229,6 +11294,52 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       playhead: atPlayhead(recording, recording.startedAt),
     });
 
+    /*
+     * **§ D1029's call, on both rules** — the card a pinned day draws when the stage stops, over two
+     * fixture calls on the case's first car: the first minute-long wait, and the act start with a
+     * peak to name. Seeded at the call's own playhead, because the card is drawn there and says only
+     * what is on the stage at that instant. The hold is the sentence before the call, which names
+     * the event and never its time.
+     */
+    {
+      const span = recording.endedAt - recording.startedAt;
+      const carId = recording.shafts[0]?.carId ?? 'A';
+      const awayAtS = recording.startedAt + span * 0.25;
+      const act = { startS: recording.startedAt + span * 0.4, endS: recording.startedAt + span * 0.6 };
+      const calls: readonly PressCall[] = [
+        { atS: recording.startedAt + span * 0.3, rule: 'first-minute-wait', carId, awayAtS, backAtS: recording.startedAt + span * 0.5, act },
+        { atS: act.startS, rule: 'act-start', carId, awayAtS, backAtS: null, act },
+      ];
+      for (const call of calls) {
+        const card = stageCallCardOf(call);
+        const at = `stage.call(${call.rule})`;
+        const playhead = atPlayhead(recording, call.atS);
+        seeds.push({ field: `${at}.heading`, text: card.heading, role: 'label' });
+        for (const [index, fact] of card.facts.entries()) {
+          seeds.push({ field: `${at}.fact[${String(index)}]`, text: fact, role: 'observation', playhead });
+        }
+        seeds.push({ field: `${at}.question`, text: card.question, role: 'prose' });
+        for (const option of card.options) {
+          seeds.push({ field: `${at}.option(${option.change?.kind ?? 'leave'})`, text: option.label, role: 'label' });
+        }
+      }
+      seeds.push({ field: 'stage.call.held', text: STAGE_CALL_COPY.held, role: 'label' });
+      /*
+       * And the pace note's two arms the sampled loop below never reaches: `call`, drawn while the
+       * card is up, and `chosen`, since § D1029 bounded to the next act boundary.
+       */
+      const acts = actsOf(recording.demandPhases);
+      for (const reason of ['call', 'chosen'] as const) {
+        const note = stagePaceNoteOf(
+          { simPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S, reason },
+          { acts, simTimeS: recording.startedAt },
+        );
+        if (note !== undefined) {
+          seeds.push({ field: `stage.pace(${reason})`, text: note, role: 'label', playhead: atPlayhead(recording, recording.startedAt) });
+        }
+      }
+    }
+
     for (const at of sampleTimes(recording)) {
       const stamp = at.toFixed(0);
       const observations = observationsAt(recording, at);
@@ -11258,7 +11369,7 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           simTimeS: at,
           watchingSimPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S,
           longestStandingS: observations.longestCurrentWaitS,
-          playerChoseSpeed: false,
+          playerChoseSpeedAtS: undefined,
         });
         const note = stagePaceNoteOf(pace, { acts, simTimeS: at });
         if (note !== undefined) {
@@ -12664,10 +12775,17 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/postRun.ts#placementLineOf',
     /* The *no API origin* sentence, owned by the host because the host decides that arm. */
     'everyday/host.ts#POST_RUN_NO_SERVER',
+    /*
+     * § D1029's hold on the brief's driver — drawn only on an admitted pinned day under its
+     * standing order, which no corpus case is (`run.ts#buildingFor` builds no rung), so seeded by
+     * name once per case below.
+     */
+    'everyday/today.ts#PRESS_DAY_DRIVER_HELD',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
     const bundle = shiftBundleOf(context);
+    seeds.push({ field: 'today.driverHeld', text: PRESS_DAY_DRIVER_HELD, role: 'prose' });
 
     for (const entry of bundle.days) {
       /*
@@ -13288,6 +13406,8 @@ const EVERYDAY_TOWER_CHOICE: SurfaceAdapter = {
        row decision is seeded below: offered, standing, other horizon, past its first day, and not
        as measured. */
     'everyday/towerChoice.ts#PRESS_DAY_CHOICE_COPY',
+    /* § D1029: the lede is derived from the admitted windows, and drawn on every render here. */
+    'everyday/towerChoice.ts#pressDayLedeOf',
     'everyday/towerChoice.ts#pressDayChoiceOf',
   ],
   render(context) {

@@ -194,6 +194,7 @@ import {
   allDispatchers,
   buildingConfigOf,
   drivingProfileOf,
+  pressDayCallOf,
   resolvedBuildingOf,
   runSubmissionOf,
   shiftDemandTemplateId,
@@ -214,7 +215,8 @@ import {
 } from '../mode/plainLevers.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
-import { ladderTowersOf, pressDayFor } from '../shift/ladder.js';
+import { admittedPressDayIds, ladderTowersOf, pressDayFor } from '../shift/ladder.js';
+import type { PressCall } from '../shift/pressCall.js';
 import {
   runHorizonOf,
   scenarioHorizonFor,
@@ -1879,6 +1881,21 @@ export interface EverydayHost {
    * the row's own refusal and writes nothing when the week it would land on is not on that day.
    */
   playPressDay(contractId: string): string | undefined;
+  /**
+   * **The pinned day's call on `recording`**, or `undefined` — [§ D1029](../../../../DECISIONS.md).
+   *
+   * `dev/state.ts#pressDayCallOf` over the state standing now: the call instant when the run on
+   * the stage is its tower's pinned day exactly as it was measured, and `undefined` on every other
+   * run. The stage asks it once per attempt, of the recording it opens on, and stops there.
+   */
+  pressCallOnStage(recording: VizRecording): PressCall | undefined;
+  /**
+   * **Take this call again** — § D1029's report action. Today's pinned day, run again from an
+   * **explicitly** empty record rather than one inherited, so the second attempt is the day as it
+   * was measured whatever the first one pressed. Returns why not, and writes nothing, when the week
+   * is not standing on an admitted pinned day.
+   */
+  takeCallAgain(): string | undefined;
   /** The replay in progress, or `undefined`. */
   replay(): EverydayReplaySession | undefined;
   /** Leave the replay, putting the parked week and the run it interrupted back. A no-op outside one. */
@@ -2729,7 +2746,7 @@ export function createEverydayHost(
     return checked.run;
   };
 
-  return {
+  const everydayHost: EverydayHost = {
     week: () => b.state().week,
     contract: () => contractById(b.state().week.contractId),
     calendarPeriod: () => b.state().calendar,
@@ -3862,6 +3879,33 @@ export function createEverydayHost(
       notifyCampaign();
       return undefined;
     },
+    pressCallOnStage: (recording) => pressDayCallOf(b.resources, b.state(), recording)?.call,
+    takeCallAgain: () => {
+      releaseCareer();
+      const state = b.state();
+      const contractId = state.week.contractId;
+      const choice = pressDayChoiceOf(pressDayInputOf(state), contractId);
+      if (choice === undefined || !admittedPressDayIds().includes(contractId)) {
+        return 'this week is not on a day the stage calls';
+      }
+      if (!choice.standing) return choice.note;
+      const press = pressDayFor(contractId);
+      if (press === undefined) return 'this week is not on a day the stage calls';
+      /*
+       * The standing order back, and the record emptied **explicitly** — `startRun` clears a log
+       * that stands, and this does not lean on that: the ruling's *Take this call again* is a
+       * re-open with an empty record, so it is written here, where the promise is made.
+       */
+      const next = withDispatcher(state, b.resources, press.standingOrder);
+      b.applyPatch({
+        interventions: [],
+        dispatcherId: next.dispatcherId,
+        dispatcherSpec: next.dispatcherSpec,
+        editingDispatcherId: next.editingDispatcherId,
+      });
+      everydayHost.startRun();
+      return undefined;
+    },
     chooseTower: (contractId) => {
       const contract = contractById(contractId);
       if (contract === undefined) return;
@@ -3947,6 +3991,7 @@ export function createEverydayHost(
       };
     },
   };
+  return everydayHost;
 }
 
 /**

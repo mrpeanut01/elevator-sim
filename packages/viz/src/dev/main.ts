@@ -295,6 +295,7 @@ import {
   drivingProfileOf,
   initialState,
   withFirstSession,
+  pressDayCallOf,
   profileById,
   resolvedBuildingOf,
   shiftRunConfigOf,
@@ -3177,6 +3178,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * whole simulation — so it is stated rather than hidden, not argued away.
    */
   let unpressedRecording: VizRecording | undefined;
+  /**
+   * The report's call row input for the state standing now — `dev/state.ts#pressDayCallOf`, with
+   * the census's names resolved the way every other dispatcher name on the sheet is. § D1029.
+   */
+  const pressCallForReport = (
+    asBuilt: VizRecording,
+  ): DayReportInput['pressCall'] => {
+    const measured = pressDayCallOf(resources, state, asBuilt);
+    if (measured === undefined) return undefined;
+    return {
+      press: measured.press,
+      call: measured.call,
+      nameOf: (id) => profileById(resources, state.savedDispatchers, id).name,
+    };
+  };
   /** Whether the job in flight on {@link shiftRunner} is the rival's — see {@link scheduleGhost}. */
   let ghostInFlight = false;
   /**
@@ -6645,6 +6661,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * kernel stood down. A recording carries no mid-run schedule, which is why this is passed.
        */
       bookedOut: bookedOutCarsOf(resolvedBuildingOf(resources, state)),
+      /*
+       * **A pinned day's call** — wave AI, [§ D1029](../../../../DECISIONS.md). Asked of the day as
+       * built where this shell kept it ({@link unpressedRecording}, the run the answer replaced) and
+       * of the filed run otherwise: the prefix before the call is identical in both, so either names
+       * the same second, and `pressDayCallOf` refuses anything but the day as it was measured.
+       */
+      pressCall: pressCallForReport(unpressedRecording ?? recording),
       /*
        * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
        * one-field-and-one-caller fix.

@@ -421,7 +421,14 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * before the fix and failed there. Nothing existing was raised:
      * 24 060 000 + 5 × 300 000 = **25 560 000**, keyed on file and case name.
      */
-    ['viz-browser', { count: 96, totalMs: 25_560_000 }],
+    /*
+     * **96 → 97, and the one is named** — wave AI lane AI-D's `everyday/pressCall.browser.test.ts`
+     * at 300 000 ms (§ D1029): one case that opens a pinned day, holds the presses before the call,
+     * stops at the call at `600×`, answers it, closes the day on the report and takes the call again
+     * — two attempts on the shipped bundle, which is what no unit tier can see. Nothing existing was
+     * raised: 25 560 000 + 300 000 = **25 860 000**.
+     */
+    ['viz-browser', { count: 97, totalMs: 25_860_000 }],
   ]);
 
 /**

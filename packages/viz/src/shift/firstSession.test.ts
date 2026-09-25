@@ -28,6 +28,8 @@ import {
   firstSessionContractFor,
   isFirstDayOnALegibleTower,
 } from './firstSession.js';
+import { FIRST_DAY_CONTRACT_IDS } from './firstSession.js';
+import { admittedPressDayIds } from './ladder.js';
 import { LEGIBILITY_SWEEP, legibilityOf } from './legibility.js';
 import { openWeek } from './week.js';
 
@@ -343,5 +345,26 @@ describe('the line has two arms, and the draw picks between them — issue #595,
     expect(FIRST_SESSION_LINE_CHOSEN).not.toContain(`${String(ELIGIBLE_FIRST_CONTRACT_IDS.length)} towers`);
     expect(FIRST_SESSION_LINE_CHOSEN).not.toMatch(/\b(you|your|yours)\b/iu);
     expect(FIRST_SESSION_LINE_CHOSEN).not.toContain('same number opens the same tower');
+  });
+});
+
+describe('the first scored day’s set — legible ∩ admitted, § D1029', () => {
+  it('is non-empty, and every member is legible and admitted', () => {
+    expect(FIRST_DAY_CONTRACT_IDS.length, 'no tower is both legible and admitted').toBeGreaterThan(0);
+    for (const id of FIRST_DAY_CONTRACT_IDS) {
+      expect(ELIGIBLE_FIRST_CONTRACT_IDS, id).toContain(id);
+      expect(admittedPressDayIds(), id).toContain(id);
+    }
+  });
+
+  it('is exactly the intersection, in contract order — never the legible set as a fallback', () => {
+    const admitted = admittedPressDayIds();
+    expect(FIRST_DAY_CONTRACT_IDS).toEqual(ELIGIBLE_FIRST_CONTRACT_IDS.filter((id) => admitted.includes(id)));
+    /*
+     * The fallback the guard exists to refuse: the legible set standing in for the intersection.
+     * Some legible tower pins no day, so the two cannot be equal unless something substituted one.
+     */
+    expect(FIRST_DAY_CONTRACT_IDS).not.toEqual(ELIGIBLE_FIRST_CONTRACT_IDS);
+    expect(FIRST_DAY_CONTRACT_IDS.every((id) => admitted.includes(id))).toBe(true);
   });
 });

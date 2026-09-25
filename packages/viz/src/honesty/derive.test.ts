@@ -1766,6 +1766,30 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The press-moment ruling’s plumbing — wave AI, § D1029. `admittedPressDayIds` and ' +
+        '`pressDayMeasuredAs` return ids and a pin, and are derived only because they reach ' +
+        '`contractLadderIssues`’ own call-block check, whose content-author strings the entry above ' +
+        'already disposes of; `dev/state.ts#pressDayCallOf` returns a pin and a call instant and ' +
+        'reaches prose only through `shiftRunConfigOf`’s own withheld-reason strings, which that ' +
+        'function’s adapters sweep. `shift/pressCall.ts#pressCallOf`, `PRESS_CALL_RULES` and ' +
+        '`PRESS_CALL_MIN_WINDOW_S` carry the two rule ids (`first-minute-wait`, `act-start`) and a ' +
+        'number, which the two-adjacent-words scanner reads as prose: an id is a contract a renderer ' +
+        'switches on, not a string a player reads. What a player reads about the call is ' +
+        '`everyday/stageCall.ts`’s card and `shift/callRow.ts`’s row, both seeded by name in ' +
+        '`honesty/surfaces.ts`. `PRESS_CALL_ROW_ID` is `press-call`, the report row’s id, on ' +
+        '`AFTER_PRESS_ROW_ID`’s precedent above.',
+      ids: [
+        'shift/ladder.ts#admittedPressDayIds',
+        'shift/ladder.ts#pressDayMeasuredAs',
+        'dev/state.ts#pressDayCallOf',
+        'shift/pressCall.ts#pressCallOf',
+        'shift/pressCall.ts#PRESS_CALL_RULES',
+        'shift/pressCall.ts#PRESS_CALL_MIN_WINDOW_S',
+        'shift/callRow.ts#PRESS_CALL_ROW_ID',
+      ],
+    },
+    {
+      reason:
         'Returns the *facts* about why a goal cannot be judged and deliberately authors none of ' +
         'the words. Derived only because its literals are goal-kind ids and `GoalJudgement` keys, ' +
         'which the two-adjacent-words scanner reads as phrases. Carrying a sentence here would ' +

@@ -89,7 +89,7 @@ import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
 import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
 import { firstSessionContractFor } from '../shift/firstSession.js';
-import { runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
+import { actsOf, runHorizonOf, runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
 import {
   SHIFT_EVENTS,
   baseDemandOf,
@@ -97,7 +97,15 @@ import {
   eventById,
   shiftRunPatch,
 } from '../shift/events.js';
-import { ladderTowerConfig, rungFor, rungIncidents } from '../shift/ladder.js';
+import {
+  ladderTowerConfig,
+  pressDayMeasuredAs,
+  rungFor,
+  rungIncidents,
+  type ContractPressDay,
+} from '../shift/ladder.js';
+import { bookedOutCarsOf } from '../shift/bookedOut.js';
+import { pressCallOf, type PressCall } from '../shift/pressCall.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
 import { shiftReportWindowFor } from '../shift/reportWindow.js';
@@ -1736,6 +1744,58 @@ export function resolvedBuildingOf(
     return undefined;
   }
   return shiftRunConfigOf(resources, state).building;
+}
+
+/**
+ * **A pinned day's call, on the run on screen** — [§ D1029](../../../../DECISIONS.md).
+ *
+ * The call instant (`shift/pressCall.ts#pressCallOf`) asked of `recording` in the building the
+ * state's run was built in, and the pin, both only when the state is that pinned day exactly as it
+ * was measured (`shift/ladder.ts#pressDayMeasuredAs`): the contract's day 1 on the pinned crowd and
+ * horizon, the ordinary wrinkle with no calendar, driven by the standing order, with nothing
+ * pressed but an answer at the call second. `undefined` on every other run, which is every run but
+ * one per admitted tower.
+ *
+ * Here because both callers hold a `ViewerState` and the resources, and a second derivation of the
+ * attempt's facts is how the stage and the report would come to disagree about one run:
+ * `everyday/host.ts#pressCallOnStage` asks it for the stage, `dev/main.ts#closeShift` for the
+ * report's call row.
+ */
+export function pressDayCallOf(
+  resources: BrowserResources,
+  state: ViewerState,
+  recording: VizRecording,
+): { readonly press: ContractPressDay; readonly call: PressCall } | undefined {
+  if (buildingConfigOf(resources, state.savedBuildings, state.buildingId) === undefined) return undefined;
+  const plan = shiftRunConfigOf(resources, state);
+  const horizon = runHorizonOf(
+    resources.trafficProfiles,
+    buildingConfigOf(resources, state.savedBuildings, state.buildingId),
+    state,
+  );
+  const call = pressCallOf({
+    legs: recording.legs,
+    bookedOut: bookedOutCarsOf(plan.building),
+    horizon,
+    acts: actsOf(recording.demandPhases),
+    startedAt: recording.startedAt,
+    endedAt: recording.endedAt,
+  });
+  if (call === undefined) return undefined;
+  const press = pressDayMeasuredAs(
+    {
+      contractId: state.week.contractId,
+      day: state.week.day,
+      eventId: plan.event.id,
+      hasCalendar: state.calendar !== null,
+      seed: state.seed,
+      horizon,
+      dispatcherId: state.dispatcherId,
+      interventions: state.interventions,
+    },
+    call.atS,
+  );
+  return press === undefined ? undefined : { press, call };
 }
 
 /** The building's display name, without loading the whole document to read it. */

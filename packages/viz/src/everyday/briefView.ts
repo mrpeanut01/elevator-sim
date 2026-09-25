@@ -146,6 +146,11 @@ export interface BriefScreenView {
     readonly options: readonly BriefDispatcherOption[];
     /** `6 styles · 2 of yours` — derived from the rendered list, never a literal (§ 16 rule 5). */
     readonly count: string;
+    /**
+     * Why the cards and the select cannot be pressed today, or `undefined` — `today.ts`'s
+     * `driverHeld`, § D1029. Drawn beside the control rather than as a tooltip, § 7.6's fourth rule.
+     */
+    readonly held: string | undefined;
   };
   readonly ghost: BriefRefusalCard;
   readonly locked: BriefRefusalCard;
@@ -389,6 +394,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
        * in it eventually contradicted something.
        */
       count: `${String(options.length)} to choose from · ${String(mine)} of yours`,
+      held: today.driverHeld,
     },
     ghost: raceAgainstCard(),
     locked: lockedForScore(),

@@ -113,9 +113,40 @@ async function waitForToday(page: Page): Promise<void> {
   );
 }
 
-/** A stage press, and the re-simulation it asks for, waited out. */
+/**
+ * A stage press, and the re-simulation it asks for, waited out.
+ *
+ * **On a pinned day played as measured the press is made at the stage's call** — wave AI,
+ * [§ D1029](../../../../DECISIONS.md): the parking presses are held until the call and the answer is
+ * stamped at the call second. So where the button is held this runs the day to the call at the
+ * fastest rung and presses the same answer on the card, which is still one press of `kind` on this
+ * attempt — the fixture these cases need — made the way a player now makes it on that day.
+ */
 async function press(page: Page, kind: 'park-cars-lobby' | 'spread-cars'): Promise<void> {
-  await page.locator(`.everyday-stage-intervene[data-intervention-kind="${kind}"]`).click();
+  const button = page.locator(`.everyday-stage-intervene[data-intervention-kind="${kind}"]`);
+  if (await button.isDisabled()) {
+    await page.locator('.everyday-stage-speed', { hasText: '600×' }).click();
+    const start = page.locator('.everyday-stage-start');
+    if (await start.isVisible()) await start.click();
+    else await page.locator('.everyday-stage-play').click();
+    await page.waitForSelector('.everyday-stage-call:not([hidden])', { timeout: 60_000 });
+    await page.locator(`.everyday-stage-call-answer[data-answer="${kind}"]`).click();
+    /*
+     * Waited out on the refusal line rather than the page's text: the stage's overlay keeps its last
+     * sentence while hidden, and on a day answered mid-run that sentence is *recomputing*.
+     */
+    await page.waitForFunction(
+      () => {
+        const line = document.querySelector('.everyday-stage-intervene-refusal')?.textContent ?? '';
+        const stamp = document.querySelector('.everyday-stage-stamp')?.textContent ?? '';
+        return !line.includes('recomputing') && stamp !== '';
+      },
+      undefined,
+      { timeout: 240_000 },
+    );
+    return;
+  }
+  await button.click();
   await page.waitForFunction(
     () => !(document.body.textContent ?? '').includes('recomputing the day'),
     undefined,

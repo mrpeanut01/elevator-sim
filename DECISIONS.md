@@ -41749,6 +41749,8 @@ another sentence* — applied to the lane that wrote the sentence.
 
 ## D914 — seven contracts carry a day whose verdict turns on a press, and the day says which standing orders make it moot
 
+> **Status 2026-09-25: AMENDED by [§ D1029](#d1029)** — the pin's typed instant is replaced by a derived call and a window of at least 120 simulated seconds from it; the moot census moves from the brief to the report.
+
 **Date: 2026-09-22 · Owner: build lane AG-A (wave AG) · GitHub issue [#587](https://github.com/mrpeanut01/elevator-sim/issues/587) · Binds `data/contract-ladder.json`, `packages/viz/src/shift/ladder.ts`, `packages/viz/src/dev/data.ts`, `packages/viz/src/everyday/today.ts`, `packages/viz/src/everyday/briefView.ts` and `packages/viz/src/everyday/briefScreen.ts`, so it is an entry rather than a docstring ([§ D405](#d405)).**
 
 **Decision.** Six more rungs declare a `ContractFabric.incidents` absence, taking the count from one
@@ -42473,6 +42475,8 @@ A Midtown week with Monday closed, a rush started, a reload: the front door open
 
 ## D973 — a day a press decides is chosen from the front door, and every sentence about it checks the horizon the press will run
 
+> **Status 2026-09-25: AMENDED by [§ D1029](#d1029)** — the lede's *while the car is away* is withdrawn and derived from the admitted windows; `pressDayMeasuredAs` gates the call and its row.
+
 **Date: 2026-09-24 · Owner: build lane AH-B (wave AH) · GitHub issue [#595](https://github.com/mrpeanut01/elevator-sim/issues/595) · Amends [§ D912](#d912) and [§ D914](#d914) rather than replacing either · Binds `packages/viz/src/shift/ladder.ts`, `shift/dayLength.ts`, `shift/firstSession.ts`, `everyday/towerChoice.ts`, `everyday/host.ts`, `everyday/today.ts`, `everyday/doorScreen.ts`, `everyday/briefScreen.ts`, `everyday/scenarioModel.ts`, `everyday/weekView.ts`, `everyday/buildNotes.ts`, `everyday/briefView.ts`, `everyday/doorView.ts` and `honesty/surfaces.ts`, so it is an entry rather than a docstring ([§ D405](#d405)). Cites [§ D227](#d227), [§ D256](#d256), [§ D729](#d729), [§ D730](#d730).**
 
 **Decision.** The front door carries a second list under the tower picker, *Days a press decides*: one row per contract whose rung pins a `ContractPressDay`. Pressing a row moves the week the way the tower list does (`switchWeek`, `resume`), writes the pinned seed and hands the day back to the tower's standing order — so the next run press is the day `shift/pressLadder.test.ts` measured, reached with no address parameter. Choosing an ordinary tower afterwards puts the session's own crowd back. A pin now says which **horizon** it was measured on, and one shared predicate, `shift/ladder.ts#pressDayStanding`, decides whether the run about to be pressed is the pinned day: contract, day 1, the ordinary wrinkle, no calendar period, the pinned seed, **and the horizon the Scenario press runs that tower on** (`shift/dayLength.ts#scenarioHorizonFor`). The picker offers a row by it and the brief's moot sentence is drawn by it, so neither can describe a day the other would not call the pinned one.
@@ -42494,6 +42498,8 @@ A Midtown week with Monday closed, a rush started, a reload: the front door open
 ---
 
 ## D974 — five of § D914's pins are re-measured on the whole day the Scenario press runs, with the press moved into the lunch peak
+
+> **Status 2026-09-25: AMENDED by [§ D1029](#d1029)** — `pressAtFraction` 0.43 is replaced by a derived call; pins that fail the window are re-pinned or refused. The tables stand as the dated record.
 
 **Date: 2026-09-24 · Owner: build lane AH-B (wave AH) · GitHub issue [#595](https://github.com/mrpeanut01/elevator-sim/issues/595) · Amends [§ D914](#d914)'s table for `c2`, `c3`, `c6`, `c9` and `c10`; § D914 is not rewritten · Binds `data/contract-ladder.json`, `packages/viz/src/shift/ladder.ts`, `dev/data.ts`, `shift/ladder.test.ts`, `shift/pressLadder.test.ts` and `everyday/pressDayChoice.browser.test.ts`, so it is an entry rather than a docstring ([§ D405](#d405)). Applied by the integrator at integration on the owner's authorisation; the lane's own permission to write the data file was refused, so the lane prepared and verified it as one atomic patch rather than writing it. Cites [§ D256](#d256), [§ D973](#d973).**
 
@@ -42637,6 +42643,8 @@ This lane held **D982–D990** and spent **D982–D984**. **D985 to D990 are uns
 ---
 
 ## D991 — Today's scenario keeps the whole day and plays it in acts: the peaks at the player's speed, the hours between at 30×
+
+> **Status 2026-09-25: CLAUSE 2 AMENDED by [§ D1029](#d1029)** — a speed chip lasts until the next act boundary, and a pinned day's call outranks it.
 
 > **Taken 2026-09-24 by agent sessions under delegated authority**, not by the product owner: the
 > ruling by a decision agent (with measurement, on `499b959`), the implementation and the
@@ -43115,3 +43123,155 @@ A day closed and its report left: back at the front door, the stepper read *Mond
 ### What moves in the corpus
 
 The door adapter seeds *Run today again* and its note on the four door renders a case draws at a closed today (+8 a case), § 3.3's door row seeds its third variant (+1), and the rail's career line is one seed rather than two identical ones (−1). Every other change is a substitution.
+
+---
+
+## D1029 — the press becomes a call: the stage stops once at an instant it can name, a pin is admitted only over a window from it, and the day runs under its standing order until the call is answered
+
+> **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: a
+> three-member decision swarm (the player, honesty and engineering lenses, whose records are the
+> integrator's scratch notes `press-moment-S1` to `-S3` and are not in this repository), reconciled by
+> wave AI's integrator (*PRESS MOMENT RECONCILED*), and built and measured
+> by wave AI lane AI-D. A later reader weighing this against a product-owner ruling should treat it as
+> an agent ruling and say so — [§ D626](#d626) is the cautionary case. **Amends [§ D914](#d914),
+> [§ D973](#d973), [§ D974](#d974) and [§ D991](#d991) clause 2**; none of them is rewritten.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it moves four recorded decisions, and it binds
+`data/contract-ladder.json`, `shift/ladder.ts`, `shift/pressCall.ts`, `shift/callRow.ts`,
+`shift/report.ts`, `shift/firstSession.ts`, `dev/state.ts`, `dev/main.ts`, `everyday/stagePace.ts`,
+`everyday/stageCall.ts`, `everyday/stageScreen.ts`, `everyday/today.ts`, `everyday/briefView.ts`,
+`everyday/briefScreen.ts`, `everyday/towerChoice.ts`, `everyday/host.ts`, `everyday/reportScreen.ts`
+and the honesty register.
+
+### What was wrong
+
+§ D914 and § D974 pinned each press day's verdict flip **at one typed instant** — `pressAtFraction`,
+0.43 of a whole day and 0.28 of a slice — and nothing asked what happened a minute either side. The
+swarm swept the hour around every pin and found three shapes: a *setting* that clears for hours
+(Midtown, Ashgate), a *needle* the pinned second sits on alone (Secure Tower cleared at 2 of 131
+sampled seconds), and a *moment* that opens at an event on the stage (St Jude, Harbour Point). The
+front door's lede said *"with the press made while the car is away"*, which was the pinned second in
+words and false on four of the seven rows it stood above.
+
+### The ruling
+
+1. **One function names the call instant**, `shift/pressCall.ts#pressCallOf`, and the stage, the
+   sweep and the tests all call it. **Rule 1**: the first instant, while the booked-out car is away,
+   at which somebody standing on a landing has waited 60 s — `WAIT_BANDS[2].fromS`, the threshold
+   `stagePace.ts#PACE_HOLD_WAIT_S` and § D992 read. **Rule 2, only where rule 1 has no instant**: the
+   later of the car leaving and the start of the act it is away during (the whole run, on a slice).
+   Never a typed clock time; `pressAtFraction` is deleted from the schema and the data. Rule 1 is
+   computed exactly from the legs with `frame/overlay.ts#isWaitingAt`, so the three callers agree to
+   the second rather than to a frame.
+2. **Admission.** A pin is admitted only if, from its call, the clearing press clears and the other
+   misses at **every** tried moment of a window of at least `PRESS_CALL_MIN_WINDOW_S` = **120
+   simulated seconds**. The data carries the measurement (`ContractPressDay.call`: the rule, the
+   window, the grid step, how far was searched, the tried count, and the tried moments past the
+   window that failed); `contractLadderIssues` refuses an offered pin whose block does not meet it,
+   and a row that fails is kept with `refused` and its reason and drawn refused on the door.
+   `shift/pressLadder.sweep.test.ts`'s call mode is the instrument (`PRESS_LADDER_CALL=1`, grid 10 s
+   to 300 s past the call, plus five seeded off-grid seconds inside the window; its search arm
+   re-pins by crowd). `shift/pressLadder.test.ts` holds each admitted pin's window always-on — the
+   call, the far edge and a grid point between, seven runs a pin — with a positive control on a crowd
+   the check is known to fail on.
+3. **The admitted set is exported**, `shift/ladder.ts#admittedPressDayIds`, derived from the pinned
+   data; so is `shift/firstSession.ts#FIRST_DAY_CONTRACT_IDS` = legible ([§ D512](#d512)) ∩ admitted,
+   guarded non-empty with no fallback to the legible set. **The first-session draw is not wired to
+   it** — the first-day lane does that.
+4. **The stage calls the day.** On a day `shift/ladder.ts#pressDayMeasuredAs` recognises — `pressDayStanding`
+   holds, the pin is admitted, the driver is the standing order, and every press on record is this
+   attempt's own answer at the call second — the transport stops at the call at any rung
+   (`stagePace.ts`'s new `'call'` reason, which outranks `'chosen'`). The card says only what is on
+   screen: the car is out (and until when), a landing has waited a minute (rule 1), the peak opened
+   (rule 2 on a whole day). It offers *Park the cars in the lobby*, *Spread the cars across the
+   tower* and *Leave them*, in the stage's fixed order, with **no countdown, no "now", no word that
+   the moment is decisive and no hint which press** (`stageCall.test.ts`). Before the call both
+   parking presses and the mid-day handover are drawn disabled with *held until the stage stops for
+   this day's call*; the answer is stamped at the call second whatever frame the stage stopped on.
+   *Skip to the end* is the player's own answer and ends the call.
+5. **A speed chip lasts until the next act boundary**, not the rest of the day — **§ D991 clause 2
+   is amended** (`stagePace.ts#chipStands`; the note reads *your speed, 8×, until 12:15*), so the
+   published day length stays true of a player who pressed a chip once.
+6. **The dispatcher on the pinned route.** The brief's cards and select are held on an admitted
+   pinned day under its standing order (`today.ts#PRESS_DAY_DRIVER_HELD`), and the stage's handover
+   until the call is answered. The list of standing orders that clear the day with no press moves
+   from the brief to the report; **the brief keeps one derived sentence**: *This day runs under the
+   tower's standing order, ⟨name⟩. Measured on today's crowd, ⟨n in words⟩ other standing orders clear
+   it with no press at all; the day's report names them.*
+7. **The report's call row** (`shift/callRow.ts`): the call's clock, the player's answer at the call
+   (or *nothing was pressed*), the unchosen answer's verdict **on this crowd** from the pinned data
+   with the tried count and clock range, the moments past the window that did not read that way, and
+   the census. § D982's two ban lists bind it, with the honesty lens's mechanism and cross-crowd
+   lists beside them (`callRow.test.ts`). *Take this call again* (`everyday/host.ts#takeCallAgain`)
+   re-opens the day with an explicitly empty record under the standing order.
+8. **The door's lede** drops the false clause and is derived (`towerChoice.ts#pressDayLedeOf`): the
+   shortest admitted window, in whole minutes, in words, after *from the call, one of the two
+   parking presses cleared it and the other did not at every moment tried over the …*.
+
+### The admitted set, measured on this tree
+
+The instrument is `PRESS_LADDER_CALL=1` over `shift/pressLadder.sweep.test.ts`, day 1 under
+`collective`, the ordinary wrinkle, no calendar, through `shiftRunConfigOf` and `recordRun`: grid
+every 10 s from the call to 300 s after it, both verbs at each moment, plus five seeded off-grid
+seconds inside the window found. *Tried* is the grid's points inside the window plus those five.
+Every call below is rule 1; no shipped or re-pinned day reached rule 2.
+
+| pin | crowd (`n`) | clears / misses | call | window | tried | holes past the window | disposition |
+|---|---|---|---|---|---|---|---|
+| `c2` Midtown | 20 276 662 (2) | spread / park | 10:40:14 | ≥ 300 s (the search) | 36 | none | **admitted as shipped** |
+| `c3` Secure Tower | **20 308 338 (6)** | spread / park | 10:45:30 | ≥ 300 s | 36 | none | **re-pinned**: § D974's 20 482 556 failed at every moment tried from its call (10:51:10) |
+| `c6` Chancery House | **20 514 232 (32)** | **park / spread** | 10:43:30 | ≥ 300 s | 36 | none | **re-pinned**: 21 100 238's call (10:41:44) failed at every moment; the verb pair flips on the new crowd |
+| `c7` Crown Hotel (slice) | **20 324 176 (8)** | spread / park | 08:42:41 | 120 s (the floor) | 18 | every tried moment from 130 s to 300 s | **re-pinned**: 20 268 743's call (08:39:47) failed at every moment |
+| `c8` St Jude's (slice) | 20 276 662 (2) | park / spread | 08:40:35 | ≥ 300 s | 36 | none | **admitted as shipped** |
+| `c9` Harbour Point | 20 941 858 (86) | spread / park | 12:21:24 | 40 s | 10 | 50, 120 and 130 s | **refused**: 81 crowds searched (`n` 0–80), 40 missed as built, one passed the 0/60/120 s screen (`n` 63) and its window was 80 s |
+| `c10` Ashgate | 20 355 852 (12) | park / spread | 11:28:30 | ≥ 300 s | 36 | none | **admitted as shipped** |
+
+Re-pins are the first crowd in search order that is admitted (`c3`: 41 crowds, 18 missed as
+built, admitted at `n` 6 and 40; `c6`: 41 crowds, 18 missed, `n` 32 and 35; `c7`: 61 crowds, 26
+missed, `n` 8, 10 and 32). Each re-pin's `mootUnder` was re-censused on its new crowd under all
+thirteen profiles (`PRESS_LADDER_CENSUS=1`): `c3` 2 of 12, `c6` 8, `c7` 10. **The admitted set is
+`c2`, `c3`, `c6`, `c7`, `c8`, `c10`**; with § D512's legibility, `FIRST_DAY_CONTRACT_IDS` is the
+same six. Wall-clock figures are not published: the box was at load 5–14 throughout.
+
+### Guards
+
+- One function, three callers: `pressLadder.test.ts` asserts the stage's `dev/state.ts#pressDayCallOf`
+  and the sweep's harness name the same second, and that the stage names none under another driver
+  or after a press before the call.
+- The window's edges and interior always-on (`pressLadder.test.ts`), and a positive control on § D974's
+  `c3` crowd, where the call window fails at its first moment.
+- Two declared honesty pairs: `press-call-window` (the door's lede ↔ the shortest admitted window in the
+  data) and `press-call-row` (the call row's tried count and range ↔ the data).
+- `everyday/pressCall.browser.test.ts` on the built bundle: open St Jude's pinned day from the door,
+  the parking presses held before the call, the stage stopped at the call at `600×`, the clearing
+  answer gives *Shift cleared*, and *Take this call again* re-opens the day with no presses.
+
+### Two things decided here that the ruling left to the build
+
+- **Rule 1 is asked across the whole absence, not only inside the act.** The player lens's draft
+  added *and, on a whole day, inside the act it is away during*; the reconciliation's text (and this
+  lane's brief) does not. Both were measured on the seven shipped pins: with the clause, `c2`'s call
+  moves to 12:20:25 and fails at its first moment, `c6`'s window is 110 s and `c9`'s 40 s, and only
+  `c8` and `c10` pass; without it `c2`, `c8` and `c10` pass as shipped. The call without the clause
+  lands where the stage's own `held` threshold is first crossed while the car is away. **Reversible
+  by one line in `pressCallOf` and a re-run of the call sweep.**
+- **A failing pin is re-pinned to the first crowd in search order that is admitted**, seeds
+  `20 260 824 + 7 919 n`, rather than to the widest window found — a stated rule, so the choice is
+  not the best-looking crowd. It is why `c7` sits exactly at the floor while `n` 32 held for 300 s.
+- **The verbs are what the new crowd measures, not what the old pin said.** `c6`'s re-pin clears on
+  *park* where § D974's pin cleared on *spread* — § D974 already recorded that the verb is not a
+  property of the tower.
+
+### Dissents, named
+
+- **S3 (engineering): the call at the pin's own second.** Refused 2–1 in the reconciliation: it marks
+  the decisive moment from a measurement the player never made.
+- **S2 (honesty): a window of 120 *real* seconds at the stage's default pacing.** Not adopted; the
+  window is 120 *simulated* seconds. The call stops the transport and the answer is stamped at the
+  call second, so the window protects the claim against the frame the stage stopped on and the
+  moment's neighbours rather than against reading time.
+
+### What it does not touch
+
+No bar, no goal, no occupancy, no rate, no booked-out car. Changes to `data/contract-ladder.json`
+are pins and their windows only. `GOAL_BARS` is byte-identical.
