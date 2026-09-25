@@ -25,6 +25,7 @@ import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 import type { PublishedSurvivors } from '../scenario/survivors.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
+import { fixitResourcesFromDisk, shippedFixitCases } from '../fixit/resources.test-helper.js';
 import type { HonestyResources } from './run.js';
 
 export { DATA_DIR };
@@ -99,7 +100,16 @@ export async function loadHonestyResources(
     if (parameter.description !== undefined) dimensionHelp.set(parameter.id, parameter.description);
   }
 
+  /*
+   * The shipped fix-it cases and the resources their runs plan against — GitHub issue #570,
+   * § D1011. Through `fixit/`'s own fixture door rather than a second loader, for that door's own
+   * reason: a harness that assembled its own resources would vouch for a reimplementation.
+   */
+  const fixitResources = await fixitResourcesFromDisk();
+  const shippedFixit = { cases: await shippedFixitCases(fixitResources), resources: fixitResources };
+
   const resources: HonestyResources = {
+    shippedFixit,
     buildingsById: config.buildingsById,
     buildingDocumentsById,
     dispatcherProfiles: config.dispatcherProfiles,

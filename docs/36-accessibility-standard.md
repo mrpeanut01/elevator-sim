@@ -285,7 +285,7 @@ adapter, and one refusal:
 4. **Registered in `honesty/surfaces.ts`.** This is the mechanisation, and it is the strongest one
    available in this tree. `render/describeFrame.ts#describeFrame` is already registered there
    (`honesty/surfaces.ts:951`), which means the Engineer text alternative is **already held to all
-   ten honesty properties** on every corpus case. A registered Everyday equivalent inherits `suppressed-mean`,
+   eleven honesty properties** on every corpus case. A registered Everyday equivalent inherits `suppressed-mean`,
    `estimate-without-n`, `probability-word`, `internal-notation` and the rest on the day it lands,
    with no new instrument written. That is `AX-16`, and it is why `AX-16` is the only clause in this
    document that is tier 1 without anybody building anything.

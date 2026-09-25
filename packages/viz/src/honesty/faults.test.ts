@@ -111,6 +111,12 @@ const FIXTURE_FOR: Readonly<Record<HonestyProperty, 'quotable' | 'suppressed'>> 
    * confused with a fixture that stopped suppressing.
    */
   'surfaces-disagree': 'quotable',
+  /*
+   * § D1011 needs neither: the shipped fix-it verdicts are worded on every case, and the day
+   * report's press beat is drawn on the intervened sheet every case builds. `quotable` so a red here
+   * is never confused with a fixture that stopped suppressing.
+   */
+  'unbacked-attribution': 'quotable',
 });
 
 describe('every property fires when the thing it protects is broken', () => {

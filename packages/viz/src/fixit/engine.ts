@@ -815,6 +815,166 @@ export interface FixitOutcome {
   readonly body: string;
   readonly rows: readonly [FixitRow, FixitRow, FixitRow];
   readonly basis: string;
+  /**
+   * **Whose act the head and body describe** — [§ D1011](../../../../DECISIONS.md).
+   *
+   * `'diagnosis'` exactly when the case's authored `result` was printed, which {@link classifyOutcome}
+   * does only on a run that is leg for leg the diagnosed repair's; `'order'` on every other outcome,
+   * whose words describe the order the player ran and nothing else. Declared by the one function that
+   * chose the words, so `honesty/properties.ts#unbacked-attribution` reads the choice rather than
+   * guessing it from the prose. Optional only so an outcome built elsewhere still type-checks; the
+   * honesty adapter reads a missing value as `'order'`.
+   */
+  readonly attribution?: 'diagnosis' | 'order' | undefined;
+}
+
+/**
+ * **What the verdict may say about whose change fixed the case** — [§ D1011](../../../../DECISIONS.md),
+ * the ruling on `rescore-ai` N1 and assessor C's D1.
+ *
+ * The fixed arm used to return `entry.result.head/body` for every fixed outcome, whatever the
+ * player had changed. Five false sentences were reproduced on the shipped bundle — a hospital roof
+ * raised three metres read *"Four hundred letters now say half past"*, a parking change on the
+ * lettings case read *"The staggered starts … take six hundred arrivals out"* — because every
+ * authored result body is a mechanism claim about **the diagnosed repair's run**, and the product
+ * printed it over runs that were not that run.
+ *
+ * - **`witnessRun`** — whether the player's after-run is **leg for leg** the diagnosed repair's
+ *   after-run on the case seed. Leg identity rather than schedule-row identity or config identity:
+ *   measured by the ruling's engineering member over the eighteen exact answers, rows matched 18 of
+ *   18 and falsely accepted *two cars out*'s car A → High (the same `rezone-bank` row as the
+ *   answer); configs matched only 9 of 18; legs matched 18 of 18 with no false accept. If every leg
+ *   is identical, the authored narrative is exactly as true of the player's run as of the witness's.
+ * - **`changes`** — the order's changes, worded by the surface in `core`'s player words. The engine
+ *   does not word them because the words belong beside the controls that set them
+ *   (`everyday/fixitScreenModel.ts#fixitOrderLinesOf`).
+ * - **`bought`** — the price-schedule rows the order bought, by their player names
+ *   ({@link rowsBoughtOf}).
+ *
+ * The object is S3's shape — one fourth argument rather than three — so a later field (a
+ * replication, a panel of mornings) is added to it rather than to the signature.
+ */
+export interface FixitVerdictContext {
+  readonly witnessRun: boolean;
+  readonly changes: readonly string[];
+  readonly bought: readonly string[];
+}
+
+/*
+ * The composed fixed verdict's words — § D1011. Four strings, and the care in them is about **what
+ * they do not say**: no mechanism, because a plausible sentence in place of a measurement is what
+ * [§ D256](../../../../DECISIONS.md) refuses, and no claim that the order *is* or *is not* the
+ * diagnosed change — only that the run is not the one the diagnosis describes, which is the fact
+ * the leg comparison established.
+ */
+/** The head of a fixed verdict on a run that is not the diagnosed repair's. */
+export const FIXED_BY_ORDER_HEAD = 'Fixed, by your own order.';
+/** Leads the list of the player's changes. */
+export const FIXED_BY_ORDER_CHANGES_LEAD = 'What you changed:';
+/** Leads the list of schedule rows bought. */
+export const FIXED_BY_ORDER_BOUGHT_LEAD = 'What it bought:';
+/**
+ * The closing sentence. The second half is the ruling's player member's line, kept verbatim (S1):
+ * the runs show the change clears the bars; they do not show why.
+ */
+export const FIXED_BY_ORDER_CLOSE =
+  'The rows below are measured on this order. The diagnosis describes a different run, so its ' +
+  'explanation is not printed here. These runs say your change works; they do not say why.';
+
+/**
+ * The state that **is** the diagnosed repair — the pinned witness § D706 clause 1 makes of it.
+ *
+ * Built directly rather than through {@link toggleRepair}: the witness is a run the case authors,
+ * and a budget gate on it would be a gate on the author rather than on the player. Throws on a case
+ * with no diagnosed repair, which `fixit/parse.ts` already refuses at the door.
+ */
+export function witnessStateOf(entry: FixitCase): FixitState {
+  const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed');
+  if (diagnosed === undefined) throw new Error(`fixit: case "${entry.id}" has no diagnosed repair.`);
+  return { ...emptyFixitState(), selectedRepairIds: [diagnosed.id] };
+}
+
+/**
+ * The schedule rows an order bought, **by their player names**, each once — § D1011.
+ *
+ * The same derivation `spendOf` charges through, read for names rather than units: the repairs'
+ * patches, the editor's settings by their `covers` paths, the two steppers' rows, a moved tenancy's
+ * row, and the standing extras by their own names. In schedule order within each source, so the
+ * sentence is stable press to press.
+ */
+export function rowsBoughtOf(
+  entry: FixitCase,
+  state: FixitState,
+  schedule: PriceSchedule,
+): readonly string[] {
+  const names = new Map<string, string>();
+  for (const repair of entry.repairs) {
+    if (!state.selectedRepairIds.includes(repair.id)) continue;
+    for (const change of changesBought(schedule, repair.patch)) names.set(change.id, change.name);
+  }
+  for (const change of changesAtPaths(schedule, editorPathsOf(state))) names.set(change.id, change.name);
+  if (state.speedSteps > 0) {
+    const change = priceOf(schedule, 'faster-machines');
+    names.set(change.id, change.name);
+  }
+  if (state.capacitySteps > 0) {
+    const change = priceOf(schedule, 'larger-car-step');
+    names.set(change.id, change.name);
+  }
+  if (tenancyCohortsMovedOf(entry.asBuilt.tenancy, state.tenancyPositions) > 0) {
+    const change = priceOf(schedule, 'tenant-floors');
+    names.set(change.id, change.name);
+  }
+  for (const extra of standingExtrasFrom(schedule)) {
+    if (state.selectedExtraIds.includes(extra.id)) names.set(`extra:${extra.id}`, extra.name);
+  }
+  return [...names.values()];
+}
+
+/**
+ * Whether two orders are the same order — the test a verdict's staleness is decided by (§ D1011).
+ *
+ * Compared as **sets** where the state holds a set (selected ids, a bank's floors, plated banks) and
+ * key by key where it holds a record, because the reducers build those in press order and a floor
+ * toggled off and on again is the same order in a different array. Anything else would call a
+ * verdict stale over nothing the run could see.
+ */
+export function sameOrder(a: FixitState, b: FixitState): boolean {
+  return canonicalOrder(a) === canonicalOrder(b);
+}
+
+function canonicalOrder(state: FixitState): string {
+  const sortedRecord = <T>(record: Readonly<Record<string, T>>, map: (value: T) => unknown = (v) => v) =>
+    Object.keys(record)
+      .sort()
+      .map((key) => [key, map(record[key] as T)]);
+  return JSON.stringify([
+    [...state.selectedRepairIds].sort(),
+    [...state.selectedExtraIds].sort(),
+    state.speedSteps,
+    state.capacitySteps,
+    state.zoneOverlapFloors,
+    state.parkingStrategy,
+    state.topFloorRaiseM,
+    sortedRecord(state.dispatcherDials),
+    sortedRecord(state.doorDwell, (setting) => [setting.hallCallS ?? null, setting.carCallS ?? null]),
+    sortedRecord(state.carBanks),
+    sortedRecord(state.bankFloors, (floors) => [...floors].sort()),
+    [...state.platedBankIds].sort(),
+    sortedRecord(state.tenancyPositions),
+  ]);
+}
+
+/**
+ * Whether a verdict still describes the order on screen — § D1011, assessor C's D6.
+ *
+ * `verdictState` is the order the verdict was measured on. A verdict is a function of that order,
+ * so once the player edits away from it the verdict describes an order they no longer have — the
+ * same defect as a verdict describing an order they never made, one edit later. `undefined` means
+ * no verdict was drawn, which is never stale.
+ */
+export function verdictIsStale(verdictState: FixitState | undefined, current: FixitState): boolean {
+  return verdictState !== undefined && !sameOrder(verdictState, current);
 }
 
 /**
@@ -881,10 +1041,21 @@ function basisOf(measurement: FixitMeasurement): string {
   return measurement.sameCrowd ? BASIS_LINE : DEMAND_BASIS_LINE;
 }
 
+/**
+ * ## The fixed arm prints the authored result only on the witness's own run — § D1011
+ *
+ * `verdict` is {@link FixitVerdictContext}. The authored `result` — a mechanism claim about the
+ * diagnosed repair's run — is printed **only** when `verdict.witnessRun` says the player's after-run
+ * is leg for leg that run. Every other fixed outcome is composed from the order: the changes, the
+ * rows bought, and {@link FIXED_BY_ORDER_CLOSE}. **An absent `verdict` is not evidence** and takes
+ * the composed arm: a caller that did not ask whether the run is the witness cannot be told that it
+ * is. The three other arms do not read `verdict` at all.
+ */
 export function classifyOutcome(
   entry: FixitCase,
   measurement: FixitMeasurement,
   spend: FixitSpend,
+  verdict?: FixitVerdictContext,
 ): FixitOutcome {
   const rows = rowsOf(entry, measurement, spend);
   const [complaintRow, restRow, spentRow] = rows;
@@ -897,15 +1068,27 @@ export function classifyOutcome(
         'will want a business case rather than a work order.',
       rows,
       basis: basisOf(measurement),
+      attribution: 'order',
     };
   }
   if (complaintRow.passed && restRow.passed) {
+    if (verdict?.witnessRun === true) {
+      return {
+        kind: 'fixed',
+        head: entry.result.head,
+        body: `${entry.result.body}${spentAnywayClause(entry, spend)}`,
+        rows,
+        basis: basisOf(measurement),
+        attribution: 'diagnosis',
+      };
+    }
     return {
       kind: 'fixed',
-      head: entry.result.head,
-      body: `${entry.result.body}${spentAnywayClause(entry, spend)}`,
+      head: FIXED_BY_ORDER_HEAD,
+      body: composedFixedBody(verdict),
       rows,
       basis: basisOf(measurement),
+      attribution: 'order',
     };
   }
   if (complaintRow.passed) {
@@ -917,6 +1100,7 @@ export function classifyOutcome(
         'have not received yet.',
       rows,
       basis: basisOf(measurement),
+      attribution: 'order',
     };
   }
   // *Better* is a claim about the measurement in the row above it. See the docstring.
@@ -932,7 +1116,24 @@ export function classifyOutcome(
         'it again.',
     rows,
     basis: basisOf(measurement),
+    attribution: 'order',
   };
+}
+
+/**
+ * The composed fixed body — § D1011. The changes and the rows, each as one sentence and each
+ * omitted when empty rather than drawn as *"What you changed: ."*; then the close, always.
+ */
+function composedFixedBody(verdict: FixitVerdictContext | undefined): string {
+  const parts: string[] = [];
+  if (verdict !== undefined && verdict.changes.length > 0) {
+    parts.push(`${FIXED_BY_ORDER_CHANGES_LEAD} ${verdict.changes.join('; ')}.`);
+  }
+  if (verdict !== undefined && verdict.bought.length > 0) {
+    parts.push(`${FIXED_BY_ORDER_BOUGHT_LEAD} ${verdict.bought.join('; ')}.`);
+  }
+  parts.push(FIXED_BY_ORDER_CLOSE);
+  return parts.join(' ');
 }
 
 /**

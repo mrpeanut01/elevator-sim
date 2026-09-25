@@ -55,16 +55,23 @@
  * because the prototype's toy model ran instantly and never needed one.
  */
 
-import type { FixitSpend } from '../fixit/engine.js';
+import {
+  rowsBoughtOf,
+  standingExtrasFrom,
+  type FixitSpend,
+  type FixitVerdictContext,
+} from '../fixit/engine.js';
+import type { PriceSchedule } from '../pricing/types.js';
 import type {
   DialGroupInput,
   DoorInput,
+  EditorInputs,
   RezoneInput,
   RowPurchase,
   TenancyInput,
 } from '../fixit/editorInputs.js';
-import { EDITOR_PARKING_STRATEGIES, KEYED_BANK, OUT_OF_SERVICE } from '../fixit/types.js';
-import type { DialValue, EditorParkingStrategy, FixitCase, FixitState } from '../fixit/types.js';
+import { EDITOR_PARKING_STRATEGIES, EVERY_CAR, KEYED_BANK, OUT_OF_SERVICE } from '../fixit/types.js';
+import type { DialValue, EditorParkingStrategy, FixitCase, FixitExtra, FixitState } from '../fixit/types.js';
 import type { ActionBarModel } from './actionBar.js';
 /* The currency's own words, from `data/chime-ledger.json` — § D530 authors them and no screen may. */
 import { CHIME_PRICES } from './chimesPanel.js';
@@ -136,6 +143,15 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   noteReady:
     'Runs the same crowd again with everything you have changed, and scores the whole building.',
   noteSolved: 'This one is settled. There are more buildings than you have afternoons.',
+  /*
+   * **A verdict that no longer describes the order on screen** — [§ D1011](../../../../DECISIONS.md),
+   * assessor C's D6. Drawn over the outcome card the moment the order moves away from the one the
+   * verdict was measured on, and the Run press comes back beside it. The verdict is kept rather than
+   * cleared, because it is still a true statement about the order that was run; what it is not is a
+   * statement about this one, and the sentence says exactly that.
+   */
+  verdictStale:
+    'You have changed the order since this verdict. It describes the order you ran, not the one on screen now — run the day again to see this one.',
   /** `dev/fixitPanel.ts`'s relabel while the synchronous pair computes. */
   runningLabel: 'Running the day…',
   /**
@@ -519,13 +535,7 @@ export function fixitParkingRow(
   standing: string,
   priceUnits: number,
 ): FixitParkingRow {
-  const words: Readonly<Record<EditorParkingStrategy, string>> = {
-    stay: FIXIT_SCREEN_COPY.parkingStay,
-    lobby: FIXIT_SCREEN_COPY.parkingLobby,
-    'zone-center': FIXIT_SCREEN_COPY.parkingZone,
-    'predicted-demand': FIXIT_SCREEN_COPY.parkingForecast,
-    'fixed-floor': FIXIT_SCREEN_COPY.parkingFixedFloor,
-  };
+  const words = PARKING_WORDS;
   const options: FixitParkingOption[] = [
     {
       value: null,
@@ -552,6 +562,138 @@ export function fixitParkingRow(
     priced:
       priceUnits === 0 ? FIXIT_SCREEN_COPY.parkingFree : `${String(priceUnits)} u`,
     options,
+  };
+}
+
+/** Each parking strategy in the select's own words — one table for the select and the verdict. */
+const PARKING_WORDS: Readonly<Record<EditorParkingStrategy, string>> = Object.freeze({
+  stay: FIXIT_SCREEN_COPY.parkingStay,
+  lobby: FIXIT_SCREEN_COPY.parkingLobby,
+  'zone-center': FIXIT_SCREEN_COPY.parkingZone,
+  'predicted-demand': FIXIT_SCREEN_COPY.parkingForecast,
+  'fixed-floor': FIXIT_SCREEN_COPY.parkingFixedFloor,
+});
+
+/**
+ * **The order the player ran, in the words of the controls that set it** — [§ D1011](../../../../DECISIONS.md).
+ *
+ * The composed fixed verdict (`fixit/engine.ts#classifyOutcome`) names what the player changed
+ * rather than what the diagnosis names, and it names it the way the screen already does: a dial by
+ * `core`'s own player name and value words (`fixit/editorInputs.ts` carries them from the schema's
+ * `player` block), a car by the bank the rezone select calls it, a door hold by the sides the door
+ * row labels, a tenancy by its authored cohort and position. **No mechanism and no judgement** —
+ * only what was set, because the verdict's close says the runs show *that* it worked and not *why*.
+ *
+ * One line per change the order carries, in the order the screen draws its families. A value the
+ * inputs cannot word (a dial the gate has since closed) is dropped rather than printed as an id:
+ * `withPrunedDials` already takes such a dial out of the order both surfaces run, so a line for it
+ * would describe a change the run did not carry.
+ */
+export function fixitOrderLinesOf(input: {
+  readonly entry: FixitCase;
+  readonly state: FixitState;
+  readonly inputs: EditorInputs;
+  readonly extras: readonly FixitExtra[];
+}): readonly string[] {
+  const { entry, state, inputs } = input;
+  const lines: string[] = [];
+  for (const repair of entry.repairs) {
+    if (state.selectedRepairIds.includes(repair.id)) lines.push(repair.name);
+  }
+  if (state.speedSteps > 0) {
+    lines.push(`${FIXIT_SCREEN_COPY.speedLabel} — +${(state.speedSteps * 0.5).toFixed(1)} m/s`);
+  }
+  if (state.capacitySteps > 0) {
+    lines.push(`${FIXIT_SCREEN_COPY.capacityLabel} — +${String(state.capacitySteps * 2)} places`);
+  }
+  if (state.zoneOverlapFloors > 0) {
+    const floors = state.zoneOverlapFloors === 1 ? 'floor' : 'floors';
+    lines.push(`${FIXIT_SCREEN_COPY.zonesLabel} — +${String(state.zoneOverlapFloors)} ${floors} each side`);
+  }
+  if (state.parkingStrategy !== null) {
+    lines.push(`${FIXIT_SCREEN_COPY.parkingLabel} — ${PARKING_WORDS[state.parkingStrategy]}`);
+  }
+  if (state.topFloorRaiseM > 0) {
+    const metres = state.topFloorRaiseM === 1 ? 'metre' : 'metres';
+    lines.push(`${FIXIT_SCREEN_COPY.elevationLabel} — +${String(state.topFloorRaiseM)} ${metres}`);
+  }
+  for (const group of inputs.dialGroups) {
+    for (const dial of group.dials) {
+      if (dial.selected === undefined) continue;
+      const value =
+        typeof dial.selected === 'boolean'
+          ? dial.selected
+            ? FIXIT_SCREEN_COPY.dialOn
+            : FIXIT_SCREEN_COPY.dialOff
+          : dial.options.find((option) => encodeFamilyValue(option.value) === encodeFamilyValue(dial.selected))
+              ?.text;
+      if (value === undefined) continue;
+      lines.push(`${dial.name} — ${value}`);
+    }
+  }
+  for (const [target, setting] of Object.entries(state.doorDwell)) {
+    const who = target === EVERY_CAR ? FIXIT_SCREEN_COPY.doorEveryCar : `Car ${target}`;
+    const sides = [
+      ...(setting.hallCallS === undefined ? [] : [`${setting.hallCallS.toFixed(1)} s ${FIXIT_SCREEN_COPY.doorHallLabel}`]),
+      ...(setting.carCallS === undefined ? [] : [`${setting.carCallS.toFixed(1)} s ${FIXIT_SCREEN_COPY.doorCarLabel}`]),
+    ];
+    if (sides.length === 0) continue;
+    lines.push(`${FIXIT_SCREEN_COPY.doorLabel} ${FIXIT_SCREEN_COPY.doorTargetLabel} ${who} — ${sides.join(', ')}`);
+  }
+  const bankName = new Map(inputs.rezone.banks.map((bank) => [bank.id, bank.name]));
+  for (const car of inputs.rezone.cars) {
+    if (car.target === car.standingBankId) continue;
+    const where =
+      car.target === KEYED_BANK
+        ? FIXIT_SCREEN_COPY.rezoneKeyed
+        : car.target === OUT_OF_SERVICE
+          ? FIXIT_SCREEN_COPY.rezoneOut
+          : (bankName.get(car.target) ?? car.target);
+    lines.push(`Car ${car.id} ${FIXIT_SCREEN_COPY.rezoneCarLabel} ${where}`);
+  }
+  for (const bank of inputs.rezone.banks) {
+    if (state.bankFloors[bank.id] !== undefined) {
+      const served = inputs.rezone.floorOrder.filter((id) => bank.floors.includes(id));
+      lines.push(`${bank.name} ${FIXIT_SCREEN_COPY.rezoneFloorsLabel} ${served.join(', ')}`);
+    }
+    if (bank.plated) {
+      const label = FIXIT_SCREEN_COPY.plateLabel;
+      lines.push(`${bank.name} ${label.charAt(0).toLowerCase()}${label.slice(1)} ${FIXIT_SCREEN_COPY.platePlate}`);
+    }
+  }
+  for (const cohort of inputs.tenancy.cohorts) {
+    const positionId = state.tenancyPositions[cohort.id];
+    const position = cohort.positions.find((candidate) => candidate.id === positionId);
+    if (position !== undefined) lines.push(`${cohort.name} — ${position.name}`);
+  }
+  for (const extra of input.extras) {
+    if (state.selectedExtraIds.includes(extra.id)) lines.push(extra.name);
+  }
+  return lines;
+}
+
+/**
+ * The fourth argument both surfaces hand `classifyOutcome` — § D1011. `witnessRun` is the press
+ * site's to decide, by comparing the after-run's legs with the diagnosed repair's
+ * (`record/crowd.ts#sameLegs`); everything else is derived here from the order that was run, so the
+ * two surfaces cannot word one order two ways.
+ */
+export function fixitVerdictContextOf(input: {
+  readonly entry: FixitCase;
+  readonly state: FixitState;
+  readonly inputs: EditorInputs;
+  readonly schedule: PriceSchedule;
+  readonly witnessRun: boolean;
+}): FixitVerdictContext {
+  return {
+    witnessRun: input.witnessRun,
+    changes: fixitOrderLinesOf({
+      entry: input.entry,
+      state: input.state,
+      inputs: input.inputs,
+      extras: standingExtrasFrom(input.schedule),
+    }),
+    bought: rowsBoughtOf(input.entry, input.state, input.schedule),
   };
 }
 

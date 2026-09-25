@@ -84,6 +84,7 @@ import {
   fixitZoneRow,
   fixitRepairStateLine,
   fixitSpendSummary,
+  fixitVerdictContextOf,
 } from '../everyday/fixitScreenModel.js';
 import {
   benchBudgetNoteOf,
@@ -304,14 +305,27 @@ import {
   stepSpeed,
   toggleExtra,
   toggleRepair,
+  setDoorDwell,
+  setParkingStrategy,
+  witnessStateOf,
+  verdictIsStale,
   type FixitMeasurement,
+  type FixitOutcome,
+  type FixitVerdictContext,
 } from '../fixit/engine.js';
 import { demandDisclosureOf } from '../fixit/parse.js';
 import { switchUnpostableReasonOf } from '../scope/switchWire.js';
-import { figureValuesOf, measuredOf } from '../fixit/run.js';
-import type { FixitCase } from '../fixit/types.js';
-import { EVERY_CAR, KEYED_BANK } from '../fixit/types.js';
+import {
+  figureValuesOf,
+  fixitRunPlanOf,
+  measuredOf,
+  standingParkingOf,
+  type FixitResources,
+} from '../fixit/run.js';
+import type { FixitCase, FixitCases, FixitState } from '../fixit/types.js';
+import { EDITOR_PARKING_STRATEGIES, EVERY_CAR, KEYED_BANK } from '../fixit/types.js';
 import type { DialGroupInput, DoorInput, RezoneInput, RowPurchase } from '../fixit/editorInputs.js';
+import { editorInputsOf } from '../fixit/editorInputs.js';
 import {
   dialGroupsOf,
   dialOptionsOf,
@@ -583,7 +597,7 @@ import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals, yesterdayLabelOf } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { AFTER_PRESS_ROW_ID } from '../shift/afterPress.js';
-import { pressCounterfactualOf } from '../shift/counterfactual.js';
+import { lastPressInRun, pressCounterfactualOf } from '../shift/counterfactual.js';
 import { scenarioHorizonFor } from '../shift/dayLength.js';
 import { CONTRACT_LADDER } from '../shift/ladder.js';
 import { FIRST_SESSION_LINE, FIRST_SESSION_LINE_CHOSEN } from '../shift/firstSession.js';
@@ -673,6 +687,7 @@ import type {
   RenderedText,
   TextProvenance,
   TextRole,
+  TextAttribution,
   TextPlayhead,
   WithheldFigure,
 } from './types.js';
@@ -774,6 +789,23 @@ export interface HonestyContext {
    * on a slow boot.
    */
   readonly scenarioPath: readonly ScenarioLadderRung[];
+  /**
+   * **The shipped fix-it cases, and the resources their runs are planned against** — GitHub issue
+   * #570, [§ D1011](../../../../DECISIONS.md).
+   *
+   * The FIXIT adapter drove only its own synthetic `fixitSearchCase`, so every sentence in
+   * `data/fixit-cases.json` a player actually meets — above all the eighteen authored `result`
+   * narratives the fixed verdict prints — was rendered by nothing the search reads. That is how the
+   * verdict could print a diagnosis's mechanism over five runs it was not true of without the corpus
+   * noticing. The same object on every case, parsed once in the test helper for `survivors`' reason.
+   */
+  readonly shippedFixit: ShippedFixit;
+}
+
+/** `data/fixit-cases.json`, parsed, beside the resources `fixit/run.ts` plans its runs with. */
+export interface ShippedFixit {
+  readonly cases: FixitCases;
+  readonly resources: FixitResources;
 }
 
 /** Just enough of `SearchSpace` for the controls surfaces, so the type does not cross a barrel. */
@@ -890,6 +922,8 @@ interface TextSeed {
   readonly playhead?: TextPlayhead | undefined;
   /** That this cell stands where a figure the state withholds would be — see {@link WithheldFigure}. */
   readonly withheld?: WithheldFigure | undefined;
+  /** What the string credits and what the run carried — `types.ts#TextAttribution`, § D1011. */
+  readonly attribution?: TextAttribution | undefined;
 }
 
 /**
@@ -951,6 +985,7 @@ function singleRun(surfaceId: string, seeds: readonly TextSeed[]): readonly Rend
       gated: seed.gated,
       playhead: seed.playhead,
       withheld: seed.withheld,
+      attribution: seed.attribution,
     }));
 }
 
@@ -3024,6 +3059,37 @@ interface ShiftDay {
    * field is {@link report}'s by construction.
    */
   readonly pairedAgainstCandidate: WeekDayReport;
+  /**
+   * **The presses the day's own record holds**, by {@link pressIdOf} — [§ D1011](../../../../DECISIONS.md).
+   * What a sheet's *"You parked the cars in the lobby"* may credit: the after-press beat names the
+   * record's last press in the run's span, and `unbacked-attribution` holds the one to the other.
+   * Here it is the same list the sheet was handed, so the pair can only disagree when something
+   * credits a press from somewhere else — which is the leak `rescore-ai` B's D1 reproduced, where a
+   * press made on another day was credited on this one.
+   */
+  readonly pressRecord: readonly string[];
+  /** The press the after-press beat names, by the same id, or `undefined` on a day with none. */
+  readonly creditedPress: string | undefined;
+}
+
+/**
+ * The attribution a drawn diagnosis row carries — the after-press beat's, where the row **is** that
+ * beat (its `what` is the sheet's after-press `what`, which a view copies rather than rewords), and
+ * none on every other row, which credits nobody. § D1011.
+ */
+function pressBeatAttribution(
+  day: ShiftDay,
+  sheet: readonly { readonly id: string; readonly what: string }[],
+  what: string,
+): TextAttribution | undefined {
+  const beat = sheet.find((row) => row.id === AFTER_PRESS_ROW_ID);
+  if (beat === undefined || beat.what !== what) return undefined;
+  return { credits: day.creditedPress === undefined ? [] : [day.creditedPress], carried: day.pressRecord };
+}
+
+/** A press's identity: what it did and when. Two presses of one kind at one instant are one act. */
+function pressIdOf(press: RunInterventionConfig): string {
+  return `${press.change.kind}@${String(press.atS)}`;
 }
 
 interface ShiftBundle {
@@ -3338,6 +3404,10 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       otherPattern,
       otherEquipment,
       pairedAgainstCandidate,
+      pressRecord: interventions.map(pressIdOf),
+      creditedPress: ((last) => (last === undefined ? undefined : pressIdOf(last)))(
+        lastPressInRun(recording, interventions),
+      ),
     };
   });
 
@@ -3596,8 +3666,16 @@ const SHIFT_REPORT: SurfaceAdapter = {
         });
       }
       for (const row of report.diagnosis) {
+        /*
+         * The after-press beat credits the player with the press it names (*"You parked the cars in
+         * the lobby, with 12 standing"*), so it declares that press and the day's record — § D1011.
+         */
+        const attribution: TextAttribution | undefined =
+          row.id === AFTER_PRESS_ROW_ID
+            ? { credits: entry.creditedPress === undefined ? [] : [entry.creditedPress], carried: entry.pressRecord }
+            : undefined;
         seeds.push({ field: `${at}.diagnosis(${row.id}).when`, text: row.when, role: 'label' });
-        seeds.push({ field: `${at}.diagnosis(${row.id}).what`, text: row.what, role: 'observation' });
+        seeds.push({ field: `${at}.diagnosis(${row.id}).what`, text: row.what, role: 'observation', attribution });
         seeds.push({ field: `${at}.diagnosis(${row.id}).why`, text: row.why, role: 'prose' });
       }
       /*
@@ -4768,6 +4846,7 @@ const REPORT_PANEL: SurfaceAdapter = {
           field: `${at}.diagnosis[${String(index)}]`,
           text: `${row.when} — ${row.what}`,
           role: 'observation',
+          attribution: pressBeatAttribution(entry, shaped.diagnosis, row.what),
         });
         seeds.push({ field: `${at}.diagnosis[${String(index)}].why`, text: row.why, role: 'prose' });
       }
@@ -4862,6 +4941,7 @@ const REPORT_PANEL: SurfaceAdapter = {
           field: `${at}.diagnosisRowsOf[${String(index)}].what`,
           text: row.what,
           role: 'observation',
+          attribution: pressBeatAttribution(entry, entry.report.diagnosis, row.what),
         });
       }
       }
@@ -7056,6 +7136,17 @@ const REPORT_CARD: SurfaceAdapter = {
 /** The declarations the FIXIT adapter drives. A list, so `derive.test.ts` can hold it both ways. */
 const FIXIT_COVERS: readonly string[] = [
   'fixit/engine.ts#classifyOutcome',
+  /*
+   * § D1011's composed fixed verdict and the order lines it carries, reached through
+   * `classifyOutcome` on every shipped case's non-witness order (`shippedFixitSeedsOf`).
+   */
+  'fixit/engine.ts#FIXED_BY_ORDER_HEAD',
+  'fixit/engine.ts#FIXED_BY_ORDER_CHANGES_LEAD',
+  'fixit/engine.ts#FIXED_BY_ORDER_BOUGHT_LEAD',
+  'fixit/engine.ts#FIXED_BY_ORDER_CLOSE',
+  'everyday/fixitScreenModel.ts#fixitOrderLinesOf',
+  'everyday/fixitScreenModel.ts#fixitVerdictContextOf',
+  'fixit/engine.ts#rowsBoughtOf',
   'fixit/engine.ts#budgetNoteOf',
   'fixit/engine.ts#repairRowOf',
   'fixit/engine.ts#standingExtrasFrom',
@@ -7177,6 +7268,96 @@ function dearestRepairOf(entry: FixitCase): FixitCase['repairs'][number] {
   );
 }
 
+/**
+ * **What a fix-it outcome credits, and what the run behind it carried** — [§ D1011](../../../../DECISIONS.md).
+ *
+ * The credit is the engine's own declaration (`FixitOutcome.attribution`): `diagnosed-repair` when it
+ * printed the case's authored words, `order` otherwise. What the run carried is the verdict context
+ * the caller handed the engine — `diagnosed-repair` only when `witnessRun` said the run is the
+ * diagnosed repair's, which both surfaces decide on the legs. The two come from different places on
+ * purpose: an engine that printed the diagnosis's words over a run the caller had said was not the
+ * witness's is the defect, and it is caught here as a credit with nothing carried behind it.
+ */
+function fixitOutcomeAttribution(outcome: FixitOutcome, verdict: FixitVerdictContext | undefined): TextAttribution {
+  return {
+    credits: [outcome.attribution === 'diagnosis' ? 'diagnosed-repair' : 'order'],
+    carried: verdict?.witnessRun === true ? ['diagnosed-repair', 'order'] : ['order'],
+  };
+}
+
+/** A measurement that clears both bars, so both fixed arms can be worded. Nothing reads its figures. */
+const FIXED_PAIR: FixitMeasurement = Object.freeze({
+  complaintBefore: 10,
+  complaintAfter: 1,
+  scopeBoardedBefore: 40,
+  scopeBoardedAfter: 40,
+  complaintGonePct: 90,
+  restAwayBeforePct: 95,
+  restAwayAfterPct: 95,
+  restBoardedBefore: 120,
+  restBoardedAfter: 120,
+  restDeltaPoints: 0,
+  sameCrowd: true,
+});
+
+const shippedFixitSeeds = new WeakMap<ShippedFixit, readonly TextSeed[]>();
+
+/**
+ * **Every shipped case's fixed verdict, in both arms** — GitHub issue #570, [§ D1011](../../../../DECISIONS.md).
+ *
+ * For each case in `data/fixit-cases.json`:
+ *
+ * - **the witness's order** — the diagnosed repair alone, which is leg for leg its own run by
+ *   construction — worded with `witnessRun: true`, so the case's **authored** head and body enter
+ *   the corpus for the first time;
+ * - **an order that is not the witness's** — a parking strategy the case does not already run and a
+ *   door hold on every car, each pressed through the engine's own reducer and worded through
+ *   `everyday/fixitScreenModel.ts#fixitVerdictContextOf` exactly as both surfaces word it — so the
+ *   composed verdict's changes and rows are the product's own words for a real order on that case.
+ *
+ * **Worded against {@link FIXED_PAIR} rather than a run, and that is deliberate.** Whether an order
+ * clears is the judge's business and differs by case; the question here is what each arm *says*,
+ * and a fabricated passing pair is how this adapter already reaches its other three arms. The leg
+ * decision itself — that the pressed answer is the witness's run and the reproduced routes are not —
+ * is held on real runs in `fixit/families.test.ts` and `fixit/verdictNamesTheOrder.test.ts`.
+ *
+ * The same strings on every honesty case, so they are built once per loaded file and reused.
+ */
+function shippedFixitSeedsOf(shipped: ShippedFixit): readonly TextSeed[] {
+  const cached = shippedFixitSeeds.get(shipped);
+  if (cached !== undefined) return cached;
+  const schedule = shipped.cases.schedule;
+  const seeds: TextSeed[] = [];
+  for (const entry of shipped.cases.cases) {
+    const witness = witnessStateOf(entry);
+    /* The select withholds the strategy the case already runs, so the order never presses it. */
+    const standing = standingParkingOf(fixitRunPlanOf(entry, emptyFixitState(), shipped.resources).asBuilt);
+    const other = EDITOR_PARKING_STRATEGIES.find((strategy) => strategy !== standing);
+    let order: FixitState = emptyFixitState();
+    if (other !== undefined) order = setParkingStrategy(entry, order, other, schedule);
+    order = setDoorDwell(entry, order, EVERY_CAR, 'hall', 5, schedule);
+    for (const [arm, state, witnessRun] of [
+      ['witness', witness, true],
+      ['order', order, false],
+    ] as const) {
+      const verdict = fixitVerdictContextOf({
+        entry,
+        state,
+        inputs: editorInputsOf(entry, state, shipped.resources, schedule),
+        schedule,
+        witnessRun,
+      });
+      const outcome = classifyOutcome(entry, FIXED_PAIR, spendOf(entry, state, schedule), verdict);
+      const attribution = fixitOutcomeAttribution(outcome, verdict);
+      const at = `shipped(${entry.id}).${arm}`;
+      seeds.push({ field: `${at}.head`, text: outcome.head, role: 'label', provenance: 'authored', attribution });
+      seeds.push({ field: `${at}.body`, text: outcome.body, role: 'prose', provenance: 'authored', attribution });
+    }
+  }
+  shippedFixitSeeds.set(shipped, seeds);
+  return seeds;
+}
+
 const FIXIT: SurfaceAdapter = {
   id: 'fixit/engine.ts#classifyOutcome',
   covers: FIXIT_COVERS,
@@ -7247,8 +7428,10 @@ const FIXIT: SurfaceAdapter = {
     ] as const) {
       const measurement = measuredOf(subject, context.comparisonRecording, context.recording);
       const outcome = classifyOutcome(subject, measurement, spendOf(subject, empty, schedule));
-      seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored' });
-      seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored' });
+      /* No verdict context: the engine cannot know this pair is the witness's, so it says so (§ D1011). */
+      const attribution = fixitOutcomeAttribution(outcome, undefined);
+      seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored', attribution });
+      seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored', attribution });
       seeds.push({ field: `outcome.${name}.basis`, text: outcome.basis, role: 'reason', provenance: 'authored' });
       for (const [index, row] of outcome.rows.entries()) {
         const isMeanRow = name === 'mean-wait' && index === 0;
@@ -7305,8 +7488,33 @@ const FIXIT: SurfaceAdapter = {
       ['short', short],
       ['over', over],
     ] as const) {
-      seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored' });
-      seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored' });
+      const attribution = fixitOutcomeAttribution(outcome, undefined);
+      seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored', attribution });
+      seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored', attribution });
+    }
+
+    /*
+     * **The shipped cases' verdicts, in both arms** — GitHub issue #570, [§ D1011](../../../../DECISIONS.md).
+     * Every case in `data/fixit-cases.json`, its authored result on the witness's own order and the
+     * composed verdict on an order that is not, each declaring what it credits and what the run
+     * carried. See {@link shippedFixitSeedsOf} for why the pair is worded against a fabricated
+     * measurement and where the leg decision itself is held.
+     */
+    seeds.push(...shippedFixitSeedsOf(context.shippedFixit));
+    /*
+     * The stale note — § D1011, assessor C's D6. Drawn over a verdict whose order the player has
+     * since edited, so it credits the player with an edit, and the state it is drawn in carries one.
+     */
+    const measuredOn = emptyFixitState();
+    const onScreen = setParkingStrategy(entry, measuredOn, 'lobby', schedule);
+    if (verdictIsStale(measuredOn, onScreen)) {
+      seeds.push({
+        field: 'outcome.stale',
+        text: FIXIT_SCREEN_COPY.verdictStale,
+        role: 'reason',
+        provenance: 'authored',
+        attribution: { credits: ['edit-after-verdict'], carried: ['edit-after-verdict'] },
+      });
     }
 
     /* ================================================================== *

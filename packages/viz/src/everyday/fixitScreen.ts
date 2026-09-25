@@ -156,8 +156,12 @@ import {
   toggleRepair,
   topFloorRaisePriceUnits,
   zonePriceUnits,
+  sameOrder,
+  verdictIsStale,
+  witnessStateOf,
   type FixitOutcome,
 } from '../fixit/engine.js';
+import { sameLegs } from '../record/crowd.js';
 import {
   FIXIT_RUN_SWITCHES,
   assertPairMatchesRepairs,
@@ -179,7 +183,7 @@ import type { PriceSchedule } from '../pricing/types.js';
 import type { VizRecording } from '../contract/types.js';
 import { mountCaseStage, type CaseStage } from './caseStage.js';
 import { DEFAULT_DOOR_TARGET, mountFixitFamilies } from './fixitFamilies.js';
-import { withPrunedDials } from '../fixit/editorInputs.js';
+import { editorInputsOf, withPrunedDials } from '../fixit/editorInputs.js';
 import { createOffThreadRunner } from '../dev/offThreadRuns.js';
 import { actionBarFor } from './actionBar.js';
 import { sideBySide } from './screenDom.js';
@@ -195,6 +199,7 @@ import {
   fixitParkingRow,
   fixitRepairStateLine,
   fixitSpendSummary,
+  fixitVerdictContextOf,
   fixitZoneRow,
   type FixitElevationRow,
   type FixitSpendSummary,
@@ -295,6 +300,31 @@ interface CaseSession {
   pairStage: CaseStage | undefined;
   /** Which door-hold target the door selects edit — view state, § D1000. */
   doorTarget: string;
+  /**
+   * **The order {@link CaseSession.outcome} was measured on** — [§ D1011](../../../../DECISIONS.md),
+   * assessor C's D6. A verdict is a function of the order it was measured on; once
+   * {@link CaseSession.state} moves away from this, the verdict is drawn as stale and the Run press
+   * comes back, including on a fixed case, so a cheaper route can be tried. A restored FIXED case
+   * carries the empty order it was restored with, so its first edit gives the press back too.
+   */
+  verdictState: FixitState | undefined;
+  /**
+   * **The diagnosed repair's own run on the case seed**, once a fixed verdict has asked for it —
+   * § D1011. Requested only after a press clears both bars, never before, so it can say nothing a
+   * player could use before they have solved the case ([§ D869](../../../../DECISIONS.md)).
+   * Session-local and per case for {@link CaseSession.asBuilt}'s reason.
+   */
+  witness: VizRecording | undefined;
+}
+
+/**
+ * Whether the case stands settled for **this** order — FIXED by the latest run, and the order on
+ * screen is still the one that run measured. The § 3.3 bar's `Next building` and the primary's
+ * advance both read this rather than `fixed` alone, which is what gives a fixed case its Run press
+ * back after an edit (§ D1011).
+ */
+function settledNow(session: CaseSession): boolean {
+  return session.fixed && !verdictIsStale(session.verdictState ?? emptyFixitState(), session.state);
 }
 
 interface LoadedFixit {
@@ -313,6 +343,8 @@ let loadPromise: Promise<void> | undefined;
 const sessions = new Map<string, CaseSession>();
 let selectedId: string | undefined;
 let running = false;
+/** What the bar was last told about each case's {@link settledNow}, so a redraw that moves it can ask for the bar. */
+const lastSettled = new Map<string, boolean>();
 
 /**
  * The price schedule these cases were loaded with — GitHub issue **#366**.
@@ -407,6 +439,8 @@ function ensureRestored(): void {
       pairSeen: false,
       pairStage: undefined,
       doorTarget: DEFAULT_DOOR_TARGET,
+      verdictState: emptyFixitState(),
+      witness: undefined,
     });
   }
 }
@@ -445,6 +479,8 @@ function sessionOf(entry: FixitCase): CaseSession {
       pairSeen: false,
       pairStage: undefined,
       doorTarget: DEFAULT_DOOR_TARGET,
+      verdictState: undefined,
+      witness: undefined,
     };
     sessions.set(entry.id, session);
   }
@@ -1016,7 +1052,28 @@ function mountFixit(
     }
 
     /* -- 8. the result, once run (§ 10.4) -- */
-    if (session.outcome !== undefined) main.append(outcomeCard(session.outcome));
+    if (session.outcome !== undefined) {
+      /*
+       * Stale over the card rather than instead of it — § D1011. The verdict is still true of the
+       * order that was run, and the sentence says it is not about the one on screen.
+       */
+      if (verdictIsStale(session.verdictState, session.state)) {
+        const stale = el(doc, 'p', 'everyday-fixit-verdict-stale', COPY.verdictStale);
+        stale.style.cssText = `margin:18px 0 0;font-size:13px;line-height:1.5;color:${C.alarm};max-width:80ch`;
+        main.append(stale);
+      }
+      main.append(outcomeCard(session.outcome));
+    }
+    /*
+     * The bar reads {@link settledNow}, and an edit only redraws the screen — so a redraw that moved
+     * the case in or out of *settled* asks the shell to redraw the bar too, or `Next building` would
+     * stay pressable over a stale verdict until something else refreshed it.
+     */
+    const nowSettled = settledNow(session);
+    if (lastSettled.get(entry.id) !== nowSettled) {
+      lastSettled.set(entry.id, nowSettled);
+      context.refreshBar();
+    }
 
     return main;
   }
@@ -1618,8 +1675,11 @@ function mountFixit(
     if (entry === undefined) return;
     const session = sessionOf(entry);
 
-    if (session.fixed) {
-      /* `Next building` — the prototype's advance: the next case, wrapping. */
+    if (settledNow(session)) {
+      /*
+       * `Next building` — the prototype's advance: the next case, wrapping. Only while the order on
+       * screen is the one the FIXED verdict measured; an edit gives the Run press back (§ D1011).
+       */
       const cases = loaded.cases.cases;
       const index = cases.findIndex((candidate) => candidate.id === entry.id);
       selectedId = cases[(index + 1) % cases.length]?.id;
@@ -1649,8 +1709,16 @@ function mountFixit(
       render();
       return;
     }
-    const plan = fixitRunPlanOf(entry, session.state, resources);
-    const spend = spendOf(entry, session.state, scheduleNow());
+    /*
+     * The order the verdict will be measured on, bound here for the spend's reason: the outcome is
+     * classified against the order the press was made with, and it is kept as
+     * {@link CaseSession.verdictState} so an edit made while the pair ran is drawn as stale the moment
+     * the verdict lands rather than silently adopted by it (§ D1011).
+     */
+    const pressed = session.state;
+    const schedule = scheduleNow();
+    const plan = fixitRunPlanOf(entry, pressed, resources);
+    const spend = spendOf(entry, pressed, schedule);
     ask = `${entry.id}:press`;
     runFailure = undefined;
     running = true;
@@ -1662,9 +1730,11 @@ function mountFixit(
         { config: plan.asRepaired, ...FIXIT_RUN_SWITCHES },
       ],
       onDone: ([before, after]) => {
-        ask = undefined;
-        running = false;
-        if (before === undefined || after === undefined) return;
+        if (before === undefined || after === undefined) {
+          ask = undefined;
+          running = false;
+          return;
+        }
         session.asBuilt = before;
         /*
          * **And the repaired run is kept** — [§ D644](../../../../DECISIONS.md). It was read twice
@@ -1681,53 +1751,105 @@ function mountFixit(
         session.pairStage = undefined;
         session.pairSeen = false;
         // GitHub issue #350: the claim the basis line will make, checked on the legs first.
-        assertPairMatchesRepairs(entry, session.state, before, after);
-        session.outcome = classifyOutcome(entry, measuredOf(entry, before, after), spend);
+        assertPairMatchesRepairs(entry, pressed, before, after);
+        const measurement = measuredOf(entry, before, after);
+        const land = (witnessRun: boolean): void => {
+          ask = undefined;
+          running = false;
+          session.outcome = classifyOutcome(
+            entry,
+            measurement,
+            spend,
+            fixitVerdictContextOf({
+              entry,
+              state: pressed,
+              inputs: editorInputsOf(entry, pressed, resources, schedule),
+              schedule,
+              witnessRun,
+            }),
+          );
+          session.verdictState = pressed;
+          /*
+           * The FIXED badge follows the **latest** run, in both directions — never a high-water mark.
+           * `docs/20` defect 16 is the argument: the Engineer panel latched on the first fixed outcome
+           * and nothing cleared it, so a case stayed badged FIXED beside an outcome card reading
+           * *"9 waits → 9 waits · 0 % of it went away"* — two verdicts about one case on one screen.
+           * The badge, the § 3.3 primary and the outcome card all read this one run.
+           *
+           * The rule itself lives in `fixit/engine.ts#fixedBadgeAfter`, which both this screen and the
+           * Engineer panel consume, so the two surfaces cannot come to disagree about what FIXED means.
+           */
+          session.fixed = fixedBadgeAfter(session.outcome);
+          // In both directions — see `keepSolved`. A case that has just stopped being FIXED stops
+          // being kept, or a reload would restore a badge this run has already taken away.
+          keepSolved();
+          /*
+           * **And the ledger hears about a case this run fixed** — GitHub issue #499. A fix case is
+           * Scenario content (`docs/38` § 2.1, § D525), and the badge this run just earned is the clear
+           * being filed: `keepSolved` wrote it one line up. A run that did not fix the case files no
+           * clear and posts nothing, and the server pays a scenario once per account however often one
+           * case is fixed again. Nothing is awaited, on `host.ts#closeDay`'s ground.
+           *
+           * **The second half of that sentence used to read *"nothing is drawn"*, and it was the
+           * whole of the defect** ([§ D673](../../../../DECISIONS.md)): a player could clear all
+           * eighteen cases and never learn a currency existed, because the only surface drawing a
+           * balance was Settings. Something is drawn now, and **it is not drawn here** — the
+           * acknowledgement lands on the rail's `PLAYING AS` card, as `docs/32` § 3.4's tally of
+           * completed turns, and `docs/32` GD13 clause 2's *never on a results page* is why this
+           * screen is still the wrong place for it. `everyday/rail.ts#bankedLineOf` carries the
+           * argument; this call is unchanged and still answers nothing to this closure.
+           */
+          if (session.fixed) scenarioHost.bankScenarioClear(entry.id);
+          // Through `live`, never through this mount: the player may have left and come back, and
+          // the screen that must draw this outcome is the one on the page now.
+          live?.redraw();
+          live?.refreshBar();
+          /*
+           * The sight, not the card — `docs/38` § 1's *watching is the point*. The pair block is what
+           * the redraw above has just built, so it is what a landed run scrolls to; the card is the
+           * next thing under it and the block's own press goes there. Falls back to the card, because
+           * a run whose pair block did not mount must still land the player on its verdict.
+           */
+          const landOn =
+            live?.root.querySelector('.everyday-fixit-pair') ??
+            live?.root.querySelector('.everyday-fixit-outcome');
+          landOn?.scrollIntoView({ block: 'nearest' });
+        };
+
         /*
-         * The FIXED badge follows the **latest** run, in both directions — never a high-water mark.
-         * `docs/20` defect 16 is the argument: the Engineer panel latched on the first fixed outcome
-         * and nothing cleared it, so a case stayed badged FIXED beside an outcome card reading
-         * *"9 waits → 9 waits · 0 % of it went away"* — two verdicts about one case on one screen.
-         * The badge, the § 3.3 primary and the outcome card all read this one run.
-         *
-         * The rule itself lives in `fixit/engine.ts#fixedBadgeAfter`, which both this screen and the
-         * Engineer panel consume, so the two surfaces cannot come to disagree about what FIXED means.
+         * **Whose words the verdict may use** — [§ D1011](../../../../DECISIONS.md). The authored
+         * result is a sentence about the diagnosed repair's run, so it is printed only over a run
+         * that is that run, leg for leg. The diagnosed run is asked for **only once a press has
+         * cleared both bars** — a pair that did not clear takes no authored words whatever it is,
+         * so the question is never asked of it, and the witness can say nothing before a solve
+         * ([§ D869](../../../../DECISIONS.md)). A press of the diagnosed repair alone *is* the
+         * witness's run by construction, so it is kept rather than simulated twice. A witness that
+         * could not be run leaves the verdict composed from the order, which is true of every run:
+         * the authored words need evidence, and a failure is not evidence.
          */
-        session.fixed = fixedBadgeAfter(session.outcome);
-        // In both directions — see `keepSolved`. A case that has just stopped being FIXED stops
-        // being kept, or a reload would restore a badge this run has already taken away.
-        keepSolved();
-        /*
-         * **And the ledger hears about a case this run fixed** — GitHub issue #499. A fix case is
-         * Scenario content (`docs/38` § 2.1, § D525), and the badge this run just earned is the clear
-         * being filed: `keepSolved` wrote it one line up. A run that did not fix the case files no
-         * clear and posts nothing, and the server pays a scenario once per account however often one
-         * case is fixed again. Nothing is awaited, on `host.ts#closeDay`'s ground.
-         *
-         * **The second half of that sentence used to read *"nothing is drawn"*, and it was the
-         * whole of the defect** ([§ D673](../../../../DECISIONS.md)): a player could clear all
-         * eighteen cases and never learn a currency existed, because the only surface drawing a
-         * balance was Settings. Something is drawn now, and **it is not drawn here** — the
-         * acknowledgement lands on the rail's `PLAYING AS` card, as `docs/32` § 3.4's tally of
-         * completed turns, and `docs/32` GD13 clause 2's *never on a results page* is why this
-         * screen is still the wrong place for it. `everyday/rail.ts#bankedLineOf` carries the
-         * argument; this call is unchanged and still answers nothing to this closure.
-         */
-        if (session.fixed) scenarioHost.bankScenarioClear(entry.id);
-        // Through `live`, never through this mount: the player may have left and come back, and
-        // the screen that must draw this outcome is the one on the page now.
-        live?.redraw();
-        live?.refreshBar();
-        /*
-         * The sight, not the card — `docs/38` § 1's *watching is the point*. The pair block is what
-         * the redraw above has just built, so it is what a landed run scrolls to; the card is the
-         * next thing under it and the block's own press goes there. Falls back to the card, because
-         * a run whose pair block did not mount must still land the player on its verdict.
-         */
-        const landOn =
-          live?.root.querySelector('.everyday-fixit-pair') ??
-          live?.root.querySelector('.everyday-fixit-outcome');
-        landOn?.scrollIntoView({ block: 'nearest' });
+        if (classifyOutcome(entry, measurement, spend).kind !== 'fixed') {
+          land(false);
+          return;
+        }
+        if (sameOrder(pressed, witnessStateOf(entry))) session.witness ??= after;
+        if (session.witness !== undefined) {
+          land(sameLegs(after, session.witness));
+          return;
+        }
+        runner.start({
+          runs: [{ config: fixitRunPlanOf(entry, witnessStateOf(entry), resources).asRepaired, ...FIXIT_RUN_SWITCHES }],
+          onDone: ([witness]) => {
+            if (witness === undefined) {
+              land(false);
+              return;
+            }
+            session.witness = witness;
+            land(sameLegs(after, witness));
+          },
+          onFailed: () => {
+            land(false);
+          },
+        });
       },
       onFailed: (message) => {
         ask = undefined;
@@ -1784,7 +1906,8 @@ function fixitBar(state: EverydayState): ActionBarModel {
     ready: entry !== undefined,
     running,
     ran: session?.outcome !== undefined,
-    solved: session?.fixed === true,
+    /* Settled for the order on screen, not merely FIXED once — § D1011. */
+    solved: session !== undefined && settledNow(session),
   });
 }
 
