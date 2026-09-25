@@ -2180,7 +2180,18 @@ type DecisionReservation = {
  * **D1048-D1055 are free rather than holed**, since nothing is written above them (§ D430), and the
  * charter row moves to **D1048**.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/*
+ * **Wave AJ is OPEN and reserves D1048-D1083**, four blocks of nine, against the week swarm's
+ * ruling (growth per tower, wrinkles spliced as episodes, a winnable week as DC-10) and its
+ * dispatcher ruling (`adopt-dispatcher`). Committed on `aj-base` before any lane worktree exists,
+ * and closed in the wave's own merge commit.
+ */
+/*
+ * Extended from D1083 to **D1092** on 2026-09-25 for a fifth lane, AJ-E (the CI ruling), which the
+ * owner's request of that day made necessary after the first four blocks were allocated. Committed
+ * on `aj-base` before AJ-E's worktree exists.
+ */
+const OPEN_RESERVATION = { wave: 'AJ', from: 1048, to: 1092 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as

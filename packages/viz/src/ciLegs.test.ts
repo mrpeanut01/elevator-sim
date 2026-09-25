@@ -36,7 +36,7 @@
  * `deepTiers.test.ts` draws for the scheduled tiers: a project landing **unwired** is a red pull
  * request here, and a project **failing** is a red leg there.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -111,5 +111,95 @@ describe('the suite legs and the vitest projects are the same set', () => {
         'vitest.config.ts sets `passWithNoTests: true`, so a mistyped or removed project makes the ' +
         'leg exit 0 having executed nothing, which reads in the Actions tab exactly like a pass.',
     ).toBe(true);
+  });
+});
+
+/**
+ * The `guards` job and the `viz` shards, § D1084.
+ *
+ * `guards` re-runs a hand-written list of files on a runner of its own so that their reds arrive in
+ * minutes. A hand-written list is the thing this file exists to distrust, and it is accepted there
+ * for one reason: every file on it also runs in its own project's leg, so a stale entry costs speed
+ * and never coverage. The one failure that reason does not cover is a path that names nothing,
+ * because vitest ignores a filter that matches no file whenever another filter matches, so the job
+ * would stay green having quietly dropped that guard. These cases close that, and pin the two
+ * properties the ruleset leans on: `suite (linux)` waits for `guards`, and a leg still reports under
+ * the name `viz` while `viz` is a required check.
+ */
+describe('the guards job and the sharded viz leg — § D1084', () => {
+  const source = (): string => readFileSync(WORKFLOW, 'utf8');
+
+  /** The `run:` line of the guards job, which is the only command in the file naming test files. */
+  const guardsCommand = (): string => {
+    const text = source();
+    const start = text.indexOf('\n  guards:\n');
+    expect(start, 'ci.yml has no `guards` job').toBeGreaterThan(0);
+    const end = text.indexOf('\n  suite:\n', start);
+    const job = text.slice(start, end < 0 ? undefined : end);
+    const line = job
+      .split('\n')
+      .find((l) => l.trimStart().startsWith('run:') && l.includes('vitest run'));
+    expect(line, 'the guards job no longer runs vitest on a single `run:` line').toBeDefined();
+    return line as string;
+  };
+
+  it('names only files that exist, each in a project the same command selects', () => {
+    const command = guardsCommand();
+    const projects = new Set([...command.matchAll(/--project (\S+)/gu)].map((m) => m[1] as string));
+    const files = [...command.matchAll(/(packages\/\S+\.test\.ts)/gu)].map((m) => m[1] as string);
+    expect(
+      files.length,
+      'the guards job names no test file, so it would run its projects whole',
+    ).toBeGreaterThanOrEqual(9);
+    const missing = files.filter((file) => !existsSync(join(ROOT, file)));
+    expect(
+      missing,
+      'the guards job names files that do not exist; vitest drops a filter that matches nothing',
+    ).toEqual([]);
+    const unselected = files.filter((file) => {
+      const pkg = /^packages\/([a-z]+)\//u.exec(file)?.[1] ?? '';
+      const project = file.endsWith('.browser.test.ts') ? `${pkg}-browser` : pkg;
+      return !projects.has(project);
+    });
+    expect(
+      unselected,
+      'the guards job names files in a project its `--project` flags do not select',
+    ).toEqual([]);
+    expect(command.includes('--passWithNoTests=false')).toBe(true);
+  });
+
+  it('is a job `suite (linux)` waits for and reads the result of', () => {
+    const text = source();
+    const suite = text.slice(text.indexOf('\n  suite:\n'));
+    expect(suite, '`suite (linux)` no longer needs the guards job').toMatch(
+      /^\s+needs: \[legs, guards\]\s*$/mu,
+    );
+    expect(suite, '`suite (linux)` needs the guards job and never reads its result').toContain(
+      'needs.guards.result',
+    );
+    expect(suite).toContain('needs.legs.result');
+  });
+
+  it('keeps a leg called `viz` while the ruleset requires one, and shards the viz project once each', () => {
+    const text = source();
+    const matrix = text.slice(text.indexOf('include:'), text.indexOf('    steps:'));
+    expect(matrix, 'no leg is named `viz`; the main-baseline ruleset requires that check').toMatch(
+      /^\s+- leg: viz\s*$/mu,
+    );
+    const shards = [...matrix.matchAll(/--project viz --shard=(\d+)\/(\d+)/gu)].map((m) => ({
+      index: Number(m[1]),
+      of: Number(m[2]),
+    }));
+    const total = shards[0]?.of ?? 0;
+    expect(total, 'the viz project is not sharded').toBeGreaterThan(1);
+    expect(
+      shards.every((shard) => shard.of === total),
+      'the viz shards disagree on how many there are',
+    ).toBe(true);
+    expect(
+      shards.map((shard) => shard.index).sort((a, b) => a - b),
+      'a viz shard is missing or doubled, so some of its files run nowhere or twice',
+    ).toEqual(Array.from({ length: total }, (_, i) => i + 1));
+    expect(matrix, 'an unsharded viz leg runs beside the shards').not.toMatch(/--project viz\s*$/mu);
   });
 });

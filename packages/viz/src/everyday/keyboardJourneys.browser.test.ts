@@ -278,10 +278,28 @@ async function leaveTutorial(page: Page): Promise<void> {
   await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
 }
 
-/** § 3.3's primary, waited out by its own label rather than by a timer, then pressed. */
+/**
+ * § 3.3's primary, waited out by its own label **and by being pressable** rather than by a timer,
+ * then pressed.
+ *
+ * **The label alone was the wrong condition, and it failed here on 2026-09-25** (§ D1084's lane,
+ * the third of three sequential local runs, load average 21): *"no keyboard path to
+ * .everyday-bar-primary in 40 presses of Tab"*, on the Career journey's stage. The stage draws
+ * *Close the day* from the moment it mounts, and `stageScreenModel.ts#stageBarModelOf` holds that
+ * same label **inert** — `disabled`, so out of the Tab order — until the day's run has landed
+ * (*"the day has not started yet"*, and again while a re-simulation is in flight). The label
+ * matched at once, the forty presses went round the page in well under the time the run took to
+ * land, and the case failed on a product that was working. A disabled button is exactly what
+ * <kbd>Tab</kbd> must skip, so the wait now asks for what the next step needs: this label, on an
+ * enabled button. A primary that never enables still fails, at this wait's ceiling, and with the
+ * label it was waiting on.
+ */
 async function pressPrimaryWhenItReads(page: Page, label: string): Promise<void> {
   await page.waitForFunction(
-    (want) => document.querySelector('.everyday-bar-primary')?.textContent === want,
+    (want) => {
+      const primary = document.querySelector<HTMLButtonElement>('.everyday-bar-primary');
+      return primary !== null && primary.textContent === want && !primary.disabled;
+    },
     label,
     { timeout: 120_000 },
   );

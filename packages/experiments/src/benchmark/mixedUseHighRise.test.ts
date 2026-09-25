@@ -47,7 +47,7 @@ import { checkPinned, describeMismatches, mixedUseFigures } from './published.js
 
 /** Three points and a three-rate coverage census on a 60-floor, 16-car building. */
 /**
- * The benchmark tier — `.github/workflows/deep-tiers.yml`, weekly and on dispatch. Shut on every
+ * The benchmark tier — `.github/workflows/deep-tiers.yml`, nightly and on dispatch. Shut on every
  * pull request since 2026-09-07: measured on `ubuntu-latest` (CI run 34075532017), this file cost
  * 153.1 s of the `experiments` leg's 4 000 s of test time, and that leg was the whole run's wall
  * clock at 25–32 minutes against under 10 for every other leg. Open, the gated suites run exactly

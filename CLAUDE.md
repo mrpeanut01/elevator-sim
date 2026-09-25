@@ -1932,17 +1932,23 @@ cite why.
   only in a commit message.
 - Do not weaken an acceptance criterion to make a phase pass. Raise it instead.
 - **One push per wave, not one per commit.** Commit as often as you like; push when the wave is
-  ready. Every push to a **pull request branch** cancels the CI run in flight — `ci.yml:85` sets
-  `cancel-in-progress: ${{ github.event_name == 'pull_request' }}`, so a push to `main` cancels
-  nothing through that flag — and since
-  [GitHub PR #386](https://github.com/mrpeanut01/elevator-sim/pull/386) a push run on `main` is
-  keyed on **its own commit** rather than on `github.ref`, because `cancel-in-progress: false`
-  protects only a *running* run: GitHub keeps at most one **pending** run per group, so a third
-  arrival evicts the queued one whatever the flag says. That was found by losing a run
-  (`RISKS.md` R46 carries the three run ids). And
-  starts a fresh ~45-minute suite, and the cancelled run completes a check suite on a head nobody
+  ready. Every push to a **pull request branch** cancels the CI run in flight (`ci.yml:127` sets
+  `cancel-in-progress: ${{ github.event_name == 'pull_request' }}`) and starts a fresh suite
+  (11 minutes at the median and 18 at p90 over the fortnight to 2026-09-25; it was ~45 before the
+  legs were split), and the cancelled run completes a check suite on a head nobody
   cares about — which arrives as a `check_suite.completed` notification saying *"no third-party check
-  suite is still running or failed"* about a commit that is no longer the head. Measured on
+  suite is still running or failed"* about a commit that is no longer the head.
+  **`main` has had no push run since [§ D1084](DECISIONS.md)**: it is tested by a nightly `schedule`
+  run, keyed on **its own commit** rather than on `github.ref` as the push run was since
+  [GitHub PR #386](https://github.com/mrpeanut01/elevator-sim/pull/386), because
+  `cancel-in-progress: false` protects only a *running* run: GitHub keeps at most one **pending**
+  run per group, so a third arrival evicts the queued one whatever the flag says. That was found by
+  losing a run (`RISKS.md` R46 carries the three run ids), and restoring the push trigger restores
+  the key with it. **A guard's red should now arrive in minutes rather than at the end of a leg**
+  (about two is § D1084's estimate, unmeasured until the job's first runs): the `guards` job re-runs the
+  registry, census, wiring and document tests (`testCost`, `boundaries`, `deadCode`,
+  `honesty/derive`, `documentation`, `citations` and their like) on a runner of their own, beside
+  the legs that still run them, so read that check first. Measured on
   2026-09-02: four pushes in one hour, three of them cancelling a run (one 45 minutes in), five
   spurious notifications, and one of those envelopes described a head whose sibling job had been
   **cancelled rather than passed**. Acting on any of them would have meant declaring CI green while

@@ -200,7 +200,7 @@ the criterion needs, on versions that may never have reached a browser. That tra
 in this direction.
 
 **Why not `git log -S` bounded at the arming date**, which is the other obvious derivation and is
-what #243's own analysis proposed. `actions/checkout@v4` clones to depth 1 and
+what #243's own analysis proposed. `actions/checkout` clones to depth 1 and
 `.github/workflows/ci.yml` sets no `fetch-depth`, so a history-based derivation would be green on a
 developer's machine and **vacuous in CI** — a guard that cannot see what it is guarding, which is
 worse than a superset. Deriving the exact deployed set is still worth doing **by hand**, once, and

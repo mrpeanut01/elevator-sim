@@ -186,7 +186,7 @@ const SEED = 20260810;
  *
  * **What the always-on tier gives up, named rather than counted.** Seven of these eight appear in no
  * other determinism or replay assertion anywhere in this repository, so per-commit they are now
- * covered by nothing and weekly by this suite's deep half: `burj-class-reference`,
+ * covered by nothing and nightly by this suite's deep half: `burj-class-reference`,
  * `ctf-class-reference`, `merdeka-class-reference`, `shanghai-class-reference`,
  * `one-wtc-class-reference`, `empire-state-class-reference` and `willis-class-reference`. The
  * eighth, `vertical-city`, is reached by `core/src/sim/determinism.test.ts` under

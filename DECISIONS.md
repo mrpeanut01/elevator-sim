@@ -26352,6 +26352,8 @@ holds the two rungs the sentence rests on, the Midtown endpoint, and the sentenc
 
 ## D393 — the opt-in tiers get a schedule, and the instrument that keeps them on it is a test rather than the workflow
 
+> **Status 2026-09-25: CADENCE AMENDED by [§ D1084](#d1084).** The tiers run **nightly** at 21:17 UTC rather than weekly on Sunday; the schedule, the dispatch, the wiring test and the `report` job stand as ruled here. Taken by agent sessions under delegated authority.
+
 **Rules on:** GitHub issue #163. Settles `.github/workflows/deep-tiers.yml`,
 `packages/viz/src/deepTiers.test.ts`, and `docs/22-charter.md` § 4's S9 row.
 
@@ -32366,6 +32368,8 @@ the criterion that looked hardest and it is structural.
 
 ## D485 — a blocker is a fact in the issue body, never a state in a register, and staleness is what triggers the check
 
+> **Status 2026-09-25: SCHEDULE GATED by [§ D1084](#d1084).** The daily check runs only when the repository variable `BLOCKED_BY_ENABLED` is `true`, and on dispatch. The grammar, the vacuity floor and the comment-once rule are unchanged. Taken by agent sessions under delegated authority.
+
 **Date: 2026-09-05 · Owner: the integrator, on the process `ISSUE_TRIAGE_PLAN.md` records · Rules
 on: GitHub issue #329, `RISKS.md` R45. Dated before the code.**
 
@@ -34232,6 +34236,8 @@ entry id. What runs it on a clock is § D522.
 
 
 ## D522 — A scheduled workflow calls an authenticated seed route: the cheapest of the three shapes, with its cost named
+
+> **Status 2026-09-25: SCHEDULE GATED by [§ D1084](#d1084).** The daily seeding runs only when the repository variable `SEED_BOARDS_ENABLED` is `true`, and on dispatch; its secret was never set, so it had seeded nothing. The route and its shape are unchanged. Taken by agent sessions under delegated authority.
 
 **Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #328.**
 
@@ -44032,3 +44038,164 @@ tower is still their own week's. Three defects this ruling makes universal belon
 lane AI-E and are **not** fixed here: the brief's *LOCKED FOR SCORE — the crowd is the day's*,
 `openTomorrow` running Tuesday on the pinned seed, and the door lede's *Nothing booked* and *the
 only thing you choose is who drives*.
+
+## D1084 — CI is streamlined: every pull-request leg stays, guards report first, `main` and the deep tiers run nightly, and the free GitHub offerings are adopted
+
+> **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner. The
+> owner asked to *"look at the CI process to do code review and security reviews and other free
+> GitHub offerings which will streamline our CI process … remove high-cost, low-value CI steps and
+> simplify the normal CI processes and batch larger runs to a periodic review."* A three-member
+> swarm ruled it, each member measuring the same 789 Actions runs (2026-09-11 00:22 to 09-25 10:58
+> UTC) through a different lens: **S1 cost and throughput**, **S2 coverage and risk**, **S3 the
+> GitHub platform and security**. Their reports are the integrator's scratch notes `ci-S1` to
+> `ci-S3` with the raw run data beside them, and are not in this repository. Wave AJ's integrator
+> reconciled them and lane AJ-E built this. A later reader weighing this against a product-owner
+> ruling should treat it as an agent ruling and say so; [§ D626](#d626) is the cautionary case.
+> **Amends [§ D393](#d393)** (the cadence), and gates the schedules of [§ D485](#d485) and
+> [§ D522](#d522). None of them is rewritten.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it moves three recorded decisions, and it binds
+every workflow in `.github/workflows/`, a new `.github/dependabot.yml`, two workflow-reading tests,
+`CLAUDE.md`'s working agreements and `RISKS.md` R46.
+
+### What was measured
+
+The three members agree on these, and each was measured rather than argued.
+
+- **Minutes cost nothing.** The repository is public and owned by a user account, so hosted runners
+  are free. What CI costs is how long a pull request waits, how long a red takes to show, the
+  account's twenty concurrent jobs (peak concurrency measured at 20), and whether a red or green
+  result can be trusted.
+- **A pull request waited 11.0 minutes at the median and 18 at p90**, and the `viz` leg was the
+  critical path on nearly every run, its median climbing from 10.2 to 18.8 minutes over the
+  fortnight. The "~45 minutes" `CLAUDE.md` quoted predates the leg split.
+- **22 of 26 red CI runs were real catches before merge.** Nineteen were a small set of registry,
+  census and document guards (`testCost.test.ts` alone was eleven) that read files and run no
+  simulation, yet reported at a median of 10.5 minutes because they sat inside the long legs.
+- **41 push runs on `main` caught nothing** a pull-request run had not; the one red was a
+  browser-tier flake.
+- **`claude review` was a required check that reviewed nothing**: green in 116 of 116 runs in about
+  7 s, each log reading that no `ANTHROPIC_API_KEY` is set.
+- **The weekly deep tiers caught the one regression the periodic batch found**, `honesty-deep`'s ten
+  violations of GitHub issue #537, up to six days late, while `CLAUDE.md` published a green verdict.
+  A firing took 22 to 31 minutes and about 150 job-minutes; the Sunday 03:00 cron started five hours
+  late both times, and 03:00 UTC was the busiest hour for CI.
+- **`seed-boards` and `Blocked by` were red on 15 of 15 days**, one on an unset secret and one on
+  its own vacuity floor.
+- **CodeQL default setup is already on** and caught two real findings (#484). Merge queue is not
+  available to a user-owned repository, and Copilot code review needs a paid plan.
+
+### The ruling
+
+1. **Every pull-request leg stays per pull request (3 of 3).** No test leaves the gate.
+2. **A `guards` job runs the guard files in parallel with the legs** (S1, unopposed), so their reds
+   arrive in minutes. It is added, and every file on it still runs in its own leg, so a stale list
+   costs speed and never coverage. `ciLegs.test.ts` fails if a path it names does not exist,
+   because vitest silently drops a file filter that matches nothing when another matches.
+3. **The `viz` leg is two shards** (S1, unopposed), `--shard=1/2` reporting under the name `viz`
+   and `--shard=2/2` as `viz-2`, because `viz` is a required check in the `main-baseline` ruleset
+   and a required name no job reports blocks every pull request. `suite (linux)` needs every leg
+   and `guards`. Three shards is the fallback if the first runs balance badly.
+4. **`main` is tested nightly rather than on every push (2 to 1: S2, plus S1 on its own stated
+   condition that the concurrency cap bites, which its measurement of 20 met; S3 would have kept
+   the push run).** `ci.yml` fires at 20:43 UTC on `main`, keyed on its commit. Deploy and CodeQL
+   keep their own push triggers.
+5. **The deep tiers run nightly at 21:17 UTC** (S1 and S2), every job, the benchmark and
+   `honesty-deep` included. This amends § D393's weekly cadence; its schedule, dispatch, wiring
+   test and `report` job stand.
+6. **`claude review` is gated, not deleted (2 to 1: S1 and S3 over S2's deletion).** It runs only
+   when the repository variable `CLAUDE_REVIEW` is `true`, once per pull request (opened, reopened,
+   ready for review), never on a fork, and fails when turned on without its key. Otherwise it is
+   skipped, which satisfies a required check without claiming a review. The action is pinned by
+   SHA. It stays advisory.
+7. **`Blocked by` and `seed-boards` stop running red every day** (S1 and S3). Each job runs on its
+   schedule only when `BLOCKED_BY_ENABLED` or `SEED_BOARDS_ENABLED` is `true`, and always on a
+   manual dispatch. `seed-boards` gains `permissions: {}` at workflow level.
+8. **Dependency review is an advisory job in `review.yml` (2 to 1: S1 and S2 over S3's required
+   check)**, failing on a new dependency with a known vulnerability of high severity or worse,
+   pinned by SHA.
+9. **Dependabot version updates (2 to 1 to include npm: S1 and S3 over S2's actions-only; monthly,
+   per S3).** Ecosystems `npm`, `github-actions` and `docker` (a root `Dockerfile` exists); minor
+   and patch grouped, majors alone; a seven-day cooldown (thirty for an npm major); small open-pull-request
+   limits; no automatic rebase and never auto-merged. Node's own major is ignored in both places it
+   appears. `deploy-viz.yml` skips Dependabot's pull requests.
+10. **Every action moves off its Node 20 major and is pinned by full SHA with its version beside
+    it**, each tag verified against the action's own repository on 2026-09-25: `actions/checkout`
+    v7.0.1, `actions/setup-node` v7.0.0, `actions/upload-artifact` v7.0.1,
+    `actions/download-artifact` v8.0.1, `azure/login` v3.1.0, `actions/dependency-review-action`
+    v5.0.0, `anthropics/claude-code-action` v1.0.234 and `Azure/static-web-apps-deploy` v1.
+    Dependabot's `github-actions` entry keeps the pins current.
+11. **Flakes are fixed at the root, with no retries** (S2). Both flakes the members named had
+    already been root-caused and fixed on 2026-09-22 (wave AE, `495aabf`), after every red the
+    members counted: `keyboardJourneys.browser.test.ts:603` read 2 because the landing page rebuilt
+    its whole subtree when its morning run arrived, destroying the button focus had just reached
+    ([§ D844](#d844)); `stageScreen.browser.test.ts`'s *expected '08:32' to be false* was a
+    `waitForFunction` resolving on a truthy Promise, replaced by a settle loop compared in node. The
+    browser leg was green on all 8 runs after that commit in the measured window. **Re-running both
+    files found a third, in the same file as the first**: the Career journey waited for the stage's
+    primary to *read* *Close the day*, and the stage draws that label disabled until the day's run
+    has landed, so under load the forty <kbd>Tab</kbd> presses went round the page before the
+    button entered the Tab order. `keyboardJourneys.browser.test.ts#pressPrimaryWhenItReads` now
+    waits for the label on an enabled button, which is the condition its next step needs. No
+    timeout moved and nothing retries.
+12. **Kept as they are**: CodeQL default setup (no workflow file), npm caching, and the
+    `merge_group` trigger, whose comment now says merge queue needs an organisation-owned repository.
+
+### Owner-only settings, which no pull request can make
+
+In the order to make them:
+
+1. **Merge this change first**, with the ruleset untouched. Every name it requires still reports:
+   `viz` from the first shard, `claude review` as skipped.
+2. **Ruleset `main-baseline`**: required checks become `suite (linux)`, `invariant gates` and
+   `guards`; remove `claude review`, `core`, `viz`, `service` and `browser`. `guards` can be picked
+   once it has reported on any pull request.
+3. **Turn on the dependency graph, Dependabot alerts and Dependabot security updates** (dependency
+   review needs the graph).
+4. **Confirm secret scanning and push protection are on.**
+5. **Default workflow permissions to read-only**, with *Allow GitHub Actions to create and approve
+   pull requests* off. Every workflow here states its own grants.
+6. *Optional*: a ruleset rule requiring CodeQL results, blocking new alerts rated high or above.
+7. *Optional*: `ANTHROPIC_API_KEY` as a secret and `CLAUDE_REVIEW=true` as a variable, to turn the
+   review on.
+8. *When wanted*: `ELEVATOR_SIM_SEED_TOKEN` and then `SEED_BOARDS_ENABLED=true`; and
+   `BLOCKED_BY_ENABLED=true` once the backlog carries ten `Blocked by` declarations again.
+
+### What the owner may reverse, and what it costs
+
+Every clause is one YAML edit or one settings toggle.
+
+- **The shards**: restore one `viz` entry, or add a third shard.
+- **`guards`**: delete the job and its entry in `suite (linux)`'s `needs`; only speed is lost. If it
+  is ever required by the ruleset, unrequire it first.
+- **`main` per push**: put `push: branches: [main]` back in `ci.yml`; the concurrency key already
+  covers it.
+- **The deep-tier cadence**: one cron line. If nightly firings make `perf-scaling`'s documented
+  wall-clock flake the usual red, that one job can take S2's weekly condition
+  (`github.event.schedule`) while the rest stay nightly.
+- **`claude review`**: set the variable and the key; re-require it only once it has a key.
+- **Dependency review**: add it to the required checks, or delete the job.
+- **Dependabot**: change `interval`, set a limit to 0, or delete the file.
+- **The two gated bots**: set or unset their variables.
+
+### Measured
+
+- `ciLegs.test.ts` gains three cases (the guards list resolves, `suite (linux)` needs and reads
+  `guards`, and the `viz` shards are complete with one named `viz`); red on the tree before this
+  entry, green after, and red again when one guards path is misspelt. `ciWorkflowMatrix.test.ts`'s
+  job-set assertion moves from `legs, suite` to `legs, guards, suite`, and was red before.
+- Every workflow parses under PyYAML, and `ci.yml` under `infra/checks/miniYaml.mjs`.
+- `keyboardJourneys.browser.test.ts` and `stageScreen.browser.test.ts`, run one process at a time
+  with `--maxWorkers=1` on a four-core container shared with other lanes (load average 21 to 27):
+  before the helper's fix, `stageScreen` 3 of 3 green (19 cases each) and `keyboardJourneys` 2 of
+  3, the third red on the Career journey as clause 11 describes; after it, `keyboardJourneys` 5 of
+  5 green (6 cases each). Five greens bound a rate and do not prove one is zero; the fix is argued
+  from the mechanism, and the runs are what did not contradict it.
+
+### What only the first real runs can confirm
+
+The shard balance and the wall clock it buys; how long `guards` takes on a runner (a local reading
+under a load average near 90 is not one); that GitHub fires the two nightly crons near their
+minutes; that Dependabot's first monthly pull requests come grouped as configured; and that the
+moved actions behave on their new majors, the deploy job's `azure/login` v3 above all, which runs
+only on `main` and on a same-repository pull request.

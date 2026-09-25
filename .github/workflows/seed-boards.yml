@@ -17,6 +17,18 @@
 # holds in its environment. The response is printed whole so the run's log names every row seeded
 # and every dispatcher skipped with the verifier's reason — and so a lagging image shows up as a
 # route that answers 404, which is the visibility #328 asked for.
+#
+# ## Off until the owner turns it on — § D1084
+#
+# The schedule fires daily and the job runs only when the repository variable `SEED_BOARDS_ENABLED`
+# is `true`. It was red on 15 of 15 days in the measured fortnight, every time on
+# `secrets.ELEVATOR_SIM_SEED_TOKEN is not set`, and a red that says the same thing every morning
+# teaches everyone to read past red. Set the secret, then the variable. A manual dispatch runs
+# regardless, which is how to try the configuration before the schedule takes it over; the refusal
+# step below still fails loudly on a dispatch that is missing either value.
+#
+# `permissions: {}` at the top: the job calls the API with its own token and needs nothing from
+# `GITHUB_TOKEN`, and this was the one workflow here that inherited the repository default.
 name: seed-boards
 
 on:
@@ -29,6 +41,8 @@ on:
         required: false
         default: ''
 
+permissions: {}
+
 concurrency:
   group: seed-boards
   cancel-in-progress: false
@@ -36,6 +50,7 @@ concurrency:
 jobs:
   seed:
     name: seed today's board
+    if: github.event_name == 'workflow_dispatch' || vars.SEED_BOARDS_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

@@ -47,12 +47,21 @@
 #
 # Daily. The cost is a handful of API calls, and R45's trigger is *an issue is found unblocked by
 # something that closed more than a day earlier* — a weekly run would leave that trigger reachable
-# six days out of seven. 06:00 UTC, after the deep tiers' Sunday slot and before a working day in
-# any of the time zones this repository's waves have run from.
+# six days out of seven. 06:00 UTC, clear of the deep tiers' nightly 21:17 slot and before a
+# working day in any of the time zones this repository's waves have run from.
 #
 # The aliveness note from `deep-tiers.yml` applies here word for word: GitHub disables scheduled
 # workflows after 60 days of repository inactivity, silently, and no test can see whether the cron
 # has fired. `gh run list --workflow=blocked-by.yml --limit 5` is the check.
+#
+# ## Off until the owner turns it on — § D1084
+#
+# The schedule stays and the job runs only when the repository variable `BLOCKED_BY_ENABLED` is
+# `true`. It was red on 15 of 15 days in the measured fortnight on its own vacuity floor (one
+# declaration against a floor of ten), which is the floor doing its job about a backlog that has
+# stopped using the grammar, and a red that says the same thing every morning teaches everyone to
+# read past red. Set the variable once the backlog carries ten declarations again, or once the owner
+# has lowered the floor. A manual dispatch runs regardless, with `dry_run` if wanted.
 name: Blocked by
 
 on:
@@ -75,15 +84,16 @@ concurrency:
 jobs:
   check:
     name: blockers that have closed
+    if: github.event_name == 'workflow_dispatch' || vars.BLOCKED_BY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
 

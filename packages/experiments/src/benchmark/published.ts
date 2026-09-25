@@ -42,7 +42,7 @@
  * `--exclude` to.
  *
  * **Since 2026-09-07 those suites are behind `ELEVATOR_SIM_BENCHMARK=1`**, so *already pay it* is
- * true of the benchmark tier and not of a pull request: Layer A is re-derived on Sunday and on
+ * true of the benchmark tier and not of a pull request: Layer A is re-derived nightly and on
  * dispatch, in `.github/workflows/deep-tiers.yml`'s four `benchmark-*` jobs, and a moved pin is
  * filed by that workflow's `report` job rather than reddening the branch that moved it. Layer B is
  * a source scan and stays always-on. The measurement behind the move — 3 665 s of the `experiments`

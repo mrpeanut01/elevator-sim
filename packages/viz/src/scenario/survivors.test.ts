@@ -4,7 +4,7 @@
  * `survivorSweep.test.ts` re-runs the sweep behind `ELEVATOR_SIM_SURVIVORS=deep` and asserts the
  * pinned counts reproduce. This file asserts everything that can be decided from two files on
  * disk, which is `difficultyCurve.test.ts`'s own split and for the same reason: a rule that only
- * runs on Sunday is a rule a pull request can break on Monday.
+ * runs on a schedule is a rule a pull request can break before it fires.
  *
  * Five separable claims, and each fails on its own:
  *
