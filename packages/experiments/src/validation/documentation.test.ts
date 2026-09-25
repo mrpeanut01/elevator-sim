@@ -2201,7 +2201,11 @@ type DecisionReservation = {
  * directions swarm's rulings on fixing a building and on the campaign. Committed on the integration
  * branch before their worktrees exist.
  */
-const OPEN_RESERVATION = { wave: 'AJ', from: 1048, to: 1137 } as DecisionReservation | null;
+/*
+ * Extended from D1137 to **D1146** on 2026-09-25 for lane AJ-L, the swarm's first-ranked ruling (the
+ * call as the core loop). Committed on the integration branch before its worktree exists.
+ */
+const OPEN_RESERVATION = { wave: 'AJ', from: 1048, to: 1146 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
