@@ -62,7 +62,15 @@ import {
 import { EVERY_CAR, KEYED_BANK, OUT_OF_SERVICE } from './types.js';
 import type { DialValue, FixitCase, FixitCases, FixitState } from './types.js';
 
-const SUITE_TIMEOUT = 900_000;
+/**
+ * The project's own ceiling, not above it. Measured at wave AH's integration on one worker at load
+ * average 6.5: the slowest case here (*proves each drawn dial on its pinned case and value*) took
+ * 14.0 s and no other took more than 5.6 s. The lane annotated 900 000 ms, about 64× the job, and
+ * `testCost.test.ts`'s ratchet refuses a bound above the ceiling unless the job earns it; this one
+ * does not, so the bound is lowered here rather than registered there (§ D405). 300 000 ms leaves
+ * about 21× at the measured load, which covers the 4.5× amplification `vitest.config.ts` records.
+ */
+const SUITE_TIMEOUT = 300_000;
 
 let resources: FixitResources;
 let cases: FixitCases;

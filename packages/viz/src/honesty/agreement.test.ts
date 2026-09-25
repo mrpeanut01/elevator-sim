@@ -278,7 +278,9 @@ describe('the tenth property goes red on § D359, which is the whole of its evid
     expect(message).toContain('inside 230 s');
     expect(message).toContain('inside 460 s');
     expect(message).toContain('everyday/briefView.ts#briefAsksOf');
-  }, 600_000);
+    // 5.7 s at wave AH's integration (one worker, load 6.5): the project's own ceiling, and not
+    // the 600 000 ms its lane wrote.
+  }, 300_000);
 
   it('holds on this tree — both shells publish one ask', () => {
     for (const each of contexts) {
