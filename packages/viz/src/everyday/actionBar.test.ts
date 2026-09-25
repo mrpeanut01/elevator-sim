@@ -70,7 +70,9 @@ interface GuideRow {
   /**
    * What the build ships in place of {@link GuideRow.primary}, variant for variant.
    *
-   * Present on the `building` row and nowhere else — GitHub issue #569 item 6. § 3.3 writes
+   * Present on the `building` row and the `door` row and nowhere else. On `door` it is
+   * [§ D1004](../../../../DECISIONS.md)'s third variant, appended after the guide's two. On
+   * `building` it is GitHub issue #569 item 6. § 3.3 writes
    * *Run the day…*; the press opens the § 7 stage **paused**, which § 7.3 specifies and
    * `stageScreen.browser.test.ts` pins, so the shipped verb is *Open*. The deviation case below
    * the table loop asserts it in both directions.
@@ -104,6 +106,8 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     back: null,
     timeline: { flow: 'daily', step: 1 },
     primary: ['Set up today', 'Set up the replay'],
+    /* § D1004: a closed today opens tomorrow from the door — the guide's two, and one more. */
+    primaryShipsInstead: ['Set up today', 'Set up the replay', 'Open the doors on ⟨day⟩'],
     notes: ['Pick who drives, then run it.'],
     inverted: false,
   },
@@ -612,8 +616,10 @@ describe('the § 3.3 rules, held over the data rather than the literals', () => 
       if (data === undefined) continue;
       expect(marked(data.leave.label), keyOf(guide.screen, guide.ctx)).toBe(false);
       expect(marked(data.back?.label)).toBe(marked(guide.back?.label ?? ''));
+      /* Against the shipped cell where one is transcribed — § D1004's third door variant is one. */
+      const shipped = guide.primaryShipsInstead ?? guide.primary;
       for (const [index, variant] of data.primary.variants.entries()) {
-        expect(marked(variant)).toBe(marked(guide.primary[index] ?? ''));
+        expect(marked(variant)).toBe(marked(shipped[index] ?? ''));
       }
     }
   });

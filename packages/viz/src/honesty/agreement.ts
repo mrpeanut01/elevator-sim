@@ -279,10 +279,10 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze([
       'to hold — so the refusal was the only string that line could render. Both screens are one ' +
       'click apart in the same rail, about the same week, and the fix pointed the card at the ' +
       'store that keeps days. What holds it there is not the fix: the two lines are **separate ' +
-      'derivations** over one `WeekState`, and they gate today’s figure differently — ' +
-      '`rail.ts#careerLineOf` asks whether any day in the `HISTORY_DAYS` window is `day < ' +
-      'week.day || dayClosed`, and `weekView.ts#streakLineOf` takes a count off cards whose own ' +
-      'gate is `!isToday || dayClosed`. Five asserted unit weeks in `rail.test.ts` hold the two ' +
+      'derivations** over one `WeekState`, and they gate today’s figure separately — ' +
+      '`rail.ts#careerLineOf` asks whether any day in the `HISTORY_DAYS` window is in the history, ' +
+      'and `weekView.ts#streakLineOf` takes a count off cards whose own gate is the same history ' +
+      '(both read the sitting’s `dayClosed` until § D1004). Five asserted unit weeks in `rail.test.ts` hold the two ' +
       'equal, which is a claim about five weeks; this is the claim over every case in the corpus, ' +
       'and it is the one a player reading both surfaces on one frame is actually owed. The whole ' +
       'line is compared rather than the streak alone, because the withheld arm — `best —` — is ' +
@@ -293,7 +293,7 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze([
         hasACareer(view)
           ? railFooter(
               { screen: 'menu', ctx: 'daily' },
-              { week: view.state.week, dayClosed: view.dayClosed },
+              { week: view.state.week },
             ).identity.streak
           : undefined,
     },
@@ -565,8 +565,14 @@ export function withTodayFiled(week: WeekState): WeekState {
  * | arm | week | `dayClosed` | what the pair sees |
  * |---|---|---|---|
  * | `day1` | nothing closed | `false` | the pair does not apply — see {@link hasACareer} |
- * | `day4` | today filed | `false` | both publish, and both must **withhold** today's figure |
+ * | `day4` | today filed | `false` | both publish, and both must **release** today's figure |
  * | `day4-filed` | today filed | `true` | both publish, and both must **release** it |
+ *
+ * **The `day4` row read *withhold* until [§ D1004](../../../../DECISIONS.md)**, when both
+ * derivations stopped asking the sitting and started asking the week: a day in the history is a
+ * closed day whether or not this sitting filed the run. The arm is kept, because it is now the state
+ * in which a derivation that went back to the sitting would disagree with one that did not —
+ * `agreement.test.ts`'s negative control is exactly that regression.
  *
  * **The account moves with the arm too, and it is a second dimension carried without a second axis**
  * — [§ D490](../../../../DECISIONS.md), GitHub issue #332. The three arms carry signed out, signed
@@ -582,11 +588,11 @@ export function withTodayFiled(week: WeekState): WeekState {
  * | `day4` | the mint, `displayNameChosen: false` | both must **still** publish this device's name |
  * | `day4-filed` | named | both publish the account's |
  *
- * The last two are one week with the axis flipped, which is what makes them a test of the *gate*
- * rather than of the arithmetic: the rail asks `history.some(day => day.day < week.day ||
- * dayClosed)` and Your week counts cards whose `show` is `!isToday || dayClosed`, and those are two
- * expressions that happen to agree. A pair driven only on a state where both release would go green
- * on a rail that had forgotten the gate entirely.
+ * The last two are one week with the sitting's axis flipped, which is what makes them a test of the
+ * *gate* rather than of the arithmetic: the rail asks whether any day of the window is in the
+ * history and Your week counts cards whose `show` is the same history, two expressions that happen
+ * to agree, and since § D1004 neither reads `dayClosed`. A pair driven only on the filed arm would go
+ * green on a derivation that had gone back to withholding today until the sitting files it.
  *
  * **The arm id is the first segment of `AgreementView.id`** — see that field for why the horizon
  * has to stay the second.

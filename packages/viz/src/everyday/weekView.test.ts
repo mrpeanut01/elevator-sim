@@ -79,16 +79,24 @@ describe('§ 16 rule 1 — today is withheld until *Close the day* has been pres
     expect(today?.verdict).toBeUndefined();
   });
 
-  it('withholds it even when the week already carries today’s outcome from a previous sitting', () => {
+  it('shows today once the week carries it, whether or not this sitting filed the run — § D1004', () => {
     /*
-     * The case that makes `dayClosed` load-bearing rather than decorative: a restored week can
-     * hold today's closed outcome while the stage holds no filed run, and `dayClosed` — which
-     * *Close the day* alone sets — is the authority. Publishing on the week alone would show a
-     * figure for a day this sitting has not finished.
+     * This case used to assert the withholding: a restored week holding today's outcome drew the
+     * em dash until the sitting filed a run. The post-AH panel met that as *THU … today · not closed
+     * yet* and *No day of this week has been closed yet* about days the report had called banked,
+     * beside a front door whose chip read the same history and said *today*. Nothing but *Close
+     * the day* writes an outcome into the history, so an outcome there is a closed day.
      */
     const week = weekWith(3, [dayOf(1, MET), dayOf(2, MET), dayOf(3, MET)]);
-    expect(viewOf(week, false).cards.at(-1)?.score).toBe(EM_DASH);
+    const restored = viewOf(week, false);
+    expect(restored.cards.at(-1)?.score).toBe('84%');
+    expect(restored.cards.at(-1)?.note).toBe('today · clean day');
+    expect(restored.tally.closed).toBe(3);
+    expect(restored.percentile.line).not.toMatch(/not closed/);
     expect(viewOf(week, true).cards.at(-1)?.score).toBe('84%');
+    // What stays about the sitting: with no sheet standing, the card does not open one, and says why.
+    expect(restored.cards.some((card) => card.readable)).toBe(false);
+    expect(restored.readNote).toMatch(/Today is closed/);
   });
 
   it('says nothing to place until the day is closed, and then says why it still cannot place you', () => {
@@ -162,7 +170,17 @@ describe('the report’s one entrance — `WeekDayCard.readable`', () => {
       sheetStanding: false,
     });
     expect(open.cards.some((card) => card.readable)).toBe(false);
-    expect(open.readNote).toMatch(/once it has been closed/);
+    // Today is in the week's history, so the note says the day is closed and why its sheet is not
+    // here — § D1004. A week with today not yet closed still says *once it has been closed*.
+    expect(open.readNote).toMatch(/Today is closed/);
+    expect(
+      weekScreenViewOf({
+        week: weekWith(3, [dayOf(1, MET), dayOf(2, MET)]),
+        towerToday: 'Chancery House',
+        dayClosed: false,
+        sheetStanding: false,
+      }).readNote,
+    ).toMatch(/once it has been closed/);
 
     // Closed, but the sheet was cleared by *Open the doors on tomorrow* — the two can disagree,
     // and a card that opened an empty sheet would be § 16 rule 4's defect.

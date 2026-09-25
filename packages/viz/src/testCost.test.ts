@@ -407,7 +407,21 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * **24 060 000**, lane A's row above plus these nine, which is the two moves adding as that
      * row said they would. Nothing existing was raised.
      */
-    ['viz-browser', { count: 91, totalMs: 24_060_000 }],
+    /*
+     * **91 → 96, and the five are named** — wave AI lane AI-A's
+     * `everyday/dayIsItsOwn.browser.test.ts` at 300 000 ms each: two cases for § D1002 (a press on
+     * one tower's day does not ride into another tower's untouched day; a second attempt from the
+     * brief starts with no presses), two for § D1003 (a reload mid-rush and one on a career report
+     * keep the Scenario week's crowd), and one for § D1004 (a closed today opens tomorrow from the
+     * front door, and Your week reads it closed after a reload).
+     *
+     * **They earn it for the reason the rows above did**: every defect they hold lived between two
+     * runs, and each case plays two or three days — or a mode and a reload — on the shipped bundle,
+     * which is exactly what no unit tier can see. Each was run against the bundle built from the tree
+     * before the fix and failed there. Nothing existing was raised:
+     * 24 060 000 + 5 × 300 000 = **25 560 000**, keyed on file and case name.
+     */
+    ['viz-browser', { count: 96, totalMs: 25_560_000 }],
   ]);
 
 /**

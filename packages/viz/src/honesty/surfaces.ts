@@ -8804,16 +8804,17 @@ const EVERYDAY_MENU: SurfaceAdapter = {
         .streak,
       role: 'reason',
     });
-    for (const dayClosed of [false, true]) {
-      seeds.push({
-        field: `rail.footer.streak.career.${dayClosed ? 'filed' : 'standing'}`,
-        text: railModel(
-          { screen: 'menu', ctx: 'daily' },
-          { week: withTodayFiled(openWeek()), dayClosed },
-        ).footer.identity.streak,
-        role: 'observation',
-      });
-    }
+    /*
+     * One arm since § D1004. It was two — the same week with the run filed this sitting and without
+     * — because the card withheld today's figure until the sitting filed it; it now reads the week,
+     * so the two drew one string and the second seed swept nothing the first did not.
+     */
+    seeds.push({
+      field: 'rail.footer.streak.career',
+      text: railModel({ screen: 'menu', ctx: 'daily' }, { week: withTodayFiled(openWeek()) }).footer
+        .identity.streak,
+      role: 'observation',
+    });
     /*
      * § D673's acknowledgement, in every state the card can draw it in — GitHub issue #499, and
      * **three states rather than five since GitHub issue #579**: the rail's `signed-out` and
@@ -12844,6 +12845,11 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
             text: door.primary.note,
             role: door.primary.inert ? 'reason' : 'prose',
           });
+          /* § D1004's second press — today again, drawn only beside a primary that opens tomorrow. */
+          if (door.primary.again !== undefined) {
+            seeds.push({ field: `${where}.again.label`, text: door.primary.again.label, role: 'label' });
+            seeds.push({ field: `${where}.again.note`, text: door.primary.again.note, role: 'prose' });
+          }
         }
 
         /* ---- Scenario: § D525's hub, the first tile's whole surface (issue #364) ---- */

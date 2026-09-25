@@ -1461,10 +1461,11 @@ export interface EverydayHost {
   closeDay(): void;
 
   /**
-   * Advance to tomorrow and run it — the report sheet's *Open the doors on tomorrow*, as one
-   * action. A no-op while no closed day's sheet is standing (`lastReport()` undefined): there is
-   * nothing to advance *from*, and the screen's § 3.3 primary is expected to be gated on the same
-   * fact.
+   * Advance to tomorrow and run it — the report sheet's *Open the doors on tomorrow*, and since
+   * [§ D1004](../../../../DECISIONS.md) the front door's, as one action. A no-op while no closed
+   * day's sheet is standing (`lastReport()` undefined) **and** the week holds no outcome for today:
+   * there is nothing to advance *from*, and each screen's § 3.3 primary is expected to be gated on
+   * the same fact — the report on its sheet, the door on the week's history.
    */
   openTomorrow(): void;
 
@@ -2648,6 +2649,11 @@ export function createEverydayHost(
       buildingId: contract.buildingId,
       shiftLengthS: shiftLengthForContract(contractId),
       windowStartS: null,
+      /*
+       * A log is stamped against one day in one tower — `dev/state.ts#withBuilding`'s rule, which
+       * this press moved the building past without applying. [§ D1002](../../../../DECISIONS.md).
+       */
+      interventions: [],
     });
   };
 
@@ -2935,7 +2941,31 @@ export function createEverydayHost(
       const kitToClear = b.state().campaignFitOut === undefined ? {} : { campaignFitOut: undefined };
       // And the campaign's event, on the same ground one field over — § D507.
       const eventToClear = b.state().campaignEventId === undefined ? {} : { campaignEventId: undefined };
-      const patch = { ...(day === undefined ? {} : wholeDayRun(day)), ...kitToClear, ...eventToClear };
+      /*
+       * **And the presses — a day's run starts with none** — [§ D1002](../../../../DECISIONS.md).
+       *
+       * Every caller of this press is starting a run rather than growing one: the brief's *Start
+       * the day*, the designer's and the tuner's *Run a day in it*, the workshop's run, the stage's
+       * entry press and its retry. A press made on the stage is not one of them — it appends through
+       * `b.intervene`, which re-simulates on `dev/main.ts#interveneAt` and never comes here. So the
+       * log that stands at this line belongs to a run this press is replacing, and a run that
+       * inherited it is the defect the post-AH panel measured: a park pressed on Garden Apartments
+       * at 08:30 replayed in Crown Hotel's untouched day and credited to the player on its sheet;
+       * five presses from five earlier attempts applied under a stage that showed one; and
+       * Midtown's pinned day graded *Shift cleared, 424 s* on a spread nobody pressed, where
+       * § D974 says that day as built misses at 690 s. A second attempt at a day is the
+       * with-and-without experiment § D931's pair exists for, and it is only an experiment if it
+       * starts clean on the same seed.
+       *
+       * Spread in only when there is a log to clear, on the comments above's ground.
+       */
+      const logToClear = b.state().interventions.length === 0 ? {} : { interventions: [] };
+      const patch = {
+        ...(day === undefined ? {} : wholeDayRun(day)),
+        ...kitToClear,
+        ...eventToClear,
+        ...logToClear,
+      };
       if (Object.keys(patch).length > 0) b.applyPatch(patch);
       // § 6's day is not a campaign day — see {@link campaignDayTowerId} for what a stale latch
       // here would file, and against which building.
@@ -3058,9 +3088,17 @@ export function createEverydayHost(
     openTomorrow: () => {
       releaseCareer();
       const state = b.state();
-      // Nothing to advance from — see the interface docstring. The screen gates its primary on
-      // the same fact, so this early return is the API refusing what the control never offers.
-      if (state.report === undefined) return;
+      /*
+       * Nothing to advance from — see the interface docstring. The screens gate their primaries on
+       * the same fact, so this early return is the API refusing what the controls never offer.
+       *
+       * **A sheet standing, or today banked in the week** — [§ D1004](../../../../DECISIONS.md). The
+       * report's button is drawn over a sheet; the front door's is drawn over the week, whose history
+       * carries today once it is closed, and a reload keeps the week and drops the sheet. A day the
+       * week already holds is a day there is something to advance from, whichever screen asks.
+       */
+      const todayBanked = state.week.history.some((entry) => entry.day === state.week.day);
+      if (state.report === undefined && !todayBanked) return;
       // Tomorrow is a day of the same kind today was — the whole-day patch rides in the same merge
       // rather than in a second one, so no render sees a week advanced onto a horizon it is not
       // running yet.
@@ -3161,6 +3199,8 @@ export function createEverydayHost(
             buildingId: contract.buildingId,
             shiftLengthS: shiftLengthForContract(contract.id),
             windowStartS: null,
+            /* A fresh week on another tower keeps no presses — `moveWeekTo`'s line, § D1002. */
+            interventions: [],
           });
         }
       }

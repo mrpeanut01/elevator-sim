@@ -43038,3 +43038,80 @@ DECIDE-3 ruled for **two prices the schedule already carries**: the flat 2 u for
 ### 6. What this does not decide
 
 Replacing trace redraws with thinning on a named stream, which may later require re-authoring `let-faster-than-the-lifts`; the fix-it single-pair judge's noise; and the campaign shop's `staggered-starts` row, which is the same near-universal shape. The coordinator files all three as issues. **§ D706's retirement**: `tenant-floors` no longer blocks it, and [§ D1000](#d1000) says what still does.
+
+## D1002 — a run the Everyday product starts begins with no presses, and a day's sheet lists only its own
+
+**Date: 2026-09-25 · Owner: wave AI lane AI-A · Answers the post-AH playability panel's assessor A defect 1 and assessor B's D1 · Rules on: `ViewerState.interventions`' clearing ledger (`dev/state.ts`), `everyday/host.ts`'s Scenario presses, `everyday/replay.ts`, and [§ D931](#d931)'s with-and-without pair.**
+
+> Taken by an agent lane under delegated authority, not by the product owner. It moves a rule that
+> was recorded in a docstring rather than ruled here, and a later reader weighing it against a
+> product-owner ruling should treat it as an agent ruling.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: the decision is taken in `everyday/host.ts` and binds `dev/state.ts`'s ledger, `everyday/replay.ts`'s restore and every Everyday screen that presses a run, and it withdraws a rule that ledger stated — *the log survives a plain re-run of the same day*.
+
+### What was wrong, measured on the shipped bundle
+
+The intervention log lived and died with the **session**, not with a run. `everyday/host.ts#startRun` — the brief's *Start the day*, the designer's, the tuner's and the workshop's runs, and the stage's own entry press — wrote the whole-day window, the kit and the event and left the log standing, and `moveWeekTo` moved the week and the building without clearing it, although `dev/state.ts#withBuilding` says a log is stamped against one day in one tower. So:
+
+- **Across towers.** From empty storage: Garden Apartments picked from the door, *park* pressed at 08:30, the day closed; then Crown Hotel's pinned day with nothing pressed, closed. Its sheet read **`08:30 · parked the cars in the lobby`** (assessor B saw *08:00* on Chancery House and *You parked the cars in the lobby* in *Where it went wrong*). Chained over three days it graded Midtown Office's pinned day *Shift cleared, 424 s* on presses made on other towers, where [§ D974](#d974) says that day as built misses at 690 s.
+- **Across attempts.** Crown Hotel's pinned day with *spread* pressed and closed, then *‹ The day*, *‹ Brief*, *Start the day* again with nothing pressed: the second sheet read **`08:30 · spread the cars across the tower`**. Assessor A's version had five presses on the sheet from five attempts while the stage showed one, which made three of that assessor's trials not clean — and the second attempt is the with-and-without experiment § D931's paired row is built to report.
+
+### The ruling
+
+1. **Every run the Everyday product starts begins with an empty log.** `startRun` clears it in the same patch that sets the day up; every caller of that press starts a run rather than growing one, because a stage press appends through `b.intervene` and re-simulates on `dev/main.ts#interveneAt`, which never passes through it. A retry after a failed run starts clean as well.
+2. **A move of the week clears it**: `moveWeekTo` (the door's tower picker and pinned days) and the career's take-offer, on `withBuilding`'s rule.
+3. **A replay starts with none and gives the parked day's back**: `ReplayBefore` carries the log with the recording, and the restore puts both back, because a log is a fact about one run and the run coming back is that one. A rush and a career day already did this through `RUSH_FIELD_ROLES` and `careerHold`.
+4. **The Engineer shell's own *Run this shift* is unchanged** — it still re-runs the record with its log, which is the surface the ledger's *plain re-run* clause was written for, and the ledger now says which surface it binds.
+
+### What this deliberately does not move
+
+The sheet still reads `state.interventions` at close, as `dev/main.ts#closeShift` always did; what changed is that the log standing there is the run's. No copy was rewritten: every sentence that names a press was true of the run it was drawn over once the log was, and none of them was wrong in isolation.
+
+---
+
+## D1003 — the address bar does not describe a mode's run, so a reload cannot put a mode's crowd on the Scenario week
+
+**Date: 2026-09-25 · Owner: wave AI lane AI-A · Answers the post-AH panel's assessor D N2 and assessor B's D3 · Amends [§ D189](#d189)'s *the seed is always written*.**
+
+> Taken by an agent lane under delegated authority, not by the product owner, and to be read as an
+> agent ruling.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it amends § D189, and it binds [§ D964](#d964) and [§ D965](#d965)'s promise that no mode writes the Scenario week, on a path neither of them covered.
+
+### What was wrong, measured on the shipped bundle
+
+`dev/main.ts#syncUrl` writes the standing run into the address on every render, and `deepLinkStateOf` reads it back on load. A career day wrote `?seed=17929870023189047903&tab=report` and a rush wrote `?building=midtown-office&seed=90210&duration=5400&windowStart=0&template=endless-rush&rate=20.64…`. A reload taken on a career report, or mid-rush, then opened the Scenario week on that crowd — the door read *crowd 90210 · a crowd of this run's own*, and assessor D once saw a Crown Hotel day filed over 08:30–09:30 with 674 arrivals where the authored day has 355. `weekSurvives.browser.test.ts`'s reload named `?seed=` explicitly, which is the one address that cannot see it.
+
+### The ruling
+
+**While a mode's own week stands** — `shift/week.ts#MODE_WEEK_CONTRACT_IDS`, a rush, a replay or a career day — `syncUrl` writes nothing, and the address keeps describing the Scenario run the mode parked. `dev/main.ts#addressFollowsRun` is the predicate.
+
+**The writer, not the reader, and why.** The reader cannot tell who wrote an address: a link somebody pasted and one this page wrote read the same, and a pasted `?seed=` is the reader's whole reason to exist. The writer knows which week is standing. And the address a mode wrote was never a true description: a career day's fit-out and event and a rush's modifiers and week are in none of the eleven params, so the link opened a different run under the mode's name — the thing `shareLinkOf` refuses through `runIdentityIssues`, which the bar was doing anyway.
+
+**What it does not do.** An address written by an earlier build still reads back; a bookmark taken mid-rush before this commit still opens on the rush's crowd, because a link is honoured. `shareLinkOf` is unchanged.
+
+---
+
+## D1004 — a closed today opens tomorrow from the front door, and a day in the week's history reads as closed everywhere
+
+**Date: 2026-09-25 · Owner: wave AI lane AI-A · Answers the post-AH panel's assessor A defects 2 and 3 and assessor B's D5 · Rules on: GAMEPLAY § 3.3's door row, § 6.1's primary, § 14's day cards and § 16 rule 1 as `weekView.ts` and `rail.ts` read it, and `honesty/agreement.ts`'s `career-line` pair.**
+
+> Taken by an agent lane under delegated authority, not by the product owner, and to be read as an
+> agent ruling. It adds a variant to a design-handoff table cell, which the handoff's owner may
+> reverse.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it binds `everyday/doorView.ts`, `doorScreen.ts`, `actionBar.ts`, `host.ts`, `weekView.ts`, `rail.ts`, `shell.ts` and the honesty agreement register, and it reverses a gate two of those files stated — *today's card and today's best figure wait on `dayClosed`*.
+
+### What was wrong, measured on the shipped bundle
+
+A day closed and its report left: back at the front door, the stepper read *Monday · day 1*, `›` was disabled, and the only press was *Set up today*, which re-ran Monday. Tuesday opened only by re-running and re-closing Monday to reach the report's own *Open the doors on Tuesday*. After a reload, *Your week* read **`MON crown-hotel — today · not closed yet`** and *No day of this week has been closed yet* about a day the report had called banked, while the door's chip, reading the same history, said *today* with its score.
+
+### The ruling
+
+1. **The door's primary opens tomorrow once today is closed.** `doorView.ts#todayIsBanked` — the week's history carries today, or the run on the stage was filed this sitting — turns the primary into *Open the doors on ⟨day⟩*, the same `openTomorrow` + brief pair as the report's button, and § 3.3's door row gains that third variant (`actionBar.test.ts` transcribes it as a shipped deviation beside the guide's two). **The retry is not taken off the door**: *Run today again* is drawn beside it and goes to the brief, where *Start the day* runs today again from no presses ([§ D1002](#d1002)). `openTomorrow` accepts a banked today as something to advance from when no sheet stands, which is the state a reload leaves.
+2. **A day in the week's history is a closed day, on every surface.** *Your week*'s card and tally and the rail's `PLAYING AS` line stop waiting on `dayClosed`, because nothing but *Close the day* writes an outcome into history. `RailOptions.dayClosed` is deleted with the gate rather than left as a flag that moves nothing. What stays about the sitting is what is about the sitting: whether today's card can open a sheet, and a note that says why it cannot when the sheet is gone.
+3. **The `career-line` pair stays declared**, with its `day4` arm now reading *release* rather than *withhold*; its negative control is the rail regressed to the sitting's gate, which goes red on that arm and nowhere else.
+
+### What moves in the corpus
+
+The door adapter seeds *Run today again* and its note on the four door renders a case draws at a closed today (+8 a case), § 3.3's door row seeds its third variant (+1), and the rail's career line is one seed rather than two identical ones (−1). Every other change is a substitution.

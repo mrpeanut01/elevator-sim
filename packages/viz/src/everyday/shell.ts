@@ -1544,8 +1544,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * stores stay two (`profile.ts` argues why the profile is not a fourth key in `persist/`'s
    * envelope); the card now asks the one that keeps days.
    *
-   * `dayClosed` travels with it because *Close the day* alone sets it and a restored week can carry
-   * today's outcome without it — the same authority § 14's own cards answer to.
+   * `dayClosed` no longer travels with it ([§ D1004](../../../../DECISIONS.md)): today's figure is
+   * published once the week carries today, which is what § 14's own cards now read too.
    *
    * ## The line this function used to be, and why it was the rest of #214
    *
@@ -1563,9 +1563,9 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * arm reads storage: `persist/` has one reader and `dev/main.ts` is it, and a second one would be
    * two answers to *what week is this* on the very screen that exists to have one.
    */
-  function weekRailOptions(): { week?: WeekState; dayClosed?: boolean; weekPending?: boolean } {
+  function weekRailOptions(): { week?: WeekState; weekPending?: boolean } {
     if (dataHost === undefined) return options.host === undefined ? {} : { weekPending: true };
-    return { week: dataHost.week(), dayClosed: dataHost.runState().dayClosed };
+    return { week: dataHost.week() };
   }
 
   /**

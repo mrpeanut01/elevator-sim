@@ -93,6 +93,17 @@ describe('the replay week', () => {
     expect(restored.parkedWeeks.some((week) => week.contractId === live.contractId)).toBe(false);
   });
 
+  it('starts with no presses and puts the parked day’s log back with its recording — § D1002', () => {
+    const log = [{ atS: 120, change: { kind: 'park-cars-lobby' as const } }];
+    const state = { ...baseState(), week: live, interventions: log };
+    const before = replayBeforeOf(state);
+    const inReplay = { ...state, ...replayPatchOf(state, 3) };
+    expect(inReplay.interventions).toEqual([]);
+    const pressed = { ...inReplay, interventions: [{ atS: 60, change: { kind: 'spread-cars' as const } }] };
+    const restored = { ...pressed, ...replayRestorePatchOf(pressed, before) };
+    expect(restored.interventions).toBe(log);
+  });
+
   it('has a parked slot of its own, counted off the sentinel table', () => {
     expect(Object.values(WEEK_CONTRACT_SENTINELS)).toContain(REPLAY_CONTRACT_ID);
     expect(PARKED_WEEKS_MAX).toBe(CONTRACTS.length + Object.keys(WEEK_CONTRACT_SENTINELS).length);

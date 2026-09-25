@@ -43,10 +43,22 @@ export interface ReplayBefore {
   readonly contractId: string;
   readonly playMode: ViewerState['playMode'];
   readonly recording: ViewerState['recording'];
+  /**
+   * The presses the parked recording was simulated under — [§ D1002](../../../../DECISIONS.md).
+   * Put back with {@link recording}, because a log is a fact about one run and the run that comes
+   * back is this one; leaving the replay's presses standing beside it would caption the player's
+   * own day with presses made on another.
+   */
+  readonly interventions: ViewerState['interventions'];
 }
 
 export function replayBeforeOf(state: ViewerState): ReplayBefore {
-  return { contractId: state.week.contractId, playMode: state.playMode, recording: state.recording };
+  return {
+    contractId: state.week.contractId,
+    playMode: state.playMode,
+    recording: state.recording,
+    interventions: state.interventions,
+  };
 }
 
 /** Whether `day` is one the standing week can hand back: a day before today, inside this week. */
@@ -73,6 +85,8 @@ export function replayPatchOf(state: ViewerState, day: number): Partial<ViewerSt
     playMode: 'shift-week',
     week: openReplay(day, replayDayIdxOf(state.week, day), history),
     parkedWeeks: moved.parked,
+    /* A replay is a clean experiment on the day's crowd — § D1002: it starts with no presses. */
+    interventions: [],
   };
 }
 
@@ -84,6 +98,7 @@ export function replayRestorePatchOf(state: ViewerState, before: ReplayBefore): 
     parkedWeeks: moved.parked,
     playMode: before.playMode,
     recording: before.recording,
+    interventions: before.interventions,
   };
 }
 

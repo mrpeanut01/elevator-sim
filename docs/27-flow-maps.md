@@ -110,6 +110,8 @@ Every `context.go(` in `packages/viz/src/everyday/`, with the control that fires
 | From | Control | To | Notes |
 |---|---|---|---|
 | `door` | primary *Set up today* | `brief` | guarded: a past day's replay is drawn **inert** rather than navigating |
+| `door` | primary *Open the doors on ⟨day⟩*, once today is closed | `brief` | `openTomorrow()` first — the report's own press, from the door ([§ D1004](../DECISIONS.md)) |
+| `door` | *Run today again*, beside that primary | `brief` | today's second attempt; *Start the day* then runs it from no presses ([§ D1002](../DECISIONS.md)) |
 | `brief` | primary *Start the day* | `stage` | `startRun()` first — the latching press, without which `closeShift` refuses to file ([§ D232](../DECISIONS.md)) |
 | `brief` | *Take it to the sandbox* card | `tuner` | the tuner's **one shipped door**; § 3.2 forbids a rail row for it |
 | `stage` | primary *Close the day* | `report` ⟳ | via `stageScreenModel.ts#stageFilingLandsOn`, asked **after** the call with what the host says happened. `undefined` — stay put — on a refused close, on a rush stage and on a watched one |
@@ -137,6 +139,7 @@ Every `context.go(` in `packages/viz/src/everyday/`, with the control that fires
 flowchart LR
   menu([main menu]) -->|Today's tower| door[1 front door]
   door -->|Set up today| brief[2 the brief]
+  door -->|Open the doors on tomorrow| brief
   brief -->|Start the day| stage[3 the day]
   stage -->|Close the day ⟳| report[4 how it went]
   report -->|Your week| week[your week]

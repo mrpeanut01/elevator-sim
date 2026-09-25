@@ -356,7 +356,12 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     screen: 'door',
     leave: leave(LEAVE_TOWER),
     timeline: { flow: 'daily', step: 1 },
-    primary: primary(['Set up today', 'Set up the replay']),
+    /*
+     * The third variant is this build's, not the guide's — [§ D1004](../../../../DECISIONS.md): a
+     * closed today opens tomorrow from the door, as the report's own button does, and `doorScreen.ts`
+     * fills the weekday in.
+     */
+    primary: primary(['Set up today', 'Set up the replay', 'Open the doors on ⟨day⟩']),
     note: 'Pick who drives, then run it.',
     inverted: false,
   }),
