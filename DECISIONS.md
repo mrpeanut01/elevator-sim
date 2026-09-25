@@ -34039,6 +34039,8 @@ four screens. `scope/commitment.ts`'s docstring stops describing the model as un
 
 ## D517 — A past day is handed back over a replay week: the same day, closed as any day is, counting for nothing
 
+> **Status 2026-09-25: AMENDED by [§ D1094](#d1094)** (an agent ruling). A replay meets the crowd and the stretch of the day its own record holds rather than the seed and length standing now, and a day filed without a record says so on the door. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #177 item 1**, GAMEPLAY § 6.1.
 
 **Context.** § 6.1 says *every past day stays playable* and *never silently rescore history*. The
@@ -41295,6 +41297,8 @@ different question from the one it is headed with. Words rather than colour alon
 
 ## D859 — a rush round records what drove it and what was changed, and the sheet stops crediting the opening dispatcher
 
+> **Status 2026-09-25: AMENDED by [§ D1099](#d1099)** (an agent ruling). Where the sitting holds an untouched round from the same start, the note under a round's changes gives that round's hold beside this one, for this crowd only. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-19 · Owner: LANE-AE-B (wave AE) · Rules on:** nothing recorded; it is the display
 half [§ D542](DECISIONS.md)'s sitting left to whoever needed it. Binds
 `everyday/rushSitting.ts`, `everyday/rushPost.ts`, `everyday/reportScreen.ts`,
@@ -43075,6 +43079,8 @@ Replacing trace redraws with thinning on a named stream, which may later require
 
 ## D1002 — a run the Everyday product starts begins with no presses, and a day's sheet lists only its own
 
+> **Status 2026-09-25: CLAUSE 3 AMENDED by [§ D1093](#d1093)** (an agent ruling). A career day cleared its log only on the way into the career; every career day now starts with none. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-25 · Owner: wave AI lane AI-A · Answers the post-AH playability panel's assessor A defect 1 and assessor B's D1 · Rules on: `ViewerState.interventions`' clearing ledger (`dev/state.ts`), `everyday/host.ts`'s Scenario presses, `everyday/replay.ts`, and [§ D931](#d931)'s with-and-without pair.**
 
 > Taken by an agent lane under delegated authority, not by the product owner. It moves a rule that
@@ -43103,6 +43109,8 @@ The sheet still reads `state.interventions` at close, as `dev/main.ts#closeShift
 
 ## D1003 — the address bar does not describe a mode's run, so a reload cannot put a mode's crowd on the Scenario week
 
+> **Status 2026-09-25: AMENDED by [§ D1097](#d1097)** (an agent ruling). The bar is also held bare while a fix-it case is on screen, and written back when it is left; the modes are unchanged. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-25 · Owner: wave AI lane AI-A · Answers the post-AH panel's assessor D N2 and assessor B's D3 · Amends [§ D189](#d189)'s *the seed is always written*.**
 
 > Taken by an agent lane under delegated authority, not by the product owner, and to be read as an
@@ -43123,6 +43131,8 @@ The sheet still reads `state.interventions` at close, as `dev/main.ts#closeShift
 **What it does not do.** An address written by an earlier build still reads back; a bookmark taken mid-rush before this commit still opens on the rush's crowd, because a link is honoured. `shareLinkOf` is unchanged.
 
 ## D1004 — a closed today opens tomorrow from the front door, and a day in the week's history reads as closed everywhere
+
+> **Status 2026-09-25: COPY AMENDED by [§ D1098](#d1098)** (an agent ruling). *Run today again* says the week keeps the attempt closed last, which is what `closeDay` does, instead of *the better one*. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-25 · Owner: wave AI lane AI-A · Answers the post-AH panel's assessor A defects 2 and 3 and assessor B's D5 · Rules on: GAMEPLAY § 3.3's door row, § 6.1's primary, § 14's day cards and § 16 rule 1 as `weekView.ts` and `rail.ts` read it, and `honesty/agreement.ts`'s `career-line` pair.**
 
@@ -43909,6 +43919,8 @@ day showed. Whether that is the suggestion clause 4 forbids is the owner's readi
 does not take it.
 
 ## D1047 — a newcomer's first scored day is a pinned press day, drawn off the date from the legible towers § D1029 admits, and nothing is stored
+
+> **Status 2026-09-25: AMENDED by [§ D1096](#d1096)** (an agent ruling). An address that only restates the date, its crowd or the tower its draw deals, deals the pinned day as a bare one does; a `?seed=` other than the date's still wins. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: a
 > three-member decision swarm (the player, honesty and engineering lenses, whose records are the
@@ -45060,3 +45072,184 @@ the peak where it does; the rung's booked-out stretch covering lunch on a whole 
 peak on a slice is a co-occurrence ([§ D256](#d256)). The larger towers were measured at three to
 five whole days each. The slice-only contracts (`c1`, `c7`, `c8`) were not measured, and the slice
 bar is not re-derived here.
+
+---
+
+## D1093 — every career day starts with no presses, not only the first one
+
+> **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ lane AJ-G), not by
+> the product owner, and to be read as an agent ruling. It carries [§ D1002](#d1002)'s own rule to
+> the one press that rule said was already covered and was not. **Amends § D1002 clause 3.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: § D1002 clause 3 says *a rush and a career day
+already did this through `RUSH_FIELD_ROLES` and `careerHold`*, and for a career day that was true of
+the first day of a sitting only.
+
+**What was wrong.** `everyday/host.ts#runCampaignDay` wrote `interventions: []` only when it was
+entering the career from the Scenario (`careerHold === undefined`). The post-AI panel's seat A
+pressed *Spread the cars across the tower* at 08:50 on Garden Apartments' day 1, pressed nothing on
+days 2, 3 and 4, and read *08:50 · spread the cars across the tower* on all three headers and *You
+spread the cars across the tower, with 0 people standing* on day 3's report: every later day was
+simulated under day 1's press and credited it to the player.
+
+**The ruling.** `runCampaignDay` clears the log on every press. A career day is a run the press
+starts, which is § D1002's ground for `startRun`, so the log that stands there always belongs to
+another run. `host.test.ts` (*starts every career day with no presses, not only the first one*)
+was red before and is green after.
+
+## D1094 — a replay meets the crowd its day had, read off the day's own record
+
+> **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ lane AJ-G), not by
+> the product owner, and to be read as an agent ruling. **Amends [§ D517](#d517)**, whose mechanism
+> left the seed and the shift length *exactly where they are, because they are what the day was*.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it moves a recorded mechanism and binds
+`everyday/replay.ts`, `everyday/doorView.ts` and `everyday/host.ts`.
+
+**What was wrong.** A week's seed does not stand still. After a pinned Monday on the pin's crowd
+(`20276662`), the session's seed goes back to the date's for Tuesday. The post-AI panel's seat D
+banked that Monday, pressed the MON chip, and read *Day 1 again, on the crowd it had* over a stage
+running `20260925`: no call, and a 304 s worst wait against the banked day's 181 s.
+
+**The ruling.**
+
+1. The replay reads the crowd and the stretch of the day off `DayOutcome.record`, the question the
+   day was, which `dev/main.ts#closeShift` writes for exactly this: the seed, the demand selection,
+   the length and the window. The building is the replay week's own at that day's growth; the
+   driver stays the player's to choose on the brief, because the door promises the crowd and not
+   the choices.
+2. A day filed without a record keeps the crowd standing now, and the door says so
+   (`REPLAY_COPY.doorNoteNoRecord`) rather than promising the one it had. The door and the replay
+   read one lookup, `replay.ts#recordOfDay`, so the promise cannot outrun the run.
+3. Leaving the replay puts the standing crowd and shape back, beside the recording and the log
+   § D1002 already restores.
+
+`replay.test.ts` compares the replay with the recorded day **on the legs** and was red before.
+
+**What it does not do.** A replay of a pinned day still draws no call: the call is gated on the
+week's contract, and a replay week has none. That is recorded as open rather than fixed here.
+
+## D1095 — the shared day's slice is its contract's length, and the address sizes only a crowd it chose
+
+> **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ lane AJ-G), not by
+> the product owner, and to be read as an agent ruling. The owner may reverse clause 2, the reading
+> that a link naming its own crowd also names its own length.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it binds `everyday/host.ts`'s Scenario
+presses, the brief's previews and `dev/main.ts`'s bindings, and it narrows what
+`dev/main.ts#deepLinkStateOf`'s `?duration=` reaches.
+
+**What was wrong.** On a tower with no authored whole day the Scenario press wrote no length, so the
+day ran whatever `ViewerState.shiftLengthS` held. Three things write that field before the press:
+the address's `?duration=` (which `deepLinkSearchOf` writes whenever the week's contract length
+differs from `c1`'s hour, so every newcomer dealt a thirty-minute tower carried `duration=1800`), a
+restored session's leftover `c1` hour (`withBuilding` does not re-seed), and the Engineer's length
+control. The post-AI panel's seat D opened one St Jude Wednesday on one crowd twice: 08:30 to 09:00
+with 461 arrivals from the carried address, 08:30 to 09:30 with 873 from a bare `/`, both under
+*anyone on this day of their week meets the same one*, and two tabs banked both into one week.
+
+**The ruling.**
+
+1. On the shared day, meaning a crowd that is the date's own or a contract's pin, the Scenario press
+   runs the contract's length as a slice, with the window unset (`host.ts#contractSliceFor`,
+   through `dayPatchFor`). The brief's `goalsAhead` and `dayAhead` read the same patch, so what the
+   brief previews is what the stage runs.
+2. A crowd the address chose (`?seed=` other than the date's) is a run the link describes, and its
+   length rides with it: a link names a whole run or it is *a different run wearing the same
+   address*, which is `deepLinkStateOf`'s own rule. This is also what keeps the tier's fast
+   `?seed=424242&duration=300` days honest.
+3. A tower with an authored whole day is unchanged, and a replay's shape is its record's
+   ([§ D1094](#d1094)).
+
+`host.test.ts` holds both arms; `everyday/dayOnScreen.browser.test.ts` loads one tower on the date's
+crowd at `?duration=300` and `?duration=1200` and requires one day. Both were red before.
+
+## D1096 — a fresh device's address deals the pinned day unless it asks for something the date does not
+
+> **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ lane AJ-G), not by
+> the product owner, and to be read as an agent ruling. **Amends [§ D1047](#d1047)**, whose *a
+> `?seed=` in the address wins* is kept for every crowd but the date's own.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it narrows how § D1047 reads the address.
+
+**What was wrong.** `dev/main.ts`'s boot dealt a first session its pinned day only when the address
+carried no `?building=`, and gave the crowd to the address whenever it carried `?seed=`. The
+address this page writes on a Scenario day is `?building=<the day's tower>&seed=<the date>`. The
+post-AI panel's seat A opened one such address in a fresh context and got the date's crowd on the
+date's tower, with no pin, no call and *today's date* on the brief, where the same newcomer at `/`
+got *crowd 20276662 · the pinned crowd*.
+
+**The ruling.** The boot asks what the address adds (`shift/firstSession.ts#firstDayDealOf`). A seed
+equal to the date's is the day's crowd, not the reader's, and so is the pin of the day the date
+deals, which is the address this page writes on the pinned day itself. A tower equal to the one the date's draw
+deals is not a choice either, unless it comes beside a crowd of the reader's own. So a bare address
+and one that restates the date deal the pinned day; `?seed=` alone still deals on the reader's
+crowd; a tower the date did not deal, or the dealt tower beside the reader's crowd, opens as it
+always did. `firstSession.test.ts` holds the table and `dayOnScreen.browser.test.ts` holds the
+newcomer on the shipped bundle, red before.
+
+## D1097 — the address bar is held bare while a fix-it case is on screen
+
+> **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ lane AJ-G), not by
+> the product owner, and to be read as an agent ruling. The owner may reverse it, and the cost of
+> reversing is stated below. **Amends [§ D1003](#d1003)** by a screen rather than by a week.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it binds `dev/main.ts#syncUrl`,
+`everyday/shell.ts#go` and `everyday/host.ts`, and it adds a case to § D1003's rule about when the
+bar may describe a run.
+
+**What was wrong.** The post-AI panel's seat B opened *Fix a building* on Vertical City and read the
+daily's `?building=…&seed=20260925` in the bar the whole time. A link copied there opened a
+different tower from the one on screen.
+
+**The ruling.** While the fix-it screen is up the bar is bare, and `syncUrl` writes nothing; leaving
+the screen writes the Scenario's address back. The case gets no address of its own, because a link
+that opened it would be the entry-screen override GAMEPLAY § 3.5 forbids. The shell's list is
+`ADDRESS_BARE_SCREENS`, holding one screen.
+
+**What it costs.** A reload taken on the fix-it screen lands on the menu with the Scenario re-derived
+from the date, so a crowd only the address was carrying (a reader's `?seed=`, or a pinned day chosen
+on the picker) does not survive that one reload. § D1003's modes are unchanged: a rush, a replay and
+a career day still leave the Scenario's address standing, which seat A reported as a second defect
+and this entry does not rule on.
+
+## D1098 — *Run today again* says which attempt the week keeps
+
+> **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ lane AJ-G), not by
+> the product owner, and to be read as an agent ruling. **Amends [§ D1004](#d1004)'s copy**, not its
+> mechanism.
+
+**Why an entry.** [§ D405](#d405)'s second ground: § D1004 clause 1 drew *Run today again* with the
+note *The week keeps the better one rather than banking both*, and `shift/week.ts#closeDay` keeps
+the later attempt: a retry replaces the day in the history and re-banks from the snapshot taken
+before the first close, whichever reads better. Seat A kept 35 % over 36 % on a Friday and seat D
+53 % over 54 % on a Tuesday.
+
+**The ruling.** The sentence moves to the arithmetic: *Your week keeps the attempt you close last in
+place of the earlier one, even when it reads worse.* `closeDay`'s rule is its own ruling (a rule
+that could only add would let a player bank a clean run and keep the credit), and the retake banking
+questions are with the swarm ruling on the call card, so the arithmetic is left alone.
+`doorView.test.ts` closes a day at 36 and re-closes it at 35 and requires the note to describe what
+the history holds.
+
+## D1099 — a rush round with changes is set beside an untouched round from the same start, when the sitting has one
+
+> **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ lane AJ-G), not by
+> the product owner, and to be read as an agent ruling. **Amends [§ D859](#d859)**'s note, which
+> said a press's worth is never measured on the sheet.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it moves a recorded refusal to a measurement.
+
+**What was wrong.** § D859's note under a round's changes ends *this sitting has only the round you
+played*. Seat A played a round with two presses, then *Run the rush again* with none, and the note
+stayed on round 1 above a listed round 2 that had played the same waves untouched.
+
+**The ruling.** Every round records a `startKey`: the building, kit, seed, stream, dispatcher
+document, rules and levers it started from, and nothing it pressed. A rush is simulated
+deterministically from exactly those, so an untouched round with the same key **is** the pressed
+round without its changes, and the gap between their holds is exact for that crowd. The note then
+has four arms (`rushPost.ts#changesNoteOf`): one round, as before; no other round from the same
+start; a twin that one of the two ended by hand, which is not compared; and a twin that broke,
+where the sheet gives the twin's hold and whether the changes held longer or less, and says it is
+one crowd. The key errs toward inequality: a lever moved between rounds is two starts.
+`rushPost.test.ts` holds the arms and `host.test.ts` holds the key. D1100 and D1101 are unspent.

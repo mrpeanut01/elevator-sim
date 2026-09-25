@@ -43,7 +43,7 @@ import type { DayOutcome, WeekState } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { EM_DASH, percentFigure } from './figures.js';
-import { REPLAY_COPY, replayableDay } from './replay.js';
+import { recordOfDay, REPLAY_COPY, replayableDay } from './replay.js';
 import type { TodayRecord } from './today.js';
 import {
   WORLD_FIGURES_ABSENT,
@@ -347,6 +347,15 @@ function noteFor(state: {
 }
 
 /**
+ * The line under *Run today again* — what the second attempt is, and which attempt the week keeps.
+ * Player-facing; swept by the corpus through the door adapter. See the `again` arm below for why it
+ * says *the one you close last* (wave AJ, [§ D1098](../../../../DECISIONS.md)).
+ */
+export const RUN_TODAY_AGAIN_NOTE =
+  'Another attempt at the same day, on the same crowd and with no presses carried over. ' +
+  'Your week keeps the attempt you close last in place of the earlier one, even when it reads worse.';
+
+/**
  * § 3.3's primary for the selected day.
  *
  * Today is pressable and goes on to the brief. A past day inside the week is pressable too since
@@ -379,9 +388,17 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
         goes: 'tomorrow',
         again: {
           label: 'Run today again',
-          note:
-            'Another attempt at the same day, on the same crowd and with no presses carried over. ' +
-            'The week keeps the better one rather than banking both.',
+          /*
+           * **What the week keeps, said as `shift/week.ts#closeDay` does it** — wave AJ, § D1098.
+           * This said *the week keeps the better one*, and the week does not: a retry replaces the
+           * day it re-ran (`history: [...slice(0, -1), outcome]`) and recomputes the banked count
+           * from the snapshot taken before the first close, whichever attempt read better. The
+           * post-AI panel's seat A kept 35 % over 36 % on a Friday, and seat D 53 % over 54 % on a
+           * Tuesday. Keeping the later attempt is `closeDay`'s ruling (*a rule that could only ever
+           * add would let a player bank a clean run and then keep the credit while re-running*), so
+           * the sentence moves to meet it rather than the arithmetic moving to meet the sentence.
+           */
+          note: RUN_TODAY_AGAIN_NOTE,
         },
       };
     }
@@ -402,7 +419,11 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
   if (chip?.day !== undefined && replayableDay(input.week, chip.day)) {
     return {
       label: 'Set up the replay',
-      note: REPLAY_COPY.doorNote(chip.day),
+      /* The promise is the record's to make — `replay.ts#replayedDayOfRecord`, § D1094. */
+      note:
+        recordOfDay(input.week, chip.day) === undefined
+          ? REPLAY_COPY.doorNoteNoRecord(chip.day)
+          : REPLAY_COPY.doorNote(chip.day),
       inert: false,
       goes: 'replay',
       again: undefined,

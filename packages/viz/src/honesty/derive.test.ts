@@ -2234,9 +2234,11 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'Since § D1047 two more read the stream and print nothing: `firstSessionDayFor` hands ' +
         '`withFirstSession` the drawn pin’s crowd and standing order, and `isDealtPinnedDay` is the ' +
         'predicate the line’s pinned arm and the boot’s seed base share — both answer with ids, ' +
-        'seeds and a boolean, and the line they choose is seeded by name.',
+        'seeds and a boolean, and the line they choose is seeded by name. Wave AJ’s ' +
+        '`firstDayDealOf` (§ D1096) is the boot’s question of the address and answers two booleans.',
       ids: [
         'shift/firstSession.ts#FIRST_SESSION_STREAM',
+        'shift/firstSession.ts#firstDayDealOf',
         'shift/firstSession.ts#firstSessionContractFor',
         'shift/firstSession.ts#firstSessionDayFor',
         'shift/firstSession.ts#isDealtPinnedDay',

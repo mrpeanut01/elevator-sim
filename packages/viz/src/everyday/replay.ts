@@ -37,6 +37,7 @@
 import type { DayOutcome, WeekState } from '../shift/types.js';
 import { openReplay, REPLAY_CONTRACT_ID, switchWeek } from '../shift/week.js';
 import type { ViewerState } from '../dev/state.js';
+import type { WatchRecord } from '../watch/types.js';
 
 /** What the replay leaves behind to be put back — {@link replayPatchOf}'s inverse. */
 export interface ReplayBefore {
@@ -50,6 +51,24 @@ export interface ReplayBefore {
    * own day with presses made on another.
    */
   readonly interventions: ViewerState['interventions'];
+  /**
+   * The crowd and the shape of the day that stood before the replay — wave AJ, § D1094. Put back
+   * on the way out, because {@link replayPatchOf} now writes the replayed day's own over them.
+   */
+  readonly day: ReplayedDay;
+}
+
+/** The fields that say which crowd a day met and over what stretch of the day — a record's half. */
+type ReplayedDay = Pick<ViewerState, 'seed' | 'pattern' | 'freePlay' | 'shiftLengthS' | 'windowStartS'>;
+
+function replayedDayOf(state: ViewerState): ReplayedDay {
+  return {
+    seed: state.seed,
+    pattern: state.pattern,
+    freePlay: state.freePlay,
+    shiftLengthS: state.shiftLengthS,
+    windowStartS: state.windowStartS,
+  };
 }
 
 export function replayBeforeOf(state: ViewerState): ReplayBefore {
@@ -58,6 +77,47 @@ export function replayBeforeOf(state: ViewerState): ReplayBefore {
     playMode: state.playMode,
     recording: state.recording,
     interventions: state.interventions,
+    day: replayedDayOf(state),
+  };
+}
+
+/**
+ * The record `day` was filed with, or `undefined` — the one read both {@link replayedDayOfRecord}
+ * and the door's promise ask, so the door cannot promise a crowd the replay would not run.
+ */
+export function recordOfDay(week: WeekState, day: number): WatchRecord | undefined {
+  return week.history.find((entry) => entry.day === day)?.record ?? undefined;
+}
+
+/**
+ * **The crowd `day` met, read off its own record** — wave AJ, [§ D1094](../../../../DECISIONS.md),
+ * or `undefined` when the week holds no record for it.
+ *
+ * The door says *"Day 1 again, on the crowd it had"*, and the replay ran the crowd standing now:
+ * after a pinned Monday (crowd `20276662`, the pin's) the session's seed goes back to the date's for
+ * Tuesday, and pressing the Monday chip ran `20260925` — a different day under that day's name, with
+ * no call, ending at 304 s where the banked Monday read 181 s (the post-AI panel's seat D, D2). The
+ * week already carries the answer: `DayOutcome.record` is the question the day was, written by
+ * `dev/main.ts#closeShift` for exactly this — *store the question, because the answer is a pure
+ * function of it*. So the replay reads the seed, the demand selection and the window off it rather
+ * than off the state.
+ *
+ * Only the crowd and the stretch of the day. The building is the week's own at that day's growth,
+ * which the replay week already stands on, and the driver is the player's to choose on the brief —
+ * a replay is a second go at the day, and the door promises its crowd rather than its choices.
+ */
+export function replayedDayOfRecord(week: WeekState, day: number): ReplayedDay | undefined {
+  const record = recordOfDay(week, day);
+  if (record === undefined) return undefined;
+  return {
+    seed: BigInt(record.seed),
+    pattern: record.pattern,
+    freePlay:
+      record.demandTemplateId === null
+        ? undefined
+        : { demandTemplateId: record.demandTemplateId, arrivalRatePctPop5min: record.arrivalRatePctPop5min },
+    shiftLengthS: record.shiftLengthS,
+    windowStartS: record.windowStartS,
   };
 }
 
@@ -75,13 +135,18 @@ export function replayDayIdxOf(week: WeekState, day: number): number {
  * The state a replay runs in: the player's week parked, a replay week standing on `day`.
  *
  * `playMode` is set to the week loop's so the sheet is the day-shaped one whatever the player was
- * last doing; the parked week keeps its own. Seed, building, dispatcher, levers and shift length
- * are all left exactly where they are, because they are what the day was.
+ * last doing; the parked week keeps its own. **The crowd and the stretch of the day are the day's
+ * own record's** ({@link replayedDayOfRecord}, § D1094); this paragraph used to say the seed and
+ * the length were *left exactly where they are, because they are what the day was*, which stopped
+ * being true the first time a week's seed moved between days. A day filed without a record keeps
+ * the standing crowd, and the door says so rather than promising the one it had
+ * ({@link REPLAY_COPY.doorNoteNoRecord}). Building, dispatcher and levers are left where they are.
  */
 export function replayPatchOf(state: ViewerState, day: number): Partial<ViewerState> {
   const moved = switchWeek(state.week, state.parkedWeeks, REPLAY_CONTRACT_ID, 'restart');
   const history: readonly DayOutcome[] = state.week.history;
   return {
+    ...(replayedDayOfRecord(state.week, day) ?? {}),
     playMode: 'shift-week',
     week: openReplay(day, replayDayIdxOf(state.week, day), history),
     parkedWeeks: moved.parked,
@@ -99,6 +164,7 @@ export function replayRestorePatchOf(state: ViewerState, before: ReplayBefore): 
     playMode: before.playMode,
     recording: before.recording,
     interventions: before.interventions,
+    ...before.day,
   };
 }
 
@@ -107,6 +173,13 @@ export const REPLAY_COPY = Object.freeze({
   /** Under *Set up the replay*, on a day the strip can hand back. */
   doorNote: (day: number): string =>
     `Day ${String(day)} again, on the crowd it had. A replay never counts: the board keeps what you posted, and your week stays where it is.`,
+  /**
+   * Under the same button, on a day filed without the record of what it ran — § D1094. The replay
+   * then meets the crowd standing now, and the door says so rather than {@link doorNote}'s promise.
+   */
+  doorNoteNoRecord: (day: number): string =>
+    `Day ${String(day)} again, on the crowd standing now: this day was filed without a record of the one it had. ` +
+    'A replay never counts: the board keeps what you posted, and your week stays where it is.',
   /** Under the same button, on a chip from before this week began. */
   beforeTheWeek: 'That day is from before this week began, so there is no day here to hand back.',
   /** The rail's subline on the stage and the report. */

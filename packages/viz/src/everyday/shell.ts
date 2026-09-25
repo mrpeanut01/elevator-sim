@@ -1336,6 +1336,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * Recorded here rather than in `DECISIONS.md`, under § D405 — the disarm is one function's interaction
    * with § D388's keeper, and the browser tier drives it.
    */
+  /** Screens that play a run the address cannot name, so the bar is held bare over them — § D1097. */
+  const ADDRESS_BARE_SCREENS: readonly EverydayScreen[] = ['fixit'];
   /** § 8's own screens — the ones a career day's state may stand behind (GitHub issue #594). */
   const CAREER_FLOW_SCREENS: readonly EverydayScreen[] = ['towers', 'building', 'contract', 'stage', 'report'];
 
@@ -1363,6 +1365,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
      * is idempotent, so a row pressed with no career day standing costs nothing.
      */
     if (state.ctx === 'campaign' && !CAREER_FLOW_SCREENS.includes(screen)) dataHost?.leaveCareer?.();
+    /*
+     * **The address names the run on screen, or nothing** — wave AJ, § D1097. A fix-it case plays a
+     * building and a crowd of its own, and the bar went on reading the daily's
+     * `?building=…&seed=…` over it (the post-AI panel's seat B), so a link copied there opened a
+     * different tower from the one on the screen. The case has no address form — a link that opened
+     * it would be the entry-screen override § 3.5 forbids — so the bar is held bare while it shows.
+     */
+    dataHost?.addressDescribesRun?.(!ADDRESS_BARE_SCREENS.includes(screen));
     /*
      * § 7.3 E8 — the beat-drop profile's only source, and it is here for {@link leaveWatch}'s own
      * reason: every rail row, every bar button and every screen's own hand-off calls {@link go},

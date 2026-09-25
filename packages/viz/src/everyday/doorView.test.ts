@@ -16,9 +16,9 @@ import { describe, expect, it } from 'vitest';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js';
 import type { WatchRecord } from '../watch/types.js';
-import { HISTORY_DAYS, openWeek, outcomeOf } from '../shift/week.js';
+import { closeDay, HISTORY_DAYS, openWeek, outcomeOf } from '../shift/week.js';
 
-import { DAY_OFFSET_MIN, doorScreenViewOf, DOOR_STEPS, sameForEveryoneLine } from './doorView.js';
+import { DAY_OFFSET_MIN, doorScreenViewOf, DOOR_STEPS, RUN_TODAY_AGAIN_NOTE, sameForEveryoneLine } from './doorView.js';
 import { EM_DASH } from './figures.js';
 import type { TodayRecord } from './today.js';
 
@@ -214,6 +214,24 @@ describe('the § 3.3 primary, and the replay a past day earns — § D517', () =
     expect(view.primary.again?.label).toBe('Run today again');
     expect(view.primary.again?.note).toMatch(/another attempt/iu);
     expect(view.primary.again?.note).toMatch(/no presses carried over/);
+  });
+
+  it('says which attempt the week keeps, and it is the one closeDay keeps (wave AJ, § D1098)', () => {
+    /*
+     * The post-AI panel's seat A: *Run today again* said *the week keeps the better one*, and Friday
+     * kept 35 % over 36 %. The week is asked rather than described: close a day at a better figure,
+     * re-close it at a worse one, and read what the history holds.
+     */
+    const better = { ...closedDay(5), minutePct: 36 };
+    const worse = { ...closedDay(5), minutePct: 35 };
+    const week = closeDay(closeDay(weekWith(5, []), better), worse);
+    expect(week.history.at(-1)?.minutePct, 'closeDay kept the better attempt, so the note must say so').toBe(35);
+
+    const note = viewAt(0, true).primary.again?.note ?? '';
+    expect(note).toBe(RUN_TODAY_AGAIN_NOTE);
+    expect(note).not.toMatch(/better one/u);
+    expect(note).toMatch(/close last/u);
+    expect(note).toMatch(/even when it reads worse/u);
   });
 
   it('reads a closed today off the week as well as off the sitting — a reload keeps the day, not the run', () => {

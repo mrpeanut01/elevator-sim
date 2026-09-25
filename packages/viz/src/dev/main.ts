@@ -223,7 +223,7 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 import { dailySeedAt } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
-import { isDealtPinnedDay } from '../shift/firstSession.js';
+import { firstDayDealOf, isDealtPinnedDay } from '../shift/firstSession.js';
 
 import { savedProfilesOf } from '../batch/library.js';
 import { mountBatchPanel } from './batchPanel.js';
@@ -791,6 +791,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * first real state change onward the address follows the run, seed included.
    */
   let urlWritable = false;
+  /**
+   * Whether the Everyday shell is showing a screen whose run the address cannot name — wave AJ,
+   * [§ D1097](../../../../DECISIONS.md). Set through `EverydayHostBindings.holdAddress`; while it is
+   * `true` the bar is bare and {@link syncUrl} writes nothing. In memory only: a reload lands on the
+   * menu whatever screen was up, and the Scenario's crowd is re-derived from the date there, so a
+   * crowd only the address was carrying (a reader's `?seed=`, a picker's pinned day) does not survive
+   * a reload taken on the fix-it screen. That is the price of the bar not naming a tower the screen
+   * is not showing, and it is paid only on that screen.
+   */
+  let addressHeld = false;
   let playback: Playback | undefined;
   let building = resources.entries[0]?.resolved;
   let lastAnnouncedMs = 0;
@@ -1896,17 +1906,29 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * week the draw opened, and one that finds none draws again from the same date, which is
        * § D476's shape.
        */
-      else if (!new URLSearchParams(window.location.search).has('building')) {
+      else {
         /*
          * **And the day it deals is the tower's pinned day** — [§ D1047](../../../../DECISIONS.md).
-         * The pin's crowd and standing order, unless the address carried `?seed=`, whose crowd is
-         * the reader's and wins. The day's own crowd is not lost by this: the host is handed it as
-         * the crowd to put back (`initialPressDaySeedBase` below), re-derived from the date rather
-         * than kept anywhere.
+         * The pin's crowd and standing order, unless the address carried a crowd of the reader's
+         * own, which wins. The day's own crowd is not lost by this: the host is handed it as the
+         * crowd to put back (`initialPressDaySeedBase` below), re-derived from the date rather than
+         * kept anywhere.
+         *
+         * **What the address adds is asked, not whether it has keys** — wave AJ, § D1096. An
+         * address naming the date's own crowd on the date's own tower is the one this page writes on
+         * a Scenario day; read as a choice, it cost a newcomer the pinned day.
+         * `shift/firstSession.ts#firstDayDealOf` carries the argument.
          */
-        state = withFirstSession(state, resources, {
-          crowdFromAddress: new URLSearchParams(window.location.search).has('seed'),
-        });
+        const params = new URLSearchParams(window.location.search);
+        const seedText = params.get('seed');
+        const deal = firstDayDealOf(
+          {
+            building: params.get('building'),
+            seed: seedText !== null && isSeedText(seedText) ? BigInt(seedText) : null,
+          },
+          dailySeedAt(deviceNowMs()),
+        );
+        if (deal.deal) state = withFirstSession(state, resources, { crowdFromAddress: deal.crowdFromAddress });
       }
       return;
     }
@@ -4265,6 +4287,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const daySeed = dailySeedAt(deviceNowMs());
       return isDealtPinnedDay(state.week.contractId, state.seed, daySeed) ? daySeed : undefined;
     })(),
+    /* The date's own crowd, read at the press — `EverydayHostBindings.daySeed`, § D1095. */
+    daySeed: () => dailySeedAt(deviceNowMs()),
+    holdAddress: (held) => {
+      if (addressHeld === held) return;
+      addressHeld = held;
+      if (!held) {
+        syncUrl();
+        return;
+      }
+      if (window.location.search !== '') window.history.replaceState(null, '', window.location.pathname);
+    },
     /*
      * #221's read half, composed here because it is client work: `boundaries.test.ts` permits
      * exactly two modules to hold a leaderboard client and a screen would be a third. `undefined`
@@ -5265,6 +5298,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   function syncUrl(): void {
     if (!urlWritable) return;
+    /* A screen showing a run the address cannot name holds it bare — {@link addressHeld}, § D1097. */
+    if (addressHeld) return;
     /* A mode's run is not written over the Scenario's address — {@link addressFollowsRun}, § D1003. */
     if (!addressFollowsRun(state)) return;
     const search = deepLinkSearchOf(state, deepLinkDefaults);

@@ -11077,6 +11077,8 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
         holdS: null,
         outcome: stopped,
         unpostable: [],
+        /* One start for both rounds, so round 2's note is § D1099's hand-stopped twin arm. */
+        startKey: 'corpus-sitting',
       },
       {
         dispatcherProfileId: recording.dispatcherProfileId,
@@ -11101,6 +11103,7 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
         holdS: broke.heldS,
         outcome: broke,
         unpostable: [],
+        startKey: 'corpus-sitting',
       },
     ];
     for (const state of rushPostStates(sittingRounds)) {
@@ -11146,6 +11149,35 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
         if (round.earned !== undefined) seeds.push({ field: `${at}.earned`, text: round.earned, role: 'observation' });
         if (round.refusal !== undefined) seeds.push({ field: `${at}.refusal`, text: round.refusal, role: 'reason' });
       }
+    }
+    /*
+     * **The measured arm of the changes note** — wave AJ, § D1099. The sitting above drives the
+     * hand-stopped twin (its two rounds share a start and the first was ended by hand); this drives
+     * the arm that sets a pressed round's hold beside an untouched one that broke on the same waves,
+     * which is the one arm of the note that prints figures. Two rounds from one start, the pressed
+     * one taken from the sitting and the untouched one holding a minute longer on the same wave, so
+     * the note reads *held 1:00 less*. The *longer* and *exactly as long* words are the same
+     * template's and are held by `rushPost.test.ts`.
+     */
+    const pressedTwin = sittingRounds[1];
+    if (pressedTwin !== undefined) {
+      const untouchedTwin: RushRoundRecord = {
+        ...pressedTwin,
+        drivers: [dispatcherNameOf(context)],
+        changes: [],
+        interventionCount: 0,
+        outcome: { ...broke, heldS: broke.heldS + 60 },
+      };
+      const twinView = rushPostViewOf({
+        rounds: [pressedTwin, untouchedTwin],
+        check: rushSittingOf({ buildingId: 'midtown-office', rounds: [pressedTwin, untouchedTwin] }),
+        hasServer: true,
+        signedIn: true,
+        posting: false,
+        outcome: undefined,
+      });
+      const note = twinView.rounds[0]?.changesNote;
+      if (note !== undefined) seeds.push({ field: 'rush.post(twin).round0.changesNote', text: note, role: 'prose' });
     }
     return singleRun(this.id, seeds);
   },
@@ -13154,6 +13186,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/firstSession.ts#FIRST_SESSION_LINE_PINNED_BY_NUMBER',
     'everyday/firstDayLength.ts#pinnedDayLengthLineOf',
     'everyday/doorView.ts#doorScreenViewOf',
+    /* *Run today again*'s note — wave AJ, § D1098. Drawn by `doorScreenViewOf` at a closed today,
+       which the door renders below reach, and exported so its test can read it by name. */
+    'everyday/doorView.ts#RUN_TODAY_AGAIN_NOTE',
     /* § 6.1's replay words — GitHub issue #177 item 1. The door's primary note carries both arms
        (a day inside the week, a chip from before it), and the bar and rail adapters carry the rest. */
     'everyday/replay.ts#REPLAY_COPY',

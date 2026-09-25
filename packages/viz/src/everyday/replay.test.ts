@@ -15,7 +15,8 @@ import { openWeek, closeDay, outcomeOf, REPLAY_CONTRACT_ID, PARKED_WEEKS_MAX, WE
 import { CONTRACTS, contractById } from '../shift/contracts.js';
 import type { DayOutcome } from '../shift/types.js';
 
-import { REPLAY_COPY, replayBeforeOf, replayDayIdxOf, replayPatchOf, replayRestorePatchOf, replayableDay } from './replay.js';
+import { recordOfDay, REPLAY_COPY, replayBeforeOf, replayDayIdxOf, replayPatchOf, replayRestorePatchOf, replayableDay } from './replay.js';
+import type { WatchRecord } from '../watch/types.js';
 
 function outcome(day: number, dayIdx: number): DayOutcome {
   return outcomeOf({
@@ -121,6 +122,61 @@ describe('a replay is the day it was — compared on the legs', () => {
     /* Non-vacuous: the standing day meets a different crowd, because the building has grown. */
     expect(legsOf({ ...base, week: live })).not.toBe(legsOf(onDayTwo));
   }, 120_000);
+});
+
+/**
+ * **The crowd a replay meets is the day's own, read off its record** — wave AJ, § D1094, the post-AI
+ * panel's seat D, D2: the pinned Monday (the pin's crowd) was replayed from the chip on the date's
+ * crowd, under *"Day 1 again, on the crowd it had"*.
+ */
+describe('a replay meets the crowd its day had, not the crowd standing now', () => {
+  const recorded = (day: number, dayIdx: number, seed: bigint, shiftLengthS: number): DayOutcome => ({
+    ...outcome(day, dayIdx),
+    record: {
+      version: 2,
+      seed: seed.toString(),
+      buildingId: baseState().buildingId,
+      dispatcherId: baseState().dispatcherId,
+      pattern: 'building',
+      demandTemplateId: null,
+      arrivalRatePctPop5min: null,
+      shiftLengthS,
+      windowStartS: null,
+      day,
+      dayIdx,
+      outOfServiceCarIds: [],
+      interventions: [],
+      ruleRows: [],
+    } as unknown as WatchRecord,
+    recordRefusal: null,
+  });
+
+  it('runs the recorded crowd and length on the legs, and puts the standing ones back on the way out', () => {
+    const base = { ...baseState(), seed: 111n, shiftLengthS: 900 };
+    const live = { ...base.week, day: 3, dayIdx: 2, history: [outcome(1, 0), recorded(2, 1, 222n, 600)] };
+    const standing = { ...base, week: live };
+    const before = replayBeforeOf(standing);
+    const replay = { ...standing, ...replayPatchOf(standing, 2) };
+    expect(replay.seed).toBe(222n);
+    expect(replay.shiftLengthS).toBe(600);
+
+    const onDayTwo = { ...base, seed: 222n, shiftLengthS: 600, week: { ...base.week, day: 2, dayIdx: 1, history: [outcome(1, 0)] } };
+    expect(legsOf(replay)).toBe(legsOf(onDayTwo));
+    /* Non-vacuous: the standing crowd on the same day is a different day. */
+    expect(legsOf({ ...onDayTwo, seed: 111n, shiftLengthS: 900 })).not.toBe(legsOf(onDayTwo));
+
+    const restored = { ...replay, ...replayRestorePatchOf(replay, before) };
+    expect(restored.seed).toBe(111n);
+    expect(restored.shiftLengthS).toBe(900);
+  }, 120_000);
+
+  it('promises the crowd only for a day with a record, and says which crowd otherwise', () => {
+    const live = { ...baseState().week, day: 3, dayIdx: 2, history: [outcome(1, 0), recorded(2, 1, 222n, 600)] };
+    expect(recordOfDay(live, 2)).toBeDefined();
+    expect(recordOfDay(live, 1)).toBeUndefined();
+    expect(REPLAY_COPY.doorNoteNoRecord(1)).not.toMatch(/the crowd it had/u);
+    expect(REPLAY_COPY.doorNoteNoRecord(1)).toMatch(/standing now/u);
+  });
 });
 
 describe('the words', () => {
