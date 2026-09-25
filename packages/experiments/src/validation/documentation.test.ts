@@ -2172,7 +2172,15 @@ type DecisionReservation = {
  * the first-day and press-moment swarms made necessary after the first five blocks were allocated.
  * Committed before AI-F's worktree exists.
  */
-const OPEN_RESERVATION = { wave: 'AI', from: 1002, to: 1055 } as DecisionReservation | null;
+/*
+ * **Wave AI's reservation is CLOSED**, in the wave's own merge commit. Six blocks went out across
+ * D1002-D1055 and eleven headings were spent: lane AI-A three (D1002-D1004), AI-B one (D1011), AI-C
+ * one (D1020), AI-D one (D1029), AI-E four (D1038-D1041) and AI-F one (D1047). **Thirty-five numbers
+ * below the highest heading come back as holes** and are registered in `KNOWN_DECISION_HOLES`;
+ * **D1048-D1055 are free rather than holed**, since nothing is written above them (§ D430), and the
+ * charter row moves to **D1048**.
+ */
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
@@ -3140,6 +3148,56 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [997, "wave AH's lane AH-D's block; unspent for § 994's reason."],
   [998, "wave AH's lane AH-D's block; unspent for § 994's reason."],
   [999, "wave AH's lane AH-D's block; unspent for § 994's reason."],
+  [
+    1005,
+    "wave AI's lane AI-A held D1002-D1010 and spent D1002-D1004. Registered under D404 and D430.",
+  ],
+  [1006, "wave AI's lane AI-A's block; unspent for § 1005's reason."],
+  [1007, "wave AI's lane AI-A's block; unspent for § 1005's reason."],
+  [1008, "wave AI's lane AI-A's block; unspent for § 1005's reason."],
+  [1009, "wave AI's lane AI-A's block; unspent for § 1005's reason."],
+  [1010, "wave AI's lane AI-A's block; unspent for § 1005's reason."],
+  [
+    1012,
+    "wave AI's lane AI-B held D1011-D1019 and spent D1011. Registered under D404 and D430.",
+  ],
+  [1013, "wave AI's lane AI-B's block; unspent for § 1012's reason."],
+  [1014, "wave AI's lane AI-B's block; unspent for § 1012's reason."],
+  [1015, "wave AI's lane AI-B's block; unspent for § 1012's reason."],
+  [1016, "wave AI's lane AI-B's block; unspent for § 1012's reason."],
+  [1017, "wave AI's lane AI-B's block; unspent for § 1012's reason."],
+  [1018, "wave AI's lane AI-B's block; unspent for § 1012's reason."],
+  [1019, "wave AI's lane AI-B's block; unspent for § 1012's reason."],
+  [
+    1021,
+    "wave AI's lane AI-C held D1020-D1028 and spent D1020. Registered under D404 and D430.",
+  ],
+  [1022, "wave AI's lane AI-C's block; unspent for § 1021's reason."],
+  [1023, "wave AI's lane AI-C's block; unspent for § 1021's reason."],
+  [1024, "wave AI's lane AI-C's block; unspent for § 1021's reason."],
+  [1025, "wave AI's lane AI-C's block; unspent for § 1021's reason."],
+  [1026, "wave AI's lane AI-C's block; unspent for § 1021's reason."],
+  [1027, "wave AI's lane AI-C's block; unspent for § 1021's reason."],
+  [1028, "wave AI's lane AI-C's block; unspent for § 1021's reason."],
+  [
+    1030,
+    "wave AI's lane AI-D held D1029-D1037 and spent D1029. Registered under D404 and D430.",
+  ],
+  [1031, "wave AI's lane AI-D's block; unspent for § 1030's reason."],
+  [1032, "wave AI's lane AI-D's block; unspent for § 1030's reason."],
+  [1033, "wave AI's lane AI-D's block; unspent for § 1030's reason."],
+  [1034, "wave AI's lane AI-D's block; unspent for § 1030's reason."],
+  [1035, "wave AI's lane AI-D's block; unspent for § 1030's reason."],
+  [1036, "wave AI's lane AI-D's block; unspent for § 1030's reason."],
+  [1037, "wave AI's lane AI-D's block; unspent for § 1030's reason."],
+  [
+    1042,
+    "wave AI's lane AI-E held D1038-D1046 and spent D1038-D1041. Registered under D404 and D430.",
+  ],
+  [1043, "wave AI's lane AI-E's block; unspent for § 1042's reason."],
+  [1044, "wave AI's lane AI-E's block; unspent for § 1042's reason."],
+  [1045, "wave AI's lane AI-E's block; unspent for § 1042's reason."],
+  [1046, "wave AI's lane AI-E's block; unspent for § 1042's reason."],
 ]);
 
 /**
