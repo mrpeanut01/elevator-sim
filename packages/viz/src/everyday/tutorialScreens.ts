@@ -73,6 +73,7 @@ import { FIXIT_RUN_SWITCHES, figureValuesOf, fixitRunPlanOf } from '../fixit/run
 import type { FixitCase, FixitCases } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import { everydayProfileStore } from './profileStore.js';
+import { PACE_HOLD_WAIT_S } from './stagePace.js';
 import { el, EYEBROW, CARD } from './screenDom.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -80,7 +81,10 @@ import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from
 import {
   TUTORIAL_CASE_ID,
   TUTORIAL_COPY,
+  TUTORIAL_FIGURE_NOTES,
+  tutorialClockOf,
   tutorialCollapseViewOf,
+  tutorialPaceOf,
   tutorialWalkthroughViewOf,
   tutorialWorkedAnswerOf,
   workedAnswerFactsOf,
@@ -401,12 +405,20 @@ function figuresFor(): readonly TutorialFigure[] {
   const entry = loaded?.entry;
   const asBuilt = session.asBuilt;
   if (entry === undefined || asBuilt === undefined) return [];
-  return figureValuesOf(entry, asBuilt).map((figure, index) => ({
-    id: `figure-${String(index)}`,
-    label: figure.label,
-    value: figure.text,
-    note: entry.complaint.measure.label,
-  }));
+  /*
+   * GitHub issue #598: every card was captioned `entry.complaint.measure.label`, including the card
+   * about the lower floors. Each caption is now its own figure's, keyed by the figure's kind —
+   * `figureValuesOf` maps `entry.figures` in order, so the index names the same figure both ways.
+   */
+  return figureValuesOf(entry, asBuilt).map((figure, index) => {
+    const kind = entry.figures[index]?.kind;
+    return {
+      id: `figure-${String(index)}`,
+      label: figure.label,
+      value: figure.text,
+      note: kind === undefined ? figure.label : TUTORIAL_FIGURE_NOTES[kind],
+    };
+  });
 }
 
 function mountTutorial(
@@ -609,6 +621,13 @@ function mountCollapse(
   let stageBeat: TutorialBeat | undefined;
   /** Whether the run for the current beat has finished or been stopped. */
   let ended = false;
+  /**
+   * Whether the as-built canvas has shown somebody past a minute on a landing — GitHub issue #598,
+   * § D992. Latched from the present frame by the block's `onFrame`, never read ahead; the press
+   * waits for it (or for the morning to end) so nobody is asked to fix a building before seeing it
+   * break.
+   */
+  let troubleSeen = false;
   let worked: MountedWorkedAnswer | undefined;
   let said = '';
   /** What the action bar was last told — see the `refreshBar` note in {@link render}. */
@@ -670,9 +689,29 @@ function mountCollapse(
       dropStage();
       stageBeat = view.beat;
       const forBeat = view.beat;
+      const watching = everydayProfileStore().defaultSpeed();
       stage = mountCaseStage(doc, {
         panes,
-        speedSimPerRealS: everydayProfileStore().defaultSpeed(),
+        speedSimPerRealS: watching,
+        /*
+         * GitHub issue #598, § D992: the quiet minutes at `TUTORIAL_QUIET_SIM_PER_REAL_S`, the
+         * trouble at the player's own speed, and a clock that says which — so the failure builds
+         * inside about twenty seconds rather than after two minutes of idle cars.
+         */
+        pace: (longestStandingS) => tutorialPaceOf({ longestStandingS, watchingSimPerRealS: watching }),
+        clockOf: (simTimeS, simPerRealS) =>
+          tutorialClockOf({
+            simTimeS,
+            startedAtS: panes[0]?.recording.startedAt ?? 0,
+            simPerRealS,
+            watchingSimPerRealS: watching,
+          }),
+        onFrame: ({ longestStandingS }) => {
+          if (troubleSeen || forBeat !== 'as-built') return;
+          if (longestStandingS === undefined || longestStandingS < PACE_HOLD_WAIT_S) return;
+          troubleSeen = true;
+          render();
+        },
         copy: view.stage,
         /*
          * Its own classes, never the fix-it screen's. `caseStage.ts` takes them for exactly this
@@ -784,6 +823,7 @@ function mountCollapse(
        */
       runReady: hasRunFor(beat),
       runEnded: ended,
+      troubleSeen,
     });
 
     const eyebrow = el(doc, 'div', 'everyday-collapse-eyebrow', view.eyebrow);

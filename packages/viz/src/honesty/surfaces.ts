@@ -184,6 +184,7 @@ import { CHIMES_PANEL_COPY } from '../everyday/chimesPanel.js';
 import { SETTINGS_ABSENCES, SIGN_IN_COPY, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
+  DEFAULT_STAGE_SIM_PER_REAL_S,
   STAGE_ABSENCES,
   STAGE_AWAITING_RUN,
   STAGE_CAMERAS,
@@ -226,11 +227,16 @@ import type { ScenarioLadderRung } from '../scenario/ladder.js';
 import {
   TUTORIAL_ABSENCES,
   TUTORIAL_COPY,
+  TUTORIAL_FIGURE_NOTES,
   TUTORIAL_STEPS,
+  tutorialClockOf,
   tutorialCollapseViewOf,
+  tutorialPaceOf,
   tutorialWalkthroughViewOf,
   tutorialWorkedAnswerOf,
 } from '../everyday/tutorialModel.js';
+import { stagePaceNoteOf, stagePaceOf } from '../everyday/stagePace.js';
+import { actsOf } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
 import { weekScreenViewOf } from '../everyday/weekView.js';
@@ -10488,6 +10494,13 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_DAY_OVER',
     'everyday/stageScreenModel.ts#stageOpeningLineOf',
     'everyday/stageScreenModel.ts#stageNextStretchOf',
+    /*
+     * § D991's note beside the chips — GitHub issue #592. Seeded below at every sampled playhead
+     * on the temporal axis, as the note a whole day would draw there: it names the next act's start
+     * from the timetable and whether somebody has waited a minute from the present frame, and
+     * nothing after the playhead.
+     */
+    'everyday/stagePace.ts#stagePaceNoteOf',
     /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
     'everyday/stageScreenModel.ts#stageGoalsOf',
     /*
@@ -10872,6 +10885,26 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         playhead: atPlayhead(recording, at),
       });
       seeds.push({ field: `stage(@${stamp}s).phase`, text: head.phase, role: 'label' });
+      /*
+       * § D991's pace note, as a whole day would draw it here — GitHub issue #592. The acts are this
+       * recording's own schedule; a recording whose schedule has no act draws no note, and none is
+       * seeded, which is the note's own `undefined`.
+       */
+      {
+        const acts = actsOf(recording.demandPhases);
+        const pace = stagePaceOf({
+          horizon: 'whole-day',
+          acts,
+          simTimeS: at,
+          watchingSimPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S,
+          longestStandingS: observations.longestCurrentWaitS,
+          playerChoseSpeed: false,
+        });
+        const note = stagePaceNoteOf(pace, { acts, simTimeS: at });
+        if (note !== undefined) {
+          seeds.push({ field: `stage(@${stamp}s).pace`, text: note, role: 'label', playhead: atPlayhead(recording, at) });
+        }
+      }
       /*
        * AD-S4's pill. On the temporal axis deliberately: it is the one string on this screen that
        * names an instant **after** the playhead, and a rule that let the schedule turn into a
@@ -13394,6 +13427,9 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
     'everyday/tutorialModel.ts#TUTORIAL_COPY',
     'everyday/tutorialModel.ts#TUTORIAL_STEPS',
     'everyday/tutorialModel.ts#TUTORIAL_ABSENCES',
+    /* GitHub issue #598, § D992: each figure card's own caption, and screen two's clock. */
+    'everyday/tutorialModel.ts#TUTORIAL_FIGURE_NOTES',
+    'everyday/tutorialModel.ts#tutorialClockOf',
     'everyday/workedAnswer.ts#workedAnswerViewOf',
     'everyday/workedAnswer.ts#WORKED_ANSWER_COPY',
     'everyday/rushScreenModel.ts#rushTutorialWorkedAnswerOf',
@@ -13406,12 +13442,19 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
     const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed');
 
     /* ---- screen one: before the run lands, and after ---- */
-    const figures = figureValuesOf(entry, context.recording).map((figure, index) => ({
-      id: `figure-${String(index)}`,
-      label: figure.label,
-      value: figure.text,
-      note: entry.complaint.measure.label,
-    }));
+    /*
+     * GitHub issue #598: every card was captioned with the complaint's measure, the lower-floors
+     * card included. Captioned by its own kind now, as `tutorialScreens.ts#figuresFor` draws it.
+     */
+    const figures = figureValuesOf(entry, context.recording).map((figure, index) => {
+      const kind = entry.figures[index]?.kind;
+      return {
+        id: `figure-${String(index)}`,
+        label: figure.label,
+        value: figure.text,
+        note: kind === undefined ? figure.label : TUTORIAL_FIGURE_NOTES[kind],
+      };
+    });
     for (const [arm, drawn] of [
       ['pending', []],
       ['landed', figures],
@@ -13520,7 +13563,7 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
       ['as-built-refusing', tutorialCollapseViewOf({ ...collapseQuoted, runReady: true })],
       [
         'as-built-pressable',
-        tutorialCollapseViewOf({ ...collapseQuoted, runReady: true, changeReady: true }),
+        tutorialCollapseViewOf({ ...collapseQuoted, runReady: true, changeReady: true, troubleSeen: true }),
       ],
       [
         'answered',
@@ -13610,6 +13653,41 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
     }
 
     /*
+     * GitHub issue #598, § D992 — the press before the building has been seen breaking. Seeded as
+     * the one string that differs, on the `ended` states' judgement above: every other field of this
+     * arm is the pressable arm's.
+     */
+    {
+      const early = tutorialCollapseViewOf({ ...collapseQuoted, runReady: true, changeReady: true });
+      const refusal = early.control?.refusal;
+      if (refusal !== undefined) {
+        seeds.push({ field: 'collapse.as-built-watch-first.control.refusal', text: refusal, role: 'reason' });
+      }
+    }
+
+    /*
+     * Screen two's clock and the reason for its speed, at the sampled playheads — § D992. The speed
+     * is `tutorialPaceOf` from the present frame, as `caseStage.ts` asks it for the tutorial.
+     */
+    for (const at of sampleTimes(context.recording)) {
+      const stamp = at.toFixed(0);
+      const watching = DEFAULT_STAGE_SIM_PER_REAL_S;
+      const speed = tutorialPaceOf({
+        longestStandingS: observationsAt(context.recording, at).longestCurrentWaitS,
+        watchingSimPerRealS: watching,
+      });
+      const line = tutorialClockOf({
+        simTimeS: at,
+        startedAtS: context.recording.startedAt,
+        simPerRealS: speed,
+        watchingSimPerRealS: watching,
+      });
+      const playhead = atPlayhead(context.recording, at);
+      seeds.push({ field: `collapse(@${stamp}s).clock`, text: line.clock, role: 'label', playhead });
+      seeds.push({ field: `collapse(@${stamp}s).pace`, text: line.pace, role: 'label', playhead });
+    }
+
+    /*
      * The register, and the two copy tables' own keys — iterated generically so a key added to
      * either arrives in the corpus without anybody remembering to seed it.
      */
@@ -13618,6 +13696,9 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
     });
     for (const [key, text] of Object.entries(TUTORIAL_COPY)) {
       seeds.push({ field: `tutorial.copy.${key}`, text, role: 'prose' });
+    }
+    for (const [kind, text] of Object.entries(TUTORIAL_FIGURE_NOTES)) {
+      seeds.push({ field: `tutorial.figureNote.${kind}`, text, role: 'label' });
     }
     for (const [key, text] of Object.entries(WORKED_ANSWER_COPY)) {
       seeds.push({ field: `worked.copy.${key}`, text, role: 'prose' });

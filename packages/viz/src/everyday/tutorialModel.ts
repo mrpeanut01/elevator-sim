@@ -101,8 +101,9 @@
 import type { DispatcherSpec, GroupLevers } from '../authoring/dispatcherSpec.js';
 import type { VizRecording } from '../contract/types.js';
 import { measuredOf } from '../fixit/run.js';
-import type { FixitCase } from '../fixit/types.js';
+import type { FigureSpec, FixitCase } from '../fixit/types.js';
 import { plainLeversOf } from '../mode/plainLevers.js';
+import { PACE_HOLD_WAIT_S } from './stagePace.js';
 import {
   workedAnswerViewOf,
   type WorkedAnswerFacts,
@@ -239,8 +240,14 @@ export const TUTORIAL_COPY = Object.freeze({
    * digit anywhere in this table.
    */
   stageEyebrow: 'THE MORNING THE LETTER IS ABOUT',
+  /*
+   * GitHub issue #598, [§ D992](../../../../DECISIONS.md). This read *"Playing now, at the speed you
+   * have set"*, and at the speed they had set a player watched about two minutes of three idle cars
+   * and nobody on a landing. The quiet minutes are crossed fast now and the picture slows to their
+   * speed whenever somebody has waited a minute, so the sentence says both halves.
+   */
   stageNote:
-    'Playing now, at the speed you have set. Nothing has been changed: this is the building as it stands.',
+    'Playing now. The quiet minutes run fast, and the picture slows to the speed you have set whenever somebody on a landing has waited a minute. Nothing has been changed: this is the building as it stands.',
   stageSkip: 'Stop it there',
   stageEnded: 'That is the morning as the building runs it today, with nothing changed.',
   stagePending:
@@ -267,6 +274,14 @@ export const TUTORIAL_COPY = Object.freeze({
     'This is the same control the dispatcher workshop lists under that name, and it is the one this building needs. Press it and the same morning runs again with it on.',
   controlRefusal:
     'The second run is still being simulated. Until it lands there is nothing to show you, so this will not press.',
+  /*
+   * GitHub issue #598, § D992: an assessor playing blind pressed the fix **before seeing anything
+   * break**, because the press was live from the first frame. It waits now for the thing the lede
+   * tells the player to watch for — somebody past a minute on a landing — or for the morning to
+   * have played out, and it says so on its own face rather than looking dead.
+   */
+  controlWatchFirst:
+    'Watch first. This presses once somebody on a landing has waited a minute, or once the morning has finished playing.',
   /*
    * **The non-visual register for the canvas and the press** — `docs/36` `AX-3`, whose policy is
    * that a live region is written *when its sentence changes and at no other time*.
@@ -297,6 +312,100 @@ export const TUTORIAL_COPY = Object.freeze({
     'This is a tutorial, so the answer is on the screen. From here on you get the building and the letter, and the answer is yours.',
   finish: 'Start playing',
   finishNote: 'The day is filed and the main menu is next.',
+});
+
+/* -------------------------------------------------------------------------- *
+ * Screen two's pace, clock and figure captions — GitHub issue #598, § D992
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The rung screen two crosses its quiet minutes at: 90 simulated seconds per real second.**
+ *
+ * GitHub issue **#598**, [§ D992](../../../../DECISIONS.md). Three assessors watched *Watch it come
+ * apart* for about two minutes and saw three idle cars and nobody on a landing: at the player's
+ * `4×` the case's first arrival is 146 real seconds in, and the first rider to wait a minute —
+ * the thing the lede tells the player to watch for — is five minutes in. The issue's bar is that the
+ * failure builds visibly **within about twenty seconds** of the screen opening.
+ *
+ * **A derivation from that bar and the ladder, not a taste.** On the shipped case's as-built run the
+ * first moment anybody on a landing has waited a minute is 1 448 simulated seconds in (measured, and
+ * re-measured by `tutorialRuns.test.ts` on every run of the suite). Crossing that at one rung inside
+ * twenty real seconds needs at least 72.4× — so `30×`, the whole-day rung
+ * (`stagePace.ts#BETWEEN_PEAKS_SIM_PER_REAL_S`), reaches it at 48 s and fails, and **`90×` is the
+ * slowest rung on the ladder that meets it** (16 s). The test asserts both halves, so a case
+ * re-authored with an earlier failure makes this constant too fast and says so.
+ *
+ * **Why this may leave § D344's cue budget where the whole day may not.** The whole day's between
+ * rung is crossed while the building is carrying people, so it has to stay a speed at which a door
+ * cycle is still a cue. Here the fast rung holds only while **nobody on any landing has waited a
+ * minute** — the stretch the assessors described as *nothing moving* — and the picture drops to the
+ * player's own rung the instant the thing worth watching begins. It is § D991's rule with a faster
+ * quiet, on a run of a few dozen journeys rather than seven thousand, and it is one constant: set it
+ * to the player's rung and the screen plays as it did.
+ */
+export const TUTORIAL_QUIET_SIM_PER_REAL_S = 90;
+
+/**
+ * **Screen two's speed at a playhead** — the player's rung while anybody on a landing has waited past
+ * `stagePace.ts#PACE_HOLD_WAIT_S`, and {@link TUTORIAL_QUIET_SIM_PER_REAL_S} or the player's rung,
+ * whichever is faster, otherwise. `longestStandingS` is the present frame's longest wait over every
+ * pane on the canvas (`live/bands.ts#waitBandsAt(…).longestCurrentWaitS`), so it never reads ahead.
+ */
+export function tutorialPaceOf(input: {
+  readonly longestStandingS: number | undefined;
+  readonly watchingSimPerRealS: number;
+}): number {
+  const held = input.longestStandingS !== undefined && input.longestStandingS >= PACE_HOLD_WAIT_S;
+  return held
+    ? input.watchingSimPerRealS
+    : Math.max(input.watchingSimPerRealS, TUTORIAL_QUIET_SIM_PER_REAL_S);
+}
+
+/** A multiplier as the ladder labels it — § D354: the label is the multiplier. */
+function rungWord(simPerRealS: number): string {
+  return `${String(simPerRealS)}×`;
+}
+
+/**
+ * **Screen two's clock and the reason for its speed** — GitHub issue #598's *no clock*.
+ *
+ * The case's run declares no hour of the day, so the clock is **building time from the start of the
+ * run** rather than a time of day a template never stated (`live/timeline.ts#clockAt` would fall
+ * back to 06:00, which is a claim nobody authored). The second line says what the transport is
+ * doing and why, from the present frame only — the same shape as the stage's § D991 note.
+ */
+export function tutorialClockOf(input: {
+  readonly simTimeS: number;
+  readonly startedAtS: number;
+  readonly simPerRealS: number;
+  readonly watchingSimPerRealS: number;
+}): { readonly clock: string; readonly pace: string } {
+  const elapsed = Math.max(0, Math.floor(input.simTimeS - input.startedAtS));
+  const minutes = Math.floor(elapsed / 60);
+  const seconds = elapsed % 60;
+  const clock = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} into the morning`;
+  const pace =
+    input.simPerRealS > input.watchingSimPerRealS
+      ? `${rungWord(input.simPerRealS)} while nobody on a landing has waited a minute`
+      : `${rungWord(input.simPerRealS)}, your speed, while somebody has waited a minute`;
+  return Object.freeze({ clock, pace });
+}
+
+/**
+ * **What each figure card on screen one is of** — GitHub issue #598.
+ *
+ * Every card used to be captioned with the complaint's own measure, *"waits over a minute starting
+ * at the upper flats"* — including the card about **the lower floors**, which is a caption
+ * describing a different card. Each kind of figure `fixit/types.ts#FigureSpec` can carry gets its
+ * own sentence here, keyed by kind so a new kind fails to type rather than inheriting a neighbour's.
+ * None carries a digit: the figure is the card's value, read off the run.
+ */
+export const TUTORIAL_FIGURE_NOTES: Readonly<Record<FigureSpec['kind'], string>> = Object.freeze({
+  complaint: 'The thing the letter is about, counted over this morning.',
+  'scope-long-waits': 'Journeys starting on the floors the letter is about that waited over a minute for a car.',
+  'scope-mean-wait': 'The wait for a car on the floors the letter is about, taken over the journeys that boarded.',
+  'scope-worst-wait': 'The longest anybody on the floors the letter is about waited for a car.',
+  'rest-away-pct': 'Every other journey in the building, for comparison with the floors the letter is about.',
 });
 
 /**
@@ -515,7 +624,7 @@ const NEUTRAL_LEVERS: GroupLevers = Object.freeze({
   dwell: undefined,
 });
 
-function tutorialControlViewOf(changeReady: boolean): TutorialControlView {
+function tutorialControlViewOf(changeReady: boolean, mayPress: boolean): TutorialControlView {
   const lever = plainLeversOf(NEUTRAL_SPEC, NEUTRAL_LEVERS).find(
     (candidate) => candidate.id === TUTORIAL_LEVER_ID,
   );
@@ -532,7 +641,11 @@ function tutorialControlViewOf(changeReady: boolean): TutorialControlView {
     from: lever.atZero,
     to: lever.atFull,
     why: TUTORIAL_COPY.controlWhy,
-    refusal: changeReady ? undefined : TUTORIAL_COPY.controlRefusal,
+    refusal: !changeReady
+      ? TUTORIAL_COPY.controlRefusal
+      : mayPress
+        ? undefined
+        : TUTORIAL_COPY.controlWatchFirst,
   });
 }
 
@@ -625,6 +738,13 @@ export function tutorialCollapseViewOf(input: {
   readonly runReady?: boolean | undefined;
   /** Whether that recording's playback has finished or been stopped. */
   readonly runEnded?: boolean | undefined;
+  /**
+   * Whether the canvas has shown somebody past a minute on a landing — latched by the mount from
+   * the present frame, never read ahead. GitHub issue #598, § D992: the press waits for it, or for
+   * the as-built morning to have finished, so nobody is asked to fix a building before seeing it
+   * break. Absent means *not yet*.
+   */
+  readonly troubleSeen?: boolean | undefined;
 }): TutorialCollapseView {
   const beat: TutorialBeat = input.beat ?? 'as-built';
   const answered = beat === 'answered';
@@ -663,7 +783,9 @@ export function tutorialCollapseViewOf(input: {
      * toggle: a second press would have to put the building back, and *undo the fix* is not a
      * lesson — it is a control whose second state the worked answer below it then contradicts.
      */
-    control: answered ? undefined : tutorialControlViewOf(input.changeReady ?? false),
+    control: answered
+      ? undefined
+      : tutorialControlViewOf(input.changeReady ?? false, (input.troubleSeen ?? false) || runEnded),
     /*
      * Five states, five sentences, and the pairing is what `docs/36` `AX-3` needs: the mount may
      * only write the region when the sentence changes, so a state that shared a sentence with its

@@ -276,6 +276,13 @@ export const STAGE_SPEEDS: readonly [StageSpeed, ...StageSpeed[]] = Object.freez
  * skip control and the chips are the answer to it — but it is a real move and AD-S6's arithmetic is
  * corrected on the commit that makes it stale rather than left to age.
  *
+ * **Two clauses of that paragraph are no longer true, and are corrected here rather than deleted**
+ * ([§ D991](../../../../DECISIONS.md), GitHub issue #592). *"Not what the Everyday content runs"*
+ * went stale with § D356: thirteen of the sixteen contracts run `office-day` whole. And a whole day
+ * is no longer played at one rung — `everyday/stagePace.ts` plays its three peaks at this default
+ * and crosses the hours between them at `30×`, so the quiet head is 60 real seconds again and the
+ * day 40–51 minutes on the game's own towers (1 h 49 at most on a reference tower, measured). This constant is still what a whole day's peaks open at.
+ *
  * **A paragraph that stood here is deleted rather than updated** ([§ D753](../../../../DECISIONS.md)).
  * It named five player-facing session shapes as outstanding and said correcting them was not this
  * constant's to do. GitHub issue **#559** measured them against a wall clock and moved all five, so

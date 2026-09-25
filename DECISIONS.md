@@ -42388,3 +42388,224 @@ So § D961 pinned a sweep **over rungs that § D914 then moved**. Neither lane w
 ### What this deliberately does not move
 
 **No rung, no bar and no threshold.** § D914's rebalance is measured and deliberate; this entry makes the measurement *of* it current. `shift/goals.ts#GOAL_BARS` is untouched, `data/contract-ladder.json` is untouched, and § D512's *more than a third of fifty seeds* is untouched. The band, the window and the union in `legibilityOf` are untouched. **§ D961 is not rewritten**: its table is a dated record of the tree it was taken on, and `legibility.ts` carries both columns for the same reason.
+
+---
+
+## D991 — Today's scenario keeps the whole day and plays it in acts: the peaks at the player's speed, the hours between at 30×
+
+> **Taken 2026-09-24 by agent sessions under delegated authority**, not by the product owner: the
+> ruling by a decision agent (with measurement, on `499b959`), the implementation and the
+> re-measurements by lane AH-D of wave AH. The session principal's standing instruction for this
+> wave is that decisions are taken by agents rather than escalated. A later reader weighing this
+> against a product-owner ruling should treat it as an agent ruling and say so — [§ D626](#d626) is
+> the cautionary case.
+
+**Rules on:** GitHub issue #592. Keeps [§ D356](#d356) (the Everyday daily loop runs the whole
+authored day) and declines to reverse it, as [§ D733](#d733) did. Reads [§ D525](#d525) clause 4 and
+[§ D641](#d641)'s opening rung. Moves [§ D946](#d946)'s published span, [§ D733](#d733)'s door
+sentence and `docs/28` AD-S6's figure.
+
+### The defect
+
+Today's scenario opens the whole authored day — `office-day`, ten hours, on thirteen of sixteen
+contracts — and the stage played every second of it at the player's rung. At the shipped `4×` that
+was **150 minutes**, with 7.5 real minutes of one-twentieth trickle before the morning ramp and
+two quiet stretches of 49 and 67 minutes. The mode picker was honest about it (*8 min–2 h 30 at
+4×*). An honest label on that length was never going to be a design.
+
+### The ruling
+
+1. **Keep the whole day. No window, no player choice.** A window is a third horizon, not the slice
+   — the ruling measured the 80 kJ bar failing 10 of 10 windowed `c3` days against 0 of 10 on the
+   slice — and it would remove the only content where the traffic pattern changes under the player.
+2. **Fix the length in the stage's playback, never in the run.** `everyday/stagePace.ts#stagePaceOf`:
+   the day's **acts** (`shift/dayLength.ts#actsOf` — maximal runs of phases touching the day's own
+   peak, read off the record: 08:30–09:00, 12:15–12:45, 17:15–17:45) play at the player's rung; the
+   hours between cross at **`BETWEEN_PEAKS_SIM_PER_REAL_S` = 30×**, dropping back to the player's
+   rung while anybody on a landing has waited past `WAIT_BANDS[2].fromS` (60 s), read from the
+   present frame only (`observationsAt(…).longestCurrentWaitS`). A chip press is the player's and
+   the stage stops pacing for the rest of that day. Every change shows on the lit chip, whose label
+   is its multiplier (§ D354), and on one schedule-derived note beside the chips.
+3. **Only on a whole day the player's own shell simulated** (`host.runHorizon()`, which answers
+   `'period'` for a watched or replayed recording). A slice, a career day, a fix case and the Rush —
+   whose `endless-rush` template is also a phase list, peaking only in its last three minutes — play
+   at one rung. `stagePace.test.ts` asserts both directions, and the positive control that the rule
+   *would* wreck the rush without the gate.
+4. **30× is a derivation.** It is § D354's fastest rung inside § D344's `S ≤ 39` cue budget, so the
+   building stays readable while it is crossed. `90×` was measured to lose nothing on 65 days and
+   refused anyway, because nothing in the tree has derived a rung above 39.
+5. **No goal bar, run record, board key or seed moves.** Grading reads `observationsAt(recording,
+   recording.endedAt)`, which playback speed cannot reach; the 350 kJ bar and
+   `WORST_WAIT_WHOLE_DAY_FACTOR` stand.
+
+### Where the owner may overrule, and what it costs
+
+This reads § D525 clause 4, *"the stage plays at a watching speed"*, as binding **wherever there are
+people to watch** — the acts, and any landing with somebody past a minute. If the owner reads it as
+every second of every run, **set `BETWEEN_PEAKS_SIM_PER_REAL_S` to the watching rung** (4): the
+rule then answers the player's rung everywhere, the tile's figure moves back to about two and a half
+hours on the same commit (it is composed from the same constant), and nothing else changes.
+
+### What was measured, and one figure that was measured at the wrong horizon
+
+**The session length is derived over every contract, not taken from the ruling's estimate.** The
+ruling's *about forty minutes* was arithmetic on the acts (5 400 s of `office-day` at `4×` plus the
+rest at `30×` is 39.5 minutes) with the drain named rather than measured. `everyday/stagePace.sweep.test.ts`
+played every contract's day 1 **as Today's scenario plays it** — the whole day where the building
+has one — sixteen contracts × fifty seeds, `collective`, seeds `20 260 824 + 7 919 n`, and read each
+day's paced real length at the default rung from the union of its acts and its held stretches:
+
+| contract | building | plays | paced length at 4×, min / median / max (min) |
+|---|---|---|---|
+| c1 | garden-apartments | slice | 15.0 / 15.0 / 15.0 |
+| c2 | midtown-office | whole day | 39.7 / 40.2 / 41.2 |
+| c3 | secure-tower | whole day | 39.7 / 40.1 / 40.8 |
+| c4 | mixed-use-high-rise | whole day | 39.5 / 39.6 / 40.1 |
+| c5 | vertical-city | whole day | 47.0 / 48.7 / **50.9** |
+| c6 | chancery-house | whole day | 39.5 / 39.6 / 39.9 |
+| c7 | crown-hotel | slice | 7.5 / 7.5 / 7.9 |
+| c8 | st-jude-hospital | slice | 7.5 / 7.5 / 7.6 |
+| c9 | harbour-point | whole day | 39.5 / 39.6 / 40.0 |
+| c10 | ashgate | whole day | 39.6 / 39.9 / 40.4 |
+| c11 | ctf-class-reference | whole day | 44.9 / 47.1 / 49.8 |
+| c12 | shanghai-class-reference | whole day | 41.1 / 42.8 / 45.8 |
+| c13 | merdeka-class-reference | whole day | 40.9 / 42.4 / 43.7 |
+| c14 | one-wtc-class-reference | whole day | 39.6 / 39.8 / 40.3 |
+| c15 | empire-state-class-reference | whole day | 40.4 / 41.1 / 42.1 |
+| c16 | willis-class-reference | whole day | 98.8 / 104.4 / **108.9** |
+
+**The top of the tile is Willis-class's, and the tile says so.** Its landings hold somebody past a
+minute for most of the day, so the stage seldom crosses anything fast. The published span is the
+union of the slices' 7.5 minutes and the longest day measured (`c16`, seed 28), composed in
+`sittingShape.ts#WHOLE_DAY_LONGEST` from the day's measured slow part so it still divides by the
+rung; the hub row adds the game's own towers' longest (`c5`, seed 39, 51 minutes,
+`WHOLE_DAY_LONGEST_GAME_TOWER`). The sweep refuses both constants at budget the day a fresh
+measurement disagrees. **The ruling's *about forty* holds, to within about two minutes at the
+longest seed, on eight of the thirteen whole-day contracts; four more run 44–51 minutes and one runs
+109**, and a tile that had published *forty* would have been § D946's defect one axis over. `stagePace.test.ts` plays `c2`'s first seed through the real `Playback` over a manual
+clock on every suite run and asserts **2 415.5 real seconds** to within thirty, which agrees with
+the sweep's leg-based reading of the same day.
+
+**§ D512's legibility, re-measured on the day actually played — the third figure in one cycle
+measured at one horizon and used at another.** The first two were § D962's energy bar (one constant
+grading a slice and a whole day) and the press pins lane AH-B of this wave is re-pinning. The
+legibility table that derives the first-session set was measured on each contract's **slice**
+while the first session plays Today's scenario, which is the whole day on thirteen of sixteen.
+Re-measured on the day as played (slice → as played, of 50): c1 0 → 0; c2 35 → **50**; c3 30 → **50**;
+c4 32 → **49**; c5 45 → **50**; c6 25 → **50**; c7 30 → 30 and c8 43 → 43 (slices both times —
+reproduced to the second, the control); c9 20 → **46**; c10 27 → **50**; c11–c13 50 → 50; **c14 1 → 31**;
+c15 45 → **50**; c16 50 → 50. **The first-session set goes fourteen → fifteen**: `c14` joins and
+nothing leaves; only `c1` is out. `FIRST_SESSION_LINE` reads *fifteen towers* on its own, and
+`shift/dailySeed.ts`'s rotation figures are re-derived from the draw: a tower repeats inside seven
+days on **32.2 %** of 730 dates (was 34.4 %) and on consecutive days **47** times (was 50).
+
+**The fix is structural as well as a re-measurement.** Every `LEGIBILITY_SWEEP` row now carries its
+`horizon`, and `legibility.test.ts` refuses a row whose horizon is not the one
+`contractDay.test-helper.ts#todaysScenarioDayState` plays for that contract — a check that needs no
+simulation, so a contract added tomorrow is checked on the commit that adds it.
+`legibility.sweep.test.ts` now builds its states through the same helper.
+
+**Pacing does not change legibility, and that is arithmetic rather than luck.** A legible stretch
+is somebody past a minute on a landing for 120 contiguous simulated seconds, and the stage holds the
+player's rung while anybody on any landing is past a minute, so every legible stretch plays at the
+watching rung: 120 simulated seconds is 30 real seconds at `4×` on all eight hundred days. The sweep
+computed legibility both ways and the two agree on every day. **What moved the set is the horizon,
+not the transport.**
+
+**The median time to the first legible stretch is about 18–20 real minutes on c2, c3, c6, c9, c10
+and c14**, against about 6 on c4 and 4–6 on c5, c11, c12, c13, c15 and c16 (and about 4 on the two
+slices, c7 and c8). That is a measurement; **no mechanism is offered for it** ([§ D256](#d256)). It
+means a first session on those six towers usually waits through the morning act for its problem —
+the cost the ruling named, now measured over every contract rather than seven. Whether the
+first-session draw should also be bounded by day length (a newcomer can now be dealt a Willis-class
+day of about 105 minutes) is a game decision this entry does not take.
+
+**Determinism, checked rather than assumed.** 136 contract × seed cells were computed twice, by
+separate processes that split the heavy towers between them; every one agrees to the last digit.
+
+### Published figures moved, each with the old one kept beside it (§ D227)
+
+- The Scenario tile and the hub's *Today's scenario* row (`everyday/sittingShape.ts`): *8 min–2 h 30
+  at 4×* → ***8 min-1 h 49 at 4×* (tile) and *8 min-1 h 49 a day at 4×, the hours between peaks at 30×; 51 min at most on the game’s own towers — the long end is a reference tower’s* (hub row)**, the hub row naming the between-peaks rung and the game's own towers.
+- `docs/32` § 7.2: a first session's second turn ends at *minute 173* → **minute 132 (23 + 109), and 74 on the game’s own towers**.
+- `docs/23` § 3.2 and `docs/12` § 5: the top-end factor against the handoff, *fifty* → ***about thirty-six* (109 against the handoff’s three)**.
+- `everyday/doorView.ts` step 2 (§ D733): *"A whole working day, at whatever speed you set"* →
+  *"…its busy hours at the speed you set and the quiet hours between them faster"*.
+- `docs/28` AD-S6: the quiet head's *7.5 real minutes* → **60 real seconds** under the between rung.
+  It was also already stale in saying `office-day` *"is not what the Everyday content runs"*: 13 of
+  16 contracts run it. **§ D641 carries the same sentence and, as an entry, is not rewritten**; it
+  is corrected here and in `stageScreenModel.ts`'s docstring.
+- § D946's table is a dated record and stays as it is.
+
+### Owed, and whose
+
+- **DC-4 at the whole-day horizon** is a pre-existing gap (#234), not caused by playback, and out of
+  this lane's scope.
+- **§ D914's *a reachable press clears the day* at the whole-day horizon** belongs to lane AH-B,
+  which was told the drop-back rule's exact definition so it can evaluate it at a press moment.
+
+---
+
+## D992 — the tutorial's "Watch it come apart" crosses its quiet at 90× and shows its failure inside twenty seconds, with a clock, and the press waits for it
+
+> **Taken 2026-09-24 by an agent session under delegated authority** (lane AH-D of wave AH), not by
+> the product owner. The session principal's standing instruction for this wave is that decisions
+> are taken by agents rather than escalated. A later reader weighing this against a product-owner
+> ruling should treat it as an agent ruling and say so — [§ D626](#d626) is the cautionary case.
+
+**Rules on:** GitHub issue #598, filed by the integrator from the post-wave-AG playability panel's
+findings. [§ D529](#d529) clause 1 (the two-screen tutorial), [§ D623](#d623) clause 3 (a fix case
+keeps its no-pause design) and [§ D991](#d991) (whole-day pacing) are the decisions it reads.
+
+### The finding
+
+Three assessors on the panel watched the tutorial's second screen — the one every new player meets
+— for about 130 s to three minutes and saw **three idle cars and nobody on a landing**, with no clock
+and no speed control. One, playing blind, pressed the fix **before seeing anything break**. Measured
+on the shipped case (`three-cars-one-cars-work`, `garden-apartments`, seed 20 260 823 as built): the
+first rider arrives **583 s** in and the first rider to wait a minute — the thing the lede tells the
+player to watch for — crosses it at **1 448 s**. At the player's `4×` that is 146 and 362 real
+seconds.
+
+### The ruling
+
+1. **Screen two is paced.** `tutorialModel.ts#tutorialPaceOf`: the player's rung while anybody on a
+   landing has waited past `stagePace.ts#PACE_HOLD_WAIT_S` (60 s, `WAIT_BANDS[2].fromS`), and
+   **`TUTORIAL_QUIET_SIM_PER_REAL_S` = 90×** otherwise. Speed only — the playhead is never moved
+   (`docs/28` AD-S4) — so the pair is the same two runs at the same minute, and nothing the worked
+   answer measures moves.
+2. **90 is derived, not chosen.** Reaching 1 448 s at one quiet rung inside twenty real seconds
+   needs ≥ 72.4×; `30×` (the whole day's rung) reaches it at 48 s and fails; **`90×` is the slowest
+   ladder rung that meets it (16 s)**. `tutorialRuns.test.ts` plays the as-built run through the
+   real `Playback` over a `ManualClock` and asserts both halves, so a re-authored case that fails
+   earlier or later moves the test before it moves a player.
+3. **It may leave § D344's cue budget where § D991's rung may not**, and the reason is stated: the
+   fast rung holds only while *nobody on any landing has waited a minute* — the stretch the
+   assessors described as nothing moving — on a run of 42 journeys, and drops to the player's rung
+   the instant the thing worth watching begins.
+4. **A clock and the reason for its speed are drawn on the block** (`tutorialClockOf`): building
+   time from the start of the run, because the case declares no hour and `clockAt` would print
+   06:00, which nobody authored.
+5. **The press waits for the failure** (`TUTORIAL_COPY.controlWatchFirst`): it refuses, on its own
+   face, until the canvas has shown somebody past a minute — latched from the present frame, never
+   read ahead — or the as-built morning has finished playing. The second run's own refusal still
+   outranks it.
+6. **Every figure card on screen one carries its own caption** (`TUTORIAL_FIGURE_NOTES`, keyed by
+   `FigureSpec['kind']`). Every card read *"waits over a minute starting at the upper flats"*,
+   including the card about the lower floors.
+
+**Measured, not argued:** first trouble at **16.1 real s** in the ruling's own arithmetic and at
+≤ 20 s in `tutorialRuns.test.ts`; the whole as-built morning in about **51 real s** against 11 min
+15 s at one rung; the repaired morning in about 30 s.
+
+### What it does not touch
+
+`everyday/caseStage.ts` gained three **opt-in** inputs (`pace`, `clockOf`, `onFrame`); the fix-it
+screen passes none of them and plays exactly as it did, so § D623 clause 3 is untouched. No case, no
+run, no seed and no figure the worked answer quotes moves. **One constant undoes it**: set
+`TUTORIAL_QUIET_SIM_PER_REAL_S` to the player's rung and screen two plays at one speed again.
+
+**No speed chips were added**, although the issue's title names their absence: § D623 clause 3 keeps
+a case's no-pause design, and the pace line on the block says what the transport is doing instead.
+Whether a tutorial should carry chips is left open rather than decided here.
+

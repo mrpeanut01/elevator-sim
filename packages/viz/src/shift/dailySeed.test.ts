@@ -194,9 +194,9 @@ describe('the rotation rules `docs/37` § 4.3 states, measured rather than assum
   it('does not satisfy *no tower twice in seven days*, and the figures are the docstring’s', () => {
     expect(
       ELIGIBLE_FIRST_CONTRACT_IDS.length,
-      'dailySeed.ts publishes 34.4 % and 50 measured over these fourteen contracts — re-measure ' +
+      'dailySeed.ts publishes 32.2 % and 47 measured over these fifteen contracts — re-measure ' +
         'and move both figures if the legible set has changed',
-    ).toBe(14);
+    ).toBe(15);
 
     const draws = twoYearsOfDraws();
     const lastSeenAt = new Map<string, number>();
@@ -219,10 +219,16 @@ describe('the rotation rules `docs/37` § 4.3 states, measured rather than assum
      * to fourteen. A set that is three members wider collides less, so the rotation rule gets
      * closer to satisfied without anybody aiming at it — 42.2 % → **34.4 %** — and still fails it.
      */
-    expect(insideSeven).toBe(251);
-    expect(consecutive).toBe(50);
-    // 251 / 730 = 34.4 %, the figure `dailySeed.ts`'s docstring publishes.
-    expect(Math.round((1000 * insideSeven) / draws.length) / 10).toBe(34.4);
+    expect(insideSeven).toBe(235);
+    /*
+     * **And again on 2026-09-24** — [§ D991](../../../../DECISIONS.md): the set went fourteen →
+     * fifteen when the legibility table was re-measured on the day Today's scenario plays, and
+     * `c14` joined. 251 → **235** inside seven days and 50 → **47** consecutive, re-derived from the
+     * draw rather than scaled. The rule is still not satisfied.
+     */
+    expect(consecutive).toBe(47);
+    // 235 / 730 = 32.2 %, the figure `dailySeed.ts`'s docstring publishes.
+    expect(Math.round((1000 * insideSeven) / draws.length) / 10).toBe(32.2);
   });
 
   it('draws only from the legible set, whatever the date', () => {

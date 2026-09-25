@@ -1671,6 +1671,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Chooses a playback speed, and authors nothing — GitHub issue #592, § D991. `stagePaceOf` ' +
+        'answers a number and a reason tag, and it is derived **only** because it compares its ' +
+        'input against the `whole-day` member of `shift/types.ts#RunHorizon`, whose hyphen the ' +
+        'two-adjacent-words scanner reads as a phrase — `runHorizonOf`’s artefact one call along. ' +
+        'What a player reads about the pace is `everyday/stagePace.ts#stagePaceNoteOf`, which the ' +
+        'stage adapter drives at every sampled playhead; that the speed itself is right is not a ' +
+        'string question and is asserted in `everyday/stagePace.test.ts`, which plays a whole day ' +
+        'through the real `Playback` and checks the gate in both directions.',
+      ids: ['everyday/stagePace.ts#stagePaceOf'],
+    },
+    {
+      reason:
         'Refuses an illegal rung in `data/contract-ladder.json` — a rate outside its profile’s ' +
         'declared range, a bank the building does not have, a machine at a speed its class ' +
         'forbids — and every string it returns is addressed to a **content author**, not to a ' +

@@ -1330,6 +1330,19 @@ export interface EverydayHost {
    */
   dayStartS(): number | undefined;
 
+  /**
+   * **Which kind of run the state is** — `shift/dayLength.ts#runHorizonOf`, read through the one
+   * expression this file already grades goals by (`horizonOf`), so the stage's pacing and the
+   * rail's bars cannot disagree about whether today is a whole day. GitHub issue #592, § D991:
+   * `everyday/stagePace.ts` paces a whole day's playback and nothing else, and this is how the
+   * stage learns which it is holding.
+   *
+   * **About the run on the stage, not merely the state** — `'period'` whenever this shell did not
+   * simulate the recording on screen (a watched run, a replay), for {@link runPointer}'s reason: the
+   * state's horizon would then be describing a different run.
+   */
+  runHorizon(): RunHorizon;
+
   /** Today's intervention log, in press order — § 1.4's `run = (seed, config, interventions[])`. */
   interventions(): readonly RunInterventionConfig[];
 
@@ -2538,6 +2551,7 @@ export function createEverydayHost(
       b.raceAgainst(pick);
     },
     dayStartS: () => b.dayStartS(),
+    runHorizon: () => (b.runIsOwn() ? horizonOf(b) : 'period'),
     interventions: () => b.state().interventions,
     editedDispatcher: () => {
       const state = b.state();

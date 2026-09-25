@@ -802,14 +802,18 @@ once as a scenario — which is the thing the ruling exists to stop.
 one place this document's own division of authority has teeth** ([§ D753](../DECISIONS.md), GitHub
 issue #559). § 5 is a table about **sessions**, and which surface offers them is all that § D525
 moved — but the handoff's *lengths* were measured against a wall clock and are out by a factor of
-three at the bottom and **fifty** at the top, because the handoff is a prototype with its own toy
+three at the bottom and **about thirty-six** at the top, because the handoff is a prototype with its own toy
 simulator and its session shapes were never played on this build's content at this build's playback
 speed. (*"roughly a factor of four"* stood here until [§ D946](../DECISIONS.md) measured the day
 as well as the rung: a *Today's scenario* on any of the thirteen office contracts runs the authored
-ten-hour `office-day`, which is two and a half hours of watching at the shipped rung.)
+ten-hour `office-day`, which is two and a half hours of watching at the shipped rung. *Fifty*
+then stood here until [§ D991](../DECISIONS.md) paced that day's playback — its three peaks at the
+player's rung and the hours between them at `30×` — which makes it 51 minutes at most on the
+game's own towers and about 109 on the reference towers, measured over every contract.)
 **The handoff still wins every disagreement about what the screen looks like; the simulator wins
 every disagreement about what a number means**, and a session length is a number. So the hub's *Today's scenario* entry now
-reads *8 min-2 h 30 a day at 4× · no losing — a day is a score, not a pass*, and its *Fix a building*
+reads *8 min-1 h 49 a day at 4×, the hours between peaks at 30×; 51 min at most on the game’s own towers — the long end is a reference tower’s · no losing — a day is a score, not a pass*
+(*8 min-2 h 30 a day at 4× · no losing — a day is a score, not a pass* until § D991), and its *Fix a building*
 entry reads *13-23 min a case at 4×, skippable · retry as often as you like* — the wording the
 handoff authored, carrying a figure it did not.
 

@@ -27,9 +27,13 @@ import {
   TUTORIAL_ABSENCES,
   TUTORIAL_CASE_ID,
   TUTORIAL_COPY,
+  TUTORIAL_FIGURE_NOTES,
+  TUTORIAL_QUIET_SIM_PER_REAL_S,
   TUTORIAL_STEPS,
+  tutorialClockOf,
   tutorialCollapseViewOf,
   tutorialIsDue,
+  tutorialPaceOf,
   tutorialWalkthroughViewOf,
   type TutorialCollapseView,
   type TutorialProgress,
@@ -388,8 +392,50 @@ describe('screen two is a canvas and one press — `charter S1`', () => {
      */
     const waiting = collapse({ runReady: true, changeReady: false }).control;
     expect(waiting?.refusal).toBe(TUTORIAL_COPY.controlRefusal);
-    const ready = collapse({ runReady: true, changeReady: true }).control;
+    const ready = collapse({ runReady: true, changeReady: true, troubleSeen: true }).control;
     expect(ready?.refusal).toBeUndefined();
+  });
+
+  /*
+   * GitHub issue #598, § D992: an assessor playing blind pressed the fix before seeing anything
+   * break. The press now waits for the thing the lede names — somebody past a minute on a landing,
+   * latched by the mount from the present frame — or for the morning to have played out, and it
+   * says so on its own face. Both polarities, and the second run still outranks it: a press that
+   * cannot work yet says *that* first.
+   */
+  it('waits for the building to be seen breaking, and says so, before it will press', () => {
+    const early = collapse({ runReady: true, changeReady: true }).control;
+    expect(early?.refusal).toBe(TUTORIAL_COPY.controlWatchFirst);
+    const seen = collapse({ runReady: true, changeReady: true, troubleSeen: true }).control;
+    expect(seen?.refusal).toBeUndefined();
+    const played = collapse({ runReady: true, changeReady: true, runEnded: true }).control;
+    expect(played?.refusal).toBeUndefined();
+    const both = collapse({ runReady: true, changeReady: false, troubleSeen: false }).control;
+    expect(both?.refusal).toBe(TUTORIAL_COPY.controlRefusal);
+  });
+
+  /*
+   * GitHub issue #598: every figure card was captioned with the complaint's measure, including the
+   * card about the lower floors. Each kind now has its own caption, and no two kinds share one.
+   */
+  it('captions each figure kind with its own sentence', () => {
+    const notes = Object.values(TUTORIAL_FIGURE_NOTES);
+    expect(new Set(notes).size).toBe(notes.length);
+    expect(TUTORIAL_FIGURE_NOTES['rest-away-pct']).toContain('Every other journey');
+    for (const note of notes) expect(note).not.toMatch(/\d/u);
+  });
+
+  it('crosses the quiet at the tutorial rung and holds the player’s speed while somebody has waited a minute', () => {
+    expect(tutorialPaceOf({ longestStandingS: undefined, watchingSimPerRealS: 4 })).toBe(TUTORIAL_QUIET_SIM_PER_REAL_S);
+    expect(tutorialPaceOf({ longestStandingS: 59, watchingSimPerRealS: 4 })).toBe(TUTORIAL_QUIET_SIM_PER_REAL_S);
+    expect(tutorialPaceOf({ longestStandingS: 60, watchingSimPerRealS: 4 })).toBe(4);
+    // A player whose own speed is faster than the quiet rung keeps it everywhere.
+    expect(tutorialPaceOf({ longestStandingS: undefined, watchingSimPerRealS: 240 })).toBe(240);
+    const quiet = tutorialClockOf({ simTimeS: 1448, startedAtS: 0, simPerRealS: 90, watchingSimPerRealS: 4 });
+    expect(quiet.clock).toBe('24:08 into the morning');
+    expect(quiet.pace).toContain('90×');
+    const held = tutorialClockOf({ simTimeS: 1448, startedAtS: 0, simPerRealS: 4, watchingSimPerRealS: 4 });
+    expect(held.pace).toContain('your speed');
   });
 
   it('spends the press: the control is gone on the beat it moved, and the answer is drawn there', () => {

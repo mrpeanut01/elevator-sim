@@ -156,9 +156,16 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
   Object.freeze({
     n: '2',
     head: 'Watch the day',
+    /*
+     * GitHub issue #592, § D991. This read *"A whole working day, at whatever speed you set"*
+     * (§ D733), and § D991 made its second clause partly false: on a whole day the stage now
+     * crosses the hours between the peaks at `30×` itself, so the speed is not only the player's.
+     * The peaks are still played at the speed they set, and a chip press still wins for the rest
+     * of the day, so the sentence says both rather than dropping either.
+     */
     body:
-      'A whole working day, at whatever speed you set. You can speed it up, not steer it — the ' +
-      'dispatcher is the decision you already made.',
+      'A whole working day, its busy hours at the speed you set and the quiet hours between them ' +
+      'faster. You can speed it up, not steer it — the dispatcher is the decision you already made.',
   }),
   Object.freeze({
     n: '3',
