@@ -2856,7 +2856,10 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    *
    * {@link tutorialOffered} is **session-local and deliberately not persisted**: without it, a player who left
    * the tutorial for the menu without filing a day would be sent straight back, and the front door
-   * would be unreachable. It is not the flag § D476 forbids — a reload clears it and the question
+   * would be unreachable. **Since [§ D993](../../../../DECISIONS.md) that describes every exit** —
+   * `tutorialScreens.ts#leave` files nothing on Skip or on Start playing — so this guard is what
+   * holds § D476's amended condition within a session, and across a reload the landing page it
+   * offers carries a live route to the modes. It is not the flag § D476 forbids — a reload clears it and the question
    * is asked again from the week, which is the behaviour that rule is protecting.
    *
    * The front-door guard is the other half: the offer only ever moves a player who is *on the

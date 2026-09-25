@@ -373,21 +373,22 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * reports a move as an addition.
      */
     /*
-     * **79 → 85, and the six are named** — wave AH lane AH-D's two browser files, each a
+     * **79 → 88, and the nine are named** — wave AH lane AH-D's three browser files, each a
      * `beforeAll` that builds and serves the bundle (180 000 ms) and two journeys at 300 000 ms:
      * `everyday/stagePace.browser.test.ts` (GitHub issue #592, § D991 — a whole day's stage crosses
      * its quiet at 30× and plays its peak at 4×, and a slice is not paced),
      * `everyday/tutorialTwentySeconds.browser.test.ts` (#598, § D992 — the tutorial's failure within
-     * twenty seconds, with a clock).
+     * twenty seconds, with a clock) and `everyday/tutorialLeave.browser.test.ts` (#598, § D993 —
+     * neither exit files a day, and a reload offers a cover with a live way past it).
      *
      * **They earn it for the reason the four above did**: each holds a claim about what the mounted
      * screen does over real time — a transport changing speed, a press going live when somebody has
      * waited a minute, a week staying empty across a worker's landing — that no unit tier can see.
      * The stage journey waits for a whole day to simulate in the worker and then plays a real minute
-     * to 08:30, which is why its bound is not the tier's. 19 920 000 + 2 × 180 000 + 4 × 300 000 =
-     * **21 480 000**. Nothing existing was raised.
+     * to 08:30, which is why its bound is not the tier's. 19 920 000 + 3 × 180 000 + 6 × 300 000 =
+     * **22 260 000**. Nothing existing was raised.
      */
-    ['viz-browser', { count: 85, totalMs: 21_480_000 }],
+    ['viz-browser', { count: 88, totalMs: 22_260_000 }],
   ]);
 
 /**

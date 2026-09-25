@@ -56,11 +56,14 @@
  *
  * ## Leaving, and why both ways out do the same thing
  *
- * § D476's playability condition — *skipping must advance the derived state* — is
- * {@link leave}, and it is that condition's one implementation. Skip and Finish
- * both file the tutorial's day, so a player who skips and reloads does not meet the screen they
- * dismissed. The day is a real one: `EverydayHost.startRun` runs it and `EverydayHost.closeDay`
- * files it, both of which hold all of `closeShift`'s ordinary gates.
+ * Skip and Finish both call {@link leave}, and since GitHub issue #598 it files **nothing** — the
+ * same as the § 3.3 leave rows on both screens always did. The day it used to file was a scored day
+ * on a tower the player never saw, and a press of Skip is a navigation, which § D232 says is not a
+ * progression event. [§ D993](../../../../DECISIONS.md) records that and amends § D476's playability
+ * condition (*skipping must advance the derived state*): it holds within a session, through the
+ * shell's `tutorialOffered` guard, and across a reload it is replaced by *the first-visit cover
+ * always carries a live route to the mode picker* — so a player who has played nothing meets the
+ * landing page again, one press from the modes. That is the cost, and it is named there.
  */
 
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
@@ -353,47 +356,36 @@ export function mountWorkedAnswer(
  * -------------------------------------------------------------------------- */
 
 /**
- * File the tutorial's day and go to the main menu.
+ * **Leave the tutorial for the main menu, filing nothing** — GitHub issue **#598**,
+ * [§ D993](../../../../DECISIONS.md).
  *
- * The same call on *Skip the tutorial* and on *Start playing*, which is what makes § D476's
- * condition hold: the week has a filed day by the time anything could reload, so
- * `tutorialModel.ts#tutorialIsDue` answers `false` on the next load whichever way the player left.
+ * The same call on *Skip the tutorial* and on *Start playing*, so both ways out do one thing.
  *
- * ## Why this is three steps rather than two, and each one is a gate somebody else wrote
+ * ## What it used to do, and why it stopped
  *
- * The obvious form — `startRun(); closeDay();` — **files nothing**, and the reason is on
- * `EverydayHost.startRun`'s own contract: it *"returns before the run lands (the simulation is on
- * a worker); the landing arrives as a subscribe notification."* `closeDay` then meets
- * `closeShift`'s first gate — *a run nobody started files nothing* — and the derived state does not
- * move, which is § D476's condition failing silently in exactly the way it warns about.
+ * It started a run and closed the day, so the week had a filed day by the time anything could
+ * reload — the cheapest form of [§ D476](../../../../DECISIONS.md)'s condition that *skipping must
+ * advance the derived state*. The day it filed was the player's week's own day 1, on whatever tower
+ * the week stood on: a **scored day on a tower the player never saw**. Three of four assessors on
+ * the post-wave-AG playability panel found the front door reading *MON mixed-use-high-rise 96 %
+ * today*, a raw slug and a score, before they had played anything. That was a false statement on
+ * the first screen after onboarding, and it filled the week's Monday with a score nobody earned.
  *
- * So the close waits for the landing, and it waits on **recording identity** rather than on
- * presence: `EverydayHost.recording`'s docstring says the object is replaced wholesale on every
- * run and that *"a screen that keeps the last reference knows a fresh recording has arrived by
- * `!==` and nothing else"*. Presence alone would have closed the run that was already on the
- * stage — on a cold load that is § D232's boot demo, which is the other run nobody started — and
- * `closeShift` would have refused that too.
+ * It also broke an older and stronger rule: [§ D232](../../../../DECISIONS.md), *a navigation is not
+ * a progression event*. A press of Skip started a run the player never saw and filed it, and it used
+ * up the week's Monday, which switched off § D514's first-session door line
+ * (`shift/firstSession.ts#isFirstDayOnALegibleTower` needs `history.length === 0`).
  *
- * A day already closed needs none of this and is left alone, which is `closeShift`'s third gate
- * read from the caller's side rather than relied on from inside it.
+ * ## What it costs, said plainly
+ *
+ * Nothing the tutorial does is progress, and § D476 forbids a stored flag, so the derived gate
+ * (`tutorialModel.ts#tutorialIsDue`) does **not** move when the player leaves. Within the session the
+ * shell's `tutorialOffered` guard keeps the tutorial from being offered again; **a reload before the
+ * player has played anything lands on the landing page again**, whose leave row reaches the modes in
+ * one press. § D993 amends § D476's condition to say so, under delegated authority, and refuses the
+ * alternative — a count of tutorials watched — as a flag in disguise.
  */
 function leave(context: EverydayScreenShellContext): void {
-  const host = context.host;
-  if (!host.runState().dayClosed) {
-    const standing = host.recording();
-    let stop: (() => void) | undefined;
-    const settle = (): void => {
-      const landed = host.recording();
-      if (landed === undefined || landed === standing) return;
-      host.closeDay();
-      stop?.();
-      stop = undefined;
-    };
-    stop = host.subscribe(settle);
-    host.startRun();
-    // In case the landing beat the subscription — a no-op on the worker path, and cheap.
-    settle();
-  }
   context.go('menu');
 }
 

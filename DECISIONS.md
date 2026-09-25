@@ -31837,6 +31837,8 @@ measurement rather than by preference, and it may turn out to be small.
 
 ## D476 — a first-run cover conditioned on derived state is not the override non-goal 10 forbids
 
+> **Status 2026-09-24: CONDITION AMENDED by [§ D993](#d993)** — the ruling stands; the cheapest form (the skip files a day) is withdrawn. The condition holds within a session; across a reload it is replaced by: the first-visit cover always carries a live route to the mode picker.
+
 **Date: 2026-09-05 · Owner: delegated to the integrator by the product owner, *"use your best
 judgement that will benefit game playability"* · Rules on: `docs/35` Q2, `charter` non-goal 10,
 [§ D335](#d335).**
@@ -34703,6 +34705,11 @@ once**."*
    mode when they reach the menu. [§ D476](#d476)'s mechanism ruling is untouched and still binds —
    the cover is conditioned on derived state rather than a stored flag, and **skipping must advance
    that state**, so a player who skips and reloads does not meet the screen they dismissed.
+   *(2026-09-24: this clause is **read, not overruled**, by [§ D993](#d993), an agent ruling — its
+   stated purpose is kept: the cover stays derived and stores nothing, and across a reload the
+   cover a player meets carries a live route to the modes. One of the three swarm members dissented
+   and read § D993 as **narrowing** this clause's *"skipping must advance that state"*; that
+   dissent is recorded so the owner can see it.)*
 4. **A worked answer is permitted in the tutorial and nowhere else.** No hint control, no suggested
    fix, no diagnosis line, and no *here is what we would have done*, in any scenario, in any mode, at
    any ladder position. Screen two shows a worked answer and [§ D525](#d525) clause 2 retires
@@ -42609,3 +42616,84 @@ run, no seed and no figure the worked answer quotes moves. **One constant undoes
 a case's no-pause design, and the pace line on the block says what the transport is doing instead.
 Whether a tutorial should carry chips is left open rather than decided here.
 
+---
+
+## D993 — leaving the tutorial files nothing, and § D476's condition is amended to what can be met without a stored flag
+
+> **Taken 2026-09-24 by an agent session under delegated authority, not by the product owner.** It
+> amends [§ D476](#d476), an integrator ruling itself taken under delegation, and touches no clause
+> the product owner worded. It answers GitHub issue **#598**. That issue was **filed by the
+> integrator** from a four-assessor playability panel (post-wave-AG). It is not a product-owner
+> ruling, although it is posted under the repository owner's GitHub account, so its author field is
+> not evidence of the owner's view. Its *"what done looks like"* is the integrator's proposal. A later
+> reader weighing this against a product-owner ruling should treat it as an agent ruling
+> ([§ D626](#d626)). **The owner may restore the withdrawn means** — filing a day on the way out — by
+> overruling this entry; nothing else would have to change back. It was proposed by lane AH-D of
+> wave AH, approved by the integrator, and then ruled on by a swarm of three agents working
+> independently, all three of which chose this option.
+
+**1. The defect, as observed.** Three of four assessors on the panel met a front door reading *MON
+mixed-use-high-rise 96 % today* before they had played anything — a raw slug and a score, on a
+tower they had never seen. That repeats [§ D383](#d383)'s P0 finding in the one place a first-time
+player cannot yet know it is wrong. `tutorialScreens.ts#leave`, the one door *Skip the tutorial*
+and *Start playing* go through, started a run and closed the day, so the week's Monday was filed
+with a score nobody earned.
+
+**2. It broke two older rules.** [§ D232](#d232): *the game may not play itself, and a navigation is
+not a progression event* — a Skip press is a navigation, and it became a progression event. And it
+switched off [§ D514](#d514)'s first-session door line: `shift/firstSession.ts#isFirstDayOnALegibleTower`
+needs `week.history.length === 0`, so every player who left the tutorial by either exit never saw
+`FIRST_SESSION_LINE`. No test covered that, because each half was green alone.
+
+**3. The tutorial produces nothing else that persists.** Its two recordings are module-scope and
+made by a private runner; the press is an in-memory beat; its only profile use is a read of the
+default speed. The one persisted quantity it could plausibly touch — `solvedCaseIds` for
+`three-cars-one-cars-work`, the case it teaches — is **forbidden** by [§ D529](#d529) clause 4: the
+player was shown the answer and did not solve it, and crediting the solve would turn the tutorial's
+worked answer into a Scenario clear, the side door that clause exists to close.
+
+**4. The condition was never universal.** Both tutorial rows in `actionBar.ts` carry a live leave to
+the modes list that files nothing, and the browser tier's `leaveTutorialIfOffered` has used it at
+thirty-odd call sites. Two exits fabricated a day and one did not; this makes the three agree.
+
+**5. The amended condition, and what it costs.** The ruling of § D476 — a cover conditioned on
+derived state satisfies charter non-goal 10 — **stands untouched**, and `tutorialIsDue` still reads
+only filed days, solved cases and ratings. Its playability condition now holds **within a session**,
+through the shell's `tutorialOffered` guard (a closure `let`, never persisted), and **across a reload
+it is replaced by: the first-visit cover always carries a live route to the mode picker.** The named
+cost: **a visitor who watched or skipped the tutorial and played nothing meets the landing page
+again after a reload, one press from the modes.** That is honest rather than a trap: the landing
+page is an offer, it shows no figure, and its leave row is live. `tutorialLeave.browser.test.ts`
+drives both exits, the reload and the leave row on the shipped bundle, and checks that § D514's line
+is drawn on the daily door afterwards.
+
+**6. Refused, each with what it would store and what would read it:**
+
+- **A count in `EverydayProgress`** (tutorials watched). Stored in the profile's localStorage slot;
+  read by `tutorialIsDue` and nothing else; incremented by a press rather than by a completed turn.
+  Its only question is `> 0`, so it is `seenTutorial: boolean` wearing `number` — a flag in disguise,
+  against § D529 clause 3's *"rather than a stored flag"*, and it would pass
+  `tutorialModel.test.ts`'s no-boolean guard for the wrong reason.
+- **Filing an unscored day.** Stored as a `DayOutcome` in `WeekState.history` with a marker; read by
+  every history reader — the week strip, streak, best day, banked count, `closeDay`'s clean-day rule,
+  the tomorrow briefing, the Day report's baseline, the rail's career line,
+  `isFirstDayOnALegibleTower`, `tutorialIsDue` and the honesty adapters — each of which would have
+  to remember to filter it. The marker *is* a stored `seenTutorial`, and the fabricated run still
+  happens.
+- **The skip starts the day** (§ D476's literal cheapest form, played rather than filed). It stores
+  nothing until the player closes the day, so it has this entry's cost across a reload anyway, and
+  it drops a first-time player into a daily day against [§ D525](#d525)'s Scenario-first order.
+
+**7. The rule that binds forward: no field whose only reader is the first-visit gate may be
+persisted, under any type.** `tutorialModel.test.ts` enforces it: `TutorialProgress` has exactly its
+three counts and no boolean, `EverydayProgress` has exactly `solvedCaseIds` and `ratings`,
+`offerTutorial` writes no storage, `tutorialOffered` is a closure `let`, and `leave` contains
+`go('menu')` and none of `startRun`, `closeDay`, `subscribe(` or `setProgress`.
+
+**§ D529 is not amended.** Clause 3 restates § D476's condition and is **read, not overruled**, by
+this entry; its stated purpose — a derived cover that stores nothing — is kept. One of the three
+swarm members read this entry as **narrowing** clause 3's *"skipping must advance that state"*; that
+dissent is recorded under the clause so the owner can see it.
+
+**Corpus forecast for this change alone: 0 strings and 0 surfaces in both tiers** — the four copy
+changes (`skipNote`, `finishNote` and the two `actionBar.ts` notes) are substitutions.
