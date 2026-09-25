@@ -903,6 +903,17 @@ answer is free; and the **draw order**, since `data/fixit-cases.json` authors ev
 in role order and both surfaces drew them in it, putting the answer in row one eighteen times out of
 eighteen. `fixit/engine.ts#repairsInDrawOrder` shuffles the rows deterministically per case.
 
+**Corrected a third time 2026-09-25: the retirement landed** ([§ D1020](../DECISIONS.md), GitHub
+issue #602). Both conditions § D706 clause 6 set are met — the editor writes every answer (§ D1000)
+and each offered case's answer clears, now judged over **fifty mornings** rather than one pair, which
+four cases' answers did not survive; one was re-authored on demand and three are **held** from the
+list with their reasons rather than shipped under a judge that cannot tell their answers from luck. So the repair list and the five
+extras left both surfaces, the kind-of-fix sentence left all eighteen notes, and
+`repairsInDrawOrder` went with the menu it ordered. The *twelve of eighteen* above, and § D1000's
+later *seventeen*, were counted under the single pair; `theAnswerIsNotPrinted.test.ts` re-pins the
+census under the fifty-morning judge, beside a table of the routes that clear the letter's morning
+and do not hold.
+
 **The deviation this creates, stated where deviations go.** The handoff's § 10 words the free price
 as *"Door dwell is free — configuration"*, and the product now draws `free`. `CLAUDE.md` keeps the
 handoff canonical for the interface, so this is a departure and it is recorded rather than quiet:

@@ -44,15 +44,18 @@
 
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
-import { bookedOutCarsOf, wrinkleNoteOf } from '../shift/bookedOut.js';
+import { bookedOutCarsOf, carAbsencesOf, wrinkleNoteOf } from '../shift/bookedOut.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { scheduledEventFor } from '../shift/calendar.js';
 import { firstSessionLineFor } from '../shift/firstSession.js';
+import { eventAsRun, eventCarChoice } from '../shift/events.js';
 import { carsToDerate } from '../shift/incidents.js';
-import { pressDayStanding } from '../shift/ladder.js';
+import { admittedPressDayIds, pressDayStanding } from '../shift/ladder.js';
+import { clockOf, clockRange } from '../shift/report.js';
 import type { GoalReading, RunHorizon, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
+import { pinnedDayLengthLineOf } from './firstDayLength.js';
 import { countFigure, EM_DASH, groupThousands } from './figures.js';
 import { speedFigure, type EverydayUnits } from './units.js';
 
@@ -131,8 +134,11 @@ export interface TodayRecord {
   /** § 6.2's strip, or `undefined` on a day that holds no car. */
   readonly outOfService: OutOfServiceStrip | undefined;
   /**
-   * The cars that are **not in the building at all today** — the day's wrinkle's holds, and only
-   * those ([§ D871](../../../../DECISIONS.md)).
+   * The cars that are **out when the day opens** — the day's own holds and any window that starts at
+   * the first instant ([§ D871](../../../../DECISIONS.md), [§ D1039](../../../../DECISIONS.md)).
+   * It used to be every car the day's wrinkle takes, including one it takes at half past ten, which
+   * greyed a lift on the opening frame that the run had running; the paragraph below already said
+   * that was the wrong answer for a tower's booking, and it was the wrong answer for a day's too.
    *
    * A field rather than a count recovered from {@link OutOfServiceStrip.badge}, and the correction
    * is the reason it exists. `briefScreen.ts` drew the tower's elevation with
@@ -168,13 +174,47 @@ export interface TodayRecord {
    */
   readonly crowdIsToday: boolean;
   /**
+   * **Whether this run is a pinned day on the crowd it was measured on** — `shift/ladder.ts#pressDayStanding`
+   * over the run about to be pressed, [§ D1047](../../../../DECISIONS.md).
+   *
+   * Echoed for {@link crowdIsToday}'s reason: the seed line and the door's closing sentence both say
+   * whose crowd this is, and since § D1047 a newcomer's first day is always one of these. The ruling's
+   * honesty member made *the day is labelled as a pinned crowd* a condition of dealing it, and *a
+   * crowd of this run's own* — the other arm's words — is true and says less than the player is
+   * owed: this crowd is shared with everybody who plays the same pinned day.
+   */
+  readonly crowdIsPinned: boolean;
+  /**
    * `shift/firstSession.ts`'s line on a first day nobody has played on a legible tower, or
    * `undefined` on every other day — GitHub issue #208, § D514.
    */
   readonly firstSessionLine: string | undefined;
+  /**
+   * **How long this pinned whole day takes to watch, and when its call comes**, or `undefined` —
+   * `firstDayLength.ts#pinnedDayLengthLineOf`, [§ D1047](../../../../DECISIONS.md). Drawn by the
+   * brief only on a pinned day as measured, where both figures are true of the run the press makes;
+   * a slice, and every day that is not its tower's pinned one, draw nothing.
+   */
+  readonly dayLength: string | undefined;
   /** Who drives, by name — or the em dash when the standing selection resolves to nothing. */
   readonly driver: string;
+  /**
+   * **Why the driver cannot be changed here**, or `undefined` when it can — wave AI,
+   * [§ D1029](../../../../DECISIONS.md).
+   *
+   * On an admitted pinned day, set up exactly as it was measured and driven by its standing order,
+   * the brief's cards and select are held: the day's press is made at the stage's call, and a
+   * different driver would be a day nobody measured (8 to 10 of 12 other orders clear these days
+   * with no press at all, which is what the census says). The hold is lifted on the stage once the
+   * call is answered, and on every other day it is never drawn.
+   */
+  readonly driverHeld: string | undefined;
 }
+
+/** {@link TodayRecord.driverHeld}'s sentence — no digit, the strip's own rule. */
+export const PRESS_DAY_DRIVER_HELD =
+  'This day is the tower’s own: its standing order drives until the stage’s call is answered. ' +
+  'Pick your own driver on any other day.';
 
 /** What {@link todayOf} needs. Every field is somebody else's fact, read rather than recomputed. */
 export interface TodayInput {
@@ -194,12 +234,50 @@ export interface TodayInput {
    * it is a fact about the week rather than about today. Required, `calendar`'s own reason.
    */
   readonly firstSession: boolean;
-  /** `dev/state.ts#resolvedBuildingOf` — `undefined` when the id names no document this build has. */
+  /**
+   * The building the next run will be handed — `host.dayAhead().building`, which is
+   * `dev/state.ts#resolvedBuildingOf` over the state after the press's own patch; `undefined` when
+   * the id names no document this build has.
+   */
   readonly building: ResolvedBuilding | undefined;
+  /**
+   * Where that run's clock will start, seconds since midnight — `host.dayAhead().startOfDayS` — or
+   * `undefined` when it is not known, in which case the strip prints no clock at all
+   * ([§ D1039](../../../../DECISIONS.md)).
+   *
+   * Required rather than optional, {@link TodayInput.calendar}'s reason: an optional start would
+   * default to *no clock*, and every caller that forgot it would silently go back to the brief that
+   * said *part-way through today* beside a stage and a report that gave the times.
+   */
+  readonly dayStartS: number | undefined;
+  /**
+   * Whether the next run's demand template keeps its own mix of trips — `host.dayAhead()`'s
+   * `templateVariesMix`. On such a day a wrinkle that asks for a mix cannot have one, and the
+   * record quotes `shift/events.ts#eventAsRun`'s note — what the run does — rather than the
+   * wrinkle's own ([§ D1040](../../../../DECISIONS.md)). Required, {@link TodayInput.calendar}'s
+   * reason: a default of `false` would print the fire drill's lobby rush over an all-day rise.
+   */
+  readonly templateVariesMix: boolean;
+  /**
+   * The cars today's event takes, as the next run takes them — `host.dayAhead().dayCars`, which is
+   * `dev/state.ts#ShiftRunConfig.dayCars` — or `undefined` for a caller with no run to ask, in
+   * which case the record asks `events.ts#eventCarChoice` over `building` with nothing booked.
+   *
+   * The run's answer rather than a second call, [§ D1038](../../../../DECISIONS.md): the day's car
+   * choice skips a car the tower books over the same stretch, and a record that re-derived it
+   * without the booking would name the wrong car on exactly the days that matter.
+   */
+  readonly dayCars: { readonly holds: readonly string[]; readonly windows: readonly string[] } | undefined;
   /** The standing selection's id, so the seed line can name a building the document lookup missed. */
   readonly buildingId: string;
   /** The standing dispatcher's display name, or `undefined`. */
   readonly dispatcherName: string | undefined;
+  /**
+   * The standing dispatcher's id — for {@link TodayRecord.driverHeld}, which holds the driver only
+   * when it **is** the pin's standing order. Optional: a caller that draws no driver control passes
+   * nothing, and nothing is held.
+   */
+  readonly dispatcherId?: string | undefined;
   /**
    * Any shipped dispatcher's display name, by id — `host.dispatcherById(id)?.name`.
    *
@@ -239,6 +317,16 @@ export interface TodayInput {
    */
   readonly crowdIsToday: boolean;
   /**
+   * **The day's own crowd** — `shift/dailySeed.ts#dailySeedAt(nowMs)`, asked by the caller for
+   * {@link crowdIsToday}'s reason, [§ D1047](../../../../DECISIONS.md).
+   *
+   * The first-session line's pinned arm is true only where the draw **on this seed** deals the
+   * week's tower, and on a pinned first day {@link seed} is the pin's rather than the one the draw
+   * was taken from — so the chooser has to be handed the day's. Required: a default would have to be
+   * {@link seed}, which is exactly the number that cannot answer the question.
+   */
+  readonly daySeed: bigint;
+  /**
    * How machine specifications read — § 15.1's `Units` row, GitHub issue #170,
    * [§ D448](../../../../DECISIONS.md).
    *
@@ -259,81 +347,160 @@ function carCountOf(building: ResolvedBuilding): number {
 }
 
 /**
- * How many cars stand out today — the event's own two mechanisms, added.
+ * **One car, as today's run will have it** — the single reading the strip, the badge, the plate,
+ * the lede and the elevation all draw from ([§ D1038](../../../../DECISIONS.md),
+ * [§ D1039](../../../../DECISIONS.md)).
  *
- * `carsOutOfService` is *not in the building today* and `derate.cars` is *away for part of it*;
- * § 6.2's strip is about a car a player will not have at the start of the morning, which is both.
- * Their sum is what the brief warns about, and `shift/events.ts` keeps them apart for the run.
+ * ## Why one reading, and what it replaced
+ *
+ * The post-AH panel's D.md N5: Midtown's Tuesday brief said *"Car D is out of service today"*, the
+ * plate *"Lifts 4 · 1 out today"* and *"3 working cars"*, the wrinkle *"one car is tied up through
+ * the middle of the shift, then rejoins"*, and then *"the tower also books car D out … part-way
+ * through the day"*. Three sources — `carsToDerate` for the badge's car, the event's hold count for
+ * the plate, and the building's service windows for the tower's sentence — each true of one
+ * schedule and none of them of the run, which (until § D1038 merged the two windows) handed the
+ * movers' car back at the rung's return. Everything below now reads this list, built once per
+ * record from the run's own spans and the day's own car choice.
  */
-function carsHeldBy(event: ShiftEvent): number {
-  return event.effect.carsOutOfService + (event.effect.derate?.cars ?? 0);
+interface CarOutToday {
+  readonly carId: string;
+  /** Today's wrinkle takes this car itself — `events.ts#eventCarChoice`, the run's own choice. */
+  readonly ofTheDay: boolean;
+  /** Held for the whole run (`carsOutOfService`), which travels beside the building, not on it. */
+  readonly wholeRun: boolean;
+  /**
+   * The run's own span for it, off the building's service events — or `undefined` when the
+   * building carries none for this car, which is a document not built for today's run (the
+   * corpus and the unit fixtures pass the authored tower).
+   */
+  readonly span: { readonly awayAtS: number; readonly backAtS: number | null } | undefined;
+  /** Out at the first instant, so a picture of the opening frame greys it. */
+  readonly atOpen: boolean;
+  /** Out for the whole run, so no count of *working* cars includes it. */
+  readonly allDay: boolean;
 }
 
-/**
- * Cars this **tower's own schedule** takes out of passenger service after the day has started —
- * `shift/ladder.ts#ContractFabric.incidents`, [§ D871](../../../../DECISIONS.md).
- *
- * The reading is `shift/bookedOut.ts#bookedOutCarsOf` since [§ D983](../../../../DECISIONS.md),
- * moved there so the wrinkle card, the Day report's header and the stage read one expression rather
- * than three. Read off `building.serviceEvents` of the run's own building, which is what makes the
- * strip name the car the kernel will actually stand down.
- */
-function scheduledAwayOf(
-  building: ResolvedBuilding | undefined,
-): readonly { readonly carId: string; readonly returns: boolean }[] {
-  return bookedOutCarsOf(building).map((car) => ({ carId: car.carId, returns: car.backAtS !== null }));
-}
-
-/**
- * The strip, or nothing. The badge is the held car's own id — `carsToDerate`'s first choice, which
- * is the same car the run holds, because it is the same call.
- *
- * **Two kinds of absence, one strip** — [§ D871](../../../../DECISIONS.md). The day's wrinkle may
- * hold a car for the whole morning, and the *tower* may book one out part-way through every day it
- * runs ({@link scheduledAwayOf}). They are separate facts with separate causes, and a player meets
- * them as one question — *which lifts will I not have?* — so they share the badge and get a
- * sentence each. A strip that drew only the first would have gone quiet on the one absence the
- * player can still do something about.
- */
-function outOfServiceOf(
+/** The day's cars first, in the run's own order, then the tower's by id. */
+function carsOutTodayOf(
   building: ResolvedBuilding | undefined,
   event: ShiftEvent,
+  dayCars: TodayInput['dayCars'],
+): readonly CarOutToday[] {
+  if (building === undefined) return [];
+  const choice =
+    dayCars === undefined
+      ? (() => {
+          const chosen = eventCarChoice(event.effect, building);
+          return {
+            holds: chosen.holdCars.map((car) => car.carId),
+            windows: chosen.derateCars.map((car) => car.carId),
+          };
+        })()
+      : dayCars;
+  const holdIds = choice.holds;
+  const derateIds = choice.windows;
+  const spans = new Map(carAbsencesOf(building).map((entry) => [entry.carId, entry]));
+  const { derate } = event.effect;
+  const ids = [...new Set([...holdIds, ...derateIds, ...spans.keys()])];
+  return ids.map((carId): CarOutToday => {
+    const wholeRun = holdIds.includes(carId);
+    const byDerate = derateIds.includes(carId);
+    const entry = spans.get(carId);
+    const span = entry === undefined ? undefined : { awayAtS: entry.awayAtS, backAtS: entry.backAtS };
+    /*
+     * A derate with no span on the building is described by its own fractions — the only other
+     * account of it there is — so the fixtures that pass an authored tower still get a plate that
+     * counts the car the day takes.
+     */
+    const fromStart =
+      span !== undefined ? span.awayAtS === 0 : byDerate && derate !== null && derate.fromFraction <= 0;
+    const toEnd =
+      span !== undefined ? span.backAtS === null : byDerate && derate !== null && derate.toFraction >= 1;
+    return {
+      carId,
+      ofTheDay: wholeRun || byDerate,
+      wholeRun,
+      span,
+      atOpen: wholeRun || fromStart,
+      allDay: wholeRun || (fromStart && toEnd),
+    };
+  });
+}
+
+/** `10:30–15:30`, `from the start of the day until 16:30`, `from 10:30 to the end of the day`, `all day`. */
+function spanPhrase(
+  span: { readonly awayAtS: number; readonly backAtS: number | null },
+  dayStartS: number,
+): string {
+  if (span.awayAtS === 0) {
+    return span.backAtS === null
+      ? 'all day'
+      : `from the start of the day until ${clockOf(span.backAtS, dayStartS)}`;
+  }
+  return span.backAtS === null
+    ? `from ${clockOf(span.awayAtS, dayStartS)} to the end of the day`
+    : clockRange(span.awayAtS, span.backAtS, dayStartS);
+}
+
+/**
+ * The strip, or nothing — a badge of every car the run loses, and a sentence for each cause.
+ *
+ * **Two kinds of absence, one strip** — [§ D871](../../../../DECISIONS.md). The day's wrinkle may
+ * take a car, and the *tower* may book one out part-way through every day it runs. They are
+ * separate facts with separate causes, and a player meets them as one question — *which lifts will
+ * I not have?* — so they share the badge. Since [§ D1038](../../../../DECISIONS.md) a car both take
+ * is **one** car in one span, and it is described once: as the day's, with the run's span.
+ *
+ * **With the clock, since [§ D1039](../../../../DECISIONS.md).** The strip said *part-way through
+ * today* and printed no time, on the ground that a time before the run is a figure whose only source
+ * is a schedule the reader cannot see. The stage's pill and the report's header printed the times
+ * from that very schedule, so the brief was the one surface keeping back a fact the other two gave;
+ * printing it is how the reader gets to see the schedule. The times are the report's own expression
+ * (`shift/report.ts#clockRange` over the run's spans), read off the run the next press produces
+ * (`host.dayAhead()`); with no known start of day the strip says what it said before, and no clock.
+ */
+function outOfServiceOf(
+  cars: readonly CarOutToday[],
+  event: ShiftEvent,
+  dayStartS: number | undefined,
   moot: string | undefined,
 ): OutOfServiceStrip | undefined {
-  if (building === undefined) return undefined;
-  const held = carsHeldBy(event);
-  const heldNames = held === 0 ? [] : carsToDerate(building, held).held.map((car) => car.carId);
-  const scheduled = scheduledAwayOf(building);
-  const names = [...new Set([...heldNames, ...scheduled.map((entry) => entry.carId)])];
-  if (names.length === 0) return undefined;
-  const badge = names.join(' · ');
+  if (cars.length === 0) return undefined;
+  const badge = cars.map((car) => car.carId).join(' · ');
   const sentences: string[] = [];
-  if (heldNames.length > 0) {
+  const days = cars.filter((car) => car.ofTheDay);
+  if (days.length > 0) {
     /*
-     * The event's note says *when* — *"for the first two thirds of the shift"*, *"for the whole
-     * shift"* — and it says it in the design's words. This sentence names the car and defers to that
-     * note rather than restating a duration it would then own a second copy of.
+     * The event's note says *when* in the design's words and stays first; the sentence after it
+     * names the car and, where the run's span is known, the clock. It used to open *"Car D is out
+     * of service today."* over a note that said the car rejoins, which is one of D.md's three.
      */
-    const first = heldNames[0] ?? '';
-    const which = heldNames.length === 1 ? `Car ${first} is` : `Cars ${heldNames.join(' · ')} are`;
-    sentences.push(`${which} out of service today. ${event.note}`);
+    sentences.push(event.note);
+    for (const car of days) {
+      if (car.wholeRun) {
+        sentences.push(`Car ${car.carId} is the car it takes, out of service all day.`);
+      } else if (car.span !== undefined && dayStartS !== undefined) {
+        sentences.push(
+          `Car ${car.carId} is the car it takes, out of passenger service ${spanPhrase(car.span, dayStartS)}.`,
+        );
+      } else {
+        sentences.push(`Car ${car.carId} is the car it takes.`);
+      }
+    }
   }
-  for (const entry of scheduled) {
-    /*
-     * No clock and no fraction. The strip is drawn before the run, and the instant is the run's to
-     * show — a time printed here would be a figure whose only source is a schedule the reader
-     * cannot see, and this file's neighbours already carry the rule that a figure needs a source a
-     * reader can reach. What the sentence owes is the *decision*: the cars that are left are the
-     * ones the stage's own arms move.
-     */
+  for (const car of cars) {
+    if (car.ofTheDay || car.span === undefined) continue;
     sentences.push(
-      entry.returns
-        ? `Car ${entry.carId} is booked out of passenger service part-way through today and comes ` +
-          'back before the end. What the cars that are left do while it is away is yours to change.'
-        : `Car ${entry.carId} is booked out of passenger service part-way through today and does ` +
-          'not come back. What the cars that are left do after it goes is yours to change.',
+      dayStartS !== undefined
+        ? `Car ${car.carId} is booked out of passenger service ${spanPhrase(car.span, dayStartS)}.`
+        : car.span.backAtS !== null
+          ? `Car ${car.carId} is booked out of passenger service part-way through today and comes back before the end.`
+          : `Car ${car.carId} is booked out of passenger service part-way through today and does not come back.`,
     );
   }
+  sentences.push(
+    `What the cars that are left do while ${cars.length === 1 ? 'it is' : 'they are'} away is yours to change.`,
+  );
   return { badge, sentence: sentences.join(' '), mootUnder: moot };
 }
 
@@ -385,25 +552,74 @@ function mootSentenceOf(
     horizon: input.horizon,
   });
   if (press === undefined) return undefined;
-  const names = press.mootUnder.map((id) => nameOf(id) ?? id);
-  if (names.length === 0) return undefined;
-  const last = names[names.length - 1] ?? '';
-  const list = names.length === 1 ? last : `${names.slice(0, -1).join(', ')} and ${last}`;
+  /*
+   * **One derived sentence now, and the list is the report's** — wave AI, [§ D1029](../../../../DECISIONS.md).
+   * The names used to be drawn here, one screen from the `<select>`, where they told a player the
+   * day's question could be skipped before they had met it; the ruling moved them to the report's
+   * call row, where they are a fact about the day just played. What stays is the count, in words,
+   * and whose order the day runs under — the visibility the first-day swarm's honesty member made a
+   * condition of the press-day default.
+   *
+   * **On *this* crowd, not *today's*** — [§ D1047](../../../../DECISIONS.md). The gate above admits
+   * only the pin's seed, and a pin's seed is never the date's (`20276662` would be the sixty-second
+   * day of the sixty-sixth month), so *today's crowd* was false on every day this sentence could be
+   * drawn — and since § D1047 that is every newcomer's first brief, under a seed line saying the
+   * crowd is not the day's.
+   */
+  const standing = nameOf(press.standingOrder) ?? press.standingOrder;
+  const others = press.mootUnder.length;
+  const count =
+    others === 0
+      ? 'No other standing order clears it'
+      : `${countWord(others, true)} other standing ${others === 1 ? 'order clears' : 'orders clear'} it`;
   return (
-    `Measured on today’s crowd: ${list} clear this day with no press at all. Change who is ` +
-    'driving and the question this day is asking goes away with it.'
+    `This day runs under the tower’s standing order, ${standing}. Measured on this crowd, ` +
+    `${count} with no press at all; the day’s report names ${others === 1 ? 'it' : 'them'}.`
   );
+}
+
+/** A small count in words, for a strip that may carry no digit. Past twenty it is the digits' job. */
+function countWord(count: number, capital: boolean): string {
+  const words = [
+    'no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+    'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen',
+    'nineteen', 'twenty',
+  ];
+  const word = words[count] ?? 'many';
+  return capital ? word.charAt(0).toUpperCase() + word.slice(1) : word;
+}
+
+/**
+ * {@link TodayRecord.driverHeld} — the pinned day as measured, admitted, and under its standing
+ * order. `pressDayStanding`'s five gates, and the two § D1029 adds for the brief: the pin is
+ * admitted, and the selection **is** the standing order (a selection that is not would not be held
+ * onto the wrong driver; the stage draws no call over it either).
+ */
+function driverHeldOf(input: TodayInput, event: ShiftEvent): string | undefined {
+  const press = pressDayStanding({
+    contractId: input.week.contractId,
+    day: input.week.day,
+    eventId: event.id,
+    hasCalendar: input.calendar !== null,
+    seed: input.seed,
+    horizon: input.horizon,
+  });
+  if (press === undefined) return undefined;
+  if (!admittedPressDayIds().includes(input.week.contractId)) return undefined;
+  if (input.dispatcherId === undefined || input.dispatcherId !== press.standingOrder) return undefined;
+  return PRESS_DAY_DRIVER_HELD;
 }
 
 /** § 6.2's five rows, from the resolved building. Empty when there is no document to read. */
 function factsOf(
   building: ResolvedBuilding | undefined,
-  held: number,
+  out: readonly CarOutToday[],
   units: EverydayUnits,
 ): readonly TodayFact[] {
   if (building === undefined) return [];
   const cars = carCountOf(building);
-  const working = Math.max(0, cars - held);
+  const working = Math.max(0, cars - out.length);
+  const away = awayPhrasesOf(out);
   const speeds = building.banks.flatMap((bank) => bank.cars.map((car) => car.ratedSpeedMps));
   const capacities = building.banks.flatMap((bank) =>
     bank.cars.map((car) => car.designCapacityPersons),
@@ -414,10 +630,7 @@ function factsOf(
     { label: 'People', value: groupThousands(building.totalPopulation) },
     {
       label: 'Lifts',
-      value:
-        held === 0
-          ? String(cars)
-          : `${String(cars)} · ${String(held)} out today`,
+      value: away.length === 0 ? String(cars) : [String(cars), ...away].join(' · '),
     },
     {
       /*
@@ -434,7 +647,8 @@ function factsOf(
       value:
         smallest === undefined
           ? EM_DASH
-          : `${String(smallest)} · ${String(smallest * working)} a trip with ${String(working)} working`,
+          : `${String(smallest)} · ${String(smallest * working)} a trip with ${String(working)} working` +
+            (out.some((car) => !car.allDay) ? ' all day' : ''),
     },
     {
       /*
@@ -452,19 +666,54 @@ function factsOf(
  * § 6.2's tinted panel, as configuration. `undefined` with no building, or with no car left to
  * divide by. The sentence says what the plate is not: a grade of a day that has not run.
  */
-function loadOf(building: ResolvedBuilding | undefined, held: number): TodayLoad | undefined {
+function loadOf(
+  building: ResolvedBuilding | undefined,
+  out: readonly CarOutToday[],
+): TodayLoad | undefined {
   if (building === undefined) return undefined;
-  const working = Math.max(0, carCountOf(building) - held);
+  const working = Math.max(0, carCountOf(building) - out.length);
   if (working === 0) return undefined;
   const perCar = Math.round(building.totalPopulation / working);
+  const part = out.filter((car) => !car.allDay).length;
+  /*
+   * *Working all day* where a car is away for part of it — § D1039's one reading. The plate used to
+   * count a car the day takes for a window as *out today*, and a car the tower books for a window as
+   * working, so the same absence was a different number depending on which schedule it was on.
+   */
+  const cars =
+    part === 0
+      ? `${String(working)} working ${working === 1 ? 'car' : 'cars'} today`
+      : `${String(working)} ${working === 1 ? 'car' : 'cars'} working all day and ${String(part)} ` +
+        'more for part of it';
   return {
     word: `${countFigure(perCar)} per working car`,
     note:
-      `${groupThousands(building.totalPopulation)} people and ${String(working)} working ` +
-      `${working === 1 ? 'car' : 'cars'} today, as the building is configured. The day shows ` +
-      'whether that is comfortable; this plate does not grade it.',
+      `${groupThousands(building.totalPopulation)} people and ${cars}, as the building is ` +
+      'configured. The day shows whether that is comfortable; this plate does not grade it.',
   };
 }
+
+/** `1 out all day`, `1 away for part of the day` — the plate's and the lede's one wording. */
+function awayPhrasesOf(out: readonly CarOutToday[]): readonly string[] {
+  const allDay = out.filter((car) => car.allDay).length;
+  const part = out.length - allDay;
+  return [
+    ...(allDay === 0 ? [] : [`${String(allDay)} out all day`]),
+    ...(part === 0 ? [] : [`${String(part)} away for part of the day`]),
+  ];
+}
+
+/**
+ * **What a player chooses about today** — the lede's closing sentence.
+ *
+ * It read *"The only thing you choose is who drives"* (the post-AH panel's H13), over a stage that
+ * offers two parking presses and a mid-day handover on every day and a list of days whose verdict
+ * turns on one of those presses. The dispatcher is chosen before the day starts and the cars can be
+ * moved while it plays, so the sentence says both halves and claims no *only*. Recorded here under
+ * [§ D405](../../../../DECISIONS.md); `doorView.ts#DOOR_STEPS` carries the same correction.
+ */
+export const TODAY_CHOICE_LINE =
+  'You choose who drives before the day starts, and what the cars do while it plays.';
 
 /**
  * § 6.1's lede — the building in words a stranger understands, composed from its own facts.
@@ -481,9 +730,14 @@ function loadOf(building: ResolvedBuilding | undefined, held: number): TodayLoad
  * tower is the one their own week was opened on. The claim about the crowd now lives on the seed
  * line, where {@link TodayRecord.crowdIsToday} can condition it and where § 6 put it in the first
  * place (*“printed so two players can confirm they had the same morning”*). What is left here is
- * the half that holds on every day and every tower: the dispatcher is the only thing you choose.
+ * the half that holds on every day and every tower — {@link TODAY_CHOICE_LINE}.
  */
-function ledeOf(building: ResolvedBuilding | undefined, event: ShiftEvent, held: number): string {
+function ledeOf(
+  building: ResolvedBuilding | undefined,
+  event: ShiftEvent,
+  note: string,
+  out: readonly CarOutToday[],
+): string {
   if (building === undefined) {
     return (
       'This build does not have the document for the building the run is set to, so nothing below ' +
@@ -491,16 +745,14 @@ function ledeOf(building: ResolvedBuilding | undefined, event: ShiftEvent, held:
     );
   }
   const cars = carCountOf(building);
-  const working = Math.max(0, cars - held);
+  const away = awayPhrasesOf(out);
   const lifts =
-    held === 0
-      ? `${String(cars)} lifts`
-      : `${String(cars)} lifts, ${String(cars - working)} of them out today`;
+    away.length === 0 ? `${String(cars)} lifts` : `${String(cars)} lifts, ${away.join(' and ')}`;
   return (
     `${String(building.floors.length)} floors, ` +
     `${groupThousands(building.totalPopulation)} people and ${lifts}. ` +
-    `${event.name}: ${event.note} ` +
-    'The only thing you choose is who drives.'
+    `${event.name}: ${note} ` +
+    TODAY_CHOICE_LINE
   );
 }
 
@@ -530,30 +782,77 @@ function ledeOf(building: ResolvedBuilding | undefined, event: ShiftEvent, held:
  * **Neither arm names the tower as shared**, and that is [§ D730](../../../../DECISIONS.md)
  * rather than an omission. The tower is the one this player’s week was opened on.
  */
-function seedLineOf(input: TodayInput): string {
+function seedLineOf(input: TodayInput, crowdIsPinned: boolean): string {
   const crowd = `tower ${input.buildingId} · crowd ${input.seed.toString()}`;
-  return input.crowdIsToday
-    ? `${crowd} · today’s date, so everyone playing today meets this crowd`
-    : `${crowd} · a crowd of this run’s own, not the day’s`;
+  if (input.crowdIsToday) return `${crowd} · today’s date, so everyone playing today meets this crowd`;
+  /*
+   * **The third arm: a pinned crowd, labelled as one** — [§ D1047](../../../../DECISIONS.md). The
+   * ruling's honesty member made it a condition of dealing a newcomer a pinned day, and the second
+   * arm's *a crowd of this run's own* is true and says less than is so: everybody who plays this
+   * tower's pinned first day meets this crowd, which is the one it was measured on.
+   */
+  if (crowdIsPinned) return `${crowd} · the pinned crowd this day was measured on, not the day’s`;
+  return `${crowd} · a crowd of this run’s own, not the day’s`;
+}
+
+/**
+ * {@link TodayRecord.dayLength} — the pinned day as measured and admitted, under its standing order,
+ * which is `driverHeldOf`'s gate: the run the length and the call were measured on is that one, and
+ * the sentence is not drawn over a run somebody else is driving.
+ */
+function dayLengthOf(input: TodayInput, event: ShiftEvent): string | undefined {
+  if (driverHeldOf(input, event) === undefined) return undefined;
+  return pinnedDayLengthLineOf(input.week.contractId);
 }
 
 /** Today, from the week and the building. Pure and total: every arm answers something drawable. */
 export function todayOf(input: TodayInput): TodayRecord {
   const { week, building } = input;
   const weekday = weekdayOf(week.dayIdx);
-  const event = scheduledEventFor(input.calendar, week.day, week.dayIdx);
-  const held = carsHeldBy(event);
+  /*
+   * The event as the run will have it — § D1040. Its note is the wrinkle's own on every day but one
+   * whose template keeps its own mix, where the wrinkle's mix is withheld by `core` and the note says
+   * so; the name, the id and the effect are the wrinkle's either way.
+   */
+  const event = eventAsRun(
+    scheduledEventFor(input.calendar, week.day, week.dayIdx),
+    input.templateVariesMix,
+  );
+  const out = carsOutTodayOf(building, event, input.dayCars);
+  /*
+   * The one sentence about the day's wrinkle — the brief's card, this record's lede and the report's
+   * header all print it. The lede quoted `event.note` and printed *"Nothing booked"* on every tower
+   * that books a car out, all seven pinned press days included (the post-AH panel's N4), one screen
+   * before the brief said the car was booked.
+   */
+  const wrinkleNote = wrinkleNoteOf(
+    event,
+    bookedOutCarsOf(
+      building,
+      out.filter((car) => car.ofTheDay).map((car) => car.carId),
+    ),
+  );
+  const crowdIsPinned =
+    pressDayStanding({
+      contractId: week.contractId,
+      day: week.day,
+      eventId: event.id,
+      hasCalendar: input.calendar !== null,
+      seed: input.seed,
+      horizon: input.horizon,
+    }) !== undefined;
   return {
     day: week.day,
     weekday,
     dayLabel: `${weekday.toUpperCase()} · DAY ${String(week.day)}`,
     towerName: building?.name ?? input.buildingId,
-    lede: ledeOf(building, event, held),
+    lede: ledeOf(building, event, wrinkleNote, out),
     wrinkle: event,
-    wrinkleNote: wrinkleNoteOf(event, bookedOutCarsOf(building)),
+    wrinkleNote,
     outOfService: outOfServiceOf(
-      building,
+      out,
       event,
+      input.dayStartS,
       mootSentenceOf(input, event, input.dispatcherNameOf),
     ),
     /*
@@ -561,23 +860,25 @@ export function todayOf(input: TodayInput): TodayRecord {
      * `carsToDerate` per day record rather than one per reader. See the field's docstring for the
      * defect that made it a field.
      */
-    heldCarIds:
-      building === undefined || carsHeldBy(event) === 0
-        ? []
-        : carsToDerate(building, carsHeldBy(event)).held.map((car) => car.carId),
-    facts: factsOf(building, held, input.units),
-    load: loadOf(building, held),
+    heldCarIds: out.filter((car) => car.atOpen).map((car) => car.carId),
+    facts: factsOf(building, out, input.units),
+    load: loadOf(building, out),
     asks: input.goals.map((reading) => reading.goal.label),
-    seedLine: seedLineOf(input),
+    seedLine: seedLineOf(input, crowdIsPinned),
     crowdIsToday: input.crowdIsToday,
+    crowdIsPinned,
     /*
      * Which arm is the draw's own answer rather than a guess about how the player arrived — GitHub
      * issue #595: the picker and the pinned days both reach a legible first day the seed did not
-     * choose, and the first arm's *the same number opens the same tower* is false of both.
+     * choose, and the first arm's *the same number opens the same tower* is false of both. Since
+     * § D1047 the draw is asked on the day's seed as well, because a first session's printed crowd is
+     * the pin's and the draw was taken from the date.
      */
     firstSessionLine: input.firstSession
-      ? firstSessionLineFor(week.contractId, input.seed)
+      ? firstSessionLineFor(week.contractId, input.seed, input.daySeed)
       : undefined,
+    dayLength: dayLengthOf(input, event),
     driver: input.dispatcherName ?? EM_DASH,
+    driverHeld: driverHeldOf(input, event),
   };
 }

@@ -40,7 +40,7 @@
  * This panel plays neither, and the divergence is a ruling rather than an oversight — #348 put the
  * opening sight on the player's screen only and this panel has run without one ever since, on the
  * ground that the two surfaces are **allowed** to differ in presentation and must not differ in
- * what the machinery decides: the same `classifyOutcome`, the same `repairRowOf`, the same
+ * what the machinery decides: the same `classifyOutcome`, the same judge (§ D1020), the same
  * `fixedBadgeAfter`, the same figures. `docs/38` § 1's *the fun is watching the people* is a claim
  * about the game, and this overlay is the Engineer's instrument for the same cases — the surface a
  * reader opens to get the sheet, beside the bench and the matrix, not the one a stranger meets.
@@ -55,16 +55,12 @@
 import { el, fill } from './dom.js';
 import type { BrowserResources } from './data.js';
 import {
-  BASIS_LINE,
   editorPricingFrom,
-  standingExtrasFrom,
   affordabilityOf,
   budgetNoteOf,
   classifyOutcome,
   emptyFixitState,
   fixedBadgeAfter,
-  repairRowOf,
-  repairsInDrawOrder,
   parkingPriceUnits,
   setParkingStrategy,
   spendOf,
@@ -74,10 +70,12 @@ import {
   stepZoneOverlap,
   topFloorRaisePriceUnits,
   zonePriceUnits,
-  toggleExtra,
-  toggleRepair,
+  sameOrder,
+  verdictIsStale,
+  witnessStateOf,
   type FixitOutcome,
 } from '../fixit/engine.js';
+import { sameLegs } from '../record/crowd.js';
 import {
   FIXIT_RUN_SWITCHES,
   assertPairMatchesRepairs,
@@ -85,18 +83,22 @@ import {
   fixitPlanRefusalOf,
   fixitRunPlanOf,
   measuredOf,
+  morningReadingOf,
   standingParkingOf,
   topFloorRaiseCeilingOf,
   zoneOverlapCeilingOf,
 } from '../fixit/run.js';
 import { DEFAULT_DOOR_TARGET, mountFixitFamilies } from '../everyday/fixitFamilies.js';
-import { FIXIT_SCREEN_COPY, fixitParkingRow } from '../everyday/fixitScreenModel.js';
-import { withPrunedDials } from '../fixit/editorInputs.js';
+import { FIXIT_SCREEN_COPY, fixitParkingRow, fixitVerdictContextOf } from '../everyday/fixitScreenModel.js';
+import { editorInputsOf, withPrunedDials } from '../fixit/editorInputs.js';
 import type { EditorParkingStrategy, FixitCase, FixitCases, FixitState } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type { VizRecording } from '../contract/types.js';
 
 import { createOffThreadRunner } from './offThreadRuns.js';
+import { createFixitJudge, pressThroughTheJudge } from '../fixit/judge.js';
+import { heldReasonOf, isOffered } from '../fixit/held.js';
+import { createOffThreadMornings, morningWorkerCountOf, type MorningWorkerLike } from './offThreadMornings.js';
 import type { ShiftWorkerLike } from './shiftRunner.js';
 
 export interface FixitPanelHost {
@@ -112,6 +114,11 @@ export interface FixitPanelHost {
    * document *or* a bundler. The shell passes the real one.
    */
   readonly spawnRunWorker: () => ShiftWorkerLike;
+  /**
+   * Start one of the judge's morning workers — `dev/morningWorker.ts`, [§ D1020](../../../../DECISIONS.md).
+   * Injected for {@link spawnRunWorker}'s reason.
+   */
+  readonly spawnMorningWorker: () => MorningWorkerLike;
 }
 
 export interface FixitPanel {
@@ -129,6 +136,10 @@ interface CaseSession {
   asBuilt: VizRecording | undefined;
   /** Which door-hold target the door selects edit — view state, § D1000. */
   doorTarget: string;
+  /** The order {@link CaseSession.outcome} was measured on — § D1011; see the Everyday screen's twin. */
+  verdictState: FixitState | undefined;
+  /** The diagnosed repair's own run on the case seed, asked for only after a fixed verdict — § D1011. */
+  witness: VizRecording | undefined;
 }
 
 /*
@@ -183,6 +194,13 @@ function scheduleNow(): PriceSchedule {
   const sessions = new Map<string, CaseSession>();
 
   const runner = createOffThreadRunner({ spawn: host.spawnRunWorker });
+  /** The judge's mornings — § D1020. A second pool, for `everyday/fixitScreen.ts`'s reason. */
+  const judge = createFixitJudge(
+    createOffThreadMornings({
+      spawn: host.spawnMorningWorker,
+      workers: morningWorkerCountOf(typeof navigator === 'undefined' ? undefined : navigator.hardwareConcurrency),
+    }),
+  );
 
   /**
    * What the runner is currently doing, as `caseId:open` or `caseId:press` — or `undefined`.
@@ -196,6 +214,8 @@ function scheduleNow(): PriceSchedule {
   let ask: string | undefined;
   /** A failed run, said where the reader is rather than swallowed. Cleared by the next ask. */
   let runFailure: string | undefined;
+  /** The letter's morning cleared and the other mornings are running — § D1020. */
+  let checking = false;
 
   const sessionOf = (entry: FixitCase): CaseSession => {
     let session = sessions.get(entry.id);
@@ -206,6 +226,8 @@ function scheduleNow(): PriceSchedule {
         outcome: undefined,
         asBuilt: undefined,
         doorTarget: DEFAULT_DOOR_TARGET,
+        verdictState: undefined,
+        witness: undefined,
       };
       sessions.set(entry.id, session);
     }
@@ -229,7 +251,7 @@ function scheduleNow(): PriceSchedule {
         .loadCases()
         .then((loaded) => {
           cases = loaded;
-          selectedId = loaded.cases[0]?.id;
+          selectedId = loaded.cases.find((entry) => isOffered(entry.id))?.id;
           render();
         })
         .catch((error: unknown) => {
@@ -257,12 +279,16 @@ function scheduleNow(): PriceSchedule {
       return;
     }
     if (cases === undefined) return;
-    const entry = cases.cases.find((candidate) => candidate.id === selectedId) ?? cases.cases[0];
+    const entry =
+      cases.cases.find((candidate) => candidate.id === selectedId && isOffered(candidate.id)) ??
+      cases.cases.find((candidate) => isOffered(candidate.id));
     if (entry === undefined) {
       fill(root, el(doc, 'p', { text: 'The case file holds no cases.', style: { padding: '2rem' } }), closeButton());
       return;
     }
-    const fixedCount = cases.cases.filter((candidate) => sessions.get(candidate.id)?.fixed === true).length;
+    const fixedCount = cases.cases.filter(
+      (candidate) => isOffered(candidate.id) && sessions.get(candidate.id)?.fixed === true,
+    ).length;
     fill(
       root,
       el(doc, 'div', {
@@ -291,28 +317,39 @@ function scheduleNow(): PriceSchedule {
       },
       children: [
         el(doc, 'p', {
-          text: `${String(fixedCount)}/${String(loaded.cases.length)} fixed`,
+          /* Out of the cases offered — a held case is not one the player can fix (§ D1020). */
+          text: `${String(fixedCount)}/${String(loaded.cases.filter((entry) => isOffered(entry.id)).length)} fixed`,
           style: { color: MUTED, margin: '0 0 0.75rem' },
         }),
         ...loaded.cases.map((entry) => {
           const session = sessions.get(entry.id);
+          const held = heldReasonOf(entry.id);
+          const tag = held !== undefined ? FIXIT_SCREEN_COPY.heldTag : session?.fixed === true ? 'FIXED' : 'OPEN';
           const row = el(doc, 'button', {
+            className: held === undefined ? 'fixit-case' : 'fixit-case fixit-case-held',
             style: {
               ...buttonStyle(entry.id === current.id),
               display: 'block',
               width: '100%',
               'text-align': 'left',
               'margin-bottom': '0.5rem',
+              ...(held === undefined ? {} : { opacity: '0.7', cursor: 'not-allowed' }),
             },
             children: [
               el(doc, 'div', { text: entry.name }),
               el(doc, 'div', {
-                text: `${buildingNameOf(entry)} · ${session?.fixed === true ? 'FIXED' : 'OPEN'}`,
+                text: `${buildingNameOf(entry)} · ${tag}`,
                 style: { color: MUTED, 'font-size': '12px' },
               }),
+              /* A held case is drawn with its reason and cannot be opened — § D1020. */
+              ...(held === undefined
+                ? []
+                : [el(doc, 'div', { className: 'fixit-held-reason', text: held, style: { color: MUTED, 'font-size': '12px' } })]),
             ],
           });
+          row.disabled = held !== undefined;
           row.addEventListener('click', () => {
+            if (held !== undefined) return;
             selectedId = entry.id;
             render();
           });
@@ -349,6 +386,8 @@ function scheduleNow(): PriceSchedule {
     ask = key;
     runFailure = undefined;
     const plan = fixitRunPlanOf(entry, emptyFixitState(), host.resources);
+    /* The judge's forty-nine as-built mornings, off-thread while the figures are drawn — § D1020. */
+    judge.prepare(entry, plan.asBuilt);
     runner.start({
       runs: [{ config: plan.asBuilt, ...FIXIT_RUN_SWITCHES }],
       onDone: ([asBuilt]) => {
@@ -422,16 +461,15 @@ function scheduleNow(): PriceSchedule {
           el(doc, 'p', { text: entry.diagnosis.text, style: { margin: '0 0 0.5rem', 'font-weight': '600' } }),
           el(doc, 'p', { text: entry.diagnosis.reasoning, style: { color: MUTED, margin: '0' } }),
         ]),
-        el(doc, 'h2', { text: 'Quick repairs', style: h2Style() }),
-        /* Draw order, not authored order — GitHub issue #566; see `fixit/engine.ts#repairsInDrawOrder`. */
-        ...repairsInDrawOrder(entry).map((repair) => repairToggle(entry, session, repair.id)),
-        el(doc, 'h2', { text: 'Also on offer', style: h2Style() }),
-        ...standingExtrasFrom(scheduleNow()).map((extra) => extraToggle(entry, session, extra.id)),
+        /*
+         * The repair menu and the standing extras stood here as toggles. They retired on
+         * [§ D1020](../../../../DECISIONS.md)'s commit, with the Everyday screen's, under § D706
+         * clause 6 — the editor below writes every answer, and a verdict now means fifty mornings.
+         */
         el(doc, 'h2', { text: 'Machinery, priced against the same budget', style: h2Style() }),
         stepperRow(entry, session, 'speed'),
         stepperRow(entry, session, 'capacity'),
         zoneRow(entry, session),
-        parkingRow(entry, session),
         elevationRow(entry, session),
         /* § D1000's five families — the same mount the Everyday screen draws, in this theme. */
         mountFixitFamilies({
@@ -463,12 +501,24 @@ function scheduleNow(): PriceSchedule {
             mono: 'ui-monospace, monospace',
           },
           prefix: 'fixit',
+          /* The parking select beside the floor it summons — § D1020, as on the Everyday screen. */
+          parkingRow: parkingRow(entry, session),
         }),
         el(doc, 'p', {
           text: `${String(spend.totalUnits)} of ${String(entry.budgetUnits)} u committed, ${String(spend.machineryUnits)} u of it machinery — ${budgetNoteOf(entry, spend)}`,
           style: { color: MUTED },
         }),
         runButton(entry, session),
+        /* Stale over the card rather than instead of it — § D1011, the Everyday screen's rule. */
+        ...(session.outcome !== undefined && verdictIsStale(session.verdictState, session.state)
+          ? [
+              el(doc, 'p', {
+                className: 'fixit-verdict-stale',
+                text: FIXIT_SCREEN_COPY.verdictStale,
+                style: { color: BAD, margin: '0.5rem 0' },
+              }),
+            ]
+          : []),
         ...(session.outcome === undefined ? [] : [outcomeCard(session.outcome)]),
       ],
     });
@@ -499,108 +549,6 @@ function scheduleNow(): PriceSchedule {
       padding: '0.5rem 0.75rem',
       cursor: 'pointer',
     };
-  }
-
-  function repairToggle(entry: FixitCase, session: CaseSession, repairId: string): HTMLElement {
-    const repair = entry.repairs.find((candidate) => candidate.id === repairId);
-    if (repair === undefined) return el(doc, 'div');
-    const row = repairRowOf(entry, session.state, repair, scheduleNow());
-    const button = el(doc, 'button', {
-      // The class is the browser tier's handle (`fixit.browser.test.ts`); nothing styles it.
-      className: 'fixit-repair',
-      style: {
-        ...buttonStyle(row.selected),
-        display: 'block',
-        width: '100%',
-        'text-align': 'left',
-        'margin-bottom': '0.5rem',
-        ...(row.selectable ? {} : { opacity: '0.55', cursor: 'not-allowed' }),
-      },
-      children: [
-        el(doc, 'div', {
-          style: { display: 'flex', 'justify-content': 'space-between', gap: '1rem' },
-          children: [
-            el(doc, 'span', { children: [tickMark(row.selected), doc.createTextNode(repair.name)] }),
-            el(doc, 'span', { text: row.priceLine, style: { color: MUTED } }),
-          ],
-        }),
-        el(doc, 'div', { text: repair.effect, style: { color: MUTED, 'font-size': '12px' } }),
-        ...(row.refusal === undefined
-          ? []
-          : [el(doc, 'div', { text: row.refusal, style: { color: BAD, 'font-size': '12px' } })]),
-      ],
-    });
-    // A toggle says which state it is in — docs/20 defect 16. `aria-pressed` is the platform's
-    // word for it, and the tick above is the sighted reader's; a background colour alone was both
-    // registers' silence.
-    button.setAttribute('aria-pressed', String(row.selected));
-    button.disabled = !row.selectable;
-    button.addEventListener('click', () => {
-      session.state = toggleRepair(entry, session.state, repair.id, scheduleNow());
-      render();
-    });
-    return button;
-  }
-
-  /**
-   * The selected mark, present in the layout in both states — `docs/20` defect 16.
-   *
-   * A visible tick when selected and a fixed-width blank when not, so rows do not reflow as they
-   * toggle. `aria-hidden` because the state's accessible register is the button's own
-   * `aria-pressed`, set beside it; a glyph read out as "check mark" over a pressed-state the
-   * reader was already told would be the same fact twice in different words.
-   */
-  function tickMark(selected: boolean): HTMLElement {
-    return el(doc, 'span', {
-      text: selected ? '✓ ' : '',
-      attrs: { 'aria-hidden': 'true' },
-      style: { display: 'inline-block', width: '1.1em', color: GOOD, 'font-weight': '600' },
-    });
-  }
-
-  function extraToggle(entry: FixitCase, session: CaseSession, extraId: string): HTMLElement {
-    const extra = standingExtrasFrom(scheduleNow()).find((candidate) => candidate.id === extraId);
-    if (extra === undefined) return el(doc, 'div');
-    const selected = session.state.selectedExtraIds.includes(extra.id);
-    const affordability = affordabilityOf(entry, session.state, extra.costUnits, scheduleNow());
-    const selectable = selected || affordability.selectable;
-    const button = el(doc, 'button', {
-      className: 'fixit-extra',
-      style: {
-        ...buttonStyle(selected),
-        display: 'block',
-        width: '100%',
-        'text-align': 'left',
-        'margin-bottom': '0.5rem',
-        ...(selectable ? {} : { opacity: '0.55', cursor: 'not-allowed' }),
-      },
-      children: [
-        el(doc, 'div', {
-          style: { display: 'flex', 'justify-content': 'space-between', gap: '1rem' },
-          children: [
-            el(doc, 'span', { children: [tickMark(selected), doc.createTextNode(extra.name)] }),
-            el(doc, 'span', { text: `${String(extra.costUnits)} u`, style: { color: MUTED } }),
-          ],
-        }),
-        el(doc, 'div', { text: extra.line, style: { color: MUTED, 'font-size': '12px' } }),
-        ...(selectable
-          ? []
-          : [
-              el(doc, 'div', {
-                text: `short by ${String(affordability.shortByUnits)} u`,
-                style: { color: BAD, 'font-size': '12px' },
-              }),
-            ]),
-      ],
-    });
-    // The same toggle contract the repair rows carry — one control kind, one register.
-    button.setAttribute('aria-pressed', String(selected));
-    button.disabled = !selectable;
-    button.addEventListener('click', () => {
-      session.state = toggleExtra(entry, session.state, extra.id, scheduleNow());
-      render();
-    });
-    return button;
   }
 
   function stepperRow(entry: FixitCase, session: CaseSession, which: 'speed' | 'capacity'): HTMLElement {
@@ -810,7 +758,13 @@ function scheduleNow(): PriceSchedule {
       // Named for the same reason `.fixit-repair` is: the tier selects a control by its class and
       // never by the prose a player reads, which is a lesson this file's sibling paid for once.
       className: 'fixit-run',
-      text: busy ? 'Running the day…' : session.outcome === undefined ? 'Run the day' : 'Run it again',
+      text: busy
+        ? checking
+          ? FIXIT_SCREEN_COPY.checkingLabel
+          : 'Running the day…'
+        : session.outcome === undefined
+          ? 'Run the day'
+          : 'Run it again',
       style: { ...buttonStyle(true), 'font-weight': '600', margin: '0.75rem 0' },
     });
     /*
@@ -831,31 +785,102 @@ function scheduleNow(): PriceSchedule {
       }
       ask = `${entry.id}:press`;
       runFailure = undefined;
-      const plan = fixitRunPlanOf(entry, session.state, host.resources);
-      // The spend is bound here rather than read in the callback: the outcome is classified
-      // against the state the press was made in, not against one the player edited meanwhile.
-      const spend = spendOf(entry, session.state, scheduleNow());
-      runner.start({
-        runs: [
-          { config: plan.asBuilt, ...FIXIT_RUN_SWITCHES },
-          { config: plan.asRepaired, ...FIXIT_RUN_SWITCHES },
-        ],
-        onDone: ([before, after]) => {
-          ask = undefined;
-          if (before === undefined || after === undefined) return;
-          session.asBuilt = before;
+      // The order and the spend are bound here rather than read in the callback: the outcome is
+      // classified against the order the press was made in, not against one the player edited
+      // meanwhile — and an edit made meanwhile is drawn as stale the moment the verdict lands.
+      const pressed = session.state;
+      const schedule = scheduleNow();
+      const plan = fixitRunPlanOf(entry, pressed, host.resources);
+      const spend = spendOf(entry, pressed, schedule);
+      /*
+       * Through the judge — [§ D1020](../../../../DECISIONS.md), exactly as the Everyday screen: one
+       * pair and today's bars as the gate, then forty-nine more mornings only when it clears, and
+       * only the fifty-morning verdict may badge the case. `ask` stays on the press through the
+       * checking, so the button holds under a verdict about to land on the order it shows.
+       */
+      pressThroughTheJudge({
+        entry,
+        plan,
+        switches: FIXIT_RUN_SWITCHES,
+        pairRunner: runner,
+        judge,
+        readingOf: morningReadingOf,
+        classify: (before, after, done) => {
           // GitHub issue #350: the claim the basis line will make, checked on the legs first.
-          assertPairMatchesRepairs(entry, session.state, before, after);
-          const outcome = classifyOutcome(entry, measuredOf(entry, before, after), spend);
+          assertPairMatchesRepairs(entry, pressed, before, after);
+          const measurement = measuredOf(entry, before, after);
+          const answer = (witnessRun: boolean): void => {
+            done(
+              classifyOutcome(
+                entry,
+                measurement,
+                spend,
+                fixitVerdictContextOf({
+                  entry,
+                  state: pressed,
+                  inputs: editorInputsOf(entry, pressed, host.resources, schedule),
+                  schedule,
+                  witnessRun,
+                }),
+              ),
+            );
+          };
+          /*
+           * The authored result only over the diagnosed repair's own run, leg for leg, and that run
+           * asked for only after both bars have cleared — § D1011, the Everyday screen's rule and its
+           * reasons, which are not restated here. It is taken inside the judge's `classify`
+           * continuation, before the mornings, as on that screen.
+           */
+          if (classifyOutcome(entry, measurement, spend).kind !== 'fixed') {
+            answer(false);
+            return;
+          }
+          if (sameOrder(pressed, witnessStateOf(entry))) session.witness ??= after;
+          const cached = session.witness;
+          if (cached !== undefined) {
+            answer(sameLegs(after, cached));
+            return;
+          }
+          runner.start({
+            runs: [
+              { config: fixitRunPlanOf(entry, witnessStateOf(entry), host.resources).asRepaired, ...FIXIT_RUN_SWITCHES },
+            ],
+            onDone: ([witness]) => {
+              if (witness === undefined) {
+                answer(false);
+                return;
+              }
+              session.witness = witness;
+              answer(sameLegs(after, witness));
+            },
+            onFailed: () => {
+              answer(false);
+            },
+          });
+        },
+        onGate: (outcome, before) => {
+          session.asBuilt = before;
           session.outcome = outcome;
-          // The badge follows the latest run, in both directions — `fixit/engine.ts#fixedBadgeAfter`
+          session.verdictState = pressed;
+          checking = outcome.kind === 'checking';
+          if (!checking) ask = undefined;
+          // The badge follows the latest verdict, in both directions — `fixit/engine.ts#fixedBadgeAfter`
           // holds the argument (docs/20 defect 16: FIXED beside a 0 % outcome card is two verdicts
-          // about one case on one screen).
+          // about one case on one screen). `checking` wears none.
+          session.fixed = fixedBadgeAfter(outcome);
+          render();
+        },
+        onVerdict: (outcome) => {
+          ask = undefined;
+          checking = false;
+          session.outcome = outcome;
+          session.verdictState = pressed;
           session.fixed = fixedBadgeAfter(outcome);
           render();
         },
         onFailed: (message) => {
           ask = undefined;
+          checking = false;
           runFailure = message;
           render();
         },
@@ -907,7 +932,12 @@ function scheduleNow(): PriceSchedule {
           ],
         }),
       ),
-      el(doc, 'p', { text: BASIS_LINE, style: { color: MUTED, 'font-size': '12px', margin: '0.5rem 0 0' } }),
+      /*
+       * The outcome's own basis — [§ D1020](../../../../DECISIONS.md). This drew `BASIS_LINE`
+       * whatever the outcome said, so a crowd-changing pair and, now, a fifty-morning verdict would
+       * both have been captioned *one run before, one run after*.
+       */
+      el(doc, 'p', { text: outcome.basis, style: { color: MUTED, 'font-size': '12px', margin: '0.5rem 0 0' } }),
     ]);
     // The card the tier waits on. `card()` is shared by six blocks on this screen, so the name goes
     // on the instance rather than into the helper.

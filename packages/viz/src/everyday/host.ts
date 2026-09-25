@@ -194,6 +194,8 @@ import {
   allDispatchers,
   buildingConfigOf,
   drivingProfileOf,
+  pressDayCallOf,
+  plannedDayOf,
   resolvedBuildingOf,
   runSubmissionOf,
   shiftDemandTemplateId,
@@ -201,6 +203,7 @@ import {
   specsWithSaved,
   withDispatcher,
   type PatternSelection,
+  type PlannedDay,
   type SavedDispatcher,
   type ViewerState,
 } from '../dev/state.js';
@@ -214,7 +217,8 @@ import {
 } from '../mode/plainLevers.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
-import { ladderTowersOf, pressDayFor } from '../shift/ladder.js';
+import { admittedPressDayIds, ladderTowersOf, pressDayFor } from '../shift/ladder.js';
+import type { PressCall } from '../shift/pressCall.js';
 import {
   runHorizonOf,
   scenarioHorizonFor,
@@ -248,7 +252,8 @@ import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import type { DemandBand } from '../fixit/parse.js';
-import { rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
+import type { RushBest } from './rushScreenModel.js';
+import { heldClock, rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
 import {
   rushRoundRecordOf,
   rushSittingOf,
@@ -972,6 +977,19 @@ export interface EverydayHost {
   resolvedBuilding(): ResolvedBuilding | undefined;
 
   /**
+   * **The run the next press will produce, before it is pressed** — `dev/state.ts#plannedDayOf`
+   * over the state after the press's own whole-day patch, [§ D1039](../../../../DECISIONS.md).
+   *
+   * The brief and the door read this for the booked-out car's clock times, so the times they print
+   * are the ones the stage and the Day report will print once the run exists: the same service
+   * windows on the same building, and the same start of day. Over `{ ...state, ...dayPatchFor }`
+   * rather than the state as it stands, on {@link goalsAhead}'s ground: until *Start* has been
+   * pressed a whole-day tower may still hold a slice's length, and a window's seconds are a
+   * fraction of the run's length.
+   */
+  dayAhead(): PlannedDay;
+
+  /**
    * What changed overnight, as the between-day beat holds it — `ViewerState.tomorrow`.
    *
    * `undefined` before any day has closed, and on a mode that does not advance the week. Read
@@ -1461,10 +1479,11 @@ export interface EverydayHost {
   closeDay(): void;
 
   /**
-   * Advance to tomorrow and run it — the report sheet's *Open the doors on tomorrow*, as one
-   * action. A no-op while no closed day's sheet is standing (`lastReport()` undefined): there is
-   * nothing to advance *from*, and the screen's § 3.3 primary is expected to be gated on the same
-   * fact.
+   * Advance to tomorrow and run it — the report sheet's *Open the doors on tomorrow*, and since
+   * [§ D1004](../../../../DECISIONS.md) the front door's, as one action. A no-op while no closed
+   * day's sheet is standing (`lastReport()` undefined) **and** the week holds no outcome for today:
+   * there is nothing to advance *from*, and each screen's § 3.3 primary is expected to be gated on
+   * the same fact — the report on its sheet, the door on the week's history.
    */
   openTomorrow(): void;
 
@@ -1795,6 +1814,12 @@ export interface EverydayHost {
   endRush(atS: number): void;
   /** Leave the rush, putting the parked week and the run it interrupted back. A no-op outside one. */
   leaveRush(): void;
+  /**
+   * The furthest any round has got since this page opened, or `undefined` before one has finished —
+   * what the rush front's *your furthest* fact draws (`rushScreenModel.ts#rushFactViews`). Kept past
+   * the sitting and not past a reload; see the post-AH panel's N7 in that function's docstring.
+   */
+  rushBest(): RushBest | undefined;
   /** § D478's line for a rush on the standing building, before one starts; `undefined` inside the band or with no building. */
   rushDisclosure(): string | undefined;
   /**
@@ -1878,6 +1903,21 @@ export interface EverydayHost {
    * the row's own refusal and writes nothing when the week it would land on is not on that day.
    */
   playPressDay(contractId: string): string | undefined;
+  /**
+   * **The pinned day's call on `recording`**, or `undefined` — [§ D1029](../../../../DECISIONS.md).
+   *
+   * `dev/state.ts#pressDayCallOf` over the state standing now: the call instant when the run on
+   * the stage is its tower's pinned day exactly as it was measured, and `undefined` on every other
+   * run. The stage asks it once per attempt, of the recording it opens on, and stops there.
+   */
+  pressCallOnStage(recording: VizRecording): PressCall | undefined;
+  /**
+   * **Take this call again** — § D1029's report action. Today's pinned day, run again from an
+   * **explicitly** empty record rather than one inherited, so the second attempt is the day as it
+   * was measured whatever the first one pressed. Returns why not, and writes nothing, when the week
+   * is not standing on an admitted pinned day.
+   */
+  takeCallAgain(): string | undefined;
   /** The replay in progress, or `undefined`. */
   replay(): EverydayReplaySession | undefined;
   /** Leave the replay, putting the parked week and the run it interrupted back. A no-op outside one. */
@@ -1920,6 +1960,14 @@ export interface EverydayHost {
 export interface EverydayHostBindings {
   /** The loaded resources. Stable for the life of the page. */
   readonly resources: BrowserResources;
+  /**
+   * **The crowd a pinned first day replaced**, when the page opened on one — `dev/main.ts`'s
+   * boot, [§ D1047](../../../../DECISIONS.md). Seeds `createEverydayHost`'s press-day seed base, so
+   * the first way off a first session's pinned day puts the day's crowd back exactly as it does
+   * after {@link EverydayHost.playPressDay}. Optional because a host opened on anything else has
+   * nothing to put back, and every test host is one of those.
+   */
+  readonly initialPressDaySeedBase?: bigint | undefined;
   /** The live state. Read fresh on every host call — never captured. */
   state(): ViewerState;
   /** The transport's playhead in simulated seconds, or the recording's start, or `0`. */
@@ -2437,8 +2485,20 @@ export function createEverydayHost(
         readonly modifiers: readonly ClaimedRushModifier[];
         /** The finished rounds — see {@link EverydayRushSession.rounds}. */
         readonly rounds: readonly RushRoundRecord[];
+        /**
+         * The second a round ended at, while the run that round's presses asked for had not landed
+         * yet — or `undefined`. See {@link settleRushRound}.
+         */
+        readonly unsettledEndS: number | undefined;
       }
     | undefined;
+  /**
+   * The furthest any round has got since this page opened — {@link EverydayHost.rushBest}. Kept
+   * past the sitting, because the rush front is drawn **between** sittings (entering it from a
+   * sitting leaves it) and read what it had nothing to show. Not persisted, for § 3.5's reason: a
+   * reload is a new visit, and the front says *this visit*.
+   */
+  let rushBestThisVisit: RushBest | undefined;
   /**
    * What the next sitting may claim, from what the ledger says this account owns —
    * [§ D672](../../../../DECISIONS.md).
@@ -2605,8 +2665,98 @@ export function createEverydayHost(
    * pinned day chosen from a first would otherwise record the first one's seed as the one to restore.
    * Not persisted, and that is correct rather than cheap — a reload re-seeds from the date, which is
    * the crowd this would have put back.
+   *
+   * **Seeded from the boot when the page opened on a pinned day** — [§ D1047](../../../../DECISIONS.md).
+   * A first session is dealt its tower's pinned day by `dev/state.ts#withFirstSession` rather than by
+   * this host's press, so without {@link EverydayHostBindings.initialPressDaySeedBase} the capture
+   * above never happened and choosing an ordinary tower kept the pin's crowd — the note on the picker
+   * (*"Choosing a tower from the list above puts your crowd back"*) false for every newcomer.
    */
-  let pressDaySeedBase: bigint | undefined;
+  let pressDaySeedBase: bigint | undefined = bindings.initialPressDaySeedBase;
+
+  /**
+   * **Every way off a pinned day puts the crowd back** — the patch that does it, or `{}`, and the
+   * base is spent either way.
+   *
+   * Two callers, and the second is the defect: {@link EverydayHost.chooseTower} restored the base
+   * and {@link EverydayHost.openTomorrow} did not, because `openTomorrowPatch` never touches `seed`.
+   * So after a pinned Monday, Tuesday ran on the pinned seed — a crowd measured on somebody else's
+   * first day, under a seed line that then called it *a crowd of this run's own* for no reason the
+   * player had given (first-day swarm S3 § 4.3). One function rather than the same three lines
+   * twice, so a third route off a pinned day has one thing to call and cannot restore half of it.
+   * Recorded here under [§ D405](../../../../DECISIONS.md): the decision is this host's.
+   */
+  const pressDaySeedRestore = (): { readonly seed?: bigint } => {
+    if (pressDaySeedBase === undefined) return {};
+    const base = pressDaySeedBase;
+    pressDaySeedBase = undefined;
+    return b.state().seed === base ? {} : { seed: base };
+  };
+
+  /**
+   * **A round joins the sitting once the run its presses asked for is the one on the stage** — the
+   * post-AH panel's A.md defect 4, and GitHub issue #372's recording point moved rather than added.
+   *
+   * It was taken the instant the round ended, from whatever recording stood. A press re-simulates
+   * the day from the start on a worker while the old recording keeps playing, so a round whose
+   * dispatcher was switched at 0:00 and then skipped to its end was recorded **on the run before the
+   * switch**: the sitting's row read *held 27:20, into wave 10* — rounds one to three's figure —
+   * under a result sheet reading *25:38, wave 9* from the run that then landed. Two accounts of one
+   * round on one screen, and the one the post carries was the wrong one.
+   *
+   * So {@link EverydayHost.endRush} marks the end and this records it, on the first call that finds
+   * no run in flight: at once when nothing is pending (every round that nobody pressed during), or
+   * on the first read after the re-run lands, which is the notification that redraws the sheet
+   * anyway. A round's record still needs the state it ran under, the recording it produced and the
+   * second it ended at together, and `startRush` still writes over the state for the next round —
+   * so a round whose re-run never landed before the next press is dropped by that press rather than
+   * recorded against a run it did not produce. The ledger's turn moves with it, for the same reason:
+   * it counts the waves of the outcome the sheet draws. Recorded here under
+   * [§ D405](../../../../DECISIONS.md): the decision is this host's.
+   */
+  const settleRushRound = (): void => {
+    if (rushSession?.unsettledEndS === undefined) return;
+    if (b.runPending?.() === true) return;
+    const state = b.state();
+    const recording = state.recording;
+    if (recording === undefined) return;
+    const atS = rushSession.unsettledEndS;
+    const round = rushRoundRecordOf({
+      state,
+      resources: b.resources,
+      recording,
+      endedAtS: atS,
+      /*
+       * The shelf the stage's own header reads — a saved dispatcher has a name too, and the round
+       * list has to say what the player drove even when that round is the reason the sitting cannot
+       * be posted. The id is the fallback, which is `stageScreen.ts`'s own.
+       */
+      dispatcherName:
+        allDispatchers(b.resources, state.savedDispatchers).find((profile) => profile.id === state.dispatcherId)
+          ?.name ?? state.dispatcherId,
+    });
+    rushSession = {
+      ...rushSession,
+      unsettledEndS: undefined,
+      rounds: Object.freeze([...rushSession.rounds, round]),
+    };
+    const { outcome } = round;
+    const best = rushBestThisVisit;
+    if (
+      best === undefined ||
+      outcome.wave > best.wave ||
+      (outcome.wave === best.wave && outcome.heldS > best.heldS)
+    ) {
+      rushBestThisVisit = {
+        wave: outcome.wave,
+        heldS: outcome.heldS,
+        held: heldClock(outcome.heldS),
+        driverName: round.drivers.join(' then '),
+      };
+    }
+    const waves = rushWavesOutlastedOf(outcome);
+    if (waves !== undefined) bankTurn({ completion: 'rush-wave-survived', waves });
+  };
 
   /** The horizon the Scenario press runs `buildingId` on — `dayLength.ts#scenarioHorizonFor`. */
   const horizonForBuilding = (buildingId: string): RunHorizon | undefined =>
@@ -2648,6 +2798,11 @@ export function createEverydayHost(
       buildingId: contract.buildingId,
       shiftLengthS: shiftLengthForContract(contractId),
       windowStartS: null,
+      /*
+       * A log is stamped against one day in one tower — `dev/state.ts#withBuilding`'s rule, which
+       * this press moved the building past without applying. [§ D1002](../../../../DECISIONS.md).
+       */
+      interventions: [],
     });
   };
 
@@ -2723,7 +2878,7 @@ export function createEverydayHost(
     return checked.run;
   };
 
-  return {
+  const everydayHost: EverydayHost = {
     week: () => b.state().week,
     contract: () => contractById(b.state().week.contractId),
     calendarPeriod: () => b.state().calendar,
@@ -2740,6 +2895,7 @@ export function createEverydayHost(
     },
     seed: () => b.state().seed,
     resolvedBuilding: () => resolvedBuildingOf(b.resources, b.state()),
+    dayAhead: () => plannedDayOf(b.resources, { ...b.state(), ...dayPatchFor(b) }),
     tomorrowBriefing: () => b.state().tomorrow,
     buildingIds: () => allBuildingIds(b.resources, b.state().savedBuildings),
     buildingById: (id) => buildingConfigOf(b.resources, b.state().savedBuildings, id),
@@ -2935,7 +3091,31 @@ export function createEverydayHost(
       const kitToClear = b.state().campaignFitOut === undefined ? {} : { campaignFitOut: undefined };
       // And the campaign's event, on the same ground one field over — § D507.
       const eventToClear = b.state().campaignEventId === undefined ? {} : { campaignEventId: undefined };
-      const patch = { ...(day === undefined ? {} : wholeDayRun(day)), ...kitToClear, ...eventToClear };
+      /*
+       * **And the presses — a day's run starts with none** — [§ D1002](../../../../DECISIONS.md).
+       *
+       * Every caller of this press is starting a run rather than growing one: the brief's *Start
+       * the day*, the designer's and the tuner's *Run a day in it*, the workshop's run, the stage's
+       * entry press and its retry. A press made on the stage is not one of them — it appends through
+       * `b.intervene`, which re-simulates on `dev/main.ts#interveneAt` and never comes here. So the
+       * log that stands at this line belongs to a run this press is replacing, and a run that
+       * inherited it is the defect the post-AH panel measured: a park pressed on Garden Apartments
+       * at 08:30 replayed in Crown Hotel's untouched day and credited to the player on its sheet;
+       * five presses from five earlier attempts applied under a stage that showed one; and
+       * Midtown's pinned day graded *Shift cleared, 424 s* on a spread nobody pressed, where
+       * § D974 says that day as built misses at 690 s. A second attempt at a day is the
+       * with-and-without experiment § D931's pair exists for, and it is only an experiment if it
+       * starts clean on the same seed.
+       *
+       * Spread in only when there is a log to clear, on the comments above's ground.
+       */
+      const logToClear = b.state().interventions.length === 0 ? {} : { interventions: [] };
+      const patch = {
+        ...(day === undefined ? {} : wholeDayRun(day)),
+        ...kitToClear,
+        ...eventToClear,
+        ...logToClear,
+      };
       if (Object.keys(patch).length > 0) b.applyPatch(patch);
       // § 6's day is not a campaign day — see {@link campaignDayTowerId} for what a stale latch
       // here would file, and against which building.
@@ -3058,9 +3238,17 @@ export function createEverydayHost(
     openTomorrow: () => {
       releaseCareer();
       const state = b.state();
-      // Nothing to advance from — see the interface docstring. The screen gates its primary on
-      // the same fact, so this early return is the API refusing what the control never offers.
-      if (state.report === undefined) return;
+      /*
+       * Nothing to advance from — see the interface docstring. The screens gate their primaries on
+       * the same fact, so this early return is the API refusing what the controls never offer.
+       *
+       * **A sheet standing, or today banked in the week** — [§ D1004](../../../../DECISIONS.md). The
+       * report's button is drawn over a sheet; the front door's is drawn over the week, whose history
+       * carries today once it is closed, and a reload keeps the week and drops the sheet. A day the
+       * week already holds is a day there is something to advance from, whichever screen asks.
+       */
+      const todayBanked = state.week.history.some((entry) => entry.day === state.week.day);
+      if (state.report === undefined && !todayBanked) return;
       // Tomorrow is a day of the same kind today was — the whole-day patch rides in the same merge
       // rather than in a second one, so no render sees a week advanced onto a horizon it is not
       // running yet.
@@ -3069,6 +3257,7 @@ export function createEverydayHost(
       b.applyPatch({
         ...openTomorrowPatch(state.week),
         ...dayPatchFor(b),
+        ...pressDaySeedRestore(),
         campaignFitOut: undefined,
         campaignEventId: undefined,
       });
@@ -3161,6 +3350,8 @@ export function createEverydayHost(
             buildingId: contract.buildingId,
             shiftLengthS: shiftLengthForContract(contract.id),
             windowStartS: null,
+            /* A fresh week on another tower keeps no presses — `moveWeekTo`'s line, § D1002. */
+            interventions: [],
           });
         }
       }
@@ -3589,6 +3780,7 @@ export function createEverydayHost(
            */
           modifiers: b.rushModifiers?.() ?? rushClaims(),
           rounds: [],
+          unsettledEndS: undefined,
         };
       } else {
         /*
@@ -3598,7 +3790,7 @@ export function createEverydayHost(
          * make every sitting one round long. What is cleared is this round's own end and hold, so
          * the next `endRush` is a new round's (see `endRush`'s first-end guard).
          */
-        rushSession = { ...rushSession, hold: undefined, endedAtS: undefined };
+        rushSession = { ...rushSession, hold: undefined, endedAtS: undefined, unsettledEndS: undefined };
       }
       /*
        * **Every press writes the rush's standing, *Run the rush again* included** — GitHub issue #518.
@@ -3622,6 +3814,7 @@ export function createEverydayHost(
     },
     rush: () => {
       if (rushSession === undefined) return undefined;
+      settleRushRound();
       const recording = b.state().recording;
       /* The hold line is read once per recording, keyed on identity — the stage asks every frame. */
       if (recording !== undefined && rushSession.hold?.recording !== recording) {
@@ -3662,40 +3855,12 @@ export function createEverydayHost(
        * beyond the account's best. Nothing is awaited and nothing is drawn, on `closeDay`'s ground.
        */
       if (!firstEnd) return;
-      const state = b.state();
-      const recording = state.recording;
-      if (recording === undefined) return;
-      /*
-       * **The round joins the sitting here, and here is the only place it can** — GitHub issue #372.
-       * A round's record needs the state it ran under, the recording it produced and the second it
-       * ended at, and this is the one moment all three are in hand: `startRush` writes a fresh
-       * standing over the state for the next round, so a record taken later would describe the round
-       * after this one. Under the same first-end guard the ledger already uses, for the same reason —
-       * a second end of one run is not a second round.
-       */
-      rushSession = {
-        ...rushSession,
-        rounds: Object.freeze([
-          ...rushSession.rounds,
-          rushRoundRecordOf({
-            state,
-            resources: b.resources,
-            recording,
-            endedAtS: atS,
-            /*
-             * The shelf the stage's own header reads — a saved dispatcher has a name too, and the
-             * round list has to say what the player drove even when that round is the reason the
-             * sitting cannot be posted. The id is the fallback, which is `stageScreen.ts`'s own.
-             */
-            dispatcherName:
-              allDispatchers(b.resources, state.savedDispatchers).find((profile) => profile.id === state.dispatcherId)
-                ?.name ?? state.dispatcherId,
-          }),
-        ]),
-      };
-      const waves = rushWavesOutlastedOf(rushOutcomeOf(recording, atS));
-      if (waves !== undefined) bankTurn({ completion: 'rush-wave-survived', waves });
+      // A round with no run on the stage has nothing to record, and one landing later is not its run.
+      if (b.state().recording === undefined) return;
+      rushSession = { ...rushSession, unsettledEndS: atS };
+      settleRushRound();
     },
+    rushBest: () => rushBestThisVisit,
     leaveRush: () => {
       if (rushSession === undefined) return;
       const before = rushSession.before;
@@ -3822,6 +3987,33 @@ export function createEverydayHost(
       notifyCampaign();
       return undefined;
     },
+    pressCallOnStage: (recording) => pressDayCallOf(b.resources, b.state(), recording)?.call,
+    takeCallAgain: () => {
+      releaseCareer();
+      const state = b.state();
+      const contractId = state.week.contractId;
+      const choice = pressDayChoiceOf(pressDayInputOf(state), contractId);
+      if (choice === undefined || !admittedPressDayIds().includes(contractId)) {
+        return 'this week is not on a day the stage calls';
+      }
+      if (!choice.standing) return choice.note;
+      const press = pressDayFor(contractId);
+      if (press === undefined) return 'this week is not on a day the stage calls';
+      /*
+       * The standing order back, and the record emptied **explicitly** — `startRun` clears a log
+       * that stands, and this does not lean on that: the ruling's *Take this call again* is a
+       * re-open with an empty record, so it is written here, where the promise is made.
+       */
+      const next = withDispatcher(state, b.resources, press.standingOrder);
+      b.applyPatch({
+        interventions: [],
+        dispatcherId: next.dispatcherId,
+        dispatcherSpec: next.dispatcherSpec,
+        editingDispatcherId: next.editingDispatcherId,
+      });
+      everydayHost.startRun();
+      return undefined;
+    },
     chooseTower: (contractId) => {
       const contract = contractById(contractId);
       if (contract === undefined) return;
@@ -3833,11 +4025,8 @@ export function createEverydayHost(
        * reason given. So it goes back to the one the session had — which is the day's, or a
        * `?seed=` deep link, and in either case what the seed line was saying before.
        */
-      if (pressDaySeedBase !== undefined) {
-        const base = pressDaySeedBase;
-        pressDaySeedBase = undefined;
-        if (b.state().seed !== base) b.applyPatch({ seed: base });
-      }
+      const restore = pressDaySeedRestore();
+      if (restore.seed !== undefined) b.applyPatch(restore);
       moveWeekTo(contractId);
       notifyCampaign();
     },
@@ -3907,6 +4096,7 @@ export function createEverydayHost(
       };
     },
   };
+  return everydayHost;
 }
 
 /**

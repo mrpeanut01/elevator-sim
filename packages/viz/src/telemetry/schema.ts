@@ -180,10 +180,11 @@ export type TelemetryEndReason = (typeof END_REASONS)[number];
 export const CONTROL_KEYS = [
   /** The fix-it screen's case picker — choosing which building to work on. */
   'fixit-case',
-  /** A repair bought or sold back. */
-  'fixit-repair',
-  /** An extra bought or sold back. */
-  'fixit-extra',
+  /*
+   * `fixit-repair` and `fixit-extra` are retired: § D1020 retired the repair menu and its standing
+   * extras, so nothing presses either, and a key nothing presses is a dead entry (`schema.test.ts`).
+   * A change is now made through the editor's own controls, each of which carries its own key below.
+   */
   /** The lift-speed stepper. */
   'fixit-speed',
   /** The car-capacity stepper. */

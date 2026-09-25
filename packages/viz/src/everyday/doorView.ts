@@ -88,12 +88,25 @@ export interface WorldBandView {
 
 /** § 3.3's door primary, as this screen's state resolves it. */
 export interface DoorPrimaryView {
-  /** `Set up today` or `Set up the replay` — § 3.3's two variants, never a third. */
+  /**
+   * `Set up today`, `Set up the replay`, or — once today is closed — `Open the doors on Tuesday`
+   * ([§ D1004](../../../../DECISIONS.md)): the row's three variants, never a fourth.
+   */
   readonly label: string;
   /** The § 3.3 note, and on a past day the reason the button cannot act. */
   readonly note: string;
   /** True only on a chip from before this week began; a past day inside the week is pressable — § D517. */
   readonly inert: boolean;
+  /**
+   * Where the press goes: today's brief, a replay's, or tomorrow — `EverydayHost.openTomorrow`,
+   * the same press as the report's *Open the doors on …*. § D1004.
+   */
+  readonly goes: 'today' | 'replay' | 'tomorrow';
+  /**
+   * Today again, as another attempt — drawn beside the primary only while the primary opens
+   * tomorrow, because that is the one state in which the retry is no longer the primary. § D1004.
+   */
+  readonly again: { readonly label: string; readonly note: string } | undefined;
 }
 
 /** The whole screen, as data. */
@@ -135,6 +148,12 @@ export interface DoorScreenInput {
   readonly dayOffset: number;
   /** Whether the run standing on the stage has been filed — `host.runState().dayClosed`. */
   readonly dayClosed: boolean;
+  /**
+   * A building's own name, by id, for a closed chip — `weekView.ts#WeekScreenInput.nameOf`'s field
+   * and reason, GitHub issue #599: a closed chip printed the tower's id beside today's chip printing
+   * its name.
+   */
+  readonly nameOf: (buildingId: string) => string | undefined;
 }
 
 /**
@@ -151,7 +170,13 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
   Object.freeze({
     n: '1',
     head: 'Pick who drives',
-    body: 'Ready-made styles, or one you built yourself. It is the only thing you choose.',
+    /*
+     * The post-AH panel's H13: *"It is the only thing you choose"*, on a page that lists days a press
+     * decides, above a stage that offers two parking presses and a handover on every day. The pick
+     * is the choice made before the day, which is what the step is about. `today.ts#TODAY_CHOICE_LINE`
+     * carries the same correction on the lede.
+     */
+    body: 'Ready-made styles, or one you built yourself. You pick before the day starts.',
   }),
   Object.freeze({
     n: '2',
@@ -163,9 +188,17 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
      * The peaks are still played at the speed they set, and a chip press still wins for the rest
      * of the day, so the sentence says both rather than dropping either.
      */
+    /*
+     * And H13's two halves, in the same step. *"A whole working day"* was false on the two towers
+     * with no authored day, both of them on the pinned-press list, whose day is a thirty-minute
+     * slice; *"the quiet hours between them faster"* is a whole day's pacing and a slice has none.
+     * *"You can speed it up, not steer it"* was false on every day: the stage parks the cars,
+     * spreads them and hands the day over while it plays. The step now names neither a length nor a
+     * pacing, and says what the controls on the stage do.
+     */
     body:
-      'A whole working day, its busy hours at the speed you set and the quiet hours between them ' +
-      'faster. You can speed it up, not steer it — the dispatcher is the decision you already made.',
+      'The day plays out at a speed you can change. While it plays you can park the cars, spread ' +
+      'them out, or hand the day to another dispatcher.',
   }),
   Object.freeze({
     n: '3',
@@ -198,14 +231,33 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
  *
  * `docs/12` § 4's deviation register is where this belongs as a *design* deviation; it is recorded
  * here as well because a reader who greps the handoff for this sentence lands on this file first.
+ *
+ * **A third arm, for a pinned crowd** — [§ D1047](../../../../DECISIONS.md). *"This run is on a
+ * crowd of its own … so nobody else is playing it"* was false on every pinned day from the day
+ * § D973 put them on this screen: everybody who opens a tower's pinned day plays the same crowd, and
+ * since § D1047 every newcomer's first day is one. Both of that arm's clauses were wrong there, and
+ * so was *the dispatcher is yours to bring*, because the brief holds the tower's standing order
+ * until the stage's call is answered (§ D1029) — so the pinned arm says whose crowd it is and leaves
+ * the driver to the brief, which states the hold beside the control it holds.
  */
-export function sameForEveryoneLine(crowdIsToday: boolean): string {
-  return crowdIsToday
-    ? 'Everyone playing today meets the same crowd — the number above is today’s date, and the ' +
-        'run is seeded from it. The tower is the one your week is on, and the dispatcher is yours ' +
-        'to bring.'
-    : 'This run is on a crowd of its own rather than the day’s, so nobody else is playing it. ' +
-        'The tower is the one your week is on, and the dispatcher is yours to bring.';
+export function sameForEveryoneLine(crowdIsToday: boolean, crowdIsPinned: boolean): string {
+  if (crowdIsToday) {
+    return (
+      'Everyone playing today meets the same crowd — the number above is today’s date, and the ' +
+      'run is seeded from it. The tower is the one your week is on, and the dispatcher is yours ' +
+      'to bring.'
+    );
+  }
+  if (crowdIsPinned) {
+    return (
+      'This run is on the crowd its day was measured on rather than the day’s, and everyone who ' +
+      'opens this tower’s pinned day meets the same one. The tower is the one your week is on.'
+    );
+  }
+  return (
+    'This run is on a crowd of its own rather than the day’s, so nobody else is playing it. ' +
+    'The tower is the one your week is on, and the dispatcher is yours to bring.'
+  );
 }
 
 /**
@@ -220,12 +272,16 @@ export function sameForEveryoneLine(crowdIsToday: boolean): string {
  * way**: a pinned day chosen from the door's own list sets the crowd it was measured on. The rule
  * names that exception rather than leaving *the same for everybody* to be false of it.
  *
+ * **And since [§ D1047](../../../../DECISIONS.md) a player can be on one without choosing it**: a
+ * newcomer's first day is dealt as a pinned day, so *unless you choose one* was false of the first
+ * screen every new player reads. *Unless you are on one* is true of both routes.
+ *
  * Unconditional, unlike {@link sameForEveryoneLine}, because it states **how the product picks a
  * crowd** rather than a claim about the run standing in front of the reader — and the two lines
  * that do make that claim are on the same screen, four lines below.
  */
 const DOOR_RULE =
-  'One crowd a day, the same for everybody, unless you choose one of the days a press decides — ' +
+  'One crowd a day, the same for everybody, unless you are on one of the days a press decides — ' +
   'the tower is the one your week is on. A run counts once; every earlier day stays open as a ' +
   'replay that does not.';
 
@@ -263,7 +319,12 @@ function chipsOf(input: DoorScreenInput): readonly DoorDayChip[] {
       weekday: day < 1 ? EM_DASH : shortWeekday(week.dayIdx + offset),
       // The tower the day was **run on**, from its own record. A day with no record says so with
       // the placeholder rather than borrowing the building standing selected now.
-      tower: closed?.record?.buildingId ?? (isToday ? input.today.towerName : EM_DASH),
+      tower:
+        closed?.record == null
+          ? isToday
+            ? input.today.towerName
+            : EM_DASH
+          : (input.nameOf(closed.record.buildingId) ?? closed.record.buildingId),
       score: closed === undefined ? EM_DASH : percentFigure(closed.minutePct),
       note: noteFor({ isToday, selected, closed: closed !== undefined, exists: day >= 1 }),
       selected,
@@ -294,13 +355,42 @@ function noteFor(state: {
  */
 function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorPrimaryView {
   if (input.dayOffset === 0) {
+    /*
+     * **A closed today opens tomorrow** — [§ D1004](../../../../DECISIONS.md), the post-AH panel's
+     * *no route to tomorrow from the front door*. Two assessors closed Monday, left the report,
+     * came back here, and met *Set up today* over a disabled `›`: the only press re-ran Monday, and
+     * Tuesday opened only by re-running and re-closing it to reach the report's own button. The
+     * week already says today is closed — its history carries the day, which is what the chip
+     * reads — so the door says it too, and the press is the report's *Open the doors on …*.
+     *
+     * Read off the history as well as `dayClosed`, because the two answer different questions:
+     * `dayClosed` is *the run on the stage was filed this sitting*, and a reload, or a second
+     * attempt pressed from the brief, leaves the day banked with no filed run standing. Either
+     * one is a closed today.
+     */
+    if (todayIsBanked(input)) {
+      const tomorrow = weekdayOf((input.week.dayIdx + 1) % 7);
+      return {
+        label: `Open the doors on ${tomorrow}`,
+        note:
+          `Today is closed and banked. This opens ${tomorrow}'s day and starts it; today stays in ` +
+          'your week as it is, and on the strip as a replay that does not count.',
+        inert: false,
+        goes: 'tomorrow',
+        again: {
+          label: 'Run today again',
+          note:
+            'Another attempt at the same day, on the same crowd and with no presses carried over. ' +
+            'The week keeps the better one rather than banking both.',
+        },
+      };
+    }
     return {
       label: 'Set up today',
-      note: input.dayClosed
-        ? 'Today is already closed. Running it again is another attempt at the same day, and the ' +
-          'week keeps the better one rather than banking both.'
-        : 'Pick who drives, then run it.',
+      note: 'Pick who drives, then run it.',
       inert: false,
+      goes: 'today',
+      again: undefined,
     };
   }
   /*
@@ -310,9 +400,30 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
    */
   const chip = chips.find((entry) => entry.offset === input.dayOffset);
   if (chip?.day !== undefined && replayableDay(input.week, chip.day)) {
-    return { label: 'Set up the replay', note: REPLAY_COPY.doorNote(chip.day), inert: false };
+    return {
+      label: 'Set up the replay',
+      note: REPLAY_COPY.doorNote(chip.day),
+      inert: false,
+      goes: 'replay',
+      again: undefined,
+    };
   }
-  return { label: 'Set up the replay', note: REPLAY_COPY.beforeTheWeek, inert: true };
+  return {
+    label: 'Set up the replay',
+    note: REPLAY_COPY.beforeTheWeek,
+    inert: true,
+    goes: 'replay',
+    again: undefined,
+  };
+}
+
+/**
+ * Whether today is closed — its outcome is in the week's history, or the run on the stage was filed
+ * this sitting. `everyday/weekView.ts` reads the same pair, so *Your week* and this door cannot
+ * disagree about the one day both draw ([§ D1004](../../../../DECISIONS.md)).
+ */
+export function todayIsBanked(input: Pick<DoorScreenInput, 'week' | 'dayClosed'>): boolean {
+  return input.dayClosed || input.week.history.some((entry) => entry.day === input.week.day);
 }
 
 /** § 6.1, resolved. Total: every arm answers something a player can read. */
@@ -350,7 +461,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     },
     seedLine: input.today.seedLine,
     firstSessionLine: input.today.firstSessionLine,
-    sameForEveryone: sameForEveryoneLine(input.today.crowdIsToday),
+    sameForEveryone: sameForEveryoneLine(input.today.crowdIsToday, input.today.crowdIsPinned),
     primary: primaryOf(clamped, chips),
   };
 }

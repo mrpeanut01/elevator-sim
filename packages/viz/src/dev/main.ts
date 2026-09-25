@@ -216,12 +216,13 @@ import {
   type DayReportInput,
   type ShapedDayReport,
 } from '../shift/report.js';
-import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
+import { HISTORY_DAYS, MODE_WEEK_CONTRACT_IDS, outcomeOf } from '../shift/week.js';
 import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 import { dailySeedAt } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
+import { isDealtPinnedDay } from '../shift/firstSession.js';
 
 import { savedProfilesOf } from '../batch/library.js';
 import { mountBatchPanel } from './batchPanel.js';
@@ -295,7 +296,9 @@ import {
   drivingProfileOf,
   initialState,
   withFirstSession,
+  pressDayCallOf,
   profileById,
+  plannedDayOf,
   resolvedBuildingOf,
   shiftRunConfigOf,
   tomorrowFactsOf,
@@ -1150,6 +1153,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     resources,
     loadCases: () => loadFixitCases(resources),
     spawnRunWorker,
+    /* The fix-it judge's mornings — § D1020. Written out here for `spawnRunWorker`'s bundler reason. */
+    spawnMorningWorker: () => new Worker(new URL('./morningWorker.ts', import.meta.url), { type: 'module' }),
   });
 
   /**
@@ -1883,13 +1888,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
       if (restored.failure.kind !== 'absent') clearSession(sessionStore);
       /*
        * The first-ever load, and the third consumer of the same read — GitHub issue #208, § D475.
-       * A device with no session draws its first tower from the legible set on a named stream off
-       * the seed it was just given, unless the address named a building, which is the player's own
-       * choice and wins. Nothing is stored: a reload that finds a session finds the week the draw
-       * opened, and one that finds none draws again from a fresh seed, which is § D476's shape.
+       * A device with no session draws its first tower on a named stream off the seed it was just
+       * given — from the first-day set since § D1047 — unless the address named a building, which is
+       * the player's own choice and wins. Nothing is stored: a reload that finds a session finds the
+       * week the draw opened, and one that finds none draws again from the same date, which is
+       * § D476's shape.
        */
       else if (!new URLSearchParams(window.location.search).has('building')) {
-        state = withFirstSession(state, resources);
+        /*
+         * **And the day it deals is the tower's pinned day** — [§ D1047](../../../../DECISIONS.md).
+         * The pin's crowd and standing order, unless the address carried `?seed=`, whose crowd is
+         * the reader's and wins. The day's own crowd is not lost by this: the host is handed it as
+         * the crowd to put back (`initialPressDaySeedBase` below), re-derived from the date rather
+         * than kept anywhere.
+         */
+        state = withFirstSession(state, resources, {
+          crowdFromAddress: new URLSearchParams(window.location.search).has('seed'),
+        });
       }
       return;
     }
@@ -3177,6 +3192,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * whole simulation — so it is stated rather than hidden, not argued away.
    */
   let unpressedRecording: VizRecording | undefined;
+  /**
+   * The report's call row input for the state standing now — `dev/state.ts#pressDayCallOf`, with
+   * the census's names resolved the way every other dispatcher name on the sheet is. § D1029.
+   */
+  const pressCallForReport = (
+    asBuilt: VizRecording,
+  ): DayReportInput['pressCall'] => {
+    const measured = pressDayCallOf(resources, state, asBuilt);
+    if (measured === undefined) return undefined;
+    return {
+      press: measured.press,
+      call: measured.call,
+      nameOf: (id) => profileById(resources, state.savedDispatchers, id).name,
+    };
+  };
   /** Whether the job in flight on {@link shiftRunner} is the rival's — see {@link scheduleGhost}. */
   let ghostInFlight = false;
   /**
@@ -4214,6 +4244,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
   const everydayHostBindings: EverydayHostBindings = {
     resources,
     /*
+     * **The crowd a first session's pinned day replaced** — [§ D1047](../../../../DECISIONS.md).
+     *
+     * The day's own, handed over exactly when the page opened on the pinned day the date deals:
+     * `shift/firstSession.ts#isDealtPinnedDay` over the state boot left standing. That covers the
+     * fresh device, and a reload that read the same day back from the address this page wrote
+     * (`?building=…&seed=<the pin>` skips the draw and lands on the same run), so choosing an
+     * ordinary tower afterwards — or opening tomorrow — puts the day's crowd back either way.
+     * Nothing is stored: both halves are functions of the date and the address.
+     */
+    initialPressDaySeedBase: (() => {
+      const daySeed = dailySeedAt(deviceNowMs());
+      return isDealtPinnedDay(state.week.contractId, state.seed, daySeed) ? daySeed : undefined;
+    })(),
+    /*
      * #221's read half, composed here because it is client work: `boundaries.test.ts` permits
      * exactly two modules to hold a leaderboard client and a screen would be a third. `undefined`
      * when the page was served with no API origin — what a CDN-served bundle gets, and the honest
@@ -5213,6 +5257,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   function syncUrl(): void {
     if (!urlWritable) return;
+    /* A mode's run is not written over the Scenario's address — {@link addressFollowsRun}, § D1003. */
+    if (!addressFollowsRun(state)) return;
     const search = deepLinkSearchOf(state, deepLinkDefaults);
     if (window.location.search === search) return;
     window.history.replaceState(null, '', `${window.location.pathname}${search}`);
@@ -6480,6 +6526,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * one question — the exact comparison § D311 built the basis to refuse.
      */
     const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx);
+    /*
+     * The run this sheet reports, read back the way the brief read it before the press — its
+     * building's windows, the cars the day's event took and whether its template kept its mix
+     * (§ D1038–§ D1040). Once per closed day, never per frame.
+     */
+    const planned = plannedDayOf(resources, state);
     const outcome = outcomeOf({
       day: state.week.day,
       dayIdx: state.week.dayIdx,
@@ -6642,7 +6694,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * building the legs on screen were simulated in, so the car the header names is the car the
        * kernel stood down. A recording carries no mid-run schedule, which is why this is passed.
        */
-      bookedOut: bookedOutCarsOf(resolvedBuildingOf(resources, state)),
+      /*
+       * With the cars the day's event took, so the header's note says *the tower also books* only
+       * of the tower's — § D1038, the post-AH panel's N5.
+       */
+      bookedOut: bookedOutCarsOf(planned.building, [...planned.dayCars.holds, ...planned.dayCars.windows]),
+      /* § D1040 — so the header and tomorrow's card say what a mix-asking wrinkle did on this tower. */
+      templateVariesMix: planned.templateVariesMix,
+      /*
+       * **A pinned day's call** — wave AI, [§ D1029](../../../../DECISIONS.md). Asked of the day as
+       * built where this shell kept it ({@link unpressedRecording}, the run the answer replaced) and
+       * of the filed run otherwise: the prefix before the call is identical in both, so either names
+       * the same second, and `pressDayCallOf` refuses anything but the day as it was measured.
+       */
+      pressCall: pressCallForReport(unpressedRecording ?? recording),
       /*
        * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
        * one-field-and-one-caller fix.
@@ -8224,6 +8289,41 @@ export function deepLinkDefaultsOf(resources: BrowserResources): DeepLinkDefault
     pattern: opening.pattern,
     windowStartS: opening.windowStartS,
   };
+}
+
+/**
+ * **Whether the address bar may describe the run standing** — [§ D1003](../../../../DECISIONS.md),
+ * the post-AH panel's N2 and D3.
+ *
+ * `false` while a mode's own week stands — a rush, a replay or a career day
+ * (`shift/week.ts#MODE_WEEK_CONTRACT_IDS`) — and `true` on every other week. While it is `false`,
+ * {@link syncUrl} writes nothing and the address keeps the last run it did describe, which is the
+ * Scenario run the mode parked.
+ *
+ * ## Why the writer and not the reader
+ *
+ * `syncUrl` wrote a career day as `?building=…&seed=<career seed>&tab=report` and a rush as
+ * `?seed=90210&template=endless-rush&rate=…`. The address is the one place this page reads a run
+ * back from on load, and {@link deepLinkStateOf} honours what it finds: a reload taken on a career
+ * report played the career's crowd as the Scenario week's day, and once filed a Crown Hotel day
+ * over 08:30–09:30 with 674 arrivals where the authored day has 355; a reload mid-rush put crowd
+ * 90210 on the Scenario week. The reader cannot be the one to refuse, because it cannot tell who
+ * wrote an address: a link somebody pasted and an address this page wrote read the same, and a
+ * pasted `?seed=` is the reader's whole reason to exist. The writer knows which week is standing.
+ *
+ * And the address a mode would have written was never a true description to begin with. A
+ * career day's crowd, fit-out and event are the career's, and a rush's modifiers and its week are
+ * the sitting's; none of them is in `?building&seed`, so the link a mode wrote would have opened a
+ * different run under the mode's name for anybody it was sent to — `shareLinkOf`'s *"a different
+ * run wearing the same address"*, which the copy-run control refuses through `runIdentityIssues`
+ * and this bar was writing anyway.
+ *
+ * **What it does not do.** An address already written by an earlier build still reads back — the
+ * reader is unchanged, on the ground above — so a bookmark taken on a rush before this commit
+ * still opens on the rush's crowd. That is a link, and a link is honoured.
+ */
+export function addressFollowsRun(state: Pick<ViewerState, 'week'>): boolean {
+  return !MODE_WEEK_CONTRACT_IDS.includes(state.week.contractId);
 }
 
 /**

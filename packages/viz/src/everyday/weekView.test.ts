@@ -57,6 +57,15 @@ function dayOf(day: number, observed: GoalObservations): DayOutcome {
   });
 }
 
+/** Building names by id, as the shipped documents carry them — the fixture for `nameOf` (GitHub issue #599). */
+const NAMES: Readonly<Record<string, string>> = {
+  'garden-apartments': 'Garden Apartments',
+  'crown-hotel': 'Crown Hotel',
+  'chancery-house': 'Chancery House',
+  'midtown-office': 'Midtown Office',
+};
+const NAME_OF = (buildingId: string): string | undefined => NAMES[buildingId];
+
 const weekWith = (day: number, history: readonly DayOutcome[]): WeekState => ({
   ...openWeek(),
   day,
@@ -67,7 +76,25 @@ const weekWith = (day: number, history: readonly DayOutcome[]): WeekState => ({
 });
 
 const viewOf = (week: WeekState, dayClosed: boolean): ReturnType<typeof weekScreenViewOf> =>
-  weekScreenViewOf({ week, towerToday: 'Chancery House', dayClosed, sheetStanding: dayClosed });
+  weekScreenViewOf({ week, towerToday: 'Chancery House', nameOf: NAME_OF, dayClosed, sheetStanding: dayClosed });
+
+describe('the tower on a card — GitHub issue #599', () => {
+  it('names a closed day by the name today’s card uses, not by its id', () => {
+    /*
+     * A closed card printed `record.buildingId` — *chancery-house* — beside today's card printing
+     * the document's *Chancery House*, so one strip named one tower two ways. A closed yesterday and
+     * a closed today on the same tower, which is the pair a player meets every evening.
+     */
+    const week = weekWith(3, [dayOf(2, MET), dayOf(3, MET)]);
+    const cards = viewOf(week, true).cards;
+    const yesterday = cards.find((card) => card.day === 2);
+    const today = cards.find((card) => card.isToday);
+    expect(today?.day).toBe(3);
+    expect(yesterday?.tower).toBe('Chancery House');
+    expect(today?.tower).toBe('Chancery House');
+    expect(cards.map((card) => card.tower)).not.toContain('chancery-house');
+  });
+});
 
 describe('§ 16 rule 1 — today is withheld until *Close the day* has been pressed', () => {
   it('draws the em dash and *not closed yet*, never a `0%`', () => {
@@ -79,16 +106,24 @@ describe('§ 16 rule 1 — today is withheld until *Close the day* has been pres
     expect(today?.verdict).toBeUndefined();
   });
 
-  it('withholds it even when the week already carries today’s outcome from a previous sitting', () => {
+  it('shows today once the week carries it, whether or not this sitting filed the run — § D1004', () => {
     /*
-     * The case that makes `dayClosed` load-bearing rather than decorative: a restored week can
-     * hold today's closed outcome while the stage holds no filed run, and `dayClosed` — which
-     * *Close the day* alone sets — is the authority. Publishing on the week alone would show a
-     * figure for a day this sitting has not finished.
+     * This case used to assert the withholding: a restored week holding today's outcome drew the
+     * em dash until the sitting filed a run. The post-AH panel met that as *THU … today · not closed
+     * yet* and *No day of this week has been closed yet* about days the report had called banked,
+     * beside a front door whose chip read the same history and said *today*. Nothing but *Close
+     * the day* writes an outcome into the history, so an outcome there is a closed day.
      */
     const week = weekWith(3, [dayOf(1, MET), dayOf(2, MET), dayOf(3, MET)]);
-    expect(viewOf(week, false).cards.at(-1)?.score).toBe(EM_DASH);
+    const restored = viewOf(week, false);
+    expect(restored.cards.at(-1)?.score).toBe('84%');
+    expect(restored.cards.at(-1)?.note).toBe('today · clean day');
+    expect(restored.tally.closed).toBe(3);
+    expect(restored.percentile.line).not.toMatch(/not closed/);
     expect(viewOf(week, true).cards.at(-1)?.score).toBe('84%');
+    // What stays about the sitting: with no sheet standing, the card does not open one, and says why.
+    expect(restored.cards.some((card) => card.readable)).toBe(false);
+    expect(restored.readNote).toMatch(/Today is closed/);
   });
 
   it('says nothing to place until the day is closed, and then says why it still cannot place you', () => {
@@ -157,18 +192,29 @@ describe('the report’s one entrance — `WeekDayCard.readable`', () => {
   it('opens today’s card only once the day is closed **and** a sheet is standing', () => {
     const open = weekScreenViewOf({
       week,
-      towerToday: 'Chancery House',
+      towerToday: 'Chancery House', nameOf: NAME_OF,
       dayClosed: false,
       sheetStanding: false,
     });
     expect(open.cards.some((card) => card.readable)).toBe(false);
-    expect(open.readNote).toMatch(/once it has been closed/);
+    // Today is in the week's history, so the note says the day is closed and why its sheet is not
+    // here — § D1004. A week with today not yet closed still says *once it has been closed*.
+    expect(open.readNote).toMatch(/Today is closed/);
+    expect(
+      weekScreenViewOf({
+        week: weekWith(3, [dayOf(1, MET), dayOf(2, MET)]),
+        towerToday: 'Chancery House',
+        nameOf: NAME_OF,
+        dayClosed: false,
+        sheetStanding: false,
+      }).readNote,
+    ).toMatch(/once it has been closed/);
 
     // Closed, but the sheet was cleared by *Open the doors on tomorrow* — the two can disagree,
     // and a card that opened an empty sheet would be § 16 rule 4's defect.
     const cleared = weekScreenViewOf({
       week,
-      towerToday: 'Chancery House',
+      towerToday: 'Chancery House', nameOf: NAME_OF,
       dayClosed: true,
       sheetStanding: false,
     });
@@ -176,7 +222,7 @@ describe('the report’s one entrance — `WeekDayCard.readable`', () => {
 
     const filed = weekScreenViewOf({
       week,
-      towerToday: 'Chancery House',
+      towerToday: 'Chancery House', nameOf: NAME_OF,
       dayClosed: true,
       sheetStanding: true,
     });
@@ -188,7 +234,7 @@ describe('the report’s one entrance — `WeekDayCard.readable`', () => {
   it('never opens a past day, because this build keeps one sheet', () => {
     const filed = weekScreenViewOf({
       week,
-      towerToday: 'Chancery House',
+      towerToday: 'Chancery House', nameOf: NAME_OF,
       dayClosed: true,
       sheetStanding: true,
     });

@@ -368,6 +368,34 @@ const collapse = (
     ...over,
   });
 
+describe('screen two points where the letter’s waits are — post-AH panel B.md', () => {
+  /*
+   * The lede said *"watch the fourth floor"* and the riders past a minute were drawn on floor 6:
+   * the letter is written from floor 4, but the case counts waits starting on the upper flats. So
+   * the stretch is derived here from the case and the building, and the lede must name it.
+   */
+  it('names the stretch the complaint measures, derived from the case and the building', () => {
+    const cases = JSON.parse(read('data/fixit-cases.json')) as {
+      readonly cases: readonly {
+        readonly id: string;
+        readonly buildingId: string;
+        readonly complaint: { readonly measure: { readonly scope: { readonly floorIds: readonly string[] } } };
+      }[];
+    };
+    const entry = cases.cases.find((candidate) => candidate.id === TUTORIAL_CASE_ID);
+    if (entry === undefined) throw new Error(`no case ${TUTORIAL_CASE_ID}`);
+    const building = JSON.parse(read(`data/buildings/${entry.buildingId}.json`)) as {
+      readonly floors: readonly { readonly id: string }[];
+    };
+    const scope = [...entry.complaint.measure.scope.floorIds].sort();
+    const top = building.floors.slice(-scope.length).map((floor) => floor.id).sort();
+    expect(scope, 'the measure is no longer the top of the building; reword the lede').toEqual(top);
+    const words = ['one', 'two', 'three', 'four', 'five', 'six'];
+    expect(TUTORIAL_COPY.collapseLede).toContain(`the top ${String(words[scope.length - 1])} floors`);
+    expect(TUTORIAL_COPY.collapseLede).not.toMatch(/\b(?:fourth|fifth|sixth) floor\b/u);
+  });
+});
+
 describe('screen two is a canvas and one press — `charter S1`', () => {
   /*
    * The finding this block was built for. `charter S1` (`docs/22` § 4) asks that a first-time

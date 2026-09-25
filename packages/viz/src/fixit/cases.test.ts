@@ -78,6 +78,8 @@ import {
   stepZoneOverlap,
   toggleRepair,
   selectionKeepsTheCrowd,
+  sameOrder,
+  witnessStateOf,
 } from './engine.js';
 import { UNBANDED_SHAFT_CASES, newShaftUnits, shaftAreaSurchargeUnits } from './parse.js';
 import {
@@ -95,8 +97,13 @@ import {
   type FixitRunPlan,
 } from './run.js';
 import { EDITOR_PARKING_STRATEGIES } from './types.js';
-import type { EditorParkingStrategy, FixitCase, FixitCases, FixitState } from './types.js';
+import type { EditorParkingStrategy, FixitCase, FixitCases, FixitPatch, FixitState } from './types.js';
 import { recordRun, type RecordedRun } from '../record/recordRun.js';
+import type { VizRecording } from '../contract/types.js';
+import { createFixitJudge, pressThroughTheJudge, type MorningRunner, type PairRunner } from './judge.js';
+import { HELD_FIX_CASES, heldReasonOf } from './held.js';
+import { morningReadingOf } from './run.js';
+import type { FixitOutcome } from './engine.js';
 
 const SUITE_TIMEOUT = 300_000;
 
@@ -140,6 +147,46 @@ function legsKey(run: RecordedRun): string {
   );
 }
 
+/**
+ * **The non-diagnosed repairs that clear their case on the letter's morning** — `case/repair` —
+ * [§ D1011](../../../../DECISIONS.md). Not negative controls, whatever their role says, and their
+ * effect lines are held to say nothing that makes them one.
+ *
+ * `two-cars-out-wrong-month/borrow-a-low-car` is the one the ruling's honesty member measured across
+ * mornings as a genuine second answer: **92.1 %** of the complaint gone, a per-morning reduction of
+ * **+17.2 [+15.1, +19.4]** on 31 mornings under common random numbers (`decide-ai` S2, § 3.4). Its
+ * line used to say *"The 100.0 % low-zone figure is the thing this spends"*; the low zone read
+ * 100.0 % → 100.0 % on the run that line described.
+ */
+const SECOND_ANSWERS: ReadonlySet<string> = new Set([
+  'two-cars-out-wrong-month/borrow-a-low-car',
+  /*
+   * **Seven more clear on the letter's morning, found by this register's first run and not by the
+   * ruling** — measured on the tree § D1011 landed on, one pair on the case seed each. Unlike the
+   * decoy above, **none of them is measured across mornings here**, so none is called an answer:
+   * the ruling's engineering member measured the single pair clearing wrong-family routes on the
+   * tail seeds these cases sit on (`decide-ai` S3, § 2.2), and whether these seven survive
+   * replication is the replicated judge's to say (GitHub issue #602). They are listed so the
+   * register is a measurement rather than a hope, and so the copy question they raise is on record:
+   * a line such as *"It trades the 33.0 s mean around, not away"* sits over a pair that cleared the
+   * letter. That is for the re-authoring the ruling assigns, and is not rewritten here.
+   *
+   * **The replicated judge has since said** — [§ D1020](../../../../DECISIONS.md) § 8, at k = 50.
+   * This register still measures the letter's morning only, so it lists every repair that clears
+   * the gate whatever the fifty mornings then say; the census is recorded beside each so the two are
+   * not confused. Three hold over fifty mornings and are real second answers; three clear once and
+   * do not hold, which the judge draws as `cleared-once` and never badges.
+   */
+  'one-start-time/trim-the-dwell', // fixed at k = 50 — a real second answer
+  'two-cars-out-wrong-month/night-working', // fixed at k = 50 — a real second answer
+  'gym-on-the-top-floor/replant-the-machines', // fixed at k = 50 — on a case § D1020 holds
+  'cars-that-always-go-home/quicker-tower-doors', // cleared-once at k = 50
+  'everyone-leaves-at-once/hold-doors-longer', // cleared-once at k = 50
+  'bed-cars-locked-out/quicker-bed-car-doors', // cleared-once at k = 50
+  // `controller-sends-every-car/regear-tower-cars` left: § D1020 re-authored that case (rate ×1.25),
+  // and the repair no longer clears the letter's morning (15 → 6, 60 %).
+]);
+
 function diagnosedState(entry: FixitCase): FixitState {
   const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed');
   if (diagnosed === undefined) throw new Error('no diagnosed repair');
@@ -147,6 +194,30 @@ function diagnosedState(entry: FixitCase): FixitState {
   expect(state.selectedRepairIds, 'the diagnosed fix must be affordable').toContain(diagnosed.id);
   return state;
 }
+
+describe('the two-cars decoy says what its run does — § D1011, § D227 in both polarities', () => {
+  it(
+    'clears the letter, and leaves the low zone where its line says it was left',
+    () => {
+      const entry = caseOf('two-cars-out-wrong-month');
+      const decoy = entry.repairs.find((repair) => repair.id === 'borrow-a-low-car');
+      expect(decoy?.role).toBe('cheap-fix');
+      const state: FixitState = { ...emptyFixitState(), selectedRepairIds: ['borrow-a-low-car'] };
+      const pair = runFixitPair(fixitRunPlanOf(entry, state, resources));
+      const measurement = measuredOf(entry, pair.before.recording, pair.after.recording);
+      /* It is an answer: the line may not call it a spend that fails, and the register lists it. */
+      expect(classifyOutcome(entry, measurement, spendOf(entry, state, shippedPriceSchedule())).kind).toBe('fixed');
+      expect(SECOND_ANSWERS.has('two-cars-out-wrong-month/borrow-a-low-car')).toBe(true);
+      /* And the figure it names is the run's, before and after: 100.0 % held. */
+      expect(measurement.restAwayBeforePct?.toFixed(1)).toBe('100.0');
+      expect(measurement.restAwayAfterPct?.toFixed(1)).toBe('100.0');
+      expect(decoy?.effect).toContain('100.0 %');
+      expect(decoy?.effect).toContain('it held');
+      expect(decoy?.effect).not.toMatch(/\bspends\b/u);
+    },
+    SUITE_TIMEOUT,
+  );
+});
 
 describe('the shipped case file', () => {
   it('parses against the shipped data and holds the eighteen authored cases', () => {
@@ -366,13 +437,20 @@ const PINNED: readonly Pinned[] = [
   },
   {
     id: 'controller-sends-every-car',
-    before: 4,
-    after: 0,
+    /*
+     * **Re-authored on demand by § D1020**: 5 → 6.25 % of the population per five minutes. At 5 the
+     * diagnosed repair removed nothing fifty mornings could tell from no change (+0.96 waits a
+     * morning, −0.41 to +2.33); at 6.25 it removes 2.36 a morning (+0.56 to +4.16) with the rest
+     * unharmed and the placebo refused at the letter's morning. The bars and the seed are unmoved,
+     * as the ruling requires; the copy's figures were re-taken off this run.
+     */
+    before: 15,
+    after: 2,
     figureTexts: [
-      '4 of 124 journeys',
-      '92 s',
-      '23.6 s over 124 boarded journeys',
-      '100.0 % of 427 journeys',
+      '15 of 143 journeys',
+      '130 s',
+      '29.0 s over 143 boarded journeys',
+      '99.8 % of 520 journeys',
     ],
   },
   {
@@ -594,8 +672,14 @@ describe.each(PINNED)('case $id', (pinned) => {
       expect(measurement.complaintBefore).toBeCloseTo(pinned.before, 1);
       expect(measurement.complaintAfter).toBeCloseTo(pinned.after, 1);
 
-      // And the classification agrees: the case is FIXED with its authored head.
-      const outcome = classifyOutcome(entry, measurement, spendOf(entry, state, shippedPriceSchedule()));
+      // And the classification agrees: the case is FIXED with its authored head — because this
+      // order *is* the diagnosed repair, which is the one run the authored words are true of (§ D1011).
+      expect(sameOrder(state, witnessStateOf(entry)), 'the diagnosed selection is the witness').toBe(true);
+      const outcome = classifyOutcome(entry, measurement, spendOf(entry, state, shippedPriceSchedule()), {
+        witnessRun: true,
+        changes: [],
+        bought: [],
+      });
       expect(outcome.kind).toBe('fixed');
       expect(outcome.head).toBe(entry.result.head);
     },
@@ -634,6 +718,22 @@ describe.each(PINNED)('case $id', (pinned) => {
         } else {
           expect(legsKey(pair.after), `repair "${repair.id}" moved no leg`).not.toBe(baseKey);
         }
+        /*
+         * **A decoy that clears is not a negative control, and is registered as what it is** —
+         * [§ D1011](../../../../DECISIONS.md), in both polarities (§ D227). § D706 clause 2 keeps the
+         * non-diagnosed repairs as *authored negative controls*; one that clears both bars on the
+         * letter's morning is a second answer, and its effect line may not say otherwise. So every
+         * affordable non-diagnosed repair is classified on the case seed, and it clears exactly
+         * when {@link SECOND_ANSWERS} lists it — a listed one that stops clearing is red, and so is
+         * an unlisted one that starts.
+         */
+        if (repair.role !== 'diagnosed' && repair.costUnits <= entry.budgetUnits) {
+          const outcome = classifyOutcome(entry, measuredOf(entry, base.recording, pair.after.recording), spendOf(entry, state, shippedPriceSchedule()));
+          expect(
+            outcome.kind === 'fixed',
+            `${entry.id}/${repair.id}: ${outcome.kind} — SECOND_ANSWERS says ${String(SECOND_ANSWERS.has(`${entry.id}/${repair.id}`))}`,
+          ).toBe(SECOND_ANSWERS.has(`${entry.id}/${repair.id}`));
+        }
       }
     },
     SUITE_TIMEOUT,
@@ -653,6 +753,117 @@ describe.each(PINNED)('case $id', (pinned) => {
     },
     SUITE_TIMEOUT,
   );
+});
+
+/* -------------------------------------------------------------------------- *
+ * The ruled judge — [§ D1020](../../../../DECISIONS.md), GitHub issue #602
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The shipped press, run synchronously in this process: `pressThroughTheJudge` over the shipped
+ * judge, with a pair runner and a morning runner that call `recordRun` directly. Nothing about the
+ * verdict is restated here — the gate is `classifyOutcome`, the mornings are `replicationSeedsOf`'s,
+ * the interval is `judgeReplication`'s — so this vouches for the chain both surfaces call.
+ */
+function judgedPress(entry: FixitCase, state: FixitState, subject: FixitCase = entry): FixitOutcome {
+  const pairRunner: PairRunner = {
+    start(ask) {
+      ask.onDone(ask.runs.map((run) => recordRun(run.config, FIXIT_RUN_SWITCHES).recording));
+    },
+  };
+  const mornings: MorningRunner = {
+    start(ask) {
+      ask.onDone(ask.configs.map((config) => morningReadingOf(recordRun(config, FIXIT_RUN_SWITCHES).recording, ask.measure)));
+    },
+    cancel() {},
+    isRunning: () => false,
+  };
+  let verdict: FixitOutcome | undefined;
+  pressThroughTheJudge({
+    entry: subject,
+    plan: fixitRunPlanOf(subject, state, resources),
+    switches: FIXIT_RUN_SWITCHES,
+    pairRunner,
+    judge: createFixitJudge(mornings),
+    readingOf: morningReadingOf,
+    classify: (before: VizRecording, after: VizRecording, done) => {
+      // The surfaces' own check first — GitHub issue #350 — so this vouches for the chain they run.
+      assertPairMatchesRepairs(subject, state, before, after);
+      done(classifyOutcome(subject, measuredOf(subject, before, after), spendOf(subject, state, shippedPriceSchedule())));
+    },
+    onGate: (outcome) => {
+      verdict = outcome;
+    },
+    onVerdict: (outcome) => {
+      verdict = outcome;
+    },
+    onFailed: (message) => {
+      throw new Error(message);
+    },
+  });
+  if (verdict === undefined) throw new Error(`case "${entry.id}": the press produced no verdict`);
+  return verdict;
+}
+
+/**
+ * The placebo — every car 3 cm/s faster, which no complaint in this file is about. A judge that
+ * lets it through is a judge a player can clear by accident, which is the defect #602 measured:
+ * under the single pair it cleared three shipped cases' letters.
+ */
+const PLACEBO_PATCH: FixitPatch = { building: { cars: [{ carIds: ['*'], set: { ratedSpeedDeltaMps: 0.03 } }] } };
+
+function withPlacebo(entry: FixitCase): FixitCase {
+  return {
+    ...entry,
+    repairs: [
+      ...entry.repairs,
+      { id: 'placebo', role: 'cheap-fix', name: 'A placebo', costUnits: 0, effect: 'Every car 3 cm/s faster.', patch: PLACEBO_PATCH },
+    ],
+  };
+}
+
+/**
+ * **Every offered case's answer passes the judge a player meets, and the placebo does not** — and a
+ * held case is held because that is not true of it.
+ *
+ * Both halves are asserted on every case, so a judge that passed everything or refused everything
+ * fails here: the answer's `fixed` is the half a lenient judge would satisfy alone, and the
+ * placebo's refusal the half a strict one would. The held register is held in both directions —
+ * a case in `fixit/held.ts` whose answer starts passing and whose placebo is refused fails this
+ * block until it is released, so the register cannot outlive its reason.
+ */
+describe.each(PINNED)('case $id under the ruled judge (§ D1020)', (pinned) => {
+  it(
+    heldReasonOf(pinned.id) === undefined
+      ? 'the diagnosed repair is fixed over fifty mornings, and the +3 cm/s placebo is not'
+      : 'is held: its answer does not pass the judge, or the placebo does',
+    () => {
+      const entry = caseOf(pinned.id);
+      const answer = judgedPress(entry, diagnosedState(entry));
+      const placebo = judgedPress(entry, { ...emptyFixitState(), selectedRepairIds: ['placebo'] }, withPlacebo(entry));
+      const passes = answer.kind === 'fixed' && placebo.kind !== 'fixed';
+      if (heldReasonOf(pinned.id) === undefined) {
+        expect(answer.kind, `${entry.id}: ${answer.head} ${answer.rows[3]?.verdict ?? ''}`).toBe('fixed');
+        expect(answer.rows, 'a fixed verdict carries its fifty-morning row').toHaveLength(4);
+        expect(placebo.kind, `${entry.id}: the placebo — ${placebo.rows[3]?.verdict ?? placebo.head}`).not.toBe('fixed');
+      } else {
+        expect(passes, `${entry.id} is held but its answer passes and its placebo is refused — release it`).toBe(false);
+      }
+    },
+    SUITE_TIMEOUT,
+  );
+});
+
+describe('the held register', () => {
+  it('names only shipped cases, and gives each a reason', () => {
+    const ids = new Set(cases.cases.map((entry) => entry.id));
+    for (const [id, reason] of Object.entries(HELD_FIX_CASES)) {
+      expect(ids.has(id), `held case "${id}" is not in the shipped file`).toBe(true);
+      expect(reason.length).toBeGreaterThan(40);
+      /* No figure: the reason is drawn, and a figure beside it would be one nobody re-measures. */
+      expect(reason).not.toMatch(/\d/);
+    }
+  });
 });
 
 /**

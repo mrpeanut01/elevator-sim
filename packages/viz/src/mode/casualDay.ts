@@ -376,13 +376,22 @@ export const CASUAL_LEVERS_HEADING = 'What would make tomorrow better';
  * driven surface in `honesty/surfaces.ts`, the run already states its own window twice, and a third
  * derivation is a third thing to keep in step.
  */
+/*
+ * **The window's two forms are plain words now, so the gloss names them as they print** — the
+ * post-AH panel's L3. The sheet printed `core`'s ids (*the peak-5min window*, *the report-window
+ * window*), and this lead existed to translate them; `shift/reportWindow.ts#reportWindowNameOf` now
+ * names the window on the sheet itself, so the lead says which names it will meet. It also stops
+ * calling the five-minute window *the busiest five minutes*, which `shift/report.ts#smallPrintFor`
+ * already refuses: two different windows carry that id and only one of them was found by counting.
+ */
 export const CASUAL_SMALL_PRINT_LEAD =
   'Two phrases below are worth having before you read them. One names the window every average ' +
-  'here was read over, and it comes in two forms: “the full-run window” is the whole shift, ' +
-  '“the peak-5min window” is the busiest five minutes of it. Either way, a wait quoted on this ' +
-  'sheet is a wait from inside the window named below. “A confidence interval that excludes ' +
-  'zero” is the bar for saying one setting beat another — one day cannot clear it, and fifty or ' +
-  'more paired runs can, which is what Compare is for.';
+  'here was read over, and it comes in more than one form: “the full-shift window” is the whole ' +
+  'shift, and “the five-minute window” and the rest say how long a stretch it was, with its clock ' +
+  'times beside it. Either ' +
+  'way, a wait quoted on this sheet is a wait from inside the window named below. “A confidence ' +
+  'interval that excludes zero” is the bar for saying one setting beat another — one day cannot ' +
+  'clear it, and fifty or more paired runs can, which is what Compare is for.';
 
 /**
  * What Casual says about **reach** — § D299 § 2, on the sheet rather than in a decision record.

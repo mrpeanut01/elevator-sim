@@ -100,7 +100,7 @@ import {
 
 import { SHIFT_EVENTS, demandTemplateVariesMix, eventCarChoice, eventFor } from './events.js';
 import { scaledBuilding } from './growth.js';
-import { carsToDerate, type CarRef } from './incidents.js';
+import { carsToDerate, type CarRef, type Incident } from './incidents.js';
 import { weekdayOf, type ShiftEvent, type ShiftEventId, type Weekday } from './types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -713,6 +713,12 @@ export interface CalendarPatchInput {
    * caption charges the period for something the reader did.
    */
   readonly playerHeldCarIds?: readonly string[] | undefined;
+  /**
+   * The tower's own bookings for the day — `shift/ladder.ts#rungIncidents`, passed on to
+   * `events.ts#eventCarChoice` so the car the event is taken to have is the car the run gives it
+   * ([§ D1038](../../../../DECISIONS.md)). `undefined` is none.
+   */
+  readonly booked?: readonly Incident[] | undefined;
 }
 
 export interface CalendarPatch {
@@ -996,10 +1002,16 @@ function spokenForCarsOf(input: {
   readonly building: BankedConfig | undefined;
   readonly event?: ShiftEvent | undefined;
   readonly playerHeldCarIds?: readonly string[] | undefined;
+  /**
+   * The tower's own bookings for the day — `shift/ladder.ts#rungIncidents`, passed on to
+   * `events.ts#eventCarChoice` so the car the event is taken to have is the car the run gives it
+   * ([§ D1038](../../../../DECISIONS.md)). `undefined` is none.
+   */
+  readonly booked?: readonly Incident[] | undefined;
 }): readonly string[] {
   const held = input.playerHeldCarIds ?? [];
   if (input.building === undefined || input.event === undefined) return held;
-  const cars = eventCarChoice(input.event.effect, input.building);
+  const cars = eventCarChoice(input.event.effect, input.building, input.booked ?? []);
   return [...held, ...cars.holdCars.map(carRuntimeId), ...cars.derateCars.map(carRuntimeId)];
 }
 
@@ -1080,6 +1092,12 @@ export interface CalendarReservationInput {
    */
   readonly event?: ShiftEvent | undefined;
   readonly playerHeldCarIds?: readonly string[] | undefined;
+  /**
+   * The tower's own bookings for the day — `shift/ladder.ts#rungIncidents`, passed on to
+   * `events.ts#eventCarChoice` so the car the event is taken to have is the car the run gives it
+   * ([§ D1038](../../../../DECISIONS.md)). `undefined` is none.
+   */
+  readonly booked?: readonly Incident[] | undefined;
 }
 
 /**

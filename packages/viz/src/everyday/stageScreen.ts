@@ -57,7 +57,7 @@
  * *Run this shift* performs, so the day it produces may file.
  */
 
-import type { DispatcherProfile } from '@elevator-sim/core/browser';
+import type { DispatcherProfile, InterventionChange } from '@elevator-sim/core/browser';
 
 import { drawCutaway, sizeCanvas } from './cutaway.js';
 import { Playback } from '../playback/playback.js';
@@ -126,6 +126,9 @@ import { bookedOutCarsOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { actsOf, type DayAct } from '../shift/dayLength.js';
 import type { RunHorizon } from '../shift/types.js';
 import { stagePaceNoteOf, stagePaceOf } from './stagePace.js';
+/* Wave AI, § D1029 — the pinned day's call. */
+import type { PressCall } from '../shift/pressCall.js';
+import { STAGE_CALL_COPY, stageCallCardOf, stageCallPhaseOf } from './stageCall.js';
 /* GitHub issue #340: the two beat-1 events. The recorder is a no-op until consent is granted. */
 import { everydayTelemetry } from './telemetryPort.js';
 import { telemetryRunPointerOf } from '../telemetry/schema.js';
@@ -373,7 +376,17 @@ function mountStage(
    */
   let paceHorizon: RunHorizon = 'period';
   let paceActs: readonly DayAct[] = [];
-  let playerChoseSpeed = false;
+  /** When a chip was pressed on this day — § D991 clause 2 as § D1029 amends it. */
+  let playerChoseSpeedAtS: number | undefined;
+  /*
+   * ---- § D1029's call — wave AI. Two cells, both set in `adopt`. ----
+   *
+   * `stageCall` is latched once per attempt, from the recording the attempt opened on, and only
+   * when the host says the run is its tower's pinned day exactly as measured. `callAnswered` is
+   * whether this attempt has answered it: a press at the call, *leave them*, or a skip to the end.
+   */
+  let stageCall: PressCall | undefined;
+  let callAnswered = false;
   /* ---- § D344's sound — GitHub issue #258. Four cells, none of which a leg can read. ---- */
   /** The synthesised sink, built on the first frame that has something to play. */
   let audioSink: AudioSink | undefined;
@@ -1092,6 +1105,7 @@ function mountStage(
   interventionStamp.setAttribute('role', 'status');
   interventionStamp.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey}`;
   const interventionRefusal = el(doc, 'span', 'everyday-stage-intervene-refusal');
+  interventionRefusal.id = 'everyday-stage-intervene-refusal';
   interventionRefusal.style.cssText = `font-size:11.5px;color:${C.label}`;
   /* The handover arm's note — drawn, not a title, because a reason a player cannot see is not one. */
   const interventionNote = el(doc, 'span', 'everyday-stage-intervene-note');
@@ -1272,6 +1286,34 @@ function mountStage(
     'border:0',
   ].join(';');
 
+  /*
+   * **§ D1029's call card** — drawn only while a pinned day's call stands at the playhead, and
+   * rebuilt only when the call changes. The words are `everyday/stageCall.ts`'s; this decides which
+   * element they go in and what the buttons press.
+   */
+  const callCard = el(doc, 'div', 'everyday-stage-call');
+  callCard.setAttribute('role', 'group');
+  callCard.hidden = true;
+  callCard.style.cssText = [
+    `border:1.5px solid ${C.ink}`,
+    `border-radius:${String(R.row)}px`,
+    `background:${C.card}`,
+    'padding:12px 14px',
+  ].join(';');
+  /*
+   * The grid lives on an inner body rather than on the card, because an inline `display:grid` on
+   * the card would outrank the `[hidden]` rule and draw an empty card before the call
+   * (`hiddenBox.test.ts`). The card is hidden by its attribute alone.
+   */
+  const callBody = el(doc, 'div', 'everyday-stage-call-body');
+  callBody.style.cssText = 'display:grid;gap:7px';
+  callCard.append(callBody);
+  let callCardKey = '';
+  /** Show or hide the card. */
+  function showCallCard(shown: boolean): void {
+    callCard.hidden = !shown;
+  }
+
   root.append(
     title,
     header,
@@ -1281,6 +1323,7 @@ function mountStage(
     alarmSay,
     stageRow,
     legend,
+    callCard,
     interventions,
     race,
   );
@@ -1328,8 +1371,11 @@ function mountStage(
 
   function setSpeed(index: number): void {
     speedIndex = index;
-    /* § D991: a chip press is the player's, and the stage stops pacing this day from here on. */
-    playerChoseSpeed = true;
+    /*
+     * § D991: a chip press is the player's — until the next act boundary since § D1029, which is
+     * `stagePace.ts#chipStands`'s rule; the stage paces again from there.
+     */
+    playerChoseSpeedAtS = playback?.simTimeS ?? 0;
     playback?.setSpeed(stageSpeedAt(index).simPerRealS);
     syncTransport();
     requestFrame();
@@ -1362,11 +1408,23 @@ function mountStage(
       simTimeS,
       watchingSimPerRealS: stageSpeedAt(speedIndex).simPerRealS,
       longestStandingS,
-      playerChoseSpeed,
+      playerChoseSpeedAtS,
+      callAtS: callPending() ? stageCall?.atS : undefined,
     });
     const note =
       stagePaceNoteOf(answer, { acts: paceActs, simTimeS, dayStartS: host.dayStartS() }) ?? '';
     if (paceNote.textContent !== note) paceNote.textContent = note;
+    /*
+     * **The call stops the transport** — § D1029. At any rung, and after a chip press, because the
+     * `'call'` reason outranks `'chosen'`. It pauses and never seeks (`docs/28` AD-S4): the frame it
+     * stops on may be a few simulated seconds past the call at a fast rung, and the answer is
+     * stamped at the call second whatever the frame, inside a window the pin was admitted on.
+     */
+    if (answer.reason === 'call') {
+      playback.pause();
+      syncTransport();
+      return;
+    }
     if (playback.speed !== answer.simPerRealS) {
       playback.setSpeed(answer.simPerRealS);
       syncTransport();
@@ -1430,10 +1488,86 @@ function mountStage(
      * harmless.
      */
     started = true;
+    /* § D1029: a skip is the player's own answer to a call they have not been asked yet. */
+    if (stageCall !== undefined) callAnswered = true;
     playback.play();
     playback.seekTo(playback.recording.endedAt);
     syncTransport();
     requestFrame();
+  }
+
+  /** Whether this attempt's call stands unanswered — the one reading pace, card and holds share. */
+  function callPending(): boolean {
+    return stageCall !== undefined && !callAnswered && watchingNow() === undefined;
+  }
+
+  /** The held reason for the parking presses and the handover, or `undefined` once answered. */
+  function callHeld(): string | undefined {
+    return callPending() ? STAGE_CALL_COPY.held : undefined;
+  }
+
+  /**
+   * **Answer the call** — § D1029. A press is stamped at the call second rather than at the
+   * playhead, because the stage may have stopped a frame past it; *leave them* presses nothing.
+   * Either way the day plays on from where it stopped.
+   */
+  function answerCall(change: InterventionChange | undefined): void {
+    const call = stageCall;
+    const current = adopted;
+    if (call === undefined || current === undefined || playback === undefined || !callPending()) return;
+    callAnswered = true;
+    showCallCard(false);
+    started = true;
+    if (change !== undefined) {
+      withRecomputeBeat(current, () => {
+        host.intervene(call.atS, change);
+      });
+    }
+    playback.play();
+    syncTransport();
+    requestFrame();
+  }
+
+  /** Show, hide or rebuild the card for the playhead. */
+  function drawCall(simTimeS: number): void {
+    const call = stageCall;
+    const showing =
+      call !== undefined &&
+      watchingNow() === undefined &&
+      stageCallPhaseOf(call, simTimeS, callAnswered) === 'called';
+    if (!showing || call === undefined) {
+      showCallCard(false);
+      return;
+    }
+    const key = `${String(call.atS)}|${call.rule}`;
+    if (key !== callCardKey) {
+      callCardKey = key;
+      const card = stageCallCardOf(call, host.dayStartS());
+      const heading = el(doc, 'div', 'everyday-stage-call-heading', card.heading);
+      heading.style.cssText = `font:600 11px ${TYPE.mono};letter-spacing:0.08em;color:${C.label}`;
+      const facts = card.facts.map((fact) => {
+        const line = el(doc, 'p', 'everyday-stage-call-fact', fact);
+        line.style.cssText = `margin:0;font-size:13px;line-height:1.45;color:${C.inkSoft}`;
+        return line;
+      });
+      const question = el(doc, 'p', 'everyday-stage-call-question', card.question);
+      question.style.cssText = 'margin:2px 0 0;font-size:13.5px;font-weight:600';
+      const row = el(doc, 'div');
+      row.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.row)}px`;
+      for (const option of card.options) {
+        const button = el(doc, 'button', 'everyday-stage-call-answer', option.label);
+        button.type = 'button';
+        button.dataset['answer'] = option.change?.kind ?? 'leave';
+        button.style.cssText = ARM_BUTTON_CSS;
+        button.addEventListener('click', () => {
+          answerCall(option.change);
+        });
+        row.append(button);
+      }
+      callCard.setAttribute('aria-label', card.heading);
+      callBody.replaceChildren(heading, ...facts, question, row);
+    }
+    showCallCard(true);
   }
 
   function intervene(change: (typeof STAGE_INTERVENTIONS)[number]['change']): void {
@@ -1676,7 +1810,20 @@ function mountStage(
     if (resumeAtS === undefined) {
       speedIndex = defaultSpeedIndex();
       started = false;
-      playerChoseSpeed = false;
+      playerChoseSpeedAtS = undefined;
+    }
+    /*
+     * § D1029 — the call, latched per attempt. A fresh attempt asks the host once, of the recording
+     * it opens on; a re-simulation after the answer keeps it and marks it answered. Never on a watched
+     * run or the rush: the host answers about the state, and on those the recording on screen is not
+     * the state's day.
+     */
+    if (resumeAtS === undefined) {
+      stageCall =
+        context.ctx === 'watch' || context.ctx === 'rush' ? undefined : host.pressCallOnStage(recording);
+      callAnswered = host.interventions().length > 0;
+    } else if (host.interventions().length > 0) {
+      callAnswered = true;
     }
     /*
      * § D991 — which runs are paced. A whole day **the player's own shell simulated**, and nothing
@@ -1953,6 +2100,16 @@ function mountStage(
      * that sentence, and this one is the instructions for a control that can.
      */
     switchPickerNote.textContent = sharedRefusal === undefined ? STAGE_SWITCH_PICKER_NOTE : '';
+    /*
+     * **And a picker the refusal disables is described by the refusal** — [§ D1047](../../../../DECISIONS.md).
+     * The note it pointed at is emptied on the line above, so a held picker announced as dimmed with
+     * no reason: `screenReaderWalkthrough.browser.test.ts`'s `disabled-says-why`, found the first time
+     * a bare load reached a pinned day's stage, which since § D1047 is every fresh device's first.
+     */
+    switchPicker.setAttribute(
+      'aria-describedby',
+      sharedRefusal === undefined ? switchPickerNote.id : interventionRefusal.id,
+    );
   }
 
   /** The handover arm re-asked from the live facts — for the picker, and for the mount. */
@@ -1968,7 +2125,7 @@ function mountStage(
       recomputing: recomputingOver !== undefined,
       ...(target === undefined ? {} : { switchTo: target }),
     });
-    applySwitchRow(view, sharedRefusalOf(view, watchingNow()));
+    applySwitchRow(view, sharedRefusalOf(view, watchingNow()) ?? callHeld());
   }
 
   /**
@@ -2049,6 +2206,7 @@ function mountStage(
     const simTimeS = playback.simTimeS;
     const observations: LiveObservations = observationsAt(recording, simTimeS);
     pace(simTimeS, observations.longestCurrentWaitS);
+    drawCall(playback.simTimeS);
     /*
      * Hoisted out of the canvas branch below for GitHub issue #258. It was computed only over a
      * laid-out canvas, which is correct for a picture and wrong for a sound: the cues are the
@@ -2302,7 +2460,12 @@ function mountStage(
      * (contract § 1.5 — *replayed, not offered*), so naming the latest one at or before the playhead
      * is a true statement about the run on screen and hiding it would misdescribe the replay.
      */
-    const refusal = sharedRefusalOf(intervention, watching);
+    /*
+     * § D1029: before a pinned day's call is answered, the parking presses and the handover are
+     * held — the call is where the day's press is made, and a press or a switch before it would be
+     * a day nobody measured. Composed after the shared refusal, which still wins.
+     */
+    const refusal = sharedRefusalOf(intervention, watching) ?? callHeld();
     for (const button of interventionButtons) button.disabled = refusal !== undefined;
     /*
      * The handover arm has a refusal of its own — a hand-over to the vector already driving moves

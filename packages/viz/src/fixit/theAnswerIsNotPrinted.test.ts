@@ -19,25 +19,29 @@
  *    tell whatever it says, and the retired tail is what that detector was calibrated against — it
  *    fires on a file with the tail put back, which is the arm that makes the green one mean
  *    something.
- * 3. **Every case is solved, not asserted to be solvable.** A role-blind enumeration of the routes
- *    a player can actually take is run, case by case, and the first one that clears both measured
- *    bars is pinned. Seventeen of the eighteen are cleared by the **editor alone** since § D1000's
- *    families landed (twelve before them) — no repair row touched — which is a larger number than
- *    § D706 § 1's *one of eighteen*, and the two figures
- *    answer different questions: § D706 asked whether the *authored answer's own patch* is
- *    reachable from the editor, and this asks whether *any affordable configuration* clears, which
- *    is [§ D525](../../../../DECISIONS.md) clause 3's own definition of a scenario's difficulty.
+ * 3. **Every offered case is solved, not asserted to be solvable — under the judge a player
+ *    meets.** A role-blind enumeration of the routes a player can actually take is run, case by
+ *    case, and the first one that **holds over fifty mornings** is pinned
+ *    ([§ D1020](../../../../DECISIONS.md)); the routes that cleared the letter's morning and then did
+ *    not hold are pinned beside it, because they are the single pair's noise named case by case.
+ *    Under the single pair this read seventeen of eighteen on the editor alone (§ D1000 § 3); the
+ *    figures now are in {@link SOLVED_BY}'s own count case below. This asks whether *any affordable
+ *    configuration* clears, which is [§ D525](../../../../DECISIONS.md) clause 3's own definition of
+ *    a scenario's difficulty.
  * 4. **A repair that names a figure and a direction moves it that way**, measured on the run rather
  *    than read. This is GitHub issue #568's fifth criterion, and it found two more false promises
  *    than the issue reported.
  *
- * **What this suite deliberately does not claim.** The decoys still refute themselves in their own
+ * **The residual this suite used to name is closed.** The decoys refute themselves in their own
  * copy — *"the empty three-hundred-metre climb that makes the long waits is not a door"* — so a
- * reader who works through four rows can still find the answer by elimination. That is honest copy
- * about what each purchase does (§ D227 requires it to stay true, and `cases.test.ts` pins it on
- * the legs), and the thing that closes it is § D706's retirement of the menu, not a re-wording of
- * four sentences into vagueness.
+ * reader who worked through four rows could find the answer by elimination. § D706's retirement of
+ * the menu was named as the thing that closes that, and it landed on [§ D1020](../../../../DECISIONS.md)'s
+ * commit: no surface draws a repair row, so no player reads a decoy's line. The copy stays true and
+ * stays pinned on the legs (`cases.test.ts`), because the file keeps the repairs as priced negative
+ * controls.
  */
+
+import { writeFileSync } from 'node:fs';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -47,7 +51,6 @@ import type { SimulationConfig } from '@elevator-sim/core/browser';
 import {
   classifyOutcome,
   emptyFixitState,
-  repairsInDrawOrder,
   spendOf,
   zonePriceUnits,
   topFloorRaisePriceUnits,
@@ -63,6 +66,7 @@ import {
 } from './families.js';
 import {
   FIXIT_RUN_SWITCHES,
+  assertPairMatchesRepairs,
   figureValuesOf,
   fixitPlanRefusalOf,
   fixitRunPlanOf,
@@ -74,6 +78,11 @@ import {
 } from './run.js';
 import { EVERY_CAR, OUT_OF_SERVICE } from './types.js';
 import type { EditorParkingStrategy, FixitCase, FixitCases, FixitState } from './types.js';
+import type { VizRecording } from '../contract/types.js';
+import type { FixitOutcome } from './engine.js';
+import { createFixitJudge, pressThroughTheJudge, type FixitJudge, type MorningRunner, type PairRunner } from './judge.js';
+import { heldReasonOf } from './held.js';
+import { morningReadingOf } from './run.js';
 
 const SUITE_TIMEOUT = 600_000;
 
@@ -145,42 +154,13 @@ describe('no fix-it case tells the player which repair is the answer', () => {
     expect(found).toEqual([]);
   });
 
-  /**
-   * **The draw order carries no information about which repair is which** — the tell a phrase sweep
-   * cannot see, and the one that shipped on all eighteen cases.
-   *
-   * `data/fixit-cases.json` still lists the repairs in role order, and both surfaces used to draw
-   * them in that order, so the answer was the first row every time.
-   * `fixit/engine.ts#repairsInDrawOrder` is what the surfaces draw now; this asserts what it buys —
-   * that the diagnosed repair is spread across the positions rather than sitting in one — and that
-   * the shipped file's own order is still the one the tell would come back through, so a later lane
-   * that stops calling the function has this test to explain why it exists.
+  /*
+   * **The draw-order check retired with the menu** — [§ D1020](../../../../DECISIONS.md). It held
+   * `repairsInDrawOrder` to spreading the answer across the menu's four rows, which mattered while a
+   * menu drew them. Nothing draws a repair row now, so there is no position to carry a tell, and the
+   * function went with its last caller. The two checks below still bind: they are about the words
+   * the file holds, and the file still holds them.
    */
-  it('draws the answer in no fixed position, though the file still authors it first', () => {
-    const authored = cases.cases.map((entry) =>
-      entry.repairs.findIndex((repair) => repair.role === 'diagnosed'),
-    );
-    expect(new Set(authored), 'the file authors the diagnosed repair first on every case').toEqual(
-      new Set([0]),
-    );
-
-    const drawn = cases.cases.map((entry) =>
-      repairsInDrawOrder(entry).findIndex((repair) => repair.role === 'diagnosed'),
-    );
-    expect(drawn).toEqual([3, 2, 0, 0, 3, 0, 2, 2, 0, 2, 2, 3, 1, 2, 3, 3, 0, 3]);
-    expect(new Set(drawn).size, 'a draw order that puts the answer in one place is the old tell')
-      .toBeGreaterThan(1);
-
-    /* Deterministic: the same case draws the same order twice, and on the next load. */
-    for (const entry of cases.cases) {
-      expect(repairsInDrawOrder(entry).map((repair) => repair.id)).toEqual(
-        repairsInDrawOrder(entry).map((repair) => repair.id),
-      );
-      expect([...repairsInDrawOrder(entry)].map((r) => r.id).sort()).toEqual(
-        [...entry.repairs].map((r) => r.id).sort(),
-      );
-    }
-  });
 
   /**
    * **The formula check, and its own control.**
@@ -290,7 +270,7 @@ const SECTION_10_3_PARKING: readonly EditorParkingStrategy[] = Object.freeze(['s
  *
  * The editor's own controls first — the five families `fixit/types.ts#FixitState` draws — and then
  * the repair rows, in the order the screen draws them
- * (`fixit/engine.ts#repairsInDrawOrder`), which is the order a player meets them in. Anything the
+ * — until § D1020 retired the menu; now the diagnosed repair alone, last, as the witness. Anything the
  * budget refuses is dropped here rather than run, because a route a player cannot select is not a
  * route.
  */
@@ -345,10 +325,18 @@ function routesFor(entry: FixitCase, asBuilt: SimulationConfig): readonly Route[
     }
   }
   candidates.push(...familyRoutesFor(entry, asBuilt));
-  for (const repair of repairsInDrawOrder(entry)) {
+  /*
+   * **The menu's rows are no longer routes** — [§ D1020](../../../../DECISIONS.md) retired the menu,
+   * so a player cannot press a repair row. What stays, last, is the witness: the diagnosed repair,
+   * which `families.test.ts` proves the editor writes leg for leg. It is reached only where no
+   * sampled editor route holds, and it is labelled `answer:` so the table says which rows are the
+   * sample's finds and which are the witness standing in for a route the sample could not choose.
+   */
+  const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed');
+  if (diagnosed !== undefined) {
     candidates.push({
-      label: `repair:${repair.id}`,
-      state: { ...emptyFixitState(), selectedRepairIds: [repair.id] },
+      label: `answer:${diagnosed.id}`,
+      state: { ...emptyFixitState(), selectedRepairIds: [diagnosed.id] },
     });
   }
   return candidates.filter(
@@ -435,109 +423,189 @@ function familyRoutesFor(entry: FixitCase, asBuilt: SimulationConfig): readonly 
 }
 
 /**
- * **The route that clears each case, and whether the menu was needed for it.**
+ * **The route that holds each case under the judge a player meets, and the routes that only cleared
+ * once** — re-pinned by [§ D1020](../../../../DECISIONS.md) under the fifty-morning judge.
  *
- * Pinned as one table and asserted in one `toEqual`, so a failing run prints every case at once
- * rather than the first — this is a survivor census and a census read one row at a time is a
- * census nobody finishes.
+ * Pinned as tables and asserted in one `toEqual` each, so a failing run prints every case at once —
+ * this is a survivor census, and a census read one row at a time is a census nobody finishes.
  *
- * **Seventeen of eighteen now clear on an editor route, and the one `repair:` row left is a
- * limit of this sample rather than of the editor** — § D1000. It read six `repair:` rows — `zoning`,
- * `doors`, `express`, `deliveries`, `two-cars` and `let-faster` — before § D1000's families landed;
- * {@link familyRoutesFor} took five of them to an editor route. `express-that-stops-everywhere`'s
- * answer is a bank's floors redrawn, which this role-blind sample does not try (there is no
- * role-blind way to choose a floor set), and `families.test.ts` shows the editor writing that answer
- * leg for leg. So what the row now measures is this enumeration's reach, not § D706 § 6's
- * precondition, which `families.test.ts`'s eighteen of eighteen is.
+ * ## What moved, and why the old table was the finding
  *
- * **Two wins are the single-pair judge's noise rather than the lesson, and they are named rather
- * than tidied.** `let-faster-than-the-lifts` — a crowd case — first clears on a fixed-floor parking
- * rule at the top floor, and `every-letter-says-nine` on a three-metre raise of the roof. Neither is
- * a mechanism anybody would predict; both are the one-run-before, one-run-after judge reading a
- * perturbed trace, which the § D1001 rulings measured and filed separately. The census is honest
- * about what it counts, and it counts first clears on one seed.
+ * Under the single pair this table read *seventeen of eighteen cleared by the editor alone* (§ D1000
+ * § 3), and it named two of its own wins as the pair's noise: `let-faster-than-the-lifts` on a fixed
+ * floor at the top and `every-letter-says-nine` on a three-metre roof raise. Under the judge, a route
+ * **holds** only when its letter's morning clears both bars and the fifty mornings' paired interval
+ * excludes zero with the rest not shown worse than the floor; a route that clears the letter's
+ * morning and then does not hold is `cleared-once`, is **not** a win, and goes in
+ * {@link NOT_REPLICATED} rather than being dropped — because those rows are the finding, the
+ * single pair's noise named case by case.
  *
- * **The count is a floor and the search is a sample, which § D525 clause 3 requires this row to
- * say.** {@link routesFor} tries the five editor families one at a time and then two at a time
- * over parking, and stops at the first route that clears; the affordable space is far larger than
- * that, so a case that lands on `repair:` here has not been shown to need the menu — it has been
- * shown that this enumeration did not find an editor route. Three of the twelve were only reached
- * by widening the enumeration once: `controller-sends-every-car` needs the **second** rung of the
- * zoning stepper rather than its ceiling, and `one-start-time` needs a parking rule and a speed
- * step together. Neither would have been found by a smaller search, and neither is a coincidence
- * worth generalising from.
+ * ## Three things the rows say, and one they do not
+ *
+ * - **A held case is not searched.** Its answer fails the judge (`fixit/held.ts` carries each
+ *   measurement), it is not offered, and its row reads `held`.
+ * - **`answer:` is the witness, not a find.** Where no sampled editor route holds, the diagnosed
+ *   repair is tried last — the change `families.test.ts` proves the editor writes leg for leg — so
+ *   the row says the case has a way through without claiming the sample found it.
+ * - **The menu's rows are gone from the routes**, because the menu is gone (§ D1020 (c)).
+ * - **The count is a floor and the search is a sample**, which § D525 clause 3 requires this row to
+ *   say. It stops at the first route that holds, and it tries each family one move at a time.
+ *
+ * **What the three `NOT_REPLICATED` rows are.** `every-letter-says-nine`'s three-metre roof raise and
+ * `let-faster-than-the-lifts`' fixed floor at the top are the two wins § D1000 § 3 itself named as
+ * the single pair's noise; the third, zone-centre parking on `every-deck-calls-itself-full`, is the
+ * decision agents' own zone-centre finding. None of the three holds, and each case's first route that
+ * does is a different one. **One route is refused rather than judged**: `every-deck-calls-itself-full`'s
+ * zoning step moves the crowd without claiming to, which the surfaces' own check (GitHub issue #350)
+ * turns into a failed press, so it is no route through; the census found it holding before that check
+ * was added here, and a player pressing it saw *Running the day…* for good (§ D1020). **The cost**, measured 2026-09-25 at `702991b`: the whole enumeration took
+ * 423 s of one vitest process under a load average of 9–14, and 236 s at 13 on the next sitting,
+ * against this file's 600 s annotation. They are dated readings of a shared box, not a bound.
  */
 const SOLVED_BY: readonly (readonly [string, string])[] = Object.freeze([
   ['sleeping-sky-lobby', 'parking:stay'],
   ['zoning-starves-the-top', 'car:A->high'],
   ['three-cars-one-cars-work', 'parking:zone-center'],
   ['doors-that-never-close', 'doors:5/3'],
-  ['cars-that-always-go-home', 'parking:stay'],
+  ['cars-that-always-go-home', 'held'],
   ['car-park-nobody-serves', 'zone:1'],
-  ['express-that-stops-everywhere', 'repair:blank-the-low-landings'],
+  ['express-that-stops-everywhere', 'answer:blank-the-low-landings'],
   ['deliveries-on-the-passenger-group', 'doors:5/3'],
   ['one-start-time', 'parking:lobby+speed:1'],
-  ['every-letter-says-nine', 'raise:3'],
-  ['everyone-leaves-at-once', 'parking:zone-center'],
+  ['every-letter-says-nine', 'dial:constraints.noDirectionReversal=false'],
+  ['everyone-leaves-at-once', 'held'],
   ['bed-cars-locked-out', 'zone:1'],
   ['two-cars-out-wrong-month', 'car:A->high'],
-  ['every-deck-calls-itself-full', 'parking:zone-center'],
+  ['every-deck-calls-itself-full', 'capacity:1'],
   ['restaurant-above-the-ballroom', 'speed:1'],
-  ['controller-sends-every-car', 'zone:2'],
-  ['let-faster-than-the-lifts', 'parking:fixed-floor@30'],
-  ['gym-on-the-top-floor', 'parking:zone-center'],
+  ['controller-sends-every-car', 'parking:zone-center+zone:3'],
+  ['let-faster-than-the-lifts', 'tenancy:new-lettings=invoke-for-all'],
+  ['gym-on-the-top-floor', 'held'],
 ]);
 
-describe('every case is solved without being told which repair is the answer', () => {
+/** Routes that cleared the letter's morning and did not hold over fifty mornings, before the winner. */
+const NOT_REPLICATED: readonly (readonly [string, string])[] = Object.freeze([
+  ['every-letter-says-nine', 'raise:3'],
+  ['every-deck-calls-itself-full', 'parking:zone-center'],
+  ['let-faster-than-the-lifts', 'parking:fixed-floor@30'],
+]);
+
+/** The shipped press, synchronously in this process — `cases.test.ts#judgedPress`'s shape. */
+function syncJudge(): FixitJudge {
+  const mornings: MorningRunner = {
+    start(ask) {
+      ask.onDone(ask.configs.map((config) => morningReadingOf(recordRun(config, FIXIT_RUN_SWITCHES).recording, ask.measure)));
+    },
+    cancel() {},
+    isRunning: () => false,
+  };
+  return createFixitJudge(mornings);
+}
+
+/**
+ * One press through the judge, with the letter's as-built run passed in so a case's routes share
+ * it, and the judge shared across them so the forty-nine as-built mornings are run once a case.
+ */
+function pressRoute(
+  entry: FixitCase,
+  state: FixitState,
+  before: VizRecording,
+  judge: FixitJudge,
+): FixitOutcome | 'refused' {
+  const schedule = shippedPriceSchedule();
+  const pairRunner: PairRunner = {
+    start(ask) {
+      /* The as-built half is the case's own, run once; the after half is this route's. */
+      ask.onDone([before, recordRun(ask.runs[1]!.config, FIXIT_RUN_SWITCHES).recording]);
+    },
+  };
+  let verdict: FixitOutcome | 'refused' | undefined;
+  pressThroughTheJudge({
+    entry,
+    plan: fixitRunPlanOf(entry, state, resources),
+    switches: FIXIT_RUN_SWITCHES,
+    pairRunner,
+    judge,
+    readingOf: morningReadingOf,
+    /*
+     * The surfaces' own check first — GitHub issue #350: the pair's crowd claim held to its legs.
+     * A route whose pair moves the crowd without claiming to is one the product refuses with a
+     * failure line rather than a verdict, so it is no route through (`every-deck-calls-itself-full`'s
+     * zoning step is the one found, § D1020).
+     */
+    classify: (b, a, done) => {
+      assertPairMatchesRepairs(entry, state, b, a);
+      done(classifyOutcome(entry, measuredOf(entry, b, a), spendOf(entry, state, schedule)));
+    },
+    onGate: (outcome) => {
+      verdict = outcome;
+    },
+    onVerdict: (outcome) => {
+      verdict = outcome;
+    },
+    onFailed: () => {
+      verdict = 'refused';
+    },
+  });
+  return verdict!;
+}
+
+describe('every offered case is solved without being told which repair is the answer', () => {
   it(
-    'clears both measured bars on the first affordable route a role-blind search reaches',
+    'holds over fifty mornings on the first affordable route a role-blind search reaches',
     () => {
-      const schedule = shippedPriceSchedule();
       const solved: (readonly [string, string])[] = [];
+      const notReplicated: (readonly [string, string])[] = [];
       for (const entry of cases.cases) {
+        if (heldReasonOf(entry.id) !== undefined) {
+          solved.push([entry.id, 'held']);
+          continue;
+        }
         const asBuilt = fixitRunPlanOf(entry, emptyFixitState(), resources).asBuilt;
         const before = recordRun(asBuilt, FIXIT_RUN_SWITCHES).recording;
+        const judge = syncJudge();
         let winner = 'none';
         for (const route of routesFor(entry, asBuilt)) {
-          const after = recordRun(
-            fixitRunPlanOf(entry, route.state, resources).asRepaired,
-            FIXIT_RUN_SWITCHES,
-          ).recording;
-          const outcome = classifyOutcome(
-            entry,
-            measuredOf(entry, before, after),
-            spendOf(entry, route.state, schedule),
-          );
+          const outcome = pressRoute(entry, route.state, before, judge);
+          if (outcome === 'refused') continue;
           if (outcome.kind === 'fixed') {
             winner = route.label;
             break;
           }
+          if (outcome.kind === 'cleared-once') notReplicated.push([entry.id, route.label]);
         }
         solved.push([entry.id, winner]);
+        /* The census's own output, written per case so a long sitting can be read while it runs. */
+        if (process.env['FIXIT_CENSUS_OUT'] !== undefined) {
+          writeFileSync(process.env['FIXIT_CENSUS_OUT'], JSON.stringify({ solved, notReplicated }, null, 1));
+        }
+      }
+      if (process.env['FIXIT_CENSUS_OUT'] !== undefined) {
+        writeFileSync(process.env['FIXIT_CENSUS_OUT'], JSON.stringify({ solved, notReplicated }, null, 1));
       }
       expect(solved).toEqual(SOLVED_BY);
+      expect(notReplicated).toEqual(NOT_REPLICATED);
       expect(
         solved.filter(([, route]) => route === 'none'),
-        'a case with no route through is a scenario with zero survivors — § D525 clause 3 says ' +
-          'that is a diagnosis or it is not a scenario, and no fix case declares itself one.',
+        'an offered case with no route through is a scenario with zero survivors — § D525 clause 3 ' +
+          'says that is a diagnosis or it is not a scenario, and no fix case declares itself one.',
       ).toEqual([]);
     },
     SUITE_TIMEOUT,
   );
 
   /**
-   * The census § D706 § 6 is conditioned on, stated as a number rather than as a feeling.
-   *
-   * **This reads {@link SOLVED_BY} rather than re-measuring it**, deliberately: the measurement is
-   * the case above, which holds every row of that table against a run, and a second sweep here
-   * would cost another ninety runs to produce the same seventeen. What this adds is that the split
-   * is written down as a figure a reader can fail, so a later change that quietly moves a case
-   * from the editor's column to the menu's has to move this line too.
+   * The census § D706 § 6 is conditioned on, stated as figures rather than as a feeling — and
+   * **read off {@link SOLVED_BY} rather than re-measured**, deliberately: the case above holds every
+   * row against a run, and what this adds is that the split is written down as figures a reader
+   * can fail.
    */
-  it('names how many cases the editor alone clears', () => {
-    const editorOnly = SOLVED_BY.filter(([, route]) => !route.startsWith('repair:'));
-    expect(editorOnly).toHaveLength(17);
-    expect(SOLVED_BY.filter(([, route]) => route.startsWith('repair:'))).toHaveLength(1);
+  it('names how many cases hold on an editor route, on the witness, and are held', () => {
+    const editor = SOLVED_BY.filter(([, route]) => route !== 'held' && !route.startsWith('answer:'));
+    const witness = SOLVED_BY.filter(([, route]) => route.startsWith('answer:'));
+    const held = SOLVED_BY.filter(([, route]) => route === 'held');
+    expect([editor.length, witness.length, held.length]).toEqual([14, 1, 3]);
+    expect(SOLVED_BY.some(([, route]) => route.startsWith('repair:')), 'the menu retired').toBe(false);
   });
 });
 

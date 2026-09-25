@@ -138,11 +138,42 @@ describe.skipIf(!HAS_BROWSER)('the week’s tower is a control a player can pres
      * week under its own id and picks the destination's up if there is one — so the second press
      * finds a parked entry, and the row that offered it says *resume* rather than *open* before it
      * is pressed. That sentence is the promise; this is the check that the product keeps it.
+     *
+     * **A day is closed first, and since wave AI that is what makes it a week to resume.**
+     * `towerChoice.ts#towerChoiceViewOf` calls a parked week *a week going here* only once somebody
+     * has played it — a closed day, or a day past the first — because a fresh profile read *"this
+     * picks it back up"* over a Monday nobody had touched (the post-AH panel's B.md). Picking an
+     * unplayed week back up is a fresh week in everything a player can see, so that row now says
+     * *open*, and this case would be testing nothing on one. So the week is played before it is
+     * left, and what comes back is checked on the strip as well as on the picker: the closed Monday
+     * is still there, which is what *rather than restarting it* means.
      */
     const page = await atTheDoor();
     try {
       const first = await selectedContract(page);
       expect(first).not.toBeNull();
+
+      /* ---- close Monday on the week the page opened on, through § 3.3's own primaries ---- */
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForFunction(
+        () => (document.querySelector('.everyday-bar-primary')?.textContent ?? '').includes('Close the day'),
+        undefined,
+        { timeout: 60_000 },
+      );
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-report', { timeout: 30_000 });
+      await page.locator('.everyday-rail-menu').click();
+      await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
+      await openEverydayDoor(page);
+      await page.waitForSelector('.everyday-door-towers', { timeout: 30_000 });
+      expect(await selectedContract(page)).toBe(first);
+      const played = (await page.textContent('.everyday-door-strip')) ?? '';
+      /* A closed day draws its score; an unplayed chip draws a dash — `doorView.ts`'s chip. */
+      expect(played).toMatch(/\d+%/u);
+
+      /* ---- away, and back ---- */
       await page.click('.everyday-door-tower[data-contract="c7"]');
       await page.waitForSelector('.everyday-door-tower[data-contract="c7"][data-selected="true"]', {
         timeout: 30_000,
@@ -155,6 +186,8 @@ describe.skipIf(!HAS_BROWSER)('the week’s tower is a control a player can pres
         { timeout: 30_000 },
       );
       expect(await selectedContract(page)).toBe(first);
+      /* The week that came back is the one that was left, closed Monday and all. */
+      expect((await page.textContent('.everyday-door-strip')) ?? '').toBe(played);
     } finally {
       await page.close();
     }

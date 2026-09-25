@@ -43,6 +43,7 @@ import {
   observedContext,
   resolveAuctionConfig,
 } from './auction.js';
+import { createPolicyFor } from './registry.js';
 import {
   board,
   call,
@@ -945,6 +946,19 @@ describe('resolveAuctionConfig', () => {
         auction: { aggregation: 'swarm' as unknown as 'contract-net' },
       }),
     ).toThrow(/auction\.aggregation/);
+  });
+
+  it('refuses an aggregation that names an inherited property rather than calling it', () => {
+    // `POLICY_FACTORIES[aggregation]` on a plain object would find `Object.prototype.constructor`
+    // or `toString` and call it as a factory; the lookup takes own keys only, so each is the same
+    // named refusal as any other unknown aggregation (CodeQL's unvalidated dynamic call, PR #606).
+    for (const aggregation of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      expect(() =>
+        createPolicyFor(waitTimeProfile(), {
+          auction: { aggregation: aggregation as unknown as 'contract-net' },
+        }),
+      ).toThrow(DispatchError);
+    }
   });
 
   it('rejects a round budget the aggregation cannot honour', () => {

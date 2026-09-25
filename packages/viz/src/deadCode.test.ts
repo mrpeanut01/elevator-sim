@@ -246,6 +246,12 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    * not the fix. An `elevator-sim wrinkles` command is the closing move, and inventing one is
    * feature work rather than an allowlist edit; § D118 closed fuzz's the same way.
    */
+  /*
+   * -- § D1029's first-day set stood here, exported and guarded by wave AI's press-moment lane and
+   * wired to nothing. § D1047 wired the first-session draw to it (`shift/firstSession.ts#
+   * firstSessionContractFor`, reached from `dev/state.ts#withFirstSession`), the staleness rule
+   * below went red on that commit exactly as the handover said it would, and the entry went with it.
+   */
   'wrinkles/gateLibrary':
     '§ 17’s content gate, swept over a library; its consumer is gate.test.ts, which drives it',
   /*

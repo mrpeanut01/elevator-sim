@@ -239,8 +239,17 @@ export const TUTORIAL_COPY = Object.freeze({
   skipNote:
     'Nothing is filed and nothing is scored. This is a way past the walkthrough, and the first day on your week is one you play.',
   collapseTitle: 'Watch it come apart',
+  /*
+   * *The top three floors*, not *the fourth floor* — the post-AH panel's B.md: a player watched
+   * floor 4 and the riders past a minute stood on floor 6. The letter is written **from** floor 4,
+   * but the case measures waits starting on floors 4, 5 and 6 (`data/fixit-cases.json`, the
+   * complaint's `scope.floorIds`), and that is where the screen's red riders come from. So the lede
+   * points at the stretch the measure counts rather than the one landing the letter-writer lives on;
+   * `tutorialModel.test.ts` derives the stretch from the case and the building and holds the word.
+   * Recorded here under [§ D405](../../../../DECISIONS.md): the decision is this sentence's.
+   */
   collapseLede:
-    'This is the same building with nothing changed. Watch the three cars, and watch the fourth floor.',
+    'This is the same building with nothing changed. Watch the three cars, and watch the top three floors, where the letter comes from.',
   collapsePending:
     'The day is being simulated now, twice — once as it stands and once with one thing changed. Nothing is shown until both land.',
   /*

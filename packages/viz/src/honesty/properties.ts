@@ -1434,6 +1434,84 @@ function checkInternalNotation(
 }
 
 /* -------------------------------------------------------------------------- *
+ * § D1011 — no act credited that the run did not carry
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A sentence **opening** by telling the player they did something — *You parked the cars in the
+ * lobby*, *You have changed the order*, *You changed the building* — which is a claim about the
+ * run's cause as much as a figure is a claim about its size.
+ *
+ * Past tense, second person, and **at the head of a sentence or clause**, because that is the shape
+ * of a claim that a particular act was made. The same verb inside a relative clause — *everything
+ * you have changed*, *the day still runs with what you changed*, *nothing you changed reached the
+ * letter* — refers to the order in general and credits no act; measured on the first run of this
+ * property, those were twenty-nine of the thirty-one hits on a clean case and none of them was a
+ * claim about what the run did. An imperative (*park the cars*) proposes an act rather than
+ * crediting one and is not matched either. The verbs are the acts a player can make on a surface
+ * this product draws: a press, a purchase, an edit to an order.
+ */
+const SECOND_PERSON_ACT =
+  /(?:^|[.!?:;]\s+|\s[—–]\s+|\n\s*)You(?:\s+have|'ve|’ve)?\s+(?:parked|spread|moved|changed|keyed|raised|re-?plated|staggered|split|pressed|switched|lent|bought|rezoned|trimmed)\b/u;
+
+/**
+ * **`unbacked-attribution`** — [§ D1011](../../../../DECISIONS.md), the decision swarm's honesty
+ * member's proposal, adopted.
+ *
+ * *"Every result body is a mechanism claim naming the witness's act. Such a sentence is measured
+ * only for the witness's run."* The fix-it verdict printed the case's authored result over every run
+ * that cleared the bars, whatever the player had changed, and the ten properties above could not see
+ * it: none relates a claimed cause to what the run did. This one does, in two halves on the
+ * structural-and-textual pattern this module's header describes.
+ *
+ * - **Structural.** A string whose surface declared {@link RenderedText.attribution} credits acts by
+ *   id; every credited act must be among the acts the run carried. The fix-it verdict credits
+ *   `diagnosed-repair` exactly when it prints the diagnosis's words, so printing them over any other
+ *   run is caught here whatever the words are.
+ * - **Textual.** A string that tells the player they did something ({@link SECOND_PERSON_ACT}) with
+ *   **no attribution declared at all** is caught too: a surface that credits an act must say which,
+ *   or nothing can check it. That is the half that would have caught a report crediting a press the
+ *   day's record never held (`rescore-ai` B's D1), on a surface that did not declare its credits.
+ */
+function checkUnbackedAttribution(
+  _context: HonestyContext,
+  texts: readonly RenderedText[],
+): readonly HonestyViolation[] {
+  const found: HonestyViolation[] = [];
+  for (const text of texts) {
+    if (text.attribution !== undefined) {
+      const carried = new Set(text.attribution.carried);
+      const unbacked = text.attribution.credits.filter((act) => !carried.has(act));
+      if (unbacked.length > 0) {
+        found.push(
+          violation(
+            'unbacked-attribution',
+            text,
+            `credits ${unbacked.map((act) => `“${act}”`).join(', ')}, which the run it describes did not ` +
+              `carry (it carried ${text.attribution.carried.length === 0 ? 'nothing it credits' : text.attribution.carried.map((act) => `“${act}”`).join(', ')}). ` +
+              '§ D1011: a sentence about why something happened is measured only for the run that did it.',
+          ),
+        );
+      }
+      continue;
+    }
+    const claim = SECOND_PERSON_ACT.exec(text.text);
+    if (claim !== null) {
+      found.push(
+        violation(
+          'unbacked-attribution',
+          text,
+          `tells the player “${claim[0]}” with nothing declared behind it. § D1011: a string that ` +
+            'credits the player with an act must say which act and what the run carried, or ' +
+            'nothing can check that the player did it.',
+        ),
+      );
+    }
+  }
+  return found;
+}
+
+/* -------------------------------------------------------------------------- *
  * The whole check
  * -------------------------------------------------------------------------- */
 
@@ -1457,9 +1535,11 @@ export const PROPERTY_CHECKS: Readonly<
    * for. See that module's docstring for why § D359's defect needed a property of a new shape.
    */
   'surfaces-disagree': checkSurfacesAgree,
+  /* The eleventh — § D1011. The first about cause rather than about a figure's licence. */
+  'unbacked-attribution': checkUnbackedAttribution,
 });
 
-/** Check all ten against one case's rendered strings. */
+/** Check all eleven against one case's rendered strings. */
 export function checkAll(
   context: HonestyContext,
   texts: readonly RenderedText[],

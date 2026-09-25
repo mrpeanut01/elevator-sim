@@ -44,7 +44,7 @@ import { describe, expect, it } from 'vitest';
 import { recordRun } from '../record/recordRun.js';
 
 import { caseAtRung } from './budgetRungs.js';
-import { affordabilityOf, emptyFixitState, repairsInDrawOrder, spendOf, toggleRepair } from './engine.js';
+import { affordabilityOf, emptyFixitState, spendOf, toggleRepair } from './engine.js';
 import { FIXIT_RUN_SWITCHES, fixitRunPlanOf, type FixitResources } from './run.js';
 import { fixitResourcesFromDisk, shippedFixitCases } from './resources.test-helper.js';
 import type { PriceSchedule } from '../pricing/types.js';
@@ -104,7 +104,7 @@ function subject(): Subject {
     if (diagnosed === undefined) continue;
     for (const step of steps) {
       const widened = caseAtRung(entry, steps, step.id);
-      for (const extra of repairsInDrawOrder(entry)) {
+      for (const extra of entry.repairs) {
         if (extra.id === diagnosed.id) continue;
         const cheap = [diagnosed.id];
         const dear = [diagnosed.id, extra.id];

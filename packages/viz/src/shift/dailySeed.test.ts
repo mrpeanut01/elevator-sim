@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { ELIGIBLE_FIRST_CONTRACT_IDS, firstSessionContractFor } from './firstSession.js';
+import { FIRST_DAY_CONTRACT_IDS, firstSessionContractFor } from './firstSession.js';
 import { dailyDateOf, dailySeedAt, dailySeedFor, isDailySeed } from './dailySeed.js';
 
 /** The server's own source, read rather than imported — `menu/client.test.ts`'s rule and reason. */
@@ -192,11 +192,17 @@ describe('the rotation rules `docs/37` § 4.3 states, measured rather than assum
   }
 
   it('does not satisfy *no tower twice in seven days*, and the figures are the docstring’s', () => {
+    /*
+     * **The set is the first-day set since § D1047** ([§ D1047](../../../../DECISIONS.md)), not the
+     * legible one, and this guard was re-pointed rather than re-numbered: it says which set the two
+     * figures are functions of, and a guard on the legible set's length would go on passing while
+     * the draw it describes indexed something else.
+     */
     expect(
-      ELIGIBLE_FIRST_CONTRACT_IDS.length,
-      'dailySeed.ts publishes 32.2 % and 47 measured over these fifteen contracts — re-measure ' +
-        'and move both figures if the legible set has changed',
-    ).toBe(15);
+      FIRST_DAY_CONTRACT_IDS,
+      'dailySeed.ts publishes its two figures measured over these six contracts — re-measure and ' +
+        'move both if the first-day set has changed',
+    ).toEqual(['c2', 'c3', 'c6', 'c7', 'c8', 'c10']);
 
     const draws = twoYearsOfDraws();
     const lastSeenAt = new Map<string, number>();
@@ -219,21 +225,32 @@ describe('the rotation rules `docs/37` § 4.3 states, measured rather than assum
      * to fourteen. A set that is three members wider collides less, so the rotation rule gets
      * closer to satisfied without anybody aiming at it — 42.2 % → **34.4 %** — and still fails it.
      */
-    expect(insideSeven).toBe(235);
     /*
      * **And again on 2026-09-24** — [§ D991](../../../../DECISIONS.md): the set went fourteen →
      * fifteen when the legibility table was re-measured on the day Today's scenario plays, and
-     * `c14` joined. 251 → **235** inside seven days and 50 → **47** consecutive, re-derived from the
-     * draw rather than scaled. The rule is still not satisfied.
+     * `c14` joined. 251 → 235 inside seven days and 50 → 47 consecutive, re-derived from the draw
+     * rather than scaled. The rule is still not satisfied.
+     *
+     * **And a third time, in the bad direction, on 2026-09-25** — [§ D1047](../../../../DECISIONS.md).
+     * The draw now indexes the six-member first-day set rather than the fifteen legible towers, so
+     * a tower repeats inside seven days on **483** of 730 dates (**66.2 %**, was 235 and 32.2 %) and
+     * on consecutive days **119** times (was 47). Re-derived from the draw on this line rather than
+     * scaled from fifteen to six, which would have given neither. `dailySeed.ts`'s reason the rule
+     * is not built — one draw per device, so no rotation has an observer — is unchanged by the
+     * set's size, and the figure is published so issue #159's generator inherits it as a measurement.
      */
-    expect(consecutive).toBe(47);
-    // 235 / 730 = 32.2 %, the figure `dailySeed.ts`'s docstring publishes.
-    expect(Math.round((1000 * insideSeven) / draws.length) / 10).toBe(32.2);
+    expect(insideSeven).toBe(483);
+    expect(consecutive).toBe(119);
+    // 483 / 730 = 66.2 %, the figure `dailySeed.ts`'s docstring publishes.
+    expect(Math.round((1000 * insideSeven) / draws.length) / 10).toBe(66.2);
   });
 
-  it('draws only from the legible set, whatever the date', () => {
+  it('draws only from the first-day set, whatever the date — and reaches every member', () => {
+    const seen = new Set<string>();
     for (const contractId of twoYearsOfDraws()) {
-      expect(ELIGIBLE_FIRST_CONTRACT_IDS).toContain(contractId);
+      expect(FIRST_DAY_CONTRACT_IDS).toContain(contractId);
+      seen.add(contractId);
     }
+    expect([...seen].sort()).toEqual([...FIRST_DAY_CONTRACT_IDS].sort());
   });
 });

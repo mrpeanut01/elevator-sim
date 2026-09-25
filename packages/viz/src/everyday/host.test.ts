@@ -28,6 +28,7 @@ import { RUSH_SEED, RUSH_TEMPLATE_ID, rushOutcomeOf, rushPatchOf } from './rush.
 import { REPLAY_COPY } from './replay.js';
 import { CAREER_CONTRACT_ID, RUSH_CONTRACT_ID, REPLAY_CONTRACT_ID, openWeek } from '../shift/week.js';
 import { CONTRACTS } from '../shift/contracts.js';
+import { pressDayFor } from '../shift/ladder.js';
 import type { CareerStore } from './careerStore.js';
 
 import { offerRefusalOf, openingCareer, towerById, type CampaignTower } from '../campaign/career.js';
@@ -51,7 +52,7 @@ import { recordRun } from '../record/recordRun.js';
 import { servedLeg, syntheticRecording } from '../live/synthetic.test-helper.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { GOAL_BARS } from '../shift/goals.js';
-import { nextDay } from '../shift/week.js';
+import { closeDay, nextDay, outcomeOf } from '../shift/week.js';
 import type { GoalReading } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 /* GitHub issue #245 — the predicate the façade carries the answer of, asked directly. */
@@ -560,6 +561,70 @@ describe('the run actions', () => {
     host.startRun();
     host.closeDay();
     expect(h.calls).toEqual(['startRun', 'closeDay']);
+  });
+
+  it('startRun clears a standing log before the press — a run it starts begins with no presses (§ D1002)', () => {
+    const withLog: ViewerState = {
+      ...base(),
+      recording: A_RECORDING,
+      interventions: [{ atS: 30, change: { kind: 'park-cars-lobby' } }],
+    };
+    const h = harnessOf(withLog);
+    createEverydayHost(h.bindings).startRun();
+    expect(h.calls).toEqual(['applyPatch', 'startRun']);
+    expect(h.patches[0]?.interventions).toEqual([]);
+  });
+
+  it('chooseTower takes the log with the week it moves — a press is stamped against one tower’s day (§ D1002)', () => {
+    const withLog: ViewerState = {
+      ...base(),
+      interventions: [{ atS: 30, change: { kind: 'park-cars-lobby' } }],
+    };
+    const other = CONTRACTS.find((contract) => contract.id !== withLog.week.contractId);
+    if (other === undefined) throw new Error('the shipped contracts hold more than one tower');
+    const h = harnessOf(withLog);
+    createEverydayHost(h.bindings).chooseTower(other.id);
+    const moved = h.patches.find((patch) => patch.week !== undefined);
+    expect(moved?.buildingId).toBe(other.buildingId);
+    expect(moved?.interventions).toEqual([]);
+  });
+
+  it('chooseTower after a boot that dealt a pinned first day puts the day’s crowd back — § D1047', () => {
+    /*
+     * A first session is dealt its pinned day by `dev/state.ts#withFirstSession`, not by
+     * `playPressDay`, so the host never captured the crowd to restore. The boot now hands it over as
+     * `initialPressDaySeedBase`; without it — the second host below — choosing an ordinary tower kept
+     * the pin's crowd, and the picker's *"puts your crowd back"* was false for every newcomer.
+     */
+    const pinnedSeed = BigInt(pressDayFor('c2')?.seedText ?? '0');
+    const daySeed = 20_260_925n;
+    const pinned: ViewerState = { ...base(), week: openWeek('c2'), buildingId: 'midtown-office', seed: pinnedSeed };
+    const other = CONTRACTS.find((contract) => contract.id !== 'c2');
+    if (other === undefined) throw new Error('the shipped contracts hold more than one tower');
+    const handed = harnessOf(pinned);
+    createEverydayHost({ ...handed.bindings, initialPressDaySeedBase: daySeed }).chooseTower(other.id);
+    expect(handed.patches.find((patch) => patch.seed !== undefined)?.seed).toBe(daySeed);
+    const bare = harnessOf(pinned);
+    createEverydayHost(bare.bindings).chooseTower(other.id);
+    expect(bare.patches.some((patch) => patch.seed !== undefined)).toBe(false);
+  });
+
+  it('openTomorrow advances from a today the week has banked when no sheet stands — a reload (§ D1004)', () => {
+    const banked = closeDay(base().week, outcomeOf({
+      day: base().week.day,
+      dayIdx: base().week.dayIdx,
+      eventId: 'ordinary',
+      arrived: 10,
+      carried: 10,
+      minutePct: 90,
+      readings: [],
+      record: null,
+      recordRefusal: null,
+    }));
+    const h = harnessOf({ ...base(), week: banked });
+    createEverydayHost(h.bindings).openTomorrow();
+    expect(h.calls).toEqual(['applyPatch', 'openRunTab', 'startRun']);
+    expect(h.patches[0]?.week?.day).toBe(banked.day + 1);
   });
 
   it('openTomorrow refuses while no closed day’s sheet is standing', () => {
@@ -1980,6 +2045,49 @@ describe('a rush sitting — GitHub issue #372', () => {
     expect(host.rush()?.rounds).toHaveLength(2);
   });
 
+  it('records a round on the run its presses asked for, not the one still playing — post-AH panel A.md 4', () => {
+    /*
+     * A press re-simulates the day from the start on a worker while the old recording keeps
+     * playing. A round switched at 0:00 and skipped to its end was recorded on the run **before**
+     * the switch, so the sitting's row read *held 27:20, into wave 10* under a sheet reading
+     * *25:38, wave 9*. The two recordings here are two dispatchers on the same stream, so their
+     * outcomes differ and the case can tell which one the round was taken on.
+     */
+    const other = resources.dispatcherProfiles.profiles.find((profile) => profile.id !== base().dispatcherId);
+    if (other === undefined) throw new Error('the shelf holds one dispatcher');
+    const state = { ...base(), dispatcherId: other.id };
+    const patch = rushPatchOf(resources, state);
+    if (patch === undefined) throw new Error(state.buildingId);
+    const landed = recordRun(shiftRunConfigOf(resources, { ...state, ...patch } as ViewerState).config, {
+      recordDecisions: false,
+    }).recording;
+
+    let pending = false;
+    const h = harnessOf(base());
+    const host = createEverydayHost({ ...h.bindings, runPending: () => pending });
+    host.startRush();
+    h.state = { ...h.state, recording: rush };
+    const staleHold = host.rush()?.holdAtS ?? 0;
+    /* The press: a re-run is in flight, and the stale recording plays on to its line. */
+    pending = true;
+    host.endRush(staleHold);
+    expect(host.rush()?.rounds, 'a round was recorded on a run its presses did not produce').toHaveLength(0);
+    expect(host.rushBest()).toBeUndefined();
+
+    /* The re-run lands. The first read after it records the round on it. */
+    h.state = { ...h.state, recording: landed };
+    pending = false;
+    const [round] = host.rush()?.rounds ?? [];
+    expect(round?.outcome).toEqual(rushOutcomeOf(landed, staleHold));
+    expect(rushOutcomeOf(landed, staleHold).heldS).not.toBe(rushOutcomeOf(rush, staleHold).heldS);
+    /* Recorded once: another read is not another round. */
+    expect(host.rush()?.rounds).toHaveLength(1);
+    /* And the front's kept figure is the same round's, surviving the sitting. */
+    host.leaveRush();
+    expect(host.rushBest()?.wave).toBe(round?.outcome.wave);
+    expect(host.rushBest()?.heldS).toBe(round?.outcome.heldS);
+  });
+
   /**
    * **The round records what drove it and what was changed** — GitHub issue **#565**, third defect,
    * § D859.
@@ -2457,6 +2565,38 @@ describe('GitHub issue #594 — the career parks the Scenario record and gives i
     host.playPressDay('c7');
     expect(host.campaignDay()).toBeUndefined();
     expect(h.state.week.contractId).not.toBe(CAREER_CONTRACT_ID);
+  });
+
+  it('runs the day after a pinned day on the crowd the session had, not the pin — first-day S3 § 4.3', () => {
+    /*
+     * `openTomorrowPatch` never touches `seed`, and only `chooseTower` restored the one
+     * `playPressDay` captured. So Tuesday ran on a seed measured on somebody else's Monday, which
+     * the seed line then called *a crowd of this run's own* with nothing the player chose behind it.
+     */
+    const h = harnessOf({ ...base(), week: openWeek('c1'), buildingId: 'garden-apartments' });
+    const host = createEverydayHost({
+      ...h.bindings,
+      applyPatch: (patch) => {
+        h.calls.push('applyPatch');
+        h.patches.push(patch);
+        h.state = { ...h.state, ...patch };
+      },
+    });
+    const before = h.state.seed;
+    expect(host.playPressDay('c2')).toBeUndefined();
+    const pinned = pressDayFor('c2');
+    if (pinned === undefined) throw new Error('c2 pins no day');
+    expect(h.state.seed).toBe(BigInt(pinned.seedText));
+    expect(before).not.toBe(BigInt(pinned.seedText));
+    /* The pinned day closes. */
+    h.state = { ...h.state, recording: A_RECORDING, report: A_REPORT };
+    host.openTomorrow();
+    expect(h.state.week.day).toBe(2);
+    expect(h.state.seed).toBe(before);
+    /* Spent: a second tomorrow does not restore it again over a crowd the player since chose. */
+    h.state = { ...h.state, seed: 424_242n, recording: A_RECORDING, report: A_REPORT };
+    host.openTomorrow();
+    expect(h.state.seed).toBe(424_242n);
   });
 
   it('is a no-op with no career day standing', () => {

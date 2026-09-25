@@ -870,6 +870,34 @@ export function measuredOf(
 }
 
 /**
+ * **One morning's reading, as the replication judge pairs it** — [§ D1020](../../../../DECISIONS.md).
+ *
+ * The three numbers `fixit/judge.ts#judgeReplication` needs from one run and nothing else, read by
+ * the same {@link readingsOf} the pair's {@link measuredOf} reads, so a morning and the letter's
+ * morning cannot be measured two ways. Small on purpose: the forty-nine mornings are simulated on a
+ * worker (`dev/morningWorker.ts`) and a recording is megabytes of legs, so what crosses the thread
+ * boundary is this and never the run.
+ *
+ * `complaint` is `null` only on a `mean-wait` case whose scope boarded nobody — a mean over no
+ * journeys, which the judge leaves out of its interval and counts as left out rather than reading
+ * as zero.
+ */
+export interface MorningReading {
+  readonly complaint: number | null;
+  readonly restAwayPct: number | null;
+  readonly restBoarded: number;
+}
+
+export function morningReadingOf(recording: VizRecording, measure: ComplaintMeasure): MorningReading {
+  const readings = readingsOf(recording, measure);
+  return {
+    complaint: complaintValueOf(readings, measure),
+    restAwayPct: readings.restAwayPct,
+    restBoarded: readings.restBoarded,
+  };
+}
+
+/**
  * Hold the pair's **claim** and its **legs** to each other — GitHub issue #350's fix-it site.
  *
  * The claim is the patch: a selection with no crowd-changing repair claims the same crowd on both

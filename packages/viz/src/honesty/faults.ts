@@ -459,6 +459,60 @@ export const oneRailSaysNothing: TextFault = (texts) => {
 };
 
 /**
+ * § D1011 — **the fix-it verdict printing the diagnosis's words over a run that is not the
+ * diagnosis's**, which is the defect verbatim (`rescore-ai` C's D1, D's N1).
+ *
+ * The smallest edit that produces it: a shipped case's composed verdict — the order arm, whose run
+ * the caller said was not the witness's — takes the **same case's** authored head and credits the
+ * diagnosed repair, while what the run carried is left as the adapter measured it. That is exactly
+ * what `classifyOutcome` did before § D1011 for every fixed outcome. The authored head is taken from
+ * the witness arm beside it rather than restated here, so the fault cannot go stale with the copy.
+ */
+export const authoredResultOnForeignRun: TextFault = (texts) => {
+  const orderHead = texts.find(
+    (text) => /^shipped\(.+\)\.order\.head$/u.test(text.field) && text.attribution !== undefined,
+  );
+  if (orderHead === undefined) return texts;
+  const witnessHead = texts.find((text) => text.field === orderHead.field.replace('.order.', '.witness.'));
+  if (witnessHead === undefined || orderHead.attribution === undefined) return texts;
+  const carried = orderHead.attribution.carried;
+  return replaceFirst(
+    texts,
+    (text) => text === orderHead,
+    (text) => ({ ...text, text: witnessHead.text, attribution: { credits: ['diagnosed-repair'], carried } }),
+  );
+};
+
+/**
+ * § D1011 again, pointed at the day report — **a press credited on a day whose record never held
+ * it**, the shape of `rescore-ai` B's D1: *"You parked the cars in the lobby"* on a day where the
+ * player pressed nothing, because a press made on another day had been carried into this one.
+ *
+ * The beat keeps its words and the press it names; the day's own record is emptied, which is the
+ * state that defect produced from the player's side. This fires whether or not that defect is
+ * fixed in the product: it is the property's own demonstration, on the product's own sentence.
+ */
+export const pressCreditedFromAnotherDay: TextFault = (texts) =>
+  replaceFirst(
+    texts,
+    (text) => text.attribution !== undefined && /\.diagnosis\(.+\)\.what$/u.test(text.field) && text.attribution.credits.length > 0,
+    (text) => ({ ...text, attribution: { credits: text.attribution?.credits ?? [], carried: [] } }),
+  );
+
+/**
+ * § D1011's **textual** half: the same press beat drawn by a surface that declares nothing behind
+ * it. The words are the product's own — *"You parked the cars in the lobby, …"* — and only the
+ * declaration is taken away, so what fires is the rule that a sentence crediting the player must
+ * say what it credits.
+ */
+export const pressClaimUndeclared: TextFault = (texts) =>
+  replaceFirst(
+    texts,
+    (text) => text.attribution !== undefined && /\.diagnosis\(.+\)\.what$/u.test(text.field),
+    (text) => ({ ...text, attribution: undefined }),
+  );
+
+/**
  * One fault per property, so the suite can iterate rather than list.
  *
  * Three of them carry a second, and in every case because the property has two halves a fault for
@@ -534,5 +588,15 @@ export const FAULTS: Readonly<
     'surfaces-disagree': [
       { name: 'railsDisagreeOnTodaysAsk', fault: railsDisagreeOnTodaysAsk },
       { name: 'oneRailSaysNothing', fault: oneRailSaysNothing },
+    ],
+    /*
+     * The sixth set, and three rather than two: the fix-it defect itself on the structural half,
+     * the day report's press leak on the structural half, and the same press beat with its
+     * declaration removed on the textual half. Each is the only fault for the thing it breaks.
+     */
+    'unbacked-attribution': [
+      { name: 'authoredResultOnForeignRun', fault: authoredResultOnForeignRun },
+      { name: 'pressCreditedFromAnotherDay', fault: pressCreditedFromAnotherDay },
+      { name: 'pressClaimUndeclared', fault: pressClaimUndeclared },
     ],
   });

@@ -75,16 +75,28 @@ const TODAY: TodayRecord = {
   asks: [],
   seedLine: 'tower chancery-house · crowd 424242 · today’s date, so everyone playing today meets this crowd',
   crowdIsToday: true,
+  crowdIsPinned: false,
   firstSessionLine: undefined,
+  dayLength: undefined,
   driver: 'Steady hand',
+  driverHeld: undefined,
 };
+
+/** Building names by id, as the shipped documents carry them — the fixture for `nameOf` (GitHub issue #599). */
+const NAMES: Readonly<Record<string, string>> = {
+  'garden-apartments': 'Garden Apartments',
+  'crown-hotel': 'Crown Hotel',
+  'chancery-house': 'Chancery House',
+  'midtown-office': 'Midtown Office',
+};
+const NAME_OF = (buildingId: string): string | undefined => NAMES[buildingId];
 
 const viewAt = (
   dayOffset: number,
   dayClosed: boolean,
   week: WeekState = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4)]),
 ): ReturnType<typeof doorScreenViewOf> =>
-  doorScreenViewOf({ week, today: { ...TODAY, day: week.day }, dayOffset, dayClosed });
+  doorScreenViewOf({ week, today: { ...TODAY, day: week.day }, dayOffset, dayClosed, nameOf: NAME_OF });
 
 describe('§ 16 rule 1 — an unfinished day shows the em dash', () => {
   it('withholds today’s score until the day is closed, and never draws a zero', () => {
@@ -131,9 +143,27 @@ describe('the seven chips are matched to the week by day number', () => {
     const week = weekWith(3, [closedDay(1, 'garden-apartments'), closedDay(2, 'crown-hotel')]);
     const byDay = new Map(viewAt(0, false, week).chips.map((chip) => [chip.day, chip]));
     // Not the building standing selected now — two different claims on a week that changed tower.
-    expect(byDay.get(1)?.tower).toBe('garden-apartments');
-    expect(byDay.get(2)?.tower).toBe('crown-hotel');
+    expect(byDay.get(1)?.tower).toBe('Garden Apartments');
+    expect(byDay.get(2)?.tower).toBe('Crown Hotel');
     expect(byDay.get(3)?.tower).toBe('Chancery House');
+  });
+
+  it('names a closed day and today the same way — GitHub issue #599', () => {
+    /*
+     * The closed chip printed `record.buildingId` and today's printed the document's name, so one
+     * strip named one tower two ways: *midtown-office* on Thursday, *Midtown Office* beside it.
+     * Today closed on the same tower as yesterday is the case, and the id may appear on neither.
+     */
+    const week = weekWith(4, [closedDay(3, 'midtown-office'), closedDay(4, 'midtown-office')]);
+    const today: TodayRecord = { ...TODAY, day: 4, towerName: 'Midtown Office' };
+    const chips = doorScreenViewOf({ week, today, dayOffset: 0, dayClosed: true, nameOf: NAME_OF }).chips;
+    const byDay = new Map(chips.map((chip) => [chip.day, chip]));
+    expect(byDay.get(3)?.tower).toBe('Midtown Office');
+    expect(byDay.get(4)?.tower).toBe('Midtown Office');
+    expect(chips.map((chip) => chip.tower)).not.toContain('midtown-office');
+    /* An id this build has no document for is printed as itself, `todayOf`'s own fallback. */
+    const unknown = weekWith(2, [closedDay(1, 'no-such-tower')]);
+    expect(viewAt(0, false, unknown).chips.find((chip) => chip.day === 1)?.tower).toBe('no-such-tower');
   });
 });
 
@@ -168,10 +198,36 @@ describe('the § 3.3 primary, and the replay a past day earns — § D517', () =
     expect(view.primary.note).toBe('Pick who drives, then run it.');
   });
 
-  it('says what a second run of a closed day does to the week, rather than nothing', () => {
+  it('opens tomorrow once today is closed, and keeps today’s second attempt beside it — § D1004', () => {
+    /*
+     * The post-AH panel's *no route to tomorrow from the front door*: a closed Monday left from its
+     * report came back here as *Set up today* over a disabled `›`, and the press re-ran Monday.
+     */
     const view = viewAt(0, true);
     expect(view.primary.inert).toBe(false);
-    expect(view.primary.note).toMatch(/another attempt/);
+    expect(view.primary.goes).toBe('tomorrow');
+    // Day 5 of this fixture is a Friday, so the doors open on Saturday.
+    expect(view.primary.label).toBe('Open the doors on Saturday');
+    expect(view.primary.note).toMatch(/closed and banked/);
+    // The retry is not taken off the door: it is drawn beside the primary and says what it does.
+    expect(view.primary.again?.label).toBe('Run today again');
+    expect(view.primary.again?.note).toMatch(/another attempt/iu);
+    expect(view.primary.again?.note).toMatch(/no presses carried over/);
+  });
+
+  it('reads a closed today off the week as well as off the sitting — a reload keeps the day, not the run', () => {
+    const banked = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4), closedDay(5)]);
+    const view = viewAt(0, false, banked);
+    expect(view.primary.goes).toBe('tomorrow');
+    // And an open today is still today, with no second button.
+    expect(viewAt(0, false).primary.goes).toBe('today');
+    expect(viewAt(0, false).primary.again).toBeUndefined();
+  });
+
+  it('never offers tomorrow from a past chip — the replay is the only thing a past day hands back', () => {
+    const view = viewAt(-2, true);
+    expect(view.primary.goes).toBe('replay');
+    expect(view.primary.again).toBeUndefined();
   });
 
   it('is pressable on a past day inside the week, names the day, and says it never counts', () => {
@@ -229,7 +285,13 @@ describe('the rest of § 6.1', () => {
      * the only thing on this screen that actually controls it.
      */
     const watch = DOOR_STEPS.find((step) => step.head === 'Watch the day');
-    expect(watch?.body).toContain('A whole working day');
+    /*
+     * And no length at all since the post-AH panel's H13: *a whole working day* was false on the
+     * two towers whose day is a slice, and *not steer it* on every day, beside three live presses.
+     */
+    expect(watch?.body).not.toMatch(/whole working day|not steer/u);
+    expect(watch?.body).toContain('park the cars');
+    expect(DOOR_STEPS.map((step) => step.body).join(' ')).not.toMatch(/only thing you choose/u);
     expect(watch?.body).not.toMatch(/couple of minutes|\bminutes?\b/);
     for (const step of DOOR_STEPS) expect(step.body).not.toMatch(/\d/);
   });
@@ -248,17 +310,42 @@ describe('the rest of § 6.1', () => {
      * The two arms are the two states that reach this screen: the day's crowd, and a crowd of the
      * run's own — a `?seed=` deep link, or a session left open past UTC midnight.
      */
-    const shared = sameForEveryoneLine(true);
-    const own = sameForEveryoneLine(false);
+    const shared = sameForEveryoneLine(true, false);
+    const own = sameForEveryoneLine(false, false);
     expect(shared).toContain('Everyone playing today meets the same crowd');
     expect(shared).toContain('today’s date');
     expect(own).toContain('nobody else is playing it');
     expect(own).not.toContain('Everyone');
-    // Neither arm says the tower is shared, because it is not — on either of them.
-    for (const line of [shared, own]) {
+    /*
+     * **The pinned arm — § D1047.** A pinned day's crowd is shared by everybody who opens that
+     * tower's pinned day, so *nobody else is playing it* was false of it; and the brief holds the
+     * standing order until the call is answered, so *the dispatcher is yours to bring* was too.
+     */
+    const pinned = sameForEveryoneLine(false, true);
+    expect(pinned).toContain('the crowd its day was measured on rather than the day’s');
+    expect(pinned).not.toContain('nobody else');
+    expect(pinned).not.toContain('yours to bring');
+    // No arm says the tower is shared, because it is not — on any of them.
+    for (const line of [shared, own, pinned]) {
       expect(line).toContain('The tower is the one your week is on');
       expect(line).not.toContain('the same tower');
     }
     expect(viewAt(0, false).sameForEveryone).toBe(shared);
+    expect(
+      doorScreenViewOf({
+        week: weekWith(1, []),
+        today: { ...TODAY, day: 1, crowdIsToday: false, crowdIsPinned: true },
+        dayOffset: 0,
+        dayClosed: false,
+        nameOf: NAME_OF,
+      }).sameForEveryone,
+    ).toBe(pinned);
+  });
+
+  it('names the pinned days as a crowd a player is on, not only one they choose — § D1047', () => {
+    /* A newcomer is dealt a pinned day without choosing it, so the rule's exception says *are on*. */
+    const rule = viewAt(0, false).rule;
+    expect(rule).toContain('unless you are on one of the days a press decides');
+    expect(rule).not.toContain('unless you choose');
   });
 });

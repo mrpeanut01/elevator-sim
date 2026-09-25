@@ -109,8 +109,12 @@ export function createPolicyFor(
   const aggregation = aggregationOf(profile, options);
   // Widened deliberately: the key is *data*, and a hand-built fixture or a JSON file can carry a
   // value the type system was told could not exist. A total `Record<Aggregation, …>` gives the
-  // compile-time completeness check; this gives the runtime one.
-  const factory: DispatchPolicyFactory | undefined = POLICY_FACTORIES[aggregation];
+  // compile-time completeness check; this gives the runtime one. Own keys only: on a plain object
+  // `constructor` or `toString` would resolve to an `Object.prototype` method and be called as a
+  // factory rather than refused.
+  const factory: DispatchPolicyFactory | undefined = Object.hasOwn(POLICY_FACTORIES, aggregation)
+    ? POLICY_FACTORIES[aggregation]
+    : undefined;
   if (factory === undefined) {
     throw new DispatchError(
       `Dispatcher "${profile.id}" declares auction.aggregation "${String(aggregation)}", which names no policy factory. Known aggregations: ${Object.keys(POLICY_FACTORIES).join(', ')}. An aggregation that silently fell back to the default would report a contract-net result produced by the centralized argmin.`,

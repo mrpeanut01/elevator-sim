@@ -72,7 +72,14 @@ describe('§ D529 clause 2 — one component, two entry points', () => {
      */
     for (const view of [tutorialWorkedAnswerOf(FACTS), rushTutorialWorkedAnswerOf(FACTS)]) {
       expect(view.boundary).toBe(WORKED_ANSWER_COPY.boundary);
-      expect(view.boundary).toContain('the only place the game answers for you');
+      /*
+       * The post-AH panel's H1: it said *the only place* on both of the two screens that draw it,
+       * and *no suggested fix* beside a repair menu. It names both places and claims no absence.
+       */
+      expect(view.boundary).toContain('the only one the game gives');
+      expect(view.boundary).toMatch(/tutorial/u);
+      expect(view.boundary).toMatch(/rush/u);
+      expect(view.boundary).not.toMatch(/only place|no suggested fix/u);
     }
   });
 });

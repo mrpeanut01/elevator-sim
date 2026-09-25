@@ -384,12 +384,21 @@ const weekWith = (day: number, history: readonly DayOutcome[]): WeekState => ({
   history,
 });
 
-const cardLineOf = (week: WeekState, dayClosed: boolean): string =>
-  railFooter({ screen: 'menu', ctx: 'daily' }, { week, dayClosed }).identity.streak;
+/** Building names by id, as the shipped documents carry them — the fixture for `nameOf` (GitHub issue #599). */
+const NAMES: Readonly<Record<string, string>> = {
+  'garden-apartments': 'Garden Apartments',
+  'crown-hotel': 'Crown Hotel',
+  'chancery-house': 'Chancery House',
+  'midtown-office': 'Midtown Office',
+};
+const NAME_OF = (buildingId: string): string | undefined => NAMES[buildingId];
+
+const cardLineOf = (week: WeekState, _dayClosed: boolean): string =>
+  railFooter({ screen: 'menu', ctx: 'daily' }, { week }).identity.streak;
 
 /** Your week's own line for the same week, drawn on the same frame — issue #214's other half. */
 const weekLineOf = (week: WeekState, dayClosed: boolean): string =>
-  weekScreenViewOf({ week, towerToday: 'Chancery House', dayClosed, sheetStanding: dayClosed })
+  weekScreenViewOf({ week, towerToday: 'Chancery House', nameOf: NAME_OF, dayClosed, sheetStanding: dayClosed })
     .streakLine;
 
 describe('the PLAYING AS card reports the week the host holds — issue #214', () => {
@@ -434,19 +443,19 @@ describe('the PLAYING AS card reports the week the host holds — issue #214', (
     expect(cardLineOf(week, false)).toBe('0 days running · best 31%');
   });
 
-  it('withholds today’s figure until the day is filed, and does so by default', () => {
+  it('publishes today’s figure once the week carries today, filed this sitting or not — § D1004', () => {
     /*
-     * § 16 rule 1, reached through the card: a restored week can hold today's outcome while the
-     * stage holds no filed run, and `dayClosed` — which *Close the day* alone sets — is the
-     * authority. The default is the withholding one, so a caller that hands over a week and
-     * forgets the flag under-reports rather than publishing a figure this sitting did not produce.
+     * This case used to assert the opposite: a restored week holding today's outcome withheld the
+     * figure until the sitting filed a run, on the ground that it was *a figure this sitting did not
+     * produce*. It is a figure the week produced — nothing but *Close the day* writes history — and
+     * the post-AH panel read the withholding as *not closed yet* about a day the report had banked.
+     * Your week reads the same history, so the two lines still agree; the case above holds that.
      */
     const week = weekWith(1, [dayOf(1, MET)]);
-    expect(cardLineOf(week, false)).toBe(`1 day running · best ${EM_DASH}`);
-    expect(cardLineOf(week, true)).toBe('1 day running · best 84%');
-    expect(railFooter({ screen: 'menu', ctx: 'daily' }, { week }).identity.streak).toBe(
-      cardLineOf(week, false),
-    );
+    expect(cardLineOf(week, false)).toBe('1 day running · best 84%');
+    expect(cardLineOf(week, true)).toBe(cardLineOf(week, false));
+    // A closed day outside the card's seven-day window still draws the em dash — the window's rule, unchanged.
+    expect(cardLineOf(weekWith(9, [dayOf(1, MET)]), false)).toBe(`1 day running · best ${EM_DASH}`);
   });
 
   it('keeps the honest absence reachable, with no career claimed and no figure invented', () => {
@@ -636,7 +645,6 @@ describe('the acknowledgement a finished turn gets', () => {
       {
         banked: { turn: 'scenario-cleared', answer: { kind: 'balance', chimes: 6 } },
         week: weekWith(3, [dayOf(1, MET), dayOf(2, MET)]),
-        dayClosed: true,
       },
     );
     expect(model.footer.identity.streak).toBe('2 days running \u00b7 best 84%');

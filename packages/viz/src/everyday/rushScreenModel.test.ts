@@ -241,15 +241,37 @@ describe('what the screen refuses, and where the refusal sits', () => {
     for (const absence of RUSH_ABSENCES) expect(absence).not.toMatch(/Engineer surface/);
   });
 
-  it('withholds the two facts no run in this build has produced, and computes the third', () => {
-    const [furthest, held, climb] = rushFactViews();
+  it('withholds the two facts before a round of this visit, and computes the third', () => {
+    const [furthest, held, climb] = rushFactViews(undefined);
     expect(furthest?.withheld).toBe(true);
     expect(furthest?.value).toBe(RUSH_SCREEN_COPY.noRun);
     expect(held?.withheld).toBe(true);
+    /*
+     * The post-AH panel's N7: this read *"no rush has run in this build"* a minute after one had.
+     * The refusal names the scope of what is kept rather than the build.
+     */
+    expect(furthest?.label).not.toMatch(/in this build/u);
+    expect(furthest?.label).toContain('this visit');
     // The climb is arithmetic rather than a measurement, so it is the one fact that is not `—`.
     expect(climb?.withheld).toBe(false);
     expect(climb?.value).toBe(`+${climbPerWavePct().toFixed(0)}%`);
     expect(climb?.value).toBe('+11%');
+  });
+
+  it('draws the furthest round of this visit once there is one — post-AH panel N7', () => {
+    const [furthest, held, climb] = rushFactViews({
+      wave: 12,
+      heldS: 2096,
+      held: '34:56',
+      driverName: 'Collective control',
+    });
+    expect(furthest?.value).toBe('wave 12');
+    expect(furthest?.withheld).toBe(false);
+    expect(furthest?.label).toContain('Collective control');
+    expect(furthest?.label).not.toMatch(/no round|no rush/u);
+    expect(held?.value).toBe('34:56');
+    expect(held?.withheld).toBe(false);
+    expect(climb?.value).toBe(`+${climbPerWavePct().toFixed(0)}%`);
   });
 
   it('names who would drive and when they start, and points the player at no other screen', () => {

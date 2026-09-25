@@ -149,3 +149,28 @@ export function assertSameCrowd(left: CrowdSource, right: CrowdSource, pair: str
       'Two runs that do not share a crowd may not be drawn on one scale or paired figure by figure.',
   );
 }
+
+/**
+ * **Whether two recordings are the same run, leg for leg** — [§ D1011](../../../../DECISIONS.md).
+ *
+ * A different question from {@link sameCrowd}, and the difference is the whole of it: `sameCrowd`
+ * deliberately reads nothing the dispatcher decided, and this reads exactly that — every leg's
+ * `(passengerId, boardedAt, alightedAt)`, in order, the identity `fixit/families.test.ts` and
+ * `fixit/cases.test.ts` each spelled privately as their `legsKey`. It is the fix-it verdict's test
+ * for *is this the diagnosed repair's run*: if every leg is identical, a sentence true of that run
+ * is exactly as true of this one, and if one leg differs it may not be.
+ *
+ * `false` for two empty recordings, on {@link sameCrowd}'s ground: a check that two runs in which
+ * nobody rode passes would certify a pair nobody ran.
+ */
+export function sameLegs(left: CrowdSource, right: CrowdSource): boolean {
+  if (left.legs.length === 0 && right.legs.length === 0) return false;
+  return legIdentityOf(left) === legIdentityOf(right);
+}
+
+/** The leg identity {@link sameLegs} compares, as one string. */
+function legIdentityOf(recording: CrowdSource): string {
+  return JSON.stringify(
+    recording.legs.map((leg) => [leg.passengerId, leg.boardedAt ?? null, leg.alightedAt ?? null]),
+  );
+}

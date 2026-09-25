@@ -68,6 +68,12 @@ export interface FixitFamiliesDeps {
   readonly palette: FixitFamiliesPalette;
   /** Class prefix, so each surface's browser tier addresses its own nodes. */
   readonly prefix: string;
+  /**
+   * The surface's own parking-strategy row, drawn at the head of the idle-parking group so the
+   * strategy sits beside the floor it summons — [§ D1020](../../../../DECISIONS.md)'s UX item. A
+   * playtest found the floor dial three hundred pixels below the select that makes it appear.
+   */
+  readonly parkingRow?: HTMLElement | undefined;
 }
 
 /** The three sections, and the line that says the order cannot run as drawn when it cannot. */
@@ -93,10 +99,20 @@ export function mountFixitFamilies(deps: FixitFamiliesDeps): HTMLElement {
 
   /* ---- the dials ---- */
   const dialsBlock = section(COPY.dialsEyebrow, COPY.dialsHint);
+  let parkingPlaced = false;
   for (const group of fixitDialGroupsView(inputs.dialGroups)) {
     const block = doc.createElement('div');
     block.className = `${prefix}-dial-group ${prefix}-dial-group-${group.key}`;
     block.append(header(group.header));
+    if (group.key === 'idle-parking' && deps.parkingRow !== undefined) {
+      block.append(deps.parkingRow);
+      parkingPlaced = true;
+    }
+    /*
+     * The cost-term weights fold under one heading — § D1020's UX item, identical on every case,
+     * so the fold says nothing about which dial is the answer. Everything else is drawn open.
+     */
+    let fold: HTMLDetailsElement | undefined;
     for (const dial of group.dials) {
       const row = line(`${prefix}-dial ${prefix}-dial-${dial.key.replace(/\./g, '-')}`);
       const select = selectOf(dial.options, dial.label, group.header.atBudget);
@@ -105,12 +121,34 @@ export function mountFixitFamilies(deps: FixitFamiliesDeps): HTMLElement {
       });
       const label = text('span', undefined, dial.label);
       label.style.cssText = 'font-size:13px;font-weight:600';
-      label.title = dial.effect;
       row.append(select, label);
-      block.append(row);
+      /* The dial's meaning, drawn — § D1020: it was a `title` alone, which touch never shows. */
+      const holder = doc.createElement('div');
+      holder.append(row);
+      if (dial.effect !== '') {
+        const meaning = text('div', `${prefix}-dial-meaning`, dial.effect);
+        meaning.style.cssText = `font-size:12px;line-height:1.45;color:${P.soft};margin:2px 0 0`;
+        holder.append(meaning);
+      }
+      if (dial.key.startsWith('weights.')) {
+        if (fold === undefined) {
+          fold = doc.createElement('details');
+          fold.className = `${prefix}-dial-fold`;
+          const summary = doc.createElement('summary');
+          summary.textContent = COPY.weightsFold;
+          summary.style.cssText = `font-size:12.5px;color:${P.soft};cursor:pointer;margin-top:6px`;
+          fold.append(summary);
+          block.append(fold);
+        }
+        fold.append(holder);
+      } else {
+        block.append(holder);
+      }
     }
     dialsBlock.append(block);
   }
+  /* A case whose dial groups draw no idle-parking group still draws its parking row, first. */
+  if (!parkingPlaced && deps.parkingRow !== undefined) dialsBlock.insertBefore(deps.parkingRow, dialsBlock.children[1] ?? null);
   root.append(dialsBlock);
 
   /* ---- the door hold ---- */

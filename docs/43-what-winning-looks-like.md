@@ -14,7 +14,7 @@ Every one of them is an engineering axis. Together they answer *is this thing so
 **Not one of them would notice a game that is correct, honest, fully reachable and boring.**
 
 That is the failure this project is actually exposed to. It has a discrete-event elevator simulator
-with a closed-form correctness oracle, ten honesty properties, a fuzz tier and a statistical
+with a closed-form correctness oracle, eleven honesty properties, a fuzz tier and a statistical
 discipline that refuses unearned claims. It has spent far more of its life on those than on whether
 anyone wants to play. Six research agents reading the tree independently converged on one diagnosis
 from six directions: the engine is years ahead of the game layer.

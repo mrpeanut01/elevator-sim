@@ -50,7 +50,7 @@ import {
 import { everydayProfileStore } from './profileStore.js';
 import { drawElevation } from './elevation.js';
 import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
-import { isDailySeed } from '../shift/dailySeed.js';
+import { dailySeedAt, isDailySeed } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
 import { todayOf, type TodayRecord } from './today.js';
 import {
@@ -92,12 +92,22 @@ function mountBrief(
     /* The reader's saved copies, by id — § D508's guard needs the shipped list without them. */
     const savedIds = new Set(data.savedDispatchers().map((entry) => entry.profile.id));
     const shipped = dispatchers.filter((profile) => !savedIds.has(profile.id));
+    const dayAhead = data.dayAhead();
     const today = todayOf({
       week: data.week(),
       calendar: data.calendarPeriod(),
-      building: data.resolvedBuilding(),
+      /*
+       * The run the press on this screen will produce, and its clock — § D1039. The strip prints the
+       * times a car is booked out, and they must be the stage's and the report's once it runs.
+       */
+      building: dayAhead.building,
+      dayStartS: dayAhead.startOfDayS,
+      templateVariesMix: dayAhead.templateVariesMix,
+      dayCars: dayAhead.dayCars,
       buildingId: selection.buildingId,
       dispatcherName: data.dispatcherById(selection.dispatcherId)?.name,
+      /* § D1029: the driver is held on a pinned day only while it is the standing order. */
+      dispatcherId: selection.dispatcherId,
       /* Any profile's name, for the moot-dispatcher sentence — § D914. */
       dispatcherNameOf: (id) => data.dispatcherById(id)?.name,
       /*
@@ -112,6 +122,8 @@ function mountBrief(
       /* § D729, § D730 — per draw, `doorScreen.ts#viewOf`'s reason, and the same question so the
          two screens cannot disagree about one run (§ 16 rule 14). */
       crowdIsToday: isDailySeed(data.seed(), deviceNowMs()),
+      /* The day's own crowd, for the first-session line's pinned arm — § D1047. */
+      daySeed: dailySeedAt(deviceNowMs()),
       firstSession: isFirstDayOnALegibleTower(data.week()),
       /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
       units: everydayProfileStore().units(),
@@ -209,6 +221,20 @@ function mountBrief(
         ].join(';');
         column.append(moot);
       }
+    }
+    /*
+     * **How long the day takes, and when the stage will stop** — [§ D1047](../../../../DECISIONS.md).
+     * Only on a pinned whole day as measured; the sentence is `firstDayLength.ts`'s, derived from a
+     * measured table and the stage's own rungs.
+     */
+    if (view.dayLength !== undefined) {
+      const length = el(doc, 'p', 'everyday-brief-day-length', view.dayLength);
+      length.style.cssText = [
+        'margin:7px 0 0',
+        'padding:0 2px',
+        `font-size:12px;line-height:1.45;color:${C.warmGrey}`,
+      ].join(';');
+      column.append(length);
     }
 
     const facts = el(doc, 'div', 'everyday-brief-facts');
@@ -352,7 +378,17 @@ function mountBrief(
       const meta = el(doc, 'span', 'everyday-brief-style-meta', option.meta);
       meta.style.cssText = MONO(10.5, option.selected ? C.terracotta : C.label);
       card.append(name, blurb, meta);
+      /* § D1029: held on a pinned day until the stage's call is answered — the reason is drawn below. */
+      card.disabled = view.drivers.held !== undefined;
+      /*
+       * **And the card says why to a reader, not only the sentence under it** — [§ D1047](../../../../DECISIONS.md).
+       * `screenReaderWalkthrough.browser.test.ts`'s `disabled-says-why` found three held cards with no
+       * description the first time a bare load landed on a pinned day, which since § D1047 is every
+       * fresh device's first brief: the select below was described and the cards beside it were not.
+       */
+      if (view.drivers.held !== undefined) card.setAttribute('aria-describedby', 'everyday-brief-driver-held');
       card.addEventListener('click', () => {
+        if (view.drivers.held !== undefined) return;
         context.host.setDispatcher(option.id);
       });
       cards.append(card);
@@ -383,13 +419,22 @@ function mountBrief(
       node.selected = option.selected;
       select.append(node);
     }
+    select.disabled = view.drivers.held !== undefined;
     select.addEventListener('change', () => {
+      if (view.drivers.held !== undefined) return;
       context.host.setDispatcher(select.value);
     });
     const count = el(doc, 'span', 'everyday-brief-count', view.drivers.count);
     count.style.cssText = MONO(11, C.label);
     pickerRow.append(pickerLabel, select, count);
     drivers.append(pickerRow);
+    if (view.drivers.held !== undefined) {
+      const held = el(doc, 'p', 'everyday-brief-driver-held', view.drivers.held);
+      held.style.cssText = `margin:9px 0 0;font-size:12px;line-height:1.45;color:${C.warmGrey}`;
+      select.setAttribute('aria-describedby', 'everyday-brief-driver-held');
+      held.id = 'everyday-brief-driver-held';
+      drivers.append(held);
+    }
     column.append(drivers);
 
     column.append(refusalCard(view.ghost, 'everyday-brief-ghost'));

@@ -139,6 +139,7 @@ function mountWeek(
     return weekScreenViewOf({
       week: data.week(),
       towerToday: data.resolvedBuilding()?.name ?? data.selection().buildingId,
+      nameOf: (buildingId) => data.buildingById(buildingId)?.name,
       dayClosed,
       sheetStanding: data.lastReport() !== undefined,
     });

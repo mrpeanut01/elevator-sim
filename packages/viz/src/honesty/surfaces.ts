@@ -82,8 +82,8 @@ import {
   fixitRezoneView,
   fixitTenancyView,
   fixitZoneRow,
-  fixitRepairStateLine,
   fixitSpendSummary,
+  fixitVerdictContextOf,
 } from '../everyday/fixitScreenModel.js';
 import {
   benchBudgetNoteOf,
@@ -216,7 +216,7 @@ import {
   stageSkipViewOf,
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
-import { todayOf } from '../everyday/today.js';
+import { todayOf, type TodayRecord } from '../everyday/today.js';
 import { RUSH_NOT_LANDED, RUSH_RESULT_EMPTY_LEDE, rushDisclosureOf, rushOutcomeOf, rushResultViewOf, rushStageHeaderOf, type RushOutcome } from '../everyday/rush.js';
 import { rushPostViewOf } from '../everyday/rushPost.js';
 import { RUSH_SITTING_COPY, rushSittingOf, type RushRoundRecord } from '../everyday/rushSitting.js';
@@ -242,6 +242,11 @@ import {
   tutorialWorkedAnswerOf,
 } from '../everyday/tutorialModel.js';
 import { stagePaceNoteOf, stagePaceOf } from '../everyday/stagePace.js';
+import { STAGE_CALL_COPY, stageCallCardOf } from '../everyday/stageCall.js';
+import type { PressCall } from '../shift/pressCall.js';
+import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
+import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
+import { PRESS_DAY_DRIVER_HELD } from '../everyday/today.js';
 import { actsOf } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
@@ -295,23 +300,36 @@ import {
   parkingPriceUnits,
   topFloorRaisePriceUnits,
   zonePriceUnits,
-  standingExtrasFrom,
   budgetNoteOf,
   classifyOutcome,
   emptyFixitState,
-  repairRowOf,
   spendOf,
   stepSpeed,
-  toggleExtra,
-  toggleRepair,
+  setDoorDwell,
+  setParkingStrategy,
+  stepZoneOverlap,
+  witnessStateOf,
+  verdictIsStale,
   type FixitMeasurement,
+  type FixitOutcome,
+  type FixitVerdictContext,
 } from '../fixit/engine.js';
+import { checkingOutcomeOf, FIXIT_MORNINGS, judgedOutcomeOf, judgeReplication } from '../fixit/judge.js';
+import { HELD_FIX_CASES, heldReasonOf } from '../fixit/held.js';
 import { demandDisclosureOf } from '../fixit/parse.js';
 import { switchUnpostableReasonOf } from '../scope/switchWire.js';
-import { figureValuesOf, measuredOf } from '../fixit/run.js';
-import type { FixitCase } from '../fixit/types.js';
-import { EVERY_CAR, KEYED_BANK } from '../fixit/types.js';
+import {
+  figureValuesOf,
+  fixitRunPlanOf,
+  measuredOf,
+  standingParkingOf,
+  type FixitResources,
+  type MorningReading,
+} from '../fixit/run.js';
+import type { FixitCase, FixitCases, FixitState } from '../fixit/types.js';
+import { EDITOR_PARKING_STRATEGIES, EVERY_CAR, KEYED_BANK } from '../fixit/types.js';
 import type { DialGroupInput, DoorInput, RezoneInput, RowPurchase } from '../fixit/editorInputs.js';
+import { editorInputsOf } from '../fixit/editorInputs.js';
 import {
   dialGroupsOf,
   dialOptionsOf,
@@ -577,18 +595,27 @@ import {
   LOADED_RUN_CANNOT_BANK,
   UNCHOSEN_RUN_CANNOT_BANK,
 } from '../shift/banking.js';
-import { baseDemandOf, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
+import { baseDemandOf, eventAsRun, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { everyWrinkle } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals, yesterdayLabelOf } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { AFTER_PRESS_ROW_ID } from '../shift/afterPress.js';
-import { pressCounterfactualOf } from '../shift/counterfactual.js';
+import { lastPressInRun, pressCounterfactualOf } from '../shift/counterfactual.js';
 import { scenarioHorizonFor } from '../shift/dayLength.js';
 import { CONTRACT_LADDER } from '../shift/ladder.js';
-import { FIRST_SESSION_LINE, FIRST_SESSION_LINE_CHOSEN } from '../shift/firstSession.js';
+import {
+  FIRST_DAY_CONTRACT_IDS,
+  FIRST_SESSION_LINE,
+  FIRST_SESSION_LINE_CHOSEN,
+  FIRST_SESSION_LINE_PINNED,
+  FIRST_SESSION_LINE_PINNED_BY_NUMBER,
+  firstSessionContractFor,
+} from '../shift/firstSession.js';
+import { PINNED_DAY_LENGTHS, pinnedDayLengthLineOf } from '../everyday/firstDayLength.js';
 import {
   averageWaitFigure,
+  clockOf,
   clockRange,
   dayReportOf,
   NOT_RECORDED,
@@ -673,6 +700,7 @@ import type {
   RenderedText,
   TextProvenance,
   TextRole,
+  TextAttribution,
   TextPlayhead,
   WithheldFigure,
 } from './types.js';
@@ -774,6 +802,23 @@ export interface HonestyContext {
    * on a slow boot.
    */
   readonly scenarioPath: readonly ScenarioLadderRung[];
+  /**
+   * **The shipped fix-it cases, and the resources their runs are planned against** — GitHub issue
+   * #570, [§ D1011](../../../../DECISIONS.md).
+   *
+   * The FIXIT adapter drove only its own synthetic `fixitSearchCase`, so every sentence in
+   * `data/fixit-cases.json` a player actually meets — above all the eighteen authored `result`
+   * narratives the fixed verdict prints — was rendered by nothing the search reads. That is how the
+   * verdict could print a diagnosis's mechanism over five runs it was not true of without the corpus
+   * noticing. The same object on every case, parsed once in the test helper for `survivors`' reason.
+   */
+  readonly shippedFixit: ShippedFixit;
+}
+
+/** `data/fixit-cases.json`, parsed, beside the resources `fixit/run.ts` plans its runs with. */
+export interface ShippedFixit {
+  readonly cases: FixitCases;
+  readonly resources: FixitResources;
 }
 
 /** Just enough of `SearchSpace` for the controls surfaces, so the type does not cross a barrel. */
@@ -890,6 +935,8 @@ interface TextSeed {
   readonly playhead?: TextPlayhead | undefined;
   /** That this cell stands where a figure the state withholds would be — see {@link WithheldFigure}. */
   readonly withheld?: WithheldFigure | undefined;
+  /** What the string credits and what the run carried — `types.ts#TextAttribution`, § D1011. */
+  readonly attribution?: TextAttribution | undefined;
 }
 
 /**
@@ -951,6 +998,7 @@ function singleRun(surfaceId: string, seeds: readonly TextSeed[]): readonly Rend
       gated: seed.gated,
       playhead: seed.playhead,
       withheld: seed.withheld,
+      attribution: seed.attribution,
     }));
 }
 
@@ -3024,6 +3072,37 @@ interface ShiftDay {
    * field is {@link report}'s by construction.
    */
   readonly pairedAgainstCandidate: WeekDayReport;
+  /**
+   * **The presses the day's own record holds**, by {@link pressIdOf} — [§ D1011](../../../../DECISIONS.md).
+   * What a sheet's *"You parked the cars in the lobby"* may credit: the after-press beat names the
+   * record's last press in the run's span, and `unbacked-attribution` holds the one to the other.
+   * Here it is the same list the sheet was handed, so the pair can only disagree when something
+   * credits a press from somewhere else — which is the leak `rescore-ai` B's D1 reproduced, where a
+   * press made on another day was credited on this one.
+   */
+  readonly pressRecord: readonly string[];
+  /** The press the after-press beat names, by the same id, or `undefined` on a day with none. */
+  readonly creditedPress: string | undefined;
+}
+
+/**
+ * The attribution a drawn diagnosis row carries — the after-press beat's, where the row **is** that
+ * beat (its `what` is the sheet's after-press `what`, which a view copies rather than rewords), and
+ * none on every other row, which credits nobody. § D1011.
+ */
+function pressBeatAttribution(
+  day: ShiftDay,
+  sheet: readonly { readonly id: string; readonly what: string }[],
+  what: string,
+): TextAttribution | undefined {
+  const beat = sheet.find((row) => row.id === AFTER_PRESS_ROW_ID);
+  if (beat === undefined || beat.what !== what) return undefined;
+  return { credits: day.creditedPress === undefined ? [] : [day.creditedPress], carried: day.pressRecord };
+}
+
+/** A press's identity: what it did and when. Two presses of one kind at one instant are one act. */
+function pressIdOf(press: RunInterventionConfig): string {
+  return `${press.change.kind}@${String(press.atS)}`;
 }
 
 interface ShiftBundle {
@@ -3338,6 +3417,10 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       otherPattern,
       otherEquipment,
       pairedAgainstCandidate,
+      pressRecord: interventions.map(pressIdOf),
+      creditedPress: ((last) => (last === undefined ? undefined : pressIdOf(last)))(
+        lastPressInRun(recording, interventions),
+      ),
     };
   });
 
@@ -3442,6 +3525,13 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * graded on another fold so the wording for two verdicts that differ is reached.
      */
     'shift/afterPress.ts#AFTER_PRESS_VERDICT_NOTE',
+    /*
+     * § D1029's call row and the report's *Take this call again* beside it. Seeded once per case
+     * below on the first admitted pin's own data, over a fixture call on this recording, on all
+     * three answers — the corpus runs no pinned day, so `dayReportOf` never draws it here.
+     */
+    'shift/callRow.ts#pressCallRowOf',
+    'shift/callRow.ts#PRESS_CALL_AGAIN',
     'shift/goals.ts#GOAL_PLAIN_NAMES',
     'shift/goals.ts#goalPlainNameOf',
     /*
@@ -3450,6 +3540,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * corpus; the brief's copy of the note is `today.ts#todayOf`'s, which the TODAY adapter drives.
      */
     'shift/bookedOut.ts#wrinkleNoteOf',
+    /* The window's name in words — the post-AH panel's L3; every window-naming sentence above reaches it. */
+    'shift/reportWindow.ts#reportWindowNameOf',
     'shift/bookedOut.ts#carsPhraseOf',
     'shift/goals.ts#goalsForDay',
     'shift/goals.ts#readGoal',
@@ -3468,6 +3560,9 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'wrinkles/draw.ts#composeWrinkle',
     'wrinkles/draw.ts#drawWrinkle',
     'shift/events.ts#shiftRunPatch',
+    /* § D1040's sentence for a wrinkle whose mix a day's template keeps — both callers seeded below. */
+    'shift/events.ts#eventAsRun',
+    'shift/events.ts#mixKeptSentenceOf',
     'shift/week.ts#closeDay',
     'shift/contracts.ts#CONTRACTS',
     'shift/contracts.ts#contractById',
@@ -3484,6 +3579,51 @@ const SHIFT_REPORT: SurfaceAdapter = {
     const { summary } = recording;
     const bundle = shiftBundleOf(context);
     const seeds: TextSeed[] = [];
+
+    /*
+     * ---- § D1029's call row, on its three answers ----
+     *
+     * The first admitted pin's own data — its window, tried count, holes and census — over a call
+     * on this recording's first car at a quarter of the run, so the clocks are this case's. What is
+     * swept is the wording and the pinned figures it quotes, which is the row's whole content.
+     */
+    {
+      const [pinId] = admittedPressDayIds();
+      const pin = pinId === undefined ? undefined : pressDayFor(pinId);
+      if (pin !== undefined) {
+        const span = recording.endedAt - recording.startedAt;
+        const call: PressCall = {
+          atS: recording.startedAt + span * 0.25,
+          rule: 'first-minute-wait',
+          carId: recording.shafts[0]?.carId ?? 'A',
+          awayAtS: recording.startedAt + span * 0.2,
+          backAtS: recording.startedAt + span * 0.5,
+          act: undefined,
+        };
+        const answers: readonly (readonly [string, readonly RunInterventionConfig[]])[] = [
+          ['none', []],
+          [pin.clearedBy, [{ atS: call.atS, change: { kind: pin.clearedBy } as RunInterventionConfig['change'] }]],
+          [pin.missedBy, [{ atS: call.atS, change: { kind: pin.missedBy } as RunInterventionConfig['change'] }]],
+        ];
+        for (const [answer, interventions] of answers) {
+          const row = pressCallRowOf(
+            {
+              press: pin,
+              call,
+              interventions,
+              nameOf: (id) => context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
+            },
+            (simTimeS) => clockOf(simTimeS, DAY_START_S),
+          );
+          if (row === undefined) continue;
+          seeds.push({ field: `callRow(${answer}).when`, text: row.when, role: 'label' });
+          seeds.push({ field: `callRow(${answer}).what`, text: row.what, role: 'observation' });
+          seeds.push({ field: `callRow(${answer}).why`, text: row.why, role: 'prose' });
+        }
+        seeds.push({ field: 'callRow.again.label', text: PRESS_CALL_AGAIN.label, role: 'label' });
+        seeds.push({ field: 'callRow.again.note', text: PRESS_CALL_AGAIN.note, role: 'prose' });
+      }
+    }
 
     /* ---- the sheet itself, on both days ---- */
     for (const entry of bundle.days) {
@@ -3596,8 +3736,16 @@ const SHIFT_REPORT: SurfaceAdapter = {
         });
       }
       for (const row of report.diagnosis) {
+        /*
+         * The after-press beat credits the player with the press it names (*"You parked the cars in
+         * the lobby, with 12 standing"*), so it declares that press and the day's record — § D1011.
+         */
+        const attribution: TextAttribution | undefined =
+          row.id === AFTER_PRESS_ROW_ID
+            ? { credits: entry.creditedPress === undefined ? [] : [entry.creditedPress], carried: entry.pressRecord }
+            : undefined;
         seeds.push({ field: `${at}.diagnosis(${row.id}).when`, text: row.when, role: 'label' });
-        seeds.push({ field: `${at}.diagnosis(${row.id}).what`, text: row.what, role: 'observation' });
+        seeds.push({ field: `${at}.diagnosis(${row.id}).what`, text: row.what, role: 'observation', attribution });
         seeds.push({ field: `${at}.diagnosis(${row.id}).why`, text: row.why, role: 'prose' });
       }
       /*
@@ -3891,6 +4039,14 @@ const SHIFT_REPORT: SurfaceAdapter = {
     for (const event of Object.values(SHIFT_EVENTS)) {
       seeds.push({ field: `SHIFT_EVENTS.${event.id}.name`, text: event.name, role: 'label' });
       seeds.push({ field: `SHIFT_EVENTS.${event.id}.note`, text: event.note, role: 'prose' });
+      /*
+       * The note as a day whose template keeps its own mix quotes it — § D1040. A different sentence
+       * only for a wrinkle that asks for a mix; the brief and the report header draw it there.
+       */
+      const asRun = eventAsRun(event, true);
+      if (asRun.note !== event.note) {
+        seeds.push({ field: `SHIFT_EVENTS.${event.id}.note.mixKept`, text: asRun.note, role: 'prose' });
+      }
       if (trafficProfile === undefined) continue;
       /*
        * Both values of `templateVariesMix`, because the refusal only exists under the second: a
@@ -4768,6 +4924,7 @@ const REPORT_PANEL: SurfaceAdapter = {
           field: `${at}.diagnosis[${String(index)}]`,
           text: `${row.when} — ${row.what}`,
           role: 'observation',
+          attribution: pressBeatAttribution(entry, shaped.diagnosis, row.what),
         });
         seeds.push({ field: `${at}.diagnosis[${String(index)}].why`, text: row.why, role: 'prose' });
       }
@@ -4862,6 +5019,7 @@ const REPORT_PANEL: SurfaceAdapter = {
           field: `${at}.diagnosisRowsOf[${String(index)}].what`,
           text: row.what,
           role: 'observation',
+          attribution: pressBeatAttribution(entry, entry.report.diagnosis, row.what),
         });
       }
       }
@@ -7056,10 +7214,32 @@ const REPORT_CARD: SurfaceAdapter = {
 /** The declarations the FIXIT adapter drives. A list, so `derive.test.ts` can hold it both ways. */
 const FIXIT_COVERS: readonly string[] = [
   'fixit/engine.ts#classifyOutcome',
+  /*
+   * § D1011's composed fixed verdict and the order lines it carries, reached through
+   * `classifyOutcome` on every shipped case's non-witness order (`shippedFixitSeedsOf`).
+   */
+  'fixit/engine.ts#FIXED_BY_ORDER_HEAD',
+  'fixit/engine.ts#FIXED_BY_ORDER_CHANGES_LEAD',
+  'fixit/engine.ts#FIXED_BY_ORDER_BOUGHT_LEAD',
+  'fixit/engine.ts#FIXED_BY_ORDER_CLOSE',
+  'everyday/fixitScreenModel.ts#fixitOrderLinesOf',
+  'everyday/fixitScreenModel.ts#fixitVerdictContextOf',
+  'fixit/engine.ts#rowsBoughtOf',
   'fixit/engine.ts#budgetNoteOf',
-  'fixit/engine.ts#repairRowOf',
-  'fixit/engine.ts#standingExtrasFrom',
   'fixit/engine.ts#BASIS_LINE',
+  /*
+   * [§ D1020](../../../../DECISIONS.md)'s judge: the checking state, the fifty-morning verdict in
+   * both forms, `cleared-once` on both grounds, the replicated basis in both forms, and the held
+   * register's reasons with the rail row that draws them. `repairRowOf` and `standingExtrasFrom`
+   * left this list on the same commit, because the menu that drew them retired.
+   */
+  'fixit/judge.ts#checkingOutcomeOf',
+  'fixit/judge.ts#judgedOutcomeOf',
+  'fixit/judge.ts#replicationRowOf',
+  'fixit/judge.ts#JUDGE_COPY',
+  'fixit/judge.ts#REPLICATED_BASIS_LINE',
+  'fixit/judge.ts#REPLICATED_DEMAND_BASIS_LINE',
+  'fixit/held.ts#HELD_FIX_CASES',
   /*
    * GitHub issue #350's second basis line and the choice between the two: the outcome's `basis`
    * is `DEMAND_BASIS_LINE` on a selection that changes the crowd, and the adapter renders that
@@ -7075,12 +7255,9 @@ const FIXIT_COVERS: readonly string[] = [
    * that is only ever swept on one side is half a surface.
    */
   'fixit/parse.ts#demandDisclosureOf',
-  // Driven through the rows above: `repairRowOf` asks `affordabilityOf`, which sums `spendOf`,
-  // and the states the adapter renders are built by the two toggles rather than written by hand.
+  // The states the adapter renders are built by the editor's own reducers rather than written by
+  // hand; `spendOf` sums them.
   'fixit/engine.ts#spendOf',
-  'fixit/engine.ts#affordabilityOf',
-  'fixit/engine.ts#toggleRepair',
-  'fixit/engine.ts#toggleExtra',
   'fixit/run.ts#figureValuesOf',
   /*
    * The Everyday screen's pure half (GAMEPLAY § 10, `everyday/fixitScreen.ts` is the DOM half and
@@ -7101,7 +7278,6 @@ const FIXIT_COVERS: readonly string[] = [
   'everyday/fixitScreenModel.ts#fixitBudgetRungRow',
   'everyday/fixitScreenModel.ts#fixitElevationRow',
   'everyday/fixitScreenModel.ts#fixitSpendSummary',
-  'everyday/fixitScreenModel.ts#fixitRepairStateLine',
   /* § D1000's five families — the dials, the door hold and the banks, and the words under them. */
   'everyday/fixitScreenModel.ts#fixitDialGroupsView',
   'everyday/fixitScreenModel.ts#fixitDoorView',
@@ -7126,7 +7302,7 @@ function fixitSearchCase(context: HonestyContext): FixitCase {
     dispatcherProfileId: context.case.baselineProfileId,
     run: { seed: '1', durationS: context.case.durationS, arrivalRatePctPop5min: null },
     asBuilt: {
-      note: 'The fault is in how it is configured, not in what it is made of.',
+      note: 'Four cars in one bank, set up the way the building was commissioned.',
       patch: {},
     },
     complaint: {
@@ -7164,17 +7340,95 @@ function fixitSearchCase(context: HonestyContext): FixitCase {
   };
 }
 
+
 /**
- * The dearest repair a case offers — the one the refused arm below needs, asked for by the property
- * it needs rather than by an index (GitHub issue **#566**).
+ * **What a fix-it outcome credits, and what the run behind it carried** — [§ D1011](../../../../DECISIONS.md).
  *
- * Stable on a tie: the first of equal prices, which is what {@link fixitSearchCase} produces, since
- * its four repairs share one patch and therefore one price.
+ * The credit is the engine's own declaration (`FixitOutcome.attribution`): `diagnosed-repair` when it
+ * printed the case's authored words, `order` otherwise. What the run carried is the verdict context
+ * the caller handed the engine — `diagnosed-repair` only when `witnessRun` said the run is the
+ * diagnosed repair's, which both surfaces decide on the legs. The two come from different places on
+ * purpose: an engine that printed the diagnosis's words over a run the caller had said was not the
+ * witness's is the defect, and it is caught here as a credit with nothing carried behind it.
  */
-function dearestRepairOf(entry: FixitCase): FixitCase['repairs'][number] {
-  return entry.repairs.reduce((dearest, repair) =>
-    repair.costUnits > dearest.costUnits ? repair : dearest,
-  );
+function fixitOutcomeAttribution(outcome: FixitOutcome, verdict: FixitVerdictContext | undefined): TextAttribution {
+  return {
+    credits: [outcome.attribution === 'diagnosis' ? 'diagnosed-repair' : 'order'],
+    carried: verdict?.witnessRun === true ? ['diagnosed-repair', 'order'] : ['order'],
+  };
+}
+
+/** A measurement that clears both bars, so both fixed arms can be worded. Nothing reads its figures. */
+const FIXED_PAIR: FixitMeasurement = Object.freeze({
+  complaintBefore: 10,
+  complaintAfter: 1,
+  scopeBoardedBefore: 40,
+  scopeBoardedAfter: 40,
+  complaintGonePct: 90,
+  restAwayBeforePct: 95,
+  restAwayAfterPct: 95,
+  restBoardedBefore: 120,
+  restBoardedAfter: 120,
+  restDeltaPoints: 0,
+  sameCrowd: true,
+});
+
+const shippedFixitSeeds = new WeakMap<ShippedFixit, readonly TextSeed[]>();
+
+/**
+ * **Every shipped case's fixed verdict, in both arms** — GitHub issue #570, [§ D1011](../../../../DECISIONS.md).
+ *
+ * For each case in `data/fixit-cases.json`:
+ *
+ * - **the witness's order** — the diagnosed repair alone, which is leg for leg its own run by
+ *   construction — worded with `witnessRun: true`, so the case's **authored** head and body enter
+ *   the corpus for the first time;
+ * - **an order that is not the witness's** — a parking strategy the case does not already run and a
+ *   door hold on every car, each pressed through the engine's own reducer and worded through
+ *   `everyday/fixitScreenModel.ts#fixitVerdictContextOf` exactly as both surfaces word it — so the
+ *   composed verdict's changes and rows are the product's own words for a real order on that case.
+ *
+ * **Worded against {@link FIXED_PAIR} rather than a run, and that is deliberate.** Whether an order
+ * clears is the judge's business and differs by case; the question here is what each arm *says*,
+ * and a fabricated passing pair is how this adapter already reaches its other three arms. The leg
+ * decision itself — that the pressed answer is the witness's run and the reproduced routes are not —
+ * is held on real runs in `fixit/families.test.ts` and `fixit/verdictNamesTheOrder.test.ts`.
+ *
+ * The same strings on every honesty case, so they are built once per loaded file and reused.
+ */
+function shippedFixitSeedsOf(shipped: ShippedFixit): readonly TextSeed[] {
+  const cached = shippedFixitSeeds.get(shipped);
+  if (cached !== undefined) return cached;
+  const schedule = shipped.cases.schedule;
+  const seeds: TextSeed[] = [];
+  for (const entry of shipped.cases.cases) {
+    const witness = witnessStateOf(entry);
+    /* The select withholds the strategy the case already runs, so the order never presses it. */
+    const standing = standingParkingOf(fixitRunPlanOf(entry, emptyFixitState(), shipped.resources).asBuilt);
+    const other = EDITOR_PARKING_STRATEGIES.find((strategy) => strategy !== standing);
+    let order: FixitState = emptyFixitState();
+    if (other !== undefined) order = setParkingStrategy(entry, order, other, schedule);
+    order = setDoorDwell(entry, order, EVERY_CAR, 'hall', 5, schedule);
+    for (const [arm, state, witnessRun] of [
+      ['witness', witness, true],
+      ['order', order, false],
+    ] as const) {
+      const verdict = fixitVerdictContextOf({
+        entry,
+        state,
+        inputs: editorInputsOf(entry, state, shipped.resources, schedule),
+        schedule,
+        witnessRun,
+      });
+      const outcome = classifyOutcome(entry, FIXED_PAIR, spendOf(entry, state, schedule), verdict);
+      const attribution = fixitOutcomeAttribution(outcome, verdict);
+      const at = `shipped(${entry.id}).${arm}`;
+      seeds.push({ field: `${at}.head`, text: outcome.head, role: 'label', provenance: 'authored', attribution });
+      seeds.push({ field: `${at}.body`, text: outcome.body, role: 'prose', provenance: 'authored', attribution });
+    }
+  }
+  shippedFixitSeeds.set(shipped, seeds);
+  return seeds;
 }
 
 const FIXIT: SurfaceAdapter = {
@@ -7186,11 +7440,11 @@ const FIXIT: SurfaceAdapter = {
     const schedule = shippedPriceSchedule();
     const entry = fixitSearchCase(context);
 
-    /* ---- the standing extras: every name and every line, authored in the engine ---- */
-    for (const extra of standingExtrasFrom(schedule)) {
-      seeds.push({ field: `extra.${extra.id}.name`, text: extra.name, role: 'label', provenance: 'authored' });
-      seeds.push({ field: `extra.${extra.id}.line`, text: extra.line, role: 'prose', provenance: 'authored' });
-    }
+    /*
+     * The standing extras and the repair rows are no longer seeded: the menu that drew them retired
+     * on [§ D1020](../../../../DECISIONS.md)'s commit, and a string no surface draws is not a
+     * surface's string.
+     */
 
     /* ---- the four figures, measured on the case's own run, both measure kinds ---- */
     for (const figure of figureValuesOf(entry, context.recording)) {
@@ -7212,18 +7466,11 @@ const FIXIT: SurfaceAdapter = {
       }
     }
 
-    /* ---- affordability and the budget notes, on states the reducers themselves build ---- */
+    /* ---- the budget notes, on states the editor's own reducers build ---- */
     const empty = emptyFixitState();
-    let spent = toggleRepair(entry, empty, 's-costly', schedule);
-    spent = toggleExtra(entry, spent, 'tenant-notices', schedule);
+    /* A setting that costs: a rezone, priced once — the no-machinery-not-free arm. */
+    const spent = stepZoneOverlap(entry, empty, 1, 2, schedule);
     for (const state of [empty, spent]) {
-      for (const repair of entry.repairs) {
-        const row = repairRowOf(entry, state, repair, schedule);
-        seeds.push({ field: `repair.${repair.id}.price`, text: row.priceLine, role: 'label' });
-        if (row.refusal !== undefined) {
-          seeds.push({ field: `repair.${repair.id}.refusal`, text: row.refusal, role: 'reason' });
-        }
-      }
       seeds.push({
         field: 'budget.note',
         text: budgetNoteOf(entry, spendOf(entry, state, schedule)),
@@ -7247,8 +7494,10 @@ const FIXIT: SurfaceAdapter = {
     ] as const) {
       const measurement = measuredOf(subject, context.comparisonRecording, context.recording);
       const outcome = classifyOutcome(subject, measurement, spendOf(subject, empty, schedule));
-      seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored' });
-      seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored' });
+      /* No verdict context: the engine cannot know this pair is the witness's, so it says so (§ D1011). */
+      const attribution = fixitOutcomeAttribution(outcome, undefined);
+      seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored', attribution });
+      seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored', attribution });
       seeds.push({ field: `outcome.${name}.basis`, text: outcome.basis, role: 'reason', provenance: 'authored' });
       for (const [index, row] of outcome.rows.entries()) {
         const isMeanRow = name === 'mean-wait' && index === 0;
@@ -7305,9 +7554,97 @@ const FIXIT: SurfaceAdapter = {
       ['short', short],
       ['over', over],
     ] as const) {
-      seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored' });
-      seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored' });
+      const attribution = fixitOutcomeAttribution(outcome, undefined);
+      seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored', attribution });
+      seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored', attribution });
     }
+
+    /*
+     * **The shipped cases' verdicts, in both arms** — GitHub issue #570, [§ D1011](../../../../DECISIONS.md).
+     * Every case in `data/fixit-cases.json`, its authored result on the witness's own order and the
+     * composed verdict on an order that is not, each declaring what it credits and what the run
+     * carried. See {@link shippedFixitSeedsOf} for why the pair is worded against a fabricated
+     * measurement and where the leg decision itself is held.
+     */
+    seeds.push(...shippedFixitSeedsOf(context.shippedFixit));
+    /*
+     * The stale note — § D1011, assessor C's D6. Drawn over a verdict whose order the player has
+     * since edited, so it credits the player with an edit, and the state it is drawn in carries one.
+     */
+    const measuredOn = emptyFixitState();
+    const onScreen = setParkingStrategy(entry, measuredOn, 'lobby', schedule);
+    if (verdictIsStale(measuredOn, onScreen)) {
+      seeds.push({
+        field: 'outcome.stale',
+        text: FIXIT_SCREEN_COPY.verdictStale,
+        role: 'reason',
+        provenance: 'authored',
+        attribution: { credits: ['edit-after-verdict'], carried: ['edit-after-verdict'] },
+      });
+    }
+
+    /*
+     * ---- the judge's arms — [§ D1020](../../../../DECISIONS.md) ----
+     *
+     * A gate that cleared, then the fifty mornings three ways: held, not held on the complaint, and
+     * not held on the rest. Each over both measure kinds, and the held arm over both crowds, so the
+     * fourth row's two unit forms and the replicated basis's two forms are all read. The mornings
+     * are fabricated readings, on this adapter's standing habit for arms a green pair cannot
+     * produce: the judge is arithmetic over readings, and what is under test is its words.
+     */
+    const clearing = (sameCrowd: boolean): FixitMeasurement => ({
+      ...flatSameCrowd(),
+      restAwayAfterPct: 95,
+      restDeltaPoints: 0,
+      sameCrowd,
+    });
+    const checkingOutcome = checkingOutcomeOf(classifyOutcome(entry, clearing(true), spendOf(entry, empty, schedule)));
+    seeds.push({ field: 'outcome.checking.head', text: checkingOutcome.head, role: 'label', provenance: 'authored' });
+    seeds.push({ field: 'outcome.checking.body', text: checkingOutcome.body, role: 'prose', provenance: 'authored' });
+    const mornings = (complaint: (i: number) => number, rest: (i: number) => number): MorningReading[] =>
+      Array.from({ length: FIXIT_MORNINGS }, (_, i) => ({ complaint: complaint(i), restAwayPct: rest(i), restBoarded: 120 }));
+    const asBuiltMornings = mornings((i) => 6 + (i % 3), () => 95);
+    for (const [judgedName, afterMornings] of [
+      ['held', mornings((i) => i % 2, () => 95)],
+      ['no-change', mornings((i) => 6 + ((i + 1) % 3), () => 95)],
+      ['rest-worse', mornings((i) => i % 2, (i) => 89 - (i % 2))],
+    ] as const) {
+      const replication = judgeReplication(asBuiltMornings, afterMornings);
+      for (const [name, subject] of [
+        ['long-waits', entry],
+        ['mean-wait', meanEntry],
+      ] as const) {
+        const judged = judgedOutcomeOf(
+          subject,
+          classifyOutcome(subject, clearing(true), spendOf(subject, empty, schedule)),
+          replication,
+        );
+        const where = `outcome.judged.${judgedName}.${name}`;
+        seeds.push({ field: `${where}.head`, text: judged.head, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `${where}.body`, text: judged.body, role: 'prose' });
+        seeds.push({ field: `${where}.basis`, text: judged.basis, role: 'reason', provenance: 'authored' });
+        const row = judged.rows[3];
+        if (row !== undefined) {
+          seeds.push({
+            field: `${where}.row[3]`,
+            text: `${row.label}: ${row.before} → ${row.after} · ${row.verdict}`,
+            role: 'observation',
+            declaredCount: replication.reduction.n,
+            countShown: true,
+          });
+        }
+      }
+    }
+    seeds.push({
+      field: 'outcome.judged.demand.basis',
+      text: judgedOutcomeOf(
+        entry,
+        classifyOutcome(entry, clearing(false), spendOf(entry, empty, schedule)),
+        judgeReplication(asBuiltMornings, mornings((i) => i % 2, () => 95)),
+      ).basis,
+      role: 'reason',
+      provenance: 'authored',
+    });
 
     /* ================================================================== *
      * The Everyday screen's own words — GAMEPLAY § 10's screen chrome.
@@ -7390,13 +7727,25 @@ const FIXIT: SurfaceAdapter = {
       });
     }
 
-    /* ---- the case rail: both tags, and the derived {fixed}/{total} on both sides of solved ---- */
-    for (const [where, solvedIds] of [
-      ['none-solved', new Set<string>()],
-      ['one-solved', new Set([entry.id])],
+    /*
+     * ---- the case rail: all three tags, and the derived {fixed}/{total} on both sides of solved ----
+     *
+     * The `held` arm draws every reason `fixit/held.ts` registers, beside a case the player can open,
+     * so the count's denominator — the cases offered — is read beside rows it leaves out
+     * ([§ D1020](../../../../DECISIONS.md)).
+     */
+    const heldCases: FixitCase[] = Object.keys(HELD_FIX_CASES).map((id) => ({ ...entry, id, name: `The held tower (${id})` }));
+    for (const [where, solvedIds, railCases] of [
+      ['none-solved', new Set<string>(), [entry]],
+      ['one-solved', new Set([entry.id]), [entry]],
+      ['held', new Set<string>(), [entry, ...heldCases]],
     ] as const) {
-      const rail = fixitCaseRailModel([entry], solvedIds, entry.id, () =>
-        buildingLineOf(context.buildingName, context.recording.floors.length),
+      const rail = fixitCaseRailModel(
+        railCases,
+        solvedIds,
+        entry.id,
+        () => buildingLineOf(context.buildingName, context.recording.floors.length),
+        heldReasonOf,
       );
       seeds.push({ field: `rail.${where}.heading`, text: rail.heading, role: 'label', provenance: 'authored' });
       seeds.push({ field: `rail.${where}.hint`, text: rail.hint, role: 'prose', provenance: 'authored' });
@@ -7409,12 +7758,15 @@ const FIXIT: SurfaceAdapter = {
         field: `rail.${where}.count`,
         text: rail.count,
         role: 'observation',
-        declaredCount: rail.rows.length,
+        declaredCount: rail.rows.filter((row) => row.heldReason === undefined).length,
         countShown: true,
       });
       for (const row of rail.rows) {
         seeds.push({ field: `rail.${where}.tag`, text: row.tag, role: 'label', provenance: 'authored' });
         seeds.push({ field: `rail.${where}.tower`, text: row.towerLine, role: 'observation' });
+        if (row.heldReason !== undefined) {
+          seeds.push({ field: `rail.${where}.held(${row.id})`, text: row.heldReason, role: 'reason', provenance: 'authored' });
+        }
       }
     }
 
@@ -7425,10 +7777,15 @@ const FIXIT: SurfaceAdapter = {
       ['ready', { ready: true, running: false, ran: false, solved: false }],
       ['ran', { ready: true, running: false, ran: true, solved: false }],
       ['running', { ready: true, running: true, ran: false, solved: false }],
+      /* § D1020: the letter's morning cleared and the other forty-nine are running. */
+      ['checking', { ready: true, running: true, ran: true, solved: false, checking: true }],
       ['solved', { ready: true, running: false, ran: true, solved: true }],
     ] as const) {
       const row = fixitBarModel(barBase, view);
       seeds.push({ field: `bar.${where}.primary`, text: row.primary.label, role: 'label', provenance: 'authored' });
+      if (where === 'checking' && row.primary.inert !== undefined) {
+        seeds.push({ field: `bar.${where}.inert`, text: row.primary.inert, role: 'reason', provenance: 'authored' });
+      }
       if (row.note !== undefined) {
         seeds.push({ field: `bar.${where}.note`, text: row.note, role: 'prose', provenance: 'authored' });
       }
@@ -7558,6 +7915,8 @@ const FIXIT: SurfaceAdapter = {
         'rezoneFloorsLabel',
         'tenancyEyebrow',
         'planRefused',
+        /* § D1020: the fold over the cost-term weights, drawn only by the same mount. */
+        'weightsFold',
       ] as const) {
         seeds.push({
           field: `families.${key}`,
@@ -7616,6 +7975,18 @@ const FIXIT: SurfaceAdapter = {
         ],
         hallOptions: doorDwellOptionsOf('hall'),
         carOptions: doorDwellOptionsOf('car'),
+        /*
+         * § D1020's *as it stands* figure, from the building's own cars — each car's hold, and the
+         * every-car arm's only where they agree, so both forms of the standing option are read.
+         */
+        standing: (() => {
+          const cars = context.building.banks.flatMap((bank) => bank.cars);
+          const out: Record<string, { hall: number | undefined; car: number | undefined }> = {
+            [EVERY_CAR]: { hall: undefined, car: cars[0]?.dwellCarCallS },
+          };
+          for (const car of cars) out[car.id] = { hall: car.dwellHallCallS, car: car.dwellCarCallS };
+          return out;
+        })(),
       };
       const firstCar = fabric.cars[0]?.id;
       for (const target of [EVERY_CAR, ...(firstCar === undefined ? [] : [firstCar])]) {
@@ -7730,36 +8101,12 @@ const FIXIT: SurfaceAdapter = {
     /* ---- the running total's two lines, on states the reducers built ---- */
     for (const [where, state] of [
       ['nothing', empty],
-      ['repairs', spent],
+      ['setting', spent],
       ['machinery', stepSpeed(entry, empty, 1, schedule)],
     ] as const) {
       const summary = fixitSpendSummary(entry, spendOf(entry, state, schedule));
-      seeds.push({ field: `spend.${where}.spent`, text: summary.spentLine, role: 'observation' });
       seeds.push({ field: `spend.${where}.committed`, text: summary.committedLine, role: 'observation' });
       seeds.push({ field: `spend.${where}.capital`, text: summary.capitalLine, role: 'observation' });
-    }
-
-    /* ---- the repair row's state word, all three arms ---- */
-    for (const [where, row] of [
-      ['selected', { selected: true, refusal: undefined }],
-      ['affordable', { selected: false, refusal: undefined }],
-      /*
-       * The **dearest** repair rather than `repairs[3]` — GitHub issue **#566**. The refused arm
-       * needs a repair the budget cannot take, and it reached one by index, which is true of
-       * {@link fixitSearchCase} only because that fixture happens to list its shaft last. Position
-       * stopped being a safe way to name a repair on the commit that gave the two fix-it surfaces
-       * a draw order (`fixit/engine.ts#repairsInDrawOrder`), so this asks for the property it
-       * actually needs. **The seeded string is unmoved**: on the fixture the four repairs share one
-       * patch and therefore one price, so index and property reach rows that are both affordable
-       * and the refusal is `undefined` either way.
-       */
-      ['refused', { selected: false, refusal: repairRowOf(entry, spent, dearestRepairOf(entry), schedule).refusal }],
-    ] as const) {
-      seeds.push({
-        field: `repair.state.${where}`,
-        text: fixitRepairStateLine(row),
-        role: where === 'refused' ? 'reason' : 'label',
-      });
     }
 
     return singleRun(this.id, seeds);
@@ -8804,16 +9151,17 @@ const EVERYDAY_MENU: SurfaceAdapter = {
         .streak,
       role: 'reason',
     });
-    for (const dayClosed of [false, true]) {
-      seeds.push({
-        field: `rail.footer.streak.career.${dayClosed ? 'filed' : 'standing'}`,
-        text: railModel(
-          { screen: 'menu', ctx: 'daily' },
-          { week: withTodayFiled(openWeek()), dayClosed },
-        ).footer.identity.streak,
-        role: 'observation',
-      });
-    }
+    /*
+     * One arm since § D1004. It was two — the same week with the run filed this sitting and without
+     * — because the card withheld today's figure until the sitting filed it; it now reads the week,
+     * so the two drew one string and the second seed swept nothing the first did not.
+     */
+    seeds.push({
+      field: 'rail.footer.streak.career',
+      text: railModel({ screen: 'menu', ctx: 'daily' }, { week: withTodayFiled(openWeek()) }).footer
+        .identity.streak,
+      role: 'observation',
+    });
     /*
      * § D673's acknowledgement, in every state the card can draw it in — GitHub issue #499, and
      * **three states rather than five since GitHub issue #579**: the rail's `signed-out` and
@@ -9119,13 +9467,21 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       seeds.push({ field: `rush.band.${band.waves}.perMinute`, text: band.perMinute, role: 'observation' });
       seeds.push({ field: `rush.band.${band.waves}.against`, text: band.against, role: 'observation' });
     }
-    for (const fact of rushFactViews()) {
-      seeds.push({
-        field: `rush.fact.${fact.label}`,
-        text: fact.value,
-        role: fact.withheld ? 'label' : 'observation',
-      });
-      seeds.push({ field: `rush.fact.${fact.label}.label`, text: fact.label, role: 'prose' });
+    /*
+     * Both arms of the kept figure — the post-AH panel's N7. Before any round of this visit the
+     * facts refuse; after one they carry the result sheet's own wave and held time, which is a
+     * state a player reaches by pressing *Leave the rush* once, so it is swept by name here with a
+     * fixture round rather than left to a case that never plays one.
+     */
+    for (const best of [undefined, { wave: 9, heldS: 1538, held: '25:38', driverName: 'Steady hand then Contract-net auction' }]) {
+      for (const fact of rushFactViews(best)) {
+        seeds.push({
+          field: `rush.fact.${fact.label}`,
+          text: fact.value,
+          role: fact.withheld ? 'label' : 'observation',
+        });
+        seeds.push({ field: `rush.fact.${fact.label}.label`, text: fact.label, role: 'prose' });
+      }
     }
     /*
      * The house's standings on this case's building, in the order the screen draws them — GitHub
@@ -10844,6 +11200,13 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      * nothing after the playhead.
      */
     'everyday/stagePace.ts#stagePaceNoteOf',
+    /*
+     * § D1029's call — the card over both rules and the hold the parking presses carry before it.
+     * Seeded once per case below on fixture calls on the case's own first car, the corpus building
+     * no contract rung (`run.ts#buildingFor`), so no case plays a pinned day as measured.
+     */
+    'everyday/stageCall.ts#stageCallCardOf',
+    'everyday/stageCall.ts#STAGE_CALL_COPY',
     /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
     'everyday/stageScreenModel.ts#stageGoalsOf',
     /*
@@ -11228,6 +11591,52 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       playhead: atPlayhead(recording, recording.startedAt),
     });
 
+    /*
+     * **§ D1029's call, on both rules** — the card a pinned day draws when the stage stops, over two
+     * fixture calls on the case's first car: the first minute-long wait, and the act start with a
+     * peak to name. Seeded at the call's own playhead, because the card is drawn there and says only
+     * what is on the stage at that instant. The hold is the sentence before the call, which names
+     * the event and never its time.
+     */
+    {
+      const span = recording.endedAt - recording.startedAt;
+      const carId = recording.shafts[0]?.carId ?? 'A';
+      const awayAtS = recording.startedAt + span * 0.25;
+      const act = { startS: recording.startedAt + span * 0.4, endS: recording.startedAt + span * 0.6 };
+      const calls: readonly PressCall[] = [
+        { atS: recording.startedAt + span * 0.3, rule: 'first-minute-wait', carId, awayAtS, backAtS: recording.startedAt + span * 0.5, act },
+        { atS: act.startS, rule: 'act-start', carId, awayAtS, backAtS: null, act },
+      ];
+      for (const call of calls) {
+        const card = stageCallCardOf(call);
+        const at = `stage.call(${call.rule})`;
+        const playhead = atPlayhead(recording, call.atS);
+        seeds.push({ field: `${at}.heading`, text: card.heading, role: 'label' });
+        for (const [index, fact] of card.facts.entries()) {
+          seeds.push({ field: `${at}.fact[${String(index)}]`, text: fact, role: 'observation', playhead });
+        }
+        seeds.push({ field: `${at}.question`, text: card.question, role: 'prose' });
+        for (const option of card.options) {
+          seeds.push({ field: `${at}.option(${option.change?.kind ?? 'leave'})`, text: option.label, role: 'label' });
+        }
+      }
+      seeds.push({ field: 'stage.call.held', text: STAGE_CALL_COPY.held, role: 'label' });
+      /*
+       * And the pace note's two arms the sampled loop below never reaches: `call`, drawn while the
+       * card is up, and `chosen`, since § D1029 bounded to the next act boundary.
+       */
+      const acts = actsOf(recording.demandPhases);
+      for (const reason of ['call', 'chosen'] as const) {
+        const note = stagePaceNoteOf(
+          { simPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S, reason },
+          { acts, simTimeS: recording.startedAt },
+        );
+        if (note !== undefined) {
+          seeds.push({ field: `stage.pace(${reason})`, text: note, role: 'label', playhead: atPlayhead(recording, recording.startedAt) });
+        }
+      }
+    }
+
     for (const at of sampleTimes(recording)) {
       const stamp = at.toFixed(0);
       const observations = observationsAt(recording, at);
@@ -11257,7 +11666,7 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           simTimeS: at,
           watchingSimPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S,
           longestStandingS: observations.longestCurrentWaitS,
-          playerChoseSpeed: false,
+          playerChoseSpeedAtS: undefined,
         });
         const note = stagePaceNoteOf(pace, { acts, simTimeS: at });
         if (note !== undefined) {
@@ -12593,15 +13002,70 @@ function postRunStates(): readonly {
   ];
 }
 
+/**
+ * The day the corpus treats as *today* for the first-session line's chooser — a fixture, not a
+ * calendar reading, `seed: 424_242n`'s footing beside it ([§ D1047](../../../../DECISIONS.md)).
+ */
+const CORPUS_DAY_SEED = 20_260_925n;
+
+/**
+ * **A first session's pinned day record** — the first member of `FIRST_DAY_CONTRACT_IDS` on its
+ * pin's crowd, under its standing order, on the first day in September 2026 whose draw deals it — or
+ * `undefined` if the set is empty, which `firstSession.test.ts` fails on first. The building
+ * document is left out: the three strings this is for read the id, the crowd and the week, and
+ * `todayOf` is total without one.
+ */
+function pinnedFirstDayRecordOf(context: HonestyContext): TodayRecord | undefined {
+  const [pinId] = FIRST_DAY_CONTRACT_IDS;
+  const press = pinId === undefined ? undefined : pressDayFor(pinId);
+  const contract = pinId === undefined ? undefined : contractById(pinId);
+  if (pinId === undefined || press === undefined || contract === undefined) return undefined;
+  let daySeed: bigint | undefined;
+  for (let day = 1; day <= 400 && daySeed === undefined; day += 1) {
+    const candidate = 20_260_900n + BigInt(day);
+    if (firstSessionContractFor(candidate) === pinId) daySeed = candidate;
+  }
+  return todayOf({
+    week: openWeek(pinId),
+    calendar: null,
+    building: undefined,
+    buildingId: contract.buildingId,
+    dispatcherName: undefined,
+    dispatcherId: press.standingOrder,
+    dispatcherNameOf: (id) => context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
+    goals: [],
+    seed: BigInt(press.seedText),
+    horizon: press.horizon,
+    dayStartS: undefined,
+    templateVariesMix: false,
+    dayCars: undefined,
+    crowdIsToday: false,
+    daySeed: daySeed ?? CORPUS_DAY_SEED,
+    firstSession: true,
+    units: 'metric',
+  });
+}
+
 const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
   id: 'everyday/today.ts#todayOf',
   covers: [
     'everyday/today.ts#todayOf',
+    /* The lede's closing sentence — H13; every seeded lede ends on it. */
+    'everyday/today.ts#TODAY_CHOICE_LINE',
     'shift/firstSession.ts#FIRST_SESSION_LINE',
     /* The line's second arm, for a first day the draw did not choose — GitHub issue #595, § D973. */
     'shift/firstSession.ts#FIRST_SESSION_LINE_CHOSEN',
-    /* The chooser between the two arms; both of its answers are seeded below. */
+    /* The chooser between the arms; every one of its answers is seeded below. */
     'shift/firstSession.ts#firstSessionLineFor',
+    /*
+     * The pinned arm — a fresh device's first day since § D1047 — and the brief's day-length line
+     * for a pinned whole day. Neither is drawn on any corpus case's own run (`run.ts#buildingFor`
+     * builds no rung, and the corpus seed is no pin), so both are seeded by name once per case below,
+     * with the seed line's and the door's pinned arms from one pinned day record.
+     */
+    'shift/firstSession.ts#FIRST_SESSION_LINE_PINNED',
+    'shift/firstSession.ts#FIRST_SESSION_LINE_PINNED_BY_NUMBER',
+    'everyday/firstDayLength.ts#pinnedDayLengthLineOf',
     'everyday/doorView.ts#doorScreenViewOf',
     /* § 6.1's replay words — GitHub issue #177 item 1. The door's primary note carries both arms
        (a day inside the week, a chip from before it), and the bar and rail adapters carry the rest. */
@@ -12663,10 +13127,46 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/postRun.ts#placementLineOf',
     /* The *no API origin* sentence, owned by the host because the host decides that arm. */
     'everyday/host.ts#POST_RUN_NO_SERVER',
+    /*
+     * § D1029's hold on the brief's driver — drawn only on an admitted pinned day under its
+     * standing order, which no corpus case is (`run.ts#buildingFor` builds no rung), so seeded by
+     * name once per case below.
+     */
+    'everyday/today.ts#PRESS_DAY_DRIVER_HELD',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
     const bundle = shiftBundleOf(context);
+    seeds.push({ field: 'today.driverHeld', text: PRESS_DAY_DRIVER_HELD, role: 'prose' });
+    /*
+     * **A first session's pinned day, as the door and the brief draw it** — § D1047. One pinned day
+     * record per case, on the first member of the first-day set, its pin's crowd and standing order
+     * and a day whose draw deals it: the seed line's pinned arm, the first-session line's pinned arm
+     * and the brief's day-length line are the three strings it adds, and every row of
+     * `PINNED_DAY_LENGTHS` is seeded as its line so no whole-day pin's sentence goes unread.
+     */
+    {
+      const pinnedToday = pinnedFirstDayRecordOf(context);
+      if (pinnedToday !== undefined) {
+        seeds.push({ field: 'today.pinned.seed', text: pinnedToday.seedLine, role: 'label' });
+        if (pinnedToday.firstSessionLine !== undefined) {
+          seeds.push({ field: 'today.pinned.firstSession', text: pinnedToday.firstSessionLine, role: 'observation' });
+        }
+      }
+      /* The fourth arm — a pin whose own number draws its tower, reached through `?seed=` (§ D1047). */
+      seeds.push({
+        field: 'today.pinned.firstSession.byNumber',
+        text: FIRST_SESSION_LINE_PINNED_BY_NUMBER,
+        role: 'observation',
+      });
+      for (const row of PINNED_DAY_LENGTHS) {
+        seeds.push({
+          field: `today.pinned.dayLength.${row.contractId}`,
+          text: pinnedDayLengthLineOf(row.contractId) ?? '',
+          role: 'observation',
+        });
+      }
+    }
 
     for (const entry of bundle.days) {
       /*
@@ -12690,6 +13190,13 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         /* The horizon the case's tower is pressed on — the moot sentence's fourth gate, § D973. */
         horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
         /*
+         * No clock: the corpus's towers carry no service windows (`run.ts#buildingFor` builds them
+         * without a rung), so the strip's clock arm is swept on the fixture record below instead.
+         */
+        dayStartS: undefined,
+        templateVariesMix: false,
+        dayCars: undefined,
+        /*
          * The day's crowd — § D729, § D730. Seeded `true` here and `false` below, because the
          * seed line and the door's closing sentence both have two arms and the arm a developer
          * never sees is the one most likely to say something a run cannot support. A pinned
@@ -12697,6 +13204,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
          * a player reaches, which is what this corpus is for.
          */
         crowdIsToday: true,
+        /* The day's own crowd, not a calendar reading — the first-session line's pinned arm, § D1047. */
+        daySeed: CORPUS_DAY_SEED,
         /* A first day nobody has played, on a legible tower — the one state that draws the line. */
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         /*
@@ -12731,7 +13240,11 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           goals: entry.readings,
           seed: 424_242n,
           horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
+          dayStartS: undefined,
+          templateVariesMix: false,
+          dayCars: undefined,
           crowdIsToday: false,
+          daySeed: CORPUS_DAY_SEED,
           firstSession: entry.week.day === 1 && entry.week.history.length === 0,
           units: 'metric',
         }).seedLine,
@@ -12775,7 +13288,12 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         goals: entry.readings,
         seed: 424_242n,
         horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
+        dayStartS: undefined,
+        templateVariesMix: false,
+        dayCars: undefined,
         crowdIsToday: true,
+        /* The day's own crowd, not a calendar reading — the first-session line's pinned arm, § D1047. */
+        daySeed: CORPUS_DAY_SEED,
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         units: 'imperial',
       }).facts;
@@ -12798,6 +13316,61 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           role: 'observation',
         });
       }
+      /*
+       * **The strip with its clock, the plate and the lede over a booked tower** — § D1038 and
+       * § D1039. The corpus builds its towers with no service windows, so none of the three reaches a
+       * booked car on its own; the report adapter's fixture bookings are the precedent (§ D983). One
+       * record per case, on its first day: the case's first car comes back, its second does not,
+       * and its day's own wrinkle draws whatever car the run would take. A fixture as that one is —
+       * what is swept is the wording, not a claim that this run lost a car.
+       */
+      if (entry === bundle.days[0]) {
+        const cars = context.building.banks.flatMap((bank) => bank.cars.map((car) => ({ bankId: bank.id, carId: car.id })));
+        const [first, second] = cars;
+        const booked: ResolvedBuilding = {
+          ...context.building,
+          serviceEvents: [
+            ...(first === undefined
+              ? []
+              : [
+                  { atS: 450, bankId: first.bankId, carId: first.carId, mode: 'out-of-service' as const },
+                  { atS: 900, bankId: first.bankId, carId: first.carId, mode: 'in-service' as const },
+                ]),
+            ...(second === undefined
+              ? []
+              : [{ atS: 1080, bankId: second.bankId, carId: second.carId, mode: 'out-of-service' as const }]),
+          ],
+        };
+        const bookedToday = todayOf({
+          week: entry.week,
+          calendar: null,
+          building: booked,
+          buildingId: context.building.id,
+          dispatcherName: entry.report.metaLines[0],
+          dispatcherNameOf: () => undefined,
+          goals: entry.readings,
+          seed: 424_242n,
+          horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
+          dayStartS: 8 * 3600,
+          templateVariesMix: false,
+          dayCars: undefined,
+          crowdIsToday: true,
+          daySeed: CORPUS_DAY_SEED,
+          firstSession: false,
+          units: 'metric',
+        });
+        seeds.push({ field: `${at}.today.booked.lede`, text: bookedToday.lede, role: 'observation' });
+        seeds.push({ field: `${at}.today.booked.wrinkle`, text: bookedToday.wrinkleNote, role: 'observation' });
+        if (bookedToday.outOfService !== undefined) {
+          seeds.push({ field: `${at}.today.booked.outage`, text: bookedToday.outOfService.sentence, role: 'observation' });
+        }
+        for (const fact of bookedToday.facts) {
+          seeds.push({ field: `${at}.today.booked.fact.${fact.label}`, text: fact.value, role: 'observation' });
+        }
+        if (bookedToday.load !== undefined) {
+          seeds.push({ field: `${at}.today.booked.load.note`, text: bookedToday.load.note, role: 'observation' });
+        }
+      }
       for (const ask of today.asks) {
         seeds.push({ field: `${at}.today.asks`, text: ask, role: 'label' });
       }
@@ -12817,12 +13390,15 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
             today,
             dayOffset: offset,
             dayClosed: closed,
+            nameOf: () => context.buildingName,
           });
           const where = `${arm}.door${String(offset)}`;
           seeds.push({ field: `${where}.kind`, text: door.kindPill, role: 'label' });
           seeds.push({ field: `${where}.stepper`, text: door.stepper.label, role: 'label' });
           seeds.push({ field: `${where}.rule`, text: door.rule, role: 'prose' });
           for (const chip of door.chips) {
+            /* The tower a chip names — GitHub issue #599: an id on a closed chip, a name on today's. */
+            seeds.push({ field: `${where}.chip.tower`, text: chip.tower, role: 'label' });
             seeds.push({ field: `${where}.chip.score`, text: chip.score, role: 'observation' });
             seeds.push({ field: `${where}.chip.note`, text: chip.note, role: 'label' });
           }
@@ -12844,6 +13420,11 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
             text: door.primary.note,
             role: door.primary.inert ? 'reason' : 'prose',
           });
+          /* § D1004's second press — today again, drawn only beside a primary that opens tomorrow. */
+          if (door.primary.again !== undefined) {
+            seeds.push({ field: `${where}.again.label`, text: door.primary.again.label, role: 'label' });
+            seeds.push({ field: `${where}.again.note`, text: door.primary.again.note, role: 'prose' });
+          }
         }
 
         /* ---- Scenario: § D525's hub, the first tile's whole surface (issue #364) ---- */
@@ -12918,6 +13499,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         const week = weekScreenViewOf({
           week: entry.week,
           towerToday: context.buildingName,
+          nameOf: () => context.buildingName,
           dayClosed: closed,
           // A sheet stands exactly when the day is closed here, which is the shipped pairing; the
           // two-can-disagree arm is `weekView.test.ts`'s, where it is a claim about a control.
@@ -12925,6 +13507,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         });
         seeds.push({ field: `${arm}.week.streak`, text: week.streakLine, role: 'observation' });
         for (const card of week.cards) {
+          seeds.push({ field: `${arm}.week.card.tower`, text: card.tower, role: 'label' });
           seeds.push({ field: `${arm}.week.card.score`, text: card.score, role: 'observation' });
           seeds.push({ field: `${arm}.week.card.note`, text: card.note, role: 'label' });
         }
@@ -13080,10 +13663,15 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     for (const step of DOOR_STEPS) {
       seeds.push({ field: `door.step.${step.n}`, text: step.body, role: 'prose' });
     }
-    for (const crowdIsToday of [true, false]) {
+    /* Three arms since § D1047 — the day's crowd, a pinned crowd, and a crowd of the run's own. */
+    for (const [crowdIsToday, crowdIsPinned] of [
+      [true, false],
+      [false, true],
+      [false, false],
+    ] as const) {
       seeds.push({
-        field: `door.same.${String(crowdIsToday)}`,
-        text: sameForEveryoneLine(crowdIsToday),
+        field: `door.same.${String(crowdIsToday)}${crowdIsPinned ? '.pinned' : ''}`,
+        text: sameForEveryoneLine(crowdIsToday, crowdIsPinned),
         role: 'prose',
       });
     }
@@ -13104,7 +13692,14 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       role: 'label',
     });
     seeds.push({ field: 'brief.ghost.why', text: raceAgainstCard().why, role: 'reason' });
-    seeds.push({ field: 'brief.locked.why', text: lockedForScore().why, role: 'reason' });
+    seeds.push({ field: 'brief.locked.why', text: lockedForScore(true).why, role: 'reason' });
+    /*
+     * Both arms of the card's first clause, by name — the post-AH panel's *"The crowd is the day's"*
+     * under a seed line saying it was not. The case's own record draws one arm through
+     * `briefScreenViewOf`; the other is a pinned day or a `?seed=` link, which no case is.
+     */
+    seeds.push({ field: 'brief.locked.what.today', text: lockedForScore(true).what, role: 'reason' });
+    seeds.push({ field: 'brief.locked.what.own', text: lockedForScore(false).what, role: 'reason' });
 
     return singleRun(this.id, seeds);
   },
@@ -13282,6 +13877,8 @@ const EVERYDAY_TOWER_CHOICE: SurfaceAdapter = {
        row decision is seeded below: offered, standing, other horizon, past its first day, and not
        as measured. */
     'everyday/towerChoice.ts#PRESS_DAY_CHOICE_COPY',
+    /* § D1029: the lede is derived from the admitted windows, and drawn on every render here. */
+    'everyday/towerChoice.ts#pressDayLedeOf',
     'everyday/towerChoice.ts#pressDayChoiceOf',
   ],
   render(context) {

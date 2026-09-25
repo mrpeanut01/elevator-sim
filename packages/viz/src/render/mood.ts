@@ -69,6 +69,7 @@ import type { FloorQueue, WaitBand } from '../frame/overlay.js';
 import type { VizSummary } from '../contract/types.js';
 import type { WaitBandBasis } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
+import { reportWindowNameOf } from '../shift/reportWindow.js';
 import { BAND_WORDS } from './riderQueue.js';
 
 /* -------------------------------------------------------------------------- *
@@ -420,9 +421,9 @@ export function buildingMood(
         'having given up.',
       overHorizon > 0
         ? `${String(overHorizon)} of ${String(level.arrivalCount)} people in the ` +
-          `${summary.reportWindow.id} window waited past the ${level.horizonS.toFixed(0)} s point ` +
+          `${reportWindowNameOf(summary.reportWindow.id)} window waited past the ${level.horizonS.toFixed(0)} s point ` +
           'at which this run stops counting a wait at all.'
-        : `Nobody in the ${summary.reportWindow.id} window waited past the ` +
+        : `Nobody in the ${reportWindowNameOf(summary.reportWindow.id)} window waited past the ` +
           `${level.horizonS.toFixed(0)} s abandonment horizon; the longest wait there was ` +
           `${level.longestWaitS === null ? 'not measured — nobody arrived in the reporting window' : `${level.longestWaitS.toFixed(0)} s${level.longestWaitIsCensored ? ' and counting, because that person never boarded' : ''}`}.`,
     ),

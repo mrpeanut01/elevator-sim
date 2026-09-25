@@ -54,6 +54,7 @@ import {
   suppressionOf,
   type ControlSpace,
   type HonestyContext,
+  type ShippedFixit,
   type StageBundle,
 } from './surfaces.js';
 import type {
@@ -98,6 +99,13 @@ export interface HonestyResources {
    * stage-keyed surface would have moved it without saying so.
    */
   readonly survivors: PublishedSurvivors;
+  /**
+   * `data/fixit-cases.json` and the resources its runs are planned against — GitHub issue #570,
+   * [§ D1011](../../../../DECISIONS.md). Handed in for `survivors`' reason: this module may not
+   * read a file. Required rather than optional, so a harness that forgot to load it is a type error
+   * rather than a corpus that silently stopped reading the shipped cases.
+   */
+  readonly shippedFixit: ShippedFixit;
   /**
    * Injected between rendering and checking, for `faults.ts` only.
    *
@@ -461,6 +469,7 @@ export function contextFor(honestyCase: HonestyCase, resources: HonestyResources
     trafficProfiles: resources.trafficProfiles,
     dispatcherProfiles: resources.dispatcherProfiles,
     survivors: resources.survivors,
+    shippedFixit: resources.shippedFixit,
     /*
      * The ordered path the Scenario hub draws — § D649, GitHub issue #364.
      *

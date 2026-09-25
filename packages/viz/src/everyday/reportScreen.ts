@@ -61,6 +61,7 @@
  * workshop route would be that refusal undone by the back door.
  */
 
+import { PRESS_CALL_AGAIN, PRESS_CALL_ROW_ID } from '../shift/callRow.js';
 import type { TabName } from '../dev/elementMap.js';
 import type { DeltaRowView, ReportView } from '../dev/reportPanel.js';
 import {
@@ -111,6 +112,7 @@ import {
 } from './tokens.js';
 import { RUSH_RESULT_EMPTY_LEDE, rushOutcomeOf, rushResultViewOf } from './rush.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
+
 
 /**
  * The two sheets this screen is holding — `dev/reportPanel.ts`'s own rotation, reused whole.
@@ -682,6 +684,40 @@ function mountReportScreen(
         text.append(what, why);
         row.append(when, text);
         beats.body.append(row);
+      }
+      /*
+       * **Take this call again** — wave AI, [§ D1029](../../../../DECISIONS.md). Drawn exactly when
+       * the sheet carries the call row, which `shift/callRow.ts` draws only for an admitted pinned
+       * day played as measured; it re-opens that day from an explicitly empty record and hands the
+       * player to the stage, where the call comes again.
+       */
+      if (drawn?.diagnosis.some((entry) => entry.id === PRESS_CALL_ROW_ID) === true) {
+        const again = el(doc, 'div', 'everyday-report-call-again');
+        again.style.cssText = `display:flex;align-items:center;gap:11px;flex-wrap:wrap`;
+        const button = el(doc, 'button', 'everyday-report-call-again-press', PRESS_CALL_AGAIN.label);
+        button.type = 'button';
+        button.style.cssText = [
+          'cursor:pointer',
+          'background:transparent',
+          `border:1px solid ${C.rule}`,
+          `border-radius:${String(R.control)}px`,
+          'padding:6px 12px',
+          `color:${C.ink}`,
+          'font-size:12.5px',
+          'font-weight:600',
+        ].join(';');
+        const note = el(doc, 'span', 'everyday-report-call-again-note', PRESS_CALL_AGAIN.note);
+        note.style.cssText = QUIET;
+        button.addEventListener('click', () => {
+          const refused = context.host.takeCallAgain();
+          if (refused === undefined) {
+            context.go('stage');
+            return;
+          }
+          note.textContent = refused;
+        });
+        again.append(button, note);
+        beats.body.append(again);
       }
       root.append(beats.root);
     }

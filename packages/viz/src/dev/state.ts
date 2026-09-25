@@ -24,6 +24,7 @@
 
 import {
   parseBuilding,
+  planDemand,
   resolveBuilding,
   type BuildingConfig,
   type DispatcherProfile,
@@ -88,16 +89,25 @@ import type { VizRecording } from '../contract/types.js';
 import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
 import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
-import { firstSessionContractFor } from '../shift/firstSession.js';
-import { runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
+import { firstSessionContractFor, firstSessionDayFor } from '../shift/firstSession.js';
+import { actsOf, runHorizonOf, runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
 import {
   SHIFT_EVENTS,
   baseDemandOf,
   demandTemplateVariesMix,
+  eventCarChoice,
   eventById,
   shiftRunPatch,
 } from '../shift/events.js';
-import { ladderTowerConfig, rungFor, rungIncidents } from '../shift/ladder.js';
+import {
+  ladderTowerConfig,
+  pressDayMeasuredAs,
+  rungFor,
+  rungIncidents,
+  type ContractPressDay,
+} from '../shift/ladder.js';
+import { bookedOutCarsOf } from '../shift/bookedOut.js';
+import { pressCallOf, type PressCall } from '../shift/pressCall.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
 import { shiftReportWindowFor } from '../shift/reportWindow.js';
@@ -573,16 +583,28 @@ export interface ViewerState {
    * The log is a fact about **this day's run**, so it lives and dies with the day rather than
    * with the session:
    *
-   * - **It survives a plain re-run of the same day** — levers moved, patience set, the Run
-   *   button pressed again. The contract's whole point is that the record replays: a re-run that
-   *   silently dropped the log would put a different day on screen under the same stamp.
-   * - **It clears when the day changes** — *Open the doors on tomorrow* (`dev/reportPanel.ts`),
-   *   taking the next assignment, starting a scenario, and `enterFreePlay`, each of which
-   *   already clears `outOfServiceCarIds` on the same argument: a run inheriting Thursday's
-   *   intervention would not be the run the screen just described.
-   * - **It clears when the building changes** ({@link withBuilding}) — an intervention is
-   *   stamped against one day in one tower, and the contract's own line is that changing the
-   *   tower is a different kind of act than changing your mind.
+   * - **It survives a plain re-run of the same day on this surface** — levers moved, patience
+   *   set, the Engineer shell's Run button pressed again. The contract's whole point is that the
+   *   record replays: a re-run that silently dropped the log would put a different day on screen
+   *   under the same stamp.
+   * - **It clears on every run the Everyday product starts** — `everyday/host.ts`'s `startRun`,
+   *   which is *Start the day* on the brief and every other Everyday press that starts a run
+   *   rather than growing one ([§ D1002](../../../../DECISIONS.md)). The Everyday product has no
+   *   *re-run with the log*: its stage presses append through `interveneAt`, and every other run
+   *   it starts is an attempt, which is the with-and-without experiment only if it begins clean.
+   *   The panel measured what inheriting it cost: a press on one tower's day credited to the
+   *   player on another tower's untouched day, and five earlier presses applied under a stage
+   *   that showed one.
+   * - **It clears when the day changes** — *Open the doors on tomorrow* (`dev/reportPanel.ts`,
+   *   and `everyday/host.ts#openTomorrowPatch`), taking the next assignment, starting a scenario,
+   *   and `enterFreePlay`, each of which already clears `outOfServiceCarIds` on the same
+   *   argument: a run inheriting Thursday's intervention would not be the run the screen just
+   *   described. A replay starts with none and puts the parked day's log back with its recording
+   *   (`everyday/replay.ts`); a rush and a career day hold it the same way.
+   * - **It clears when the building changes** ({@link withBuilding}, and the Everyday front
+   *   door's `moveWeekTo`) — an intervention is stamped against one day in one tower, and the
+   *   contract's own line is that changing the tower is a different kind of act than changing
+   *   your mind.
    *
    * It deliberately survives a **seed** change: the log is part of the record being re-rolled,
    * and re-rolling the crowd under the same change of mind is a legitimate question to ask. What
@@ -1276,8 +1298,30 @@ export function disclosureOf(mode: ViewMode): DisclosureMode {
  * their own week was opened on and is nobody else's. *One tower a day* is a property of a product
  * this one does not yet have, and the strings say the narrower true thing instead of the wider
  * false one; `everyday/buildNotes.ts` carries the gap.
+ *
+ * ## The day it deals is the tower's pinned day — [§ D1047](../../../../DECISIONS.md)
+ *
+ * The draw is over `shift/firstSession.ts#FIRST_DAY_CONTRACT_IDS` — legible towers whose pinned
+ * press day § D1029 admits — and the run is that day **as it was measured**: the pin's crowd and
+ * the tower's standing order, the same two fields `everyday/host.ts#playPressDay` writes, read from
+ * the same row. So a newcomer's first scored day is the one run `shift/pressLadder.test.ts` proves
+ * misses as built and turns on the stage's call, rather than whatever the date's crowd happens to
+ * do on whichever tower the date draws.
+ *
+ * **Unless the address carried `?seed=`** ({@link FirstSessionOptions.crowdFromAddress}): the
+ * reader's crowd wins, § D729's own rule, and the tower is still drawn — from that seed, so the
+ * same link opens the same tower — and played on it, which is an ordinary day on a press-day tower.
+ *
+ * **Nothing is written that a later load reads.** The pin is a pure function of the date, so a
+ * reload that restores no session draws it again; § D993's forward rule (no field whose only
+ * reader is the first-visit gate) is met by there being no field. `firstSession.test.ts` asserts
+ * the returned state differs from its input only in fields a run already carries.
  */
-export function withFirstSession(state: ViewerState, resources: BrowserResources): ViewerState {
+export function withFirstSession(
+  state: ViewerState,
+  resources: BrowserResources,
+  options: FirstSessionOptions,
+): ViewerState {
   const contractId = firstSessionContractFor(state.seed);
   const contract = contractById(contractId);
   if (contract === undefined) return state;
@@ -1287,7 +1331,21 @@ export function withFirstSession(state: ViewerState, resources: BrowserResources
     shiftLengthS: shiftLengthForContract(contractId),
     windowStartS: null,
   };
-  return withBuilding(drawn, resources, contract.buildingId);
+  const moved = withBuilding(drawn, resources, contract.buildingId);
+  if (options.crowdFromAddress) return moved;
+  const day = firstSessionDayFor(state.seed);
+  return { ...withDispatcher(moved, resources, day.standingOrder), seed: day.seed };
+}
+
+/** How {@link withFirstSession} is asked — required, `TodayInput.calendar`'s reason. */
+export interface FirstSessionOptions {
+  /**
+   * Whether the address carried `?seed=` — the reader's crowd, which wins over the pin
+   * ([§ D1047](../../../../DECISIONS.md), § D729). Required rather than optional: a default of
+   * `false` would pin a crowd over a link somebody pasted, and a default of `true` would restore the
+   * pre-§ D1047 draw on every caller that forgot the field.
+   */
+  readonly crowdFromAddress: boolean;
 }
 
 /**
@@ -1726,6 +1784,127 @@ export function resolvedBuildingOf(
   return shiftRunConfigOf(resources, state).building;
 }
 
+/**
+ * **A pinned day's call, on the run on screen** — [§ D1029](../../../../DECISIONS.md).
+ *
+ * The call instant (`shift/pressCall.ts#pressCallOf`) asked of `recording` in the building the
+ * state's run was built in, and the pin, both only when the state is that pinned day exactly as it
+ * was measured (`shift/ladder.ts#pressDayMeasuredAs`): the contract's day 1 on the pinned crowd and
+ * horizon, the ordinary wrinkle with no calendar, driven by the standing order, with nothing
+ * pressed but an answer at the call second. `undefined` on every other run, which is every run but
+ * one per admitted tower.
+ *
+ * Here because both callers hold a `ViewerState` and the resources, and a second derivation of the
+ * attempt's facts is how the stage and the report would come to disagree about one run:
+ * `everyday/host.ts#pressCallOnStage` asks it for the stage, `dev/main.ts#closeShift` for the
+ * report's call row.
+ */
+export function pressDayCallOf(
+  resources: BrowserResources,
+  state: ViewerState,
+  recording: VizRecording,
+): { readonly press: ContractPressDay; readonly call: PressCall } | undefined {
+  if (buildingConfigOf(resources, state.savedBuildings, state.buildingId) === undefined) return undefined;
+  const plan = shiftRunConfigOf(resources, state);
+  const horizon = runHorizonOf(
+    resources.trafficProfiles,
+    buildingConfigOf(resources, state.savedBuildings, state.buildingId),
+    state,
+  );
+  const call = pressCallOf({
+    legs: recording.legs,
+    bookedOut: bookedOutCarsOf(plan.building),
+    horizon,
+    acts: actsOf(recording.demandPhases),
+    startedAt: recording.startedAt,
+    endedAt: recording.endedAt,
+  });
+  if (call === undefined) return undefined;
+  const press = pressDayMeasuredAs(
+    {
+      contractId: state.week.contractId,
+      day: state.week.day,
+      eventId: plan.event.id,
+      hasCalendar: state.calendar !== null,
+      seed: state.seed,
+      horizon,
+      dispatcherId: state.dispatcherId,
+      interventions: state.interventions,
+    },
+    call.atS,
+  );
+  return press === undefined ? undefined : { press, call };
+}
+
+/** What a run will be, read before it is pressed — {@link plannedDayOf}. */
+export interface PlannedDay {
+  /** {@link resolvedBuildingOf}'s answer: the building the kernel will be handed. */
+  readonly building: ResolvedBuilding | undefined;
+  /**
+   * Where the run's clock will start, seconds since midnight, or `undefined` when its template
+   * declares no hour (or the day cannot be planned) — the value the finished run carries as
+   * `SimulationResult.trace.startOfDayS`, which the stage's clock and the Day report's times read.
+   */
+  readonly startOfDayS: number | undefined;
+  /**
+   * Whether the run's demand template varies the mix of trips itself — `shift/events.ts`'s
+   * `demandTemplateVariesMix` over the run's own template, the question `shiftRunPatch` asks before
+   * it withholds a wrinkle's mix. What `events.ts#eventAsRun` needs to say what the day does
+   * ([§ D1040](../../../../DECISIONS.md)).
+   */
+  readonly templateVariesMix: boolean;
+  /** {@link ShiftRunConfig.dayCars} for the same run — the cars today's event takes. */
+  readonly dayCars: ShiftRunConfig['dayCars'];
+}
+
+/**
+ * **The building and the clock of the run `state` would produce** — [§ D1039](../../../../DECISIONS.md).
+ *
+ * The brief prints the times a car is booked out, and they have to be the times the stage and the
+ * report will print after the run. Both halves come from here rather than from a second derivation:
+ * the building is {@link shiftRunConfigOf}'s (so a service window's seconds are the run's), and the
+ * hour is `core`'s own `planDemand` over the same config — the arrival plan the trace is generated
+ * from, whose template carries the `startOfDayS` the trace then reports. `planDemand` builds no
+ * trace and draws nothing, so this is a document resolve and a plan, not a simulation.
+ *
+ * Total: a day `core` refuses to plan answers `undefined` for the hour, and the brief then prints no
+ * clock rather than a guessed one.
+ */
+export function plannedDayOf(resources: BrowserResources, state: ViewerState): PlannedDay {
+  if (buildingConfigOf(resources, state.savedBuildings, state.buildingId) === undefined) {
+    return { building: undefined, startOfDayS: undefined, templateVariesMix: false, dayCars: { holds: [], windows: [] } };
+  }
+  const plan = shiftRunConfigOf(resources, state);
+  const { config } = plan;
+  const demand = config.demand ?? {};
+  let startOfDayS: number | undefined;
+  try {
+    startOfDayS = planDemand({
+      building: config.building,
+      profiles: config.trafficProfiles,
+      ...(config.demandTemplate === undefined ? {} : { template: config.demandTemplate }),
+      ...(config.durationS === undefined ? {} : { templateOverrides: { durationS: config.durationS } }),
+      ...(config.windowStartS === undefined ? {} : { windowStartS: config.windowStartS }),
+      ...(config.windowEndS === undefined ? {} : { windowEndS: config.windowEndS }),
+      ...(demand.arrivalRatePctPop5min === undefined
+        ? {}
+        : { arrivalRatePctPop5min: demand.arrivalRatePctPop5min }),
+      ...(demand.directionalSplit === undefined ? {} : { directionalSplit: demand.directionalSplit }),
+    }).template.startOfDayS;
+  } catch {
+    startOfDayS = undefined;
+  }
+  return {
+    building: plan.building,
+    startOfDayS,
+    dayCars: plan.dayCars,
+    templateVariesMix:
+      typeof config.demandTemplate === 'string'
+        ? demandTemplateVariesMix(config.demandTemplate, config.trafficProfiles.demandTemplates)
+        : config.demandTemplate?.meanDirectionalSplit !== undefined,
+  };
+}
+
 /** The building's display name, without loading the whole document to read it. */
 export function buildingNameOf(
   resources: BrowserResources,
@@ -1762,6 +1941,13 @@ export interface ShiftRunConfig {
   readonly event: ShiftEvent;
   /** Cars held out of service — the reader's, plus any the day's event withheld. */
   readonly outOfServiceCarIds: readonly string[];
+  /**
+   * The cars **today's event** takes, by car id, as this run took them — the whole-shift holds and
+   * the windowed ones — after the tower's own bookings were spoken for ([§ D1038](../../../../DECISIONS.md)).
+   * The brief and the report name a car as *the day's* from this, so a sentence about which car the
+   * day took is the run's answer rather than a second call that could forget the booking.
+   */
+  readonly dayCars: { readonly holds: readonly string[]; readonly windows: readonly string[] };
   /** Anything the shift patch refused to configure, with its reason. Shown, never swallowed. */
   readonly withheld: readonly string[];
 }
@@ -1987,10 +2173,16 @@ export function shiftRunConfigOf(
     spec === undefined
       ? resources.trafficProfiles
       : trafficProfilesWithPattern(resources.trafficProfiles, authored.trafficProfile, spec);
+  /*
+   * The tower's own bookings for today, spoken for by the day's car choice — § D1038. Named once
+   * here so the patch, the calendar's reservation and {@link ShiftRunConfig.dayCars} ask one list.
+   */
+  const booked = rungIncidents(rung);
   const patch = shiftRunPatch({
     event,
     building,
     base: fitBase,
+    booked,
     /*
      * `core`'s own answer, through `shift/events.ts#demandTemplateVariesMix` — GitHub issue #593.
      * This was `demandTemplate === 'lunch-two-way'`, a list of one, and `office-day` — the whole
@@ -2037,6 +2229,7 @@ export function shiftRunConfigOf(
     ...askInput,
     event,
     playerHeldCarIds: state.outOfServiceCarIds,
+    booked,
   });
 
   const outOfServiceCarIds = [
@@ -2071,12 +2264,14 @@ export function shiftRunConfigOf(
      * `(atS, bankId, carId)` — and is written this way so the list reads the way a reader meets the
      * two facts: what this tower is, then what happened today.
      *
-     * Two entries naming the same car would schedule two `out-of-service` events on it, which
-     * `core` handles as a mode set twice; nothing here dedupes, because a rung naming a car is a
-     * declaration the contract's brief carries and silently dropping the day's draw over it would
-     * be the caption-that-does-not-describe-the-picture defect one field over.
+     * Two entries naming the same car would schedule two `out-of-service` events on it — and the
+     * first return would hand the day's car back mid-window, which is what Midtown's Tuesday did
+     * until [§ D1038](../../../../DECISIONS.md). The day's choice now treats the rung's cars as
+     * spoken for (`booked` above), so the two lists name different cars wherever their windows
+     * meet. Nothing here dedupes, because silently dropping either entry would be the
+     * caption-that-does-not-describe-the-picture defect one field over.
      */
-    [...rungIncidents(rung), ...patch.incidents],
+    [...booked, ...patch.incidents],
     state.shiftLengthS,
   );
   const finalBuilding =
@@ -2101,6 +2296,10 @@ export function shiftRunConfigOf(
      */
     calendarLine: calendarDay === null ? '' : calendarLine(calendar),
     outOfServiceCarIds,
+    dayCars: {
+      holds: patch.outOfServiceCarIds.length === 0 ? [] : eventCarChoice(event.effect, building, booked).holdCars.map((car) => car.carId),
+      windows: patch.incidents.map((incident) => incident.car.carId),
+    },
     withheld: [...patch.withheld, ...calendar.withheld],
     config: {
       building: finalBuilding,

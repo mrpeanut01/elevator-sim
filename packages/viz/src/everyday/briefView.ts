@@ -129,6 +129,13 @@ export interface BriefScreenView {
         readonly mootUnder: string | undefined;
       }
     | undefined;
+  /**
+   * How long this pinned whole day takes to watch and when its call comes, or `undefined` —
+   * `today.ts`'s `dayLength`, [§ D1047](../../../../DECISIONS.md). Drawn under the strip, before the
+   * day starts, because the ruling that deals newcomers a forty-minute day made saying so first the
+   * condition of dealing it.
+   */
+  readonly dayLength: string | undefined;
   readonly facts: readonly { readonly label: string; readonly value: string }[];
   readonly load: { readonly heading: string; readonly word: string; readonly note: string } | undefined;
   readonly wrinkle: {
@@ -146,6 +153,11 @@ export interface BriefScreenView {
     readonly options: readonly BriefDispatcherOption[];
     /** `6 styles · 2 of yours` — derived from the rendered list, never a literal (§ 16 rule 5). */
     readonly count: string;
+    /**
+     * Why the cards and the select cannot be pressed today, or `undefined` — `today.ts`'s
+     * `driverHeld`, § D1029. Drawn beside the control rather than as a tooltip, § 7.6's fourth rule.
+     */
+    readonly held: string | undefined;
   };
   readonly ghost: BriefRefusalCard;
   readonly locked: BriefRefusalCard;
@@ -251,8 +263,13 @@ export function raceAgainstCard(): BriefRefusalCard {
   const built = isScreenBuilt('stage');
   return {
     heading: 'RACE AGAINST',
+    /*
+     * *This run's crowd*, not *today's* — [§ D1047](../../../../DECISIONS.md). The rival drives the
+     * run's own seed, which is the day's only on a day on the day's crowd; on a pinned day — every
+     * newcomer's first — and on a `?seed=` link it is not, and the seed line two rows up says so.
+     */
     what:
-      'A second dispatcher driving a second copy of today’s crowd beside yours — the plain ' +
+      'A second dispatcher driving a second copy of this run’s crowd beside yours — the plain ' +
       'baseline, your latest saved, or nobody.',
     why: built
       ? 'Pick one on the stage, under THE DAY SO FAR: the rival drives the same crowd from the ' +
@@ -295,7 +312,7 @@ export function raceAgainstCard(): BriefRefusalCard {
  */
 export const SANDBOX_DOOR_LABEL = 'Change it anyway — the day stops counting';
 
-export function lockedForScore(): BriefRefusalCard {
+export function lockedForScore(crowdIsToday: boolean): BriefRefusalCard {
   const built = isScreenBuilt('tuner');
   return {
     heading: 'LOCKED FOR SCORE',
@@ -310,9 +327,21 @@ export function lockedForScore(): BriefRefusalCard {
      * have two arms: this card says what LOCKED FOR SCORE *means* — which of the run’s inputs are
      * not the reader’s to pick here — rather than making a claim about who else is playing it.
      * The two lines that do make that claim are on the same screen and carry the condition.
+     *
+     * **And it carries the same condition now, because it was false on the days that do not have
+     * it** — the post-AH panel's D.md, *"LOCKED FOR SCORE — The crowd is the day's"* printed
+     * directly under the seed line's *"a crowd of this run's own, not the day's"*. A pinned press
+     * day plays the pin's crowd and a `?seed=` link plays the reader's, and on either this card was
+     * the one of three sentences that said otherwise. So the first clause is keyed on
+     * `TodayRecord.crowdIsToday`, the one field all three read (`today.ts`'s own docstring on it),
+     * and the rest — what is locked and what changing it costs — is unchanged in both arms.
+     * Recorded here under [§ D405](../../../../DECISIONS.md): nothing outside this card moved.
      */
     what:
-      'The crowd is the day’s and the tower is your week’s — neither is yours to pick from here. ' +
+      (crowdIsToday
+        ? 'The crowd is the day’s and the tower is your week’s — neither is yours to pick from here. '
+        : 'The crowd is this run’s own rather than the day’s, and the tower is your week’s — neither ' +
+          'is yours to pick from here. ') +
       'You can change all of it, the machines too — the run just stops counting.',
     /*
      * **The door names a state, never a destination** — GitHub issue #225,
@@ -353,6 +382,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
     title: `Today at ${today.towerName}`,
     seedLine: today.seedLine,
     outOfService: today.outOfService,
+    dayLength: today.dayLength,
     facts: today.facts,
     load:
       today.load === undefined
@@ -389,9 +419,10 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
        * in it eventually contradicted something.
        */
       count: `${String(options.length)} to choose from · ${String(mine)} of yours`,
+      held: today.driverHeld,
     },
     ghost: raceAgainstCard(),
-    locked: lockedForScore(),
+    locked: lockedForScore(today.crowdIsToday),
     barNote: `${BRIEF_NOTE_LEAD}${today.driver}`,
   };
 }

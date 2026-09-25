@@ -38,8 +38,11 @@ const TODAY: TodayRecord = {
   asks: ['Carry 90% of the people who turn up', 'Nobody waits longer than 120 s'],
   seedLine: 'tower chancery-house · crowd 424242 · today’s date, so everyone playing today meets this crowd',
   crowdIsToday: true,
+  crowdIsPinned: false,
   firstSessionLine: undefined,
+  dayLength: undefined,
   driver: 'Steady hand',
+  driverHeld: undefined,
 };
 
 const DISPATCHERS = [
@@ -56,6 +59,31 @@ const viewOf = (selectedId = 'collective'): ReturnType<typeof briefScreenViewOf>
     savedIds: ['yours:morning'],
     selectedId,
   });
+
+describe('LOCKED FOR SCORE says whose crowd it is, the way the seed line does — post-AH panel D.md', () => {
+  /*
+   * A pinned press day plays the pin's crowd, and the card read *"The crowd is the day's"* directly
+   * under a seed line reading *"a crowd of this run's own, not the day's"*. Both arms, each against
+   * the seed line of the same record, so the two cannot come apart again on either kind of day.
+   */
+  it('names the day’s crowd on a day that has it, and does not on one that does not', () => {
+    const daily = briefScreenViewOf({ today: TODAY, dispatchers: DISPATCHERS, savedIds: [], selectedId: 'collective' });
+    expect(daily.seedLine).toContain('today’s date');
+    expect(daily.locked.what).toMatch(/^The crowd is the day’s/u);
+
+    const own: TodayRecord = {
+      ...TODAY,
+      seedLine: 'tower crown-hotel · crowd 20268743 · a crowd of this run’s own, not the day’s',
+      crowdIsToday: false,
+    };
+    const pinned = briefScreenViewOf({ today: own, dispatchers: DISPATCHERS, savedIds: [], selectedId: 'collective' });
+    expect(pinned.locked.what).not.toMatch(/crowd is the day’s/u);
+    expect(pinned.locked.what).toContain('this run’s own rather than the day’s');
+    /* What is locked and what changing it costs are the same sentence on both kinds of day. */
+    expect(pinned.locked.what).toContain('the run just stops counting');
+    expect(pinned.locked.why).toBe(daily.locked.why);
+  });
+});
 
 describe('who drives today', () => {
   it('derives the count from the rendered list — § 16 rule 5, never a literal', () => {
@@ -131,6 +159,9 @@ describe('the two cards this build states rather than draws as a live control', 
     const card = raceAgainstCard();
     expect(isScreenBuilt('stage')).toBe(true);
     expect(card.what).toMatch(/second dispatcher/);
+    /* § D1047: the rival drives this run's crowd, which on a pinned first day is not today's. */
+    expect(card.what).toContain('a second copy of this run’s crowd');
+    expect(card.what).not.toMatch(/today’s crowd|today's crowd/u);
     expect(card.why).toMatch(/on the stage/);
     expect(card.why).not.toMatch(/one run at a time/);
     expect(card.why).not.toMatch(/[Nn]ot (built|here)/);
@@ -171,7 +202,7 @@ describe('the two cards this build states rather than draws as a live control', 
      * So the pair is asserted against the **registry**, both ways, which is the thing that actually
      * decides it: built ⇒ a door and no refusal; unbuilt ⇒ the registry's own sentence and no door.
      */
-    const card = lockedForScore();
+    const card = lockedForScore(true);
     expect(isScreenBuilt('tuner')).toBe(true);
     expect(card.door).toEqual({ label: SANDBOX_DOOR_LABEL, screen: 'tuner' });
     expect(card.why).toContain('sandbox day');
@@ -186,7 +217,7 @@ describe('the two cards this build states rather than draws as a live control', 
      * what changing does, and the card's reason names the state in the word the tuner's own strip
      * uses on the far side of the door.
      */
-    const card = lockedForScore();
+    const card = lockedForScore(true);
     expect(card.door?.label).toBe(SANDBOX_DOOR_LABEL);
     expect(card.door?.label).not.toMatch(/take it to|go to|open the|enter the/iu);
     expect(card.door?.label).toMatch(/stops counting/u);
@@ -202,7 +233,7 @@ describe('the two cards this build states rather than draws as a live control', 
      * the refusing arm calls `unbuiltReasonFor`, which **throws** on a built key, so a card that
      * refused today could not have been constructed at all.
      */
-    expect(lockedForScore().why).not.toContain('undefined');
+    expect(lockedForScore(true).why).not.toContain('undefined');
     expect(viewOf().locked.why).not.toContain('undefined');
     expect(viewOf().locked.door?.screen).toBe('tuner');
     /*

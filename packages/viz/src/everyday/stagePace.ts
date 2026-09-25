@@ -34,8 +34,11 @@
  * - **The longest current wait**, from `live/observations.ts#observationsAt` at the playhead — the
  *   present frame and nothing after it. The drain clause never looks ahead to see whether the
  *   queue is *about* to clear; it slows while it has not.
- * - **Whether the player has pressed a chip today.** A press is theirs, and the stage stops
- *   managing the speed for the rest of that day (§ D991). {@link StagePaceInput.playerChoseSpeed}.
+ * - **When the player last pressed a chip.** A press is theirs until the next act boundary, and
+ *   then the stage paces again (§ D991 clause 2 as § D1029 amends it).
+ *   {@link StagePaceInput.playerChoseSpeedAtS}.
+ * - **Whether a pinned day's call stands unanswered** — `shift/pressCall.ts`, § D1029. The one
+ *   reason that stops the transport rather than choosing its speed.
  *
  * ## Where it applies, and the one place it must not
  *
@@ -96,14 +99,18 @@ export const PACE_HOLD_WAIT_S: number = (() => {
 /**
  * Why the transport is at the speed it is.
  *
+ * - `call` — a pinned day's call has come and is unanswered; the transport **stops**, at any rung
+ *   and on either horizon ([§ D1029](../../../../DECISIONS.md)). It outranks every other reason,
+ *   `chosen` included, because a chip press is a choice about speed and the call is not a speed.
  * - `unmanaged` — not a whole day; the player's rung, and no note, because nothing is being paced.
- * - `chosen` — a whole day whose player has pressed a chip; their rung, for the rest of the day.
+ * - `chosen` — a whole day whose player has pressed a chip; their rung, **until the next act
+ *   boundary** (§ D1029 amends § D991 clause 2 — see {@link StagePaceInput.playerChoseSpeedAtS}).
  * - `act` — inside a peak; the player's rung.
  * - `held` — between peaks with somebody past {@link PACE_HOLD_WAIT_S}; the player's rung.
  * - `between` — between peaks with nobody past it; {@link BETWEEN_PEAKS_SIM_PER_REAL_S} or the
  *   player's rung, whichever is faster.
  */
-export type StagePaceReason = 'unmanaged' | 'chosen' | 'act' | 'held' | 'between';
+export type StagePaceReason = 'call' | 'unmanaged' | 'chosen' | 'act' | 'held' | 'between';
 
 export interface StagePace {
   readonly simPerRealS: number;
@@ -120,8 +127,46 @@ export interface StagePaceInput {
   readonly watchingSimPerRealS: number;
   /** `LiveObservations.longestCurrentWaitS` at the playhead. `undefined` on empty landings. */
   readonly longestStandingS: number | undefined;
-  /** A chip has been pressed on this day. */
-  readonly playerChoseSpeed: boolean;
+  /**
+   * **When a chip was last pressed on this day**, or `undefined` for none.
+   *
+   * [§ D1029](../../../../DECISIONS.md) amends § D991 clause 2: a chip press is the player's until
+   * the next act boundary — a peak opening or closing — and then the stage paces again. It used to
+   * hold for the rest of the day, and the ruling's engineering lens measured what that cost: a
+   * player who pressed `4×` once in the morning watched the hours between peaks at `4×`, so the
+   * published day length (`sittingShape.ts`, the tile's figure) was true only of a player who never
+   * touched a chip. Bounded by the next boundary, the choice still takes effect at once and the
+   * figure stays true of every player.
+   */
+  readonly playerChoseSpeedAtS: number | undefined;
+  /**
+   * **The pinned day's call, while it stands unanswered** — `shift/pressCall.ts#pressCallOf`'s
+   * instant, or `undefined` on every other day and once the call is answered.
+   */
+  readonly callAtS?: number | undefined;
+}
+
+/** The act boundary after `fromS` — a peak opening or closing — or `undefined` when none remains. */
+function nextActBoundaryAfter(acts: readonly DayAct[], fromS: number): number | undefined {
+  let next: number | undefined;
+  for (const act of acts) {
+    for (const edge of [act.startS, act.endS]) {
+      if (edge > fromS && (next === undefined || edge < next)) next = edge;
+    }
+  }
+  return next;
+}
+
+/**
+ * Whether the chip pressed at {@link StagePaceInput.playerChoseSpeedAtS} still stands: no act
+ * boundary lies in `(pressedAt, simTimeS]`. A scrub back to before the press ends it too, because
+ * the press was made further on in the day than the playhead now is.
+ */
+function chipStands(input: StagePaceInput): boolean {
+  const at = input.playerChoseSpeedAtS;
+  if (at === undefined || input.simTimeS < at) return false;
+  const boundary = nextActBoundaryAfter(input.acts, at);
+  return boundary === undefined || input.simTimeS < boundary;
 }
 
 /** The act the playhead is inside, or `undefined`. Half-open, `[startS, endS)`. */
@@ -132,10 +177,13 @@ export function actAt(acts: readonly DayAct[], simTimeS: number): DayAct | undef
 /** **The speed the stage plays at this playhead.** See the module docstring for the rule. */
 export function stagePaceOf(input: StagePaceInput): StagePace {
   const watching = input.watchingSimPerRealS;
+  if (input.callAtS !== undefined && input.simTimeS >= input.callAtS) {
+    return { simPerRealS: watching, reason: 'call' };
+  }
   if (input.horizon !== 'whole-day' || input.acts.length === 0) {
     return { simPerRealS: watching, reason: 'unmanaged' };
   }
-  if (input.playerChoseSpeed) return { simPerRealS: watching, reason: 'chosen' };
+  if (chipStands(input)) return { simPerRealS: watching, reason: 'chosen' };
   if (actAt(input.acts, input.simTimeS) !== undefined) return { simPerRealS: watching, reason: 'act' };
   if (input.longestStandingS !== undefined && input.longestStandingS >= PACE_HOLD_WAIT_S) {
     return { simPerRealS: watching, reason: 'held' };
@@ -173,8 +221,14 @@ export function stagePaceNoteOf(
   switch (pace.reason) {
     case 'unmanaged':
       return undefined;
-    case 'chosen':
-      return `your speed, ${rung}, for the rest of this day`;
+    case 'call':
+      return 'stopped for the day’s call';
+    case 'chosen': {
+      const until = nextActBoundaryAfter(context.acts, context.simTimeS);
+      return until === undefined
+        ? `your speed, ${rung}, to the end of the day`
+        : `your speed, ${rung}, until ${clockAt(until, context.dayStartS)}`;
+    }
     case 'act': {
       const act = actAt(context.acts, context.simTimeS);
       return act === undefined

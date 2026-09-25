@@ -194,8 +194,8 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'these is a **load-time refusal addressed to whoever authored `data/price-schedule.json`** ' +
         '("the new shaft costs 12 u; data/price-schedule.json prices it 34"), or a config path, or ' +
         'a tier id. None of them reaches a player: the words a player reads about a price are the ' +
-        'change’s own `name`, which the FIXIT adapter drives through `standingExtrasFrom` and ' +
-        '`repairRowOf`, and the schedule’s `note` fields, which are provenance for a reviewer and ' +
+        'change’s own `name`, which the FIXIT adapter drove through `standingExtrasFrom` and ' +
+        '`repairRowOf` until the menu that drew them retired (§ D1020), and the schedule’s `note` fields, which are provenance for a reviewer and ' +
         'are drawn on no screen. `fixit/parse.ts`’s own exclusion three groups down is the same ' +
         'argument for the same reason, and this is that file’s pricing half.',
       ids: [
@@ -848,6 +848,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'shift/bookedOut.ts#bookedOutCarsOf',
         /*
+         * And `carAbsencesOf` is the same reading with the first instant included (§ D1039), which
+         * `bookedOutCarsOf` now filters — the same hyphenated modes, the same car id and two
+         * seconds, and no sentence. The strip built from it is `everyday/today.ts#todayOf`'s, driven.
+         */
+        'shift/bookedOut.ts#carAbsencesOf',
+        /*
          * And `shift/goals.ts#SHIFT_GOAL_IDS` is the goal ids as a tuple (§ D982) — `worst-wait` is
          * hyphenated — which is the id-table case `shift/types.ts#GOAL_OBSERVATION_IDS` is excluded
          * under. The words a reader meets for a goal are its label and `GOAL_PLAIN_NAMES`, both driven.
@@ -974,6 +980,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * by the Everyday adapters, and #300's own case requires those to agree with the run.
          */
         'dev/state.ts#resolvedBuildingOf',
+        /*
+         * `plannedDayOf` is `resolvedBuildingOf`'s case exactly (§ D1039): the same lookup guard in
+         * front of the same delegate, plus `core`'s `planDemand` for the start of day, whose refusal
+         * it catches and turns into `undefined`. It returns a building, a number and a boolean; what
+         * a player reads from them is `everyday/today.ts`'s strip, driven by the Everyday adapters.
+         */
+        'dev/state.ts#plannedDayOf',
         /*
          * § D231's three, here for `enterFreePlay`'s reason above and no other: the scanner reads
          * the `PlayMode` members they switch on — `shift-week`, `free-play` — as prose, because
@@ -1582,6 +1595,32 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'fixit/run.ts#fixitRunPlanOf',
         'fixit/run.ts#measuredOf',
+        /*
+         * [§ D1020](../../../../DECISIONS.md)'s judge and its register, on the same ground: numbers in,
+         * numbers or outcomes out. `morningReadingOf` is `measuredOf`'s reading of one run and is
+         * derived through the same scope-mode ids. `createFixitJudge` and `pressThroughTheJudge`
+         * orchestrate runs; every word they carry is `checkingOutcomeOf`'s and `judgedOutcomeOf`'s,
+         * which the FIXIT adapter drives — the transitive hit is a cache key and those two. The two
+         * register predicates return a string or a boolean off `HELD_FIX_CASES`, which the adapter
+         * seeds whole. `affordabilityOf` and `toggleRepair` reach prose only through `spendOf`'s
+         * schedule ids; the adapter drove them through the repair menu's rows until the menu retired,
+         * and what a player reads about a spend is `fixitSpendSummary`'s, which it still drives.
+         */
+        'fixit/run.ts#morningReadingOf',
+        'fixit/judge.ts#createFixitJudge',
+        'fixit/judge.ts#pressThroughTheJudge',
+        'fixit/held.ts#heldReasonOf',
+        'fixit/held.ts#isOffered',
+        'fixit/engine.ts#affordabilityOf',
+        'fixit/engine.ts#toggleRepair',
+        /*
+         * The five standing extras' names and lines. **Player copy that no surface draws** since the
+         * menu that listed them retired (§ D1020, § D706 clause 3 — they survive as prices, not as a
+         * menu), so there is nothing to sweep; `spendOf` still prices them for a state that selects
+         * one, which no press on either surface can produce. The day a surface draws them again, this
+         * line goes and the FIXIT adapter seeds them.
+         */
+        'fixit/engine.ts#standingExtrasFrom',
         'fixit/engine.ts#stepSpeed',
         'fixit/engine.ts#stepCapacity',
         /*
@@ -1766,6 +1805,30 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The press-moment ruling’s plumbing — wave AI, § D1029. `admittedPressDayIds` and ' +
+        '`pressDayMeasuredAs` return ids and a pin, and are derived only because they reach ' +
+        '`contractLadderIssues`’ own call-block check, whose content-author strings the entry above ' +
+        'already disposes of; `dev/state.ts#pressDayCallOf` returns a pin and a call instant and ' +
+        'reaches prose only through `shiftRunConfigOf`’s own withheld-reason strings, which that ' +
+        'function’s adapters sweep. `shift/pressCall.ts#pressCallOf`, `PRESS_CALL_RULES` and ' +
+        '`PRESS_CALL_MIN_WINDOW_S` carry the two rule ids (`first-minute-wait`, `act-start`) and a ' +
+        'number, which the two-adjacent-words scanner reads as prose: an id is a contract a renderer ' +
+        'switches on, not a string a player reads. What a player reads about the call is ' +
+        '`everyday/stageCall.ts`’s card and `shift/callRow.ts`’s row, both seeded by name in ' +
+        '`honesty/surfaces.ts`. `PRESS_CALL_ROW_ID` is `press-call`, the report row’s id, on ' +
+        '`AFTER_PRESS_ROW_ID`’s precedent above.',
+      ids: [
+        'shift/ladder.ts#admittedPressDayIds',
+        'shift/ladder.ts#pressDayMeasuredAs',
+        'dev/state.ts#pressDayCallOf',
+        'shift/pressCall.ts#pressCallOf',
+        'shift/pressCall.ts#PRESS_CALL_RULES',
+        'shift/pressCall.ts#PRESS_CALL_MIN_WINDOW_S',
+        'shift/callRow.ts#PRESS_CALL_ROW_ID',
+      ],
+    },
+    {
+      reason:
         'Returns the *facts* about why a goal cannot be judged and deliberately authors none of ' +
         'the words. Derived only because its literals are goal-kind ids and `GoalJudgement` keys, ' +
         'which the two-adjacent-words scanner reads as phrases. Carrying a sentence here would ' +
@@ -1839,7 +1902,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`dev/offThreadRuns.test.ts` drives it through a worker it answers for, including the ' +
         'failed-to-start arm and the ordering claims a moved run makes possible; that is weaker ' +
         'than the search and is said as a limitation rather than offered as coverage.',
-      ids: ['dev/offThreadRuns.ts#createOffThreadRunner', 'dev/shiftRunner.ts#createShiftRunner'],
+      ids: [
+        'dev/offThreadRuns.ts#createOffThreadRunner',
+        'dev/shiftRunner.ts#createShiftRunner',
+        /*
+         * [§ D1020](../../../../DECISIONS.md)'s morning pool, on `createOffThreadRunner`'s exact
+         * ground: its one sentence, *a morning worker failed to start: …*, exists only when a worker
+         * did not load. `dev/offThreadMornings.test.ts` drives the pool through workers it answers
+         * for; that is weaker than the search and is said as a limitation.
+         */
+        'dev/offThreadMornings.ts#createOffThreadMornings',
+      ],
     },
     {
       reason:
@@ -2124,10 +2197,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`first-session` is the name `deriveStreamSeed` mixes into the first tower’s draw, and ' +
         '`LEGIBILITY_SWEEP` is § D512’s table as data (`garden-apartments`, a count, a median), ' +
         'from which `shift/firstSession.ts` derives the eligible set. What a player reads of the ' +
-        'draw is `FIRST_SESSION_LINE`, which `EVERYDAY_TODAY` seeds on a first day and covers.',
+        'draw is `FIRST_SESSION_LINE`, which `EVERYDAY_TODAY` seeds on a first day and covers. ' +
+        'Since § D1047 two more read the stream and print nothing: `firstSessionDayFor` hands ' +
+        '`withFirstSession` the drawn pin’s crowd and standing order, and `isDealtPinnedDay` is the ' +
+        'predicate the line’s pinned arm and the boot’s seed base share — both answer with ids, ' +
+        'seeds and a boolean, and the line they choose is seeded by name.',
       ids: [
         'shift/firstSession.ts#FIRST_SESSION_STREAM',
         'shift/firstSession.ts#firstSessionContractFor',
+        'shift/firstSession.ts#firstSessionDayFor',
+        'shift/firstSession.ts#isDealtPinnedDay',
         'shift/legibility.ts#LEGIBILITY_SWEEP',
       ],
     },

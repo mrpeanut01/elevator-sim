@@ -160,7 +160,12 @@ describe('parseFixitCases', () => {
     expect(violationsOf(fileWith((entry) => { entry['budgetUnits'] = 17; })).join('\n')).toContain('10–16');
   });
 
-  it('requires exactly one repair per role', () => {
+  /*
+   * § D706 clause 2, relaxed on § D1020's commit: exactly one diagnosed repair, and each other role
+   * optional and at most once. Both halves are driven — a case with its three negative controls
+   * removed parses, and one with two diagnosed repairs or two of a control does not.
+   */
+  it('requires exactly one diagnosed repair and at most one of each other role', () => {
     const violations = violationsOf(
       fileWith((entry) => {
         const repairs = entry['repairs'] as { role: string }[];
@@ -168,7 +173,19 @@ describe('parseFixitCases', () => {
       }),
     );
     expect(violations.join('\n')).toContain('"diagnosed" repairs');
-    expect(violations.join('\n')).toContain('"costly-fix" repairs');
+    expect(violationsOf(
+      fileWith((entry) => {
+        const repairs = entry['repairs'] as { role: string }[];
+        (repairs[1] as { role: string }).role = 'cheap-fix';
+      }),
+    ).join('\n')).toContain('"cheap-fix" repairs');
+    expect(
+      violationsOf(
+        fileWith((entry) => {
+          entry['repairs'] = (entry['repairs'] as { role: string }[]).filter((r) => r.role === 'diagnosed');
+        }),
+      ).filter((line) => line.includes('repairs;')),
+    ).toEqual([]);
   });
 
   /**

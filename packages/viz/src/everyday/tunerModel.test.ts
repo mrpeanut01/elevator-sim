@@ -601,7 +601,7 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
 
     /** § 3.2's career line — the rail's two figures, as the identity card draws them. */
     const careerLine = (week: WeekState): string =>
-      railModel({ screen: 'menu', ctx: 'daily' }, { week, dayClosed: true }).footer.identity.streak;
+      railModel({ screen: 'menu', ctx: 'daily' }, { week }).footer.identity.streak;
 
     it('shows nothing saved before a day is closed, on a cold profile', () => {
       const state = baseState();

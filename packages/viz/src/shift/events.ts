@@ -327,6 +327,56 @@ export function demandTemplateVariesMix(
   }
 }
 
+/**
+ * **What a wrinkle that asks for a mix does on a day whose template keeps its own** — one sentence,
+ * the brief's, the report header's and the overnight beat's ([§ D1040](../../../../DECISIONS.md)).
+ *
+ * The post-AH panel's A.md defect 5: the fire drill's brief said *"Twenty minutes where the whole
+ * building wants to be in the lobby at once"*, and on a whole authored day the run made an all-day
+ * rise in demand with the day's own mix — 165 people standing in the car park at nine. The only
+ * account of that was on the *previous* day's report, in the engine's words (*"The engine refuses
+ * both at once rather than letting one win silently"*). `core` refuses an explicit split beside a
+ * template that varies the mix, so the mix is the template's and the level is all that moves
+ * ({@link shiftRunPatch}); this says so in the player's words and is the one place that does.
+ *
+ * **Nothing about the run changes here** — which half wins is `core`'s rule, and making the drill
+ * reach the mix on a whole day is a separate decision. What changes is that the sentence describes
+ * the run the player gets. A wrinkle that moves only the mix moves **nothing** on such a day, and
+ * the sentence says that too, because a caption over an ordinary day naming a conference is the
+ * caption-that-does-not-describe-the-picture defect this module was written against.
+ */
+export function mixKeptSentenceOf(event: ShiftEvent): string {
+  const factor = event.effect.arrivalRateMultiplier;
+  const what = `the ${event.name.charAt(0).toLowerCase()}${event.name.slice(1)}`;
+  if (factor === null || factor === 1) {
+    return (
+      `This tower's day keeps its own mix of trips, which changes through the day, and the mix is ` +
+      `the only thing ${what} would have moved — so the run is an ordinary day.`
+    );
+  }
+  return (
+    `This tower's day keeps its own mix of trips, which changes through the day, so ${what} ` +
+    `changes how many people travel and not where they go: ${factor > 1 ? 'more' : 'fewer'} of ` +
+    'them, all day.'
+  );
+}
+
+/**
+ * The event as the run will have it — its note replaced by {@link mixKeptSentenceOf} where the
+ * run's template keeps its own mix and the event asked for one, and the event itself everywhere
+ * else. [§ D1040](../../../../DECISIONS.md).
+ *
+ * `templateVariesMix` is {@link demandTemplateVariesMix}'s answer for the run, which is the same
+ * question {@link shiftRunPatch} asks before it withholds the split, so the note is replaced on
+ * exactly the runs whose mix was withheld.
+ */
+export function eventAsRun(event: ShiftEvent, templateVariesMix: boolean): ShiftEvent {
+  if (!templateVariesMix || event.effect.changesNothing || event.effect.directionalSplit === null) {
+    return event;
+  }
+  return { ...event, note: mixKeptSentenceOf(event) };
+}
+
 export interface ShiftRunPatchInput {
   readonly event: ShiftEvent;
   /** The building the shift is running — grown, if `grownBuilding` has been applied. */
@@ -347,6 +397,12 @@ export interface ShiftRunPatchInput {
    * `endless-rush` vary the mix too, and so does `office-day`.
    */
   readonly templateVariesMix?: boolean | undefined;
+  /**
+   * The cars the **tower's own schedule** takes out today — `shift/ladder.ts#rungIncidents` for the
+   * week's rung, [§ D1038](../../../../DECISIONS.md). Spoken for: the day's wrinkle takes another
+   * car rather than one the tower already has out over the same stretch. `undefined` is none.
+   */
+  readonly booked?: readonly Incident[] | undefined;
 }
 
 /** What a run builder applies. Both halves are values the simulator reads. */
@@ -404,11 +460,12 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
 
   if (effect.directionalSplit !== null) {
     if (input.templateVariesMix === true) {
-      withheld.push(
-        `${input.event.name}: the directional mix is set by this run’s demand template, which ` +
-          'varies it within the run. The engine refuses both at once rather than letting one win ' +
-          'silently, so the mix is the template’s and only the demand level moved.',
-      );
+      /*
+       * The player's words for `core`'s refusal — § D1040. This read *"the directional mix is set by
+       * this run's demand template … The engine refuses both at once rather than letting one win
+       * silently"*, on the day before the one it described, and was the only place that said so.
+       */
+      withheld.push(`${input.event.name}: ${mixKeptSentenceOf(input.event)}`);
     } else {
       demand.directionalSplit = effect.directionalSplit;
     }
@@ -421,7 +478,7 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
    * needs the decision without the prose.
    */
   const { derate } = effect;
-  const cars = eventCarChoice(effect, input.building);
+  const cars = eventCarChoice(effect, input.building, input.booked ?? []);
 
   if (cars.holdShortfall > 0) {
     withheld.push(
@@ -441,7 +498,14 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
     withheld.push(
       `${input.event.name}: asked to stand ${String(derate.cars)} car(s) down for part of ` +
         `the shift and could stand ${String(derate.cars - cars.derateShortfall)}. Every bank ` +
-        'keeps at least one car in service — a bank with none is a set of floors nobody can reach.',
+        'keeps at least one car in service — a bank with none is a set of floors nobody can reach.' +
+        /*
+         * § D1038: the tower's own booking is the other half of why, where it took a car the
+         * wrinkle could otherwise have had — said, because the brief names that booking too.
+         */
+        (cars.derateSpokenFor > 0
+          ? ' The tower has its own car booked out over the same stretch, and that car is not the day’s to take.'
+          : ''),
     );
   }
 
@@ -507,6 +571,12 @@ export interface EventCarChoice {
   /** How many of `derate.cars` could not be stood down. */
   readonly derateShortfall: number;
   /**
+   * How many of the cars the derate would have taken with nothing booked are ones the tower books
+   * over an overlapping stretch — so the choice moved, or fell short, because of the booking.
+   * [§ D1038](../../../../DECISIONS.md). `0` with nothing booked.
+   */
+  readonly derateSpokenFor: number;
+  /**
    * The event declared **both** a whole-shift hold and a window, so the window was dropped.
    *
    * The two pick from the same building by the same total order and would take the same car out
@@ -516,27 +586,67 @@ export interface EventCarChoice {
   readonly derateRefusedForHold: boolean;
 }
 
-export function eventCarChoice(effect: EventEffect, building: BankedBuilding): EventCarChoice {
+export function eventCarChoice(
+  effect: EventEffect,
+  building: BankedBuilding,
+  /*
+   * **The tower's own bookings are spoken for** — [§ D1038](../../../../DECISIONS.md), the week
+   * swarm's ruling S1 § 1 on the post-AH panel's N5. Midtown's Tuesday `move-in:middle` picked car D
+   * by this function's total order, and the rung already books car D out 10:30–13:00; the two
+   * schedules collapsed into the rung's, so the run was identical to an ordinary Tuesday on all 95
+   * configurations the swarm measured while the brief promised a car tied up through the middle of
+   * the shift. A whole-shift hold skips every booked car; a window skips a booked car whose window
+   * overlaps its own. What is left is chosen by the same order, and a building that cannot spare a
+   * car reports the shortfall, which {@link shiftRunPatch} words. `calendarPatch` passes the same
+   * list, so the goods car it reserves around the day's choice is reserved around this one.
+   */
+  booked: readonly Incident[] = [],
+): EventCarChoice {
   const none: EventCarChoice = {
     holdCars: Object.freeze([]),
     holdShortfall: 0,
     derateCars: Object.freeze([]),
     derateShortfall: 0,
+    derateSpokenFor: 0,
     derateRefusedForHold: false,
   };
   if (effect.changesNothing) return none;
 
   const holds =
     effect.carsOutOfService > 0
-      ? carsToDerate(building, effect.carsOutOfService)
+      ? carsToDerate(withoutCars(building, booked.map((entry) => entry.car)), effect.carsOutOfService)
       : { held: [] as readonly CarRef[], shortfall: 0 };
   const held = { ...none, holdCars: holds.held, holdShortfall: holds.shortfall };
 
-  if (effect.derate === null) return held;
+  const { derate } = effect;
+  if (derate === null) return held;
   if (holds.held.length > 0) return { ...held, derateRefusedForHold: true };
 
-  const choice = carsToDerate(building, effect.derate.cars);
-  return { ...held, derateCars: choice.held, derateShortfall: choice.shortfall };
+  const overlapping = booked
+    .filter((entry) => entry.fromFraction < derate.toFraction && derate.fromFraction < entry.toFraction)
+    .map((entry) => entry.car);
+  const choice = carsToDerate(withoutCars(building, overlapping), derate.cars);
+  const unbooked = carsToDerate(building, derate.cars);
+  return {
+    ...held,
+    derateCars: choice.held,
+    derateShortfall: choice.shortfall,
+    derateSpokenFor: unbooked.held.filter((car) =>
+      overlapping.some((taken) => taken.bankId === car.bankId && taken.carId === car.carId),
+    ).length,
+  };
+}
+
+/** The building with these cars left out of their banks — spoken for, so no rule may pick them. */
+function withoutCars(building: BankedBuilding, cars: readonly CarRef[]): BankedBuilding {
+  if (cars.length === 0) return building;
+  const taken = new Set(cars.map((car) => JSON.stringify([car.bankId, car.carId])));
+  return {
+    banks: building.banks.map((bank) => ({
+      ...bank,
+      cars: bank.cars.filter((car) => !taken.has(JSON.stringify([bank.id, car.id]))),
+    })),
+  };
 }
 
 /**

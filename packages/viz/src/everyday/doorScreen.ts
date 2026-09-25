@@ -19,7 +19,7 @@ import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
 import { BODY, CARD, el, EYEBROW, LEDE, MONO, pill, QUIET, section, unavailableBand } from './screenDom.js';
 import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
-import { isDailySeed } from '../shift/dailySeed.js';
+import { dailySeedAt, isDailySeed } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
 import { todayOf } from './today.js';
 import {
@@ -49,12 +49,17 @@ let lastView: DoorScreenView | undefined;
 function viewOf(context: EverydayScreenShellContext): DoorScreenView {
   const { host } = context;
   const selection = host.selection();
+  const dayAhead = host.dayAhead();
   return doorScreenViewOf({
     week: host.week(),
     today: todayOf({
       week: host.week(),
       calendar: host.calendarPeriod(),
-      building: host.resolvedBuilding(),
+      /* The run the next press produces, and its clock — § D1039, `briefScreen.ts#factsNow`'s. */
+      building: dayAhead.building,
+      dayStartS: dayAhead.startOfDayS,
+      templateVariesMix: dayAhead.templateVariesMix,
+      dayCars: dayAhead.dayCars,
       buildingId: selection.buildingId,
       dispatcherName: host.dispatcherById(selection.dispatcherId)?.name,
       /* Any profile's name, for the moot-dispatcher sentence — § D914. */
@@ -73,12 +78,15 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
        * which is § D227’s stale claim arriving through a cache instead of through a sentence.
        */
       crowdIsToday: isDailySeed(host.seed(), deviceNowMs()),
+      /* The day's own crowd, for the first-session line's pinned arm — § D1047. */
+      daySeed: dailySeedAt(deviceNowMs()),
       firstSession: isFirstDayOnALegibleTower(host.week()),
       /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
       units: everydayProfileStore().units(),
     }),
     dayOffset,
     dayClosed: host.runState().dayClosed,
+    nameOf: (buildingId) => host.buildingById(buildingId)?.name,
   });
 }
 
@@ -313,6 +321,35 @@ function mountDoor(
       `border:1px solid ${view.primary.inert ? C.amberEdge : C.ruleLight}`,
     ].join(';');
     column.append(primaryNote);
+    /*
+     * **Today again, beside a primary that now opens tomorrow** — § D1004. The retry is the
+     * product's most-used verb (`WeekState.attempt`'s docstring), and taking it off the primary to
+     * give the door a way into tomorrow may not take it off the door: it goes to the brief, where
+     * *Start the day* runs today again from no presses on the same crowd.
+     */
+    if (view.primary.again !== undefined) {
+      const again = el(document_, 'div', 'everyday-door-again');
+      again.style.cssText = `display:flex;align-items:center;gap:11px;flex-wrap:wrap`;
+      const button = el(document_, 'button', 'everyday-door-again-press', view.primary.again.label);
+      button.type = 'button';
+      button.style.cssText = [
+        'cursor:pointer',
+        'background:transparent',
+        `border:1px solid ${C.rule}`,
+        `border-radius:${String(R.control)}px`,
+        'padding:6px 12px',
+        `color:${C.ink}`,
+        'font-size:12.5px',
+        'font-weight:600',
+      ].join(';');
+      button.addEventListener('click', () => {
+        context.go('brief');
+      });
+      const note = el(document_, 'span', 'everyday-door-again-note', view.primary.again.note);
+      note.style.cssText = QUIET;
+      again.append(button, note);
+      column.append(again);
+    }
     return column;
   }
 
@@ -513,6 +550,16 @@ function mountDoor(
      * one question.
      */
     primary: () => {
+      /*
+       * A closed today opens tomorrow — § D1004. The same pair of calls as the report's own
+       * *Open the doors on …* (`reportScreen.ts`), so a day opened here and one opened there cannot
+       * differ. Read off the view the bar was drawn from, so the label and the press are one decision.
+       */
+      if (dayOffset === 0 && lastView?.primary.goes === 'tomorrow') {
+        context.host.openTomorrow();
+        context.go('brief');
+        return;
+      }
       if (dayOffset === 0) {
         context.go('brief');
         return;
@@ -541,14 +588,21 @@ function mountDoor(
 function doorBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
   const replay = dayOffset !== 0;
-  const label = base.primary.variants[replay ? 1 : 0] ?? base.primary.label;
   /* The view's own resolution of the day — `doorView.ts#primaryOf` — so the bar and the screen agree. */
   const view = lastView;
+  /*
+   * The third variant carries the weekday, so it is the view's label rather than the table's
+   * placeholder — `Open the doors on ⟨day⟩` is the cell, `Open the doors on Tuesday` is the press.
+   */
+  const label =
+    view?.primary.goes === 'tomorrow' && !replay
+      ? view.primary.label
+      : (base.primary.variants[replay ? 1 : 0] ?? base.primary.label);
   const inert = replay && view !== undefined && view.primary.inert ? view.primary.note : undefined;
   return {
     ...base,
     primary: { ...base.primary, label, ...(inert === undefined ? {} : { inert }) },
-    note: replay && view !== undefined ? view.primary.note : base.note,
+    note: view !== undefined && (replay || view.primary.goes === 'tomorrow') ? view.primary.note : base.note,
   };
 }
 

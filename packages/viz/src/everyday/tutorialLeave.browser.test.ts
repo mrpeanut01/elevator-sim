@@ -8,7 +8,8 @@
  * only a browser can hold, and this file drives both on the shipped bundle:
  *
  * 1. **Neither exit files a day.** Checked by the one line whose presence *is* an empty week:
- *    § D514's `FIRST_SESSION_LINE`, drawn on the daily door exactly when
+ *    § D514's first-session line — its pinned arm since § D1047, the one a fresh device's pinned
+ *    day draws — on the daily door exactly when
  *    `shift/firstSession.ts#isFirstDayOnALegibleTower` holds, which needs `history.length === 0`.
  *    The filing used to switch it off; this is that regression's test.
  * 2. **Within a session the cover is not re-offered, and across a reload it is, with a live route to
@@ -26,7 +27,7 @@ import {
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
-import { FIRST_SESSION_LINE } from '../shift/firstSession.js';
+import { FIRST_SESSION_LINE_PINNED } from '../shift/firstSession.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -64,7 +65,7 @@ async function expectNothingFiled(page: Page): Promise<void> {
   await page.waitForTimeout(8_000);
   expect(await page.locator('.everyday-landing, .everyday-tutorial').count(), 'the cover came back in-session').toBe(0);
   await openEverydayDoor(page);
-  await page.waitForFunction((line) => document.body.textContent?.includes(line) === true, FIRST_SESSION_LINE, {
+  await page.waitForFunction((line) => document.body.textContent?.includes(line) === true, FIRST_SESSION_LINE_PINNED, {
     timeout: 30_000,
   });
 }

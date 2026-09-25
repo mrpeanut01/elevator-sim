@@ -14,37 +14,20 @@
  * interpolate is either the engine's own spend arithmetic or § 9's prices read from
  * the schedule's own figures, passed in — never a literal (GitHub issue #366).
  *
- * ## Three of these words are ruled to retire, and the ruling says when — [§ D706](../../../../DECISIONS.md)
+ * ## The menu has retired, and three of these words went with it — [§ D1020](../../../../DECISIONS.md)
  *
  * `docs/38` § 2.1 retires *"the four-repair menu and the five decoys … and with them the printed
- * line that says what kind of fix it is"*, under the heading **No proposed fixes**, and this module
- * still ships `repairsEyebrow`, `repairsHint` and `diagnosisEyebrow` while `everyday/fixitScreen.ts`
- * still draws the toggle grid. **That is sequencing and not a page nobody re-read**, which is worth
- * a paragraph here because a reader arriving at these constants from `docs/38` will otherwise find
- * a design ruling and a screen that contradicts it, with nothing in between — an adversarial panel
- * did exactly that on 2026-09-19 and filed it as a suspected gap.
+ * line that says what kind of fix it is"*, and [§ D706](../../../../DECISIONS.md) conditioned that on
+ * an editor that could write every answer and on a judge that could say whether one had. § D1000
+ * built the first and § D1020 the second, so the retirement landed on § D1020's commit:
+ * `repairsEyebrow`, `repairsHint`, `stateSelected` and `stateAffordable` are gone with the toggle
+ * grid they labelled, and the kind-of-fix sentence left the eighteen `asBuilt.note`s on the same
+ * commit. `diagnosisEyebrow` stays, because § D706 clause 5 keeps the diagnosis — what went is the
+ * menu of answers under it. The repairs stay in `data/fixit-cases.json`: the diagnosed one is each
+ * case's pinned witness and the others are priced negative controls, and nothing draws either.
  *
- * § D706 is the ruling in between, it is **in force** (`docs/39` § 2), and it is a measurement
- * rather than a preference: **1 of 18** shipped cases' `diagnosed` answers is reachable from the
- * editor `fixit/types.ts#FixitState` draws today, so retiring the menu before the editor can write
- * the other seventeen answers would leave seventeen scenarios at zero survivors, against § D525
- * clause 3's own definition of what a scenario is. So all three retirements land **together**, on
- * the commit that gives this screen the priced change families those answers live behind, and the
- * `diagnosed` repair stays in `data/fixit-cases.json` afterwards as the scenario's pinned witness.
- *
- * Nothing in this module may be read as a claim that the retirement has happened, and nothing a
- * player reads here says it has. When it lands, these three keys go and this paragraph goes with
- * them.
- *
- * **One part of it has landed early, deliberately, and it is not any of the three keys above** —
- * GitHub issue **#566**, [§ D869](../../../../DECISIONS.md). The *answer key* is gone: the
- * sentence on every diagnosed repair naming the complaint as its target, the *"and it is a
- * setting"* tail on seven of them, the `free — configuration` price line, and the draw order that
- * put the correct row first on all eighteen cases. § D706 clause 6 conditions the **menu** on an
- * editor that can write the answers, and none of its reasons reach a sentence whose only job is to
- * say which of four rows is right — so that sentence leaves on the commit that makes it false,
- * which is § D227 run forwards. The grid below still draws four rows; what it no longer does is
- * mark one of them.
+ * **The answer key had already gone** — GitHub issue **#566**, [§ D869](../../../../DECISIONS.md) —
+ * which is why the grid, while it lasted, drew four unmarked rows in a hashed order.
  *
  * ## The copy is the prototype's
  *
@@ -55,16 +38,23 @@
  * because the prototype's toy model ran instantly and never needed one.
  */
 
-import type { FixitSpend } from '../fixit/engine.js';
+import {
+  rowsBoughtOf,
+  standingExtrasFrom,
+  type FixitSpend,
+  type FixitVerdictContext,
+} from '../fixit/engine.js';
+import type { PriceSchedule } from '../pricing/types.js';
 import type {
   DialGroupInput,
   DoorInput,
+  EditorInputs,
   RezoneInput,
   RowPurchase,
   TenancyInput,
 } from '../fixit/editorInputs.js';
-import { EDITOR_PARKING_STRATEGIES, KEYED_BANK, OUT_OF_SERVICE } from '../fixit/types.js';
-import type { DialValue, EditorParkingStrategy, FixitCase, FixitState } from '../fixit/types.js';
+import { EDITOR_PARKING_STRATEGIES, EVERY_CAR, KEYED_BANK, OUT_OF_SERVICE } from '../fixit/types.js';
+import type { DialValue, EditorParkingStrategy, FixitCase, FixitExtra, FixitState } from '../fixit/types.js';
 import type { ActionBarModel } from './actionBar.js';
 /* The currency's own words, from `data/chime-ledger.json` — § D530 authors them and no screen may. */
 import { CHIME_PRICES } from './chimesPanel.js';
@@ -73,11 +63,9 @@ import { CHIME_PRICES } from './chimesPanel.js';
  * The screen's authored chrome, one frozen object so the honesty sweep renders every sentence.
  *
  * Sources, line by line: `railHeading`, `railHint`, `complaintEyebrow`, `diagnosisEyebrow`,
- * `repairsEyebrow`, `repairsHint`, `machinesEyebrow`, the two tags and `noCapital` are the
- * prototype markup's own cells; `noteReady`/`noteSolved` are its `fixFootNote` pair;
- * `stateSelected`/`stateAffordable` are its repair-row state words (the third state's words —
- * *beyond a repair budget* — arrive inside `fixit/engine.ts#repairRowOf`'s refusal and are not
- * restated here); `asBuiltEyebrow` is § 10.1 item 2's own name for the card, uppercased to the
+ * `machinesEyebrow`, the two tags and `noCapital` are the prototype markup's own cells;
+ * `noteReady`/`noteSolved` are its `fixFootNote` pair; the menu's cells — its eyebrow, its hint and
+ * its two row-state words — retired with the menu ([§ D1020](../../../../DECISIONS.md)); `asBuiltEyebrow` is § 10.1 item 2's own name for the card, uppercased to the
  * eyebrow register, because the prototype's heading for that region names its elevation editor —
  * the per-shaft, per-floor-band click-to-set grid § 10.1 item 6 asks for, which this build still
  * deliberately does not draw (see `fixitScreen.ts`). What *is* drawn now is narrower: one control
@@ -116,26 +104,28 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   pairStageEyebrow: 'WATCH WHAT YOU CHANGED',
   pairStageNote:
     'The same morning and the same crowd, played once on each building — as it stands on the left, ' +
-    'with your change on the right. The verdict below is measured from these two runs and no others.',
+    'with your change on the right. The verdict below starts from these two runs, and a change that clears this morning is then run on forty-nine more before it is called fixed.',
   pairStageSkip: 'Skip to the verdict',
   pairStageBeforeCaption: 'As it stands',
   pairStageAfterCaption: 'With your change',
   diagnosisEyebrow: 'THE DIAGNOSIS',
-  repairsEyebrow: 'RECONFIGURE IT YOURSELF',
-  repairsHint:
-    'a repair budget, not a capital one — the big items are priced so you can see why they are ' +
-    'not the answer',
   machinesEyebrow: 'THE MACHINES',
   /** The rail tag on a case whose pass conditions have held — § 10.1's `FIXED`. */
   solvedTag: 'FIXED',
   openTag: 'OPEN',
-  /** The repair row's state word while selected. The `✓` is the toggle's visible mark. */
-  stateSelected: '✓ in the repair',
-  stateAffordable: 'within budget',
   /** § 3.3's note for the fixit row — the guide's cell reads `⟨what the run will measure⟩`. */
   noteReady:
     'Runs the same crowd again with everything you have changed, and scores the whole building.',
   noteSolved: 'This one is settled. There are more buildings than you have afternoons.',
+  /*
+   * **A verdict that no longer describes the order on screen** — [§ D1011](../../../../DECISIONS.md),
+   * assessor C's D6. Drawn over the outcome card the moment the order moves away from the one the
+   * verdict was measured on, and the Run press comes back beside it. The verdict is kept rather than
+   * cleared, because it is still a true statement about the order that was run; what it is not is a
+   * statement about this one, and the sentence says exactly that.
+   */
+  verdictStale:
+    'You have changed the order since this verdict. It describes the order you ran, not the one on screen now — run the day again to see this one.',
   /** `dev/fixitPanel.ts`'s relabel while the synchronous pair computes. */
   runningLabel: 'Running the day…',
   /**
@@ -144,6 +134,19 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    * not press this*, and those are different questions (GitHub issue #262).
    */
   runningWhy: 'The pair of days is being simulated. This finishes on its own.',
+  /*
+   * [§ D1020](../../../../DECISIONS.md): the letter's morning cleared and the same order is running
+   * on the forty-nine derived mornings. The relabel says what is happening and the inert sentence
+   * why the press waits — GitHub issue #262's two questions, asked of a longer wait.
+   */
+  checkingLabel: 'Checking it on 49 more mornings…',
+  checkingWhy:
+    'It cleared on the letter’s morning, and one morning can be luck. The same order is running on forty-nine more; this finishes on its own.',
+  /*
+   * A case held from the list — § D1020. Its own reason is drawn beside the tag, and the reason is
+   * `fixit/held.ts`'s, where the measurement that holds it is recorded.
+   */
+  heldTag: 'HELD',
   loading: 'Loading the case file…',
   emptyFile: 'The case file holds no cases.',
   /** The machinery card's capital split when nothing bought steel — the prototype's own word. */
@@ -180,6 +183,12 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   dialsHint:
     'Every setting the controller holds, grouped by what the owner charges for it. One charge covers a whole group, however many of its settings you move.',
   dialStanding: 'as it stands',
+  /*
+   * § D1020's UX items. The cost-term weights fold under one heading, identically on every case —
+   * no shipped answer lives in them, and a fold that never varies with the case carries no
+   * information about which dial is the answer (`docs/38` § 2.1's line is not rebuilt out of layout).
+   */
+  weightsFold: 'The rest of the standing order — how the controller weighs one car against another',
   dialOn: 'yes',
   dialOff: 'no',
   groupPricedOnce: 'once for the group',
@@ -258,9 +267,14 @@ export interface FixitCaseRailRow {
   readonly name: string;
   readonly towerLine: string;
   readonly solved: boolean;
-  /** {@link FIXIT_SCREEN_COPY.solvedTag} or {@link FIXIT_SCREEN_COPY.openTag}. */
+  /** {@link FIXIT_SCREEN_COPY.solvedTag}, {@link FIXIT_SCREEN_COPY.openTag} or {@link FIXIT_SCREEN_COPY.heldTag}. */
   readonly tag: string;
   readonly active: boolean;
+  /**
+   * Why the case is held from the list, or `undefined` for a case that is offered — § D1020. A held
+   * row is drawn with its reason and cannot be opened; it is never silently dropped.
+   */
+  readonly heldReason?: string | undefined;
 }
 
 export interface FixitCaseRailModel {
@@ -290,19 +304,32 @@ export function fixitCaseRailModel(
   solvedIds: ReadonlySet<string>,
   selectedId: string | undefined,
   towerLineOf: (entry: FixitCase) => string,
+  heldReasonOf: (caseId: string) => string | undefined = () => undefined,
 ): FixitCaseRailModel {
-  const rows: readonly FixitCaseRailRow[] = cases.map((entry) => ({
-    id: entry.id,
-    name: entry.name,
-    towerLine: towerLineOf(entry),
-    solved: solvedIds.has(entry.id),
-    tag: solvedIds.has(entry.id) ? FIXIT_SCREEN_COPY.solvedTag : FIXIT_SCREEN_COPY.openTag,
-    active: entry.id === selectedId,
-  }));
+  const rows: readonly FixitCaseRailRow[] = cases.map((entry) => {
+    const heldReason = heldReasonOf(entry.id);
+    const solved = heldReason === undefined && solvedIds.has(entry.id);
+    return {
+      id: entry.id,
+      name: entry.name,
+      towerLine: towerLineOf(entry),
+      solved,
+      tag:
+        heldReason !== undefined
+          ? FIXIT_SCREEN_COPY.heldTag
+          : solved
+            ? FIXIT_SCREEN_COPY.solvedTag
+            : FIXIT_SCREEN_COPY.openTag,
+      active: entry.id === selectedId,
+      heldReason,
+    };
+  });
   const fixed = rows.filter((row) => row.solved).length;
+  /* Out of the cases offered: a held case is not one the player can fix, so it is not in the total. */
+  const offered = rows.filter((row) => row.heldReason === undefined).length;
   return {
     heading: FIXIT_SCREEN_COPY.railHeading,
-    count: `${String(fixed)}/${String(rows.length)} fixed`,
+    count: `${String(fixed)}/${String(offered)} fixed`,
     rows,
     hint: FIXIT_SCREEN_COPY.railHint,
   };
@@ -318,6 +345,12 @@ export interface FixitBarView {
   readonly ran: boolean;
   /** The open case's three rows have held (§ 10.4's `Next building`, and the inversion). */
   readonly solved: boolean;
+  /**
+   * The letter's morning cleared and the other forty-nine are running — [§ D1020](../../../../DECISIONS.md).
+   * Only meaningful while {@link running}; optional so a caller that predates the judge reads as
+   * not checking.
+   */
+  readonly checking?: boolean;
 }
 
 /**
@@ -343,8 +376,8 @@ export function fixitBarModel(base: ActionBarModel, view: FixitBarView): ActionB
       ...base,
       primary: {
         ...base.primary,
-        label: FIXIT_SCREEN_COPY.runningLabel,
-        inert: FIXIT_SCREEN_COPY.runningWhy,
+        label: view.checking === true ? FIXIT_SCREEN_COPY.checkingLabel : FIXIT_SCREEN_COPY.runningLabel,
+        inert: view.checking === true ? FIXIT_SCREEN_COPY.checkingWhy : FIXIT_SCREEN_COPY.runningWhy,
       },
       note: FIXIT_SCREEN_COPY.noteReady,
     };
@@ -519,17 +552,18 @@ export function fixitParkingRow(
   standing: string,
   priceUnits: number,
 ): FixitParkingRow {
-  const words: Readonly<Record<EditorParkingStrategy, string>> = {
-    stay: FIXIT_SCREEN_COPY.parkingStay,
-    lobby: FIXIT_SCREEN_COPY.parkingLobby,
-    'zone-center': FIXIT_SCREEN_COPY.parkingZone,
-    'predicted-demand': FIXIT_SCREEN_COPY.parkingForecast,
-    'fixed-floor': FIXIT_SCREEN_COPY.parkingFixedFloor,
-  };
+  const words = PARKING_WORDS;
   const options: FixitParkingOption[] = [
     {
       value: null,
-      label: FIXIT_SCREEN_COPY.parkingStanding,
+      /*
+       * § D1020: the standing strategy, named, where this screen has a word for it — *as it stands —
+       * back down at the lobby* rather than *as the standing order has it*, which hid the one thing
+       * a diagnosis about parking quotes.
+       */
+      label: (EDITOR_PARKING_STRATEGIES as readonly string[]).includes(standing)
+        ? `${FIXIT_SCREEN_COPY.dialStanding} — ${words[standing as EditorParkingStrategy]}`
+        : FIXIT_SCREEN_COPY.parkingStanding,
       selected: state.parkingStrategy === null,
     },
   ];
@@ -552,6 +586,138 @@ export function fixitParkingRow(
     priced:
       priceUnits === 0 ? FIXIT_SCREEN_COPY.parkingFree : `${String(priceUnits)} u`,
     options,
+  };
+}
+
+/** Each parking strategy in the select's own words — one table for the select and the verdict. */
+const PARKING_WORDS: Readonly<Record<EditorParkingStrategy, string>> = Object.freeze({
+  stay: FIXIT_SCREEN_COPY.parkingStay,
+  lobby: FIXIT_SCREEN_COPY.parkingLobby,
+  'zone-center': FIXIT_SCREEN_COPY.parkingZone,
+  'predicted-demand': FIXIT_SCREEN_COPY.parkingForecast,
+  'fixed-floor': FIXIT_SCREEN_COPY.parkingFixedFloor,
+});
+
+/**
+ * **The order the player ran, in the words of the controls that set it** — [§ D1011](../../../../DECISIONS.md).
+ *
+ * The composed fixed verdict (`fixit/engine.ts#classifyOutcome`) names what the player changed
+ * rather than what the diagnosis names, and it names it the way the screen already does: a dial by
+ * `core`'s own player name and value words (`fixit/editorInputs.ts` carries them from the schema's
+ * `player` block), a car by the bank the rezone select calls it, a door hold by the sides the door
+ * row labels, a tenancy by its authored cohort and position. **No mechanism and no judgement** —
+ * only what was set, because the verdict's close says the runs show *that* it worked and not *why*.
+ *
+ * One line per change the order carries, in the order the screen draws its families. A value the
+ * inputs cannot word (a dial the gate has since closed) is dropped rather than printed as an id:
+ * `withPrunedDials` already takes such a dial out of the order both surfaces run, so a line for it
+ * would describe a change the run did not carry.
+ */
+export function fixitOrderLinesOf(input: {
+  readonly entry: FixitCase;
+  readonly state: FixitState;
+  readonly inputs: EditorInputs;
+  readonly extras: readonly FixitExtra[];
+}): readonly string[] {
+  const { entry, state, inputs } = input;
+  const lines: string[] = [];
+  for (const repair of entry.repairs) {
+    if (state.selectedRepairIds.includes(repair.id)) lines.push(repair.name);
+  }
+  if (state.speedSteps > 0) {
+    lines.push(`${FIXIT_SCREEN_COPY.speedLabel} — +${(state.speedSteps * 0.5).toFixed(1)} m/s`);
+  }
+  if (state.capacitySteps > 0) {
+    lines.push(`${FIXIT_SCREEN_COPY.capacityLabel} — +${String(state.capacitySteps * 2)} places`);
+  }
+  if (state.zoneOverlapFloors > 0) {
+    const floors = state.zoneOverlapFloors === 1 ? 'floor' : 'floors';
+    lines.push(`${FIXIT_SCREEN_COPY.zonesLabel} — +${String(state.zoneOverlapFloors)} ${floors} each side`);
+  }
+  if (state.parkingStrategy !== null) {
+    lines.push(`${FIXIT_SCREEN_COPY.parkingLabel} — ${PARKING_WORDS[state.parkingStrategy]}`);
+  }
+  if (state.topFloorRaiseM > 0) {
+    const metres = state.topFloorRaiseM === 1 ? 'metre' : 'metres';
+    lines.push(`${FIXIT_SCREEN_COPY.elevationLabel} — +${String(state.topFloorRaiseM)} ${metres}`);
+  }
+  for (const group of inputs.dialGroups) {
+    for (const dial of group.dials) {
+      if (dial.selected === undefined) continue;
+      const value =
+        typeof dial.selected === 'boolean'
+          ? dial.selected
+            ? FIXIT_SCREEN_COPY.dialOn
+            : FIXIT_SCREEN_COPY.dialOff
+          : dial.options.find((option) => encodeFamilyValue(option.value) === encodeFamilyValue(dial.selected))
+              ?.text;
+      if (value === undefined) continue;
+      lines.push(`${dial.name} — ${value}`);
+    }
+  }
+  for (const [target, setting] of Object.entries(state.doorDwell)) {
+    const who = target === EVERY_CAR ? FIXIT_SCREEN_COPY.doorEveryCar : `Car ${target}`;
+    const sides = [
+      ...(setting.hallCallS === undefined ? [] : [`${setting.hallCallS.toFixed(1)} s ${FIXIT_SCREEN_COPY.doorHallLabel}`]),
+      ...(setting.carCallS === undefined ? [] : [`${setting.carCallS.toFixed(1)} s ${FIXIT_SCREEN_COPY.doorCarLabel}`]),
+    ];
+    if (sides.length === 0) continue;
+    lines.push(`${FIXIT_SCREEN_COPY.doorLabel} ${FIXIT_SCREEN_COPY.doorTargetLabel} ${who} — ${sides.join(', ')}`);
+  }
+  const bankName = new Map(inputs.rezone.banks.map((bank) => [bank.id, bank.name]));
+  for (const car of inputs.rezone.cars) {
+    if (car.target === car.standingBankId) continue;
+    const where =
+      car.target === KEYED_BANK
+        ? FIXIT_SCREEN_COPY.rezoneKeyed
+        : car.target === OUT_OF_SERVICE
+          ? FIXIT_SCREEN_COPY.rezoneOut
+          : (bankName.get(car.target) ?? car.target);
+    lines.push(`Car ${car.id} ${FIXIT_SCREEN_COPY.rezoneCarLabel} ${where}`);
+  }
+  for (const bank of inputs.rezone.banks) {
+    if (state.bankFloors[bank.id] !== undefined) {
+      const served = inputs.rezone.floorOrder.filter((id) => bank.floors.includes(id));
+      lines.push(`${bank.name} ${FIXIT_SCREEN_COPY.rezoneFloorsLabel} ${served.join(', ')}`);
+    }
+    if (bank.plated) {
+      const label = FIXIT_SCREEN_COPY.plateLabel;
+      lines.push(`${bank.name} ${label.charAt(0).toLowerCase()}${label.slice(1)} ${FIXIT_SCREEN_COPY.platePlate}`);
+    }
+  }
+  for (const cohort of inputs.tenancy.cohorts) {
+    const positionId = state.tenancyPositions[cohort.id];
+    const position = cohort.positions.find((candidate) => candidate.id === positionId);
+    if (position !== undefined) lines.push(`${cohort.name} — ${position.name}`);
+  }
+  for (const extra of input.extras) {
+    if (state.selectedExtraIds.includes(extra.id)) lines.push(extra.name);
+  }
+  return lines;
+}
+
+/**
+ * The fourth argument both surfaces hand `classifyOutcome` — § D1011. `witnessRun` is the press
+ * site's to decide, by comparing the after-run's legs with the diagnosed repair's
+ * (`record/crowd.ts#sameLegs`); everything else is derived here from the order that was run, so the
+ * two surfaces cannot word one order two ways.
+ */
+export function fixitVerdictContextOf(input: {
+  readonly entry: FixitCase;
+  readonly state: FixitState;
+  readonly inputs: EditorInputs;
+  readonly schedule: PriceSchedule;
+  readonly witnessRun: boolean;
+}): FixitVerdictContext {
+  return {
+    witnessRun: input.witnessRun,
+    changes: fixitOrderLinesOf({
+      entry: input.entry,
+      state: input.state,
+      inputs: input.inputs,
+      extras: standingExtrasFrom(input.schedule),
+    }),
+    bought: rowsBoughtOf(input.entry, input.state, input.schedule),
   };
 }
 
@@ -720,7 +886,17 @@ export function fixitDoorView(
       key,
       label: key === 'hall' ? FIXIT_SCREEN_COPY.doorHallLabel : FIXIT_SCREEN_COPY.doorCarLabel,
       options: [
-        { value: '', label: FIXIT_SCREEN_COPY.doorStanding, selected: current === undefined },
+        {
+          value: '',
+          /* § D1020: the as-built hold, printed, wherever one figure is true of the target. */
+          label: (() => {
+            const seconds = input.standing?.[target]?.[key];
+            return seconds === undefined
+              ? FIXIT_SCREEN_COPY.doorStanding
+              : `${FIXIT_SCREEN_COPY.dialStanding} — ${seconds.toFixed(1)} s`;
+          })(),
+          selected: current === undefined,
+        },
         ...values.map((seconds) => ({
           value: encodeFamilyValue(seconds),
           label: `${seconds.toFixed(1)} s`,
@@ -942,14 +1118,11 @@ export function fixitBudgetRungRow(input: {
 }
 
 /**
- * The running total, split the way the prototype splits it: the repairs strip quotes what the
- * toggles have **spent**, the machinery card quotes what the whole order has **committed** and
- * how much of that is steel. Both sums are the engine's ({@link FixitSpend}); the note beside
+ * The running total, on the machinery card: what the whole order has **committed** and how much of
+ * that is steel. (The repairs strip's *spent* line retired with the strip, § D1020.) Both sums are the engine's ({@link FixitSpend}); the note beside
  * them is `fixit/engine.ts#budgetNoteOf`'s and is not restated here.
  */
 export interface FixitSpendSummary {
-  /** The repairs strip's right edge — toggles only, the prototype's `fixBudgetLine`. */
-  readonly spentLine: string;
   /** The machinery card's total — everything, the prototype's `fixEditTotal`. */
   readonly committedLine: string;
   /** The machinery card's capital split — the prototype's `fixEditCapital`. */
@@ -959,7 +1132,6 @@ export interface FixitSpendSummary {
 
 export function fixitSpendSummary(entry: FixitCase, spend: FixitSpend): FixitSpendSummary {
   return {
-    spentLine: `${String(spend.repairUnits + spend.extraUnits)} of ${String(entry.budgetUnits)} units spent`,
     committedLine: `${String(spend.totalUnits)} of ${String(entry.budgetUnits)} u committed`,
     capitalLine:
       spend.machineryUnits === 0
@@ -969,15 +1141,4 @@ export function fixitSpendSummary(entry: FixitCase, spend: FixitSpend): FixitSpe
   };
 }
 
-/**
- * The repair row's state line — § 10.2's third word arrives as the engine's refusal (*short by
- * 22 u — beyond a repair budget*), the other two are the prototype's, and the selected one
- * carries the toggle's visible mark.
- */
-export function fixitRepairStateLine(row: {
-  readonly selected: boolean;
-  readonly refusal: string | undefined;
-}): string {
-  if (row.selected) return FIXIT_SCREEN_COPY.stateSelected;
-  return row.refusal ?? FIXIT_SCREEN_COPY.stateAffordable;
-}
+

@@ -30,11 +30,21 @@ import type { ShiftEvent } from '../shift/types.js';
 import { carsToDerate } from '../shift/incidents.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { GoalReading, WeekState } from '../shift/types.js';
-import { ladderRowFor, ladderTowerConfig, rungFor } from '../shift/ladder.js';
+import { admittedPressDayIds, ladderRowFor, ladderTowerConfig, rungFor } from '../shift/ladder.js';
 import { openWeek } from '../shift/week.js';
 
+import { bookedOutCarsOf, carAbsencesOf } from '../shift/bookedOut.js';
+import { contractBuildings, todaysScenarioDayState } from '../shift/contractDay.test-helper.js';
+import { CONTRACTS } from '../shift/contracts.js';
+import { clockOf, clockRange } from '../shift/report.js';
+import { recordRun } from '../record/recordRun.js';
+import { plannedDayOf } from '../dev/state.js';
+
 import { EM_DASH, groupThousands } from './figures.js';
-import { todayOf } from './today.js';
+import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE, todayOf } from './today.js';
+import { pinnedDayLengthLineOf } from './firstDayLength.js';
+import { dailySeedFor } from '../shift/dailySeed.js';
+import { FIRST_SESSION_LINE_PINNED, firstSessionContractFor } from '../shift/firstSession.js';
 
 const DATA = new URL('../../../../data/', import.meta.url);
 const read = (path: string): unknown =>
@@ -72,6 +82,26 @@ const pendingGoals = (day: number): readonly GoalReading[] =>
 
 const weekOn = (day: number, dayIdx: number): WeekState => ({ ...openWeek(), day, dayIdx });
 
+/** A brief's input for a state, every field from the state or a stated fixture. */
+const inputOf = (state: ViewerState): Parameters<typeof todayOf>[0] => ({
+  week: state.week,
+  calendar: NO_CALENDAR,
+  building: undefined,
+  buildingId: state.buildingId,
+  dispatcherName: 'Steady hand',
+  dispatcherNameOf: () => undefined,
+  goals: pendingGoals(state.week.day),
+  seed: state.seed,
+  horizon: 'whole-day',
+  dayStartS: undefined,
+  templateVariesMix: false,
+  dayCars: undefined,
+  crowdIsToday: true,
+  daySeed: 20_260_925n,
+  firstSession: false,
+  units: 'metric',
+});
+
 const recordFor = (
   building: ResolvedBuilding,
   day: number,
@@ -88,7 +118,11 @@ const recordFor = (
     goals: pendingGoals(day),
     seed: 424_242n,
     horizon: 'period',
+    dayStartS: undefined,
+    templateVariesMix: false,
+    dayCars: undefined,
     crowdIsToday: true,
+    daySeed: 20_260_925n,
     firstSession: false,
     units: 'metric',
   });
@@ -207,7 +241,11 @@ describe('the tower’s own booked absence reaches the strip — issue #576, § 
       goals: pendingGoals(1),
       seed: state.seed,
       horizon: 'period',
+      dayStartS: undefined,
+      templateVariesMix: false,
+      dayCars: undefined,
       crowdIsToday: true,
+      daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
     });
@@ -239,6 +277,131 @@ describe('the tower’s own booked absence reaches the strip — issue #576, § 
     // The negative control: the same code path, a contract with no declared absence, no strip.
     const quiet = weekdayWhere((event) => holdOf(event) === 0);
     expect(recordFor(midtown, quiet.day, quiet.dayIdx).outOfService).toBeUndefined();
+  });
+});
+
+/**
+ * **One reading of every car today's run loses** — the post-AH panel's N4 and N5, § D1038, § D1039.
+ *
+ * Built through the shipped chain on both sides: the brief's building is `plannedDayOf` over the
+ * state after the whole-day patch (what `host.dayAhead()` answers), and the run's is
+ * `shiftRunConfigOf` over the same state. The times the brief prints are then compared with the
+ * report header's own expression — `bookedOutCarsOf` over the run's building, on the clock the
+ * finished run carries — rather than with a transcription of either.
+ */
+describe('the day’s cars, as the run will have them — N4, N5, § D1038, § D1039', () => {
+  const RESOURCES = contractBuildings();
+
+  function briefFor(contractId: string, day: number): {
+    readonly record: ReturnType<typeof todayOf>;
+    readonly state: ViewerState;
+    readonly startOfDayS: number | undefined;
+  } {
+    const { state: first, horizon } = todaysScenarioDayState(RESOURCES, contractId, { seed: 20_260_925n });
+    const state: ViewerState = {
+      ...first,
+      campaignEventId: undefined,
+      week: { ...first.week, day, dayIdx: day - 1 },
+    };
+    const planned = plannedDayOf(RESOURCES, state);
+    const record = todayOf({
+      week: state.week,
+      calendar: NO_CALENDAR,
+      building: planned.building,
+      buildingId: state.buildingId,
+      dispatcherName: 'Steady hand',
+      dispatcherNameOf: () => undefined,
+      goals: pendingGoals(day),
+      seed: state.seed,
+      horizon,
+      dayStartS: planned.startOfDayS,
+      templateVariesMix: planned.templateVariesMix,
+      dayCars: planned.dayCars,
+      crowdIsToday: true,
+      daySeed: 20_260_925n,
+      firstSession: false,
+      units: 'metric',
+    });
+    return { record, state, startOfDayS: planned.startOfDayS };
+  }
+
+  it('never says *Nothing booked* on the door of a tower that books a car out — N4, every pinned day', () => {
+    /*
+     * The door's lede quoted `event.note` and printed *"An ordinary day: Nothing booked"* on every
+     * tower that books a car out, all seven pinned press days included, one screen before the brief
+     * said the car was booked. The lede and the wrinkle card now print one sentence.
+     */
+    const booking = CONTRACTS.filter((contract) => (ladderRowFor(contract.id)?.fabric.incidents.length ?? 0) > 0);
+    expect(booking.length, 'no contract books a car out, so this case tests nothing').toBeGreaterThan(0);
+    const pinned = CONTRACTS.filter((contract) => ladderRowFor(contract.id)?.pressDay !== undefined);
+    for (const contract of pinned) expect(booking).toContain(contract);
+    for (const contract of booking) {
+      const { record } = briefFor(contract.id, 1);
+      expect(record.wrinkle.id, contract.id).toBe('ordinary');
+      expect(record.lede, contract.id).not.toContain('Nothing booked');
+      expect(record.lede, contract.id).toContain(record.wrinkleNote);
+      expect(record.wrinkleNote, contract.id).toContain('books car');
+    }
+    /* The negative control: a tower that books nothing keeps the ordinary day's own words. */
+    const quiet = briefFor('c1', 1).record;
+    expect(quiet.lede).toContain('Nothing booked');
+  });
+
+  it('gives the brief the times the report’s header gives, from the same windows and clock', () => {
+    const { record, state } = briefFor('c2', 1);
+    const run = shiftRunConfigOf(RESOURCES, state);
+    const trace = recordRun(run.config, { recordDecisions: false }).result.trace;
+    const booked = bookedOutCarsOf(run.building);
+    expect(booked.length).toBeGreaterThan(0);
+    for (const car of booked) {
+      const times =
+        car.backAtS === null
+          ? `from ${clockOf(car.awayAtS, trace.startOfDayS)}`
+          : clockRange(car.awayAtS, car.backAtS, trace.startOfDayS);
+      expect(record.outOfService?.sentence).toContain(`Car ${car.carId} is booked out of passenger service ${times}`);
+    }
+    /* And without a known start of day the strip prints no clock at all, rather than a guessed one. */
+    const blind = todayOf({ ...inputOf(state), building: plannedDayOf(RESOURCES, state).building, dayStartS: undefined });
+    expect(/\d/u.test(blind.outOfService?.sentence ?? ''), blind.outOfService?.sentence).toBe(false);
+  }, 300_000);
+
+  it('gives one account of each car on Midtown’s Tuesday, where the day and the tower take two — N5', () => {
+    /*
+     * The move-in picked car D, which the rung already books out; the run collapsed into the rung's
+     * schedule and the brief gave three accounts of car D. Since § D1038 the day's choice skips the
+     * booked car, so the day takes another and each car has one sentence, with the run's window.
+     */
+    const { record, state, startOfDayS } = briefFor('c2', 2);
+    expect(record.wrinkle.id.startsWith('move-in')).toBe(true);
+    const run = shiftRunConfigOf(RESOURCES, state);
+    const [dayCar] = run.dayCars.windows;
+    expect(dayCar, 'the move-in took no car').toBeDefined();
+    expect(dayCar).not.toBe('D');
+    const spans = new Map(carAbsencesOf(run.building).map((entry) => [entry.carId, entry]));
+    const day = spans.get(dayCar ?? '');
+    const tower = spans.get('D');
+    if (day?.backAtS == null || tower?.backAtS == null || startOfDayS === undefined) {
+      throw new Error('both cars go and come back on this day');
+    }
+    const sentence = record.outOfService?.sentence ?? '';
+    expect(record.outOfService?.badge).toBe(`${String(dayCar)} · D`);
+    expect(sentence).not.toContain('out of service today');
+    expect(sentence.match(/Car D /gu)?.length, sentence).toBe(1);
+    expect(sentence.match(new RegExp(`Car ${String(dayCar)} `, 'gu'))?.length, sentence).toBe(1);
+    expect(sentence).toContain(
+      `Car ${String(dayCar)} is the car it takes, out of passenger service ${clockRange(day.awayAtS, day.backAtS, startOfDayS)}.`,
+    );
+    expect(sentence).toContain(
+      `Car D is booked out of passenger service ${clockRange(tower.awayAtS, tower.backAtS, startOfDayS)}.`,
+    );
+    /* The wrinkle's *also books* is now about a second car, which is what the run has. */
+    expect(record.wrinkleNote).toBe(`${record.wrinkle.note} The tower also books car D out of passenger service part-way through the day.`);
+    /* The plate counts both, as away for part of the day, and neither as out all day. */
+    const lifts = record.facts.find((fact) => fact.label === 'Lifts')?.value;
+    expect(lifts).toBe('4 · 2 away for part of the day');
+    expect(record.load?.note).toContain('2 cars working all day and 2 more for part of it');
+    /* Both are running when the day opens, so the opening frame greys nothing. */
+    expect(record.heldCarIds).toEqual([]);
   });
 });
 
@@ -276,7 +439,11 @@ describe('the facts come from the resolved building', () => {
       goals: [],
       seed: 1n,
       horizon: 'period',
+      dayStartS: undefined,
+      templateVariesMix: false,
+      dayCars: undefined,
       crowdIsToday: true,
+      daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
     });
@@ -347,7 +514,11 @@ describe('the rest of the record', () => {
       goals: pendingGoals(2),
       seed: 424_242n,
       horizon: 'period',
+      dayStartS: undefined,
+      templateVariesMix: false,
+      dayCars: undefined,
       crowdIsToday: false,
+      daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
     });
@@ -365,7 +536,12 @@ describe('the rest of the record', () => {
      * condition it; what is left here is the half that holds on every day and every tower.
      */
     const lede = recordFor(midtown, 2, 1).lede;
-    expect(lede).toContain('The only thing you choose is who drives.');
+    /*
+     * And off *only* — the post-AH panel's H13: *"The only thing you choose is who drives"* over a
+     * stage with two parking presses and a handover on every day.
+     */
+    expect(lede).toContain(TODAY_CHOICE_LINE);
+    expect(lede).not.toMatch(/\bonly thing you choose\b/u);
     expect(lede).not.toContain('Everyone');
     expect(lede).not.toContain('same crowd');
   });
@@ -446,7 +622,11 @@ function briefOn(state: ViewerState): ReturnType<typeof todayOf> {
     goals: pendingGoals(state.week.day),
     seed: state.seed,
     horizon: 'period',
+    dayStartS: undefined,
+    templateVariesMix: false,
+    dayCars: undefined,
     crowdIsToday: true,
+    daySeed: 20_260_925n,
     firstSession: false,
     units: 'metric',
   });
@@ -582,6 +762,7 @@ describe('the moot sentence is drawn only over the run it was measured on — is
     readonly seed?: bigint;
     readonly horizon?: 'period' | 'whole-day' | undefined;
     readonly calendar?: CalendarPeriod | null;
+    readonly dispatcherId?: string;
   }): ReturnType<typeof todayOf> {
     const press = ladderRowFor('c7')?.pressDay;
     if (press === undefined) throw new Error('c7 pins no day');
@@ -601,11 +782,16 @@ describe('the moot sentence is drawn only over the run it was measured on — is
       building,
       buildingId: 'crown-hotel',
       dispatcherName: 'Steady hand',
+      ...(overrides.dispatcherId === undefined ? {} : { dispatcherId: overrides.dispatcherId }),
       dispatcherNameOf: (id) => `name of ${id}`,
       goals: pendingGoals(day),
       seed: overrides.seed ?? BigInt(press.seedText),
       horizon: 'horizon' in overrides ? overrides.horizon : press.horizon,
+      dayStartS: undefined,
+      templateVariesMix: false,
+      dayCars: undefined,
       crowdIsToday: false,
+      daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
     });
@@ -613,9 +799,15 @@ describe('the moot sentence is drawn only over the run it was measured on — is
 
   it('draws on the pinned day, on its crowd and its horizon', () => {
     const sentence = crownOn({}).outOfService?.mootUnder ?? '';
-    expect(sentence).toContain('clear this day with no press at all');
-    /* Names, not ids — and no digit, the strip's own rule. */
-    expect(sentence).toContain('name of ');
+    /*
+     * § D1029: one derived sentence — whose order the day runs under, and how many others clear it
+     * with no press, in words. The names moved to the report's call row.
+     */
+    const press = ladderRowFor('c7')?.pressDay;
+    expect(sentence).toContain(`standing order, name of ${press?.standingOrder ?? ''}`);
+    expect(sentence).toContain('with no press at all; the day’s report names');
+    for (const id of press?.mootUnder ?? []) expect(sentence).not.toContain(`name of ${id}`);
+    /* No digit, the strip's own rule. */
     expect(/\d/u.test(sentence), sentence).toBe(false);
   });
 
@@ -632,5 +824,132 @@ describe('the moot sentence is drawn only over the run it was measured on — is
     const period = Object.values(CALENDAR_PERIODS)[0];
     if (period === undefined) throw new Error('no calendar period ships');
     expect(crownOn({ calendar: periodOnDays(period, 1, 7) }).outOfService?.mootUnder).toBeUndefined();
+  });
+});
+
+describe('the brief holds the driver on an admitted pinned day under its standing order — § D1029', () => {
+  function crownHeld(overrides: { readonly dispatcherId?: string; readonly seed?: bigint }): string | undefined {
+    const press = ladderRowFor('c7')?.pressDay;
+    if (press === undefined) throw new Error('c7 pins no day');
+    const resources = resourcesWith('crown-hotel');
+    const state: ViewerState = {
+      ...initialState(resources, BigInt(press.seedText)),
+      buildingId: 'crown-hotel',
+      shiftLengthS: 1800,
+      week: openWeek('c7'),
+    };
+    return todayOf({
+      week: state.week,
+      calendar: NO_CALENDAR,
+      dayStartS: undefined,
+      templateVariesMix: false,
+      dayCars: undefined,
+      building: resolvedBuildingOf(resources, state),
+      buildingId: 'crown-hotel',
+      dispatcherName: 'Steady hand',
+      ...(overrides.dispatcherId === undefined ? {} : { dispatcherId: overrides.dispatcherId }),
+      dispatcherNameOf: (id) => `name of ${id}`,
+      goals: pendingGoals(1),
+      seed: overrides.seed ?? BigInt(press.seedText),
+      horizon: press.horizon,
+      crowdIsToday: false,
+      daySeed: 20_260_925n,
+      firstSession: false,
+      units: 'metric',
+    }).driverHeld;
+  }
+
+  it('holds it, with the reason, exactly when the driver is the standing order on the day as measured', () => {
+    const standing = ladderRowFor('c7')?.pressDay?.standingOrder ?? '';
+    expect(admittedPressDayIds()).toContain('c7');
+    expect(crownHeld({ dispatcherId: standing })).toBe(PRESS_DAY_DRIVER_HELD);
+    /* Another driver is not held onto the wrong one; another crowd is not the pinned day. */
+    expect(crownHeld({ dispatcherId: 'eta' })).toBeUndefined();
+    expect(crownHeld({ dispatcherId: standing, seed: 424_242n })).toBeUndefined();
+    /* A caller that names no driver holds nothing. */
+    expect(crownHeld({})).toBeUndefined();
+    expect(/\d/u.test(PRESS_DAY_DRIVER_HELD)).toBe(false);
+  });
+});
+
+describe('a pinned first day says whose crowd it is, and how long it takes — § D1047', () => {
+  /**
+   * `c2`'s pin, Midtown Office's whole day, dealt by the first date of 2026 whose draw deals `c2` —
+   * the state `dev/state.ts#withFirstSession` leaves a fresh device in, read as the brief reads it.
+   * The building document is the run's own (`resolvedBuildingOf`), so the moot sentence is drawn.
+   */
+  function midtownPinned(overrides: {
+    readonly seed?: bigint;
+    readonly dispatcherId?: string;
+    readonly contractId?: string;
+    readonly buildingId?: string;
+  }): ReturnType<typeof todayOf> {
+    const contractId = overrides.contractId ?? 'c2';
+    const buildingId = overrides.buildingId ?? 'midtown-office';
+    const press = ladderRowFor(contractId)?.pressDay;
+    if (press === undefined) throw new Error(`${contractId} pins no day`);
+    let daySeed = 0n;
+    for (let day = 0; day < 365 && daySeed === 0n; day += 1) {
+      const candidate = dailySeedFor(new Date(Date.UTC(2026, 0, 1) + day * 86_400_000).toISOString().slice(0, 10));
+      if (firstSessionContractFor(candidate) === contractId) daySeed = candidate;
+    }
+    const resources = resourcesWith(buildingId);
+    const seed = overrides.seed ?? BigInt(press.seedText);
+    const state: ViewerState = {
+      ...initialState(resources, seed),
+      buildingId,
+      week: openWeek(contractId),
+    };
+    return todayOf({
+      week: state.week,
+      calendar: NO_CALENDAR,
+      building: resolvedBuildingOf(resources, state),
+      buildingId,
+      dispatcherName: 'Steady hand',
+      dispatcherId: overrides.dispatcherId ?? press.standingOrder,
+      dispatcherNameOf: (id) => `name of ${id}`,
+      goals: pendingGoals(1),
+      seed,
+      horizon: press.horizon,
+      dayStartS: undefined,
+      templateVariesMix: false,
+      dayCars: undefined,
+      crowdIsToday: false,
+      daySeed,
+      firstSession: true,
+      units: 'metric',
+    });
+  }
+
+  it('labels the crowd as the pinned one, on the seed line and on the first-session line', () => {
+    const pinned = midtownPinned({});
+    expect(pinned.crowdIsPinned).toBe(true);
+    expect(pinned.seedLine).toContain('the pinned crowd this day was measured on, not the day’s');
+    expect(pinned.seedLine).not.toContain('of this run’s own');
+    expect(pinned.firstSessionLine).toBe(FIRST_SESSION_LINE_PINNED);
+    /* Another crowd on the same tower is not the pinned day, and says so the way it always did. */
+    const own = midtownPinned({ seed: 424_242n });
+    expect(own.crowdIsPinned).toBe(false);
+    expect(own.seedLine).toContain('a crowd of this run’s own, not the day’s');
+  });
+
+  it('says the moot census was measured on this crowd — never *today’s*, which a pin never is', () => {
+    const sentence = midtownPinned({}).outOfService?.mootUnder ?? '';
+    expect(sentence).toContain('Measured on this crowd');
+    expect(sentence).not.toContain('today’s crowd');
+  });
+
+  it('prints how long the whole day takes and when the call comes, derived — and only on the day as measured', () => {
+    const pinned = midtownPinned({});
+    expect(pinned.dayLength).toBe(pinnedDayLengthLineOf('c2'));
+    expect(pinned.dayLength).toMatch(/^A whole day: up to \d+ min of watching at 4×/u);
+    expect(pinned.dayLength).toContain('The stage stops once for its call');
+    /* Under another driver it is a day nobody measured; on another crowd it is not the pinned day. */
+    expect(midtownPinned({ dispatcherId: 'eta' }).dayLength).toBeUndefined();
+    expect(midtownPinned({ seed: 424_242n }).dayLength).toBeUndefined();
+    /* A slice is not a whole day: St Jude's pinned day is labelled as pinned and draws no length. */
+    const slice = midtownPinned({ contractId: 'c8', buildingId: 'st-jude-hospital' });
+    expect(slice.crowdIsPinned).toBe(true);
+    expect(slice.dayLength).toBeUndefined();
   });
 });

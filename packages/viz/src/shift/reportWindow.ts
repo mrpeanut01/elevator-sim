@@ -152,3 +152,29 @@ export type ShiftReportWindow = SimulationConfig['reportWindow'];
 export function shiftReportWindowFor(buildingId: string): ShiftReportWindow {
   return reportWindowForBuilding(buildingId);
 }
+
+/**
+ * **What a player reads for a reporting window's id** — `the five-minute window`, never
+ * `the peak-5min window`. The post-AH panel's L3, first raised by the panel before it.
+ *
+ * `summary.reportWindow.id` is `core`'s identifier, and five sentences on the Day report and the
+ * rail printed it raw: *"the report-window window's worst"* on every whole authored day, *"the
+ * full-run window"*, *"the peak-5min window"*. So the id is named here, once, in words:
+ *
+ * - `peak-5min` is **five-minute** and `peak-<n>s` is **<n>-second** — the length and nothing else,
+ *   because two different windows carry `peak-5min` and only one of them was found by counting
+ *   arrivals (`report.ts#smallPrintFor`'s *busiest* correction), so the name may not say *busiest*;
+ * - `full-run` is **full-shift**, hyphenated on purpose: `honesty/properties.ts#NAMES_ITS_OWN_WINDOW`
+ *   excuses a figure that says *the whole shift* in words, and a label that happened to match it
+ *   would excuse sentences this name never meant to vouch for;
+ * - anything else — `report-window`, the whole-day template's own — is **reporting**, which is what
+ *   the report's own sentences already call it (*"the reporting window held no arrivals"*).
+ *
+ * The clock span is printed beside it wherever one is, so the name never has to carry the span.
+ */
+export function reportWindowNameOf(id: string): string {
+  if (id === 'peak-5min') return 'five-minute';
+  if (id === 'full-run') return 'full-shift';
+  const seconds = /^peak-(\d+)s$/u.exec(id)?.[1];
+  return seconds === undefined ? 'reporting' : `${seconds}-second`;
+}

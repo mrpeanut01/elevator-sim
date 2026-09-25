@@ -16,6 +16,7 @@
 
 import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { reportWindowNameOf } from '../shift/reportWindow.js';
 
 import { DATA_DIR, breadthConfig, fixtureSummary } from '../fixtures.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
@@ -220,7 +221,9 @@ describe('every driver reads its own observation', () => {
       observations({ reportWindow: { id, startS: 60, endS: 360 } });
     for (const id of ['peak-5min', 'report-window', 'lunch-hold']) {
       const driver = buildingMood(windowed(id)).drivers.find((d) => d.id === 'abandoned');
-      expect(driver?.text, id).toContain(`in the ${id} window`);
+      expect(driver?.text, id).toContain(`in the ${reportWindowNameOf(id)} window`);
+      /* The engine's id stays off the rail — the post-AH panel's L3. */
+      expect(driver?.text, id).not.toContain(id);
     }
 
     // And on the loud arm, where the count and the denominator are already in the sentence.
@@ -236,7 +239,7 @@ describe('every driver reads its own observation', () => {
       },
     });
     const loud = buildingMood(starved).drivers.find((d) => d.id === 'abandoned');
-    expect(loud?.text).toContain('7 of 46 people in the peak-5min window');
+    expect(loud?.text).toContain('7 of 46 people in the five-minute window');
   });
 
   it('leaves the unluckiest-rider verdict exactly where it was — only the sentence moved', () => {
@@ -286,7 +289,7 @@ describe('every driver reads its own observation', () => {
       },
     });
     const text = buildingMood(censored).drivers.find((d) => d.id === 'abandoned')?.text ?? '';
-    expect(text).toContain('in the peak-5min window');
+    expect(text).toContain('in the five-minute window');
     expect(text).toContain('210 s and counting, because that person never boarded');
   });
 
