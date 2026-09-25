@@ -48,7 +48,7 @@ import { bookedOutCarsOf, carAbsencesOf, wrinkleNoteOf } from '../shift/bookedOu
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { scheduledEventFor } from '../shift/calendar.js';
 import { firstSessionLineFor } from '../shift/firstSession.js';
-import { eventCarChoice } from '../shift/events.js';
+import { eventAsRun, eventCarChoice } from '../shift/events.js';
 import { pressDayStanding } from '../shift/ladder.js';
 import { clockOf, clockRange } from '../shift/report.js';
 import type { GoalReading, RunHorizon, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
@@ -214,6 +214,14 @@ export interface TodayInput {
    * said *part-way through today* beside a stage and a report that gave the times.
    */
   readonly dayStartS: number | undefined;
+  /**
+   * Whether the next run's demand template keeps its own mix of trips — `host.dayAhead()`'s
+   * `templateVariesMix`. On such a day a wrinkle that asks for a mix cannot have one, and the
+   * record quotes `shift/events.ts#eventAsRun`'s note — what the run does — rather than the
+   * wrinkle's own ([§ D1040](../../../../DECISIONS.md)). Required, {@link TodayInput.calendar}'s
+   * reason: a default of `false` would print the fire drill's lobby rush over an all-day rise.
+   */
+  readonly templateVariesMix: boolean;
   /** The standing selection's id, so the seed line can name a building the document lookup missed. */
   readonly buildingId: string;
   /** The standing dispatcher's display name, or `undefined`. */
@@ -665,7 +673,15 @@ function seedLineOf(input: TodayInput): string {
 export function todayOf(input: TodayInput): TodayRecord {
   const { week, building } = input;
   const weekday = weekdayOf(week.dayIdx);
-  const event = scheduledEventFor(input.calendar, week.day, week.dayIdx);
+  /*
+   * The event as the run will have it — § D1040. Its note is the wrinkle's own on every day but one
+   * whose template keeps its own mix, where the wrinkle's mix is withheld by `core` and the note says
+   * so; the name, the id and the effect are the wrinkle's either way.
+   */
+  const event = eventAsRun(
+    scheduledEventFor(input.calendar, week.day, week.dayIdx),
+    input.templateVariesMix,
+  );
   const out = carsOutTodayOf(building, event);
   /*
    * The one sentence about the day's wrinkle — the brief's card, this record's lede and the report's

@@ -296,6 +296,7 @@ import {
   initialState,
   withFirstSession,
   profileById,
+  plannedDayOf,
   resolvedBuildingOf,
   shiftRunConfigOf,
   tomorrowFactsOf,
@@ -6647,6 +6648,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * header's note does not say *the tower also books* it — § D1038, the post-AH panel's N5.
        */
       bookedOut: bookedOutCarsOf(resolvedBuildingOf(resources, state), event),
+      /* § D1040 — so the header and tomorrow's card say what a mix-asking wrinkle did on this tower. */
+      templateVariesMix: plannedDayOf(resources, state).templateVariesMix,
       /*
        * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
        * one-field-and-one-caller fix.

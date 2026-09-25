@@ -58,6 +58,7 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
       /* The run the next press produces, and its clock — § D1039, `briefScreen.ts#factsNow`'s. */
       building: dayAhead.building,
       dayStartS: dayAhead.startOfDayS,
+      templateVariesMix: dayAhead.templateVariesMix,
       buildingId: selection.buildingId,
       dispatcherName: host.dispatcherById(selection.dispatcherId)?.name,
       /* Any profile's name, for the moot-dispatcher sentence — § D914. */

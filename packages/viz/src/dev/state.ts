@@ -1737,6 +1737,13 @@ export interface PlannedDay {
    * `SimulationResult.trace.startOfDayS`, which the stage's clock and the Day report's times read.
    */
   readonly startOfDayS: number | undefined;
+  /**
+   * Whether the run's demand template varies the mix of trips itself — `shift/events.ts`'s
+   * `demandTemplateVariesMix` over the run's own template, the question `shiftRunPatch` asks before
+   * it withholds a wrinkle's mix. What `events.ts#eventAsRun` needs to say what the day does
+   * ([§ D1040](../../../../DECISIONS.md)).
+   */
+  readonly templateVariesMix: boolean;
 }
 
 /**
@@ -1754,7 +1761,7 @@ export interface PlannedDay {
  */
 export function plannedDayOf(resources: BrowserResources, state: ViewerState): PlannedDay {
   if (buildingConfigOf(resources, state.savedBuildings, state.buildingId) === undefined) {
-    return { building: undefined, startOfDayS: undefined };
+    return { building: undefined, startOfDayS: undefined, templateVariesMix: false };
   }
   const plan = shiftRunConfigOf(resources, state);
   const { config } = plan;
@@ -1776,7 +1783,14 @@ export function plannedDayOf(resources: BrowserResources, state: ViewerState): P
   } catch {
     startOfDayS = undefined;
   }
-  return { building: plan.building, startOfDayS };
+  return {
+    building: plan.building,
+    startOfDayS,
+    templateVariesMix:
+      typeof config.demandTemplate === 'string'
+        ? demandTemplateVariesMix(config.demandTemplate, config.trafficProfiles.demandTemplates)
+        : config.demandTemplate?.meanDirectionalSplit !== undefined,
+  };
 }
 
 /** The building's display name, without loading the whole document to read it. */

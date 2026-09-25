@@ -327,6 +327,56 @@ export function demandTemplateVariesMix(
   }
 }
 
+/**
+ * **What a wrinkle that asks for a mix does on a day whose template keeps its own** — one sentence,
+ * the brief's, the report header's and the overnight beat's ([§ D1040](../../../../DECISIONS.md)).
+ *
+ * The post-AH panel's A.md defect 5: the fire drill's brief said *"Twenty minutes where the whole
+ * building wants to be in the lobby at once"*, and on a whole authored day the run made an all-day
+ * rise in demand with the day's own mix — 165 people standing in the car park at nine. The only
+ * account of that was on the *previous* day's report, in the engine's words (*"The engine refuses
+ * both at once rather than letting one win silently"*). `core` refuses an explicit split beside a
+ * template that varies the mix, so the mix is the template's and the level is all that moves
+ * ({@link shiftRunPatch}); this says so in the player's words and is the one place that does.
+ *
+ * **Nothing about the run changes here** — which half wins is `core`'s rule, and making the drill
+ * reach the mix on a whole day is a separate decision. What changes is that the sentence describes
+ * the run the player gets. A wrinkle that moves only the mix moves **nothing** on such a day, and
+ * the sentence says that too, because a caption over an ordinary day naming a conference is the
+ * caption-that-does-not-describe-the-picture defect this module was written against.
+ */
+export function mixKeptSentenceOf(event: ShiftEvent): string {
+  const factor = event.effect.arrivalRateMultiplier;
+  const what = `the ${event.name.charAt(0).toLowerCase()}${event.name.slice(1)}`;
+  if (factor === null || factor === 1) {
+    return (
+      `This tower's day keeps its own mix of trips, which changes through the day, and the mix is ` +
+      `the only thing ${what} would have moved — so the run is an ordinary day.`
+    );
+  }
+  return (
+    `This tower's day keeps its own mix of trips, which changes through the day, so ${what} ` +
+    `changes how many people travel and not where they go: ${factor > 1 ? 'more' : 'fewer'} of ` +
+    'them, all day.'
+  );
+}
+
+/**
+ * The event as the run will have it — its note replaced by {@link mixKeptSentenceOf} where the
+ * run's template keeps its own mix and the event asked for one, and the event itself everywhere
+ * else. [§ D1040](../../../../DECISIONS.md).
+ *
+ * `templateVariesMix` is {@link demandTemplateVariesMix}'s answer for the run, which is the same
+ * question {@link shiftRunPatch} asks before it withholds the split, so the note is replaced on
+ * exactly the runs whose mix was withheld.
+ */
+export function eventAsRun(event: ShiftEvent, templateVariesMix: boolean): ShiftEvent {
+  if (!templateVariesMix || event.effect.changesNothing || event.effect.directionalSplit === null) {
+    return event;
+  }
+  return { ...event, note: mixKeptSentenceOf(event) };
+}
+
 export interface ShiftRunPatchInput {
   readonly event: ShiftEvent;
   /** The building the shift is running — grown, if `grownBuilding` has been applied. */
@@ -404,11 +454,12 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
 
   if (effect.directionalSplit !== null) {
     if (input.templateVariesMix === true) {
-      withheld.push(
-        `${input.event.name}: the directional mix is set by this run’s demand template, which ` +
-          'varies it within the run. The engine refuses both at once rather than letting one win ' +
-          'silently, so the mix is the template’s and only the demand level moved.',
-      );
+      /*
+       * The player's words for `core`'s refusal — § D1040. This read *"the directional mix is set by
+       * this run's demand template … The engine refuses both at once rather than letting one win
+       * silently"*, on the day before the one it described, and was the only place that said so.
+       */
+      withheld.push(`${input.event.name}: ${mixKeptSentenceOf(input.event)}`);
     } else {
       demand.directionalSplit = effect.directionalSplit;
     }

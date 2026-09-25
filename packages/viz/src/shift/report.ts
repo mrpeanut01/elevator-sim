@@ -119,6 +119,7 @@ import { wrinkleNoteOf, type BookedOutCar } from './bookedOut.js';
 import type { PressCounterfactual } from './counterfactual.js';
 
 import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
+import { eventAsRun } from './events.js';
 import { contractStatus } from './contracts.js';
 import { gaveUpBesideOf, goalPlainNameOf, horizonLabelOf, readGoals, wasDisplayOf } from './goals.js';
 import { growthFactor } from './growth.js';
@@ -680,6 +681,14 @@ export interface DayReportInput {
    * that wait ({@link missedGoalRowsOf}).
    */
   readonly bookedOut?: readonly BookedOutCar[] | undefined;
+  /**
+   * Whether this run's demand template kept its own mix of trips — `dev/state.ts#plannedDayOf`'s
+   * `templateVariesMix` for the run's state. On such a run a wrinkle that asked for a mix did not
+   * get one, and the header's note and tomorrow's card quote `events.ts#eventAsRun`'s account of
+   * what the run did rather than the wrinkle's own ([§ D1040](../../../../DECISIONS.md)). Tomorrow
+   * is the same building on the same horizon, so it keeps the same mix. `undefined` is `false`.
+   */
+  readonly templateVariesMix?: boolean | undefined;
 }
 
 /**
@@ -723,7 +732,7 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
     `${recording.buildingName} · ${dispatcherName}`,
     `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
     ...(subject.kind === 'single-run' ? selectionLines(subject.selection) : []),
-    ...bookedLine(input.event, subject, input.bookedOut ?? [], dayStartS),
+    ...bookedLine(eventAsRun(input.event, input.templateVariesMix === true), subject, input.bookedOut ?? [], dayStartS),
     /*
      * The rules in force, before the attempt count and well before the intervention log —
      * `docs/20` defect 2. Config, so it belongs with what was asked for; see
@@ -1071,7 +1080,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     streakLine: streakLineFor(judgement.verdict, week.streak),
     contractLine: contractLineFor(contract, week),
     cleared: week.cleared,
-    forecast: forecastFor(input.calendar, week.day, nextIdx),
+    forecast: forecastFor(input.calendar, week.day, nextIdx, input.templateVariesMix === true),
     taught: taughtFor(contract, week),
     nextDayName: weekdayOf(nextIdx),
   };
@@ -2612,8 +2621,9 @@ function forecastFor(
   calendar: CalendarPeriod | null,
   day: number,
   nextIdx: number,
+  templateVariesMix: boolean,
 ): ReportForecast {
-  const event = scheduledEventFor(calendar, day + 1, nextIdx);
+  const event = eventAsRun(scheduledEventFor(calendar, day + 1, nextIdx), templateVariesMix);
   const increase = (growthFactor(day + 1) / growthFactor(day) - 1) * 100;
   return {
     name: event.name,

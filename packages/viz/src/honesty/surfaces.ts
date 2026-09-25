@@ -577,7 +577,7 @@ import {
   LOADED_RUN_CANNOT_BANK,
   UNCHOSEN_RUN_CANNOT_BANK,
 } from '../shift/banking.js';
-import { baseDemandOf, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
+import { baseDemandOf, eventAsRun, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { everyWrinkle } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals, yesterdayLabelOf } from '../shift/goals.js';
@@ -3468,6 +3468,9 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'wrinkles/draw.ts#composeWrinkle',
     'wrinkles/draw.ts#drawWrinkle',
     'shift/events.ts#shiftRunPatch',
+    /* § D1040's sentence for a wrinkle whose mix a day's template keeps — both callers seeded below. */
+    'shift/events.ts#eventAsRun',
+    'shift/events.ts#mixKeptSentenceOf',
     'shift/week.ts#closeDay',
     'shift/contracts.ts#CONTRACTS',
     'shift/contracts.ts#contractById',
@@ -3891,6 +3894,14 @@ const SHIFT_REPORT: SurfaceAdapter = {
     for (const event of Object.values(SHIFT_EVENTS)) {
       seeds.push({ field: `SHIFT_EVENTS.${event.id}.name`, text: event.name, role: 'label' });
       seeds.push({ field: `SHIFT_EVENTS.${event.id}.note`, text: event.note, role: 'prose' });
+      /*
+       * The note as a day whose template keeps its own mix quotes it — § D1040. A different sentence
+       * only for a wrinkle that asks for a mix; the brief and the report header draw it there.
+       */
+      const asRun = eventAsRun(event, true);
+      if (asRun.note !== event.note) {
+        seeds.push({ field: `SHIFT_EVENTS.${event.id}.note.mixKept`, text: asRun.note, role: 'prose' });
+      }
       if (trafficProfile === undefined) continue;
       /*
        * Both values of `templateVariesMix`, because the refusal only exists under the second: a
@@ -12702,6 +12713,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
          * without a rung), so the strip's clock arm is swept on the fixture record below instead.
          */
         dayStartS: undefined,
+        templateVariesMix: false,
         /*
          * The day's crowd — § D729, § D730. Seeded `true` here and `false` below, because the
          * seed line and the door's closing sentence both have two arms and the arm a developer
@@ -12745,6 +12757,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           seed: 424_242n,
           horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
           dayStartS: undefined,
+          templateVariesMix: false,
           crowdIsToday: false,
           firstSession: entry.week.day === 1 && entry.week.history.length === 0,
           units: 'metric',
@@ -12790,6 +12803,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         seed: 424_242n,
         horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
         dayStartS: undefined,
+        templateVariesMix: false,
         crowdIsToday: true,
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         units: 'imperial',
@@ -12849,6 +12863,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           seed: 424_242n,
           horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
           dayStartS: 8 * 3600,
+          templateVariesMix: false,
           crowdIsToday: true,
           firstSession: false,
           units: 'metric',

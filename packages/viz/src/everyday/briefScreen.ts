@@ -102,6 +102,7 @@ function mountBrief(
        */
       building: dayAhead.building,
       dayStartS: dayAhead.startOfDayS,
+      templateVariesMix: dayAhead.templateVariesMix,
       buildingId: selection.buildingId,
       dispatcherName: data.dispatcherById(selection.dispatcherId)?.name,
       /* Any profile's name, for the moot-dispatcher sentence — § D914. */
