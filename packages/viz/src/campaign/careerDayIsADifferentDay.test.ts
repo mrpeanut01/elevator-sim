@@ -47,6 +47,7 @@ import {
 import { RESOURCES, baseState, legsOf } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf, tomorrowFactsOf, type ViewerState } from '../dev/state.js';
 import { growthFactor } from '../shift/growth.js';
+import { CAREER_CONTRACT_ID } from '../shift/week.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
 import { towerById } from './career.js';
@@ -246,17 +247,28 @@ describe('the growth the report announces is the growth the morning delivers —
 });
 
 describe('what a career day does not disturb', () => {
-  it('leaves the contract, the building and the length exactly where the press put them', () => {
+  it('leaves the player\'s own week exactly as it was, parked behind a week of the career\'s own', () => {
+    /*
+     * **Restated at wave AH's integration, for § D964 — not weakened.** This case used to assert
+     * that a career day ran on the Scenario week and moved only its day. That was the mechanism
+     * GitHub issue #594 found filing a career day into the player's week, and § D964 replaced it:
+     * a career day now stands on a `career` week and the Scenario week is parked behind it. The
+     * claim the case exists for, that a career day is not a second way of disturbing the player's
+     * week, is kept and is now asserted where the week actually is: parked untouched while the
+     * career day stands, and put back identical when it is released. `switchWeek` is still the
+     * only thing that changes what a week is *of*, which is why the career's own week is reached
+     * through it.
+     */
     const h = harness();
     const before = h.state().week;
     h.host.runCampaignDay('c1');
-    const after = h.state().week;
-    /* Only the day and its weekday index move — a career day is not a second way of taking a
-       contract, and `switchWeek` is still the only thing that changes what a week is *of*. */
-    expect(after.contractId).toBe(before.contractId);
-    expect(after.history).toBe(before.history);
-    expect(after.completed).toBe(before.completed);
-    expect(after.streak).toBe(before.streak);
+    expect(h.state().week.contractId).toBe(CAREER_CONTRACT_ID);
+    const parked = h.state().parkedWeeks.find((week) => week.contractId === before.contractId);
+    expect(parked).toBe(before);
+    h.host.leaveCareer?.();
+    /* By value, and the whole week rather than four of its fields: `switchWeek` hands back a fresh
+       record, so identity is not the claim, and every field being equal is more than the old four. */
+    expect(h.state().week).toEqual(before);
   });
 
   it('reprices nothing: the schedule the reducer is given is still the shipped one', () => {

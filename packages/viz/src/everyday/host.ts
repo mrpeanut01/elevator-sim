@@ -1328,8 +1328,9 @@ export interface EverydayHost {
    * player walks back to is the week, tower and crowd they left, and never the career's.
    *
    * Every Scenario press on this host ({@link startRun}, {@link openTomorrow}, {@link chooseTower},
-   * {@link startRush}, {@link startReplay}) calls the same release first, so a path that reaches
-   * one without passing the shell's hook still cannot act on the career's state. Idempotent: a
+   * {@link startReplay}, {@link playPressDay}) calls the same release first, so a path that reaches
+   * one without passing the shell's hook still cannot act on the career's state. {@link startRush}
+   * does not: it parks the career's week and {@link leaveRush} hands it back, § D548 clause 5. Idempotent: a
    * no-op with no career day standing. **Optional** on {@link runFailure}'s ground.
    */
   leaveCareer?(): void;
@@ -2581,7 +2582,17 @@ export function createEverydayHost(
     campaignDayIncident = undefined;
     const state = b.state();
     const moved = switchWeek(state.week, state.parkedWeeks, hold.contractId, 'resume');
-    b.applyPatch({ ...hold.patch, week: moved.week, parkedWeeks: moved.parked });
+    /*
+     * `buildingId` is in `hold.patch` already; it is named again because `parkedWeeks` is latent and
+     * realised by the building (`scope/surface.ts`), and `workshopTravel.test.ts` reads the patch's
+     * literal keys, which a spread hides. Found at wave AH's integration; the value is unchanged.
+     */
+    b.applyPatch({
+      ...hold.patch,
+      buildingId: hold.patch.buildingId,
+      week: moved.week,
+      parkedWeeks: moved.parked,
+    });
   };
 
   /**
@@ -3529,8 +3540,16 @@ export function createEverydayHost(
       b.stopWatching();
     },
     startRush: () => {
-      /* The rush parks what it stands on, so the Scenario record has to be what it stands on (#594). */
-      releaseCareer();
+      /*
+       * **A rush does not release a standing career day; it parks it** — wave AH's integration,
+       * reconciling § D964 with § D548 clause 5. Lane AH-A released the career here on the ground
+       * that the rush parks what it stands on; but the rush stands on a week of its own, parks the
+       * career's week exactly as it parks the Scenario's, and `leaveRush` puts that week and the run
+       * it interrupted back. Releasing here threw the campaign day away, which is the one thing
+       * § D548 clause 5 rules against (*leaving the rush hands the campaign day back as the day had
+       * it*), and § D964 does not mention that clause. The rush's own crowd is unaffected either way:
+       * `RUSH_FIELD_ROLES` still keeps the campaign day's fit-out, event and held cars out of it.
+       */
       const state = b.state();
       /*
        * **The rush's building, never the standing week's** — PR #513's review, finding 1. This read
