@@ -22,7 +22,7 @@
  */
 
 import { chromium, type Browser, type Page } from 'playwright-core';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
 import {
@@ -62,9 +62,22 @@ afterAll(async () => {
   await site?.close();
 });
 
+/*
+ * **Each case's page is closed when the case ends** — § D1020. Opening a case now asks for its
+ * forty-nine as-built mornings on a pool of workers, and a page left open goes on computing them.
+ * Four pages left standing in one browser were four pools competing with the page the frame-gap
+ * case measures: it read 648 ms in the file and passed alone. A player has one page; so does each
+ * case here.
+ */
+const opened: Page[] = [];
+afterEach(async () => {
+  for (const page of opened.splice(0)) await page.close();
+});
+
 /** A page with the Fix-a-building overlay open on its first case, reached the player's way. */
 async function fixitPage(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1280, height: 800 } });
+  opened.push(page);
   await page.goto(`${origin}?building=garden-apartments`, { waitUntil: 'load' });
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,

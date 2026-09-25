@@ -43046,3 +43046,392 @@ DECIDE-3 ruled for **two prices the schedule already carries**: the flat 2 u for
 ### 6. What this does not decide
 
 Replacing trace redraws with thinning on a named stream, which may later require re-authoring `let-faster-than-the-lifts`; the fix-it single-pair judge's noise; and the campaign shop's `staggered-starts` row, which is the same near-universal shape. The coordinator files all three as issues. **§ D706's retirement**: `tenant-floors` no longer blocks it, and [§ D1000](#d1000) says what still does.
+
+---
+
+## D1020 — the fix-it verdict is judged on fifty mornings, three cases are held and one re-authored, and the repair menu retires
+
+> **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner. The
+> session principal's standing instruction for this wave is that decisions are taken by the swarm
+> rather than escalated, on [§ D729](#d729)'s form. Three decision agents (S1 the player's lens, S2
+> honesty's, S3 engineering's) ruled independently on GitHub issue #602; the integrator reconciled
+> them where they split, and settled the one number they disagreed on by the repository's own rule
+> rather than by preference. This lane implemented parts (b) and (c) of that reconciliation; part
+> (a), the verdict's wording, is a sibling lane's. A later reader weighing this against a
+> product-owner ruling should treat it as an agent ruling and say so.
+
+**Date: 2026-09-25 · Owner: lane AI-C (wave AI), implementing the reconciled ruling of decision agents S1, S2 and S3 · GitHub issue [#602](https://github.com/mrpeanut01/elevator-sim/issues/602) · Amends [§ D706](#d706) clauses 6 and 7, [§ D1000](#d1000) §§ 3–4, [§ D869](#d869) § 3 and [§ D1001](#d1001) § 6 · Under [§ D525](#d525) clauses 2 and 3 · Rules on: `packages/viz/src/fixit/judge.ts` (new), `fixit/held.ts` (new), `fixit/engine.ts`, `fixit/run.ts`, `fixit/parse.ts`, `dev/morningWorker.ts` and `dev/offThreadMornings.ts` (new), `everyday/fixitScreen.ts`, `everyday/fixitScreenModel.ts`, `everyday/fixitFamilies.ts`, `fixit/editorInputs.ts`, `dev/fixitPanel.ts`, `dev/main.ts`, `honesty/surfaces.ts`, `data/fixit-cases.json`, `docs/12` § 4.15, `docs/39`.**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds. It binds two surfaces, the honesty corpus,
+the case file and the parser, which no one module owns; it moves four things already recorded —
+§ D706 clause 6's precondition (*"clears"* now means *clears over fifty mornings*), § D706 § 7's
+obligation (discharged by this wave's assessor playtest of the editor with the menu hidden), § D1000 § 3's *seventeen of eighteen*
+and § D869 § 3's census, both counted under the single pair; and it holds content a later lane has to
+rewrite.
+
+### 1. What was measured before the ruling
+
+The single-pair judge — one run as the building stands and one with the order, on the letter's own
+seed, against § 9's two bars — was fooled on the shipped cases in both directions. Under common random
+numbers an unchanged building compares identical, so the pair is not a lottery; the defect is that
+**the case seeds sit where almost any perturbation clears the complaint**. The decision agents
+measured, on `e1d10ac`:
+
+- a 3 cm/s speed placebo cleared the letter's morning on two to three of eighteen cases, free
+  zone-centre parking on six, and a three-metre roof raise cleared the outpatients' letter;
+- the letter's morning was at or above the 75th percentile of twenty as-built mornings on eleven of
+  eighteen cases (S1);
+- and several cases' **own diagnosed repairs** removed nothing off the letter's morning.
+
+### 2. The ruling, as implemented
+
+1. **The gate** is the existing single pair on the letter's morning with today's bars — 80 % of the
+   complaint gone, the rest of the building down by at most 2 points. A press that misses it is
+   classified exactly as before and costs one pair.
+2. **Replication** runs only when the gate clears: the same order on forty-nine further mornings, each
+   paired with the building as it stands on that morning's crowd (common random numbers).
+3. **The mornings are derived in code and never authored**: the case seed plus `i × 7919`,
+   i = 1 … 49 (`fixit/judge.ts#replicationSeedsOf`). `judge.test.ts` holds that no field of
+   `data/fixit-cases.json` can name one and that no derived seed appears in it.
+4. **Fixed** requires the gate, **and** a two-sided 95 % paired-t interval on the per-morning
+   complaint reduction whose lower bound is above zero (`experiments`' own
+   `pairedDifferenceEstimate`, Student-t at n − 1), **and** the rest of the building not shown worse
+   than the 2-point floor — the upper bound of the same interval on the rest's per-morning change is at
+   or above −2.
+5. **k = 50 in total.** Not a tuning choice: `CLAUDE.md`'s *"Budget 50–200 replications per
+   configuration. Ten is not enough"*, applied to a better-than-as-built claim. The dissent is § 6.
+6. **A clear that does not hold is `cleared-once`**: no badge, no chimes, nothing banked, and its
+   screen says it cleared on this morning only. While the mornings run the press draws a `checking`
+   state at once — the letter's morning's three rows under *"It cleared on the letter's morning. Now
+   checking it on forty-nine more."* — which wears no badge either.
+7. **`BASIS_LINE`'s second form.** *"One run before, one run after"* is false of a verdict fifty
+   mornings decided, so a replicated verdict prints `REPLICATED_BASIS_LINE`, or its demand form for an
+   order that changes who arrives. The pair stage's note, which said the verdict was measured from
+   *"these two runs and no others"*, now says the verdict starts from them.
+8. **Cost.** The forty-nine as-built mornings are asked once, when the case opens, on a second pool
+   of workers (`dev/offThreadMornings.ts`) while the as-built day plays; the forty-nine after-runs are
+   asked only on a press whose gate cleared. A worker measures its own run and sends back three
+   numbers, so no recording of a morning crosses to the painting thread. `judge.test.ts` counts it
+   with fake runners: **a failing press asks for one pair; a clearing press asks for one pair plus
+   forty-nine** (ninety-eight when the case's own mornings were never prepared).
+
+### 3. The census under the ruled judge, one case re-authored and three held
+
+Every shipped case's diagnosed repair and the +3 cm/s placebo, at k = 50, measured on `702991b`
+(`cases.test.ts` now asserts both, per case). Per-morning complaint reduction with its two-sided 95 %
+interval; *rest* is the rest of the building's per-morning change in points.
+
+Measured as shipped — `controller-sends-every-car` at its authored 5 %/5 min, before § 3's re-authoring:
+
+| case | the diagnosed repair: reduction a morning | its rest, points | its verdict | the placebo: reduction | the placebo's verdict | status |
+|---|---|---|---|---|---|---|
+| `sleeping-sky-lobby` | +0.64 [+0.08, +1.20] | −0.09 [−0.15, −0.02] | fixed | −0.16 [−0.56, +0.24] | refused at the gate | passes |
+| `zoning-starves-the-top` | +226.63 [+204.80, +248.47] | −2.08 [−3.18, −0.99] | fixed | +5.65 [−0.74, +12.04] | refused at the gate | passes |
+| `three-cars-one-cars-work` | +1.22 [+0.75, +1.69] | −0.05 [−1.08, +0.98] | fixed | +0.02 [−0.27, +0.31] | refused at the gate | passes |
+| `doors-that-never-close` | +22.14 [+18.61, +25.67] | +13.76 [+11.44, +16.09] | fixed | +2.32 [+0.05, +4.59] | refused at the gate | passes |
+| `cars-that-always-go-home` | +0.62 [−0.37, +1.61] | +0.02 [−0.05, +0.08] | cleared-once | −0.60 [−1.70, +0.50] | cleared-once | **held** |
+| `car-park-nobody-serves` | +15.04 [+12.40, +17.68] | +1.94 [+0.96, +2.93] | fixed | +0.20 [−0.92, +1.32] | refused at the gate | passes |
+| `express-that-stops-everywhere` | +2.60 [+1.69, +3.51] | −0.53 [−0.94, −0.11] | fixed | +0.02 [−0.65, +0.69] | refused at the gate | passes |
+| `deliveries-on-the-passenger-group` | +6.04 [+4.72, +7.36] | +4.68 [+3.34, +6.01] | fixed | +0.40 [−0.42, +1.22] | refused at the gate | passes |
+| `one-start-time` | +13.50 [+10.72, +16.28] | +11.90 [+9.39, +14.41] | fixed | +0.74 [−1.99, +3.47] | refused at the gate | passes |
+| `every-letter-says-nine` | +6.56 [+5.02, +8.10] | +5.24 [+3.80, +6.69] | fixed | +1.22 [−0.47, +2.91] | refused at the gate | passes |
+| `everyone-leaves-at-once` | +3.10 [+1.86, +4.34] | −3.09 [−3.78, −2.40] | cleared-once | +1.24 [+0.21, +2.27] | **fixed** | **held** |
+| `bed-cars-locked-out` | +3.66 [+2.15, +5.17] | −0.44 [−1.47, +0.60] | fixed | −0.58 [−2.02, +0.86] | refused at the gate | passes |
+| `two-cars-out-wrong-month` | +17.32 [+15.70, +18.94] | +0.00 [+0.00, +0.00] | fixed | +0.18 [−0.40, +0.76] | refused at the gate | passes |
+| `every-deck-calls-itself-full` | +12.10 [+5.19, +19.01] | +3.62 [+3.08, +4.16] | fixed | +1.52 [−1.17, +4.21] | refused at the gate | passes |
+| `restaurant-above-the-ballroom` | +1.10 [+0.40, +1.80] | −2.40 [−3.21, −1.60] | fixed | +0.22 [−0.70, +1.14] | refused at the gate | passes |
+| `controller-sends-every-car` | +0.96 [−0.41, +2.33] | +0.08 [−0.03, +0.19] | cleared-once | −0.12 [−0.97, +0.73] | cleared-once | **re-authored** (× 1.25, below) |
+| `let-faster-than-the-lifts` | +31.26 [+24.66, +37.86] | +10.18 [+6.44, +13.92] | fixed | +2.38 [+0.16, +4.60] | refused at the gate | passes |
+| `gym-on-the-top-floor` | −0.06 [−0.81, +0.69] | −0.26 [−1.49, +0.97] | cleared-once | +0.08 [−0.52, +0.68] | refused at the gate | **held** |
+
+**Fourteen pass; four fail.** `cars-that-always-go-home`, `controller-sends-every-car` and
+`gym-on-the-top-floor` remove nothing fifty mornings can tell from no change — S1 and S3 found the
+same three. `everyone-leaves-at-once` fails twice: its answer clears the letter by making the rest of
+the building worse across the fifty, and **its placebo passes**, so the case cannot tell an answer
+from a change that should do nothing. The expected shape was S3's seven and S1's four; at k = 50 four
+of S3's seven pass (`bed-cars-locked-out`, `every-deck-calls-itself-full`,
+`restaurant-above-the-ballroom`, `sleeping-sky-lobby` — power limits at k = 8, as S3 said they might
+be), and one case neither agent listed fails.
+
+**Re-authoring was tried first, on demand only**, as the ruling requires — never the bar, never the
+seed. Each failing case was re-measured at its shipped arrival rate × 0.8, × 1.25 and × 1.5, answer
+and placebo, k = 50, and the two nearest at more rates:
+
+| case | rate | the letter's morning clears | the answer over fifty | answer's verdict | the placebo |
+|---|---|---|---|---|---|
+| `cars-that-always-go-home` | × 0.8 | no | +0.52 [−0.05, +1.09], rest −0.01 [−0.07, +0.04] | not cleared | refused at the gate |
+| `everyone-leaves-at-once` | × 0.8 | no | +0.62 [+0.19, +1.05], rest −2.86 [−3.74, −1.99] | not cleared | refused at the gate |
+| `controller-sends-every-car` | × 0.8 | no | +0.12 [−0.56, +0.80], rest +0.02 [−0.05, +0.09] | not cleared | refused at the gate |
+| `gym-on-the-top-floor` | × 0.8 | no | +0.02 [−0.39, +0.43], rest +0.55 [−0.57, +1.67] | not cleared | refused at the gate |
+| `cars-that-always-go-home` | × 1.25 | no | +1.90 [+0.36, +3.44], rest −0.05 [−0.29, +0.18] | not cleared | refused at the gate |
+| `everyone-leaves-at-once` | × 1.25 | no | +11.24 [+7.39, +15.09], rest −6.85 [−8.13, −5.57] | not cleared | refused at the gate |
+| `controller-sends-every-car` | × 1.25 | yes | +2.36 [+0.56, +4.16], rest +0.19 [+0.06, +0.32] | fixed | refused at the gate |
+| `gym-on-the-top-floor` | × 1.25 | yes | +0.82 [−0.16, +1.80], rest −0.14 [−1.50, +1.22] | cleared-once | refused at the gate |
+| `cars-that-always-go-home` | × 1.5 | no | +2.94 [+0.53, +5.35], rest +0.02 [−0.21, +0.25] | not cleared | refused at the gate |
+| `everyone-leaves-at-once` | × 1.5 | no | +25.16 [+19.66, +30.66], rest −7.34 [−8.91, −5.77] | not cleared | refused at the gate |
+| `controller-sends-every-car` | × 1.5 | no | +3.26 [+0.77, +5.75], rest +0.11 [−0.08, +0.31] | not cleared | refused at the gate |
+| `gym-on-the-top-floor` | × 1.5 | no | −0.14 [−1.32, +1.04], rest +1.17 [−0.41, +2.75] | not cleared | refused at the gate |
+| `cars-that-always-go-home` | × 1.1 | no | +0.16 [−1.06, +1.38], rest −0.05 [−0.18, +0.07] | not cleared | refused at the gate |
+| `gym-on-the-top-floor` | × 1.1 | no | +0.20 [−0.39, +0.79], rest −1.09 [−3.00, +0.81] | not cleared | refused at the gate |
+| `cars-that-always-go-home` | × 1.2 | no | +0.08 [−1.30, +1.46], rest −0.05 [−0.21, +0.11] | not cleared | refused at the gate |
+| `gym-on-the-top-floor` | × 1.2 | no | −0.08 [−0.85, +0.69], rest −0.03 [−1.67, +1.60] | not cleared | refused at the gate |
+| `gym-on-the-top-floor` | × 1.3 | no | −0.18 [−0.89, +0.53], rest +0.42 [−1.06, +1.90] | not cleared | refused at the gate |
+| `gym-on-the-top-floor` | × 1.4 | no | +0.74 [−0.27, +1.75], rest +0.19 [−1.15, +1.52] | not cleared | refused at the gate |
+
+**One comes back and three are held.** `controller-sends-every-car` at × 1.25 — 5 → 6.25 % of the
+population per five minutes — clears the letter's morning, holds over fifty (+2.36 waits a morning,
++0.56 to +4.16, the rest unharmed) and refuses the placebo at the gate, so it is **re-authored**: the
+rate moves in `data/fixit-cases.json`, and the three figures its copy quotes (the diagnosis's
+*15 of 143 … 130 s … 99.8 % of 520*, and the worst and the mean two negative controls cite) were
+re-taken off the new run and re-pinned in `cases.test.ts`. The seed, the bars, the letter and the
+answer are unchanged. For the other three, at every rate tried either the letter's own morning stops
+clearing — which would mean rewriting the letter rather than the demand — or the answer's effect
+stays indistinguishable from none, or the rest stays shown worse. So they are **held**:
+`fixit/held.ts#HELD_FIX_CASES`, each with a reason drawn beside the case in both surfaces' case
+lists, disabled, never opened; the `{fixed}/{total}` line counts the cases offered. `cases.test.ts`
+holds the register both ways — a held case whose answer starts passing and whose placebo is refused
+fails until it is released.
+
+**This is the clause the product owner is most likely to reverse.** Three of eighteen scenarios
+are not offered, and a fourth was re-authored. Reversing it is deleting a row of `HELD_FIX_CASES`, and what the owner would then be
+choosing is a scenario whose diagnosed answer the game's own judge will not call fixed.
+
+### 4. The survivor census, re-pinned
+
+`theAnswerIsNotPrinted.test.ts#SOLVED_BY` is re-pinned under the ruled judge, and the routes that
+cleared the letter's morning and then did not hold are a second table, `NOT_REPLICATED`, rather than
+dropped — they are the single pair's noise, named case by case. The menu's rows are no longer routes;
+where no sampled editor route holds, the diagnosed repair is tried last and labelled `answer:`, the
+witness `families.test.ts` proves the editor writes leg for leg.
+
+| case | the first route that holds | routes that cleared the letter's morning first and did not hold |
+|---|---|---|
+| `sleeping-sky-lobby` | `parking:stay` | — |
+| `zoning-starves-the-top` | `car:A->high` | — |
+| `three-cars-one-cars-work` | `parking:zone-center` | — |
+| `doors-that-never-close` | `doors:5/3` | — |
+| `cars-that-always-go-home` | `held` | — |
+| `car-park-nobody-serves` | `zone:1` | — |
+| `express-that-stops-everywhere` | `answer:blank-the-low-landings` | — |
+| `deliveries-on-the-passenger-group` | `doors:5/3` | — |
+| `one-start-time` | `parking:lobby+speed:1` | — |
+| `every-letter-says-nine` | `dial:constraints.noDirectionReversal=false` | `raise:3` |
+| `everyone-leaves-at-once` | `held` | — |
+| `bed-cars-locked-out` | `zone:1` | — |
+| `two-cars-out-wrong-month` | `car:A->high` | — |
+| `every-deck-calls-itself-full` | `capacity:1` | `parking:zone-center` |
+| `restaurant-above-the-ballroom` | `speed:1` | — |
+| `controller-sends-every-car` | `parking:zone-center+zone:3` | — |
+| `let-faster-than-the-lifts` | `tenancy:new-lettings=invoke-for-all` | `parking:fixed-floor@30` |
+| `gym-on-the-top-floor` | `held` | — |
+
+So § D1000 § 3's **seventeen of eighteen** on an editor route becomes **fourteen of eighteen on an editor route, one (`express-that-stops-everywhere`) on the witness alone, and three held**, and both of
+the wins § D1000 § 3 itself named as the pair's noise went: `every-letter-says-nine`'s three-metre roof
+raise is in `NOT_REPLICATED`, and `let-faster-than-the-lifts`' fixed floor at the top no longer comes
+first. **One sampled route is refused rather than judged**: on `every-deck-calls-itself-full` the
+zoning step `zone:1` changes who arrives on `vertical-city`, so its after-run is not the as-built
+morning's crowd and `assertPairMatchesRepairs` refuses the pair; the census skips it and takes the
+next route, `capacity:1`. Why a zoning edit moves that tower's crowd is not established here (§ 10).
+§ D869 § 3's twelve of eighteen was counted under the same single pair and is superseded by the
+same table.
+
+### 5. The menu retires, on this commit
+
+§ D706 clause 6 conditioned the retirement on an editor that writes every answer (§ D1000 built it)
+and on each retiring case's answer being reachable **and clearing** — which, with this judge, means
+clearing over fifty mornings, and is now true of every case offered. § D706 § 7's playtest of the
+editor with the menu hidden was taken by an assessor before this wave (thirteen cases through the
+editor alone, all fixed in a median of one run) — **judged by the single pair this entry replaces**, so
+it says the editor reaches the answers, not that they hold; § 4's table is what says the second. So, on this commit:
+
+- **the repair menu and the five standing extras leave both surfaces** (`everyday/fixitScreen.ts`,
+  `dev/fixitPanel.ts`), with `FIXIT_SCREEN_COPY`'s `repairsEyebrow`, `repairsHint`, `stateSelected` and
+  `stateAffordable`, the repairs strip's spent line, and the three engine functions that only a menu
+  called — `repairsInDrawOrder`, `repairRowOf` and `toggleExtra`;
+- **the kind-of-fix line leaves all eighteen `asBuilt.note`s** — *"The fault is in how it is
+  configured, not in what it is made of."* — as § D706 clause 4 required, on the same commit as the
+  menu;
+- **`fixit/parse.ts`'s role rule relaxes** to § D706 clause 2's: exactly one diagnosed repair, the
+  other three roles optional and at most one each. The file keeps them, as the witness and as priced
+  negative controls;
+- **the Engineer panel's outcome card prints the outcome's own basis**, which it had drawn as
+  `BASIS_LINE` whatever the outcome said.
+
+**The sentence that becomes true.** The worked answer's boundary line, *"In a scenario you get the
+building, the letter and the whole editor, and no suggested fix"* (`everyday/workedAnswer.ts`, drawn
+by the tutorial and the Rush pre-roll), was false while a four-row menu printed the answer. With the
+menu gone it is true: a scenario draws the letter, the four figures, the diagnosis — which § D706
+clause 5 keeps and which names a fault, not a change — and the editor.
+
+**The editor items that land with it and do not gate it** (§ D706 § 7's findings, S1's four, the
+reconciliation's *"same wave, don't gate"*): every dial's meaning is drawn under it rather than only in
+a hover title; *as it stands* prints the as-built value for the door hold and names the standing
+parking strategy; the parking select is drawn at the head of the idle-parking group, beside the floor
+it summons; and the eleven cost-term weights fold under one heading, identically on every case.
+**Ordering the editor by the diagnosed family is refused** — it is the kind-of-fix line rebuilt out
+of layout (§ D525 clause 2, § D706 clause 4), and S1 refused it in terms.
+
+### 6. The dissents
+
+- **S2's fifty-morning pooled 80 % bar.** S2 ruled k = 50 too, and required the pooled complaint over
+  the fifty to fall by 80 % as well as the interval. It lost 2–1: the 80 % bar was authored against
+  the letter's morning's magnitude, and asking it of every morning refuses repairs whose effect is
+  real on every one — S3 measured `car-park-nobody-serves` at 77.6 % pooled and `zoning-starves-the-top`
+  on its pooled rest, both of which replicate on every morning.
+- **S1's k = 10 against S3's k = 8.** Both were measured trade-offs — S1: 13 of 18 answers at ten;
+  S3: 11 at eight, 12 at twelve, 13 at sixteen — and both lost to the repository's own rule rather
+  than to each other. `CLAUDE.md` says ten is not enough and budgets fifty to two hundred; a verdict
+  that calls a building fixed is a better-than-as-built claim, and the floor of that budget is what it
+  gets. The cost of the choice is § 7's wait, measured rather than argued.
+
+### 7. The wait, measured on the built bundle
+
+Measured on the built bundle (`vite build`, the Everyday fix-it screen in Chromium through the
+browser tier), 2026-09-25 between 07:37 and 08:43 UTC, on **one shared box: four cores, the pool
+therefore two workers, and a load average between 6.8 and 12.1** from `uptime` taken before and after
+every sitting. *Checking* is from the gate's verdict appearing to the fifty-morning verdict
+replacing it; *whole press* is from the press to the final verdict. Three presses a case; the case
+list is every case whose diagnosed or first editor route clears the gate, except `express`, `restaurant`,
+`controller` and `let-faster`, which were not timed. `every-deck-calls-itself-full` is timed on
+`capacity:1`, its survivor route (§ 4).
+
+**Pressed after thirty seconds on the letter** (the as-built mornings had their head start):
+| case | presses | checking, median | checking, p90 | whole press, median | verdict |
+|---|---|---|---|---|---|
+| `sleeping-sky-lobby` | 3 | 17.8 s | 18.4 s | 19.9 s | fixed |
+| `zoning-starves-the-top` | 3 | 4.0 s | 4.3 s | 4.7 s | fixed |
+| `three-cars-one-cars-work` | 3 | 1.4 s | 1.4 s | 1.7 s | fixed |
+| `doors-that-never-close` | 3 | 6.3 s | 7.3 s | 6.8 s | fixed |
+| `car-park-nobody-serves` | 3 | 4.2 s | 5.7 s | 4.7 s | fixed |
+| `deliveries-on-the-passenger-group` | 3 | 6.0 s | 6.9 s | 6.5 s | fixed |
+| `one-start-time` | 3 | 6.7 s | 7.2 s | 7.4 s | fixed |
+| `every-letter-says-nine` | 3 | 8.8 s | 9.6 s | 9.4 s | cleared-once |
+| `bed-cars-locked-out` | 3 | 9.6 s | 10.2 s | 10.4 s | fixed |
+| `two-cars-out-wrong-month` | 3 | 4.5 s | 4.8 s | 5.5 s | fixed |
+| `every-deck-calls-itself-full` | 3 | 33.8 s | 36.6 s | 37.2 s | fixed |
+
+all presses: n = 33, median 6.3 s, p90 18.4 s, max 36.6 s
+
+**Pressed at once** (the as-built mornings and the after-runs share the pool):
+| case | presses | checking, median | checking, p90 | whole press, median | verdict |
+|---|---|---|---|---|---|
+| `sleeping-sky-lobby` | 3 | 27.1 s | 28.0 s | 31.4 s | fixed |
+| `three-cars-one-cars-work` | 3 | 2.0 s | 2.3 s | 2.6 s | fixed |
+| `every-deck-calls-itself-full` | 3 | 45.5 s | 46.0 s | 49.8 s | fixed |
+
+all presses: n = 9, median 27.1 s, p90 46.0 s, max 46.0 s
+
+**What it says.** On ten of eleven timed cases a player who has watched the letter for thirty
+seconds waits a median of 1.4 to 9.6 s after the first three rows appear, and 17.8 s on
+`sleeping-sky-lobby`. **The outlier is `every-deck-calls-itself-full`, at 34 s after a head start and
+46 s pressed at once** — `vertical-city`'s mornings are the longest runs in the file. Across the
+thirty-three warm presses the p90 is 18.4 s and the worst 36.6 s. Pressed at once, the as-built
+mornings are still running when the after-runs are asked for, and `sleeping-sky-lobby` goes from
+17.8 to 27.1 s.
+
+**These are the figures of an oversubscribed box**, which is the direction that overstates the
+wait: load averages of three times the core count, and a pool of two where a player's machine with
+eight cores gets four. They are not a claim about any player's machine. Whether a 30–45 s check on
+the largest tower is playable is the question the ruling returns to a swarm if it is not; this entry
+reports it and does not lower k. The frame budget was held rather than argued: the Engineer panel's
+browser case measures the longest gap between painted frames while the mornings run, and a pool of
+cores − 1 missed it at 1 015 ms, so the pool is cores − 2 (`dev/offThreadMornings.ts#morningWorkerCountOf`).
+
+### 8. What the sibling lane owns, and what this lane assumes of it
+
+Lane AI-B, in its own entry of this wave, owns part (a): the fixed verdict prints the case's authored narrative
+only on a run leg for leg identical to the diagnosed repair's, and otherwise a composed verdict;
+an edit makes a verdict stale and gives the Run press back; the two-cars decoy's line; and an
+eleventh honesty property. Its `classifyOutcome` takes an optional fourth argument,
+`FixitVerdictContext`, and adds an `attribution` field to the outcome.
+
+**This lane changed `classifyOutcome` not at all, and needs no `replication` field in that context.**
+The judge sits beside it: `fixit/judge.ts` takes the gate outcome `classifyOutcome` returns and passes
+it through (a gate that did not clear), draws `checking`, or returns `fixed` with the gate's **own**
+head and body and a fourth row, or `cleared-once`. The two wrapper arms **spread the gate** before
+overriding their five fields, so whatever the classification carries beside them — AI-B's
+`attribution` — travels with them. So whatever head and body AI-B's classification produces for a
+fixed gate is the head and body of the fifty-morning `fixed` verdict, and a `cleared-once` verdict
+prints no narration. The press sites call `pressThroughTheJudge` with a `classify` **continuation**
+rather than a return, which is the seam for AI-B's witness run: the classification may ask for the
+diagnosed repair's own run before answering, and the judge waits on it. The two lanes' press-site
+edits conflict textually and are one flow semantically: pair → classify (with the witness) → gate →
+mornings → verdict.
+
+**Retiring the menu makes the editor the only path**, which is why AI-B's composed verdict must merge
+with this commit: without it, every route a player finds in the editor would be narrated as the
+diagnosed repair.
+
+**The seven second answers AI-B's `SECOND_ANSWERS` register found**, each a non-diagnosed repair that
+clears the letter's morning, judged here at k = 50 on this branch's data:
+
+| case / repair | reduction a morning | rest, points | verdict |
+|---|---|---|---|
+| `cars-that-always-go-home/quicker-tower-doors` | −0.96 [−2.06, +0.14] | +0.08 [+0.01, +0.16] | cleared-once |
+| `one-start-time/trim-the-dwell` | +4.44 [+2.09, +6.79] | +1.47 [−0.67, +3.60] | **fixed — a real second answer** |
+| `everyone-leaves-at-once/hold-doors-longer` | +0.74 [−0.62, +2.10] | −0.57 [−1.36, +0.22] | cleared-once |
+| `bed-cars-locked-out/quicker-bed-car-doors` | +0.44 [−0.91, +1.79] | +0.86 [+0.08, +1.64] | cleared-once |
+| `two-cars-out-wrong-month/night-working` | +18.88 [+17.01, +20.75] | +0.00 [+0.00, +0.00] | **fixed — a real second answer** |
+| `controller-sends-every-car/regear-tower-cars` | +3.12 [+1.03, +5.21] | +0.15 [+0.03, +0.26] | no longer clears the letter's morning at the re-authored rate |
+| `gym-on-the-top-floor/replant-the-machines` | +0.82 [+0.25, +1.39] | +2.09 [+1.18, +3.00] | **fixed — a real answer on a held case** |
+
+Two effect lines were false by these measurements and are corrected in `data/fixit-cases.json`:
+`one-start-time`'s *"The queue is the start time, not the doors"* over a change that holds, and
+`gym-on-the-top-floor`'s *"but the cars still start every gym run from the front door"* offered as
+why a change that holds does not. **`night-working`'s line was already true** (*"It works — at three
+times the price"*). **AI-B's register holds `controller-sends-every-car/regear-tower-cars` in both
+directions, and on the merged tree it will go red**: at the re-authored 6.25 %/5 min that repair no
+longer clears the letter's morning (15 → 6, 60 %), so the entry comes out on the merge. That is a
+content fact this lane's re-authoring caused, not a defect in the register.
+
+**`gym-on-the-top-floor` stays held although a way through exists.** Its diagnosis names parking at the
+gym floor, and that change does not hold; a faster machine does. S3 ruled this shape — *"their
+diagnosis and witness are what get re-authored"* — and rewriting a diagnosis is content work beyond
+demand, which is what this lane was given. It is the first case to release when that work is taken.
+
+### 9. The corpus, as a forecast rather than as the row
+
+[§ D343](#d343) puts the measurement on the integrator. **Surfaces +0**: every string enters the
+existing FIXIT adapter. **Strings: this lane's own term is +21 a case in both tiers, decomposed, with
+no conditional term** — every arm below is seeded unconditionally, on the adapter's synthetic case.
+
+| | per case |
+|---|---|
+| out: the five extras' names and lines | −10 |
+| out: the four repair rows' price lines, on two states | −8 |
+| out: the repair row's three state words | −3 |
+| out: the repairs strip's spent line, on three states | −3 |
+| in: the checking head and body | +2 |
+| in: three judged arms × two measure kinds × head, body, basis and the fifty-morning row | +24 |
+| in: the replicated basis's demand form | +1 |
+| in: the rail's held arm — heading, hint, count, four rows' tag and tower line, three reasons | +14 |
+| in: the checking bar — label, note and inert sentence | +3 |
+| in: the weights fold's heading, seeded by name because only a mount reads it | +1 |
+| substituted: the door hold's and the parking row's *as it stands* option | 0 |
+
+−24 + 45 = **+21**, so **+1 029 always-on and +1 260 deep** from this lane. **It is not additive with
+lane AI-B's move**: that lane's adapter drives the shipped cases (#570), and the two changes meet in
+the same adapter, so the integrated figure is the integrator's to measure and this row claims only
+its own decomposition. The always-on tier was run on this branch after the seeding
+(`honesty.test.ts`, 29 passed, 0 failing cases); that is a check, not the row.
+
+### 10. What this does not establish
+
+- **Whether fifty mornings is playable on every case.** § 7 is one machine on one day.
+- **Whether a held case can be re-authored on anything but demand.** The ruling allows demand or
+  building; this lane tried demand only, at three rates. A building change, or a letter rewritten
+  around a complaint present on most mornings, is open.
+- **Why a zoning edit changes the crowd on `vertical-city`.** The press site's pair check refuses it
+  (§ 4), and before this lane wrapped the classification that refusal threw inside a worker callback
+  and hung the press forever; it now becomes a failed press. The root cause is unexamined.
+- **Whether the rest-not-shown-worse rule is strict enough.** `restaurant-above-the-ballroom` passes
+  with the rest a mean 2.40 points worse a morning — its interval, −3.21 to −1.60, does not show it
+  worse than the 2-point floor. That is the rule as ruled; a reader who thinks a mean beyond the floor
+  should refuse is proposing a different rule.
+- **Anything about players.** No figure here is a retention or fun claim.
+
+### 11. Numbers spent
+
+This lane held **D1020–D1028** and spent **D1020 only**. D1021 to D1028 are unspent and, under
+[§ D404](#d404) and [§ D430](#d430), become permanent holes once a later lane writes above them; the
+integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
