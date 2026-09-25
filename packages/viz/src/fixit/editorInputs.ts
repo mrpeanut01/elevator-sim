@@ -76,6 +76,13 @@ export interface DoorInput {
   readonly targets: readonly { readonly key: string; readonly carId: string | undefined; readonly bankName: string | undefined }[];
   readonly hallOptions: readonly number[];
   readonly carOptions: readonly number[];
+  /**
+   * **What each target holds as it stands**, in seconds, per side — [§ D1020](../../../../DECISIONS.md)'s
+   * UX item: *"as it stands" prints the as-built value*. A playtest read a diagnosis quoting eleven
+   * seconds beside a select reading *as the car has it*, with no way to see the eleven. `undefined`
+   * on the every-car target where the cars differ, because one figure would then be false of some.
+   */
+  readonly standing: Readonly<Record<string, { readonly hall: number | undefined; readonly car: number | undefined }>>;
 }
 
 /** A bank as the rezone control draws it — the as-built banks plus any keyed bank the order made. */
@@ -238,8 +245,19 @@ function computeEditorInputs(
   const fabric = rezoneFabricOf(asBuilt, shippedOf(entry, resources));
   const bankName = new Map(fabric.banks.map((bank) => [bank.id, bank.name]));
 
+  const resolvedCars = asBuilt.banks.flatMap((bank) => bank.cars);
+  const agreed = (values: readonly number[]): number | undefined =>
+    values.length > 0 && values.every((value) => Math.abs(value - values[0]!) < 1e-9) ? values[0] : undefined;
+  const doorStanding: Record<string, { hall: number | undefined; car: number | undefined }> = {
+    '*': {
+      hall: agreed(resolvedCars.map((car) => car.dwellHallCallS)),
+      car: agreed(resolvedCars.map((car) => car.dwellCarCallS)),
+    },
+  };
+  for (const car of resolvedCars) doorStanding[car.id] = { hall: car.dwellHallCallS, car: car.dwellCarCallS };
   const door: DoorInput = {
     row: rowPurchase(entry, state, schedule, 'door-dwell', Object.keys(state.doorDwell).length > 0),
+    standing: doorStanding,
     targets: [
       { key: '*', carId: undefined, bankName: undefined },
       ...fabric.cars

@@ -38912,6 +38912,8 @@ This lane held **D701–D705** and spent **D701** only. **D702, D703, D704 and D
 
 ## D706 — The fix-case repair menu retires from the screen and not from the file: the diagnosed repair becomes the scenario's pinned witness, the decoys survive as prices, and all three retirements wait for the editor that can write the answers
 
+> **Status 2026-09-25: CONDITIONS REFINED AND MET by [§ D1020](#d1020)** (an agent ruling). Clause 6's *"clears"* is judged over fifty mornings rather than one pair, four cases whose answers do not clear are held from the list, and the menu, the decoys-as-rows and the kind-of-fix line retired together on that commit; § 7's playtest was taken. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-24: NARROWED by [§ D1001](#d1001), and its § 1 re-measured by [§ D1000](#d1000).** `tenant-floors` is offered as case-authored cohorts rather than a per-floor population control, and the editor now writes all eighteen answers; the retirement still waits on § 7's playtest. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken by an agent session under authority delegated by the session principal on 2026-09-19, not by the product owner.** It **narrows** [§ D525](#d525) clause 2 in one place, named in § 4 below, and conditions the rest of it on a measurement. `docs/39` § 2 carries the row and § D525 carries the marker, on this commit.
@@ -41032,6 +41034,8 @@ is the library that already ships, so nothing here can render a note no passenge
 
 ## D869 — the fix case's answer key retires now, ahead of the menu § D706 conditions, and the survivor census it rests on is 12 of 18 rather than 1 of 18
 
+> **Status 2026-09-25: § 3 SUPERSEDED by [§ D1020](#d1020)**, and § 4's draw order retired with the menu it ordered. The census here was counted under the single-pair judge; § D1020 re-pins it over fifty mornings.
+
 **Date: 2026-09-19 · Owner: LANE-AE-C (wave AE) · Narrows [§ D706](#d706) clause 4 and re-measures its § 1 · GitHub issue [#566](https://github.com/mrpeanut01/elevator-sim/issues/566) · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.1, [`docs/12`](docs/12-design-handoff.md) § 4.15, `data/fixit-cases.json`, `packages/viz/src/fixit/engine.ts`, `packages/viz/src/everyday/fixitScreen.ts`, `packages/viz/src/dev/fixitPanel.ts`, `packages/viz/src/honesty/surfaces.ts`.**
 
 **Why an entry.** Two of [§ D405](#d405)'s three grounds. It **moves something already recorded** — § D706 clause 4 held the kind-of-fix line back until the menu goes, and this releases one of the two sentences that clause is about — and it binds a data file, two surfaces and the corpus adapter, none of which one module owns.
@@ -42940,6 +42944,8 @@ changes (`skipNote`, `finishNote` and the two `actionBar.ts` notes) are substitu
 
 ## D1000 — the fix-it editor gains five of § D706's six change families, writes all eighteen answers leg for leg with the sixth, and the menu still does not retire
 
+> **Status 2026-09-25: §§ 3–4 AMENDED by [§ D1020](#d1020)** (an agent ruling). § 3's *seventeen of eighteen* was counted under the single-pair judge and is re-pinned under the fifty-morning one, with a second table of the routes that clear once and do not hold; § 4's retirement landed. The families of §§ 1–2 are unchanged.
+
 **Date: 2026-09-24 · Owner: lane AH-E (wave AH) · GitHub issues [#566](https://github.com/mrpeanut01/elevator-sim/issues/566) and [#580](https://github.com/mrpeanut01/elevator-sim/issues/580) · Under [§ D706](#d706) clause 6 · Rules on: `packages/viz/src/fixit/families.ts`, `fixit/editorInputs.ts`, `fixit/engine.ts`, `fixit/run.ts`, `fixit/types.ts`, `everyday/fixitFamilies.ts`, `everyday/fixitScreenModel.ts`, `everyday/fixitScreen.ts`, `dev/fixitPanel.ts`, `honesty/surfaces.ts`, `core`'s `dispatch/parameters.ts` and `physics/doors/types.ts` player words.**
 
 **Why an entry.** [§ D405](#d405)'s first two grounds. It binds two surfaces, the honesty corpus, `core`'s declared player words and a guard figure five documents publish, none of which one module owns; and it moves two things already recorded — § D706 § 1's *one of eighteen* and § D869's *twelve of eighteen*, both of which it re-measures, and § D706 § 8's stale refusal of `predicted-demand`, which it takes rather than files.
@@ -42995,6 +43001,8 @@ This lane holds **D1000–D1008** and spends **D1000 and D1001**. D1000 is the f
 ---
 
 ## D1001 — tenant-floors is offered in every fix case at its flat 2 u, and moves only the cohorts a case authors
+
+> **Status 2026-09-25: § 6 AMENDED by [§ D1020](#d1020).** *"The fix-it single-pair judge's noise"* is no longer undecided: the letter's morning is a gate and fifty mornings decide. The three demand cases' answers all pass that judge.
 
 > **Taken 2026-09-24 by agent sessions under delegated authority**, not by the product owner. The
 > session principal's standing instruction for this wave is that decisions are taken by the swarm

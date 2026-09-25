@@ -1150,6 +1150,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     resources,
     loadCases: () => loadFixitCases(resources),
     spawnRunWorker,
+    /* The fix-it judge's mornings — § D1020. Written out here for `spawnRunWorker`'s bundler reason. */
+    spawnMorningWorker: () => new Worker(new URL('./morningWorker.ts', import.meta.url), { type: 'module' }),
   });
 
   /**

@@ -95,8 +95,13 @@ import {
   type FixitRunPlan,
 } from './run.js';
 import { EDITOR_PARKING_STRATEGIES } from './types.js';
-import type { EditorParkingStrategy, FixitCase, FixitCases, FixitState } from './types.js';
+import type { EditorParkingStrategy, FixitCase, FixitCases, FixitPatch, FixitState } from './types.js';
 import { recordRun, type RecordedRun } from '../record/recordRun.js';
+import type { VizRecording } from '../contract/types.js';
+import { createFixitJudge, pressThroughTheJudge, type MorningRunner, type PairRunner } from './judge.js';
+import { HELD_FIX_CASES, heldReasonOf } from './held.js';
+import { morningReadingOf } from './run.js';
+import type { FixitOutcome } from './engine.js';
 
 const SUITE_TIMEOUT = 300_000;
 
@@ -366,13 +371,20 @@ const PINNED: readonly Pinned[] = [
   },
   {
     id: 'controller-sends-every-car',
-    before: 4,
-    after: 0,
+    /*
+     * **Re-authored on demand by § D1020**: 5 → 6.25 % of the population per five minutes. At 5 the
+     * diagnosed repair removed nothing fifty mornings could tell from no change (+0.96 waits a
+     * morning, −0.41 to +2.33); at 6.25 it removes 2.36 a morning (+0.56 to +4.16) with the rest
+     * unharmed and the placebo refused at the letter's morning. The bars and the seed are unmoved,
+     * as the ruling requires; the copy's figures were re-taken off this run.
+     */
+    before: 15,
+    after: 2,
     figureTexts: [
-      '4 of 124 journeys',
-      '92 s',
-      '23.6 s over 124 boarded journeys',
-      '100.0 % of 427 journeys',
+      '15 of 143 journeys',
+      '130 s',
+      '29.0 s over 143 boarded journeys',
+      '99.8 % of 520 journeys',
     ],
   },
   {
@@ -653,6 +665,114 @@ describe.each(PINNED)('case $id', (pinned) => {
     },
     SUITE_TIMEOUT,
   );
+});
+
+/* -------------------------------------------------------------------------- *
+ * The ruled judge — [§ D1020](../../../../DECISIONS.md), GitHub issue #602
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The shipped press, run synchronously in this process: `pressThroughTheJudge` over the shipped
+ * judge, with a pair runner and a morning runner that call `recordRun` directly. Nothing about the
+ * verdict is restated here — the gate is `classifyOutcome`, the mornings are `replicationSeedsOf`'s,
+ * the interval is `judgeReplication`'s — so this vouches for the chain both surfaces call.
+ */
+function judgedPress(entry: FixitCase, state: FixitState, subject: FixitCase = entry): FixitOutcome {
+  const pairRunner: PairRunner = {
+    start(ask) {
+      ask.onDone(ask.runs.map((run) => recordRun(run.config, FIXIT_RUN_SWITCHES).recording));
+    },
+  };
+  const mornings: MorningRunner = {
+    start(ask) {
+      ask.onDone(ask.configs.map((config) => morningReadingOf(recordRun(config, FIXIT_RUN_SWITCHES).recording, ask.measure)));
+    },
+    cancel() {},
+    isRunning: () => false,
+  };
+  let verdict: FixitOutcome | undefined;
+  pressThroughTheJudge({
+    entry: subject,
+    plan: fixitRunPlanOf(subject, state, resources),
+    switches: FIXIT_RUN_SWITCHES,
+    pairRunner,
+    judge: createFixitJudge(mornings),
+    readingOf: morningReadingOf,
+    classify: (before: VizRecording, after: VizRecording, done) =>
+      done(classifyOutcome(subject, measuredOf(subject, before, after), spendOf(subject, state, shippedPriceSchedule()))),
+    onGate: (outcome) => {
+      verdict = outcome;
+    },
+    onVerdict: (outcome) => {
+      verdict = outcome;
+    },
+    onFailed: (message) => {
+      throw new Error(message);
+    },
+  });
+  if (verdict === undefined) throw new Error(`case "${entry.id}": the press produced no verdict`);
+  return verdict;
+}
+
+/**
+ * The placebo — every car 3 cm/s faster, which no complaint in this file is about. A judge that
+ * lets it through is a judge a player can clear by accident, which is the defect #602 measured:
+ * under the single pair it cleared three shipped cases' letters.
+ */
+const PLACEBO_PATCH: FixitPatch = { building: { cars: [{ carIds: ['*'], set: { ratedSpeedDeltaMps: 0.03 } }] } };
+
+function withPlacebo(entry: FixitCase): FixitCase {
+  return {
+    ...entry,
+    repairs: [
+      ...entry.repairs,
+      { id: 'placebo', role: 'cheap-fix', name: 'A placebo', costUnits: 0, effect: 'Every car 3 cm/s faster.', patch: PLACEBO_PATCH },
+    ],
+  };
+}
+
+/**
+ * **Every offered case's answer passes the judge a player meets, and the placebo does not** — and a
+ * held case is held because that is not true of it.
+ *
+ * Both halves are asserted on every case, so a judge that passed everything or refused everything
+ * fails here: the answer's `fixed` is the half a lenient judge would satisfy alone, and the
+ * placebo's refusal the half a strict one would. The held register is held in both directions —
+ * a case in `fixit/held.ts` whose answer starts passing and whose placebo is refused fails this
+ * block until it is released, so the register cannot outlive its reason.
+ */
+describe.each(PINNED)('case $id under the ruled judge (§ D1020)', (pinned) => {
+  it(
+    heldReasonOf(pinned.id) === undefined
+      ? 'the diagnosed repair is fixed over fifty mornings, and the +3 cm/s placebo is not'
+      : 'is held: its answer does not pass the judge, or the placebo does',
+    () => {
+      const entry = caseOf(pinned.id);
+      const answer = judgedPress(entry, diagnosedState(entry));
+      const placebo = judgedPress(entry, { ...emptyFixitState(), selectedRepairIds: ['placebo'] }, withPlacebo(entry));
+      const passes = answer.kind === 'fixed' && placebo.kind !== 'fixed';
+      if (heldReasonOf(pinned.id) === undefined) {
+        expect(answer.kind, `${entry.id}: ${answer.head} ${answer.rows[3]?.verdict ?? ''}`).toBe('fixed');
+        expect(answer.rows, 'a fixed verdict carries its fifty-morning row').toHaveLength(4);
+        expect(placebo.kind, `${entry.id}: the placebo — ${placebo.rows[3]?.verdict ?? placebo.head}`).not.toBe('fixed');
+      } else {
+        expect(passes, `${entry.id} is held but its answer passes and its placebo is refused — release it`).toBe(false);
+      }
+    },
+    SUITE_TIMEOUT,
+  );
+});
+
+describe('the held register', () => {
+  it('names only shipped cases, and gives each a reason', () => {
+    const ids = new Set(cases.cases.map((entry) => entry.id));
+    for (const [id, reason] of Object.entries(HELD_FIX_CASES)) {
+      expect(ids.has(id), `held case "${id}" is not in the shipped file`).toBe(true);
+      expect(reason.length).toBeGreaterThan(40);
+      /* No figure: the reason is drawn, and a figure beside it would be one nobody re-measures. */
+      expect(reason).not.toMatch(/\d/);
+    }
+  });
 });
 
 /**

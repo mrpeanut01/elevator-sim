@@ -194,8 +194,8 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'these is a **load-time refusal addressed to whoever authored `data/price-schedule.json`** ' +
         '("the new shaft costs 12 u; data/price-schedule.json prices it 34"), or a config path, or ' +
         'a tier id. None of them reaches a player: the words a player reads about a price are the ' +
-        'change’s own `name`, which the FIXIT adapter drives through `standingExtrasFrom` and ' +
-        '`repairRowOf`, and the schedule’s `note` fields, which are provenance for a reviewer and ' +
+        'change’s own `name`, which the FIXIT adapter drove through `standingExtrasFrom` and ' +
+        '`repairRowOf` until the menu that drew them retired (§ D1020), and the schedule’s `note` fields, which are provenance for a reviewer and ' +
         'are drawn on no screen. `fixit/parse.ts`’s own exclusion three groups down is the same ' +
         'argument for the same reason, and this is that file’s pricing half.',
       ids: [
@@ -1582,6 +1582,32 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'fixit/run.ts#fixitRunPlanOf',
         'fixit/run.ts#measuredOf',
+        /*
+         * [§ D1020](../../../../DECISIONS.md)'s judge and its register, on the same ground: numbers in,
+         * numbers or outcomes out. `morningReadingOf` is `measuredOf`'s reading of one run and is
+         * derived through the same scope-mode ids. `createFixitJudge` and `pressThroughTheJudge`
+         * orchestrate runs; every word they carry is `checkingOutcomeOf`'s and `judgedOutcomeOf`'s,
+         * which the FIXIT adapter drives — the transitive hit is a cache key and those two. The two
+         * register predicates return a string or a boolean off `HELD_FIX_CASES`, which the adapter
+         * seeds whole. `affordabilityOf` and `toggleRepair` reach prose only through `spendOf`'s
+         * schedule ids; the adapter drove them through the repair menu's rows until the menu retired,
+         * and what a player reads about a spend is `fixitSpendSummary`'s, which it still drives.
+         */
+        'fixit/run.ts#morningReadingOf',
+        'fixit/judge.ts#createFixitJudge',
+        'fixit/judge.ts#pressThroughTheJudge',
+        'fixit/held.ts#heldReasonOf',
+        'fixit/held.ts#isOffered',
+        'fixit/engine.ts#affordabilityOf',
+        'fixit/engine.ts#toggleRepair',
+        /*
+         * The five standing extras' names and lines. **Player copy that no surface draws** since the
+         * menu that listed them retired (§ D1020, § D706 clause 3 — they survive as prices, not as a
+         * menu), so there is nothing to sweep; `spendOf` still prices them for a state that selects
+         * one, which no press on either surface can produce. The day a surface draws them again, this
+         * line goes and the FIXIT adapter seeds them.
+         */
+        'fixit/engine.ts#standingExtrasFrom',
         'fixit/engine.ts#stepSpeed',
         'fixit/engine.ts#stepCapacity',
         /*
@@ -1839,7 +1865,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`dev/offThreadRuns.test.ts` drives it through a worker it answers for, including the ' +
         'failed-to-start arm and the ordering claims a moved run makes possible; that is weaker ' +
         'than the search and is said as a limitation rather than offered as coverage.',
-      ids: ['dev/offThreadRuns.ts#createOffThreadRunner', 'dev/shiftRunner.ts#createShiftRunner'],
+      ids: [
+        'dev/offThreadRuns.ts#createOffThreadRunner',
+        'dev/shiftRunner.ts#createShiftRunner',
+        /*
+         * [§ D1020](../../../../DECISIONS.md)'s morning pool, on `createOffThreadRunner`'s exact
+         * ground: its one sentence, *a morning worker failed to start: …*, exists only when a worker
+         * did not load. `dev/offThreadMornings.test.ts` drives the pool through workers it answers
+         * for; that is weaker than the search and is said as a limitation.
+         */
+        'dev/offThreadMornings.ts#createOffThreadMornings',
+      ],
     },
     {
       reason:

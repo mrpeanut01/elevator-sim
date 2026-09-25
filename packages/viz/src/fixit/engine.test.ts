@@ -26,7 +26,6 @@ import {
   classifyOutcome,
   emptyFixitState,
   fixedBadgeAfter,
-  repairRowOf,
   spendOf,
   editorPathsOf,
   parkingPriceUnits,
@@ -37,7 +36,6 @@ import {
   stepZoneOverlap,
   topFloorRaisePriceUnits,
   zonePriceUnits,
-  toggleExtra,
   toggleRepair,
   type FixitMeasurement,
   type FixitSpend,
@@ -148,8 +146,8 @@ describe('spend and the editor prices', () => {
       machineryUnits: 10,
     });
 
-    /* And an extra on top of that is refused, which is the boundary the sum just reached. */
-    expect(toggleExtra(CASE, state, 'tenant-notices', shippedPriceSchedule())).toBe(state);
+    /* And one more step on top of that is refused, which is the boundary the sum just reached. */
+    expect(stepSpeed(CASE, state, 1, shippedPriceSchedule())).toBe(state);
   });
 
   /**
@@ -218,20 +216,16 @@ describe('affordability — § 10.2', () => {
     const affordability = affordabilityOf(CASE, state, 34, shippedPriceSchedule());
     expect(affordability.selectable).toBe(false);
     expect(affordability.shortByUnits).toBe(32);
-    const row = repairRowOf(CASE, state, CASE.repairs[3] as FixitCase['repairs'][number], shippedPriceSchedule());
-    expect(row.refusal).toBe('short by 32 u — beyond a repair budget');
   });
 
-  it('the new shaft is visible and never affordable, even with nothing else selected', () => {
-    const row = repairRowOf(CASE, emptyFixitState(), CASE.repairs[3] as FixitCase['repairs'][number], shippedPriceSchedule());
-    expect(row.selectable).toBe(false);
-    expect(row.refusal).toContain('beyond a repair budget');
+  it('the new shaft is never affordable, even with nothing else selected', () => {
+    const shaft = CASE.repairs[3] as FixitCase['repairs'][number];
+    expect(affordabilityOf(CASE, emptyFixitState(), shaft.costUnits, shippedPriceSchedule()).selectable).toBe(false);
   });
 
   it('a reducer refuses what the panel could not offer, so the gate holds without the panel', () => {
     const state = toggleRepair(CASE, emptyFixitState(), 'dear-fix', shippedPriceSchedule());
     expect(toggleRepair(CASE, state, 'shaft', shippedPriceSchedule())).toBe(state);
-    expect(toggleExtra(CASE, state, 'car-interiors', shippedPriceSchedule()).selectedExtraIds).toEqual([]);
     // 10 spent, a speed step (10) does not fit; a return below zero is refused too.
     expect(stepSpeed(CASE, state, 1, shippedPriceSchedule())).toBe(state);
     const empty = emptyFixitState();

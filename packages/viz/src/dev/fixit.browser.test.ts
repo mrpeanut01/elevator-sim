@@ -3,10 +3,11 @@
  *
  * ## Why these are browser cases
  *
- * The repair rows are buttons `mountFixitPanel` builds and the overlay is appended to
+ * The panel's rows are buttons `mountFixitPanel` builds and the overlay is appended to
  * `document.body`; no node test in this package can see either (`boundaries.test.ts` keeps jsdom
- * out), and both findings are about what a reader perceives: a toggle whose only state signal was
- * a background colour, and a dark room inside a light product. The third half of the defect — the
+ * out), and both findings were about what a reader perceives: a toggle whose only state signal was
+ * a background colour, and a dark room inside a light product. The toggles were the repair menu's,
+ * which retired on § D1020's commit; that case now holds the retirement itself. The third half of the defect — the
  * FIXED badge surviving a failing run — is a pure rule and is driven in `fixit/engine.test.ts`
  * (`fixedBadgeAfter`), with the panel's assignment pinned at the source there; a browser replay of
  * it would cost four simulations to re-prove a one-line pure function.
@@ -72,8 +73,9 @@ async function fixitPage(): Promise<Page> {
   await reopenEngineerMenu(page);
   await pressMenuRow(page, 'main.campaign');
   await pressMenuRow(page, 'campaign.fixit');
-  // The case file is fetched on first open; a repair row existing is the honest "loaded" latch.
-  await page.waitForSelector('.fixit-repair', { timeout: 30_000 });
+  // The case file is fetched on first open; the run button existing is the honest "loaded" latch —
+  // a repair row was, until the menu retired (§ D1020).
+  await page.waitForSelector('.fixit-run', { timeout: 30_000 });
   return page;
 }
 
@@ -139,24 +141,28 @@ async function runFrames(page: Page): Promise<readonly RunFrame[]> {
 }
 
 describe.skipIf(!HAS_BROWSER)('Fix-a-building’s chrome — docs/20 defect 16', () => {
-  it('repair rows are toggles that say so: aria-pressed both ways, and a visible tick', async () => {
+  /**
+   * **The menu retired from this surface too** — [§ D1020](../../../../DECISIONS.md), § D706
+   * clause 6, on the same commit as the Everyday screen. No repair row, no standing extra; the held
+   * cases are in the rail, disabled, each with its reason.
+   */
+  it('draws no repair menu, and draws each held case with its reason and no way in', async () => {
     const page = await fixitPage();
-    const row = page.locator('.fixit-repair:not([disabled])').first();
-    expect(await row.getAttribute('aria-pressed')).toBe('false');
-    const name = (await row.textContent()) ?? '';
-    expect(name.includes('✓'), 'an unselected row must not wear the tick').toBe(false);
-
-    await row.click();
-    await page.waitForTimeout(200);
-    // The panel re-renders whole, so the row is re-located rather than held.
-    const pressed = page.locator('.fixit-repair[aria-pressed="true"]');
-    expect(await pressed.count(), 'the pressed state must be on the row that was pressed').toBe(1);
-    expect(((await pressed.first().textContent()) ?? '').includes('✓')).toBe(true);
-
-    // And back: a toggle that can only be told "on" is a latch wearing a toggle's contract.
-    await pressed.first().click();
-    await page.waitForTimeout(200);
-    expect(await page.locator('.fixit-repair[aria-pressed="true"]').count()).toBe(0);
+    const drawn = await page.evaluate(() => ({
+      repairs: document.querySelectorAll('.fixit-repair').length,
+      extras: document.querySelectorAll('.fixit-extra').length,
+      held: [...document.querySelectorAll<HTMLButtonElement>('.fixit-case-held')].map((row) => ({
+        disabled: row.disabled,
+        reason: row.querySelector('.fixit-held-reason')?.textContent ?? '',
+      })),
+    }));
+    expect(drawn.repairs).toBe(0);
+    expect(drawn.extras).toBe(0);
+    expect(drawn.held.length).toBeGreaterThan(0);
+    for (const row of drawn.held) {
+      expect(row.disabled).toBe(true);
+      expect(row.reason).toMatch(/^Held back\./);
+    }
   });
 
   it('wears the product’s own palette, not a room of its own', async () => {

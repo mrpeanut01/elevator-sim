@@ -141,30 +141,6 @@ async function skipTheOpeningRun(page: Page): Promise<void> {
   );
 }
 
-/**
- * The index of the first repair row whose price matches `priced`, and which is not refused.
- *
- * **Selected by its priced cell rather than by `hasText`, and that is a fix rather than a
- * preference.** The first draft filtered rows with Playwright's `hasText: ' u'` — a
- * case-insensitive substring over the row's whole `textContent`, which the effect sentence
- * satisfies with any word beginning in `u`. It matched the *free* row, the spend line correctly
- * did not move, and the assertion failed for a reason that was nothing to do with the product.
- * `browserTier.test-helper.ts` records the same lesson about selecting a control by prose that
- * belongs to the player; this is that lesson inside one file.
- */
-async function repairIndex(page: Page, priced: 'free' | 'costed'): Promise<number> {
-  const index = await page.evaluate((want) => {
-    const rows = [...document.querySelectorAll('.everyday-fixit-repair')];
-    return rows.findIndex((row) => {
-      if (row instanceof HTMLButtonElement && row.disabled) return false;
-      const price = row.querySelector('.everyday-fixit-price')?.textContent ?? '';
-      return want === 'free' ? /^free/.test(price) : /^\d+ u$/.test(price);
-    });
-  }, priced);
-  expect(index, `no ${priced} repair on this case`).toBeGreaterThanOrEqual(0);
-  return index;
-}
-
 /** One state the § 3.3 primary was in, as {@link recordPrimaryStates} caught it. */
 interface PrimaryState {
   readonly label: string;
@@ -321,8 +297,8 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
           complaint: document.querySelector('.everyday-fixit-complaint')?.textContent ?? '',
           figures: document.querySelectorAll('.everyday-fixit-figure').length,
           diagnosis: document.querySelector('.everyday-fixit-diagnosis')?.textContent ?? '',
+          held: document.querySelectorAll('.everyday-fixit-case-held').length,
           repairs: document.querySelectorAll('.everyday-fixit-repair').length,
-          extras: document.querySelectorAll('.everyday-fixit-extra').length,
         };
       });
       expect(screen.insideRegion).toBe(true);
@@ -330,13 +306,13 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       // Derived, never asserted: however many cases the file ships, the rail's line counts the
       // rows it drew. Three today, eighteen when the catalogue lands.
       expect(screen.cases).toBeGreaterThan(0);
-      expect(screen.count).toBe(`0/${String(screen.cases)} fixed`);
+      /* Out of the cases offered — a held case is drawn and is not one the player can fix (§ D1020). */
+      expect(screen.count).toBe(`0/${String(screen.cases - screen.held)} fixed`);
       expect(screen.complaint).toContain('THE COMPLAINT');
-      // § 10.1 item 3's four figures, and § 10.6 rule 3's four repairs beside the five extras.
+      // § 10.1 item 3's four figures and the diagnosis, which § D706 clause 5 keeps; the menu is gone.
       expect(screen.figures).toBe(4);
       expect(screen.diagnosis).toContain('THE DIAGNOSIS');
-      expect(screen.repairs).toBe(4);
-      expect(screen.extras).toBe(5);
+      expect(screen.repairs).toBe(0);
     } finally {
       await page.close();
     }
@@ -369,43 +345,37 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
     }
   });
 
-  it('toggles a repair, says so in the platform’s word and in a visible mark, and moves the spend', async () => {
+  /**
+   * **The menu retired, and the held cases are drawn rather than dropped** — [§ D1020](../../../../DECISIONS.md).
+   *
+   * No repair row and no standing extra is drawn: the editor is the only way to change the building.
+   * A held case is in the rail with its reason, disabled — a row that vanished would be the list
+   * shrinking quietly, and one that opened would be a letter nobody can answer honestly.
+   */
+  it('draws no repair menu, and draws each held case with its reason and no way in', async () => {
     const page = await coldLoad();
     try {
       await openFixit(page);
-      const before = await page.evaluate(() => ({
-        pressed: document.querySelector('.everyday-fixit-repair')?.getAttribute('aria-pressed'),
-        state: document.querySelector('.everyday-fixit-repair .everyday-fixit-state')?.textContent ?? '',
-        committed: document.querySelector('.everyday-fixit-committed')?.textContent ?? '',
+      const drawn = await page.evaluate(() => ({
+        repairs: document.querySelectorAll('.everyday-fixit-repair').length,
+        extras: document.querySelectorAll('.everyday-fixit-extra').length,
+        held: [...document.querySelectorAll<HTMLButtonElement>('.everyday-fixit-case-held')].map((row) => ({
+          disabled: row.disabled,
+          tag: row.querySelector('.everyday-fixit-tag')?.textContent ?? '',
+          reason: row.querySelector('.everyday-fixit-held-reason')?.textContent ?? '',
+        })),
+        active: document.querySelector('.everyday-fixit-case[aria-current="true"]')?.className ?? '',
       }));
-      expect(before.pressed).toBe('false');
-
-      /*
-       * A **priced** repair rather than the first: the diagnosed fix is free on this case — on
-       * **four** of the eighteen, derived through the price schedule, and `repairIndex` is why this
-       * reads as a search rather
-       * than as a claim about all of them — so pressing it would move `aria-pressed` and leave the
-       * spend line identical, which is a test that would pass on a screen whose budget arithmetic
-       * was disconnected. Nor is *the first* the diagnosed row any more, since GitHub issue #566
-       * gave the surfaces a draw order; the row is found by its price either way. This is § D219's
-       * rule (*move the control and require the run to change*) at the cheapest place to apply it,
-       * and it caught its own first draft: see {@link repairIndex}.
-       */
-      await page.locator('.everyday-fixit-repair').nth(await repairIndex(page, 'costed')).click();
-
-      const after = await page.evaluate(() => ({
-        pressedCount: [...document.querySelectorAll('.everyday-fixit-repair')].filter(
-          (row) => row.getAttribute('aria-pressed') === 'true',
-        ).length,
-        marks: [...document.querySelectorAll('.everyday-fixit-repair .everyday-fixit-state')]
-          .map((node) => node.textContent ?? '')
-          .filter((text) => text.includes('✓')).length,
-        committed: document.querySelector('.everyday-fixit-committed')?.textContent ?? '',
-      }));
-      expect(after.pressedCount).toBe(1);
-      // Not `aria-pressed` alone — a sighted reader gets the tick, and a colour change was both.
-      expect(after.marks).toBe(1);
-      expect(after.committed).not.toBe(before.committed);
+      expect(drawn.repairs).toBe(0);
+      expect(drawn.extras).toBe(0);
+      expect(drawn.held.length).toBeGreaterThan(0);
+      for (const row of drawn.held) {
+        expect(row.disabled).toBe(true);
+        expect(row.tag).toBe('HELD');
+        expect(row.reason).toMatch(/^Held back\./);
+      }
+      /* The screen never opens on a held case. */
+      expect(drawn.active).not.toContain('held');
     } finally {
       await page.close();
     }
@@ -456,47 +426,13 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
     }
   });
 
-  it('shows an unaffordable repair, dimmed and inert, saying what it is short by', async () => {
-    const page = await coldLoad();
-    try {
-      await openFixit(page);
-      /*
-       * § 10.2: the new shaft is listed at its real 34 u, *"permanently out of reach and labelled
-       * beyond a repair budget"*. It has to be visible and unaffordable rather than absent — a
-       * player must be able to see why more shafts is not the answer — and the refusal has to say
-       * the number, which is the engine's sentence rather than this screen's.
-       */
-      const shaft = await page.evaluate(() => {
-        const rows = [...document.querySelectorAll('.everyday-fixit-repair')];
-        const refused = rows.find((row) => row instanceof HTMLButtonElement && row.disabled);
-        return refused instanceof HTMLButtonElement
-          ? {
-              disabled: refused.disabled,
-              pressed: refused.getAttribute('aria-pressed'),
-              dimmed: refused.style.opacity,
-              text: refused.textContent ?? '',
-            }
-          : null;
-      });
-      expect(shaft?.disabled).toBe(true);
-      expect(shaft?.pressed).toBe('false');
-      expect(Number(shaft?.dimmed)).toBeLessThan(1);
-      expect(shaft?.text).toMatch(/short by \d+ u/);
-      expect(shaft?.text).toContain('beyond a repair budget');
-    } finally {
-      await page.close();
-    }
-  });
-
   it('runs the day from the bar’s primary, holds it inert meanwhile, and draws the outcome', async () => {
     const page = await coldLoad();
     try {
       await openFixit(page);
 
-      // The diagnosed fix is free and is the one the case was authored to be solved by; the
-      // screen does not label it (§ 10.2 — *nothing labels itself*), and this test does not need
-      // it to, because it asserts that a verdict was drawn rather than which verdict.
-      await page.locator('.everyday-fixit-repair').nth(await repairIndex(page, 'free')).click();
+      // Nothing changed, which the letter's morning cannot clear: the gate's own verdict, drawn at
+      // once, with no mornings run behind it (§ D1020). What it measured is not asserted.
       await recordPrimaryStates(page);
       await page.locator('.everyday-bar-primary').click();
 
@@ -547,6 +483,8 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       expect(outcome.head.trim()).not.toBe('');
       expect(outcome.rows).toBe(3);
       expect(outcome.basis).toContain('one run before, one run after');
+      /* A gate that did not clear: no checking state was ever drawn. */
+      expect(states.some((state) => /more mornings/.test(state.label))).toBe(false);
       expect(outcome.primary?.disabled).toBe(false);
 
       /*
@@ -587,8 +525,9 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
    *    second press's verdict.
    *
    * The first press selects nothing, which is the *did not clear* branch by construction: with no
-   * repair bought the two configurations are the same building and the complaint cannot have moved.
-   * The second selects the free diagnosed repair, which is the branch the case was authored for.
+   * change the two configurations are the same building and the complaint cannot have moved. The
+   * second changes where idle cars wait, through the editor — the menu retired on § D1020's commit —
+   * and it is asserted to agree with its badge whichever way the fifty mornings go.
    */
   it('plays the pair after a press, on both branches, without withholding the verdict', async () => {
     const page = await coldLoad();
@@ -623,7 +562,7 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       expect(unchanged.fixedTags).toBe(0);
       expect(unchanged.primaryLabel).toBe('Run it again');
 
-      /* ---- branch two: the free diagnosed repair, and a second press over the first ---- */
+      /* ---- branch two: a change through the editor, and a second press over the first ---- */
       await page.click('.everyday-fixit-pair-skip');
       await page.waitForFunction(
         () => document.querySelectorAll('.everyday-fixit-pair').length === 0,
@@ -633,9 +572,15 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       // Skip takes the sight away and leaves the verdict, which is where the press says it goes.
       expect(await page.locator('.everyday-fixit-outcome').count()).toBe(1);
 
-      await page.locator('.everyday-fixit-repair').nth(await repairIndex(page, 'free')).click();
+      await page.locator('.everyday-fixit-parking-select').selectOption('stay');
       await page.locator('.everyday-bar-primary').click();
       await page.waitForSelector('.everyday-fixit-pair', { timeout: 120_000 });
+      /* A clearing press draws the checking state first; the verdict is the one after it. */
+      await page.waitForFunction(
+        () => !/more mornings/.test(document.querySelector('.everyday-bar-primary')?.textContent ?? ''),
+        undefined,
+        { timeout: 240_000 },
+      );
       await page.waitForFunction(
         () => {
           const canvases = [
@@ -660,6 +605,59 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       const solved = repaired.primaryLabel === 'Next building';
       expect(solved || repaired.primaryLabel === 'Run it again').toBe(true);
       expect(repaired.fixedTags).toBe(solved ? 1 : 0);
+    } finally {
+      await page.close();
+    }
+  });
+
+  /**
+   * **A noise route clears the letter's morning, and the fifty mornings take it away** —
+   * [§ D1020](../../../../DECISIONS.md), GitHub issue #602, on the shipped bundle.
+   *
+   * *Every letter says nine o'clock* is an outpatients' complaint, and under the single pair a
+   * three-metre raise of the roof cleared it — the playtest's *slot machine*. The route is taken
+   * because `theAnswerIsNotPrinted.test.ts#NOT_REPLICATED` pins it as one that clears the letter's
+   * morning and does not hold, so this case asserts the product's side of a measured fact rather
+   * than hoping a route misbehaves. Four claims: the press draws the checking state first, disabled
+   * and named; it ends; the verdict is `cleared-once`, saying it cleared on this morning only, with
+   * the fifty-morning row beside the letter's three; and no FIXED badge, because nothing was banked.
+   */
+  it('draws cleared-once for a roof raise on the appointment letters, after checking it on forty-nine more mornings', async () => {
+    const page = await coldLoad();
+    try {
+      await openFixit(page);
+      await page.locator('.everyday-fixit-case', { hasText: 'Every letter says nine' }).click();
+      await skipTheOpeningRun(page);
+      const up = page.locator('.everyday-fixit-stepper-elevation .everyday-fixit-step-up');
+      for (let metre = 0; metre < 3; metre += 1) await up.click();
+      expect(await page.locator('.everyday-fixit-stepper-elevation .everyday-fixit-readout').textContent()).toContain('3');
+
+      await recordPrimaryStates(page);
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForFunction(
+        () => (document.querySelector('.everyday-fixit-outcome-head')?.textContent ?? '').includes('did not hold'),
+        undefined,
+        { timeout: 300_000 },
+      );
+      const states = await primaryStates(page);
+      const checkingAt = states.findIndex((state) => /more mornings/.test(state.label));
+      expect(checkingAt, `the primary never said it was checking: ${JSON.stringify(states)}`).toBeGreaterThanOrEqual(0);
+      expect(states[checkingAt]?.disabled).toBe(true);
+      expect(checkingAt).toBeLessThan(states.length - 1);
+
+      const verdict = await page.evaluate(() => ({
+        head: document.querySelector('.everyday-fixit-outcome-head')?.textContent ?? '',
+        card: document.querySelector('.everyday-fixit-outcome')?.textContent ?? '',
+        rows: document.querySelectorAll('.everyday-fixit-outcome-row').length,
+        fixedTags: [...document.querySelectorAll('.everyday-fixit-tag')].filter((tag) => tag.textContent === 'FIXED').length,
+        primary: document.querySelector('.everyday-bar-primary')?.textContent ?? '',
+      }));
+      expect(verdict.head).toBe('It cleared on the letter’s morning, and it did not hold on the others.');
+      expect(verdict.card).toContain('cleared on this morning only');
+      expect(verdict.card).toContain('forty-nine more mornings');
+      expect(verdict.rows).toBe(4);
+      expect(verdict.fixedTags).toBe(0);
+      expect(verdict.primary).toBe('Run it again');
     } finally {
       await page.close();
     }
@@ -800,7 +798,7 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
     }
   });
 
-  it('leaves through the bar’s left button, and nothing but the repairs, the editor and the primary is clickable', async () => {
+  it('leaves through the bar’s left button, and nothing but the editor and the primary is clickable', async () => {
     const page = await coldLoad();
     try {
       await openFixit(page);
@@ -821,7 +819,8 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
        * clause's own second word — and they offer a floor to serve, not a cause to pick, which the
        * direct check below holds.
        */
-      const allowed = /everyday-fixit-(case|repair|extra|step-up|step-down|budget-buy|floor-chip)/;
+      /* `repair` and `extra` left this list with the menu — § D1020. */
+      const allowed = /everyday-fixit-(case|step-up|step-down|budget-buy|floor-chip)/;
       expect(controls.filter((className) => !allowed.test(className))).toEqual([]);
 
       /*
