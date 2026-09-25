@@ -38,6 +38,7 @@
  * is worse — a player would learn their week's days are gone rather than that they are read-only.
  */
 
+import { dayWordsFor } from '../mode/glossary.js';
 import { HISTORY_DAYS } from '../shift/week.js';
 import type { DayOutcome, WeekState } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
@@ -127,6 +128,14 @@ export interface DoorScreenView {
   readonly chips: readonly DoorDayChip[];
   /** § 6.1's *One tower a day…* line, under the stepper. */
   readonly rule: string;
+  /**
+   * **What the day's own words mean, drawn under the rule** — the post-AI playability panel's
+   * newcomer seat, who met *a press*, *standing order* and *pinned crowd* on this screen with
+   * nothing saying what any of them was. Each is `mode/glossary.ts`'s one definition, chosen by
+   * `dayWordsFor` from the text this screen actually prints, so a word the door stops printing
+   * stops being defined here. Empty when the door prints none of them.
+   */
+  readonly words: readonly string[];
   readonly lede: string;
   readonly world: WorldBandView;
   readonly stepsHeading: string;
@@ -154,6 +163,12 @@ export interface DoorScreenInput {
    * its name.
    */
   readonly nameOf: (buildingId: string) => string | undefined;
+  /**
+   * The words the door's other cards print — the press-day card's heading, lede and note, which
+   * `towerChoice.ts` owns — so {@link DoorScreenView.words} is read off everything on the screen
+   * rather than off this view's half of it. Absent reads this view's own text only.
+   */
+  readonly alsoOnScreen?: readonly string[] | undefined;
 }
 
 /**
@@ -454,6 +469,16 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
   const chips = chipsOf(clamped);
   const selected = chips.find((chip) => chip.offset === offset);
   const isReplay = offset !== 0;
+  const sameForEveryone = sameForEveryoneLine(input.today.crowdIsToday, input.today.crowdIsPinned);
+  const printed = [
+    DOOR_RULE,
+    input.today.lede,
+    ...DOOR_STEPS.map((step) => step.body),
+    input.today.seedLine,
+    input.today.firstSessionLine ?? '',
+    sameForEveryone,
+    ...(input.alsoOnScreen ?? []),
+  ];
   return {
     eyebrow: input.today.dayLabel,
     title: input.today.towerName,
@@ -471,6 +496,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     weekHeading: 'THE WEEK SO FAR',
     chips,
     rule: DOOR_RULE,
+    words: dayWordsFor(printed).map((entry) => entry.plain),
     lede: input.today.lede,
     world: WORLD_BAND,
     stepsHeading: 'WHAT THE JOB IS',
@@ -482,7 +508,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     },
     seedLine: input.today.seedLine,
     firstSessionLine: input.today.firstSessionLine,
-    sameForEveryone: sameForEveryoneLine(input.today.crowdIsToday, input.today.crowdIsPinned),
+    sameForEveryone,
     primary: primaryOf(clamped, chips),
   };
 }

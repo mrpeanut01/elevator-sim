@@ -18,7 +18,9 @@ import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js'
 import type { WatchRecord } from '../watch/types.js';
 import { closeDay, HISTORY_DAYS, openWeek, outcomeOf } from '../shift/week.js';
 
+import { GLOSSARY_TERMS } from '../mode/glossary.js';
 import { DAY_OFFSET_MIN, doorScreenViewOf, DOOR_STEPS, RUN_TODAY_AGAIN_NOTE, sameForEveryoneLine } from './doorView.js';
+import { PRESS_DAY_CHOICE_COPY } from './towerChoice.js';
 import { EM_DASH } from './figures.js';
 import type { TodayRecord } from './today.js';
 
@@ -367,4 +369,38 @@ describe('the rest of § 6.1', () => {
     expect(rule).toContain('unless you are on one of the days a press decides');
     expect(rule).not.toContain('unless you choose');
   });
+
+  /*
+   * The post-AI playability panel's newcomer seat met *a press*, *standing order* and *pinned
+   * crowd* on this screen with nothing saying what they were. The door now defines each under its
+   * rule, from `mode/glossary.ts` by reference, and only the ones it prints.
+   */
+  it('defines the day’s own words it prints, by the glossary’s own sentence, and no others', () => {
+    const plainOf = (id: string): string => {
+      const found = GLOSSARY_TERMS.find((entry) => entry.id === id);
+      if (found === undefined) throw new Error(`no glossary term ${id}`);
+      return found.plain;
+    };
+    /* An ordinary door prints *a press decides* in its rule and nothing about a pinned crowd. */
+    const ordinary = viewAt(0, false).words;
+    expect(ordinary[0]).toBe(plainOf('press'));
+    expect(ordinary).not.toContain(plainOf('pinned-crowd'));
+    expect(ordinary).not.toContain(plainOf('standing-order'));
+
+    /* A pinned day's door names its pinned day, and the press-day card names the standing order. */
+    const pinned = doorScreenViewOf({
+      week: weekWith(1, []),
+      today: { ...TODAY, day: 1, crowdIsToday: false, crowdIsPinned: true },
+      dayOffset: 0,
+      dayClosed: false,
+      nameOf: NAME_OF,
+      alsoOnScreen: [PRESS_DAY_CHOICE_COPY.heading, PRESS_DAY_CHOICE_COPY.ledeBefore],
+    }).words;
+    expect(pinned).toEqual([plainOf('press'), plainOf('standing-order'), plainOf('pinned-crowd')]);
+    /* Each definition names the word it defines, so a line read alone still says what it is about. */
+    expect(pinned[0]).toMatch(/^A press is/u);
+    expect(pinned[1]).toMatch(/^A standing order is/u);
+    expect(pinned[2]).toMatch(/^A pinned crowd is/u);
+  });
 });
+

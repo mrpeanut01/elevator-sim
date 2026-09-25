@@ -174,7 +174,7 @@ describe('the two days are alike everywhere the defect lives', () => {
 /** `20 of 40 waited past the 15-minute give-up horizon, none of them carried; …` */
 const EXPECTED_BESIDE =
   '20 of 40 waited past the 15-minute give-up horizon, none of them carried; ' +
-  'this share is over the legs that boarded';
+  'this share is over the rides that boarded';
 
 describe('the derivation itself', () => {
   it('says nothing on the day that moved its people, and names the twenty on the day that did not', () => {
@@ -313,7 +313,7 @@ describe('the overlap moves inside one run, so it is an outcome rather than a re
      */
     expect(live).toContain(`${String(MIDWAY.abandoned)} of ${String(MIDWAY.arrived)}`);
     expect(live).toContain('15-minute give-up horizon');
-    expect(live).toContain('this share is over the legs that boarded');
+    expect(live).toContain('this share is over the rides that boarded');
     expect(live).toContain('so far');
     // And the withholding is *said*, which is § D223's remedy rather than a quieter figure.
     expect(live).toContain(OVERLAP_UNSETTLED);

@@ -1293,6 +1293,14 @@ function mountStage(
    */
   const callCard = el(doc, 'div', 'everyday-stage-call');
   callCard.setAttribute('role', 'group');
+  /*
+   * **A destination rather than a stop on the tab order** — `docs/36` `AX-12`, *focus moves to what
+   * just happened*, and the post-AI playability panel's first finding in all four seats: the stage
+   * stopped for the call and the card was drawn below the fold with nothing sent to it, so a
+   * player saw a frozen clock. See {@link showCallCard} for when focus moves, and why only then.
+   */
+  callCard.tabIndex = -1;
+  callCard.setAttribute('aria-describedby', 'everyday-stage-call-question');
   callCard.hidden = true;
   callCard.style.cssText = [
     `border:1.5px solid ${C.ink}`,
@@ -1309,21 +1317,52 @@ function mountStage(
   callBody.style.cssText = 'display:grid;gap:7px';
   callCard.append(callBody);
   let callCardKey = '';
-  /** Show or hide the card. */
+  /**
+   * Show or hide the card — and, **on the frame it appears and on no other**, bring it into the
+   * screen region's view and put focus on it.
+   *
+   * `drawCall` runs on every paint, and `AX-12`'s second half is *never because of the render
+   * loop*: a focus written per frame would pull the keyboard back to the card every sixteen
+   * milliseconds and would steal it from anything the player moved to. So the move is keyed on the
+   * transition from hidden to shown, which is the stage stopping for the call — an event in the
+   * run, once per attempt — and a card already up is left alone. `nearest` rather than `start`,
+   * because the card sits directly under the header and is already in view at a desktop height;
+   * at a phone height it scrolls the region only as far as the card needs.
+   *
+   * After an answer the card leaves the document flow, and focus would fall to the body; it goes to
+   * the transport instead, which is what the answer set moving.
+   */
   function showCallCard(shown: boolean): void {
+    const appearing = shown && callCard.hidden;
+    const leaving = !shown && !callCard.hidden;
+    const hadFocus = leaving && callCard.contains(doc.activeElement);
     callCard.hidden = !shown;
+    if (appearing) {
+      callCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      callCard.focus({ preventScroll: true });
+    } else if (hadFocus) {
+      playButton.focus({ preventScroll: true });
+    }
   }
 
+  /*
+   * **The call card sits under the header and above the goals** — the post-AI playability panel,
+   * all four seats. It was appended after the building and its legend, which put it at y ≈ 1 060
+   * on a 900 px viewport and y ≈ 1 320 on a 844 px phone while the only sign above the fold was the
+   * transport's small grey *stopped for the day's call*. Here it is the next thing under the clock
+   * that stopped, which is where the eye already is. Hidden, it has no box, so every other screen
+   * state lays out exactly as it did.
+   */
   root.append(
     title,
     header,
+    callCard,
     goals,
     watchBand,
     alarm,
     alarmSay,
     stageRow,
     legend,
-    callCard,
     interventions,
     race,
   );
@@ -1551,6 +1590,7 @@ function mountStage(
         return line;
       });
       const question = el(doc, 'p', 'everyday-stage-call-question', card.question);
+      question.id = 'everyday-stage-call-question';
       question.style.cssText = 'margin:2px 0 0;font-size:13.5px;font-weight:600';
       const row = el(doc, 'div');
       row.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.row)}px`;

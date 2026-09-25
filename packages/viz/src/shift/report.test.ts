@@ -264,8 +264,8 @@ describe('AVERAGE WAIT', () => {
   it('numbers a one-leg denominator in the singular — docs/19 defect 8’s “over 1 legs”', () => {
     // A window can legitimately carry one served leg, and R13 makes the count part of what the
     // mean means — so its grammar is asserted, not left to luck.
-    expect(averageWaitFigure(fixtureSummary({ waitCount: 1 })).note).toContain('over 1 leg in');
-    expect(averageWaitFigure(fixtureSummary({ waitCount: 2 })).note).toContain('over 2 legs in');
+    expect(averageWaitFigure(fixtureSummary({ waitCount: 1 })).note).toContain('over 1 ride in');
+    expect(averageWaitFigure(fixtureSummary({ waitCount: 2 })).note).toContain('over 2 rides in');
   });
 });
 
@@ -1765,12 +1765,12 @@ describe('the levers point at what this run showed — issue #55', () => {
       subject: { kind: 'week-day' },
     });
     const body = leverBody(weekDay(one), 'add-a-car');
-    expect(body).toContain('1 leg never boarded at all');
+    expect(body).toContain('1 ride never boarded at all');
     // *Waited past the give-up horizon*, not *gave up and took the stairs* — `docs/19` defect 3:
     // the count is an attribute of a wait, and these riders may all be inside CARRIED.
     expect(body).toContain('1 rider waited past the give-up horizon');
     expect(body).not.toContain('gave up and took the stairs');
-    expect(body).not.toContain('1 legs');
+    expect(body).not.toContain('1 rides');
     expect(body).not.toContain('1 riders');
   });
 
@@ -1787,7 +1787,7 @@ describe('the levers point at what this run showed — issue #55', () => {
       subject: { kind: 'week-day' },
     });
     const body = leverBody(weekDay(many), 'add-a-car');
-    expect(body).toContain('4 legs never boarded at all');
+    expect(body).toContain('4 rides never boarded at all');
     expect(body).toContain('7 riders waited past the give-up horizon');
   });
 

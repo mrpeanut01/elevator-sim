@@ -61,7 +61,12 @@ import { waitBandsAt } from '../live/bands.js';
 import { systemClock } from '../playback/clock.js';
 import { Playback } from '../playback/playback.js';
 import { drawCutaway, sizeCanvas } from './cutaway.js';
-import { stageGeometryOf } from './stageScreenModel.js';
+import {
+  stageCarReadoutFits,
+  stageGeometryOf,
+  stageReadoutRoomOf,
+  type StageCameraWindow,
+} from './stageScreenModel.js';
 import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from './tokens.js';
 
 /** The words this block draws — authored on the model side (`fixitScreenModel.ts`), passed in. */
@@ -69,6 +74,19 @@ export interface CaseStageCopy {
   readonly eyebrow: string;
   readonly note: string;
   readonly skip: string;
+  /**
+   * The bank view's label — see {@link CaseStageInput.banks}. Required exactly when banks are
+   * passed, so a caller that offers the view also says what it is.
+   */
+  readonly bankView?: string | undefined;
+  /** The bank view's first option, the picture the block always drew. */
+  readonly bankViewWhole?: string | undefined;
+}
+
+/** One bank the block may show on its own: its id in the recordings and its name in the building. */
+export interface CaseStageBank {
+  readonly id: string;
+  readonly name: string;
 }
 
 /**
@@ -121,6 +139,31 @@ export interface CaseStageInput {
   readonly clockOf?:
     | ((simTimeS: number, simPerRealS: number) => { readonly clock: string; readonly pace: string })
     | undefined;
+  /**
+   * **The bank view** — the post-AI playability panel's Vertical City finding, where thirty-five
+   * cars drawn in a half-width pane put six pixels between two shafts and every car's readout over
+   * its neighbours'. The painter now drops a readout that cannot read (`stageCarReadoutFits`), which
+   * stops the smear and leaves thirty-five unlabelled bars; this is the legible alternative.
+   *
+   * When the whole tower's readouts do not fit a pane and the panes hold two or more of these banks,
+   * a select above the canvases shows one bank at a time: **every pane** draws only that bank's
+   * shafts, over the band of floors those shafts serve in **either** run, so the two pictures keep
+   * one scale and one set of floors and stay a before and an after. Offered only where it changes
+   * what can be read — the stage camera's rule (§ D505), and the reason the select is absent rather
+   * than inert on a tower that draws legibly whole. A view over the recordings, like the camera: it
+   * writes nothing to either run.
+   *
+   * A bank a run has rezoned a car out of is still that bank; the car appears under the bank it
+   * runs in, which is what the player changed.
+   */
+  readonly banks?: readonly CaseStageBank[] | undefined;
+  /**
+   * Take the column's whole width rather than a line of prose's — the fix-it screen's blocks, where
+   * a pair in 80ch left each pane about 270 px at 1440 × 900, and a tower's shafts are what that
+   * width is for. The note keeps its measure either way. Absent keeps the tutorial's layout, which
+   * sets its own width around this block.
+   */
+  readonly wide?: boolean | undefined;
   /** Told on each frame what the canvas shows now, so a screen can latch what has been seen. */
   readonly onFrame?:
     | ((frame: { readonly simTimeS: number; readonly longestStandingS: number | undefined }) => void)
@@ -148,8 +191,10 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
     `border-radius:${String(R.card)}px`,
     `background:${C.card}`,
     'padding:14px 17px',
-    'max-width:80ch',
-  ].join(';');
+    input.wide === true ? '' : 'max-width:80ch',
+  ]
+    .filter((rule) => rule !== '')
+    .join(';');
 
   const head = doc.createElement('div');
   head.style.cssText = 'display:flex;align-items:baseline;gap:12px;flex-wrap:wrap';
@@ -175,7 +220,7 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
 
   const note = doc.createElement('p');
   note.textContent = input.copy.note;
-  note.style.cssText = `font-size:13px;line-height:1.5;color:${C.inkSoft};margin:6px 0 10px`;
+  note.style.cssText = `font-size:13px;line-height:1.5;color:${C.inkSoft};margin:6px 0 10px;max-width:80ch`;
 
   /*
    * `auto-fit`/`minmax` rather than a fixed two-column rule: a pair that will not fit side by side
@@ -206,6 +251,63 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
     canvases.push(canvas);
     grid.append(cell);
   }
+  /* The bank view — {@link CaseStageInput.banks}. Built only when two or more banks are in play. */
+  const offeredBanks = (input.banks ?? []).filter((bank) =>
+    panes.some((pane) => pane.recording.shafts.some((shaft) => shaft.bankId === bank.id)),
+  );
+  let shownBank: string | undefined;
+  const bankRow = doc.createElement('label');
+  bankRow.className = `${input.classes.root}-banks`;
+  bankRow.hidden = true;
+  bankRow.style.cssText = `display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;margin:0 0 8px;font-size:12.5px;color:${C.inkSoft}`;
+  const bankPicker = doc.createElement('select');
+  bankPicker.className = `${input.classes.root}-bank`;
+  bankPicker.style.cssText = `max-width:100%;font-size:12.5px;padding:4px 6px;border:1px solid ${C.rule};border-radius:${String(R.control)}px;background:${C.card};color:${C.ink}`;
+  if (offeredBanks.length >= 2) {
+    const lead = doc.createElement('span');
+    lead.textContent = input.copy.bankView ?? '';
+    const whole = doc.createElement('option');
+    whole.value = '';
+    whole.textContent = input.copy.bankViewWhole ?? '';
+    bankPicker.append(whole);
+    for (const bank of offeredBanks) {
+      const option = doc.createElement('option');
+      option.value = bank.id;
+      option.textContent = bank.name;
+      bankPicker.append(option);
+    }
+    bankPicker.addEventListener('change', () => {
+      shownBank = bankPicker.value === '' ? undefined : bankPicker.value;
+    });
+    bankRow.append(lead, bankPicker);
+  }
+  /** The widest readout any car in these runs can print — the one the legibility test must fit. */
+  const widestReadout = ((): string => {
+    let capacity = 0;
+    for (const pane of panes) {
+      for (const shaft of pane.recording.shafts) capacity = Math.max(capacity, shaft.capacityPersons);
+    }
+    return `${String(capacity)}/${String(capacity)}`;
+  })();
+  /** The floor band the shown bank serves in either run, or `undefined` for the whole tower. */
+  const bankWindowOf = (bankId: string): StageCameraWindow | undefined => {
+    let from = Number.POSITIVE_INFINITY;
+    let to = Number.NEGATIVE_INFINITY;
+    for (const pane of panes) {
+      const indexOf = new Map(pane.recording.floors.map((floor) => [floor.id, floor.index]));
+      for (const shaft of pane.recording.shafts) {
+        if (shaft.bankId !== bankId) continue;
+        for (const floorId of shaft.servedFloorIds) {
+          const index = indexOf.get(floorId);
+          if (index === undefined) continue;
+          from = Math.min(from, index);
+          to = Math.max(to, index);
+        }
+      }
+    }
+    return Number.isFinite(from) && Number.isFinite(to) ? { fromIndex: from, toIndex: to } : undefined;
+  };
+
   /* GitHub issue #598's clock — drawn only for a caller that asked for one. */
   const clockRow = doc.createElement('div');
   clockRow.className = `${input.classes.root}-clock`;
@@ -214,8 +316,8 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
   const paceText = doc.createElement('span');
   paceText.style.cssText = `color:${C.label}`;
   clockRow.append(clockText, paceText);
-  if (input.clockOf === undefined) root.append(head, note, grid);
-  else root.append(head, note, clockRow, grid);
+  if (input.clockOf === undefined) root.append(head, note, bankRow, grid);
+  else root.append(head, note, clockRow, bankRow, grid);
 
   /*
    * The transport runs on the longest pane, so neither run is cut short by the other's horizon. The
@@ -279,6 +381,34 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
         if (paceText.textContent !== line.pace) paceText.textContent = line.pace;
       }
     }
+    /*
+     * The bank view's offer, asked of the first pane at its laid-out size: whether the whole tower's
+     * widest readout fits between two shafts. Written only on a change, so a steady picture costs
+     * no DOM write per frame; a bank shown on a tower that has become legible whole (a wider window)
+     * goes back to the whole tower rather than hiding a choice the player can no longer see.
+     */
+    if (offeredBanks.length >= 2) {
+      const box = first.getBoundingClientRect();
+      const wholeFits = stageCarReadoutFits(
+        widestReadout,
+        stageReadoutRoomOf(
+          stageGeometryOf({
+            width: box.width,
+            height: box.height,
+            floors: longestPane.recording.floors,
+            shafts: longestPane.recording.shafts,
+          }),
+        ),
+      );
+      if (bankRow.hidden !== wholeFits) {
+        bankRow.hidden = wholeFits;
+        if (wholeFits) {
+          shownBank = undefined;
+          bankPicker.value = '';
+        }
+      }
+    }
+    const bankWindow = shownBank === undefined ? undefined : bankWindowOf(shownBank);
     canvases.forEach((canvas, index) => {
       const pane = panes[index];
       if (pane === undefined) return;
@@ -286,6 +416,8 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
       if (ctx === undefined) return;
       const rect = canvas.getBoundingClientRect();
       const recording = pane.recording;
+      const shafts =
+        shownBank === undefined ? recording.shafts : recording.shafts.filter((shaft) => shaft.bankId === shownBank);
       drawCutaway(ctx, {
         recording,
         frame: frameAt(recording, simTimeS),
@@ -294,8 +426,9 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
           width: rect.width,
           height: rect.height,
           floors: recording.floors,
-          shafts: recording.shafts,
+          shafts,
           outOfServiceCarIds: recording.outOfServiceCarIds,
+          window: bankWindow,
         }),
         floorLabelOf: labelOf(recording),
       });

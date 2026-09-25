@@ -253,7 +253,7 @@ function closedRowsOf(
       label: 'YESTERDAY',
       value: `${count(closed.carried)} of ${count(closed.arrived)} carried`,
       note:
-        `${closed.weekday}, day ${String(closed.day)} — legs offered and legs carried over the ` +
+        `${closed.weekday}, day ${String(closed.day)} — rides offered and rides carried over the ` +
         'whole shift. Waiting, abandoned and turned away are four different outcomes and this ' +
         'line counts none of them; the sheet above is where the day is judged.',
     },

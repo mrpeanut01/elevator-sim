@@ -45,6 +45,7 @@ import {
   pill,
   QUIET,
   section,
+  sideBySide,
   WELL,
 } from './screenDom.js';
 import { everydayProfileStore } from './profileStore.js';
@@ -64,6 +65,9 @@ import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.
 /** The drawing's aspect. The prototype's card is a tall panel; this is its ratio — `elevation.ts` paints it. */
 const ELEVATION_HEIGHT_PX = 300;
 
+/** The day card's width beside the rest of the brief — the prototype's 340 px, unchanged. */
+const BRIEF_CARD_PX = 340;
+
 function mountBrief(
   host: HTMLElement,
   context: EverydayScreenShellContext,
@@ -71,13 +75,15 @@ function mountBrief(
   const doc = host.ownerDocument;
   let alive = true;
 
+  /*
+   * **Two columns that stack on a phone** — `screenDom.ts#sideBySide`, the post-AI playability
+   * panel's phone seat. This was `grid-template-columns: 340px minmax(0,1fr)`, and at 390 px the
+   * fixed track took the whole screen and pushed the day's title, the wrinkle, *what today asks*
+   * and *who drives* to x = 380–695, reachable only by a sideways swipe a player had no reason to
+   * try. Stacked, the day card comes first and the rest follows it down the page, in the order a
+   * screen reader already read them. Above the wrap the geometry is the grid's.
+   */
   const root = el(doc, 'div', 'everyday-brief');
-  root.style.cssText = [
-    'display:grid',
-    'grid-template-columns:340px minmax(0,1fr)',
-    `gap:${String(GAP.wide)}px`,
-    'align-items:start',
-  ].join(';');
   host.append(root);
 
   const canvas = doc.createElement('canvas');
@@ -160,7 +166,10 @@ function mountBrief(
     // changed on this screen moves the bar's sentence with the card the reader pressed.
     briefDriver = today.driver;
     root.replaceChildren();
-    root.append(leftColumn(view), rightColumn(view));
+    const left = leftColumn(view);
+    const right = rightColumn(view);
+    root.append(left, right);
+    sideBySide(root, { fixed: left, fluid: right, fixedPx: BRIEF_CARD_PX, gapPx: GAP.wide });
     drawTodaysElevation(canvas, context.host.resolvedBuilding(), today);
     context.refreshBar();
   }

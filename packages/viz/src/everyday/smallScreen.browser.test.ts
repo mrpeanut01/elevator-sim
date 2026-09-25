@@ -219,6 +219,61 @@ const CLAUSES = (): { readonly clipped: readonly string[]; readonly unreachable:
   return { clipped, unreachable };
 };
 
+/**
+ * **The overflow {@link CLAUSES} cannot see, because the box scrolls rather than clips** — the
+ * post-AI playability panel's phone seat.
+ *
+ * `main.everyday-screen` is the shell's scroller, and its `overflow` is `auto` on both axes. A
+ * column pushed past its right edge is therefore not clipped — the region grows a sideways scroll —
+ * and not unreachable either, since a sideways swipe does reach it. So § 2's clauses 1 and 3 both
+ * came back green on a brief whose title, wrinkle, goals and driver sat at x = 380–695 on a 390 px
+ * phone, and on a front door whose left column was crushed to one word a line. Both halves were
+ * true and neither was the question a player asks, which is *can I read this screen by scrolling
+ * down it*.
+ *
+ * This asks that: the region's own sideways overrun, and, for each named selector, whether its box
+ * sits inside the region's width. `narrowest` is the narrowest top-level column of the screen's
+ * root, the crushed-column shape: a column a word wide is inside the width and still unreadable.
+ */
+const SIDEWAYS = (args: {
+  readonly root: string;
+  readonly within: readonly string[];
+}): {
+  readonly overrunPx: number;
+  readonly outside: readonly string[];
+  readonly missing: readonly string[];
+  readonly narrowestColumnPx: number;
+} => {
+  const region = document.querySelector<HTMLElement>('main.everyday-screen');
+  if (region === null) throw new Error('the Everyday screen region is not mounted');
+  const r = region.getBoundingClientRect();
+  const SLIVER_PX = 4;
+  const outside: string[] = [];
+  const missing: string[] = [];
+  for (const selector of args.within) {
+    const node = document.querySelector(selector);
+    if (node === null) {
+      missing.push(selector);
+      continue;
+    }
+    const box = node.getBoundingClientRect();
+    if (box.left < r.left - SLIVER_PX || box.right > r.right + SLIVER_PX) {
+      outside.push(`${selector} at x ${String(Math.round(box.left))}–${String(Math.round(box.right))}`);
+    }
+  }
+  const root = document.querySelector(args.root);
+  const widths = [...(root?.children ?? [])].map((child) => child.getBoundingClientRect().width);
+  return {
+    overrunPx: region.scrollWidth - region.clientWidth,
+    outside,
+    missing,
+    narrowestColumnPx: widths.length === 0 ? 0 : Math.min(...widths),
+  };
+};
+
+/** The phone the post-AI panel played on, where the door and the brief broke. */
+const PANEL_PHONE = { width: 390, height: 844 } as const;
+
 /** `isVisible` on a selector that may not exist, which Playwright's own `isVisible` throws on. */
 async function page$isVisible(page: Page, selector: string): Promise<boolean> {
   const found = page.locator(selector);
@@ -442,6 +497,45 @@ describe.skipIf(!HAS_BROWSER)('every mode opens at 360 px, and the daily loop cr
       await page.close();
     }
   }, 120_000);
+
+  it('lays the front door and the brief out for scrolling down at 390×844, as a newcomer meets them', async () => {
+    /* No address parameter: the newcomer's route, so a first day dealt as a pinned day is the one
+       measured when the date deals it, which is the state the panel found broken. */
+    const page = await openPage(browser, { viewport: { ...PANEL_PHONE } });
+    try {
+      await page.goto(origin, { waitUntil: 'load' });
+      await page.waitForFunction(
+        () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+        undefined,
+        { timeout: 30_000 },
+      );
+      await leaveTutorialIfOffered(page);
+      await openEverydayDoor(page);
+      await page.waitForTimeout(500);
+      const door = await page.evaluate(SIDEWAYS, { root: '.everyday-door', within: ['.everyday-door-stepper'] });
+      expect(door.missing, 'the front door drew none of its stepper').toEqual([]);
+      expect(door.overrunPx, 'the front door scrolls sideways at 390 px').toBeLessThanOrEqual(4);
+      expect(door.outside, 'the front door draws a column past the phone’s edge').toEqual([]);
+      expect(
+        door.narrowestColumnPx,
+        'a front-door column is crushed to a word a line at 390 px',
+      ).toBeGreaterThanOrEqual(280);
+
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+      await page.waitForTimeout(500);
+      const brief = await page.evaluate(SIDEWAYS, {
+        root: '.everyday-brief',
+        within: ['.everyday-brief-title', '.everyday-brief-asks', '.everyday-brief-drivers'],
+      });
+      expect(brief.missing, 'the brief drew no title, goals or driver choice').toEqual([]);
+      expect(brief.overrunPx, 'the brief scrolls sideways at 390 px').toBeLessThanOrEqual(4);
+      expect(brief.outside, 'the brief puts its goals or its driver choice past the phone’s edge').toEqual([]);
+      expect(brief.narrowestColumnPx, 'a brief column is crushed at 390 px').toBeGreaterThanOrEqual(280);
+    } finally {
+      await page.close();
+    }
+  });
 
   it('plays the daily loop from the front door to a running stage at 360 px', async () => {
     const page = await coldLoad(PHONE);

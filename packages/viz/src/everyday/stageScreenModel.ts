@@ -2225,6 +2225,45 @@ export function stageCarReadoutOf(input: StageCarReadoutInput): StageCarReadout 
   };
 }
 
+/** The readout's type size, px — the painter's `500 8.5px` mono. */
+export const STAGE_CAR_READOUT_PX = 8.5;
+
+/**
+ * A monospace glyph's advance, in ems. The stage's mono faces advance at 0.6 em, which is the
+ * usual figure for a coding face; an estimate rather than `measureText`, so the rule is arithmetic
+ * a test can check without a canvas, which is this module's standing reason for owning the paint.
+ */
+const MONO_ADVANCE_EM = 0.6;
+
+/** Clear space kept between two neighbouring readouts, px. */
+const READOUT_GUTTER_PX = 2;
+
+/**
+ * **The room a car's readout has: the distance between two neighbouring shafts' centres** — the
+ * post-AI playability panel's Vertical City finding. A readout is centred on its shaft, so two of
+ * them collide once each is wider than the pitch between the shafts, and on a thirty-five-car tower
+ * drawn in a half-width pane that pitch is six pixels: every car's `0/23` printed over its
+ * neighbours' and the pane read as a smear. Unbounded with one shaft, which has no neighbour.
+ */
+export function stageReadoutRoomOf(geometry: Pick<StageGeometry, 'columns'>): number {
+  let room = Number.POSITIVE_INFINITY;
+  const centres = geometry.columns.map((column) => column.centreX).sort((a, b) => a - b);
+  for (let index = 1; index < centres.length; index += 1) {
+    room = Math.min(room, (centres[index] ?? 0) - (centres[index - 1] ?? 0));
+  }
+  return room - READOUT_GUTTER_PX;
+}
+
+/**
+ * Whether a readout reads rather than overprints — the floor labels' own rule
+ * (`MIN_LABEL_PITCH_PX`) turned on its side. A readout that does not fit is **not drawn**, as a
+ * floor label below its pitch is not: the car is still there, and a figure nobody can read is not
+ * a figure the stage has told anybody.
+ */
+export function stageCarReadoutFits(text: string, roomPx: number): boolean {
+  return text.length * STAGE_CAR_READOUT_PX * MONO_ADVANCE_EM <= roomPx;
+}
+
 /**
  * One rectangle of a car's paint, in the **body's own** coordinates — `(0, 0)` is its top-left.
  *

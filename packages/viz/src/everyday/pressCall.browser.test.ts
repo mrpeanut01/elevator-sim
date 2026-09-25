@@ -95,6 +95,21 @@ async function recomputed(page: Page): Promise<void> {
   );
 }
 
+/**
+ * *Skip to the end*, unless the day already reached it. At 600× the rest of a thirty-minute slice
+ * after the call plays in about two seconds, and on a loaded box the re-simulation an answer asks
+ * for can take longer than that — so the day may have ended before this line runs, and the skip is
+ * then correctly inert (`stageSkipViewOf`). Waiting for a click on an inert control was a race
+ * between this file and the box, not a finding about the product.
+ */
+async function skipIfAnythingIsLeft(page: Page): Promise<void> {
+  /* Read and pressed in one page turn, so the day cannot end between the two. */
+  await page.evaluate(() => {
+    const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');
+    if (skip !== null && !skip.disabled) skip.click();
+  });
+}
+
 /** Whether both parking presses are held, and the reason the page gives. */
 async function parkingHeld(page: Page): Promise<{ readonly held: boolean; readonly reason: string }> {
   const disabled = await page.evaluate(() =>
@@ -106,6 +121,65 @@ async function parkingHeld(page: Page): Promise<{ readonly held: boolean; readon
     held: disabled.length === 2 && disabled.every(Boolean),
     reason: await textOf(page, '.everyday-stage-intervene-refusal'),
   };
+}
+
+/**
+ * **Where the call card is, and who has focus, on the frame the stage stops** — the post-AI
+ * playability panel's first finding in all four seats. The card was drawn after the building and
+ * its legend, at y ≈ 1 060 on a 900 px viewport and y ≈ 1 320 on an 844 px phone, and nothing sent
+ * the eye or the keyboard to it, so the player met a frozen clock.
+ *
+ * *In view* is asked of the shell's own scroller rather than of the window, because the shell pins
+ * an action bar under `main.everyday-screen` and a card behind that bar is a card the player cannot
+ * see (`docs/36` `AX-11`). The box must sit wholly inside the region's visible rectangle, and the
+ * region inside the viewport, with no scroll made by this function: whatever offset the region has
+ * is the one the product left it at.
+ */
+async function callCardAtTheStop(page: Page): Promise<{
+  readonly inView: boolean;
+  readonly focused: boolean;
+  readonly box: string;
+}> {
+  return page.evaluate(() => {
+    const card = document.querySelector<HTMLElement>('.everyday-stage-call');
+    const region = document.querySelector<HTMLElement>('main.everyday-screen');
+    if (card === null || region === null) return { inView: false, focused: false, box: 'no card or no region' };
+    const c = card.getBoundingClientRect();
+    const r = region.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const SLIVER = 1;
+    const inView =
+      c.height > 0 &&
+      c.top >= Math.max(0, r.top) - SLIVER &&
+      c.left >= Math.max(0, r.left) - SLIVER &&
+      c.bottom <= Math.min(vh, r.bottom) + SLIVER &&
+      c.right <= Math.min(vw, r.right) + SLIVER;
+    return {
+      inView,
+      focused: document.activeElement === card,
+      box:
+        `card ${String(Math.round(c.top))}–${String(Math.round(c.bottom))} × ` +
+        `${String(Math.round(c.left))}–${String(Math.round(c.right))} in region ` +
+        `${String(Math.round(r.top))}–${String(Math.round(r.bottom))} of a ${String(vw)}×${String(vh)} viewport`,
+    };
+  });
+}
+
+/** A fresh page on the shipped site, past the first-visit offer, set up on the pinned day. */
+async function onThePinnedDay(page: Page): Promise<void> {
+  await page.goto(origin, { waitUntil: 'load' });
+  await page.waitForFunction(
+    () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+    undefined,
+    { timeout: 30_000 },
+  );
+  await leaveTutorialIfOffered(page);
+  await openEverydayDoor(page);
+  const row = `.everyday-door-pressday[data-contract="${PRESS_DAY}"]`;
+  if ((await page.locator(`${row}[data-standing="true"]`).count()) === 0) await page.click(row);
+  await page.waitForSelector(`${row}[data-standing="true"]`, { timeout: 30_000 });
+  await startTheDayFromDoor(page);
 }
 
 describe.skipIf(!HAS_BROWSER)('the stage calls a pinned day — § D1029', () => {
@@ -156,6 +230,9 @@ describe.skipIf(!HAS_BROWSER)('the stage calls a pinned day — § D1029', () =>
       await page.locator('.everyday-stage-speed', { hasText: '600×' }).click();
       await page.locator('.everyday-stage-start').click();
       await page.waitForSelector('.everyday-stage-call:not([hidden])', { timeout: 60_000 });
+      const atStop = await callCardAtTheStop(page);
+      expect(atStop.inView, `the call card is out of view at 1440×900: ${atStop.box}`).toBe(true);
+      expect(atStop.focused, 'the call card did not take focus when the stage stopped').toBe(true);
       expect(await textOf(page, '.everyday-stage-play'), 'the transport did not stop').toContain('Play');
       const card = await textOf(page, '.everyday-stage-call');
       expect(card).toContain('out of passenger service');
@@ -168,7 +245,7 @@ describe.skipIf(!HAS_BROWSER)('the stage calls a pinned day — § D1029', () =>
       /* ---- the answer the pin clears on, then the report ---- */
       await page.locator(`.everyday-stage-call-answer[data-answer="${press?.clearedBy ?? ''}"]`).click();
       await recomputed(page);
-      await page.locator('.everyday-stage-skip').click();
+      await skipIfAnythingIsLeft(page);
       await page.waitForFunction(
         () => (document.querySelector('.everyday-bar-primary')?.textContent ?? '').includes('Close the day'),
         undefined,
@@ -202,4 +279,28 @@ describe.skipIf(!HAS_BROWSER)('the stage calls a pinned day — § D1029', () =>
       await page.close();
     }
   }, 300_000);
+
+  /*
+   * The phone half, at the width the post-AI panel measured (390×844, where the card sat at
+   * y ≈ 1 320). No answer and no report: the one question is where the card is and who has focus
+   * on the frame the stage stops. The project's own timeout, so this case adds no annotation.
+   */
+  it('puts the call card in view and in focus on a phone when the stage stops', async () => {
+    const page = await openPage(browser, { viewport: { width: 390, height: 844 } });
+    try {
+      await onThePinnedDay(page);
+      await page.locator('.everyday-stage-speed', { hasText: '600×' }).click();
+      await page.locator('.everyday-stage-start').click();
+      await page.waitForSelector('.everyday-stage-call:not([hidden])', { timeout: 60_000 });
+      const atStop = await callCardAtTheStop(page);
+      expect(atStop.inView, `the call card is out of view at 390×844: ${atStop.box}`).toBe(true);
+      expect(atStop.focused, 'the call card did not take focus when the stage stopped').toBe(true);
+      /* Tab from the card reaches its first answer, so the keyboard is where the question is. */
+      await page.keyboard.press('Tab');
+      const next = await page.evaluate(() => document.activeElement?.className ?? '');
+      expect(next, 'Tab from the card left the card').toContain('everyday-stage-call-answer');
+    } finally {
+      await page.close();
+    }
+  });
 });

@@ -220,7 +220,18 @@ async function pairAndVerdict(page: Page): Promise<{
   readonly primaryLabel: string;
 }> {
   return page.evaluate(() => ({
-    text: document.querySelector('.everyday-fixit-pair')?.textContent ?? '',
+    /*
+     * The block's own words, without the bank view's option list: those are the building's bank
+     * names (*Zone 1 local …*), where a digit is part of a name rather than a figure the block
+     * states. The bank view's label is kept, so a figure written into it would still be caught.
+     */
+    text: (() => {
+      const block = document.querySelector('.everyday-fixit-pair');
+      if (block === null) return '';
+      const copy = block.cloneNode(true) as HTMLElement;
+      for (const picker of copy.querySelectorAll('.everyday-fixit-pair-bank')) picker.remove();
+      return copy.textContent ?? '';
+    })(),
     pairs: document.querySelectorAll('.everyday-fixit-pair').length,
     outcomes: document.querySelectorAll('.everyday-fixit-outcome').length,
     asBuiltStages: document.querySelectorAll('.everyday-fixit-stage').length,

@@ -45253,3 +45253,59 @@ start; a twin that one of the two ended by hand, which is not compared; and a tw
 where the sheet gives the twin's hold and whether the changes held longer or less, and says it is
 one crowd. The key errs toward inequality: a lever moved between rounds is two starts.
 `rushPost.test.ts` holds the arms and `host.test.ts` holds the key. D1100 and D1101 are unspent.
+
+---
+
+## D1111 — a player surface defines the day's own words where it first prints them, from the glossary, and says *ride* where the record says *leg*
+
+> **Taken 2026-09-25 by an agent session under delegated authority**, not by the product owner:
+> wave AJ lane AJ-I, acting on the post-AI playability panel's newcomer seat. A later reader weighing
+> this against a product-owner ruling should treat it as an agent ruling and say so; [§ D626](#d626)
+> is the cautionary case. It amends no recorded decision. It widens `mode/glossary.ts`, which
+> [§ D240](#d240) built for the statistics vocabulary, to hold three words of the game as well, under
+> both of that entry's rules unchanged.
+
+**Why an entry.** [§ D405](#d405)'s first ground: the rule binds `mode/glossary.ts`,
+`mode/casualDay.ts`, `everyday/doorView.ts`, `everyday/doorScreen.ts`, `shift/report.ts`,
+`shift/goals.ts`, `shift/tomorrow.ts` and the honesty corpus's glossary adapter, and a later lane
+writing a player sentence is bound by its second half.
+
+### What was wrong
+
+The newcomer seat named five words it met with nothing saying what they meant: *press* (on the
+front door's first line, *"the days a press decides"*, which they read as pressing any button),
+*standing order*, *pinned crowd*, *legs* and *give-up line* (*"0 past the give-up line"* beside a
+526 s worst wait, with a Casual lead that restated the label). None of the five was a new mechanic.
+Three were the game's own vocabulary, one was the simulator's unit printed where a player reads it,
+and one was the report's name for a point the glossary already defined under another name.
+
+### The ruling
+
+1. **The day's own words are defined once, in `mode/glossary.ts`, and drawn where they are first
+   printed.** *Press*, *standing order* and *pinned crowd* are glossary entries whose plain sentence
+   begins with the word it defines. The front door draws them under its rule, chosen by
+   `dayWordsFor` from the text the door itself prints, so a word the door stops printing stops being
+   defined there. Their trigger phrases are the ones the day uses (*press decides*, *parking press*,
+   *no press at all*), never the bare word, because `batch/report.ts` says *"a press is one step"*
+   about a lab and must not attach this definition.
+2. **The give-up line is the abandonment horizon, and one meaning keeps one definition.** The
+   phrase joins that entry's triggers rather than becoming a second entry, and the Day report's
+   Casual lead for the cell now opens with the definition by reference, so the sentence a reader
+   sees before *Read the rest* says what the line is.
+3. **A player surface says *ride* where the record says *leg*.** A leg is one car ride of a
+   journey, and *ride* is the word the energy goal (*"per ride delivered"*) and the daily board
+   already used for it. The Day report's count notes, its average-wait Casual lead, the goal notes and
+   the tomorrow row now say *rides*. Nothing was renamed in code, and the Engineer's own instrument surfaces
+   (`render/describeFrame.ts`, `live/honesty.ts`, the left rail) keep *legs*, where the reader is
+   reading the record.
+
+### What the owner may reverse, and what it costs
+
+The door's definitions are one view field and one block in the mount; removing them removes the
+three sentences and nothing else. The *ride* substitution is eleven strings in four modules and
+their tests. Neither touches a figure, a bar, a run or `data/`.
+
+### What it does not touch
+
+The front door's rule, the call card's words, what the report prints after a call and retake banking
+are unchanged; a decision swarm is ruling on those. No mechanic is renamed.

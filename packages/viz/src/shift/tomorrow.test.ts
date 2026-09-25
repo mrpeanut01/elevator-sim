@@ -195,7 +195,7 @@ describe('the beat answers three questions and keeps them apart', () => {
  * -------------------------------------------------------------------------- */
 
 describe('the day’s counts are counts, and nothing is folded into anything', () => {
-  it('prints legs offered and legs carried, and never subtracts them', () => {
+  it('prints rides offered and rides carried, and never subtracts them', () => {
     const beat = briefing({ week: closedWeek(1, POOR) });
     const row = rowIn(beat, 'carried');
     expect(row.value).toBe('74 of 180 carried');

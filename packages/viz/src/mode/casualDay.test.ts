@@ -31,6 +31,7 @@ import {
   casualNoteFor,
 } from './casualDay.js';
 import { SUPPRESSION_LEAD } from './disclosure.js';
+import { glossaryPlain } from './glossary.js';
 import type { ReportFigure } from '../shift/types.js';
 
 /** The shipped grid's ids, in `shift/report.ts#figuresFor`'s own order. */
@@ -114,6 +115,19 @@ describe('a Casual note leads the engineer’s note and never replaces it', () =
       const source = cell(id);
       expect(casualNoteFor(source).length, id).toBeGreaterThan(source.note.length);
     }
+  });
+
+  it('says what the give-up line is in the sentence the report shows before its fold', () => {
+    /*
+     * The post-AI playability panel's newcomer seat read *"0 past the give-up line"* and the lead
+     * beside it restated the label. The first sentence is the one shown before *Read the rest*, so
+     * it is the one that has to define the term, and it does so with the glossary's own sentence.
+     */
+    const first = casualNoteFor(cell('stairs')).split('. ')[0] ?? '';
+    expect(first).toMatch(/^The give-up line is /u);
+    expect(casualNoteFor(cell('stairs'))).toContain(
+      glossaryPlain('abandonment-horizon').charAt(0).toLowerCase() + glossaryPlain('abandonment-horizon').slice(1),
+    );
   });
 
   it('marks the seam between the two registers — docs/19 defect 8', () => {

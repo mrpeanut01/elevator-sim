@@ -181,7 +181,12 @@ import type {
 } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type { VizRecording } from '../contract/types.js';
-import { mountCaseStage, type CaseStage } from './caseStage.js';
+import { mountCaseStage, type CaseStage, type CaseStageBank } from './caseStage.js';
+import { keyedBankIdOf, keyedBankNameOf } from '../fixit/families.js';
+import { STAGE_CAMERAS } from './stageScreenModel.js';
+
+/** The bank view's first option — the stage camera's own word for the whole picture. */
+const WHOLE_TOWER = STAGE_CAMERAS[0].label;
 import { DEFAULT_DOOR_TARGET, mountFixitFamilies } from './fixitFamilies.js';
 import { editorInputsOf, withPrunedDials } from '../fixit/editorInputs.js';
 import { createOffThreadRunner } from '../dev/offThreadRuns.js';
@@ -696,6 +701,27 @@ function mountFixit(
     sideBySide(root, { fixed: rail, fluid: main, fixedPx: CASE_RAIL_PX, gapPx: GAP.wide });
   }
 
+  /**
+   * The banks the played blocks may show one at a time — `caseStage.ts#CaseStageInput.banks`. Named
+   * as the building names them, and a car the player keyed to a bank of its own under
+   * `fixit/families.ts#keyedBankNameOf`, the name the editor already prints for it.
+   */
+  function stageBanksOf(
+    loadedFixit: LoadedFixit,
+    entry: FixitCase,
+    recordings: readonly VizRecording[],
+  ): readonly CaseStageBank[] {
+    const building = loadedFixit.resources.buildings.find((b) => b.id === entry.buildingId);
+    const named = new Map<string, string>();
+    for (const bank of building?.banks ?? []) if (bank.name !== undefined) named.set(bank.id, bank.name);
+    for (const recording of recordings) {
+      for (const shaft of recording.shafts) {
+        if (shaft.bankId === keyedBankIdOf(shaft.carId)) named.set(shaft.bankId, keyedBankNameOf(shaft.carId));
+      }
+    }
+    return [...named].map(([id, name]) => ({ id, name }));
+  }
+
   function towerLineOf(loadedFixit: LoadedFixit) {
     return (entry: FixitCase): string => {
       const building = loadedFixit.resources.buildings.find((b) => b.id === entry.buildingId);
@@ -907,7 +933,15 @@ function mountFixit(
       session.asBuiltStage ??= mountCaseStage(doc, {
         panes: [{ recording }],
         speedSimPerRealS: everydayProfileStore().defaultSpeed(),
-        copy: { eyebrow: COPY.asBuiltStageEyebrow, note: COPY.asBuiltStageNote, skip: COPY.asBuiltStageSkip },
+        copy: {
+          eyebrow: COPY.asBuiltStageEyebrow,
+          note: COPY.asBuiltStageNote,
+          skip: COPY.asBuiltStageSkip,
+          bankView: COPY.stageBankView,
+          bankViewWhole: WHOLE_TOWER,
+        },
+        wide: true,
+        banks: stageBanksOf(loadedFixit, entry, [recording]),
         classes: AS_BUILT_STAGE_CLASSES,
         onDone: () => {
           const current = sessionOf(entry);
@@ -1032,7 +1066,15 @@ function mountFixit(
           { recording: after, caption: COPY.pairStageAfterCaption },
         ],
         speedSimPerRealS: everydayProfileStore().defaultSpeed(),
-        copy: { eyebrow: COPY.pairStageEyebrow, note: COPY.pairStageNote, skip: COPY.pairStageSkip },
+        copy: {
+          eyebrow: COPY.pairStageEyebrow,
+          note: COPY.pairStageNote,
+          skip: COPY.pairStageSkip,
+          bankView: COPY.stageBankView,
+          bankViewWhole: WHOLE_TOWER,
+        },
+        wide: true,
+        banks: stageBanksOf(loadedFixit, entry, [before, after]),
         classes: PAIR_STAGE_CLASSES,
         onDone: () => {
           const current = sessionOf(entry);

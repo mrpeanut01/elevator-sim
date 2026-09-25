@@ -1611,7 +1611,7 @@ function figuresFor(
       label: 'AWAY INSIDE A MINUTE',
       value: `${String(observations.minutePct)}%`,
       // R13: the share never travels without the count it was taken over.
-      note: `an observation, never suppressed — over ${legCount(observations.servedLegs, 'served leg')}`,
+      note: `an observation, never suppressed — over ${legCount(observations.servedLegs, 'served ride')}`,
       tone: observations.minutePct >= 75 ? 'good' : observations.minutePct >= 50 ? 'caution' : 'bad',
       axisOnly: false,
     },
@@ -1727,7 +1727,7 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
     label: 'AVERAGE WAIT',
     value: `${summary.meanWaitS.toFixed(1)} s`,
     // R13 and § 7.4: a mean is not a figure without its window and its `n`.
-    note: `over ${legCount(summary.waitCount, 'leg')} in the ${reportWindowNameOf(summary.reportWindow.id)} window`,
+    note: `over ${legCount(summary.waitCount, 'ride')} in the ${reportWindowNameOf(summary.reportWindow.id)} window`,
     // The same denominator, structured, so it survives being carried off this grid. See above.
     count: summary.waitCount,
     tone: 'plain',
@@ -1973,7 +1973,7 @@ function energyFigures(summary: VizSummary): readonly ReportFigure[] {
         measured && energy.workPerServedLegKJ !== null
           ? `${energy.workPerServedLegKJ.toFixed(1)} kJ`
           : NOT_RECORDED,
-      note: `over ${legCount(energy.deliveredLegCount, 'delivered leg')} — a day that spends less by carrying fewer people has saved nothing`,
+      note: `over ${legCount(energy.deliveredLegCount, 'delivered ride')} — a day that spends less by carrying fewer people has saved nothing`,
       tone: 'unranked',
       axisOnly: true,
     },
@@ -2312,10 +2312,10 @@ function missedGoalRowOf(
       return {
         id,
         when: wholeRun,
-        what: `The work came to ${reading.display} for each of the ${String(recording.summary.energy.deliveredLegCount)} delivered legs`,
+        what: `The work came to ${reading.display} for each of the ${String(recording.summary.energy.deliveredLegCount)} delivered rides`,
         why:
-          `The energy goal asked for ${bar} kJ or less for each delivered leg. A day that spends ` +
-          'less by carrying fewer people has saved nothing, which is why the legs are the divisor.',
+          `The energy goal asked for ${bar} kJ or less for each delivered ride. A day that spends ` +
+          'less by carrying fewer people has saved nothing, which is why the rides are the divisor.',
         tone: 'bad',
       };
     default:
@@ -2526,7 +2526,7 @@ function leverPointersFor(
    */
   if (summary.unservedCount > 0) {
     const legs = summary.unservedCount;
-    outrun.push(`${String(legs)} leg${legs === 1 ? '' : 's'} never boarded at all`);
+    outrun.push(`${String(legs)} ride${legs === 1 ? '' : 's'} never boarded at all`);
   }
   if (observations.abandoned > 0) {
     /*

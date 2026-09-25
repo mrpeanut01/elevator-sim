@@ -17,7 +17,19 @@ import { actionBarFor } from './actionBar.js';
 import { doorScreenViewOf, type DoorScreenView } from './doorView.js';
 import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
-import { BODY, CARD, el, EYEBROW, LEDE, MONO, pill, QUIET, section, unavailableBand } from './screenDom.js';
+import {
+  BODY,
+  CARD,
+  el,
+  EYEBROW,
+  LEDE,
+  MONO,
+  pill,
+  QUIET,
+  section,
+  sideBySide,
+  unavailableBand,
+} from './screenDom.js';
 import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
 import { dailySeedAt, isDailySeed } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
@@ -42,6 +54,8 @@ import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.
  * view clamps, so a stale offset can only ever select a day the strip is drawing.
  */
 let dayOffset = 0;
+/** The right column's width beside the left one — the prototype's 300 px, unchanged. */
+const DOOR_RIGHT_COLUMN_PX = 300;
 /** The last view drawn, so the § 3.3 bar reads the same primary the screen does — see {@link doorBar}. */
 let lastView: DoorScreenView | undefined;
 
@@ -88,7 +102,13 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
     dayOffset,
     dayClosed: host.runState().dayClosed,
     nameOf: (buildingId) => host.buildingById(buildingId)?.name,
+    alsoOnScreen: pressDayTextsOf(host.towerChoice().pressDays),
   });
+}
+
+/** The press-day card's words, when it is drawn — `rightColumn`'s own condition. */
+function pressDayTextsOf(days: PressDayChoiceView): readonly string[] {
+  return days.rows.length > 0 ? [days.heading, days.lede, days.note] : [];
 }
 
 function mountDoor(
@@ -98,13 +118,14 @@ function mountDoor(
   const doc = host.ownerDocument;
   let alive = true;
 
+  /*
+   * **Two columns that stack on a phone** — `screenDom.ts#sideBySide`, the post-AI playability
+   * panel's phone seat. This was `grid-template-columns: minmax(0,1fr) 300px`, the fixed track
+   * with no breakpoint that helper's docstring was written about, and at 390 px it left the left
+   * column **36 px** wide: the stepper, the day's title and the rule set one word a line under a
+   * right column that kept its 300. Above the wrap the geometry is the grid's.
+   */
   const root = el(doc, 'div', 'everyday-door');
-  root.style.cssText = [
-    'display:grid',
-    'grid-template-columns:minmax(0,1fr) 300px',
-    `gap:${String(GAP.wide)}px`,
-    'align-items:start',
-  ].join(';');
   host.append(root);
 
   function render(): void {
@@ -112,7 +133,10 @@ function mountDoor(
     const view = viewOf(context);
     lastView = view;
     root.replaceChildren();
-    root.append(leftColumn(doc, view), rightColumn(doc, view));
+    const left = leftColumn(doc, view);
+    const right = rightColumn(doc, view);
+    root.append(left, right);
+    sideBySide(root, { fixed: right, fluid: left, fixedPx: DOOR_RIGHT_COLUMN_PX, gapPx: GAP.wide });
   }
 
   /** The left column: stepper, strip, lede, world band, seed line. */
@@ -174,6 +198,17 @@ function mountDoor(
     const rule = el(document_, 'p', 'everyday-door-rule', view.rule);
     rule.style.cssText = `${QUIET};margin:12px 0 0;max-width:70ch`;
     column.append(rule);
+    /* The day's own words, defined under the rule that first prints one — `doorView.ts#words`. */
+    if (view.words.length > 0) {
+      const words = el(document_, 'div', 'everyday-door-words');
+      words.style.cssText = `margin:8px 0 0;max-width:70ch;padding-left:10px;border-left:2px solid ${C.ruleLight};display:grid;gap:4px`;
+      for (const word of view.words) {
+        const line = el(document_, 'p', 'everyday-door-word', word);
+        line.style.cssText = `${QUIET};margin:0`;
+        words.append(line);
+      }
+      column.append(words);
+    }
 
     /* ---- the seven-chip week strip ---- */
     const strip = section(document_, view.weekHeading);

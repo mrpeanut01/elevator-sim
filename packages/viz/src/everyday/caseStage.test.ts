@@ -27,7 +27,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { syntheticFloor, syntheticRecording } from '../live/synthetic.test-helper.js';
+import { syntheticFloor, syntheticRecording, syntheticShaft } from '../live/synthetic.test-helper.js';
 import { mountCaseStage } from './caseStage.js';
 
 /* -------------------------------------------------------------------------- *
@@ -367,6 +367,81 @@ describe('the fix case stage block', () => {
     tick();
     expect(canvasesOf(stage.root, 'pane')[0]?.ops).toEqual([]);
     expect(pending()).toBe(1);
+    stage.dispose();
+  });
+
+  /*
+   * **The bank view** — the post-AI playability panel's Vertical City finding. Thirty-three cars
+   * in a 400 px pane have no room for a readout between two shafts, so none is printed and the
+   * block offers one bank at a time; a bank of three has room, so its readouts come back and the
+   * other bank's cars leave the picture. Both panes follow the one select.
+   */
+  it('offers one bank at a time where the whole tower cannot print its readouts, and both panes follow it', () => {
+    const shafts = [
+      ...['A', 'B', 'C'].map((id) => ({ ...syntheticShaft(`low-${id}`, id), bankId: 'low' })),
+      ...Array.from({ length: 30 }, (_, index) => ({
+        ...syntheticShaft(`high-${String(index)}`, `H${String(index)}`),
+        bankId: 'high',
+      })),
+    ];
+    const wide = (label: string) =>
+      syntheticRecording({ floors: [syntheticFloor('L0', 0, label), syntheticFloor('L1', 1), syntheticFloor('L2', 2)], shafts });
+    const { doc, tick } = recorder({ width: 400, height: 300 });
+    const stage = mountCaseStage(doc, {
+      panes: [
+        { recording: wide('BeforeLobby'), caption: 'As it stands' },
+        { recording: wide('AfterLobby'), caption: 'With your change' },
+      ],
+      speedSimPerRealS: 30,
+      copy: { ...COPY, bankView: 'Show one bank:', bankViewWhole: 'Whole tower' },
+      classes: CLASSES,
+      banks: [
+        { id: 'low', name: 'Low rise' },
+        { id: 'high', name: 'High rise' },
+      ],
+      onDone: () => undefined,
+    });
+    const nodes = walk(stage.root as unknown as Recorded) as (Recorded & { hidden?: boolean; value?: string })[];
+    const row = nodes.find((node) => node.className === 'block-banks');
+    const picker = nodes.find((node) => node.className === 'block-bank');
+    expect(row, 'no bank view was built for a two-bank tower').toBeDefined();
+    expect(picker?.children.map((option) => option.textContent)).toEqual(['Whole tower', 'Low rise', 'High rise']);
+
+    tick();
+    const canvases = canvasesOf(stage.root, 'pane');
+    const readouts = (canvas: Recorded | undefined): string[] =>
+      (canvas?.texts ?? []).filter((text) => /^\d+\/\d+$/u.test(text));
+    expect(row?.hidden, 'the bank view is hidden on a tower whose readouts do not fit').toBe(false);
+    expect(readouts(canvases[0]), 'a readout was printed with no room for it').toEqual([]);
+
+    if (picker !== undefined) picker.value = 'low';
+    picker?.listeners.get('change')?.();
+    for (const canvas of canvases) canvas.texts.length = 0;
+    tick();
+    expect(readouts(canvases[0]), 'the low bank drew other cars, or none').toEqual(['0/13', '0/13', '0/13']);
+    expect(readouts(canvases[1]), 'the second pane did not follow the select').toEqual(['0/13', '0/13', '0/13']);
+    stage.dispose();
+  });
+
+  it('offers no bank view on a tower that prints every readout whole', () => {
+    const { doc, tick } = recorder({ width: 400, height: 300 });
+    const stage = mountCaseStage(doc, {
+      panes: [{ recording: before }],
+      speedSimPerRealS: 30,
+      copy: { ...COPY, bankView: 'Show one bank:', bankViewWhole: 'Whole tower' },
+      classes: CLASSES,
+      banks: [
+        { id: 'main', name: 'Main' },
+        { id: 'other', name: 'Not in this run' },
+      ],
+      onDone: () => undefined,
+    });
+    tick();
+    const nodes = walk(stage.root as unknown as Recorded) as (Recorded & { hidden?: boolean })[];
+    const row = nodes.find((node) => node.className === 'block-banks');
+    /* One bank in play is no choice at all, so the row stays hidden with nothing in it. */
+    expect(row?.hidden).toBe(true);
+    expect(row?.children).toEqual([]);
     stage.dispose();
   });
 });

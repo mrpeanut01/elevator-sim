@@ -7072,6 +7072,13 @@ const GLOSSARY: SurfaceAdapter = {
     // returns a `plain` this adapter already seeds, so driving it separately would put one
     // sentence in the corpus twice; listing it here is the claim that seeding the table drives it.
     'mode/glossary.ts#glossaryPlain',
+    /*
+     * The front door's selector for the day's own words — the post-AI playability panel's newcomer
+     * seat. It returns `plain` sentences this adapter already seeds from the table, and the door's
+     * `words` field holds them by value, so seeding them again under the door would be one sentence
+     * twice under two surface ids, which is the reason given above for `BATCH_REPORT`.
+     */
+    'mode/glossary.ts#dayWordsFor',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -7707,6 +7714,13 @@ const FIXIT: SurfaceAdapter = {
     seeds.push({ field: 'pair.skip', text: FIXIT_SCREEN_COPY.pairStageSkip, role: 'label', provenance: 'authored' });
     seeds.push({ field: 'pair.before', text: FIXIT_SCREEN_COPY.pairStageBeforeCaption, role: 'label', provenance: 'authored' });
     seeds.push({ field: 'pair.after', text: FIXIT_SCREEN_COPY.pairStageAfterCaption, role: 'label', provenance: 'authored' });
+    /*
+     * The bank view's label, on both played blocks — the post-AI playability panel's Vertical City
+     * finding, `caseStage.ts#CaseStageInput.banks`. Same mount, same ground as the eight above.
+     * Its option labels are the building's own bank names and `STAGE_CAMERAS`' *Whole tower*,
+     * which other adapters already seed.
+     */
+    seeds.push({ field: 'stage.banks', text: FIXIT_SCREEN_COPY.stageBankView, role: 'label', provenance: 'authored' });
 
     /*
      * **The wider budget, in all four states its row can be in** — GitHub issue #579,

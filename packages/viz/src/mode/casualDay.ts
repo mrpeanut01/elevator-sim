@@ -89,6 +89,12 @@
  */
 
 import { suppressionLeadFor } from './disclosure.js';
+import { glossaryPlain } from './glossary.js';
+
+/** A definition read into the middle of a sentence. */
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
 import type { ReportFigure } from '../shift/types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -234,7 +240,7 @@ const CASUAL_LEAD_BY_CELL: Readonly<Record<string, string>> = Object.freeze({
    */
   'average-wait':
     'An average wait: everybody’s wait added up and divided, so a few long ones can hide inside ' +
-    'a good-looking number. How many legs went into it, and which stretch of the day it was read ' +
+    'a good-looking number. How many rides went into it, and which stretch of the day it was read ' +
     'over, are the cell’s own note — and that stretch is not the same on every building.',
   /*
    * Rewritten for `docs/19` defect 3, and the old sentence is quoted because it was false twice
@@ -246,11 +252,20 @@ const CASUAL_LEAD_BY_CELL: Readonly<Record<string, string>> = Object.freeze({
    * the cell's own note (`shift/report.ts#stairsNote`), which carries the run's actual split —
    * a static lead may not restate a figure, so it may not guess the overlap either.
    */
+  /*
+   * **The lead now says what the line is** — the post-AI playability panel's newcomer seat, who
+   * read *"0 past the give-up line"* beside a 526 s worst wait and could not tell what the line
+   * was. The first sentence is the one the report shows before *Read the rest*, and it used to be
+   * the cell's label restated. It is `mode/glossary.ts`'s definition of the abandonment horizon
+   * now, read by reference, because *give-up line* is this sheet's name for that point and one
+   * meaning gets one definition. Its last clause already says why the count sits beside the
+   * average, so the sentence that said it here is gone rather than said twice. The length itself
+   * is the cell's own note, which derives it from the run; a static lead may not.
+   */
   stairs:
-    'People this building made stand past its give-up line. The note beside the count says how ' +
-    'many of them a car still came for — those are inside CARRIED as well, so the two cells can ' +
-    'overlap rather than add. The count is published beside the average and never folded into ' +
-    'it: dropping the longest waits is what would flatter the day.',
+    `The give-up line is ${lowerFirst(glossaryPlain('abandonment-horizon'))} The note beside the ` +
+    'count says how long it is and how many of them a car still came for — those are inside ' +
+    'CARRIED as well, so the two cells can overlap rather than add.',
   'energy-work':
     'How hard the motors worked. It is read beside the waits and never added to them: a day ' +
     'that spends less by carrying fewer people has not saved anything.',

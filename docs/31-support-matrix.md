@@ -247,6 +247,16 @@ stated as two clauses that can each fail:
   (`everyday/screenDom.ts#sideBySide`). § 6.1's week strip was seven fixed columns of 30 px and is
   an `auto-fit` grid.
 
+  **Two more screens kept the same fixed track, and the sweep could not see them.** § 6.1's front
+  door drew `minmax(0,1fr) 300px` and § 6.3's brief drew `340px minmax(0,1fr)`, both with no
+  breakpoint. The screen region scrolls sideways rather than clipping, so clause 1's instrument,
+  which counts boxes that clip, read zero on both, and clause 3 counted the brief's goals and driver
+  choice as reachable because a sideways swipe does reach them. The post-AI playability panel
+  measured the door's left column at 36 px and the brief's right column at x = 380 to 695 on a
+  390 × 844 phone. Both use `sideBySide` now, and `smallScreen.browser.test.ts` measures the half of
+  clause 1 the sweep does not ask: the region's own sideways overrun, whether the brief's title,
+  goals and driver choice sit inside its width, and the narrowest column on each screen, at 390 × 844.
+
   **A closed drawer draws no control, so clause 3 says nothing about the eight rail rows behind
   it** — and a layout that passed this commitment by hiding controls behind a toggle nobody opened
   would be the tier-2 row above wearing a gate. `packages/viz/src/everyday/smallScreen.browser.test.ts`

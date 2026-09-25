@@ -237,7 +237,8 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = Object.freeze([
   Object.freeze({
     id: 'abandonment-horizon',
     term: 'abandonment horizon',
-    appearsAs: ['abandonment horizon'],
+    /* *Give-up line* is the Day report's name for the same point — see the day's own words below. */
+    appearsAs: ['abandonment horizon', 'give-up line'],
     plain:
       'The point at which this simulator counts a rider as having given up rather than gone on ' +
       'waiting. Riders leaving pulls the longest waits out of the sample, so an average that ' +
@@ -422,7 +423,63 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = Object.freeze([
       'something switched off. It says the profile is well formed and says nothing at all about ' +
       'how it will run.',
   }),
+
+  /* ---------------------------------------------------------------- *
+   * The day's own words — the post-AI playability panel's newcomer seat
+   * ---------------------------------------------------------------- */
+  /*
+   * Three words the daily loop prints before it has said what they mean, each named by the
+   * newcomer seat as a place they got lost: *press* (*"Days a press decides"* — they guessed it
+   * meant pressing a button, which is nearly right and not what the heading turns on), *standing
+   * order* and *pinned crowd*. The fourth word that seat named, *give-up line*, is the product's
+   * name for the abandonment horizon above and is one of its phrases rather than a second entry,
+   * because two ids for one meaning is the drift this module exists to stop.
+   *
+   * They are here rather than beside the screens that print them for this module's own reason: one
+   * definition, held once, read by reference. The Everyday front door draws them through
+   * {@link dayWordsFor}, which reads its own text and returns only these, so a door that stops
+   * printing a word stops defining it. The trigger phrases are chosen so no Engineer surface this
+   * module is wired to prints one — `batch/report.ts` says *"a press is one step"* about a lab
+   * press, which is why *press* is matched on the phrases the day uses and never on the bare word.
+   */
+  Object.freeze({
+    id: 'press',
+    term: 'press',
+    appearsAs: ['press decides', 'parking press', 'no press at all'],
+    plain:
+      'A press is something you do to a day while it plays: park the cars in the lobby, spread ' +
+      'them across the tower, or hand the day to another dispatcher. On a day a press decides, the ' +
+      'stage stops once to ask for one, and the answer is what the day turns on.',
+  }),
+  Object.freeze({
+    id: 'standing-order',
+    term: 'standing order',
+    appearsAs: ['standing order'],
+    plain: 'A standing order is the dispatcher a tower runs on until somebody picks a different one.',
+  }),
+  Object.freeze({
+    id: 'pinned-crowd',
+    term: 'pinned crowd',
+    appearsAs: ['pinned crowd', 'pinned day'],
+    plain:
+      'A pinned crowd is a set of arrivals fixed in advance: the same people at the same moments ' +
+      'every time that day is played. A pinned day is played on one, so a day measured once can be ' +
+      'played again exactly as it was measured.',
+  }),
 ]);
+
+/** The ids of the day's own words, in the order a screen lists them. */
+const DAY_WORD_IDS: ReadonlySet<string> = new Set(['press', 'standing-order', 'pinned-crowd']);
+
+/**
+ * The day's own words a screen's text uses — {@link glossaryFor} over that text, kept to the three
+ * the daily loop defines where it first prints them. The statistics vocabulary is left out on
+ * purpose: the front door says *seeded* and *window* in passing, and a newcomer's first screen is
+ * not where a paired difference is explained.
+ */
+export function dayWordsFor(texts: readonly string[]): readonly GlossaryTerm[] {
+  return glossaryFor(texts).filter((entry) => DAY_WORD_IDS.has(entry.id));
+}
 
 /* -------------------------------------------------------------------------- *
  * Reading a surface's own words

@@ -89,6 +89,13 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
     'The morning the letter is about, as the building runs today. The four figures below are read from this run and no other.',
   asBuiltStageSkip: 'Skip to the figures',
   /*
+   * The bank view's label, on both played blocks — `caseStage.ts#CaseStageInput.banks`. Drawn only
+   * where the whole tower's car readouts do not fit a pane, so the first clause is true wherever it
+   * is read; the select beside it opens on `STAGE_CAMERAS`' own *Whole tower*, the stage's word for
+   * the same picture.
+   */
+  stageBankView: 'Too many cars to read at this size. Show one bank:',
+  /*
    * The pair, played after a press — [§ D644](../../../../DECISIONS.md). Five strings: the block's
    * eyebrow, the sentence saying what the two panes are and where the verdict under them comes
    * from, the one press, and a caption over each canvas. Here rather than in `caseStage.ts` for the

@@ -979,11 +979,11 @@ export function horizonLabelOf(horizonS: number): string {
  */
 const DENOMINATOR_CLAUSE: Readonly<Record<GoalObservationId, string>> = Object.freeze({
   carryPct: '',
-  minutePct: 'this share is over the legs that boarded',
+  minutePct: 'this share is over the rides that boarded',
   peakQueue: '',
   abandoned: '',
   worstWaitS: '',
-  loadedDepartures: 'a leg that never boarded made no trip',
+  loadedDepartures: 'a ride that never boarded made no trip',
   workPerServedLegKJ: '',
 });
 
