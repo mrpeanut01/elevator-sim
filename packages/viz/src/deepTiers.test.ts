@@ -337,7 +337,7 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
    * What the pull request gives up is stated rather than glossed. Fourteen of these files hold the
    * `checkPinned` calls that re-derive `benchmark/published.ts`'s pin table — the guard that exists
    * because three published intervals had gone stale before it did. After this entry a pull request
-   * that moves a pinned number merges green, and the move is found by the next dispatch or Sunday
+   * that moves a pinned number merges green, and the move is found by the next dispatch or nightly
    * run and filed by the `report` job, then attributed by reading back over the wave rather than
    * off one pull request. That is the same trade `matrixCensus.test.ts` made at the top of this
    * table, and it is the right one for numbers that move only when `core`, `experiments` or `data/`

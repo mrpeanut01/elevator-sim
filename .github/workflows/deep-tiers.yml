@@ -84,8 +84,8 @@
 # 21:17 UTC, chosen by measurement: 03:00 UTC was the busiest hour for CI runs in the fortnight
 # measured and the Sunday 03:00 cron started five hours late both times, while 21:00 carried no run
 # at all. The minute is off the hour because GitHub's scheduler is most delayed on the hour.
-# `ci.yml`'s nightly run on `main` fires at 20:43 and is done before this starts, so the two do
-# not compete for the account's twenty concurrent jobs. `perf-scaling` is the one tier documented as
+# `ci.yml`'s nightly run on `main` fires at 20:43 and is usually done before this starts, so the
+# two should not compete for the account's twenty concurrent jobs. `perf-scaling` is the one tier documented as
 # flaky under load; if nightly firings make it the usual red, `report` names it as such, and moving
 # that one job back to a weekly condition is the owner-reversible fallback § D1084 records.
 #

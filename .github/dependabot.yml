@@ -11,6 +11,10 @@
 # updates"), which only the owner can turn on; when it is on, those pull requests land in the
 # `npm-security` group below.
 #
+# No `labels:`. Dependabot's default applies `dependencies` and the ecosystem's name and creates
+# them if they are missing, and neither exists here yet; a `labels:` list naming a label the
+# repository does not have is silently dropped.
+#
 # `rebase-strategy: disabled` because an automatic rebase is a fresh CI run on every merge to
 # `main`. Comment `@dependabot rebase` on the pull request when it is about to be read.
 #

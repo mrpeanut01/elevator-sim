@@ -71,10 +71,10 @@ on:
   # need; `review.yml` would need it too, or the required `invariant gates` stalls every entry.
   merge_group:
   workflow_dispatch:
-  # Nightly on `main`, at a minute past no hour: GitHub's scheduler delays top-of-the-hour crons by
+  # Nightly on `main`, at a minute off the hour: GitHub's scheduler delays top-of-the-hour crons by
   # hours (the deep tiers' `0 3 * * 0` started at 08:10 and 08:27), and 20:00 UTC carried one CI
-  # run in the measured fortnight. `deep-tiers.yml` fires at 21:17, after this has finished, so the
-  # two never compete for the twenty concurrent jobs the account is allowed.
+  # run in the measured fortnight. `deep-tiers.yml` fires at 21:17, after this usually finishes, so
+  # the two should not compete for the twenty concurrent jobs the account is allowed.
   schedule:
     - cron: '43 20 * * *'
 

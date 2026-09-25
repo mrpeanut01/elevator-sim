@@ -21,9 +21,9 @@
  * under-test the question the acceptance criterion asks; it can only do more work than the criterion
  * strictly needs, on versions that may never have reached a browser. That is the honest trade and it
  * is deliberately in this direction, because the alternative — deriving the deployed set from
- * `git log -S` bounded at the arming date — cannot run here: `actions/checkout@v4` clones to depth 1
- * by default (`.github/workflows/ci.yml:190` sets no `fetch-depth`), so a git-history derivation
- * would be green locally and vacuous in CI, which is worse than a superset.
+ * `git log -S` bounded at the arming date — cannot run here: `actions/checkout` clones to depth 1
+ * by default (the `legs` job's checkout in `.github/workflows/ci.yml` sets no `fetch-depth`), so a
+ * git-history derivation would be green locally and vacuous in CI, which is worse than a superset.
  *
  * **What makes it unable to go stale.** Bumping `SESSION_SCHEMA_VERSION` adds a row to this matrix
  * on the same commit, and that row is **red** until somebody writes the step-down for it and the

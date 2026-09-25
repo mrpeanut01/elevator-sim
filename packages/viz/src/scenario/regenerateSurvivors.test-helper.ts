@@ -42,7 +42,7 @@
  * reader does not read it as the tier having doubled.
  *
  * A hosted four-core runner is slower again, which is why this lives behind
- * `ELEVATOR_SIM_SURVIVORS=deep` and runs on the weekly `deep-tiers.yml` schedule rather than
+ * `ELEVATOR_SIM_SURVIVORS=deep` and runs on the nightly `deep-tiers.yml` schedule rather than
  * on a pull request.
  */
 
