@@ -99,6 +99,7 @@ import {
   ENDLESS_CONTRACT_ID,
   FREE_PLAY_CONTRACT_ID,
   HISTORY_DAYS,
+  MODE_WEEK_CONTRACT_IDS,
   PARKED_WEEKS_MAX,
   SANDBOX_CONTRACT_ID,
 } from '../shift/week.js';
@@ -699,7 +700,17 @@ function namesSomething(id: string): boolean {
     contractById(id) !== undefined ||
     id === ENDLESS_CONTRACT_ID ||
     id === SANDBOX_CONTRACT_ID ||
-    id === FREE_PLAY_CONTRACT_ID
+    id === FREE_PLAY_CONTRACT_ID ||
+    /*
+     * **And the three a mode stands on — GitHub issue #594, [§ D965](../../../../DECISIONS.md).**
+     * A rush, a replay and a career day each park the Scenario week behind a week of their own, and
+     * this build wrote those weeks to disk until § D965: refused here, a session holding one was
+     * *"banked toward assignments this build no longer has"* and was cleared, and the Scenario week
+     * parked right beside it went with it. They are read now so that
+     * `dev/state.ts#scenarioWeeksOf` can take them off and hand the player's week back — which is
+     * the paragraph above's friction doing its job a fourth time, not a relaxation of it.
+     */
+    MODE_WEEK_CONTRACT_IDS.includes(id)
   );
 }
 

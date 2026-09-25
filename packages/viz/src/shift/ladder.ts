@@ -128,6 +128,8 @@ import { commissionableClasses, type BankChoice } from '../commissioning/types.j
 import { contractForBuilding, CONTRACTS } from './contracts.js';
 import { scaledBuilding } from './growth.js';
 import { INCIDENT_KINDS, type Incident, type IncidentKind } from './incidents.js';
+import { parseRunHorizon } from './dayLength.js';
+import type { RunHorizon } from './types.js';
 
 /** What the design intends a contract to be, so the measurement has something to disagree with. */
 export interface ContractIntent {
@@ -317,6 +319,29 @@ export interface ContractPressDay {
   /** Where the press falls, as a fraction of the shift. `shift/incidents.ts`'s own units. */
   readonly pressAtFraction: number;
   /**
+   * **Which kind of run the day was measured on** — GitHub issue #595,
+   * [§ D973](../../../../DECISIONS.md).
+   *
+   * § D914 measured all seven pins at `shiftLengthForContract`'s thirty-minute slice, and five of
+   * those towers are never played that way: `everyday/host.ts#startRun` spreads
+   * `shift/dayLength.ts#wholeDayRun` into the state for every building `wholeDayFor` answers, so the
+   * Scenario press runs Midtown, Secure Tower, Chancery House, Harbour Point and Ashgate as ten-hour
+   * days. A seed is not a day on its own — the same seed over a different horizon is a different
+   * crowd on a different schedule, and on Chancery House the slice's pinned seed run whole missed
+   * under every press tried because the lobby failed before the press could land.
+   *
+   * So the pin says which horizon it is true of, and every reader of the pin —
+   * {@link pressDayStanding}, the picker and the moot sentence — asks for it by this field rather
+   * than assuming the slice. A day whose pin is on one horizon while the Scenario press runs its
+   * tower on the other is **not offered and not described**: that is what those readers do with it.
+   *
+   * **Absent reads as `'period'`, and that is a fact rather than a fallback.** Every pin authored
+   * before this field existed was measured by § D914 on the contract's slice, so a block that does
+   * not say is a slice measurement. A value that is neither horizon parses as the empty string and
+   * {@link contractLadderIssues} names it.
+   */
+  readonly horizon: RunHorizon;
+  /**
    * The shipped dispatcher ids that clear this day **as built, with no press**, in profile order.
    * Never contains {@link ContractPressDay.standingOrder} — a standing order that cleared its own
    * day would mean the day does not turn on anything.
@@ -394,6 +419,49 @@ export function pressDayFor(contractId: string | undefined): ContractPressDay | 
   return ladderRowFor(contractId)?.pressDay;
 }
 
+/**
+ * **The run about to be pressed, as the four facts a pinned day was measured on** — GitHub issue
+ * #595, [§ D973](../../../../DECISIONS.md).
+ *
+ * `shift/pressLadder.test.ts` measures a pin under `campaignEventId: 'ordinary'`, no calendar, day 1
+ * of the contract, at the pinned seed and on {@link ContractPressDay.horizon}. A sentence quoting
+ * that measurement, or a control that says it sets that day up, is true only while every one of
+ * those holds of the run the player will actually press — so they are asked of that run, together,
+ * in one place.
+ */
+export interface PressDayRun {
+  readonly contractId: string;
+  /** `WeekState.day`. A pin is a day 1. */
+  readonly day: number;
+  /** The wrinkle the day draws — `shift/calendar.ts#scheduledEventFor(...).id`. */
+  readonly eventId: string;
+  /** Whether a calendar period is set; the measurement ran with none. */
+  readonly hasCalendar: boolean;
+  readonly seed: bigint;
+  /** The horizon the Scenario press runs this building on — `dayLength.ts#scenarioHorizonFor`. */
+  readonly horizon: RunHorizon | undefined;
+}
+
+/**
+ * The contract's pinned day when `run` **is** that day, else `undefined`.
+ *
+ * The one predicate `everyday/today.ts`'s moot sentence and `everyday/towerChoice.ts`'s pinned-day
+ * rows share, so the brief cannot quote a census over a run the picker would not call the pinned
+ * day, and the reverse. It used to be three conditions inside `today.ts#mootSentenceOf` — contract,
+ * day 1, seed — and the missing fourth, the horizon, is the whole of #595's second finding: the seed
+ * matched on five towers whose day the product runs ten hours long, so a sentence measured over a
+ * thirty-minute slice would have been drawn over a whole day.
+ */
+export function pressDayStanding(run: PressDayRun): ContractPressDay | undefined {
+  const press = pressDayFor(run.contractId);
+  if (press === undefined) return undefined;
+  if (run.day !== 1) return undefined;
+  if (run.eventId !== 'ordinary' || run.hasCalendar) return undefined;
+  if (run.horizon !== press.horizon) return undefined;
+  if (run.seed.toString() !== press.seedText) return undefined;
+  return press;
+}
+
 export function rungIncidents(rung: ContractLadderRow | undefined): readonly Incident[] {
   if (rung === undefined) return [];
   return rung.fabric.incidents.map((entry) => ({
@@ -422,6 +490,12 @@ function pressDayOf(value: unknown): ContractPressDay | undefined {
     clearedBy: asString(record['clearedBy']),
     missedBy: asString(record['missedBy']),
     pressAtFraction: asNumber(record['pressAtFraction']) ?? -1,
+    /*
+     * Absent is `'period'` — § D914 measured every pin that predates the field on the slice — and
+     * anything else that is not a horizon is the empty string, so {@link contractLadderIssues}
+     * names it. See {@link ContractPressDay.horizon}.
+     */
+    horizon: parseRunHorizon(record['horizon']) as RunHorizon,
     mootUnder: Object.freeze(moot.map((id) => asString(id))),
   });
 }
@@ -568,6 +642,15 @@ export interface LadderValidationInput {
    * `dev/data.ts`'s fetch and are not available at module-init time.
    */
   readonly dispatcherIds: () => readonly string[];
+  /**
+   * The horizon the Scenario run press runs a building on — `'whole-day'` where
+   * `shift/dayLength.ts#wholeDayFor` answers and `'period'` where it does not, which is
+   * `dayLength.ts#scenarioHorizonFor`. `undefined` for a building this build cannot resolve.
+   *
+   * Threaded for {@link ContractPressDay.horizon}: a pin measured on a horizon the product never
+   * runs its tower on is a measurement of a day nobody can play (GitHub issue #595, § D974).
+   */
+  readonly horizonFor: (buildingId: string) => RunHorizon | undefined;
 }
 
 /** The two parking verbs a {@link ContractPressDay} may name — `core`'s own kinds, not new ones. */
@@ -795,6 +878,27 @@ export function contractLadderIssues(
           issues.push(
             `ladder row ${row.contractId} says ${id} makes its day moot, and no shipped ` +
               'dispatcher profile declares that id',
+          );
+        }
+      }
+      if ((press.horizon as string) === '') {
+        issues.push(
+          `ladder row ${row.contractId} pins a press day on a horizon that is neither 'period' ` +
+            "nor 'whole-day'; a pin says which kind of run it was measured on (GitHub issue #595)",
+        );
+      } else {
+        /*
+         * § D974: a pin on a horizon the Scenario press does not run its tower on is a measurement of
+         * a day no player can take, which is what five of § D914's seven were until they were
+         * re-measured on the whole day.
+         */
+        const horizon = input.horizonFor(row.buildingId);
+        if (press.horizon !== horizon) {
+          issues.push(
+            `ladder row ${row.contractId} pins a press day measured on ` +
+              `${JSON.stringify(press.horizon)}, and the Scenario press runs ${row.buildingId} on ` +
+              `${JSON.stringify(horizon ?? 'nothing')}; a pin on a horizon nobody plays is a day ` +
+              'nobody can meet',
           );
         }
       }

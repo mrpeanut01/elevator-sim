@@ -288,8 +288,18 @@ const DAILY_BOARD_POINTER =
 const BOARD_RULES: readonly { readonly title: string; readonly body: string }[] = Object.freeze([
   Object.freeze({
     title: 'One board a day, and nothing you configure enters its key',
+    /*
+     * GitHub issue #595, § D973. The first sentence read *"One tower, one crowd, one seed,
+     * everybody"* — true of the **board**, which the server keys on one fixture tower and the day's
+     * seed (`packages/server/src/leaderboard/boardKey.ts#DAILY_FIXTURE_CONFIG`), and read on this
+     * screen as a claim about the player's own week, which since the front door's picker (§ D912)
+     * may be on any tower. A day run on another tower goes to the player's own record, not the
+     * board, so the sentence now says so rather than letting *everybody* stand for *you*.
+     */
     body:
-      'One tower, one crowd, one seed, everybody. A board keyed by building and dispatcher and ' +
+      'The board is one tower and one crowd for everybody, and it need not be the tower your week ' +
+      'is on — a day joins it only when it ran that tower on that crowd, and anything else goes to ' +
+      'your own record. A board keyed by building and dispatcher and ' +
       'traffic and arrival rate fragments into thousands of one-entry boards where everyone is ' +
       'permanently first and nobody ever meets. Arbitrary configurations are a personal record, ' +
       'not a board.',

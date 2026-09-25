@@ -104,7 +104,7 @@
  * has no *finished* instant to agree with.
  */
 
-import { GOAL_GLYPHS, PENDING_DISPLAY } from '../shift/goals.js';
+import { GOAL_GLYPHS, PENDING_DISPLAY, yesterdayLabelOf } from '../shift/goals.js';
 import { contractById } from '../shift/contracts.js';
 import {
   CASUAL_LEVERS_HEADING,
@@ -180,9 +180,10 @@ export interface GoalRowView {
   /** The observed value, or the em dash while the building has not woken up. */
   readonly display: string;
   /**
-   * `was 78%`, or the bare em dash when the building has no previous day — `GoalLine.was`,
+   * `yesterday 78%`, or the bare em dash when the building has no previous day — `GoalLine.was`,
    * dressed exactly as the rail's `goalRowsOf` dresses it, because two spellings of yesterday
-   * would be two screens disagreeing.
+   * would be two screens disagreeing. It read `was 78%` until § D983: a few rows above the
+   * after-press pair, *was* read as *before my press*.
    */
   readonly was: string;
   /**
@@ -699,7 +700,8 @@ export function goalRowViewOf(line: GoalLine): GoalRowView {
     display: reading.display,
     // The word only when there is a figure to attribute — `was —` would dress an absence as a
     // measurement. The same rule `dev/leftRail.ts#goalRowsOf` applies, spelled the same way.
-    was: line.was === PENDING_DISPLAY ? PENDING_DISPLAY : `was ${line.was}`,
+    // Spelled as yesterday's — § D983, `shift/goals.ts#yesterdayLabelOf`, one spelling for both.
+    was: yesterdayLabelOf(line.was),
     /*
      * Verbatim, including the empty string — § D106 at the renderer, GitHub issue #456.
      * `shift/goals.ts#gaveUpBesideOf` decides which goals carry one and what it says; this panel

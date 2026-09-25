@@ -290,7 +290,17 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * `deepTiers.test.ts` names. A four-hour bound on a ten-second job passes every check in this
      * repository, and the only reason this one was caught is that it happened to push a count.
      */
-    ['viz', { count: 111, totalMs: 158_100_000 }],
+    /*
+     * **111 → 112, and the one is named** — wave AH lane AH-D's `everyday/stagePace.sweep.test.ts`,
+     * GitHub issue #592, § D991: every contract's Today's-scenario day 1 over fifty seeds, read for
+     * § D512 legibility in real seconds under the stage's pacing and for each day's paced length. It
+     * is gated on `STAGE_PACE_SWEEP` and registered in `deepTiers.test.ts`, so it costs the default
+     * suite nothing. Measured: **368 s for one seed of all sixteen contracts at load average 11**,
+     * the reference towers' whole days being most of it, so fifty seeds is about **5.1 h** serial —
+     * annotated at **six hours** (21 600 000 ms), the job with a sixth to spare rather than a
+     * multiple of it. 158 100 000 + 21 600 000 = **179 700 000**. Nothing existing was raised.
+     */
+    ['viz', { count: 112, totalMs: 179_700_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this
@@ -362,7 +372,42 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * because a lane that edits above an existing case shifts its line number and a line-keyed diff
      * reports a move as an addition.
      */
-    ['viz-browser', { count: 79, totalMs: 19_920_000 }],
+    /*
+     * **79 → 82, and the three are named** — all three are wave AH lane A's
+     * `everyday/weekSurvives.browser.test.ts` at 600 000 ms each: *plays seven days on …* (one
+     * annotation, two cases, because the case is written once inside a loop over a whole-day tower
+     * and a slice tower), *closes a Scenario day, plays every other mode …*, and *a reload taken
+     * while a rush is standing …*. GitHub issues #593 and #594.
+     *
+     * **They earn it because both defects lived where no case went.** No case played past day 1 of a
+     * Scenario week, so a day 3 that `core` refused on thirteen towers reached assessors first; and
+     * no case left Scenario and came back, so a career day filed into the week and a rush's week was
+     * written to disk and refused on the next load. Each case plays a real week or a real round
+     * trip on the shipped bundle, several runs a case, which is why none can honestly sit at this
+     * tier's ceiling.
+     *
+     * Nothing existing was raised: 19 920 000 + 3 × 600 000 = 21 720 000, keyed on file and case
+     * name. If another lane of the same wave moved this row, the two moves add.
+     */
+    /*
+     * **82 → 91 at integration, and the nine are named** — wave AH lane AH-D's three browser
+     * files, each a `beforeAll` that builds and serves the bundle (180 000 ms) and two journeys at
+     * 300 000 ms:
+     * `everyday/stagePace.browser.test.ts` (GitHub issue #592, § D991 — a whole day's stage crosses
+     * its quiet at 30× and plays its peak at 4×, and a slice is not paced),
+     * `everyday/tutorialTwentySeconds.browser.test.ts` (#598, § D992 — the tutorial's failure within
+     * twenty seconds, with a clock) and `everyday/tutorialLeave.browser.test.ts` (#598, § D993 —
+     * neither exit files a day, and a reload offers a cover with a live way past it).
+     *
+     * **They earn it for the reason the four above did**: each holds a claim about what the mounted
+     * screen does over real time — a transport changing speed, a press going live when somebody has
+     * waited a minute, a week staying empty across a worker's landing — that no unit tier can see.
+     * The stage journey waits for a whole day to simulate in the worker and then plays a real minute
+     * to 08:30, which is why its bound is not the tier's. 21 720 000 + 3 × 180 000 + 6 × 300 000 =
+     * **24 060 000**, lane A's row above plus these nine, which is the two moves adding as that
+     * row said they would. Nothing existing was raised.
+     */
+    ['viz-browser', { count: 91, totalMs: 24_060_000 }],
   ]);
 
 /**

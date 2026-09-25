@@ -112,6 +112,7 @@ import type { LiveObservations, WaitBandId } from '../live/types.js';
  */
 import type { PriceSchedule } from '../pricing/types.js';
 import { goalRowsOf } from '../dev/leftRail.js';
+import type { BookedOutCar } from '../shift/bookedOut.js';
 import { GOAL_GLYPHS, TODAY_ASKS_DECIDES, TODAY_ASKS_HEADING } from '../shift/goals.js';
 import type { DayOutcome, GoalObservations, GoalReading, GoalState } from '../shift/types.js';
 // AD-S17's length rule, shared with the Engineer stage. The *derivation* — what counts as standing
@@ -275,6 +276,13 @@ export const STAGE_SPEEDS: readonly [StageSpeed, ...StageSpeed[]] = Object.freez
  * what the Everyday content runs (`rise-and-fall`, 1 800 s, ramps from its first second), and § 2.3's
  * skip control and the chips are the answer to it — but it is a real move and AD-S6's arithmetic is
  * corrected on the commit that makes it stale rather than left to age.
+ *
+ * **Two clauses of that paragraph are no longer true, and are corrected here rather than deleted**
+ * ([§ D991](../../../../DECISIONS.md), GitHub issue #592). *"Not what the Everyday content runs"*
+ * went stale with § D356: thirteen of the sixteen contracts run `office-day` whole. And a whole day
+ * is no longer played at one rung — `everyday/stagePace.ts` plays its three peaks at this default
+ * and crosses the hours between them at `30×`, so the quiet head is 60 real seconds again and the
+ * day 40–51 minutes on the game's own towers (1 h 49 at most on a reference tower, measured). This constant is still what a whole day's peaks open at.
  *
  * **A paragraph that stood here is deleted rather than updated** ([§ D753](../../../../DECISIONS.md)).
  * It named five player-facing session shapes as outstanding and said correcting them was not this
@@ -502,6 +510,45 @@ export function stageHeaderOf(input: StageHeaderInput): StageHeaderView {
 }
 
 /**
+ * **The car the tower books out, on the stage** — GitHub issue #596 item 3,
+ * [§ D983](../../../../DECISIONS.md).
+ *
+ * The dashed well (`STAGE_OUT_OF_SERVICE`) is drawn for a car held for the **whole** run, which is
+ * what `VizRecording.outOfServiceCarIds` carries. A car the tower's own schedule books out part-way
+ * through — Crown Hotel's car D, § D871 — had nothing on the stage: the brief's plate named it and
+ * the stage showed a lift that simply stopped. So the header carries one pill per booked car, with
+ * the two clock times from the run's own building (`shift/bookedOut.ts#bookedOutCarsOf`) and where
+ * the playhead stands against them.
+ *
+ * The clock times are the **schedule**, not the outcome, which is why they may be shown at a
+ * playhead short of the end: a booking is written into the building before the run starts, the way
+ * `stageNextStretchOf` names a demand segment ahead of the playhead. What it never says is anything
+ * the run did while the car was away.
+ *
+ * `[]` on a tower that books nothing, which is most of them, so the header is unchanged there.
+ */
+export function stageBookedOutOf(input: {
+  readonly bookedOut: readonly BookedOutCar[];
+  readonly simTimeS: number;
+  readonly dayStartS?: number | undefined;
+}): readonly string[] {
+  return input.bookedOut.map((car) => {
+    const away = clockAt(car.awayAtS, input.dayStartS);
+    const span =
+      car.backAtS === null
+        ? `booked out from ${away}`
+        : `booked out ${away}–${clockAt(car.backAtS, input.dayStartS)}`;
+    const where =
+      input.simTimeS < car.awayAtS
+        ? 'still running'
+        : car.backAtS === null || input.simTimeS < car.backAtS
+          ? 'out now'
+          : 'back';
+    return `Car ${car.carId} ${span} · ${where}`;
+  });
+}
+
+/**
  * What the overlay says while the day is still being simulated.
  *
  * Mount-authored until [§ D347](../../../../DECISIONS.md), which is the whole of why it is here:
@@ -509,6 +556,57 @@ export function stageHeaderOf(input: StageHeaderInput): StageHeaderView {
  * property at all.
  */
 export const STAGE_AWAITING_RUN = 'simulating today’s day — the stage draws the moment it lands';
+
+/**
+ * **What the stage says when today's day could not be simulated, and where it lets the player go**
+ * — GitHub issue #593.
+ *
+ * The overlay used to have two states with no run behind them — waiting and recomputing — and a
+ * failed run fell into the first for good: the worker's refusal went to the Engineer transport's
+ * error line under the Everyday cover, and a player sat in front of *simulating today's day* for
+ * seven minutes before giving up on the week. A failure is a third state, and it has to do what the
+ * other two do not: say that nothing is coming, and give the player two ways on — try the same day
+ * again, or step back to the screen the day was set up from.
+ *
+ * **Player words, and no engine sentence.** The engine's own message is a bug report
+ * (`EverydayHost.runFailure` carries it, and the Engineer transport still prints it); it names
+ * templates and splits, which § 16 rule 11 keeps off a Casual surface. What the player is owed is
+ * the fact and the fault: the day did not run, and it is the game's doing rather than theirs.
+ *
+ * **Where *back* goes is the flow's own set-up screen**, so a career day returns to its building
+ * and a rush to its own screen rather than all of them to Scenario's front door. The shell's `go`
+ * already puts a rush's or a replay's parked week back on the way off the stage, so this decides a
+ * destination and nothing else.
+ *
+ * Its one non-test caller is `everyday/stageScreen.ts#syncTransport`.
+ */
+export function stageRunFailedViewOf(ctx: RunContext): {
+  readonly line: string;
+  readonly retry: string;
+  readonly back: { readonly label: string; readonly screen: EverydayScreen };
+} {
+  const back: { readonly label: string; readonly screen: EverydayScreen } =
+    ctx === 'campaign'
+      ? { label: STAGE_RUN_FAILED_COPY.backToBuilding, screen: 'building' }
+      : ctx === 'rush'
+        ? { label: STAGE_RUN_FAILED_COPY.backToRush, screen: 'rush' }
+        : ctx === 'watch'
+          ? { label: STAGE_RUN_FAILED_COPY.backToModes, screen: 'menu' }
+          : { label: STAGE_RUN_FAILED_COPY.backToDoor, screen: 'door' };
+  return { line: STAGE_RUN_FAILED_COPY.line, retry: STAGE_RUN_FAILED_COPY.retry, back };
+}
+
+/** {@link stageRunFailedViewOf}'s words, keyed so the corpus can sweep every one of them. */
+export const STAGE_RUN_FAILED_COPY = Object.freeze({
+  line:
+    'Today’s day could not be simulated, so there is nothing to watch. That is a fault in the ' +
+    'game, not in anything you chose.',
+  retry: 'Try the day again',
+  backToDoor: 'Back to the front door',
+  backToBuilding: 'Back to the building',
+  backToRush: 'Back to the rush',
+  backToModes: 'Back to the modes',
+});
 
 /**
  * **Whether the stage may take the recording the host is publishing** — GitHub issue **#548**.
@@ -532,6 +630,11 @@ export function stageMayAdopt(input: {
   readonly runPending: boolean;
   /** What stood on the host when this mount began waiting — see the third clause. */
   readonly standingAtEntry: VizRecording | undefined;
+  /**
+   * Whether the day this mount is waiting for **failed** — `EverydayHost.runFailure`, GitHub issue
+   * #593. Optional, and absent reads as *no failure*, which is every caller before the field existed.
+   */
+  readonly runFailed?: boolean | undefined;
 }): boolean {
   const { incoming, adopted, runPending, standingAtEntry } = input;
   if (incoming === undefined) return false;
@@ -550,6 +653,14 @@ export function stageMayAdopt(input: {
    * recording this mount never saw standing, so both pass.
    */
   if (runPending && incoming === standingAtEntry) return false;
+  /*
+   * **And the same refusal once the day has failed rather than while it is pending** — GitHub issue
+   * #593. The third clause holds exactly as long as the run is in flight; a failure takes
+   * `runPending` down, and without this the next notification would hand the stage yesterday's
+   * recording as today's — the revert #548 closed, arriving through the failure path. What stood
+   * at entry is still not the player's day, and the overlay says why there is none.
+   */
+  if (input.runFailed === true && incoming === standingAtEntry) return false;
   return true;
 }
 

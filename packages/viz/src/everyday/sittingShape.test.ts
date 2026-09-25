@@ -36,15 +36,24 @@ import { scenarioHubViewOf } from './scenarioModel.js';
 import {
   SITTING_SHAPES,
   SITTING_SPANS,
+  WHOLE_DAY_LONGEST,
+  WHOLE_DAY_LONGEST_GAME_TOWER,
+  pacedDayRealS,
   sittingLengthPhrase,
   sittingMinutes,
+  watchedRealS,
   type SittingSpan,
 } from './sittingShape.js';
+import { BETWEEN_PEAKS_SIM_PER_REAL_S } from './stagePace.js';
 import {
   DEFAULT_STAGE_SPEED_INDEX,
   STAGE_SPEEDS,
   stageSpeedAt,
 } from './stageScreenModel.js';
+
+/** Simulated seconds of act in a day. */
+const actSecondsOf = (acts: readonly { readonly startS: number; readonly endS: number }[]): number =>
+  acts.reduce((sum, act) => sum + (act.endS - act.startS), 0);
 
 const SRC = fileURLToPath(new URL('..', import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -71,6 +80,8 @@ function dayCensus(): readonly {
   readonly careerS: number;
   /** What *Today's scenario* plays: the authored day where there is one, else the slice. */
   readonly scenarioS: number;
+  /** Seconds of act in that day — `actsOf` over the record — or `undefined` for a slice. */
+  readonly actsS: number | undefined;
 }[] {
   const trafficProfiles = parseTrafficProfiles(data('traffic-profiles.json'));
   return CONTRACTS.map((contract) => {
@@ -81,6 +92,7 @@ function dayCensus(): readonly {
       buildingId: contract.buildingId,
       careerS,
       scenarioS: day === undefined ? careerS : wholeDayRun(day).shiftLengthS,
+      actsS: day === undefined ? undefined : actSecondsOf(day.acts),
     };
   });
 }
@@ -145,9 +157,48 @@ describe('every advertised length is the day the tile actually opens', () => {
     const midtown = census.find((row) => row.buildingId === 'midtown-office');
     if (garden === undefined || midtown === undefined) throw new Error('a measured contract left the ladder');
     expect(sittingMinutes(garden.careerS, RUNG.simPerRealS)).toBe(15);
+    /*
+     * Midtown's day is still ten hours of building — 150 minutes if it were played at one rung, which
+     * is what the assessor measured. § D991 paces it: the three acts at the rung and the rest at the
+     * between-peaks rung, so the figure a player reads is forty minutes, and it says both rungs.
+     */
     expect(sittingMinutes(midtown.scenarioS, RUNG.simPerRealS)).toBe(150);
+    const midtownActs = midtown.actsS;
+    if (midtownActs === undefined) throw new Error('midtown-office has no authored day');
+    /* The acts alone, with nobody held: § D991's floor, 39.5 minutes, which rounds up to 40. */
+    expect(
+      Math.ceil(pacedDayRealS({ periodS: midtown.scenarioS, recordedS: midtown.scenarioS, slowS: midtownActs }, RUNG.simPerRealS) / 60),
+    ).toBe(40);
     expect(SITTING_SHAPES.careerMode).toContain('15 min');
-    expect(SITTING_SHAPES.contractDay).toContain('2 h 30');
+    /* The long end is the longest day measured on any contract, a reference tower's. */
+    const top = Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST, RUNG.simPerRealS) / 60);
+    expect(top).toBeGreaterThan(90);
+    expect(SITTING_SHAPES.contractDay).toContain(`${String(Math.floor(top / 60))} h`);
+    expect(SITTING_SHAPES.contractDay).not.toContain('2 h 30');
+    expect(SITTING_SHAPES.contractDay).toContain(`between peaks at ${String(BETWEEN_PEAKS_SIM_PER_REAL_S)}×`);
+    expect(SITTING_SHAPES.contractDay).toContain('at most on the game’s own towers');
+  });
+
+  /*
+   * § D991's census, on AUTHORED_DAY_PERIOD_S's pattern. The long end is a measured day, so what
+   * can be checked without the sweep is that it is a day of the period every contract runs and that
+   * its slow part holds at least that day's acts — a slow part smaller than the acts would be a day
+   * the stage crossed a peak of fast, which the rule never does.
+   */
+  it('the measured longest days are days of the authored period, with at least their acts played slow', () => {
+    const days = dayCensus().filter((row) => row.actsS !== undefined);
+    expect(days.length).toBeGreaterThan(0);
+    for (const measured of [WHOLE_DAY_LONGEST, WHOLE_DAY_LONGEST_GAME_TOWER]) {
+      for (const row of days) {
+        expect(row.scenarioS, row.id).toBe(measured.periodS);
+        expect(measured.slowS, row.id).toBeGreaterThanOrEqual(row.actsS ?? 0);
+      }
+      expect(measured.recordedS).toBeGreaterThanOrEqual(measured.periodS);
+    }
+    expect(SITTING_SPANS.contractDay.pacedDay).toBe(WHOLE_DAY_LONGEST);
+    expect(pacedDayRealS(WHOLE_DAY_LONGEST, RUNG.simPerRealS)).toBeGreaterThanOrEqual(
+      pacedDayRealS(WHOLE_DAY_LONGEST_GAME_TOWER, RUNG.simPerRealS),
+    );
   });
 });
 
@@ -223,7 +274,26 @@ describe('the figures are derived from the rung, never typed against it', () => 
       for (const rung of STAGE_SPEEDS) {
         const minutes = sittingMinutes(span.highSimS, rung.simPerRealS);
         expect(minutes * 60 * rung.simPerRealS).toBeGreaterThanOrEqual(span.highSimS);
+        /* And the figure a player actually reads, which for a paced day is not `simS / rung`. */
+        const watched = watchedRealS(span, span.highSimS, rung.simPerRealS);
+        expect(Math.ceil(watched / 60) * 60).toBeGreaterThanOrEqual(watched);
       }
+    }
+  });
+
+  /*
+   * § D991's owner fallback, as arithmetic: with the between-peaks rung at or below the watching
+   * rung, a paced day is exactly the day at one rung. `pacedDayRealS` takes the faster of the two,
+   * so at the ladder's `30×` and above the pacing buys nothing and costs nothing.
+   */
+  it('a paced day is never longer than the day at one rung, and equal where the rungs meet', () => {
+    const paced = SITTING_SPANS.contractDay.pacedDay;
+    if (paced === undefined) throw new Error('contractDay is not paced');
+    for (const rung of STAGE_SPEEDS) {
+      const flat = paced.recordedS / rung.simPerRealS;
+      const real = pacedDayRealS(paced, rung.simPerRealS);
+      expect(real).toBeLessThanOrEqual(flat + 1e-9);
+      if (rung.simPerRealS >= BETWEEN_PEAKS_SIM_PER_REAL_S) expect(real).toBeCloseTo(flat, 9);
     }
   });
 

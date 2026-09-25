@@ -30,6 +30,7 @@ import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/
 
 import { restrictedFloorIds } from '../access/zoning.js';
 import { mixedFleetBanks } from '../commissioning/choices.js';
+import { scenarioHorizonFor } from '../shift/dayLength.js';
 import { CONTRACT_LADDER, contractLadderIssues } from '../shift/ladder.js';
 import { parseEngineeringBriefs, type EngineeringBriefs } from '../briefs/parse.js';
 import { parseCampaign } from '../campaign/parse.js';
@@ -242,6 +243,12 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
     },
     /* Every shipped profile id, for a rung's pinned press day to name — § D914. */
     dispatcherIds: () => dispatchers.profiles.map((profile) => profile.id),
+    /* The horizon the Scenario press runs each tower on, for a pinned day to match — § D974. */
+    horizonFor: (buildingId) =>
+      scenarioHorizonFor(
+        trafficProfiles,
+        entries.find((candidate) => candidate.config.id === buildingId)?.config,
+      ),
     floorProfilesFor: (buildingId) => {
       const entry = entries.find((candidate) => candidate.config.id === buildingId);
       if (entry === undefined) return undefined;

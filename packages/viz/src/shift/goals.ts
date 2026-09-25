@@ -663,6 +663,63 @@ export function goalsForDay(
   return Object.freeze([carry, minute, queue, worst, energy]);
 }
 
+/**
+ * The ids {@link goalsForDay} writes, in its order. `ShiftGoal.id` stays a `string` because a
+ * restored session's goals come back through `persist/validate.ts` as whatever was saved, so this
+ * union is the set the **shipped** producer writes rather than a narrowing of the persisted type.
+ */
+export const SHIFT_GOAL_IDS = Object.freeze([
+  'carry',
+  'minute',
+  'queue',
+  'worst-wait',
+  'energy',
+] as const);
+
+/** One of {@link SHIFT_GOAL_IDS}. */
+export type ShiftGoalId = (typeof SHIFT_GOAL_IDS)[number];
+
+/**
+ * **A goal's name with no bar in it** — [§ D982](../../../../DECISIONS.md), the table the day
+ * report's after-press row names a missed goal from.
+ *
+ * ## Why not the label
+ *
+ * A label carries its bar — *Keep the worst wait inside 230 s across the whole shift* — and the
+ * row that names these (`shift/afterPress.ts`) has a rule that every digit on it is a count of
+ * people with its cohort attached (§ D931 rule 4). A bar in seconds or kilojoules would be the
+ * first figure there that is not a headcount, and the label of the **other** run's goal would be a
+ * second copy of the same bar four inches under the goal table that already prints it. So the row
+ * names the goal and the table carries its value — one source for the number.
+ *
+ * *The energy goal* rather than anything that says *per ride*: that phrase is already an estimate
+ * cue on the row (`counterfactual.test.ts`), and a goal's name does not need its denominator to be
+ * recognised beside a table that prints it in full.
+ *
+ * `Record` over {@link ShiftGoalId}, so a sixth goal is a compile error here rather than a row
+ * that names it with the fallback in {@link goalPlainNameOf}.
+ */
+export const GOAL_PLAIN_NAMES: Readonly<Record<ShiftGoalId, string>> = Object.freeze({
+  carry: 'the carry goal',
+  minute: 'the inside-a-minute goal',
+  queue: 'the landing-queue goal',
+  'worst-wait': 'the worst-wait goal',
+  energy: 'the energy goal',
+});
+
+function isShiftGoalId(id: string): id is ShiftGoalId {
+  return (SHIFT_GOAL_IDS as readonly string[]).includes(id);
+}
+
+/**
+ * {@link GOAL_PLAIN_NAMES} for a goal, or a name that claims nothing about which goal it was when
+ * the id is not one this build writes (a goal restored from a session saved by another build). The
+ * fallback names no goal rather than inventing one, and carries no digit either.
+ */
+export function goalPlainNameOf(goal: ShiftGoal): string {
+  return isShiftGoalId(goal.id) ? GOAL_PLAIN_NAMES[goal.id] : 'one of the day’s goals';
+}
+
 /* -------------------------------------------------------------------------- *
  * Reading one
  * -------------------------------------------------------------------------- */
@@ -1050,6 +1107,22 @@ export function bestLineFor(observations: GoalObservations, bestMinutePct: numbe
  *   yesterday therefore reads `—` here too, which is honest — an ungraded morning measured
  *   nothing worth quoting tonight.
  */
+/**
+ * **The *was* slot, dressed as yesterday's** — GitHub issue #596 item 4, [§ D983](../../../../DECISIONS.md).
+ *
+ * The slot read `was 78%`, and on the Day report it sits a few rows above the after-press pair,
+ * which prints *this run* and *the run without that press* — so two assessors read *was* as
+ * *before my press*. It is the building's **previous day** ({@link wasDisplayOf}), and the word now
+ * says so. The em dash stays bare, for the rule both callers already kept: `yesterday —` would dress
+ * an absence as a measurement.
+ *
+ * One function because the rail and the report must spell yesterday one way — `dev/reportPanel.ts`
+ * says two spellings would be two screens disagreeing — and they did, identically, as `was`.
+ */
+export function yesterdayLabelOf(was: string): string {
+  return was === PENDING_DISPLAY ? PENDING_DISPLAY : `yesterday ${was}`;
+}
+
 export function wasDisplayOf(
   history: readonly DayOutcome[],
   day: number,

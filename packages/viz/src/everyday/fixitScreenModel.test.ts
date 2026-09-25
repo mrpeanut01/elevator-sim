@@ -28,12 +28,17 @@ import {
   topFloorRaisePriceUnits,
   zonePriceUnits,
 } from '../fixit/engine.js';
-import { EDITOR_PARKING_STRATEGIES } from '../fixit/types.js';
+import { EDITOR_PARKING_STRATEGIES, EVERY_CAR, OUT_OF_SERVICE } from '../fixit/types.js';
 import type { FixitCase, FixitState } from '../fixit/types.js';
 import { actionBarFor } from './actionBar.js';
 import {
   buildingLineOf,
   FIXIT_SCREEN_COPY as COPY,
+  decodeFamilyValue,
+  encodeFamilyValue,
+  fixitDialGroupsView,
+  fixitDoorView,
+  fixitRezoneView,
   fixitBarModel,
   fixitBudgetRungRow,
   fixitCaseRailModel,
@@ -334,9 +339,13 @@ describe('the parking row', () => {
       expect(row.options[0]?.selected).toBe(true);
       expect(row.options.length).toBe(EDITOR_PARKING_STRATEGIES.length);
     }
-    /* A standing order outside the offered subset — three shipped cases park at a fixed floor. */
+    /*
+     * There is no longer a standing order outside the offered list — § D1000 offers all five — so a
+     * case that parks at a fixed floor loses that one option like any other.
+     */
     const whole = fixitParkingRow(emptyFixitState(), 'fixed-floor', price);
-    expect(whole.options.length).toBe(EDITOR_PARKING_STRATEGIES.length + 1);
+    expect(whole.options.map((option) => option.value)).not.toContain('fixed-floor');
+    expect(whole.options.length).toBe(EDITOR_PARKING_STRATEGIES.length);
   });
 
   /**
@@ -369,6 +378,7 @@ describe('the parking row', () => {
       COPY.parkingStay,
       COPY.parkingLobby,
       COPY.parkingZone,
+      COPY.parkingForecast,
     ]);
   });
 
@@ -447,5 +457,111 @@ describe('the wider budget, priced in chimes — GitHub issue #579', () => {
     for (const arm of [row({}), row({ balanceChimes: 0 }), row({ balanceChimes: 1 }), row({ nextChimes: undefined })]) {
       expect(arm?.note.length ?? 0).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * § D1000's five families, worded. The decisions behind every row — which dials are live, what a
+ * select offers, what a rezone may move — are `fixit/`'s and are proved on the legs in
+ * `fixit/families.test.ts`; what is held here is that the words are this module's and never an
+ * engine identifier, and that a select's value survives the trip through a string.
+ */
+describe('the five families, worded', () => {
+  const row = (affordable: boolean, bought = false) => ({
+    changeId: 'dispatch-rules',
+    name: 'How calls are assigned',
+    units: 2,
+    bought,
+    affordable,
+  });
+
+  it('carries a dial value through a select and back as what it was', () => {
+    for (const value of [0.1, 7, 'single-car', true, false]) {
+      expect(decodeFamilyValue(encodeFamilyValue(value))).toEqual(value);
+    }
+    expect(decodeFamilyValue(encodeFamilyValue(undefined))).toBeNull();
+  });
+
+  it('says a group’s price once, and says so when the budget refuses the group', () => {
+    const open = fixitDialGroupsView([{ row: row(true), dials: [] }])[0]!;
+    expect(open.header.heading).toBe('How calls are assigned');
+    expect(open.header.priced).toBe(`2 u ${COPY.groupPricedOnce}`);
+    expect(open.header.atBudget).toBe(false);
+    const refused = fixitDialGroupsView([{ row: row(false), dials: [] }])[0]!;
+    expect(refused.header.atBudget).toBe(true);
+    expect(refused.header.priced).toContain(COPY.groupAtBudget);
+  });
+
+  it('opens a dial on its standing value, says what that is, and words a switch as yes or no', () => {
+    const view = fixitDialGroupsView([
+      {
+        row: row(true),
+        dials: [
+          {
+            id: 'eligibility.enRouteDiversion',
+            name: 'divert a car already moving',
+            effect: 'a car on its way somewhere may be sent to a call on a floor it has not yet passed',
+            standingText: 'off',
+            options: [{ value: true, text: 'on' }],
+            selected: undefined,
+          },
+        ],
+      },
+    ])[0]!;
+    const dial = view.dials[0]!;
+    expect(dial.options.map((option) => option.label)).toEqual([`${COPY.dialStanding} — ${COPY.dialOff}`, COPY.dialOn]);
+    expect(dial.options[0]!.selected).toBe(true);
+  });
+
+  it('offers a car every other bank, a bank of its own and out of service, and never its own bank', () => {
+    const view = fixitRezoneView({
+      row: row(true),
+      floorOrder: ['G', '2', '3'],
+      cars: [
+        { id: 'A', standingBankId: 'low', doubleDeck: false, homeFloors: ['G', '2'], target: 'low' },
+        { id: 'E', standingBankId: OUT_OF_SERVICE, doubleDeck: false, homeFloors: ['G', '3'], target: OUT_OF_SERVICE },
+      ],
+      banks: [
+        { id: 'low', name: 'Low bank', servesFloors: ['G', '2'], paired: false, offPlate: false, standingFloors: ['G', '2'], floors: ['G', '2'], keyed: false, plated: false },
+        { id: 'high', name: 'High bank', servesFloors: ['G', '3'], paired: false, offPlate: true, standingFloors: ['G', '3'], floors: ['G', '3'], keyed: false, plated: true },
+      ],
+    });
+    const [a, e] = view.cars;
+    expect(a!.options.map((option) => option.label)).toEqual([
+      `${COPY.dialStanding} — Low bank`,
+      'High bank',
+      COPY.rezoneKeyed,
+      COPY.rezoneOut,
+    ]);
+    expect(e!.options.map((option) => option.label)).toEqual([
+      `${COPY.dialStanding} — ${COPY.rezoneOutForWorks}`,
+      'Low bank',
+      'High bank',
+      COPY.rezoneKeyed,
+    ]);
+    const high = view.banks.find((bank) => bank.key === 'high')!;
+    expect(high.floors?.map((floor) => floor.served)).toEqual([true, false, true]);
+    expect(high.plate?.options.find((option) => option.selected)?.label).toBe(COPY.platePlate);
+    expect(view.banks.find((bank) => bank.key === 'low')!.plate).toBeUndefined();
+  });
+
+  it('words the door hold per target, in seconds, opening on the car as it is', () => {
+    const view = fixitDoorView(
+      {
+        row: row(true),
+        targets: [
+          { key: EVERY_CAR, carId: undefined, bankName: undefined },
+          { key: 'D', carId: 'D', bankName: 'Main bank' },
+        ],
+        hallOptions: [4, 5],
+        carOptions: [2, 3],
+      },
+      { D: { hallCallS: 5 } },
+      'D',
+    );
+    expect(view.targets.map((option) => option.label)).toEqual([COPY.doorEveryCar, 'Car D · Main bank']);
+    const [hall, car] = view.sides;
+    expect(hall!.options.find((option) => option.selected)?.label).toBe('5.0 s');
+    expect(car!.options.find((option) => option.selected)?.label).toBe(COPY.doorStanding);
   });
 });

@@ -207,6 +207,7 @@ import { contractById, statLineOf } from '../shift/contracts.js';
 import { bankingRefusalFor, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { pressCounterfactualOf } from '../shift/counterfactual.js';
+import { bookedOutCarsOf } from '../shift/bookedOut.js';
 import { readGoals } from '../shift/goals.js';
 import {
   clockOf,
@@ -298,6 +299,7 @@ import {
   resolvedBuildingOf,
   shiftRunConfigOf,
   tomorrowFactsOf,
+  scenarioWeeksOf,
   weeksForSession,
   withBuilding,
   type PatternSelection,
@@ -1901,10 +1903,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * otherwise resume a week out of an empty list — which is the restored campaign losing every
      * scenario except the one it opened on, at the first boot after issue #107 was fixed.
      */
-    state = {
-      ...state,
+    /*
+     * **With every mode's own week taken off** — GitHub issue #594, § D965. A session written by an
+     * earlier build during a rush or after a replay holds a week that is a mode's slot rather than
+     * the player's; `scenarioWeeksOf` hands the parked Scenario week back instead of the product
+     * opening on a rush week, or — as it did until `persist/validate.ts` learned the ids — refusing
+     * the session outright.
+     */
+    const weeks = scenarioWeeksOf({
       week: restored.snapshot.week,
       parkedWeeks: restored.snapshot.parkedWeeks,
+    });
+    state = {
+      ...state,
+      week: weeks.week,
+      parkedWeeks: weeks.parkedWeeks,
     };
     /*
      * The building follows the week rather than being persisted beside it. `persist/` excludes
@@ -1912,7 +1925,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * sources of truth for exactly the mismatch `withBuilding` exists to prevent — a sheet headed
      * one building and footed another, which this repository has already shipped once.
      */
-    const contract = contractById(restored.snapshot.week.contractId);
+    const contract = contractById(weeks.week.contractId);
     if (contract !== undefined) state = withBuilding(state, resources, contract.buildingId);
   }
 
@@ -3183,6 +3196,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * has written the new recording), so no screen can observe *nothing pending* beside the old run.
    */
   let shiftInFlight = false;
+  /**
+   * The engine's sentence for the player's last shift that failed, or `undefined` — GitHub issue
+   * **#593**, and `everyday/host.ts#runFailure`'s binding.
+   *
+   * {@link failRun} writes the same sentence onto the transport's error line, which is right for
+   * this surface and invisible from the other: under the Everyday cover nobody can read it, and
+   * the stage waited on a run that had already failed. Set only for a shift — the rival's race and
+   * {@link verifyCurrent} are not the player's day — and cleared when the next shift starts.
+   */
+  let shiftFailure: string | undefined;
+  /**
+   * Whether the job the runner just finished was a shift, captured in `onRunning(false)` before that
+   * hook takes {@link shiftInFlight} down — the runner calls `onRunning(false)` and **then**
+   * `onFailed`, so by the time the failure arrives the flag that says whose run it was is gone.
+   */
+  let endedJobWasShift = false;
   /** The plan behind the run on screen, held so a pick change can re-race without re-planning. */
   let lastShiftPlan: ShiftRunConfig | undefined;
   /** What the strip geometry was last drawn for — see {@link drawRaceStrip}'s keying. */
@@ -3331,6 +3360,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * the race strip's *waiting* line can never outlive the run it was waiting for.
        */
       if (!running) {
+        endedJobWasShift = shiftInFlight;
         ghostInFlight = false;
         /* And no shift is pending either, however this one ended — GitHub issue #548. */
         shiftInFlight = false;
@@ -3345,6 +3375,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
     },
     onFailed: (message) => {
       failRun(message);
+      /*
+       * **And the Everyday stage hears it** — GitHub issue #593. `failRun` speaks to this surface
+       * alone; a failed shift used to leave the other product's stage on *simulating today's day*
+       * for good, because nothing notified it. `renderAll` is the one notification its screens
+       * listen to, and a failure is rare enough that a full redraw costs nothing worth saving.
+       */
+      if (endedJobWasShift) {
+        shiftFailure = message;
+        renderAll();
+      }
     },
   });
   /*
@@ -4440,6 +4480,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * screen*. `everyday/stageScreen.ts` is the caller — GitHub issue #548.
      */
     runPending: () => shiftInFlight,
+    /* GitHub issue #593 — {@link shiftFailure}; `everyday/stageScreen.ts` is the caller. */
+    runFailure: () => shiftFailure,
     /*
      * The runner's own cancel, the Run button's cancel face: the result is dropped unread, and
      * `onRunning(false)` takes the rival's flag and the recompute beat down with it. A no-op with
@@ -5796,6 +5838,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // {@link runCause}; `'player'` is the default because every press but one means *a new ask*.
     runCause = cause;
     setText(ui.transport.error, '');
+    // A new ask is a new chance: the failure the stage is drawing belonged to the run this replaces.
+    shiftFailure = undefined;
     /*
      * The restore notice survives boot's own run and nothing after it.
      *
@@ -5869,6 +5913,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
       /* `shiftRunner.start` threw or was never reached, so `onRunning(false)` will not fire. */
       shiftInFlight = false;
       failRun(error);
+      /*
+       * The same failure, one step earlier: `shiftRunConfigOf` refusing the state is a day that
+       * cannot run, and the Everyday stage is owed the sentence exactly as it is on a worker's
+       * refusal (GitHub issue #593). No redraw from here: this is synchronous inside the press,
+       * and the Everyday stage — whose mount is where a press comes from — reads the host on the
+       * line after its own `startRun`. A notification from inside the press would re-enter it.
+       */
+      shiftFailure = error instanceof Error ? error.message : String(error);
     }
   }
 
@@ -6583,6 +6635,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * than whatever the editor happens to be holding now.
        */
       ruleRows: state.ruleRows,
+      /*
+       * The cars the tower's own schedule took out part-way through this run — GitHub issue #596
+       * item 3, § D983. Off the run's own resolved building (`resolvedBuildingOf` is
+       * `shiftRunConfigOf(...).building`), from `state` for `interventions`' reason: it is the
+       * building the legs on screen were simulated in, so the car the header names is the car the
+       * kernel stood down. A recording carries no mid-run schedule, which is why this is passed.
+       */
+      bookedOut: bookedOutCarsOf(resolvedBuildingOf(resources, state)),
       /*
        * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
        * one-field-and-one-caller fix.

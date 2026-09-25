@@ -35,7 +35,16 @@ import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { GoalObservations, WeekState } from '../shift/types.js';
-import { closeDay, openWeek, outcomeOf } from '../shift/week.js';
+import {
+  CAREER_CONTRACT_ID,
+  REPLAY_CONTRACT_ID,
+  RUSH_CONTRACT_ID,
+  closeDay,
+  openRush,
+  openWeek,
+  outcomeOf,
+  switchWeek,
+} from '../shift/week.js';
 import { PLAY_MODES, type PlayMode } from '../scope/types.js';
 
 import type { BrowserResources } from './data.js';
@@ -43,6 +52,7 @@ import {
   advancesTheWeek,
   closedWeekOf,
   initialState,
+  scenarioWeeksOf,
   weeksForSession,
   type ViewerState,
 } from './state.js';
@@ -287,5 +297,55 @@ describe('issue #64 — the session keeps the week on disk while a mode does not
       written.parkedWeeks.some((entry) => entry.contractId === written.week.contractId),
       'no parked week may carry the live week’s contract',
     ).toBe(false);
+  });
+});
+
+/**
+ * **A mode's own week never reaches the saved session** — GitHub issue #594, § D965.
+ *
+ * A rush sets `playMode: 'endless'`, which owns a week, so the rush week was written as the live
+ * week; `persist/validate.ts` then refused the whole session on the next load and a Midtown week
+ * with Monday closed came back as a fresh Garden Apartments Monday. Measured on the shipped bundle,
+ * and held end to end by `everyday/weekSurvives.browser.test.ts`; these are the pair's rules.
+ */
+describe('scenarioWeeksOf — GitHub issue #594', () => {
+  const midtown = { ...openWeek('c2'), day: 3, dayIdx: 2, completed: ['c1'] };
+
+  it('gives the parked Scenario week back when a rush is the live one', () => {
+    const inRush = switchWeek(midtown, [], RUSH_CONTRACT_ID, 'restart');
+    expect(inRush.week.contractId).toBe(RUSH_CONTRACT_ID);
+    const saved = scenarioWeeksOf({ week: inRush.week, parkedWeeks: inRush.parked });
+    expect(saved.week).toBe(midtown);
+    expect(saved.parkedWeeks).toEqual([]);
+  });
+
+  it('drops a mode week left in the parked list, for each of the three modes', () => {
+    for (const id of [RUSH_CONTRACT_ID, REPLAY_CONTRACT_ID, CAREER_CONTRACT_ID]) {
+      const saved = scenarioWeeksOf({ week: midtown, parkedWeeks: [openWeek('c1'), openWeek(id)] });
+      expect(saved.week).toBe(midtown);
+      expect(saved.parkedWeeks.map((week) => week.contractId)).toEqual(['c1']);
+    }
+  });
+
+  it('is the identity on a pair with no mode week in it', () => {
+    const pair = { week: midtown, parkedWeeks: [openWeek('c1')] };
+    expect(scenarioWeeksOf(pair)).toBe(pair);
+  });
+
+  it('keeps what was cleared when a mode week stands with nothing parked behind it', () => {
+    const saved = scenarioWeeksOf({ week: { ...openRush(), completed: ['c1', 'c2'] }, parkedWeeks: [] });
+    expect(saved.week.completed).toEqual(['c1', 'c2']);
+    expect(saved.week.contractId).not.toBe(RUSH_CONTRACT_ID);
+  });
+
+  it('weeksForSession writes the Scenario week during a rush rather than the rush week', () => {
+    const inRush = switchWeek(midtown, [], RUSH_CONTRACT_ID, 'restart');
+    const state: ViewerState = {
+      ...initialState(resources, 1n),
+      playMode: 'endless',
+      week: inRush.week,
+      parkedWeeks: inRush.parked,
+    };
+    expect(weeksForSession(state, undefined).week).toBe(midtown);
   });
 });

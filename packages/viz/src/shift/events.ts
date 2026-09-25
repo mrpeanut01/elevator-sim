@@ -63,12 +63,14 @@
  * `events.test.ts` still drives it. An event that wants a whole-shift hold declares one.
  */
 
-import type {
-  DemandLevel,
-  DirectionalSplit,
-  ResolvedBuilding,
-  SimulationDemandOptions,
-  TrafficProfile,
+import {
+  resolveDemandTemplate,
+  type DemandLevel,
+  type DemandTemplate,
+  type DirectionalSplit,
+  type ResolvedBuilding,
+  type SimulationDemandOptions,
+  type TrafficProfile,
 } from '@elevator-sim/core/browser';
 
 import { carsToDerate, type BankedBuilding, type CarRef, type Incident } from './incidents.js';
@@ -275,20 +277,74 @@ export function baseDemandOf(
   };
 }
 
+/**
+ * **Whether a demand template varies the directional mix within the run** — asked of `core`
+ * rather than of a list, GitHub issue #593.
+ *
+ * ## The defect this exists to end
+ *
+ * `core`'s `planDemand` refuses an explicit `directionalSplit` beside a template whose resolved
+ * form carries a `meanDirectionalSplit`, and it throws rather than let one of them win silently. The
+ * viewer had **two** answers to *does this template vary the mix?*, and neither was that one:
+ *
+ * - the event path in `dev/state.ts#shiftRunConfigOf` asked `demandTemplate === 'lunch-two-way'`,
+ *   a list of one; and
+ * - `shift/calendar.ts`'s bias decision asked whether the record declares
+ *   `directionalSplitAtStart`, which is how a **shape** template varies the mix and not how a
+ *   **phase-list** one does.
+ *
+ * `office-day` is a phase list whose every phase declares a mix, so `core` resolves it with a
+ * `meanDirectionalSplit` and both answers said *no*. It is the whole-day template thirteen of the
+ * sixteen contracts run in Scenario (`shift/dayLength.ts#wholeDayFor`), so every day that drew a
+ * wrinkle with a mix of its own — a fire drill, a conference, a coach party, eleven more in
+ * `data/wrinkles.json` — built a config `core` refused. The refusal went to a worker, the worker's
+ * failure went to the Engineer transport's error line under the Everyday cover, and the stage said
+ * *simulating today's day* for as long as anybody waited. Two assessors found it on day 3.
+ *
+ * ## Why `resolveDemandTemplate` and not a third reading of the record
+ *
+ * `planDemand` branches on `resolveDemandTemplate(id, templates).meanDirectionalSplit`, so that is
+ * the question asked here, through the same function, with the same arguments. A third reading
+ * of the record's fields would agree today and be the next list of one the day a template gains a
+ * new way to vary its mix. No overrides are passed: the viewer's only override on a shift is
+ * `durationS`, which refits the geometry and never adds or removes a mix, and a window selects
+ * phases with their mixes intact (`demandTemplate.ts#windowTemplate`'s own spread-or-omit).
+ *
+ * An id `core` cannot resolve answers `false`. Such a run fails in `core` on the id itself, with
+ * that id's own sentence, and naming a mix it cannot see would put a second, wrong reason beside it.
+ *
+ * Callers: `dev/state.ts#shiftRunConfigOf` (the event path) and `shift/calendar.ts`'s bias decision
+ * (the period path) — the two paths #593 found disagreeing, now one expression.
+ */
+export function demandTemplateVariesMix(
+  templateId: string,
+  templates: readonly DemandTemplate[],
+): boolean {
+  try {
+    return resolveDemandTemplate(templateId, templates).meanDirectionalSplit !== undefined;
+  } catch {
+    return false;
+  }
+}
+
 export interface ShiftRunPatchInput {
   readonly event: ShiftEvent;
   /** The building the shift is running — grown, if `grownBuilding` has been applied. */
   readonly building: ResolvedBuilding;
   readonly base: ShiftDemandBase;
   /**
-   * Whether this run's demand template varies the directional mix within the run
-   * (`lunch-two-way`, whose `meanDirectionalSplit` is declared).
+   * Whether this run's demand template varies the directional mix within the run —
+   * {@link demandTemplateVariesMix}'s answer, which is `core`'s.
    *
    * `core` **refuses** the combination: a template that varies the mix and an explicit
    * `directionalSplit` would each have to win silently, so `generateTrace` throws rather than
    * resolve it. An event that wanted to swing the mix under such a template therefore cannot, and
    * says so in {@link ShiftRunPatch.withheld} rather than producing a config that throws at run
-   * time. Default `false`, which is true of both templates the viewer runs.
+   * time. Default `false`; the one shipped caller that builds a run always passes it.
+   *
+   * **The default used to be described as true of every template the viewer runs, and it stopped
+   * being true when `office-day` became Scenario's day** — GitHub issue #593. `lunch-two-way` and
+   * `endless-rush` vary the mix too, and so does `office-day`.
    */
   readonly templateVariesMix?: boolean | undefined;
 }

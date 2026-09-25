@@ -1245,7 +1245,7 @@ candidates they list are what the rulings ruled *on*; the dispositions are here.
 | | question | ruling | owner, as the record names them | date | what remains |
 |---|---|---|---|---|---|
 | **Q1** | does the rate band bind player-facing content? | [§ D478](../DECISIONS.md) — **it binds the `demandLevel` selector and not authored content**; `gym-on-the-top-floor` is not out of compliance | product owner, delegated to the integrator | 2026-09-05 | the attached obligation: a case running outside its profile's band **says so on its own face**. Unbuilt; see § 13.3 row 6's note |
-| **Q2** | does a derived-state cover satisfy `charter` non-goal 10? | [§ D476](../DECISIONS.md) — **yes**. `PM-DOOR` stores nothing; a rule against memory does not reach a function of game state | product owner, delegated to the integrator | 2026-09-05 | one **playability condition**: skipping must advance the derived state, or a player who skips and reloads meets the screen they dismissed |
+| **Q2** | does a derived-state cover satisfy `charter` non-goal 10? | [§ D476](../DECISIONS.md) — **yes**. `PM-DOOR` stores nothing; a rule against memory does not reach a function of game state | product owner, delegated to the integrator | 2026-09-05 | one **playability condition**: skipping must advance the derived state, or a player who skips and reloads meets the screen they dismissed — **amended by [§ D993](../DECISIONS.md)** (2026-09-24): holds within a session; across a reload the first-visit cover carries a live route to the modes |
 | **Q3** | is the rush cut, demoted, or placed at minute one? | [§ D477](../DECISIONS.md) — **kept**; the fail state is the lobby overfilling; the ramp is traffic and/or breakdowns | product owner | 2026-09-05 | **CLOSED 2026-09-16 by [§ D626](../DECISIONS.md)** — demoted off the front door, beside the bench. #220 can build the mode without it, and the tile move is left to implementation |
 | **Q4** | which building carries the first session? | [§ D475](../DECISIONS.md) — **none of the three candidates.** *"Allow all eligible buildings to be 1st session, but rotate them randomly for players"* | product owner | 2026-09-05 | the eligibility **measurement**, per building, against #208's AC1–AC3; and a draw on a named stream with its seed recorded |
 | **Q5** | is `PM-PARK` a `viz` change or a `core` one? | **answered in the tree, not by a decision** — `packages/viz/src/render/carRest.ts`, which cites § 3.2 and § 9.4 by name. *Standing still* is an observable and is `viz`-only; *parked* is a claim about the dispatcher's intent and would be `core` | whoever picked up row 12, as § 12 assigns it | 2026-08-25 | nothing. See § 13.3 row 12 and § 13.4 claim 4 |
@@ -1330,7 +1330,7 @@ Run that across the set and the set is defined by measurement rather than by pre
 | row | rule | change | size |
 |---|---|---|---|
 | 2 | `PM-TT1` | Move the *How hard this looks* plate off the pre-run position, or reword it as configuration. `everyday/today.ts:63,254` computes 120 ÷ 2 = 60 against `COMFORTABLE_PER_CAR = 400`, and the 400 is a citation to the design prototype rather than a measurement — that module's own docstring says so. It is a whole-day verdict at `t = 0`, which is `PM2` inverted twice over | **Small**, copy-and-ordering — **and it is the only one of the fourteen blocked by no product decision at all** |
-| 14 | `PM-DOOR` | The first-run sequence as a **cover** over the Everyday menu, conditioned on derived state rather than a stored flag, skippable | **Large**, and **no longer blocked**: § D476 rules the cover satisfies `charter` non-goal 10, with one playability condition — skipping must advance the derived state |
+| 14 | `PM-DOOR` | The first-run sequence as a **cover** over the Everyday menu, conditioned on derived state rather than a stored flag, skippable | **Large**, and **no longer blocked**: § D476 rules the cover satisfies `charter` non-goal 10, with one playability condition — skipping must advance the derived state (**amended by [§ D993](../DECISIONS.md)**: the skip files nothing now) |
 
 AC4 is unchanged as the tester gate ([§ D349](../blob/main/DECISIONS.md)).
 
@@ -1367,7 +1367,9 @@ has never finished a day, which is most of what a first run is."*
 must advance the derived state.* Otherwise a player who skips the cover, reloads and meets it again
 has been handed a screen they already dismissed, and [§ D456](../blob/main/DECISIONS.md)'s second
 test asks whether the player can still play. The cheapest form § D476 names: **the skip starts the
-day**, so the state conditioning the cover has moved before anything could reload.
+day**, so the state conditioning the cover has moved before anything could reload. *(**Amended by
+[§ D993](../DECISIONS.md)**, 2026-09-24: that form filed a scored day on a tower the player never
+saw, and is withdrawn.)*
 
 **Cost, carried rather than summarised:** docs/35 § 10 row 14 — `everyday/`, `menuPanel.ts#coverShell`'s
 shape — sized **Large**. It was marked *blocked on a product-owner decision*; it is not blocked now.

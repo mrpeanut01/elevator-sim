@@ -484,6 +484,12 @@ export interface PlayerControlWords {
   readonly atZero?: string | undefined;
   /** The high end. */
   readonly atFull?: string | undefined;
+  /**
+   * A categorical control's values in words, keyed by the declared value — so a select on an
+   * Everyday surface names *one car for each call* and never prints `single-car`. Present on a
+   * categorical row an Everyday surface draws as a select; § D1000.
+   */
+  readonly values?: Readonly<Record<string, string>> | undefined;
 }
 
 /**

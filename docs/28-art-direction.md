@@ -503,9 +503,22 @@ transport.**
 
   **Both figures were sixfold smaller at `30×`** — 60 real seconds and a 20-minute day — and the
   move is stated rather than absorbed, because it is the one real cost of the new opening rung.
-  `office-day` is the only one of the seven templates with a phase schedule, it is not what the
-  Everyday content runs, and § 2.3's skip control and the chips are the answer to it; none of which
-  makes 7.5 minutes of an empty lobby a thing to leave unsaid.
+  `office-day` is the only one of the seven templates with a phase schedule, and § 2.3's skip
+  control and the chips are the answer to it; none of which makes 7.5 minutes of an empty lobby a
+  thing to leave unsaid.
+
+  **Both halves of that paragraph have since moved, and the correction is kept beside the figures it
+  corrects** ([§ D227](../DECISIONS.md)). *"It is not what the Everyday content runs"* was already
+  stale when [§ D991](../DECISIONS.md) found it: § D356 made the Everyday daily loop run the whole
+  authored day, and **13 of the 16 contracts run `office-day`**. And the 7.5 real minutes is now
+  **60 real seconds** again, for a different reason than before: under § D991 (GitHub issue #592) a
+  whole day's stage plays its three peaks at the player's rung and crosses the hours between them —
+  the quiet head among them — at `30×`, so 08:00–08:30 is 1 800 s ÷ 30 = 60 s, and the whole day is
+  **40–51 minutes** at `4×` on the game's own towers rather than 2.5 hours (measured over every
+  contract × fifty seeds; the longest reference tower, held all day, is 1 h 49). That is a transport change keyed to the
+  record's own schedule, which is § 5.3's *"the empty stretch is a transport problem and is fixed
+  with the transport"*; the playhead is never moved, so reason 2 above is untouched. [§ D641](../DECISIONS.md)
+  carries the same stale sentence and, as a decision entry, is not rewritten.
 
   So the empty opening is **template-shaped**, it is one minute rather than the several #212's
   wording implies, and on the most common shipped run it does not exist. **The fix, where one is

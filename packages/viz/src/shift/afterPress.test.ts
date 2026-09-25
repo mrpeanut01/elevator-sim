@@ -263,20 +263,38 @@ describe('the sheet', () => {
     const pressed = sheet([pressAt(0.4, PARK)]);
     expect(untouched.diagnosis.map((row) => row.id)).not.toContain(AFTER_PRESS_ROW_ID);
     expect(pressed.diagnosis.map((row) => row.id)).toContain(AFTER_PRESS_ROW_ID);
-    // The two rows the section has always had keep their order and their place, because
-    // `render/reportCard.ts` draws `diagnosis[0]` and nothing else moved.
-    expect(untouched.diagnosis.map((row) => row.id)).toEqual(['peak-queue', 'peak-phase']);
-    expect(pressed.diagnosis.map((row) => row.id)).toEqual([
-      'peak-queue',
-      'peak-phase',
-      AFTER_PRESS_ROW_ID,
-    ]);
+    // The rows the run's own reading draws keep their order and their place, because
+    // `render/reportCard.ts` draws `diagnosis[0]` — the press row goes last and moves nothing above
+    // it. On a missed day those rows open on the goals missed (§ D983), which this sheet's is.
+    for (const sheetIds of [
+      untouched.diagnosis.map((row) => row.id),
+      pressed.diagnosis.slice(0, -1).map((row) => row.id),
+    ]) {
+      expect(sheetIds).toContain('peak-queue');
+      expect(sheetIds[sheetIds.length - 1]).toBe('peak-phase');
+    }
+    expect(pressed.diagnosis[pressed.diagnosis.length - 1]?.id).toBe(AFTER_PRESS_ROW_ID);
   });
 
   it('draws it in the sheet’s own clock, not in a second one', () => {
     const press = pressAt(0.4, PARK);
     const row = sheet([press]).diagnosis.find((candidate) => candidate.id === AFTER_PRESS_ROW_ID);
     expect(row?.when).toBe(clockRange(press.atS, run.endedAt, DAY_START_S));
+  });
+
+  it('carries no verdict word on the unpaired row — § D900’s row stays byte-identical', () => {
+    /*
+     * § D982 prints both runs' verdicts on the **paired** row only. A sheet filed with no pair —
+     * every sheet here — keeps § D900's sentence, and that sentence never said *cleared* or
+     * *missed*: the banner above it does, once.
+     */
+    const row = sheet([pressAt(0.4, PARK)]).diagnosis.find(
+      (candidate) => candidate.id === AFTER_PRESS_ROW_ID,
+    );
+    for (const line of ['Shift cleared', 'Shift missed', 'Too quiet to grade']) {
+      expect(`${row?.what ?? ''} ${row?.why ?? ''}`).not.toContain(line);
+    }
+    expect(row?.why.endsWith(AFTER_PRESS_DISCLAIMER)).toBe(true);
   });
 
   it('draws the same press the log above it names', () => {

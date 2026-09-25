@@ -31837,6 +31837,8 @@ measurement rather than by preference, and it may turn out to be small.
 
 ## D476 — a first-run cover conditioned on derived state is not the override non-goal 10 forbids
 
+> **Status 2026-09-24: CONDITION AMENDED by [§ D993](#d993)** — the ruling stands; the cheapest form (the skip files a day) is withdrawn. The condition holds within a session; across a reload it is replaced by: the first-visit cover always carries a live route to the mode picker.
+
 **Date: 2026-09-05 · Owner: delegated to the integrator by the product owner, *"use your best
 judgement that will benefit game playability"* · Rules on: `docs/35` Q2, `charter` non-goal 10,
 [§ D335](#d335).**
@@ -34703,6 +34705,11 @@ once**."*
    mode when they reach the menu. [§ D476](#d476)'s mechanism ruling is untouched and still binds —
    the cover is conditioned on derived state rather than a stored flag, and **skipping must advance
    that state**, so a player who skips and reloads does not meet the screen they dismissed.
+   *(2026-09-24: this clause is **read, not overruled**, by [§ D993](#d993), an agent ruling — its
+   stated purpose is kept: the cover stays derived and stores nothing, and across a reload the
+   cover a player meets carries a live route to the modes. One of the three swarm members dissented
+   and read § D993 as **narrowing** this clause's *"skipping must advance that state"*; that
+   dissent is recorded so the owner can see it.)*
 4. **A worked answer is permitted in the tutorial and nowhere else.** No hint control, no suggested
    fix, no diagnosis line, and no *here is what we would have done*, in any scenario, in any mode, at
    any ladder position. Screen two shows a worked answer and [§ D525](#d525) clause 2 retires
@@ -38905,6 +38912,8 @@ This lane held **D701–D705** and spent **D701** only. **D702, D703, D704 and D
 
 ## D706 — The fix-case repair menu retires from the screen and not from the file: the diagnosed repair becomes the scenario's pinned witness, the decoys survive as prices, and all three retirements wait for the editor that can write the answers
 
+> **Status 2026-09-24: NARROWED by [§ D1001](#d1001), and its § 1 re-measured by [§ D1000](#d1000).** `tenant-floors` is offered as case-authored cohorts rather than a per-floor population control, and the editor now writes all eighteen answers; the retirement still waits on § 7's playtest. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken by an agent session under authority delegated by the session principal on 2026-09-19, not by the product owner.** It **narrows** [§ D525](#d525) clause 2 in one place, named in § 4 below, and conditions the rest of it on a measurement. `docs/39` § 2 carries the row and § D525 carries the marker, on this commit.
 
 **Date: 2026-09-19 · Narrows [§ D525](#d525) clause 2 · Reads it together with [§ D525](#d525) clause 3 · GitHub issues [#233](https://github.com/mrpeanut01/elevator-sim/issues/233), [#177](https://github.com/mrpeanut01/elevator-sim/issues/177) item 7 · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.1, [`docs/12`](docs/12-design-handoff.md) § 4.15, [`docs/39`](docs/39-decisions-in-force.md) §§ 2 and 3, [`docs/37`](docs/37-content-plan.md) § 5.2, `data/fixit-cases.json`, `data/price-schedule.json`, `packages/viz/src/fixit/parse.ts`, `packages/viz/src/fixit/types.ts`, `packages/viz/src/fixit/cases.test.ts`, `packages/viz/src/everyday/fixitScreen.ts`, `packages/viz/src/dev/fixitPanel.ts`.**
@@ -42388,3 +42397,644 @@ So § D961 pinned a sweep **over rungs that § D914 then moved**. Neither lane w
 ### What this deliberately does not move
 
 **No rung, no bar and no threshold.** § D914's rebalance is measured and deliberate; this entry makes the measurement *of* it current. `shift/goals.ts#GOAL_BARS` is untouched, `data/contract-ladder.json` is untouched, and § D512's *more than a third of fifty seeds* is untouched. The band, the window and the union in `legibilityOf` are untouched. **§ D961 is not rewritten**: its table is a dated record of the tree it was taken on, and `legibility.ts` carries both columns for the same reason.
+
+---
+
+## D964 — a career day stands on a week of its own, and the Scenario record is parked behind it
+
+**Date: 2026-09-24 · Owner: wave AH lane A · GitHub issue [#594](https://github.com/mrpeanut01/elevator-sim/issues/594) · Rules on: `docs/38` § 2.2 (*the week and the career are separate records*), [§ D510](#d510)'s take-offer, and the career's run pipeline as [§ D507](#d507) and GitHub issue #563 left it.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: the decision is taken in `everyday/host.ts` and binds `shift/week.ts` (a new sentinel), `everyday/shell.ts` (the release on the way out), `everyday/stageScreen.ts` (the entry press), `everyday/campaignScreens.ts` (what the desk grades) and, through `shift/ladder.ts#rungFor`, which rung a career run is handed.
+
+### What was wrong, measured on the shipped bundle
+
+A Midtown Office week with Monday closed, then Career → *Look in* → *Lock it in and run day 1* → skip → *Close the day*, then back to Scenario's front door: the selected tower still read `c2`, and the seed line read **`tower garden-apartments · crowd 17929870023189047903`** over a week strip reading **`MON garden-apartments 100%`** where Midtown's 90 % had been. `runCampaignDay` wrote the tower's building, dispatcher, derived crowd and **the tower's day over `ViewerState.week`**; `dev/main.ts#closeShift` then filed the career's run into that week, replacing Monday. Nothing about the front door was wrong — it read the week it was given.
+
+From fresh storage the route was worse: the stage's entry rule found the boot run open to nobody's choice and pressed `host.startRun()` over the career run already in flight. That press is § 6's and disarms the career latch by design, so the career day filed into the Scenario week and **nothing** into the career — assessor D's *MON Garden Apartments 100 %* on a player who had never opened Scenario.
+
+### The ruling
+
+1. **A career day parks the Scenario week behind `shift/week.ts#CAREER_CONTRACT_ID`**, with `switchWeek`, exactly as a rush and a replay already park it. The career's own days are filed there and kept per tower for the page's life (`EverydayHost.campaignHistory`), which is what the desk's *was* column now reads instead of the Scenario week's Monday.
+2. **What the career press overwrites is held and put back** — building, dispatcher, crowd, held cars, kit, event, length, window, the intervention log, and the recording, report and tomorrow card a filed career day replaces. Taken on the first career press of a sitting, released by `EverydayHost.leaveCareer`, which the shell calls on any navigation out of § 8's five screens and on the leave strip; and every Scenario press on the host (`startRun`, `openTomorrow`, `chooseTower`, `startReplay`, take-offer, and `playPressDay`, which lane AH-B wrote and the integrator added to this list) releases first, so a path that skips the shell cannot act on the career's state.
+
+   **`startRush` was on that list as the lane wrote it and is not on it as merged.** A rush stands on a week of its own and parks whatever week it is pressed from, the career's included, and `leaveRush` puts that week and the run it interrupted back; releasing on the rush's press threw the campaign day away, which [§ D548](#d548) clause 5 rules against (*leaving the rush hands the campaign day back as the day had it*, held by `everyday/rushCrowd.test.ts`). The integrator kept the older clause because this entry does not mention it. **Say the limit of that plainly:** in the product a player reaches the rush through the shell, and the shell's navigation release above ends a career day on the way out of § 8's screens, so the host-level guarantee holds for a press made while the career day stands and the shell's path still ends it. Whether a standing career day should survive a detour into another mode is a question about the game, and it is queued for a decision swarm rather than settled here.
+3. **The stage never re-presses a day that is already coming**, and in the campaign context its entry press is `runCampaignDay` for the latched tower rather than `startRun`.
+4. **The desk grades only a career day's run** — the latched tower's, once it has landed. A rush just left read *1 of 4 holding* on a tower with no career day run; it now reads *nothing run yet today*.
+
+### What moves, said rather than found later
+
+**Which rung a career day is handed.** The career borrowed the Scenario week's contract id, so `rungFor` handed it a rung only when the player's Scenario tower happened to be the career tower's contract — on Garden Apartments with a Midtown week, the tower ran **as built**. A week on no contract borrows the building's own rung, so a career day is now handed over as its contract hands it over whichever Scenario tower the player is on. That is a change to career runs for every player whose Scenario week is on a different tower, and it is the direction `docs/38` § 2.2 asks for: a career day is a function of the career, not of an unrelated record.
+
+**The *was* column after a reload reads the em dash.** The career persists and its per-tower weeks do not — carrying them would need a `CAREER_SCHEMA_VERSION` bump that quarantines every save, the cost `careerSeedBase` already declines for the same reason. An em dash is no reading; the Scenario week's Monday was a wrong one.
+
+### What this deliberately does not move
+
+**[§ D510](#d510)'s take-offer still moves the Scenario week**, and it is the one Career action that does. The offer card says so in the player's words — *taking it starts a fresh week on this building; the week you are on is parked, not lost* — so it is an announced write rather than a silent one, and removing it is a ruling on § D510 that is the product owner's to make, not a lane's. What changed is only that it now releases a standing career day first, so the week it parks is the Scenario week and not the career's slot.
+
+---
+
+## D965 — a mode's own week is never written to the saved session, and one found there is taken off
+
+**Date: 2026-09-24 · Owner: wave AH lane A · GitHub issue [#594](https://github.com/mrpeanut01/elevator-sim/issues/594) · Rules on: [§ D231](#d231)'s *a mode that does not own a week does not write one*, and `persist/validate.ts`'s closed set of ids a week may name.**
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it binds `persist/validate.ts`, `dev/state.ts#weeksForSession` and `dev/main.ts`'s restore, and it widens a set `validate.ts` documents as deliberately closed.
+
+### What was wrong, measured on the shipped bundle
+
+A Midtown week with Monday closed, a rush started, a reload: the front door opened on **`c1`, a fresh Garden Apartments Monday, on today's date's crowd**. The saved session held `{"contractId":"rush","day":1}` as the live week with Midtown parked behind it. A rush sets `playMode: 'endless'`, which `advancesTheWeek` answers `true` for, so the rush's week was written as the player's; and neither `rush` nor `replay` is in `validate.ts#namesSomething`, so the next load refused the whole session as *banked toward assignments this build no longer has* and cleared it — Midtown with it. A rush or replay **left** behind did the same from the parked list, which is how a player can lose a week without ever reloading mid-mode.
+
+### The ruling
+
+`shift/week.ts#MODE_WEEK_CONTRACT_IDS` names the three weeks a mode stands on — rush, replay, career — and `dev/state.ts#scenarioWeeksOf` takes them off a pair: a mode week parked is dropped, and a mode week live gives way to the last parked week that is not a mode's, which is the Scenario week `switchWeek` parked when the mode began. It runs on the way **out** (`weeksForSession`, both arms) and on the way **in** (`dev/main.ts`'s restore), and `validate.ts` now reads the three ids so that a session an earlier build wrote is repaired rather than refused. Identity-preserving when there is nothing to take off, so every ordinary save writes exactly the objects it did.
+
+**This does not rescue a week already lost.** The refusing load cleared the bytes, as `persist/` does on every non-`absent` failure; what a player lost before this commit is gone. What changes is that it cannot happen again, and that a session written mid-rush by the build still deployed today comes back as the week rather than as a refusal.
+
+---
+
+## D966 — whether a demand template varies the mix is `core`'s answer on both paths, and a day that cannot simulate says so
+
+**Date: 2026-09-24 · Owner: wave AH lane A · GitHub issue [#593](https://github.com/mrpeanut01/elevator-sim/issues/593) · Rules on: `shift/calendar.ts`'s bias refusal and `shift/events.ts`'s mix refusal, both written for `lunch-two-way`.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: one predicate now decides for `dev/state.ts`, `shift/calendar.ts` and `shift/events.ts`, and the failure it could cause reaches `dev/main.ts`, `everyday/host.ts` and the stage.
+
+### What was wrong
+
+`core`'s `planDemand` refuses an explicit `directionalSplit` beside a template whose resolved form carries a `meanDirectionalSplit`. The event path asked `demandTemplate === 'lunch-two-way'` and the calendar asked whether the record declares `directionalSplitAtStart`, which is how a shape template varies the mix and not how a phase list does. `office-day` — the whole day thirteen of sixteen contracts run in Scenario — declares a mix on every phase, so both said *no*, and every day that drew a wrinkle with a mix of its own sent `core` a config it refused. The worker's refusal went to the Engineer transport's error line under the Everyday cover, and the stage said *simulating today's day* indefinitely. Reproduced on Midtown Office at day 3 on the built bundle, as the assessors found it.
+
+**It was not only the fire drill, and it was not only the event path.** Swept over every contract × days 1–21 × every starting weekday (2 352 cells) and handed to `core`'s own `planDemand`, the old predicates built **1 157 refused configs, every one on a whole-day tower**: the week's own draw produced fifteen wrinkles that set a mix — fire-drill, conference, caterers, goods-inward, evacuation-drill, shift-change, contractors, all-hands, audit-day, flu-day, open-day, late-finish, and the three weekend events — and every one of the fifteen hit it. (`coach-party` sets a mix too and is drawn only by a career's calendar, which runs no whole day.) And the **period path** was wrong too, measured with only its predicate reverted: `moving-week` and `vacation` built **182** refused configs through `calendarPatch`'s own bias alone — every one of their seven days on all thirteen whole-day towers — in the guard the issue believed was right. (With both reverted the calendar sweep read 208; the other 26, on `public-holiday`, are the event path under a period.)
+
+### The ruling
+
+`shift/events.ts#demandTemplateVariesMix` asks `resolveDemandTemplate(id, templates).meanDirectionalSplit` — the expression `planDemand` branches on — and both paths call it. `shift/wholeDayEvents.test.ts` holds the sweep against `core` rather than against the predicate, so it is not circular. And a failure is no longer silent: `EverydayHost.runFailure` carries the engine's sentence for a failed run of the player's own, and the stage draws `stageScreenModel.ts#stageRunFailedViewOf` — the day could not be simulated, the fault is the game's, *Try the day again* or back to the flow's own set-up screen — instead of waiting.
+
+**What it does not do.** A day that genuinely cannot simulate does not advance the week: *back* returns to the front door on the same day. Letting a player file a day nobody watched would be a ruling on the week's arithmetic, and with the cause fixed the sweep says no shipped Scenario day reaches that state.
+
+---
+
+## D973 — a day a press decides is chosen from the front door, and every sentence about it checks the horizon the press will run
+
+**Date: 2026-09-24 · Owner: build lane AH-B (wave AH) · GitHub issue [#595](https://github.com/mrpeanut01/elevator-sim/issues/595) · Amends [§ D912](#d912) and [§ D914](#d914) rather than replacing either · Binds `packages/viz/src/shift/ladder.ts`, `shift/dayLength.ts`, `shift/firstSession.ts`, `everyday/towerChoice.ts`, `everyday/host.ts`, `everyday/today.ts`, `everyday/doorScreen.ts`, `everyday/briefScreen.ts`, `everyday/scenarioModel.ts`, `everyday/weekView.ts`, `everyday/buildNotes.ts`, `everyday/briefView.ts`, `everyday/doorView.ts` and `honesty/surfaces.ts`, so it is an entry rather than a docstring ([§ D405](#d405)). Cites [§ D227](#d227), [§ D256](#d256), [§ D729](#d729), [§ D730](#d730).**
+
+**Decision.** The front door carries a second list under the tower picker, *Days a press decides*: one row per contract whose rung pins a `ContractPressDay`. Pressing a row moves the week the way the tower list does (`switchWeek`, `resume`), writes the pinned seed and hands the day back to the tower's standing order — so the next run press is the day `shift/pressLadder.test.ts` measured, reached with no address parameter. Choosing an ordinary tower afterwards puts the session's own crowd back. A pin now says which **horizon** it was measured on, and one shared predicate, `shift/ladder.ts#pressDayStanding`, decides whether the run about to be pressed is the pinned day: contract, day 1, the ordinary wrinkle, no calendar period, the pinned seed, **and the horizon the Scenario press runs that tower on** (`shift/dayLength.ts#scenarioHorizonFor`). The picker offers a row by it and the brief's moot sentence is drawn by it, so neither can describe a day the other would not call the pinned one.
+
+**The two findings, as the brief put them.** Wave AG's picker (§ D912) moved the week and left the crowd on the date's seed, and only `n = 0` of `20 260 824 + 7 919 n` is a date — so the pinned days were reachable only through `?seed=`, and `today.ts`'s moot sentence was gated on exactly that seed. And five of the seven pins (`c2`, `c3`, `c6`, `c9`, `c10`) were measured on `shiftLengthForContract`'s 1 800 s slice of towers `everyday/host.ts#startRun` runs as a 36 000 s authored day, so on those five the gate matched a seed over a run that was never measured.
+
+**Why a named choice rather than authoring the property onto date seeds.** The date seed changes daily and the tower is the week's, so a property authored onto a date is met only by a player whose week happens to stand on that tower's first day on that date — which is the reachability defect § D912 was written about, one layer down. A choice on the door is met by anybody who reads the door. The cost is stated on the row before the press: the crowd is the pinned one rather than the day's, and the seed line and the door's rule both say so (`today.ts#seedLineOf` already had the arm; `doorView.ts#DOOR_RULE` now names the exception).
+
+**What a row refuses, and why each refusal is a row rather than an absence.** A week there past its first day (`pastFirstDay`, never a `restart` — § D912's reason); a pin on the other horizon (`otherHorizon`); and a first day that would not run as measured — a wrinkle or a calendar period (`notAsMeasured`). The refused row is drawn disabled with its reason inside it, the tower list's own precedent for its selected row.
+
+**Absent reads as `'period'`, and that is a fact about the data rather than a fallback.** Every pin authored before the field existed was measured by § D914 on the slice. So on the shipped ladder **only `c7` and `c8` are offered** — a hotel and a hospital have no authored day, so the Scenario press plays them on the slice they were pinned on — and the five office rows are refused with `otherHorizon`. `towerChoice.test.ts` asserts, over the shipped data and the product's own horizon rule, that the rows offered are exactly the pins whose horizon agrees with their tower's, which holds before and after those five are re-measured.
+
+**The re-measurement is prepared and not applied here.** Re-pinning the five on the whole day is a `data/contract-ladder.json` edit, and this lane's permission to write that file was refused; the integrator is putting the edit to the owner. It travels as one atomic patch — the data, the `contractLadderIssues` check that refuses a pin on the wrong horizon (which rejects the current data, so it cannot land without it), the always-on cases that assert the new pins, and the browser case for a whole-day pin — so the tree is green in either state and never in between. Its figures are the patch's to publish and are not repeated here.
+
+**The picker falsified four sentences, and a sweep found two more.** Corrected, each in its own docstring: the Scenario hub's *"the same day for everybody"*; the week screen's board rule *"One tower, one crowd, one seed, everybody"*, true of the board and read as a claim about the player's week; the build-notes register's *"nothing moves you to the day’s tower once you have started"*; and the first-session line's *"the crowd number above is the draw, so the same number opens the same tower"*, which now has a second arm, `FIRST_SESSION_LINE_CHOSEN`, picked by asking the draw itself whether it would have opened the tower (`firstSession.ts#firstSessionLineFor`). The sweep's two: the brief's wrinkle line *"Everyone playing today gets the same one"* — the wrinkle is drawn from the day of the week, not the date, so players on different days of their weeks meet different ones — and the door's rule, which now names the pinned-day exception to *one crowd a day*.
+
+**What this does not claim.** A pinned day is one crowd under one standing order with one press at one moment. Nothing on the door says which press clears it, and nothing says a press decides a tower's days in general: § D914's own fifty-seed measurement found the press flipping the verdict in a minority of pairs with no tower's effect distinguishable from zero.
+
+---
+
+## D974 — five of § D914's pins are re-measured on the whole day the Scenario press runs, with the press moved into the lunch peak
+
+**Date: 2026-09-24 · Owner: build lane AH-B (wave AH) · GitHub issue [#595](https://github.com/mrpeanut01/elevator-sim/issues/595) · Amends [§ D914](#d914)'s table for `c2`, `c3`, `c6`, `c9` and `c10`; § D914 is not rewritten · Binds `data/contract-ladder.json`, `packages/viz/src/shift/ladder.ts`, `dev/data.ts`, `shift/ladder.test.ts`, `shift/pressLadder.test.ts` and `everyday/pressDayChoice.browser.test.ts`, so it is an entry rather than a docstring ([§ D405](#d405)). Applied by the integrator at integration on the owner's authorisation; the lane's own permission to write the data file was refused, so the lane prepared and verified it as one atomic patch rather than writing it. Cites [§ D256](#d256), [§ D973](#d973).**
+
+**Decision.** The five pins § D914 took on the 1 800 s slice of towers the Scenario press runs as a 36 000 s authored day are re-measured on that day, each declares `"horizon": "whole-day"`, and `c7` and `c8` declare `"period"`, which is what they always were. `contractLadderIssues` now refuses a pin whose horizon is not the one the Scenario press runs its tower on, so the defect cannot return by a pin going stale under a horizon that moved. With this, all seven rows of § D973's front-door list are offered.
+
+**The press moves from 0.28 of the run to 0.43 on a whole day, and the reason is the stage, not the verdict.** Wave AH's stage-pace ruling plays a whole day's three peaks at the player's own speed and crosses the hours between them at thirty times, holding the player's speed outside a peak only while somebody on a landing has waited at least sixty seconds. 0.28 of the day is 10 080 s, 10:48, outside every peak — so a pin there is a press a player makes in fast-forward unless somebody happens to be waiting that long, which is no more reachable than a press behind `?seed=`. 0.43 is 15 480 s, 12:18, inside the lunch peak (15 300–17 100 s), so the press is made at the player's speed by construction rather than by the seed's luck. `pressLadder.test.ts` derives the peaks from `office-day`'s own phases and fails a whole-day pin outside them. **The lunch peak sits inside every one of the five rungs' booked-out car** (0.25–0.5 of the day, 10:30–13:00), so the press now coincides with the outage on all five. Whether that is *why* a press decides these days is not measured, and no mechanism is offered.
+
+**The protocol.** Day 1 under `collective`, `campaignEventId: 'ordinary'`, no calendar, through `shiftRunConfigOf` and `recordRun` exactly as the product builds the day; seeds `20 260 824 + 7 919 n`; three arms — as built, *spread the cars* at 0.43, *park the cars in the lobby* at 0.43. A pin is the **first** `n` in the searched range where the day misses as built, one press clears it, the other press still misses, and both presses move the legs. Each pin was then re-run on `dayReportOf`'s verdict line, with the boardings before the press compared between arms, and censused under all thirteen shipped profiles as built. Instruments: `shift/pressLadder.sweep.test.ts`'s sweep, verify and census modes with `PRESS_LADDER_HORIZON=whole-day`.
+
+| contract | tower | seed (`n`) | as built | the press that clears | the press that does not | prefix before the press | clear as built |
+|---|---|---|---|---|---|---|---|
+| `c2` | Midtown Office | 20 276 662 (2) | **missed**, 690 s | *spread the cars* — **cleared**, 424 s | *park in the lobby* — missed, 483 s | identical | 10 of 13 |
+| `c3` | Secure Tower | 20 482 556 (28) | **missed**, 502 s | *spread the cars* — **cleared**, 377 s | *park in the lobby* — missed, 490 s | identical | 9 of 13 |
+| `c6` | Chancery House | 21 100 238 (106) | **missed**, 480 s | *spread the cars* — **cleared**, 420 s | *park in the lobby* — missed, 480 s | identical | 8 of 13 |
+| `c9` | Harbour Point | 20 941 858 (86) | **missed**, 555 s | *spread the cars* — **cleared**, 369 s | *park in the lobby* — missed, 481 s | identical | 10 of 13 |
+| `c10` | Ashgate Mixed-Use | 20 355 852 (12) | **missed**, 510 s | *park in the lobby* — **cleared**, 374 s | *spread the cars* — missed, 546 s | identical | 9 of 13 |
+
+The seconds are the day's worst wait; the verdicts are the sheet's. On every row the deciding goal is the worst wait (460 s on a whole day), so the seconds and the verdicts agree here — unlike § D914's `c6` and `c9`, where the queue decided.
+
+**How rare the property is, stated so nobody reads the table as a rule.** Over the searched seeds, counting days whose verdict a press changes in either direction:
+
+| contract | seeds searched | missed as built | spread rescues / breaks | lobby rescues / breaks | two-sided days |
+|---|---|---|---|---|---|
+| `c2` | 50 (`n` 0–49) | 29 | 8 / 3 | 2 / 1 | 8 |
+| `c3` | 50 (0–49) | 23 | 2 / 7 | 2 / 7 | 2 |
+| `c6` | 70 (0–59, 100–109) | 28 | 5 / 6 | 4 / 6 | 1 |
+| `c9` | 99 (0–89, 100–108) | 52 | 2 / 6 | 1 / 7 | 1 |
+| `c10` | 50 (0–49) | 23 | 2 / 5 | 2 / 7 | 2 |
+
+On four of the five a press **breaks** a clean day about as often as it rescues a missed one, or more often. These are verdict counts on single days with no interval and no comparison between presses, and none is offered: a pinned day is one crowd, which is § D914's own caution. `c6`'s range has a gap (`n` 60–99 unsearched), so its pin is the first *found*, not the first in the sequence. The other four are the first in a contiguous range from `n = 0`. **Every wall-clock figure from this sitting is withheld**: the box ran at a load average of 40–130 on four cores while it was taken.
+
+**What moved against § D914, and what is not concluded from it.** `c6` is cleared by *park in the lobby* on its slice pin and by *spread the cars* on its whole-day pin, and `c10` the other way round. § D914 read its four-and-three split as *"the right verb is a property of the building"*. Across horizons, moments and seeds these pins do not support that, and they do not refute it either: one day per cell cannot tell a building's property from a seed's.
+
+**Considered and not taken.** Keeping 0.28 and showing, per seed, that somebody had waited sixty seconds at 10:48, so the stage would hold the player's speed. It was measurable — the verify mode records the longest standing wait at the press — but it would make reachability depend on each seed's queue at one instant, where a moment inside a peak makes it depend on the day's schedule. The recorded waits at 0.43, 12.2–33.6 s on the five pins, are below sixty, and do not need to be.
+
+**No rung, no bar, no threshold.** Lettings, crowds, occupancy, the booked-out cars, `intent` and every note are byte-identical. `shift/goals.ts#GOAL_BARS` is untouched. `c7` and `c8` keep their seeds, verbs and 0.28, because the stage-pace rule applies only to whole days.
+
+---
+
+## D982 — the paired after-press row prints both runs' verdicts, graded by the sheet's own grader, and amends § D931 clause 3
+
+**Date: 2026-09-24 · Owner: LANE-AH-C (wave AH) · GitHub issue [#596](https://github.com/mrpeanut01/elevator-sim/issues/596) item 1 · Amends [§ D931](#d931) clause 3 rather than editing it · Rules on `packages/viz/src/shift/afterPress.ts`, `shift/counterfactual.ts`, `shift/report.ts`, `shift/goals.ts` and `honesty/surfaces.ts`. Cites [§ D900](#d900), [§ D227](#d227), [§ D256](#d256), [§ D343](#d343), [§ D405](#d405).**
+
+**Why an entry.** Two of [§ D405](#d405)'s grounds: it **moves something already recorded** — § D931 clause 3 says in terms *"No verdict either"* — and it binds `shift/report.ts`'s grader and the honesty corpus, neither of which `shift/afterPress.ts` owns. § D931 is left exactly as written; this entry is what changed.
+
+### 1. The ruling this implements, and the measurement behind it
+
+A decision agent of wave AH ruled on this question with a measurement, and its ruling binds the lane. The measurement: **7 press-day contracts** (§ D914's c2, c3, c6, c7, c8, c9, c10) × seeds `20 260 824 + 7 919 n`, n = 0…49 × **3 arms** (as built, *spread the cars*, *park the cars in the lobby*), day 1 under each contract's standing order with the press at the pinned `pressAtFraction` — **1 050 day-long simulations**. Every pair passed all six of `pressCounterfactualOf`'s grounds, and all seven pinned days reproduced § D914's table.
+
+- The press changes the verdict in **126 of 700** pairs, in both directions: 72 missed days cleared, 54 cleared days missed.
+- When the pressed run **cleared**, the run without the press **also cleared in 296 of 368** (80 %). The sheet printed *Shift cleared* in the banner and nothing answering *would it have cleared anyway?*, so *my press cleared the day* — false four times in five — was left standing. That is `docs/43` P3's *a theory the game neither confirms nor denies*.
+- The pair's only moving figure, long waits, points **against** the verdict in 27 of the 126 flips, including c2's pinned day (82 → 96 on a day the press cleared).
+- No tower × verb cell's verdict effect is distinguishable from zero at 50 crowds (exact sign test on the discordant pairs, p ≥ 0.13). **That test is justification for this ruling only and is printed nowhere in the product**: it is a sign test over 50 seeds, not a paired-t interval over a metric, and no shipped surface is entitled to it.
+
+### 2. What the row now says
+
+On every **paired** row, after the three counts: *"Graded against the same goals, this run reads Shift cleared; the run without that press, over its own whole day, reads Shift missed on the worst-wait goal."* and the note gains one clause, `AFTER_PRESS_VERDICT_NOTE`: *"The two verdicts are the same kind of fact as the counts: how this crowd's day was graded with that press and without it, and nothing about how a day is graded for any other crowd, even in this tower."*
+
+1. **One grader, one vocabulary.** Both sides are `VERDICT_VOICE[verdict].line` through `shift/report.ts#verdictOf`, lifted out of `judgementOf` so a second run is graded by the same predicate rather than a copy, against **the same `input.goals`**. The pressed side is built from the readings the banner is; `counterfactual.test.ts` asserts it equals the sheet's `verdictLine`, and the unpressed side equals the banner of that recording's own sheet.
+2. **The unpressed run is graded over its own whole run**, `observationsAt(unpressed, unpressed.endedAt)` through `shiftObservationsOf`, carried on `PressCounterfactual.wholeRunObservations` — not at the pressed run's window end, because a verdict is a whole-day property and the two runs can end seconds apart. The words say *over its own whole day* rather than attaching it to the counts' two clock times.
+3. **Always both, whether they agree or not.** No sentence, tone, flag or order depends on agreement.
+4. **A missed run names its missed goals, with no digit** — `shift/goals.ts#GOAL_PLAIN_NAMES`, a `Record` over the shipped goal ids, so the row stays a row of headcounts (§ D931 rule 4) and a sixth goal is a compile error.
+5. **No word connects the two.** `counterfactual.test.ts` bans *decided, decides, decisive, rescued, rescue, flipped, turned, won, lost, either way, anyway, still, same verdict, changed the verdict, if you had, would, could have* on word boundaries over the whole paired row, and the pattern `\bpress(es)?\b(\W+\w+){0,3}\W+(clear|clears|cleared|miss|misses|missed)\b` — so no press is ever the subject of a verdict. The ruling's own draft sentence (*the run without that press reads Shift missed*) fails that pattern, which is why the implemented sentence puts *over its own whole day* between them. § D900's causal list and § D931's estimation list are unchanged.
+6. **The unpressed verdict never leaves the row.** Banner, lede, headline, goals, figures and every other diagnosis row are byte-identical with and without a pair (asserted); the row stays `tone: 'plain'` and stays **last**, so `render/reportCard.ts`'s `diagnosis[0]` never carries it; nothing reaches the week, the streak, `closeDay` or banking, because none of them reads a diagnosis row.
+7. **§ D900's unpaired row is byte-identical**, and `afterPress.test.ts` now asserts it carries none of *Shift cleared*, *Shift missed*, *Too quiet to grade*.
+
+### 3. One narrowing, stated rather than hidden
+
+A **single-run** sheet prints no verdict on the paired row. Its banner is `read, not graded — no scenario asked for this run` (`docs/19` defect 13), and a row printing *Shift cleared* under a banner that refused to grade would grade twice what the sheet declined to grade once. The counts and § D931's note still draw there; `AFTER_PRESS_VERDICT_NOTE` does not, since it would be a caption over no verdict. That is why the clause is its own constant appended to `AFTER_PRESS_PAIR_NOTE` rather than spliced into it.
+
+### 4. Pinned by runs, not by this paragraph
+
+`shift/pressLadder.test.ts` runs three `c7` crowds with *spread the cars* at the rung's own press second: **20 268 743** (the pinned day — this run reads *Shift cleared*, the other *Shift missed on the worst-wait goal*), **20 442 961** (the same press on the same tower turns a cleared day into a missed one — the row says so as plainly as it says a win, and this arm is the run that pins the note's *even in this tower*), and **20 260 824** (both cleared, nothing connecting them). All three reproduce the ruling's table.
+
+### 5. The corpus
+
+`honesty/surfaces.ts`'s intervened sheet pairs the recording with itself, so its two verdicts always agree. The ruling asked for one arm where they can differ: `ShiftDay.pairedAgainstCandidate` grades the unpressed side on the candidate dispatcher's fold of the same day and seeds that row's `why`. It is a fixture exactly as the self-pair is. The string count moves; the integrator measures it (§ D343).
+
+### 6. Stale text removed in the same change (§ D227)
+
+`shift/counterfactual.ts`' header no longer says *No verdict, either*; it says what § D931 withheld and why this entry reverses it.
+
+---
+
+## D983 — a missed day's report opens on the goal it missed, and a car the tower books out is named on the brief, the header and the stage
+
+**Date: 2026-09-24 · Owner: LANE-AH-C (wave AH) · GitHub issue [#596](https://github.com/mrpeanut01/elevator-sim/issues/596) items 2–4 · Rules on `packages/viz/src/shift/report.ts`, the new `shift/bookedOut.ts`, `shift/goals.ts`, `everyday/today.ts`, `everyday/briefView.ts`, `everyday/stageScreenModel.ts`, `everyday/stageScreen.ts`, `dev/main.ts`, `dev/reportPanel.ts`, `dev/leftRail.ts` and `honesty/surfaces.ts`. Cites [§ D871](#d871), [§ D227](#d227), [§ D256](#d256), [§ D343](#d343), [§ D405](#d405).**
+
+**Why an entry.** It binds a dozen modules in four directories and moves a spelling two of them agreed on (`was`), so it reaches past any one module (§ D405).
+
+### 1. *Where it went wrong* names the goal that went wrong
+
+On a missed day the section opened on the deepest queue whatever was missed. An assessor's Crown Hotel day missed on a **311 s worst wait** under a heading pointing at *Floor G stacked 14 deep*, a landing inside its bar of 32, drawn red. A Midtown day lost to a 929 s wait at lunch with car D out was headed by 08:48's queue.
+
+Now a missed day opens on one row per goal read `missed`, in the goal table's order (`shift/report.ts#missedGoalRowOf`): the worst wait's floor and its two clock times — the leg found by `live/observations.ts`'s own rule, and dropped to *no clock* if it does not round to the graded figure — and whether a booked-out car was away for any of it; the carry and inside-a-minute shares with the count each is over; the energy ratio with its legs. The landing-queue goal's row **is** the queue row, placed where that goal falls, so the queue leads only when it was missed. **The queue row's tone follows its own goal**, red only when the landing-queue goal was missed. A cleared day's section is unchanged in shape. Measured on `c7`'s pinned day as built: the sheet now opens *The worst wait reached 303 s on floor 8 — … Car D was booked out of passenger service for part of that wait*, and the 16-deep queue below it is plain (`shift/bookedOut.test.ts`).
+
+**The fixed cause is gone.** `report.ts` printed *"Every car was committed elsewhere when the calls landed together"* on every peak-queue row regardless of the run. It is replaced by a count this run produced — how many people called from that floor in the minute before — and where the peak stood against the landing-queue goal's bar. **No mechanism is offered in its place** ([§ D256](#d256)): the count is what calls landing together looks like, and why the cars were where they were is unmeasured.
+
+The phase row's *The worst of it landed in …* becomes *The deepest queue stood in …*, because with a worst-wait row able to head the section, *the worst of it* would name two moments on one sheet.
+
+### 2. *Nothing booked* stops being printed on a day a car is booked
+
+All four assessors saw the brief and the report header read *An ordinary day — Nothing booked* beside a plate saying car D is booked out. The calendar booked nothing and the tower's own schedule ([§ D871](#d871)) booked a car. `shift/bookedOut.ts` now owns the reading — `bookedOutCarsOf` over the **run's own** resolved building, moved out of `everyday/today.ts` so three surfaces read one expression — and `wrinkleNoteOf` is the one sentence the brief's wrinkle card and the report's header both print: the event's note verbatim when the tower books nothing, the ordinary day's *Nothing booked* **replaced** when it does, any other event's note followed by one sentence naming the car. No clock on the brief (`today.ts`' rule: a time before the run is a figure with no source the reader can see). The report header then gives each car its own line with the two clock times the run had (`DayReportInput.bookedOut`, passed by `dev/main.ts#closeShift`, because a `VizRecording` carries whole-run holds and not a mid-run schedule). The stage header carries a pill per car — *Car D booked out 06:07–06:15 · out now* — from `stageScreenModel.ts#stageBookedOutOf`, which names the schedule and never anything the run did; it is hidden while watching someone else's record and on a rush. The stage change is the header pill only: playback and the simulating state are untouched.
+
+### 3. The *was* column is visibly yesterday's
+
+The goal table's slot read `was 78%` a few rows above the after-press pair, and two assessors read *was* as *before my press*. It is the building's previous day, and it now reads `yesterday 78%` through `shift/goals.ts#yesterdayLabelOf`, which both the rail and the report call — they had agreed to spell it one way, and still do. The bare em dash is unchanged. The run-to-run delta block's `was → now` is a different claim (the previous sheet) and is not touched.
+
+### 4. The corpus
+
+The corpus builds towers without a contract rung (`run.ts#buildingFor`), so no case books a car out. Fixture bookings on the recording's own first two cars — one that comes back, one that does not — are seeded on `ShiftDay.pairedAgainstCandidate`'s header and on the stage pill at every sample playhead, so every arm of the new sentences is swept. The string count moves; the integrator measures it (§ D343).
+
+---
+
+## D984 — the brief asks the goals its own press will grade, and a declared pair across the press closes the gap `surfaces-disagree` had
+
+**Date: 2026-09-24 · Owner: LANE-AH-C (wave AH) · GitHub issue [#597](https://github.com/mrpeanut01/elevator-sim/issues/597) · Rules on `packages/viz/src/everyday/host.ts`, `everyday/briefView.ts`, `everyday/briefScreen.ts` and `honesty/agreement.ts`. Cites [§ D359](#d359), [§ D962](#d962), [§ D227](#d227), [§ D405](#d405).**
+
+**Why an entry.** It adds a pair to `honesty/agreement.ts`'s register and a method to the Everyday host, neither owned by the brief (§ D405).
+
+### 1. The defect, and why it was a timing rather than a derivation
+
+On day 1 of a whole-day tower the brief printed a 230 s worst wait and an 80 kJ energy bar; the stage and the report graded the same day against 460 s and 350 kJ (§ D962's bar and the whole-day factor). The replay brief printed 220 s against 440 s. **Every surface asked `runHorizonOf` correctly.** The brief asked it about the wrong state: `everyday/host.ts#startRun` writes the whole-day window **on the press**, and the brief is drawn before it, so `host.goalsToday()` read the slice the state still was.
+
+### 2. The repair
+
+`EverydayHost.goalsAhead()` — the same fold over the state the press will produce, `{ ...state, ...dayPatchFor(b) }` through the same `runHorizonOf`, read against no run. No second rule about which horizon a day is: the patch is the rule, read one step early. The brief reads it through `everyday/briefView.ts#briefAsksOf`, a shipped expression rather than an argument inside a DOM mount, so the corpus can drive it.
+
+### 3. Why `surfaces-disagree` did not catch it — both halves of the question #597 asked
+
+**The brief and the stage were not a declared pair**, and the one pair that compares goal asks could not have seen it anyway. `today-asks` compares the Engineer rail and the Everyday host **on one state**; its whole-day views are built with the press's patch already applied (`agreementViews` composes `wholeDayRun` the way `dayPatchFor` does), so the state the brief is drawn on — a whole-day tower **before** the press — was never a side of anything. And the brief's own corpus seeding took its asks off the report sheet's readings at the default `'period'` horizon, since no corpus case is a whole authored day (`goalsForDay`'s docstring says why). So both of #597's hypotheses were true at once.
+
+**What closes it** is a pair of a different shape — § D359's across time rather than across shells. `asks-before-the-press` gives both sides the **pre-press** state: the left is `briefAsksOf`, the right is the Everyday host after **its own** `startRun` has written **its own** patch (the harness lets that one binding write, into a copy, and simulates nothing), read the way the stage reads it. `agreement.test.ts` reverts the left to the brief as it shipped — `goalsToday()` — and the property fires on the slice views of towers with an authored day **and nowhere else**, quoting *inside 230 s* against *inside 460 s*. `everyday/host.test.ts` asserts `goalsAhead` equals `goalsToday` after the press's own patch on two towers, and that on Midtown the two differ before it, so the case is not vacuous.
+
+### 4. Not claimed
+
+Issue #597 also records that the 350 kJ whole-day energy bar never failed across one assessor's twenty days. That is a single sitting rather than a measurement and nothing here moves the bar; § D962's derivation stands.
+
+This lane held **D982–D990** and spent **D982–D984**. **D985 to D990 are unspent**, and under [§ D404](#d404) and [§ D430](#d430) they become permanent holes once a later number is written above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+---
+
+## D991 — Today's scenario keeps the whole day and plays it in acts: the peaks at the player's speed, the hours between at 30×
+
+> **Taken 2026-09-24 by agent sessions under delegated authority**, not by the product owner: the
+> ruling by a decision agent (with measurement, on `499b959`), the implementation and the
+> re-measurements by lane AH-D of wave AH. The session principal's standing instruction for this
+> wave is that decisions are taken by agents rather than escalated. A later reader weighing this
+> against a product-owner ruling should treat it as an agent ruling and say so — [§ D626](#d626) is
+> the cautionary case.
+
+**Rules on:** GitHub issue #592. Keeps [§ D356](#d356) (the Everyday daily loop runs the whole
+authored day) and declines to reverse it, as [§ D733](#d733) did. Reads [§ D525](#d525) clause 4 and
+[§ D641](#d641)'s opening rung. Moves [§ D946](#d946)'s published span, [§ D733](#d733)'s door
+sentence and `docs/28` AD-S6's figure.
+
+### The defect
+
+Today's scenario opens the whole authored day — `office-day`, ten hours, on thirteen of sixteen
+contracts — and the stage played every second of it at the player's rung. At the shipped `4×` that
+was **150 minutes**, with 7.5 real minutes of one-twentieth trickle before the morning ramp and
+two quiet stretches of 49 and 67 minutes. The mode picker was honest about it (*8 min–2 h 30 at
+4×*). An honest label on that length was never going to be a design.
+
+### The ruling
+
+1. **Keep the whole day. No window, no player choice.** A window is a third horizon, not the slice
+   — the ruling measured the 80 kJ bar failing 10 of 10 windowed `c3` days against 0 of 10 on the
+   slice — and it would remove the only content where the traffic pattern changes under the player.
+2. **Fix the length in the stage's playback, never in the run.** `everyday/stagePace.ts#stagePaceOf`:
+   the day's **acts** (`shift/dayLength.ts#actsOf` — maximal runs of phases touching the day's own
+   peak, read off the record: 08:30–09:00, 12:15–12:45, 17:15–17:45) play at the player's rung; the
+   hours between cross at **`BETWEEN_PEAKS_SIM_PER_REAL_S` = 30×**, dropping back to the player's
+   rung while anybody on a landing has waited past `WAIT_BANDS[2].fromS` (60 s), read from the
+   present frame only (`observationsAt(…).longestCurrentWaitS`). A chip press is the player's and
+   the stage stops pacing for the rest of that day. Every change shows on the lit chip, whose label
+   is its multiplier (§ D354), and on one schedule-derived note beside the chips.
+3. **Only on a whole day the player's own shell simulated** (`host.runHorizon()`, which answers
+   `'period'` for a watched or replayed recording). A slice, a career day, a fix case and the Rush —
+   whose `endless-rush` template is also a phase list, peaking only in its last three minutes — play
+   at one rung. `stagePace.test.ts` asserts both directions, and the positive control that the rule
+   *would* wreck the rush without the gate.
+4. **30× is a derivation.** It is § D354's fastest rung inside § D344's `S ≤ 39` cue budget, so the
+   building stays readable while it is crossed. `90×` was measured to lose nothing on 65 days and
+   refused anyway, because nothing in the tree has derived a rung above 39.
+5. **No goal bar, run record, board key or seed moves.** Grading reads `observationsAt(recording,
+   recording.endedAt)`, which playback speed cannot reach; the 350 kJ bar and
+   `WORST_WAIT_WHOLE_DAY_FACTOR` stand.
+
+### Where the owner may overrule, and what it costs
+
+This reads § D525 clause 4, *"the stage plays at a watching speed"*, as binding **wherever there are
+people to watch** — the acts, and any landing with somebody past a minute. If the owner reads it as
+every second of every run, **set `BETWEEN_PEAKS_SIM_PER_REAL_S` to the watching rung** (4): the
+rule then answers the player's rung everywhere, the tile's figure moves back to about two and a half
+hours on the same commit (it is composed from the same constant), and nothing else changes.
+
+### What was measured, and one figure that was measured at the wrong horizon
+
+**The session length is derived over every contract, not taken from the ruling's estimate.** The
+ruling's *about forty minutes* was arithmetic on the acts (5 400 s of `office-day` at `4×` plus the
+rest at `30×` is 39.5 minutes) with the drain named rather than measured. `everyday/stagePace.sweep.test.ts`
+played every contract's day 1 **as Today's scenario plays it** — the whole day where the building
+has one — sixteen contracts × fifty seeds, `collective`, seeds `20 260 824 + 7 919 n`, and read each
+day's paced real length at the default rung from the union of its acts and its held stretches:
+
+| contract | building | plays | paced length at 4×, min / median / max (min) |
+|---|---|---|---|
+| c1 | garden-apartments | slice | 15.0 / 15.0 / 15.0 |
+| c2 | midtown-office | whole day | 39.7 / 40.2 / 41.2 |
+| c3 | secure-tower | whole day | 39.7 / 40.1 / 40.8 |
+| c4 | mixed-use-high-rise | whole day | 39.5 / 39.6 / 40.1 |
+| c5 | vertical-city | whole day | 47.0 / 48.7 / **50.9** |
+| c6 | chancery-house | whole day | 39.5 / 39.6 / 39.9 |
+| c7 | crown-hotel | slice | 7.5 / 7.5 / 7.9 |
+| c8 | st-jude-hospital | slice | 7.5 / 7.5 / 7.6 |
+| c9 | harbour-point | whole day | 39.5 / 39.6 / 40.0 |
+| c10 | ashgate | whole day | 39.6 / 39.9 / 40.4 |
+| c11 | ctf-class-reference | whole day | 44.9 / 47.1 / 49.8 |
+| c12 | shanghai-class-reference | whole day | 41.1 / 42.8 / 45.8 |
+| c13 | merdeka-class-reference | whole day | 40.9 / 42.4 / 43.7 |
+| c14 | one-wtc-class-reference | whole day | 39.6 / 39.8 / 40.3 |
+| c15 | empire-state-class-reference | whole day | 40.4 / 41.1 / 42.1 |
+| c16 | willis-class-reference | whole day | 98.8 / 104.4 / **108.9** |
+
+**The top of the tile is Willis-class's, and the tile says so.** Its landings hold somebody past a
+minute for most of the day, so the stage seldom crosses anything fast. The published span is the
+union of the slices' 7.5 minutes and the longest day measured (`c16`, seed 28), composed in
+`sittingShape.ts#WHOLE_DAY_LONGEST` from the day's measured slow part so it still divides by the
+rung; the hub row adds the game's own towers' longest (`c5`, seed 39, 51 minutes,
+`WHOLE_DAY_LONGEST_GAME_TOWER`). The sweep refuses both constants at budget the day a fresh
+measurement disagrees. **The ruling's *about forty* holds, to within about two minutes at the
+longest seed, on eight of the thirteen whole-day contracts; four more run 44–51 minutes and one runs
+109**, and a tile that had published *forty* would have been § D946's defect one axis over. `stagePace.test.ts` plays `c2`'s first seed through the real `Playback` over a manual
+clock on every suite run and asserts **2 415.5 real seconds** to within thirty, which agrees with
+the sweep's leg-based reading of the same day.
+
+**§ D512's legibility, re-measured on the day actually played — the third figure in one cycle
+measured at one horizon and used at another.** The first two were § D962's energy bar (one constant
+grading a slice and a whole day) and the press pins lane AH-B of this wave is re-pinning. The
+legibility table that derives the first-session set was measured on each contract's **slice**
+while the first session plays Today's scenario, which is the whole day on thirteen of sixteen.
+Re-measured on the day as played (slice → as played, of 50): c1 0 → 0; c2 35 → **50**; c3 30 → **50**;
+c4 32 → **49**; c5 45 → **50**; c6 25 → **50**; c7 30 → 30 and c8 43 → 43 (slices both times —
+reproduced to the second, the control); c9 20 → **46**; c10 27 → **50**; c11–c13 50 → 50; **c14 1 → 31**;
+c15 45 → **50**; c16 50 → 50. **The first-session set goes fourteen → fifteen**: `c14` joins and
+nothing leaves; only `c1` is out. `FIRST_SESSION_LINE` reads *fifteen towers* on its own, and
+`shift/dailySeed.ts`'s rotation figures are re-derived from the draw: a tower repeats inside seven
+days on **32.2 %** of 730 dates (was 34.4 %) and on consecutive days **47** times (was 50).
+
+**The fix is structural as well as a re-measurement.** Every `LEGIBILITY_SWEEP` row now carries its
+`horizon`, and `legibility.test.ts` refuses a row whose horizon is not the one
+`contractDay.test-helper.ts#todaysScenarioDayState` plays for that contract — a check that needs no
+simulation, so a contract added tomorrow is checked on the commit that adds it.
+`legibility.sweep.test.ts` now builds its states through the same helper.
+
+**Pacing does not change legibility, and that is arithmetic rather than luck.** A legible stretch
+is somebody past a minute on a landing for 120 contiguous simulated seconds, and the stage holds the
+player's rung while anybody on any landing is past a minute, so every legible stretch plays at the
+watching rung: 120 simulated seconds is 30 real seconds at `4×` on all eight hundred days. The sweep
+computed legibility both ways and the two agree on every day. **What moved the set is the horizon,
+not the transport.**
+
+**The median time to the first legible stretch is about 18–20 real minutes on c2, c3, c6, c9, c10
+and c14**, against about 6 on c4 and 4–6 on c5, c11, c12, c13, c15 and c16 (and about 4 on the two
+slices, c7 and c8). That is a measurement; **no mechanism is offered for it** ([§ D256](#d256)). It
+means a first session on those six towers usually waits through the morning act for its problem —
+the cost the ruling named, now measured over every contract rather than seven. Whether the
+first-session draw should also be bounded by day length (a newcomer can now be dealt a Willis-class
+day of about 105 minutes) is a game decision this entry does not take.
+
+**Determinism, checked rather than assumed.** 136 contract × seed cells were computed twice, by
+separate processes that split the heavy towers between them; every one agrees to the last digit.
+
+### Published figures moved, each with the old one kept beside it (§ D227)
+
+- The Scenario tile and the hub's *Today's scenario* row (`everyday/sittingShape.ts`): *8 min–2 h 30
+  at 4×* → ***8 min-1 h 49 at 4×* (tile) and *8 min-1 h 49 a day at 4×, the hours between peaks at 30×; 51 min at most on the game’s own towers — the long end is a reference tower’s* (hub row)**, the hub row naming the between-peaks rung and the game's own towers.
+- `docs/32` § 7.2: a first session's second turn ends at *minute 173* → **minute 132 (23 + 109), and 74 on the game’s own towers**.
+- `docs/23` § 3.2 and `docs/12` § 5: the top-end factor against the handoff, *fifty* → ***about thirty-six* (109 against the handoff’s three)**.
+- `everyday/doorView.ts` step 2 (§ D733): *"A whole working day, at whatever speed you set"* →
+  *"…its busy hours at the speed you set and the quiet hours between them faster"*.
+- `docs/28` AD-S6: the quiet head's *7.5 real minutes* → **60 real seconds** under the between rung.
+  It was also already stale in saying `office-day` *"is not what the Everyday content runs"*: 13 of
+  16 contracts run it. **§ D641 carries the same sentence and, as an entry, is not rewritten**; it
+  is corrected here and in `stageScreenModel.ts`'s docstring.
+- § D946's table is a dated record and stays as it is.
+
+### Owed, and whose
+
+- **DC-4 at the whole-day horizon** is a pre-existing gap (#234), not caused by playback, and out of
+  this lane's scope.
+- **§ D914's *a reachable press clears the day* at the whole-day horizon** belongs to lane AH-B,
+  which was told the drop-back rule's exact definition so it can evaluate it at a press moment.
+
+---
+
+## D992 — the tutorial's "Watch it come apart" crosses its quiet at 90× and shows its failure inside twenty seconds, with a clock, and the press waits for it
+
+> **Taken 2026-09-24 by an agent session under delegated authority** (lane AH-D of wave AH), not by
+> the product owner. The session principal's standing instruction for this wave is that decisions
+> are taken by agents rather than escalated. A later reader weighing this against a product-owner
+> ruling should treat it as an agent ruling and say so — [§ D626](#d626) is the cautionary case.
+
+**Rules on:** GitHub issue #598, filed by the integrator from the post-wave-AG playability panel's
+findings. [§ D529](#d529) clause 1 (the two-screen tutorial), [§ D623](#d623) clause 3 (a fix case
+keeps its no-pause design) and [§ D991](#d991) (whole-day pacing) are the decisions it reads.
+
+### The finding
+
+Three assessors on the panel watched the tutorial's second screen — the one every new player meets
+— for about 130 s to three minutes and saw **three idle cars and nobody on a landing**, with no clock
+and no speed control. One, playing blind, pressed the fix **before seeing anything break**. Measured
+on the shipped case (`three-cars-one-cars-work`, `garden-apartments`, seed 20 260 823 as built): the
+first rider arrives **583 s** in and the first rider to wait a minute — the thing the lede tells the
+player to watch for — crosses it at **1 448 s**. At the player's `4×` that is 146 and 362 real
+seconds.
+
+### The ruling
+
+1. **Screen two is paced.** `tutorialModel.ts#tutorialPaceOf`: the player's rung while anybody on a
+   landing has waited past `stagePace.ts#PACE_HOLD_WAIT_S` (60 s, `WAIT_BANDS[2].fromS`), and
+   **`TUTORIAL_QUIET_SIM_PER_REAL_S` = 90×** otherwise. Speed only — the playhead is never moved
+   (`docs/28` AD-S4) — so the pair is the same two runs at the same minute, and nothing the worked
+   answer measures moves.
+2. **90 is derived, not chosen.** Reaching 1 448 s at one quiet rung inside twenty real seconds
+   needs ≥ 72.4×; `30×` (the whole day's rung) reaches it at 48 s and fails; **`90×` is the slowest
+   ladder rung that meets it (16 s)**. `tutorialRuns.test.ts` plays the as-built run through the
+   real `Playback` over a `ManualClock` and asserts both halves, so a re-authored case that fails
+   earlier or later moves the test before it moves a player.
+3. **It may leave § D344's cue budget where § D991's rung may not**, and the reason is stated: the
+   fast rung holds only while *nobody on any landing has waited a minute* — the stretch the
+   assessors described as nothing moving — on a run of 42 journeys, and drops to the player's rung
+   the instant the thing worth watching begins.
+4. **A clock and the reason for its speed are drawn on the block** (`tutorialClockOf`): building
+   time from the start of the run, because the case declares no hour and `clockAt` would print
+   06:00, which nobody authored.
+5. **The press waits for the failure** (`TUTORIAL_COPY.controlWatchFirst`): it refuses, on its own
+   face, until the canvas has shown somebody past a minute — latched from the present frame, never
+   read ahead — or the as-built morning has finished playing. The second run's own refusal still
+   outranks it.
+6. **Every figure card on screen one carries its own caption** (`TUTORIAL_FIGURE_NOTES`, keyed by
+   `FigureSpec['kind']`). Every card read *"waits over a minute starting at the upper flats"*,
+   including the card about the lower floors.
+
+**Measured, not argued:** first trouble at **16.1 real s** in the ruling's own arithmetic and at
+≤ 20 s in `tutorialRuns.test.ts`; the whole as-built morning in about **51 real s** against 11 min
+15 s at one rung; the repaired morning in about 30 s.
+
+### What it does not touch
+
+`everyday/caseStage.ts` gained three **opt-in** inputs (`pace`, `clockOf`, `onFrame`); the fix-it
+screen passes none of them and plays exactly as it did, so § D623 clause 3 is untouched. No case, no
+run, no seed and no figure the worked answer quotes moves. **One constant undoes it**: set
+`TUTORIAL_QUIET_SIM_PER_REAL_S` to the player's rung and screen two plays at one speed again.
+
+**No speed chips were added**, although the issue's title names their absence: § D623 clause 3 keeps
+a case's no-pause design, and the pace line on the block says what the transport is doing instead.
+Whether a tutorial should carry chips is left open rather than decided here.
+
+---
+
+## D993 — leaving the tutorial files nothing, and § D476's condition is amended to what can be met without a stored flag
+
+> **Taken 2026-09-24 by an agent session under delegated authority, not by the product owner.** It
+> amends [§ D476](#d476), an integrator ruling itself taken under delegation, and touches no clause
+> the product owner worded. It answers GitHub issue **#598**. That issue was **filed by the
+> integrator** from a four-assessor playability panel (post-wave-AG). It is not a product-owner
+> ruling, although it is posted under the repository owner's GitHub account, so its author field is
+> not evidence of the owner's view. Its *"what done looks like"* is the integrator's proposal. A later
+> reader weighing this against a product-owner ruling should treat it as an agent ruling
+> ([§ D626](#d626)). **The owner may restore the withdrawn means** — filing a day on the way out — by
+> overruling this entry; nothing else would have to change back. It was proposed by lane AH-D of
+> wave AH, approved by the integrator, and then ruled on by a swarm of three agents working
+> independently, all three of which chose this option.
+
+**1. The defect, as observed.** Three of four assessors on the panel met a front door reading *MON
+mixed-use-high-rise 96 % today* before they had played anything — a raw slug and a score, on a
+tower they had never seen. That repeats [§ D383](#d383)'s P0 finding in the one place a first-time
+player cannot yet know it is wrong. `tutorialScreens.ts#leave`, the one door *Skip the tutorial*
+and *Start playing* go through, started a run and closed the day, so the week's Monday was filed
+with a score nobody earned.
+
+**2. It broke two older rules.** [§ D232](#d232): *the game may not play itself, and a navigation is
+not a progression event* — a Skip press is a navigation, and it became a progression event. And it
+switched off [§ D514](#d514)'s first-session door line: `shift/firstSession.ts#isFirstDayOnALegibleTower`
+needs `week.history.length === 0`, so every player who left the tutorial by either exit never saw
+`FIRST_SESSION_LINE`. No test covered that, because each half was green alone.
+
+**3. The tutorial produces nothing else that persists.** Its two recordings are module-scope and
+made by a private runner; the press is an in-memory beat; its only profile use is a read of the
+default speed. The one persisted quantity it could plausibly touch — `solvedCaseIds` for
+`three-cars-one-cars-work`, the case it teaches — is **forbidden** by [§ D529](#d529) clause 4: the
+player was shown the answer and did not solve it, and crediting the solve would turn the tutorial's
+worked answer into a Scenario clear, the side door that clause exists to close.
+
+**4. The condition was never universal.** Both tutorial rows in `actionBar.ts` carry a live leave to
+the modes list that files nothing, and the browser tier's `leaveTutorialIfOffered` has used it at
+thirty-odd call sites. Two exits fabricated a day and one did not; this makes the three agree.
+
+**5. The amended condition, and what it costs.** The ruling of § D476 — a cover conditioned on
+derived state satisfies charter non-goal 10 — **stands untouched**, and `tutorialIsDue` still reads
+only filed days, solved cases and ratings. Its playability condition now holds **within a session**,
+through the shell's `tutorialOffered` guard (a closure `let`, never persisted), and **across a reload
+it is replaced by: the first-visit cover always carries a live route to the mode picker.** The named
+cost: **a visitor who watched or skipped the tutorial and played nothing meets the landing page
+again after a reload, one press from the modes.** That is honest rather than a trap: the landing
+page is an offer, it shows no figure, and its leave row is live. `tutorialLeave.browser.test.ts`
+drives both exits, the reload and the leave row on the shipped bundle, and checks that § D514's line
+is drawn on the daily door afterwards.
+
+**6. Refused, each with what it would store and what would read it:**
+
+- **A count in `EverydayProgress`** (tutorials watched). Stored in the profile's localStorage slot;
+  read by `tutorialIsDue` and nothing else; incremented by a press rather than by a completed turn.
+  Its only question is `> 0`, so it is `seenTutorial: boolean` wearing `number` — a flag in disguise,
+  against § D529 clause 3's *"rather than a stored flag"*, and it would pass
+  `tutorialModel.test.ts`'s no-boolean guard for the wrong reason.
+- **Filing an unscored day.** Stored as a `DayOutcome` in `WeekState.history` with a marker; read by
+  every history reader — the week strip, streak, best day, banked count, `closeDay`'s clean-day rule,
+  the tomorrow briefing, the Day report's baseline, the rail's career line,
+  `isFirstDayOnALegibleTower`, `tutorialIsDue` and the honesty adapters — each of which would have
+  to remember to filter it. The marker *is* a stored `seenTutorial`, and the fabricated run still
+  happens.
+- **The skip starts the day** (§ D476's literal cheapest form, played rather than filed). It stores
+  nothing until the player closes the day, so it has this entry's cost across a reload anyway, and
+  it drops a first-time player into a daily day against [§ D525](#d525)'s Scenario-first order.
+
+**7. The rule that binds forward: no field whose only reader is the first-visit gate may be
+persisted, under any type.** `tutorialModel.test.ts` enforces it: `TutorialProgress` has exactly its
+three counts and no boolean, `EverydayProgress` has exactly `solvedCaseIds` and `ratings`,
+`offerTutorial` writes no storage, `tutorialOffered` is a closure `let`, and `leave` contains
+`go('menu')` and none of `startRun`, `closeDay`, `subscribe(` or `setProgress`.
+
+**§ D529 is not amended.** Clause 3 restates § D476's condition and is **read, not overruled**, by
+this entry; its stated purpose — a derived cover that stores nothing — is kept. One of the three
+swarm members read this entry as **narrowing** clause 3's *"skipping must advance that state"*; that
+dissent is recorded under the clause so the owner can see it.
+
+**Corpus forecast for this change alone: 0 strings and 0 surfaces in both tiers** — the four copy
+changes (`skipNote`, `finishNote` and the two `actionBar.ts` notes) are substitutions.
+
+---
+
+## D1000 — the fix-it editor gains five of § D706's six change families, writes all eighteen answers leg for leg with the sixth, and the menu still does not retire
+
+**Date: 2026-09-24 · Owner: lane AH-E (wave AH) · GitHub issues [#566](https://github.com/mrpeanut01/elevator-sim/issues/566) and [#580](https://github.com/mrpeanut01/elevator-sim/issues/580) · Under [§ D706](#d706) clause 6 · Rules on: `packages/viz/src/fixit/families.ts`, `fixit/editorInputs.ts`, `fixit/engine.ts`, `fixit/run.ts`, `fixit/types.ts`, `everyday/fixitFamilies.ts`, `everyday/fixitScreenModel.ts`, `everyday/fixitScreen.ts`, `dev/fixitPanel.ts`, `honesty/surfaces.ts`, `core`'s `dispatch/parameters.ts` and `physics/doors/types.ts` player words.**
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It binds two surfaces, the honesty corpus, `core`'s declared player words and a guard figure five documents publish, none of which one module owns; and it moves two things already recorded — § D706 § 1's *one of eighteen* and § D869's *twelve of eighteen*, both of which it re-measures, and § D706 § 8's stale refusal of `predicted-demand`, which it takes rather than files.
+
+### 1. What the editor could write when this lane started
+
+Measured on `c56707a`. The editor drew five controls — speed and capacity steps, the zone-overlap stepper (widening only), the parking select over `stay`, `lobby` and `zone-center`, and the top-floor raise. Of § D706 § 1's six rows it drew **none whole**: `idle-parking` in part (three of five strategies; no floor, deadband or energy weight) and `rezone-bank` in part (a widened boundary, never a narrowed one, a moved car or a keyed one). **Strictly, one of eighteen** diagnosed answers was writable by the editor — `cars-that-always-go-home`, parking at `stay` — which is § D706 § 1's figure unmoved. On § D869's role-blind census, **twelve of eighteen** cleared on an editor route.
+
+### 2. What was built, and what proves each control
+
+Every family is priced by the schedule row a repair buying the same act already pays, through the same `covers` paths and the same dedupe, and every control is proved on the legs in `fixit/families.test.ts`:
+
+| schedule row | what the editor now writes | proved |
+|---|---|---|
+| `idle-parking` (0 u) | all five strategies — `predicted-demand` and `fixed-floor` join, § D706 § 8's refusal being false — plus the parking floor, the deadband and the energy weight as dials | `cases.test.ts`'s every-offered-strategy test, now over five; each dial on its pinned case and value |
+| `dispatch-rules` (2 u) | every dimension the row covers: assignment mode and split threshold, the cost-term weights, eligibility, the no-reversal constraint, the sole-car bypass | the same pinned table, twenty-five dials in all |
+| `dwell-policy` (3 u) | fixed or adaptive dwell, its gain and its ceiling — the ceiling's options filtered by core's own car-bound admission, so no option is one core refuses | the same |
+| `door-dwell` (2 u) | the hall-call and car-call hold, for every car or one car, over `core`'s declared ranges at half-second steps | every car on each side; one car alone |
+| `rezone-bank` (6 u, shared with the zoning stepper) | a car moved into another bank, into a bank of its own, out of service or back from works; the floors a bank serves; a bank re-plated where it weighs against something other than its plate | each press moves the legs; an unloadable redraw holds the Run press with one sentence instead of throwing |
+
+**The dials are the declared space, not a list.** `families.ts#dialGroupsOf` derives them from the three rows' `covers` against `collectSearchSpace()`, so a dimension added to one of those rows arrives with no edit — and fails `families.test.ts` until somebody proves it on the legs. One covered dimension is **not drawn**: `weights.dutyMismatch` moved no leg on any of the eighteen cases at either end of its range, because no building a fix case is set in declares a duty; `families.ts#INERT_DIALS` holds it with that reason and the test holds the register both ways. One more is never live: `weights.rideTime` is gated on a destination call type, which `destination-panels` sells and this editor does not, so it is never drawn and the test names it.
+
+**Words from beside the rows.** Every dial's name and ends are `core`'s — ten rows gained player words beside their declarations, three of them `DOOR_PARAMETERS`' and a categorical row's values now carry words (`PlayerControlWords.values`) — so no screen holds an id-to-prose table (GitHub issue #147), and `core/src/dispatch/playerWords.test.ts` pins the set both ways.
+
+**A dead dial is never charged.** A dial whose gate a later press closes is pruned (`families.ts#pruneDials`) by both surfaces, and `fixit/run.ts` refuses an unpruned one loudly rather than skipping it — a skipped dial would be a price for nothing.
+
+### 3. What the editor writes now
+
+**All eighteen**, leg for leg. `families.test.ts` builds each case's answer from the controls a player has and asserts, per case, that it buys the same schedule rows as the diagnosed repair at the same price, that its run is **identical on every leg** to the diagnosed repair's run, and that it clears both bars. Fifteen are written by the five families above; the other three are written by the tenancy row [§ D1001](#d1001) rules on.
+
+The role-blind census moves too: `theAnswerIsNotPrinted.test.ts` now tries the new families after every route it tried before, and **seventeen of eighteen** clear on an editor route. The one left, `express-that-stops-everywhere`, falls to its repair because its answer is a bank's floors redrawn and there is no role-blind way to choose a floor set; the editor writes it exactly in `families.test.ts`. **Two of the census's wins are the single-pair judge's noise, and the table says so**: `let-faster-than-the-lifts` first clears on fixed-floor parking at the top floor and `every-letter-says-nine` on a three-metre raise of the roof.
+
+### 4. Why the menu is still not retired
+
+§ D706 clause 6's condition — *the six priced change families … and demonstrates, per retiring case, that its answer is reachable and clears* — is **met in this branch**. The retirement is still not taken, on § D706's own § 7: *"a playtest of the built editor against a shipped case, taken before any repair row is deleted"*. That is a person playing it, and no lane can discharge it; a twenty-five-dial editor under a ninety-second turn is exactly the thing § 7 says no evidence in this repository reaches. So the menu, the decoys-as-menu and the kind-of-fix line all still ship, together, as § D706 requires, and the commit that retires them is the next one after that playtest. [§ D869](#d869)'s draw order and answer-key retirements are untouched.
+
+### 5. What moved in documents, and why
+
+A shared mount (`everyday/fixitFamilies.ts#mountFixitFamilies`) is one more statically swept DOM entry point, so `honesty/derive.test.ts`'s published figure moves from 40 to **41** (**20** mounts, 21 screen rows) at all five sites that carry it, as that test requires.
+
+### 6. The corpus, as a forecast rather than as the row
+
+[§ D343](#d343) puts the measurement on the integrator. **Surfaces: +0** — every new string enters the existing FIXIT adapter (`fixit/engine.ts#classifyOutcome`). **Strings: a floor of 1 094 a case in both tiers, and no per-case constant above it.** The floor is the part that does not depend on the case's building, counted term by term: the twenty-five dials other than the parking floor, each with its label, effect, *as it stands* entry and every option over the declared space, **1 016**; the three groups' heading and price line, open and at the budget, **12**; the parking-floor dial's label, effect and *as it stands*, **3**; the door hold on two targets without their per-car entries, **36**; § D1001's tenancy row in three arms, **15**; eight frame keys seeded by name because only a mount reads them, **8**; and two more parking strategies on each of the two seeded standing orders, **4**. Above it the count grows with each case's building — two door targets per car, the parking floor's options, and the banks block's cars, banks and floors — so the tiers' totals will not divide by their case counts, and a quotient would be § D256's refusal. The always-on tier was run on this branch after the seeding and reported no violation; that is a check, not the row.
+
+### 7. What this does not establish
+
+Whether the twenty-five-dial editor is playable in a ninety-second turn (§ D706 § 7). Whether any dial beyond its one pinned proof moves the legs on *every* case — the proof is per dial, not per case, and a dial may be inert on a building where its mechanism has nothing to act on, which is § D219's defect in a narrower form than the register above catches. And whether the single-pair judge's verdicts are stable under the perturbations these controls introduce — the § D1001 rulings measured that they are not, and filed it.
+
+### 8. Numbers spent
+
+This lane holds **D1000–D1008** and spends **D1000 and D1001**. D1000 is the first four-digit heading; `documentation.test.ts` and `citations.test.ts` were run on it and read it.
+
+---
+
+## D1001 — tenant-floors is offered in every fix case at its flat 2 u, and moves only the cohorts a case authors
+
+> **Taken 2026-09-24 by agent sessions under delegated authority**, not by the product owner. The
+> session principal's standing instruction for this wave is that decisions are taken by the swarm
+> rather than escalated, on [§ D729](#d729)'s form. Three decision agents ruled independently on
+> one measured question and two of them agreed; this lane implemented the majority and records the
+> dissent. A later reader weighing this against a product-owner ruling should treat it as an agent
+> ruling and say so.
+
+**Date: 2026-09-24 · Owner: lane AH-E (wave AH), implementing the ruling of decision agents TF-2 and TF-3 over DECIDE-3 · Under [§ D525](#d525), [§ D528](#d528), [§ D535](#d535) and [§ D706](#d706) · Rules on: `data/fixit-cases.json`, `data/price-schedule.json`'s `tenant-floors` note, `packages/viz/src/fixit/parse.ts`, `fixit/types.ts`, `fixit/engine.ts`, `fixit/run.ts`, `fixit/families.ts`, both fix-it surfaces, `honesty/surfaces.ts`.**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds: it binds a data schema, the parser, two surfaces and three cases' content; it moves something recorded — [§ D706](#d706) §§ 1 and 6 describe `tenant-floors` as a per-floor population control, and this replaces that with authored cohorts; and it reads an owner's clause in a way the owner may reverse (§ 4).
+
+### 1. The measurement
+
+`tenant-floors` (2 u, covers `building.floorPopulations[]`) is the row three answers live behind. Offered as a per-floor population dial it is nearly a universal answer. Measured on each case's own seed with the product's own judge: keeping a third of every floor's as-built headcount clears **14 of 18** on the explicit floors the shipped patch door could reach, and **17 of 18** once `floorRanges` floors are patched too — **14 of the 15** cases whose fault is not the crowd (all but `car-park-nobody-serves`). A 10 % cut already clears 7 of those 15. And because interfloor destinations are weighted by floor population, **any** population edit redraws the whole trace: removing one person from one floor scored *fixed* on 5 of the 15 wrong cases on their own seeds. So a crowd-changing press is also a re-roll.
+
+**No price separates the answers from the wrong clears**, and all three agents measured it. A flat price low enough to keep the three answers affordable (≤ 11 u) still leaves 9 of 15 wrong cases a clearing cut; a rate per person moved or per point of the building leaves 11; a per-scenario price in the fifteen must exceed 22 u to stop the leak at the bought +6 rung, which is a price nobody can pay — the prohibition in price's clothing [§ D535](#d535) names. The act that clears a wrong case is smaller than the act that clears a right one (twelve of fourteen wrong clears move fewer people than the smallest answer), so no price that rises with the size of the act can work.
+
+### 2. The ruling
+
+1. **The row is drawn on every fix case**, at the schedule's existing flat 2 u, **charged once per cohort moved**, with no new price figure.
+2. **It moves only what the case authors**: an optional `asBuilt.tenancy` of cohorts, each with an id, a name, its floors, a licensing reason, and a few **named positions**, each a per-floor headcount the watched window keeps. There is no free per-floor dial, and positions are discrete and authored because every value is a fresh redraw.
+3. **Authored on the three demand cases only**: `one-start-time` (floors 12–20; two start times at 45, three at 30), `every-letter-says-nine` (floor 1; half the letters moved at 350, four hundred moved at 300) and `let-faster-than-the-lifts` (the five bands; the clause invoked for half the new tenants, and for all of them at 44/34/36/26/12). The fifteen author none, and draw the row with one sentence — *nobody here has a start time the owner can ask them to move* — that says nothing more than the kept diagnosis already does.
+4. **`fixit/parse.ts` refuses** a tenancy on a case whose diagnosed repair moves nobody, a crowd-moving diagnosed repair with no tenancy, a witness that is not exactly one authored position, a position that raises a headcount or moves nobody, a cohort with no reason, and a floor that is not the building's or the cohort's. **Nothing derives a position from the witness at run time**, which would be [§ D869](#d869)'s answer key again.
+5. **`fixit/run.ts` expands `floorRanges`** through `core`'s `expandFloors` when a population names a range floor, so a cohort authored on a tall building later is not silently unpatchable.
+
+`families.test.ts` holds it on the legs over all eighteen cases: every authored position moves the run; on the fifteen, every press is refused and a state carrying a stale id anyway runs byte-identical and costs nothing; no case without a cohort can write a population from the editor and every case with one can; each witness clears on its case's seed; and **a one-person placebo on the same floors does not** — *not-enough* on all three.
+
+### 3. A copy defect fixed on the same commit
+
+`every-letter-says-nine` claimed what no run backs. Its reasoning said *"Print half the letters … and the surge halves with the paper"* and its result *"Half the letters now say half past … The landing clears between them"*. The witness keeps **300 of 700**, not half; keeping the literal half, 350, is *not-enough* on the shipped seed; and the moved 400-person sitting, run as its own window, scores *building-worse*. The claims now say what the runs support: four hundred letters move, this run watches the three hundred left at nine, and the half past sitting is not in this run.
+
+### 4. The one reading the owner may reverse
+
+[§ D528](#d528) clause 3 says per-scenario scarcity is *"a price, never a removed control"*. This ruling reads it as **allowing a row drawn inert because the scenario authors no crowd to move** — the building varies between scenarios, which [§ D525](#d525) clause 2 permits, and the zoning and elevation steppers already draw a zero ceiling where the fabric allows no move. **If the owner reads a drawn-but-inert row as a removed control, no measured option satisfies both § D528 and *no wrong-family clears*.** The owner then chooses between withholding `tenant-floors` from every scenario — [§ D535](#d535)'s form, which the schedule's own notes say is the owner's act alone, and which leaves the three demand cases with no way through until they are re-authored — and accepting a family that clears 14 of the 15 wrong cases. No measurement stands in for that choice.
+
+### 5. The dissent, and why it lost
+
+DECIDE-3 ruled for **two prices the schedule already carries**: the flat 2 u for floors a case-authored document covers, and `move-a-tenant`'s 20 u a floor everywhere else, with every crowd change applied by **thinning** the as-built trace on a named stream rather than redrawing it. The thinning half is right and is filed as its own issue; the lease half lost on measurement. At 20 u the fifteen still leak at the +6 rung — `bed-cars-locked-out`, `two-cars-out-wrong-month` and `every-deck-calls-itself-full` clear on their shipped seeds with a half cut — and DECIDE-3's own table left one or two wrong clears. A price that leaks at the bought rung is a price that sells the universal answer to anyone who buys the rung.
+
+### 6. What this does not decide
+
+Replacing trace redraws with thinning on a named stream, which may later require re-authoring `let-faster-than-the-lifts`; the fix-it single-pair judge's noise; and the campaign shop's `staggered-starts` row, which is the same near-universal shape. The coordinator files all three as issues. **§ D706's retirement**: `tenant-floors` no longer blocks it, and [§ D1000](#d1000) says what still does.

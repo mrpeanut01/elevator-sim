@@ -88,6 +88,7 @@ import {
   goalsForDay,
   readGoals,
   wasDisplayOf,
+  yesterdayLabelOf,
 } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import {
@@ -736,7 +737,7 @@ export function goalRowsOf(
       glyph: reading.glyph,
       label: reading.goal.label,
       value: reading.display,
-      was: was === PENDING_DISPLAY ? PENDING_DISPLAY : `was ${was}`,
+      was: yesterdayLabelOf(was),
       /*
        * The fourth argument is here rather than on the reading because the count is a fact about
        * the **day**, not about the verdict: `GoalReading` is persisted inside `DayOutcome` and a

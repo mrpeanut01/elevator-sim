@@ -626,15 +626,15 @@ describe("the editor's zoning and parking are priced by the rows a repair alread
   });
 
   /**
-   * The offered subset is a **subset**, checked against core's own vocabulary rather than against a
-   * copy of it. A strategy that left `PARKING_STRATEGIES` would otherwise go on being written into a
-   * config the schema refuses, and the first sign would be a run that throws on a player's press.
+   * The offered list is checked against core's own vocabulary rather than against a copy of it. A
+   * strategy that left `PARKING_STRATEGIES` would otherwise go on being written into a config the
+   * schema refuses, and the first sign would be a run that throws on a player's press.
+   *
+   * **It is the whole vocabulary now**, § D1000: the two strategies that were withheld were withheld
+   * on reasons that stopped being true, and `families.test.ts` proves each one moves the legs.
    */
-  it('offers only strategies the core still declares', () => {
-    for (const strategy of EDITOR_PARKING_STRATEGIES) {
-      expect(PARKING_STRATEGIES as readonly string[]).toContain(strategy);
-    }
-    expect(EDITOR_PARKING_STRATEGIES.length).toBeLessThan(PARKING_STRATEGIES.length);
+  it('offers exactly the strategies the core declares', () => {
+    expect([...EDITOR_PARKING_STRATEGIES]).toEqual([...PARKING_STRATEGIES]);
   });
 });
 

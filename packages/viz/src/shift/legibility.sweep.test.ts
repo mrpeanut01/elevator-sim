@@ -23,7 +23,7 @@ import { describe, expect, it } from 'vitest';
 import { shiftRunConfigOf } from '../dev/state.js';
 import { recordRun } from '../record/recordRun.js';
 
-import { contractBuildings, contractDayState } from './contractDay.test-helper.js';
+import { contractBuildings, todaysScenarioDayState } from './contractDay.test-helper.js';
 import { CONTRACTS } from './contracts.js';
 import { LEGIBILITY_SWEEP, legibilityOf } from './legibility.js';
 
@@ -40,7 +40,11 @@ describe.runIf(process.env['LEGIBILITY_SWEEP'] === '1')('the legibility sweep �
       const longest: number[] = [];
       let legible = 0;
       for (let n = 0; n < SEEDS; n += 1) {
-        const state = contractDayState(contract.id, { seed: seedAt(n) });
+        /*
+         * § D991: the day Today's scenario plays — the whole authored day where the building has
+         * one — rather than the slice every row was measured on until 2026-09-24.
+         */
+        const { state } = todaysScenarioDayState(resources, contract.id, { seed: seedAt(n) });
         const plan = shiftRunConfigOf(resources, state);
         const recording = recordRun(plan.config, {
           recordDecisions: false,

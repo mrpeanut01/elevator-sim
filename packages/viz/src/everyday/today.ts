@@ -42,14 +42,15 @@
  * own words that whether the crowd is comfortable is the day's to show. GitHub issue #208.
  */
 
-import { isServiceModeEvent, type ResolvedBuilding } from '@elevator-sim/core/browser';
+import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
+import { bookedOutCarsOf, wrinkleNoteOf } from '../shift/bookedOut.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { scheduledEventFor } from '../shift/calendar.js';
-import { FIRST_SESSION_LINE } from '../shift/firstSession.js';
+import { firstSessionLineFor } from '../shift/firstSession.js';
 import { carsToDerate } from '../shift/incidents.js';
-import { pressDayFor } from '../shift/ladder.js';
-import type { GoalReading, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
+import { pressDayStanding } from '../shift/ladder.js';
+import type { GoalReading, RunHorizon, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { countFigure, EM_DASH, groupThousands } from './figures.js';
@@ -75,8 +76,9 @@ export interface OutOfServiceStrip {
    * `<select>` and never learn that the day had a question in it — and the product said nothing.
    *
    * It is drawn **only on the day the census was measured on**: `ContractPressDay` pins a seed, and
-   * {@link mootSentenceOf} refuses to draw unless the week's contract, its day and its crowd are
-   * all that day's. A sentence about *this* day's dispatchers, drawn over a different crowd, would
+   * {@link mootSentenceOf} refuses to draw unless the week's contract, its day, its crowd, its
+   * wrinkle, its calendar and the horizon the press will run are all that day's (the last three since
+   * GitHub issue #595, [§ D973](../../../../DECISIONS.md)). A sentence about *this* day's dispatchers, drawn over a different crowd, would
    * be a measurement quoted about a run it was not taken on — which is the class
    * [§ D227](../../../../DECISIONS.md) is about, arriving through a cache of a different kind.
    */
@@ -115,6 +117,17 @@ export interface TodayRecord {
   readonly lede: string;
   /** The day's event, quoted — total, because `scheduledEventFor` falls through to the schedule. */
   readonly wrinkle: ShiftEvent;
+  /**
+   * The wrinkle's note **as the brief prints it** — `shift/bookedOut.ts#wrinkleNoteOf`, GitHub issue
+   * #596 item 3, [§ D983](../../../../DECISIONS.md).
+   *
+   * `wrinkle.note` verbatim on a day the tower books nothing. On a day it does, the ordinary day's
+   * *Nothing booked* is replaced rather than printed beside {@link outOfService}'s strip saying a car
+   * is booked out — which is what all four assessors of the post-wave-AG panel saw — and any other
+   * event's note is followed by one sentence naming the car. The Day report's header prints the same
+   * sentence from the same function, so the brief and the sheet cannot disagree about the day.
+   */
+  readonly wrinkleNote: string;
   /** § 6.2's strip, or `undefined` on a day that holds no car. */
   readonly outOfService: OutOfServiceStrip | undefined;
   /**
@@ -201,6 +214,17 @@ export interface TodayInput {
   readonly goals: readonly GoalReading[];
   readonly seed: bigint;
   /**
+   * **The horizon the next run press will run this tower on** — `host.scenarioHorizon()`, GitHub
+   * issue #595, [§ D973](../../../../DECISIONS.md).
+   *
+   * Required, {@link TodayInput.calendar}'s reason: the moot sentence quotes a census taken on one
+   * horizon, and the same seed run on the other is a different day. A caller that forgot this would
+   * default to *whatever the pin says*, which is the defect — § D914's five office pins were taken
+   * on a thirty-minute slice while the Scenario press runs those towers ten hours long, and the
+   * sentence was drawn over the whole day on the seed alone.
+   */
+  readonly horizon: RunHorizon | undefined;
+  /**
    * Whether {@link seed} is the day’s crowd — `shift/dailySeed.ts#isDailySeed(seed, nowMs)`,
    * asked by the caller and passed in.
    *
@@ -249,42 +273,15 @@ function carsHeldBy(event: ShiftEvent): number {
  * Cars this **tower's own schedule** takes out of passenger service after the day has started —
  * `shift/ladder.ts#ContractFabric.incidents`, [§ D871](../../../../DECISIONS.md).
  *
- * Read off `building.serviceEvents` rather than off the rung, and that is the whole reason this
- * sentence can be trusted: the building handed back here is the run's own
- * (`dev/state.ts#resolvedBuildingOf` is `shiftRunConfigOf(...).building`), so the strip names the
- * car the kernel will actually stand down. A second reading of the ladder would be two answers to
- * *which lift is away* — the caption-that-does-not-describe-the-picture defect this file's
- * neighbours have recorded a dozen times.
- *
- * `atS > 0` is what makes this *part-way through today* rather than *not in the building*: a car
- * stood down at the first instant is the second thing, and `carsOutOfService` is where that lives.
- *
- * Returns each car once, with whether the same schedule brings it back, so the sentence can say the
- * true one of two things rather than the safe one of one.
+ * The reading is `shift/bookedOut.ts#bookedOutCarsOf` since [§ D983](../../../../DECISIONS.md),
+ * moved there so the wrinkle card, the Day report's header and the stage read one expression rather
+ * than three. Read off `building.serviceEvents` of the run's own building, which is what makes the
+ * strip name the car the kernel will actually stand down.
  */
 function scheduledAwayOf(
   building: ResolvedBuilding | undefined,
 ): readonly { readonly carId: string; readonly returns: boolean }[] {
-  /*
-   * `isServiceModeEvent` rather than a field test: `ResolvedServiceEvent` is a union of a mode
-   * change, a derate and a range change (§ D523), and only the first has a `mode` and a `carId` at
-   * all. `core` exports the predicate for exactly this, and `shift/incidents.test.ts` narrows the
-   * same way.
-   */
-  const events = (building?.serviceEvents ?? []).filter(isServiceModeEvent);
-  const leaves = events.filter((entry) => entry.mode === 'out-of-service' && entry.atS > 0);
-  const seen = new Map<string, { carId: string; returns: boolean }>();
-  for (const leaving of leaves) {
-    if (seen.has(leaving.carId)) continue;
-    seen.set(leaving.carId, {
-      carId: leaving.carId,
-      returns: events.some(
-        (entry) =>
-          entry.carId === leaving.carId && entry.mode === 'in-service' && entry.atS > leaving.atS,
-      ),
-    });
-  }
-  return [...seen.values()].sort((a, b) => a.carId.localeCompare(b.carId));
+  return bookedOutCarsOf(building).map((car) => ({ carId: car.carId, returns: car.backAtS !== null }));
 }
 
 /**
@@ -343,11 +340,12 @@ function outOfServiceOf(
 /**
  * The moot-dispatcher sentence for this exact day, or `undefined`.
  *
- * ## The three gates, and each one is the difference between a measurement and a claim
+ * ## The gates, and each one is the difference between a measurement and a claim
  *
- * `ContractPressDay` is measured on **one contract, on day 1, at one seed** — so the sentence is
- * drawn when the week is on that contract, standing on day 1, with that crowd, and at no other
- * moment. A player on day 4 of Crown Hotel is playing a different day; a player with a `?seed=`
+ * `ContractPressDay` is measured on **one contract, on day 1, at one seed, on one horizon** — so the
+ * sentence is drawn when the week is on that contract, standing on day 1, with that crowd, about to
+ * be run on that horizon, and at no other moment. The horizon is GitHub issue #595's addition: the
+ * pin's seed run ten hours long is a different day from the same seed run for thirty minutes. A player on day 4 of Crown Hotel is playing a different day; a player with a `?seed=`
  * deep link is meeting a different crowd. Either would be this repository's oldest defect wearing
  * new words: a figure quoted about a run it was not taken on.
  *
@@ -364,13 +362,29 @@ function outOfServiceOf(
  * (`shift/pressLadder.test.ts`) than implied here.
  */
 function mootSentenceOf(
-  week: WeekState,
-  seed: bigint,
+  input: TodayInput,
+  event: ShiftEvent,
   nameOf: (id: string) => string | undefined,
 ): string | undefined {
-  const press = pressDayFor(week.contractId);
+  /*
+   * **Five gates now, not three, and the fourth is GitHub issue #595.** Contract, day and seed were
+   * checked here; the horizon was not, and on five of the seven pinned towers the Scenario press
+   * runs a ten-hour day where the census was taken over a thirty-minute slice — so the sentence was
+   * drawn, on the right seed, over a run it was not measured on. The wrinkle and the calendar are
+   * the fifth for the same reason: the census ran on the ordinary day with no calendar period, and
+   * either would make it a different day. All five are `shift/ladder.ts#pressDayStanding`'s, the
+   * predicate the picker offers the day by, so the two cannot disagree about which run is the
+   * pinned one ([§ D973](../../../../DECISIONS.md)).
+   */
+  const press = pressDayStanding({
+    contractId: input.week.contractId,
+    day: input.week.day,
+    eventId: event.id,
+    hasCalendar: input.calendar !== null,
+    seed: input.seed,
+    horizon: input.horizon,
+  });
   if (press === undefined) return undefined;
-  if (week.day !== 1 || seed.toString() !== press.seedText) return undefined;
   const names = press.mootUnder.map((id) => nameOf(id) ?? id);
   if (names.length === 0) return undefined;
   const last = names[names.length - 1] ?? '';
@@ -536,10 +550,11 @@ export function todayOf(input: TodayInput): TodayRecord {
     towerName: building?.name ?? input.buildingId,
     lede: ledeOf(building, event, held),
     wrinkle: event,
+    wrinkleNote: wrinkleNoteOf(event, bookedOutCarsOf(building)),
     outOfService: outOfServiceOf(
       building,
       event,
-      mootSentenceOf(week, input.seed, input.dispatcherNameOf),
+      mootSentenceOf(input, event, input.dispatcherNameOf),
     ),
     /*
      * The same call the run makes, and the same call the strip's own badge half makes — one
@@ -555,7 +570,14 @@ export function todayOf(input: TodayInput): TodayRecord {
     asks: input.goals.map((reading) => reading.goal.label),
     seedLine: seedLineOf(input),
     crowdIsToday: input.crowdIsToday,
-    firstSessionLine: input.firstSession ? FIRST_SESSION_LINE : undefined,
+    /*
+     * Which arm is the draw's own answer rather than a guess about how the player arrived — GitHub
+     * issue #595: the picker and the pinned days both reach a legible first day the seed did not
+     * choose, and the first arm's *the same number opens the same tower* is false of both.
+     */
+    firstSessionLine: input.firstSession
+      ? firstSessionLineFor(week.contractId, input.seed)
+      : undefined,
     driver: input.dispatcherName ?? EM_DASH,
   };
 }

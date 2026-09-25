@@ -27,9 +27,13 @@ import {
   TUTORIAL_ABSENCES,
   TUTORIAL_CASE_ID,
   TUTORIAL_COPY,
+  TUTORIAL_FIGURE_NOTES,
+  TUTORIAL_QUIET_SIM_PER_REAL_S,
   TUTORIAL_STEPS,
+  tutorialClockOf,
   tutorialCollapseViewOf,
   tutorialIsDue,
+  tutorialPaceOf,
   tutorialWalkthroughViewOf,
   type TutorialCollapseView,
   type TutorialProgress,
@@ -41,6 +45,7 @@ const read = (path: string): string => readFileSync(join(REPO, path), 'utf8');
 const MODEL_SOURCE = read('packages/viz/src/everyday/tutorialModel.ts');
 const SCREENS_SOURCE = read('packages/viz/src/everyday/tutorialScreens.ts');
 const SHELL_SOURCE = read('packages/viz/src/everyday/shell.ts');
+const PROFILE_SOURCE = read('packages/viz/src/everyday/profile.ts');
 
 /** A player who has produced nothing. The one state § D476's condition is about. */
 const NOTHING_YET: TutorialProgress = { filedDays: 0, solvedCases: 0, ratings: 0 };
@@ -101,8 +106,20 @@ describe('the gate is derived state, and § D476 says which kind', () => {
   });
 });
 
-describe('§ D476’s playability condition — skipping advances the state', () => {
-  it('closes the gate for every progress that a filed day can reach it from', () => {
+/*
+ * **§ D476's condition, as amended by § D993** (GitHub issue #598): the skip no longer files a day,
+ * so it no longer advances the state across a reload. Within a session the shell's `tutorialOffered`
+ * guard holds it; across a reload the first-visit cover carries a live route to the mode picker,
+ * which `tutorialLeave.browser.test.ts` drives on the shipped bundle.
+ */
+describe('§ D476’s condition as § D993 amends it — leaving files nothing, and the gate stays derived', () => {
+  /*
+   * Relabelled rather than deleted (§ D993): this was *"closes the gate for every progress that a
+   * filed day can reach it from"* and read as the condition's mechanism. The filing is gone, and
+   * what remains true is a property of `tutorialIsDue` alone — a player who has filed a day is not
+   * due, whatever else they have or have not done.
+   */
+  it('is a property of tutorialIsDue: a filed day closes the gate from every progress it is open at', () => {
     /*
      * The property, not an example: *every* progress this gate answers `true` for answers `false`
      * once a day is filed. There is exactly one such progress — `tutorialIsDue` is a conjunction of
@@ -127,28 +144,26 @@ describe('§ D476’s playability condition — skipping advances the state', ()
     }
   });
 
-  it('leaves by the same door on Skip and on Finish, and that door files the day', () => {
+  it('leaves by the same door on Skip and on Finish, and that door files nothing', () => {
     /*
-     * The condition is only satisfiable if the skip actually moves the week, so the mount is read
-     * off disk: `leave` must be what both the skip button and the § 3.3 primary call, and it must
-     * be the one place that runs and files. A skip wired to `go('menu')` on its own would pass
-     * every assertion above and hand the screen straight back on the next load, which is the exact
-     * defect § D476's condition names.
+     * GitHub issue #598, § D993. This case read *"…and that door files the day"* and asserted
+     * `leave` ran and closed one, on § D476's condition that skipping must advance the derived
+     * state. The day it filed was a scored day on a tower the player never saw — the front door read
+     * *MON mixed-use-high-rise 96 % today* before anybody had played — so the condition is amended
+     * and the assertion reversed rather than deleted: `leave` must be what both ways out call, and it
+     * must neither start a run nor close a day. A future lane that restores the filing turns this
+     * red and has to argue with § D993 rather than with a missing test.
      */
     const leaveBody = /function leave\(context: EverydayScreenShellContext\): void \{([\s\S]*?)\n\}/u
       .exec(SCREENS_SOURCE)?.[1];
     expect(leaveBody, 'leave() moved or was renamed').toBeTypeOf('string');
-    expect(leaveBody ?? '').toContain('host.startRun()');
-    expect(leaveBody ?? '').toContain('host.closeDay()');
-    /*
-     * And the close **waits for the landing**. `startRun` returns before the run lands, so a
-     * `closeDay` on the next line meets `closeShift`'s *a run nobody started files nothing* gate
-     * and the derived state does not move — § D476's condition failing silently in exactly the way
-     * it warns about. The wait is on recording identity, because presence alone would close the
-     * run already on the stage, which on a cold load is § D232's boot demo.
-     */
-    expect(leaveBody ?? '').toContain('host.subscribe(');
-    expect(leaveBody ?? '').toContain('=== standing');
+    expect(leaveBody ?? '').toContain("context.go('menu')");
+    for (const filing of ['startRun', 'closeDay', 'subscribe(', 'setProgress']) {
+      expect(leaveBody ?? '', `leave() must not ${filing}`).not.toContain(filing);
+    }
+    // And nothing else in the tutorial's mount starts or files a day either.
+    expect(SCREENS_SOURCE).not.toContain('host.startRun');
+    expect(SCREENS_SOURCE).not.toContain('host.closeDay');
     // Two callers and no more: the skip button on screen one, and screen two's primary.
     expect(SCREENS_SOURCE.match(/leave\(context\)/gu) ?? []).toHaveLength(2);
   });
@@ -163,6 +178,34 @@ describe('§ D476’s playability condition — skipping advances the state', ()
     expect(offer ?? '').toContain('tutorialIsDue');
     // And it only ever moves a player who is standing on the front door.
     expect(offer ?? '').toContain('EVERYDAY_ROOT');
+    /*
+     * § D993's forward rule: no field whose only reader is the first-visit gate may be stored,
+     * under any type. `offerTutorial` writes nothing — no store, no week, no progress — and its
+     * once-per-session memory is a closure `let` in the shell, never a field of persisted state.
+     */
+    for (const write of ['setProgress', 'localStorage', 'sessionStorage', '.save(', 'persist']) {
+      expect(offer ?? '', `offerTutorial must not ${write}`).not.toContain(write);
+    }
+    expect(SHELL_SOURCE).toMatch(/\n\s+let tutorialOffered\b/u);
+  });
+
+  /*
+   * § D993's forward rule, at the two types a flag would arrive in. `TutorialProgress` is exactly the
+   * three counts, and `EverydayProgress` — the profile's persisted progress — is exactly its two
+   * lists, so a *tutorials watched* count cannot be added to either without this going red.
+   */
+  it('stores nothing whose only reader is the gate: the two progress types keep exactly their fields', () => {
+    const tutorial = /export interface TutorialProgress \{([\s\S]*?)\n\}/u.exec(MODEL_SOURCE)?.[1] ?? '';
+    expect([...tutorial.matchAll(/readonly (\w+):/gu)].map((match) => match[1])).toEqual([
+      'filedDays',
+      'solvedCases',
+      'ratings',
+    ]);
+    const profile = /export interface EverydayProgress \{([\s\S]*?)\n\}/u.exec(PROFILE_SOURCE)?.[1] ?? '';
+    expect([...profile.matchAll(/readonly (\w+):/gu)].map((match) => match[1])).toEqual([
+      'solvedCaseIds',
+      'ratings',
+    ]);
   });
 });
 
@@ -388,8 +431,50 @@ describe('screen two is a canvas and one press — `charter S1`', () => {
      */
     const waiting = collapse({ runReady: true, changeReady: false }).control;
     expect(waiting?.refusal).toBe(TUTORIAL_COPY.controlRefusal);
-    const ready = collapse({ runReady: true, changeReady: true }).control;
+    const ready = collapse({ runReady: true, changeReady: true, troubleSeen: true }).control;
     expect(ready?.refusal).toBeUndefined();
+  });
+
+  /*
+   * GitHub issue #598, § D992: an assessor playing blind pressed the fix before seeing anything
+   * break. The press now waits for the thing the lede names — somebody past a minute on a landing,
+   * latched by the mount from the present frame — or for the morning to have played out, and it
+   * says so on its own face. Both polarities, and the second run still outranks it: a press that
+   * cannot work yet says *that* first.
+   */
+  it('waits for the building to be seen breaking, and says so, before it will press', () => {
+    const early = collapse({ runReady: true, changeReady: true }).control;
+    expect(early?.refusal).toBe(TUTORIAL_COPY.controlWatchFirst);
+    const seen = collapse({ runReady: true, changeReady: true, troubleSeen: true }).control;
+    expect(seen?.refusal).toBeUndefined();
+    const played = collapse({ runReady: true, changeReady: true, runEnded: true }).control;
+    expect(played?.refusal).toBeUndefined();
+    const both = collapse({ runReady: true, changeReady: false, troubleSeen: false }).control;
+    expect(both?.refusal).toBe(TUTORIAL_COPY.controlRefusal);
+  });
+
+  /*
+   * GitHub issue #598: every figure card was captioned with the complaint's measure, including the
+   * card about the lower floors. Each kind now has its own caption, and no two kinds share one.
+   */
+  it('captions each figure kind with its own sentence', () => {
+    const notes = Object.values(TUTORIAL_FIGURE_NOTES);
+    expect(new Set(notes).size).toBe(notes.length);
+    expect(TUTORIAL_FIGURE_NOTES['rest-away-pct']).toContain('Every other journey');
+    for (const note of notes) expect(note).not.toMatch(/\d/u);
+  });
+
+  it('crosses the quiet at the tutorial rung and holds the player’s speed while somebody has waited a minute', () => {
+    expect(tutorialPaceOf({ longestStandingS: undefined, watchingSimPerRealS: 4 })).toBe(TUTORIAL_QUIET_SIM_PER_REAL_S);
+    expect(tutorialPaceOf({ longestStandingS: 59, watchingSimPerRealS: 4 })).toBe(TUTORIAL_QUIET_SIM_PER_REAL_S);
+    expect(tutorialPaceOf({ longestStandingS: 60, watchingSimPerRealS: 4 })).toBe(4);
+    // A player whose own speed is faster than the quiet rung keeps it everywhere.
+    expect(tutorialPaceOf({ longestStandingS: undefined, watchingSimPerRealS: 240 })).toBe(240);
+    const quiet = tutorialClockOf({ simTimeS: 1448, startedAtS: 0, simPerRealS: 90, watchingSimPerRealS: 4 });
+    expect(quiet.clock).toBe('24:08 into the morning');
+    expect(quiet.pace).toContain('90×');
+    const held = tutorialClockOf({ simTimeS: 1448, startedAtS: 0, simPerRealS: 4, watchingSimPerRealS: 4 });
+    expect(held.pace).toContain('your speed');
   });
 
   it('spends the press: the control is gone on the beat it moved, and the answer is drawn there', () => {

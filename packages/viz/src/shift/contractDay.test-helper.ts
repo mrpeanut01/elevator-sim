@@ -45,12 +45,14 @@ import { join } from 'node:path';
 import { parseBuilding, resolveBuilding } from '@elevator-sim/core';
 
 import type { BrowserResources } from '../dev/data.js';
-import { shiftLengthForContract } from '../dev/state.js';
+import { buildingConfigOf, shiftLengthForContract } from '../dev/state.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import type { ViewerState } from '../dev/state.js';
 
 import { CONTRACTS, contractById } from './contracts.js';
+import { wholeDayFor, wholeDayRun } from './dayLength.js';
+import type { RunHorizon } from './types.js';
 import { openWeek } from './week.js';
 
 /**
@@ -125,4 +127,32 @@ export function contractDayState(contractId: string, options: ContractDayOptions
   };
   assertContractPair(state);
   return state;
+}
+
+/**
+ * **Day 1 of `contractId` as Today's scenario plays it** — the whole authored day where
+ * `wholeDayFor` answers for the contract's building, the slice where it does not — and which of the
+ * two that is. GitHub issue #592, [§ D991](../../../../DECISIONS.md).
+ *
+ * `host.ts#startRun` spreads `wholeDayRun(day)` into the patch for any building with an authored
+ * day, so this is the run a player's first session plays. It exists because three figures in one
+ * cycle were measured on {@link contractDayState}'s **slice** and used at the whole day — the energy
+ * bar (§ D962), the press pins (wave AH's lane AH-B) and § D512's legibility table (§ D991) — and a
+ * sweep that means *the day a player gets* should say so in one call rather than rebuild the pair.
+ */
+export function todaysScenarioDayState(
+  resources: BrowserResources,
+  contractId: string,
+  options: ContractDayOptions,
+): { readonly state: ViewerState; readonly horizon: RunHorizon } {
+  const probe = contractDayState(contractId, options);
+  const day = wholeDayFor(
+    resources.trafficProfiles,
+    buildingConfigOf(resources, probe.savedBuildings, probe.buildingId),
+  );
+  if (day === undefined) return { state: probe, horizon: 'period' };
+  return {
+    state: contractDayState(contractId, { ...options, over: { ...(options.over ?? {}), ...wholeDayRun(day) } }),
+    horizon: 'whole-day',
+  };
 }

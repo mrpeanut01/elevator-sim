@@ -196,13 +196,54 @@ export const FREE_PLAY_CONTRACT_ID = 'free-play';
  */
 export const REPLAY_CONTRACT_ID = 'replay';
 
+/**
+ * The id of a **career day's** week — GitHub issue #594, [§ D964](../../../../DECISIONS.md).
+ *
+ * A career day ran on the Scenario week itself: `everyday/host.ts#runCampaignDay` wrote the tower's
+ * day over `ViewerState.week`, `dev/main.ts#closeShift` filed the career's run into that week's
+ * history, and the front door then read *MON Garden Apartments 100 %* on a Midtown week, on the
+ * career run's crowd — `docs/38` § 2.2's two records collapsed into one. The Scenario week is now
+ * parked while a career day stands, exactly as {@link RUSH_CONTRACT_ID} and
+ * {@link REPLAY_CONTRACT_ID} park it, and the career's days are filed into one of these instead.
+ *
+ * Resolving to no contract is what makes it safe to file into: {@link closeDay} banks nothing and
+ * clears nothing on it, and `shift/ladder.ts#rungFor` hands a week on no contract **the building's
+ * own rung**, so a career tower is handed over as its contract hands it over whichever Scenario
+ * tower the player happens to be on — which it was not before, when the career borrowed the
+ * Scenario week's contract id and took a rung only when the two happened to agree.
+ */
+export const CAREER_CONTRACT_ID = 'career';
+
 export const WEEK_CONTRACT_SENTINELS: Readonly<Record<string, string>> = Object.freeze({
   endless: ENDLESS_CONTRACT_ID,
   sandbox: SANDBOX_CONTRACT_ID,
   'free play': FREE_PLAY_CONTRACT_ID,
   rush: RUSH_CONTRACT_ID,
   replay: REPLAY_CONTRACT_ID,
+  career: CAREER_CONTRACT_ID,
 });
+
+/**
+ * **The weeks a mode other than Scenario stands on while it plays** — GitHub issue #594,
+ * [§ D965](../../../../DECISIONS.md).
+ *
+ * Each of these is a slot the player's Scenario week is parked behind for the length of one mode's
+ * sitting, and none of them is a week the player owns. They were written to the saved session
+ * anyway: a rush sets `playMode: 'endless'`, which `dev/state.ts#advancesTheWeek` says owns a week,
+ * so the rush week went to disk as the live week with the Scenario week parked behind it, and a
+ * rush or a replay left behind stayed in the parked list after the player walked out. Neither id
+ * names a contract, so `persist/validate.ts` refused the whole session on the next load as *banked
+ * toward assignments this build no longer has* and started a fresh week — which is assessor A's
+ * *"a Midtown week with Monday closed became a fresh Garden Apartments Monday"*.
+ *
+ * `dev/state.ts#scenarioWeeksOf` is the one reader: it takes these off the pair before it is
+ * written and before a restored one is used.
+ */
+export const MODE_WEEK_CONTRACT_IDS: readonly string[] = Object.freeze([
+  RUSH_CONTRACT_ID,
+  REPLAY_CONTRACT_ID,
+  CAREER_CONTRACT_ID,
+]);
 
 /**
  * A week with no assignment — the *endless mode* `c5` and `c8` name in their rewards.
@@ -236,6 +277,11 @@ export function openEndless(): WeekState {
 /** The week an Endless rush runs on — see {@link RUSH_CONTRACT_ID}. */
 export function openRush(): WeekState {
   return openWeek(RUSH_CONTRACT_ID);
+}
+
+/** A career tower's week, before its first day is filed — see {@link CAREER_CONTRACT_ID}. */
+export function openCareer(): WeekState {
+  return openWeek(CAREER_CONTRACT_ID);
 }
 
 

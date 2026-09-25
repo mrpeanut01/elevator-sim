@@ -90,7 +90,13 @@ import type { ViewMode } from '../mode/types.js';
 import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
 import { firstSessionContractFor } from '../shift/firstSession.js';
 import { runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
-import { SHIFT_EVENTS, eventById, shiftRunPatch, baseDemandOf } from '../shift/events.js';
+import {
+  SHIFT_EVENTS,
+  baseDemandOf,
+  demandTemplateVariesMix,
+  eventById,
+  shiftRunPatch,
+} from '../shift/events.js';
 import { ladderTowerConfig, rungFor, rungIncidents } from '../shift/ladder.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
@@ -118,6 +124,7 @@ import {
 } from '../commissioning/types.js';
 import {
   FREE_PLAY_CONTRACT_ID,
+  MODE_WEEK_CONTRACT_IDS,
   SANDBOX_CONTRACT_ID,
   closeDay,
   nextDay,
@@ -901,10 +908,51 @@ export interface StoredWeeks {
  * rather than trusting this paragraph.
  */
 export function weeksForSession(state: ViewerState, stored: StoredWeeks | undefined): StoredWeeks {
-  if (advancesTheWeek(state.playMode)) {
-    return { week: state.week, parkedWeeks: state.parkedWeeks };
+  const current = scenarioWeeksOf({ week: state.week, parkedWeeks: state.parkedWeeks });
+  if (advancesTheWeek(state.playMode)) return current;
+  return stored === undefined ? current : scenarioWeeksOf(stored);
+}
+
+/**
+ * **The player's weeks with every mode's own week taken off** — GitHub issue #594,
+ * [§ D965](../../../../DECISIONS.md).
+ *
+ * A rush, a replay and a career day each stand on a week of their own
+ * (`shift/week.ts#MODE_WEEK_CONTRACT_IDS`) and park the Scenario week behind it with
+ * `switchWeek`, which appends the week it leaves to the **end** of the parked list. Leaving puts
+ * the Scenario week back and parks the mode's week in its place. So at any instant the pair can
+ * hold a mode's week in either slot, and neither is anything the player owns:
+ *
+ * - **live** — the rush, replay or career day is standing. The Scenario week is the last parked
+ *   week that is not a mode's, and it goes back to the live slot. A rush sets
+ *   `playMode: 'endless'`, which {@link advancesTheWeek} answers `true` for, so the rush week was
+ *   the one written — and on the next load `persist/validate.ts` refused the session as banked
+ *   toward an assignment this build does not have, and cleared it.
+ * - **parked** — the mode is over. The entry is dropped; the week it parked was put back when the
+ *   player left, and a parked rush week is the same refusal waiting for a reload.
+ *
+ * Identity-preserving when there is nothing to take off, so the ordinary path — every Scenario day
+ * ever saved — writes exactly the objects it did before, which `state.progression.test.ts` asserts
+ * with `toBe`.
+ *
+ * Read on the way **out** by {@link weeksForSession} and on the way **in** by `dev/main.ts`'s
+ * restore, so a session written before this existed is repaired rather than refused.
+ *
+ * The fallback when nothing is parked is a fresh first week keeping what the player has cleared —
+ * a mode's week is always opened by parking the week it replaced, so the branch is reached only by
+ * a pair `PARKED_WEEKS_MAX` has already trimmed, and `completed` is what survives that too.
+ */
+export function scenarioWeeksOf(pair: StoredWeeks): StoredWeeks {
+  const isModeWeek = (week: WeekState): boolean => MODE_WEEK_CONTRACT_IDS.includes(week.contractId);
+  const parked = pair.parkedWeeks.filter((week) => !isModeWeek(week));
+  if (!isModeWeek(pair.week)) {
+    return parked.length === pair.parkedWeeks.length ? pair : { week: pair.week, parkedWeeks: parked };
   }
-  return stored ?? { week: state.week, parkedWeeks: state.parkedWeeks };
+  const resumed = parked.at(-1);
+  if (resumed === undefined) {
+    return { week: { ...openWeek(), completed: pair.week.completed }, parkedWeeks: [] };
+  }
+  return { week: resumed, parkedWeeks: parked.slice(0, -1) };
 }
 
 /**
@@ -1943,7 +1991,14 @@ export function shiftRunConfigOf(
     event,
     building,
     base: fitBase,
-    templateVariesMix: demandTemplate === 'lunch-two-way',
+    /*
+     * `core`'s own answer, through `shift/events.ts#demandTemplateVariesMix` — GitHub issue #593.
+     * This was `demandTemplate === 'lunch-two-way'`, a list of one, and `office-day` — the whole
+     * day thirteen contracts run in Scenario — varies the mix too: every wrinkle that set a mix
+     * of its own built a config `core` refused, and the stage waited on it forever. Read against
+     * the file the run resolves against, which is `trafficProfiles` below and not the resources'.
+     */
+    templateVariesMix: demandTemplateVariesMix(demandTemplate, trafficProfiles.demandTemplates),
   });
 
   /*

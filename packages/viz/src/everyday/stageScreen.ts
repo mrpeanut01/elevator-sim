@@ -98,6 +98,8 @@ import {
   STAGE_FLOOR_JUMP_PLACEHOLDER,
   stageAlarmOf,
   stageBarModelOf,
+  stageRunFailedViewOf,
+  stageBookedOutOf,
   stageCameraChipsOf,
   type StageCameraId,
   stageCameraWindowOf,
@@ -119,6 +121,11 @@ import {
   type StageSwitchTarget,
 } from './stageScreenModel.js';
 import { everydayProfileStore } from './profileStore.js';
+import { bookedOutCarsOf, type BookedOutCar } from '../shift/bookedOut.js';
+/* GitHub issue #592, § D991 — the whole day's acts and the pace rule over them. */
+import { actsOf, type DayAct } from '../shift/dayLength.js';
+import type { RunHorizon } from '../shift/types.js';
+import { stagePaceNoteOf, stagePaceOf } from './stagePace.js';
 /* GitHub issue #340: the two beat-1 events. The recorder is a no-op until consent is granted. */
 import { everydayTelemetry } from './telemetryPort.js';
 import { telemetryRunPointerOf } from '../telemetry/schema.js';
@@ -357,6 +364,16 @@ function mountStage(
    */
   let standingAtEntry: VizRecording | undefined;
   let speedIndex = defaultSpeedIndex();
+  /*
+   * ---- § D991's pace — GitHub issue #592. Three cells, all set in `adopt`. ----
+   *
+   * `speedIndex` above stays the **player's** rung; the transport may run faster than it between a
+   * whole day's peaks, and `everyday/stagePace.ts` decides when. A chip press sets
+   * `playerChoseSpeed`, and from then on the stage leaves the speed alone for the rest of the day.
+   */
+  let paceHorizon: RunHorizon = 'period';
+  let paceActs: readonly DayAct[] = [];
+  let playerChoseSpeed = false;
   /* ---- § D344's sound — GitHub issue #258. Four cells, none of which a leg can read. ---- */
   /** The synthesised sink, built on the first frame that has something to play. */
   let audioSink: AudioSink | undefined;
@@ -472,6 +489,25 @@ function mountStage(
     'display:none',
   ].join(';');
 
+  /*
+   * The car the tower books out part-way through the day — GitHub issue #596 item 3, § D983. The
+   * words are `stageScreenModel.ts#stageBookedOutOf`'s; this is the pill. Down on a tower that books
+   * nothing, which is most of them.
+   */
+  const bookedPill = el(doc, 'span', 'everyday-stage-booked');
+  bookedPill.style.cssText = [
+    `border:1px dashed ${C.terracotta}`,
+    `border-radius:${String(R.pill)}px`,
+    'padding:3px 10px',
+    `font:500 10px ${TYPE.mono}`,
+    'letter-spacing:.08em',
+    `color:${C.terracotta}`,
+    'display:none',
+  ].join(';');
+  /* Read once per recording, not per frame — `resolvedBuilding()` resolves the whole run config. */
+  let bookedFor: VizRecording | undefined;
+  let bookedCars: readonly BookedOutCar[] = [];
+
   const driving = el(doc, 'span', 'everyday-stage-driving');
   driving.style.cssText = 'display:flex;align-items:center;gap:6px';
   /* The model's own word, here and on every draw from `stageHeaderOf`'s `drivingLabel` — the corpus
@@ -546,6 +582,13 @@ function mountStage(
    * positions are one picture, and a chip that changed nothing would be a lie in a strip.
    */
   speeds.append(skipButton);
+  /*
+   * § D991's note — why the transport is at the rung it is, on a whole day. Empty on every other
+   * run, where nothing is paced. Written by {@link pace} on change only.
+   */
+  const paceNote = el(doc, 'span', 'everyday-stage-pace');
+  paceNote.style.cssText = `align-self:center;font:500 11px ${TYPE.mono};color:${C.warmGrey}`;
+  speeds.append(paceNote);
 
   const cameras = el(doc, 'div', 'everyday-stage-cameras');
   /*
@@ -625,7 +668,7 @@ function mountStage(
   }
   syncCamera();
 
-  header.append(clock, phase, nextPhase, driving, figures, playButton, speeds, cameras, floorJump);
+  header.append(clock, phase, nextPhase, bookedPill, driving, figures, playButton, speeds, cameras, floorJump);
 
   /*
    * **Pillar 3's strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
@@ -853,7 +896,44 @@ function mountStage(
   startButton.addEventListener('click', () => {
     togglePlay();
   });
-  status.append(statusText, startButton);
+  /*
+   * **The failed state's two ways on** — GitHub issue #593, `stageRunFailedViewOf`. Hidden until a
+   * run of the player's own fails; then the overlay says so and these are the only two controls it
+   * offers, because a failure the player cannot act on is the endless spinner with better words.
+   */
+  const failedRow = el(doc, 'div', 'everyday-stage-failed');
+  failedRow.style.cssText = 'display:none;gap:10px;flex-wrap:wrap;justify-content:center';
+  const retryButton = el(doc, 'button', 'everyday-stage-failed-retry');
+  retryButton.type = 'button';
+  retryButton.style.cssText = startButton.style.cssText;
+  retryButton.addEventListener('click', () => {
+    /*
+     * The flow's own run press, not the daily one: `host.startRun` disarms a career day's latch by
+     * design (`host.ts#campaignDayTowerId`), so a career retry through it would come back as a
+     * Scenario day, and a rush's standing is written by `startRush` alone.
+     */
+    const careerDay = context.ctx === 'campaign' ? host.campaignDay() : undefined;
+    if (careerDay !== undefined) host.runCampaignDay(careerDay.tower.id);
+    else if (context.ctx === 'rush') host.startRush();
+    else host.startRun();
+    syncTransport();
+  });
+  const backButton = el(doc, 'button', 'everyday-stage-failed-back');
+  backButton.type = 'button';
+  backButton.style.cssText = [
+    'background:transparent',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.row)}px`,
+    'padding:10px 22px',
+    `color:${C.ink}`,
+    'font-size:14px',
+    'cursor:pointer',
+  ].join(';');
+  backButton.addEventListener('click', () => {
+    context.go(stageRunFailedViewOf(context.ctx).back.screen);
+  });
+  failedRow.append(retryButton, backButton);
+  status.append(statusText, startButton, failedRow);
   stageWrap.append(canvas, description, watchPill, status);
 
   const legend = el(doc, 'div', 'everyday-stage-legend');
@@ -1248,9 +1328,49 @@ function mountStage(
 
   function setSpeed(index: number): void {
     speedIndex = index;
+    /* § D991: a chip press is the player's, and the stage stops pacing this day from here on. */
+    playerChoseSpeed = true;
     playback?.setSpeed(stageSpeedAt(index).simPerRealS);
     syncTransport();
     requestFrame();
+  }
+
+  /**
+   * **Pace a whole day** — GitHub issue #592, [§ D991](../../../../DECISIONS.md).
+   *
+   * Asked once a frame, from {@link draw}, with the present frame's longest wait and nothing
+   * later. The rule is `everyday/stagePace.ts#stagePaceOf`'s; this moves the transport only when
+   * the answer changes, because `Playback.setSpeed` re-anchors and a re-anchor on every frame
+   * would be sixty for nothing. The note is written on change for the same reason.
+   *
+   * It touches the transport's speed and nothing else — never the playhead (`docs/28` AD-S4) — so a
+   * day played this way is the same recording, the same legs and the same report.
+   */
+  function pace(simTimeS: number, longestStandingS: number | undefined): void {
+    if (playback === undefined) return;
+    /*
+     * **Only while the transport is playing.** The stage opens paused at `startedAt` on the player's
+     * own rung — § 4.6's *the day opens at the player's default speed*, which two browser cases
+     * hold — and pacing begins with the first *Start*, *Play* or skip. A paused transport is not
+     * moving, so nothing is re-paced under it: the chip and the note keep what they last said, and
+     * on a day nobody has started that is the rung the player set and no note at all.
+     */
+    if (playback.state !== 'playing') return;
+    const answer = stagePaceOf({
+      horizon: paceHorizon,
+      acts: paceActs,
+      simTimeS,
+      watchingSimPerRealS: stageSpeedAt(speedIndex).simPerRealS,
+      longestStandingS,
+      playerChoseSpeed,
+    });
+    const note =
+      stagePaceNoteOf(answer, { acts: paceActs, simTimeS, dayStartS: host.dayStartS() }) ?? '';
+    if (paceNote.textContent !== note) paceNote.textContent = note;
+    if (playback.speed !== answer.simPerRealS) {
+      playback.setSpeed(answer.simPerRealS);
+      syncTransport();
+    }
   }
 
   /**
@@ -1556,7 +1676,16 @@ function mountStage(
     if (resumeAtS === undefined) {
       speedIndex = defaultSpeedIndex();
       started = false;
+      playerChoseSpeed = false;
     }
+    /*
+     * § D991 — which runs are paced. A whole day **the player's own shell simulated**, and nothing
+     * else: `host.runHorizon()` answers about the state, so on a watched or replayed recording it
+     * would be describing a different run, and the Rush's template is a phase list whose only peak
+     * is its end. The acts are the recording's own schedule, never a list written here.
+     */
+    paceHorizon = context.ctx !== 'rush' ? host.runHorizon() : 'period';
+    paceActs = actsOf(recording.demandPhases);
     /*
      * A new recording is a new building — GitHub issue #258. The crossover is the old tower's
      * doors and the remembered frame is the old tower's cars, so both are dropped rather than
@@ -1602,6 +1731,7 @@ function mountStage(
       adopted,
       runPending: host.runPending(),
       standingAtEntry,
+      runFailed: host.runFailure?.() !== undefined,
     });
     if (mayAdopt && recording !== undefined) adopt(recording);
     /*
@@ -1705,8 +1835,14 @@ function mountStage(
       `color:${skipButton.disabled ? C.label : C.ink}`,
       `cursor:${skipButton.disabled ? 'default' : 'pointer'}`,
     ].join(';');
+    /*
+     * The chip that is lit is the rung the transport is **at**, which between a whole day's peaks
+     * may be faster than the player's own (§ D991: *every change shows on the chip*). The label is
+     * always the multiplier, so the lit chip is never a claim the transport contradicts.
+     */
+    const runningAt = playback?.speed ?? stageSpeedAt(speedIndex).simPerRealS;
     for (const [index, button] of speedButtons.entries()) {
-      const on = index === speedIndex;
+      const on = stageSpeedAt(index).simPerRealS === runningAt;
       button.disabled = playback === undefined;
       button.setAttribute('aria-pressed', String(on));
       button.style.cssText = [
@@ -1724,6 +1860,27 @@ function mountStage(
      * overlay never sits over a moving picture; a run that has not arrived says so in the same
      * place, because a blank stage with no sentence is the control-that-does-nothing shape.
      */
+    /*
+     * **A day that failed says so, and offers a way on** — GitHub issue #593. Only while nothing of
+     * today's is on the stage (or a re-run over it is what failed) and nothing newer is pending: a
+     * press of *Try the day again* clears the host's failure as it starts the next run, so the
+     * waiting line takes over on the same notification.
+     */
+    const failed =
+      context.ctx !== 'watch' &&
+      host.runFailure?.() !== undefined &&
+      !host.runPending() &&
+      (adopted === undefined || recomputingOver !== undefined);
+    failedRow.style.display = failed ? 'flex' : 'none';
+    if (failed) {
+      const failedView = stageRunFailedViewOf(context.ctx);
+      statusText.textContent = failedView.line;
+      retryButton.textContent = failedView.retry;
+      backButton.textContent = failedView.back.label;
+      startButton.style.display = 'none';
+      status.style.display = 'flex';
+      return;
+    }
     if (adopted === undefined) {
       statusText.textContent =
         recomputingOver !== undefined ? STAGE_RECOMPUTING : STAGE_AWAITING_RUN;
@@ -1872,7 +2029,7 @@ function mountStage(
     audioCrossover ??= audioCrossoverOf(recording);
     const planned = audioPlanFor({
       crossover: audioCrossover,
-      simPerRealS: stageSpeedAt(speedIndex).simPerRealS,
+      simPerRealS: playback?.speed ?? stageSpeedAt(speedIndex).simPerRealS,
       before: audioBefore,
       now: frame,
       observations,
@@ -1891,6 +2048,7 @@ function mountStage(
     if (recording === undefined || playback === undefined) return;
     const simTimeS = playback.simTimeS;
     const observations: LiveObservations = observationsAt(recording, simTimeS);
+    pace(simTimeS, observations.longestCurrentWaitS);
     /*
      * Hoisted out of the canvas branch below for GitHub issue #258. It was computed only over a
      * laid-out canvas, which is correct for a picture and wrong for a sound: the cues are the
@@ -1938,6 +2096,21 @@ function mountStage(
     /* Nothing rather than a placeholder: inside the last stretch there is no next one to name. */
     nextPhase.textContent = head.next ?? '';
     nextPhase.style.display = head.next === undefined ? 'none' : '';
+    /*
+     * § D983. The player's own building, and only on the player's own run: a watched record is
+     * somebody else's day in somebody else's tower, and a rush books nothing.
+     */
+    if (recording !== bookedFor) {
+      bookedFor = recording;
+      const building = host.resolvedBuilding();
+      bookedCars = building?.id === recording.buildingId ? bookedOutCarsOf(building) : [];
+    }
+    const booked =
+      watching === undefined && context.ctx !== 'rush'
+        ? stageBookedOutOf({ bookedOut: bookedCars, simTimeS, dayStartS: host.dayStartS() })
+        : [];
+    bookedPill.textContent = booked.join('   ');
+    bookedPill.style.display = booked.length === 0 ? 'none' : '';
     drivingName.textContent = watching?.dispatcherName ?? head.driverName;
     drawFigures(head.figures);
     drawGoals(recording, simTimeS, watching);
@@ -2510,7 +2683,21 @@ function mountStage(
    */
   /* GitHub issue #548 — latched *before* the press below, which is the press that makes it stale. */
   if (context.ctx !== 'watch') standingAtEntry = host.recording();
-  if (context.ctx !== 'watch' && context.ctx !== 'rush' && stageEntryStartsARun(host.runState())) host.startRun();
+  /*
+   * **Not while the day asked for is still coming, and a career day by the career's own press** —
+   * GitHub issue #594. From fresh storage the boot run is nobody's choice, so a career day's stage
+   * arrived here with `open` false and pressed `host.startRun()` over the career run already in
+   * flight: that press is § 6's, it disarms the career latch by design, and the career day was then
+   * filed into the Scenario week as a Monday nobody played. A pending run is the day the player
+   * pressed for, so the mount waits for it; and in the campaign context the re-press, when one is
+   * due, is `runCampaignDay` for the latched tower, which is the only press that files to a career.
+   */
+  const pressTheDay = (): void => {
+    const careerDay = context.ctx === 'campaign' ? host.campaignDay() : undefined;
+    if (careerDay !== undefined) host.runCampaignDay(careerDay.tower.id);
+    else if (context.ctx !== 'campaign') host.startRun();
+  };
+  if (context.ctx !== 'watch' && context.ctx !== 'rush' && !host.runPending() && stageEntryStartsARun(host.runState())) pressTheDay();
   /*
    * The handover arm is drawn from inside this call, before any frame — `draw` returns early with
    * no recording, so without it the button would sit on the awaiting-run stage with no words on it.

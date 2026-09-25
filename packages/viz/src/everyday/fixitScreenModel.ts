@@ -56,8 +56,15 @@
  */
 
 import type { FixitSpend } from '../fixit/engine.js';
-import { EDITOR_PARKING_STRATEGIES } from '../fixit/types.js';
-import type { EditorParkingStrategy, FixitCase, FixitState } from '../fixit/types.js';
+import type {
+  DialGroupInput,
+  DoorInput,
+  RezoneInput,
+  RowPurchase,
+  TenancyInput,
+} from '../fixit/editorInputs.js';
+import { EDITOR_PARKING_STRATEGIES, KEYED_BANK, OUT_OF_SERVICE } from '../fixit/types.js';
+import type { DialValue, EditorParkingStrategy, FixitCase, FixitState } from '../fixit/types.js';
 import type { ActionBarModel } from './actionBar.js';
 /* The currency's own words, from `data/chime-ledger.json` — § D530 authors them and no screen may. */
 import { CHIME_PRICES } from './chimesPanel.js';
@@ -162,6 +169,52 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   parkingStay: 'where each one last stopped',
   parkingLobby: 'back down at the lobby',
   parkingZone: 'in the middle of its own zone',
+  /* § D1000: the two strategies the select withheld on reasons that stopped being true. */
+  parkingForecast: 'where the next calls are forecast to come from',
+  parkingFixedFloor: 'at one floor you name',
+  /*
+   * § D1000's five families. The dials' own names and ends are `core`'s, beside the rows that
+   * declare them (GitHub issue #147); what is here is the frame around them.
+   */
+  dialsEyebrow: 'THE STANDING ORDER',
+  dialsHint:
+    'Every setting the controller holds, grouped by what the owner charges for it. One charge covers a whole group, however many of its settings you move.',
+  dialStanding: 'as it stands',
+  dialOn: 'yes',
+  dialOff: 'no',
+  groupPricedOnce: 'once for the group',
+  groupAtBudget: 'the repair budget will not stretch to this group',
+  doorLabel: 'Door hold',
+  doorTargetLabel: 'on',
+  doorEveryCar: 'every car',
+  doorHallLabel: 'answering a landing call',
+  doorCarLabel: 'for riders already aboard',
+  doorStanding: 'as the car has it',
+  rezoneEyebrow: 'THE BANKS',
+  rezoneHint:
+    'Which bank each car runs in, and which floors each bank stops at. One rezone is one charge, however much of it you redraw.',
+  rezoneCarLabel: 'runs in',
+  rezoneKeyed: 'a bank of its own',
+  rezoneOut: 'out of service',
+  rezoneOutForWorks: 'out for works',
+  rezoneFloorsLabel: 'stops at',
+  rezoneFloorServed: 'stops here',
+  rezoneFloorPassed: 'passes by',
+  rezonePairedNote: 'A double-deck bank stops at floors in pairs, and its pairs are not redrawn here.',
+  plateLabel: 'Weighs its load against',
+  plateAsSet: 'the setting it has now',
+  platePlate: 'the car’s own plate',
+  /*
+   * § D1001's tenancy row, drawn on every case. The sentence for a case with no movable crowd says
+   * what is true of it — its cases author no cohort — and nothing about where else to look.
+   */
+  tenancyEyebrow: 'THE TENANCIES',
+  tenancyNone:
+    'Nobody here has a start time the owner can ask them to move, so this row has nothing to stagger.',
+  tenancyAsItStands: 'as it stands — everyone on the same clock',
+  tenancyPricedEach: 'a tenancy',
+  planRefused:
+    'The building would not run as drawn — a bank may have been left with no car, or with one floor to stop at. Put the last change back and run again.',
   /** Why *buy one more step* refuses — § 10.3's budget cap, said on the control. */
   noBudgetLeft: 'The repair budget will not stretch to another step on this row.',
   /* Section 10.3's elevation — issue #422. */
@@ -470,6 +523,8 @@ export function fixitParkingRow(
     stay: FIXIT_SCREEN_COPY.parkingStay,
     lobby: FIXIT_SCREEN_COPY.parkingLobby,
     'zone-center': FIXIT_SCREEN_COPY.parkingZone,
+    'predicted-demand': FIXIT_SCREEN_COPY.parkingForecast,
+    'fixed-floor': FIXIT_SCREEN_COPY.parkingFixedFloor,
   };
   const options: FixitParkingOption[] = [
     {
@@ -543,6 +598,269 @@ export function fixitElevationRow(
         ? FIXIT_SCREEN_COPY.noBudgetLeft
         : undefined,
     canStepDown: state.topFloorRaiseM > 0,
+  };
+}
+
+/* -------------------------------------------------------------------------- *
+ * § D1000's five families — the dials, the door hold and the banks
+ * -------------------------------------------------------------------------- */
+
+/** One entry in a family select. `value` is `''` for *leave it as it stands*, else an encoded value. */
+export interface FixitSelectOption {
+  readonly value: string;
+  readonly label: string;
+  readonly selected: boolean;
+}
+
+/** A family group's heading, with the schedule row's price said once for the whole group. */
+export interface FixitGroupHeader {
+  readonly heading: string;
+  readonly priced: string;
+  /** The row is not yet bought and the budget cannot take it — every select in it is held. */
+  readonly atBudget: boolean;
+}
+
+/**
+ * How a dial value travels through a `<select>`'s string `value` and back — JSON, because a dial
+ * holds a number, a name or a switch and all three must come back as what they were. `''` is the
+ * *as it stands* entry and decodes to `null`, which every family reducer reads as *hand it back*.
+ */
+export function encodeFamilyValue(value: DialValue | undefined): string {
+  return value === undefined ? '' : JSON.stringify(value);
+}
+export function decodeFamilyValue(value: string): DialValue | null {
+  return value === '' ? null : (JSON.parse(value) as DialValue);
+}
+
+/** The heading over a family group: its schedule row's name and what the row costs, once. */
+export function fixitGroupHeader(row: RowPurchase): FixitGroupHeader {
+  const priced =
+    row.units === 0 ? FIXIT_SCREEN_COPY.parkingFree : `${String(row.units)} u ${FIXIT_SCREEN_COPY.groupPricedOnce}`;
+  const atBudget = !row.affordable;
+  return {
+    heading: row.name,
+    priced: atBudget ? `${priced} · ${FIXIT_SCREEN_COPY.groupAtBudget}` : priced,
+    atBudget,
+  };
+}
+
+/** One dial, worded. `label` and `effect` are `core`'s words beside the row. */
+export interface FixitDialView {
+  readonly key: string;
+  readonly label: string;
+  readonly effect: string;
+  readonly options: readonly FixitSelectOption[];
+}
+
+export interface FixitDialGroupView {
+  readonly key: string;
+  readonly header: FixitGroupHeader;
+  readonly dials: readonly FixitDialView[];
+}
+
+/**
+ * The dial groups, worded — `fixit/editorInputs.ts#editorInputsOf` decides which dials are live and
+ * which values each offers; this says them. The *as it stands* entry quotes the standing value, so a
+ * player can see what they would be moving away from without moving it.
+ */
+export function fixitDialGroupsView(groups: readonly DialGroupInput[]): readonly FixitDialGroupView[] {
+  return groups.map((group) => ({
+    key: group.row.changeId,
+    header: fixitGroupHeader(group.row),
+    dials: group.dials.map((dial) => ({
+      key: dial.id,
+      label: dial.name,
+      effect: dial.effect,
+      options: [
+        {
+          value: '',
+          label:
+            dial.standingText === ''
+              ? FIXIT_SCREEN_COPY.dialStanding
+              : `${FIXIT_SCREEN_COPY.dialStanding} — ${boolWords(dial.standingText)}`,
+          selected: dial.selected === undefined,
+        },
+        ...dial.options.map((option) => ({
+          value: encodeFamilyValue(option.value),
+          label: typeof option.value === 'boolean' ? (option.value ? FIXIT_SCREEN_COPY.dialOn : FIXIT_SCREEN_COPY.dialOff) : option.text,
+          selected: dial.selected !== undefined && encodeFamilyValue(dial.selected) === encodeFamilyValue(option.value),
+        })),
+      ],
+    })),
+  }));
+}
+
+/** `fixit/families.ts#dialValueText` says a switch as *on* or *off*; this screen says *yes* or *no*. */
+function boolWords(text: string): string {
+  return text === 'on' ? FIXIT_SCREEN_COPY.dialOn : text === 'off' ? FIXIT_SCREEN_COPY.dialOff : text;
+}
+
+/** The door-hold row, worded, for the target the player has picked. */
+export interface FixitDoorView {
+  readonly header: FixitGroupHeader;
+  readonly label: string;
+  readonly targetLabel: string;
+  readonly targets: readonly FixitSelectOption[];
+  readonly sides: readonly {
+    readonly key: 'hall' | 'car';
+    readonly label: string;
+    readonly options: readonly FixitSelectOption[];
+  }[];
+}
+
+export function fixitDoorView(
+  input: DoorInput,
+  doorDwell: FixitState['doorDwell'],
+  target: string,
+): FixitDoorView {
+  const setting = doorDwell[target] ?? {};
+  const side = (key: 'hall' | 'car', values: readonly number[]) => {
+    const current = key === 'hall' ? setting.hallCallS : setting.carCallS;
+    return {
+      key,
+      label: key === 'hall' ? FIXIT_SCREEN_COPY.doorHallLabel : FIXIT_SCREEN_COPY.doorCarLabel,
+      options: [
+        { value: '', label: FIXIT_SCREEN_COPY.doorStanding, selected: current === undefined },
+        ...values.map((seconds) => ({
+          value: encodeFamilyValue(seconds),
+          label: `${seconds.toFixed(1)} s`,
+          selected: current !== undefined && Math.abs(current - seconds) < 1e-9,
+        })),
+      ],
+    };
+  };
+  return {
+    header: fixitGroupHeader(input.row),
+    label: FIXIT_SCREEN_COPY.doorLabel,
+    targetLabel: FIXIT_SCREEN_COPY.doorTargetLabel,
+    targets: input.targets.map((candidate) => ({
+      value: candidate.key,
+      label:
+        candidate.carId === undefined
+          ? FIXIT_SCREEN_COPY.doorEveryCar
+          : `Car ${candidate.carId}${candidate.bankName === undefined ? '' : ` · ${candidate.bankName}`}`,
+      selected: candidate.key === target,
+    })),
+    sides: [side('hall', input.hallOptions), side('car', input.carOptions)],
+  };
+}
+
+/** The banks, worded. */
+export interface FixitRezoneView {
+  readonly header: FixitGroupHeader;
+  readonly cars: readonly { readonly key: string; readonly label: string; readonly options: readonly FixitSelectOption[] }[];
+  readonly banks: readonly {
+    readonly key: string;
+    readonly name: string;
+    /** Absent on a double-deck bank, whose floors come in pairs this control does not redraw. */
+    readonly floors:
+      | readonly { readonly id: string; readonly served: boolean; readonly label: string }[]
+      | undefined;
+    readonly pairedNote: string | undefined;
+    /** Present only where the bank weighs against something other than its plate. */
+    readonly plate: { readonly label: string; readonly options: readonly FixitSelectOption[] } | undefined;
+  }[];
+}
+
+export function fixitRezoneView(input: RezoneInput): FixitRezoneView {
+  const plainBanks = input.banks.filter((bank) => !bank.keyed);
+  const nameOf = new Map(input.banks.map((bank) => [bank.id, bank.name]));
+  return {
+    header: fixitGroupHeader(input.row),
+    cars: input.cars.map((car) => {
+      const standingLabel =
+        car.standingBankId === OUT_OF_SERVICE
+          ? FIXIT_SCREEN_COPY.rezoneOutForWorks
+          : (nameOf.get(car.standingBankId) ?? car.standingBankId);
+      const choices: { value: string; label: string }[] = [
+        { value: '', label: `${FIXIT_SCREEN_COPY.dialStanding} — ${standingLabel}` },
+        ...plainBanks
+          .filter((bank) => bank.id !== car.standingBankId)
+          .map((bank) => ({ value: bank.id, label: bank.name })),
+        { value: KEYED_BANK, label: FIXIT_SCREEN_COPY.rezoneKeyed },
+        ...(car.standingBankId === OUT_OF_SERVICE ? [] : [{ value: OUT_OF_SERVICE, label: FIXIT_SCREEN_COPY.rezoneOut }]),
+      ];
+      const picked = car.target === car.standingBankId ? '' : car.target;
+      return {
+        key: car.id,
+        label: `Car ${car.id} ${FIXIT_SCREEN_COPY.rezoneCarLabel}`,
+        options: choices.map((choice) => ({ ...choice, selected: choice.value === picked })),
+      };
+    }),
+    banks: input.banks.map((bank) => ({
+      key: bank.id,
+      name: bank.name,
+      floors: bank.paired
+        ? undefined
+        : input.floorOrder.map((id) => {
+            const served = bank.floors.includes(id);
+            return {
+              id,
+              served,
+              label: `${id} — ${served ? FIXIT_SCREEN_COPY.rezoneFloorServed : FIXIT_SCREEN_COPY.rezoneFloorPassed}`,
+            };
+          }),
+      pairedNote: bank.paired ? FIXIT_SCREEN_COPY.rezonePairedNote : undefined,
+      plate: bank.offPlate
+        ? {
+            label: FIXIT_SCREEN_COPY.plateLabel,
+            options: [
+              { value: '', label: FIXIT_SCREEN_COPY.plateAsSet, selected: !bank.plated },
+              { value: 'plate', label: FIXIT_SCREEN_COPY.platePlate, selected: bank.plated },
+            ],
+          }
+        : undefined,
+    })),
+  };
+}
+
+/** The tenancy row, worded — § D1001. */
+export interface FixitTenancyView {
+  readonly heading: string;
+  readonly priced: string;
+  readonly atBudget: boolean;
+  /** One select per cohort the case authors. Empty on a case that authors none. */
+  readonly cohorts: readonly {
+    readonly key: string;
+    readonly name: string;
+    readonly reason: string;
+    readonly options: readonly FixitSelectOption[];
+  }[];
+  /** The sentence drawn where there is nothing to move — present exactly when `cohorts` is empty. */
+  readonly none: string | undefined;
+}
+
+/**
+ * The tenancy row. **Drawn on every case** — § D1001 and § D528 clause 3's *never a removed
+ * control*, read as allowing a row that is inert because the scenario authors no crowd to move —
+ * so a case with no cohort gets the row and {@link FIXIT_SCREEN_COPY}'s `tenancyNone` sentence rather
+ * than nothing. The price is said per tenancy, because that is how it is charged.
+ */
+export function fixitTenancyView(input: TenancyInput): FixitTenancyView {
+  const unitWord = `${String(input.row.units)} u ${FIXIT_SCREEN_COPY.tenancyPricedEach}`;
+  const atBudget = !input.row.affordable;
+  return {
+    heading: input.row.name,
+    priced: atBudget ? `${unitWord} · ${FIXIT_SCREEN_COPY.groupAtBudget}` : unitWord,
+    atBudget,
+    cohorts: input.cohorts.map((cohort) => ({
+      key: cohort.id,
+      name: cohort.name,
+      reason: cohort.reason,
+      options: [
+        {
+          value: '',
+          label: FIXIT_SCREEN_COPY.tenancyAsItStands,
+          selected: input.chosen[cohort.id] === undefined,
+        },
+        ...cohort.positions.map((position) => ({
+          value: position.id,
+          label: position.name,
+          selected: input.chosen[cohort.id] === position.id,
+        })),
+      ],
+    })),
+    none: input.cohorts.length === 0 ? FIXIT_SCREEN_COPY.tenancyNone : undefined,
   };
 }
 

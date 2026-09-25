@@ -56,10 +56,13 @@ import {
   stageFilingLandsOn,
   stageGeometryOf,
   stageHeaderOf,
+  stageBookedOutOf,
   stageInkFor,
   stageInterventionsOf,
   stageLegend,
   stageMayAdopt,
+  stageRunFailedViewOf,
+  STAGE_RUN_FAILED_COPY,
   stageNextStretchOf,
   stageOpeningLineOf,
   stageSpeedAt,
@@ -2022,5 +2025,75 @@ describe('what the stage may adopt — GitHub issue #548', () => {
     expect(
       stageMayAdopt({ incoming: yesterday, adopted: undefined, runPending: false, standingAtEntry: yesterday }),
     ).toBe(true);
+  });
+});
+
+/**
+ * **A day that failed says so, and the stage does not fall back on yesterday** — GitHub issue #593.
+ *
+ * Two assessors sat in front of *simulating today's day* for seven minutes: the worker had refused
+ * the day and nothing told the stage. The failure is now a third no-run state with two ways on, and
+ * the adoption rule has to keep refusing what stood at entry once the failure has taken `runPending`
+ * down — otherwise the next notification hands the stage yesterday's day as today's, which is #548's
+ * revert arriving by the failure path.
+ */
+describe('a day that could not be simulated — GitHub issue #593', () => {
+  const yesterday = syntheticRecording();
+
+  it('refuses what stood at entry once the day it was waiting for has failed', () => {
+    expect(
+      stageMayAdopt({
+        incoming: yesterday,
+        adopted: undefined,
+        runPending: false,
+        standingAtEntry: yesterday,
+        runFailed: true,
+      }),
+    ).toBe(false);
+    /* The negative control: the same moment with no failure is an ordinary landing. */
+    expect(
+      stageMayAdopt({ incoming: yesterday, adopted: undefined, runPending: false, standingAtEntry: yesterday }),
+    ).toBe(true);
+  });
+
+  it('says the day did not run, in words that name no engine term, and offers a retry', () => {
+    const view = stageRunFailedViewOf('daily');
+    expect(view.line).toBe(STAGE_RUN_FAILED_COPY.line);
+    expect(view.line).not.toMatch(/template|directional|split|worker|core/iu);
+    expect(view.retry).toBe(STAGE_RUN_FAILED_COPY.retry);
+  });
+
+  it('sends each flow back to its own set-up screen', () => {
+    expect(stageRunFailedViewOf('daily').back.screen).toBe('door');
+    expect(stageRunFailedViewOf('replay').back.screen).toBe('door');
+    expect(stageRunFailedViewOf('campaign').back.screen).toBe('building');
+    expect(stageRunFailedViewOf('rush').back.screen).toBe('rush');
+    expect(stageRunFailedViewOf('watch').back.screen).toBe('menu');
+  });
+});
+
+describe('the booked-out car’s pill — GitHub issue #596 item 3, § D983', () => {
+  const bookings = [
+    { carId: 'D', awayAtS: 450, backAtS: 900 },
+    { carId: 'E', awayAtS: 600, backAtS: null },
+  ] as const;
+
+  it('names each car with its schedule, and where the playhead stands against it', () => {
+    expect(stageBookedOutOf({ bookedOut: bookings, simTimeS: 100, dayStartS: 0 })).toEqual([
+      'Car D booked out 00:07–00:15 · still running',
+      'Car E booked out from 00:10 · still running',
+    ]);
+    expect(stageBookedOutOf({ bookedOut: bookings, simTimeS: 700, dayStartS: 0 })).toEqual([
+      'Car D booked out 00:07–00:15 · out now',
+      'Car E booked out from 00:10 · out now',
+    ]);
+    expect(stageBookedOutOf({ bookedOut: bookings, simTimeS: 950, dayStartS: 0 })).toEqual([
+      'Car D booked out 00:07–00:15 · back',
+      'Car E booked out from 00:10 · out now',
+    ]);
+  });
+
+  it('draws nothing on a tower that books nothing', () => {
+    expect(stageBookedOutOf({ bookedOut: [], simTimeS: 700 })).toEqual([]);
   });
 });

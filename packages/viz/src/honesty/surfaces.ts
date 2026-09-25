@@ -74,9 +74,13 @@ import {
   fixitBarModel,
   fixitBudgetRungRow,
   fixitCaseRailModel,
+  fixitDialGroupsView,
+  fixitDoorView,
   fixitElevationRow,
   fixitMachineryRows,
   fixitParkingRow,
+  fixitRezoneView,
+  fixitTenancyView,
   fixitZoneRow,
   fixitRepairStateLine,
   fixitSpendSummary,
@@ -184,6 +188,7 @@ import { CHIMES_PANEL_COPY } from '../everyday/chimesPanel.js';
 import { SETTINGS_ABSENCES, SIGN_IN_COPY, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
+  DEFAULT_STAGE_SIM_PER_REAL_S,
   STAGE_ABSENCES,
   STAGE_AWAITING_RUN,
   STAGE_CAMERAS,
@@ -198,10 +203,12 @@ import {
   STAGE_SWITCH_PICKER_NOTE,
   stageAlarmOf,
   stageBarModelOf,
+  stageRunFailedViewOf,
   stageCarReadoutOf,
   stageCrowdCapOf,
   stageGoalsOf,
   stageHeaderOf,
+  stageBookedOutOf,
   stageInkFor,
   stageInterventionsOf,
   stageLegend,
@@ -226,11 +233,16 @@ import type { ScenarioLadderRung } from '../scenario/ladder.js';
 import {
   TUTORIAL_ABSENCES,
   TUTORIAL_COPY,
+  TUTORIAL_FIGURE_NOTES,
   TUTORIAL_STEPS,
+  tutorialClockOf,
   tutorialCollapseViewOf,
+  tutorialPaceOf,
   tutorialWalkthroughViewOf,
   tutorialWorkedAnswerOf,
 } from '../everyday/tutorialModel.js';
+import { stagePaceNoteOf, stagePaceOf } from '../everyday/stagePace.js';
+import { actsOf } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
 import { weekScreenViewOf } from '../everyday/weekView.js';
@@ -298,6 +310,19 @@ import { demandDisclosureOf } from '../fixit/parse.js';
 import { switchUnpostableReasonOf } from '../scope/switchWire.js';
 import { figureValuesOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase } from '../fixit/types.js';
+import { EVERY_CAR, KEYED_BANK } from '../fixit/types.js';
+import type { DialGroupInput, DoorInput, RezoneInput, RowPurchase } from '../fixit/editorInputs.js';
+import {
+  dialGroupsOf,
+  dialOptionsOf,
+  dialValueText,
+  doorDwellOptionsOf,
+  keyedBankIdOf,
+  keyedBankNameOf,
+  playerWordsOfDimension,
+  rezoneFabricOf,
+} from '../fixit/families.js';
+import { purchaseUnits } from '../pricing/parse.js';
 import { frameAt } from '../frame/frameAt.js';
 import {
   BOARD_SCREEN_COPY,
@@ -555,14 +580,19 @@ import {
 import { baseDemandOf, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { everyWrinkle } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
-import { bestLineFor, goalsForDay, readGoal, readGoals } from '../shift/goals.js';
+import { bestLineFor, goalsForDay, readGoal, readGoals, yesterdayLabelOf } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
+import { AFTER_PRESS_ROW_ID } from '../shift/afterPress.js';
 import { pressCounterfactualOf } from '../shift/counterfactual.js';
+import { scenarioHorizonFor } from '../shift/dayLength.js';
+import { CONTRACT_LADDER } from '../shift/ladder.js';
+import { FIRST_SESSION_LINE, FIRST_SESSION_LINE_CHOSEN } from '../shift/firstSession.js';
 import {
   averageWaitFigure,
   clockRange,
   dayReportOf,
   NOT_RECORDED,
+  type DayReportInput,
   type ShapedDayReport,
   type ShiftPlan,
   type SingleRunReport,
@@ -574,6 +604,7 @@ import {
   type GoalReading,
   type Observations,
   type ReportFigure,
+  type RunHorizon,
   type ScenarioContract,
   type ShiftEvent,
   type ShiftGoal,
@@ -2979,6 +3010,20 @@ interface ShiftDay {
    * review finding L1. The one pairing that is neither drawn whole nor refused whole.
    */
   readonly otherEquipment: WeekDayReport;
+  /**
+   * {@link report}'s after-press row with the unpressed side graded on **another run's** whole-run
+   * fold — [§ D982](../../../../DECISIONS.md).
+   *
+   * {@link report}'s pair is the recording against itself, so its two verdicts always read the same
+   * and the row's disagreeing wording — *this run reads Shift missed on …; the run without that press
+   * … reads Shift cleared* — would ship unswept. The decision agent's ruling asked for one arm where
+   * they can differ. The fold is the candidate dispatcher's run on the same day and crowd
+   * (`comparisonObservations`), which is a fixture exactly as the self-pair is: what is swept is the
+   * **wording** the grader produces for whichever pair of verdicts this case lands on, not a claim
+   * that this is the unpressed run. Only the after-press row is seeded off this sheet; every other
+   * field is {@link report}'s by construction.
+   */
+  readonly pairedAgainstCandidate: WeekDayReport;
 }
 
 interface ShiftBundle {
@@ -3116,7 +3161,7 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
         },
       },
     ];
-    const report = dayReportOf({
+    const reportInput = {
       ...common,
       subject: { kind: 'week-day' },
       plan: shiftPlan,
@@ -3158,6 +3203,35 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
         { when: 'lobby-queue-passes', whenValue: 30, then: 'hold-at-lobby' },
         { when: 'call-waited', whenValue: 30, then: 'jump-queue' },
       ],
+    } satisfies DayReportInput;
+    const report = dayReportOf(reportInput) as WeekDayReport;
+    /*
+     * § D982's second arm — see {@link ShiftDay.pairedAgainstCandidate}. The self-pair above always
+     * grades both sides alike; this one grades the unpressed side on the candidate run's fold, so the
+     * wording for two verdicts that differ is in the corpus on the cases where they do.
+     */
+    const selfPair = reportInput.pressCounterfactual;
+    /*
+     * And a tower booking beside it — § D983. The corpus builds its towers without a contract rung
+     * (`run.ts#buildingFor`), so no case books a car out and the header's booked-car lines, the
+     * rewritten wrinkle note and a missed worst wait's *car … was booked out* clause would ship
+     * unswept. Two fixture bookings on the recording's own first two cars, one that comes back and
+     * one that does not, so both arms of each sentence are reached. A fixture exactly as the pair
+     * is: what is swept is the wording, not a claim that this run lost a car.
+     */
+    const span = recording.endedAt - recording.startedAt;
+    const fixtureBookings = recording.shafts.slice(0, 2).map((shaft, index) => ({
+      carId: shaft.carId,
+      awayAtS: recording.startedAt + span * 0.25,
+      backAtS: index === 0 ? recording.startedAt + span * 0.5 : null,
+    }));
+    const pairedAgainstCandidate = dayReportOf({
+      ...reportInput,
+      pressCounterfactual:
+        selfPair === undefined
+          ? undefined
+          : { ...selfPair, wholeRunObservations: comparisonObservations },
+      bookedOut: fixtureBookings,
     }) as WeekDayReport;
     /*
      * The four sheets a **pairing** needs — issue #127, and each is one axis away from `report`.
@@ -3263,6 +3337,7 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       shorterShift,
       otherPattern,
       otherEquipment,
+      pairedAgainstCandidate,
     };
   });
 
@@ -3361,6 +3436,21 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * that function produces three counts. The strings it feeds are `shift/afterPress.ts`'s.
      */
     'shift/afterPress.ts#AFTER_PRESS_PAIR_NOTE',
+    /*
+     * The paired arm's verdict clause and its missed-goal names — § D982. Seeded on this bundle's
+     * intervened sheet and on {@link ShiftDay.pairedAgainstCandidate}, whose unpressed side is
+     * graded on another fold so the wording for two verdicts that differ is reached.
+     */
+    'shift/afterPress.ts#AFTER_PRESS_VERDICT_NOTE',
+    'shift/goals.ts#GOAL_PLAIN_NAMES',
+    'shift/goals.ts#goalPlainNameOf',
+    /*
+     * The booked-car sentences — § D983. Reached through `dayReportOf`'s header on
+     * {@link ShiftDay.pairedAgainstCandidate}, whose fixture bookings are the only ones in the
+     * corpus; the brief's copy of the note is `today.ts#todayOf`'s, which the TODAY adapter drives.
+     */
+    'shift/bookedOut.ts#wrinkleNoteOf',
+    'shift/bookedOut.ts#carsPhraseOf',
     'shift/goals.ts#goalsForDay',
     'shift/goals.ts#readGoal',
     'shift/goals.ts#readGoals',
@@ -3479,7 +3569,7 @@ const SHIFT_REPORT: SurfaceAdapter = {
          */
         seeds.push({
           field: `${at}.goals(${reading.goal.id}).was`,
-          text: was === '—' ? was : `was ${was}`,
+          text: yesterdayLabelOf(was),
           role: 'observation',
         });
         /*
@@ -3509,6 +3599,44 @@ const SHIFT_REPORT: SurfaceAdapter = {
         seeds.push({ field: `${at}.diagnosis(${row.id}).when`, text: row.when, role: 'label' });
         seeds.push({ field: `${at}.diagnosis(${row.id}).what`, text: row.what, role: 'observation' });
         seeds.push({ field: `${at}.diagnosis(${row.id}).why`, text: row.why, role: 'prose' });
+      }
+      /*
+       * The after-press row with its two verdicts graded on two different folds — § D982. One
+       * string: the row's `why`, where the verdicts are printed. Its `when` and `what` are the
+       * pressed run's and identical to the row above.
+       */
+      const flipRow = entry.pairedAgainstCandidate.diagnosis.find(
+        (row) => row.id === AFTER_PRESS_ROW_ID,
+      );
+      if (flipRow !== undefined) {
+        seeds.push({
+          field: `${at}.pairedAgainstCandidate.diagnosis(${flipRow.id}).why`,
+          text: flipRow.why,
+          role: 'prose',
+        });
+      }
+      /*
+       * The same sheet's booked-car header lines and any diagnosis sentence the fixture bookings
+       * changed — § D983. Seeded by difference from {@link report}, so a line both sheets share is
+       * swept once rather than twice.
+       */
+      const sharedMeta = new Set(report.metaLines);
+      for (const [index, line] of entry.pairedAgainstCandidate.metaLines.entries()) {
+        if (sharedMeta.has(line)) continue;
+        seeds.push({
+          field: `${at}.pairedAgainstCandidate.metaLines[${String(index)}]`,
+          text: line,
+          role: 'label',
+        });
+      }
+      for (const row of entry.pairedAgainstCandidate.diagnosis) {
+        if (row.id === AFTER_PRESS_ROW_ID) continue;
+        if (report.diagnosis.some((other) => other.id === row.id && other.why === row.why)) continue;
+        seeds.push({
+          field: `${at}.pairedAgainstCandidate.diagnosis(${row.id}).why`,
+          text: row.why,
+          role: 'prose',
+        });
       }
       for (const lever of report.levers) {
         seeds.push({ field: `${at}.levers(${lever.id}).title`, text: lever.title, role: 'label' });
@@ -6974,6 +7102,17 @@ const FIXIT_COVERS: readonly string[] = [
   'everyday/fixitScreenModel.ts#fixitElevationRow',
   'everyday/fixitScreenModel.ts#fixitSpendSummary',
   'everyday/fixitScreenModel.ts#fixitRepairStateLine',
+  /* § D1000's five families — the dials, the door hold and the banks, and the words under them. */
+  'everyday/fixitScreenModel.ts#fixitDialGroupsView',
+  'everyday/fixitScreenModel.ts#fixitDoorView',
+  'everyday/fixitScreenModel.ts#fixitRezoneView',
+  'everyday/fixitScreenModel.ts#fixitGroupHeader',
+  'everyday/fixitScreenModel.ts#fixitTenancyView',
+  'fixit/families.ts#dialGroupsOf',
+  'fixit/families.ts#dialOptionsOf',
+  'fixit/families.ts#dialValueText',
+  'fixit/families.ts#doorDwellOptionsOf',
+  'fixit/families.ts#keyedBankNameOf',
 ];
 
 function fixitSearchCase(context: HonestyContext): FixitCase {
@@ -7389,6 +7528,202 @@ const FIXIT: SurfaceAdapter = {
           role: 'label',
           provenance: 'authored',
         });
+      }
+    }
+
+    /*
+     * ---- § D1000's five families: the dials, the door hold and the banks ----
+     *
+     * Every dial the editor can draw, each with every option it offers on this case's building,
+     * over the declared space the context carries — so a dial's words and every value it names are
+     * read, not just the ones a shipped case happens to reach. Each group is seeded twice, bought
+     * and at the budget, because the header says a different thing on each. The door hold is seeded
+     * on every car and on one car; the banks with nothing moved and with a car keyed to a bank of
+     * its own, which is the one arm that draws a bank the building never had. The plate arm is
+     * forced on the first bank, because no corpus building weighs against anything but its plate
+     * and a sentence nothing renders is a sentence nothing has read.
+     */
+    {
+      /*
+       * The families card's own frame, seeded by name: `everyday/fixitFamilies.ts` is the only
+       * reader of these keys and it is a mount, so no model reaches them — wave T's finding that
+       * being in `covers` is not being swept, applied before rather than after a probe.
+       */
+      for (const key of [
+        'dialsEyebrow',
+        'dialsHint',
+        'doorTargetLabel',
+        'rezoneEyebrow',
+        'rezoneHint',
+        'rezoneFloorsLabel',
+        'tenancyEyebrow',
+        'planRefused',
+      ] as const) {
+        seeds.push({
+          field: `families.${key}`,
+          text: FIXIT_SCREEN_COPY[key],
+          role: key === 'planRefused' ? 'reason' : key.endsWith('Hint') ? 'prose' : 'label',
+          provenance: 'authored',
+        });
+      }
+      const rowOf = (changeId: string, affordable: boolean): RowPurchase => {
+        const change = schedule.changes.find((candidate) => candidate.id === changeId)!;
+        return { changeId, name: change.name, units: purchaseUnits(change), bought: false, affordable };
+      };
+      const standing = new Map(context.space.parameters.map((parameter) => [parameter.id, parameter.default]));
+      for (const affordable of [true, false]) {
+        const groups: DialGroupInput[] = dialGroupsOf(schedule, context.space).map((group) => ({
+          row: rowOf(group.changeId, affordable),
+          dials: group.parameters.map((parameter) => {
+            const words = playerWordsOfDimension(parameter.id);
+            const standingValue = standing.get(parameter.id);
+            return {
+              id: parameter.id,
+              name: words?.name ?? parameter.key,
+              effect: words?.effect ?? '',
+              standingText: standingValue === undefined ? '' : dialValueText(parameter, standingValue, context.building),
+              options: dialOptionsOf(parameter, standingValue, context.building),
+              selected: undefined,
+            };
+          }),
+        }));
+        for (const group of fixitDialGroupsView(groups)) {
+          const where = `dials.${affordable ? 'open' : 'at-budget'}.${group.key}`;
+          seeds.push({ field: `${where}.heading`, text: group.header.heading, role: 'label', provenance: 'authored' });
+          seeds.push({ field: `${where}.priced`, text: group.header.priced, role: 'label' });
+          if (!affordable) continue;
+          for (const dial of group.dials) {
+            seeds.push({ field: `${where}.${dial.key}.label`, text: dial.label, role: 'label', provenance: 'authored' });
+            if (dial.effect !== '') {
+              seeds.push({ field: `${where}.${dial.key}.effect`, text: dial.effect, role: 'prose', provenance: 'authored' });
+            }
+            for (const option of dial.options) {
+              seeds.push({ field: `${where}.${dial.key}.option(${option.value})`, text: option.label, role: 'label' });
+            }
+          }
+        }
+      }
+      const fabric = rezoneFabricOf(context.building, context.building.config);
+      const doorInput: DoorInput = {
+        row: rowOf('door-dwell', true),
+        targets: [
+          { key: EVERY_CAR, carId: undefined, bankName: undefined },
+          ...fabric.cars.map((car) => ({
+            key: car.id,
+            carId: car.id,
+            bankName: fabric.banks.find((bank) => bank.id === car.standingBankId)?.name,
+          })),
+        ],
+        hallOptions: doorDwellOptionsOf('hall'),
+        carOptions: doorDwellOptionsOf('car'),
+      };
+      const firstCar = fabric.cars[0]?.id;
+      for (const target of [EVERY_CAR, ...(firstCar === undefined ? [] : [firstCar])]) {
+        const door = fixitDoorView(doorInput, { [target]: { hallCallS: 5 } }, target);
+        seeds.push({ field: `door(${target}).label`, text: door.label, role: 'label', provenance: 'authored' });
+        for (const option of door.targets) {
+          seeds.push({ field: `door(${target}).target(${option.value})`, text: option.label, role: 'label' });
+        }
+        for (const side of door.sides) {
+          seeds.push({ field: `door(${target}).${side.key}.label`, text: side.label, role: 'label', provenance: 'authored' });
+          for (const option of side.options) {
+            seeds.push({ field: `door(${target}).${side.key}.option(${option.value})`, text: option.label, role: 'label' });
+          }
+        }
+      }
+      /*
+       * The tenancy row, § D1001, in both of its shapes: the synthetic case authors no cohort, which
+       * is the fifteen shipped cases' shape and draws the inert sentence; and one seeded cohort over
+       * the searched half's floors, with a position that watches a third of each, bought and at the
+       * budget — the shape the three demand cases draw.
+       */
+      const tenancyRow = (affordable: boolean): RowPurchase => rowOf('tenant-floors', affordable);
+      const seededCohort = {
+        id: 'searched-half',
+        name: 'The tenancies in the searched half',
+        reason: 'Their leases let the landlord set a later start.',
+        floorIds: entry.complaint.measure.scope.floorIds,
+        positions: [
+          {
+            id: 'a-third-watched',
+            name: 'Three start times, and this run watches the first',
+            watched: [{ floorIds: entry.complaint.measure.scope.floorIds, population: 1 }],
+          },
+        ],
+      };
+      for (const [where, input] of [
+        ['none', { row: tenancyRow(true), cohorts: [], chosen: {} }],
+        ['cohort', { row: tenancyRow(true), cohorts: [seededCohort], chosen: { [seededCohort.id]: 'a-third-watched' } }],
+        ['at-budget', { row: tenancyRow(false), cohorts: [seededCohort], chosen: {} }],
+      ] as const) {
+        const view = fixitTenancyView(input);
+        seeds.push({ field: `tenancy.${where}.heading`, text: view.heading, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `tenancy.${where}.priced`, text: view.priced, role: 'label' });
+        if (view.none !== undefined) {
+          seeds.push({ field: `tenancy.${where}.none`, text: view.none, role: 'reason', provenance: 'authored' });
+        }
+        for (const cohort of view.cohorts) {
+          seeds.push({ field: `tenancy.${where}.${cohort.key}.name`, text: cohort.name, role: 'label', provenance: 'authored' });
+          seeds.push({ field: `tenancy.${where}.${cohort.key}.reason`, text: cohort.reason, role: 'prose', provenance: 'authored' });
+          for (const option of cohort.options) {
+            seeds.push({ field: `tenancy.${where}.${cohort.key}.option(${option.value})`, text: option.label, role: 'label', provenance: 'authored' });
+          }
+        }
+      }
+      for (const [where, keyedCar] of [['as-drawn', undefined], ['keyed', firstCar]] as const) {
+        const banks: RezoneInput['banks'] = fabric.banks.map((bank, index) => ({
+          ...bank,
+          offPlate: index === 0,
+          standingFloors: bank.servesFloors,
+          floors: bank.servesFloors,
+          keyed: false,
+          plated: false,
+        }));
+        const cars = fabric.cars.map((car) => ({
+          ...car,
+          target: car.id === keyedCar ? KEYED_BANK : car.standingBankId,
+        }));
+        const keyed = cars.find((car) => car.target === KEYED_BANK);
+        const view = fixitRezoneView({
+          row: rowOf('rezone-bank', true),
+          floorOrder: fabric.floorOrder,
+          cars,
+          banks:
+            keyed === undefined
+              ? banks
+              : [
+                  ...banks,
+                  {
+                    id: keyedBankIdOf(keyed.id),
+                    name: keyedBankNameOf(keyed.id),
+                    servesFloors: keyed.homeFloors,
+                    paired: false,
+                    offPlate: false,
+                    standingFloors: keyed.homeFloors,
+                    floors: keyed.homeFloors,
+                    keyed: true,
+                    plated: false,
+                  },
+                ],
+        });
+        for (const car of view.cars) {
+          seeds.push({ field: `banks.${where}.car(${car.key}).label`, text: car.label, role: 'label' });
+          for (const option of car.options) {
+            seeds.push({ field: `banks.${where}.car(${car.key}).option(${option.value})`, text: option.label, role: 'label' });
+          }
+        }
+        for (const bank of view.banks) {
+          seeds.push({ field: `banks.${where}.bank(${bank.key}).name`, text: bank.name, role: 'label' });
+          for (const floor of bank.floors ?? []) {
+            seeds.push({ field: `banks.${where}.bank(${bank.key}).floor(${floor.id})`, text: floor.label, role: 'label' });
+          }
+          if (bank.pairedNote !== undefined) {
+            seeds.push({ field: `banks.${where}.bank(${bank.key}).paired`, text: bank.pairedNote, role: 'reason', provenance: 'authored' });
+          }
+          for (const option of bank.plate?.options ?? []) {
+            seeds.push({ field: `banks.${where}.bank(${bank.key}).plate(${option.value})`, text: option.label, role: 'label', provenance: 'authored' });
+          }
+        }
       }
     }
 
@@ -10425,6 +10760,13 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
   id: 'everyday/stageScreenModel.ts#stageHeaderOf',
   covers: [
     'everyday/stageScreenModel.ts#stageHeaderOf',
+    /*
+     * The booked-out car's pill — § D983. Seeded at every sample playhead below over two fixture
+     * bookings on the recording's own cars, because the corpus builds no contract rung and so no
+     * case books a car out: all three of its playhead arms (*still running*, *out now*, *back*) and
+     * both of its span arms are reached.
+     */
+    'everyday/stageScreenModel.ts#stageBookedOutOf',
     'everyday/stageScreenModel.ts#stageAlarmOf',
     'everyday/stageScreenModel.ts#stageInterventionsOf',
     'everyday/stageScreenModel.ts#stageBarModelOf',
@@ -10485,9 +10827,23 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stageScreenModel.ts#STAGE_OUT_OF_SERVICE',
     'everyday/stageScreenModel.ts#STAGE_AWAITING_RUN',
+    /*
+     * The overlay's third no-run state — GitHub issue #593: a day that could not be simulated, and
+     * the two ways on. Driven below over every run context, because *back* names each flow's own
+     * set-up screen.
+     */
+    'everyday/stageScreenModel.ts#stageRunFailedViewOf',
+    'everyday/stageScreenModel.ts#STAGE_RUN_FAILED_COPY',
     'everyday/stageScreenModel.ts#STAGE_DAY_OVER',
     'everyday/stageScreenModel.ts#stageOpeningLineOf',
     'everyday/stageScreenModel.ts#stageNextStretchOf',
+    /*
+     * § D991's note beside the chips — GitHub issue #592. Seeded below at every sampled playhead
+     * on the temporal axis, as the note a whole day would draw there: it names the next act's start
+     * from the timetable and whether somebody has waited a minute from the present frame, and
+     * nothing after the playhead.
+     */
+    'everyday/stagePace.ts#stagePaceNoteOf',
     /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
     'everyday/stageScreenModel.ts#stageGoalsOf',
     /*
@@ -10845,6 +11201,22 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     seeds.push({ field: 'stage.well.outOfService', text: STAGE_OUT_OF_SERVICE, role: 'label' });
     seeds.push({ field: 'stage.overlay.awaitingRun', text: STAGE_AWAITING_RUN, role: 'prose' });
     /*
+     * GitHub issue #593's failed state: the line and the retry once, since every context draws the
+     * same two, and *back* per context, since each names its own flow's screen.
+     */
+    {
+      const failed = stageRunFailedViewOf('daily');
+      seeds.push({ field: 'stage.overlay.runFailed', text: failed.line, role: 'prose' });
+      seeds.push({ field: 'stage.overlay.runFailed.retry', text: failed.retry, role: 'label' });
+      for (const ctx of RUN_CONTEXTS) {
+        seeds.push({
+          field: `stage.overlay.runFailed.back(${ctx})`,
+          text: stageRunFailedViewOf(ctx).back.label,
+          role: 'label',
+        });
+      }
+    }
+    /*
      * AD-S5's opening sentence, at the one playhead it is ever drawn at — the overlay is up before
      * the first press and gone after it, so `startedAt` is not a sample among five here, it is the
      * whole of when this string exists.
@@ -10873,6 +11245,26 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       });
       seeds.push({ field: `stage(@${stamp}s).phase`, text: head.phase, role: 'label' });
       /*
+       * § D991's pace note, as a whole day would draw it here — GitHub issue #592. The acts are this
+       * recording's own schedule; a recording whose schedule has no act draws no note, and none is
+       * seeded, which is the note's own `undefined`.
+       */
+      {
+        const acts = actsOf(recording.demandPhases);
+        const pace = stagePaceOf({
+          horizon: 'whole-day',
+          acts,
+          simTimeS: at,
+          watchingSimPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S,
+          longestStandingS: observations.longestCurrentWaitS,
+          playerChoseSpeed: false,
+        });
+        const note = stagePaceNoteOf(pace, { acts, simTimeS: at });
+        if (note !== undefined) {
+          seeds.push({ field: `stage(@${stamp}s).pace`, text: note, role: 'label', playhead: atPlayhead(recording, at) });
+        }
+      }
+      /*
        * AD-S4's pill. On the temporal axis deliberately: it is the one string on this screen that
        * names an instant **after** the playhead, and a rule that let the schedule turn into a
        * preview of the outcome would be R6's own defect wearing a timetable.
@@ -10886,6 +11278,27 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         });
       }
       seeds.push({ field: `stage(@${stamp}s).driving`, text: head.drivingLabel, role: 'label' });
+      /*
+       * § D983's pill, over fixture bookings — see this adapter's `covers`. A schedule written into
+       * the building before the run, so it is on the temporal axis for the same reason `next` is:
+       * it names instants the playhead has not reached, and must name only the schedule there.
+       */
+      const stageSpan = recording.endedAt - recording.startedAt;
+      for (const [index, line] of stageBookedOutOf({
+        bookedOut: recording.shafts.slice(0, 2).map((shaft, which) => ({
+          carId: shaft.carId,
+          awayAtS: recording.startedAt + stageSpan * 0.25,
+          backAtS: which === 0 ? recording.startedAt + stageSpan * 0.5 : null,
+        })),
+        simTimeS: at,
+      }).entries()) {
+        seeds.push({
+          field: `stage(@${stamp}s).booked[${String(index)}]`,
+          text: line,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+      }
       /*
        * The car readouts — § D347's live figure, one per car. Counts at the playhead, both of
        * them: `frameAt` folds the occupancy and the shaft carries the capacity, so the pair is
@@ -12185,6 +12598,10 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
   covers: [
     'everyday/today.ts#todayOf',
     'shift/firstSession.ts#FIRST_SESSION_LINE',
+    /* The line's second arm, for a first day the draw did not choose — GitHub issue #595, § D973. */
+    'shift/firstSession.ts#FIRST_SESSION_LINE_CHOSEN',
+    /* The chooser between the two arms; both of its answers are seeded below. */
+    'shift/firstSession.ts#firstSessionLineFor',
     'everyday/doorView.ts#doorScreenViewOf',
     /* § 6.1's replay words — GitHub issue #177 item 1. The door's primary note carries both arms
        (a day inside the week, a chip from before it), and the bar and rail adapters carry the rest. */
@@ -12270,6 +12687,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
         goals: entry.readings,
         seed: 424_242n,
+        /* The horizon the case's tower is pressed on — the moot sentence's fourth gate, § D973. */
+        horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
         /*
          * The day's crowd — § D729, § D730. Seeded `true` here and `false` below, because the
          * seed line and the door's closing sentence both have two arms and the arm a developer
@@ -12311,6 +12730,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
             context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
           goals: entry.readings,
           seed: 424_242n,
+          horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
           crowdIsToday: false,
           firstSession: entry.week.day === 1 && entry.week.history.length === 0,
           units: 'metric',
@@ -12319,6 +12739,17 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       });
       if (today.firstSessionLine !== undefined) {
         seeds.push({ field: `${at}.today.firstSession`, text: today.firstSessionLine, role: 'observation' });
+        /*
+         * **The other arm of the first-session line** — GitHub issue #595, § D973. Which arm a case
+         * draws depends on whether the seed's own draw opens this tower, and the pinned fixture
+         * seed decides that for every case at once; seeding only the drawn arm would leave the
+         * other — the one a player meets after the picker or a pinned day — unswept. The seed line's
+         * own second arm above is the precedent, and for its reason: `todayOf` is total in this
+         * field, so the arm is seeded as the line rather than as a second record.
+         */
+        const otherArm =
+          today.firstSessionLine === FIRST_SESSION_LINE ? FIRST_SESSION_LINE_CHOSEN : FIRST_SESSION_LINE;
+        seeds.push({ field: `${at}.today.firstSession.other`, text: otherArm, role: 'observation' });
       }
       for (const fact of today.facts) {
         seeds.push({ field: `${at}.today.fact.${fact.label}`, text: fact.value, role: 'observation' });
@@ -12343,6 +12774,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
         goals: entry.readings,
         seed: 424_242n,
+        horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
         crowdIsToday: true,
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         units: 'imperial',
@@ -12843,7 +13275,15 @@ const EVERYDAY_SIGN_IN_LINK: SurfaceAdapter = {
  */
 const EVERYDAY_TOWER_CHOICE: SurfaceAdapter = {
   id: 'everyday/towerChoice.ts#towerChoiceViewOf',
-  covers: ['everyday/towerChoice.ts#towerChoiceViewOf', 'everyday/towerChoice.ts#TOWER_CHOICE_COPY'],
+  covers: [
+    'everyday/towerChoice.ts#towerChoiceViewOf',
+    'everyday/towerChoice.ts#TOWER_CHOICE_COPY',
+    /* The days a press decides, under the towers — GitHub issue #595, § D973. Every arm of the
+       row decision is seeded below: offered, standing, other horizon, past its first day, and not
+       as measured. */
+    'everyday/towerChoice.ts#PRESS_DAY_CHOICE_COPY',
+    'everyday/towerChoice.ts#pressDayChoiceOf',
+  ],
   render(context) {
     const seeds: TextSeed[] = [];
     /*
@@ -12858,8 +13298,34 @@ const EVERYDAY_TOWER_CHOICE: SurfaceAdapter = {
       ['fresh', []],
       ['parked', [openWeek('c2'), openWeek('c7')]],
     ];
+    /* The horizon the Scenario press runs each loaded tower on — the pinned rows' gate, § D973. */
+    const horizonFor = (buildingId: string): RunHorizon | undefined =>
+      scenarioHorizonFor(
+        context.trafficProfiles,
+        context.buildings.find((building) => building.id === buildingId),
+      );
+    const pressInput = { seed: 424_242n, calendar: null, horizonFor } as const;
     for (const [state, parked] of states) {
-      const view = towerChoiceViewOf({ week, parked, nameOf });
+      const view = towerChoiceViewOf({ week, parked, nameOf, ...pressInput });
+      /*
+       * **The pinned-day list** — GitHub issue #595, § D973. Every row here is a promise about the
+       * crowd the press sets, and the lede is a claim about a measurement, so both are swept.
+       */
+      seeds.push(
+        { field: `towers.${state}.pressDays.heading`, text: view.pressDays.heading, role: 'label' },
+        { field: `towers.${state}.pressDays.lede`, text: view.pressDays.lede, role: 'prose' },
+        { field: `towers.${state}.pressDays.note`, text: view.pressDays.note, role: 'prose' },
+      );
+      for (const row of view.pressDays.rows) {
+        seeds.push(
+          {
+            field: `towers.${state}.pressDays.${row.contractId}.name`,
+            text: `${row.label} · ${row.tower}`,
+            role: 'label',
+          },
+          { field: `towers.${state}.pressDays.${row.contractId}.note`, text: row.note, role: 'prose' },
+        );
+      }
       seeds.push(
         { field: `towers.${state}.heading`, text: view.heading, role: 'label' },
         { field: `towers.${state}.lede`, text: view.lede, role: 'prose' },
@@ -12880,6 +13346,38 @@ const EVERYDAY_TOWER_CHOICE: SurfaceAdapter = {
             role: 'prose',
           },
         );
+      }
+    }
+    /*
+     * **The pinned-day rows' other three arms** — standing on a pinned day, a week there past its
+     * first day, and a tower the build cannot resolve a horizon for. Only the row notes are seeded:
+     * every other string on these states is one the two states above already drew.
+     */
+    const firstPin = CONTRACT_LADDER.rows.find((row) => row.pressDay !== undefined);
+    const secondPin = CONTRACT_LADDER.rows.filter((row) => row.pressDay !== undefined)[1];
+    if (firstPin?.pressDay !== undefined && secondPin !== undefined) {
+      const extra: readonly (readonly [string, Parameters<typeof towerChoiceViewOf>[0]])[] = [
+        [
+          'pinned',
+          {
+            week: openWeek(firstPin.contractId),
+            parked: [{ ...openWeek(secondPin.contractId), day: 4 }],
+            nameOf,
+            seed: BigInt(firstPin.pressDay.seedText),
+            calendar: null,
+            horizonFor,
+          },
+        ],
+        ['unresolved', { week, parked: [], nameOf, seed: 424_242n, calendar: null, horizonFor: () => undefined }],
+      ];
+      for (const [state, input] of extra) {
+        for (const row of towerChoiceViewOf(input).pressDays.rows) {
+          seeds.push({
+            field: `towers.${state}.pressDays.${row.contractId}.note`,
+            text: row.note,
+            role: 'prose',
+          });
+        }
       }
     }
     return singleRun(this.id, seeds);
@@ -13394,6 +13892,9 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
     'everyday/tutorialModel.ts#TUTORIAL_COPY',
     'everyday/tutorialModel.ts#TUTORIAL_STEPS',
     'everyday/tutorialModel.ts#TUTORIAL_ABSENCES',
+    /* GitHub issue #598, § D992: each figure card's own caption, and screen two's clock. */
+    'everyday/tutorialModel.ts#TUTORIAL_FIGURE_NOTES',
+    'everyday/tutorialModel.ts#tutorialClockOf',
     'everyday/workedAnswer.ts#workedAnswerViewOf',
     'everyday/workedAnswer.ts#WORKED_ANSWER_COPY',
     'everyday/rushScreenModel.ts#rushTutorialWorkedAnswerOf',
@@ -13406,12 +13907,19 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
     const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed');
 
     /* ---- screen one: before the run lands, and after ---- */
-    const figures = figureValuesOf(entry, context.recording).map((figure, index) => ({
-      id: `figure-${String(index)}`,
-      label: figure.label,
-      value: figure.text,
-      note: entry.complaint.measure.label,
-    }));
+    /*
+     * GitHub issue #598: every card was captioned with the complaint's measure, the lower-floors
+     * card included. Captioned by its own kind now, as `tutorialScreens.ts#figuresFor` draws it.
+     */
+    const figures = figureValuesOf(entry, context.recording).map((figure, index) => {
+      const kind = entry.figures[index]?.kind;
+      return {
+        id: `figure-${String(index)}`,
+        label: figure.label,
+        value: figure.text,
+        note: kind === undefined ? figure.label : TUTORIAL_FIGURE_NOTES[kind],
+      };
+    });
     for (const [arm, drawn] of [
       ['pending', []],
       ['landed', figures],
@@ -13520,7 +14028,7 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
       ['as-built-refusing', tutorialCollapseViewOf({ ...collapseQuoted, runReady: true })],
       [
         'as-built-pressable',
-        tutorialCollapseViewOf({ ...collapseQuoted, runReady: true, changeReady: true }),
+        tutorialCollapseViewOf({ ...collapseQuoted, runReady: true, changeReady: true, troubleSeen: true }),
       ],
       [
         'answered',
@@ -13610,6 +14118,41 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
     }
 
     /*
+     * GitHub issue #598, § D992 — the press before the building has been seen breaking. Seeded as
+     * the one string that differs, on the `ended` states' judgement above: every other field of this
+     * arm is the pressable arm's.
+     */
+    {
+      const early = tutorialCollapseViewOf({ ...collapseQuoted, runReady: true, changeReady: true });
+      const refusal = early.control?.refusal;
+      if (refusal !== undefined) {
+        seeds.push({ field: 'collapse.as-built-watch-first.control.refusal', text: refusal, role: 'reason' });
+      }
+    }
+
+    /*
+     * Screen two's clock and the reason for its speed, at the sampled playheads — § D992. The speed
+     * is `tutorialPaceOf` from the present frame, as `caseStage.ts` asks it for the tutorial.
+     */
+    for (const at of sampleTimes(context.recording)) {
+      const stamp = at.toFixed(0);
+      const watching = DEFAULT_STAGE_SIM_PER_REAL_S;
+      const speed = tutorialPaceOf({
+        longestStandingS: observationsAt(context.recording, at).longestCurrentWaitS,
+        watchingSimPerRealS: watching,
+      });
+      const line = tutorialClockOf({
+        simTimeS: at,
+        startedAtS: context.recording.startedAt,
+        simPerRealS: speed,
+        watchingSimPerRealS: watching,
+      });
+      const playhead = atPlayhead(context.recording, at);
+      seeds.push({ field: `collapse(@${stamp}s).clock`, text: line.clock, role: 'label', playhead });
+      seeds.push({ field: `collapse(@${stamp}s).pace`, text: line.pace, role: 'label', playhead });
+    }
+
+    /*
      * The register, and the two copy tables' own keys — iterated generically so a key added to
      * either arrives in the corpus without anybody remembering to seed it.
      */
@@ -13618,6 +14161,9 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
     });
     for (const [key, text] of Object.entries(TUTORIAL_COPY)) {
       seeds.push({ field: `tutorial.copy.${key}`, text, role: 'prose' });
+    }
+    for (const [kind, text] of Object.entries(TUTORIAL_FIGURE_NOTES)) {
+      seeds.push({ field: `tutorial.figureNote.${kind}`, text, role: 'label' });
     }
     for (const [key, text] of Object.entries(WORKED_ANSWER_COPY)) {
       seeds.push({ field: `worked.copy.${key}`, text, role: 'prose' });

@@ -2152,7 +2152,16 @@ type DecisionReservation = {
  * the first lane to write a heading hit a guard failure that looked like its own fault. Four lanes
  * had to be told to merge a commit before they could record a decision.
  */
-const OPEN_RESERVATION = { wave: 'AG-fix', from: 963, to: 970 } as DecisionReservation | null;
+/*
+ * **Wave AH's reservation is CLOSED**, in the wave's own merge commit, which is the rule wave AG's
+ * accounting added. Five blocks went out across D964-D1008 and thirteen headings were spent: lane
+ * AH-A three (D964-D966), AH-B two (D973-D974, the second in the patch the integrator applied),
+ * AH-C three (D982-D984), AH-D three (D991-D993) and AH-E two (D1000-D1001, this repository's
+ * first four-digit numbers). **Twenty-five numbers below the highest heading come back as holes**
+ * and are registered in `KNOWN_DECISION_HOLES`; **D1002-D1008 are free rather than holed**, since
+ * nothing is written above them (§ D430), and the charter row moves to **D1002**.
+ */
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
@@ -3083,7 +3092,43 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [957, "wave AG's lane AG-C's block; unspent for § 950's reason."],
   [958, "wave AG's lane AG-C's block; unspent for § 950's reason."],
   [959, "wave AG's lane AG-C's block; unspent for § 950's reason."],
-  [960, "wave AG's lane AG-C's block; unspent for § 950's reason."],
+  [960, "wave AG's lane AG-C's block; unspent for § 950's reason."],  [
+    967,
+    "wave AH's lane AH-A held D964-D972 and spent D964-D966. Registered under D404 and D430.",
+  ],
+  [968, "wave AH's lane AH-A's block; unspent for § 967's reason."],
+  [969, "wave AH's lane AH-A's block; unspent for § 967's reason."],
+  [970, "wave AH's lane AH-A's block; unspent for § 967's reason."],
+  [971, "wave AH's lane AH-A's block; unspent for § 967's reason."],
+  [972, "wave AH's lane AH-A's block; unspent for § 967's reason."],
+  [
+    975,
+    "wave AH's lane AH-B held D973-D981 and spent D973-D974. Registered under D404 and D430.",
+  ],
+  [976, "wave AH's lane AH-B's block; unspent for § 975's reason."],
+  [977, "wave AH's lane AH-B's block; unspent for § 975's reason."],
+  [978, "wave AH's lane AH-B's block; unspent for § 975's reason."],
+  [979, "wave AH's lane AH-B's block; unspent for § 975's reason."],
+  [980, "wave AH's lane AH-B's block; unspent for § 975's reason."],
+  [981, "wave AH's lane AH-B's block; unspent for § 975's reason."],
+  [
+    985,
+    "wave AH's lane AH-C held D982-D990 and spent D982-D984. Registered under D404 and D430.",
+  ],
+  [986, "wave AH's lane AH-C's block; unspent for § 985's reason."],
+  [987, "wave AH's lane AH-C's block; unspent for § 985's reason."],
+  [988, "wave AH's lane AH-C's block; unspent for § 985's reason."],
+  [989, "wave AH's lane AH-C's block; unspent for § 985's reason."],
+  [990, "wave AH's lane AH-C's block; unspent for § 985's reason."],
+  [
+    994,
+    "wave AH's lane AH-D held D991-D999 and spent D991-D993. Registered under D404 and D430.",
+  ],
+  [995, "wave AH's lane AH-D's block; unspent for § 994's reason."],
+  [996, "wave AH's lane AH-D's block; unspent for § 994's reason."],
+  [997, "wave AH's lane AH-D's block; unspent for § 994's reason."],
+  [998, "wave AH's lane AH-D's block; unspent for § 994's reason."],
+  [999, "wave AH's lane AH-D's block; unspent for § 994's reason."],
 ]);
 
 /**

@@ -121,7 +121,81 @@ export interface WholeDay {
   readonly periodS: number;
   /** `startOfDayMin × 60`, so a caller can put a clock on it without restating 08:00. */
   readonly startOfDayS: number;
+  /**
+   * The day's **acts** — its busiest stretches, read off the record by {@link actsOf}. Seconds from
+   * the start of the day, the same axis a run windowed from `0` plays on. Three for `office-day`:
+   * 08:30–09:00, 12:15–12:45 and 17:15–17:45.
+   */
+  readonly acts: readonly DayAct[];
 }
+
+/**
+ * **One act of an authored day** — a stretch the stage plays at the player's own watching speed.
+ *
+ * GitHub issue **#592**, [§ D991](../../../../DECISIONS.md). A whole day is ten hours, and at the
+ * shipped `4×` it was two and a half hours of watching, most of it a quarter-rate trickle. The
+ * ruling that settled it keeps the whole day and fixes the length in the **playback**: the acts
+ * play at the player's speed, and the hours between them are crossed faster. This type is the half
+ * of that ruling that is a fact about the record rather than about the stage.
+ */
+export interface DayAct {
+  /** Seconds from the start of the day — the run's own time axis, windowed from `0`. */
+  readonly startS: number;
+  readonly endS: number;
+}
+
+/** A phase as {@link actsOf} reads it — the record's, or a recording's `VizPhase`, in seconds. */
+export interface PhaseIntensity {
+  readonly startS: number;
+  readonly endS: number;
+  readonly startIntensity: number;
+  readonly endIntensity: number;
+}
+
+/**
+ * **The acts of a day** — every maximal contiguous run of phases that touches the day's own peak.
+ *
+ * A phase belongs to an act when `max(startIntensity, endIntensity)` equals the busiest intensity
+ * anywhere in the list: so a ramp *into* a peak, the hold at it and the ramp back out are one act,
+ * and the quarter-rate hours between two peaks are not. That is {@link wholeDayFor}'s own idiom —
+ * the peak is read off the record rather than assumed to be `1.0` — and for the same reason: a day
+ * authored tomorrow is picked up without a line here changing.
+ *
+ * Read against `office-day` it gives 30–60, 255–285 and 555–585 minutes, which is 08:30–09:00,
+ * 12:15–12:45 and 17:15–17:45 on its own clock — the three peaks the record cites — and 5 400 s of
+ * act against 30 600 s of quiet. `shift/dayLength.test.ts` asserts that against the shipped file.
+ *
+ * **Pure over any phase list, and that is deliberate rather than general.** The stage calls it on
+ * `VizRecording.demandPhases`, which is the resolved template's own schedule — an input to the run,
+ * on the record before a passenger was generated — so an act is never a reading of the outcome.
+ * What it must **not** be called on is a phase list that is not a day: `endless-rush` is a ramp
+ * whose only peak is its last three minutes, and pacing it by this rule would cross the whole rush
+ * at the between-peaks speed. The caller gates on `runHorizonOf(...) === 'whole-day'` for that
+ * reason, and `everyday/stagePace.ts` is where that gate lives.
+ *
+ * Empty for an empty list, and the empty answer is honest: a run with no schedule has no act.
+ */
+export function actsOf(phases: readonly PhaseIntensity[]): readonly DayAct[] {
+  if (phases.length === 0) return Object.freeze([]);
+  const peak = phases.reduce(
+    (highest, phase) => Math.max(highest, phase.startIntensity, phase.endIntensity),
+    0,
+  );
+  if (peak <= 0) return Object.freeze([]);
+  const acts: { startS: number; endS: number }[] = [];
+  const ordered = [...phases].sort((a, b) => a.startS - b.startS);
+  for (const phase of ordered) {
+    if (Math.max(phase.startIntensity, phase.endIntensity) < peak) continue;
+    const last = acts[acts.length - 1];
+    if (last !== undefined && Math.abs(last.endS - phase.startS) < 1e-6) {
+      last.endS = phase.endS;
+    } else {
+      acts.push({ startS: phase.startS, endS: phase.endS });
+    }
+  }
+  return Object.freeze(acts.map((act) => Object.freeze({ startS: act.startS, endS: act.endS })));
+}
+
 
 /** Two mixes are the same when all three shares are, to the precision `data/` authors them at. */
 function sameSplit(left: DirectionalSplit, right: DirectionalSplit): boolean {
@@ -148,7 +222,8 @@ function sameSplit(left: DirectionalSplit, right: DirectionalSplit): boolean {
  */
 export function wholeDayFor(
   trafficProfiles: TrafficProfiles,
-  building: BuildingConfig | undefined,
+  /* Only the profile id is read, so a resolved building answers as well as an authored one. */
+  building: Pick<BuildingConfig, 'trafficProfile'> | undefined,
 ): WholeDay | undefined {
   if (building === undefined) return undefined;
   const profile = trafficProfiles.profiles.find(
@@ -185,9 +260,48 @@ export function wholeDayFor(
       templateId: record.id,
       periodS: record.durationMin * 60,
       startOfDayS: record.startOfDayMin * 60,
+      acts: actsOf(
+        phases.map((phase) => ({
+          startS: phase.startMin * 60,
+          endS: phase.endMin * 60,
+          startIntensity: phase.startIntensity,
+          endIntensity: phase.endIntensity,
+        })),
+      ),
     });
   }
   return undefined;
+}
+
+/**
+ * A pin's authored horizon, read off `data/` — GitHub issue #595, [§ D973](../../../../DECISIONS.md).
+ *
+ * Absent is `'period'`, because every pin authored before the field existed was measured by § D914
+ * on the contract's slice; anything that is not one of {@link RunHorizon}'s two members is the empty
+ * string, so `shift/ladder.ts#contractLadderIssues` can name it. Here rather than in `ladder.ts` so
+ * the horizon's two spellings stay in the one module that already owns them.
+ */
+export function parseRunHorizon(value: unknown): RunHorizon | '' {
+  if (value === undefined) return 'period';
+  return value === 'period' || value === 'whole-day' ? value : '';
+}
+
+/**
+ * **The horizon the Scenario run press will run `building` on** — before the press, which is when a
+ * brief, a picker or a pinned day has to know it. GitHub issue #595, [§ D973](../../../../DECISIONS.md).
+ *
+ * {@link runHorizonOf} answers what a *state* is running, and until `everyday/host.ts#startRun` has
+ * spread {@link wholeDayRun} in, a state whose tower has a day is still a slice. So a surface drawn
+ * before the press that asked `runHorizonOf` would describe the slice the press is about to replace.
+ * This is the press's own condition — `startRun` writes the whole day exactly when
+ * {@link wholeDayFor} answers — kept beside it so the two cannot disagree.
+ */
+export function scenarioHorizonFor(
+  trafficProfiles: TrafficProfiles,
+  building: Pick<BuildingConfig, 'trafficProfile'> | undefined,
+): RunHorizon | undefined {
+  if (building === undefined) return undefined;
+  return wholeDayFor(trafficProfiles, building) === undefined ? 'period' : 'whole-day';
 }
 
 /**

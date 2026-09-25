@@ -960,12 +960,65 @@ describe('where it went wrong is derived from the run', () => {
   });
 
   it('files only rows that are events, on every run', () => {
-    // Two, and both of them a moment: where the deepest queue stood, and the phase it stood in.
+    /*
+     * Where the deepest queue stood and the phase it stood in, on every run — and on a missed day,
+     * one row per missed goal first, in the goal table's order, with the queue row standing in for
+     * the landing-queue goal (§ D983). The expected list is derived from the sheet's own goal lines,
+     * so a run that misses a different goal fails here rather than reading another run's shape.
+     */
     for (const recording of [clean, saturated, missedWithoutSaturating]) {
-      expect(reportOf(recording).diagnosis.map((row) => row.id)).toEqual([
-        'peak-queue',
-        'peak-phase',
-      ]);
+      const report = reportOf(recording);
+      const missed =
+        report.verdict === 'missed'
+          ? report.goals
+              .filter((line) => line.reading.state === 'missed')
+              .map((line) => (line.reading.goal.reads === 'peakQueue' ? 'peak-queue' : `missed-${line.reading.goal.id}`))
+          : [];
+      const expected = [...missed, ...(missed.includes('peak-queue') ? [] : ['peak-queue']), 'peak-phase'];
+      expect(report.diagnosis.map((row) => row.id)).toEqual(expected);
+    }
+  });
+
+  it('opens a missed day on the goal it missed, never on a queue that passed its bar — #596', () => {
+    /*
+     * The assessor's Crown Hotel day: missed on a 311 s worst wait, headed *Where it went wrong* over
+     * *Floor G stacked 14 deep* — a landing inside its bar of 32, drawn red. § D983. The first row of
+     * a missed sheet names a goal that was missed, and the queue row is red only when the
+     * landing-queue goal is.
+     */
+    let sawMissedDay = false;
+    for (const recording of [clean, saturated, missedWithoutSaturating]) {
+      const report = reportOf(recording);
+      const queueLine = report.goals.find((line) => line.reading.goal.reads === 'peakQueue');
+      const queueRow = report.diagnosis.find((row) => row.id === 'peak-queue');
+      expect(queueRow?.tone === 'bad', recording.buildingId).toBe(
+        report.verdict === 'missed' && queueLine?.reading.state === 'missed',
+      );
+      // The fixed cause is gone, on every run: the row says what this run's calls did instead.
+      expect(queueRow?.why).not.toContain('committed elsewhere');
+      if (report.verdict !== 'missed') continue;
+      sawMissedDay = true;
+      const first = report.diagnosis[0];
+      const missedIds = report.goals
+        .filter((line) => line.reading.state === 'missed')
+        .map((line) => (line.reading.goal.reads === 'peakQueue' ? 'peak-queue' : `missed-${line.reading.goal.id}`));
+      expect(missedIds).toContain(first?.id);
+      expect(first?.tone).toBe('bad');
+    }
+    expect(sawMissedDay, 'some fixture run misses, or the case checks nothing').toBe(true);
+  });
+
+  it('gives every missed goal’s row its cohort, and names the goal and its bar', () => {
+    for (const recording of [saturated, missedWithoutSaturating]) {
+      const report = reportOf(recording);
+      for (const row of report.diagnosis.filter((entry) => entry.id.startsWith('missed-'))) {
+        const goal = report.goals.find((line) => `missed-${line.reading.goal.id}` === row.id)?.reading.goal;
+        expect(goal, row.id).toBeDefined();
+        expect(row.why).toContain(`asked for`);
+        expect(row.why).toContain(String(goal?.bar));
+        // A share names what it is a share of — R13 on a row the corpus now reads.
+        if (row.what.includes('%')) expect(row.what).toMatch(/\d+ (people|of)/u);
+      }
     }
   });
 

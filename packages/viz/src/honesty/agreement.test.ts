@@ -24,6 +24,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { goalsForDay } from '../shift/goals.js';
 import type { BrowserResources } from '../dev/data.js';
+import { createEverydayHost, type EverydayHostBindings } from '../everyday/host.js';
 import { railFooter } from '../everyday/rail.js';
 
 import {
@@ -238,6 +239,48 @@ describe('the tenth property goes red on § D359, which is the whole of its evid
     expect(message).toContain('dev/leftRail.ts#shiftGoalsOf');
     expect(message).toContain('everyday/host.ts#createEverydayHost');
   }, 600_000);
+
+  it('goes red on #597 — a brief that asks the state’s goals rather than the press’s', () => {
+    /*
+     * **GitHub issue #597, reverted at the level this property sees** (§ D984). The right side is
+     * left as it ships — the Everyday host after its own *Start the day* — and the left is the
+     * brief's expression as it was before the repair: `host.goalsToday()` over the pre-press state.
+     *
+     * The claim is where it fires, not only that it does: on the **slice** views of a tower with an
+     * authored day, and nowhere else. A whole-day view already carries the press's patch, and a
+     * tower with no day is a slice before and after — which is exactly why `today-asks` could not
+     * see this defect and why this pair is declared at all.
+     */
+    const declared = AGREED_FIGURES.find((figure) => figure.id === 'asks-before-the-press');
+    expect(declared, 'the #597 pair is gone — this case is about nothing').toBeDefined();
+    const reverted: AgreedFigure = {
+      ...(declared as AgreedFigure),
+      left: {
+        surfaceId: 'everyday/briefView.ts#briefAsksOf',
+        read: (view) =>
+          createEverydayHost({
+            ...({} as EverydayHostBindings),
+            resources: view.resources,
+            state: () => view.state,
+            playheadS: () => 0,
+            dayClosed: () => view.dayClosed,
+          } as EverydayHostBindings)
+            .goalsToday()
+            .map((reading) => reading.goal.label)
+            .join(' · '),
+      },
+    };
+    const found = checkSurfacesAgree(contexts[0]?.context as HonestyContext, readings([reverted]));
+    expect(found.length).toBeGreaterThan(0);
+    for (const violation of found) expect(violation.field).toContain('/period');
+    const message = found.map((violation) => violation.message).join('\n');
+    // The two ceilings #597 records — the brief's 230 s against the day's 460 s, on day 1.
+    expect(message).toContain('inside 230 s');
+    expect(message).toContain('inside 460 s');
+    expect(message).toContain('everyday/briefView.ts#briefAsksOf');
+    // 5.7 s at wave AH's integration (one worker, load 6.5): the project's own ceiling, and not
+    // the 600 000 ms its lane wrote.
+  }, 300_000);
 
   it('holds on this tree — both shells publish one ask', () => {
     for (const each of contexts) {

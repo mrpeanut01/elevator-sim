@@ -21,6 +21,8 @@ import { CONTRACTS, FIRST_CONTRACT_ID, contractById } from './contracts.js';
 import {
   ELIGIBLE_FIRST_CONTRACT_IDS,
   FIRST_SESSION_LINE,
+  FIRST_SESSION_LINE_CHOSEN,
+  firstSessionLineFor,
   FIRST_SESSION_STREAM,
   LEGIBILITY_SWEEP_N,
   firstSessionContractFor,
@@ -92,8 +94,16 @@ describe('the eligible set — § D512’s table read by arithmetic', () => {
      * session as never* was measured on days with every car in service. Both now book cars out —
      * St Jude's books two — and both are eligible. A first session can now open on the hospital.
      */
+    /*
+     * **Fourteen → fifteen on 2026-09-24, and it is the horizon that moved rather than a rung** —
+     * [§ D991](../../../../DECISIONS.md), GitHub issue #592. The table was measured on each
+     * contract's slice while the first session plays Today's scenario, which is the whole authored
+     * day on thirteen of sixteen contracts. Re-measured on the day actually played, `c14`
+     * (One-WTC-class) goes 1 of 50 → **31** and joins; nothing leaves, and only `c1` — no authored
+     * day, so its slice is its day — is out. The threshold is untouched.
+     */
     expect(ELIGIBLE_FIRST_CONTRACT_IDS).toEqual([
-      'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10', 'c11', 'c12', 'c13', 'c15', 'c16',
+      'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10', 'c11', 'c12', 'c13', 'c14', 'c15', 'c16',
     ]);
     for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) {
       const row = LEGIBILITY_SWEEP.find((entry) => entry.contractId === id);
@@ -103,7 +113,7 @@ describe('the eligible set — § D512’s table read by arithmetic', () => {
      * first. It was five until the rungs moved; `c6`, `c8` and `c9` are in now, and shrinking this
      * list is the measurement rather than a concession — every one of the three is above the
      * threshold § D512 set and nothing here moved that threshold. */
-    for (const id of ['c1', 'c14']) expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(id);
+    for (const id of ['c1']) expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(id);
     expect(ELIGIBLE_FIRST_CONTRACT_IDS).not.toContain(FIRST_CONTRACT_ID);
   });
 
@@ -155,7 +165,11 @@ describe('the door’s line — derived from the week, never stored', () => {
     expect(isFirstDayOnALegibleTower(openWeek('c1'))).toBe(false);
     expect(isFirstDayOnALegibleTower({ ...openWeek('c2'), day: 2 })).toBe(false);
     expect(isFirstDayOnALegibleTower({ ...openWeek('c2'), attempt: 1 })).toBe(false);
-    /* Worded to be true however the player arrived: it names the set, not the draw. */
+    /*
+     * It was said here that the line is *worded to be true however the player arrived*. It was not
+     * — its last sentence names the draw — and GitHub issue #595 gave it a second arm for a first
+     * day the draw did not choose; see the case below.
+     */
     /*
      * **Both figures are checked against the table rather than against a literal** — GitHub issues
      * #500 and #501. This read `toContain('five towers')` and `toContain('400 days')`, which pinned
@@ -247,6 +261,17 @@ describe('AC1 and AC2, asked of every member of the set on the pinned seeds', ()
       c11: 10,
       c12: 10,
       c13: 10,
+      /*
+       * **`c14` joined the set on 2026-09-24 and reads one of ten here, and both are right** —
+       * [§ D991](../../../../DECISIONS.md). This walk builds each member's **slice**
+       * (`contractDayState`), and the set is now derived from the day Today's scenario plays, which
+       * for One-WTC-class is the whole authored day: 31 of 50 there, 1 of 50 on its slice. So this
+       * case reads the slice of a member admitted on its whole day. It is kept on the slice because
+       * walking fifteen whole days × ten seeds here would cost the default suite most of an hour;
+       * the whole-day rows are held at budget by `everyday/stagePace.sweep.test.ts` and
+       * `legibility.sweep.test.ts`, and one whole day is pinned per run by `stagePace.test.ts`.
+       */
+      c14: 1,
       c15: 8,
       c16: 10,
     });
@@ -281,4 +306,42 @@ describe('AC1 and AC2, asked of every member of the set on the pinned seeds', ()
    * would be arithmetic dressed as a measurement.
    */
   }, 1_800_000);
+});
+
+describe('the line has two arms, and the draw picks between them — issue #595, § D973', () => {
+  it('says the number opens the tower only where the number’s own draw opens it', () => {
+    /*
+     * The picker (§ D912) and the pinned days both reach a legible first day the seed did not
+     * choose, and *the same number opens the same tower* is false of both. So the arm is the draw's
+     * own answer: across a run of seeds, every contract the draw names gets the first arm and every
+     * other eligible contract gets the second.
+     */
+    let drawn = 0;
+    let chosen = 0;
+    for (let n = 0; n < 40; n += 1) {
+      const seed = 20_260_824n + 7_919n * BigInt(n);
+      const opened = firstSessionContractFor(seed);
+      for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) {
+        const line = firstSessionLineFor(id, seed);
+        if (id === opened) {
+          expect(line, `${id} at ${String(seed)}`).toBe(FIRST_SESSION_LINE);
+          drawn += 1;
+        } else {
+          expect(line, `${id} at ${String(seed)}`).toBe(FIRST_SESSION_LINE_CHOSEN);
+          chosen += 1;
+        }
+      }
+    }
+    expect(drawn).toBe(40);
+    expect(chosen).toBeGreaterThan(0);
+  });
+
+  it('keeps the chosen arm’s counts derived and its words the same register as the first', () => {
+    expect(FIRST_SESSION_LINE_CHOSEN).toContain(
+      `${String(LEGIBILITY_SWEEP.length * LEGIBILITY_SWEEP_N)} days`,
+    );
+    expect(FIRST_SESSION_LINE_CHOSEN).not.toContain(`${String(ELIGIBLE_FIRST_CONTRACT_IDS.length)} towers`);
+    expect(FIRST_SESSION_LINE_CHOSEN).not.toMatch(/\b(you|your|yours)\b/iu);
+    expect(FIRST_SESSION_LINE_CHOSEN).not.toContain('same number opens the same tower');
+  });
 });

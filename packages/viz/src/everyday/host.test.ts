@@ -26,7 +26,7 @@ import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
 import { RUSH_SEED, RUSH_TEMPLATE_ID, rushOutcomeOf, rushPatchOf } from './rush.js';
 import { REPLAY_COPY } from './replay.js';
-import { RUSH_CONTRACT_ID, REPLAY_CONTRACT_ID } from '../shift/week.js';
+import { CAREER_CONTRACT_ID, RUSH_CONTRACT_ID, REPLAY_CONTRACT_ID, openWeek } from '../shift/week.js';
 import { CONTRACTS } from '../shift/contracts.js';
 import type { CareerStore } from './careerStore.js';
 
@@ -670,6 +670,36 @@ describe('the run actions', () => {
     const residential: ViewerState = { ...base(), shiftLengthS: 36000, windowStartS: 0 };
     expect(worstBarOf(residential)).toBe(worstBarOf(base()));
     expect(energyBarOf(residential)).toBe(energyBarOf(base()));
+  });
+
+  it('asks on the brief what the press will grade — the goals ahead are the goals after it (#597)', () => {
+    /*
+     * GitHub issue #597, § D984. The brief is drawn **before** *Start the day*, while the state is
+     * still a slice; the press writes the whole-day window. So the brief read 230 s / 80 kJ over a
+     * day the stage then graded against 460 s / 350 kJ. `goalsAhead` must equal what `goalsToday`
+     * reads once the press's **own** patch has landed — taken from the press through the harness,
+     * not rebuilt here, so a press that changed its patch moves this case with it.
+     */
+    for (const buildingId of ['midtown-office', 'garden-apartments']) {
+      const slice: ViewerState = { ...base(), buildingId };
+      const harness = harnessOf(slice);
+      const host = createEverydayHost(harness.bindings);
+      const ahead = host.goalsAhead().map((reading) => reading.goal.label);
+      host.startRun();
+      const landed: ViewerState = { ...slice, ...(harness.patches.at(-1) ?? {}) };
+      const after = createEverydayHost(harnessOf(landed).bindings)
+        .goalsToday()
+        .map((reading) => reading.goal.label);
+      expect(ahead, buildingId).toEqual(after);
+      // Before the run, every ask is a question rather than a reading.
+      expect(host.goalsAhead().every((reading) => reading.state === 'pending')).toBe(true);
+    }
+    // And the case is not vacuous: on a tower with an authored day the slice's own asks differ.
+    const midtown: ViewerState = { ...base(), buildingId: 'midtown-office' };
+    const host = createEverydayHost(harnessOf(midtown).bindings);
+    expect(host.goalsAhead().map((r) => r.goal.label)).not.toEqual(
+      host.goalsToday().map((r) => r.goal.label),
+    );
   });
 
   /**
@@ -2333,5 +2363,106 @@ describe('a run in flight when a day is left — GitHub issue #526', () => {
     expect(h.calls.slice(beforeTaking)).toEqual(['cancelRun', 'applyPatch']);
     /* And the week still moves, so this is the refusal being dropped rather than the arm being skipped. */
     expect(h.patches.at(-1)?.week?.contractId).toBe(offer.id);
+  });
+});
+
+/**
+ * **A career day never writes the Scenario week** — GitHub issue #594, § D964.
+ *
+ * Measured on the shipped bundle before the fix: a Midtown week with Monday closed, one career day
+ * closed, and the front door read the career's tower and crowd over *MON Garden Apartments 100 %*.
+ * The browser tier holds that route end to end (`weekSurvives.browser.test.ts`); this holds the two
+ * halves the route is made of, on a harness whose `applyPatch` actually applies.
+ */
+describe('GitHub issue #594 — the career parks the Scenario record and gives it back', () => {
+  function applyingHarness(): { readonly h: Harness; readonly host: EverydayHost } {
+    const h = harnessOf({
+      ...base(),
+      week: { ...openWeek('c2'), day: 3, dayIdx: 2 },
+      buildingId: 'midtown-office',
+    });
+    const bindings: EverydayHostBindings = {
+      ...h.bindings,
+      applyPatch: (patch) => {
+        h.calls.push('applyPatch');
+        h.patches.push(patch);
+        h.state = { ...h.state, ...patch };
+      },
+    };
+    const career = openingCareer(base().dispatcherId);
+    const store: CareerStore = {
+      load: () => ({ career, refusal: undefined, notice: undefined }),
+      save: () => {},
+      clear: () => {},
+    };
+    return { h, host: createEverydayHost(bindings, store) };
+  }
+
+  it('runs the career day on a career week with the Scenario week parked, and puts it all back', () => {
+    const { h, host } = applyingHarness();
+    const scenario = h.state;
+    const tower = host.campaign().towers[0];
+    if (tower === undefined) throw new Error('the opening career holds no tower');
+
+    host.runCampaignDay(tower.id);
+    expect(h.state.week.contractId).toBe(CAREER_CONTRACT_ID);
+    expect(h.state.week.day).toBe(tower.day);
+    /* Parked by identity, which is what makes *not written* checkable rather than argued. */
+    expect(h.state.parkedWeeks.at(-1)).toBe(scenario.week);
+    expect(h.state.buildingId).toBe(tower.buildingId);
+
+    host.leaveCareer?.();
+    expect(h.state.week).toEqual(scenario.week);
+    expect(h.state.parkedWeeks.some((week) => week.contractId === 'c2')).toBe(false);
+    for (const field of [
+      'buildingId',
+      'dispatcherId',
+      'seed',
+      'shiftLengthS',
+      'windowStartS',
+      'outOfServiceCarIds',
+      'campaignFitOut',
+      'campaignEventId',
+      'recording',
+      'report',
+    ] as const) {
+      expect(h.state[field], field).toEqual(scenario[field]);
+    }
+  });
+
+  it('a Scenario press releases a standing career day before it acts', () => {
+    const { h, host } = applyingHarness();
+    const scenario = h.state;
+    const tower = host.campaign().towers[0];
+    if (tower === undefined) throw new Error('the opening career holds no tower');
+    host.runCampaignDay(tower.id);
+    host.startRun();
+    expect(h.state.week.contractId).toBe('c2');
+    expect(h.state.week.day).toBe(scenario.week.day);
+    expect(h.state.buildingId).toBe('midtown-office');
+    expect(host.campaignDay()).toBeUndefined();
+  });
+
+  it('a pinned day from the front door releases a standing career day too — added at integration', () => {
+    /*
+     * Lane A gave every Scenario press a release and lane B wrote a new one, `playPressDay`, without
+     * it; each was green alone. A pinned day read with the career's week standing would ask the
+     * career's record whether the row is available, and run on it.
+     */
+    const { h, host } = applyingHarness();
+    const tower = host.campaign().towers[0];
+    if (tower === undefined) throw new Error('the opening career holds no tower');
+    host.runCampaignDay(tower.id);
+    expect(host.campaignDay()).toBeDefined();
+    host.playPressDay('c7');
+    expect(host.campaignDay()).toBeUndefined();
+    expect(h.state.week.contractId).not.toBe(CAREER_CONTRACT_ID);
+  });
+
+  it('is a no-op with no career day standing', () => {
+    const { h, host } = applyingHarness();
+    const before = h.calls.length;
+    host.leaveCareer?.();
+    expect(h.calls.length).toBe(before);
   });
 });

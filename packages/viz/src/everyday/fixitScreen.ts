@@ -162,6 +162,7 @@ import {
   FIXIT_RUN_SWITCHES,
   assertPairMatchesRepairs,
   figureValuesOf,
+  fixitPlanRefusalOf,
   fixitRunPlanOf,
   measuredOf,
   standingParkingOf,
@@ -177,6 +178,8 @@ import type {
 import type { PriceSchedule } from '../pricing/types.js';
 import type { VizRecording } from '../contract/types.js';
 import { mountCaseStage, type CaseStage } from './caseStage.js';
+import { DEFAULT_DOOR_TARGET, mountFixitFamilies } from './fixitFamilies.js';
+import { withPrunedDials } from '../fixit/editorInputs.js';
 import { createOffThreadRunner } from '../dev/offThreadRuns.js';
 import { actionBarFor } from './actionBar.js';
 import { sideBySide } from './screenDom.js';
@@ -290,6 +293,8 @@ interface CaseSession {
   pairSeen: boolean;
   /** The mounted pair stage, kept across redraws so a toggled repair does not restart it. */
   pairStage: CaseStage | undefined;
+  /** Which door-hold target the door selects edit — view state, § D1000. */
+  doorTarget: string;
 }
 
 interface LoadedFixit {
@@ -401,6 +406,7 @@ function ensureRestored(): void {
       asRepaired: undefined,
       pairSeen: false,
       pairStage: undefined,
+      doorTarget: DEFAULT_DOOR_TARGET,
     });
   }
 }
@@ -438,6 +444,7 @@ function sessionOf(entry: FixitCase): CaseSession {
       asRepaired: undefined,
       pairSeen: false,
       pairStage: undefined,
+      doorTarget: DEFAULT_DOOR_TARGET,
     };
     sessions.set(entry.id, session);
   }
@@ -1305,6 +1312,44 @@ function mountFixit(
       topFloorRaisePriceUnits(scheduleNow()),
     );
     if (elevation !== null) body.append(elevationLine(entry, session, elevation, fabric.elevationCeiling));
+    /*
+     * § D1000's five families — the dials, the door hold and the banks — on the same card and the
+     * same budget. `everyday/fixitFamilies.ts` is the mount both fix-it surfaces share.
+     */
+    body.append(
+      mountFixitFamilies({
+        doc,
+        entry,
+        state: session.state,
+        resources: loadedFixit.resources,
+        schedule: scheduleNow(),
+        running,
+        doorTarget: session.doorTarget,
+        setDoorTarget: (target) => {
+          session.doorTarget = target;
+          render();
+        },
+        commit: (next, key) => {
+          if (running) return;
+          session.state = next;
+          everydayTelemetry().record({ name: 'change_made', controlKey: key, screenKey: 'fixit' });
+          render();
+        },
+        palette: {
+          ink: C.ink,
+          soft: C.inkSoft,
+          faint: C.faint,
+          rule: C.rule,
+          paper: C.paper,
+          label: C.label,
+          alarm: C.alarm,
+          accent: C.terracotta,
+          radius: R.control,
+          mono: TYPE.mono,
+        },
+        prefix: 'everyday-fixit',
+      }),
+    );
     card.append(body);
 
     const note = el(doc, 'div', 'everyday-fixit-budget-note', budgetNoteOf(entry, spendOf(entry, session.state, scheduleNow())));
@@ -1444,7 +1489,9 @@ function mountFixit(
     select.addEventListener('change', () => {
       if (running) return;
       const picked = select.value === '' ? null : (select.value as EditorParkingStrategy);
-      session.state = setParkingStrategy(entry, session.state, picked, scheduleNow());
+      const parked = setParkingStrategy(entry, session.state, picked, scheduleNow());
+      /* A dial this strategy's gate no longer admits leaves the order with it — § D1000. */
+      session.state = loaded === undefined ? parked : withPrunedDials(entry, parked, loaded.resources);
       everydayTelemetry().record({ name: 'change_made', controlKey: 'fixit-parking', screenKey: 'fixit' });
       render();
     });
@@ -1592,6 +1639,16 @@ function mountFixit(
      * The spend is bound here for the same reason the resources are: the outcome is classified
      * against the state the press was made in, never one the player edited while it ran.
      */
+    /*
+     * An order the loader or core would refuse — a rezone that leaves a bank with no car, § D1000 —
+     * is said where the reader is and never thrown from a click. The families card already draws
+     * the same sentence above the controls that could put it right.
+     */
+    if (fixitPlanRefusalOf(entry, session.state, resources) !== undefined) {
+      runFailure = COPY.planRefused;
+      render();
+      return;
+    }
     const plan = fixitRunPlanOf(entry, session.state, resources);
     const spend = spendOf(entry, session.state, scheduleNow());
     ask = `${entry.id}:press`;

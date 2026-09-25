@@ -26,6 +26,7 @@
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import {
+  briefAsksOf,
   briefBarModel,
   briefScreenViewOf,
   type BriefRefusalCard,
@@ -99,8 +100,15 @@ function mountBrief(
       dispatcherName: data.dispatcherById(selection.dispatcherId)?.name,
       /* Any profile's name, for the moot-dispatcher sentence — § D914. */
       dispatcherNameOf: (id) => data.dispatcherById(id)?.name,
-      goals: data.goalsToday(),
+      /*
+       * The goals the press on this screen will grade, not the state's — GitHub issue #597,
+       * § D984. `goalsToday()` read the slice this state still is until *Start the day* patches in
+       * the whole day, so this card printed 230 s over a day the stage then graded against 460 s.
+       */
+      goals: briefAsksOf(data),
       seed: data.seed(),
+      /* The horizon the next press runs — the moot sentence's fourth gate, GitHub issue #595. */
+      horizon: data.scenarioHorizon(),
       /* § D729, § D730 — per draw, `doorScreen.ts#viewOf`'s reason, and the same question so the
          two screens cannot disagree about one run (§ 16 rule 14). */
       crowdIsToday: isDailySeed(data.seed(), deviceNowMs()),

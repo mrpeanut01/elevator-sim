@@ -113,7 +113,7 @@ are this document's.
 
 | Mode | Length | Beats | Retry costs | **Half served** | **What it is for** |
 |---|---|---|---|---|---|
-| **Today's tower** | 8 min-2 h 30 a day at 4× | 1 and 5 | one per day | **Diagnostic**, with a *social* fifth beat | The only mode whose verdict is against other people on the same seed rather than against your own previous attempt |
+| **Today's tower** | 8 min-1 h 49 a day at 4× | 1 and 5 | one per day | **Diagnostic**, with a *social* fifth beat | The only mode whose verdict is against other people on the same seed rather than against your own previous attempt |
 | **Campaign** | 8-15 min a building-day at 4× | 3, by pricing it | units, and a works night | **Both**, with the adjudicative half made expensive | The only mode where a change costs something and persists past the day |
 | **Endless rush** | 4-23 min at 4× | 1 only | nothing — no retry exists | **Neither** — see § 1.4 | It answers *where does this configuration break*. That is a limit, not a differential |
 | **Fix a building** | 13-23 min a case at 4× | all five, on one screen | free, and it says so | **Both, entire** | The only mode that closes the loop without navigating |
@@ -967,11 +967,18 @@ the second introduction at about minute 8, inside the budget with a turn to spar
 **That arithmetic does not survive the measurement, and the schedule is left standing rather than
 quietly re-fitted** ([§ D753](../DECISIONS.md), GitHub issue #559). At the stage's opening rung a
 fix-a-building case is **13-23 min a case at 4×** of watching and a tower day is
-**8 min-2 h 30 a day at 4×**, so a first session that plays one of each ends its second turn between
-minute 21 and **minute 173** rather than at minute 8. **The top of that range read *minute 38*
+**8 min-1 h 49 a day at 4×**, so a first session that plays one of each ends its second turn between
+minute 21 and **minute 132** rather than at minute 8. **The top of that range read *minute 38*
 until [§ D946](../DECISIONS.md)**, because the tower-day figure quoted a thirty-minute slice that
 thirteen of the sixteen contracts do not run — they run the authored ten-hour `office-day`, and
-the arithmetic follows the day rather than the other way round. `charter S3` is *comfortably* met
+the arithmetic follows the day rather than the other way round. **It then read *minute 173*, with
+the day at *8 min-2 h 30*, until [§ D991](../DECISIONS.md)** (GitHub issue #592): the day is still
+played whole, but the stage now plays its three peaks at the player's rung and the hours between
+them at `30×`, holding the player's rung while anyone on a landing has waited past a minute. 132 is
+23 + 109, and 109 is the longest paced day measured on any contract — a reference tower's, which a
+first session can be dealt, since the reference towers are in the eligible set. On the game's own towers the
+longest measured day is 51 minutes, so the same sum there is 74. The ruling's own
+estimate was *minute 63*, from a day of about forty minutes, and it held only for those towers. `charter S3` is *comfortably* met
 by that and `charter S2` is the one at risk, in the direction nobody designed for: the budget is not too tight,
 the turns are too long to fit two of them inside a first sitting. **What this does not settle is whether that is a defect**, because the
 figure is a floor on the *watching* and the player has a skip on every case stage and a speed ladder

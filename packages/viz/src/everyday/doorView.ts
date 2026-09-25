@@ -156,9 +156,16 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
   Object.freeze({
     n: '2',
     head: 'Watch the day',
+    /*
+     * GitHub issue #592, § D991. This read *"A whole working day, at whatever speed you set"*
+     * (§ D733), and § D991 made its second clause partly false: on a whole day the stage now
+     * crosses the hours between the peaks at `30×` itself, so the speed is not only the player's.
+     * The peaks are still played at the speed they set, and a chip press still wins for the rest
+     * of the day, so the sentence says both rather than dropping either.
+     */
     body:
-      'A whole working day, at whatever speed you set. You can speed it up, not steer it — the ' +
-      'dispatcher is the decision you already made.',
+      'A whole working day, its busy hours at the speed you set and the quiet hours between them ' +
+      'faster. You can speed it up, not steer it — the dispatcher is the decision you already made.',
   }),
   Object.freeze({
     n: '3',
@@ -209,13 +216,18 @@ export function sameForEveryoneLine(crowdIsToday: boolean): string {
  * so the tower changes when a contract does and not when the date does. The crowd is what turns
  * over daily ([§ D730](../../../../DECISIONS.md)), and it is what this rule now states.
  *
+ * **Since GitHub issue #595 ([§ D973](../../../../DECISIONS.md)) the product picks a crowd a second
+ * way**: a pinned day chosen from the door's own list sets the crowd it was measured on. The rule
+ * names that exception rather than leaving *the same for everybody* to be false of it.
+ *
  * Unconditional, unlike {@link sameForEveryoneLine}, because it states **how the product picks a
  * crowd** rather than a claim about the run standing in front of the reader — and the two lines
  * that do make that claim are on the same screen, four lines below.
  */
 const DOOR_RULE =
-  'One crowd a day, the same for everybody — the tower is the one your week is on. A run counts ' +
-  'once; every earlier day stays open as a replay that does not.';
+  'One crowd a day, the same for everybody, unless you choose one of the days a press decides — ' +
+  'the tower is the one your week is on. A run counts once; every earlier day stays open as a ' +
+  'replay that does not.';
 
 /** The world band, which every world figure on this screen degrades to. */
 const WORLD_BAND: WorldBandView = Object.freeze({

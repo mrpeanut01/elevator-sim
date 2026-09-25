@@ -190,8 +190,16 @@ export interface FixitCase {
     readonly durationS: number;
     readonly arrivalRatePctPop5min: number | null;
   };
-  /** The deltas that make the shipped building this case's as-built one, plus its stand line. */
-  readonly asBuilt: { readonly note: string; readonly patch: FixitPatch };
+  /**
+   * The deltas that make the shipped building this case's as-built one, plus its stand line — and,
+   * on a case whose crowd has a start time the owner can move, the **tenancy** that says which
+   * (§ D1001).
+   */
+  readonly asBuilt: {
+    readonly note: string;
+    readonly patch: FixitPatch;
+    readonly tenancy?: FixitTenancy | undefined;
+  };
   readonly complaint: {
     readonly text: string;
     readonly complainer: string;
@@ -258,25 +266,33 @@ export interface FixitExtra {
 }
 
 /**
- * **The parking strategies the fix-it editor offers**, a deliberate subset of core's
- * `PARKING_STRATEGIES` — GitHub issue **#422**.
+ * **The parking strategies the fix-it editor offers — all five of core's `PARKING_STRATEGIES`**,
+ * GitHub issue **#422** for the first three and [§ D1000](../../../../DECISIONS.md) for the other
+ * two.
  *
- * Two of the five are left out, and each for a reason a player would otherwise meet as a dead
- * control:
+ * This was a subset of three, and both of the two it left out were refused on a written reason
+ * that has stopped being true:
  *
- * - `fixed-floor` parks at `idle.parkingFloorIndex`, and this editor draws no floor control. Offered
- *   without one it would be a setting whose meaning the player cannot state, landing on whatever the
- *   standing order happens to carry — and on a shaft that does not serve that index the stage
- *   answers `no-target` and nothing moves at all.
- * - `predicted-demand` needs a forecast. Without Phase 5's learned one the stage reports
- *   `no-forecast` rather than guessing, so the option would be a press that changes no leg — which
- *   is § D219's defect wearing a select's clothes.
+ * - `predicted-demand` was refused because *"without Phase 5's learned one the stage reports
+ *   `no-forecast`"*. [§ D706](../../../../DECISIONS.md) § 8 found that false: `core/src/sim/simulation.ts`
+ *   resolves each bank's arrival model once and feeds the stage its forecast, and
+ *   `sleeping-sky-lobby`'s diagnosed repair runs on that strategy and moves the legs. A control that
+ *   works, withheld on a false sentence, is [§ D227](../../../../DECISIONS.md)'s stale refusal.
+ * - `fixed-floor` was refused because the editor drew no floor control. It draws one now —
+ *   `idle.parkingFloorIndex` is one of `fixit/families.ts`'s dials, live exactly when this select
+ *   reads `fixed-floor`, and its options are the floors this building's banks actually serve.
  *
- * Both belong to the lane that builds the floor control and the forecast, not to this one. The
- * subset is asserted against core's own vocabulary in `engine.test.ts`, so a strategy that leaves
- * `PARKING_STRATEGIES` cannot go on shipping from here.
+ * Both are proved on the legs in `fixit/families.test.ts`, which is the only thing that makes
+ * offering them different from miming them. The list is still asserted against core's vocabulary
+ * in `engine.test.ts`, so a strategy core stops declaring cannot go on shipping from here.
  */
-export const EDITOR_PARKING_STRATEGIES = ['stay', 'lobby', 'zone-center'] as const;
+export const EDITOR_PARKING_STRATEGIES = [
+  'stay',
+  'lobby',
+  'zone-center',
+  'predicted-demand',
+  'fixed-floor',
+] as const;
 export type EditorParkingStrategy = (typeof EDITOR_PARKING_STRATEGIES)[number];
 
 /** What the player has selected on a case. The pure model the panel renders. */
@@ -329,4 +345,88 @@ export interface FixitState {
    * look up by id.
    */
   readonly topFloorRaiseM: number;
+  /**
+   * **The dispatcher-tier dials** — every declared dimension of the schedule's `idle-parking`,
+   * `dispatch-rules` and `dwell-policy` rows except `idle.parkingStrategy`, which keeps its own
+   * select above. Dimension id → value, only what the player moved. `fixit/families.ts` says what is
+   * offered and why; [§ D1000](../../../../DECISIONS.md) is the lane that built it.
+   */
+  readonly dispatcherDials: Readonly<Record<string, DialValue>>;
+  /**
+   * **Door hold, per car or for every car** — the schedule's `door-dwell` row. Key
+   * {@link EVERY_CAR} or a car id; a car-specific entry is applied after the every-car one.
+   */
+  readonly doorDwell: Readonly<Record<string, DoorDwellSetting>>;
+  /**
+   * **Which bank a car runs in** — part of the schedule's `rezone-bank` row. Car id → an existing
+   * bank's id, {@link KEYED_BANK} (a bank of its own, keyed to a run the player draws), or
+   * {@link OUT_OF_SERVICE}. A car the as-built building has out for works is listed too, so it can
+   * be put back.
+   */
+  readonly carBanks: Readonly<Record<string, string>>;
+  /** **The floors a bank serves**, bank id → floor ids — `rezone-bank` again. */
+  readonly bankFloors: Readonly<Record<string, readonly string[]>>;
+  /**
+   * **Banks whose cars weigh against their own plate** — `rezone-bank` again: the plated rated load
+   * the shipped building authors, where the as-built building sets a different one.
+   */
+  readonly platedBankIds: readonly string[];
+  /**
+   * **Which authored position each tenancy cohort is moved to** — cohort id → position id, the
+   * schedule's `tenant-floors` row charged once per cohort ([§ D1001](../../../../DECISIONS.md)). An
+   * id the case does not author is never written: `engine.ts#setTenancyPosition` refuses it, so on
+   * the fifteen cases that author no cohort this stays empty whatever is pressed.
+   */
+  readonly tenancyPositions: Readonly<Record<string, string>>;
 }
+
+/**
+ * **A case's movable crowd** — [§ D1001](../../../../DECISIONS.md), the ruling on how the schedule's
+ * `tenant-floors` row is offered in a fix case.
+ *
+ * The row is drawn on every case, and it can only move what the case authors here: named cohorts,
+ * each with a few named **positions**, each position a per-floor headcount the watched window keeps.
+ * There is no free per-floor population dial, because measured, a cut to a third of every floor
+ * clears seventeen of the eighteen cases — fourteen of them cases whose fault is not the crowd — and
+ * because any population edit redraws the whole trace, so even a one-person move is a re-roll. A
+ * case that authors no cohort draws the row with a sentence saying so, and a press there changes
+ * nothing.
+ */
+export interface FixitTenancy {
+  readonly cohorts: readonly TenancyCohort[];
+}
+
+export interface TenancyCohort {
+  readonly id: string;
+  /** The tenancy, in the player's words. */
+  readonly name: string;
+  /** Why the owner can move this crowd's start: a lease clause, a letter, a memo. Never empty. */
+  readonly reason: string;
+  /** Every floor any of its positions sets. */
+  readonly floorIds: readonly string[];
+  readonly positions: readonly TenancyPosition[];
+}
+
+export interface TenancyPosition {
+  readonly id: string;
+  /** The position, in the player's words — *three start times, one watched*. */
+  readonly name: string;
+  /** The headcount each floor keeps in the watched window. Never above the as-built figure. */
+  readonly watched: readonly { readonly floorIds: readonly string[]; readonly population: number }[];
+}
+
+/** A dial's value: a declared dimension's number, name or switch. */
+export type DialValue = number | string | boolean;
+
+/** One target's door hold. An absent side is left as the car has it. */
+export interface DoorDwellSetting {
+  readonly hallCallS?: number | undefined;
+  readonly carCallS?: number | undefined;
+}
+
+/** {@link FixitState.doorDwell}'s key for every car in the building. */
+export const EVERY_CAR = '*';
+/** {@link FixitState.carBanks}'s target for a car taken out of service. */
+export const OUT_OF_SERVICE = 'out-of-service';
+/** {@link FixitState.carBanks}'s target for a car given a bank of its own. */
+export const KEYED_BANK = 'keyed';

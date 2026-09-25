@@ -57,6 +57,7 @@
 import type { VizRecording } from '../contract/types.js';
 import { frameAt } from '../frame/frameAt.js';
 import { queueAt } from '../frame/overlay.js';
+import { waitBandsAt } from '../live/bands.js';
 import { systemClock } from '../playback/clock.js';
 import { Playback } from '../playback/playback.js';
 import { drawCutaway, sizeCanvas } from './cutaway.js';
@@ -104,6 +105,26 @@ export interface CaseStageInput {
   readonly classes: CaseStageClasses;
   /** Called once, on the skip press or the run's end, whichever comes first. */
   readonly onDone: () => void;
+  /**
+   * **The transport's speed at a frame**, from the present frame's longest wait over every pane —
+   * GitHub issue #598, [§ D992](../../../../DECISIONS.md). Absent on the fix-it screen, which plays
+   * at one rung as it always has; the tutorial passes `tutorialModel.ts#tutorialPaceOf`, so its
+   * quiet minutes are crossed fast and its trouble plays at the player's speed. Speed only — the
+   * playhead is never moved, and a pane's picture is the same frame at any speed.
+   */
+  readonly pace?: ((longestStandingS: number | undefined) => number) | undefined;
+  /**
+   * A clock and a line saying why the transport is at its speed, drawn above the canvases and
+   * rewritten on change. Absent draws neither — GitHub issue #598's *no clock*, opt-in so the fix-it
+   * screen is untouched by this lane.
+   */
+  readonly clockOf?:
+    | ((simTimeS: number, simPerRealS: number) => { readonly clock: string; readonly pace: string })
+    | undefined;
+  /** Told on each frame what the canvas shows now, so a screen can latch what has been seen. */
+  readonly onFrame?:
+    | ((frame: { readonly simTimeS: number; readonly longestStandingS: number | undefined }) => void)
+    | undefined;
 }
 
 export interface CaseStage {
@@ -185,7 +206,16 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
     canvases.push(canvas);
     grid.append(cell);
   }
-  root.append(head, note, grid);
+  /* GitHub issue #598's clock — drawn only for a caller that asked for one. */
+  const clockRow = doc.createElement('div');
+  clockRow.className = `${input.classes.root}-clock`;
+  clockRow.style.cssText = `display:flex;gap:12px;flex-wrap:wrap;align-items:baseline;margin:0 0 8px;font:500 12px ${TYPE.mono};color:${C.ink}`;
+  const clockText = doc.createElement('span');
+  const paceText = doc.createElement('span');
+  paceText.style.cssText = `color:${C.label}`;
+  clockRow.append(clockText, paceText);
+  if (input.clockOf === undefined) root.append(head, note, grid);
+  else root.append(head, note, clockRow, grid);
 
   /*
    * The transport runs on the longest pane, so neither run is cut short by the other's horizon. The
@@ -228,6 +258,27 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
       return;
     }
     const simTimeS = playback.simTimeS;
+    /*
+     * GitHub issue #598, § D992 — the present frame's longest wait over every pane, only when a
+     * caller asked for pace or for frames. `waitBandsAt` folds at `t` and reads nothing later.
+     */
+    if (input.pace !== undefined || input.onFrame !== undefined || input.clockOf !== undefined) {
+      let longest: number | undefined;
+      for (const pane of panes) {
+        const here = waitBandsAt(pane.recording, simTimeS).longestCurrentWaitS;
+        if (here !== undefined && (longest === undefined || here > longest)) longest = here;
+      }
+      if (input.pace !== undefined) {
+        const speed = input.pace(longest);
+        if (playback.speed !== speed) playback.setSpeed(speed);
+      }
+      input.onFrame?.({ simTimeS, longestStandingS: longest });
+      if (input.clockOf !== undefined) {
+        const line = input.clockOf(simTimeS, playback.speed);
+        if (clockText.textContent !== line.clock) clockText.textContent = line.clock;
+        if (paceText.textContent !== line.pace) paceText.textContent = line.pace;
+      }
+    }
     canvases.forEach((canvas, index) => {
       const pane = panes[index];
       if (pane === undefined) return;

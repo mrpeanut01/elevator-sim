@@ -120,7 +120,6 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
 'analytical/ANALYTICAL_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 'metrics/METRICS_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 'car/CAR_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
-'doors/DOOR_PARAMETERS': 'invariant 8 schema; no shipped search varies these yet',
 // Its own table rather than three more `answer.*` rows, because the ids are `sim.*` on purpose:
 // how crowded a lobby gets is a property of the building and its demand, and a dispatcher that
 // could author it could tune away the cost of the queues it produces.

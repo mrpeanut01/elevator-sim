@@ -33,6 +33,35 @@ single exception the charter allows: M1 may begin on concept artefacts M0 has al
 **Opening a gate and declaring one exited are both human decisions.** The orchestrator prepares the
 evidence; it does not open or close a milestone.
 
+### The owner's standing instructions for autonomous work
+
+The repository owner gave these to the integrating session in their own words, and they bind every
+wave run without a human in the loop until the owner withdraws them. They are recorded here because
+the session that received them will not be the last one to integrate a wave.
+
+1. **Pull requests are opened and merged without waiting for human approval.** A red check is never
+   merged; the rule removes the wait for a person, not the checks.
+2. **Work continues until a panel of agents judges the game and the engine equal and each the best
+   it can be**, scored on [`docs/43`](docs/43-what-winning-looks-like.md)'s nine axes. Game-play,
+   usability, understandability and entertainment are the primary four, and the goal is a winning
+   game rather than a science project.
+3. **Any question that arises is answered by spawning an agent or a swarm of agents to answer it**,
+   rather than by stopping to ask.
+4. **Every decision about what the game is or does goes to a swarm, never to one agent** (given
+   2026-09-24). A swarm is several independent agents asked the same neutral question from
+   different starting lenses, with no coordination between them, reconciled afterwards by the
+   integrator. The reconciliation records each member's ruling, any split and how it was settled,
+   and the dissent in the decision entry itself, so the owner can see what was not chosen and
+   reverse it. Integration mechanics (merge order, decision numbers, conflict resolution, test
+   bounds) stay the integrator's own. Wave AH is the first wave run under this rule: § D476's
+   amendment ([§ D993](DECISIONS.md)) and the tenant-floors offer ([§ D1001](DECISIONS.md)) were
+   each ruled by three members, and both entries name the split.
+
+A ruling taken under these instructions is an agent's ruling and says so in its first lines, in
+[§ D729](DECISIONS.md)'s form. It never reads as the owner's, which is the distinction
+[§ D626](DECISIONS.md) lost. Where it interprets a clause the owner worded, the entry names that
+clause and states that the owner may reverse the reading.
+
 ---
 
 ## The baseline this programme starts from
@@ -47,7 +76,7 @@ Measured on this tree at `c8fd6fa`, before any charter work:
 | Test suite | **440 files / 440 passed · 8 688 passed, 11 skipped (8 699)** · green |
 | Browser tier | **ran** — 25 of the 440 files; `ELEVATOR_SIM_CHROMIUM` pointed at the container's Chromium |
 | Wall clock | 3 771 s (62 m 52 s) — **contended, not comparable**; see the caveat below |
-| Next free decision number | **D963** — wave AG's **fix-lane** reservation is open at D963–D970, so this row names that block's floor and stays there for the whole of it; `documentation.test.ts` asserts the row against `OPEN_RESERVATION.from` while a wave is open and against `max(heading) + 1` when none is. **The row is therefore stale by design while the fix lanes run: D963 is spent (§ D963) and this row does not move for it.** When a wave opens, the integrator sets this to the block's floor and it stays there for the whole wave: the row is the integrator's input and is stale while a wave runs, which is why two lanes reading it once both computed § D336. **Take your numbers from your dispatch brief, never from this row.** Wave AG's accounting, which this supersedes as the *next free* figure but not as a record: **nine headings spent** of D912–D980 — D912–D914 (AG-A), D931 (AG-B), D946–D949 (AG-C), D961–D962 (AG-D) — **thirty holes registered** with each lane's reason, and D963–D980 left free rather than holed because nothing is written past D962. **This wave opened its block at D912 in error**: wave AF had already registered D912–D925 as holes, so the reservation and the register contradicted each other and lane AG-A had to resolve it mid-build by removing exactly the three it wrote headings for (§ D430 — a number with nothing written above it is free, and the registration was a convenience). The block should have opened at **D926**. The integrator owns that mistake; a future wave opens its block above both the highest heading and the highest registered hole. |
+| Next free decision number | **D1002** — no wave is open. Wave AH held **D964–D1008** across five lanes, spent thirteen headings (D964–D966, D973–D974, D982–D984, D991–D993, D1000–D1001), registered the twenty-five numbers left below the highest heading as holes, and closed its reservation in its own merge commit, which is the rule wave AG's accounting added. D1002–D1008 had nothing written above them and are free rather than holed (§ D430). **Take your numbers from your dispatch brief, never from this row**: the row names the floor the integrator allocates from, and while a wave runs it is stale by design, which is why two lanes reading it once both computed § D336. |
 **The skip count is 11, and it is the number this programme was told to watch.** All eleven are
 deep-tier opt-ins behind `describe.skipIf(!DEEP)` / `!deepRequested()` in `packages/experiments`
 (`matrixCensus`, `collectiveAdoption`, `fuzz/deep`, `perfScaling`, `perfSweep`, `goldenRuns`,

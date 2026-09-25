@@ -113,13 +113,57 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave AG's, measured 2026-09-22 and 2026-09-24 on the integrated tree**; the paragraph above
+  below are wave AH's, measured 2026-09-25 on the integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **778 432** | **606** | **63** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **967 962** | **4 710** | **64** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **872 009** | **606** | **64** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **1 090 548** | **4 710** | **65** | **0** | **green**, and the register is empty |
+
+  **Wave AH's move is the largest per case this column has recorded, and for the first time it
+  was attributed by tallying every always-on case by producer on both trees rather than by
+  probing one.** Measured on the integrated tree at `86e159b`, both tiers in one sitting, on a head
+  green in **all six** projects.
+
+  **The base reproduced to the string in both tiers**, at `dfe71ba`: 778 432 / 63 / 0 and
+  967 962 / 64 / 0, identical to wave AG's published row. Fifth consecutive wave it has held.
+
+  | | base `dfe71ba` | wave AH | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 778 432 | **872 009** | **+93 577** | **1 909.73** |
+  | deep strings | 967 962 | **1 090 548** | **+122 586** | **2 043.10** |
+  | surfaces | 63 / 64 | **64 / 65** | **+1 / +1** | none |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | none |
+
+  **The probe renders every always-on case through `honesty/surfaces.ts#renderAll` on both trees
+  and reproduces the corpus exactly** (778 432 and 872 009), so its split is the measurement
+  rather than an estimate:
+
+  | producer | per case | lane and forecast |
+  |---|---|---|
+  | `fixit/engine.ts#classifyOutcome` | **+1 784.16** | AH-E, a floor of 1 094 plus terms that grow with each building's cars, banks and floors |
+  | `everyday/towerChoice.ts#towerChoiceViewOf` | **+48.00** | AH-B forecast 48, and 0 from the first-session arm; both exact |
+  | `everyday/stageScreenModel.ts#stageHeaderOf` | **+22.00** | AH-A's 7, AH-C's 10 and AH-D's 5; the sum is exact |
+  | `everyday/tutorialModel.ts#tutorialWalkthroughViewOf` | **+17.00** | AH-D forecast 17; exact |
+  | the report's three producers, net | **+28.41** | AH-C's 8 and AH-A's 2, plus AH-C's missed-goal rows, which it declined to quantify |
+  | `everyday/briefView.ts#briefAsksOf` and `everyday/host.ts#createEverydayHost` | **+10.16** | AH-C's new pair, forecast as 6 or 12 by building |
+
+  **Three forecasts were exact and the rest were floors that held.** The report producers are not
+  split further: they carry one lane's constant and another lane's conditional rows together, and
+  dividing the 18.41 left over between them would be the quotient § D256 refuses. **The deep tier's
+  quotient differs because the fix-it term is building-dependent** and the deep tier draws more of
+  the larger towers; no deep probe was taken, so nothing finer is claimed for it.
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: exactly one
+  added in each, `everyday/briefView.ts#briefAsksOf`, which AH-C forecast by name, and nothing
+  removed. **The deep tier's one-surface lead survives**: `campaign/judge.ts#judgeStage` is still
+  the only surface in deep and not in always-on.
+
+  **Green in all six projects before the row was published**, counts rather than the word:
+  viz **332 / 7 390**, viz-browser **57 / 368** with `ELEVATOR_SIM_CHROMIUM` set, core
+  **143 / 2 991**, experiments **115 / 1 526**, cli **12 / 179**, server **29 / 649**, and
+  `tsc -b` clean.
 
   **Wave AG's move is exactly 104.00 strings a case and one surface in both tiers, four lanes
   forecast it before the measurement, and the forecasts sum to it to the string.** Measured on the
@@ -1440,7 +1484,7 @@ verdict:
   the Day report and the live-metrics panel became mode-aware for GitHub issues #110 and #100, and
   both adapters now render **both** registers on every case, which is where the always-on tier's
   string count moved to 278 756. A null is a measurement of a tree, not a property of the axis)*,
-  **40 statically swept DOM entry points** are not driven *(**19** mounts and **21**
+  **41 statically swept DOM entry points** are not driven *(**20** mounts and **21**
   screen-registry rows, derived by `packages/viz/src/honesty/derive.test.ts` rather than
   transcribed, and published in this verdict as three until [§ D421](DECISIONS.md) measured it —
   the screen rows' pure halves **are** driven, so what goes unswept in both groups is only what the

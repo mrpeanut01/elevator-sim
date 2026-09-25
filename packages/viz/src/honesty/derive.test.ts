@@ -257,6 +257,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * exact strings the product refuses to show into the corpus as if they were copy.
          */
         'fixit/types.ts#EDITOR_PARKING_STRATEGIES',
+        /*
+         * § D1000's ids and paths: the three schedule row ids the dials are grouped under, the one
+         * dimension id whose options are floors, the rezone target id for a car taken out, and the
+         * two functions returning `covers` paths. Dotted config paths and engine ids, on
+         * `editorPathsOf`'s ground above — a path is not a sentence, and § 16 rule 11 is why every
+         * one of them is mapped to a phrase before it is drawn. `INERT_DIALS`' reasons are this
+         * module's record of why a dial is not drawn, read by `families.test.ts` and by nobody on a
+         * screen.
+         */
+        'fixit/families.ts#DIAL_CHANGE_IDS',
+        'fixit/families.ts#PARKING_FLOOR_DIMENSION',
+        'fixit/families.ts#INERT_DIALS',
+        'fixit/families.ts#doorDwellPathsOf',
+        'fixit/families.ts#rezonePathsOf',
+        'fixit/types.ts#OUT_OF_SERVICE',
       ],
     },
     {
@@ -394,6 +409,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'everyday/caseStage.ts#mountCaseStage',
         'everyday/cutaway.ts#drawCutaway',
+        /*
+         * § D1000's five families' mount, shared by both fix-it surfaces. It builds selects and
+         * chips and needs a document; every word on it is `fixitScreenModel.ts`'s
+         * `fixitDialGroupsView`, `fixitDoorView` and `fixitRezoneView`, which the FIXIT adapter
+         * drives, plus `FIXIT_SCREEN_COPY`, which it iterates.
+         */
+        'everyday/fixitFamilies.ts#mountFixitFamilies',
         /*
          * The brief's elevation painter, shared with the campaign's tower screen since GitHub
          * issue #353. It paints wells and slabs onto a canvas and authors three floor marks and a
@@ -818,6 +840,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'shift/incidents.ts#serviceEventsFor',
         'shift/incidents.ts#withIncidents',
+        /*
+         * `shift/bookedOut.ts#bookedOutCarsOf` is the same false positive a third time (§ D983): it
+         * filters `ResolvedServiceEvent`s on the hyphenated modes and returns a car id and two
+         * seconds per car. The sentences built from those are `wrinkleNoteOf`'s and `carsPhraseOf`'s
+         * in the same module, and `shift/report.ts#bookedLine`'s, which the corpus drives.
+         */
+        'shift/bookedOut.ts#bookedOutCarsOf',
+        /*
+         * And `shift/goals.ts#SHIFT_GOAL_IDS` is the goal ids as a tuple (§ D982) — `worst-wait` is
+         * hyphenated — which is the id-table case `shift/types.ts#GOAL_OBSERVATION_IDS` is excluded
+         * under. The words a reader meets for a goal are its label and `GOAL_PLAIN_NAMES`, both driven.
+         */
+        'shift/goals.ts#SHIFT_GOAL_IDS',
         /*
          * `render/theme.ts` is the same false positive again, and the most clear-cut instance of it:
          * it returns a record of CSS custom-property names to hex values — `--edge-mid` to
@@ -1557,6 +1592,24 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'fixit/engine.ts#stepZoneOverlap',
         'fixit/engine.ts#setParkingStrategy',
         'fixit/engine.ts#stepTopFloorRaise',
+        /*
+         * § D1000's five reducers, on the same ground: a `FixitState` in, a `FixitState` out,
+         * reaching prose only through `spendOf`'s schedule lookups. What a player reads about any
+         * of them is `fixitScreenModel.ts`'s dial, door and bank rows, which the FIXIT adapter
+         * drives. `fixitPlanRefusalOf` returns the loader's own diagnostic, which no surface draws —
+         * both surfaces draw `FIXIT_SCREEN_COPY.planRefused` in its place — and `applyRezone` and
+         * `editorInputsOf` hand ids, floors and core's own words onward to the model the adapter
+         * seeds; `keyedBankNameOf`, the one name `applyRezone` writes, is seeded there by name.
+         */
+        'fixit/engine.ts#setDial',
+        'fixit/engine.ts#setDoorDwell',
+        'fixit/engine.ts#setCarBank',
+        'fixit/engine.ts#toggleBankFloor',
+        'fixit/engine.ts#togglePlate',
+        'fixit/engine.ts#setTenancyPosition',
+        'fixit/run.ts#fixitPlanRefusalOf',
+        'fixit/families.ts#applyRezone',
+        'fixit/editorInputs.ts#editorInputsOf',
         'frame/overlay.ts#queueAt',
         'frame/overlay.ts#landingAssignmentsAt',
         'frame/sequence.ts#frameSequence',
@@ -1668,6 +1721,32 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'checking here was never its literals, and `everyday/host.test.ts` checks it by giving ' +
         'both shells one state and requiring one set of bars.',
       ids: ['shift/dayLength.ts#runHorizonOf'],
+    },
+    {
+      reason:
+        'Chooses a playback speed, and authors nothing — GitHub issue #592, § D991. `stagePaceOf` ' +
+        'answers a number and a reason tag, and it is derived **only** because it compares its ' +
+        'input against the `whole-day` member of `shift/types.ts#RunHorizon`, whose hyphen the ' +
+        'two-adjacent-words scanner reads as a phrase — `runHorizonOf`’s artefact one call along. ' +
+        'What a player reads about the pace is `everyday/stagePace.ts#stagePaceNoteOf`, which the ' +
+        'stage adapter drives at every sampled playhead; that the speed itself is right is not a ' +
+        'string question and is asserted in `everyday/stagePace.test.ts`, which plays a whole day ' +
+        'through the real `Playback` and checks the gate in both directions.',
+      ids: ['everyday/stagePace.ts#stagePaceOf'],
+    },
+    {
+      reason:
+        'The same union tag as `runHorizonOf` above, and for its reason: both return a member of ' +
+        '`shift/types.ts#RunHorizon` (or, for a malformed `data/` value, the empty string a loader ' +
+        'check names), and are derived only because `whole-day` reads to the two-adjacent-words ' +
+        'scanner as a phrase. GitHub issue #595, § D973. `scenarioHorizonFor` answers which horizon ' +
+        'the Scenario press will run a tower on; `parseRunHorizon` reads a pinned day’s declared ' +
+        'horizon off `data/contract-ladder.json`. Neither is shown to anybody: what a player reads ' +
+        'is whether a pinned-day row is offered and whether the moot sentence is drawn, and both ' +
+        'of those are driven — `everyday/towerChoice.ts#towerChoiceViewOf` and ' +
+        '`everyday/today.ts#todayOf`. That the answers are right is asserted in ' +
+        '`everyday/towerChoice.test.ts` over the shipped data and in `everyday/today.test.ts`.',
+      ids: ['shift/dayLength.ts#scenarioHorizonFor', 'shift/dayLength.ts#parseRunHorizon'],
     },
     {
       reason:

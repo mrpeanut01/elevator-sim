@@ -68,6 +68,7 @@ const TODAY: TodayRecord = {
   towerName: 'Chancery House',
   lede: 'Fourteen floors and three lifts.',
   wrinkle: { id: 'ordinary', name: 'An ordinary day', note: 'Nothing booked.' } as TodayRecord['wrinkle'],
+  wrinkleNote: 'Nothing booked.',
   outOfService: undefined,
   facts: [],
   load: undefined,
