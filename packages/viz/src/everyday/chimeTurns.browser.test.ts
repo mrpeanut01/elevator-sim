@@ -195,13 +195,23 @@ const CASES: readonly ShippedCase[] = (
 /**
  * *Three cars, one car's work*, on Garden Apartments.
  *
- * Chosen for its tower, the smallest a shipped case runs on, so a pair of runs costs seconds and two
- * of them fit one case under the tier's ceiling. Its name and its diagnosed repair's name are read
- * from `data/fixit-cases.json` rather than transcribed, so an edit to either moves this file with it.
- * `fixit/cases.test.ts` pins that the diagnosed repair alone classifies FIXED on every shipped case.
+ * Chosen for its tower, the smallest a shipped case runs on, so a pair of runs costs seconds and the
+ * fifty mornings a fixed verdict now needs ([§ D1020](../../../../DECISIONS.md)) fit one case under
+ * the tier's ceiling. Its name is read from `data/fixit-cases.json` rather than transcribed, so an
+ * edit to it moves this file with it.
+ *
+ * **Fixed through the editor, because the repair menu is gone** — § D1020 retired it from both
+ * surfaces. The parking select's `zone-center` is the case's diagnosed repair's own strategy, read
+ * from that repair's patch below rather than written here, and it is the route
+ * `fixit/theAnswerIsNotPrinted.test.ts#SOLVED_BY` pins as the first that holds on this case over the
+ * fifty mornings. Whether it holds is still a **precondition** of this file rather than a claim it
+ * makes about the simulator — the header's rule — and the FIXED wait below is what states it.
  */
 const FIX_CASE = CASES.find((entry) => entry.id === 'three-cars-one-cars-work');
 const DIAGNOSED = FIX_CASE?.repairs.find((repair) => repair.role === 'diagnosed');
+const DIAGNOSED_PARKING = (
+  DIAGNOSED as { readonly patch?: { readonly dispatcher?: { readonly idle?: { readonly parkingStrategy?: string } } } } | undefined
+)?.patch?.dispatcher?.idle?.parkingStrategy;
 
 /** Whether the case rail wears FIXED on any case. The page opens with none, in a fresh browser context. */
 async function anyCaseFixed(page: Page): Promise<boolean> {
@@ -226,8 +236,9 @@ describe.skipIf(!HAS_BROWSER)('what the chime ledger is told when a turn ends �
   it('posts nothing for a fix-it run that does not fix its case, and the case’s id once for the run that does', async () => {
     expect(FIX_CASE, 'data/fixit-cases.json no longer ships three-cars-one-cars-work').toBeDefined();
     expect(DIAGNOSED, 'the case no longer has a diagnosed repair').toBeDefined();
+    expect(DIAGNOSED_PARKING, 'the diagnosed repair no longer sets a parking strategy').toBeDefined();
     const caseName = FIX_CASE?.name ?? '';
-    const repairName = DIAGNOSED?.name ?? '';
+    const parking = DIAGNOSED_PARKING ?? '';
 
     const { page, wire } = await signedInLoad('building=garden-apartments');
     try {
@@ -266,16 +277,20 @@ describe.skipIf(!HAS_BROWSER)('what the chime ledger is told when a turn ends �
       expect(await anyCaseFixed(page), 'a run with no repair fixed the case, so this control tests nothing').toBe(false);
       expect(earnedBodies(wire), 'a run that did not fix its case posted an earn').toEqual([]);
 
-      /* **The run that fixes.** The diagnosed repair, alone. */
-      const repair = page.locator('.everyday-fixit-repair', { hasText: repairName });
-      expect(await repair.count(), `no single repair row reads "${repairName}"`).toBe(1);
-      await repair.click();
-      expect(await repair.getAttribute('aria-pressed')).toBe('true');
+      /*
+       * **The run that fixes.** The diagnosed repair's parking strategy, alone, through the editor's
+       * own select — the menu retired on § D1020's commit. The press clears the letter's morning and
+       * then draws a `checking` state that wears no badge and posts nothing, and FIXED lands only
+       * when the forty-nine further mornings hold; so the wait is for the badge, not for the card.
+       */
+      const select = page.locator('.everyday-fixit-parking-select');
+      await select.selectOption(parking);
+      expect(await select.inputValue()).toBe(parking);
       await page.click('.everyday-bar-primary');
       await page.waitForFunction(
         () => [...document.querySelectorAll('.everyday-fixit-tag')].some((tag) => tag.textContent === 'FIXED'),
         undefined,
-        { timeout: 60_000 },
+        { timeout: 90_000 },
       );
 
       await expect

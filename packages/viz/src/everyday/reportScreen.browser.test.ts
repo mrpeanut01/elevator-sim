@@ -228,12 +228,15 @@ describe.skipIf(!HAS_BROWSER)('the figure cards are layered on the page — issu
       /*
        * The stairs card is the one the issue named at seventy words; its lead is drawn whole. It is
        * found by its label, because the note's cohort clause names the stairs only on a day somebody
-       * took them, and Garden Apartments at this seed does not always produce one.
+       * took them, and Garden Apartments at this seed does not always produce one. **The label is
+       * *past the give-up line* since wave AI** — `shift/report.ts`'s `stairs` cell, renamed because
+       * it counts every wait that crossed the give-up horizon and on a run with no patience every
+       * one of them was still carried (the post-AH panel's H11); the card is the same card.
        */
       const labels = await page.$$eval('.everyday-report-figures .everyday-figure-label', (nodes) =>
         nodes.map((node) => node.textContent ?? ''),
       );
-      expect(flat(labels.join(' ')).toLowerCase()).toContain('stairs');
+      expect(flat(labels.join(' ')).toLowerCase()).toContain('past the give-up line');
       const handles = page.locator('.everyday-report-figures details.everyday-figure-note-more summary');
       for (let index = 0; index < before.folds; index += 1) await handles.nth(index).click();
       const after = await cardNotes(page);

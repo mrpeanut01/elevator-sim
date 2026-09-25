@@ -40,10 +40,14 @@
  *   whatever the verdict, so the current schema version is in the slot either way — measured by removing
  *   the call, which reddens this case.
  * - **The read half would, if the run solved nothing**, because two empty badge sets compare equal.
- *   Measured on this host 2026-09-01: the shipped catalogue's diagnosed free repair solves exactly
- *   **one** case, so the comparison is over a non-empty set today. That is a fact about `data/` and
- *   not a property, which is why it is recorded here rather than asserted — an assertion would be
- *   this tier claiming what a run measured, and it would fail the day a building was retuned.
+ *   Since [§ D1020](../../../../DECISIONS.md) the repair menu is gone and a verdict is judged over
+ *   fifty mornings, so the journey fixes a case **through the editor**: *Three cars, one car's work*
+ *   with idle cars parked at their zones' centres, the route
+ *   `fixit/theAnswerIsNotPrinted.test.ts#SOLVED_BY` pins as the first one that holds on that case —
+ *   on the smallest tower a case runs on, so fifty mornings fit this tier. So the comparison is over
+ *   a non-empty set today. That is a fact about `data/` and the judge, not a property, which is why
+ *   it is recorded here rather than asserted — an assertion would be this tier claiming what a run
+ *   measured, and it would fail the day a building was retuned.
  *
  * The standing positive control is therefore the second case, which seeds the slot the way a
  * **previous sitting** left it — using a case id read from the product's own catalogue rather than
@@ -162,16 +166,45 @@ async function shippedCaseIds(page: Page): Promise<readonly string[]> {
   });
 }
 
-/** The index of the first repair row that is free and pressable — the case's diagnosed fix. */
-async function freeRepairIndex(page: Page): Promise<number> {
-  const index = await page.evaluate(() =>
-    [...document.querySelectorAll('.everyday-fixit-repair')].findIndex((row) => {
-      if (row instanceof HTMLButtonElement && row.disabled) return false;
-      return /^free/.test(row.querySelector('.everyday-fixit-price')?.textContent ?? '');
-    }),
+/**
+ * The rail's `{fixed}/{total}` line counts the cases **offered**, and a held case is drawn in the
+ * list without being one — [§ D1020](../../../../DECISIONS.md), `fixit/held.ts`. So the total is the
+ * rows less the held ones, read off the same tags, rather than a number written here.
+ */
+function offeredCount(rail: RailState): number {
+  return rail.tags.filter((tag) => tag !== 'HELD').length;
+}
+
+/** The case the journey fixes, by its row's name — see the file's docstring for why this one. */
+const JOURNEY_CASE = 'Three cars, one car';
+
+/**
+ * Open {@link JOURNEY_CASE}, park its idle cars at their zones' centres through the editor, run the
+ * day, and wait out the judge — the letter's morning and, when that clears, the forty-nine more
+ * behind it (§ D1020). Settled when § 3.3's primary reads one of its two verdict labels, which is
+ * `fixitVerdict.browser.test.ts`'s own wait: the outcome card is drawn at the gate, before the
+ * mornings, so waiting for the card alone would read the `checking` state.
+ */
+async function fixTheJourneyCase(page: Page): Promise<void> {
+  await page.locator('.everyday-fixit-case', { hasText: JOURNEY_CASE }).click();
+  await page.waitForSelector('.everyday-fixit-skip', { timeout: 60_000 });
+  await page.click('.everyday-fixit-skip');
+  await page.waitForFunction(
+    () => document.querySelectorAll('.everyday-fixit-figure').length === 4,
+    undefined,
+    { timeout: 60_000 },
   );
-  expect(index, 'no free repair on this case').toBeGreaterThanOrEqual(0);
-  return index;
+  await page.locator('.everyday-fixit-parking-select').selectOption('zone-center');
+  await page.locator('.everyday-bar-primary').click();
+  await page.waitForSelector('.everyday-fixit-outcome', { timeout: 60_000 });
+  await page.waitForFunction(
+    () => {
+      const label = document.querySelector('.everyday-bar-primary')?.textContent ?? '';
+      return label === 'Next building' || label === 'Run it again';
+    },
+    undefined,
+    { timeout: 100_000 },
+  );
 }
 
 describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #224', () => {
@@ -186,9 +219,7 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
       // Nothing has been kept, so nothing is owed — the silent state is correct exactly here.
       expect(before.notice).toBeNull();
 
-      await page.locator('.everyday-fixit-repair').nth(await freeRepairIndex(page)).click();
-      await page.locator('.everyday-bar-primary').click();
-      await page.waitForSelector('.everyday-fixit-outcome', { timeout: 120_000 });
+      await fixTheJourneyCase(page);
 
       const ran = await railState(page);
       const stored = (await slotContents(page)) as {
@@ -266,7 +297,7 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
       const rail = await railState(page);
 
       // One building is fixed, and it is the first row — the count and the badge agree.
-      expect(rail.count).toBe(`1/${String(rail.tags.length)} fixed`);
+      expect(rail.count).toBe(`1/${String(offeredCount(rail))} fixed`);
       expect(rail.tags[0]).toBe('FIXED');
       expect(rail.tags.filter((tag) => tag === 'FIXED')).toHaveLength(1);
       expect(rail.notice).toBeNull();
@@ -316,7 +347,7 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
        * nothing sees, so *nothing is badged* is not evidence of anything on its own — the sentence
        * beside it is what tells a player their afternoon is in there and this build cannot read it.
        */
-      expect(rail.count).toBe(`0/${String(rail.tags.length)} fixed`);
+      expect(rail.count).toBe(`0/${String(offeredCount(rail))} fixed`);
       expect(rail.notice).not.toBeNull();
       expect(rail.notice ?? '').toContain('not readable text');
       // Never a placeholder, and never an identifier: § 13 and § 19's rule about what a player reads.
@@ -434,7 +465,7 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
       await openFixit(page);
       const rail = await railState(page);
       expect(rail.notice).toBeNull();
-      expect(rail.count).toBe(`0/${String(rail.tags.length)} fixed`);
+      expect(rail.count).toBe(`0/${String(offeredCount(rail))} fixed`);
 
       /*
        * And the next write carries the migrated profile into the **current** envelope — version 5
@@ -445,9 +476,7 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
        * more than it was: `withProgress` and `withUnits` run in sequence on one read, and a second
        * migration that clobbered the first would be invisible to a one-step case.
        */
-      await page.locator('.everyday-fixit-repair').nth(await freeRepairIndex(page)).click();
-      await page.locator('.everyday-bar-primary').click();
-      await page.waitForSelector('.everyday-fixit-outcome', { timeout: 120_000 });
+      await fixTheJourneyCase(page);
 
       expect(await slotContents(page)).toMatchObject({
         schemaVersion: 5,

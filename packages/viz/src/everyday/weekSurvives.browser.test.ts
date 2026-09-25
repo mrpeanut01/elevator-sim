@@ -184,9 +184,13 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #594 — no mode but Scenario writes
       await page.waitForSelector('.everyday-report', { timeout: 30_000 });
       await toModes(page);
       const before = await weekAtTheDoor(page);
-      /* The fixture is what it claims to be: Midtown, a closed Monday, the address's crowd. */
+      /*
+       * The fixture is what it claims to be: Midtown, a closed Monday, the address's crowd. The
+       * closed chip names its tower as today's chip does — by the building's name, not its id, since
+       * wave AI's GitHub issue #599 (`everyday/doorView.ts#DoorScreenInput.nameOf`).
+       */
       expect(before.tower).toBe('c2');
-      expect(before.strip).toContain('midtown-office');
+      expect(before.strip).toContain('Midtown Office');
       expect(before.crowd).toContain(String(SEED));
 
       /* ---- the Rush tile: open it, start a rush, leave it ---- */
