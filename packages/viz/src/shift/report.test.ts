@@ -71,6 +71,7 @@ import {
   type SingleRunReport,
   type WeekDayReport,
 } from './report.js';
+import { reportWindowNameOf } from './reportWindow.js';
 import { closeDay, openEndless, openWeek, outcomeOf } from './week.js';
 import {
   DAY_START_S,
@@ -218,7 +219,7 @@ describe('AVERAGE WAIT', () => {
     expect(wait.tone).toBe('plain');
     // R13: the mean never travels without its `n` or its window.
     expect(wait.note).toContain(String(clean.summary.waitCount));
-    expect(wait.note).toContain(clean.summary.reportWindow.id);
+    expect(wait.note).toContain(`${reportWindowNameOf(clean.summary.reportWindow.id)} window`);
   });
 
   it('is never the mockup’s arithmetic', () => {
@@ -558,11 +559,11 @@ describe('TOOK THE STAIRS names its true cohort, and the people can be totalled 
      * says that instead — which is a state `office-day` produces and this fixture does not.
      */
     const report = reportOf(saturated);
-    const windowId = saturated.summary.reportWindow.id;
+    const windowName = reportWindowNameOf(saturated.summary.reportWindow.id);
     expect(figure(report, 'stairs').note).toContain(
-      `counted over the whole shift, not the ${windowId} window`,
+      `counted over the whole shift, not the ${windowName} window`,
     );
-    expect(figure(report, 'worst-wait').note).toContain(`${windowId} window`);
+    expect(figure(report, 'worst-wait').note).toContain(`${windowName} window`);
   });
 
   it('names the riders the door turned away, and stays silent when there are none', () => {
@@ -607,12 +608,14 @@ describe('TOOK THE STAIRS names its true cohort, and the people can be totalled 
     const cellLabel = figure(reportOf(saturated), 'stairs').label.toLowerCase();
     const bandLabel = WAIT_BANDS[WAIT_BANDS.length - 1]?.label.toLowerCase() ?? '';
 
-    expect(cellLabel).toContain('stairs');
     expect(bandLabel).toContain('stairs');
-    // The verb is what separates them: one cohort has gone, the other is still standing there.
-    expect(cellLabel).toContain('took the stairs');
-    expect(bandLabel).not.toContain('took the stairs');
-    expect(bandLabel).not.toContain('taking the stairs');
+    /*
+     * And the cell no longer claims its cohort walked — the post-AH panel's H11. It counts waits
+     * past the give-up line, every one of which may still have been carried, so *took the stairs*
+     * was false on exactly the runs its own note said so; the word is the band's alone now.
+     */
+    expect(cellLabel).not.toContain('stairs');
+    expect(cellLabel).toContain('give-up');
   });
 
   it('grounds the carry goal in arrivals including the horizon-crossers, so abandonment cannot flatter it', () => {
@@ -671,7 +674,7 @@ describe('WORST WAIT states its censoring', () => {
     expect(worst.value).toBe('at least 640 s');
     expect(worst.note).toContain('lower bound');
     // The window rides inline on the censored branch too — docs/19 defect 3's second half.
-    expect(worst.note).toContain(`the ${censored.reportWindow.id} window`);
+    expect(worst.note).toContain(`the ${reportWindowNameOf(censored.reportWindow.id)} window`);
   });
 
   it('labels its window inline, and points at the whole-shift reading beside it — docs/19 defect 3', () => {
@@ -681,7 +684,9 @@ describe('WORST WAIT states its censoring', () => {
      * says which it is where it stands, not only in the small print.
      */
     const worst = figure(reportOf(clean), 'worst-wait');
-    expect(worst.note).toContain(`the ${clean.summary.reportWindow.id} window`);
+    expect(worst.note).toContain(`the ${reportWindowNameOf(clean.summary.reportWindow.id)} window`);
+    /* The engine's id stays off the player's sheet — the post-AH panel's L3, *the report-window window*. */
+    expect(worst.note).not.toContain(clean.summary.reportWindow.id);
     expect(worst.note).toContain('the goal row reads the whole shift');
   });
 
@@ -901,7 +906,8 @@ describe('where it went wrong is derived from the run', () => {
     for (const recording of [clean, saturated, missedWithoutSaturating]) {
       const report = reportOf(recording);
       expect(report.diagnosis.map((row) => row.id)).not.toContain('report-window');
-      expect(report.smallPrint).toContain(recording.summary.reportWindow.id);
+      expect(report.smallPrint).toContain(reportWindowNameOf(recording.summary.reportWindow.id));
+      expect(report.smallPrint).not.toContain(`${recording.summary.reportWindow.id} window`);
       expect(report.smallPrint).toContain(clockOf(recording.summary.reportWindow.startS));
       /*
        * `docs/20` defect 5. This used to pin *during the busiest five minutes*, and the phrase was
@@ -944,7 +950,7 @@ describe('where it went wrong is derived from the run', () => {
 
       for (const id of ['peak-queue', 'peak-phase']) {
         const row = report.diagnosis.find((entry) => entry.id === id);
-        expect(row?.why).toContain(`${window.id} window the means above are read over`);
+        expect(row?.why).toContain(`${reportWindowNameOf(window.id)} window the means above are read over`);
         expect(row?.why?.includes('That instant is inside')).toBe(inside);
         expect(row?.why?.includes('two different parts of it')).toBe(!inside);
       }

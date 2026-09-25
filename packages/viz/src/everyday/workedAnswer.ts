@@ -123,8 +123,18 @@ export const WORKED_ANSWER_COPY = Object.freeze({
    */
   pending:
     'The day is being simulated now, twice — once as it stands and once with one thing changed. Nothing is shown until both land.',
+  /*
+   * The post-AH panel's H1. It read *"This is the only place the game answers for you. In a
+   * scenario you get the building, the letter and the whole editor, and no suggested fix"* — drawn
+   * on **two** screens, the tutorial and the rush's setup page, each calling itself the only place,
+   * and beside a Fix a building screen whose repair menu names what each fix does. What stays true
+   * on both screens and whatever that menu becomes: this one worked answer is the only one, it is
+   * shown in the two places it is shown, and anywhere else the change is the player's to choose.
+   * Recorded here under [§ D405](../../../../DECISIONS.md); § D529 clause 4 is the owner's rule and
+   * is untouched — this sentence stopped claiming the product already meets it.
+   */
   boundary:
-    'This is the only place the game answers for you. In a scenario you get the building, the letter and the whole editor, and no suggested fix.',
+    'This worked answer — in the tutorial and again before the rush — is the only one the game gives. In a scenario the change is yours to choose.',
 });
 
 /** `7 waits over a minute starting at the upper flats`, with the count read off a run. */

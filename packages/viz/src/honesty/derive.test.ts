@@ -848,6 +848,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'shift/bookedOut.ts#bookedOutCarsOf',
         /*
+         * And `carAbsencesOf` is the same reading with the first instant included (§ D1039), which
+         * `bookedOutCarsOf` now filters — the same hyphenated modes, the same car id and two
+         * seconds, and no sentence. The strip built from it is `everyday/today.ts#todayOf`'s, driven.
+         */
+        'shift/bookedOut.ts#carAbsencesOf',
+        /*
          * And `shift/goals.ts#SHIFT_GOAL_IDS` is the goal ids as a tuple (§ D982) — `worst-wait` is
          * hyphenated — which is the id-table case `shift/types.ts#GOAL_OBSERVATION_IDS` is excluded
          * under. The words a reader meets for a goal are its label and `GOAL_PLAIN_NAMES`, both driven.
@@ -974,6 +980,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * by the Everyday adapters, and #300's own case requires those to agree with the run.
          */
         'dev/state.ts#resolvedBuildingOf',
+        /*
+         * `plannedDayOf` is `resolvedBuildingOf`'s case exactly (§ D1039): the same lookup guard in
+         * front of the same delegate, plus `core`'s `planDemand` for the start of day, whose refusal
+         * it catches and turns into `undefined`. It returns a building, a number and a boolean; what
+         * a player reads from them is `everyday/today.ts`'s strip, driven by the Everyday adapters.
+         */
+        'dev/state.ts#plannedDayOf',
         /*
          * § D231's three, here for `enterFreePlay`'s reason above and no other: the scanner reads
          * the `PlayMode` members they switch on — `shift-week`, `free-play` — as prose, because

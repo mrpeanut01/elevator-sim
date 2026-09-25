@@ -256,7 +256,13 @@ describe('the rest of § 6.1', () => {
      * the only thing on this screen that actually controls it.
      */
     const watch = DOOR_STEPS.find((step) => step.head === 'Watch the day');
-    expect(watch?.body).toContain('A whole working day');
+    /*
+     * And no length at all since the post-AH panel's H13: *a whole working day* was false on the
+     * two towers whose day is a slice, and *not steer it* on every day, beside three live presses.
+     */
+    expect(watch?.body).not.toMatch(/whole working day|not steer/u);
+    expect(watch?.body).toContain('park the cars');
+    expect(DOOR_STEPS.map((step) => step.body).join(' ')).not.toMatch(/only thing you choose/u);
     expect(watch?.body).not.toMatch(/couple of minutes|\bminutes?\b/);
     for (const step of DOOR_STEPS) expect(step.body).not.toMatch(/\d/);
   });

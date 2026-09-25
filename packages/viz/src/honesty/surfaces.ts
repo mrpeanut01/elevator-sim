@@ -3450,6 +3450,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * corpus; the brief's copy of the note is `today.ts#todayOf`'s, which the TODAY adapter drives.
      */
     'shift/bookedOut.ts#wrinkleNoteOf',
+    /* The window's name in words — the post-AH panel's L3; every window-naming sentence above reaches it. */
+    'shift/reportWindow.ts#reportWindowNameOf',
     'shift/bookedOut.ts#carsPhraseOf',
     'shift/goals.ts#goalsForDay',
     'shift/goals.ts#readGoal',
@@ -12616,6 +12618,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
   id: 'everyday/today.ts#todayOf',
   covers: [
     'everyday/today.ts#todayOf',
+    /* The lede's closing sentence — H13; every seeded lede ends on it. */
+    'everyday/today.ts#TODAY_CHOICE_LINE',
     'shift/firstSession.ts#FIRST_SESSION_LINE',
     /* The line's second arm, for a first day the draw did not choose — GitHub issue #595, § D973. */
     'shift/firstSession.ts#FIRST_SESSION_LINE_CHOSEN',

@@ -120,6 +120,7 @@ import type { PressCounterfactual } from './counterfactual.js';
 
 import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
 import { eventAsRun } from './events.js';
+import { reportWindowNameOf } from './reportWindow.js';
 import { contractStatus } from './contracts.js';
 import { gaveUpBesideOf, goalPlainNameOf, horizonLabelOf, readGoals, wasDisplayOf } from './goals.js';
 import { growthFactor } from './growth.js';
@@ -1585,9 +1586,17 @@ function figuresFor(
       tone: observations.peakQueue > DEEP_QUEUE ? 'hot' : 'plain',
       axisOnly: false,
     },
+    /*
+     * *Past the give-up line*, not *took the stairs* — the post-AH panel's H11, and the panel before
+     * it. The cell counts every wait that crossed the give-up horizon, and on a run whose riders
+     * have no patience every one of them was still carried: the note beside it says so (*"every
+     * one of them is inside CARRIED too"*), under a label saying they had walked. The label now
+     * names the count, which is true on both kinds of run; whether any of them left is the note's.
+     * Recorded here under [§ D405](../../../../DECISIONS.md): the cell is this sheet's.
+     */
     {
       id: 'stairs',
-      label: 'TOOK THE STAIRS',
+      label: 'PAST THE GIVE-UP LINE',
       value: String(observations.abandoned),
       note: stairsNote(observations, summary),
       tone: observations.abandoned > 0 ? 'bad' : 'good',
@@ -1679,7 +1688,7 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
     label: 'AVERAGE WAIT',
     value: `${summary.meanWaitS.toFixed(1)} s`,
     // R13 and § 7.4: a mean is not a figure without its window and its `n`.
-    note: `over ${legCount(summary.waitCount, 'leg')} in the ${summary.reportWindow.id} window`,
+    note: `over ${legCount(summary.waitCount, 'leg')} in the ${reportWindowNameOf(summary.reportWindow.id)} window`,
     // The same denominator, structured, so it survives being carried off this grid. See above.
     count: summary.waitCount,
     tone: 'plain',
@@ -1729,7 +1738,7 @@ function stairsNote(observations: Observations, summary: VizSummary): string {
      * *peak-5min*, so a day whose window is the whole of it says so and a reader can see that the
      * two coincide.
      */
-    `counted over the whole shift, not the ${summary.reportWindow.id} window`,
+    `counted over the whole shift, not the ${reportWindowNameOf(summary.reportWindow.id)} window`,
     turnedAwayClause(observations),
   ];
   return clauses.filter((clause) => clause !== '').join('; ');
@@ -1827,7 +1836,7 @@ function worstWaitFigure(summary: VizSummary): ReportFigure {
       axisOnly: false,
     };
   }
-  const windowClause = `the ${summary.reportWindow.id} window’s worst — the goal row reads the whole shift`;
+  const windowClause = `the ${reportWindowNameOf(summary.reportWindow.id)} window’s worst — the goal row reads the whole shift`;
   return {
     id: 'worst-wait',
     label: 'WORST WAIT',
@@ -2301,15 +2310,25 @@ function missedGoalRowOf(
 function windowRelationClause(atS: SimTime, reportWindow: VizSummary['reportWindow']): string {
   const inside = atS >= reportWindow.startS && atS < reportWindow.endS;
   return inside
-    ? `That instant is inside the ${reportWindow.id} window the means above are read over.`
-    : `That instant is outside the ${reportWindow.id} window the means above are read over — the ` +
+    ? `That instant is inside the ${reportWindowNameOf(reportWindow.id)} window the means above are read over.`
+    : `That instant is outside the ${reportWindowNameOf(reportWindow.id)} window the means above are read over — the ` +
       'worst moment of the day and the waits quoted up there are two different parts of it, and ' +
       'both are true.';
 }
 
-/** ` at 12.4 %pop/5min`, or nothing when the record carried no population to divide by. */
+/**
+ * `, with 12.4 % of the building arriving every five minutes`, or nothing when the record carried no
+ * population to divide by.
+ *
+ * It read `, at 12.4 %pop/5min` — the engine's unit, on a Day report row a player reads (the
+ * post-AH panel's L3). The figure is unchanged; the unit is said in words. The single-run sheet's
+ * demand line keeps the unit, because that line is the Engineer surface's basis for comparing two
+ * sheets and is printed where the unit is the one the editor beside it speaks.
+ */
 function rateClause(ratePctPop5min: number | null): string {
-  return ratePctPop5min === null ? '' : `, at ${ratePctPop5min.toFixed(1)} %pop/5min`;
+  return ratePctPop5min === null
+    ? ''
+    : `, with ${ratePctPop5min.toFixed(1)} % of the building arriving every five minutes`;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -2716,11 +2735,11 @@ function smallPrintFor(
     `${dispatcherName.toLowerCase()} is better than anything — that needs 50 or more paired runs ` +
     'against the same passengers, and a confidence interval that excludes zero. What it can tell ' +
     'you is what happened today, and today is where the queue was. ' +
-    `Every cohort figure above is the ${reportWindow.id} window, ` +
+    `Every cohort figure above is the ${reportWindowNameOf(reportWindow.id)} window, ` +
     `${clockRange(reportWindow.startS, reportWindow.endS, dayStartS)}: “Riders waited twenty-five ` +
     `seconds on average” is false without “${windowQualifierOf(reportWindow)}”. ` +
     'The counts — carried, ' +
-    'took the stairs, the deepest queue, and every goal reading above, the worst-wait bar ' +
+    'past the give-up line, the deepest queue, and every goal reading above, the worst-wait bar ' +
     'included — are over the whole shift; the means and the WORST WAIT figure are over that ' +
     'window and nothing else. ' +
     /*
