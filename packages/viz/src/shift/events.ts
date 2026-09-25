@@ -397,6 +397,12 @@ export interface ShiftRunPatchInput {
    * `endless-rush` vary the mix too, and so does `office-day`.
    */
   readonly templateVariesMix?: boolean | undefined;
+  /**
+   * The cars the **tower's own schedule** takes out today — `shift/ladder.ts#rungIncidents` for the
+   * week's rung, [§ D1038](../../../../DECISIONS.md). Spoken for: the day's wrinkle takes another
+   * car rather than one the tower already has out over the same stretch. `undefined` is none.
+   */
+  readonly booked?: readonly Incident[] | undefined;
 }
 
 /** What a run builder applies. Both halves are values the simulator reads. */
@@ -472,7 +478,7 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
    * needs the decision without the prose.
    */
   const { derate } = effect;
-  const cars = eventCarChoice(effect, input.building);
+  const cars = eventCarChoice(effect, input.building, input.booked ?? []);
 
   if (cars.holdShortfall > 0) {
     withheld.push(
@@ -492,7 +498,14 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
     withheld.push(
       `${input.event.name}: asked to stand ${String(derate.cars)} car(s) down for part of ` +
         `the shift and could stand ${String(derate.cars - cars.derateShortfall)}. Every bank ` +
-        'keeps at least one car in service — a bank with none is a set of floors nobody can reach.',
+        'keeps at least one car in service — a bank with none is a set of floors nobody can reach.' +
+        /*
+         * § D1038: the tower's own booking is the other half of why, where it took a car the
+         * wrinkle could otherwise have had — said, because the brief names that booking too.
+         */
+        (cars.derateSpokenFor > 0
+          ? ' The tower has its own car booked out over the same stretch, and that car is not the day’s to take.'
+          : ''),
     );
   }
 
@@ -558,6 +571,12 @@ export interface EventCarChoice {
   /** How many of `derate.cars` could not be stood down. */
   readonly derateShortfall: number;
   /**
+   * How many of the cars the derate would have taken with nothing booked are ones the tower books
+   * over an overlapping stretch — so the choice moved, or fell short, because of the booking.
+   * [§ D1038](../../../../DECISIONS.md). `0` with nothing booked.
+   */
+  readonly derateSpokenFor: number;
+  /**
    * The event declared **both** a whole-shift hold and a window, so the window was dropped.
    *
    * The two pick from the same building by the same total order and would take the same car out
@@ -567,27 +586,67 @@ export interface EventCarChoice {
   readonly derateRefusedForHold: boolean;
 }
 
-export function eventCarChoice(effect: EventEffect, building: BankedBuilding): EventCarChoice {
+export function eventCarChoice(
+  effect: EventEffect,
+  building: BankedBuilding,
+  /*
+   * **The tower's own bookings are spoken for** — [§ D1038](../../../../DECISIONS.md), the week
+   * swarm's ruling S1 § 1 on the post-AH panel's N5. Midtown's Tuesday `move-in:middle` picked car D
+   * by this function's total order, and the rung already books car D out 10:30–13:00; the two
+   * schedules collapsed into the rung's, so the run was identical to an ordinary Tuesday on all 95
+   * configurations the swarm measured while the brief promised a car tied up through the middle of
+   * the shift. A whole-shift hold skips every booked car; a window skips a booked car whose window
+   * overlaps its own. What is left is chosen by the same order, and a building that cannot spare a
+   * car reports the shortfall, which {@link shiftRunPatch} words. `calendarPatch` passes the same
+   * list, so the goods car it reserves around the day's choice is reserved around this one.
+   */
+  booked: readonly Incident[] = [],
+): EventCarChoice {
   const none: EventCarChoice = {
     holdCars: Object.freeze([]),
     holdShortfall: 0,
     derateCars: Object.freeze([]),
     derateShortfall: 0,
+    derateSpokenFor: 0,
     derateRefusedForHold: false,
   };
   if (effect.changesNothing) return none;
 
   const holds =
     effect.carsOutOfService > 0
-      ? carsToDerate(building, effect.carsOutOfService)
+      ? carsToDerate(withoutCars(building, booked.map((entry) => entry.car)), effect.carsOutOfService)
       : { held: [] as readonly CarRef[], shortfall: 0 };
   const held = { ...none, holdCars: holds.held, holdShortfall: holds.shortfall };
 
-  if (effect.derate === null) return held;
+  const { derate } = effect;
+  if (derate === null) return held;
   if (holds.held.length > 0) return { ...held, derateRefusedForHold: true };
 
-  const choice = carsToDerate(building, effect.derate.cars);
-  return { ...held, derateCars: choice.held, derateShortfall: choice.shortfall };
+  const overlapping = booked
+    .filter((entry) => entry.fromFraction < derate.toFraction && derate.fromFraction < entry.toFraction)
+    .map((entry) => entry.car);
+  const choice = carsToDerate(withoutCars(building, overlapping), derate.cars);
+  const unbooked = carsToDerate(building, derate.cars);
+  return {
+    ...held,
+    derateCars: choice.held,
+    derateShortfall: choice.shortfall,
+    derateSpokenFor: unbooked.held.filter((car) =>
+      overlapping.some((taken) => taken.bankId === car.bankId && taken.carId === car.carId),
+    ).length,
+  };
+}
+
+/** The building with these cars left out of their banks — spoken for, so no rule may pick them. */
+function withoutCars(building: BankedBuilding, cars: readonly CarRef[]): BankedBuilding {
+  if (cars.length === 0) return building;
+  const taken = new Set(cars.map((car) => JSON.stringify([car.bankId, car.carId])));
+  return {
+    banks: building.banks.map((bank) => ({
+      ...bank,
+      cars: bank.cars.filter((car) => !taken.has(JSON.stringify([bank.id, car.id]))),
+    })),
+  };
 }
 
 /**

@@ -95,6 +95,7 @@ import {
   SHIFT_EVENTS,
   baseDemandOf,
   demandTemplateVariesMix,
+  eventCarChoice,
   eventById,
   shiftRunPatch,
 } from '../shift/events.js';
@@ -1744,6 +1745,8 @@ export interface PlannedDay {
    * ([§ D1040](../../../../DECISIONS.md)).
    */
   readonly templateVariesMix: boolean;
+  /** {@link ShiftRunConfig.dayCars} for the same run — the cars today's event takes. */
+  readonly dayCars: ShiftRunConfig['dayCars'];
 }
 
 /**
@@ -1761,7 +1764,7 @@ export interface PlannedDay {
  */
 export function plannedDayOf(resources: BrowserResources, state: ViewerState): PlannedDay {
   if (buildingConfigOf(resources, state.savedBuildings, state.buildingId) === undefined) {
-    return { building: undefined, startOfDayS: undefined, templateVariesMix: false };
+    return { building: undefined, startOfDayS: undefined, templateVariesMix: false, dayCars: { holds: [], windows: [] } };
   }
   const plan = shiftRunConfigOf(resources, state);
   const { config } = plan;
@@ -1786,6 +1789,7 @@ export function plannedDayOf(resources: BrowserResources, state: ViewerState): P
   return {
     building: plan.building,
     startOfDayS,
+    dayCars: plan.dayCars,
     templateVariesMix:
       typeof config.demandTemplate === 'string'
         ? demandTemplateVariesMix(config.demandTemplate, config.trafficProfiles.demandTemplates)
@@ -1829,6 +1833,13 @@ export interface ShiftRunConfig {
   readonly event: ShiftEvent;
   /** Cars held out of service — the reader's, plus any the day's event withheld. */
   readonly outOfServiceCarIds: readonly string[];
+  /**
+   * The cars **today's event** takes, by car id, as this run took them — the whole-shift holds and
+   * the windowed ones — after the tower's own bookings were spoken for ([§ D1038](../../../../DECISIONS.md)).
+   * The brief and the report name a car as *the day's* from this, so a sentence about which car the
+   * day took is the run's answer rather than a second call that could forget the booking.
+   */
+  readonly dayCars: { readonly holds: readonly string[]; readonly windows: readonly string[] };
   /** Anything the shift patch refused to configure, with its reason. Shown, never swallowed. */
   readonly withheld: readonly string[];
 }
@@ -2054,10 +2065,16 @@ export function shiftRunConfigOf(
     spec === undefined
       ? resources.trafficProfiles
       : trafficProfilesWithPattern(resources.trafficProfiles, authored.trafficProfile, spec);
+  /*
+   * The tower's own bookings for today, spoken for by the day's car choice — § D1038. Named once
+   * here so the patch, the calendar's reservation and {@link ShiftRunConfig.dayCars} ask one list.
+   */
+  const booked = rungIncidents(rung);
   const patch = shiftRunPatch({
     event,
     building,
     base: fitBase,
+    booked,
     /*
      * `core`'s own answer, through `shift/events.ts#demandTemplateVariesMix` — GitHub issue #593.
      * This was `demandTemplate === 'lunch-two-way'`, a list of one, and `office-day` — the whole
@@ -2104,6 +2121,7 @@ export function shiftRunConfigOf(
     ...askInput,
     event,
     playerHeldCarIds: state.outOfServiceCarIds,
+    booked,
   });
 
   const outOfServiceCarIds = [
@@ -2138,14 +2156,14 @@ export function shiftRunConfigOf(
      * `(atS, bankId, carId)` — and is written this way so the list reads the way a reader meets the
      * two facts: what this tower is, then what happened today.
      *
-     * Two entries naming the same car are **merged, not deduped** — `serviceEventsFor` takes the
-     * car out for the union of its windows ([§ D1038](../../../../DECISIONS.md)). This paragraph
-     * used to say two `out-of-service` events were merely *a mode set twice*, which was true of the
-     * departures and missed the returns: the rung's return fired first and handed the day's car
-     * back mid-window, so neither caption described the run. Dropping either entry would be the
-     * caption-that-does-not-describe-the-picture defect one field over, and still is.
+     * Two entries naming the same car would schedule two `out-of-service` events on it — and the
+     * first return would hand the day's car back mid-window, which is what Midtown's Tuesday did
+     * until [§ D1038](../../../../DECISIONS.md). The day's choice now treats the rung's cars as
+     * spoken for (`booked` above), so the two lists name different cars wherever their windows
+     * meet. Nothing here dedupes, because silently dropping either entry would be the
+     * caption-that-does-not-describe-the-picture defect one field over.
      */
-    [...rungIncidents(rung), ...patch.incidents],
+    [...booked, ...patch.incidents],
     state.shiftLengthS,
   );
   const finalBuilding =
@@ -2170,6 +2188,10 @@ export function shiftRunConfigOf(
      */
     calendarLine: calendarDay === null ? '' : calendarLine(calendar),
     outOfServiceCarIds,
+    dayCars: {
+      holds: patch.outOfServiceCarIds.length === 0 ? [] : eventCarChoice(event.effect, building, booked).holdCars.map((car) => car.carId),
+      windows: patch.incidents.map((incident) => incident.car.carId),
+    },
     withheld: [...patch.withheld, ...calendar.withheld],
     config: {
       building: finalBuilding,

@@ -39,6 +39,7 @@ import { wholeDayFor, wholeDayRun } from './dayLength.js';
 import { demandTemplateVariesMix, mixKeptSentenceOf } from './events.js';
 import { plannedDayOf } from '../dev/state.js';
 import { todayOf } from '../everyday/today.js';
+import { rungFor, rungIncidents } from './ladder.js';
 
 const RESOURCES = contractBuildings();
 
@@ -114,6 +115,7 @@ function briefOf(contractId: string, found: { readonly day: number; readonly day
       horizon: undefined,
       dayStartS: planned.startOfDayS,
       templateVariesMix: planned.templateVariesMix,
+      dayCars: planned.dayCars,
       crowdIsToday: false,
       firstSession: false,
       units: 'metric',
@@ -206,6 +208,45 @@ describe('GitHub issue #593 — a Scenario day on a whole-day tower is a run the
     /* The ask is refused out loud rather than dropped: some day in the sweep has a wrinkle whose mix
        the template owns, and its run carries the sentence that says so. */
     expect(mixWithheld).toBeGreaterThan(0);
+  }, 300_000);
+
+  it('no day’s window takes a car the tower books over the same stretch — § D1038', () => {
+    /*
+     * Midtown's Tuesday move-in took car D, which its rung books 10:30–13:00, and the run collapsed
+     * into the rung's schedule. Swept over every contract × day × weekday the week can start on: a
+     * day's windowed car is never a booked car whose window meets the day's, and where the building
+     * could spare none the run says so in `withheld` rather than dropping the ask.
+     */
+    const collisions: string[] = [];
+    let moved = 0;
+    for (const contract of CONTRACTS) {
+      const booked = rungIncidents(rungFor(contract.id, contract.buildingId));
+      if (booked.length === 0) continue;
+      for (let day = 1; day <= 21; day += 1) {
+        for (let start = 0; start < 7; start += 1) {
+          const dayIdx = (start + day - 1) % 7;
+          const run = shiftRunConfigOf(RESOURCES, scenarioDay(contract.id, day, dayIdx));
+          const derate = run.event.effect.derate;
+          if (derate === null || run.event.effect.changesNothing) continue;
+          const meets = booked.filter(
+            (entry) => entry.fromFraction < derate.toFraction && derate.fromFraction < entry.toFraction,
+          );
+          for (const carId of run.dayCars.windows) {
+            if (meets.some((entry) => entry.car.carId === carId)) {
+              collisions.push(`${contract.id} day ${String(day)} dayIdx ${String(dayIdx)}: ${carId}`);
+            }
+          }
+          if (meets.length > 0) {
+            moved += 1;
+            if (run.dayCars.windows.length < derate.cars) {
+              expect(run.withheld.join(' '), `${contract.id} day ${String(day)}`).toContain('booked out over the same stretch');
+            }
+          }
+        }
+      }
+    }
+    expect(collisions).toEqual([]);
+    expect(moved, 'no day met a booking, so this case tests nothing').toBeGreaterThan(0);
   }, 300_000);
 
   it('the fire drill on a whole-day tower withholds its mix and keeps its rate', () => {

@@ -92,6 +92,7 @@ const inputOf = (state: ViewerState): Parameters<typeof todayOf>[0] => ({
   horizon: 'whole-day',
   dayStartS: undefined,
   templateVariesMix: false,
+  dayCars: undefined,
   crowdIsToday: true,
   firstSession: false,
   units: 'metric',
@@ -115,6 +116,7 @@ const recordFor = (
     horizon: 'period',
     dayStartS: undefined,
     templateVariesMix: false,
+    dayCars: undefined,
     crowdIsToday: true,
     firstSession: false,
     units: 'metric',
@@ -236,6 +238,7 @@ describe('the tower’s own booked absence reaches the strip — issue #576, § 
       horizon: 'period',
       dayStartS: undefined,
       templateVariesMix: false,
+      dayCars: undefined,
       crowdIsToday: true,
       firstSession: false,
       units: 'metric',
@@ -307,6 +310,7 @@ describe('the day’s cars, as the run will have them — N4, N5, § D1038, § D
       horizon,
       dayStartS: planned.startOfDayS,
       templateVariesMix: planned.templateVariesMix,
+      dayCars: planned.dayCars,
       crowdIsToday: true,
       firstSession: false,
       units: 'metric',
@@ -354,28 +358,42 @@ describe('the day’s cars, as the run will have them — N4, N5, § D1038, § D
     expect(/\d/u.test(blind.outOfService?.sentence ?? ''), blind.outOfService?.sentence).toBe(false);
   }, 300_000);
 
-  it('gives one account of a car the day and the tower both take — N5, Midtown’s Tuesday', () => {
+  it('gives one account of each car on Midtown’s Tuesday, where the day and the tower take two — N5', () => {
+    /*
+     * The move-in picked car D, which the rung already books out; the run collapsed into the rung's
+     * schedule and the brief gave three accounts of car D. Since § D1038 the day's choice skips the
+     * booked car, so the day takes another and each car has one sentence, with the run's window.
+     */
     const { record, state, startOfDayS } = briefFor('c2', 2);
     expect(record.wrinkle.id.startsWith('move-in')).toBe(true);
+    const run = shiftRunConfigOf(RESOURCES, state);
+    const [dayCar] = run.dayCars.windows;
+    expect(dayCar, 'the move-in took no car').toBeDefined();
+    expect(dayCar).not.toBe('D');
+    const spans = new Map(carAbsencesOf(run.building).map((entry) => [entry.carId, entry]));
+    const day = spans.get(dayCar ?? '');
+    const tower = spans.get('D');
+    if (day?.backAtS == null || tower?.backAtS == null || startOfDayS === undefined) {
+      throw new Error('both cars go and come back on this day');
+    }
     const sentence = record.outOfService?.sentence ?? '';
-    /* One car, named once as the day's, with the run's one window for it. */
-    expect(record.outOfService?.badge).toBe('D');
+    expect(record.outOfService?.badge).toBe(`${String(dayCar)} · D`);
     expect(sentence).not.toContain('out of service today');
     expect(sentence.match(/Car D /gu)?.length, sentence).toBe(1);
-    const [window] = carAbsencesOf(shiftRunConfigOf(RESOURCES, state).building);
-    expect(window?.carId).toBe('D');
-    if (window === undefined || window.backAtS === null || startOfDayS === undefined) {
-      throw new Error('the day takes car D and brings it back');
-    }
-    expect(sentence).toContain(`Car D is the car it takes, out of passenger service ${clockRange(window.awayAtS, window.backAtS, startOfDayS)}.`);
-    /* The wrinkle does not say the tower *also* books the day's own car. */
-    expect(record.wrinkleNote).toBe(record.wrinkle.note);
-    expect(record.wrinkleNote).not.toContain('also books');
-    /* The plate counts the car once, as away for part of the day, not as out all day. */
+    expect(sentence.match(new RegExp(`Car ${String(dayCar)} `, 'gu'))?.length, sentence).toBe(1);
+    expect(sentence).toContain(
+      `Car ${String(dayCar)} is the car it takes, out of passenger service ${clockRange(day.awayAtS, day.backAtS, startOfDayS)}.`,
+    );
+    expect(sentence).toContain(
+      `Car D is booked out of passenger service ${clockRange(tower.awayAtS, tower.backAtS, startOfDayS)}.`,
+    );
+    /* The wrinkle's *also books* is now about a second car, which is what the run has. */
+    expect(record.wrinkleNote).toBe(`${record.wrinkle.note} The tower also books car D out of passenger service part-way through the day.`);
+    /* The plate counts both, as away for part of the day, and neither as out all day. */
     const lifts = record.facts.find((fact) => fact.label === 'Lifts')?.value;
-    expect(lifts).toBe('4 · 1 away for part of the day');
-    expect(record.load?.note).toContain('3 cars working all day and 1 more for part of it');
-    /* And the car is running when the day opens, so the opening frame greys nothing. */
+    expect(lifts).toBe('4 · 2 away for part of the day');
+    expect(record.load?.note).toContain('2 cars working all day and 2 more for part of it');
+    /* Both are running when the day opens, so the opening frame greys nothing. */
     expect(record.heldCarIds).toEqual([]);
   });
 });
@@ -416,6 +434,7 @@ describe('the facts come from the resolved building', () => {
       horizon: 'period',
       dayStartS: undefined,
       templateVariesMix: false,
+      dayCars: undefined,
       crowdIsToday: true,
       firstSession: false,
       units: 'metric',
@@ -489,6 +508,7 @@ describe('the rest of the record', () => {
       horizon: 'period',
       dayStartS: undefined,
       templateVariesMix: false,
+      dayCars: undefined,
       crowdIsToday: false,
       firstSession: false,
       units: 'metric',
@@ -595,6 +615,7 @@ function briefOn(state: ViewerState): ReturnType<typeof todayOf> {
     horizon: 'period',
     dayStartS: undefined,
     templateVariesMix: false,
+    dayCars: undefined,
     crowdIsToday: true,
     firstSession: false,
     units: 'metric',
@@ -756,6 +777,7 @@ describe('the moot sentence is drawn only over the run it was measured on — is
       horizon: 'horizon' in overrides ? overrides.horizon : press.horizon,
       dayStartS: undefined,
       templateVariesMix: false,
+      dayCars: undefined,
       crowdIsToday: false,
       firstSession: false,
       units: 'metric',

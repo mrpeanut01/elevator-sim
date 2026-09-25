@@ -222,6 +222,16 @@ export interface TodayInput {
    * reason: a default of `false` would print the fire drill's lobby rush over an all-day rise.
    */
   readonly templateVariesMix: boolean;
+  /**
+   * The cars today's event takes, as the next run takes them — `host.dayAhead().dayCars`, which is
+   * `dev/state.ts#ShiftRunConfig.dayCars` — or `undefined` for a caller with no run to ask, in
+   * which case the record asks `events.ts#eventCarChoice` over `building` with nothing booked.
+   *
+   * The run's answer rather than a second call, [§ D1038](../../../../DECISIONS.md): the day's car
+   * choice skips a car the tower books over the same stretch, and a record that re-derived it
+   * without the booking would name the wrong car on exactly the days that matter.
+   */
+  readonly dayCars: { readonly holds: readonly string[]; readonly windows: readonly string[] } | undefined;
   /** The standing selection's id, so the seed line can name a building the document lookup missed. */
   readonly buildingId: string;
   /** The standing dispatcher's display name, or `undefined`. */
@@ -322,11 +332,21 @@ interface CarOutToday {
 function carsOutTodayOf(
   building: ResolvedBuilding | undefined,
   event: ShiftEvent,
+  dayCars: TodayInput['dayCars'],
 ): readonly CarOutToday[] {
   if (building === undefined) return [];
-  const choice = eventCarChoice(event.effect, building);
-  const holdIds = choice.holdCars.map((car) => car.carId);
-  const derateIds = choice.derateCars.map((car) => car.carId);
+  const choice =
+    dayCars === undefined
+      ? (() => {
+          const chosen = eventCarChoice(event.effect, building);
+          return {
+            holds: chosen.holdCars.map((car) => car.carId),
+            windows: chosen.derateCars.map((car) => car.carId),
+          };
+        })()
+      : dayCars;
+  const holdIds = choice.holds;
+  const derateIds = choice.windows;
   const spans = new Map(carAbsencesOf(building).map((entry) => [entry.carId, entry]));
   const { derate } = event.effect;
   const ids = [...new Set([...holdIds, ...derateIds, ...spans.keys()])];
@@ -682,14 +702,20 @@ export function todayOf(input: TodayInput): TodayRecord {
     scheduledEventFor(input.calendar, week.day, week.dayIdx),
     input.templateVariesMix,
   );
-  const out = carsOutTodayOf(building, event);
+  const out = carsOutTodayOf(building, event, input.dayCars);
   /*
    * The one sentence about the day's wrinkle — the brief's card, this record's lede and the report's
    * header all print it. The lede quoted `event.note` and printed *"Nothing booked"* on every tower
    * that books a car out, all seven pinned press days included (the post-AH panel's N4), one screen
    * before the brief said the car was booked.
    */
-  const wrinkleNote = wrinkleNoteOf(event, bookedOutCarsOf(building, event));
+  const wrinkleNote = wrinkleNoteOf(
+    event,
+    bookedOutCarsOf(
+      building,
+      out.filter((car) => car.ofTheDay).map((car) => car.carId),
+    ),
+  );
   return {
     day: week.day,
     weekday,

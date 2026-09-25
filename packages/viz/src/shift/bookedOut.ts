@@ -35,7 +35,6 @@
 
 import { isServiceModeEvent, type ResolvedBuilding } from '@elevator-sim/core/browser';
 
-import { eventCarChoice } from './events.js';
 import type { ShiftEvent } from './types.js';
 
 /** One car the run's schedule takes out of passenger service. */
@@ -49,13 +48,13 @@ export interface BookedOutCar {
   /** The second the same schedule brings it back, or `null` when it does not come back. */
   readonly backAtS: number | null;
   /**
-   * Whether **today's wrinkle** takes this car itself — `events.ts#eventCarChoice` over the same
-   * building — rather than only the tower's own schedule. `undefined` when the caller did not say
-   * which day it is, which every reader treats as *the tower's*.
+   * Whether **today's wrinkle** takes this car — `dev/state.ts#ShiftRunConfig.dayCars`, the run's
+   * own answer — rather than the tower's schedule. `undefined` when the caller did not say which
+   * cars the day took, which every reader treats as *the tower's*.
    *
-   * [§ D1038](../../../../DECISIONS.md): a car the day and the tower both take is one window in the
-   * run, and {@link wrinkleNoteOf} must not say *the tower also books* a car that is the day's own —
-   * on Midtown's Tuesday that sentence was the third of three accounts of car D.
+   * [§ D1038](../../../../DECISIONS.md): a wrinkle whose window starts after the first instant is on
+   * the building's service events beside the tower's bookings, and {@link wrinkleNoteOf} read it
+   * back as *the tower also books car C* — on any tower, including one whose rung books nothing.
    */
   readonly ofTheDay?: boolean;
 }
@@ -67,29 +66,23 @@ export interface BookedOutCar {
  * The brief's strip reads this ([§ D1039](../../../../DECISIONS.md)), because a car the day takes
  * from the start and hands back at 16:30 is as much a fact about today as one the tower books at
  * 10:30, and the strip used to describe the first with one sentence and the second with another.
- * `event`, when given, marks the cars the day's own wrinkle takes ({@link BookedOutCar.ofTheDay}).
+ * `dayCarIds`, when given, marks the cars the day's own wrinkle takes ({@link BookedOutCar.ofTheDay}).
  *
  * A car out twice is reported at its **first** leaving and the first return after it — which is the
- * sentence a player needs (*it goes, and it comes back*). Two windows on one car that meet are one
- * window by the time they reach a building (`incidents.ts#serviceEventsFor`, § D1038), so what is
- * left to disagree is two windows that do not meet, and no shipped day draws one.
+ * sentence a player needs (*it goes, and it comes back*). Since § D1038 the day's wrinkle does not
+ * take a car the tower books over an overlapping stretch, so no shipped day puts two windows on one
+ * car.
  */
 export function carAbsencesOf(
   building: ResolvedBuilding | undefined,
-  event?: ShiftEvent,
+  dayCarIds?: readonly string[],
 ): readonly BookedOutCar[] {
   /*
    * `isServiceModeEvent` rather than a field test: `ResolvedServiceEvent` is a union of a mode
    * change, a derate and a range change (§ D523), and only the first has a `mode` and a `carId`.
    */
   const events = (building?.serviceEvents ?? []).filter(isServiceModeEvent);
-  const dayCars =
-    event === undefined || building === undefined
-      ? undefined
-      : (() => {
-          const choice = eventCarChoice(event.effect, building);
-          return new Set([...choice.holdCars, ...choice.derateCars].map((car) => car.carId));
-        })();
+  const dayCars = dayCarIds === undefined ? undefined : new Set(dayCarIds);
   const leaves = events
     .filter((entry) => entry.mode === 'out-of-service' && entry.atS >= 0)
     .sort((a, b) => a.atS - b.atS);
@@ -122,9 +115,9 @@ export function carAbsencesOf(
  */
 export function bookedOutCarsOf(
   building: ResolvedBuilding | undefined,
-  event?: ShiftEvent,
+  dayCarIds?: readonly string[],
 ): readonly BookedOutCar[] {
-  return carAbsencesOf(building, event).filter((car) => car.awayAtS > 0);
+  return carAbsencesOf(building, dayCarIds).filter((car) => car.awayAtS > 0);
 }
 
 /** `car D` / `cars D and E` / `cars D, E and F`. */

@@ -43039,47 +43039,58 @@ DECIDE-3 ruled for **two prices the schedule already carries**: the flat 2 u for
 
 Replacing trace redraws with thinning on a named stream, which may later require re-authoring `let-faster-than-the-lifts`; the fix-it single-pair judge's noise; and the campaign shop's `staggered-starts` row, which is the same near-universal shape. The coordinator files all three as issues. **§ D706's retirement**: `tenant-floors` no longer blocks it, and [§ D1000](#d1000) says what still does.
 
-## D1038 — a car two schedules take is out for the union of their windows, and a day's own car is never *also* the tower's
+## D1038 — a day's wrinkle does not take a car the tower already books over the same stretch, and a day's own car is never *also* the tower's
+
+> **Implements an agent ruling under delegated authority** — the week decision swarm's member S1,
+> § 1 (*"One defect found on the way is ruled here"*), relayed by the wave AI coordinator. It is not
+> a product-owner ruling.
 
 **Date: 2026-09-25 · Owner: lane AI-E (wave AI) · The post-AH panel's D.md N5 · Rules on
-`packages/viz/src/shift/incidents.ts#serviceEventsFor`, `shift/bookedOut.ts` (`BookedOutCar.ofTheDay`,
-`wrinkleNoteOf`), `dev/state.ts#shiftRunConfigOf`'s step 5 comment and `dev/main.ts#closeShift`'s
-`bookedOut` argument. Cites [§ D871](#d871), [§ D983](#d983), [§ D227](#d227), [§ D405](#d405).**
+`packages/viz/src/shift/events.ts#eventCarChoice` (a `booked` list, `derateSpokenFor`) and
+`#shiftRunPatch` (`booked`, the shortfall sentence), `shift/calendar.ts` (`booked` on both inputs),
+`dev/state.ts#shiftRunConfigOf` (`booked`, `ShiftRunConfig.dayCars`), `shift/bookedOut.ts`
+(`BookedOutCar.ofTheDay`, `wrinkleNoteOf`) and `dev/main.ts#closeShift`'s `bookedOut` argument.
+Cites [§ D871](#d871), [§ D983](#d983), [§ D227](#d227), [§ D405](#d405).**
 
-**Why an entry.** It changes what a run does, on days a contract rung and the day's wrinkle take the
-same car, and that binds the kernel's input on every tower [§ D871](#d871) gave a rung — code this
-brief-side lane does not own. It also moves a recorded statement: `shiftRunConfigOf` said two
-entries naming one car were *a mode set twice* and that nothing dedupes.
+**Why an entry.** It changes what a run does on days a contract rung and the day's wrinkle would
+take the same car, which binds the kernel's input on every tower [§ D871](#d871) gave a rung — code
+this brief-side lane does not own — and it moves a recorded statement: `shiftRunConfigOf` said two
+entries naming one car were *a mode set twice*.
 
-**What the panel saw.** Midtown's Tuesday brief gave three accounts of car D: *"Car D is out of
-service today"*, *"one car is tied up through the middle of the shift, then rejoins"*, and *"the
-tower also books car D out of passenger service part-way through the day"*. Measured on the run's
-own building (`resolvedBuildingOf` over the Scenario state), the move-in derate and Midtown's rung
-both take car D by the same total order (`incidents.ts#carsToDerate` picks the bank's last car, and
-the rung names it), and the building carried four events for it: out at 9 000 s twice, **in at
-18 000 s**, in at 27 000 s. The rung's return fired first, so the run handed the movers' car back
-at 13:00 of a window that was meant to run to 15:30 — neither caption described the run. Friday's
-shaft-out was worse: the maintenance car from the first instant came back at 13:00 on a day whose
-note says *"for all but the last stretch of the shift"*.
+**What the panel saw, and what was under it.** Midtown's Tuesday brief gave three accounts of car D:
+*"Car D is out of service today"*, *"one car is tied up through the middle of the shift, then
+rejoins"*, and *"the tower also books car D out of passenger service part-way through the day"*. The
+move-in derate and the rung both took car D (`incidents.ts#carsToDerate` picks the bank's last car,
+and the rung names it), and the building carried out at 9 000 s twice, **in at 18 000 s**, in at
+27 000 s. The rung's return fired first, so the movers' car came back at 13:00 of a window meant to
+run to 15:30 — and the swarm measured the run **identical to an ordinary Tuesday on all 95
+configurations** it swept. Friday's shaft-out had the same collision from the first instant.
 
-**The ruling.** `serviceEventsFor` merges one car's windows before it emits them: a car in two
-windows that meet is out for their union, and one window per car is emitted exactly as before. That
-is the only reading under which both captions are true of the run, and it is what both authors
-wrote. The alternative — the day's derate avoiding a car the rung books, #272's shape for the
-calendar's goods car — was considered and not taken: it takes a **second** car out at lunch on
-Tuesday and Friday, which changes the week's difficulty in a direction nobody measured, where the
-union keeps the number of cars the day takes at the number its note says.
+**The ruling.** `eventCarChoice` counts the tower's own bookings as **spoken for**, as
+`calendarPatch` already counts the player's holds: a whole-shift hold skips every booked car, and a
+window skips a booked car whose window overlaps its own. The rest is chosen by the same total order.
+Where the building cannot spare a car — a bank keeps one in service — the window is withheld with
+the shortfall sentence `shiftRunPatch` already had, plus one clause naming the booking.
+`calendarPatch` is handed the same list, so the goods car it reserves around the day's choice is
+reserved around the choice the run makes. On Midtown's Tuesday the move-in now takes car C, and
+`events.test.ts` requires that run to differ **on the legs** from the ordinary Tuesday.
 
-**The sentence half.** `BookedOutCar` gains `ofTheDay`, set when the day's own `eventCarChoice`
-takes the car, and `wrinkleNoteOf` names only cars it does not mark. Before, a wrinkle whose window
-starts after the first instant was read back from the building's windows as *the tower's* booking —
-on any tower, including one whose rung books nothing.
+**Considered and not taken: a car in two windows is out for their union.** It keeps the number of
+cars the day takes at one and was implemented first in this lane; the swarm's ruling chose the
+spoken-for rule, which is the one the calendar already follows and the one under which the brief's
+*one car is tied up* and *the tower also books car D* describe two different cars, as they read.
+
+**The sentence half.** `ShiftRunConfig.dayCars` records the cars today's event took, as the run
+took them, and `BookedOutCar.ofTheDay` is set from it; `wrinkleNoteOf` names only cars it does not
+mark. Before, a wrinkle whose window starts after the first instant was read back from the
+building's windows as *the tower's* booking — on any tower, including one whose rung books nothing.
 
 **What it moves.** Nothing on day 1: a pinned press day is the ordinary day, which takes no car, so
-every pin and every legibility row is a day-1 measurement the union cannot reach. On days 2+ of a
-rung tower it moves the run wherever the day's car is the rung's; those days carry no published
-figure. `incidents.test.ts` holds the union in both orders and the from-the-start case; the brief's
-single account is `today.test.ts`'s Midtown Tuesday case.
+every pin and every legibility row, all day-1 measurements, are out of its reach. On days 2+ of a
+rung tower whose wrinkle would have taken the rung's car, the run now loses a second car over the
+overlap; those days carry no published figure, and the week swarm's DC-10 instrument is where their
+difficulty gets measured. `wholeDayEvents.test.ts` sweeps every contract × day × weekday and finds
+no day's window on a booked car that meets it.
 
 ## D1039 — the brief prints the times a car is booked out, read off the run the next press produces
 
@@ -43111,10 +43122,12 @@ printed before, with no clock.
 
 **One reading of each car.** The strip, the badge, the *Lifts* fact, the load plate, the lede's count
 and the elevation's greyed cars now read one list built from the run's windows and the day's car
-choice, where they read three sources before (§ D1038 has the defect that made that visible). Two
-counting rules follow and are stated rather than implied: a car away for part of the day is counted
-**out of the working cars** on the plate and named as *away for part of the day*, so Midtown's
-Monday reads 3 cars working all day and 1 more for part of it rather than 4; and the opening frame
+choice — the choice the run makes, `ShiftRunConfig.dayCars`, rather than a second call — where
+they read three sources before (§ D1038 has the defect that made that visible). Two counting rules
+follow and are stated rather than implied: a car away for part of the day is counted **out of the
+working cars** on the plate and named as *away for part of the day*, so Midtown's Tuesday, where the
+movers take car C and the tower books car D, reads 2 cars working all day and 2 more for part of it
+rather than 4 (`today.test.ts` asserts it); and the opening frame
 greys only a car out at the first instant, where it used to grey every car the day's wrinkle takes,
 including one it takes at 10:30.
 

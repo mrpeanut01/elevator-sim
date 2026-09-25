@@ -106,12 +106,12 @@ describe('the wrinkle note stops saying *Nothing booked* on a day a car is booke
     );
     if (moveIn === undefined) throw new Error('no wrinkle takes a car part-way through the day');
     const garden = contractDayState('c1', { seed: 20_260_925n });
-    const building = shiftRunConfigOf(RES, { ...garden, campaignEventId: moveIn.id }).building;
-    const unmarked = bookedOutCarsOf(building);
+    const run = shiftRunConfigOf(RES, { ...garden, campaignEventId: moveIn.id });
+    const unmarked = bookedOutCarsOf(run.building);
     expect(unmarked.length, 'the day took no car, so this case tests nothing').toBeGreaterThan(0);
     /* Unmarked, the day's car reads as the tower's — the defect. */
     expect(wrinkleNoteOf(moveIn, unmarked)).toContain('also books');
-    const marked = bookedOutCarsOf(building, moveIn);
+    const marked = bookedOutCarsOf(run.building, [...run.dayCars.holds, ...run.dayCars.windows]);
     expect(marked.every((entry) => entry.ofTheDay === true)).toBe(true);
     expect(wrinkleNoteOf(moveIn, marked)).toBe(moveIn.note);
   });

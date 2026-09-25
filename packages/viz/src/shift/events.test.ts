@@ -35,9 +35,13 @@ import {
   MAX_ARRIVAL_RATE_PCT_POP_5MIN,
   SHIFT_EVENTS,
   baseDemandOf,
+  eventCarChoice,
   eventFor,
   shiftRunPatch,
 } from './events.js';
+import { shiftRunConfigOf } from '../dev/state.js';
+import { contractBuildings, todaysScenarioDayState } from './contractDay.test-helper.js';
+import { scheduledEventFor } from './calendar.js';
 import { serviceEventsFor, type Incident } from './incidents.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
 import { poolFor } from '../wrinkles/draw.js';
@@ -507,5 +511,70 @@ describe('which car is held is a decision, not a draw', () => {
         expect(heldInBank.length, `${building.id}/${bank.id}`).toBeLessThan(bank.cars.length);
       }
     }
+  });
+});
+
+/**
+ * **A day's car is not a car the tower already has out** — [§ D1038](../../../../DECISIONS.md), the
+ * week swarm's ruling S1 § 1 on the post-AH panel's N5.
+ *
+ * Midtown's Tuesday `move-in:middle` picked car D by `carsToDerate`'s order, and the rung books car D
+ * out 10:30–13:00; the two schedules collapsed into the rung's and the swarm measured the run
+ * identical to an ordinary Tuesday on all 95 configurations, under a brief promising a car tied up
+ * through the middle of the shift.
+ */
+describe('the tower’s bookings are spoken for — § D1038', () => {
+  const booked = (carId: string, fromFraction: number, toFraction: number): Incident => ({
+    kind: 'maintenance',
+    car: { bankId: 'main', carId },
+    fromFraction,
+    toFraction,
+  });
+  const fourCars = { banks: [{ id: 'main', cars: ['A', 'B', 'C', 'D'].map((id) => ({ id })) }] };
+  const derate = { ...SHIFT_EVENTS.ordinary.effect, changesNothing: false, derate: { cars: 1, fromFraction: 0.25, toFraction: 0.75 } };
+
+  it('takes another car where the tower books one over the same stretch, and the same car where it does not', () => {
+    expect(eventCarChoice(derate, fourCars).derateCars.map((car) => car.carId)).toEqual(['D']);
+    const spoken = eventCarChoice(derate, fourCars, [booked('D', 0.25, 0.5)]);
+    expect(spoken.derateCars.map((car) => car.carId)).toEqual(['C']);
+    expect(spoken.derateSpokenFor).toBe(1);
+    /* A booking that does not meet the window is not in its way. */
+    const apart = eventCarChoice(derate, fourCars, [booked('D', 0.8, 0.9)]);
+    expect(apart.derateCars.map((car) => car.carId)).toEqual(['D']);
+    expect(apart.derateSpokenFor).toBe(0);
+  });
+
+  it('withholds the window, with its reason, where the building cannot spare another car', () => {
+    const twoCars = requireBuilding(config, BUILDING_ID);
+    const bank = twoCars.banks[0];
+    if (bank === undefined) throw new Error('no bank');
+    const small = { ...twoCars, banks: [{ ...bank, cars: bank.cars.slice(0, 2) }] };
+    const [, second] = bank.cars;
+    if (second === undefined) throw new Error('fewer than two cars');
+    const event: ShiftEvent = { ...SHIFT_EVENTS.ordinary, id: 'move-in', name: 'Move-in day', effect: derate };
+    const patch = shiftRunPatch({
+      event,
+      building: small,
+      base: base(),
+      booked: [{ kind: 'maintenance', car: { bankId: bank.id, carId: second.id }, fromFraction: 0.25, toFraction: 0.5 }],
+    });
+    expect(patch.incidents).toEqual([]);
+    expect(patch.withheld.join(' ')).toContain('could stand 0');
+    expect(patch.withheld.join(' ')).toContain('The tower has its own car booked out over the same stretch');
+  });
+
+  it('makes Midtown’s Tuesday a different day from an ordinary Tuesday, on the legs', () => {
+    const resources = contractBuildings();
+    const { state: first } = todaysScenarioDayState(resources, 'c2', { seed: 20_260_925n });
+    const tuesday = { ...first, campaignEventId: undefined, week: { ...first.week, day: 2, dayIdx: 1 } };
+    expect(scheduledEventFor(null, 2, 1).id).toBe('move-in:middle');
+    const moveIn = shiftRunConfigOf(resources, tuesday);
+    const ordinary = shiftRunConfigOf(resources, { ...tuesday, campaignEventId: 'ordinary' });
+    expect(moveIn.dayCars.windows).toEqual(['C']);
+    const legsOf = (run: VizRecording): string =>
+      JSON.stringify(run.legs.map((leg) => [leg.arrivedAt, leg.boardedAt ?? null, leg.alightedAt ?? null]));
+    const a = recordRun(moveIn.config, { recordDecisions: false }).recording;
+    const b = recordRun(ordinary.config, { recordDecisions: false }).recording;
+    expect(legsOf(a)).not.toBe(legsOf(b));
   });
 });

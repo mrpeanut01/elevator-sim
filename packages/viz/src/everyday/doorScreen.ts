@@ -59,6 +59,7 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
       building: dayAhead.building,
       dayStartS: dayAhead.startOfDayS,
       templateVariesMix: dayAhead.templateVariesMix,
+      dayCars: dayAhead.dayCars,
       buildingId: selection.buildingId,
       dispatcherName: host.dispatcherById(selection.dispatcherId)?.name,
       /* Any profile's name, for the moot-dispatcher sentence — § D914. */

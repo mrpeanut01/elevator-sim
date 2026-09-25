@@ -12718,6 +12718,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
          */
         dayStartS: undefined,
         templateVariesMix: false,
+        dayCars: undefined,
         /*
          * The day's crowd — § D729, § D730. Seeded `true` here and `false` below, because the
          * seed line and the door's closing sentence both have two arms and the arm a developer
@@ -12762,6 +12763,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
           dayStartS: undefined,
           templateVariesMix: false,
+          dayCars: undefined,
           crowdIsToday: false,
           firstSession: entry.week.day === 1 && entry.week.history.length === 0,
           units: 'metric',
@@ -12808,6 +12810,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
         dayStartS: undefined,
         templateVariesMix: false,
+        dayCars: undefined,
         crowdIsToday: true,
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         units: 'imperial',
@@ -12868,6 +12871,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
           dayStartS: 8 * 3600,
           templateVariesMix: false,
+          dayCars: undefined,
           crowdIsToday: true,
           firstSession: false,
           units: 'metric',
