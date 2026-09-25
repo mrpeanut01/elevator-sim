@@ -44116,7 +44116,7 @@ The three members agree on these, and each was measured rather than argued.
    pinned by SHA.
 9. **Dependabot version updates (2 to 1 to include npm: S1 and S3 over S2's actions-only; monthly,
    per S3).** Ecosystems `npm`, `github-actions` and `docker` (a root `Dockerfile` exists); minor
-   and patch grouped, majors alone; a seven-day cooldown (thirty for a major); small open-pull-request
+   and patch grouped, majors alone; a seven-day cooldown (thirty for an npm major); small open-pull-request
    limits; no automatic rebase and never auto-merged. Node's own major is ignored in both places it
    appears. `deploy-viz.yml` skips Dependabot's pull requests.
 10. **Every action moves off its Node 20 major and is pinned by full SHA with its version beside
@@ -44131,8 +44131,13 @@ The three members agree on these, and each was measured rather than argued.
     its whole subtree when its morning run arrived, destroying the button focus had just reached
     ([§ D844](#d844)); `stageScreen.browser.test.ts`'s *expected '08:32' to be false* was a
     `waitForFunction` resolving on a truthy Promise, replaced by a settle loop compared in node. The
-    browser leg was green on all 8 runs after that commit in the measured window. This lane changed
-    neither file and re-ran both (see Measured).
+    browser leg was green on all 8 runs after that commit in the measured window. **Re-running both
+    files found a third, in the same file as the first**: the Career journey waited for the stage's
+    primary to *read* *Close the day*, and the stage draws that label disabled until the day's run
+    has landed, so under load the forty <kbd>Tab</kbd> presses went round the page before the
+    button entered the Tab order. `keyboardJourneys.browser.test.ts#pressPrimaryWhenItReads` now
+    waits for the label on an enabled button, which is the condition its next step needs. No
+    timeout moved and nothing retries.
 12. **Kept as they are**: CodeQL default setup (no workflow file), npm caching, and the
     `merge_group` trigger, whose comment now says merge queue needs an organisation-owned repository.
 
@@ -44180,8 +44185,12 @@ Every clause is one YAML edit or one settings toggle.
   entry, green after, and red again when one guards path is misspelt. `ciWorkflowMatrix.test.ts`'s
   job-set assertion moves from `legs, suite` to `legs, guards, suite`, and was red before.
 - Every workflow parses under PyYAML, and `ci.yml` under `infra/checks/miniYaml.mjs`.
-- `keyboardJourneys.browser.test.ts` and `stageScreen.browser.test.ts`, run one process at a time:
-  STABILITY_RESULTS.
+- `keyboardJourneys.browser.test.ts` and `stageScreen.browser.test.ts`, run one process at a time
+  with `--maxWorkers=1` on a four-core container shared with other lanes (load average 21 to 27):
+  before the helper's fix, `stageScreen` 3 of 3 green (19 cases each) and `keyboardJourneys` 2 of
+  3, the third red on the Career journey as clause 11 describes; after it, `keyboardJourneys` 5 of
+  5 green (6 cases each). Five greens bound a rate and do not prove one is zero; the fix is argued
+  from the mechanism, and the runs are what did not contradict it.
 
 ### What only the first real runs can confirm
 

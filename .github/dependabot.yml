@@ -13,12 +13,12 @@
 #
 # No `labels:`. Dependabot's default applies `dependencies` and the ecosystem's name and creates
 # them if they are missing, and neither exists here yet; a `labels:` list naming a label the
-# repository does not have is silently dropped.
+# repository does not have is ignored.
 #
 # `rebase-strategy: disabled` because an automatic rebase is a fresh CI run on every merge to
 # `main`. Comment `@dependabot rebase` on the pull request when it is about to be read.
 #
-# The cooldown holds a release back for a week (a month for a major) before a pull request is
+# The cooldown holds a release back for a week (a month for an npm major) before a pull request is
 # opened for it, which is when a bad release is usually yanked.
 #
 # Node's own major is ignored in both places it appears. `ci.yml`'s header pins Node to one
@@ -61,7 +61,6 @@ updates:
       timezone: Etc/UTC
     cooldown:
       default-days: 7
-      semver-major-days: 30
     open-pull-requests-limit: 2
     rebase-strategy: disabled
     commit-message:
