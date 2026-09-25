@@ -797,7 +797,6 @@ function judgedPress(entry: FixitCase, state: FixitState, subject: FixitCase = e
     switches: FIXIT_RUN_SWITCHES,
     pairRunner,
     judge: createFixitJudge(mornings),
-    readingOf: morningReadingOf,
     classify: (before: VizRecording, after: VizRecording, done) => {
       // The surfaces' own check first — GitHub issue #350 — so this vouches for the chain they run.
       assertPairMatchesRepairs(subject, state, before, after);

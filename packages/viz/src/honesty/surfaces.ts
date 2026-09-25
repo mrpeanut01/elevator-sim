@@ -70,8 +70,10 @@ import {
 } from '../everyday/watchStage.js';
 import {
   buildingLineOf,
+  checkStoppedLineOf,
   FIXIT_SCREEN_COPY,
   fixitBarModel,
+  fixitDiagnosisView,
   fixitBudgetRungRow,
   fixitCaseRailModel,
   fixitDialGroupsView,
@@ -321,7 +323,16 @@ import {
   type FixitOutcome,
   type FixitVerdictContext,
 } from '../fixit/engine.js';
-import { checkingOutcomeOf, FIXIT_MORNINGS, judgedOutcomeOf, judgeReplication } from '../fixit/judge.js';
+import {
+  checkingOutcomeOf,
+  DERIVED_MORNINGS,
+  judgedOutcomeOf,
+  judgeMornings,
+  judgeReplication,
+  markTitleOf,
+  progressLineOf,
+  type MorningMark,
+} from '../fixit/judge.js';
 import { HELD_FIX_CASES, heldReasonOf } from '../fixit/held.js';
 import { demandDisclosureOf } from '../fixit/parse.js';
 import { switchUnpostableReasonOf } from '../scope/switchWire.js';
@@ -7281,6 +7292,19 @@ const FIXIT_COVERS: readonly string[] = [
   'fixit/judge.ts#JUDGE_COPY',
   'fixit/judge.ts#REPLICATED_BASIS_LINE',
   'fixit/judge.ts#REPLICATED_DEMAND_BASIS_LINE',
+  /*
+   * [§ D1120](../../../../DECISIONS.md): the futility stop's two basis lines, the live count and the
+   * per-morning marks' titles, and the diagnosis card in its three states with the stopped-check
+   * line and the census sentence. Every one is seeded below by the adapter rather than claimed.
+   */
+  'fixit/judge.ts#FUTILITY_BASIS_LINE',
+  'fixit/judge.ts#FUTILITY_DEMAND_BASIS_LINE',
+  'fixit/judge.ts#progressLineOf',
+  'fixit/judge.ts#markTitleOf',
+  'everyday/fixitScreenModel.ts#fixitDiagnosisView',
+  'everyday/fixitScreenModel.ts#diagnosisHintTextOf',
+  'everyday/fixitScreenModel.ts#diagnosisOpenedBecauseOf',
+  'everyday/fixitScreenModel.ts#checkStoppedLineOf',
   'fixit/held.ts#HELD_FIX_CASES',
   /*
    * GitHub issue #350's second basis line and the choice between the two: the outcome's `basis`
@@ -7474,14 +7498,14 @@ function shippedFixitSeedsOf(shipped: ShippedFixit): readonly TextSeed[] {
        * player reads, so both are swept; the mornings are fabricated readings, this adapter's habit.
        */
       if (!witnessRun || entry.result.rest === undefined) continue;
-      const asBuilt = Array.from({ length: FIXIT_MORNINGS }, () => ({ complaint: 6, restAwayPct: 90, restBoarded: 120 }));
+      const asBuilt = Array.from({ length: DERIVED_MORNINGS }, () => ({ complaint: 6, restAwayPct: 90, restBoarded: 120 }));
       for (const [restArm, restAt] of [
         ['agrees', (i: number) => 89 + (i % 2) * 2],
         ['noticed', (i: number) => 89 - (i % 2) * 0.5],
       ] as const) {
         const replication = judgeReplication(
           asBuilt,
-          Array.from({ length: FIXIT_MORNINGS }, (_, i) => ({ complaint: i % 2, restAwayPct: restAt(i), restBoarded: 120 })),
+          Array.from({ length: DERIVED_MORNINGS }, (_, i) => ({ complaint: i % 2, restAwayPct: restAt(i), restBoarded: 120 })),
         );
         seeds.push({
           field: `${at}.judged(${restArm}).body`,
@@ -7675,7 +7699,7 @@ const FIXIT: SurfaceAdapter = {
     seeds.push({ field: 'outcome.checking.head', text: checkingOutcome.head, role: 'label', provenance: 'authored' });
     seeds.push({ field: 'outcome.checking.body', text: checkingOutcome.body, role: 'prose', provenance: 'authored' });
     const mornings = (complaint: (i: number) => number, rest: (i: number) => number): MorningReading[] =>
-      Array.from({ length: FIXIT_MORNINGS }, (_, i) => ({ complaint: complaint(i), restAwayPct: rest(i), restBoarded: 120 }));
+      Array.from({ length: DERIVED_MORNINGS }, (_, i) => ({ complaint: complaint(i), restAwayPct: rest(i), restBoarded: 120 }));
     const asBuiltMornings = mornings((i) => 6 + (i % 3), () => 95);
     for (const [judgedName, afterMornings] of [
       ['held', mornings((i) => i % 2, () => 95)],
@@ -7718,6 +7742,79 @@ const FIXIT: SurfaceAdapter = {
       role: 'reason',
       provenance: 'authored',
     });
+
+    /*
+     * ---- [§ D1120](../../../../DECISIONS.md): a check stopped for futility, and a check as it runs ----
+     *
+     * The futility arm is the judge's own `judgeMornings` over an order that changes nothing, which
+     * stops at the first look; both measure kinds, and both crowds for the basis. Its row claims
+     * counts only, and declares the mornings it read. Then the live count and one mark title of each
+     * kind, and the line a stopped check leaves.
+     */
+    const futile = judgeMornings(asBuiltMornings, asBuiltMornings);
+    for (const [name, subject] of [
+      ['long-waits', entry],
+      ['mean-wait', meanEntry],
+    ] as const) {
+      const judged = judgedOutcomeOf(subject, classifyOutcome(subject, clearing(true), spendOf(subject, empty, schedule)), futile);
+      const where = `outcome.judged.futile.${name}`;
+      seeds.push({ field: `${where}.head`, text: judged.head, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `${where}.body`, text: judged.body, role: 'prose' });
+      seeds.push({ field: `${where}.basis`, text: judged.basis, role: 'reason', provenance: 'authored' });
+      const row = judged.rows[3];
+      if (row !== undefined) {
+        seeds.push({
+          field: `${where}.row[3]`,
+          text: `${row.label}: ${row.before} → ${row.after} · ${row.verdict}`,
+          role: 'observation',
+          declaredCount: futile.reduction.n,
+          countShown: true,
+        });
+      }
+    }
+    seeds.push({
+      field: 'outcome.judged.futile.demand.basis',
+      text: judgedOutcomeOf(entry, classifyOutcome(entry, clearing(false), spendOf(entry, empty, schedule)), futile).basis,
+      role: 'reason',
+      provenance: 'authored',
+    });
+    const marks: readonly (MorningMark | undefined)[] = ['lower', 'higher', 'same', 'unread', undefined];
+    const running = { landed: 12, planned: DERIVED_MORNINGS, marks };
+    seeds.push({ field: 'check.count', text: progressLineOf(running), role: 'observation', declaredCount: running.planned, countShown: true });
+    for (const [index, mark] of marks.entries()) {
+      seeds.push({ field: `check.mark(${mark ?? 'pending'})`, text: markTitleOf(index, mark), role: 'observation' });
+    }
+    seeds.push({ field: 'check.editable', text: FIXIT_SCREEN_COPY.checkingEditable, role: 'prose', provenance: 'authored' });
+    seeds.push({
+      field: 'check.stopped',
+      text: checkStoppedLineOf(running.landed, running.planned),
+      role: 'observation',
+      declaredCount: running.planned,
+      countShown: true,
+    });
+
+    /*
+     * ---- the diagnosis card in its three states — § D1120 clause 1 ----
+     *
+     * Withheld with its press; shown because asked; shown because the census opened it, with the
+     * census's two counts (a synthetic row, since the adapter's case is synthetic); and explained,
+     * which prints the case's authored diagnosis only over a fixed verdict on the witness run.
+     */
+    for (const [where, asked, census, explained] of [
+      ['withheld', false, undefined, false],
+      ['asked', true, undefined, false],
+      ['census', false, { routes: 34, clearing: 1 }, false],
+      ['explained', true, undefined, true],
+    ] as const) {
+      const view = fixitDiagnosisView({ entry, schedule, asked, census, explained });
+      seeds.push({ field: `diagnosis.${where}.eyebrow`, text: view.eyebrow, role: 'label', provenance: 'authored' });
+      if (view.text !== undefined) seeds.push({ field: `diagnosis.${where}.text`, text: view.text, role: 'prose' });
+      seeds.push({ field: `diagnosis.${where}.note`, text: view.note, role: 'prose' });
+      if (view.press !== undefined) seeds.push({ field: `diagnosis.${where}.press`, text: view.press, role: 'label', provenance: 'authored' });
+      if (view.because !== undefined) {
+        seeds.push({ field: `diagnosis.${where}.because`, text: view.because, role: 'observation', declaredCount: census?.routes ?? 0, countShown: true });
+      }
+    }
 
     /* ================================================================== *
      * The Everyday screen's own words — GAMEPLAY § 10's screen chrome.
@@ -7850,6 +7947,25 @@ const FIXIT: SurfaceAdapter = {
       }
     }
 
+    /* ---- § D1120 clause 1: the row's mark, on an open case asked about and on a fixed one ---- */
+    for (const [where, solvedIds] of [
+      ['asked-open', new Set<string>()],
+      ['asked-solved', new Set([entry.id])],
+      ['own-solved', new Set([entry.id])],
+    ] as const) {
+      const rail = fixitCaseRailModel(
+        [entry],
+        solvedIds,
+        entry.id,
+        () => buildingLineOf(context.buildingName, context.recording.floors.length),
+        heldReasonOf,
+        () => where !== 'own-solved',
+      );
+      for (const row of rail.rows) {
+        if (row.mark !== undefined) seeds.push({ field: `rail.${where}.mark`, text: row.mark, role: 'label', provenance: 'authored' });
+      }
+    }
+
     /* ---- the § 3.3 substitutions, over all four states the screen can be in ---- */
     const barBase = actionBarFor({ screen: 'fixit', ctx: 'daily' });
     for (const [where, view] of [
@@ -7859,6 +7975,8 @@ const FIXIT: SurfaceAdapter = {
       ['running', { ready: true, running: true, ran: false, solved: false }],
       /* § D1020: the letter's morning cleared and the other forty-nine are running. */
       ['checking', { ready: true, running: true, ran: true, solved: false, checking: true }],
+      /* § D1120: a check running on an order since edited gives the press back, and says what it stops. */
+      ['supersedes', { ready: true, running: false, ran: true, solved: false, supersedes: true }],
       ['solved', { ready: true, running: false, ran: true, solved: true }],
     ] as const) {
       const row = fixitBarModel(barBase, view);

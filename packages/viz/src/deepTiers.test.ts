@@ -216,6 +216,24 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       '137.5 s quiet and 189.8 s under load, one case per building, none near the 300 s ceiling',
     scheduled: true,
   },
+  'packages/viz/src/fixit/asBuiltMornings.sweep.test.ts': {
+    gates: ['ELEVATOR_SIM_FIXIT_MORNINGS'],
+    reason:
+      '§ D1120 clause 4: every fix case’s forty-nine as-built mornings re-run and matched to the bit ' +
+      'against data/fixit-as-built-mornings.json, the derived artifact that makes no press cold. The ' +
+      'always-on half is asBuiltMornings.test.ts, which checks every row’s input digest. Measured ' +
+      '2026-09-25 on the shared four-core container at load 5 to 7: 18 cases in 105.9 s',
+    scheduled: true,
+  },
+  'packages/viz/src/fixit/routeCensus.sweep.test.ts': {
+    gates: ['ELEVATOR_SIM_FIXIT_ROUTES'],
+    reason:
+      '§ D1120 clause 1: every role-blind route through every offered fix case pressed through the ' +
+      'gate, and the counts matched against fixit/routeCensus.ts#ROUTE_CENSUS, which decides which ' +
+      'cases open with their diagnosis shown. The always-on half re-derives the rows that open a ' +
+      'case. Measured 2026-09-25 on the shared four-core container: 15 cases in 190 s',
+    scheduled: true,
+  },
   'packages/experiments/src/fuzz/deep.test.ts': {
     gates: ['ELEVATOR_SIM_FUZZ'],
     reason:

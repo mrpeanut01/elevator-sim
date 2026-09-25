@@ -203,6 +203,16 @@ export interface EverydayProgress {
   readonly solvedCaseIds: readonly string[];
   /** One per dispatcher that has been through the forty. */
   readonly ratings: readonly SavedRating[];
+  /**
+   * Fix cases whose diagnosis the player asked to see — [§ D1120](../../../../DECISIONS.md) clause 1,
+   * the case row's *with the diagnosis* mark. Kept, because a mark that a reload dropped would turn
+   * *with the diagnosis* into *on your own*, which is a false claim about the player's own clear.
+   *
+   * **Optional, and its absence means something**: progress written before § D1120 has no such
+   * field, and every case it records as solved was solved with the diagnosis printed on screen,
+   * because until then it always was. {@link diagnosisShownSetOf} reads an absent field that way.
+   */
+  readonly diagnosisShownCaseIds?: readonly string[];
 }
 
 /** A player who has earned nothing yet — and what every refusal falls back to. */
@@ -214,6 +224,37 @@ export const EMPTY_EVERYDAY_PROGRESS: EverydayProgress = Object.freeze({
 /** The stored list as the screens want it. One crossing, so no screen builds its own. */
 export function solvedCaseSetOf(progress: EverydayProgress): ReadonlySet<string> {
   return new Set(progress.solvedCaseIds);
+}
+
+/**
+ * The cases whose diagnosis was on screen for the player — asked for, or, on progress kept before
+ * [§ D1120](../../../../DECISIONS.md), every case it records as solved, since the diagnosis was then
+ * printed on every case. See {@link EverydayProgress.diagnosisShownCaseIds}.
+ */
+export function diagnosisShownSetOf(progress: EverydayProgress): ReadonlySet<string> {
+  return new Set(progress.diagnosisShownCaseIds ?? progress.solvedCaseIds);
+}
+
+/**
+ * Progress with one more case's diagnosis recorded as shown — the one writer both fix-it surfaces
+ * call, so the kept set and its legacy reading ({@link diagnosisShownSetOf}) are decided once.
+ * Returns the same object when the case is already recorded.
+ */
+export function progressWithDiagnosisShown(progress: EverydayProgress, caseId: string): EverydayProgress {
+  const shown = diagnosisShownSetOf(progress);
+  if (shown.has(caseId)) return progress;
+  return { ...progress, diagnosisShownCaseIds: [...shown, caseId] };
+}
+
+/**
+ * Progress with a new solved set — the fix-it screen's one writer of it — **and the kept diagnoses
+ * written out as they stood before it**. A progress kept before § D1120 has no such field and reads
+ * its solved cases as shown ({@link diagnosisShownSetOf}); writing the new solved set without
+ * freezing that reading first would make every case solved from now on read as solved with the
+ * diagnosis, including one reached on the player's own.
+ */
+export function progressWithSolvedCases(progress: EverydayProgress, solvedCaseIds: readonly string[]): EverydayProgress {
+  return { ...progress, solvedCaseIds, diagnosisShownCaseIds: [...diagnosisShownSetOf(progress)] };
 }
 
 /**
@@ -234,6 +275,7 @@ export function everydayProgressWith(
       ...progress.ratings.filter((held) => held.dispatcherId !== rating.dispatcherId),
       rating,
     ],
+    ...(progress.diagnosisShownCaseIds === undefined ? {} : { diagnosisShownCaseIds: progress.diagnosisShownCaseIds }),
   };
 }
 
@@ -615,6 +657,13 @@ function progressIssue(value: unknown): string | undefined {
   for (const id of solved as readonly unknown[]) {
     if (typeof id !== 'string' || id === '') return 'a solved building has no id';
   }
+  const shown = record['diagnosisShownCaseIds'];
+  if (shown !== undefined) {
+    if (!Array.isArray(shown)) return 'the saved list of diagnoses shown is not a list';
+    for (const id of shown as readonly unknown[]) {
+      if (typeof id !== 'string' || id === '') return 'a diagnosis shown has no case id';
+    }
+  }
   const ratings = record['ratings'];
   if (!Array.isArray(ratings)) return 'the saved progress carries no list of ratings';
   for (const rating of ratings as readonly unknown[]) {
@@ -654,6 +703,9 @@ export function loadProgress(store: SessionStore): EverydayProgressStatus {
     progress: Object.freeze({
       solvedCaseIds: Object.freeze([...progress.solvedCaseIds]),
       ratings: Object.freeze([...progress.ratings]),
+      ...(progress.diagnosisShownCaseIds === undefined
+        ? {}
+        : { diagnosisShownCaseIds: Object.freeze([...progress.diagnosisShownCaseIds]) }),
     }),
     notice: null,
   };

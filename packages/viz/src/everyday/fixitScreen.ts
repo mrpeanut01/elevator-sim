@@ -165,12 +165,20 @@ import {
   fixitPlanRefusalOf,
   fixitRunPlanOf,
   measuredOf,
-  morningReadingOf,
   standingParkingOf,
   topFloorRaiseCeilingOf,
   zoneOverlapCeilingOf,
 } from '../fixit/run.js';
-import { createFixitJudge, pressThroughTheJudge } from '../fixit/judge.js';
+import {
+  createFixitJudge,
+  markTitleOf,
+  pressThroughTheJudge,
+  progressLineOf,
+  type MorningMark,
+  type MorningProgress,
+} from '../fixit/judge.js';
+import { shippedAsBuiltMorningsOf } from '../fixit/asBuiltMornings.js';
+import { opensWithDiagnosis, routeCensusOf } from '../fixit/routeCensus.js';
 import { heldReasonOf, isOffered } from '../fixit/held.js';
 import { createOffThreadMornings, morningWorkerCountOf } from '../dev/offThreadMornings.js';
 import type {
@@ -195,8 +203,10 @@ import { sideBySide } from './screenDom.js';
 import type { ActionBarModel } from './actionBar.js';
 import {
   buildingLineOf,
+  checkStoppedLineOf,
   FIXIT_SCREEN_COPY as COPY,
   fixitBarModel,
+  fixitDiagnosisView,
   fixitBudgetRungRow,
   fixitCaseRailModel,
   fixitElevationRow,
@@ -213,7 +223,7 @@ import { caseAtRung, nextBudgetStepOf } from '../fixit/budgetRungs.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
 import { CHIME_PRICES } from './chimesPanel.js';
 import { boughtStepIdOf } from './deviceChimes.js';
-import { solvedCaseSetOf } from './profile.js';
+import { diagnosisShownSetOf, progressWithDiagnosisShown, progressWithSolvedCases, solvedCaseSetOf } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
 /* GitHub issue #340: beat 3, from the four presses this screen offers. A no-op without consent. */
@@ -319,6 +329,25 @@ interface CaseSession {
    * Session-local and per case for {@link CaseSession.asBuilt}'s reason.
    */
   witness: VizRecording | undefined;
+  /**
+   * The line a stopped check leaves — [§ D1120](../../../../DECISIONS.md) clause 4: a press made while
+   * the last order was still being checked stops that check, and this says where it stopped and that
+   * it has no verdict. Cleared when the next verdict lands.
+   */
+  stoppedLine: string | undefined;
+  /**
+   * Whether this case's as-built mornings were held the moment it opened — shipped with the build, or
+   * run earlier this sitting (§ D1120 clause 4). Drawn as a data attribute for the browser tier, which
+   * is the only place that can tell a shipped reading from one that happened to finish quickly.
+   */
+  mornings: 'held' | 'running' | undefined;
+  /**
+   * *Show the diagnosis* was pressed on this case in this sitting — § D1120 clause 1. The card reads
+   * this or the profile's kept set; only a press on a case that is **not** already fixed is kept,
+   * because a mark is about how a clear was reached, and a case fixed on the player's own that they
+   * then look up stays fixed on their own.
+   */
+  asked: boolean;
 }
 
 /**
@@ -348,7 +377,7 @@ const sessions = new Map<string, CaseSession>();
 let selectedId: string | undefined;
 let running = false;
 /** What the bar was last told about each case's {@link settledNow}, so a redraw that moves it can ask for the bar. */
-const lastSettled = new Map<string, boolean>();
+const lastSettled = new Map<string, string>();
 
 /**
  * The price schedule these cases were loaded with — GitHub issue **#366**.
@@ -396,10 +425,56 @@ const judge = createFixitJudge(
     spawn: () => new Worker(new URL('../dev/morningWorker.ts', import.meta.url), { type: 'module' }),
     workers: morningWorkerCountOf(typeof navigator === 'undefined' ? undefined : navigator.hardwareConcurrency),
   }),
+  /* § D1120 clause 4: the as-built mornings ship with the build, so a press asks only for its own. */
+  { shipped: shippedAsBuiltMorningsOf },
 );
 
-/** Whether the letter's morning cleared and the other mornings are running — the § 3.3 relabel. */
+/**
+ * Whether the letter's morning cleared and the other mornings are running — the § 3.3 relabel.
+ *
+ * **Since [§ D1120](../../../../DECISIONS.md) this is no longer `running`.** `running` is the pair
+ * in flight, and it holds every control still; `checking` is the mornings, and the order's controls
+ * stay editable through it — an edit makes the pending verdict stale, and the press it gives back
+ * stops the check. The rail and the budget stay held while checking, because a verdict landing on a
+ * case the player has left, or against a budget they have since widened, is two claims on one screen.
+ */
 let checking = false;
+/** The case the running check is about, and how far it has got — counts and marks, never an interval. */
+let checkingCaseId: string | undefined;
+let checkProgress: MorningProgress | undefined;
+/** Repaint the live mount's progress block in place — assigned by the mount. */
+let paintProgress: () => void = () => {};
+
+/**
+ * Whether a check is running on an order the player has since edited — § D1120 clause 4's stale
+ * pending verdict. Then the press comes back, and pressing it stops the check.
+ */
+function supersedesNow(): boolean {
+  if (!checking || checkingCaseId === undefined) return false;
+  const session = sessions.get(checkingCaseId);
+  return session !== undefined && verdictIsStale(session.verdictState, session.state);
+}
+
+/**
+ * The cases whose diagnosis is on screen for the player: asked for (kept in the profile), or opened
+ * shown by the route census — § D1120 clause 1. What the rail's mark reads.
+ */
+function diagnosisShownOf(caseId: string): boolean {
+  return diagnosisShownSetOf(everydayProfileStore().progress()).has(caseId) || opensWithDiagnosis(caseId);
+}
+
+/**
+ * *Show the diagnosis*, pressed — § D1120 clause 1. Free: it spends nothing and posts nothing. It
+ * records the case in the profile's kept set, so the row's mark survives a reload; a mark a reload
+ * dropped would turn *with the diagnosis* into *on your own*.
+ */
+function askDiagnosis(entry: FixitCase, session: CaseSession): void {
+  session.asked = true;
+  if (session.fixed) return;
+  const store = everydayProfileStore();
+  const next = progressWithDiagnosisShown(store.progress(), entry.id);
+  if (next !== store.progress()) store.setProgress(next);
+}
 
 /**
  * What the runner is currently doing, as `caseId:open` or `caseId:press` — or `undefined`.
@@ -463,6 +538,9 @@ function ensureRestored(): void {
       doorTarget: DEFAULT_DOOR_TARGET,
       verdictState: emptyFixitState(),
       witness: undefined,
+      stoppedLine: undefined,
+      mornings: undefined,
+      asked: false,
     });
   }
 }
@@ -484,7 +562,8 @@ function ensureRestored(): void {
  */
 function keepSolved(): void {
   const store = everydayProfileStore();
-  store.setProgress({ ...store.progress(), solvedCaseIds: [...solvedIds()] });
+  /* § D1120: the kept diagnoses are frozen as they stood, so a new clear is not read as a helped one. */
+  store.setProgress(progressWithSolvedCases(store.progress(), [...solvedIds()]));
 }
 
 function sessionOf(entry: FixitCase): CaseSession {
@@ -503,6 +582,9 @@ function sessionOf(entry: FixitCase): CaseSession {
       doorTarget: DEFAULT_DOOR_TARGET,
       verdictState: undefined,
       witness: undefined,
+      stoppedLine: undefined,
+      mornings: undefined,
+      asked: false,
     };
     sessions.set(entry.id, session);
   }
@@ -571,8 +653,13 @@ function measureAsBuilt(loadedFixit: LoadedFixit, entry: FixitCase): void {
   ask = key;
   runFailure = undefined;
   const plan = fixitRunPlanOf(entry, emptyFixitState(), loadedFixit.resources);
-  /* The judge's forty-nine as-built mornings, while the as-built day plays — § D1020. */
+  /*
+   * The judge's forty-nine as-built mornings — § D1020 — which ship with the build since § D1120, so
+   * `prepare` finds them held and asks no worker; a case whose shipped row no longer matches its
+   * inputs asks for them here, while the as-built day plays.
+   */
   judge.prepare(entry, plan.asBuilt);
+  sessionOf(entry).mornings ??= judge.prepared(entry) ? 'held' : 'running';
   runner.start({
     runs: [{ config: plan.asBuilt, ...FIXIT_RUN_SWITCHES }],
     onDone: ([asBuilt]) => {
@@ -740,6 +827,7 @@ function mountFixit(
       current.id,
       towerLineOf(loadedFixit),
       heldReasonOf,
+      diagnosisShownOf,
     );
     const rail = el(doc, 'div', 'everyday-fixit-rail');
     rail.style.cssText = [
@@ -810,6 +898,12 @@ function mountFixit(
       const tower = el(doc, 'span', undefined, row.towerLine);
       tower.style.cssText = `font-size:12px;line-height:1.4;color:${C.warmGrey}`;
       button.append(top, tower);
+      /* § D1120 clause 1: whether the diagnosis played a part, said on the row. */
+      if (row.mark !== undefined) {
+        const mark = el(doc, 'span', 'everyday-fixit-case-mark', row.mark);
+        mark.style.cssText = `${MONO(10, C.warmGrey)}`;
+        button.append(mark);
+      }
       if (row.heldReason !== undefined) {
         const reason = el(doc, 'span', 'everyday-fixit-held-reason', row.heldReason);
         reason.style.cssText = `font-size:12px;line-height:1.45;color:${C.inkSoft}`;
@@ -817,7 +911,7 @@ function mountFixit(
         button.title = row.heldReason;
       }
       button.addEventListener('click', () => {
-        if (running || held) return;
+        if (running || checking || held) return;
         /*
          * A case that is already open is not a change. Guarded rather than emitted unconditionally,
          * because a player re-pressing the row they are on would otherwise be filed as beat 3 and
@@ -863,6 +957,8 @@ function mountFixit(
 
     const main = el(doc, 'div', 'everyday-fixit-main');
     main.style.cssText = 'min-width:0';
+    /* Whether the as-built mornings were held when the case opened — § D1120, for the browser tier. */
+    if (session.mornings !== undefined) main.dataset['mornings'] = session.mornings;
 
     /* -- the heading: case name, tower line beside it -- */
     const headRow = el(doc, 'div');
@@ -1010,8 +1106,21 @@ function mountFixit(
       main.append(failed);
     }
 
-    /* -- 4. the diagnosis, stated plainly, reasoning underneath -- */
+    /*
+     * -- 4. the diagnosis — withheld until asked, since [§ D1120](../../../../DECISIONS.md) clause 1.
+     * The words are `fixitScreenModel.ts#fixitDiagnosisView`'s; this draws its three states. A case
+     * whose route census shows fewer than two ways through opens shown, and says why.
+     */
+    const view = fixitDiagnosisView({
+      entry,
+      schedule: loadedFixit.cases.schedule,
+      asked: session.asked || diagnosisShownSetOf(everydayProfileStore().progress()).has(entry.id),
+      census: routeCensusOf(entry.id),
+      explained:
+        settledNow(session) && session.outcome?.kind === 'fixed' && session.outcome.attribution === 'diagnosis',
+    });
     const diagnosis = el(doc, 'div', 'everyday-fixit-diagnosis');
+    diagnosis.dataset['state'] = view.state;
     diagnosis.style.cssText = [
       'margin-top:16px',
       `border:1px solid ${PROTO.diagnosisEdge}`,
@@ -1020,13 +1129,42 @@ function mountFixit(
       'padding:15px 18px',
       'max-width:80ch',
     ].join(';');
-    const dEyebrow = el(doc, 'div', undefined, COPY.diagnosisEyebrow);
+    const dEyebrow = el(doc, 'div', undefined, view.eyebrow);
     dEyebrow.style.cssText = EYEBROW;
-    const dText = el(doc, 'div', undefined, entry.diagnosis.text);
-    dText.style.cssText = `font:600 19px ${TYPE.heading};line-height:1.3;margin-top:4px`;
-    const dWhy = el(doc, 'p', undefined, entry.diagnosis.reasoning);
-    dWhy.style.cssText = `font-size:13.5px;line-height:1.55;color:${C.inkSoft};margin:6px 0 0`;
-    diagnosis.append(dEyebrow, dText, dWhy);
+    diagnosis.append(dEyebrow);
+    if (view.text !== undefined) {
+      const dText = el(doc, 'div', 'everyday-fixit-diagnosis-text', view.text);
+      dText.style.cssText = `font:600 ${view.state === 'explained' ? '19px' : '16px'} ${TYPE.heading};line-height:1.3;margin-top:4px`;
+      diagnosis.append(dText);
+    }
+    const dNote = el(doc, 'p', 'everyday-fixit-diagnosis-note', view.note);
+    dNote.style.cssText = `font-size:13.5px;line-height:1.55;color:${C.inkSoft};margin:6px 0 0`;
+    diagnosis.append(dNote);
+    if (view.because !== undefined) {
+      const because = el(doc, 'p', 'everyday-fixit-diagnosis-because', view.because);
+      because.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.warmGrey};margin:6px 0 0`;
+      diagnosis.append(because);
+    }
+    if (view.press !== undefined) {
+      const show = el(doc, 'button', 'everyday-fixit-diagnosis-show', view.press);
+      show.type = 'button';
+      show.style.cssText = [
+        'margin-top:10px',
+        `border:1px solid ${C.rule}`,
+        `border-radius:${String(R.control)}px`,
+        `background:${C.paper}`,
+        `color:${C.ink}`,
+        'font-size:13px',
+        'padding:5px 12px',
+        'cursor:pointer',
+      ].join(';');
+      show.addEventListener('click', () => {
+        askDiagnosis(entry, session);
+        everydayTelemetry().record({ name: 'change_made', controlKey: 'fixit-case', screenKey: 'fixit' });
+        render();
+      });
+      diagnosis.append(show);
+    }
     main.append(diagnosis);
 
     /*
@@ -1089,6 +1227,11 @@ function mountFixit(
     }
 
     /* -- 8. the result, once run (§ 10.4) -- */
+    if (session.stoppedLine !== undefined) {
+      const stopped = el(doc, 'p', 'everyday-fixit-check-stopped', session.stoppedLine);
+      stopped.style.cssText = `margin:18px 0 0;font-size:13px;line-height:1.5;color:${C.warmGrey};max-width:80ch`;
+      main.append(stopped);
+    }
     if (session.outcome !== undefined) {
       /*
        * Stale over the card rather than instead of it — § D1011. The verdict is still true of the
@@ -1099,7 +1242,10 @@ function mountFixit(
         stale.style.cssText = `margin:18px 0 0;font-size:13px;line-height:1.5;color:${C.alarm};max-width:80ch`;
         main.append(stale);
       }
-      main.append(outcomeCard(session.outcome));
+      const card = outcomeCard(session.outcome);
+      /* § D1120 clause 4: the live count and the marks, under the checking card and nowhere else. */
+      if (session.outcome.kind === 'checking' && checking && checkingCaseId === entry.id) card.append(progressBlock());
+      main.append(card);
     }
     /*
      * The bar reads {@link settledNow}, and an edit only redraws the screen — so a redraw that moved
@@ -1107,8 +1253,10 @@ function mountFixit(
      * stay pressable over a stale verdict until something else refreshed it.
      */
     const nowSettled = settledNow(session);
-    if (lastSettled.get(entry.id) !== nowSettled) {
-      lastSettled.set(entry.id, nowSettled);
+    /* The press also comes back when a check is running on an order since edited — § D1120. */
+    const barKey = `${String(nowSettled)}|${String(supersedesNow())}`;
+    if (lastSettled.get(entry.id) !== barKey) {
+      lastSettled.set(entry.id, barKey);
       context.refreshBar();
     }
 
@@ -1173,7 +1321,7 @@ function mountFixit(
       'line-height:1',
     ].join(';');
     buy.addEventListener('click', () => {
-      if (running || next === undefined) return;
+      if (running || checking || next === undefined) return;
       const outcome = store.spend({ scenarioId: entry.id, stepId: next.id, chimes: next.chimes });
       if (outcome.kind === 'bought') {
         everydayTelemetry().record({ name: 'change_made', controlKey: 'fixit-budget', screenKey: 'fixit' });
@@ -1575,6 +1723,55 @@ function mountFixit(
     return line;
   }
 
+  /**
+   * **The check as it runs** — [§ D1120](../../../../DECISIONS.md) clause 4: *N of 49 mornings in*,
+   * one mark a morning as it lands, and a line saying the order stays editable. No running mean, no
+   * running interval and no word like *holding*: each mark is a fact about one named morning, which
+   * its title says, and nothing on it pools them. Updated in place by {@link paintProgress}, so an
+   * open select is not torn down under the player's pointer forty-nine times.
+   */
+  function progressBlock(): HTMLElement {
+    const block = el(doc, 'div', 'everyday-fixit-check-progress');
+    block.style.cssText = 'margin-top:12px';
+    fillProgress(block);
+    return block;
+  }
+
+  function fillProgress(block: HTMLElement): void {
+    const progress = checkProgress;
+    block.replaceChildren();
+    const counter = el(doc, 'div', 'everyday-fixit-check-count', progress === undefined ? '' : progressLineOf(progress));
+    counter.style.cssText = `${MONO(12, C.ink)}`;
+    const marks = el(doc, 'div', 'everyday-fixit-check-marks');
+    marks.setAttribute('role', 'list');
+    marks.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;margin-top:6px;max-width:60ch';
+    for (const [index, mark] of (progress?.marks ?? []).entries()) {
+      const cell = el(doc, 'span', `everyday-fixit-check-mark everyday-fixit-check-mark-${mark ?? 'pending'}`);
+      cell.setAttribute('role', 'listitem');
+      cell.title = markTitleOf(index, mark);
+      cell.setAttribute('aria-label', cell.title);
+      cell.style.cssText = `width:9px;height:9px;border-radius:2px;display:inline-block;${markStyleOf(mark)}`;
+      marks.append(cell);
+    }
+    const editable = el(doc, 'p', 'everyday-fixit-check-editable', COPY.checkingEditable);
+    editable.style.cssText = `font-size:12px;line-height:1.5;color:${C.warmGrey};margin:6px 0 0`;
+    block.append(counter, marks, editable);
+  }
+
+  function markStyleOf(mark: MorningMark | undefined): string {
+    if (mark === 'lower') return `background:${C.moss}`;
+    if (mark === 'higher') return `background:${C.alarm}`;
+    if (mark === 'same') return `background:${C.warmGrey}`;
+    if (mark === 'unread') return `border:1px dashed ${C.warmGrey}`;
+    return `border:1px solid ${C.ruleMid}`;
+  }
+
+  /** The progress block of the mount that is live, repainted where it stands — never a full redraw. */
+  paintProgress = (): void => {
+    const block = live?.root.querySelector<HTMLElement>('.everyday-fixit-check-progress');
+    if (block !== null && block !== undefined) fillProgress(block);
+  };
+
   /** § 10.4's result card — head, body, the three measured rows, the basis line. All engine. */
   function outcomeCard(outcome: FixitOutcome): HTMLElement {
     const passed = outcome.kind === 'fixed';
@@ -1621,6 +1818,8 @@ function mountFixit(
 
   function primary(): void {
     if (running || loaded === undefined) return;
+    /* A check on the order on screen is not interrupted by its own press — the bar draws it inert. */
+    if (checking && !supersedesNow()) return;
     /* Bound here rather than read inside the callback: the run's resources are the ones the press
      * was made against, and a narrowed local is also what makes the callback body total. */
     const resources = loaded.resources;
@@ -1677,6 +1876,19 @@ function mountFixit(
     const schedule = scheduleNow();
     const plan = fixitRunPlanOf(entry, pressed, resources);
     const spend = spendOf(entry, pressed, schedule);
+    /*
+     * **A press made while the last order is still being checked stops that check** — § D1120 clause
+     * 4, the latest ask wins. The stopped check has no verdict and says so, with the count it reached;
+     * the card it was drawing goes, because it described an order that is no longer being judged.
+     */
+    if (checking) {
+      judge.cancel();
+      session.stoppedLine = checkStoppedLineOf(checkProgress?.landed ?? 0, checkProgress?.planned ?? 0);
+      session.outcome = undefined;
+      checking = false;
+      checkingCaseId = undefined;
+      checkProgress = undefined;
+    }
     ask = `${entry.id}:press`;
     runFailure = undefined;
     running = true;
@@ -1733,7 +1945,6 @@ function mountFixit(
       switches: FIXIT_RUN_SWITCHES,
       pairRunner: runner,
       judge,
-      readingOf: morningReadingOf,
       /*
        * The gate's classification, and the seam § D1011's witness run lives in — the judge takes
        * `classify` as a continuation precisely so a verdict that needs one more run can take it
@@ -1810,7 +2021,11 @@ function mountFixit(
         session.pairStage = undefined;
         session.pairSeen = false;
         checking = outcome.kind === 'checking';
-        running = checking;
+        /* The pair is in: the controls come back even while the mornings run — § D1120 clause 4. */
+        running = false;
+        checkingCaseId = checking ? entry.id : undefined;
+        checkProgress = undefined;
+        if (!checking) session.stoppedLine = undefined;
         landed(outcome);
         // Through `live`, never through this mount: the player may have left and come back, and
         // the screen that must draw this outcome is the one on the page now.
@@ -1827,9 +2042,16 @@ function mountFixit(
           live?.root.querySelector('.everyday-fixit-outcome');
         landOn?.scrollIntoView({ block: 'nearest' });
       },
+      onProgress: (progress) => {
+        checkProgress = progress;
+        paintProgress();
+      },
       onVerdict: (outcome) => {
         checking = false;
         running = false;
+        checkingCaseId = undefined;
+        checkProgress = undefined;
+        session.stoppedLine = undefined;
         landed(outcome);
         live?.redraw();
         live?.refreshBar();
@@ -1838,6 +2060,8 @@ function mountFixit(
         ask = undefined;
         running = false;
         checking = false;
+        checkingCaseId = undefined;
+        checkProgress = undefined;
         runFailure = message;
         live?.redraw();
         live?.refreshBar();
@@ -1886,11 +2110,14 @@ function fixitBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
   const entry = currentEntry();
   const session = entry === undefined ? undefined : sessions.get(entry.id);
+  const supersedes = supersedesNow();
   return fixitBarModel(base, {
     ready: entry !== undefined,
-    running,
-    checking,
-    ran: session?.outcome !== undefined,
+    /* A check on the order on screen holds the press; one on an order since edited gives it back. */
+    running: running || (checking && !supersedes),
+    checking: checking && !supersedes,
+    supersedes,
+    ran: session?.outcome !== undefined || session?.stoppedLine !== undefined,
     /* Settled for the order on screen, not merely FIXED once — § D1011. */
     solved: session !== undefined && settledNow(session),
   });

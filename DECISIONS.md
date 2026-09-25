@@ -38924,6 +38924,8 @@ This lane held **D701–D705** and spent **D701** only. **D702, D703, D704 and D
 
 ## D706 — The fix-case repair menu retires from the screen and not from the file: the diagnosed repair becomes the scenario's pinned witness, the decoys survive as prices, and all three retirements wait for the editor that can write the answers
 
+> **Status 2026-09-25: clause 5 AMENDED by [§ D1120](#d1120)** (an agent ruling). The diagnosis is kept and withheld until the player asks for it. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-25: CONDITIONS REFINED AND MET by [§ D1020](#d1020)** (an agent ruling). Clause 6's *"clears"* is judged over fifty mornings rather than one pair, three cases whose answers do not clear are held from the list and a fourth is re-authored on demand, and the menu, the decoys-as-rows and the kind-of-fix line retired together on that commit; § 7's playtest was taken. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-24: NARROWED by [§ D1001](#d1001), and its § 1 re-measured by [§ D1000](#d1000).** `tenant-floors` is offered as case-authored cohorts rather than a per-floor population control, and the editor now writes all eighteen answers; the retirement still waits on § 7's playtest. See [`docs/39`](docs/39-decisions-in-force.md).
@@ -43160,6 +43162,10 @@ The door adapter seeds *Run today again* and its note on the four door renders a
 
 > **Status 2026-09-25: AMENDED by [§ D1106](#d1106).** A claim about the rest of the building is held apart in `result.rest` and prints only where the fifty mornings agree with it. See [`docs/39`](docs/39-decisions-in-force.md).
 
+---
+
+> **Status 2026-09-25: EXTENDED by [§ D1120](#d1120)** (an agent ruling). The witness-run rule now holds the diagnosis card as well as the result: the authored diagnosis prints only over a fixed verdict on the diagnosed repair's own run, and until then the card is withheld or shows the measured witness. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner. The
 > session principal's standing instruction for this wave is that decisions about what the game is
 > and does go to a swarm of at least three independent lenses, on [§ D729](#d729)'s form. **The
@@ -43227,6 +43233,8 @@ Whether the composed verdict is legible to a player in a ninety-second turn; no 
 This lane holds **D1011–D1019** and spends **D1011** only. D1012–D1019 are unspent and are the integrator's to register (§ D404, § D430).
 
 ## D1020 — the fix-it verdict is judged on fifty mornings, three cases are held and one re-authored, and the repair menu retires
+
+> **Status 2026-09-25: AMENDED by [§ D1120](#d1120)** (an agent ruling). The interval is taken over the forty-nine derived mornings only, a check may stop at 10, 20, 30 or 40 mornings to say not fixed and never fixed, the as-built mornings ship as a derived artifact, and the controls stay editable through the check. k = 50 runs a side is unchanged. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner. The
 > session principal's standing instruction for this wave is that decisions are taken by the swarm
@@ -45495,3 +45503,267 @@ next run is handed, the brief's own derivation, and `todays-shift` ([§ D1102](#
 equal. The call card names every booked-out car away at the call, one line per return time, from the
 same reading the stage's pill draws. The card's placement, what it offers and what the report prints
 after it are unchanged.
+
+---
+
+## D1120 — a fix case is a search: the diagnosis waits until asked, the interval reads the forty-nine derived mornings, a check stops early only to say not fixed, and the wait is a count
+
+> **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: a
+> three-member decision swarm (S1 the player's lens, S2 honesty's, S3 engineering's) ruled
+> independently on the post-AI panel's second question, *fixing a building as a search, and the
+> wait as a beat*; wave AJ's integrator reconciled the three (its § Q2); and wave AJ lane AJ-J
+> built and measured it. The members' records are the integrator's scratch notes S1 to S3 of the
+> `decide-ak` swarm and are not in this repository. A later reader weighing this against a product-owner
+> ruling should treat it as an agent ruling and say so; [§ D626](#d626) is the cautionary case.
+
+**Date: 2026-09-25 · Owner: lane AJ-J (wave AJ) · Amends [§ D1020](#d1020) § 2 clauses 4, 5 and 8,
+§ 5's *"a scenario draws … the diagnosis"* and § 7; amends [§ D1011](#d1011) by carrying its
+witness-run rule from the result to the diagnosis card; amends [§ D706](#d706) clause 5, which kept
+the diagnosis · Under [§ D525](#d525) clauses 2 and 3, `docs/38` § 2.4 · Rules on:
+`packages/viz/src/fixit/judge.ts`, `fixit/asBuiltMornings.ts`, `fixit/morningsInput.ts`,
+`fixit/routeCensus.ts`, `dev/offThreadMornings.ts`, `everyday/fixitScreen.ts`,
+`everyday/fixitScreenModel.ts`, `everyday/profile.ts`, `everyday/tutorialModel.ts`,
+`dev/fixitPanel.ts`, `honesty/surfaces.ts`, `data/fixit-as-built-mornings.json`,
+`.github/workflows/deep-tiers.yml`.**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds. It binds two surfaces, the Everyday
+profile's stored shape, a new file in `data/`, two new nightly tiers and the honesty corpus, which
+no one module owns; it moves three recorded rulings (§ D1020's verdict arithmetic and wait, § D1011's
+witness rule, § D706 clause 5's kept diagnosis); and it holds a dissent the owner may take up.
+
+### 1. The ruling, and where the members split
+
+1. **The diagnosis is withheld until asked (three of three).** A case opens on the letter, the building as it
+   stands, the four figures and the editor. *Show the diagnosis* is one free press at any time.
+   - **Free, and its use marked on the case row (two to one, S1).** S2 and S3 would have sold it for
+     chimes. **Settled by `docs/38` § 2.4**, which spends chimes on a mode's modifiers and never on
+     access: a hint is access to information, and it moves no bar and widens no budget. Their
+     dissent is recorded in § 4. The mark is standing and pays nothing: *on your own* or *with the
+     diagnosis* on a fixed case, *diagnosis shown* on an open one.
+   - **A case whose route census shows fewer than two clearing routes opens with it shown, and says
+     why (S1, unopposed).** The rule reads the census and never a list: on this tree it opens
+     `express-that-stops-everywhere` alone, whose one clearing route is the diagnosed repair.
+   - **The hint is the measured witness, never a mechanism story (S2).** It names the priced rows
+     the diagnosed repair buys, in the schedule's own words (*"a change bought as 'Rezone a
+     bank'"*), and says that change clears the letter's morning and holds across the forty-nine,
+     which `cases.test.ts` asserts of every offered case. The authored `diagnosis.text` and
+     `.reasoning`, which say why, print only once a fixed verdict stands on the diagnosed repair's
+     own run leg for leg: § D1011's rule for the result, carried to the diagnosis card.
+   - **The tutorial's *"the answer is yours"* becomes true**, and the sentence now says where the
+     diagnosis went. *"already diagnosed"* leaves the case list's hint.
+2. **Defect fix: the interval is taken over the forty-nine derived mornings only (S2 and S3,
+   unopposed).** The letter's morning is the gate's, and a gate-clearing order has by construction
+   removed 80 % of its complaint, so it sat inside the interval that tests the gate's clear. S2
+   measured a no-effect order passing about 4 % of the time with it in, against 2.1 to 2.7 % with it
+   out. **No current verdict changes**, measured in § 3.
+3. **No early *fixed* (two to one, S1).** S2 and S3 would have allowed a Lan-DeMets O'Brien-Fleming
+   efficacy stop. **Settled by `CLAUDE.md`'s budget of 50 to 200 replications** and its paired-t
+   rule: an interval computed after efficacy peeks is not a 95 % interval, and an early efficacy
+   stop would call a building fixed on fewer than fifty mornings. The dissent is § 4.
+   **An early *not fixed* is allowed (three of three):** at 10, 20, 30 and 40 derived mornings, a check whose
+   running mean reduction is at or below zero stops and says *not fixed* with counts and no
+   interval. It can only turn a *fixed* into a *not fixed*, so the false-fixed rate cannot rise.
+4. **The wait becomes a beat (three of three).** A live *N of 49 mornings in* and one mark a morning as it
+   lands, lower, higher, no different or unreadable, each a fact about one named morning. **No
+   running interval, no running mean and no word like *holding* (S2).** The order's controls stay
+   editable through the check; **an edit draws the pending verdict stale (S3), and the press it
+   gives back stops the check (S1)**, which then says where it stopped and that it has no verdict.
+   Both members' forms are built, one after the other. **The as-built readings ship as a derived
+   artifact (S3)**, checked always-on by an input digest and re-derived in the deep tier, so no press
+   is cold. The target is a 20 s median and a 45 s worst on a quiet box; § 3.5 is what was measured.
+
+### 2. What was built
+
+- **`fixit/judge.ts`.** `DERIVED_MORNINGS` (49) and `FUTILITY_LOOKS` ([10, 20, 30, 40]) as
+  constants. `judgeReplication` takes the derived mornings only, and `replicate` no longer takes the
+  letter's readings at all, so no caller can put them back. `judgeMornings` is the judge's verdict:
+  the looks in order, then the interval. `createFixitJudge` streams each morning as it lands, takes
+  the looks over the contiguous prefix, cancels the pool at a futile look, and reaches the verdict
+  `judgeMornings` would reach on all of them at once, which `judge.test.ts` asserts. A cold check
+  interleaves the two sides so its pairs land together. `JudgedPress.onProgress` carries the count
+  and the marks. The replicated basis lines say which morning is the gate and which forty-nine are
+  the interval, and a futility stop has its own two basis lines, since *"forty-nine more mornings"*
+  is false of a check that ran ten.
+- **`dev/offThreadMornings.ts`** reports each reading as it lands, and a handler may cancel it.
+- **`data/fixit-as-built-mornings.json`**, eighteen rows of forty-nine readings, each with the
+  digest of every input its readings depend on (`fixit/morningsInput.ts`: the as-built config, the
+  derived seeds, the measure and the switches). `fixit/asBuiltMornings.ts` hands a matching row to
+  the judge and refuses a row whose digest does not match, so a stale file costs a cold press and
+  never a wrong verdict. `asBuiltMornings.test.ts` checks every digest and re-runs two mornings
+  always-on; `asBuiltMornings.sweep.test.ts` re-runs all 882 in the nightly job
+  `fixit-as-built-mornings`.
+- **`fixit/routeCensus.ts`**, the census and `opensWithDiagnosis`. The role-blind routes moved to
+  `fixit/routes.test-helper.ts`, shared with `theAnswerIsNotPrinted.test.ts`. `routeCensus.test.ts`
+  re-derives the opening rows always-on; `routeCensus.sweep.test.ts` re-derives every row in the
+  nightly job `fixit-route-census`.
+- **`everyday/fixitScreenModel.ts`**: `fixitDiagnosisView` in three states, the row's `mark`, the
+  bar's `supersedes` note, `checkStoppedLineOf`. **`everyday/profile.ts`**: an optional
+  `diagnosisShownCaseIds`. Progress kept before this entry has none and reads its solved cases as
+  shown, since the diagnosis was printed on every case then; the first write of the solved set
+  freezes that reading, so a clear made afterwards on the player's own is not read as helped.
+- **Both surfaces.** The Everyday screen draws the card, the mark, the count and the marks in place,
+  keeps the order editable while checking and holds the case list and the budget purchase; the
+  Engineer panel draws the same card through the same model, records a press in the same kept set,
+  and draws the count.
+
+### 3. Measured
+
+**3.1 No verdict the product ships moves.** On this tree, with the letter's morning out and the
+looks in: `cases.test.ts` passes whole (121 cases), so every offered case's diagnosed repair is
+still fixed, the +3 cm/s placebo is still refused on each, and the three held cases still fail;
+`theAnswerIsNotPrinted.test.ts` passes whole (7 cases), so `SOLVED_BY` and `NOT_REPLICATED` are
+unchanged. The diagnosed repairs over the forty-nine, from the shipped as-built readings:
+
+| case | reduction a morning, 95 % interval over 49 |
+|---|---|
+| `sleeping-sky-lobby` | +0.47 [+0.02, +0.92] |
+| `zoning-starves-the-top` | +225.45 [+203.29, +247.61] |
+| `three-cars-one-cars-work` | +1.10 [+0.69, +1.52] |
+| `doors-that-never-close` | +22.08 [+18.48, +25.68] |
+| `car-park-nobody-serves` | +14.98 [+12.29, +17.67] |
+| `express-that-stops-everywhere` | +2.57 [+1.64, +3.50] |
+| `deliveries-on-the-passenger-group` | +5.90 [+4.59, +7.21] |
+| `one-start-time` | +12.65 [+9.98, +15.33] |
+| `every-letter-says-nine` | +6.86 [+5.35, +8.37] |
+| `bed-cars-locked-out` | +3.53 [+2.01, +5.05] |
+| `two-cars-out-wrong-month` | +17.33 [+15.67, +18.98] |
+| `every-deck-calls-itself-full` | +12.18 [+5.13, +19.24] |
+| `restaurant-above-the-ballroom` | +1.00 [+0.31, +1.69] |
+| `controller-sends-every-car` | +2.14 [+0.36, +3.93] |
+| `let-faster-than-the-lifts` | +35.61 [+29.67, +41.56] |
+
+`sleeping-sky-lobby` is the knife-edge S2 named: its lower bound is +0.02. It is the case to watch.
+
+**3.2 The looks, on every gate-clearing route the census found.** 69 routes on the thirteen
+non-Vertical-City cases plus the two Vertical City answers, each judged over its forty-nine: 62
+fixed and 7 not. Six of the seven stop for futility: `every-letter-says-nine`'s *raise 3*,
+`bed-cars-locked-out`'s *raise 5* and *doors 4/2*, and `restaurant-above-the-ballroom`'s *lobby
+parking with a speed step* at 10; the restaurant's *no opposite-direction pickup* at 20; and
+`controller-sends-every-car`'s *adaptive dwell* at 40. The seventh, the controller's *en-route
+diversion*, runs to forty-nine and is refused on its interval. **Every futility stop is also
+refused by the full forty-nine without looks**, so on the shipped routes the looks changed no
+verdict and saved between 9 and 39 after-runs a press.
+
+**3.3 The design's error rates, through the judge's own arithmetic** (`judge.test.ts`, S1's
+generator and seed, 20 000 replicates a row, per-morning reduction drawn normal):
+
+| effect ÷ sd | fixed, 49 without looks | fixed, with the looks | mornings run on average |
+|---|---|---|---|
+| 0 | 0.0241 | **0.0219** | **24.35** |
+| 0.3 | 0.5411 | 0.4919 | 41.08 |
+| 0.6 | 0.9842 | 0.9557 | 47.74 |
+
+S1 measured 0.021 and 24.5 on fifty; the test holds the null row within three binomial standard
+errors of 0.021 and the mean between 24 and 25.
+
+**3.4 The route census** (`fixit/routeCensus.ts`), every role-blind route pressed through the gate:
+
+| case | routes | clearing the letter's morning |
+|---|---|---|
+| `sleeping-sky-lobby` | 233 | 51 |
+| `zoning-starves-the-top` | 31 | 4 |
+| `three-cars-one-cars-work` | 23 | 6 |
+| `doors-that-never-close` | 23 | 2 |
+| `car-park-nobody-serves` | 29 | 7 |
+| **`express-that-stops-everywhere`** | 34 | **1** |
+| `deliveries-on-the-passenger-group` | 22 | 3 |
+| `one-start-time` | 25 | 4 |
+| `every-letter-says-nine` | 25 | 5 |
+| `bed-cars-locked-out` | 31 | 5 |
+| `two-cars-out-wrong-month` | 33 | 6 |
+| `every-deck-calls-itself-full` | 234 | 59 |
+| `restaurant-above-the-ballroom` | 23 | 5 |
+| `controller-sends-every-car` | 55 | 17 |
+| `let-faster-than-the-lifts` | 36 | 2 |
+
+S1's census on `e00c0f6` differs on four rows (46, 4, 55 and 3 where this reads 51, 5, 59 and 2),
+with every route count the same; which change between the trees moved them is not established. The
+rule's answer is the same on both: `express` opens shown, and `let-faster` is nearest the line.
+
+**3.5 The wait, on the built bundle.** Measured 2026-09-25 between 18:41 and 18:48 UTC on `dist-web/` as the
+browser tier builds it, headless Chromium at 1440 by 900, on **one shared box: four cores, so a
+morning pool of two workers, at a one-minute load average of 6.1 to 9.2**, read before every press.
+That is not a quiet box: it is one and a half to two and a half times oversubscribed, the direction
+that overstates the wait. Each press is a fresh page: open the case, skip the opening run, set the
+case's first holding route from `SOLVED_BY`, press. *Gate* is the press to the first card; *whole
+press* is the press to the settled primary. Three presses a case, fourteen cases; `express` is not
+timed, because its one route is the diagnosed repair and no single control writes it. Every case
+opened with its as-built mornings held (`data-mornings="held"`), and every press ended *fixed*.
+
+| case | whole press, median | worst |
+|---|---|---|
+| `sleeping-sky-lobby` | 16.7 s | 16.8 s |
+| `every-deck-calls-itself-full` | 14.7 s | 17.0 s |
+| `controller-sends-every-car` | 10.5 s | 11.1 s |
+| `zoning-starves-the-top` | 4.9 s | 5.8 s |
+| `restaurant-above-the-ballroom` | 4.6 s | 5.6 s |
+| `every-letter-says-nine` | 4.5 s | 7.8 s |
+| `let-faster-than-the-lifts` | 4.4 s | 7.2 s |
+| `one-start-time` | 4.1 s | 4.2 s |
+| `bed-cars-locked-out` | 4.0 s | 5.4 s |
+| `doors-that-never-close` | 3.9 s | 4.8 s |
+| `deliveries-on-the-passenger-group` | 3.9 s | 3.9 s |
+| `car-park-nobody-serves` | 3.2 s | 3.5 s |
+| `two-cars-out-wrong-month` | 1.8 s | 4.3 s |
+| `three-cars-one-cars-work` | 1.5 s | 1.6 s |
+
+All 42 presses: **median 4.2 s, p90 14.7 s, worst 17.0 s**, the gate at 0.2 to 2.1 s of it. **The
+target of 20 s median and 45 s worst is met on a box that was not quiet**; § D1020 § 7 read a median
+of 27.1 s pressed at once and 46 s on `every-deck`, cold, at a load of 6.8 to 12.1. This is a dated
+reading of one machine on one day. The instrument was a scratch browser file driving exactly the
+steps above and is not in the tree; what the tree holds always-on is that the mornings are shipped
+and used (`fixitHint.browser.test.ts` asserts `data-mornings="held"` on the bundle), which is the
+change the wait rests on. A futility stop is shorter again: a no-change order is checked in about
+24 mornings on average rather than 49 (§ 3.3).
+
+### 4. The dissents
+
+- **S2 and S3: an O'Brien-Fleming efficacy boundary.** K = 5 looks at 10, 20, 30, 40 and 49
+  derived mornings, one-sided α = 0.025 spent Lan-DeMets, with the non-binding futility look
+  built here. S2 measured type I at 2.0 % (at most 2.5 %) and repeated-interval coverage at
+  94.1 %; S3 measured 980 after-runs falling to 570 across twenty arms with every verdict unchanged.
+  **Refused on `CLAUDE.md`'s replication budget**, which a fixed verdict on twenty mornings would
+  be under. **If the owner adopts it, S2's condition comes with it**: an interim efficacy stop also
+  requires the rest of the building to be *shown within* the 2-point floor, because S2 measured the
+  *everyone-leaves* placebo passing 66 % of the time under the boundary without that clause, against
+  10 % at a fixed n. The verdict would then print the repeated confidence interval at the look's
+  boundary and never a naive one.
+- **S2 and S3: sell the hint for chimes**, S3 at one budget rung's price through `CHIME_PRICES`.
+  Refused on `docs/38` § 2.4. A sold hint would be recorded beside the clear as a bought budget is.
+
+### 5. The clauses the owner may reverse
+
+Withholding by default; the *fewer than two routes* rule and its threshold; the futility schedule
+and its threshold; the 20 s and 45 s target; the *on your own* mark; the hint's being free rather
+than sold (§ 4); the O'Brien-Fleming boundary (§ 4); and the letter's exclusion from the interval,
+which S3 listed as reversible although both measuring members found it a defect.
+
+### 6. Not established
+
+- **Anything about players.** No figure here is a retention or fun claim.
+- **Whether the census's route sample is the right one.** It is a role-blind sample of single moves
+  and a few pairs, and the screen says *"single changes tried"*.
+- **Why four census rows moved between `e00c0f6` and this tree.**
+- **A mark on progress kept before this entry** reads *with the diagnosis* for every case solved
+  then, which is true of how the product drew those cases and says nothing about whether the player
+  read the card.
+- **The Engineer panel** draws the count and not the per-morning marks, and keeps its Run button
+  held through the check; its controls were already editable.
+
+### 7. The corpus, as a forecast
+
+[§ D343](#d343) puts the measurement on the integrator. **Surfaces +0**: every string enters the
+existing FIXIT adapter. **Strings: +35 a case in both tiers**, every arm seeded unconditionally on the
+adapter's synthetic case: the futility arm over two measure kinds (head, body, basis, fourth row)
+and its demand basis, **+9**; the live count, five mark titles, the editable line and the stopped
+line, **+8**; the diagnosis card's four states (3 + 3 + 4 + 3), **+13**; three rail marks, **+3**;
+the bar's `supersedes` arm (label and note), **+2**. The case list's hint, the checking body, the
+replicated basis lines, the fourth row's label and the tutorial's worked line are substitutions,
+**0**. So **+1 715 always-on and +2 100 deep** from this lane, if every seed is counted as a string
+as in the waves recorded in `CLAUDE.md`. The always-on tier ran green on this branch after the
+seeding (0 failing cases); that is a check, not the row.
+
+### 8. Numbers spent
+
+This lane held **D1120-D1128** and spent **D1120 only**. D1121 to D1128 are unspent and become
+permanent holes under [§ D404](#d404) once a later lane writes above them.

@@ -832,7 +832,12 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
        * direct check below holds.
        */
       /* `repair` and `extra` left this list with the menu — § D1020. */
-      const allowed = /everyday-fixit-(case|step-up|step-down|budget-buy|floor-chip)/;
+      /*
+       * `diagnosis-show` joins from § D1120: the diagnosis is withheld until asked, and asking is one
+       * free press. It reveals one measured fact; it offers nothing to pick, which the check below
+       * holds for every other control.
+       */
+      const allowed = /everyday-fixit-(case|step-up|step-down|budget-buy|floor-chip|diagnosis-show)/;
       expect(controls.filter((className) => !allowed.test(className))).toEqual([]);
 
       /*
@@ -851,6 +856,8 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
         const root = document.querySelector('.everyday-fixit');
         return [...(root?.querySelectorAll('button, input, select') ?? [])]
           .map((node) => `${node.className} ${node.getAttribute('name') ?? ''}`)
+          /* The one reveal § D1120 added is exempt by its exact class, and nothing else is. */
+          .filter((face) => face.trim() !== 'everyday-fixit-diagnosis-show')
           .filter((face) => /guess|candidate|which-|cause-pick|diagnos/iu.test(face));
       });
       expect(quizLike, 'a control offering the diagnosis to pick is back on the fix screen').toEqual(

@@ -1633,6 +1633,23 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'fixit/judge.ts#pressThroughTheJudge',
         'fixit/held.ts#heldReasonOf',
         'fixit/held.ts#isOffered',
+        /*
+         * [§ D1120](../../../../DECISIONS.md)'s two derived artifacts, on the same ground. The shipped
+         * as-built mornings are readings in and readings out, and the only sentences in the module
+         * are its loader's own refusals of a malformed file, which fire at import and no surface
+         * draws. The input digest is canonical JSON and hex. The route census is counts per case id,
+         * and `opensWithDiagnosis` a boolean off it; the sentence a player reads about a case the
+         * census opens is `fixitScreenModel.ts#diagnosisOpenedBecauseOf`'s, which the FIXIT adapter
+         * drives with the census's own counts.
+         */
+        'fixit/asBuiltMornings.ts#asBuiltMorningsDocumentOf',
+        'fixit/asBuiltMornings.ts#SHIPPED_AS_BUILT_MORNINGS',
+        'fixit/asBuiltMornings.ts#shippedAsBuiltMorningsOf',
+        'fixit/morningsInput.ts#morningsInputOf',
+        'fixit/morningsInput.ts#morningsInputHashOf',
+        'fixit/routeCensus.ts#ROUTE_CENSUS',
+        'fixit/routeCensus.ts#routeCensusOf',
+        'fixit/routeCensus.ts#opensWithDiagnosis',
         'fixit/engine.ts#affordabilityOf',
         'fixit/engine.ts#toggleRepair',
         /*
@@ -2180,6 +2197,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'everyday/host.ts#challengeTodayOf',
         'everyday/host.ts#DAILY_BOARD_METRIC',
       ],
+    },
+    {
+      reason:
+        'A composition that authors no string — wave AJ integration. `dev/leftRail.ts#todaysShiftOf` ' +
+        'builds the Engineer rail’s day line from `shift/events.ts#eventAsRun` and the brief’s own ' +
+        '`wrinkleNameOf` and `wrinkleNoteOf`, so every word it can draw is somebody else’s; the ' +
+        'deriver collects it only because the run’s horizon tag, `whole-day`, reads as two ' +
+        'hyphenated words to `PROSE`. What holds it honest is the declared `todays-shift` pair in ' +
+        '`honesty/agreement.ts`, which compares its whole line — name and note — against the ' +
+        'brief’s, and which caught this function disagreeing with the brief on whole days when two ' +
+        'lanes merged. Over-collection is the safe direction, so this is classified rather than ' +
+        'the scan loosened.',
+      ids: ['dev/leftRail.ts#todaysShiftOf'],
     },
     {
       reason:

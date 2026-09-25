@@ -352,8 +352,13 @@ export const TUTORIAL_COPY = Object.freeze({
     'Both mornings have finished playing, side by side. The worked answer is under them.',
   complaintHeading: 'The letter',
   symptomHeading: 'What you are looking at',
+  /*
+   * *"the answer is yours"* was false while every fix case printed its diagnosis before play; it is
+   * true since [§ D1120](../../../../DECISIONS.md) clause 1 withheld it, and the sentence now says
+   * where the diagnosis went rather than leaving a reader to find it held back.
+   */
   workedWhy:
-    'This is a tutorial, so the answer is on the screen. From here on you get the building and the letter, and the answer is yours.',
+    'This is a tutorial, so the answer is on the screen. From here on you get the building and the letter, and the answer is yours: the diagnosis waits until you ask for it.',
   finish: 'Start playing',
   /* § D993: it read *"The day is filed and the main menu is next."* Nothing is filed now. */
   finishNote: 'Nothing is filed. The main menu is next, and the first day on your week is one you play.',
