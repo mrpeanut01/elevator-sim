@@ -1298,18 +1298,19 @@ function mountStage(
     `border-radius:${String(R.row)}px`,
     `background:${C.card}`,
     'padding:12px 14px',
-    'display:none',
-    'gap:7px',
   ].join(';');
-  let callCardKey = '';
-  /**
-   * Show or hide the card. Both the attribute and the inline `display`, because an inline
-   * `display:grid` outranks the `[hidden]` rule — the first build drew an empty card before the call.
+  /*
+   * The grid lives on an inner body rather than on the card, because an inline `display:grid` on
+   * the card would outrank the `[hidden]` rule and draw an empty card before the call
+   * (`hiddenBox.test.ts`). The card is hidden by its attribute alone.
    */
+  const callBody = el(doc, 'div', 'everyday-stage-call-body');
+  callBody.style.cssText = 'display:grid;gap:7px';
+  callCard.append(callBody);
+  let callCardKey = '';
+  /** Show or hide the card. */
   function showCallCard(shown: boolean): void {
-    if (callCard.hidden === !shown) return;
     callCard.hidden = !shown;
-    callCard.style.display = shown ? 'grid' : 'none';
   }
 
   root.append(
@@ -1563,7 +1564,7 @@ function mountStage(
         row.append(button);
       }
       callCard.setAttribute('aria-label', card.heading);
-      callCard.replaceChildren(heading, ...facts, question, row);
+      callBody.replaceChildren(heading, ...facts, question, row);
     }
     showCallCard(true);
   }
