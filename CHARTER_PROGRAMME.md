@@ -33,6 +33,35 @@ single exception the charter allows: M1 may begin on concept artefacts M0 has al
 **Opening a gate and declaring one exited are both human decisions.** The orchestrator prepares the
 evidence; it does not open or close a milestone.
 
+### The owner's standing instructions for autonomous work
+
+The repository owner gave these to the integrating session in their own words, and they bind every
+wave run without a human in the loop until the owner withdraws them. They are recorded here because
+the session that received them will not be the last one to integrate a wave.
+
+1. **Pull requests are opened and merged without waiting for human approval.** A red check is never
+   merged; the rule removes the wait for a person, not the checks.
+2. **Work continues until a panel of agents judges the game and the engine equal and each the best
+   it can be**, scored on [`docs/43`](docs/43-what-winning-looks-like.md)'s nine axes. Game-play,
+   usability, understandability and entertainment are the primary four, and the goal is a winning
+   game rather than a science project.
+3. **Any question that arises is answered by spawning an agent or a swarm of agents to answer it**,
+   rather than by stopping to ask.
+4. **Every decision about what the game is or does goes to a swarm, never to one agent** (given
+   2026-09-24). A swarm is several independent agents asked the same neutral question from
+   different starting lenses, with no coordination between them, reconciled afterwards by the
+   integrator. The reconciliation records each member's ruling, any split and how it was settled,
+   and the dissent in the decision entry itself, so the owner can see what was not chosen and
+   reverse it. Integration mechanics (merge order, decision numbers, conflict resolution, test
+   bounds) stay the integrator's own. Wave AH is the first wave run under this rule: § D476's
+   amendment ([§ D993](DECISIONS.md)) and the tenant-floors offer ([§ D1001](DECISIONS.md)) were
+   each ruled by three members, and both entries name the split.
+
+A ruling taken under these instructions is an agent's ruling and says so in its first lines, in
+[§ D729](DECISIONS.md)'s form. It never reads as the owner's, which is the distinction
+[§ D626](DECISIONS.md) lost. Where it interprets a clause the owner worded, the entry names that
+clause and states that the owner may reverse the reading.
+
 ---
 
 ## The baseline this programme starts from
