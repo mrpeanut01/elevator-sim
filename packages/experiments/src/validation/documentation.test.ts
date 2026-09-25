@@ -2167,7 +2167,12 @@ type DecisionReservation = {
  * Committed before any lane worktree exists, as wave AG's accounting requires, and closed in the
  * wave's own merge commit.
  */
-const OPEN_RESERVATION = { wave: 'AI', from: 1002, to: 1046 } as DecisionReservation | null;
+/*
+ * Extended from D1046 to **D1055** on 2026-09-25 for a sixth lane, AI-F (the first-day draw), which
+ * the first-day and press-moment swarms made necessary after the first five blocks were allocated.
+ * Committed before AI-F's worktree exists.
+ */
+const OPEN_RESERVATION = { wave: 'AI', from: 1002, to: 1055 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
