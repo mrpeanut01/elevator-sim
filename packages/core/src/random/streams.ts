@@ -126,6 +126,18 @@ export const STREAM_NAMES = [
    * a byte-identical trace (`traffic/dutyIdentity.test.ts`).
    */
   'duty',
+  /**
+   * **Which people a crowd reduction keeps** — GitHub issue #601, `DECISIONS.md` § D1076. Appended
+   * for `batchSize`'s reason: the spelling decides the parameters, so the twelve names above keep
+   * the draws their golden vectors pin.
+   *
+   * Drawn only when a run declares `crowdThinning`, and then **once per generated passenger, in
+   * final trace order, after every other trace draw has been taken** — so the trace it thins is
+   * the one the configuration generates without it, and a kept passenger is that passenger field
+   * for field. Taken for every passenger rather than only for those on a thinned floor, so the
+   * draw a person receives is a property of the person and two thinnings of one trace are nested.
+   */
+  'thinning',
 ] as const;
 
 export type StreamName = (typeof STREAM_NAMES)[number];
@@ -265,6 +277,7 @@ const TRAFFIC_STREAM_NAMES: ReadonlySet<string> = new Set([
   'dayVariation',
   'credential',
   'duty',
+  'thinning',
 ]);
 
 /** Optional second seed, for separating demand from machine. See {@link StreamSet}. */
@@ -378,6 +391,13 @@ export class StreamSet {
    * property beside it is a source the architecture declares and the type does not.
    */
   readonly duty: Rng;
+  /**
+   * Which passengers a crowd reduction keeps. See {@link STREAM_NAMES} § `thinning`.
+   *
+   * Materialized here for {@link batchSize}'s reason — a name in {@link STREAM_NAMES} without a
+   * property beside it is a source the architecture declares and the type does not.
+   */
+  readonly thinning: Rng;
 
   readonly #streams = new Map<string, Pcg32>();
 
@@ -398,6 +418,7 @@ export class StreamSet {
     this.dayVariation = this.#derive('dayVariation');
     this.credential = this.#derive('credential');
     this.duty = this.#derive('duty');
+    this.thinning = this.#derive('thinning');
   }
 
   /** Typed accessor for the required streams. Returns the same instance as the property. */

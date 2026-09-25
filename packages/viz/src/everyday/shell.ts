@@ -2857,7 +2857,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    *
    * Here rather than in the initial state, because the answer is a function of the week and the
    * week arrives with the host. The condition is
-   * `tutorialModel.ts#tutorialIsDue` over three counts the player produced by playing, so
+   * `tutorialModel.ts#tutorialIsDue` over four counts the player produced by playing, so
    * [§ D476](../../../../DECISIONS.md)'s ruling holds unchanged: **nothing is stored and nothing
    * survives a reload** — it is re-derived, which is what every screen that depends on progress
    * already does, and `charter` non-goal 10 is about a remembered world rather than about a
@@ -2885,6 +2885,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       filedDays: host.week().history.length,
       solvedCases: progress.solvedCaseIds.length,
       ratings: progress.ratings.length,
+      careerDays: host.campaign().today - 1,
     });
     if (due) go('landing');
   }

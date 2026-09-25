@@ -3,7 +3,8 @@
  * diagnosis's own run** — [§ D1011](../../../../DECISIONS.md), `rescore-ai` C's D1 and D's N1.
  *
  * `fixit/engine.ts#classifyOutcome` returned the case's authored `result` for **every** fixed
- * outcome. Six routes were reproduced on the shipped bundle, each clearing its case by a change the
+ * outcome. Six routes were reproduced on the shipped bundle (five still clear; see the note at the
+ * end of {@link FALSE_ROUTES}), each clearing its case by a change the
  * diagnosis does not name and each read back the diagnosis's mechanism as though the player had made
  * it — *"Four hundred letters now say half past"* over a hospital roof raised three metres, *"The
  * staggered starts … take six hundred arrivals out"* over a parking change. Every one is here, built
@@ -43,7 +44,6 @@ import {
   carTo,
   dial,
   doors,
-  parkAtFloor,
   parking,
   pressed,
   raiseTopFloor,
@@ -110,12 +110,14 @@ const FALSE_ROUTES: readonly {
     presses: [carTo('A', 'high')],
     printed: 'The same refit, re-phased',
   },
-  {
-    caseId: 'let-faster-than-the-lifts',
-    source: 'D N1 — park at one floor you name, floor 30',
-    presses: [...parkAtFloor('30')],
-    printed: 'The clause bought the morning back',
-  },
+  /*
+   * `let-faster-than-the-lifts` — *D N1, park at one floor you name, floor 30*, which printed *"The
+   * clause bought the morning back"* — stood here and is removed rather than kept failing. GitHub
+   * issue #601 (§ D1076) re-authored that case at 7.0 % a five minutes once its answer thinned the
+   * crowd instead of re-drawing it, and on the re-authored case seed the route no longer clears the
+   * letter's morning (`not-enough`), so there is no fixed verdict left for it to misattribute. The
+   * five rows above still hold the property.
+   */
 ];
 
 interface Judged {

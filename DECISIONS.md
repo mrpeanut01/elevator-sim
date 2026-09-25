@@ -44621,3 +44621,278 @@ days pass the queue gate, is `docs/33` DC-10's.
   (`queueOnlyMisses`) and the screen's lowest peak (`lowestPeakQueue`), so a later ruling can read
   which days it would move.
 - **Days 8 and beyond**, and the towers named in `data/week-way.json`'s `unmeasured` block.
+
+---
+
+## D1075 — the crowd check reads the journey, so a zoning edit on Vertical City no longer refuses the pair
+
+> **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ, lane AJ-D), not by
+> the product owner. No clause here reads an owner's ruling; the one owner-reversible consequence is
+> clause 3's census row, which moves because the check stopped refusing a route.
+
+**Date: 2026-09-25 · GitHub issue #605 · Rules on: `packages/viz/src/record/crowd.ts`,
+`record/recordRun.ts`, `contract/types.ts#VIZ_SCHEMA_VERSION` (15 → 16), and the refused route in
+`fixit/theAnswerIsNotPrinted.test.ts`'s census.**
+
+**Why an entry.** [§ D405](#d405)'s first ground: it bumps the recording schema every surface
+reads, and it moves a census row [§ D1020](#d1020) pinned.
+
+### What was wrong, measured
+
+Lane AI-C found that on `every-deck-calls-itself-full` one floor of zone overlap trips
+`fixit/run.ts#assertPairMatchesRepairs`, and that before wave AI's judge caught the throw the press
+sat on *Running the day…* for good. The issue asked whether the passenger trace depends on the
+building's shape, which would break common random numbers. **It does not.** At `zone:1` on that
+case's seed, all **649** generated passengers are identical on both sides (id, arrival, origin,
+destination and mass), and `fixit/zoningKeepsTheCrowd.test.ts` holds that at every zone rung of
+both Vertical City cases.
+
+What moved was the route. A rider for the upper deck walks in at `G` and rides the escalator to
+`2`, so their first **lift** leg starts at `2`, 21.2 s after they arrived. **97** generated journeys
+used the escalator as built and **none** did under one floor of overlap, because a local now serves
+`G`. `record/crowd.ts` keyed a rider on their first lift leg's arrival and origin, and read **89**
+first lift legs as different people. That is `crowd.ts`'s own founding finding a third time: a transfer leg's arrival and a zoned leg's destination were already left out as routes; the
+escalator's arrival and origin were not.
+
+### The ruling
+
+1. **The recording carries the journey's own arrival, origin and destination** on a first leg where
+   the route moved them: `VizLeg.journeyStartedAt`, `journeyOriginFloorId`,
+   `journeyDestinationFloorId`, written by `recordRun` from the run's own trace and **absent** where
+   they equal the leg's, so a recording of a building with no transport mode is the version-15
+   recording with a new number. `VIZ_SCHEMA_VERSION` goes to **16**, with its consumer in the same
+   change.
+2. **`record/crowd.ts` keys the crowd on those values.** The check is not loosened: two runs whose
+   generator output differs still differ on every key, and the arrival, origin and destination are
+   still compared, only as the journey's rather than the lift's.
+3. **The refused route is reconsidered, as the issue asked, and it holds.** With the pair matching,
+   the census runs `zone:N` on `every-deck-calls-itself-full` as a route like any other, and
+   **`zone:1` holds over fifty mornings**, so it is that case's row in
+   `theAnswerIsNotPrinted.test.ts` ahead of `capacity:1`, which held while it was refused. It is a
+   second answer to a case whose diagnosis is the deck load weighing, found by a role-blind search
+   rather than authored; whether a zoning overlap should clear that complaint is a question for the
+   case's author, and nothing here changes the diagnosis or its witness.
+
+### What this does not decide
+
+The judge's catch around the pair check stays: a throw at the press is still a failed press and
+never a hang, which is wave AI's fix and is correct whatever this one does.
+
+## D1076 — a fix-it crowd change thins the as-built crowd on a named stream, and never re-draws it
+
+> **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ, lane AJ-D),
+> implementing the half of DECIDE-3's dissent in [§ D1001](#d1001) § 5 that § D1001 § 6 filed as
+> GitHub issue #601. Not a product-owner ruling. **Amends [§ D1001](#d1001) § 2** (*"every value is a
+> fresh redraw"*) and **§ 6**, and rewords the two demand basis lines (GitHub issue #349's and [§ D1020](#d1020)'s).
+
+**Date: 2026-09-25 · GitHub issue #601 · Rules on: `core/traffic/generator.ts`, `core/sim/simulation.ts`,
+`core/traffic/types.ts#CrowdThinning`, `core/random/streams.ts` (a thirteenth stream, `thinning`),
+`core/sim/types.ts#SimulationConfig.crowdThinning`, `viz/fixit/run.ts`, `record/crowd.ts`,
+`fixit/engine.ts#DEMAND_BASIS_LINE`, `fixit/judge.ts#REPLICATED_DEMAND_BASIS_LINE`.**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds: it adds a named stream to `core`, which
+every run materialises; it binds two packages; and it amends a recorded ruling.
+
+### What was wrong
+
+Any edit to `building.floorPopulations` re-drew the whole trace, because interfloor destinations
+are weighted by floor population. DECIDE-3 measured **0 of 214, 0 of 233 and 0 of 245** untouched
+legs surviving one floor's removal, and a one-person placebo scored *fixed* on 5 of 15 wrong-family
+cases. So each of the three demand cases' before and after met two unrelated crowds, which
+`CLAUDE.md`'s common-random-numbers rule forbids a comparison to rest on.
+
+### The ruling
+
+1. **`core` gains `crowdThinning`**: `keepShareByFloor[f]` in `[0, 1]` is the share of the journeys
+   whose `demandFloorId` is `f` that stay. The generator builds the trace the configuration
+   describes, **then** draws one uniform per passenger in trace order from a new named stream,
+   `thinning`, and keeps the passenger when the draw falls under their floor's share. Every other
+   trace draw has already been taken, so **a kept passenger is the as-built passenger field for
+   field**. The draw is taken for everybody, so two thinnings of one trace are nested. Absent, the
+   trace is byte-identical and the stream is never consumed. A floor the building lacks and a share
+   outside `[0, 1]` are refused.
+2. **`Simulation` draws patience and the stairs before it thins.** Both are drawn one per passenger
+   in trace order, so over a thinned trace every kept rider took the draw of whoever used to stand
+   before them. Found by measurement rather than argued: on `every-letter-says-nine` at St Jude's,
+   the only shipped building with a stair, **54** riders who walked as built rode the lift once half
+   of floor 1 was thinned, and the pair check refused the press. The constructor now generates the
+   unthinned trace, draws both over it, and applies `traffic/generator.ts#thinTrace` last; with no
+   thinning declared that is the order of operations it always was. `crowdThinning.test.ts` holds a
+   kept rider's stair choice on the legs.
+3. **What it means, said rather than implied.** A floor's own arrivals, departures and interfloor
+   trips are removed in proportion; **visits to it by other floors' people are not, and nobody
+   else's trips are re-weighted** towards the floors that stayed, which a re-drawn trace at the lower
+   population would do. The people who stay do exactly what they did.
+4. **`fixit/run.ts` routes every crowd change through it.** The case's own as-built patch still
+   writes its populations into the document, because that is the building the complaint is about;
+   every later population (a crowd-moving repair, an authored tenancy position) is taken off the
+   patches and becomes `later / as-built` per floor, read off the **resolved** as-built building,
+   which closes § D1001's `floorRanges` gap for these patches too. A later population above the
+   as-built one is refused. `assertPairMatchesRepairs` now also requires the repaired crowd to be a
+   subset of the as-built one (`record/crowd.ts#crowdAddedOf`).
+5. **Two basis lines stop saying *a different crowd***, which was true only of the re-draw: *"…so
+   the second run meets the same crowd less the people it moved"*, and the replicated form per
+   morning. Substitutions, one string each.
+
+### The three demand cases, re-judged
+
+Re-judged on the tree this entry lands on, through `cases.test.ts`'s own harness: the letter's
+morning, then fifty mornings with the +3 cm/s placebo beside it.
+
+| case | witness | letter's morning | fifty mornings |
+|---|---|---|---|
+| `one-start-time` | three start times | 21 → 0, rest +5.0 points, **fixed** | fixed, placebo refused |
+| `every-letter-says-nine` | four hundred letters moved | 10 → **1** (was 0 under the re-draw), rest +0.7, **fixed** | fixed, placebo refused |
+| `let-faster-than-the-lifts` at 6.8 % | the clause for every new tenant | 32 → 0, rest **−11.0** points on 14 journeys, **building-worse** | not reached: the letter's morning is the gate |
+
+**One answer moved, and it is re-authored in the open rather than quietly.** GitHub issue #601
+said how: rebalance `arrivalRatePctPop5min`, never move a bar and never search seeds. Rates either
+side of 6.8 were measured, nearest first, on the case's own seed:
+
+| rate | letter's morning | fifty mornings, complaint | fifty mornings, rest | placebo |
+|---|---|---|---|---|
+| 6.6 | 7 → 0, rest 0.0, fixed | falls 23.4 a morning [19.3, 27.4] | +12.2 points [8.4, 16.0] | not-enough |
+| **7.0** | **30 → 5 (83.3 % gone), rest +25.0, fixed** | **falls 35.4 a morning [29.6, 41.2]** | **+11.3 points [7.5, 15.1]** | **not-enough** |
+| 6.4 | 16 → 3, rest −1.8, fixed | not run | not run | not run |
+
+**7.0 is chosen** because it keeps a complaint of thirty long waits on the letter's morning, where
+6.6 keeps seven; the case's four figures are re-pinned from the run (`30 of 381 journeys`, `128 s`,
+`23.1 s over 381 boarded journeys`, `75.0 % of 12 journeys`). The issue's own forecast, *69 % on
+the case seed*, was measured on a thinning of its own and does not reproduce here; the figure
+above is this tree's. The witness position, the bars, the seed and the letter are unchanged.
+
+Two records move with it, each said where it lives. The diagnosis's reasoning quoted the old run's
+figures and now quotes the new ones, and it no longer says the floor-to-floor traffic *still works*,
+because on twelve journeys at 75.0 % it does not say much at all. And the assessor's route *park at
+floor 30*, which cleared the old letter's morning once and misattributed the diagnosis's words
+(§ D1011), no longer clears it: it leaves `theAnswerIsNotPrinted.test.ts`'s not-replicated table and
+`verdictNamesTheOrder.test.ts`'s false routes, each with a note.
+
+### What the owner may reverse
+
+Clause 3's meaning. If visits to a thinned floor should fall with it, the thinning is per
+`(origin, destination)` pair at the ratio of the two plans' weights, capped at 1, which cannot add
+the re-weighted trips a lower population sends elsewhere, so it is exact only for reductions that
+leave the interfloor denominators alone.
+
+## D1077 — a player whose only play is the career is not a first arrival
+
+> **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ, lane AJ-D), not by
+> the product owner. **Amends what [§ D476](#d476)'s gate reads**, as [§ D993](#d993) left it; nothing
+> in either is rewritten.
+
+**Date: 2026-09-25 · GitHub issue #600 · Rules on: `everyday/tutorialModel.ts#TutorialProgress`,
+`#tutorialIsDue`, `everyday/shell.ts#offerTutorial`, `everyday/landingScreen.ts#firstSessionFor`.**
+
+**Why an entry.** [§ D405](#d405)'s second ground: it moves what a recorded ruling's gate reads, which
+the issue itself asked be decided under § D405.
+
+**What was wrong.** `tutorialIsDue` read three counts (days filed into the Scenario week, fix cases
+solved and dispatchers rated), and the career keeps its own record in none of them. A player whose
+whole history was career days read as *played nothing yet* and met the landing page, whose one
+button offers *show me how it plays*, on every reload.
+
+**The ruling.** A fourth count, `careerDays`, read as `host.campaign().today - 1` at both gate sites.
+`CampaignCareer.today` starts at 1 and `campaign/career.ts#fileDay` is the only thing that moves it,
+one per career day filed, and `campaign/careerPersist.ts` stores it for the career's own reasons.
+**Nothing new is stored**: no field whose only reader is the gate exists under any type, which is
+§ D993's forward rule, and `tutorialModel.test.ts`'s no-boolean and exact-fields guards move with the
+fourth input on the same commit, to four counts and four named fields, rather than being loosened.
+
+**What it does not do.** A player who has only *started* a career and filed no day is still due,
+because nothing they did was play. The ten campaign stages played on the Engineer surface keep no
+progress anywhere, so there is nothing of theirs for the gate to read; if the product ever keeps
+stage clears, they are a fifth count on the same terms.
+
+## D1078 — the career's staggered start times thin the start-time crowd, and are refused where nobody keeps a start time
+
+> **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ, lane AJ-D), not by
+> the product owner. GitHub issue #603 says a near-universal tier is a game decision for a swarm;
+> this lane's brief applied the fix-it swarm's rule for one ([§ D1001](#d1001): move only what the
+> building authors, refuse where it authors none) and records it here so a swarm can overrule it.
+> **Owner-reversible**: § 3's refusal, and § 4's decision not to move the price.
+
+**Date: 2026-09-25 · GitHub issues #603 and #601 · Rules on: `campaign/fitOut.ts`
+(`fittedCrowdThinning`, `startTimeFloorIdsOf`), `campaign/economy.ts#shopTierState` (a
+`no-start-time` state), `dev/state.ts#shiftRunConfigOf`, `everyday/host.ts`
+(`buildingStartTimeFloors`, and `campaignAct`'s refusal), `everyday/campaignModel.ts`
+(`BuildingFacts.startTimeFloors`, `SHOP_NO_START_TIME`), and a new instrument,
+`campaign/shopTiers.sweep.test.ts`.**
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it binds the career's run, its shop, its
+reducer's host and a data reading, and it moves [§ D427](#d427)'s `tenants` L2 row, whose third was
+applied to the rate.
+
+### 1. The measurement
+
+`campaign/shopTiers.sweep.test.ts`, gated on `CAREER_SHOP_SWEEP` and registered as a deep tier:
+every contract's career day 1, as built and under each of the shop's sixteen tiers alone, over
+base seeds `20 260 824 + 7 919 n` through `campaign/incidents.ts#careerDaySeedFor`, on the ordinary
+event, judged by `campaignDayVerdict` at the standard difficulty, which is what `host.ts#closeDay`
+files. `tenants` L2 was measured as a thinning of the whole crowd, the same expected rate as the
+rate factor it replaced, so the measurement is not a re-roll (the issue's own condition, and
+[§ D1076](#d1076)'s seam).
+
+Ten seeds on the eight smaller contracts and on `c4`, three on `c11`, `c13` and `c14` and one on
+`c12`, taken 2026-09-25 under a load average of 20 to 70: **100 days, 76 missed as built**, on
+twelve contracts.
+
+| tier | missed days it clears | as-built clears it breaks |
+|---|---|---|
+| **`tenants` L2, staggered start times (10 u, no nights)** | **54 of 76** | 1 |
+| `shafts` L2, a fifth car (54 u, ten nights) | 35 | 0 |
+| `doors` L3, advance opening (16 u, two nights) | 34 | 3 |
+| `shafts` L1, a fourth car (34 u, eight nights) | 27 | 2 |
+| `machines` L3 | 24 | 2 |
+| every other tier | 18 or fewer | up to 5 |
+
+**It is the universal answer, and the shape is the fix-it swarm's.** It clears the most missed days
+of any tier, at a tenth of a perfect month's pay and no nights, and on two towers it is nearly the
+only thing that clears at all: **8 of 10** missed days on `mixed-use-high-rise`, where no other tier
+clears one, and **7 of 10** at St Jude's, where the next best clears three. Four of Crown Hotel's
+six went the same way. A hotel's guests, a hospital's patients and a block of flats keep no start
+time a landlord can negotiate; the tier cleared their days because a cut to the rate removes
+whoever is there. On the three supertall contracts measured, no tier clears any day.
+
+Two findings the sweep made in passing, **recorded and not acted on here**: `control` L3, the
+Level-1 destination panel, clears none of the 76 and **breaks 14** of the 24 days that clear as
+built; and the career's shop requires `tenants` L1 before L2, so the stagger's effective price is
+15 u.
+
+### 2. The ruling
+
+1. **The tier thins the start-time crowd and nobody else.** `startTimeFloorIdsOf` names the
+   populated floors whose traffic profile's `governingPeak` is `up-peak`, the morning peak a shared
+   start time makes; `fittedCrowdThinning` thins those floors by the tier's factor and returns
+   nothing where there are none. Read off `data/traffic-profiles.json` rather than off profile
+   names: the shipped answer is both office profiles and nothing else.
+2. **It is a thinning of the day's own crowd, never a rate** ([§ D1076](#d1076)): the fitted day
+   meets the as-built day's people less a third, `fitOut.test.ts` pins that on the legs at
+   `midtown-office`, and the event multiplies the as-built rate so a drill's own draw is not moved
+   by the purchase.
+3. **Refused, not sold inert, where no floor keeps a start time.** `shopTierState` answers
+   `no-start-time` (not pressable) for a tier carrying `arrivalRateFactor` on a building whose count
+   is `0`, ahead of the purse and the tier below; the row reads *nobody here keeps a start time to
+   stagger*; and `host.campaignAct` refuses the press on the same count, the reducer holding no
+   building. A tier already fitted stays fitted. The career's opening tower, Garden Apartments, is
+   such a building, so `fitOut.test.ts`'s register of tiers that move nothing at the campaign's own
+   cell gains `tenants` L2 beside the three it had, each with the cell where it does move.
+4. **The price does not move.** No price was found that stops the tier being the best buy where it
+   works: it clears 1.5 times the days of the next tier at a fifth of its units, and a price above
+   the next tier's per-clear rate is outside the schedule's own band (30 u). A price is the owner's
+   instrument (§ D528 clause 3), so this is left for the swarm the issue names, with the table above
+   as its input.
+
+### 3. After, measured
+
+Re-run with the ruling in place, as built against `tenants` L2 alone, ten seeds each: Crown Hotel
+**0 of 6** and St Jude's **0 of 10** (the tier thins nobody there, and the shop refuses it),
+`mixed-use-high-rise` **8 of 10** on its office floors alone, and on the five office towers
+**35 of 40**, as before: `c2` 9 of 10, `c3` 7 of 7, `c6` 5 of 8, `c9` 8 of 9 and `c10` 6 of 6. Across the table the tier's clears go from 54 of 76 to **43**, the eleven it loses being every one it made at the hotel and the hospital. The tier is still the strongest single buy on an office tower, where a morning up-peak
+is what a staggered start is for; what the ruling removes is the clears whose premise was false.
+
+### 4. What this does not touch
+
+No bar, no goal, no price, no other tier. The shop total (324 u) and the perfect month (98 u) are
+unmoved. The honesty corpus's campaign adapter now tells the shop which of its two buildings keeps a
+start time, so the refused row is swept on Garden Apartments.

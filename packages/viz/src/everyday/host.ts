@@ -166,8 +166,9 @@ import {
   DIFFICULTIES,
   contractIsLost,
   purseOf,
+  shopTierAt,
 } from '../campaign/economy.js';
-import { fitOutOf } from '../campaign/fitOut.js';
+import { fitOutOf, startTimeFloorIdsOf } from '../campaign/fitOut.js';
 import {
   answerChangeOf,
   campaignEventFor,
@@ -1053,6 +1054,14 @@ export interface EverydayHost {
    * to prevent.
    */
   buildingSpecLine(id: string): string | undefined;
+
+  /**
+   * How many of a building's floors keep a shared start time — `campaign/fitOut.ts#startTimeFloorIdsOf`
+   * on the tower {@link buildingSpecLine} describes, or `undefined` for a building this build cannot
+   * resolve. GitHub issue #603, `DECISIONS.md` § D1078: the career shop refuses staggered start
+   * times where it is `0`, and {@link campaignAct} refuses the press on the same count.
+   */
+  buildingStartTimeFloors(id: string): number | undefined;
 
   /**
    * The career GAMEPLAY § 8's three campaign screens read — the whole record, as plain data.
@@ -2380,6 +2389,24 @@ export function createEverydayHost(
   let career: CampaignCareer = restored.career ?? openingCareer(b.state().dispatcherId);
   const careerLoadNotice: string | undefined = restored.notice;
   /**
+   * A building's start-time floor count, on the tower the contract hands over — GitHub issue #603,
+   * § D1078. Memoised per id because the towers are resolved once per resources and the shop asks on
+   * every draw.
+   */
+  const startTimeFloorCounts = new Map<string, number | undefined>();
+  const startTimeFloorsOf = (id: string): number | undefined => {
+    if (!startTimeFloorCounts.has(id)) {
+      const resolved = ladderTowersOf(b.resources).find((building) => building.id === id);
+      startTimeFloorCounts.set(
+        id,
+        resolved === undefined
+          ? undefined
+          : startTimeFloorIdsOf(resolved.floors, resolved.trafficProfile, b.resources.trafficProfiles).length,
+      );
+    }
+    return startTimeFloorCounts.get(id);
+  };
+  /**
    * Assign and persist together. One writer, so a lane that adds a fourth mutation site cannot
    * forget the save — which is how a career that persists on two of three paths ships.
    */
@@ -2926,6 +2953,7 @@ export function createEverydayHost(
       const resolved = ladderTowersOf(b.resources).find((building) => building.id === id);
       return resolved === undefined ? undefined : statLineOf(resolved);
     },
+    buildingStartTimeFloors: (id) => startTimeFloorsOf(id),
     campaign: () => career,
     priceSchedule: () => bindings.resources.priceSchedule,
     careerNotice: () => careerLoadNotice,
@@ -3295,6 +3323,23 @@ export function createEverydayHost(
       b.applyPatch({ dispatcherSpec: applied.spec, levers: applied.levers });
     },
     campaignAct: (action) => {
+      /*
+       * The second lock on § D1078's refusal: the shop draws staggered start times dimmed on a
+       * building where nobody keeps a start time, and this refuses the press the same way the
+       * reducer refuses an unaffordable one, by moving nothing. The reducer holds no building, so
+       * the count is the host's.
+       */
+      if (action.kind === 'press-tier') {
+        const tower = towerById(career, action.towerId);
+        const tier = shopTierAt(action.categoryId, action.level);
+        if (
+          tower !== undefined &&
+          tier?.fits.arrivalRateFactor !== undefined &&
+          startTimeFloorsOf(tower.buildingId) === 0
+        ) {
+          return;
+        }
+      }
       const next = applyCampaignAction(career, action, bindings.resources.priceSchedule);
       /* A refused action moves nothing and notifies nobody: a redraw over an unchanged record
          would repaint a screen mid-interaction for no reason a player could see. */

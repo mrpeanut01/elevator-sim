@@ -291,6 +291,31 @@ describe('§ 8.2’s buying rules', () => {
     expect(state.pressable).toBe(false);
   });
 
+  it('refuses staggered start times on a building where nobody keeps one, and only that tier (#603)', () => {
+    /*
+     * § D1078. Where the building has no start-time floor the stagger would thin nobody, so the row
+     * is refused before the purse or the tier below is asked about. With start-time floors, or with
+     * no building known, the tier follows the ordinary rules; and no other tier is refused this way.
+     */
+    const tenants = SHOP.find((category) => category.id === 'tenants')!;
+    const staggered = tenants.tiers.find((tier) => tier.priceId === 'staggered-starts')!;
+    const rich = tower({ carry: 100, fitted: { tenants: 1 } });
+    expect(shopTierState(rich, 'tenants', staggered, shippedPriceSchedule(), 0)).toEqual({
+      id: 'no-start-time',
+      pressable: false,
+    });
+    expect(shopTierState(rich, 'tenants', staggered, shippedPriceSchedule(), 12).id).toBe('buyable');
+    expect(shopTierState(rich, 'tenants', staggered, shippedPriceSchedule()).id).toBe('buyable');
+    for (const category of SHOP) {
+      for (const tier of category.tiers) {
+        if (tier === staggered) continue;
+        expect(shopTierState(rich, category.id, tier, shippedPriceSchedule(), 0).id, tier.priceId).not.toBe(
+          'no-start-time',
+        );
+      }
+    }
+  });
+
   it('refuses works that would run past the contract', () => {
     // Day 18 of twenty, and the fourth car needs eight nights.
     const late = tower({ day: 18, carry: 100 });

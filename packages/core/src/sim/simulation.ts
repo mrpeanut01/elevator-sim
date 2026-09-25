@@ -215,6 +215,7 @@ import {
   egressTransitSecondsOf,
   generateTrace,
   leadingTransitSecondsOf,
+  thinTrace,
   toPassengerInit,
   transportHopBefore,
 } from '../traffic/generator.js';
@@ -967,12 +968,21 @@ export class Simulation {
     this.#interventions = Object.freeze([...(config.interventions ?? [])]);
 
     /* ---- the trace, before anything moves (common random numbers) ---- */
-    this.#trace = generateTrace(traceConfigFor(config, this.#streams));
-    for (const [index, record] of this.#trace.passengers.entries()) {
-      this.#recordsByJourney.set(record.journeyId, record);
-      this.#recordIndexById.set(record.id, index);
-    }
-    this.#warnings.push(...this.#trace.warnings);
+    /*
+     * **Generated whole, drawn over, then thinned** — GitHub issue #601, `DECISIONS.md` § D1076.
+     *
+     * Patience and the stairs are drawn one value per passenger **in trace order**, so drawing them
+     * over a thinned trace would hand every kept rider the draw of whoever used to stand before
+     * them: measured on the fix case `every-letter-says-nine`, 54 hospital riders who walked the
+     * stair as built rode the lift once half of floor 1 was thinned away. So both are drawn over the
+     * trace the configuration generates without its thinning, and the thinning is applied last —
+     * which makes who gives up and who walks a property of the person on both sides of a paired
+     * comparison. With no thinning declared, `thinTrace` returns its argument and this is the order
+     * of operations it always was.
+     */
+    const traceConfig = traceConfigFor(config, this.#streams);
+    const { crowdThinning, ...unthinnedConfig } = traceConfig;
+    const whole = generateTrace(unthinnedConfig);
 
     /*
      * **Patience, drawn here or not at all.** In trace order, one value per planned leg, before
@@ -984,7 +994,7 @@ export class Simulation {
     this.#patienceByLeg =
       this.#options.patience === undefined
         ? new Map()
-        : drawPatienceTable(this.#streams.patience, this.#options.patience, this.#trace.passengers);
+        : drawPatienceTable(this.#streams.patience, this.#options.patience, whole.passengers);
 
     /*
      * **Who takes the stairs, offered here and decided before anything moves** (docs/14 § 3.3).
@@ -997,8 +1007,15 @@ export class Simulation {
     this.#stairsTaken = drawStairsChoices(
       this.#streams.modeChoice,
       stairsIndexOf(this.#resolved),
-      this.#trace.passengers,
+      whole.passengers,
     );
+
+    this.#trace = thinTrace(whole, crowdThinning, this.#streams.thinning, config.building);
+    for (const [index, record] of this.#trace.passengers.entries()) {
+      this.#recordsByJourney.set(record.journeyId, record);
+      this.#recordIndexById.set(record.id, index);
+    }
+    this.#warnings.push(...this.#trace.warnings);
 
     /* ---- the building, with real cars ---- */
     const profile = config.dispatcherProfile;
@@ -6790,6 +6807,9 @@ function traceConfigFor(config: SimulationConfig, streams: StreamSet): TrafficCo
     // this the answer to the refusal `durationS` gets on a phase list rather than a way round it.
     ...(config.windowStartS === undefined ? {} : { windowStartS: config.windowStartS }),
     ...(config.windowEndS === undefined ? {} : { windowEndS: config.windowEndS }),
+    // GitHub issue #601, § D1076. Spread-or-omit, so a run that thins nobody hands the generator
+    // the config it had before the field existed and the `thinning` stream is never consumed.
+    ...(config.crowdThinning === undefined ? {} : { crowdThinning: config.crowdThinning }),
     ...(demand.demandLevel === undefined ? {} : { demandLevel: demand.demandLevel }),
     ...(demand.arrivalRatePctPop5min === undefined
       ? {}

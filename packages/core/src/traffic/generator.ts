@@ -147,6 +147,7 @@ import {
   type ArrivalEvent,
   type BatchSizeCurve,
   type CredentialAssignment,
+  type CrowdThinning,
   type DayVariationConfig,
   type DemandLevel,
   type DemandSource,
@@ -386,6 +387,7 @@ const TRAFFIC_CONFIG_FIELDS: { readonly [K in keyof Required<TrafficConfig>]-?: 
   journeyIdPrefix: true,
   batchIdPrefix: true,
   dayVariation: true,
+  crowdThinning: true,
 };
 
 const TRAFFIC_CONFIG_KEYS: readonly string[] = Object.keys(TRAFFIC_CONFIG_FIELDS).sort();
@@ -1757,7 +1759,97 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
     warnings: plan.warnings,
   });
 
-  return sliceToWindow(whole, config.windowStartS, config.windowEndS);
+  return thinTrace(
+    sliceToWindow(whole, config.windowStartS, config.windowEndS),
+    config.crowdThinning,
+    streams.thinning,
+    building,
+  );
+}
+
+/**
+ * The trace with part of its crowd removed — GitHub issue #601, `DECISIONS.md` § D1076. See
+ * {@link CrowdThinning} for what it means and what it deliberately does not.
+ *
+ * **Returns the trace itself when no thinning is declared**, and consumes nothing from `rng`, so a
+ * run that asks for none is the run this function did not exist for.
+ *
+ * Applied **last**, to the trace as the run receives it — after any window is sliced — and exported
+ * because `sim/simulation.ts` applies it itself: it draws patience and the stairs over the
+ * unthinned trace first, since both are drawn one per passenger in trace order and a thinned trace
+ * would shift every kept rider onto somebody else's draw. `generateTrace` with a thinning is this
+ * function over `generateTrace` without one, so the two paths are one crowd. One uniform per
+ * passenger in trace order, drawn whether or not the passenger's floor is named.
+ *
+ * Nothing is renumbered, on `sliceToWindow`'s ground: the ids of the people who stay are the ids
+ * they had, so two runs of one trace, thinned and not, name the same person the same way. A batch
+ * every member of which is removed is removed with them; a batch keeping some keeps its id.
+ *
+ * `sources` stay the plan the trace was drawn from, because they are attribution. The peak rate and
+ * the expectation are re-derived as the thinned process's own — each destination weight times its
+ * demand floor's share — because `generator.test.ts` checks a realised count against the
+ * expectation and `sliceToWindow` re-derives a window's from the peak.
+ */
+export function thinTrace(
+  trace: PassengerTrace,
+  thinning: CrowdThinning | undefined,
+  rng: Rng,
+  building: ResolvedBuilding,
+): PassengerTrace {
+  if (thinning === undefined) return trace;
+  const shares = thinning.keepShareByFloor;
+  for (const [floorId, share] of Object.entries(shares)) {
+    if (!building.floorsById.has(floorId)) {
+      throw new TrafficError(
+        `crowdThinning names floor "${floorId}", which building "${building.id}" does not declare. A share on a floor nobody lives on would thin nobody and look as if it had.`,
+      );
+    }
+    if (!Number.isFinite(share) || share < 0 || share > 1) {
+      throw new TrafficError(
+        `crowdThinning's share for floor "${floorId}" must be in [0, 1]; received ${String(share)}. Thinning removes people from a trace and cannot add any.`,
+      );
+    }
+  }
+  const shareOf = (floorId: string): number => shares[floorId] ?? 1;
+
+  const kept = new Set<GeneratedPassenger>();
+  for (const passenger of trace.passengers) {
+    // Drawn for everybody, before the share is read, so the draw is the person's and not the floor's.
+    const draw = rng.nextFloat();
+    if (draw < shareOf(passenger.demandFloorId)) kept.add(passenger);
+  }
+
+  const arrivals: ArrivalEvent[] = [];
+  const passengers: GeneratedPassenger[] = [];
+  for (const batch of trace.arrivals) {
+    const members = batch.passengers.filter((passenger) => kept.has(passenger));
+    if (members.length === 0) continue;
+    passengers.push(...members);
+    arrivals.push(
+      members.length === batch.passengers.length
+        ? batch
+        : Object.freeze({ ...batch, passengers: Object.freeze(members) }),
+    );
+  }
+
+  const peakPassengersPerSecond = trace.sources.reduce(
+    (sum, source) =>
+      sum +
+      source.destinations.reduce(
+        (inner, destination) => inner + destination.weight * shareOf(destination.demandFloorId),
+        0,
+      ),
+    0,
+  );
+  return Object.freeze({
+    ...trace,
+    arrivals: Object.freeze(arrivals),
+    passengers: Object.freeze(passengers),
+    passengerCount: passengers.length,
+    passengersInReportWindow: passengers.filter((passenger) => passenger.inReportWindow).length,
+    peakPassengersPerSecond,
+    expectedPassengers: expectedPassengersOver(trace.template, peakPassengersPerSecond),
+  });
 }
 
 /**

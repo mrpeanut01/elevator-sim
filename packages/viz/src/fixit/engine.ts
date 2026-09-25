@@ -734,13 +734,16 @@ export const BASIS_LINE =
  * Three shipped cases diagnose the crowd rather than the kit: staggered tenancy starts, appointment
  * letters reprinted for half past nine, a staggered-starts lease clause invoked. Each of those
  * repairs patches `floorPopulations`, so its after-run meets fewer people than its before-run by
- * design, and {@link BASIS_LINE}'s implied *same crowd, twice* would be false under it. This line
+ * design, and {@link BASIS_LINE}'s implied *same crowd, twice* would be false under it. Since GitHub
+ * issue #601 the after-run's people are the before-run's less the ones moved, thinned rather than
+ * re-drawn (`run.ts#crowdThinningOf`), and the line says so where it used to say *a different
+ * crowd*, which was true only of the re-draw. This line
  * says what the pair actually is. Chosen from the **measurement** ({@link FixitMeasurement.sameCrowd},
  * read off the legs) rather than from the patch, so the sentence cannot claim a crowd the runs did
  * not have; `run.ts#assertPairMatchesRepairs` then holds the patch and the legs to each other.
  */
 export const DEMAND_BASIS_LINE =
-  'one run before, one run after — and the repair changed who arrives, so the second run meets a different crowd. Enough to see a repair this size; not enough to split hairs.';
+  'one run before, one run after — and the repair changed who arrives, so the second run meets the same crowd less the people it moved. Enough to see a repair this size; not enough to split hairs.';
 
 /**
  * Whether a repair changes **who arrives** rather than what carries them — the one patch field that

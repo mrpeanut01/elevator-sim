@@ -191,9 +191,12 @@ export function judgeReplication(
 export const REPLICATED_BASIS_LINE =
   'one run before and one after on the letter’s morning, then the same order on forty-nine more mornings, each run beside the building as it stands on the same crowd — fifty pairs in all, and fixed only where the drop holds across them.';
 
-/** The same, for an order that changes who arrives, so no morning's two runs share a crowd. */
+/**
+ * The same, for an order that changes who arrives: each morning's second run meets that morning's
+ * crowd less the people moved, thinned rather than re-drawn since GitHub issue #601 (§ D1076).
+ */
 export const REPLICATED_DEMAND_BASIS_LINE =
-  'one run before and one after on the letter’s morning, then the same order on forty-nine more mornings, each run beside the building as it stands — and the change moves who arrives, so each morning’s second run meets a different crowd from its first. Fifty pairs in all, and fixed only where the drop holds across them.';
+  'one run before and one after on the letter’s morning, then the same order on forty-nine more mornings, each run beside the building as it stands — and the change moves who arrives, so each morning’s second run meets that morning’s crowd less the people it moved. Fifty pairs in all, and fixed only where the drop holds across them.';
 
 export const JUDGE_COPY = Object.freeze({
   checkingHead: 'It cleared on the letter’s morning. Now checking it on forty-nine more.',

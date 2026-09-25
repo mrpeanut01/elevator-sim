@@ -524,6 +524,17 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'building moves',
     scheduled: false,
   },
+  'packages/viz/src/campaign/shopTiers.sweep.test.ts': {
+    gates: ['CAREER_SHOP_SWEEP'],
+    reason:
+      'GitHub issue #603’s instrument, § D1078 — every contract’s career day 1 as built and under ' +
+      'each of the shop’s sixteen tiers alone, over n base seeds of docs/33 § 4.6’s sequence, judged ' +
+      'by the career’s own day verdict. It produced § D1078’s table of which tiers clear which days. ' +
+      'Not scheduled because it is a compute job rather than a check: fitOut.test.ts pins the tier ' +
+      'that table was about on the legs on every run, and a nightly re-derivation would write ' +
+      'figures nothing reads. It is re-run by hand when a tier, a building or the career’s judge moves',
+    scheduled: false,
+  },
   'packages/viz/src/everyday/stagePace.sweep.test.ts': {
     gates: ['STAGE_PACE_SWEEP'],
     reason:

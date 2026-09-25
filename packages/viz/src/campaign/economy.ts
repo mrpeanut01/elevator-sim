@@ -204,7 +204,11 @@ export interface FitOutDelta {
   readonly hallDwellSecondsSaved?: number;
   /** A ceiling on seconds per passenger per direction through the doorway. */
   readonly transferCeilingS?: number;
-  /** Multiplier on the crowd's arrival rate. */
+  /**
+   * The share of the start-time crowd a day keeps — applied as a thinning of the floors whose
+   * people keep a start time, never as a rate (GitHub issues #601 and #603, `DECISIONS.md` § D1078).
+   * A tier carrying it is refused on a building where nobody keeps one ({@link shopTierState}).
+   */
   readonly arrivalRateFactor?: number;
   /** The heaviest tenant floor's population moved down to the lowest floors above the entrance. */
   readonly movesHeaviestTenantDown?: boolean;
@@ -806,6 +810,7 @@ export type ShopTierStateId =
   | 'needs-below'
   | 'short'
   | 'past-contract'
+  | 'no-start-time'
   | 'buyable';
 
 export interface ShopTierState {
@@ -911,6 +916,13 @@ export function shopTierState(
   categoryId: ShopCategoryId,
   tier: ShopTier,
   schedule: PriceSchedule,
+  /**
+   * How many of the building's floors keep a shared start time — `campaign/fitOut.ts#startTimeFloorIdsOf`
+   * on the tower the day runs. GitHub issue #603, § D1078: a tier that thins the start-time crowd
+   * is refused where this is `0`, because it would move nobody. `undefined` is a caller that knows
+   * no building, and refuses nothing on this ground.
+   */
+  startTimeFloors?: number,
 ): ShopTierState {
   const dayIdx = dayIndexOf(tower);
   const booking = bookingFor(tower, categoryId, tier.level);
@@ -924,6 +936,14 @@ export function shopTierState(
   }
   /* Carried in from an earlier month: owned, with no booking against this month's purse. */
   if ((tower.fitted[categoryId] ?? 0) >= tier.level) return { id: 'fitted', pressable: false };
+  /*
+   * § D1078: staggered start times on a building whose floors keep none — a hotel, a hospital, a
+   * block of flats. Before the purse and the level below, because no amount of money and no earlier
+   * tier makes it move anybody here.
+   */
+  if (tier.fits.arrivalRateFactor !== undefined && startTimeFloors === 0) {
+    return { id: 'no-start-time', pressable: false };
+  }
   if (tier.level > 1) {
     const below = tier.level - 1;
     const owned = Math.max(fittedLevel(tower, categoryId), bookedLevel(tower, categoryId));

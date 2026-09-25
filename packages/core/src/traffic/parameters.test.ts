@@ -102,6 +102,13 @@ const PARAMETERS_BY_CONFIG_FIELD = {
    */
   windowStartS: null,
   windowEndS: null,
+  /*
+   * Which of the generated people a run keeps (GitHub issue #601, § D1076) — a comparison axis,
+   * not a knob, and `null` on the window's ground one step further: a share per floor says *which
+   * crowd this arm meets*, so an optimizer sampling it would search for the crowd that makes a
+   * configuration look best rather than for a configuration that serves a crowd.
+   */
+  crowdThinning: null,
 
   template: ['traffic.template'],
   templateOverrides: [

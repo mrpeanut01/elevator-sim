@@ -137,6 +137,13 @@ export interface BuildingFacts {
   readonly name: string;
   /** `shift/contracts.ts#statLineOf`'s line, or `undefined` when the building did not resolve. */
   readonly spec: string | undefined;
+  /**
+   * How many floors keep a shared start time — `campaign/fitOut.ts#startTimeFloorIdsOf` on the tower
+   * the day runs (GitHub issue #603, § D1078). The shop refuses staggered start times where it is
+   * `0`. Optional because a fixture that knows no building refuses nothing on that ground; the
+   * shipped path (`campaignScreens.ts#campaignInputOf`) always writes it.
+   */
+  readonly startTimeFloors?: number | undefined;
 }
 
 /** One dispatcher on offer, for the standing-order selects. */
@@ -1522,8 +1529,9 @@ function shopTierRow(
   category: ShopCategory,
   tier: ShopTier,
   schedule: PriceSchedule,
+  facts: BuildingFacts,
 ): ShopTierRowView {
-  const state = shopTierState(tower, category.id, tier, schedule);
+  const state = shopTierState(tower, category.id, tier, schedule, facts.startTimeFloors);
   const priced = shopTierPrice(schedule, tier);
   return {
     categoryId: category.id,
@@ -1540,6 +1548,12 @@ function shopTierRow(
     pressable: state.pressable,
   };
 }
+
+/**
+ * The line a staggered start drawn on a building with no start time reads — GitHub issue #603,
+ * § D1078. Says what is true of the building and nothing about what would help instead.
+ */
+export const SHOP_NO_START_TIME = 'nobody here keeps a start time to stagger';
 
 /** § 8.2's *"every tier shows its own derived state"*, worded. */
 function shopStateLine(
@@ -1562,6 +1576,8 @@ function shopStateLine(
       return `need ${String(state.shortBy ?? 0)} more`;
     case 'past-contract':
       return 'works run past the contract';
+    case 'no-start-time':
+      return SHOP_NO_START_TIME;
     case 'buyable': {
       if (nights === 0) return 'working tomorrow';
       const ready = dayIndexOf(tower) + nights;
@@ -1752,7 +1768,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
               : booking > 0
                 ? `level ${String(booking)} booked`
                 : 'nothing yet',
-          rows: category.tiers.map((tier) => shopTierRow(tower, category, tier, input.schedule)),
+          rows: category.tiers.map((tier) => shopTierRow(tower, category, tier, input.schedule, facts)),
         };
       }),
     },

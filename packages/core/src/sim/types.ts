@@ -57,6 +57,7 @@ import type {
   BatchSizeCurve,
   CredentialAssignment,
   CredentialGapOverride,
+  CrowdThinning,
   DutyDemandOverride,
   DayVariationConfig,
   DemandLevel,
@@ -780,6 +781,17 @@ export interface SimulationConfig {
   readonly windowStartS?: number | undefined;
   /** End of the run's part of the template's period, seconds, exclusive. See {@link windowStartS}. */
   readonly windowEndS?: number | undefined;
+  /**
+   * Remove part of the crowd from the trace this configuration generates, rather than generating
+   * a different one — GitHub issue #601, `DECISIONS.md` § D1076. Handed to the generator as
+   * `TrafficConfig.crowdThinning`; see `traffic/types.ts#CrowdThinning`.
+   *
+   * On the run rather than on {@link demand} for {@link windowStartS}'s reason: it does not change
+   * what demand the building has, it changes which of the generated people this run keeps, and two
+   * runs that differ only here are the same crowd less some people. Absent means the trace is the
+   * one generated before this field existed, byte for byte.
+   */
+  readonly crowdThinning?: CrowdThinning | undefined;
   /**
    * Which window the summary is computed over.
    *

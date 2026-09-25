@@ -82,6 +82,7 @@ import type {
  * | 12 | {@link VizLeg.structuralRefusal} added — the structural reason every car refused a waiting rider's call, joined to the leg by `core` at reconcile time (GitHub issue #178 item 9, § D511). Optional and absent on every leg that boarded, so a version-11 recording reads as a version-12 one with no rider refused structurally; the bump is because a reader that draws the reason must know a recording without the field is *older* rather than *clean*. |
  * | 14 | {@link VizRecording.bankEquipment} added — what each bank was fitted with when it is not the default, read off the resolved building the run was simulated on through `core`'s `energyConventionOf` (`DECISIONS.md` § D539, and GitHub PR #515's review finding L1). The Day report's before/after block reads it as `shift/report.ts#ReportBasis.equipment`, so the energy rows of two runs priced on different scales are refused rather than paired. Absent on every shipped building, so a shipped run's recording differs from version 13's in this number and nothing else. |
  * | 15 | {@link VizBankEquipment.ropeMassKg} added — the rope moving with each of a bank's cars, when the bank declares a rope class (`DECISIONS.md` § D583, GitHub issue #433). Optional, and absent on every shipped building, so a version-14 recording reads as a version-15 one with no rope modelled. The bump is because the equipment axis is a **pairing key**: without this field two runs of one building roped differently carry identical `bankEquipment` entries, and the Day report's before/after block would pair their energy rows although the two were priced on different scales — which is exactly the defect GitHub PR #515's review found and version 14 was added to close. |
+ * | 16 | {@link VizLeg.journeyStartedAt}, {@link VizLeg.journeyOriginFloorId} and {@link VizLeg.journeyDestinationFloorId} added — the generator's own arrival, origin and destination on a first leg whose lift ride begins or ends away from them, because the route opened or closed with an escalator (GitHub issue #605, `DECISIONS.md` § D1075). **Its consumer lands in the same change**: `src/record/crowd.ts` keys the crowd on them, because a zoning edit on `vertical-city` moved riders' first lift legs from `2` to `G` and 21.2 s earlier without moving one of the 649 people the generator issued, and the same-crowd check the fix-it press runs refused the pair. Optional, and absent on every leg of every building that declares no transport mode, so a version-15 recording of such a building differs from a version-16 one in this number and nothing else. |
  *
  * ## What version 4 fixed, measured rather than predicted
  *
@@ -114,7 +115,7 @@ import type {
  * a recording arrives from somewhere other than this build and the versions genuinely can
  * disagree (`UX.md` `PB-07`/`PB-15`).
  */
-export const VIZ_SCHEMA_VERSION = 15;
+export const VIZ_SCHEMA_VERSION = 16;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -305,6 +306,33 @@ export interface VizLeg {
    * fixture, and read as {@link destinationFloorId} there.
    */
   readonly finalDestinationFloorId?: string | undefined;
+  /**
+   * **Where the journey began, when the first lift ride began somewhere else** — version 16,
+   * GitHub issue #605, `DECISIONS.md` § D1075. The three `journey*` fields are written on a first
+   * leg ({@link legIndex} `0`) and only where they differ from the leg's own
+   * {@link arrivedAt}, {@link originFloorId} and {@link finalDestinationFloorId}, which happens only
+   * in a building whose route opens or closes with an escalator or a stair: a rider who walks in at
+   * `G` and rides the escalator to `2` has a first lift leg that starts at `2`, 21.2 s after they
+   * arrived, on `vertical-city`.
+   *
+   * That route is the building's, so a zoning edit can move it without moving the person: measured
+   * on the fix-it case `every-deck-calls-itself-full`, 97 generated journeys used the escalator as
+   * built and none did under one floor of zone overlap, and `record/crowd.ts` read 89 first lift legs
+   * as different people while all 649 generated passengers were identical. The generator's own arrival, origin and destination
+   * (`GeneratedPassenger.arrivalTimeS`, `originFloorId`, `finalDestinationFloorId`) are what the
+   * crowd is, and these three carry them.
+   *
+   * **Absent is the leg's own value**, so a recording of a building that declares no transport mode
+   * is the version-15 recording with a different version number.
+   */
+  readonly journeyStartedAt?: SimTime | undefined;
+  /** Where the journey began, when that is not {@link originFloorId}. See {@link journeyStartedAt}. */
+  readonly journeyOriginFloorId?: string | undefined;
+  /**
+   * Where the journey ends, when that is not {@link finalDestinationFloorId} — a route closing with an
+   * escalator. See {@link journeyStartedAt}.
+   */
+  readonly journeyDestinationFloorId?: string | undefined;
   /** When the wait ended. `undefined` for a leg nobody ever served. */
   readonly boardedAt?: SimTime | undefined;
   /**

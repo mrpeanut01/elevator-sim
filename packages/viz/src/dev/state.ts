@@ -123,8 +123,9 @@ import {
   type CalendarPeriod,
 } from '../shift/calendar.js';
 import {
-  fittedArrivalRate,
   fittedBuilding,
+  fittedCrowdThinning,
+  startTimeFloorIdsOf,
   leversWithKit,
   profileWithKit,
   type CampaignFitOut,
@@ -2207,28 +2208,14 @@ export function shiftRunConfigOf(
         : { ...pattern.demand, arrivalRatePctPop5min: rungRate }
       : { ...pattern.demand, arrivalRatePctPop5min: rate };
   /*
-   * § 8's `tenants` tier, applied to the rate the day would otherwise have run at.
-   *
-   * Two writes rather than one, because a rate can arrive here from two places and only one of them
-   * is on `demand`: `baseOf` falls back to the **building's own traffic profile** when the pattern
-   * asked for nothing, which is the campaign's own case, so a factor written onto `demand` alone
-   * would flatten a number that is not there. `fitBase` is what the day's event multiplies (a fire
-   * drill is five times a staggered morning, not the other way round) and `demand` is what runs when
-   * there is no event.
-   *
-   * Both are the identity at *nothing bought*: `fittedArrivalRate` returns its input at factor 1 and
-   * the spread is skipped, so `demand` is `asked` by object identity.
+   * § 8's `tenants` tier **no longer touches the rate** — GitHub issues #601 and #603, § D1078. It
+   * used to multiply the rate the day would otherwise have run at, which re-drew the whole trace;
+   * it is now a `crowdThinning` on the config below (`campaign/fitOut.ts#fittedCrowdThinning`), so
+   * the fitted day meets the as-built day's people less a third. `fitBase` is therefore the asked
+   * base whatever was bought, and it is still what the day's event multiplies.
    */
-  const askedBase = baseOf(resources, authored, asked);
-  const fitBase =
-    state.campaignFitOut === undefined || state.campaignFitOut.arrivalRateFactor === 1
-      ? askedBase
-      : {
-          ...askedBase,
-          ratePctPop5min: fittedArrivalRate(askedBase.ratePctPop5min, state.campaignFitOut),
-        };
-  const demand =
-    fitBase === askedBase ? asked : { ...asked, arrivalRatePctPop5min: fitBase.ratePctPop5min };
+  const fitBase = baseOf(resources, authored, asked);
+  const demand = asked;
   /*
    * Mean group size is not a `demand` option — it lives on the traffic profile, so a pattern that
    * moved it widens the file the run resolves against. See `patternSpec.ts`'s
@@ -2461,6 +2448,20 @@ export function shiftRunConfigOf(
         ...calendar.demand,
         ...(state.paramDemand === null ? {} : state.paramDemand),
       },
+      /*
+       * § 8's `tenants` L2, as a thinning of the day's own crowd — GitHub issues #601 and #603,
+       * § D1078. Over the start-time floors of the building the day actually runs on (the file the
+       * run resolves against decides which those are), after the event and the calendar have set
+       * the rate, and spread-or-omit so a tower that bought no tenancy runs the config it ran
+       * before.
+       */
+      ...(() => {
+        const thinning = fittedCrowdThinning(
+          startTimeFloorIdsOf(finalBuilding.floors, finalBuilding.trafficProfile, trafficProfiles),
+          state.campaignFitOut,
+        );
+        return thinning === undefined ? {} : { crowdThinning: thinning };
+      })(),
       /*
        * The Parameters tab's first applied schema — the audit's B4, and the first member of
        * `dev/parameterForm.ts`'s `APPLIED_SCHEMAS`.

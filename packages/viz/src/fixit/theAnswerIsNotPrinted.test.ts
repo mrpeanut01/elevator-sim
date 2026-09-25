@@ -451,14 +451,19 @@ function familyRoutesFor(entry: FixitCase, asBuilt: SimulationConfig): readonly 
  * - **The count is a floor and the search is a sample**, which § D525 clause 3 requires this row to
  *   say. It stops at the first route that holds, and it tries each family one move at a time.
  *
- * **What the three `NOT_REPLICATED` rows are.** `every-letter-says-nine`'s three-metre roof raise and
- * `let-faster-than-the-lifts`' fixed floor at the top are the two wins § D1000 § 3 itself named as
- * the single pair's noise; the third, zone-centre parking on `every-deck-calls-itself-full`, is the
- * decision agents' own zone-centre finding. None of the three holds, and each case's first route that
- * does is a different one. **One route is refused rather than judged**: `every-deck-calls-itself-full`'s
- * zoning step moves the crowd without claiming to, which the surfaces' own check (GitHub issue #350)
- * turns into a failed press, so it is no route through; the census found it holding before that check
- * was added here, and a player pressing it saw *Running the day…* for good (§ D1020). **The cost**, measured 2026-09-25 at `702991b`: the whole enumeration took
+ * **What the two `NOT_REPLICATED` rows are.** `every-letter-says-nine`'s three-metre roof raise is
+ * one of the two wins § D1000 § 3 itself named as the single pair's noise; the other, zone-centre
+ * parking on `every-deck-calls-itself-full`, is the decision agents' own zone-centre finding. Neither
+ * holds, and each case's first route that does is a different one. A third row,
+ * `let-faster-than-the-lifts`' fixed floor at the top, left the table when GitHub issue #601
+ * (§ D1076) re-authored that case at 7.0 %: on the re-authored letter's morning that route no longer
+ * clears even once. **`every-deck-calls-itself-full`'s zoning step was refused rather than
+ * judged until GitHub issue #605** (§ D1075): the surfaces' own crowd check (GitHub issue #350) read
+ * an escalator hop the overlap removed as a change of crowd, so the press failed, and before wave AI
+ * a player pressing it saw *Running the day…* for good (§ D1020). The generator's crowd was identical
+ * all along; with the check reading the journey rather than the first lift leg, `zone:1` is a route
+ * like any other and it **holds**, so it is that case's row, ahead of `capacity:1`, which held
+ * while it was refused. **The cost**, measured 2026-09-25 at `702991b`: the whole enumeration took
  * 423 s of one vitest process under a load average of 9–14, and 236 s at 13 on the next sitting,
  * against this file's 600 s annotation. They are dated readings of a shared box, not a bound.
  */
@@ -476,7 +481,7 @@ const SOLVED_BY: readonly (readonly [string, string])[] = Object.freeze([
   ['everyone-leaves-at-once', 'held'],
   ['bed-cars-locked-out', 'zone:1'],
   ['two-cars-out-wrong-month', 'car:A->high'],
-  ['every-deck-calls-itself-full', 'capacity:1'],
+  ['every-deck-calls-itself-full', 'zone:1'],
   ['restaurant-above-the-ballroom', 'speed:1'],
   ['controller-sends-every-car', 'parking:zone-center+zone:3'],
   ['let-faster-than-the-lifts', 'tenancy:new-lettings=invoke-for-all'],
@@ -487,7 +492,6 @@ const SOLVED_BY: readonly (readonly [string, string])[] = Object.freeze([
 const NOT_REPLICATED: readonly (readonly [string, string])[] = Object.freeze([
   ['every-letter-says-nine', 'raise:3'],
   ['every-deck-calls-itself-full', 'parking:zone-center'],
-  ['let-faster-than-the-lifts', 'parking:fixed-floor@30'],
 ]);
 
 /** The shipped press, synchronously in this process — `cases.test.ts#judgedPress`'s shape. */

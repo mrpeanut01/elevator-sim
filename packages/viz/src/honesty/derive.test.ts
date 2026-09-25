@@ -1561,6 +1561,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Which floors keep a shared start time — GitHub issue #603, § D1078. ' +
+        '`startTimeFloorIdsOf` returns floor ids read off each floor’s traffic profile and prints ' +
+        'nothing; the sentence a player reads about a building with none is ' +
+        '`campaignModel.ts#SHOP_NO_START_TIME`, which the campaign adapter draws.',
+      ids: ['campaign/fitOut.ts#startTimeFloorIdsOf'],
+    },
+    {
+      reason:
         'Assertions that two runs met the same crowd — GitHub issue #350 — and the three sites ' +
         'that make them. `crowdDifferencesOf` returns sentences naming the first legs that differ, ' +
         '`sameCrowd` is the predicate over it, `assertSameCrowd` throws with the pair’s own name in ' +
@@ -1576,6 +1584,8 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'record/crowd.ts#crowdDifferencesOf',
         'record/crowd.ts#sameCrowd',
         'record/crowd.ts#assertSameCrowd',
+        /* GitHub issue #601, § D1076: the thinned half of the same check, in the same class. */
+        'record/crowd.ts#crowdAddedOf',
         'fixit/run.ts#assertPairMatchesRepairs',
         'scope/switchWire.ts#wireInterventionsOf',
         /*

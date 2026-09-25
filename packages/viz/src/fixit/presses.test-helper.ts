@@ -140,17 +140,6 @@ export const raiseTopFloor =
     return next;
   };
 
-/** Park at a named floor: the strategy, then the floor by its id on the floor select. */
-export const parkAtFloor = (floorId: string): readonly Press[] => [
-  parking('fixed-floor'),
-  (entry, state, context) => {
-    const building = fixitRunPlanOf(entry, state, context.resources).asRepaired.building;
-    const floor = building.floors.find((candidate) => candidate.id === floorId);
-    if (floor === undefined) throw new Error(`${entry.id}: no floor "${floorId}"`);
-    return dial('idle.parkingFloorIndex', floor.index)(entry, state, context);
-  },
-];
-
 /**
  * Run the presses in order from an empty order, each through `withPrunedDials` as both surfaces do,
  * and require that each one **took**: a reducer that hands the state back (a budget refusal, an id

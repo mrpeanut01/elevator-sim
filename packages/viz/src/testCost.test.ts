@@ -310,7 +310,19 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * for hours at load average 16–20. 179 700 000 + 21 600 000 = **201 300 000**. Nothing existing
      * was raised.
      */
-    ['viz', { count: 113, totalMs: 201_300_000 }],
+    /*
+     * **113 → 114, and the one is named** — wave AJ lane AJ-D's `campaign/shopTiers.sweep.test.ts`,
+     * GitHub issue #603, § D1078: every contract's career day 1 as built and under each of the
+     * shop's sixteen tiers alone. It is gated on `CAREER_SHOP_SWEEP` and registered in
+     * `deepTiers.test.ts`, so it costs the default suite nothing. Measured: **956 s for eight of the
+     * sixteen contracts at ten seeds** at load average 25–60, and the reference towers' days are
+     * several times longer, so sixteen contracts at ten seeds does not fit under four hours —
+     * annotated at **four hours** (14 400 000 ms), `contractCurve.sweep.test.ts`'s own bound, and
+     * run in slices by `CAREER_SHOP_ONLY` and `CAREER_SHOP_SEEDS` as § D1078's table was.
+     * 201 300 000 + 14 400 000 = **215 700 000**. Nothing existing was raised, and the lane's two
+     * other new files annotate at the ceiling rather than above it.
+     */
+    ['viz', { count: 114, totalMs: 215_700_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this

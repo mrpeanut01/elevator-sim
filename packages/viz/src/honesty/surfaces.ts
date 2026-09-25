@@ -10275,6 +10275,8 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
     'everyday/campaignModel.ts#TEST_TENSIONS',
     /* § 8.1's build select saying it changes no day — drawn under the control on both surfaces. */
     'everyday/campaignModel.ts#BUILD_REFUSAL',
+    /* § D1078's refused stagger, drawn on Garden Apartments' shop row, which keeps no start time. */
+    'everyday/campaignModel.ts#SHOP_NO_START_TIME',
     'everyday/campaignModel.ts#CALENDAR_LEGEND',
     'everyday/campaignModel.ts#MONTH_LEGEND',
     /* Reached through the three views above: every figure they print is one of these. */
@@ -10310,9 +10312,20 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
     void context;
     const seeds: TextSeed[] = [];
 
+    /*
+     * `startTimeFloors` is what `campaignScreens.ts#campaignInputOf` writes from the host (GitHub
+     * issue #603, § D1078): a block of flats keeps no start time, so its shop draws staggered start
+     * times refused, and Chancery House's eighteen populated office floors all keep one.
+     */
     const buildings = new Map([
-      ['garden-apartments', { name: 'Garden Apartments', spec: '7 floors · 2 cars · 0.63 m/s · 240 people' }],
-      ['chancery-house', { name: 'Chancery House', spec: '20 floors · 6 cars · 5 m/s · 612 people' }],
+      [
+        'garden-apartments',
+        { name: 'Garden Apartments', spec: '7 floors · 2 cars · 0.63 m/s · 240 people', startTimeFloors: 0 },
+      ],
+      [
+        'chancery-house',
+        { name: 'Chancery House', spec: '20 floors · 6 cars · 5 m/s · 612 people', startTimeFloors: 18 },
+      ],
     ]);
     const dispatchers = [
       { id: 'eta', name: 'Minimum estimated wait', note: undefined, saved: false },
