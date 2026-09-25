@@ -642,6 +642,15 @@ export interface LadderValidationInput {
    * `dev/data.ts`'s fetch and are not available at module-init time.
    */
   readonly dispatcherIds: () => readonly string[];
+  /**
+   * The horizon the Scenario run press runs a building on — `'whole-day'` where
+   * `shift/dayLength.ts#wholeDayFor` answers and `'period'` where it does not, which is
+   * `dayLength.ts#scenarioHorizonFor`. `undefined` for a building this build cannot resolve.
+   *
+   * Threaded for {@link ContractPressDay.horizon}: a pin measured on a horizon the product never
+   * runs its tower on is a measurement of a day nobody can play (GitHub issue #595, § D974).
+   */
+  readonly horizonFor: (buildingId: string) => RunHorizon | undefined;
 }
 
 /** The two parking verbs a {@link ContractPressDay} may name — `core`'s own kinds, not new ones. */
@@ -877,6 +886,21 @@ export function contractLadderIssues(
           `ladder row ${row.contractId} pins a press day on a horizon that is neither 'period' ` +
             "nor 'whole-day'; a pin says which kind of run it was measured on (GitHub issue #595)",
         );
+      } else {
+        /*
+         * § D974: a pin on a horizon the Scenario press does not run its tower on is a measurement of
+         * a day no player can take, which is what five of § D914's seven were until they were
+         * re-measured on the whole day.
+         */
+        const horizon = input.horizonFor(row.buildingId);
+        if (press.horizon !== horizon) {
+          issues.push(
+            `ladder row ${row.contractId} pins a press day measured on ` +
+              `${JSON.stringify(press.horizon)}, and the Scenario press runs ${row.buildingId} on ` +
+              `${JSON.stringify(horizon ?? 'nothing')}; a pin on a horizon nobody plays is a day ` +
+              'nobody can meet',
+          );
+        }
       }
       if (press.mootUnder.includes(press.standingOrder)) {
         issues.push(

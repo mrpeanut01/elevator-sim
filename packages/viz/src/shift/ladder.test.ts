@@ -34,6 +34,7 @@ import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 
 import { CONTRACTS } from './contracts.js';
+import { scenarioHorizonFor } from './dayLength.js';
 import {
   CONTRACT_LADDER,
   contractLadderIssues,
@@ -75,6 +76,9 @@ function validationInput(): LadderValidationInput {
     mixedBankIdsFor: (buildingId) => mixedFleetBanks(authoredBuilding(buildingId)),
     /* Every shipped profile id, for a rung's pinned press day to name — § D914. */
     dispatcherIds: () => config.dispatcherProfiles.profiles.map((profile) => profile.id),
+    /* The horizon the Scenario press runs each tower on, for a pin to match — § D974. */
+    horizonFor: (buildingId) =>
+      scenarioHorizonFor(config.trafficProfiles, authoredBuilding(buildingId)),
     speedBandFor: (machineClassId) => {
       const entry = config.specsById.get(machineClassId);
       if (entry === undefined) return undefined;
@@ -128,7 +132,8 @@ describe('the shipped ladder is legal against the shipped data', () => {
        * comparing — the fabric's `incidents` two blocks below has read this way since § D871, and
        * the point of the check survives either way: the set is closed, so a key this table does not
        * name still fails. § D914 added the fifth, and it declares no bar either: a seed, two
-       * `InterventionChange` kinds, a fraction and a list of shipped dispatcher ids.
+       * `InterventionChange` kinds, a fraction and a list of shipped dispatcher ids. § D974 added
+       * `horizon`, which names the kind of run the pin was measured on and grades nothing.
        */
       expect(Object.keys(row).sort().filter((key) => key !== 'pressDay')).toEqual([
         'buildingId',
@@ -141,6 +146,7 @@ describe('the shipped ladder is legal against the shipped data', () => {
       if (press !== undefined) {
         expect(Object.keys(press).sort()).toEqual([
           'clearedBy',
+          'horizon',
           'missedBy',
           'mootUnder',
           'pressAtFraction',

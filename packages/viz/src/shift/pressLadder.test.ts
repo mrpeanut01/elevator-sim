@@ -68,7 +68,7 @@ import { AFTER_PRESS_ROW_ID, AFTER_PRESS_VERDICT_NOTE } from './afterPress.js';
 import { contractDayState } from './contractDay.test-helper.js';
 import { contractById, CONTRACTS } from './contracts.js';
 import { pressCounterfactualOf } from './counterfactual.js';
-import { runHorizonOf, wholeDayFor, wholeDayRun } from './dayLength.js';
+import { runHorizonOf, scenarioHorizonFor, wholeDayFor, wholeDayRun } from './dayLength.js';
 import { SHIFT_EVENTS } from './events.js';
 import { goalsForDay, readGoals } from './goals.js';
 import { CONTRACT_LADDER, ladderRowFor, pressDayFor, type ContractPressDay } from './ladder.js';
@@ -236,6 +236,72 @@ describe('the press ladder — every pinned day, in both directions', () => {
     expect(PINNED.map(([contractId]) => contractId)).toEqual(booking);
     expect(PINNED.length, 'some rung pins a day, or this file checks nothing').toBeGreaterThan(0);
   });
+
+  it('pins each day on the horizon the Scenario press runs its tower on — issue #595', () => {
+    /*
+     * GitHub issue #595, § D974. § D914 measured all seven pins on the contract's thirty-minute
+     * slice, and `everyday/host.ts#startRun` runs five of those towers as whole authored days — so
+     * five pins were true of a run no player could take. Asked of the building rather than of the
+     * pin, in both directions: a pin on the wrong horizon fails here, and so does a tower whose
+     * horizon moved under a pin that stayed.
+     */
+    for (const [contractId, press] of PINNED) {
+      const contract = contractById(contractId);
+      const horizon = scenarioHorizonFor(
+        RESOURCES_WITH_TOWERS.trafficProfiles,
+        buildingConfigOf(RESOURCES_WITH_TOWERS, [], contract?.buildingId ?? ''),
+      );
+      expect(press.horizon, contractId).toBe(horizon);
+    }
+    /* Non-vacuity: both horizons are pinned somewhere, so neither half of the check is idle. */
+    expect(new Set(PINNED.map(([, press]) => press.horizon))).toEqual(new Set(['period', 'whole-day']));
+  });
+
+  it('presses a whole day inside one of its peaks, where the stage plays at the player’s speed', () => {
+    /*
+     * GitHub issue #595, § D974, against wave AH's stage-pace ruling: on a whole-day run the
+     * stage crosses the hours between the day's peaks at thirty times and plays the peaks at the
+     * player's own speed. A press pinned between peaks is one a player makes in fast-forward — no
+     * more reachable than a press behind `?seed=`. So a whole-day pin must fall inside a peak.
+     *
+     * The peaks are derived here from the record rather than listed: maximal contiguous runs of
+     * phases whose `max(startIntensity, endIntensity)` reaches the day's own peak — the rule the
+     * ruling states for `shift/dayLength.ts`'s acts, which on `office-day` gives 08:30–09:00,
+     * 12:15–12:45 and 17:15–17:45. A first draft required *both* ends at the peak and found only the
+     * five-minute holds inside each act, which is narrower than the stage the ruling builds.
+     * Computed in this file because that function is another lane's; when it lands, this is the
+     * place to call it instead.
+     */
+    const whole = PINNED.filter(([, press]) => press.horizon === 'whole-day');
+    expect(whole.length, 'some pin is on a whole day, or this checks nothing').toBeGreaterThan(0);
+    for (const [contractId, press] of whole) {
+      const contract = contractById(contractId);
+      const day = wholeDayFor(
+        RESOURCES_WITH_TOWERS.trafficProfiles,
+        buildingConfigOf(RESOURCES_WITH_TOWERS, [], contract?.buildingId ?? ''),
+      );
+      const record = RESOURCES_WITH_TOWERS.trafficProfiles.demandTemplates.find(
+        (candidate) => candidate.id === day?.templateId,
+      );
+      const phases = record?.phases ?? [];
+      const peak = phases.reduce((top, phase) => Math.max(top, phase.startIntensity, phase.endIntensity), 0);
+      const held: (readonly [number, number])[] = [];
+      for (const phase of phases) {
+        if (Math.max(phase.startIntensity, phase.endIntensity) < peak) continue;
+        const last = held[held.length - 1];
+        if (last !== undefined && last[1] === phase.startMin * 60) {
+          held[held.length - 1] = [last[0], phase.endMin * 60];
+        } else {
+          held.push([phase.startMin * 60, phase.endMin * 60]);
+        }
+      }
+      expect(held.length, `${contractId} has peaks to press in`).toBeGreaterThan(0);
+      const atS = (day?.periodS ?? 0) * press.pressAtFraction;
+      const inside = held.some(([fromS, toS]) => atS >= fromS && atS < toS);
+      expect(inside, `${contractId} presses at ${String(atS)} s, outside ${JSON.stringify(held)}`).toBe(true);
+    }
+  });
+
 
   for (const [contractId, press] of PINNED) {
     describe(contractId, () => {

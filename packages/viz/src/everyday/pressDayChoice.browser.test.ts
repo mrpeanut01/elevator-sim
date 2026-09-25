@@ -97,7 +97,11 @@ describe.skipIf(!HAS_BROWSER)('a day a press decides is reachable from the front
    * their pins on the whole day (GitHub issue #595, § D973), and not before — until then their rows
    * are refused on the door, which `towerChoice.test.ts` asserts over the shipped data.
    */
-  for (const [contractId, buildingId] of [['c7', 'crown-hotel']] as const) {
+  for (const [contractId, buildingId] of [
+    ['c7', 'crown-hotel'],
+    /* A whole-day pin, re-measured by § D974 — the horizon gate on the shipped bundle. */
+    ['c2', 'midtown-office'],
+  ] as const) {
     it(`sets ${contractId}'s pinned day up on its own crowd, and the brief agrees it is that day`, async () => {
       const press = pressDayFor(contractId);
       expect(press, `${contractId} pins a day`).toBeDefined();
