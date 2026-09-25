@@ -908,7 +908,8 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     const page = await coldLoad('midtown-office');
     await enterEverydayStage(page);
 
-    const SWITCH = '.everyday-stage-intervene[data-intervention-kind="switch-dispatcher"]';
+    /* The whole-dispatcher handover since § D1048 — the press the label names. */
+    const SWITCH = '.everyday-stage-intervene[data-intervention-kind="adopt-dispatcher"]';
     await page.waitForSelector('.everyday-stage-switch-pick', { timeout: 30_000 });
     /* The standing dispatcher is what the picker opens on — § 7.6's own *who is driving*. */
     const standing = await page.evaluate(
@@ -947,7 +948,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     expect(await page.getAttribute(SWITCH, 'disabled')).not.toBe(null);
     /* § 7.6's fourth rule: it *says so*, in the refusal line, rather than only in a tooltip. */
     expect(await page.textContent('.everyday-stage-intervene-refusal')).toContain(
-      'already running',
+      'already runs this way',
     );
 
     /*
@@ -962,6 +963,22 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
 
     const beforePick = await runFingerprint(page);
     expect(beforePick).not.toBeNull();
+
+    /*
+     * **A destination row is refused on the page, with its reason** — § D1048. It used to arrive
+     * enabled and move no leg, which is the inert control § D177 ranks below no control at all.
+     * Selected here first so the refusal is read off the same button the handover then uses.
+     */
+    const panelled = other.find((value) => value.startsWith('destination-'));
+    if (panelled !== undefined && panelled !== standing) {
+      await page.selectOption('.everyday-stage-switch-pick', panelled);
+      await page.waitForFunction(
+        () => (document.querySelector('.everyday-stage-intervene-refusal')?.textContent ?? '').includes('landing panels'),
+        undefined,
+        { timeout: 30_000 },
+      );
+      expect(await page.getAttribute(SWITCH, 'disabled')).not.toBe(null);
+    }
 
     await page.selectOption('.everyday-stage-switch-pick', handTo);
     await page.waitForFunction(

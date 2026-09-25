@@ -95,7 +95,9 @@ import {
   SPREAD_CARS_LABEL,
   switchChangesNothing,
   switchDispatcherLabelOf,
+  switchNoteOf,
   SWITCH_PINS_NOTE,
+  switchRefusalOf,
   admitWorks,
   worksKindOfTier,
   worksLabelOf,
@@ -1206,17 +1208,22 @@ export const STAGE_SWITCH_PICKER_NOTE =
   'press the button beside it.';
 
 /**
- * Why the handover arm cannot act — it would hand the day to the vector already driving.
+ * Why the handover arm cannot act — it would hand the day to the dispatcher already in force.
  *
  * A sentence rather than a bare disabled button (§ 7.6's fourth rule), and it names the *reason*
- * rather than the comparison: what the player has selected is what the building is already obeying,
- * so the record would grow an entry that changed no decision. `live/interventions.ts` decides when
- * this is true, and it is emphatically not an id comparison — a player who has moved the plain
- * levers is driving a different vector under the same name, and handing the day to that name is a
- * real change.
+ * rather than the comparison. `live/interventions.ts` decides when this is true, and it is
+ * emphatically not an id comparison — a player who has moved the plain levers is driving a
+ * different dispatcher under the same name, and handing the day to that name is a real change.
+ *
+ * **Rewritten by [§ D1048](../../../../DECISIONS.md)**, because its first half was false. It read
+ * *"that is what the building is already running"*, drawn under *Switch to Minimum estimated wait*
+ * on a day collective was driving: the two share a weight vector, the old check compared vectors,
+ * and the sentence named the wrong dispatcher as the driver while the brief said ETA clears the
+ * day. It now claims identity of **effect** and nothing about who is driving, which is the only
+ * thing the check establishes.
  */
 export const STAGE_SWITCH_NO_CHANGE =
-  'that is what the building is already running — handing the day over would change nothing';
+  'the day already runs this way — handing it over would change no decision';
 
 /** The intervention control, resolved for a run and a playhead. */
 export interface StageInterventionView {
@@ -1352,19 +1359,43 @@ function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] 
   const { switchTo } = input;
   const works = worksRowsOf(input);
   if (switchTo === undefined) return Object.freeze([...STAGE_INTERVENTIONS, ...works]);
-  const changesNothing = switchChangesNothing({
-    interventions: input.interventions,
-    target: switchTo.target,
-    driving: switchTo.driving,
-  });
+  /*
+   * The target's own refusal first — [§ D1048](../../../../DECISIONS.md): a handover that cannot
+   * carry the landing panels or the bidding is refused on that ground whatever else is true of it,
+   * because the no-change ground would be answering a question about a dispatcher the press could
+   * not deliver.
+   */
+  const driving = switchTo.driving();
+  const refusal =
+    switchRefusalOf(switchTo.target, driving) ??
+    (switchChangesNothing({
+      interventions: input.interventions,
+      target: switchTo.target,
+      driving: () => driving,
+    })
+      ? STAGE_SWITCH_NO_CHANGE
+      : undefined);
+  /*
+   * What this target cannot bring with it (§ D1048), then whether the day can be posted — both
+   * facts the player is owed before pressing, and neither disables anything.
+   */
+  const notes = [
+    ...(refusal === undefined ? [switchNoteOf(switchTo.target, driving)] : []),
+    switchTo.unpostable,
+  ].filter((note): note is string => note !== undefined);
   return Object.freeze([
     ...STAGE_INTERVENTIONS,
     Object.freeze({
-      change: Object.freeze({ kind: 'switch-dispatcher' as const, profile: switchTo.target }),
+      /*
+       * `adopt-dispatcher` since [§ D1048](../../../../DECISIONS.md): the label says *Switch to X*,
+       * and only the whole dispatcher makes that true. `switch-dispatcher` stays in `core` for the
+       * records that already carry it.
+       */
+      change: Object.freeze({ kind: 'adopt-dispatcher' as const, profile: switchTo.target }),
       label: switchDispatcherLabelOf(switchTo.target.name),
       explains: STAGE_SWITCH_EXPLAINS,
-      ...(changesNothing ? { refusal: STAGE_SWITCH_NO_CHANGE } : {}),
-      ...(switchTo.unpostable === undefined ? {} : { note: switchTo.unpostable }),
+      ...(refusal === undefined ? {} : { refusal }),
+      ...(notes.length === 0 ? {} : { note: notes.join('. ') }),
     }),
     ...works,
   ]);

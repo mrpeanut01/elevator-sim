@@ -504,7 +504,12 @@ function valueIsDeclared(
  * under, applied to the switch arm instead of a category refusal standing over it.
  */
 export interface SubmittedSwitch {
-  readonly kind: 'switch-dispatcher';
+  /**
+   * Either handover kind. `adopt-dispatcher` ([§ D1048](../../../../DECISIONS.md)) travels on
+   * exactly this shape and this bound — § D858's row rules apply to it unchanged — because it names
+   * a shipped dispatcher the same way and differs only in what the kernel takes from it.
+   */
+  readonly kind: 'switch-dispatcher' | 'adopt-dispatcher';
   readonly toProfileId: string;
   readonly ruleRows?: readonly RuleRowConfig[] | undefined;
 }
@@ -556,11 +561,11 @@ export function interventionIssues(log: readonly SubmittedIntervention[] | undef
           `only ${SUBMITTABLE_INTERVENTION_KINDS.join(', ')} travel, because ` +
           `${interventionKindRefusal(kind) ?? 'this build does not say why'}`,
       );
-    } else if (kind === 'switch-dispatcher') {
+    } else if (kind === 'switch-dispatcher' || kind === 'adopt-dispatcher') {
       const change = entry.change as Partial<SubmittedSwitch>;
       if (typeof change.toProfileId !== 'string' || change.toProfileId.length === 0) {
         issues.push(
-          `interventions[${index}] is a switch-dispatcher with no toProfileId — a switch travels as ` +
+          `interventions[${index}] is a ${kind} with no toProfileId — a switch travels as ` +
             'a shipped dispatcher id plus rule rows, never as an inline profile',
         );
       }

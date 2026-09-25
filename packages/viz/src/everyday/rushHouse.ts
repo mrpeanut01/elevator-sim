@@ -200,8 +200,9 @@ export const RUSH_HOUSE_COPY = Object.freeze({
     'and the same waves you face. Nobody played them, and the order does not rank the ' +
     'dispatchers — one crowd, one run each. Outlast one and you have outlasted a machine on the ' +
     'same arrivals. Each row drove from the run’s first second, which is what picking one below ' +
-    'does; handing the day over part-way through swaps the weight vector and leaves the rest of ' +
-    'the opening dispatcher’s settings running, so it is not what these rows measured.',
+    'does. A day handed over part-way through runs on its opening dispatcher until the handover, ' +
+    'and a dispatcher whose door timing or call forecast is set when the day starts cannot bring ' +
+    'those with it, so a handed-over day is not what these rows measured.',
   /**
    * The row the player is set to run — GitHub issue **#565**, second defect,
    * [§ D858](../../../../DECISIONS.md).

@@ -168,14 +168,16 @@ function asTheClientBuildsIt(run: SubmittedRun): SimulationConfig {
  */
 function asTheClientHoldsTheLog(run: SubmittedRun): readonly RunInterventionConfig[] {
   return (run.interventions ?? []).map((entry): RunInterventionConfig => {
-    if (entry.change.kind !== 'switch-dispatcher') return { atS: entry.atS, change: { kind: entry.change.kind } };
+    if (entry.change.kind !== 'switch-dispatcher' && entry.change.kind !== 'adopt-dispatcher') {
+      return { atS: entry.atS, change: { kind: entry.change.kind } };
+    }
     const profile = config.dispatcherProfilesById.get(entry.change.toProfileId);
     if (profile === undefined) throw new Error('fixture does not resolve');
     const rows = entry.change.ruleRows ?? [];
     return {
       atS: entry.atS,
       change: {
-        kind: 'switch-dispatcher',
+        kind: entry.change.kind,
         profile:
           rows.length === 0
             ? profile
@@ -389,6 +391,35 @@ describe('an Everyday run is submittable, and the server reaches the same figure
     const plain = metricsOf(runSimulation(asTheClientBuildsIt(EVERYDAY_RUN)).summary);
     const handed = metricsOf(runSimulation(asTheClientBuildsIt(bare)).summary);
     expect(handed.awtS).not.toBe(plain.awtS);
+  });
+
+  it('replays a whole-dispatcher handover to the client’s own metrics, and it is not the weights-only one — § D1048', () => {
+    /*
+     * The player's press since § D1048. It travels on the switch's own shape, an id plus rows, and
+     * the server keeps the kind, because the kind is what decides how much of the dispatcher the
+     * kernel hands over. `eta` is the target because it shares collective's weights: a server that
+     * dropped the kind and replayed a weights-only switch would agree with nothing here.
+     */
+    const adopted: SubmittedRun = {
+      ...EVERYDAY_RUN,
+      interventions: [{ atS: 300, change: { kind: 'adopt-dispatcher', toProfileId: 'eta' } }],
+    };
+    const ruled: SubmittedRun = {
+      ...EVERYDAY_RUN,
+      interventions: [{ atS: 300, change: { kind: 'adopt-dispatcher', toProfileId: 'eta', ruleRows: RULES } }],
+    };
+    for (const run of [adopted, ruled]) {
+      const verification = verifySubmission(claimedByTheClient(run), resources);
+      expect(verification.ok, JSON.stringify(verification)).toBe(true);
+    }
+    const weightsOnly = runSimulation(
+      asTheClientBuildsIt({
+        ...EVERYDAY_RUN,
+        interventions: [{ atS: 300, change: { kind: 'switch-dispatcher', toProfileId: 'eta' } }],
+      }),
+    );
+    const whole = runSimulation(asTheClientBuildsIt(adopted));
+    expect(JSON.stringify(whole.record.passengers)).not.toBe(JSON.stringify(weightsOnly.record.passengers));
   });
 
   it('replays both together, because a player who writes rules also plays the day', () => {

@@ -213,7 +213,11 @@ export function rushRoundRecordOf(input: {
   const ordered = [...state.interventions].sort((a, b) => a.atS - b.atS);
   const drivers = [
     input.dispatcherName,
-    ...ordered.flatMap((entry) => (entry.change.kind === 'switch-dispatcher' ? [entry.change.profile.name] : [])),
+    ...ordered.flatMap((entry) =>
+      entry.change.kind === 'switch-dispatcher' || entry.change.kind === 'adopt-dispatcher'
+        ? [entry.change.profile.name]
+        : [],
+    ),
   ];
   return Object.freeze({
     dispatcherProfileId: state.dispatcherId,
@@ -252,13 +256,13 @@ function wireRoundInterventions(
       carried.push({ atS: entry.atS, change: { kind: change.kind } });
       continue;
     }
-    if (change.kind === 'switch-dispatcher') {
+    if (change.kind === 'switch-dispatcher' || change.kind === 'adopt-dispatcher') {
       const target = switchWireOf(change.profile, shipped);
       if (target === undefined) {
         refusals.push(switchUnpostableReasonOf(change.profile, shipped) ?? '');
         continue;
       }
-      carried.push({ atS: entry.atS, change: { kind: 'switch-dispatcher', ...target } });
+      carried.push({ atS: entry.atS, change: { kind: change.kind, ...target } });
       continue;
     }
     /*

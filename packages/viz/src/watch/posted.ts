@@ -147,7 +147,7 @@ export function postedLogOf(
   const log: RunInterventionConfig[] = [];
   for (const intervention of entry.run.interventions ?? []) {
     const change = intervention.change;
-    if (change.kind === 'switch-dispatcher') {
+    if (change.kind === 'switch-dispatcher' || change.kind === 'adopt-dispatcher') {
       const rows = rowsFromWire(change.ruleRows ?? []);
       if (typeof rows === 'string') return `${rows}, and this run's handover is written on it`;
       const profile = switchTargetFromWire({ toProfileId: change.toProfileId, ruleRows: rows }, shipped);
@@ -157,7 +157,7 @@ export function postedLogOf(
           'so the handover cannot be replayed here and the row cannot be watched'
         );
       }
-      log.push({ atS: intervention.atS, change: { kind: 'switch-dispatcher', profile } });
+      log.push({ atS: intervention.atS, change: { kind: change.kind, profile } });
     } else {
       log.push({ atS: intervention.atS, change: { kind: change.kind } });
     }

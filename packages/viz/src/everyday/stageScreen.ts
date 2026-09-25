@@ -1077,7 +1077,7 @@ function mountStage(
   }
   const switchButton = el(doc, 'button', 'everyday-stage-intervene');
   switchButton.type = 'button';
-  switchButton.dataset['interventionKind'] = 'switch-dispatcher';
+  switchButton.dataset['interventionKind'] = 'adopt-dispatcher';
   switchButton.style.cssText = ARM_BUTTON_CSS;
   /** The handover row as of the last {@link draw} — the model's, never composed here. */
   let switchRow: StageInterventionRow | undefined;
@@ -2077,7 +2077,7 @@ function mountStage(
    * page after the wider one had gone.
    */
   function applySwitchRow(view: StageInterventionView, sharedRefusal: string | undefined): void {
-    switchRow = view.rows.find((row) => row.change.kind === 'switch-dispatcher');
+    switchRow = view.rows.find((row) => row.change.kind === 'adopt-dispatcher');
     if (switchRow !== undefined) {
       switchButton.textContent = switchRow.label;
       switchButton.title = switchRow.refusal ?? switchRow.explains;

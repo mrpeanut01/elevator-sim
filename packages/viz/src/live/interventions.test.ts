@@ -33,8 +33,15 @@ import {
   SPREAD_CARS_LABEL,
   spentOnWorks,
   switchChangesNothing,
+  SWITCH_KEEPS_DOORS,
+  SWITCH_KEEPS_FORECAST,
+  SWITCH_NEEDS_BIDDING,
+  SWITCH_NEEDS_OTHER_PANELS,
   SWITCH_PINS_NOTE,
+  SWITCH_STOPS_BIDDING,
   switchDispatcherLabelOf,
+  switchNoteOf,
+  switchRefusalOf,
   WORKS_ARM_EXPLAINS,
   worksKindOfTier,
   worksLabelOf,
@@ -121,8 +128,13 @@ describe('interventionStampOf', () => {
     // The mechanism's one player-facing sentence, carried on the switch control's title: the
     // adopted vector silences rules and pattern switching from the stamped instant, and a
     // behaviour nothing states is a stale refusal waiting to happen.
-    expect(SWITCH_PINS_NOTE).toContain('weights alone');
     expect(SWITCH_PINS_NOTE).toContain('rules or pattern switching stand down');
+    // § D1048: the press hands over the whole dispatcher, so the sentence no longer says *weights
+    // alone* — which was true of the old kind and made the button's own label false — and names
+    // the stages a player can see move, and the assignments that do not.
+    expect(SWITCH_PINS_NOTE).not.toContain('weights');
+    expect(SWITCH_PINS_NOTE).toContain('runs as this dispatcher would run it');
+    expect(SWITCH_PINS_NOTE).toContain('calls already given a car keep it');
   });
 
   it('stamps an incident answer with the chosen option’s own words — § 20.16’s clock', () => {
@@ -243,27 +255,168 @@ describe('switchChangesNothing', () => {
       asked += 1;
       return profileOf('plain', { waitTime: 9, stopCount: 2 });
     };
-    const log = [{ atS: 60, change: { kind: 'switch-dispatcher', profile: PLAIN } }] as const;
+    const log = [{ atS: 60, change: { kind: 'adopt-dispatcher', profile: PLAIN } }] as const;
     expect(switchChangesNothing({ interventions: log, target: PLAIN, driving })).toBe(true);
     /*
      * The thunk's whole reason, asserted rather than described: the pinned case answers from the log
      * and never walks the spec chain, and both callers run this on frames.
      */
     expect(asked).toBe(0);
-    const other = profileOf('other', { waitTime: 1, stopCount: 2 });
+    const other = profileOf('other', { waitTime: 3, stopCount: 2 });
     expect(switchChangesNothing({ interventions: log, target: other, driving })).toBe(false);
     expect(asked).toBe(0);
+  });
+
+  /**
+   * **§ D1048's correction, on the shipped pair that found it.** `collective` and *Minimum estimated
+   * wait* share `waitTime: 1`, so a vector comparison called the handover a no-op and the stage drew
+   * *"that is what the building is already running"* under a dispatcher the building was not
+   * running. The whole dispatcher differs by one hard constraint, and that is a change.
+   */
+  it('compares the whole dispatcher a handover carries, not the vector — collective to ETA is a change', () => {
+    const collective: DispatcherProfile = { id: 'collective', name: 'Collective', weights: { waitTime: 1 }, hardConstraints: ['noDirectionReversal'] };
+    const eta: DispatcherProfile = { id: 'eta', name: 'ETA', weights: { waitTime: 1 } };
+    expect(switchChangesNothing({ interventions: [], target: eta, driving: () => collective })).toBe(false);
+    /* A stage setting is a difference too, at equal weights and constraints. */
+    const reassigning: DispatcherProfile = { ...eta, id: 'r', dispatch: { reassignmentPolicy: 'until-commitment' } };
+    expect(switchChangesNothing({ interventions: [], target: reassigning, driving: () => eta })).toBe(false);
+    /* And a field a handover does not carry is not: an authored default is the default. */
+    const spelledOut: DispatcherProfile = { ...eta, id: 's', dispatch: { reassignmentPolicy: 'never' } };
+    expect(switchChangesNothing({ interventions: [], target: spelledOut, driving: () => eta })).toBe(true);
+  });
+
+  it('reads a weights-only handover on a replayed log as the driver’s stages under its weights', () => {
+    const collective: DispatcherProfile = { id: 'collective', name: 'Collective', weights: { waitTime: 1 }, hardConstraints: ['noDirectionReversal'] };
+    const nearest: DispatcherProfile = { id: 'nearest', name: 'Nearest', weights: { distanceTravelled: 1 } };
+    const log = [{ atS: 60, change: { kind: 'switch-dispatcher', profile: nearest } }] as const;
+    /* What is in force is collective's rule with nearest's weights, which is not nearest. */
+    expect(switchChangesNothing({ interventions: log, target: nearest, driving: () => collective })).toBe(false);
+    expect(
+      switchChangesNothing({
+        interventions: log,
+        target: { ...nearest, id: 'n2', hardConstraints: ['noDirectionReversal'] },
+        driving: () => collective,
+      }),
+    ).toBe(true);
   });
 
   it('reads the last handover on the log, not the first', () => {
     const other = profileOf('other', { waitTime: 3 });
     const log = [
-      { atS: 60, change: { kind: 'switch-dispatcher', profile: PLAIN } },
-      { atS: 120, change: { kind: 'switch-dispatcher', profile: other } },
+      { atS: 60, change: { kind: 'adopt-dispatcher', profile: PLAIN } },
+      { atS: 120, change: { kind: 'adopt-dispatcher', profile: other } },
     ] as const;
     expect(
       switchChangesNothing({ interventions: log, target: other, driving: () => PLAIN }),
     ).toBe(true);
+  });
+});
+
+/**
+ * **The two things no handover can carry, refused on the target's own data** — § D1048.
+ *
+ * Driven over the shipped file rather than over fixtures alone, because the defect this closes was
+ * two shipped rows: *Destination disclosure* and *Destination dispatch* were offered, enabled, and
+ * moved no leg. The refusal is decided off the fields the engine resolves (the landing pair and the
+ * auction section), so a saved dispatcher is refused on the same ground as a shipped one and no
+ * profile id is read (invariant 7).
+ */
+describe('switchRefusalOf — § D1048', () => {
+  let shipped: readonly DispatcherProfile[];
+  beforeAll(async () => {
+    shipped = (await loadConfig(DATA_DIR)).dispatcherProfiles.profiles;
+  });
+  const byId = (id: string): DispatcherProfile => {
+    const found = shipped.find((profile) => profile.id === id);
+    if (found === undefined) throw new Error(`no shipped profile ${id}`);
+    return found;
+  };
+
+  it('refuses both destination rows from a day on up-and-down buttons, with the panels reason', () => {
+    expect(switchRefusalOf(byId('destination-eta'), byId('collective'))).toBe(SWITCH_NEEDS_OTHER_PANELS);
+    expect(switchRefusalOf(byId('destination-panel'), byId('collective'))).toBe(SWITCH_NEEDS_OTHER_PANELS);
+  });
+
+  it('refuses the way back too, and between the two destination levels', () => {
+    expect(switchRefusalOf(byId('collective'), byId('destination-panel'))).toBe(SWITCH_NEEDS_OTHER_PANELS);
+    /* Same call type, different panel: one names a car per rider and the other does not. */
+    expect(switchRefusalOf(byId('destination-panel'), byId('destination-eta'))).toBe(SWITCH_NEEDS_OTHER_PANELS);
+  });
+
+  it('refuses a bidding target from a day that does not bid, and the reverse, and a change of rounds', () => {
+    expect(switchRefusalOf(byId('auction'), byId('collective'))).toBe(SWITCH_NEEDS_BIDDING);
+    expect(switchRefusalOf(byId('auction-multi-round'), byId('collective'))).toBe(SWITCH_NEEDS_BIDDING);
+    expect(switchRefusalOf(byId('collective'), byId('auction'))).toBe(SWITCH_STOPS_BIDDING);
+    expect(switchRefusalOf(byId('auction-multi-round'), byId('auction'))).toBe(SWITCH_STOPS_BIDDING);
+  });
+
+  it('refuses nothing between two conventional dispatchers, or a bidding day handed its own rules', () => {
+    for (const target of shipped) {
+      const sameLanding =
+        (target.dispatch?.callType ?? 'up-down-buttons') === 'up-down-buttons' &&
+        (target.dispatch?.passengerAssignment ?? 'none') === 'none';
+      const bids = target.auction !== undefined;
+      expect(switchRefusalOf(target, byId('collective')) === undefined, target.id).toBe(sameLanding && !bids);
+    }
+    expect(switchRefusalOf(byId('auction'), byId('auction'))).toBeUndefined();
+  });
+
+  it('reads the data, not the name — a saved copy with a panel is refused, and one without is not', () => {
+    const saved: DispatcherProfile = { ...byId('eta'), id: 'saved-1', name: 'My dispatcher' };
+    expect(switchRefusalOf(saved, byId('collective'))).toBeUndefined();
+    expect(
+      switchRefusalOf({ ...saved, dispatch: { callType: 'destination-entry' } }, byId('collective')),
+    ).toBe(SWITCH_NEEDS_OTHER_PANELS);
+  });
+
+  it('says what cannot change and never names an engine field', () => {
+    for (const sentence of [SWITCH_NEEDS_OTHER_PANELS, SWITCH_NEEDS_BIDDING, SWITCH_STOPS_BIDDING]) {
+      expect(sentence).toMatch(/^cannot take over part-way through the day: /u);
+      expect(sentence).not.toMatch(/callType|passengerAssignment|aggregation|auction|weight/u);
+    }
+  });
+});
+
+/**
+ * **What a handover cannot bring part-way, named on the row** — § D1048.
+ *
+ * Driven over the shipped file: the two notes appear exactly for the two targets whose door timing
+ * or demand forecast is built with the day, and for no other conventional target from the standing
+ * order. `core`'s `sim/adoptDispatcher.test.ts` is the run that pins the same partition: those two
+ * are the only adoptable targets a handover at 0:00 does not reproduce.
+ */
+describe('switchNoteOf — § D1048', () => {
+  let shipped: readonly DispatcherProfile[];
+  beforeAll(async () => {
+    shipped = (await loadConfig(DATA_DIR)).dispatcherProfiles.profiles;
+  });
+
+  it('names door timing for Energy aware, both halves for Predictive balanced, and nothing else', () => {
+    const collective = shipped.find((profile) => profile.id === 'collective');
+    if (collective === undefined) throw new Error('no collective');
+    const noted = Object.fromEntries(
+      shipped
+        .filter((target) => switchRefusalOf(target, collective) === undefined)
+        .map((target) => [target.id, switchNoteOf(target, collective)] as const)
+        .filter(([, note]) => note !== undefined),
+    );
+    expect(noted).toEqual({
+      'energy-aware': SWITCH_KEEPS_DOORS,
+      'predictive-balanced': `${SWITCH_KEEPS_DOORS}; ${SWITCH_KEEPS_FORECAST}`,
+    });
+  });
+
+  it('is relative to the day: the same target from a day already on its settings needs no note', () => {
+    const energy = shipped.find((profile) => profile.id === 'energy-aware');
+    if (energy === undefined) throw new Error('no energy-aware');
+    expect(switchNoteOf(energy, energy)).toBeUndefined();
+  });
+
+  it('says what stays, in the player’s words, and never names a field', () => {
+    for (const sentence of [SWITCH_KEEPS_DOORS, SWITCH_KEEPS_FORECAST]) {
+      expect(sentence).toMatch(/^the cars keep /u);
+      expect(sentence).not.toMatch(/dwell|predictor|answer|idle|bypass/u);
+    }
   });
 });
 

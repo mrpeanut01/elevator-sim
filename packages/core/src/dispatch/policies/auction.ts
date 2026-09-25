@@ -122,6 +122,7 @@ import {
   type EligibilityVerdict,
   type RepositionContext,
   type RepositionDecision,
+  type ResolvedDispatchConfig,
 } from '../types.js';
 
 import { MAX_AUCTION_ROUNDS, POLICY_DEFAULTS, POLICY_PARAMETERS } from './parameters.js';
@@ -424,7 +425,17 @@ export class AuctionDispatchPolicy implements DispatchPolicy {
   readonly id: string;
   readonly name: string;
   readonly engine = 'weighted-cost' as const;
-  readonly config: ResolvedAuctionConfig;
+  /**
+   * The engine's configuration with this object's auction stage beside it. Behind a getter since
+   * [§ D1048](../../../../../DECISIONS.md) for the engine's own reason: an `adopt-dispatcher` moves
+   * the engine's stages, and `Simulation` reads some of them (eligibility, idle) off this field at
+   * decision time, so a copy taken at construction would answer for a dispatcher no longer running.
+   */
+  #config: ResolvedAuctionConfig;
+  readonly #opening: ResolvedAuctionConfig;
+  get config(): ResolvedAuctionConfig {
+    return this.#config;
+  }
   /** Every lifecycle tunable, plus the aggregation's own (CLAUDE.md invariant 8). */
   readonly parameters: readonly DispatchParameterSpec[] = Object.freeze([
     ...DISPATCH_PARAMETERS,
@@ -436,7 +447,8 @@ export class AuctionDispatchPolicy implements DispatchPolicy {
   readonly #auctions = new Map<string, AuctionOutcome>();
 
   constructor(config: ResolvedAuctionConfig) {
-    this.config = config;
+    this.#config = config;
+    this.#opening = config;
     this.id = config.id;
     this.name = config.name;
     this.#inner = new WeightedCostDispatchPolicy(config);
@@ -621,7 +633,21 @@ export class AuctionDispatchPolicy implements DispatchPolicy {
     this.#inner.adoptWeights(weights);
   }
 
+  /**
+   * An `adopt-dispatcher` intervention, delegated to the engine underneath — [§ D1048](../../../../../DECISIONS.md).
+   *
+   * Reached only for a target whose auction section equals this one's: `Simulation` refuses any
+   * other at scheduling time, because the aggregation and its rounds are this object's, fixed at
+   * construction, and a handover that changed them would be a different controller rather than a
+   * setting of this one. So what is adopted is everything the engine reads, and the bidding stands.
+   */
+  adoptProfile(config: ResolvedDispatchConfig): void {
+    this.#inner.adoptProfile(config);
+    this.#config = Object.freeze({ ...this.#inner.config, auction: this.#config.auction });
+  }
+
   reset(): void {
+    this.#config = this.#opening;
     this.#auctions.clear();
     this.#inner.reset();
   }

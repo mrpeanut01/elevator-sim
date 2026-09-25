@@ -170,15 +170,19 @@ describe('the standings are the house’s runs on the standing building', () => 
    * **The note says what its rows are runs of** — GitHub issue #565's second defect, § D858.
    *
    * The clause is licensed by `everyday/rushHandover.test.ts`, which measures both halves on
-   * Harbour Point: a dispatcher set before the run reproduces its row to the second, and a 0:00
-   * handover to the same dispatcher is a different run whose legs are bit-identical to a
-   * weights-only substitution. The note states the mechanism that measurement established and
-   * claims nothing about the size of the gap, which is one cell's.
+   * Harbour Point: a dispatcher set before the run reproduces its row to the second, and since
+   * [§ D1048](../../../../DECISIONS.md) a handover carries the whole dispatcher — so a 0:00 handover
+   * to a target with nothing left behind *is* that row, and one to a target whose door timing or
+   * forecast is built with the day is not. The note used to say *swaps the weight vector*, which was
+   * true of the old kind and is false of the press the stage makes now. It states the two mechanisms
+   * that measurement establishes and claims nothing about the size of a gap, which is one cell's.
    */
-  it('says the rows drove from the first second, and that a handover is not that', () => {
+  it('says the rows drove from the first second, and what a handover part-way cannot be', () => {
     expect(RUSH_HOUSE_COPY.note).toContain('first second');
-    expect(RUSH_HOUSE_COPY.note).toContain('handing the day over part-way through');
-    expect(RUSH_HOUSE_COPY.note).toContain('weight vector');
+    expect(RUSH_HOUSE_COPY.note).toContain('handed over part-way through');
+    expect(RUSH_HOUSE_COPY.note).toContain('until the handover');
+    expect(RUSH_HOUSE_COPY.note).toContain('door timing or call forecast');
+    expect(RUSH_HOUSE_COPY.note).not.toContain('weight vector');
     /* No figure: the gap is one building's and the note is drawn on every building. */
     expect(RUSH_HOUSE_COPY.note).not.toMatch(/\d/u);
   });

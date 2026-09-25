@@ -40,9 +40,13 @@ import {
   contractLadderIssues,
   ladderRowFor,
   ladderTowersOf,
+  admittedPressDayIds,
   OCCUPANCY_BOUNDS,
+  pressDayFor,
+  pressDayMeasuredAs,
   rungIncidents,
   type ContractIncident,
+  type PressDayAttempt,
   type LadderValidationInput,
 } from './ladder.js';
 
@@ -402,6 +406,57 @@ describe('DC-6 on the declaration', () => {
         targets[index] ?? 0,
         `${CONTRACTS[index]?.id ?? ''} after ${CONTRACTS[index - 1]?.id ?? ''}`,
       ).toBeGreaterThanOrEqual(targets[index - 1] ?? 0);
+    }
+  });
+});
+
+/**
+ * **A handover of either kind makes a pinned day one nobody measured** — § D1029 clause 6, checked
+ * for [§ D1048](../../../../DECISIONS.md)'s new kind.
+ *
+ * The whole-dispatcher handover is the one that matters here: wave AJ's week swarm measured a
+ * mid-day `adopt-dispatcher` to *Minimum estimated wait* clearing all five whole-day press days, so
+ * a press day that let one through would be a puzzle answered by a switch the pin never measured.
+ * The stage holds the handover until the call is answered (`everyday/stageScreen.ts#callHeld`, which
+ * is kind-blind, and `pressCall.browser.test.ts` presses against it), and this predicate is the
+ * second line: after the call, a handover on the record stops the day reading as the pinned one, so
+ * the call row and the report's pin claims are not drawn over it.
+ */
+describe('a handover on a pinned day is not the day that was measured — § D1029, § D1048', () => {
+  const [pinId] = admittedPressDayIds();
+  const press = pinId === undefined ? undefined : pressDayFor(pinId);
+  const callAtS = 1234;
+  const attempt = (interventions: PressDayAttempt['interventions']): PressDayAttempt => ({
+    contractId: pinId ?? '',
+    day: 1,
+    eventId: 'ordinary',
+    hasCalendar: false,
+    seed: BigInt(press?.seedText ?? '0'),
+    horizon: press?.horizon,
+    dispatcherId: press?.standingOrder ?? '',
+    interventions,
+  });
+
+  it('reads the pin with nothing pressed, and with the clearing answer at the call', () => {
+    expect(press, 'an admitted pin exists').toBeDefined();
+    expect(pressDayMeasuredAs(attempt([]), callAtS)).toBe(press);
+    expect(pressDayMeasuredAs(attempt([{ atS: callAtS, change: { kind: press?.clearedBy ?? '' } }]), callAtS)).toBe(press);
+  });
+
+  it('refuses the pin once either handover kind is on the record, at the call or anywhere else', () => {
+    for (const kind of ['adopt-dispatcher', 'switch-dispatcher']) {
+      expect(pressDayMeasuredAs(attempt([{ atS: callAtS, change: { kind } }]), callAtS), kind).toBeUndefined();
+      expect(pressDayMeasuredAs(attempt([{ atS: callAtS + 60, change: { kind } }]), callAtS), kind).toBeUndefined();
+      expect(
+        pressDayMeasuredAs(
+          attempt([
+            { atS: callAtS, change: { kind: press?.clearedBy ?? '' } },
+            { atS: callAtS + 60, change: { kind } },
+          ]),
+          callAtS,
+        ),
+        kind,
+      ).toBeUndefined();
     }
   });
 });

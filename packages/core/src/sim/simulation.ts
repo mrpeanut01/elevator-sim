@@ -127,11 +127,14 @@ import {
 import {
   CapacityReassignmentMonitor,
   DISPATCH_DEFAULTS,
+  POLICY_DEFAULTS,
+  aggregationOf,
   callCarriesCredential,
   createArrivalModel,
   createPolicyFor,
   groupContext,
   repositionContextFor,
+  resolveDispatchConfig,
   resolvePrepositionContext,
   resolveWeights,
   weightSetSourceFrom,
@@ -143,6 +146,7 @@ import {
   type DispatchDecision,
   type DispatchPolicy,
   type GroupObservationContext,
+  type ResolvedDispatchConfig,
   type ResolvedIdleStage,
 } from '../dispatch/index.js';
 import { SimKernel, type ScheduledEvent, type SimTime } from '../kernel/index.js';
@@ -662,6 +666,15 @@ export class Simulation {
    */
   readonly #switchWeights = new Map<number, ReadonlyMap<string, number>>();
   /**
+   * `adopt-dispatcher` entries' resolved dispatchers, by log index — [§ D1048](../../../../DECISIONS.md).
+   * Resolved once at scheduling time through `resolveDispatchConfig`, the function the opening
+   * profile went through, so every refusal that function makes is the same loud `DispatchError`
+   * before a single event fires rather than mid-run.
+   */
+  readonly #adoptConfigs = new Map<number, ResolvedDispatchConfig>();
+  /** The profile the run opened with — what an `adopt-dispatcher` target's bidding is checked against. */
+  readonly #openingProfile: DispatcherProfile;
+  /**
    * The service schedule this run drives: the building's own resolved events, then every
    * `answer-incident` entry's effects, in log order. Built by {@link #scheduleServiceEvents} and
    * indexed by {@link #onServiceChange}, so the handler reads the schedule the run actually
@@ -990,6 +1003,7 @@ export class Simulation {
     /* ---- the building, with real cars ---- */
     const profile = config.dispatcherProfile;
     this.#profileId = profile.id;
+    this.#openingProfile = profile;
     const resolved = this.#resolved;
     const kernel = this.#kernel;
     const loadSensorSpec = config.elevatorSpecs?.loadSensor;
@@ -2582,6 +2596,10 @@ export class Simulation {
    *   model the record stamps stays the model the cars ran. A policy supplied through
    *   `config.createPolicy` that predates {@link DispatchPolicy.adoptWeights} is warned about by
    *   bank, because a switch such a bank cannot adopt is a control that moved nothing.
+   * - `adopt-dispatcher` resolves the target's whole dispatcher **here**, through
+   *   {@link #resolveAdoption}, which refuses loudly a target whose passenger model or bidding
+   *   differs from the run's ([§ D1048](../../../../DECISIONS.md)), and schedules the event that
+   *   hands it to every bank's policy.
    * - `answer-incident`, `equipment-change` and `building-change` schedule **nothing here**: their
    *   effects ride the service schedule ({@link #scheduleServiceEvents} says why), and their `atS`
    *   is a fact for the report rather than an action for the kernel — for the incident answer it is
@@ -2644,6 +2662,9 @@ export class Simulation {
           );
         }
       }
+      if (entry.change.kind === 'adopt-dispatcher') {
+        this.#adoptConfigs.set(index, this.#resolveAdoption(index, entry.change.profile, entry.atS));
+      }
       this.#kernel.schedule(
         entry.atS,
         interventionEvent({ index }, (payload, context) => {
@@ -2651,6 +2672,76 @@ export class Simulation {
         }),
       );
     }
+  }
+
+  /**
+   * **An `adopt-dispatcher` target, resolved or refused** — [§ D1048](../../../../DECISIONS.md).
+   *
+   * Refused loudly, at scheduling time and before any event fires, on the two grounds no handover
+   * can carry. Neither is a disclaimer beside a run that went ahead, because the viewer never emits
+   * such an entry and a hand-built log that does is asking for a dispatcher the run cannot become —
+   * replaying it *approximately* is contract § 1.5's forbidden outcome.
+   *
+   * 1. **The passenger model.** The target's `dispatch.callType` and `dispatch.passengerAssignment`,
+   *    with the stage defaults applied as `resolveDispatchConfig` applies them, must equal the run's
+   *    own, read off the policy this run built. `dispatch/selector.ts` § *Why only the weights
+   *    switch* is why: a record that changed model part-way would publish metrics not comparable
+   *    with themselves.
+   * 2. **The bidding.** The target's aggregation must be the opening profile's, and where that is an
+   *    auction its whole section must be too. The aggregation names the policy *object*
+   *    (`dispatch/policies/registry.ts`), fixed at construction; migrating calls in flight across a
+   *    new one is not built.
+   *
+   * Then the target is resolved **with its own chooser off** — `selection.policy: 'off'` and no rule
+   * rows — through the same `resolveDispatchConfig` and with none of the run's optimizer overrides,
+   * which were written for the opening profile. A handover pins the weights, so a chooser resolved
+   * here would be read by nothing; resolving it anyway would refuse a target for rows it never uses.
+   * A deferring target on a building with a destination-entry kiosk is refused on the construction
+   * check's own ground, one landing at a time.
+   */
+  #resolveAdoption(index: number, profile: DispatcherProfile, atS: number): ResolvedDispatchConfig {
+    const [held] = [...this.#policies.values()];
+    const heldStage = held?.config.dispatch;
+    const callType = profile.dispatch?.callType ?? DISPATCH_DEFAULTS.callType;
+    const passengerAssignment =
+      profile.dispatch?.passengerAssignment ?? DISPATCH_DEFAULTS.passengerAssignment;
+    if (
+      heldStage !== undefined &&
+      (callType !== heldStage.callType || passengerAssignment !== heldStage.passengerAssignment)
+    ) {
+      throw new SimulationError(
+        `interventions[${index}] hands the run to dispatcher "${profile.id}" at ${atS} s, which calls a lift by "${callType}" with passengerAssignment "${passengerAssignment}"; this run opened on "${heldStage.callType}" with "${heldStage.passengerAssignment}". An adopt-dispatcher cannot change the passenger model part-way — a record that did would publish metrics not comparable with themselves (metrics/comparability.ts). Pick that dispatcher before the run instead.`,
+      );
+    }
+    const biddingNow = biddingKeyOf(this.#openingProfile);
+    const biddingThen = biddingKeyOf(profile);
+    if (biddingNow !== biddingThen) {
+      throw new SimulationError(
+        `interventions[${index}] hands the run to dispatcher "${profile.id}" at ${atS} s, whose bidding (${biddingThen}) is not the opening dispatcher's (${biddingNow}). The aggregation is the policy object itself, fixed when the run was built, so an adopt-dispatcher cannot start, stop or change it part-way.`,
+      );
+    }
+    const adopted = resolveDispatchConfig({
+      ...profile,
+      selection: { ...(profile.selection ?? {}), policy: 'off' },
+      rules: undefined,
+    });
+    if (
+      adopted.dispatch.assignmentTiming === 'deferred' &&
+      this.#building.floors.some((floor) => floor.landingCallType === 'destination-entry')
+    ) {
+      throw new SimulationError(
+        `interventions[${index}] hands the run to dispatcher "${profile.id}", which defers assignment, on a building with a destination-entry kiosk. A kiosk holds a person at a screen, so it cannot defer — the combination this run refuses at construction, refused here for the handover (DECISIONS.md § D553).`,
+      );
+    }
+    const unadoptable = [...this.#policies.entries()]
+      .filter(([, policy]) => policy.adoptProfile === undefined)
+      .map(([bankId]) => bankId);
+    if (unadoptable.length > 0) {
+      this.#warnings.push(
+        `interventions[${index}] hands the run to dispatcher "${profile.id}" at ${atS} s, and the policy of bank(s) ${unadoptable.join(', ')} (supplied through config.createPolicy) implements no adoptProfile, so ${unadoptable.length === this.#policies.size ? 'every bank' : 'those banks'} take${unadoptable.length === 1 ? 's' : ''} its weights alone and keep${unadoptable.length === 1 ? 's' : ''} the opening profile's stages.`,
+      );
+    }
+    return adopted;
   }
 
   /**
@@ -2675,6 +2766,14 @@ export class Simulation {
    * stand — stage 5's reassignment machinery, under the profile's own `reassignmentPolicy`, is
    * the only thing entitled to move one — and every decision from this instant on scores with
    * the new vector, which is the whole of what a change of driver is.
+   *
+   * **`adopt-dispatcher`** is the same push with the whole resolved dispatcher, through
+   * {@link DispatchPolicy.adoptProfile} ([§ D1048](../../../../DECISIONS.md)). The same argument
+   * holds for every stage it carries: each is read off the policy's config at its own decision time,
+   * so one write here is seen by every later decision and by no earlier one, and assignments already
+   * made stand — stage 5, now under the adopted reassignment policy, is still the only thing entitled
+   * to move one. What this push cannot reach is built before the first event (each car's door and
+   * load-sensor settings, and each bank's arrival model) and stays the opening profile's.
    */
   #onIntervention(index: number, at: SimTime): void {
     const entry = this.#interventions[index];
@@ -2693,6 +2792,23 @@ export class Simulation {
         );
       }
       for (const policy of this.#policies.values()) policy.adoptWeights?.(weights);
+      return;
+    }
+    if (entry.change.kind === 'adopt-dispatcher') {
+      const adopted = this.#adoptConfigs.get(index);
+      /* c8 ignore next 5 -- #scheduleInterventions resolved this index a moment ago. */
+      if (adopted === undefined) {
+        throw new SimulationError(
+          `Intervention ${index} fired with no resolved dispatcher; the schedule and the log disagree.`,
+        );
+      }
+      // Banks in `Map` order, which is building order — the same order the opening policies were
+      // built in, so the push is as deterministic as the build (invariant 4). A hand-built policy
+      // without the seam takes the weights alone, and `#resolveAdoption` has already said so.
+      for (const policy of this.#policies.values()) {
+        if (policy.adoptProfile !== undefined) policy.adoptProfile(adopted);
+        else policy.adoptWeights?.(adopted.weights);
+      }
       return;
     }
     /*
@@ -6717,6 +6833,20 @@ function traceReportWindow(trace: PassengerTrace): ReportWindow {
     startS: trace.reportWindowStartS,
     endS: trace.reportWindowEndS,
   });
+}
+
+/**
+ * A profile's bidding, as one comparable string — the aggregation with the default applied, and
+ * for an auction its section with keys sorted, since key order is authoring noise. What
+ * `Simulation#resolveAdoption` holds equal across an `adopt-dispatcher` (§ D1048).
+ */
+function biddingKeyOf(profile: DispatcherProfile): string {
+  const aggregation = aggregationOf(profile);
+  if (aggregation === POLICY_DEFAULTS.aggregation) return aggregation;
+  const section = profile.auction ?? {};
+  return `${aggregation} ${JSON.stringify(
+    Object.fromEntries(Object.entries(section).sort(([a], [b]) => a.localeCompare(b))),
+  )}`;
 }
 
 function requireBank(building: ResolvedBuilding, bankId: string): ResolvedBank {

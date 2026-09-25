@@ -41206,6 +41206,8 @@ repaired, because a browser case is the wrong instrument to establish it and no 
 
 ## D857 — a rush's dispatcher is chosen before the run, on the rush's own screen, and the refusal that kept it off is withdrawn by a measurement
 
+> **Status 2026-09-25: NARROWED by [§ D1048](#d1048)** — *a handover's effect is exactly the weight substitution* stays true of `switch-dispatcher`, which stored rounds carry; the player's press is `adopt-dispatcher` now, which hands over the whole dispatcher less the passenger model and the bidding.
+
 **Date: 2026-09-19 · Owner: LANE-AE-B (wave AE) · Rules on:** the refusal recorded in
 `everyday/rushScreenModel.ts#rushDrivingLine`'s docstring, which is **withdrawn**. Binds
 `everyday/rushScreen.ts`, `everyday/rushScreenModel.ts`, `honesty/surfaces.ts` and a new
@@ -41264,6 +41266,8 @@ is the negative, and it follows from arm D rather than from the seconds.
 
 
 ## D858 — the house board says what its rows are runs of, and marks the row the player is set to run
+
+> **Status 2026-09-25: NOTE CORRECTED by [§ D1048](#d1048)** — *swaps the weight vector and leaves the rest of the opening dispatcher's settings running* is withdrawn with the press it described; the note now says a handed-over day runs on its opening dispatcher until the handover and cannot bring door timing or a call forecast set at the start.
 
 **Date: 2026-09-19 · Owner: LANE-AE-B (wave AE) · Rules on:** nothing recorded; it adds to
 [§ D547](DECISIONS.md)'s standings. Binds `everyday/rushHouse.ts`, `everyday/rushScreen.ts` and
@@ -44199,3 +44203,112 @@ under a load average near 90 is not one); that GitHub fires the two nightly cron
 minutes; that Dependabot's first monthly pull requests come grouped as configured; and that the
 moved actions behave on their new majors, the deploy job's `azure/login` v3 above all, which runs
 only on `main` and on a same-repository pull request.
+
+---
+
+## D1048 — the mid-day *Switch to X* hands over the whole dispatcher as a new kind, `adopt-dispatcher`, and refuses the targets it cannot carry
+
+> **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: a
+> three-member decision swarm (the player, honesty and engineering lenses, whose records are the
+> integrator's scratch notes `week-S1` to `-S3`, their Q2 sections, and are not in this repository)
+> ruled 3/3 for the engineering lens's form, and wave AJ lane AJ-A built and measured it. A later
+> reader weighing this against a product-owner ruling should treat it as an agent ruling and say so;
+> [§ D626](#d626) is the cautionary case. **Narrows [§ D857](#d857)**, **corrects the note
+> [§ D858](#d858) wrote**, and amends `dispatch/selector.ts` § *Why only the weights switch* for the
+> player's handover only. Nothing is rewritten.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it moves two recorded decisions, and it binds
+`core`'s intervention vocabulary and policy contract (`sim/types.ts`, `sim/interventionWire.ts`,
+`sim/storedEffect.ts`, `sim/simulation.ts`, `dispatch/types.ts`, `dispatch/policy.ts`,
+`dispatch/policies/auction.ts`), the server's submission and replay (`leaderboard/submission.ts`,
+`leaderboard/verify.ts`, `leaderboard/rushSitting.ts`), both shells (`everyday/stageScreenModel.ts`,
+`everyday/stageScreen.ts`, `dev/main.ts`), the wire and record readers in `viz` (`scope/`,
+`watch/`, `everyday/rushSitting.ts`), the rush board's note and the honesty corpus.
+
+### What was wrong
+
+The player's *Switch to X* press emitted `switch-dispatcher`, which hands over the **weight vector
+alone**. The label says it hands the day to X, and on most of the shelf that was false.
+
+- A dispatcher is its weights and its hard constraints, eligibility, dispatch-stage and answer
+  settings. *Switch to Fairness first* ran collective's no-turning rule and collective's
+  reassignment under Fairness first's two weights.
+- *Switch to Minimum estimated wait* was refused as *"that is what the building is already running"*
+  on a day `collective` drove, because the two share `waitTime: 1`. The brief on the same day said
+  ETA clears it. Handed over at 0:00 with its constraint, ETA reproduced the brief's pick on the legs
+  on 7 of 7 pinned days; with weights alone, 0 of 7 moved at all.
+- **The two destination rows were enabled and moved no leg**, 14 of 14 pinned-day switches: a
+  destination term reads nothing at an up-and-down button and a run keeps the landing it opened
+  with. That is [§ D177](#d177)'s inert control drawn as pressable, and it was fixed first, on its
+  own commit.
+
+### The ruling
+
+1. **A new intervention kind, `adopt-dispatcher`.** At its stamped instant every bank's policy takes
+   the target's whole resolved dispatcher (weights, hard constraints, eligibility, the dispatch
+   stage's timing, split, reassignment and commitment, the answer decision and the idle stage),
+   resolved through the same `resolveDispatchConfig` the opening profile went through, with the
+   target's own chooser off. The weights are pinned exactly as `switch-dispatcher` pins them, so the
+   player's rules and pattern switching stand down. One kernel event at `(time, sequence)`, no random
+   draw, no clock, and the swap is a field write on the policy at the event, never inside a scoring
+   pass, so `estimateCost` is untouched (invariants 1 to 4). Assignments already made stand.
+2. **`switch-dispatcher` is kept and means what it meant**, so every stored log and posted run that
+   carries it replays bit-identically (invariant 5). `sim/adoptDispatcher.test.ts` pins its legs to
+   the digest it produced on `47d15b5`, before the new kind existed. **Both shells' press emits
+   `adopt-dispatcher`.**
+3. **What cannot be carried is refused, loudly and on the row.** A target whose `callType` or
+   `passengerAssignment` differs from the run's (the passenger model), or whose bidding differs from
+   the opening profile's (`auction.aggregation` names the policy object, fixed at construction), is
+   refused: `Simulation` throws at scheduling time, and `live/interventions.ts#switchRefusalOf` draws
+   the reason on the row. Both are decided off the profile's fields, never its id (invariant 7).
+4. **What an adoption still cannot reach is named on the row.** Two parts of a dispatcher are built
+   with the day: each car's door timing and load-sensor threshold (`answer`'s car-level fields), and
+   each bank's arrival model (`idle.predictor*`). `switchNoteOf` notes either, beside an enabled
+   button, when the target differs from the day's there. On the shipped shelf from `collective` that
+   is *Energy aware* (doors) and *Predictive balanced* (doors and forecast), and nothing else.
+5. **The words follow the press.** `SWITCH_PINS_NOTE` names what the day now runs by, in the
+   player's words, and that calls already given a car keep it. `STAGE_SWITCH_NO_CHANGE` claims
+   identity of effect and no longer names who is driving. `switchChangesNothing` compares the whole
+   adopted configuration rather than the vector. The rush board's note stops saying a handover swaps
+   the weight vector.
+6. **The wire carries the new kind on `switch-dispatcher`'s shape**, a shipped id plus rows, and
+   § D858's row rules and bound apply to it unchanged; the server rebuilds it through
+   `profileWithRules` and keeps the kind.
+7. **The press-day hold covers it.** [§ D1029](#d1029) clause 6 holds the stage's handover until the
+   call is answered, and the hold is kind-blind; `pressDayMeasuredAs` refuses a day with a handover of
+   either kind on its record. S2 measured a mid-day adopt of ETA clearing all five whole-day press
+   days at 0.43, which is why both halves are pinned (`shift/ladder.test.ts`,
+   `pressCall.browser.test.ts`).
+
+### Measured on this tree
+
+- **0:00 equivalence** (`sim/adoptDispatcher.test.ts`): from `collective`, handing over at 0:00
+  reproduces picking the target before the day, on every leg, for the six residual-free adoptable
+  targets (`nearest-car`, `eta`, `collective-enroute`, `fairness-first`, `capacity-aware`,
+  `zoned-uppeak`) on both `garden-apartments` and `midtown-office`, and does not for exactly the two
+  residual targets. Asserted both ways and derived from the data, so if a residual starts
+  reproducing its note must go. With the four refused targets and the standing order, that accounts
+  for all thirteen profiles; the swarm's 12 of 24 counted the refused four as unequal.
+- **Every enabled row moves the legs** (`everyday/stageHandover.test.ts`, Midtown Office, 900 s,
+  seed 20 260 804, handover at 300 s): all eight enabled rows move, and five rows are refused (the
+  standing order, two destination, two bidding), each pinned by a run. Under the weights-only press
+  on the same cell, three enabled rows moved nothing (`collective-enroute`, `fairness-first`,
+  `capacity-aware`) and ETA was refused.
+- **The rush** (`everyday/rushHandover.test.ts`, Harbour Point, the rush's seed): the house row for
+  *Predictive balanced* holds 2 766 s, the weights-only handover at 0:00 2 364 s, the whole-dispatcher
+  handover at 0:00 **2 746 s**. A whole-dispatcher handover to ETA at 0:00 is ETA's house row to the
+  leg. One cell and one seed; no mechanism is offered for either gap ([§ D256](#d256)).
+
+### What the owner may reverse, and what it costs
+
+Clause 2's press is one line in each shell (`stageScreenModel.ts#rowsOf`, `dev/main.ts`); reverting
+it restores the weights-only press and needs the old sentences back, because the new ones would then
+be false. The refusals (clause 3) and the notes (clause 4) stand on either press. Adopting the
+bidding or the car-level answer mid-run is later work, a policy-object handover with its calls
+migrated and a car method at the event; each note retires on the both-ways test when it lands.
+
+### What it does not touch
+
+The automatic weight-set selector and the rule arms still choose among weight vectors alone.
+`data/dispatcher-profiles.json`, `data/rush-house-runs.json` and every pinned press day are
+byte-identical. The record's `dispatcherProfileId` stays the profile the run started under.

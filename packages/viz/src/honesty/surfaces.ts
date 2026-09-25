@@ -394,6 +394,8 @@ import {
   SWITCH_PINS_NOTE,
   stampVerbOf,
   switchDispatcherLabelOf,
+  switchNoteOf,
+  switchRefusalOf,
 } from '../live/interventions.js';
 import {
   GHOST_OPTIONS,
@@ -1538,8 +1540,8 @@ const LIVE_RAIL: SurfaceAdapter = {
     seeds.push({ field: 'switchButton.title', text: SWITCH_PINS_NOTE, role: 'observation' });
     seeds.push({ field: 'interventionStamp.recomputing', text: RECOMPUTING_BEAT, role: 'observation' });
     /*
-     * One log carrying **all six** kinds, stamped across the run, so every stamp sentence enters
-     * the corpus at the playheads that can show it — and the deliberate `''` before the first,
+     * One log carrying **every kind a press produces**, stamped across the run, so every stamp
+     * sentence enters the corpus at the playheads that can show it — and the deliberate `''` before the first,
      * which is what keeps `interventionStampOf`'s temporal property met by construction.
      *
      * The two bought kinds joined on GitHub issue #370, seeded with a shipped `changeId` and the
@@ -1547,6 +1549,10 @@ const LIVE_RAIL: SurfaceAdapter = {
      * no screen draws them yet, and a string the corpus sweeps that nothing renders is coverage
      * manufactured rather than earned — `derive.test.ts` carries the same reasoning for
      * `scenario/budget.ts#admitPurchase`, and both enter an adapter on the commit that draws them.
+     *
+     * The handover entry is `adopt-dispatcher` since § D1048, the kind both shells' press emits.
+     * `switch-dispatcher` is now only ever replayed from a stored record, and `stampVerbOf` gives the
+     * two kinds one sentence, so seeding it too would add no string.
      */
     const third = (recording.endedAt - recording.startedAt) / 3;
     const interventionLog = [
@@ -1555,7 +1561,7 @@ const LIVE_RAIL: SurfaceAdapter = {
       {
         atS: recording.startedAt + third * 1.5,
         change: {
-          kind: 'switch-dispatcher',
+          kind: 'adopt-dispatcher',
           profile: { id: 'plain-baseline', name: switchTargetName, weights: {} },
         } as const,
       },
@@ -11054,7 +11060,7 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
           { atS: 0, verb: stampVerbOf({ kind: 'park-cars-lobby' }) },
           ...(handedTo === undefined
             ? []
-            : [{ atS: Math.round(broke.heldS / 2), verb: stampVerbOf({ kind: 'switch-dispatcher', profile: handedTo }) }]),
+            : [{ atS: Math.round(broke.heldS / 2), verb: stampVerbOf({ kind: 'adopt-dispatcher', profile: handedTo }) }]),
         ],
         ruleRows: [],
         wireInterventions: [],
@@ -11155,6 +11161,15 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     /* § 7.6's handover — the title it carries, and the refusal it draws on itself (issue #171). */
     'everyday/stageScreenModel.ts#STAGE_SWITCH_EXPLAINS',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_NO_CHANGE',
+    /* § D1048: a handover's own refusal when the target's panels or bidding cannot be carried. */
+    'live/interventions.ts#switchRefusalOf',
+    'live/interventions.ts#SWITCH_NEEDS_OTHER_PANELS',
+    'live/interventions.ts#SWITCH_NEEDS_BIDDING',
+    'live/interventions.ts#SWITCH_STOPS_BIDDING',
+    /* § D1048: what an enabled handover cannot bring part-way, drawn as the row's note. */
+    'live/interventions.ts#switchNoteOf',
+    'live/interventions.ts#SWITCH_KEEPS_DOORS',
+    'live/interventions.ts#SWITCH_KEEPS_FORECAST',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_NOTE',
     /*
@@ -11418,7 +11433,45 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      * the one driving, which is the only way the refusal is ever produced.
      */
     const [driving, elsewhere] = context.dispatcherProfiles.profiles;
+    /*
+     * § D1048's refusals, each on a shipped profile found by the **field** that refuses it rather
+     * than by id: a destination landing, and a bidding controller. Handed each way round, so both
+     * bidding sentences enter the corpus.
+     */
+    const withPanels = context.dispatcherProfiles.profiles.find(
+      (profile) => profile.dispatch?.callType !== undefined && profile.dispatch.callType !== 'up-down-buttons',
+    );
+    const bidding = context.dispatcherProfiles.profiles.find((profile) => profile.auction !== undefined);
+    const conventional = context.dispatcherProfiles.profiles.find(
+      (profile) => profile.dispatch?.callType === undefined && profile.auction === undefined,
+    );
+    const refusedStates: readonly (readonly [string, StageSwitchTarget])[] =
+      withPanels === undefined || bidding === undefined || conventional === undefined
+        ? []
+        : [
+            ['panels', { target: withPanels, driving: () => conventional }],
+            ['bidding', { target: bidding, driving: () => conventional }],
+            ['stops-bidding', { target: conventional, driving: () => bidding }],
+          ];
+    /*
+     * And the notes an enabled row carries on what its target cannot bring part-way — one state per
+     * distinct note the shipped shelf produces from the first conventional profile, so every sentence
+     * `switchNoteOf` can draw from that day enters once rather than once per profile.
+     */
+    const notedStates: (readonly [string, StageSwitchTarget])[] = [];
+    if (conventional !== undefined) {
+      const seen = new Set<string>();
+      for (const target of context.dispatcherProfiles.profiles) {
+        if (switchRefusalOf(target, conventional) !== undefined) continue;
+        const note = switchNoteOf(target, conventional);
+        if (note === undefined || seen.has(note)) continue;
+        seen.add(note);
+        notedStates.push([`keeps-${String(seen.size)}`, { target, driving: () => conventional }]);
+      }
+    }
     const switchStates: readonly (readonly [string, StageSwitchTarget | undefined])[] = [
+      ...refusedStates,
+      ...notedStates,
       ['plain', undefined],
       ...(driving === undefined || elsewhere === undefined
         ? []

@@ -134,6 +134,13 @@ export const INTERVENTION_WIRE = Object.freeze({
         'budget — so a replay would hold the change and not the entitlement to it, and the board ' +
         'would rank a tower nobody could check the player could afford',
     },
+    /*
+     * [§ D1048](../../../../DECISIONS.md): the player's handover since that ruling. It carries what
+     * `switch-dispatcher` carries — a shipped id and the player's rows, never a profile — and it
+     * replays from those on the server exactly as that kind does, because the kernel resolves the
+     * whole dispatcher from the profile the id names. § D858's row rules bind it unchanged.
+     */
+    'adopt-dispatcher': { carried: true },
   } as const) satisfies Readonly<Record<InterventionKind, InterventionWireRule>>;
 
 /**
@@ -191,7 +198,8 @@ export interface SwitchOnTheWire<Row = RuleRowConfig> {
 export type WireInterventionChange<Row = RuleRowConfig> =
   | { readonly kind: 'park-cars-lobby' }
   | { readonly kind: 'spread-cars' }
-  | ({ readonly kind: 'switch-dispatcher' } & SwitchOnTheWire<Row>);
+  | ({ readonly kind: 'switch-dispatcher' } & SwitchOnTheWire<Row>)
+  | ({ readonly kind: 'adopt-dispatcher' } & SwitchOnTheWire<Row>);
 
 /** One entry of the log as the wire carries it — `{ atS, change }`, contract § 1.4's own shape. */
 export interface WireIntervention<Row = RuleRowConfig> {

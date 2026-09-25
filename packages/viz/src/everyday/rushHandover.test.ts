@@ -51,6 +51,11 @@
  * Four rushes, about thirteen seconds cold. It is the always-on tier because the figures it pins
  * are drawn on two player surfaces: a build whose handover started adopting a whole profile would
  * make `RUSH_HOUSE_COPY.note`'s last clause false, and nothing else in the suite would notice.
+ *
+ * **That build is this one**, since [§ D1048](../../../../DECISIONS.md): the stage's press emits
+ * `adopt-dispatcher`, and the note's last clause was rewritten on the same commit. The four arms above
+ * stay as they were, because `switch-dispatcher` is kept for the records that carry it and must replay
+ * exactly; the describe block at the foot adds the two arms the new press reaches.
  */
 
 import { loadConfig } from '@elevator-sim/core';
@@ -160,3 +165,67 @@ describe('a rush dispatcher set before the run, against one handed over at 0:00'
     expect(untouched.legs).not.toBe(handover.legs);
   });
 });
+
+/**
+ * **The whole-dispatcher handover the stage presses since [§ D1048](../../../../DECISIONS.md)**, on the
+ * same cell. `switch-dispatcher` above is kept because stored rounds carry it and it must replay as it
+ * did; the player's press is `adopt-dispatcher` now, and this is what it reaches.
+ *
+ * | arm | what it is | held |
+ * |---|---|---|
+ * | E | `collective` with an `adopt-dispatcher` to `predictive-balanced` at 0:00 | **2 746 s** |
+ * | F | `collective` with an `adopt-dispatcher` to `eta` at 0:00 | the `eta` house row, to the leg |
+ *
+ * Two arms. **E** hands the round to *Predictive balanced* at 0:00 as a whole dispatcher, and it is
+ * neither the weights-only handover (arm B) nor the house row (arm A): its door timing and demand
+ * forecast are built with the day and stay collective's, which is what the stage's note on that row
+ * says. **F** hands the round to *Minimum estimated wait* at 0:00, a target with nothing a handover
+ * leaves behind, and it is the run a player gets by picking that dispatcher before the rush — the
+ * house row's own path — to the leg.
+ */
+describe('the whole-dispatcher handover on the rush — § D1048', () => {
+  const RESIDUAL_FREE = 'eta';
+  let configured: Arm;
+  let weightsOnly: Arm;
+  let adopted: Arm;
+  let residualFreePicked: Arm;
+  let residualFreeAdopted: Arm;
+
+  beforeAll(() => {
+    const byId = (id: string) => {
+      const found = resources.dispatcherProfiles.profiles.find((profile) => profile.id === id);
+      if (found === undefined) throw new Error(`no shipped dispatcher "${id}"`);
+      return found;
+    };
+    configured = rush(TARGET);
+    weightsOnly = rush(OPENING, [{ atS: 0, change: { kind: 'switch-dispatcher', profile: byId(TARGET) } }]);
+    adopted = rush(OPENING, [{ atS: 0, change: { kind: 'adopt-dispatcher', profile: byId(TARGET) } }]);
+    residualFreePicked = rush(RESIDUAL_FREE);
+    residualFreeAdopted = rush(OPENING, [
+      { atS: 0, change: { kind: 'adopt-dispatcher', profile: byId(RESIDUAL_FREE) } },
+    ]);
+  }, 300_000);
+
+  it('E: carries more than the weights, and still not the house row — the note’s two halves', () => {
+    expect(adopted.legs).not.toBe(weightsOnly.legs);
+    expect(adopted.legs).not.toBe(configured.legs);
+    expect(adopted.brokeAtS).toBe(ADOPTED_BROKE_AT_S);
+  });
+
+  it('F: a target with nothing left behind is the house row’s own path, to the leg', () => {
+    expect(residualFreeAdopted.legs).toBe(residualFreePicked.legs);
+    const row = RUSH_HOUSE_TABLE.runs.find(
+      (run) => run.buildingId === BUILDING && run.dispatcherId === RESIDUAL_FREE,
+    );
+    expect(residualFreeAdopted.brokeAtS).toBe(row?.brokeAtS);
+  });
+});
+
+/**
+ * Arm E's hold moment, measured on this tree with the rest of this file's arms: **2 746 s**, beside
+ * A's 2 766, C's 2 480 and B's 2 364. So the whole-dispatcher handover at 0:00 comes within twenty
+ * seconds of the house row where the weights alone fell 402 short, and the twenty are the door timing
+ * and forecast the note names. One cell and one seed; no mechanism for the size of either gap is
+ * offered (§ D256).
+ */
+const ADOPTED_BROKE_AT_S = 2746;

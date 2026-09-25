@@ -358,9 +358,13 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
     );
     const shipped = resources.dispatcherProfiles.profiles;
     const unpostable = new Set<string>();
+    const unpostableKinds = new Set<string>();
     for (const entry of state.interventions) {
-      if (entry.change.kind !== 'switch-dispatcher') continue;
-      if (switchWireOf(entry.change.profile, shipped) === undefined) unpostable.add(entry.change.profile.name);
+      if (entry.change.kind !== 'switch-dispatcher' && entry.change.kind !== 'adopt-dispatcher') continue;
+      if (switchWireOf(entry.change.profile, shipped) === undefined) {
+        unpostable.add(entry.change.profile.name);
+        unpostableKinds.add(entry.change.kind);
+      }
     }
     if (unpostable.size > 0) {
       clauses.push(
@@ -373,7 +377,7 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
      * *a “answer-incident”* is the shape a template produces when it puts an article in front of a
      * value it does not know the first letter of, and this string is read by a player.
      */
-    const named = [...refusedKinds, ...(unpostable.size > 0 ? ['switch-dispatcher'] : [])];
+    const named = [...refusedKinds, ...unpostableKinds];
     const noun = named.length === 1 ? 'an intervention of kind' : 'interventions of kind';
     return `this day's record holds ${noun} ${listOf(named.map((kind) => `“${kind}”`))}, and ${listOf(clauses)}`;
   },

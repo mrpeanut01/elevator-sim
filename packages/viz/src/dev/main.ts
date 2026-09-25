@@ -153,6 +153,7 @@ import {
   switchChangesNothing,
   SWITCH_PINS_NOTE,
   switchDispatcherLabelOf,
+  switchRefusalOf,
 } from '../live/interventions.js';
 import { patternReadoutAt } from '../live/patternReadout.js';
 import {
@@ -3783,7 +3784,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
   switchButton.addEventListener('click', () => {
     if (state.recording === undefined || playback === undefined) return;
     if (switchTarget === undefined) return;
-    interveneAt(playback.simTimeS, { kind: 'switch-dispatcher', profile: switchTarget });
+    // `adopt-dispatcher` since § D1048 — the label says *Switch to X*, and only the whole
+    // dispatcher makes that true.
+    interveneAt(playback.simTimeS, { kind: 'adopt-dispatcher', profile: switchTarget });
   });
 
   /** Memo per state object — the derivation walks the whole chain and this runs per frame. */
@@ -3803,11 +3806,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
   const switchWouldChangeNothing = (viewState: ViewerState): boolean => {
     if (switchTarget === undefined) return true;
     if (switchNoopCache?.forState === viewState) return switchNoopCache.noop;
-    const noop = switchChangesNothing({
-      interventions: viewState.interventions,
-      target: switchTarget,
-      driving: () => drivingProfileOf(resources, viewState),
-    });
+    // § D1048: a target whose landing panels or bidding differ from the day's cannot be handed
+    // the day at all, and the button is disabled on that ground before the no-change one is asked.
+    const noop =
+      switchRefusalOf(switchTarget, drivingProfileOf(resources, viewState)) !== undefined ||
+      switchChangesNothing({
+        interventions: viewState.interventions,
+        target: switchTarget,
+        driving: () => drivingProfileOf(resources, viewState),
+      });
     switchNoopCache = { forState: viewState, noop };
     return noop;
   };

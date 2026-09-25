@@ -139,6 +139,17 @@ describe.skipIf(!HAS_BROWSER)('the stage calls a pinned day — § D1029', () =>
       const before = await parkingHeld(page);
       expect(before.held, 'the parking presses are pressable before the call').toBe(true);
       expect(before.reason).toContain('held until the stage stops for this day’s call');
+      /*
+       * **And the handover is held with them** — § D1029 clause 6, checked for § D1048's new kind.
+       * A mid-day handover of the whole dispatcher clears every whole-day press day the week swarm
+       * measured, so a handover button live before the call would be the puzzle answered by a press
+       * the pin never measured. It is the `adopt-dispatcher` button, whatever the picker names.
+       */
+      const handover = page.locator('.everyday-stage-intervene[data-intervention-kind="adopt-dispatcher"]');
+      expect(await handover.count(), 'the stage draws the whole-dispatcher handover').toBe(1);
+      expect(await handover.isDisabled(), 'the handover is pressable before the call').toBe(true);
+      /* The picker is held too, so no target can be lined up to make the button live. */
+      expect(await page.locator('.everyday-stage-switch-pick').isDisabled(), 'the picker is live before the call').toBe(true);
       expect(await page.locator('.everyday-stage-call').isHidden()).toBe(true);
 
       /* ---- the fastest rung, then Start: the stage stops at the call ---- */

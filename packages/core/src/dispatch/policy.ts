@@ -561,8 +561,24 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
   readonly id: string;
   readonly name: string;
   readonly engine = 'weighted-cost' as const;
-  readonly config: ResolvedDispatchConfig;
   readonly parameters: readonly DispatchParameterSpec[] = DISPATCH_PARAMETERS;
+
+  /**
+   * The configuration every stage reads, **at its decision time** — the profile's own, or since an
+   * `adopt-dispatcher` intervention the adopted one ({@link adoptProfile}).
+   *
+   * A field behind a getter rather than a `readonly` property since [§ D1048](../../../../DECISIONS.md),
+   * and that is the whole of the kernel change a whole-dispatcher handover needed: every stage
+   * already read `this.config` when it decided, never a copy taken earlier, so one write at one
+   * `(time, sequence)` hands every later decision the new stages and no earlier one can see them.
+   * `#opening` is what {@link reset} restores.
+   */
+  #config: ResolvedDispatchConfig;
+  readonly #opening: ResolvedDispatchConfig;
+
+  get config(): ResolvedDispatchConfig {
+    return this.#config;
+  }
 
   /** Call id to lifecycle. A Map, so iteration order is registration order and reproducible. */
   readonly #lifecycles = new Map<string, CallLifecycle>();
@@ -610,7 +626,8 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
   #interventionWeights: ReadonlyMap<string, number> | undefined;
 
   constructor(config: ResolvedDispatchConfig) {
-    this.config = config;
+    this.#config = config;
+    this.#opening = config;
     this.id = config.id;
     this.name = config.name;
     this.#weights = config.weights;
@@ -978,6 +995,40 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
     this.#activeRuleIdle = undefined;
   }
 
+  /**
+   * Adopt an `adopt-dispatcher` intervention's whole resolved dispatcher — see the interface
+   * member's contract and [§ D1048](../../../../DECISIONS.md).
+   *
+   * Three things are held rather than taken, and each is held for its own reason:
+   *
+   * - **`dispatch.callType` and `dispatch.passengerAssignment`** — the passenger model. The kernel
+   *   refuses a target that differs at scheduling time, so under the shipped path these are already
+   *   equal; they are written back from the opening config anyway, so no caller that skipped that
+   *   check can change the model a record is stamped with.
+   * - **`id` and `name`** — {@link id} is the profile the run *started* under and never decides
+   *   anything; a config that answered a different id than its policy would be two provenances for
+   *   one controller.
+   *
+   * Then the weights are pinned through {@link adoptWeights}, which is what stands the opening
+   * chooser down: the target is resolved by the kernel with its own chooser off, so there is none to
+   * start. Nothing here reads a clock or draws a number, and `estimateCost` is never called — the
+   * swap happens at the intervention's own event, never inside a scoring pass (invariants 1–3).
+   */
+  adoptProfile(next: ResolvedDispatchConfig): void {
+    const held = this.#config;
+    this.#config = Object.freeze({
+      ...next,
+      id: held.id,
+      name: held.name,
+      dispatch: Object.freeze({
+        ...next.dispatch,
+        callType: held.dispatch.callType,
+        passengerAssignment: held.dispatch.passengerAssignment,
+      }),
+    });
+    this.adoptWeights(next.weights);
+  }
+
   /* ---------------------------------------------------------------- *
    * Stage 5 — reassignment
    * ---------------------------------------------------------------- */
@@ -1304,6 +1355,10 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
   }
 
   reset(): void {
+    // The adopted dispatcher goes first, so every line below reads the opening config: a second
+    // replication that began already handed over would be running a config its record does not
+    // carry — the intervention pin's reason, at the bottom of this method.
+    this.#config = this.#opening;
     this.#lifecycles.clear();
     this.#openBatches.clear();
     // The selector's memory goes with the lifecycles, for the same reason and by the same

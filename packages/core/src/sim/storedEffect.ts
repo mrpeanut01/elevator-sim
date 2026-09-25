@@ -344,6 +344,7 @@ const CARRIES_EFFECTS = {
   'spread-cars': false,
   'equipment-change': true,
   'building-change': true,
+  'adopt-dispatcher': false,
 } as const satisfies Readonly<Record<InterventionKind, boolean>>;
 
 /** The kinds the table says carry effects, as a type. The union's own answer is above. */
