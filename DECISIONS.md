@@ -44896,3 +44896,177 @@ is what a staggered start is for; what the ruling removes is the clears whose pr
 No bar, no goal, no price, no other tier. The shop total (324 u) and the perfect month (98 u) are
 unmoved. The honesty corpus's campaign adapter now tells the shop which of its two buildings keeps a
 start time, so the refused row is swept on Garden Apartments.
+
+---
+
+---
+
+## D1085 — the queue goal keeps one ladder on both horizons: no whole-day bar, factor, window or withholding, and the later-day wall goes to demand
+
+> **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: a
+> three-member decision swarm (the player, honesty and engineering lenses, S1 to S3, whose records
+> are the integrator's scratch notes `queue-S1` to `-S3` and are not in this repository), unanimous,
+> reconciled by wave AJ's integrator and built and measured by wave AJ lane AJ-F. A later reader
+> weighing this against a product-owner ruling should treat it as an agent ruling and say so;
+> [§ D626](#d626) is the cautionary case. **It moves no bar and amends no ruling.** It declines to
+> extend [§ D962](#d962)'s horizon split to a second goal, re-pins the published figure the queue's
+> flatness rested on, and hands a measured wall to the demand side.
+
+**Why an entry.** [§ D405](#d405)'s second and third grounds. It refuses, on a measurement, the move
+§ D962 made for the energy goal, which is a recorded decision a later lane will reach for by
+analogy; it replaces a published table in `shift/goals.ts` that was the only evidence for a
+behaviour `goals.test.ts` pins; and it hands work to lane AJ-C and GitHub issue #234, which this
+module does not own.
+
+### The question
+
+Wave AI's week swarm measured towers that fail the queue goal alone over a whole authored day under
+every dispatcher and press it tried: Chancery day 4 at a lowest peak of 73 against a bar of 26,
+Harbour day 2 at 44 against 30. § D962 had found the same class of defect for the energy bar and
+derived a second constant for the whole day. The swarm was asked whether the queue goal needs its
+own whole-day bar, a window inside the day, or withholding at whole-day horizon, and whether any
+answer opens a way to win by carrying fewer people ([§ D106](#d106)).
+
+### The answer, three of three: no
+
+**One ladder, `max(12, 34 − 2d)`, grades both horizons.** No whole-day constant, no factor, no
+window and no withholding. The reason is mechanical before it is statistical. `peakQueue` is the
+deepest single landing over the **whole run** on both horizons (`live/observations.ts#sweepQueues`)
+and never reads the reporting window; energy does, and that window grows from `peak-5min`'s 300 s to
+the whole 36 000 s day. So § D962's defect, one constant grading a figure whose window grew
+a hundred and twentyfold, cannot carry over. A whole day only adds peaks to take the maximum over:
+lunch holds the day's deepest landing on 10 to 13 of 25 whole days at Midtown, Secure Tower and
+Ashgate, and on 3 to 6 of 25 at Chancery and Harbour, where the morning holds it.
+
+### What each member measured
+
+All three used § D962's cell: each tower as its contract hands it over (`contractDay.test-helper.ts`,
+issue #584), day 1 unless stated, ordinary, `collective`, seeds `20 260 824 + 7 919 n`, each seed run
+as the contract's own 1 800 s slice and as the 36 000 s `office-day` Today's scenario plays, graded
+by `readGoals(goalsForDay(d, runHorizonOf(…)))`. The honesty and engineering members built separate
+instruments, and their 300 day-1 rows on the six game contracts are **identical run for run**, in
+peak, legs and all five goal verdicts.
+
+- **S1, the player.** The five office towers the Scenario plays, over 13 standing orders × three
+  press states (39 reachable plays), days 1 to 5, about 4 100 runs. Over 424 same-play pairs the
+  whole day's peak is not larger than the slice's: median ratio 0.93, higher in 163 and lower in
+  247. On its five-tower pool the shipped 32 is the slice's two-thirds point to within one person
+  (33) and refuses 24.6 % of whole days (n = 122). The wall is at both horizons: of 32 tower-day
+  cells measured both ways with every play, **14 are infeasible on the slice and 13 over the whole
+  day**, and from day 3 no reachable play meets the bar on most office towers at either. On
+  Chancery and Harbour the queue is the goal that decides a whole day (84 of 124 and 78 of 118
+  misses are queue-only).
+- **S2, honesty and statistics.** Six game contracts × 25 paired seeds at days 1, 2 and 4; § D468's
+  protocol run at the whole-day horizon over the contracts whose verdict **the building does not
+  decide** (a miss rate strictly between 0 and 1): `c2`, `c3`, `c4`, `c6`, `c9`, `c10`. The shipped
+  32 refuses **34.7 %** of 150 whole days against a pooled two-thirds point of **34.00**, which is
+  0.35 standard errors from one third; the five-goal day misses **52.7 %**, inside `docs/33` DC-4's
+  band; and the paired whole − slice difference is **−1.6 [−4.0, +0.8]**. On the slice the same bar
+  refuses 44.7 %, so it fits the whole day better than the horizon it was drawn for. At days 2 and 4
+  the pooled paired difference is **−8.4 [−11.3, −5.5]**: the wall stands on the slice, and higher.
+- **S3, engineering.** The same six at days 1, 2, 4 and 7 × 25 seeds × both horizons, plus the
+  seven larger towers at day 1 on three to five whole days each. Queue misses of 150, slice then
+  whole day: day 1 **67 and 52**, day 2 122 and 106, day 4 149 and 149, day 7 150 and 150. The seven
+  larger towers miss 32 on every run at both horizons. It priced every option, and this is the only
+  one that touches nothing but a docstring and tests.
+
+### § D106, run rather than argued
+
+**Structurally the queue goal has no carry-fewer route.** The depth falls only when a rider boards;
+a rider left standing stays in it, `VizLeg` carries no `abandonedAt`, and
+`goals.ts#ABANDONMENT_FLATTERS.peakQueue` is `false`. **Measured, the same.** Every arm carried
+100 % on every seed over all thirteen shipped dispatchers on `c6` (S2, 25 seeds) and on `c2`, `c6`
+and `c9` (S3, 10 seeds), with delivered legs identical across arms. `nearest-car` has the lowest
+energy median wherever energy was measured and the deepest queue on every contract measured, and it
+meets the queue goal on **0 of 25** on `c6` and `c9` against `collective`'s 16. S1 found
+`nearest-car` first on energy in 32 of 32 whole-day cells, last on the queue in 30 of them and 11th
+or 12th of 13 in the other two. S2's counterfactual is the reason withholding is refused: with the
+queue goal taken away, `energy-aware` goes from 10 to 25 clean days of 25 on `c6` and from 5 to 25
+on `c9`, tying for best by driving less and stacking deeper. That is § D106's perverse ranking,
+arriving by removing a bar.
+
+### What it refuses
+
+1. **A whole-day constant by § D962's pooling.** Over all thirteen whole-day contracts the pooled
+   two-thirds point is **271 people** (S3), and over any pool including the seven larger towers **at
+   least 54** (S2). Either passes every game contract on nearly every seed; that is `docs/33` O2
+   answered by moving the mark.
+2. **A factor.** Per-contract paired ratios run from 0.73 to 1.21 on the game six and from about 1
+   to 3.2 on the larger towers, with no consistent direction on the game six (Midtown deeper over
+   the day, Secure Tower shallower, four indistinguishable). Any factor above 1 loosens the easier
+   horizon.
+3. **A window**, morning or peak. It stops grading the lunch stack that sets the day's maximum on up
+   to half the whole days at three towers, opens a route to meet the goal by deferring the backlog
+   past the window, and leaves *Never let a landing stack past N people* untrue of its figure
+   ([§ D227](#d227)). It would also leave 10 of S1's cells infeasible against 13.
+4. **Withholding.** § D106 above; withholding as `pending` would be worse, since
+   `week.ts#outcomeOf` counts pending as not met and no whole day could be clean.
+5. **Tightening the whole day to 30**, which § D468's first constraint gives on S1's five-tower
+   pool. The bar exists and fits the protocol on the six-contract pool, and a ladder two people
+   harder would push days 2 and 3, the last winnable ones, further out of reach.
+6. **Reading the later-day wall as a horizon defect.** It stands on the slice too, and higher.
+
+### The wall is demand's, and it is handed over
+
+The peak roughly doubles from day 1 to day 4 at both horizons while the legs grow 1.33 times and the
+ladder hardens from 32 to 26, which is `docs/33` F5: growth compounding against a hardening ladder.
+Under [§ D537](#d537) the remedy is demand and fabric, never a bar. **It goes to wave AJ lane AJ-C's
+demand rebalance and GitHub issue #234**, with S1's gate as its acceptance: no Scenario office day
+ships where none of the 39 reachable plays meets the queue bar on its pinned crowd, with Harbour
+day 4 as the positive control that fails the gate today. `GOAL_BARS`' values, the growth curve and
+`docs/33` DC-10 are AJ-C's and are not touched here. Until that gate is green, S1 endorses wave AI's
+interim: a brief on a day the census marks infeasible says no measured standing order kept the
+landings under the bar.
+
+### What was built
+
+- `shift/goals.ts`: the four-cell flatness table under `WORST_WAIT_WHOLE_DAY_FACTOR` is replaced by
+  the six-contract day-1 table with the pooled figures and the week summary; the old table stays as
+  a dated record, marked as measured on towers as built before `data/contract-ladder.json`.
+- `shift/goals.test.ts`: `GOAL_BARS` carries no whole-day queue key (the detector is shown to find
+  the two horizon keys the table does carry), the queue bar and label are identical across horizons
+  for days 1 to 20, and the label reads *Never let a landing stack past N people* on both.
+- `shift/queueBar.test.ts`, always on: `c6`, `n = 0`, day 1 reads **43** on the slice and misses,
+  **29** over the whole day and meets, on the same bar; `nearest-car` on the same day reads **128**
+  and misses, with every rider carried and the same legs as `collective`. Re-derived from the run on
+  every suite run, about 12 s of simulation at load 14.
+- `shift/queueBar.sweep.test.ts`, gated on `QUEUE_BAR_SWEEP=1` and registered in `deepTiers.test.ts`:
+  the derived pool, the one-third ± 1.96 SE line, DC-4's band, the paired interval not wholly above
+  zero, and the § D106 arm, all asserted. **Run by lane AJ-F on the game six**
+  (`QUEUE_BAR_CONTRACTS=c2,c3,c4,c6,c9,c10`, `QUEUE_BAR_D106_SEEDS=10`), both cases green in
+  2 241 s at load 14 to 25: a third instrument reproducing the members' figures exactly, with the
+  pool derived as the same six, 52 of 150 refused (34.7 %), a two-thirds point of 34, a day-miss
+  rate of 52.7 % and a paired interval of −1.63 [−4.03, +0.76] with the whole day deeper on 62. On
+  the § D106 arm at 10 seeds `nearest-car` had the lowest energy median on both `c6` and `c9` and
+  met the queue goal on 0 of 10 against `collective`'s 7, and every arm carried the same 34 986 and
+  39 716 riders. The seven larger towers were not re-run.
+
+### The clauses the owner may reverse
+
+- **The pool** (S2 R1, S3 clause 1). § D468's line is read over the contracts the building does not
+  decide. Pooling all thirteen gives about 271; S1's five office towers without `c4` give a
+  two-thirds point of 30, which would tighten the day-1 whole-day rung by two people and raise
+  queue-only misses from 24.6 % to 32.0 % there, the day staying inside DC-4 at 50.0 %.
+- **32 against 34** at day 1 (S2 R2). Both sit inside one standard error; 32 is what ships and the
+  stricter.
+- **The any-landing, any-act maximum** (S1 clause 2). Narrowing to the morning act stops grading
+  the lunch peak, where the rung's booked car is away on a whole day.
+- **The cell is the ordinary day** (S3 clause 2). With wrinkles the walls are higher at both
+  horizons; the calendar week could be the cell instead.
+- **Sending the wall to demand** (S1 clause 3, S2 R3, S3 clause 3). Flattening the queue ladder
+  under `docs/33` § 1.4, or a bar that tracks growth, would be a ladder change on every horizon; no
+  member recommends it, since demand alone reopens Midtown's days 3 to 5 in wave AI's growth-held
+  arm.
+- **No copy change** to the queue label (S2 R4), and **the interim brief sentence** (S1 clause 4),
+  which could give way to shipping nothing until the gate is green.
+- **The larger towers stay graded at 32** on both horizons and keep missing at 1.00 (S2 R5), and
+  their reference cells could be raised to 25 seeds before *misses at both horizons* is trusted
+  (S3 clause 5).
+
+### Not established
+
+No mechanism is offered for the building-dependent sign of the horizon effect, nor for lunch holding
+the peak where it does; the rung's booked-out stretch covering lunch on a whole day and the morning
+peak on a slice is a co-occurrence ([§ D256](#d256)). The larger towers were measured at three to
+five whole days each. The slice-only contracts (`c1`, `c7`, `c8`) were not measured, and the slice
+bar is not re-derived here.

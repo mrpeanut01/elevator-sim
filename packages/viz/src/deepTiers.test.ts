@@ -582,6 +582,19 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'building, a demand template or the day’s length moves',
     scheduled: false,
   },
+  'packages/viz/src/shift/queueBar.sweep.test.ts': {
+    gates: ['QUEUE_BAR_SWEEP'],
+    reason:
+      '§ D1085’s instrument — the queue bar at the horizon the day runs: every contract with an ' +
+      'authored whole day, day 1, each seed as the slice and as the whole day, asserting the shipped ' +
+      'bar sits on § D468’s one-third line over the pool the building does not decide, the day ' +
+      'inside DC-4, the paired whole − slice interval not wholly above zero, and § D106’s arm over ' +
+      'all thirteen shipped dispatchers. Not scheduled because it is a compute job rather than a ' +
+      'check: `shift/queueBar.test.ts` pins one crowd at both horizons and under `nearest-car` on ' +
+      'every run, and `shift/goals.test.ts` asserts the ladder is horizon-blind. It is re-run by ' +
+      'hand when a rung, a building, a demand template or the queue ladder moves',
+    scheduled: false,
+  },
   /*
    * The first entry in this table whose file carries **two** gates opening **two different**
    * blocks, which is why `gates` is read here as a list of names rather than as a conjunction.

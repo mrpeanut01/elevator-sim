@@ -322,7 +322,27 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * 201 300 000 + 14 400 000 = **215 700 000**. Nothing existing was raised, and the lane's two
      * other new files annotate at the ceiling rather than above it.
      */
-    ['viz', { count: 114, totalMs: 215_700_000 }],
+    /*
+     * **114 → 116 and 215 700 000 → 244 500 000, both one file** — wave AJ lane AJ-F's
+     * `shift/queueBar.sweep.test.ts`, § D1085: the queue bar re-derived at the whole-day horizon.
+     * Gated on `QUEUE_BAR_SWEEP` and registered in `deepTiers.test.ts`, so the default suite pays
+     * nothing. Two cases, priced separately because they are separate jobs a hand-run selects with
+     * `-t`:
+     *
+     * - *derive*, **21 600 000 ms**: every whole-day contract × 25 seeds × both horizons. Its own
+     *   docstring prices it off the swarm's per-run wall clock under load: about 25 minutes for the
+     *   six game contracts (this lane ran that restriction beside a 10-seed *d106* in 2 241 s
+     *   at load 14 to 25), 23 for
+     *   `vertical-city`, and about **11 hours** for the six reference towers. Six hours is the
+     *   quiet-box share of that and is **not** a measured quiet-box figure, which is said rather
+     *   than implied; a loaded full run should raise `--testTimeout` on the command line rather
+     *   than this annotation.
+     * - *d106*, **7 200 000 ms**: thirteen dispatchers × 25 whole days on two office towers,
+     *   about an hour at the same load, extrapolated from the 10-seed run above.
+     *
+     * 215 700 000 + 21 600 000 + 7 200 000 = **244 500 000**. Nothing existing was raised.
+     */
+    ['viz', { count: 116, totalMs: 244_500_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this

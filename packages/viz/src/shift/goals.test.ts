@@ -29,6 +29,7 @@ import {
   WAKE_UP_ARRIVALS,
   type DayOutcome,
   type GoalObservations,
+  type RunHorizon,
   type ShiftGoal,
 } from './types.js';
 
@@ -244,7 +245,8 @@ describe('what a whole day asks, against what a slice asks', () => {
       expect(whole.map((goal) => goal.compare)).toEqual(slice.map((goal) => goal.compare));
 
       // Two shares and one maximum are horizon-blind, and the queue's flatness is measured rather
-      // than assumed — see `WORST_WAIT_WHOLE_DAY_FACTOR` for the four cells it was measured on.
+      // than assumed: § D1085's census, in `WORST_WAIT_WHOLE_DAY_FACTOR`'s docstring, and pinned
+      // to one crowd at both horizons by `queueBar.test.ts`.
       for (const id of ['carry', 'minute', 'queue']) {
         expect(barOf(whole, id), `day ${String(day)} ${id}`).toBe(barOf(slice, id));
       }
@@ -318,6 +320,73 @@ describe('what a whole day asks, against what a slice asks', () => {
     };
     expect(worstOn('period')).toBe('missed');
     expect(worstOn('whole-day')).toBe('met');
+  });
+});
+
+/**
+ * **The queue goal has one ladder for both horizons, and nothing in `GOAL_BARS` offers a second** —
+ * [§ D1085](../../../../DECISIONS.md), three members of three.
+ *
+ * § D962 gave the energy goal a second constant because its figure is computed over the reporting
+ * window and that window grew from 300 s to 36 000 s. The queue's figure is the deepest landing
+ * over the whole run on both horizons, and the swarm measured the whole day grading it **no harder**
+ * than the slice on the game contracts (52 against 67 misses of 150 at day 1, and 34.7 % refused at
+ * the shipped 32 against a pooled two-thirds point of 34). So every shape a later lane might reach
+ * for by analogy — a `queueWholeDay…` constant, a factor, a label that differs by horizon — fails
+ * here, and the measurement that would license one is `queueBar.sweep.test.ts`.
+ */
+describe('the queue goal is one ladder on both horizons — § D1085', () => {
+  const queueOf = (day: number, over: RunHorizon): ShiftGoal => {
+    const goal = goalsForDay(day, over).find((entry) => entry.id === 'queue');
+    if (goal === undefined) throw new Error(`no queue goal on day ${String(day)} (${over})`);
+    return goal;
+  };
+
+  it('offers no whole-day queue key in `GOAL_BARS`, as it offers no energy factor', () => {
+    const keys = Object.keys(GOAL_BARS);
+    expect(keys.filter((key) => /queue.*whole|whole.*queue/iu.test(key))).toEqual([]);
+    // The detector is not simply off: the one horizon key the table does carry is found by the
+    // same shape of pattern, and the energy goal's second constant is found by it too.
+    expect(keys.filter((key) => /worst.*whole|whole.*worst/iu.test(key))).toEqual([
+      'worstWholeDayFactor',
+    ]);
+    expect(keys.filter((key) => /energy.*whole/iu.test(key))).toEqual(['energyPerLegMaxWholeDayKJ']);
+    // And the three queue keys are exactly the ladder's three terms.
+    expect(keys.filter((key) => /queue/iu.test(key)).sort()).toEqual([
+      'queueBase',
+      'queueMin',
+      'queuePerDay',
+    ]);
+  });
+
+  it('grades days 1 to 20 against the same bar and prints the same sentence on both horizons', () => {
+    for (let day = 1; day <= 20; day += 1) {
+      const slice = queueOf(day, 'period');
+      const whole = queueOf(day, 'whole-day');
+      expect(whole.bar, `day ${String(day)}`).toBe(slice.bar);
+      expect(whole.label, `day ${String(day)}`).toBe(slice.label);
+      expect(whole.compare, `day ${String(day)}`).toBe('at-most');
+      expect(whole.reads, `day ${String(day)}`).toBe('peakQueue');
+      expect(slice.bar, `day ${String(day)}`).toBe(
+        Math.max(GOAL_BARS.queueMin, GOAL_BARS.queueBase - day * GOAL_BARS.queuePerDay),
+      );
+    }
+  });
+
+  it('says "Never let a landing stack past N people" with the bar it grades, on both horizons', () => {
+    /*
+     * The sentence quantifies over the whole run and over every landing, which is what `peakQueue`
+     * is on both horizons, so § D1085 owes it no change: on a whole day the deepest landing falls at
+     * lunch on up to half the crowds on three towers, and *never* and *a landing* already say so.
+     */
+    for (const day of [1, 4, 11, 20]) {
+      for (const over of ['period', 'whole-day'] as const) {
+        const goal = queueOf(day, over);
+        expect(goal.label, `day ${String(day)} ${over}`).toBe(
+          `Never let a landing stack past ${String(goal.bar)} people`,
+        );
+      }
+    }
   });
 });
 
