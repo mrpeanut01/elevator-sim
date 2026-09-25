@@ -2148,10 +2148,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`first-session` is the name `deriveStreamSeed` mixes into the first tower’s draw, and ' +
         '`LEGIBILITY_SWEEP` is § D512’s table as data (`garden-apartments`, a count, a median), ' +
         'from which `shift/firstSession.ts` derives the eligible set. What a player reads of the ' +
-        'draw is `FIRST_SESSION_LINE`, which `EVERYDAY_TODAY` seeds on a first day and covers.',
+        'draw is `FIRST_SESSION_LINE`, which `EVERYDAY_TODAY` seeds on a first day and covers. ' +
+        'Since § D1047 two more read the stream and print nothing: `firstSessionDayFor` hands ' +
+        '`withFirstSession` the drawn pin’s crowd and standing order, and `isDealtPinnedDay` is the ' +
+        'predicate the line’s pinned arm and the boot’s seed base share — both answer with ids, ' +
+        'seeds and a boolean, and the line they choose is seeded by name.',
       ids: [
         'shift/firstSession.ts#FIRST_SESSION_STREAM',
         'shift/firstSession.ts#firstSessionContractFor',
+        'shift/firstSession.ts#firstSessionDayFor',
+        'shift/firstSession.ts#isDealtPinnedDay',
         'shift/legibility.ts#LEGIBILITY_SWEEP',
       ],
     },

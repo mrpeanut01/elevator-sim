@@ -33903,6 +33903,8 @@ for Phase 7 to search, and this entry makes the curve reproducible rather than m
 
 > **Status 2026-09-06: NARROWED by [§ D525](#d525).** The first session is Scenario's first entry; the draw among the legible five stands only where every candidate is doable with a tweak and failable with the wrong one. See [`docs/39`](docs/39-decisions-in-force.md).
 
+> **Status 2026-09-25: AMENDED by [§ D1047](#d1047)**, which carries § D525's narrowing out: the draw is over the legible towers whose pinned press day § D1029 admits, and it deals that pinned day.
+
 **Date: 2026-09-06 · Owner: the integrator, wave W · Rules on: GitHub issue #208's code half under
 § D475 and § D512, `docs/35` `PM-TT1`, `packages/viz/src/shift/firstSession.ts`, `dev/state.ts`,
 `dev/main.ts`'s boot, `everyday/today.ts`, the door.**
@@ -38590,6 +38592,8 @@ stage 9's whole baseline batch is five seconds.
 
 ## D729 — The day's crowd is the UTC date's own digits, derived on the device from the server's own expression
 
+> **Status 2026-09-25: AMENDED FOR THE FIRST DAY ONLY by [§ D1047](#d1047)** — a fresh device's first scored day is its tower's pinned day on the pin's crowd; the draw is still taken from the date, and every later day is on the day's crowd as here.
+
 > **Taken 2026-09-19 by an agent session under delegated authority**, not by the product owner. The
 > session principal's standing instruction for this wave is that decisions are taken by the swarm
 > rather than escalated; this entry, [§ D730](#d730), [§ D731](#d731), [§ D732](#d732) and
@@ -43275,3 +43279,144 @@ same six. Wall-clock figures are not published: the box was at load 5–14 throu
 
 No bar, no goal, no occupancy, no rate, no booked-out car. Changes to `data/contract-ladder.json`
 are pins and their windows only. `GOAL_BARS` is byte-identical.
+
+---
+
+## D1047 — a newcomer's first scored day is a pinned press day, drawn off the date from the legible towers § D1029 admits, and nothing is stored
+
+> **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: a
+> three-member decision swarm (the player, honesty and engineering lenses, whose records are the
+> integrator's scratch notes `first-day-S1` to `-S3` and are not in this repository), a tiebreak on
+> the horizon asked of the honesty member, reconciled by wave AI's integrator (*FIRST DAY
+> RECONCILED*), and built and measured by wave AI lane AI-F. A later reader weighing this against a
+> product-owner ruling should treat it as an agent ruling and say so — [§ D626](#d626) is the
+> cautionary case. **Amends [§ D514](#d514)**, carrying out [§ D525](#d525)'s never-built narrowing
+> of it, and **amends [§ D729](#d729) for the first day only**; moves `shift/dailySeed.ts`'s two
+> published rotation figures. None of them is rewritten.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it moves three recorded decisions and two
+published figures, and it binds `shift/firstSession.ts`, `dev/state.ts`, `dev/main.ts`,
+`everyday/host.ts`, `everyday/today.ts`, `everyday/doorView.ts`, `everyday/briefView.ts`,
+`everyday/briefScreen.ts`, `everyday/stageScreen.ts`, a new `everyday/firstDayLength.ts`, the honesty
+register and the browser tier.
+
+### What was wrong
+
+§ D525 narrowed § D514's draw — *the draw stands only where every candidate is doable with a tweak
+and failable with the wrong one* — and nothing ever measured that of any candidate. The set stayed
+§ D512's legibility reading alone, which at the whole-day horizon admits fifteen of sixteen
+contracts and has stopped selecting anything. Over 730 dates from 2026-01-01 the draw dealt a
+reference tower on **307**; on 2026-09-25, the day this was ruled, it dealt Merdeka-class, which
+§ D962 measured missing 150 of 150 whole days and which simulated for 171 s before the stage drew.
+
+### The ruling
+
+1. **The draw is over `shift/firstSession.ts#FIRST_DAY_CONTRACT_IDS`** — § D512's legible set
+   intersected with `shift/ladder.ts#admittedPressDayIds`, § D1029's call-window admission. Derived,
+   never typed; guarded non-empty with no fallback to the legible set (the draw throws on an empty
+   set, and `firstSession.test.ts` fails first). On this tree it is `c2`, `c3`, `c6`, `c7`, `c8`,
+   `c10`. The stream, `first-session`, and its seed, the date's, are unchanged.
+2. **The day it deals is the tower's pinned day**: the pin's crowd and the standing order, the same
+   two fields `everyday/host.ts#playPressDay` writes, read from the same row
+   (`firstSessionDayFor`, applied by `dev/state.ts#withFirstSession`). It is the one run
+   `shift/pressLadder.test.ts` proves misses as built and turns on the stage's call.
+3. **A `?seed=` in the address wins** (`FirstSessionOptions.crowdFromAddress`, required): the tower
+   is drawn from that seed and played on it, which is an ordinary day on a press-day tower.
+4. **Nothing is stored** — [§ D993](#d993)'s forward rule. The pin is a function of the date, so a
+   reload that restores no session draws it again; a reload that reads the address this page wrote
+   (`?building=…&seed=<pin>`) lands on the same run without drawing. The boot hands the host the
+   day's crowd as its press-day seed base (`initialPressDaySeedBase`) whenever the page opened on
+   the pinned day the date deals (`isDealtPinnedDay`), so choosing an ordinary tower afterwards puts
+   the day's crowd back on either path.
+5. **Reference towers and whole days stay one press away** on the tower picker. They are not dealt
+   to a stranger.
+
+### The honesty member's conditions, and how each is met
+
+- **The card shows the measured span.** § D1029's door lede is derived from the shortest admitted
+  window, and every first-day member is admitted, so the span it names is one every dealt day was
+  measured over. Unchanged here, and true on the first day by construction.
+- **The clearing-dispatcher information stays visible.** § D1029's derived brief sentence and the
+  report's call row. Its *"Measured on today's crowd"* was false on every day it could be drawn — a
+  pin's seed is never the date's — and now reads *this crowd*.
+- **The day is labelled as a pinned crowd.** The seed line gains a third arm (*the pinned crowd this
+  day was measured on, not the day's*), the door's closing sentence a third arm (its *nobody else is
+  playing it* and *the dispatcher is yours to bring* were both false on a pinned day), and
+  `FIRST_SESSION_LINE` a pinned arm whose chooser asks the draw on the **day's** seed, because the
+  printed number is the pin's. None names the verb ([§ D529](#d529) clause 4).
+- **A whole-day first day's brief says how long the day takes and when the call comes**, derived
+  (`everyday/firstDayLength.ts`): a measured table re-run on every suite run, composed through
+  `sittingShape.ts#pacedDayRealS` at the stage's own rungs. On this tree: *up to* 42, 41, 40 and 41
+  minutes of watching at 4× on `c2`, `c3`, `c6`, `c10`, with the call about 12, 12, 12 and 13
+  minutes in.
+
+### One condition was carried out against its own wording, and it is recorded
+
+The tiebreak asked the brief to say *the call comes in the lunch act, about 20 real minutes in*.
+That was true of § D974's pins — a press at 0.43 of the day, 12:18 — and stopped being true when
+§ D1029 moved the press to a call the stage names: measured, **every whole-day call falls between
+the first and second of the day's three peaks** (10:40:14, 10:45:30, 10:43:30 and 11:28:30), about
+twelve minutes in. So the sentence derives the call's position from `shift/dayLength.ts#actsOf`
+rather than naming an act, and `firstDayLength.test.ts` refuses *lunch* wherever the measurement
+does not put the call there. Printing the tiebreak's words would have been [§ D227](#d227)'s stale
+claim on the first brief every newcomer reads.
+
+### Dissent, recorded — FD-S2, the honesty member
+
+A rescuable draw on the date's crowd rather than a pinned day: a contract is eligible where, on more
+than a third of fifty seeds at the played horizon, it is legible **and** the standing order misses
+**and** some dispatcher on the brief clears it. The press-day default hands every newcomer **a
+selected outlier** — a crowd chosen because a press flips it, one to eight in fifty to ninety-nine
+crowds, where § D982 found no press effect distinguishable from zero at fifty — so the first lesson
+risks being a superstition about one crowd. Outvoted 2–1; its four minimum conditions are adopted
+above, and *on one crowd* is in the line itself so nothing reads as a claim about the tower's days in
+general.
+
+**Its tiebreak on the horizon: whole days admitted, gated on the span test.** A slice-only set is
+one crowd for every newcomer — the dissent at full strength, no draw left, and one rung edit empties
+it; three or more pins are different crowds with different right answers. Forty minutes is a
+playability cost rather than dishonesty, stated before the day starts. The set the tiebreak
+expected (`c2`, `c8`, `c10`) became six when § D1029 re-pinned `c3`, `c6` and `c7` on crowds that
+pass its window.
+
+### Measured
+
+- **The draw on 2026-09-25 deals `c8`**, St Jude's pinned slice (the legible draw dealt `c13`).
+  `everyday/firstSession.browser.test.ts` holds it on the built bundle with the page's clock fixed
+  to that date: a cold load from empty storage opens on the pin, labelled, with nothing in storage;
+  a reload and a fresh visit to the bare origin both land on the same day; on 2026-09-23 (`c10`,
+  a whole day) the brief draws the length line and choosing an ordinary tower after a reload puts
+  the date's crowd back.
+- **`shift/dailySeed.ts`'s figures, re-derived from the draw**: a tower repeats inside seven days on
+  **483 of 730** dates (**66.2 %**, was 32.2 %) and on consecutive days **119** times (was 47). The bad
+  direction, and the module's reason not to build a rotation — one draw per device, no observer —
+  is unchanged.
+- **Two pins draw their own tower**: `c8`'s `20276662` and `c10`'s `20355852`, because the pins were
+  searched on the sequence the draw is handed. A `?seed=` carrying one lands on that pinned day as
+  measured, and none of three arms was true of it, so the line has a fourth
+  (`FIRST_SESSION_LINE_PINNED_BY_NUMBER`) and `firstSession.test.ts` names which pins reach it.
+
+### Found while building, fixed on the same commit
+
+- `everyday/briefView.ts#raceAgainstCard` said the rival drives *a second copy of today's crowd*;
+  it drives the run's, which is not today's on a pinned day. Now *this run's crowd*.
+- `everyday/doorView.ts#DOOR_RULE` said *unless you choose one of the days a press decides*; a
+  newcomer is dealt one without choosing. Now *unless you are on one*.
+- `screenReaderWalkthrough.browser.test.ts` went red the first time a bare load reached a pinned
+  day: the brief's held driver cards (§ D1029) and the stage's held handover picker announced as
+  dimmed with no reason. Both now carry an accessible description of the hold.
+
+### What the owner may reverse, and what it costs
+
+Widening `FIRST_DAY_CONTRACT_IDS` to the legible set restores the draw as it was before this entry;
+the pinned route then applies only to members that pin a day, and nothing else depends on the set
+being narrow. Reversing the pinned route alone is `withFirstSession`'s last two lines.
+
+### What it does not touch
+
+No bar, goal, pin, window, rate or booked-out car. `GOAL_BARS` and `data/` are byte-identical. The
+tutorial, the landing page and § D529's order are untouched; so is § D730 — a returning player's
+tower is still their own week's. Three defects this ruling makes universal belong to wave AI's
+lane AI-E and are **not** fixed here: the brief's *LOCKED FOR SCORE — the crowd is the day's*,
+`openTomorrow` running Tuesday on the pinned seed, and the door lede's *Nothing booked* and *the
+only thing you choose is who drives*.

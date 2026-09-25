@@ -88,7 +88,7 @@ import type { VizRecording } from '../contract/types.js';
 import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
 import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
-import { firstSessionContractFor } from '../shift/firstSession.js';
+import { firstSessionContractFor, firstSessionDayFor } from '../shift/firstSession.js';
 import { actsOf, runHorizonOf, runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
 import {
   SHIFT_EVENTS,
@@ -1296,8 +1296,30 @@ export function disclosureOf(mode: ViewMode): DisclosureMode {
  * their own week was opened on and is nobody else's. *One tower a day* is a property of a product
  * this one does not yet have, and the strings say the narrower true thing instead of the wider
  * false one; `everyday/buildNotes.ts` carries the gap.
+ *
+ * ## The day it deals is the tower's pinned day — [§ D1047](../../../../DECISIONS.md)
+ *
+ * The draw is over `shift/firstSession.ts#FIRST_DAY_CONTRACT_IDS` — legible towers whose pinned
+ * press day § D1029 admits — and the run is that day **as it was measured**: the pin's crowd and
+ * the tower's standing order, the same two fields `everyday/host.ts#playPressDay` writes, read from
+ * the same row. So a newcomer's first scored day is the one run `shift/pressLadder.test.ts` proves
+ * misses as built and turns on the stage's call, rather than whatever the date's crowd happens to
+ * do on whichever tower the date draws.
+ *
+ * **Unless the address carried `?seed=`** ({@link FirstSessionOptions.crowdFromAddress}): the
+ * reader's crowd wins, § D729's own rule, and the tower is still drawn — from that seed, so the
+ * same link opens the same tower — and played on it, which is an ordinary day on a press-day tower.
+ *
+ * **Nothing is written that a later load reads.** The pin is a pure function of the date, so a
+ * reload that restores no session draws it again; § D993's forward rule (no field whose only
+ * reader is the first-visit gate) is met by there being no field. `firstSession.test.ts` asserts
+ * the returned state differs from its input only in fields a run already carries.
  */
-export function withFirstSession(state: ViewerState, resources: BrowserResources): ViewerState {
+export function withFirstSession(
+  state: ViewerState,
+  resources: BrowserResources,
+  options: FirstSessionOptions,
+): ViewerState {
   const contractId = firstSessionContractFor(state.seed);
   const contract = contractById(contractId);
   if (contract === undefined) return state;
@@ -1307,7 +1329,21 @@ export function withFirstSession(state: ViewerState, resources: BrowserResources
     shiftLengthS: shiftLengthForContract(contractId),
     windowStartS: null,
   };
-  return withBuilding(drawn, resources, contract.buildingId);
+  const moved = withBuilding(drawn, resources, contract.buildingId);
+  if (options.crowdFromAddress) return moved;
+  const day = firstSessionDayFor(state.seed);
+  return { ...withDispatcher(moved, resources, day.standingOrder), seed: day.seed };
+}
+
+/** How {@link withFirstSession} is asked — required, `TodayInput.calendar`'s reason. */
+export interface FirstSessionOptions {
+  /**
+   * Whether the address carried `?seed=` — the reader's crowd, which wins over the pin
+   * ([§ D1047](../../../../DECISIONS.md), § D729). Required rather than optional: a default of
+   * `false` would pin a crowd over a link somebody pasted, and a default of `true` would restore the
+   * pre-§ D1047 draw on every caller that forgot the field.
+   */
+  readonly crowdFromAddress: boolean;
 }
 
 /**

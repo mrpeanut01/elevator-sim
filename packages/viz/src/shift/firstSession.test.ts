@@ -12,24 +12,35 @@
 import { describe, expect, it } from 'vitest';
 
 import { recordRun } from '../record/recordRun.js';
-import { RESOURCES } from '../scope/probes.test-helper.js';
-import { initialState, shiftLengthForContract, shiftRunConfigOf, withFirstSession } from '../dev/state.js';
+import {
+  buildingConfigOf,
+  initialState,
+  shiftLengthForContract,
+  shiftRunConfigOf,
+  withFirstSession,
+} from '../dev/state.js';
 
 import { contractBuildings, contractDayState } from './contractDay.test-helper.js';
 
 import { CONTRACTS, FIRST_CONTRACT_ID, contractById } from './contracts.js';
+import { dailySeedFor } from './dailySeed.js';
+import { scenarioHorizonFor } from './dayLength.js';
 import {
   ELIGIBLE_FIRST_CONTRACT_IDS,
   FIRST_SESSION_LINE,
   FIRST_SESSION_LINE_CHOSEN,
+  FIRST_SESSION_LINE_PINNED,
+  FIRST_SESSION_LINE_PINNED_BY_NUMBER,
+  firstSessionDayFor,
   firstSessionLineFor,
   FIRST_SESSION_STREAM,
   LEGIBILITY_SWEEP_N,
   firstSessionContractFor,
+  isDealtPinnedDay,
   isFirstDayOnALegibleTower,
 } from './firstSession.js';
 import { FIRST_DAY_CONTRACT_IDS } from './firstSession.js';
-import { admittedPressDayIds } from './ladder.js';
+import { admittedPressDayIds, pressDayFor, pressDayStanding } from './ladder.js';
 import { LEGIBILITY_SWEEP, legibilityOf } from './legibility.js';
 import { openWeek } from './week.js';
 
@@ -127,37 +138,128 @@ describe('the eligible set — § D512’s table read by arithmetic', () => {
 });
 
 describe('the draw — a named stream off the session’s seed', () => {
-  it('is a function of the seed, lands inside the set, and reaches every member', () => {
+  it('is a function of the seed, lands inside the first-day set, and reaches every member', () => {
+    /*
+     * **The set it lands in is the first-day set since § D1047**, not the legible one. Over the
+     * legible set this drew fifteen towers, six of them reference towers no shipped dispatcher
+     * clears on a whole day (§ D962); over the first-day set it deals six pinned days.
+     */
     expect(FIRST_SESSION_STREAM).toBe('first-session');
     const seen = new Map<string, number>();
     for (let n = 0; n < 2_000; n += 1) {
       const seed = 20_260_906n + 7_919n * BigInt(n);
       const drawn = firstSessionContractFor(seed);
       expect(firstSessionContractFor(seed)).toBe(drawn);
-      expect(ELIGIBLE_FIRST_CONTRACT_IDS).toContain(drawn);
+      expect(FIRST_DAY_CONTRACT_IDS).toContain(drawn);
       seen.set(drawn, (seen.get(drawn) ?? 0) + 1);
     }
-    expect([...seen.keys()].sort()).toEqual([...ELIGIBLE_FIRST_CONTRACT_IDS].sort());
+    expect([...seen.keys()].sort()).toEqual([...FIRST_DAY_CONTRACT_IDS].sort());
     /*
      * No member is starved: each lands at least a fifth of its share. The bound is **derived from
      * the set's own size** rather than written as `2 000 / 25`, which was five squared and read as a
-     * constant — the set is six now (GitHub issue #500) and a hard-coded denominator would have
-     * gone from *a fifth of a share* to *a quarter* without anybody choosing that.
+     * constant — a hard-coded denominator would have moved from *a fifth of a share* to something
+     * else every time the set did, without anybody choosing that.
      */
-    const share = 2_000 / ELIGIBLE_FIRST_CONTRACT_IDS.length;
-    for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) expect(seen.get(id) ?? 0).toBeGreaterThan(share / 5);
+    const share = 2_000 / FIRST_DAY_CONTRACT_IDS.length;
+    for (const id of FIRST_DAY_CONTRACT_IDS) expect(seen.get(id) ?? 0).toBeGreaterThan(share / 5);
   });
 
-  it('opens a fresh week on the drawn contract, and the building follows the week', () => {
+  it('opens a fresh week on the drawn contract, on its pinned crowd under its standing order — § D1047', () => {
+    const resources = contractBuildings();
     const seed = 424_242n;
-    const drawn = withFirstSession(initialState(RESOURCES, seed), RESOURCES);
+    const drawn = withFirstSession(initialState(resources, seed), resources, { crowdFromAddress: false });
     const contract = contractById(firstSessionContractFor(seed));
+    const press = pressDayFor(contract?.id);
     expect(contract).toBeDefined();
+    expect(press).toBeDefined();
     expect(drawn.week).toEqual(openWeek(contract?.id));
     expect(drawn.buildingId).toBe(contract?.buildingId);
     expect(drawn.shiftLengthS).toBe(shiftLengthForContract(contract?.id ?? ''));
     expect(drawn.parkedWeeks).toEqual([]);
     expect(isFirstDayOnALegibleTower(drawn.week)).toBe(true);
+    /* The pair `everyday/host.ts#playPressDay` writes, read from the same row. */
+    expect(drawn.seed.toString()).toBe(press?.seedText);
+    expect(drawn.dispatcherId).toBe(press?.standingOrder);
+    expect(firstSessionDayFor(seed)).toEqual({
+      contractId: contract?.id,
+      seed: BigInt(press?.seedText ?? '0'),
+      standingOrder: press?.standingOrder,
+    });
+    /* And it is the pinned day as the picker and the brief recognise one — one predicate, § D973. */
+    const horizon = scenarioHorizonFor(
+      resources.trafficProfiles,
+      buildingConfigOf(resources, [], contract?.buildingId ?? ''),
+    );
+    expect(
+      pressDayStanding({
+        contractId: drawn.week.contractId,
+        day: drawn.week.day,
+        eventId: 'ordinary',
+        hasCalendar: drawn.calendar !== null,
+        seed: drawn.seed,
+        horizon,
+      }),
+    ).toBe(press);
+    expect(isDealtPinnedDay(drawn.week.contractId, drawn.seed, seed)).toBe(true);
+  });
+
+  it('lets a `?seed=` in the address win: the tower is drawn from it and played on it — § D1047', () => {
+    const resources = contractBuildings();
+    const seed = 424_242n;
+    const linked = withFirstSession(initialState(resources, seed), resources, { crowdFromAddress: true });
+    expect(linked.week.contractId).toBe(firstSessionContractFor(seed));
+    expect(linked.seed).toBe(seed);
+    expect(linked.dispatcherId).toBe(initialState(resources, seed).dispatcherId);
+    expect(isDealtPinnedDay(linked.week.contractId, linked.seed, seed)).toBe(false);
+  });
+
+  it('stores nothing: a reload re-derives the same day, and what is saved is what an unpinned first day saves', () => {
+    /*
+     * § D993's forward rule — no field whose only reader is the first-visit gate. Two halves. The
+     * state it returns has exactly the fields it was handed, so there is no new field to persist;
+     * and the pin reaches the run through `seed` and `dispatcherId`, which `persist/session.ts`'s
+     * snapshot (week, parked weeks, settings, free play) does not carry, so what the pinned day
+     * saves is what the same week saves on the address's crowd. A reload that restores no session
+     * therefore draws again, and the date hands it the same pin.
+     */
+    const resources = contractBuildings();
+    const daySeed = dailySeedFor('2026-09-25');
+    const first = withFirstSession(initialState(resources, daySeed), resources, { crowdFromAddress: false });
+    const reload = withFirstSession(initialState(resources, daySeed), resources, { crowdFromAddress: false });
+    expect(Object.keys(first).sort()).toEqual(Object.keys(initialState(resources, daySeed)).sort());
+    expect(reload.seed).toBe(first.seed);
+    expect(reload.week).toEqual(first.week);
+    expect(reload.dispatcherId).toBe(first.dispatcherId);
+    const unpinned = withFirstSession(initialState(resources, daySeed), resources, { crowdFromAddress: true });
+    const saved = (state: typeof first): string =>
+      JSON.stringify({ week: state.week, parkedWeeks: state.parkedWeeks });
+    expect(saved(first)).toBe(saved(unpinned));
+    expect(first.seed).not.toBe(unpinned.seed);
+  });
+
+  it('gives a pin whose own number draws its tower an arm of its own, and names which pins do', () => {
+    /*
+     * This case was written first as *no pin draws its own tower*, so that three arms would do — and
+     * it was red on its first run: `c8`'s `20276662` draws `c8`, and `c10`'s `20355852` draws
+     * `c10`. The pins were searched on the same sequence the draw is handed, and with six members a
+     * pin draws its own tower one time in six, so two of six is no surprise. A `?seed=20276662`
+     * link therefore lands on St Jude's pinned day as measured, and of the three arms one says the
+     * date chose it, one that the crowd is not the measured one, and one that the week was moved
+     * rather than drawn — all false. So it has a fourth, and the literal below says which pins reach
+     * it, so a re-pin that moves them is seen.
+     */
+    const selfDrawing = FIRST_DAY_CONTRACT_IDS.filter(
+      (id) => firstSessionContractFor(BigInt(pressDayFor(id)?.seedText ?? '0')) === id,
+    );
+    expect(selfDrawing).toEqual(['c8', 'c10']);
+    for (const id of selfDrawing) {
+      const pin = BigInt(pressDayFor(id)?.seedText ?? '0');
+      const notTheDate = dailySeedFor('2026-09-25');
+      if (firstSessionContractFor(notTheDate) === id) continue;
+      expect(firstSessionLineFor(id, pin, notTheDate)).toBe(FIRST_SESSION_LINE_PINNED_BY_NUMBER);
+    }
+    expect(FIRST_SESSION_LINE_PINNED_BY_NUMBER).toContain('that crowd, and it is also the draw');
+    expect(FIRST_SESSION_LINE_PINNED_BY_NUMBER).not.toMatch(/\b(park|parking|spread|lobby|today)\b/iu);
   });
 });
 
@@ -193,12 +295,16 @@ describe('the door’s line — derived from the week, never stored', () => {
       'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
       'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen',
     ];
-    expect(FIRST_SESSION_LINE).toContain(
-      `${words[ELIGIBLE_FIRST_CONTRACT_IDS.length] ?? ''} towers`,
-    );
-    expect(FIRST_SESSION_LINE).toContain(
-      `${String(LEGIBILITY_SWEEP.length * LEGIBILITY_SWEEP_N)} days`,
-    );
+    /* § D1047: the drawn arms count the set the draw is over, which is the first-day set. */
+    for (const line of [FIRST_SESSION_LINE, FIRST_SESSION_LINE_PINNED]) {
+      expect(line).toContain(`${words[FIRST_DAY_CONTRACT_IDS.length] ?? ''} towers`);
+      expect(line).toContain(`${String(LEGIBILITY_SWEEP.length * LEGIBILITY_SWEEP_N)} days`);
+      expect(line).not.toMatch(/\b(you|your|yours)\b/iu);
+      /* § D529 clause 4: no worked answer outside the tutorial — neither verb, nor which one. */
+      expect(line).not.toMatch(/\b(park|parking|spread|lobby)\b/iu);
+    }
+    expect(FIRST_SESSION_LINE_CHOSEN).toContain(`${words[ELIGIBLE_FIRST_CONTRACT_IDS.length] ?? ''} towers`);
+    expect(FIRST_DAY_CONTRACT_IDS.length).toBeGreaterThan(1);
     // Non-vacuity: the set is neither empty nor past the word list, so neither `toContain` above
     // is asserting the presence of a bare ` towers`.
     expect(ELIGIBLE_FIRST_CONTRACT_IDS.length).toBeGreaterThan(1);
@@ -317,15 +423,33 @@ describe('the line has two arms, and the draw picks between them — issue #595,
      * choose, and *the same number opens the same tower* is false of both. So the arm is the draw's
      * own answer: across a run of seeds, every contract the draw names gets the first arm and every
      * other eligible contract gets the second.
+     *
+     * **Except on a contract's own pin** (§ D1047), and this run of seeds meets five of them: the
+     * pins were searched on this very sequence (`20 260 824 + 7 919 n`, § D974 and § D1029), so
+     * `n` = 2, 6, 8, 12 and 32 are the crowds c2 and c8, c3, c7, c10 and c6 were measured on. On its
+     * pin a contract never reads the drawn arm — that arm says the crowd is not the measured one —
+     * and reads the pinned arm only where the **day's** draw dealt it, which a date this case holds
+     * fixed decides.
      */
+    const daySeed = dailySeedFor('2026-09-25');
     let drawn = 0;
     let chosen = 0;
+    let onPin = 0;
     for (let n = 0; n < 40; n += 1) {
       const seed = 20_260_824n + 7_919n * BigInt(n);
       const opened = firstSessionContractFor(seed);
       for (const id of ELIGIBLE_FIRST_CONTRACT_IDS) {
-        const line = firstSessionLineFor(id, seed);
-        if (id === opened) {
+        const line = firstSessionLineFor(id, seed, daySeed);
+        if (pressDayFor(id)?.seedText === seed.toString()) {
+          expect(line, `${id} on its pin`).toBe(
+            firstSessionContractFor(daySeed) === id
+              ? FIRST_SESSION_LINE_PINNED
+              : id === opened
+                ? FIRST_SESSION_LINE_PINNED_BY_NUMBER
+                : FIRST_SESSION_LINE_CHOSEN,
+          );
+          onPin += 1;
+        } else if (id === opened) {
           expect(line, `${id} at ${String(seed)}`).toBe(FIRST_SESSION_LINE);
           drawn += 1;
         } else {
@@ -334,8 +458,45 @@ describe('the line has two arms, and the draw picks between them — issue #595,
         }
       }
     }
-    expect(drawn).toBe(40);
+    expect(drawn).toBeGreaterThan(30);
     expect(chosen).toBeGreaterThan(0);
+    expect(onPin, 'the run of seeds meets no pin, so the case above tests nothing about one').toBeGreaterThan(0);
+  });
+
+  it('says the crowd is the pinned one exactly where the date dealt the tower and the crowd is its pin — § D1047', () => {
+    /*
+     * The pinned arm is the one a fresh device meets, and its chooser asks the draw on the **day's**
+     * seed, because the printed number is the pin's. Over a year of dates: the date's dealt tower on
+     * its pin reads the pinned arm; every other first-day tower on its own pin reads the chosen arm
+     * (the picker's press-day row reaches it); and the day's own crowd on the dealt tower reads the
+     * drawn arm — a player who came back to it from the picker — because the draw on that number
+     * does deal it.
+     */
+    const reached = new Set<string>();
+    for (let day = 0; day < 365; day += 1) {
+      const date = new Date(Date.UTC(2026, 0, 1) + day * 86_400_000).toISOString().slice(0, 10);
+      const daySeed = dailySeedFor(date);
+      const dealt = firstSessionContractFor(daySeed);
+      reached.add(dealt);
+      for (const id of FIRST_DAY_CONTRACT_IDS) {
+        const pin = BigInt(pressDayFor(id)?.seedText ?? '0');
+        expect(firstSessionLineFor(id, pin, daySeed), `${id} on ${date}`).toBe(
+          id === dealt
+            ? FIRST_SESSION_LINE_PINNED
+            : firstSessionContractFor(pin) === id
+              ? FIRST_SESSION_LINE_PINNED_BY_NUMBER
+              : FIRST_SESSION_LINE_CHOSEN,
+        );
+        expect(isDealtPinnedDay(id, pin, daySeed)).toBe(id === dealt);
+      }
+      expect(firstSessionLineFor(dealt, daySeed, daySeed)).toBe(FIRST_SESSION_LINE);
+    }
+    expect([...reached].sort()).toEqual([...FIRST_DAY_CONTRACT_IDS].sort());
+    /* The pinned arm names the crowd as the measured one and not the day's; the drawn arm, the reverse. */
+    expect(FIRST_SESSION_LINE_PINNED).toContain('that crowd, not the day’s');
+    expect(FIRST_SESSION_LINE_PINNED).toContain('today’s date chose the tower');
+    expect(FIRST_SESSION_LINE).toContain('it is not the crowd that was measured');
+    expect(FIRST_SESSION_LINE).not.toContain('today’s date');
   });
 
   it('keeps the chosen arm’s counts derived and its words the same register as the first', () => {
@@ -354,6 +515,25 @@ describe('the first scored day’s set — legible ∩ admitted, § D1029', () =
     for (const id of FIRST_DAY_CONTRACT_IDS) {
       expect(ELIGIBLE_FIRST_CONTRACT_IDS, id).toContain(id);
       expect(admittedPressDayIds(), id).toContain(id);
+    }
+  });
+
+  it('is, on this data, the six § D1029 admitted — and each pin is measured on the day the Scenario press plays', () => {
+    /*
+     * The ghost check: the literal is here so a move is seen and explained on the commit that makes
+     * it, not so the set is typed — the case below derives it. And § D1047's guard that every
+     * member's pin carries the horizon `scenarioHorizonFor` runs its building on: a pin measured on a
+     * slice and dealt on a whole day would be a day nobody measured.
+     */
+    expect(FIRST_DAY_CONTRACT_IDS).toEqual(['c2', 'c3', 'c6', 'c7', 'c8', 'c10']);
+    const resources = contractBuildings();
+    for (const id of FIRST_DAY_CONTRACT_IDS) {
+      const horizon = scenarioHorizonFor(
+        resources.trafficProfiles,
+        buildingConfigOf(resources, [], contractById(id)?.buildingId ?? ''),
+      );
+      expect(horizon, id).toBeDefined();
+      expect(pressDayFor(id)?.horizon, id).toBe(horizon);
     }
   });
 

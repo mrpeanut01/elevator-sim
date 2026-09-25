@@ -50,7 +50,7 @@ import {
 import { everydayProfileStore } from './profileStore.js';
 import { drawElevation } from './elevation.js';
 import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
-import { isDailySeed } from '../shift/dailySeed.js';
+import { dailySeedAt, isDailySeed } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
 import { todayOf, type TodayRecord } from './today.js';
 import {
@@ -114,6 +114,8 @@ function mountBrief(
       /* § D729, § D730 — per draw, `doorScreen.ts#viewOf`'s reason, and the same question so the
          two screens cannot disagree about one run (§ 16 rule 14). */
       crowdIsToday: isDailySeed(data.seed(), deviceNowMs()),
+      /* The day's own crowd, for the first-session line's pinned arm — § D1047. */
+      daySeed: dailySeedAt(deviceNowMs()),
       firstSession: isFirstDayOnALegibleTower(data.week()),
       /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
       units: everydayProfileStore().units(),
@@ -211,6 +213,20 @@ function mountBrief(
         ].join(';');
         column.append(moot);
       }
+    }
+    /*
+     * **How long the day takes, and when the stage will stop** — [§ D1047](../../../../DECISIONS.md).
+     * Only on a pinned whole day as measured; the sentence is `firstDayLength.ts`'s, derived from a
+     * measured table and the stage's own rungs.
+     */
+    if (view.dayLength !== undefined) {
+      const length = el(doc, 'p', 'everyday-brief-day-length', view.dayLength);
+      length.style.cssText = [
+        'margin:7px 0 0',
+        'padding:0 2px',
+        `font-size:12px;line-height:1.45;color:${C.warmGrey}`,
+      ].join(';');
+      column.append(length);
     }
 
     const facts = el(doc, 'div', 'everyday-brief-facts');
@@ -356,6 +372,13 @@ function mountBrief(
       card.append(name, blurb, meta);
       /* § D1029: held on a pinned day until the stage's call is answered — the reason is drawn below. */
       card.disabled = view.drivers.held !== undefined;
+      /*
+       * **And the card says why to a reader, not only the sentence under it** — [§ D1047](../../../../DECISIONS.md).
+       * `screenReaderWalkthrough.browser.test.ts`'s `disabled-says-why` found three held cards with no
+       * description the first time a bare load landed on a pinned day, which since § D1047 is every
+       * fresh device's first brief: the select below was described and the cards beside it were not.
+       */
+      if (view.drivers.held !== undefined) card.setAttribute('aria-describedby', 'everyday-brief-driver-held');
       card.addEventListener('click', () => {
         if (view.drivers.held !== undefined) return;
         context.host.setDispatcher(option.id);

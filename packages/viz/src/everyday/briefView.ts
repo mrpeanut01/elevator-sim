@@ -129,6 +129,13 @@ export interface BriefScreenView {
         readonly mootUnder: string | undefined;
       }
     | undefined;
+  /**
+   * How long this pinned whole day takes to watch and when its call comes, or `undefined` —
+   * `today.ts`'s `dayLength`, [§ D1047](../../../../DECISIONS.md). Drawn under the strip, before the
+   * day starts, because the ruling that deals newcomers a forty-minute day made saying so first the
+   * condition of dealing it.
+   */
+  readonly dayLength: string | undefined;
   readonly facts: readonly { readonly label: string; readonly value: string }[];
   readonly load: { readonly heading: string; readonly word: string; readonly note: string } | undefined;
   readonly wrinkle: {
@@ -256,8 +263,13 @@ export function raceAgainstCard(): BriefRefusalCard {
   const built = isScreenBuilt('stage');
   return {
     heading: 'RACE AGAINST',
+    /*
+     * *This run's crowd*, not *today's* — [§ D1047](../../../../DECISIONS.md). The rival drives the
+     * run's own seed, which is the day's only on a day on the day's crowd; on a pinned day — every
+     * newcomer's first — and on a `?seed=` link it is not, and the seed line two rows up says so.
+     */
     what:
-      'A second dispatcher driving a second copy of today’s crowd beside yours — the plain ' +
+      'A second dispatcher driving a second copy of this run’s crowd beside yours — the plain ' +
       'baseline, your latest saved, or nobody.',
     why: built
       ? 'Pick one on the stage, under THE DAY SO FAR: the rival drives the same crowd from the ' +
@@ -358,6 +370,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
     title: `Today at ${today.towerName}`,
     seedLine: today.seedLine,
     outOfService: today.outOfService,
+    dayLength: today.dayLength,
     facts: today.facts,
     load:
       today.load === undefined

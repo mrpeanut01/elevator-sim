@@ -1938,6 +1938,14 @@ export interface EverydayHost {
 export interface EverydayHostBindings {
   /** The loaded resources. Stable for the life of the page. */
   readonly resources: BrowserResources;
+  /**
+   * **The crowd a pinned first day replaced**, when the page opened on one — `dev/main.ts`'s
+   * boot, [§ D1047](../../../../DECISIONS.md). Seeds `createEverydayHost`'s press-day seed base, so
+   * the first way off a first session's pinned day puts the day's crowd back exactly as it does
+   * after {@link EverydayHost.playPressDay}. Optional because a host opened on anything else has
+   * nothing to put back, and every test host is one of those.
+   */
+  readonly initialPressDaySeedBase?: bigint | undefined;
   /** The live state. Read fresh on every host call — never captured. */
   state(): ViewerState;
   /** The transport's playhead in simulated seconds, or the recording's start, or `0`. */
@@ -2623,8 +2631,14 @@ export function createEverydayHost(
    * pinned day chosen from a first would otherwise record the first one's seed as the one to restore.
    * Not persisted, and that is correct rather than cheap — a reload re-seeds from the date, which is
    * the crowd this would have put back.
+   *
+   * **Seeded from the boot when the page opened on a pinned day** — [§ D1047](../../../../DECISIONS.md).
+   * A first session is dealt its tower's pinned day by `dev/state.ts#withFirstSession` rather than by
+   * this host's press, so without {@link EverydayHostBindings.initialPressDaySeedBase} the capture
+   * above never happened and choosing an ordinary tower kept the pin's crowd — the note on the picker
+   * (*"Choosing a tower from the list above puts your crowd back"*) false for every newcomer.
    */
-  let pressDaySeedBase: bigint | undefined;
+  let pressDaySeedBase: bigint | undefined = bindings.initialPressDaySeedBase;
 
   /** The horizon the Scenario press runs `buildingId` on — `dayLength.ts#scenarioHorizonFor`. */
   const horizonForBuilding = (buildingId: string): RunHorizon | undefined =>

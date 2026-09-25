@@ -211,14 +211,33 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
  *
  * `docs/12` § 4's deviation register is where this belongs as a *design* deviation; it is recorded
  * here as well because a reader who greps the handoff for this sentence lands on this file first.
+ *
+ * **A third arm, for a pinned crowd** — [§ D1047](../../../../DECISIONS.md). *"This run is on a
+ * crowd of its own … so nobody else is playing it"* was false on every pinned day from the day
+ * § D973 put them on this screen: everybody who opens a tower's pinned day plays the same crowd, and
+ * since § D1047 every newcomer's first day is one. Both of that arm's clauses were wrong there, and
+ * so was *the dispatcher is yours to bring*, because the brief holds the tower's standing order
+ * until the stage's call is answered (§ D1029) — so the pinned arm says whose crowd it is and leaves
+ * the driver to the brief, which states the hold beside the control it holds.
  */
-export function sameForEveryoneLine(crowdIsToday: boolean): string {
-  return crowdIsToday
-    ? 'Everyone playing today meets the same crowd — the number above is today’s date, and the ' +
-        'run is seeded from it. The tower is the one your week is on, and the dispatcher is yours ' +
-        'to bring.'
-    : 'This run is on a crowd of its own rather than the day’s, so nobody else is playing it. ' +
-        'The tower is the one your week is on, and the dispatcher is yours to bring.';
+export function sameForEveryoneLine(crowdIsToday: boolean, crowdIsPinned: boolean): string {
+  if (crowdIsToday) {
+    return (
+      'Everyone playing today meets the same crowd — the number above is today’s date, and the ' +
+      'run is seeded from it. The tower is the one your week is on, and the dispatcher is yours ' +
+      'to bring.'
+    );
+  }
+  if (crowdIsPinned) {
+    return (
+      'This run is on the crowd its day was measured on rather than the day’s, and everyone who ' +
+      'opens this tower’s pinned day meets the same one. The tower is the one your week is on.'
+    );
+  }
+  return (
+    'This run is on a crowd of its own rather than the day’s, so nobody else is playing it. ' +
+    'The tower is the one your week is on, and the dispatcher is yours to bring.'
+  );
 }
 
 /**
@@ -233,12 +252,16 @@ export function sameForEveryoneLine(crowdIsToday: boolean): string {
  * way**: a pinned day chosen from the door's own list sets the crowd it was measured on. The rule
  * names that exception rather than leaving *the same for everybody* to be false of it.
  *
+ * **And since [§ D1047](../../../../DECISIONS.md) a player can be on one without choosing it**: a
+ * newcomer's first day is dealt as a pinned day, so *unless you choose one* was false of the first
+ * screen every new player reads. *Unless you are on one* is true of both routes.
+ *
  * Unconditional, unlike {@link sameForEveryoneLine}, because it states **how the product picks a
  * crowd** rather than a claim about the run standing in front of the reader — and the two lines
  * that do make that claim are on the same screen, four lines below.
  */
 const DOOR_RULE =
-  'One crowd a day, the same for everybody, unless you choose one of the days a press decides — ' +
+  'One crowd a day, the same for everybody, unless you are on one of the days a press decides — ' +
   'the tower is the one your week is on. A run counts once; every earlier day stays open as a ' +
   'replay that does not.';
 
@@ -413,7 +436,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     },
     seedLine: input.today.seedLine,
     firstSessionLine: input.today.firstSessionLine,
-    sameForEveryone: sameForEveryoneLine(input.today.crowdIsToday),
+    sameForEveryone: sameForEveryoneLine(input.today.crowdIsToday, input.today.crowdIsPinned),
     primary: primaryOf(clamped, chips),
   };
 }

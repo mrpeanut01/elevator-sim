@@ -216,7 +216,7 @@ import {
   stageSkipViewOf,
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
-import { todayOf } from '../everyday/today.js';
+import { todayOf, type TodayRecord } from '../everyday/today.js';
 import { RUSH_NOT_LANDED, RUSH_RESULT_EMPTY_LEDE, rushDisclosureOf, rushOutcomeOf, rushResultViewOf, rushStageHeaderOf, type RushOutcome } from '../everyday/rush.js';
 import { rushPostViewOf } from '../everyday/rushPost.js';
 import { RUSH_SITTING_COPY, rushSittingOf, type RushRoundRecord } from '../everyday/rushSitting.js';
@@ -591,7 +591,15 @@ import { AFTER_PRESS_ROW_ID } from '../shift/afterPress.js';
 import { pressCounterfactualOf } from '../shift/counterfactual.js';
 import { scenarioHorizonFor } from '../shift/dayLength.js';
 import { CONTRACT_LADDER } from '../shift/ladder.js';
-import { FIRST_SESSION_LINE, FIRST_SESSION_LINE_CHOSEN } from '../shift/firstSession.js';
+import {
+  FIRST_DAY_CONTRACT_IDS,
+  FIRST_SESSION_LINE,
+  FIRST_SESSION_LINE_CHOSEN,
+  FIRST_SESSION_LINE_PINNED,
+  FIRST_SESSION_LINE_PINNED_BY_NUMBER,
+  firstSessionContractFor,
+} from '../shift/firstSession.js';
+import { PINNED_DAY_LENGTHS, pinnedDayLengthLineOf } from '../everyday/firstDayLength.js';
 import {
   averageWaitFigure,
   clockOf,
@@ -12705,6 +12713,47 @@ function postRunStates(): readonly {
   ];
 }
 
+/**
+ * The day the corpus treats as *today* for the first-session line's chooser — a fixture, not a
+ * calendar reading, `seed: 424_242n`'s footing beside it ([§ D1047](../../../../DECISIONS.md)).
+ */
+const CORPUS_DAY_SEED = 20_260_925n;
+
+/**
+ * **A first session's pinned day record** — the first member of `FIRST_DAY_CONTRACT_IDS` on its
+ * pin's crowd, under its standing order, on the first day in September 2026 whose draw deals it — or
+ * `undefined` if the set is empty, which `firstSession.test.ts` fails on first. The building
+ * document is left out: the three strings this is for read the id, the crowd and the week, and
+ * `todayOf` is total without one.
+ */
+function pinnedFirstDayRecordOf(context: HonestyContext): TodayRecord | undefined {
+  const [pinId] = FIRST_DAY_CONTRACT_IDS;
+  const press = pinId === undefined ? undefined : pressDayFor(pinId);
+  const contract = pinId === undefined ? undefined : contractById(pinId);
+  if (pinId === undefined || press === undefined || contract === undefined) return undefined;
+  let daySeed: bigint | undefined;
+  for (let day = 1; day <= 400 && daySeed === undefined; day += 1) {
+    const candidate = 20_260_900n + BigInt(day);
+    if (firstSessionContractFor(candidate) === pinId) daySeed = candidate;
+  }
+  return todayOf({
+    week: openWeek(pinId),
+    calendar: null,
+    building: undefined,
+    buildingId: contract.buildingId,
+    dispatcherName: undefined,
+    dispatcherId: press.standingOrder,
+    dispatcherNameOf: (id) => context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
+    goals: [],
+    seed: BigInt(press.seedText),
+    horizon: press.horizon,
+    crowdIsToday: false,
+    daySeed: daySeed ?? CORPUS_DAY_SEED,
+    firstSession: true,
+    units: 'metric',
+  });
+}
+
 const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
   id: 'everyday/today.ts#todayOf',
   covers: [
@@ -12712,8 +12761,17 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/firstSession.ts#FIRST_SESSION_LINE',
     /* The line's second arm, for a first day the draw did not choose — GitHub issue #595, § D973. */
     'shift/firstSession.ts#FIRST_SESSION_LINE_CHOSEN',
-    /* The chooser between the two arms; both of its answers are seeded below. */
+    /* The chooser between the arms; every one of its answers is seeded below. */
     'shift/firstSession.ts#firstSessionLineFor',
+    /*
+     * The pinned arm — a fresh device's first day since § D1047 — and the brief's day-length line
+     * for a pinned whole day. Neither is drawn on any corpus case's own run (`run.ts#buildingFor`
+     * builds no rung, and the corpus seed is no pin), so both are seeded by name once per case below,
+     * with the seed line's and the door's pinned arms from one pinned day record.
+     */
+    'shift/firstSession.ts#FIRST_SESSION_LINE_PINNED',
+    'shift/firstSession.ts#FIRST_SESSION_LINE_PINNED_BY_NUMBER',
+    'everyday/firstDayLength.ts#pinnedDayLengthLineOf',
     'everyday/doorView.ts#doorScreenViewOf',
     /* § 6.1's replay words — GitHub issue #177 item 1. The door's primary note carries both arms
        (a day inside the week, a chip from before it), and the bar and rail adapters carry the rest. */
@@ -12786,6 +12844,35 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     const seeds: TextSeed[] = [];
     const bundle = shiftBundleOf(context);
     seeds.push({ field: 'today.driverHeld', text: PRESS_DAY_DRIVER_HELD, role: 'prose' });
+    /*
+     * **A first session's pinned day, as the door and the brief draw it** — § D1047. One pinned day
+     * record per case, on the first member of the first-day set, its pin's crowd and standing order
+     * and a day whose draw deals it: the seed line's pinned arm, the first-session line's pinned arm
+     * and the brief's day-length line are the three strings it adds, and every row of
+     * `PINNED_DAY_LENGTHS` is seeded as its line so no whole-day pin's sentence goes unread.
+     */
+    {
+      const pinnedToday = pinnedFirstDayRecordOf(context);
+      if (pinnedToday !== undefined) {
+        seeds.push({ field: 'today.pinned.seed', text: pinnedToday.seedLine, role: 'label' });
+        if (pinnedToday.firstSessionLine !== undefined) {
+          seeds.push({ field: 'today.pinned.firstSession', text: pinnedToday.firstSessionLine, role: 'observation' });
+        }
+      }
+      /* The fourth arm — a pin whose own number draws its tower, reached through `?seed=` (§ D1047). */
+      seeds.push({
+        field: 'today.pinned.firstSession.byNumber',
+        text: FIRST_SESSION_LINE_PINNED_BY_NUMBER,
+        role: 'observation',
+      });
+      for (const row of PINNED_DAY_LENGTHS) {
+        seeds.push({
+          field: `today.pinned.dayLength.${row.contractId}`,
+          text: pinnedDayLengthLineOf(row.contractId) ?? '',
+          role: 'observation',
+        });
+      }
+    }
 
     for (const entry of bundle.days) {
       /*
@@ -12816,6 +12903,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
          * a player reaches, which is what this corpus is for.
          */
         crowdIsToday: true,
+        /* The day's own crowd, not a calendar reading — the first-session line's pinned arm, § D1047. */
+        daySeed: CORPUS_DAY_SEED,
         /* A first day nobody has played, on a legible tower — the one state that draws the line. */
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         /*
@@ -12851,6 +12940,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           seed: 424_242n,
           horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
           crowdIsToday: false,
+          daySeed: CORPUS_DAY_SEED,
           firstSession: entry.week.day === 1 && entry.week.history.length === 0,
           units: 'metric',
         }).seedLine,
@@ -12895,6 +12985,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         seed: 424_242n,
         horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
         crowdIsToday: true,
+        /* The day's own crowd, not a calendar reading — the first-session line's pinned arm, § D1047. */
+        daySeed: CORPUS_DAY_SEED,
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         units: 'imperial',
       }).facts;
@@ -13204,10 +13296,15 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     for (const step of DOOR_STEPS) {
       seeds.push({ field: `door.step.${step.n}`, text: step.body, role: 'prose' });
     }
-    for (const crowdIsToday of [true, false]) {
+    /* Three arms since § D1047 — the day's crowd, a pinned crowd, and a crowd of the run's own. */
+    for (const [crowdIsToday, crowdIsPinned] of [
+      [true, false],
+      [false, true],
+      [false, false],
+    ] as const) {
       seeds.push({
-        field: `door.same.${String(crowdIsToday)}`,
-        text: sameForEveryoneLine(crowdIsToday),
+        field: `door.same.${String(crowdIsToday)}${crowdIsPinned ? '.pinned' : ''}`,
+        text: sameForEveryoneLine(crowdIsToday, crowdIsPinned),
         role: 'prose',
       });
     }
