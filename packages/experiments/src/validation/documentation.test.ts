@@ -2186,7 +2186,12 @@ type DecisionReservation = {
  * dispatcher ruling (`adopt-dispatcher`). Committed on `aj-base` before any lane worktree exists,
  * and closed in the wave's own merge commit.
  */
-const OPEN_RESERVATION = { wave: 'AJ', from: 1048, to: 1083 } as DecisionReservation | null;
+/*
+ * Extended from D1083 to **D1092** on 2026-09-25 for a fifth lane, AJ-E (the CI ruling), which the
+ * owner's request of that day made necessary after the first four blocks were allocated. Committed
+ * on `aj-base` before AJ-E's worktree exists.
+ */
+const OPEN_RESERVATION = { wave: 'AJ', from: 1048, to: 1092 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
