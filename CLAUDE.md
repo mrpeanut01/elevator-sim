@@ -113,13 +113,40 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave AH's, measured 2026-09-25 on the integrated tree**; the paragraph above
+  below are wave AI's always-on reading and wave AH's deep one, both measured 2026-09-25 on the
+  integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **872 009** | **606** | **64** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **1 090 548** | **4 710** | **65** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **886 906** | **606** | **67** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`), **wave AH's reading; not re-measured in wave AI** | 60 | 1 090 548 | 4 710 | 65 | 0 | green at `e1d10ac`; unknown on wave AI's tree |
+
+  **Wave AI's move is 304.02 strings a case in the always-on tier, with three surfaces, and the
+  deep tier was not measured this wave.** Measured at `412de16` on a head green in all six projects
+  (viz by directory, viz-browser **60 / 377**, core **2 991**, experiments **1 526**, cli **179**,
+  server **649**, `tsc -b` clean). The base at `4a81821` reproduced wave AH's row to the string in
+  **both** tiers, 872 009 / 64 and 1 090 548 / 65, the sixth consecutive wave.
+
+  **Why the deep row is stale, stated because a stale row read as current is this column's oldest
+  failure.** The deep run on the integrated head was killed after 43 minutes by the container's
+  memory limit (`oom-kill … CONSTRAINT_MEMCG`), with ten agents sharing a 16 GB box at load 56.
+  It was not re-run before the push; the weekly deep job and the next wave's integration measure it.
+  Until then the deep row describes `e1d10ac` and says nothing about this tree.
+
+  | | base `4a81821` | wave AI | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 872 009 | **886 906** | **+14 897** | **304.02** |
+  | always-on surfaces | 64 | **67** | **+3** | none |
+
+  **The surface sets were diffed and the three are the ones AI-D forecast by name**:
+  `shift/callRow.ts#pressCallRowOf`, `shift/ladder.ts#CONTRACT_LADDER` and
+  `shift/ladder.ts#admittedPressDayIds`. Nothing was removed. **The producer probe reproduces the
+  always-on corpus exactly on both trees** and attributes the move: the door's `todayOf` **+139.69**,
+  `fixit/engine.ts#classifyOutcome` **+94.00**, `shift/report.ts#dayReportOf` **+27.00**, the stage
+  header **+17.00**, the designer **+6.00**, and **+5.08** on each of tower choice and AI-D's three new
+  surfaces. The door and fix-it terms carry several lanes' changes each and are not split between
+  them (§ D256), so the lanes' string forecasts are left unscored.
 
   **Wave AH's move is the largest per case this column has recorded, and for the first time it
   was attributed by tallying every always-on case by producer on both trees rather than by
