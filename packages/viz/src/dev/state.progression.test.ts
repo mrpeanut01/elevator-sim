@@ -41,6 +41,7 @@ import {
   RUSH_CONTRACT_ID,
   closeDay,
   openRush,
+  nextDay,
   openWeek,
   outcomeOf,
   switchWeek,
@@ -183,16 +184,19 @@ describe('issue #64 — a free-play run does not overwrite the saved scenario we
     expect(closedWeekOf(state, outcome(week, AWFUL))).toBe(week);
   });
 
-  it('is not a vacuous test — the same day on the same week does move a campaign week', () => {
+  it('is not a vacuous test — the next day on the same week does move a campaign week', () => {
     // Without this the assertion above would pass on a `closedWeekOf` that had been broken to
-    // return its input, which is the failure mode of every "nothing changed" test.
+    // return its input, which is the failure mode of every "nothing changed" test. The next day,
+    // because since § D1138 a second close of the same day is practice and moves no score, so it
+    // could not tell a working gate from a broken one on the streak.
+    const tomorrow = nextDay(week);
     const state: ViewerState = {
       ...initialState(resources, 20260804n),
       playMode: 'shift-week',
-      week,
+      week: tomorrow,
     };
-    const after = closedWeekOf(state, outcome(week, AWFUL));
-    expect(after).not.toBe(week);
+    const after = closedWeekOf(state, outcome(tomorrow, AWFUL));
+    expect(after).not.toBe(tomorrow);
     expect(after.streak).toBe(0);
     expect(after.history.at(-1)?.arrived).toBe(AWFUL.arrived);
   });

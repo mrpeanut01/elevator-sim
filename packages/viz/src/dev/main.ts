@@ -241,6 +241,8 @@ import {
 } from './data.js';
 import { mountFixitPanel } from './fixitPanel.js';
 import { createOffThreadRunner, type OffThreadRun } from './offThreadRuns.js';
+import { openDayCallSession, type DayCallSession } from './dayCallSession.js';
+import { dayCallsOffered, type DayCallAnswer, type DayCallOnStage } from '../shift/dayCalls.js';
 import { WATCHING_HEADER_CLASS, mountWatchPanel } from './watchPanel.js';
 import { chip, el, fill, fillSelect, keyedFill, setHidden, setText } from './dom.js';
 import {
@@ -299,6 +301,7 @@ import {
   drivingProfileOf,
   initialState,
   withFirstSession,
+  dayCallFactsOf,
   pressDayCallOf,
   profileById,
   plannedDayOf,
@@ -1607,6 +1610,120 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * silently supersede a watch press that was already in flight.
    */
   const everydayWatchRunner = createOffThreadRunner({ spawn: spawnRunWorker });
+
+  /**
+   * **The ordinary day's calls** — [§ D1138](../../../../DECISIONS.md). Its own runner, for
+   * `everydayWatchRunner`'s reason: the two alternative runs a candidate call needs must not
+   * supersede the player's shift or the rival, nor be superseded by them.
+   *
+   * The session is opened lazily, the first time the Everyday stage asks about the run it opened on
+   * ({@link dayCallOnStage}), so a run nobody plays on the daily stage costs no lookahead. It is
+   * dropped by every fresh ask ({@link runShift} with cause `'player'`), so a retake, a new day or a
+   * new tower starts with no calls answered and no rows, and it is told about every run the record
+   * grew to by a press outside a call.
+   */
+  const dayCallRunner = createOffThreadRunner({ spawn: spawnRunWorker });
+  let dayCallSession: DayCallSession | undefined;
+  /** The run a session was refused on, so the refusal is asked once rather than once a frame. */
+  let dayCallRefusedOn: VizRecording | undefined;
+
+  function closeDayCalls(): void {
+    dayCallSession?.close();
+    dayCallSession = undefined;
+    dayCallRefusedOn = undefined;
+  }
+
+  /**
+   * The next ordinary call on `recording`, for the Everyday stage — § D1138. `undefined` on every run
+   * that is not the player's own scored week day as this shell simulated it, on a pinned press day
+   * (§ D1029's single call stands there), on a whole day too costly to call on, and once the day's
+   * calls are spent.
+   */
+  function dayCallOnStage(recording: VizRecording): DayCallOnStage | undefined {
+    if (recording !== state.recording || recording !== simulatedRecording) return undefined;
+    /* A re-simulation in flight is about to replace this run, so nothing is called on it. */
+    if (shiftInFlight) return undefined;
+    if (state.playMode !== 'shift-week' || watching !== undefined) return undefined;
+    if (contractById(state.week.contractId) === undefined) return undefined;
+    if (dayCallSession === undefined) {
+      if (dayCallRefusedOn === recording || state.interventions.length > 0) return undefined;
+      const facts = dayCallFactsOf(resources, state);
+      if (facts === undefined || facts.pinned || !dayCallsOffered(facts.horizon, recording.legs.length)) {
+        dayCallRefusedOn = recording;
+        return undefined;
+      }
+      dayCallSession = openDayCallSession(
+        {
+          planWith: (extra) => {
+            try {
+              const plan = shiftRunConfigOf(resources, {
+                ...state,
+                interventions: [...state.interventions, extra],
+              });
+              return {
+                config: plan.config,
+                outOfServiceCarIds: plan.outOfServiceCarIds,
+                // The shift's own switch, so an adopted answer is the run a re-simulation would make.
+                recordDecisions: true,
+              };
+            } catch {
+              return undefined;
+            }
+          },
+          simulate: (runs, done, failed) => {
+            dayCallRunner.start({ runs, onDone: done, onFailed: failed });
+          },
+          cancel: () => {
+            dayCallRunner.cancel();
+          },
+          changed: () => {
+            renderAll();
+          },
+        },
+        { recording, bookedOut: facts.bookedOut, horizon: facts.horizon },
+      );
+    } else if (dayCallSession.recording() !== recording) {
+      /* The record grew by a press outside a call: ask on from the latest press. */
+      const pressedAtS = state.interventions.reduce((latest, entry) => Math.max(latest, entry.atS), 0);
+      dayCallSession.grew(recording, pressedAtS);
+    }
+    return dayCallSession.onStage();
+  }
+
+  /**
+   * **Answer the raised call** — § D1138. A press adopts the run the session already made for it,
+   * exactly as an intervention's re-simulation would have been adopted: the log grows by one entry,
+   * the cause is `'intervention'`, and `applyShift` asserts the crowd is the same. No simulation
+   * happens here, which is S3's *no extra runs*.
+   */
+  function answerDayCall(answer: DayCallAnswer): void {
+    const session = dayCallSession;
+    /*
+     * Only over the run the session stands on, with nothing in flight: a press made outside the call
+     * has already grown the log, and the run this call made would not carry it.
+     */
+    if (session === undefined || shiftInFlight || session.recording() !== state.recording) return;
+    const answered = session.answer(answer, (adoption) => {
+      state = { ...state, interventions: [...state.interventions, adoption.entry] };
+      runCause = 'intervention';
+      settleRecompute();
+      applyShift(adoption.recording, runStartOfDayS, state.withheld);
+      playback?.seekTo(adoption.entry.atS);
+      /*
+       * And the rival re-races the run that replaced the one it raced, as `runShift`'s own callback
+       * does after an intervention: `applyShift` dropped the old race, and a strip left waiting
+       * would be waiting for a run nobody asked for.
+       */
+      try {
+        const plan = shiftRunConfigOf(resources, state);
+        lastShiftPlan = plan;
+        scheduleGhost(plan, adoption.recording);
+      } catch {
+        /* A state `shiftRunConfigOf` refuses has no rival to race; the day itself is already adopted. */
+      }
+    });
+    if (answered) renderAll();
+  }
 
   function runChallenge(): void {
     const view = challengeView.view;
@@ -4593,6 +4710,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     intervene: (atS, change) => {
       interveneAt(atS, change);
     },
+    /* § D1138 — the ordinary day's calls; the three functions carry the argument. */
+    dayCallOnStage: (recording) => dayCallOnStage(recording),
+    answerDayCall: (answer) => {
+      answerDayCall(answer);
+    },
+    skipDayCalls: (called) => {
+      dayCallSession?.skip(called);
+      renderAll();
+    },
     closeDay: () => {
       closeShift();
     },
@@ -5945,6 +6071,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // runner supersedes in-flight asks, and the latest ask is the one whose recording files. See
     // {@link runCause}; `'player'` is the default because every press but one means *a new ask*.
     runCause = cause;
+    /*
+     * A fresh ask is a fresh attempt, and an attempt's calls are its own — § D1138. An intervention
+     * is the same attempt's record growing, so its session stands and is told about the new run.
+     */
+    if (cause === 'player') closeDayCalls();
     setText(ui.transport.error, '');
     // A new ask is a new chance: the failure the stage is drawing belonged to the run this replaces.
     shiftFailure = undefined;
@@ -6646,11 +6777,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * docstring is where the one thing it gates is argued.
      */
     const week = closedWeekOf(state, outcome, runCause === 'intervention');
+    /*
+     * **A close of a day that had already closed is practice** — [§ D1138](../../../../DECISIONS.md)
+     * clause 4, read off the week before the close, which is the one question `closeDay` keys it on.
+     * Only where the mode owns a week: a Free Play sheet banks nothing on any close and says so in
+     * its own words.
+     */
+    const practice = week !== state.week && state.week.closedDay === state.week.day;
     filedReportInput = {
       recording,
       observations,
       goals,
       week,
+      practice,
+      /*
+       * § D1138 clause 3 — the ordinary day's calls, from the session that raised them over the run
+       * being filed. Nothing is printed about any call before this line runs.
+       */
+      dayCalls: dayCallSession?.records() ?? [],
       // The scenario this shift belongs to, not `undefined`. Passing nothing made the sheet say
       // *your own building — nothing is being banked* on the same day the banner cleared a
       // scenario and the rail counted the shift as banked: three panels, two answers.

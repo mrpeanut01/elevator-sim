@@ -390,6 +390,15 @@ function mountStage(
    */
   let stageCall: PressCall | undefined;
   let callAnswered = false;
+  /*
+   * ---- § D1138's ordinary calls — wave AJ. One cell. ----
+   *
+   * The calls themselves are the host's (`everyday/host.ts#dayCallOnStage`), asked afresh each
+   * frame because they move as the player answers. This is only whether the transport is paused
+   * **waiting** at a call whose two runs have not landed yet, so the stage can play on by itself if
+   * that candidate turns out not to be raised.
+   */
+  let waitingOnCall = false;
   /* ---- § D344's sound — GitHub issue #258. Four cells, none of which a leg can read. ---- */
   /** The synthesised sink, built on the first frame that has something to play. */
   let audioSink: AudioSink | undefined;
@@ -1451,11 +1460,18 @@ function mountStage(
       watchingSimPerRealS: stageSpeedAt(speedIndex).simPerRealS,
       longestStandingS,
       playerChoseSpeedAtS,
-      callAtS: callPending() ? stageCall?.atS : undefined,
+      callAtS: activeCall()?.call.atS,
     });
-    const note =
-      stagePaceNoteOf(answer, { acts: paceActs, simTimeS, dayStartS: host.dayStartS() }) ?? '';
+    /*
+     * § D1138: an ordinary call whose two runs have not landed stops the transport too, and says
+     * what it is waiting for rather than *stopped for the day's call* — the call may not be raised.
+     */
+    const waiting = answer.reason === 'call' && activeCall()?.raised === false;
+    const note = waiting
+      ? STAGE_CALL_COPY.waiting
+      : (stagePaceNoteOf(answer, { acts: paceActs, simTimeS, dayStartS: host.dayStartS() }) ?? '');
     if (paceNote.textContent !== note) paceNote.textContent = note;
+    if (answer.reason === 'call') waitingOnCall = waiting;
     /*
      * **The call stops the transport** — § D1029. At any rung, and after a chip press, because the
      * `'call'` reason outranks `'chosen'`. It pauses and never seeks (`docs/28` AD-S4): the frame it
@@ -1559,38 +1575,91 @@ function mountStage(
     started = true;
     /* § D1029: a skip is the player's own answer to a call they have not been asked yet. */
     if (stageCall !== undefined) callAnswered = true;
+    /*
+     * § D1138: and to every ordinary call the day had left. A call whose card is up when the player
+     * skips is recorded as skipped, so the report still says the stage called there.
+     */
+    const ordinary = activeCall();
+    if (ordinary !== undefined && !ordinary.pinned) {
+      host.skipDayCalls(ordinary.raised && playback.simTimeS >= ordinary.call.atS);
+    }
+    waitingOnCall = false;
     playback.play();
     playback.seekTo(playback.recording.endedAt);
     syncTransport();
     requestFrame();
   }
 
-  /** Whether this attempt's call stands unanswered — the one reading pace, card and holds share. */
-  function callPending(): boolean {
-    return stageCall !== undefined && !callAnswered && watchingNow() === undefined;
-  }
-
-  /** The held reason for the parking presses and the handover, or `undefined` once answered. */
-  function callHeld(): string | undefined {
-    return callPending() ? STAGE_CALL_COPY.held : undefined;
+  /**
+   * **The call standing on this attempt**, of either kind — the one reading pace, card and holds
+   * share. The pinned day's § D1029 call while it is unanswered, else the ordinary day's next call
+   * from the host (§ D1138), which only the daily stage asks for. `raised: false` is an ordinary
+   * candidate whose runs have not landed: the stage waits at it but draws no card.
+   */
+  function activeCall():
+    | { readonly call: PressCall; readonly raised: boolean; readonly pinned: boolean }
+    | undefined {
+    if (watchingNow() !== undefined) return undefined;
+    if (stageCall !== undefined) {
+      return callAnswered ? undefined : { call: stageCall, raised: true, pinned: true };
+    }
+    if (context.ctx !== 'daily' || adopted === undefined || recomputingOver !== undefined) return undefined;
+    const next = host.dayCallOnStage(adopted);
+    return next === undefined ? undefined : { call: next.call, raised: next.raised, pinned: false };
   }
 
   /**
-   * **Answer the call** — § D1029. A press is stamped at the call second rather than at the
-   * playhead, because the stage may have stopped a frame past it; *leave them* presses nothing.
-   * Either way the day plays on from where it stopped.
+   * The held reason for the parking presses and the handover, or `undefined`. A pinned call holds
+   * them from the day's start until it is answered (§ D1029: the call is where that day's press is
+   * made). An ordinary call holds them only while its card is up, because an ordinary day's calls
+   * are not promised in advance and a hold that named one might name a call that is never raised.
+   */
+  function callHeld(): string | undefined {
+    const standing = activeCall();
+    if (standing === undefined) return undefined;
+    if (standing.pinned) return STAGE_CALL_COPY.held;
+    return standing.raised && (playback?.simTimeS ?? 0) >= standing.call.atS ? STAGE_CALL_COPY.held : undefined;
+  }
+
+  /**
+   * **Answer the call** — § D1029, and § D1138 for an ordinary one. A press is stamped at the call
+   * second rather than at the playhead, because the stage may have stopped a frame past it; *leave
+   * them* presses nothing. An ordinary call's press adopts the run the host already made for it, so
+   * the beat is the same one an intervention shows and ends on the same notification. Either way
+   * the day plays on from where it stopped.
    */
   function answerCall(change: InterventionChange | undefined): void {
-    const call = stageCall;
+    const standing = activeCall();
     const current = adopted;
-    if (call === undefined || current === undefined || playback === undefined || !callPending()) return;
-    callAnswered = true;
+    if (standing === undefined || !standing.raised || current === undefined || playback === undefined) return;
+    const call = standing.call;
     showCallCard(false);
     started = true;
-    if (change !== undefined) {
+    waitingOnCall = false;
+    if (standing.pinned) {
+      callAnswered = true;
+      if (change !== undefined) {
+        withRecomputeBeat(current, () => {
+          host.intervene(call.atS, change);
+        });
+      }
+    } else if (change === undefined) {
+      host.answerDayCall('leave');
+    } else {
+      const kind = change.kind === 'park-cars-lobby' ? 'park-cars-lobby' : 'spread-cars';
       withRecomputeBeat(current, () => {
-        host.intervene(call.atS, change);
+        host.answerDayCall(kind);
       });
+      /*
+       * The adoption is synchronous, so the beat has already ended on the new recording. If the host
+       * refused the answer (a run it did not make stands, or one is in flight), nothing was adopted
+       * and the beat would wait for a recording that is not coming: it ends here instead.
+       */
+      if (adopted === current) {
+        recomputingOver = undefined;
+        barFacts.recomputing = false;
+        context.refreshBar();
+      }
     }
     playback.play();
     syncTransport();
@@ -1599,15 +1668,35 @@ function mountStage(
 
   /** Show, hide or rebuild the card for the playhead. */
   function drawCall(simTimeS: number): void {
-    const call = stageCall;
+    const standing = activeCall();
+    const call = standing?.call;
+    /*
+     * § D1138: the stage stopped to wait for an ordinary candidate's runs, and they landed without
+     * raising it (or the day's calls ran out). Nothing stands at this instant any more, so the day
+     * plays on by itself — the player did not pause it, and a stage left paused here would be a
+     * stop with no call behind it.
+     */
+    if (waitingOnCall && playback !== undefined && (standing === undefined || standing.call.atS > simTimeS)) {
+      waitingOnCall = false;
+      playback.play();
+      syncTransport();
+      requestFrame();
+    }
     const showing =
+      standing !== undefined &&
+      standing.raised &&
       call !== undefined &&
-      watchingNow() === undefined &&
-      stageCallPhaseOf(call, simTimeS, callAnswered) === 'called';
+      stageCallPhaseOf(call, simTimeS, false) === 'called';
     if (!showing || call === undefined) {
       showCallCard(false);
       return;
     }
+    /* The wait is over and the call is raised: the note says what the stop now is. */
+    if (paceNote.textContent === STAGE_CALL_COPY.waiting) {
+      paceNote.textContent =
+        stagePaceNoteOf({ simPerRealS: stageSpeedAt(speedIndex).simPerRealS, reason: 'call' }, { acts: paceActs, simTimeS }) ?? '';
+    }
+    waitingOnCall = false;
     const key = `${String(call.atS)}|${call.rule}`;
     if (key !== callCardKey) {
       callCardKey = key;

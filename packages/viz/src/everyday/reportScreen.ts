@@ -588,6 +588,15 @@ function mountReportScreen(
     const lede = el(doc, 'p', 'everyday-report-lede', sheet.lede);
     lede.style.cssText = `${LEDE};margin:12px 0 0`;
     head.append(meta, title, verdict, lede);
+    /*
+     * § D1138 clause 4 — a practice close says so under the verdict, where the player reads whether
+     * the day cleared, because *Shift cleared* on a practice run banks nothing.
+     */
+    if (view.practiceNote !== undefined) {
+      const practice = el(doc, 'p', 'everyday-report-practice', view.practiceNote);
+      practice.style.cssText = `${QUIET};margin:10px 0 0;max-width:74ch`;
+      head.append(practice);
+    }
     root.append(head);
 
     if (view.staleNote !== undefined) {

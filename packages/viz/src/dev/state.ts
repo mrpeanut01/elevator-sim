@@ -104,11 +104,12 @@ import {
   growthPerDayOf,
   ladderTowerConfig,
   pressDayMeasuredAs,
+  pressDayStanding,
   rungFor,
   rungIncidents,
   type ContractPressDay,
 } from '../shift/ladder.js';
-import { bookedOutCarsOf } from '../shift/bookedOut.js';
+import { bookedOutCarsOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { pressCallOf, type PressCall } from '../shift/pressCall.js';
 import { grownBuilding } from '../shift/growth.js';
 import { spliceEpisode, trafficProfilesWithRecord } from '../shift/episode.js';
@@ -146,7 +147,7 @@ import {
   switchWeek,
 } from '../shift/week.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
-import type { DayOutcome, ShiftEvent, ShiftEventId, WeekState } from '../shift/types.js';
+import type { DayOutcome, RunHorizon, ShiftEvent, ShiftEventId, WeekState } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { PlayMode } from '../scope/types.js';
 
@@ -1838,6 +1839,35 @@ export function pressDayCallOf(
     call.atS,
   );
   return press === undefined ? undefined : { press, call };
+}
+
+/**
+ * **What an ordinary day's calls are asked under** — [§ D1138](../../../../DECISIONS.md), beside
+ * {@link pressDayCallOf} because both read the same facts off the same state.
+ *
+ * The run's horizon (a whole day's size gates its calls), the tower's own booked-out cars (a fact
+ * on the card), and whether the state is its tower's **pinned press day**: § D1138 clause 1 keeps
+ * that day's single § D1029 call unchanged, so a pinned day raises no ordinary call whether or not
+ * its pin is admitted. `undefined` when the state's building resolves to nothing.
+ */
+export function dayCallFactsOf(
+  resources: BrowserResources,
+  state: ViewerState,
+): { readonly horizon: RunHorizon; readonly bookedOut: readonly BookedOutCar[]; readonly pinned: boolean } | undefined {
+  const config = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
+  if (config === undefined) return undefined;
+  const plan = shiftRunConfigOf(resources, state);
+  const horizon = runHorizonOf(resources.trafficProfiles, config, state);
+  const pinned =
+    pressDayStanding({
+      contractId: state.week.contractId,
+      day: state.week.day,
+      eventId: plan.event.id,
+      hasCalendar: state.calendar !== null,
+      seed: state.seed,
+      horizon,
+    }) !== undefined;
+  return { horizon, bookedOut: bookedOutCarsOf(plan.building), pinned };
 }
 
 /** What a run will be, read before it is pressed — {@link plannedDayOf}. */

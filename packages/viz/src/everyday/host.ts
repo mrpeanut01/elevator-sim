@@ -220,6 +220,7 @@ import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
 import { admittedPressDayIds, ladderTowersOf, pressDayFor } from '../shift/ladder.js';
 import type { PressCall } from '../shift/pressCall.js';
+import type { DayCallAnswer, DayCallOnStage } from '../shift/dayCalls.js';
 import {
   runHorizonOf,
   scenarioHorizonFor,
@@ -1936,6 +1937,22 @@ export interface EverydayHost {
    * is not standing on an admitted pinned day.
    */
   takeCallAgain(): string | undefined;
+  /**
+   * **The ordinary day's next call on `recording`**, or `undefined` — [§ D1138](../../../../DECISIONS.md).
+   *
+   * Where the next call is and whether it has been raised; never what its answers did, which the
+   * report prints at day close. `undefined` on a pinned press day (§ D1029's single call stands
+   * there, through {@link pressCallOnStage}), on any run that is not the player's own scored week
+   * day, and once the day's calls are spent. The daily stage asks it; no other context does.
+   */
+  dayCallOnStage(recording: VizRecording): DayCallOnStage | undefined;
+  /** Answer the raised ordinary call — a press adopts the run already made for it. § D1138. */
+  answerDayCall(answer: DayCallAnswer): void;
+  /**
+   * *Skip to the end* on a day with ordinary calls: every call left is answered. `called` is
+   * whether a call's card was up, which records that call as skipped. § D1138.
+   */
+  skipDayCalls(called: boolean): void;
   /** The replay in progress, or `undefined`. */
   replay(): EverydayReplaySession | undefined;
   /** Leave the replay, putting the parked week and the run it interrupted back. A no-op outside one. */
@@ -2051,6 +2068,12 @@ export interface EverydayHostBindings {
    * a closed day — § 3.4's strip is drawn only while `runState().open` is true.
    */
   abandonDay?(): void;
+  /** § D1138 — `dev/main.ts#dayCallOnStage`. Optional: a host with no calls answers `undefined`. */
+  dayCallOnStage?(recording: VizRecording): DayCallOnStage | undefined;
+  /** § D1138 — `dev/main.ts#answerDayCall`. */
+  answerDayCall?(answer: DayCallAnswer): void;
+  /** § D1138 — the session's skip, then a re-render. */
+  skipDayCalls?(called: boolean): void;
   /**
    * § 1.4's *record growing*: append at `atS`, re-run with cause `'intervention'`, and seek the
    * shell's own transport to `atS` once the new recording is adopted. One implementation, shared
@@ -4119,6 +4142,13 @@ export function createEverydayHost(
       return undefined;
     },
     pressCallOnStage: (recording) => pressDayCallOf(b.resources, b.state(), recording)?.call,
+    dayCallOnStage: (recording) => b.dayCallOnStage?.(recording),
+    answerDayCall: (answer) => {
+      b.answerDayCall?.(answer);
+    },
+    skipDayCalls: (called) => {
+      b.skipDayCalls?.(called);
+    },
     takeCallAgain: () => {
       releaseCareer();
       const state = b.state();

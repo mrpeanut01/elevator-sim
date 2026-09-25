@@ -41,6 +41,7 @@ import type { InterventionChange } from '@elevator-sim/core/browser';
 import { PARK_CARS_LOBBY_LABEL, SPREAD_CARS_LABEL } from '../live/interventions.js';
 import { clockAt } from '../live/timeline.js';
 import { carsPhraseOf, type BookedOutCar } from '../shift/bookedOut.js';
+import { DAY_CALL_LEAVE_LABEL } from '../shift/dayCalls.js';
 import type { PressCall } from '../shift/pressCall.js';
 
 /** Every sentence the call draws. */
@@ -48,8 +49,15 @@ export const STAGE_CALL_COPY = Object.freeze({
   heading: 'THE DAY’S CALL',
   question: 'What do the cars that are left do?',
   minute: 'Somebody on a landing has waited a minute.',
-  leave: 'Leave them',
+  /* One label for both kinds of call and the ordinary call's report row — `shift/dayCalls.ts`. */
+  leave: DAY_CALL_LEAVE_LABEL,
   held: 'held until the stage stops for this day’s call',
+  /*
+   * § D1138: the pace note while the stage waits at an ordinary candidate whose two runs have not
+   * landed. It names what the stage is doing and nothing about the call, which may not be raised:
+   * the same words whether the answers will turn out to matter or not.
+   */
+  waiting: 'stopped while the day is run ahead from here',
 });
 
 /** One of the card's three answers. `change` is `undefined` for *leave them*. */
@@ -85,13 +93,24 @@ export function stageCallCardOf(
   dayStartS: number | undefined,
   bookedOut: readonly BookedOutCar[],
 ): StageCallCard {
-  const facts: string[] = [...awayLinesOf(call, bookedOut, dayStartS)];
+  /*
+   * The car lines only where a car is out at the call. A pinned call is always inside its car's
+   * absence; an ordinary day's call ([§ D1138](../../../../DECISIONS.md)) is not gated on one, and
+   * says so only where one is — the same fact, never an invented one. Where one is, every car out
+   * at that instant is named ([§ D1107](../../../../DECISIONS.md)), not only the call's own.
+   */
+  const facts: string[] = call.carAway === false ? [] : [...awayLinesOf(call, bookedOut, dayStartS)];
   if (call.rule === 'first-minute-wait') facts.push(STAGE_CALL_COPY.minute);
   /*
    * The second rule's own fact, and only where there is a peak to name: on a slice the act is the
-   * whole run, and its start is the car leaving, which the line above already says.
+   * whole run, and its start is the car leaving, which the line above already says. On an ordinary
+   * day with no car out, the peak's start is the call, and the line is the call's only fact.
    */
-  if (call.rule === 'act-start' && call.act !== undefined && call.act.startS > call.awayAtS) {
+  if (
+    call.rule === 'act-start' &&
+    call.act !== undefined &&
+    (call.carAway === false || call.act.startS > call.awayAtS)
+  ) {
     facts.push(`The peak opened at ${clockAt(call.act.startS, dayStartS)}.`);
   }
   return Object.freeze({

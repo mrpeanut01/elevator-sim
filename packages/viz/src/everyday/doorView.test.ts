@@ -219,22 +219,23 @@ describe('the § 3.3 primary, and the replay a past day earns — § D517', () =
     expect(view.primary.again?.note).toMatch(/no presses carried over/);
   });
 
-  it('says which attempt the week keeps, and it is the one closeDay keeps (wave AJ, § D1098)', () => {
+  it('says which attempt the week keeps, and it is the one closeDay keeps (§ D1098, § D1138)', () => {
     /*
      * The post-AI panel's seat A: *Run today again* said *the week keeps the better one*, and Friday
-     * kept 35 % over 36 %. The week is asked rather than described: close a day at a better figure,
-     * re-close it at a worse one, and read what the history holds.
+     * kept 35 % over 36 %. The week is asked rather than described: close a day at one figure,
+     * re-close it at another, and read what the history holds. Since § D1138 it holds the first.
      */
-    const better = { ...closedDay(5), minutePct: 36 };
-    const worse = { ...closedDay(5), minutePct: 35 };
-    const week = closeDay(closeDay(weekWith(5, []), better), worse);
-    expect(week.history.at(-1)?.minutePct, 'closeDay kept the better attempt, so the note must say so').toBe(35);
+    const first = { ...closedDay(5), minutePct: 36 };
+    const second = { ...closedDay(5), minutePct: 35 };
+    const week = closeDay(closeDay(weekWith(5, []), first), second);
+    expect(week.history.at(-1)?.minutePct, 'closeDay kept the first attempt, so the note must say so').toBe(36);
 
     const note = viewAt(0, true).primary.again?.note ?? '';
     expect(note).toBe(RUN_TODAY_AGAIN_NOTE);
     expect(note).not.toMatch(/better one/u);
-    expect(note).toMatch(/close last/u);
-    expect(note).toMatch(/even when it reads worse/u);
+    expect(note).not.toMatch(/close last/u);
+    expect(note).toMatch(/practice/u);
+    expect(note).toMatch(/first attempt/u);
   });
 
   it('reads a closed today off the week as well as off the sitting — a reload keeps the day, not the run', () => {

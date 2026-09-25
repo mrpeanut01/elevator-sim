@@ -442,6 +442,8 @@ export interface ForecastView {
  */
 export interface WeekFramingView {
   readonly kind: 'week-day';
+  /** `shift/report.ts#PRACTICE_NOTE` on a practice close, and absent otherwise — § D1138. */
+  readonly practiceNote?: string | undefined;
   readonly streakLine: string;
   readonly contractLine: string;
   readonly cleared: ClearedBannerView | null;
@@ -1441,6 +1443,7 @@ function framingOf(report: ShapedDayReport): FramingView {
   }
   return {
     kind: 'week-day',
+    ...(report.practiceNote === undefined ? {} : { practiceNote: report.practiceNote }),
     streakLine: report.streakLine,
     contractLine: report.contractLine,
     cleared: clearedBannerOf(report.cleared),

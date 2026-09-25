@@ -43136,6 +43136,8 @@ The sheet still reads `state.interventions` at close, as `dev/main.ts#closeShift
 
 > **Status 2026-09-25: COPY AMENDED by [§ D1098](#d1098)** (an agent ruling). *Run today again* says the week keeps the attempt closed last, which is what `closeDay` does, instead of *the better one*. See [`docs/39`](docs/39-decisions-in-force.md).
 
+> **Status 2026-09-25: AMENDED by [§ D1138](#d1138)** (an agent ruling). *Run today again* is practice: the first closed attempt at a day banks, and the retry replays the day without replacing it.
+
 **Date: 2026-09-25 · Owner: wave AI lane AI-A · Answers the post-AH panel's assessor A defects 2 and 3 and assessor B's D5 · Rules on: GAMEPLAY § 3.3's door row, § 6.1's primary, § 14's day cards and § 16 rule 1 as `weekView.ts` and `rail.ts` read it, and `honesty/agreement.ts`'s `career-line` pair.**
 
 > Taken by an agent lane under delegated authority, not by the product owner, and to be read as an
@@ -43624,6 +43626,10 @@ integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
 ## D1029 — the press becomes a call: the stage stops once at an instant it can name, a pin is admitted only over a window from it, and the day runs under its standing order until the call is answered
 
 > **Status 2026-09-25: AMENDED by [§ D1107](#d1107).** The card names every booked-out car away at the call, and the called day is named for the call. See [`docs/39`](docs/39-decisions-in-force.md).
+
+---
+
+> **Status 2026-09-25: AMENDED by [§ D1138](#d1138)** (an agent ruling). The pinned day keeps its single call exactly as ruled here; every other scored Scenario day now raises up to three ordinary calls, admitted by what their answers do to the next ten minutes rather than by this entry's window search, which is refused for them. Clause 7's *Take this call again* is practice and banks nothing. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: a
 > three-member decision swarm (the player, honesty and engineering lenses, whose records are the
@@ -45227,6 +45233,8 @@ and this entry does not rule on.
 
 ## D1098 — *Run today again* says which attempt the week keeps
 
+> **Status 2026-09-25: SUPERSEDED IN ITS ARITHMETIC by [§ D1138](#d1138)** (an agent ruling). The first closed attempt at a day banks and every later close of it is practice, so the note now says *your week keeps your first attempt at this day*. This entry's rule, that the sentence follows `closeDay`, stands.
+
 > **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ lane AJ-G), not by
 > the product owner, and to be read as an agent ruling. **Amends [§ D1004](#d1004)'s copy**, not its
 > mechanism.
@@ -45767,3 +45775,174 @@ seeding (0 failing cases); that is a check, not the row.
 
 This lane held **D1120-D1128** and spent **D1120 only**. D1121 to D1128 are unspent and become
 permanent holes under [§ D404](#d404) once a later lane writes above them.
+
+---
+
+## D1138 — the call is the core loop of every scored day: up to three calls, admitted by what their answers do to the next ten minutes, rows only at the close, and the first closed attempt banks
+
+> **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: the
+> post-AI decision swarm (the player, honesty and engineering lenses, whose records are the
+> integrator's scratch notes *decide-ak S1* to *S3* with their raw data, and are not in this
+> repository), reconciled by wave AJ's integrator (the *decide-ak* ruling, § Q1), and built and
+> measured by wave AJ lane AJ-L. A later reader weighing this against a product-owner ruling should
+> treat it as an agent ruling and say so; [§ D626](#d626) is the cautionary case. **Amends
+> [§ D1029](#d1029) clauses 1, 4 and 7, [§ D1004](#d1004)'s *Run today again* and
+> [§ D1098](#d1098)'s arithmetic**; none of them is rewritten. The owner-reversible clauses are
+> named below.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves three recorded decisions, and it
+binds `shift/dayCalls.ts`, `shift/pressCall.ts`, `shift/week.ts`, `shift/report.ts`,
+`shift/callRow.ts`, `dev/dayCallSession.ts`, `dev/state.ts`, `dev/main.ts`, `dev/reportPanel.ts`,
+`everyday/host.ts`, `everyday/stageScreen.ts`, `everyday/stageCall.ts`, `everyday/doorView.ts`,
+`everyday/reportView.ts`, `everyday/reportScreen.ts` and the honesty register.
+
+### What was wrong
+
+Every seat of the post-AI panel named the call as the one real moment in the game, and every seat
+met it once. Seat A counted about 0.4 decisions a real minute over a 55-minute session and a gap of
+six and a half minutes after the call on the day a newcomer meets first; seat B's Tuesday was one
+dropdown and about four minutes of watching. Seats B and D found the second half: the report printed
+which press cleared the pinned day, and *Take this call again* then banked the clean day, so reading
+the answer and retaking was the dominant line and the front door's *A run counts once* was false in
+effect. Seat A: *make the call the core loop; every scored day should raise two or three calls, each
+with the with/without row in the report.*
+
+§ D1029's admission could not be carried to an ordinary day. It admits a pin only if the clearing
+press clears and the other misses at every tried moment of at least 120 simulated seconds, which
+needed a pinned crowd and a dense search per crowd, and refused `c9` after 81 crowds. The swarm
+measured why no cheap version of it exists: the day's verdict differs between the three answers at
+**5 of 125** candidate calls in S1's sweep and **14 of 131** in S3's, and on one call in a hundred it
+holds for a minute.
+
+### The ruling
+
+1. **Up to three calls on a scored day, never a quota (three of three).** A candidate comes from the day's own
+   events, § D1029's two rules repeated across the day (S2): the first instant somebody standing on a
+   landing has waited a minute, read exactly from the legs by the function the pinned call uses
+   (`shift/pressCall.ts#firstMinuteWaitIn`), and on a whole day the start of a peak that has no such
+   instant. One stretch per peak on a whole day and five simulated minutes between candidates on a
+   slice (S1). From the candidate the day is run twice more, *park the cars in the lobby* and
+   *spread the cars across the tower*, with every earlier press kept; *leave them* is the run
+   already on the stage. **The call is raised when the three runs' counts of riders who arrived in
+   the next ten minutes and waited a minute or more differ by at least three riders and a tenth of
+   the largest count** (S1's and S3's threshold, derived from their data in
+   `shift/dayCalls.ts#DAY_CALL_MIN_SPREAD`). A refused candidate costs its two runs and nothing
+   else, and the next one in the stretch is asked, up to six a day. **The answer adopts the run
+   already made for it**, so admission and answer together cost no run beyond the two the report
+   prints (S3). **The pinned press day keeps its single § D1029 call, unchanged (S1).**
+2. **The card is identical whether a call turns the day or not (S2).** It is § D1029's card: the
+   same heading, question and three answers in the stage's fixed order, a car line only where a
+   booked-out car is out at that instant, the minute line under the first rule and the peak line
+   under the second, with no countdown, no *now* and no hint. The stage is told where the next call
+   is and whether it has been raised, and nothing else; AJ-I's placement and focus carry over, so
+   each call's card comes into view above the goals and takes focus once.
+3. **Nothing is printed about the other answers until the day closes (three of three).** At the close the
+   report gives one row per call (`shift/dayCalls.ts#dayCallRowOf`), each claiming only what its
+   three runs measured: on this crowd, from the call's clock to ten minutes after, the count under
+   each answer with every earlier press kept and nothing pressed after the call, and the day's
+   verdict under each answer **only where the three split** (S2). No mechanism, no *better*, no
+   word across crowds, and no sum across a day's calls, since each row holds the others' presses
+   where they were. A declared honesty pair, `day-call-row`, holds the row's three counts to the
+   same counts read off the runs' legs by an independent expression.
+4. **The first closed attempt at a day banks; a retake after the report is practice (three of three).**
+   `shift/week.ts#closeDay` treats any close of a day that has already closed as practice: it moves
+   no streak, clean run, completed list, best day or history, counts the attempt and drops the award
+   banner. The sheet says so under its verdict and in its meta block
+   (`shift/report.ts#PRACTICE_NOTE`), and *Run today again* and *Take this call again* say so
+   before they are pressed. This ends *Take this call again* re-banking a missed day.
+5. **A whole day that costs more than about 3 s of simulation gets calls on its slices only (S3,
+   unopposed).** The set is derived from a measured cost: `DAY_CALL_WHOLE_DAY_MAX_LEGS` is 5 000
+   legs of the day's own as-built run, which is 3 s at the slowest legible rate S3 measured
+   (0.60 ms a leg). It reads the run rather than a clock, so the same day gets the same calls on
+   every machine.
+
+### Refused
+
+- **§ D1029's window search for ordinary calls (three of three).** The day's verdict flips on 4 to 11 % of
+  calls and holds on about one in a hundred, and the search costs tens of runs a crowd.
+- **A promise of two or three decisive calls every day (S2).** At most three calls, from what the
+  day produces, and most of them move the next ten minutes without moving the verdict.
+- **A cap of one moot call a day (S2's own clause 3, not carried by the reconciliation).** With the
+  verdict splitting on a few per cent of calls, the cap would leave almost every day with one call.
+- **S1's and S2's steadiness screen at +30 s and +60 s** (four more runs a call) and the row's
+  stability sentence. The reconciliation's clause 3 costs no extra run, and a steadiness claim with
+  one moment run is one of the faults S2 names.
+- **S1's brief line *a quiet day: the stage will not stop*.** Whether a day raises a call is known
+  only by running its answers, so the brief would be publishing the run's future.
+- **Holding the parking presses before an ordinary call.** A pinned day holds them because its call
+  is where that day's press is made and it is promised; an ordinary call is not promised, so a hold
+  that named it could name a call that is never raised. They are held only while a call's card is
+  up.
+
+### Built, and what holds it
+
+| clause | where | held by |
+|---|---|---|
+| 1 | `shift/dayCalls.ts#nextDayCallOf`, `#dayCallAdmits`, `#longWaitRidersIn`; `dev/dayCallSession.ts#openDayCallSession`; `dev/main.ts#dayCallOnStage`, `#answerDayCall` | `dayCalls.test.ts` (both horizons, the threshold at its edges, the negative control); `dayCallSession.test.ts` on a real Crown Hotel slice: a call is raised only where its runs differ by the threshold, the adopted run is the log's own re-simulation, identical before the call and different after it, and a session whose presses change nothing raises no call and stops at the cap |
+| 2 | `everyday/stageCall.ts#stageCallCardOf` (`PressCall.carAway`), `everyday/stageScreen.ts#activeCall` | `stageCall.test.ts`: an ordinary card has the pinned card's heading, question and answers and passes its four ban lists |
+| 3 | `shift/dayCalls.ts#dayCallRowOf`, `#dayCallRecordOf`; `shift/report.ts` | `dayCalls.test.ts` (§ D982's and § D1029's ban lists on every arm), `report.test.ts`, the `day-call-row` pair, and the corpus's report adapter |
+| 4 | `shift/week.ts#closeDay`, `shift/report.ts#PRACTICE_NOTE`, `everyday/doorView.ts#RUN_TODAY_AGAIN_NOTE`, `shift/callRow.ts#PRESS_CALL_AGAIN` | `week.test.ts` (the replay rule's two cases inverted), `doorView.test.ts`, `report.test.ts` |
+| 5 | `shift/dayCalls.ts#dayCallsOffered` | `dayCalls.test.ts` and `everyday/dayCalls.sweep.test.ts` |
+
+`everyday/dayCalls.browser.test.ts` walks both halves on the shipped bundle with the page's clock
+held on 2026-10-03: Crown Hotel's day from the door's tower list, two calls met and answered, no
+count or verdict on the page before the close, a row per call after it; then the same day taken
+again from *Run today again*, whose sheet says it is practice while the week's stored day 1 is the
+first attempt's, unchanged. `pressCall.browser.test.ts` now also reads the practice note on
+*Take this call again*'s sheet.
+
+### Measured on this tree
+
+The instrument is `everyday/dayCalls.sweep.test.ts` (`DAY_CALLS_SWEEP=1`,
+`--testTimeout=21600000`): the day Today's scenario plays for each contract, day 1 under
+`collective`, crowds `20 260 824 + 7 919 n` for `n` 0 to 7, through `recordRun` and the shipped
+session, with the answers given in rotation (*spread*, *park*, *leave them*) so the day branches as
+a player's does. Real time is § D991's pacing at the default rung, integrated as
+`stagePace.sweep.test.ts` does, with no time added for answering.
+
+**How many calls days get.** Of 64 days on the eight legible contracts, three are pinned press days
+(`c2`/2, `c3`/6, `c8`/2) and keep their § D1029 call. Of the other **61, 46 raise at least one call
+(75 %)**: 15 raise none, 15 one, 11 two and 20 three. **Every whole day raises one (38 of 38, a mean
+of 2.21)**; slices raise fewer (8 of 23, a mean of 0.57), and Garden Apartments' eight slices raise
+none because nobody on them waits a minute, which S1 also found. Without Garden Apartments, 46 of
+53 days (87 %) raise a call. S1's figure was 39 of 48 (81 %) on its own candidate rule.
+
+**Decisions per real minute on a Midtown day at 4×.** Midtown Office's whole day plays in a median
+of **40.5 real minutes** (2 430 s). Before this ruling an ordinary day asked one question, who
+drives, on the brief: **0.025 decisions a real minute**, and the longest gap is the whole day. After
+it, over the seven unpinned crowds: a median of **0.098 a real minute** (0.049 to 0.099), and a
+median longest gap of **17.4 minutes** (16.6 to 37.3). On the slices that raise a call the median is
+0.33 a real minute with a longest gap of 3.9 minutes. Seat A's 0.4 a minute counted every decision
+in a session, menus included, and is not the same measure. **What this does not reach**: S1's target
+of a median longest gap of 2.5 real minutes on a whole day. A whole day's peaks are hours apart and
+the ruling allows one call a peak, so the gaps between peaks stay; the pace between them is
+§ D991's, which this entry does not touch.
+
+**Cost.** The two runs behind every candidate asked, whole day included, came to a median of 0.61 s
+of CPU a slice day (at most 0.97) and 11.4 s a whole day (at most 16.8), spread over the calls of a
+40-minute sitting. The legible whole days measured 2 449 to 4 343 legs and 0.8 to 2.2 s of CPU;
+Mixed-Use measured 9 749 to 9 905 legs and 4.4 to 5.8 s, and Vertical City 32 724 to 33 275 legs
+and 13.4 to 13.9 s, so both are gated by the 5 000-leg line and get calls on their slices.
+
+### Owner-reversible clauses
+
+The cap of three (`DAY_CALL_MAX`); the ten-minute window and the one-minute wait it counts; the
+threshold of three riders and a tenth; the five-minute spacing; the 5 000-leg whole-day gate; no
+ordinary calls on a pinned press day; practice retakes, whose reversal would bring back
+§ D1098's *the attempt you close last* and make *A run counts once* false again.
+
+### Amendments
+
+- **§ D1029 clause 1** names one function for the pinned call; it still does, and ordinary calls
+  ask `nextDayCallOf`, which reads the same threshold through the same exact reading.
+- **§ D1029 clause 4**: the stage calls every scored Scenario day, the pinned day by its pin and the
+  others by this entry. The pinned day's hold before its call is unchanged.
+- **§ D1029 clause 7**: *Take this call again* re-opens the day from an empty record, as ruled, and
+  the attempt is practice.
+- **§ D1004 and § D1098**: *Run today again* is practice, and its note says the week keeps the first
+  attempt.
+
+### What it does not touch
+
+No bar, goal, rate, occupancy or booked-out car. `data/` is unchanged. The career, the rush, a
+watched run and a replay raise no ordinary call, and the Engineer surface is unchanged.

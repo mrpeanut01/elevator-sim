@@ -1879,6 +1879,29 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The ordinary call’s plumbing — wave AJ, § D1138. `nextDayCallOf` returns an instant and ' +
+        'a rule id, `dayCallsOffered` and `dayCallAdmits` return booleans, `dayCallRecordOf` ' +
+        'returns counts, `dayCallRowIdOf` returns the row’s id (`day-call-1`, on ' +
+        '`PRESS_CALL_ROW_ID`’s precedent above), and `DAY_CALL_ANSWERS` is the three answer ids, ' +
+        'which the two-adjacent-words scanner reads as prose. `dev/state.ts#dayCallFactsOf` and ' +
+        '`dev/dayCallSession.ts#openDayCallSession` return a horizon, cars, a flag and a sequence of ' +
+        'runs, reaching prose only through `shiftRunConfigOf`’s withheld-reason strings, which that ' +
+        'function’s adapters sweep. What a player reads about an ordinary call is the stage card ' +
+        '(`everyday/stageCall.ts`, seeded by name) and the report row (`shift/dayCalls.ts#dayCallRowOf`, ' +
+        'seeded by the report adapter).',
+      ids: [
+        'shift/dayCalls.ts#nextDayCallOf',
+        'shift/dayCalls.ts#dayCallsOffered',
+        'shift/dayCalls.ts#dayCallAdmits',
+        'shift/dayCalls.ts#dayCallRecordOf',
+        'shift/dayCalls.ts#dayCallRowIdOf',
+        'shift/dayCalls.ts#DAY_CALL_ANSWERS',
+        'dev/state.ts#dayCallFactsOf',
+        'dev/dayCallSession.ts#openDayCallSession',
+      ],
+    },
+    {
+      reason:
         'Returns the *facts* about why a goal cannot be judged and deliberately authors none of ' +
         'the words. Derived only because its literals are goal-kind ids and `GoalJudgement` keys, ' +
         'which the two-adjacent-words scanner reads as phrases. Carrying a sentence here would ' +

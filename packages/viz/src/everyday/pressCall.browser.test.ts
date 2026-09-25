@@ -142,7 +142,7 @@ async function callCardAtTheStop(page: Page): Promise<{
 }> {
   return page.evaluate(() => {
     const card = document.querySelector<HTMLElement>('.everyday-stage-call');
-    const region = document.querySelector<HTMLElement>('main.everyday-screen');
+    const region = document.querySelector<HTMLElement>('.everyday-screen');
     if (card === null || region === null) return { inView: false, focused: false, box: 'no card or no region' };
     const c = card.getBoundingClientRect();
     const r = region.getBoundingClientRect();
@@ -282,6 +282,8 @@ describe.skipIf(!HAS_BROWSER)('the stage calls a pinned day — § D1029', () =>
       await page.waitForSelector('.everyday-report', { timeout: 60_000 });
       const second = await textOf(page, '.everyday-report');
       expect(second).toContain('nothing was pressed');
+      /* § D1138 clause 4: the retake is practice, and says so on its own sheet. */
+      expect(second).toContain('Practice. Your week keeps your first attempt at this day');
       expect(second).not.toMatch(/\d{2}:\d{2} · (parked the cars in the lobby|spread the cars across the tower)/u);
     } finally {
       await page.close();

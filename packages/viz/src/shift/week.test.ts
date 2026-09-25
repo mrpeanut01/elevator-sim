@@ -530,25 +530,43 @@ describe('re-closing the same day replays it rather than adding to it', () => {
     expect(week.history[0]?.day).toBe(1);
   });
 
-  it('still lets a missed day be recovered — the design’s “nothing here is a game over”', () => {
+  /*
+   * [§ D1138](../../../../DECISIONS.md) clause 4: the first closed attempt at a day banks, and a
+   * re-close of that day is practice. These two cases were the replay rule's (a missed day recovered
+   * by a clean retry, a clean day un-banked by a missed one) and are inverted rather than deleted,
+   * so the rule they held is visibly the one that moved.
+   */
+  it('banks the first attempt: a clean retake of a missed day is practice and banks nothing', () => {
     let week = openWeek('c1');
     week = closeDay(week, missedDay(1));
     expect(week.cleanRun).toBe(0);
     expect(week.streak).toBe(0);
     week = closeDay(week, cleanDay(1));
-    expect(week.cleanRun).toBe(1);
-    expect(week.streak).toBe(1);
+    expect(week.cleanRun).toBe(0);
+    expect(week.streak).toBe(0);
+    expect(week.completed).toEqual([]);
+    expect(week.attempt).toBe(2);
+    // The history keeps the attempt that banked, not the practice run.
+    expect(week.history.map((entry) => entry.allMet)).toEqual([false]);
   });
 
-  it('takes the credit back when a re-run turns a clean day into a missed one', () => {
-    // The row that needs the snapshot to exist. A rule that could only ever add would let a player
-    // bank a clean run and keep the credit while re-running until the picture was prettier.
+  it('keeps the credit when a practice retake of a clean day misses', () => {
     let week = openWeek('c1');
     week = closeDay(week, cleanDay(1));
     expect(week.cleanRun).toBe(1);
     week = closeDay(week, missedDay(1));
-    expect(week.cleanRun).toBe(0);
-    expect(week.streak).toBe(0);
+    expect(week.cleanRun).toBe(1);
+    expect(week.streak).toBe(1);
+    expect(week.history.map((entry) => entry.allMet)).toEqual([true]);
+  });
+
+  it('drops the award banner on a practice close, and keeps the contract cleared', () => {
+    let week = openWeek('c1');
+    week = closeDay(week, cleanDay(1));
+    expect(week.cleared).not.toBeNull();
+    week = closeDay(week, cleanDay(1));
+    expect(week.cleared).toBeNull();
+    expect(week.completed).toEqual(['c1']);
   });
 
   it('keeps the best day as a high-water mark across attempts', () => {
@@ -600,15 +618,18 @@ describe('re-closing the same day replays it rather than adding to it', () => {
     expect(closeDay(week, cleanDay(1)).attempt).toBe(2);
   });
 
-  it('still replaces the day’s effect on a record-grown re-close — only the attempt is gated', () => {
-    // An intervention that turns a clean day into a missed one must still un-bank it: the flag is
-    // about *why the close happened*, never about what the day turned out to be.
+  it('is practice on a record-grown re-close as on any other, and only the attempt is gated', () => {
+    /*
+     * § D1138: the day's report has been read by the time it re-closes, so an intervention that
+     * turns a clean day missed no longer un-banks it, and one that turns a missed day clean no
+     * longer banks it. The flag still says *why the close happened* and nothing else.
+     */
     let week = openWeek('c1');
     week = closeDay(week, cleanDay(1));
     expect(week.cleanRun).toBe(1);
     week = closeDay(week, missedDay(1), true);
-    expect(week.cleanRun).toBe(0);
-    expect(week.streak).toBe(0);
+    expect(week.cleanRun).toBe(1);
+    expect(week.streak).toBe(1);
     expect(week.attempt).toBe(1);
     expect(week.history.length).toBe(1);
   });

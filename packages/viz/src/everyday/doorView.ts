@@ -363,12 +363,13 @@ function noteFor(state: {
 
 /**
  * The line under *Run today again* — what the second attempt is, and which attempt the week keeps.
- * Player-facing; swept by the corpus through the door adapter. See the `again` arm below for why it
- * says *the one you close last* (wave AJ, [§ D1098](../../../../DECISIONS.md)).
+ * Player-facing; swept by the corpus through the door adapter. It said *the one you close last*
+ * under [§ D1098](../../../../DECISIONS.md); [§ D1138](../../../../DECISIONS.md) clause 4 made the
+ * first closed attempt the one that banks, so it says that, as `shift/week.ts#closeDay` does it.
  */
 export const RUN_TODAY_AGAIN_NOTE =
   'Another attempt at the same day, on the same crowd and with no presses carried over. ' +
-  'Your week keeps the attempt you close last in place of the earlier one, even when it reads worse.';
+  'It is practice: your week keeps your first attempt at this day, and this one banks nothing.';
 
 /**
  * § 3.3's primary for the selected day.
@@ -404,14 +405,12 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
         again: {
           label: 'Run today again',
           /*
-           * **What the week keeps, said as `shift/week.ts#closeDay` does it** — wave AJ, § D1098.
-           * This said *the week keeps the better one*, and the week does not: a retry replaces the
-           * day it re-ran (`history: [...slice(0, -1), outcome]`) and recomputes the banked count
-           * from the snapshot taken before the first close, whichever attempt read better. The
-           * post-AI panel's seat A kept 35 % over 36 % on a Friday, and seat D 53 % over 54 % on a
-           * Tuesday. Keeping the later attempt is `closeDay`'s ruling (*a rule that could only ever
-           * add would let a player bank a clean run and then keep the credit while re-running*), so
-           * the sentence moves to meet it rather than the arithmetic moving to meet the sentence.
+           * **What the week keeps, said as `shift/week.ts#closeDay` does it** — wave AJ, § D1098
+           * and § D1138. This said *the week keeps the better one*, and the week did not: § D1098
+           * moved it to *the attempt you close last*, which was the arithmetic then. § D1138
+           * clause 4 then moved the arithmetic: the first closed attempt banks and a re-close is
+           * practice, because a retake after the report could otherwise bank the answer the report
+           * had just printed. The sentence follows the rule again.
            */
           note: RUN_TODAY_AGAIN_NOTE,
         },

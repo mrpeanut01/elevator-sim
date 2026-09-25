@@ -243,6 +243,12 @@ export interface EverydayReportView {
    * an account of the run they can currently see. `undefined` when the sheet and the stage agree.
    */
   readonly staleNote: string | undefined;
+  /**
+   * `shift/report.ts#PRACTICE_NOTE` when this sheet is a practice close — [§ D1138](../../../../DECISIONS.md)
+   * clause 4: the first closed attempt at a day banks, and this is a later one. `undefined` on the
+   * attempt that banked.
+   */
+  readonly practiceNote: string | undefined;
 }
 
 /** What {@link everydayReportViewOf} is computed from. */
@@ -650,5 +656,6 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
       ? 'A newer run is standing on the stage and has not been closed. This sheet is the last day ' +
         'you closed, not that run — close the day to replace it.'
       : undefined,
+    practiceNote: framing.kind === 'week-day' ? framing.practiceNote : undefined,
   };
 }

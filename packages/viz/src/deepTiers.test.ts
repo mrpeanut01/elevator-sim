@@ -553,6 +553,20 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'figures nothing reads. It is re-run by hand when a tier, a building or the career’s judge moves',
     scheduled: false,
   },
+  'packages/viz/src/everyday/dayCalls.sweep.test.ts': {
+    gates: ['DAY_CALLS_SWEEP'],
+    reason:
+      'Wave AJ’s instrument, § D1138 — every legible contract’s day 1 as Today’s scenario plays it, ' +
+      'eight crowds each, with the shipped call session asked of it and its calls answered in ' +
+      'rotation: how many calls a day raises, the day’s real length and decisions per real minute ' +
+      'under the stage’s pacing, and the as-built run’s legs and CPU time that the whole-day gate is ' +
+      'derived from. It produced § D1138’s published figures. Not scheduled because it is a compute ' +
+      'job rather than a check: dayCallSession.test.ts runs one real day through the same session on ' +
+      'every run and pins its admission, its adoption and its negative control, and a nightly ' +
+      're-derivation would write figures nothing reads. It is re-run by hand when the call rule, a ' +
+      'building, a demand template or the pace rule moves',
+    scheduled: false,
+  },
   'packages/viz/src/everyday/stagePace.sweep.test.ts': {
     gates: ['STAGE_PACE_SWEEP'],
     reason:

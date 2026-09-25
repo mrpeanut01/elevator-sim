@@ -116,6 +116,7 @@ import { interventionLogOf } from '../live/interventions.js';
 
 import { afterPressBeatOf, type PairVerdicts } from './afterPress.js';
 import { pressCallRowOf, type PressCallRowInput } from './callRow.js';
+import { dayCallRowOf, type DayCallRecord } from './dayCalls.js';
 import { wrinkleNameOf, wrinkleNoteOf, type BookedOutCar } from './bookedOut.js';
 import type { PressCounterfactual } from './counterfactual.js';
 
@@ -464,7 +465,21 @@ type WeekShapedField = 'streakLine' | 'contractLine' | 'cleared' | 'forecast' | 
 /** A day of a week: types.ts's {@link DayReport} exactly, plus the discriminator. */
 export interface WeekDayReport extends DayReport, ShapedOnlyFields {
   readonly of: 'week-day';
+  /**
+   * {@link PRACTICE_NOTE} on a practice close ([§ D1138](../../../../DECISIONS.md) clause 4), and
+   * absent on the close that banked. The report screens draw it under the verdict.
+   */
+  readonly practiceNote?: string | undefined;
 }
+
+/**
+ * **What a practice sheet says about itself** — [§ D1138](../../../../DECISIONS.md) clause 4. The
+ * first closed attempt at a day banks; this run is a later one. No digit, and nothing about which
+ * answer the player should have given.
+ */
+export const PRACTICE_NOTE =
+  'Practice. Your week keeps your first attempt at this day, so this run banks nothing: the streak, ' +
+  'the clean days and the day’s record stand as that attempt left them.';
 
 /**
  * One run, belonging to no week — the same figures, the same diagnosis, the same levers and the
@@ -693,6 +708,21 @@ export interface DayReportInput {
    */
   readonly pressCall?: Omit<PressCallRowInput, 'interventions'> | undefined;
   /**
+   * **This close is practice** — [§ D1138](../../../../DECISIONS.md) clause 4. The day had already
+   * closed once, so `shift/week.ts#closeDay` banked nothing from this run, and the sheet says so
+   * in its streak line and its meta block rather than congratulating or resetting a streak this
+   * run did not touch. Passed by `dev/main.ts#closeShift`, which knows the week before the close;
+   * `undefined` is `false`, the first close.
+   */
+  readonly practice?: boolean | undefined;
+  /**
+   * The ordinary day's calls, in the order they were raised — [§ D1138](../../../../DECISIONS.md)
+   * clause 3. One row each after § D1029's, from the three runs that admitted it
+   * (`shift/dayCalls.ts#DayCallRecord`). Passed by `dev/main.ts#closeShift` from the session that
+   * raised them; `undefined` and empty draw nothing.
+   */
+  readonly dayCalls?: readonly DayCallRecord[] | undefined;
+  /**
    * Whether this run's demand template kept its own mix of trips — `dev/state.ts#plannedDayOf`'s
    * `templateVariesMix` for the run's state. On such a run a wrinkle that asked for a mix did not
    * get one, and the header's note and tomorrow's card quote `events.ts#eventAsRun`'s account of
@@ -737,7 +767,13 @@ export interface DayReportInput {
  * Absent on the first, because *"attempt 1"* on every sheet is noise that trains a reader to stop
  * reading the line — and the line only means anything by contrast.
  */
-function attemptLine(subject: ReportSubject, attempt: number): readonly string[] {
+function attemptLine(subject: ReportSubject, attempt: number, practice = false): readonly string[] {
+  /*
+   * § D1138 clause 4: a close of a day that had already closed banks nothing, and the identity block
+   * says so beside the attempt it was. A record-grown re-close keeps its attempt number, so it can be
+   * practice at attempt 1.
+   */
+  if (practice) return [attempt <= 1 ? 'practice at this day' : `attempt ${String(attempt)} at this day · practice`];
   if (attempt <= 1) return [];
   // *at this day* is a week's phrasing. A single run re-rolls a selection, not a Tuesday.
   const what = subject.kind === 'week-day' ? 'at this day' : 'at this selection';
@@ -773,7 +809,7 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
      * An empty list prints nothing, exactly as an untouched day prints no intervention lines.
      */
     ...ruleLines(input.ruleRows ?? [], dispatcherName),
-    ...attemptLine(subject, week.attempt),
+    ...attemptLine(subject, week.attempt, input.practice === true && subject.kind === 'week-day'),
     /*
      * The intervention log, last — `docs/19` defect 10, and it is identity rather than a reading:
      * the run record is `{ seed, config, interventions[] }`, and a sheet that reproduces without
@@ -1084,6 +1120,13 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
       readings,
       input.bookedOut ?? [],
       input.pressCall,
+      input.subject.kind === 'week-day'
+        ? {
+            records: input.dayCalls ?? [],
+            gradeOf: (callObservations) =>
+              VERDICT_VOICE[verdictOf(readGoals(input.goals, callObservations))].line,
+          }
+        : undefined,
     ),
     levers: leversFor(recording, observations, summary, readings),
     smallPrint: smallPrintFor(dispatcherName, summary, dayStartS),
@@ -1112,10 +1155,16 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
   }
 
   const nextIdx = (week.dayIdx + 1) % 7;
+  const practice = input.practice === true;
   return {
     ...core,
     of: 'week-day',
-    streakLine: streakLineFor(judgement.verdict, week.streak),
+    /*
+     * § D1138 clause 4: a practice close moved no streak, so the streak sentence for this verdict
+     * would describe a change that did not happen. The practice sentence stands in its place.
+     */
+    streakLine: practice ? PRACTICE_NOTE : streakLineFor(judgement.verdict, week.streak),
+    ...(practice ? { practiceNote: PRACTICE_NOTE } : {}),
     contractLine: contractLineFor(contract, week),
     cleared: week.cleared,
     forecast: forecastFor(
@@ -2103,6 +2152,10 @@ function diagnosisFor(
   readings: readonly GoalReading[],
   bookedOut: readonly BookedOutCar[],
   pressCall?: Omit<PressCallRowInput, 'interventions'> | undefined,
+  dayCalls?: {
+    readonly records: readonly DayCallRecord[];
+    readonly gradeOf: (observations: Observations) => string;
+  },
 ): readonly ReportDiagnosis[] {
   const at = observations.peakQueueAtS;
   const floorId = observations.peakQueueFloorId;
@@ -2225,7 +2278,24 @@ function diagnosisFor(
     pressCall === undefined
       ? undefined
       : pressCallRowOf({ ...pressCall, interventions }, (simTimeS) => clockOf(simTimeS, dayStartS));
-  return [...rows, ...(afterPress === undefined ? [] : [afterPress]), ...(callRow === undefined ? [] : [callRow])];
+  /*
+   * § D1138's rows, one per ordinary call, after § D1029's (a day has one kind or the other, never
+   * both). Graded by this sheet's grader against this sheet's goals, so a row's *Shift cleared* is
+   * the banner's vocabulary; a single-run sheet grades nothing and passes none (`pairVerdictsOf`'s
+   * reason).
+   */
+  const callRows =
+    dayCalls === undefined
+      ? []
+      : dayCalls.records.map((record, index) =>
+          dayCallRowOf(record, index + 1, dayCalls.gradeOf, (simTimeS) => clockOf(simTimeS, dayStartS)),
+        );
+  return [
+    ...rows,
+    ...(afterPress === undefined ? [] : [afterPress]),
+    ...(callRow === undefined ? [] : [callRow]),
+    ...callRows,
+  ];
 }
 
 /** `1 person` / `5 people` — the diagnosis rows' cohort word. */

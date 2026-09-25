@@ -89,7 +89,7 @@
 
 import type { BrowserResources } from '../dev/data.js';
 import { SIGNED_OUT, signedIn, type AccountState } from '../menu/account.js';
-import type { VizRecording } from '../contract/types.js';
+import type { VizLeg, VizRecording } from '../contract/types.js';
 import { shiftGoalsOf, todaysShiftOf } from '../dev/leftRail.js';
 import { buildingConfigOf, initialState, plannedDayOf, type ViewerState } from '../dev/state.js';
 import { stageHeaderOf } from '../everyday/stageScreenModel.js';
@@ -108,6 +108,7 @@ import { weekScreenViewOf } from '../everyday/weekView.js';
 import { scenarioHorizonFor, wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { pressCallRowOf } from '../shift/callRow.js';
+import { dayCallRecordOf, dayCallRowOf } from '../shift/dayCalls.js';
 import {
   admittedPressDayIds,
   CONTRACT_LADDER,
@@ -578,6 +579,54 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze<AgreedFigur
       },
     },
   },
+  {
+    id: 'day-call-row',
+    figure: 'an ordinary call’s three ten-minute counts — the report’s call row and the runs it was counted on',
+    why:
+      'Wave AJ, [§ D1138](../../../../DECISIONS.md) clause 3. The row is the one place a player is ' +
+      'told what the answers they did not give did, and it may say only what its runs measured: on ' +
+      'this crowd, how many riders who arrived in the ten minutes from the call waited a minute or ' +
+      'more under each answer. The left side is the row as `shift/dayCalls.ts#dayCallRowOf` draws it ' +
+      'from a record the shipped `dayCallRecordOf` counted; the right side is the same three counts ' +
+      'taken straight off the runs’ legs by an expression written here, from the legs’ own boarding ' +
+      'and refusal times rather than through `isWaitingAt`. A row that counted legs where it says ' +
+      'riders, read the window’s far edge as inside, counted a rider the building turned away, or ' +
+      'printed its answers in another order would publish a count its runs do not hold, which is ' +
+      'the claim-past-its-runs defect the ruling names; the pair fails on any of them.',
+    left: {
+      surfaceId: 'shift/dayCalls.ts#dayCallRowOf',
+      read: () => {
+        const row = dayCallRowOf(
+          dayCallRecordOf({
+            atS: DAY_CALL_FIXTURE.atS,
+            windowEndS: DAY_CALL_FIXTURE.endS,
+            answer: 'spread-cars',
+            legs: DAY_CALL_FIXTURE.legs,
+            observations: DAY_CALL_FIXTURE.observations,
+          }),
+          1,
+          () => 'Shift cleared',
+          (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        );
+        const counts = /: (\d+) with park[^,]*, (\d+) with spread[^.]* and (\d+) with leave/u.exec(row.why);
+        return counts === null ? undefined : `${String(counts[1])}/${String(counts[2])}/${String(counts[3])}`;
+      },
+    },
+    right: {
+      surfaceId: 'shift/dayCalls.ts#dayCallRecordOf',
+      read: () =>
+        DAY_CALL_ANSWER_ORDER.map((answer) => {
+          const riders = new Set<string>();
+          for (const leg of DAY_CALL_FIXTURE.legs[answer]) {
+            if (leg.arrivedAt < DAY_CALL_FIXTURE.atS || leg.arrivedAt >= DAY_CALL_FIXTURE.endS) continue;
+            /* Still standing a minute after arriving: neither boarded nor turned away by then. */
+            const ended = Math.min(leg.boardedAt ?? Infinity, leg.refusedAt ?? Infinity);
+            if (ended > leg.arrivedAt + 60) riders.add(leg.passengerId);
+          }
+          return String(riders.size);
+        }).join('/'),
+    },
+  },
 ]);
 
 /** The *nobody* pick with no rival and no refusal — the slot the standing pairs read. */
@@ -668,6 +717,45 @@ function briefTodayOf(view: AgreementView): TodayRecord {
     units: 'metric',
   });
 }
+
+/** The three answers in the row's order, spelled out here rather than read from `DAY_CALL_ANSWERS`. */
+const DAY_CALL_ANSWER_ORDER = ['park-cars-lobby', 'spread-cars', 'leave'] as const;
+
+/**
+ * The `day-call-row` fixture: three runs of one call, a call at 10:00 and its ten-minute window. Each
+ * run holds riders on both sides of every edge the count has — before the window, at its far edge,
+ * a wait of exactly a minute, a wait just short of one, a rider turned away, and one rider with two
+ * legs — so the two sides disagree on any of them if either reads it wrongly.
+ */
+const DAY_CALL_FIXTURE = (() => {
+  const atS = 7200;
+  const endS = atS + 600;
+  const leg = (passengerId: string, arrivedAt: number, boardedAt?: number, refusedAt?: number): VizLeg =>
+    ({
+      passengerId,
+      arrivedAt,
+      ...(boardedAt === undefined ? {} : { boardedAt }),
+      ...(refusedAt === undefined ? {} : { refusedAt }),
+    }) as unknown as VizLeg;
+  const base = [
+    leg('early', atS - 10, atS + 100),
+    leg('edge', endS, endS + 200),
+    leg('minute', atS + 30, atS + 90),
+    leg('short', atS + 40, atS + 99),
+    leg('refused', atS + 50, undefined, atS + 70),
+    leg('twice', atS + 60, atS + 200),
+    leg('twice', atS + 300, atS + 400),
+  ];
+  const legs = {
+    'park-cars-lobby': [...base, leg('p1', atS + 100, atS + 250)],
+    'spread-cars': [...base, leg('s1', atS + 100, atS + 130), leg('s2', atS + 120, atS + 300), leg('s3', atS + 500)],
+    leave: [...base, leg('l1', atS + 10, atS + 400), leg('l2', atS + 20, atS + 500)],
+  } as const;
+  /* The row's verdict clause is graded by the caller, and this pair's grader reads no fold. */
+  const unread = {} as Observations;
+  const observations = { 'park-cars-lobby': unread, 'spread-cars': unread, leave: unread };
+  return { atS, endS, legs, observations };
+})();
 
 /** Minutes in words — the right side of `press-call-window`, kept apart from the picker's own table. */
 const MINUTE_NAMES: readonly string[] = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];

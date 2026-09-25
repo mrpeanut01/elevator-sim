@@ -60,6 +60,7 @@ const observationsOfRun = (recording: Parameters<typeof observationsAt>[0]) =>
   shiftObservationsOf(observationsAt(recording, recording.endedAt));
 import {
   NOT_RECORDED,
+  PRACTICE_NOTE,
   WITHHELD,
   averageWaitFigure,
   clockOf,
@@ -84,6 +85,7 @@ import {
   type ShiftGoal,
 } from './types.js';
 import { readGoals } from './goals.js';
+import { DAY_CALL_ROW_NOTE, type DayCallRecord } from './dayCalls.js';
 
 /**
  * The week-day sheet, narrowed — and the narrowing is an assertion, not a cast.
@@ -2178,5 +2180,58 @@ describe('the energy-per-leg note says how far one crowd moves it', () => {
     }
     expect(perLeg).toHaveLength(8);
     expect(Math.max(...perLeg) / Math.min(...perLeg)).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('the ordinary day’s calls and a practice close — § D1138', () => {
+  const WEEK = { ...openWeek('c2'), day: 4, dayIdx: 3, streak: 2, cleanRun: 1 };
+  function sheet(over: Partial<DayReportInput>, subject: ReportSubject = { kind: 'week-day' }): ShapedDayReport {
+    return dayReportOf({
+      recording: clean,
+      observations: observationsOfRun(clean),
+      goals: goalsForDay(4),
+      week: WEEK,
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject,
+      ...over,
+    });
+  }
+  const passing = (): Observations => observationsOfRun(clean);
+  const failing = (): Observations => ({ ...passing(), worstWaitS: 10_000, minutePct: 0 });
+  const call = (atS: number, answer: DayCallRecord['answer'], spread: Observations): DayCallRecord => ({
+    atS,
+    windowEndS: atS + 600,
+    answer,
+    counts: { 'park-cars-lobby': 4, 'spread-cars': 9, leave: 6 },
+    observations: { 'park-cars-lobby': passing(), 'spread-cars': spread, leave: passing() },
+  });
+
+  it('prints one row per call, in order, after every other row, graded by the sheet’s own grader', () => {
+    const report = sheet({ dayCalls: [call(clean.startedAt + 60, 'spread-cars', failing()), call(clean.startedAt + 400, 'leave', passing())] });
+    const ids = report.diagnosis.map((row) => row.id);
+    expect(ids.slice(-2)).toEqual(['day-call-1', 'day-call-2']);
+    const [first, second] = report.diagnosis.slice(-2);
+    expect(first?.why).toContain('4 with park the cars in the lobby, 9 with spread the cars across the tower and 6 with leave them');
+    expect(first?.why).toMatch(/The day read Shift (cleared|missed) with park the cars in the lobby and leave them and Shift (cleared|missed) with spread the cars across the tower\./u);
+    expect(second?.why).not.toContain('The day read');
+    expect(second?.why.endsWith(DAY_CALL_ROW_NOTE)).toBe(true);
+  });
+
+  it('prints no call row on a single run, which grades nothing', () => {
+    const report = sheet({ dayCalls: [call(clean.startedAt + 60, 'spread-cars', failing())] }, { kind: 'single-run', selection: SELECTION });
+    expect(report.diagnosis.some((row) => row.id.startsWith('day-call-'))).toBe(false);
+  });
+
+  it('says a practice close is practice, where the streak line stood and in the meta block', () => {
+    const practised = weekDay(sheet({ practice: true, week: { ...WEEK, attempt: 2, closedDay: 4 } }));
+    expect(practised.practiceNote).toBe(PRACTICE_NOTE);
+    expect(practised.streakLine).toBe(PRACTICE_NOTE);
+    expect(practised.metaLines).toContain('attempt 2 at this day · practice');
+    const banked = weekDay(sheet({ week: { ...WEEK, attempt: 1, closedDay: 4 } }));
+    expect(banked.practiceNote).toBeUndefined();
+    expect(banked.streakLine).not.toBe(PRACTICE_NOTE);
   });
 });

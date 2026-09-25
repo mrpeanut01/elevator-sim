@@ -244,7 +244,7 @@ const SIDEWAYS = (args: {
   readonly missing: readonly string[];
   readonly narrowestColumnPx: number;
 } => {
-  const region = document.querySelector<HTMLElement>('main.everyday-screen');
+  const region = document.querySelector<HTMLElement>('.everyday-screen');
   if (region === null) throw new Error('the Everyday screen region is not mounted');
   const r = region.getBoundingClientRect();
   const SLIVER_PX = 4;

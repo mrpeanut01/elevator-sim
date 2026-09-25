@@ -253,6 +253,7 @@ import { stagePaceNoteOf, stagePaceOf } from '../everyday/stagePace.js';
 import { STAGE_CALL_COPY, stageCallCardOf } from '../everyday/stageCall.js';
 import type { PressCall } from '../shift/pressCall.js';
 import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
+import { dayCallRecordOf, dayCallWindowEndOf } from '../shift/dayCalls.js';
 import { wayThroughSentenceOf, WEEK_WAY } from '../shift/weekWay.js';
 import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
 import { PRESS_DAY_DRIVER_HELD } from '../everyday/today.js';
@@ -3330,6 +3331,29 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       awayAtS: recording.startedAt + span * 0.25,
       backAtS: index === 0 ? recording.startedAt + span * 0.5 : null,
     }));
+    /*
+     * § D1138's ordinary calls, on the same sheet — three calls, one per way a call can be left:
+     * a press, *leave them*, and a skip with the card up. Each record is counted by the shipped
+     * `dayCallRecordOf` over two runs this case holds, the case's own and the candidate's, standing
+     * in for the three a raised call makes: a fixture exactly as the pair is, and what is swept is
+     * the row's wording and the counts it quotes. The first call's three folds differ (the candidate
+     * run's is one of them), so the arm that names a split verdict is reached wherever the two runs
+     * grade apart; the other two are graded on one fold, so the arm that names none is reached too.
+     */
+    const dayCalls = (['park-cars-lobby', 'leave', 'skipped'] as const).map((answer, index) => {
+      const atS = recording.startedAt + span * (0.2 + 0.2 * index);
+      return dayCallRecordOf({
+        atS,
+        windowEndS: dayCallWindowEndOf(atS, recording.endedAt),
+        answer,
+        legs: { 'park-cars-lobby': recording.legs, 'spread-cars': comparison.legs, leave: recording.legs },
+        observations: {
+          'park-cars-lobby': observations,
+          'spread-cars': index === 0 ? comparisonObservations : observations,
+          leave: observations,
+        },
+      });
+    });
     const pairedAgainstCandidate = dayReportOf({
       ...reportInput,
       pressCounterfactual:
@@ -3337,6 +3361,7 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
           ? undefined
           : { ...selfPair, wholeRunObservations: comparisonObservations },
       bookedOut: fixtureBookings,
+      dayCalls,
     }) as WeekDayReport;
     /*
      * The four sheets a **pairing** needs — issue #127, and each is one axis away from `report`.
@@ -3354,6 +3379,11 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       week: closeDay(banked, outcome),
       subject: { kind: 'week-day' },
       plan: shiftPlan,
+      /*
+       * § D1138 clause 4: a close of a day that already closed is practice, and the shell passes
+       * exactly that here, so the sheet's practice note and its practice attempt line are swept.
+       */
+      practice: true,
     }) as WeekDayReport;
     const swapped = dayReportOf({
       ...common,
@@ -3558,6 +3588,15 @@ const SHIFT_REPORT: SurfaceAdapter = {
      */
     'shift/callRow.ts#pressCallRowOf',
     'shift/callRow.ts#PRESS_CALL_AGAIN',
+    /*
+     * § D1138's ordinary call rows and the practice sheet. Seeded once per case below on
+     * {@link ShiftDay.pairedAgainstCandidate}, whose `dayCalls` are counted by the shipped record
+     * builder over this case's two runs, and on {@link ShiftDay.retried}, a practice close.
+     */
+    'shift/dayCalls.ts#dayCallRowOf',
+    'shift/dayCalls.ts#DAY_CALL_ROW_NOTE',
+    'shift/dayCalls.ts#DAY_CALL_LEAVE_LABEL',
+    'shift/report.ts#PRACTICE_NOTE',
     'shift/goals.ts#GOAL_PLAIN_NAMES',
     'shift/goals.ts#goalPlainNameOf',
     /*
@@ -3803,6 +3842,24 @@ const SHIFT_REPORT: SurfaceAdapter = {
           text: line,
           role: 'label',
         });
+      }
+      /*
+       * § D1138's call rows, all three parts: the `what` credits the player's own answer, which the
+       * row's record carries, and the `why` quotes the three counts and, where the folds split, the
+       * verdicts. The generic loop below would seed only the `why`.
+       */
+      for (const row of entry.pairedAgainstCandidate.diagnosis) {
+        if (!row.id.startsWith('day-call-')) continue;
+        seeds.push({ field: `${at}.dayCalls(${row.id}).when`, text: row.when, role: 'label' });
+        seeds.push({ field: `${at}.dayCalls(${row.id}).what`, text: row.what, role: 'observation' });
+      }
+      /* § D1138 clause 4's practice sheet: its note, and its streak line, which carries the same words. */
+      if (entry.retried.practiceNote !== undefined) {
+        seeds.push({ field: `${at}.retried.practiceNote`, text: entry.retried.practiceNote, role: 'prose' });
+      }
+      for (const [index, line] of entry.retried.metaLines.entries()) {
+        if (sharedMeta.has(line)) continue;
+        seeds.push({ field: `${at}.retried.metaLines[${String(index)}]`, text: line, role: 'label' });
       }
       for (const row of entry.pairedAgainstCandidate.diagnosis) {
         if (row.id === AFTER_PRESS_ROW_ID) continue;
@@ -11934,6 +11991,17 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         }
       }
       seeds.push({ field: 'stage.call.held', text: STAGE_CALL_COPY.held, role: 'label' });
+      /*
+       * § D1138's pace note while the stage waits at an ordinary candidate whose runs have not
+       * landed. An ordinary call's card draws only facts the two cards above already seed (the
+       * minute line, the peak line, no car line), so the wait is the one new sentence it brings.
+       */
+      seeds.push({
+        field: 'stage.call.waiting',
+        text: STAGE_CALL_COPY.waiting,
+        role: 'label',
+        playhead: atPlayhead(recording, recording.startedAt + span * 0.3),
+      });
       /*
        * And the pace note's two arms the sampled loop below never reaches: `call`, drawn while the
        * card is up, and `chosen`, since § D1029 bounded to the next act boundary.
