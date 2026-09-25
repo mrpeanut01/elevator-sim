@@ -38914,6 +38914,8 @@ This lane held **D701–D705** and spent **D701** only. **D702, D703, D704 and D
 
 > **Status 2026-09-24: NARROWED by [§ D1001](#d1001), and its § 1 re-measured by [§ D1000](#d1000).** `tenant-floors` is offered as case-authored cohorts rather than a per-floor population control, and the editor now writes all eighteen answers; the retirement still waits on § 7's playtest. See [`docs/39`](docs/39-decisions-in-force.md).
 
+> **Status 2026-09-25: clause 2 AMENDED by [§ D1011](#d1011)** *(agent sessions, delegated authority — not the product owner)*. *Two cars out*'s cheap-fix, *"Lend a low-zone car to the upper zone"*, clears its case and was measured across mornings as a second answer, so it is **not** one of clause 2's authored negative controls; its line is corrected and `cases.test.ts#SECOND_ANSWERS` registers every non-diagnosed repair that clears on the letter's morning. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken by an agent session under authority delegated by the session principal on 2026-09-19, not by the product owner.** It **narrows** [§ D525](#d525) clause 2 in one place, named in § 4 below, and conditions the rest of it on a measurement. `docs/39` § 2 carries the row and § D525 carries the marker, on this commit.
 
 **Date: 2026-09-19 · Narrows [§ D525](#d525) clause 2 · Reads it together with [§ D525](#d525) clause 3 · GitHub issues [#233](https://github.com/mrpeanut01/elevator-sim/issues/233), [#177](https://github.com/mrpeanut01/elevator-sim/issues/177) item 7 · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.1, [`docs/12`](docs/12-design-handoff.md) § 4.15, [`docs/39`](docs/39-decisions-in-force.md) §§ 2 and 3, [`docs/37`](docs/37-content-plan.md) § 5.2, `data/fixit-cases.json`, `data/price-schedule.json`, `packages/viz/src/fixit/parse.ts`, `packages/viz/src/fixit/types.ts`, `packages/viz/src/fixit/cases.test.ts`, `packages/viz/src/everyday/fixitScreen.ts`, `packages/viz/src/dev/fixitPanel.ts`.**
@@ -43275,3 +43277,75 @@ same six. Wall-clock figures are not published: the box was at load 5–14 throu
 
 No bar, no goal, no occupancy, no rate, no booked-out car. Changes to `data/contract-ladder.json`
 are pins and their windows only. `GOAL_BARS` is byte-identical.
+
+---
+
+---
+
+## D1011 — a fixed fix-it verdict prints the diagnosis's words only over the diagnosis's own run, goes stale on an edit, and an eleventh honesty property holds every string that credits an act to the run that carried it
+
+> **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner. The
+> session principal's standing instruction for this wave is that decisions about what the game is
+> and does go to a swarm of at least three independent lenses, on [§ D729](#d729)'s form. **The
+> verdict text was ruled by a three-member decision swarm** — S1 (the player), S2 (honesty and
+> statistical discipline) and S3 (engineering) — each measuring independently on `e1d10ac`, and the
+> integrator reconciled their split. This lane implements that ruling's part (a) and the property S2
+> proposed; the replicated judge, the `cleared-once` outcome, the case holds and the menu's
+> retirement are a sibling lane's, **whose entry records them and which this one does not
+> duplicate**. A later reader weighing this against a product-owner ruling should treat it as an
+> agent ruling and say so.
+
+**Date: 2026-09-25 · Owner: lane AI-B (wave AI) · `rescore-ai` C's D1, D3 and D6 and D's N1 · GitHub issue [#570](https://github.com/mrpeanut01/elevator-sim/issues/570) · Under [§ D706](#d706), [§ D1000](#d1000) and [§ D869](#d869) · Rules on: `packages/viz/src/fixit/engine.ts`, `record/crowd.ts`, `everyday/fixitScreenModel.ts`, `everyday/fixitScreen.ts`, `dev/fixitPanel.ts`, `honesty/types.ts`, `honesty/properties.ts`, `honesty/surfaces.ts`, `honesty/faults.ts`, `honesty/run.ts`, `data/fixit-cases.json`'s *two cars out* decoy line.**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds. It binds the engine, both fix-it surfaces, the honesty corpus's property list and `data/`, which no one module owns; it moves something recorded — [§ D706](#d706) clause 2 keeps the non-diagnosed repairs as *authored negative controls*, and one of them is not one; and it adds an eleventh property to a list every property register in `honesty/` asserts.
+
+### 1. The defect
+
+`fixit/engine.ts#classifyOutcome` returned the case's authored `result.head` and `result.body` for **every** fixed outcome, whatever the player had changed. Every authored body is a mechanism claim about the diagnosed repair's run — *"each deck weighs against its own plate"*, *"the staggered starts … take six hundred arrivals out of the shared peak"* — so a clear by any other route was narrated as the author's repair. Six routes were reproduced on the shipped bundle: split-demand at 2 on *everyone leaves at once*, zone-centre parking on *every deck*, the roof raised 3 m on *every letter says nine*, doors 5/3 on *doors that never close*, car A into the High bank on *two cars out*, and fixed-floor parking at 30 on *let faster than the lifts*. With the menu present most players press the diagnosed row and the words happen to be true; with it gone every player searches, and search is where the defect lives.
+
+### 2. The ruling, part (a)
+
+1. **The authored `result` is printed only when the player's after-run is leg for leg the diagnosed repair's after-run on the case seed.** Two of three (S2, S3). S3 measured the three candidate matchers over the eighteen exact answers and the reproduced routes: schedule-row identity accepted 18 of 18 answers and **falsely accepted** *two cars out*'s car A → High (the answer's own `rezone-bank` row); config identity accepted only **9 of 18** answers; **leg identity accepted 18 of 18 and falsely accepted none**. If every leg is identical, the narrative is as true of the player's run as of the witness's.
+2. **Every other fixed verdict is composed from the run**: head *"Fixed, by your own order."*; the order's changes in the controls' own words (`core`'s player names for a dial, the rezone select's bank names, the door row's sides, the tenancy's authored cohorts); the `data/price-schedule.json` rows the order bought, by their player names; and a close saying the rows are measured on this order, the diagnosis describes a different run, and *"These runs say your change works; they do not say why"* — S1's line, kept verbatim. **No mechanism**, which is [§ D256](#d256).
+3. **The diagnosed run is requested only after a pair has cleared both bars**, on the same worker, cached per case; a press of the diagnosed repair alone is the witness's run by construction and is kept rather than simulated twice. It is never requested before a solve, so it can say nothing a player could use before solving — [§ D869](#d869). **A witness that cannot be run leaves the verdict composed**, and **an absent verdict context is not evidence**: `classifyOutcome` called without one composes too.
+4. **Stale on edit** (3/3). A verdict is a function of the order it was measured on. Any edit that moves the order away from it draws a stale note over the verdict and gives the Run press back, **including on a fixed case**, so a cheaper route can be tried; the verdict is kept, because it is still true of the order that was run. Sets are compared as sets, so a floor toggled off and on again is not an edit.
+
+**The dissent.** S1 ruled for **containment on the editor state** — the authored text whenever the player's order contains the diagnosed repair field by field, with *"You also changed X; this run does not say what that did"* for extra changes. It lost 2–1 on the ground that leg identity tracks what happened rather than what was typed, and that containment would print the diagnosis's mechanism over a run whose extra change may be the thing that worked. S2's intermediate arm for an order that contains the witness's writes but runs differently (*"… and N others. This run cannot say which of them did the work"*) is not built: the composed arm is true of that run too, and containment needs S1's per-case editor witness in `data/`, which no lane has written.
+
+### 3. The *two cars out* decoy, in both polarities ([§ D227](#d227))
+
+*"Lend a low-zone car to the upper zone"* said *"The 100.0 % low-zone figure is the thing this spends"*; the low zone reads 100.0 % → 100.0 % on that run, and S2 measured the route across 31 mornings as **a genuine second answer**: 92.1 % of the complaint gone, per-morning reduction **+17.2 [+15.1, +19.4]**. So the line was false and § D706 clause 2's *negative control* was not negative. The line now reads *"… The 100.0 % low-zone figure is what it puts at risk, and on this morning it held."*, and `cases.test.ts` pins both halves on the run: the repair clears the letter, and the low zone reads 100.0 % on both sides. **§ D706 clause 2 is read, for this repair, as not a negative control.**
+
+**The register that pins it found seven more.** `cases.test.ts#SECOND_ANSWERS` classifies every affordable non-diagnosed repair on its case seed and requires *fixed* exactly where the register says so. Its first run found seven further repairs that clear their case on the letter's morning — the door trims on *cars that always go home*, *one start time* and *bed cars*, the longer holds on *everyone leaves at once*, night working on *two cars out*, and the re-geared machines on *controller* and *gym*. **None is measured across mornings here**, so none is called an answer: S3 measured the single pair clearing wrong-family routes on exactly these tail seeds, and whether these survive replication is the replicated judge's to say. Several of their lines — *"It trades the 33.0 s mean around, not away"* — sit over a pair that cleared the letter, and **that copy is not rewritten here**; it is the re-authoring the ruling assigns to the sibling lane.
+
+### 4. The eleventh property, `unbacked-attribution`
+
+S2's proposal, adopted. **No string credits the player with an act the run did not carry.** The ten before it are predicates over a string's form or over declared figure pairs; *"The clause bought the morning back"* has no numeric or lexical signature, which is why the corpus never saw the defect in § 1.
+
+- **Structural half.** `RenderedText.attribution` declares the acts a string credits and the acts the run it describes carried; a credited act not carried is a violation. The fix-it verdict credits `diagnosed-repair` exactly when the engine printed the authored words (`FixitOutcome.attribution`, set by the one function that chose them) and the run carried it only when the caller's leg comparison said so. The day report's after-press beat credits the press it names and carries the day's own press record.
+- **Textual half.** A string that **opens** by telling the player they did something — *You parked …*, *You have changed …*, *You changed the building …* — with no attribution declared is a violation. The first draft matched the verb anywhere and reported thirty-one hits on a clean case, twenty-nine of them relative clauses such as *everything you have changed* that credit no act; the rule is now anchored to the head of a sentence or clause, and the clean corpus case reads zero.
+- **Faults**, three, each the only one for what it breaks: `authoredResultOnForeignRun` (a shipped case's composed verdict given the same case's authored head and a `diagnosed-repair` credit — the defect verbatim); `pressCreditedFromAnotherDay` (the report's *"You changed the building — Re-zone a bank …"* with the day's record emptied — `rescore-ai` B's press leak, from the player's side); and `pressClaimUndeclared` (the same beat with its declaration removed — the textual half). All three fire on `faults.test.ts`'s quotable fixture. **On the pre-fix engine arm the property fires 36 times on a clean case** — eighteen shipped cases, head and body.
+- **The adapter drives the shipped cases** (#570). `HonestyContext.shippedFixit` carries `data/fixit-cases.json` and its run resources, required rather than optional so a harness that forgot it is a type error. For each of the eighteen, the FIXIT adapter words the witness's order (the authored head and body, in the corpus for the first time) and a non-witness order pressed through the engine's reducers (a parking strategy the case does not run and a door hold on every car), against a fabricated passing pair; the leg decision itself is held on real runs in `fixit/families.test.ts` and `fixit/verdictNamesTheOrder.test.ts`.
+
+**What the property does not do.** It does not reproduce the press leak's route through the product — that route runs through the shell's day state and storage, which the corpus does not drive — and it does not depend on lane AI-A's fix of it. It fires on a state built to the leak's shape, on the product's own sentence, and it will fire on any surface that credits a press its declared record does not hold.
+
+### 5. What holds it
+
+- `fixit/verdictNamesTheOrder.test.ts` — the six reproduced routes, each pressed through the reducers, run on the case seed, judged by leg comparison: composed head, no sentence of the authored body, every bought row and every change named, and the close; the negative control forces `witnessRun: true` on the same run and the authored words return; the pressed answers on the same six cases are the witness's run; an absent context composes. **Red before**: with the fixed arm reverted to always-authored, 7 of its 8 cases fail.
+- `fixit/families.test.ts` — the eighteen answers are now **pressed** through the real reducers (`presses.test-helper.ts#ANSWER_PRESSES`), every dial value checked against the options its own select offers and every press required to take, which closes assessor D's claim 12 against [§ D1000](#d1000); all eighteen are judged the witness's run on the legs and read the authored head.
+- `fixit/engine.test.ts` — the composed arm's exact shape, attribution on every outcome kind, and staleness both ways.
+- `fixit/cases.test.ts` — the decoy's two polarities and the `SECOND_ANSWERS` register.
+- `everyday/fixitVerdict.browser.test.ts` — on the built bundle, *two cars out* with car A moved to High reads the composed verdict and none of the authored narrative; an edit draws it stale and the primary returns to *Run it again*.
+- `honesty/faults.test.ts` and `honesty/honesty.test.ts` — the property registered, faulted, and clean on the corpus.
+
+### 6. The corpus, as a forecast rather than as the row
+
+[§ D343](#d343) puts the measurement on the integrator. **Surfaces: +0** — every new string enters the existing `fixit/engine.ts#classifyOutcome` adapter. **Strings: +73 a case, a constant, in both tiers**, decomposed: eighteen shipped cases × two arms × head and body, **72**; the stale note, **1**, seeded on a state the engine's own staleness test calls stale, which it always is. The synthetic case's two measured outcomes change words when they clear (the authored head becomes the composed one) and do not change count; the report's attribution declarations add none. So **49 × 73 = 3 577** always-on and **60 × 73 = 4 380** deep, with cases, simulations and failing cases unmoved. The quotient is exact only if no other lane's change touches these strings, which § D454 says to measure rather than assume.
+
+### 7. What this does not establish
+
+Whether the composed verdict is legible to a player in a ninety-second turn; no playtest was taken. Whether the seven repairs in § 3 are answers across mornings. Whether any fix-it surface other than the two press sites calls `classifyOutcome` for a fixed outcome without a context — the corpus now composes in that case, so the failure is quiet rather than false.
+
+### 8. Numbers spent
+
+This lane holds **D1011–D1019** and spends **D1011** only. D1012–D1019 are unspent and are the integrator's to register (§ D404, § D430).

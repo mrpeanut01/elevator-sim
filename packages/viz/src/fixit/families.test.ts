@@ -37,7 +37,12 @@ import {
   toggleBankFloor,
   togglePlate,
   toggleRepair,
+  witnessStateOf,
 } from './engine.js';
+import { fixitVerdictContextOf } from '../everyday/fixitScreenModel.js';
+import { sameLegs } from '../record/crowd.js';
+import { editorInputsOf } from './editorInputs.js';
+import { ANSWER_PRESSES, pressed } from './presses.test-helper.js';
 import {
   INERT_DIALS,
   dialGroupsOf,
@@ -380,41 +385,17 @@ describe('every fabric control the editor draws moves the legs', () => {
  * -------------------------------------------------------------------------- */
 
 /**
- * **The editor state that writes each case's diagnosed answer**, built by hand from the controls a
- * player has — which is the claim: these are presses, not patches. `keyedBankIdOf` is the one id a
- * player never types, because keying a car is what creates its bank.
+ * **The editor state that writes each case's diagnosed answer**, produced by **pressing** the
+ * controls a player has — `presses.test-helper.ts#ANSWER_PRESSES`, run through the engine's own
+ * reducers from an empty order ([§ D1011](../../../../DECISIONS.md)). This was a table of
+ * hand-built `FixitState` literals, and assessor D's claim 12 was that a literal proves nothing about
+ * a state nobody can make: a literal can hold a value no select offers. The presses refuse one.
  */
-const EDITOR_ANSWERS: Readonly<Record<string, FixitState>> = {
-  'sleeping-sky-lobby': { ...empty(), parkingStrategy: 'predicted-demand', dispatcherDials: { 'idle.repositionEnergyWeight': 0.1 } },
-  'zoning-starves-the-top': { ...empty(), carBanks: { C: 'high' } },
-  'three-cars-one-cars-work': { ...empty(), parkingStrategy: 'zone-center', dispatcherDials: { 'idle.repositionEnergyWeight': 0.1 } },
-  'doors-that-never-close': {
-    ...empty(),
-    doorDwell: { [EVERY_CAR]: { carCallS: 3, hallCallS: 5 } },
-    dispatcherDials: { 'answer.dwellPolicy': 'adaptive', 'answer.dwellAdaptationGain': 0.3, 'answer.maxDwellS': 11 },
-  },
-  'cars-that-always-go-home': { ...empty(), parkingStrategy: 'stay' },
-  'car-park-nobody-serves': { ...empty(), carBanks: { B: 'garage' } },
-  'express-that-stops-everywhere': {
-    ...empty(),
-    bankFloors: { high: ['G', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30'] },
-  },
-  'deliveries-on-the-passenger-group': {
-    ...empty(),
-    doorDwell: { D: { carCallS: 3, hallCallS: 5 }, E: { carCallS: 3, hallCallS: 5 } },
-  },
-  'everyone-leaves-at-once': { ...empty(), carBanks: { A: KEYED_BANK }, bankFloors: { [keyedBankIdOf('A')]: ['G', '2'] } },
-  'bed-cars-locked-out': { ...empty(), bankFloors: { beds: ['LG', 'G', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'] } },
-  'two-cars-out-wrong-month': { ...empty(), carBanks: { E: 'high' } },
-  'every-deck-calls-itself-full': { ...empty(), platedBankIds: ['shuttle'] },
-  'restaurant-above-the-ballroom': { ...empty(), carBanks: { S: KEYED_BANK }, bankFloors: { [keyedBankIdOf('S')]: ['G', '2', '3'] } },
-  'controller-sends-every-car': { ...empty(), dispatcherDials: { 'dispatch.assignmentMode': 'single-car' } },
-  'gym-on-the-top-floor': { ...empty(), parkingStrategy: 'fixed-floor', dispatcherDials: { 'idle.parkingFloorIndex': 6 } },
-  /* § D1001's three: a cohort the case authors, moved to the position its witness is. */
-  'one-start-time': { ...empty(), tenancyPositions: { 'upper-tenancies': 'three-start-times' } },
-  'every-letter-says-nine': { ...empty(), tenancyPositions: { 'outpatient-letters': 'four-hundred-say-half-past' } },
-  'let-faster-than-the-lifts': { ...empty(), tenancyPositions: { 'new-lettings': 'invoke-for-all' } },
-};
+function editorAnswerOf(entry: FixitCase): FixitState {
+  const presses = ANSWER_PRESSES[entry.id];
+  if (presses === undefined) throw new Error(`no presses write the answer to "${entry.id}"`);
+  return pressed(entry, presses, { resources, schedule: shippedPriceSchedule() });
+}
 
 /** The three cases whose crowd has a start time the owner can move — § D1001. */
 const TENANCY_CASES: readonly string[] = Object.freeze([
@@ -430,8 +411,7 @@ describe('the editor writes the answer § D706 conditions the retirement on', ()
       const schedule = shippedPriceSchedule();
       const reached: string[] = [];
       for (const entry of cases.cases) {
-        const state = EDITOR_ANSWERS[entry.id];
-        if (state === undefined) continue;
+        const state = editorAnswerOf(entry);
         const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed')!;
         const repairState = toggleRepair(entry, empty(), diagnosed.id, schedule);
 
@@ -453,14 +433,30 @@ describe('the editor writes the answer § D706 conditions the retirement on', ()
           repairedLegs(entry, repairState),
         );
 
-        /* And it clears. */
+        /*
+         * And it clears — **with the authored head**, because a pressed answer *is* the witness's
+         * run (§ D1011). The witness decision is taken the way both surfaces take it: the after-run's
+         * legs against the diagnosed repair's own run, by `record/crowd.ts#sameLegs`.
+         */
         const before = recordRun(plan.asBuilt, FIXIT_RUN_SWITCHES);
+        const witness = recordRun(fixitRunPlanOf(entry, witnessStateOf(entry), resources).asRepaired, FIXIT_RUN_SWITCHES);
+        const witnessRun = sameLegs(after.recording, witness.recording);
+        expect(witnessRun, `${entry.id}: the pressed answer is not the witness's run`).toBe(true);
         const outcome = classifyOutcome(
           entry,
           measuredOf(entry, before.recording, after.recording),
           spendOf(entry, state, schedule),
+          fixitVerdictContextOf({
+            entry,
+            state,
+            inputs: editorInputsOf(entry, state, resources, schedule),
+            schedule,
+            witnessRun,
+          }),
         );
         expect(outcome.kind, entry.id).toBe('fixed');
+        expect(outcome.head, `${entry.id}: the witness's run gets the authored head`).toBe(entry.result.head);
+        expect(outcome.attribution).toBe('diagnosis');
         reached.push(entry.id);
       }
       expect(reached, 'every case is written by the editor alone').toHaveLength(18);
@@ -566,7 +562,7 @@ describe('the tenancy row moves only the crowds a case authors', () => {
       const verdicts: string[] = [];
       for (const id of TENANCY_CASES) {
         const entry = caseOf(id);
-        const witness = EDITOR_ANSWERS[id]!;
+        const witness = editorAnswerOf(entry);
         const plan = fixitRunPlanOf(entry, witness, resources);
         const before = recordRun(plan.asBuilt, FIXIT_RUN_SWITCHES);
         const judge = (state: FixitState, runs: ReturnType<typeof fixitRunPlanOf>) =>

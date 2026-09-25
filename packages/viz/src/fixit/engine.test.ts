@@ -44,6 +44,11 @@ import {
   DEMAND_BASIS_LINE,
   repairChangesTheCrowd,
   selectionKeepsTheCrowd,
+  FIXED_BY_ORDER_CLOSE,
+  FIXED_BY_ORDER_HEAD,
+  sameOrder,
+  verdictIsStale,
+  witnessStateOf,
 } from './engine.js';
 import { EDITOR_PARKING_STRATEGIES } from './types.js';
 import type { FixitCase, FixitState } from './types.js';
@@ -254,10 +259,15 @@ describe('affordability — § 10.2', () => {
 });
 
 describe('the four outcomes — § 10.4, copy verbatim', () => {
-  it('all three bars held: the authored result, and the case reads FIXED', () => {
-    const outcome = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()));
+  it('all three bars held on the witness’s own run: the authored result, and the case reads FIXED', () => {
+    const outcome = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()), {
+      witnessRun: true,
+      changes: [],
+      bought: [],
+    });
     expect(outcome.kind).toBe('fixed');
     expect(outcome.head).toBe('Fixed head.');
+    expect(outcome.attribution).toBe('diagnosis');
     expect(outcome.rows.map((row) => row.passed)).toEqual([true, true, true]);
     expect(outcome.basis).toBe(BASIS_LINE);
     expect(outcome.basis).toBe(
@@ -427,25 +437,77 @@ describe('a verdict may not claim more than the run measured — docs/20 defect 
     expect(none.head).toBe('No change, and the complaint still stands.');
   });
 
+  /* The two arms below are about the authored body, so they are the witness's run — § D1011. */
+  const WITNESS = { witnessRun: true, changes: [], bought: [] } as const;
+
   it('leaves the authored “nothing was bought” punchline alone when nothing was bought', () => {
-    const outcome = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()));
+    const outcome = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()), WITNESS);
     expect(outcome.body).toBe('Fixed body.');
   });
 
   it('corrects it when the player did buy, naming the committed total', () => {
-    const outcome = classifyOutcome(CASE, MEASURED, {
-      repairUnits: 11,
-      extraUnits: 0,
-      editorUnits: 0,
-      totalUnits: 11,
-      machineryUnits: 0,
-    });
+    const outcome = classifyOutcome(
+      CASE,
+      MEASURED,
+      {
+        repairUnits: 11,
+        extraUnits: 0,
+        editorUnits: 0,
+        totalUnits: 11,
+        machineryUnits: 0,
+      },
+      WITNESS,
+    );
     expect(outcome.kind).toBe('fixed');
     // The authored sentence survives; what follows it is the fact it is silent about.
     expect(outcome.body.startsWith('Fixed body.')).toBe(true);
     expect(outcome.body).toContain('about the repair, not about your order');
     expect(outcome.body).toContain('11 of 12 u');
     expect(outcome.body).toContain('none of it machinery');
+  });
+});
+
+/**
+ * **The fixed verdict's words, and whose act they describe** — [§ D1011](../../../../DECISIONS.md).
+ * The routes that reach the composed arm on real runs are `verdictNamesTheOrder.test.ts`'s; these
+ * hold the arm's shape on the fixture, where every other arm is held.
+ */
+describe('the fixed verdict names the order unless the run is the witness’s — § D1011', () => {
+  it('composes the head and body from the order on any run that is not the witness’s', () => {
+    const outcome = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()), {
+      witnessRun: false,
+      changes: ['Where idle cars wait — in the middle of its own zone', 'Car A runs in High bank'],
+      bought: ['Where idle cars wait', 'Rezone a bank'],
+    });
+    expect(outcome.kind).toBe('fixed');
+    expect(outcome.attribution).toBe('order');
+    expect(outcome.head).toBe(FIXED_BY_ORDER_HEAD);
+    expect(outcome.body).toBe(
+      'What you changed: Where idle cars wait — in the middle of its own zone; Car A runs in High bank. ' +
+        'What it bought: Where idle cars wait; Rezone a bank. ' +
+        FIXED_BY_ORDER_CLOSE,
+    );
+    expect(outcome.body).not.toContain('Fixed body.');
+  });
+
+  it('declares whose act every outcome kind describes', () => {
+    const spend = spendOf(CASE, emptyFixitState(), shippedPriceSchedule());
+    expect(classifyOutcome(CASE, { ...MEASURED, complaintGonePct: 40 }, spend).attribution).toBe('order');
+    expect(classifyOutcome(CASE, { ...MEASURED, restDeltaPoints: -6 }, spend).attribution).toBe('order');
+    expect(classifyOutcome(CASE, MEASURED, spend).attribution).toBe('order');
+  });
+
+  it('marks a verdict stale on any edit that changes the order, and on none that does not', () => {
+    const measured: FixitState = { ...emptyFixitState(), parkingStrategy: 'zone-center', bankFloors: { high: ['G', '12', '14'] } };
+    expect(verdictIsStale(undefined, measured), 'no verdict is never stale').toBe(false);
+    expect(verdictIsStale(measured, measured)).toBe(false);
+    expect(verdictIsStale(measured, { ...measured, bankFloors: { high: ['14', 'G', '12'] } }), 'a set in another order').toBe(false);
+    expect(verdictIsStale(measured, { ...measured, parkingStrategy: 'lobby' })).toBe(true);
+    expect(verdictIsStale(measured, { ...measured, speedSteps: 1 })).toBe(true);
+    expect(verdictIsStale(measured, { ...measured, doorDwell: { A: { hallCallS: 5 } } })).toBe(true);
+    expect(sameOrder(witnessStateOf(CASE), { ...emptyFixitState(), selectedRepairIds: ['free-fix'] })).toBe(
+      CASE.repairs.find((repair) => repair.role === 'diagnosed')?.id === 'free-fix',
+    );
   });
 });
 

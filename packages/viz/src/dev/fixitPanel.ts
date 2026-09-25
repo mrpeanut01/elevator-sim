@@ -76,8 +76,12 @@ import {
   zonePriceUnits,
   toggleExtra,
   toggleRepair,
+  sameOrder,
+  verdictIsStale,
+  witnessStateOf,
   type FixitOutcome,
 } from '../fixit/engine.js';
+import { sameLegs } from '../record/crowd.js';
 import {
   FIXIT_RUN_SWITCHES,
   assertPairMatchesRepairs,
@@ -90,8 +94,8 @@ import {
   zoneOverlapCeilingOf,
 } from '../fixit/run.js';
 import { DEFAULT_DOOR_TARGET, mountFixitFamilies } from '../everyday/fixitFamilies.js';
-import { FIXIT_SCREEN_COPY, fixitParkingRow } from '../everyday/fixitScreenModel.js';
-import { withPrunedDials } from '../fixit/editorInputs.js';
+import { FIXIT_SCREEN_COPY, fixitParkingRow, fixitVerdictContextOf } from '../everyday/fixitScreenModel.js';
+import { editorInputsOf, withPrunedDials } from '../fixit/editorInputs.js';
 import type { EditorParkingStrategy, FixitCase, FixitCases, FixitState } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type { VizRecording } from '../contract/types.js';
@@ -129,6 +133,10 @@ interface CaseSession {
   asBuilt: VizRecording | undefined;
   /** Which door-hold target the door selects edit — view state, § D1000. */
   doorTarget: string;
+  /** The order {@link CaseSession.outcome} was measured on — § D1011; see the Everyday screen's twin. */
+  verdictState: FixitState | undefined;
+  /** The diagnosed repair's own run on the case seed, asked for only after a fixed verdict — § D1011. */
+  witness: VizRecording | undefined;
 }
 
 /*
@@ -206,6 +214,8 @@ function scheduleNow(): PriceSchedule {
         outcome: undefined,
         asBuilt: undefined,
         doorTarget: DEFAULT_DOOR_TARGET,
+        verdictState: undefined,
+        witness: undefined,
       };
       sessions.set(entry.id, session);
     }
@@ -469,6 +479,16 @@ function scheduleNow(): PriceSchedule {
           style: { color: MUTED },
         }),
         runButton(entry, session),
+        /* Stale over the card rather than instead of it — § D1011, the Everyday screen's rule. */
+        ...(session.outcome !== undefined && verdictIsStale(session.verdictState, session.state)
+          ? [
+              el(doc, 'p', {
+                className: 'fixit-verdict-stale',
+                text: FIXIT_SCREEN_COPY.verdictStale,
+                style: { color: BAD, margin: '0.5rem 0' },
+              }),
+            ]
+          : []),
         ...(session.outcome === undefined ? [] : [outcomeCard(session.outcome)]),
       ],
     });
@@ -831,28 +851,80 @@ function scheduleNow(): PriceSchedule {
       }
       ask = `${entry.id}:press`;
       runFailure = undefined;
-      const plan = fixitRunPlanOf(entry, session.state, host.resources);
-      // The spend is bound here rather than read in the callback: the outcome is classified
-      // against the state the press was made in, not against one the player edited meanwhile.
-      const spend = spendOf(entry, session.state, scheduleNow());
+      // The order and the spend are bound here rather than read in the callback: the outcome is
+      // classified against the order the press was made in, not against one the player edited
+      // meanwhile — and an edit made meanwhile is drawn as stale the moment the verdict lands.
+      const pressed = session.state;
+      const schedule = scheduleNow();
+      const plan = fixitRunPlanOf(entry, pressed, host.resources);
+      const spend = spendOf(entry, pressed, schedule);
       runner.start({
         runs: [
           { config: plan.asBuilt, ...FIXIT_RUN_SWITCHES },
           { config: plan.asRepaired, ...FIXIT_RUN_SWITCHES },
         ],
         onDone: ([before, after]) => {
-          ask = undefined;
-          if (before === undefined || after === undefined) return;
+          if (before === undefined || after === undefined) {
+            ask = undefined;
+            return;
+          }
           session.asBuilt = before;
           // GitHub issue #350: the claim the basis line will make, checked on the legs first.
-          assertPairMatchesRepairs(entry, session.state, before, after);
-          const outcome = classifyOutcome(entry, measuredOf(entry, before, after), spend);
-          session.outcome = outcome;
-          // The badge follows the latest run, in both directions — `fixit/engine.ts#fixedBadgeAfter`
-          // holds the argument (docs/20 defect 16: FIXED beside a 0 % outcome card is two verdicts
-          // about one case on one screen).
-          session.fixed = fixedBadgeAfter(outcome);
-          render();
+          assertPairMatchesRepairs(entry, pressed, before, after);
+          const measurement = measuredOf(entry, before, after);
+          const land = (witnessRun: boolean): void => {
+            ask = undefined;
+            const outcome = classifyOutcome(
+              entry,
+              measurement,
+              spend,
+              fixitVerdictContextOf({
+                entry,
+                state: pressed,
+                inputs: editorInputsOf(entry, pressed, host.resources, schedule),
+                schedule,
+                witnessRun,
+              }),
+            );
+            session.outcome = outcome;
+            session.verdictState = pressed;
+            // The badge follows the latest run, in both directions — `fixit/engine.ts#fixedBadgeAfter`
+            // holds the argument (docs/20 defect 16: FIXED beside a 0 % outcome card is two verdicts
+            // about one case on one screen).
+            session.fixed = fixedBadgeAfter(outcome);
+            render();
+          };
+          /*
+           * The authored result only over the diagnosed repair's own run, leg for leg, and that run
+           * asked for only after both bars have cleared — § D1011, the Everyday screen's rule and its
+           * reasons, which are not restated here.
+           */
+          if (classifyOutcome(entry, measurement, spend).kind !== 'fixed') {
+            land(false);
+            return;
+          }
+          if (sameOrder(pressed, witnessStateOf(entry))) session.witness ??= after;
+          const cached = session.witness;
+          if (cached !== undefined) {
+            land(sameLegs(after, cached));
+            return;
+          }
+          runner.start({
+            runs: [
+              { config: fixitRunPlanOf(entry, witnessStateOf(entry), host.resources).asRepaired, ...FIXIT_RUN_SWITCHES },
+            ],
+            onDone: ([witness]) => {
+              if (witness === undefined) {
+                land(false);
+                return;
+              }
+              session.witness = witness;
+              land(sameLegs(after, witness));
+            },
+            onFailed: () => {
+              land(false);
+            },
+          });
         },
         onFailed: (message) => {
           ask = undefined;

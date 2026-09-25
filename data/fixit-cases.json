@@ -3147,7 +3147,7 @@
           "id": "borrow-a-low-car",
           "role": "cheap-fix",
           "name": "Lend a low-zone car to the upper zone",
-          "effect": "One low car re-ranges to the upper zone for the duration. The 100.0 % low-zone figure is the thing this spends.",
+          "effect": "One low car re-ranges to the upper zone for the duration. The 100.0 % low-zone figure is what it puts at risk, and on this morning it held.",
           "patch": {
             "building": {
               "banks": [

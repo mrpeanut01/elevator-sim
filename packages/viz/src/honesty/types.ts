@@ -125,6 +125,15 @@ export const HONESTY_PROPERTIES = [
   'internal-notation',
   /** `TEST_MATRIX.md` T1 / § D359 — two surfaces, one state, and one figure that means one thing. */
   'surfaces-disagree',
+  /**
+   * [§ D1011](../../../../DECISIONS.md) — no string credits the player with an act the run did not
+   * carry. The eleventh, and the first about **cause** rather than about a figure's licence: every
+   * one of the ten above is a predicate over a string's form or over declared figure pairs, and a
+   * sentence such as *"The clause bought the morning back"* has no numeric or lexical signature, so
+   * the fix-it verdict printed the diagnosis's mechanism over five runs it was not true of and the
+   * corpus could not see it.
+   */
+  'unbacked-attribution',
 ] as const;
 
 export type HonestyProperty = (typeof HONESTY_PROPERTIES)[number];
@@ -371,6 +380,30 @@ export interface RenderedText {
    * this is the only field on this interface that is about **two** surfaces at once.
    */
   readonly agreement?: AgreementReading | undefined;
+  /**
+   * That this string credits somebody with an act, and what the run it describes carried. See
+   * {@link TextAttribution}. `undefined` on a string that credits nobody with anything — and on a
+   * string that does credit the player but whose surface never declared it, which is the textual
+   * half of `unbacked-attribution`'s business.
+   */
+  readonly attribution?: TextAttribution | undefined;
+}
+
+/**
+ * **What a string credits, and what the run behind it carried** — [§ D1011](../../../../DECISIONS.md).
+ *
+ * Both lists are ids of **acts**, and the surface that drew the string is the only party that knows
+ * either: a fix-it verdict credits `diagnosed-repair` when it prints the diagnosis's words and
+ * `order` when it describes the player's own order, and the run carried `diagnosed-repair` only when
+ * its legs are the diagnosed repair's; a day report's press beat credits the press it names, and the
+ * run carried the presses the day's own record holds. A credited act the run did not carry is the
+ * violation, whatever the words say — which is the half a phrase list can never reach.
+ */
+export interface TextAttribution {
+  /** The acts this string credits, by id. */
+  readonly credits: readonly string[];
+  /** The acts the run this string describes actually carried, by the same ids. */
+  readonly carried: readonly string[];
 }
 
 /* -------------------------------------------------------------------------- *
