@@ -64,6 +64,7 @@ import { observationsAt } from '../live/observations.js';
 import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 
+import { contractDayState } from './contractDay.test-helper.js';
 import { CONTRACTS, contractById } from './contracts.js';
 import { runHorizonOf, wholeDayFor, wholeDayRun } from './dayLength.js';
 import { goalsForDay, readGoals } from './goals.js';
@@ -301,16 +302,12 @@ describe.runIf(process.env['PRESS_LADDER_VERIFY'] === '1')('a candidate pin, on 
         readonly prefix: string;
         readonly standing: number;
       } => {
-        const base = baseState();
-        const state = {
-          ...base,
-          buildingId: contract.buildingId,
-          dispatcherId: 'collective',
-          ...fields,
+        /* The pair, built together — issue #584's helper, so the rung reaches the run. */
+        const state = contractDayState(contractId, {
           seed: BigInt(pin.seed),
-          campaignEventId: 'ordinary' as const,
-          week: openWeek(contractId),
-        };
+          dispatcherId: 'collective',
+          over: fields,
+        });
         const plan = shiftRunConfigOf(resources, state);
         const { recording } = recordRun(
           { ...plan.config, interventions },
